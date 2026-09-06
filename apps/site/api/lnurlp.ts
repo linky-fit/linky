@@ -1,7 +1,9 @@
+// Relative source import: Vercel compiles traced .ts files to .js, but the package
+// exports map still points at .ts, so the package specifier fails at runtime.
 import {
   isLightningAddress,
   getLightningAddressRequestUrl,
-} from "@linky/linkshu/lightning-address";
+} from "../../../packages/linkshu/src/lnurl/lightningAddress.js";
 import {
   getFirstQueryValue,
   parseJsonObject,
