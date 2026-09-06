@@ -167,14 +167,7 @@ const UnauthenticatedAppShell = () => {
   );
 };
 
-interface AppShellProps {
-  onCommit?: () => void;
-}
-
-const AppShell = ({ onCommit }: AppShellProps) => {
-  React.useEffect(() => {
-    onCommit?.();
-  }, [onCommit]);
+const AppShell = () => {
   const { currentNsec, isResolved, setCurrentNsec } = useCurrentNsec();
   usePersistentInspectorLogStartup();
 

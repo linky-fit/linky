@@ -54,8 +54,11 @@
     <script>
       (() => {
         const recoveryKey = "linky.boot.shell_recovery_at.v1";
+        const currentDiagnosticsKey = "linky.boot.diagnostics.current.v1";
+        const previousDiagnosticsKey = "linky.boot.diagnostics.previous.v1";
         const defaultWatchdogMs = 18_000;
         const retryCooldownMs = 60_000;
+        const shellStartedAt = new Date().toISOString();
         const configuredWatchdogMs = Number(
           Reflect.get(window, "__linkyBootWatchdogMs"),
         );
@@ -82,6 +85,72 @@
           } catch {
             return false;
           }
+        };
+
+        const readDiagnosticAttempt = (key) => {
+          try {
+            const stored = sessionStorage.getItem(key);
+            return stored === null ? null : JSON.parse(stored);
+          } catch {
+            return null;
+          }
+        };
+
+        const downloadBootDiagnostics = () => {
+          const report = {
+            collectedAt: new Date().toISOString(),
+            currentAttempt: readDiagnosticAttempt(currentDiagnosticsKey),
+            environment: {
+              displayModeStandalone:
+                typeof matchMedia === "function" &&
+                matchMedia("(display-mode: standalone)").matches,
+              documentVisibility: document.visibilityState,
+              features: {
+                broadcastChannel: typeof BroadcastChannel !== "undefined",
+                cacheStorage: "caches" in window,
+                indexedDb: "indexedDB" in window,
+                locks: Boolean(navigator.locks),
+                opfs: typeof navigator.storage?.getDirectory === "function",
+                serviceWorker: "serviceWorker" in navigator,
+                worker: typeof Worker !== "undefined",
+              },
+              language: navigator.language,
+              online:
+                typeof navigator.onLine === "boolean" ? navigator.onLine : null,
+              page: {
+                origin: location.origin,
+                pathname: location.pathname,
+              },
+              screen: {
+                devicePixelRatio,
+                height: screen.height,
+                viewportHeight: innerHeight,
+                viewportWidth: innerWidth,
+                width: screen.width,
+              },
+              secureContext:
+                typeof isSecureContext === "boolean" ? isSecureContext : null,
+              userAgent: navigator.userAgent,
+            },
+            previousAttempt: readDiagnosticAttempt(previousDiagnosticsKey),
+            shell: {
+              startedAt: shellStartedAt,
+              watchdogMs,
+            },
+          };
+          const blob = new Blob([JSON.stringify(report, null, 2)], {
+            type: "application/json;charset=utf-8",
+          });
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = `linky-boot-diagnostics-${new Date()
+            .toISOString()
+            .replace(/[:.]/g, "-")}.json`;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
         };
 
         const clearAppCaches = async () => {
@@ -146,8 +215,17 @@
           description.style.cssText =
             "font-size:14px;line-height:1.5;opacity:.85;margin:0";
           description.textContent = isCzech
-            ? "Načtení trvá příliš dlouho. Obnovené klíče zůstaly uložené."
-            : "Loading is taking too long. Your restored keys remain saved.";
+            ? "Načtení trvá příliš dlouho. Obnovené klíče zůstaly uložené. Před dalším pokusem si můžete stáhnout diagnostiku."
+            : "Loading is taking too long. Your restored keys remain saved. You can download diagnostics before trying again.";
+
+          const download = document.createElement("button");
+          download.type = "button";
+          download.style.cssText =
+            "border:0;border-radius:12px;padding:12px 18px;background:#1e293b;color:#e2e8f0;font:inherit;font-weight:700;cursor:pointer";
+          download.textContent = isCzech
+            ? "Stáhnout diagnostiku"
+            : "Download diagnostics";
+          download.addEventListener("click", downloadBootDiagnostics);
 
           const retry = document.createElement("button");
           retry.type = "button";
@@ -161,7 +239,7 @@
             void recoverAndReload();
           });
 
-          content.append(title, description, retry);
+          content.append(title, description, download, retry);
           panel.append(content);
           root.replaceChildren(panel);
         };
@@ -191,6 +269,14 @@
         });
         window.addEventListener("linky-boot-decision-resolved", () => {
           if (!appMounted) armWatchdog();
+        });
+
+        window.addEventListener("linky-boot-failed", () => {
+          window.clearTimeout(watchdog);
+        });
+
+        window.addEventListener("linky-clear-cache-and-reload", () => {
+          void recoverAndReload();
         });
 
         window.addEventListener(

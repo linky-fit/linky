@@ -1,8 +1,14 @@
 import React, { type ReactNode } from "react";
 import { getInitialLang, translations } from "./i18n";
+import {
+  downloadBootDiagnostics,
+  formatBootError,
+  recordBootError,
+} from "./utils/bootDiagnostics";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  onError?: () => void;
 }
 
 interface ErrorBoundaryState {
@@ -24,19 +30,37 @@ export class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    recordBootError(error, "react-error-boundary", info.componentStack);
+    this.props.onError?.();
     console.error("ErrorBoundary caught:", error, info);
   }
 
   render() {
     if (this.state.hasError) {
+      const text = translations[getInitialLang()];
       return (
         <div className="error-boundary">
-          <h2>{translations[getInitialLang()].appCrashed}</h2>
+          <h2>{text.appCrashed}</h2>
           <pre className="error-boundary-details">
-            {this.state.error?.message}
-            {"\n\n"}
-            {this.state.error?.stack}
+            {formatBootError(this.state.error)}
           </pre>
+          <div className="error-boundary-actions">
+            <button
+              type="button"
+              onClick={() => void downloadBootDiagnostics()}
+            >
+              {text.downloadNostrInspectorLogs}
+            </button>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(new Event("linky-clear-cache-and-reload"))
+              }
+            >
+              {text.reloadApp}
+            </button>
+          </div>
         </div>
       );
     }

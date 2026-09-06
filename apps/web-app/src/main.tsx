@@ -1,10 +1,15 @@
 import { Buffer } from "buffer";
-import { StrictMode } from "react";
+import { StrictMode, Suspense } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
+import {
+  BootCommitSignal,
+  BootLoadingFallback,
+} from "./components/BootCommitSignal";
 import "./index.css";
 import {
+  enableInMemoryEvoluStorageForSession,
   type OpfsProbeIssue,
   prepareEvoluWebStorage,
   shouldUseInMemoryEvoluStorage,
@@ -17,6 +22,13 @@ import type {
 } from "./types/browser";
 import type { JsonValue } from "./types/json";
 import { decodeBase64Url, encodeBase64Url } from "./utils/base64";
+import {
+  downloadBootDiagnostics,
+  formatBootError,
+  getBootDiagnosticSnapshot,
+  recordBootError,
+  recordBootStage,
+} from "./utils/bootDiagnostics";
 import { appendPushDebugLog } from "./utils/pushDebugLog";
 import {
   handlePwaUpdateAvailable,
@@ -251,14 +263,6 @@ if ("serviceWorker" in navigator) {
     });
 }
 
-const escapeHtml = (value: string) =>
-  value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
 const getErrorName = (value: unknown): string | null => {
   if (value instanceof DOMException) {
     return value.name;
@@ -486,42 +490,131 @@ const applyEvoluWebCompatPolyfills = () => {
   }
 };
 
-const renderBootError = (error: unknown) => {
+const getBootErrorText = () => {
+  const language = navigator.language.toLowerCase();
+  if (language.startsWith("cs")) {
+    return {
+      details: "Podrobnosti",
+      download: "Stáhnout diagnostiku",
+      reload: "Vyčistit cache a načíst znovu",
+      stage: "Aplikace se zastavila ve fázi",
+      temporary: "Pokračovat v dočasné relaci",
+      temporaryDescription:
+        "Lokální úložiště neodpovídá. Dočasná relace načte synchronizovaná data, ale nové změny se na tomto zařízení neuloží.",
+      title: "Chyba při spuštění",
+    };
+  }
+  if (language.startsWith("de")) {
+    return {
+      details: "Details",
+      download: "Diagnose herunterladen",
+      reload: "Cache leeren und neu laden",
+      stage: "Die App wurde in dieser Phase angehalten",
+      temporary: "Mit temporärer Sitzung fortfahren",
+      temporaryDescription:
+        "Der lokale Speicher antwortet nicht. Synchronisierte Daten werden geladen, neue Änderungen aber nicht auf diesem Gerät gespeichert.",
+      title: "Startfehler",
+    };
+  }
+  return {
+    details: "Details",
+    download: "Download diagnostics",
+    reload: "Clear cache and reload",
+    stage: "The app stopped at stage",
+    temporary: "Continue with temporary session",
+    temporaryDescription:
+      "Local storage is not responding. Synced data will load, but new changes will not be saved on this device.",
+    title: "Boot error",
+  };
+};
+
+const signalBootFailure = (): void => {
+  window.dispatchEvent(new Event("linky-boot-failed"));
+};
+
+const renderBootError = (error: unknown, source: string) => {
+  recordBootError(error, source);
+  signalBootFailure();
   const root = document.getElementById("root");
   if (!root) return;
 
-  const message =
-    error instanceof Error
-      ? `${error.message}\n\n${error.stack ?? ""}`
-      : typeof error === "string"
-        ? error
-        : JSON.stringify(error, null, 2);
+  const text = getBootErrorText();
+  const snapshot = getBootDiagnosticSnapshot();
+  const panel = document.createElement("div");
+  panel.style.cssText =
+    "min-height:100vh;overflow:auto;padding:32px 24px;background:#020617;color:#f9fbfc;font-family:ui-monospace,SFMono-Regular,Menlo,monospace";
 
-  const diagnostics = {
-    href: globalThis.location?.href ?? null,
-    userAgent: globalThis.navigator?.userAgent ?? null,
-    isSecureContext:
-      typeof globalThis.isSecureContext === "boolean"
-        ? globalThis.isSecureContext
-        : null,
-    hasWorker: typeof globalThis.Worker !== "undefined",
-    hasBroadcastChannel: typeof globalThis.BroadcastChannel !== "undefined",
-    hasLocks: Boolean(globalThis.navigator?.locks),
-    hasIndexedDB: typeof globalThis.indexedDB !== "undefined",
-    hasStorage: typeof globalThis.navigator?.storage !== "undefined",
-  };
+  const title = document.createElement("h1");
+  title.style.cssText = "font:700 24px system-ui;margin:0 0 16px";
+  title.textContent = text.title;
 
-  root.innerHTML = `
-    <div style="padding: 40px; color: #ff6b6b; font-family: monospace;">
-      <h2>Boot error</h2>
-      <pre style="overflow: auto; background: #1a1a1a; padding: 10px; white-space: pre-wrap;">${escapeHtml(
-        message,
-      )}</pre>
-      <pre style="overflow: auto; background: #111827; padding: 10px; white-space: pre-wrap; margin-top: 12px;">${escapeHtml(
-        JSON.stringify(diagnostics, null, 2),
-      )}</pre>
-    </div>
-  `;
+  const stage = document.createElement("p");
+  stage.style.cssText = "font:600 15px system-ui;margin:0 0 14px";
+  stage.textContent = `${text.stage}: ${snapshot.currentStage}`;
+
+  const message = document.createElement("pre");
+  message.style.cssText =
+    "overflow:auto;background:#1a1a1a;color:#ff7b7b;padding:12px;white-space:pre-wrap;border-radius:8px";
+  message.textContent = formatBootError(error);
+
+  const summary = document.createElement("details");
+  summary.style.cssText = "margin-top:12px";
+  const summaryTitle = document.createElement("summary");
+  summaryTitle.style.cssText = "cursor:pointer;font:600 14px system-ui";
+  summaryTitle.textContent = text.details;
+  const summaryBody = document.createElement("pre");
+  summaryBody.style.cssText =
+    "overflow:auto;background:#111827;padding:12px;white-space:pre-wrap;border-radius:8px";
+  summaryBody.textContent = JSON.stringify(snapshot, null, 2);
+  summary.append(summaryTitle, summaryBody);
+  panel.append(title, stage, message, summary);
+
+  const actions = document.createElement("div");
+  actions.style.cssText =
+    "display:flex;flex-wrap:wrap;gap:10px;margin-top:16px";
+
+  if (snapshot.currentStage === "await-initial-local-data") {
+    const temporaryDescription = document.createElement("p");
+    temporaryDescription.style.cssText =
+      "font:14px/1.5 system-ui;color:#cbd5e1;margin:16px 0 0";
+    temporaryDescription.textContent = text.temporaryDescription;
+    panel.append(temporaryDescription);
+
+    const temporary = document.createElement("button");
+    temporary.type = "button";
+    temporary.style.cssText =
+      "border:0;border-radius:12px;padding:12px 16px;background:#14b8a6;color:#020617;font:700 14px system-ui;cursor:pointer";
+    temporary.textContent = text.temporary;
+    temporary.addEventListener("click", () => {
+      temporary.disabled = true;
+      enableInMemoryEvoluStorageForSession();
+      window.location.reload();
+    });
+    actions.append(temporary);
+  }
+
+  const download = document.createElement("button");
+  download.type = "button";
+  download.style.cssText =
+    "border:0;border-radius:12px;padding:12px 16px;background:#14b8a6;color:#020617;font:700 14px system-ui;cursor:pointer";
+  download.textContent = text.download;
+  download.addEventListener("click", () => {
+    void downloadBootDiagnostics();
+  });
+
+  const reload = document.createElement("button");
+  reload.type = "button";
+  reload.style.cssText =
+    "border:0;border-radius:12px;padding:12px 16px;background:#1e293b;color:#e2e8f0;font:700 14px system-ui;cursor:pointer";
+  reload.textContent = text.reload;
+  reload.addEventListener("click", () => {
+    reload.disabled = true;
+    window.dispatchEvent(new Event("linky-clear-cache-and-reload"));
+  });
+
+  actions.append(download, reload);
+  panel.append(actions);
+  root.replaceChildren(panel);
 };
 
 const TEMPORARY_SESSION_PROMPT_ID = "linky-temporary-session-prompt";
@@ -594,6 +687,11 @@ const removeTemporarySessionPrompt = () => {
 
 const bootstrap = async () => {
   let stage = "init";
+  const setStage = (nextStage: string): void => {
+    stage = nextStage;
+    recordBootStage(nextStage);
+  };
+  setStage(stage);
   let appCommitRecorded = false;
   // Surface a stuck-loading state with the last completed boot stage so we
   // can tell whether bootstrap froze in dynamic imports, polyfills, or the
@@ -602,18 +700,21 @@ const bootstrap = async () => {
   let stuckTimer = 0;
   const armStuckTimer = () => {
     stuckTimer = window.setTimeout(() => {
-      renderBootError(new Error(`Boot stuck after 15s at stage: ${stage}`));
+      renderBootError(
+        new Error(`Boot stuck after 15s at stage: ${stage}`),
+        "boot-watchdog",
+      );
     }, 15_000);
   };
   armStuckTimer();
   try {
     console.log("[linky][boot] start");
-    stage = "polyfills";
+    setStage("polyfills");
     applyEvoluWebCompatPolyfills();
     installIosViewportHeal();
     console.log("[linky][boot] polyfills done");
 
-    stage = "storage-compat";
+    setStage("storage-compat");
     let storagePromptShown = false;
     await prepareEvoluWebStorage({
       requestInMemoryConsent: (issue) => {
@@ -635,34 +736,51 @@ const bootstrap = async () => {
       inMemory: shouldUseInMemoryEvoluStorage(),
     });
 
-    stage = "import-app";
+    setStage("import-app");
     const [{ default: App }, { ErrorBoundary }] = await Promise.all([
       import("./App.tsx"),
       import("./ErrorBoundary.tsx"),
     ]);
     console.log("[linky][boot] app modules loaded");
 
-    stage = "import-evolu";
+    setStage("import-evolu");
     const { evolu, EvoluProvider } = await import("./evolu.ts");
     console.log("[linky][boot] evolu loaded");
 
-    stage = "await-render-commit";
+    setStage("await-render-commit");
     const root = createRoot(document.getElementById("root")!);
     const recordAppCommit = () => {
       if (appCommitRecorded) return;
       appCommitRecorded = true;
-      stage = "mounted";
+      setStage("mounted");
       window.clearTimeout(stuckTimer);
       appHasMounted = true;
       window.dispatchEvent(new Event("linky-app-mounted"));
       clearDynamicImportFetchRetry();
     };
+    const recordInitialDataWait = () => {
+      if (stage !== "await-initial-local-data") {
+        setStage("await-initial-local-data");
+      }
+    };
     flushSync(() => {
       root.render(
         <StrictMode>
           <EvoluProvider value={evolu}>
-            <ErrorBoundary>
-              <App onCommit={recordAppCommit} />
+            <ErrorBoundary
+              onError={() => {
+                window.clearTimeout(stuckTimer);
+                signalBootFailure();
+              }}
+            >
+              <Suspense
+                fallback={
+                  <BootLoadingFallback onSuspend={recordInitialDataWait} />
+                }
+              >
+                <BootCommitSignal onCommit={recordAppCommit} />
+                <App />
+              </Suspense>
             </ErrorBoundary>
           </EvoluProvider>
         </StrictMode>,
@@ -679,7 +797,7 @@ const bootstrap = async () => {
             message: `[stage: ${stage}] ${error.message}`,
           })
         : new Error(`[stage: ${stage}] ${String(error)}`);
-    renderBootError(wrapped);
+    renderBootError(wrapped, "bootstrap-catch");
   }
 };
 
@@ -696,7 +814,7 @@ window.addEventListener("unhandledrejection", (event) => {
     console.error("[linky] post-mount unhandled rejection", event.reason);
     return;
   }
-  renderBootError(event.reason);
+  renderBootError(event.reason, "unhandled-rejection");
 });
 
 window.addEventListener("error", (event) => {
@@ -713,7 +831,7 @@ window.addEventListener("error", (event) => {
     console.error("[linky] post-mount window error", error);
     return;
   }
-  renderBootError(error);
+  renderBootError(error, "window-error");
 });
 
 void bootstrap();

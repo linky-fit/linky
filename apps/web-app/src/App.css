@@ -6788,6 +6788,8 @@ button.cashu-token-pill {
 }
 
 .error-boundary {
+  height: 100%;
+  overflow: auto;
   padding: 40px;
   color: #ff6b6b;
   font-family: monospace;
@@ -6796,6 +6798,13 @@ button.cashu-token-pill {
   overflow: auto;
   background: #1a1a1a;
   padding: 10px;
+  white-space: pre-wrap;
+}
+.error-boundary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
 .hidden-input {
   display: none;

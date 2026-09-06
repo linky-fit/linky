@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { generateSecretKey, nip19 } from "nostr-tools";
@@ -46,6 +47,24 @@ test("recovers once when the main bundle cannot start", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Clear cache and reload" }),
   ).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download diagnostics" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(
+    /^linky-boot-diagnostics-.*\.json$/,
+  );
+  const path = await download.path();
+  expect(path).not.toBeNull();
+  if (path === null) return;
+  const report: unknown = JSON.parse(await readFile(path, "utf8"));
+  expect(report).toMatchObject({
+    environment: {
+      page: { pathname: "/" },
+    },
+    shell: {
+      watchdogMs: 50,
+    },
+  });
 });
 
 test("does not reload forever when session storage is unavailable", async ({

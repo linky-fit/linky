@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  enableInMemoryEvoluStorageForSession,
   prepareEvoluWebStorage,
   shouldUseInMemoryEvoluStorage,
 } from "./evoluWebStorage";
@@ -14,6 +15,17 @@ afterEach(() => {
 });
 
 describe("prepareEvoluWebStorage", () => {
+  it("can opt into memory storage after a later database stall", async () => {
+    enableInMemoryEvoluStorageForSession();
+
+    expect(shouldUseInMemoryEvoluStorage()).toBe(true);
+    expect(sessionStorage.getItem("linky.in_memory_session.v1")).toBe("1");
+
+    const requestInMemoryConsent = vi.fn(() => Promise.resolve());
+    await prepareEvoluWebStorage({ requestInMemoryConsent });
+    expect(requestInMemoryConsent).not.toHaveBeenCalled();
+  });
+
   it("keeps persistent storage without prompting when OPFS is available", async () => {
     vi.stubGlobal("navigator", {
       storage: {

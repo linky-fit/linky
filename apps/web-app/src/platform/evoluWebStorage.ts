@@ -44,6 +44,11 @@ const rememberInMemorySession = (): void => {
   }
 };
 
+export const enableInMemoryEvoluStorageForSession = (): void => {
+  useInMemoryStorage = true;
+  rememberInMemorySession();
+};
+
 export const prepareEvoluWebStorage = async (
   options: PrepareEvoluWebStorageOptions,
 ): Promise<void> => {
@@ -80,8 +85,7 @@ export const prepareEvoluWebStorage = async (
   ]);
   if (!consented) return;
 
-  useInMemoryStorage = true;
-  rememberInMemorySession();
+  enableInMemoryEvoluStorageForSession();
 };
 
 export const shouldUseInMemoryEvoluStorage = (): boolean => useInMemoryStorage;
