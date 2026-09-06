@@ -14,6 +14,8 @@ import {
   writeAndroidStoredSecret,
 } from "./nativeBridge";
 import { getPlatformTarget, isNativePlatform } from "./runtime";
+import { isRecord } from "../utils/unknown";
+import { asNonEmptyString } from "../utils/validation";
 
 interface IosSecretStoragePlugin {
   get(options: { key: string }): Promise<{ value?: string | null }>;
@@ -23,10 +25,6 @@ interface IosSecretStoragePlugin {
 
 const LinkySecretStorage =
   registerPlugin<IosSecretStoragePlugin>("LinkySecretStorage");
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null;
-};
 
 const isNativeSecretStorageBridge = (
   value: unknown,
@@ -47,11 +45,6 @@ const isLinkyNativeBridge = (value: unknown): value is LinkyNativeBridge => {
   );
 };
 
-const normalizeStoredValue = (value: unknown): string | null => {
-  const normalized = String(value ?? "").trim();
-  return normalized || null;
-};
-
 const supportsIosNativeSecretStorage = (): boolean => {
   return (
     getPlatformTarget() === "ios" &&
@@ -70,7 +63,7 @@ const getNativeSecretStorage = () => {
 const readNativeSecretValue = async (key: string): Promise<string | null> => {
   if (supportsIosNativeSecretStorage()) {
     const result = await LinkySecretStorage.get({ key });
-    return normalizeStoredValue(result.value);
+    return asNonEmptyString(result.value);
   }
 
   const secretStorage = getNativeSecretStorage();
@@ -78,13 +71,13 @@ const readNativeSecretValue = async (key: string): Promise<string | null> => {
 
   const result = await secretStorage.get({ key });
   if (typeof result === "string") {
-    return normalizeStoredValue(result);
+    return asNonEmptyString(result);
   }
   if (!isRecord(result)) {
     return null;
   }
 
-  return normalizeStoredValue(Reflect.get(result, "value"));
+  return asNonEmptyString(Reflect.get(result, "value"));
 };
 
 export const readStoredSecret = async (key: string): Promise<string | null> => {
@@ -104,14 +97,14 @@ export const readStoredSecret = async (key: string): Promise<string | null> => {
     }
   }
 
-  return normalizeStoredValue(safeLocalStorageGet(key));
+  return asNonEmptyString(safeLocalStorageGet(key));
 };
 
 export const writeStoredSecret = async (
   key: string,
   value: string,
 ): Promise<void> => {
-  const normalized = normalizeStoredValue(value);
+  const normalized = asNonEmptyString(value);
   if (!normalized) {
     await removeStoredSecret(key);
     return;

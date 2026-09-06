@@ -5,7 +5,7 @@ import {
 } from "./npubCashUsernameClaim";
 import { asNonEmptyString, asRecord } from "./validation";
 
-export interface NpubCashProfileInfo {
+interface NpubCashProfileInfo {
   mintUrl: string | null;
   ownedLightningAddresses: string[];
 }

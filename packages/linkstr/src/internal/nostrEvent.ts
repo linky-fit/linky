@@ -84,3 +84,21 @@ export const tagValues = (tags: NostrTags, name: string): Array<string> =>
   tags.flatMap((tag) =>
     tag[0] === name && tag[1] !== undefined ? [tag[1]] : [],
   );
+
+/** First `name` tag whose value is non-blank, trimmed. */
+export const firstTrimmedTagValue = (
+  tags: NostrTags,
+  name: string,
+): string | null =>
+  tagValues(tags, name)
+    .map((value) => value.trim())
+    .find((value) => value.length > 0) ?? null;
+
+/** The value of the `name` tag, only when exactly one such tag exists. */
+export const singleTagValue = (
+  tags: NostrTags,
+  name: string,
+): string | null => {
+  const matching = tags.filter((tag) => tag[0] === name);
+  return matching.length === 1 ? (matching[0]?.[1] ?? null) : null;
+};

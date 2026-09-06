@@ -1,7 +1,20 @@
 import { Either, Option, Schema } from "effect";
-import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
+import {
+  ClientId,
+  isClientId,
+  isPubkey,
+  isRumorId,
+  isUnixSeconds,
+  Pubkey,
+  UnixSeconds,
+} from "../domain/primitives";
 import type { DropReason } from "../inbox/events";
-import { Rumor, rumorWithHash, tagValues } from "../internal/nostrEvent";
+import {
+  firstTrimmedTagValue,
+  Rumor,
+  rumorWithHash,
+  tagValues,
+} from "../internal/nostrEvent";
 import type { NostrTags } from "../internal/nostrEvent";
 import { BankOfferId, BankOfferStatus } from "./domain";
 import type { BankOfferDraft } from "./domain";
@@ -16,12 +29,8 @@ export const BANK_OFFER_VALUE = "bank_payment_offer";
 
 const isBankOfferId = Schema.is(BankOfferId);
 const isBankOfferStatus = Schema.is(BankOfferStatus);
-const isClientId = Schema.is(ClientId);
 const isNonEmptyTrimmedString = Schema.is(Schema.NonEmptyTrimmedString);
 const isPositiveInt = Schema.is(Schema.Int.pipe(Schema.positive()));
-const isPubkey = Schema.is(Pubkey);
-const isRumorId = Schema.is(RumorId);
-const isUnixSeconds = Schema.is(UnixSeconds);
 const decodeJsonRecord = Schema.decodeUnknownOption(
   Schema.parseJson(
     Schema.Record({ key: Schema.String, value: Schema.Unknown }),
@@ -113,15 +122,6 @@ export const encodeBankOfferRumor = (
     ],
     content,
   });
-};
-
-const firstTrimmedTagValue = (tags: NostrTags, name: string): string | null => {
-  for (const tag of tags) {
-    if (tag[0] !== name) continue;
-    const value = tag[1]?.trim();
-    if (value) return value;
-  }
-  return null;
 };
 
 const trimmedString = (value: unknown): string | null => {

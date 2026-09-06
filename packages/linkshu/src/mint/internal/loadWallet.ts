@@ -6,13 +6,13 @@ import type {
   MintKeys,
   MintKeyset,
 } from "@cashu/cashu-ts";
+import { errorMessage } from "../../internal/errorMessage";
 
 /**
- * Port of the web app's `createLoadedCashuWallet` (`utils/cashuWallet.ts`)
- * with the cashu-ts classes injected as parameters. The narrow structural
- * types below describe exactly what the loader consumes; the real cashu-ts
- * `Mint`/`Wallet` classes satisfy them, and tests can substitute fakes
- * without casting.
+ * Wallet loading with the cashu-ts classes injected as parameters. The narrow
+ * structural types below describe exactly what the loader consumes; the real
+ * cashu-ts `Mint`/`Wallet` classes satisfy them, and tests can substitute
+ * fakes without casting.
  */
 
 export interface CashuWalletOptions {
@@ -43,42 +43,6 @@ export interface LoadWalletArgs<
   unit?: string | null;
 }
 
-const isUnknownRecord = (value: unknown): value is Record<string, unknown> => {
-  return value !== null && typeof value === "object";
-};
-
-export const unknownErrorMessage = (
-  value: unknown,
-  fallback: string,
-): string => {
-  if (value === null || value === undefined) return fallback;
-
-  if (typeof value === "string") {
-    return value || fallback;
-  }
-
-  if (value instanceof Error) {
-    const message = String(value);
-    return message || fallback;
-  }
-
-  if (isUnknownRecord(value) && typeof value.message === "string") {
-    return value.message || fallback;
-  }
-
-  if (typeof value === "object") {
-    try {
-      const json = JSON.stringify(value);
-      if (json && json !== "{}") return json;
-    } catch {
-      // Fall back to String below for circular/non-serializable values.
-    }
-  }
-
-  const message = String(value);
-  return message || fallback;
-};
-
 const isHexString = (value: string): boolean => {
   return /^[0-9a-f]+$/i.test(value);
 };
@@ -87,18 +51,16 @@ const buildWalletOptions = (
   args: Pick<LoadWalletArgs<MintLike, WalletLike>, "bip39seed" | "unit">,
 ): CashuWalletOptions => {
   const options: CashuWalletOptions = {};
-  const unit = String(args.unit ?? "").trim();
+  const unit = args.unit?.trim();
   if (unit) options.unit = unit;
-  if (args.bip39seed instanceof Uint8Array) {
-    options.bip39seed = args.bip39seed;
-  }
+  if (args.bip39seed !== undefined) options.bip39seed = args.bip39seed;
   return options;
 };
 
 // Deliberately does not match "Mint keys for keyset … are unavailable" —
 // that is the fallback's own thrown error, and matching it would recurse.
 export const isKeysetVerificationError = (error: unknown): boolean => {
-  const message = unknownErrorMessage(error, "").toLowerCase();
+  const message = errorMessage(error, "").toLowerCase();
   return (
     message.includes("couldn't verify keyset id") ||
     message.includes("short keyset id v2") ||
@@ -113,11 +75,7 @@ export const pickPreferredMintKeyset = (
 ): MintKeyset | null => {
   const matches = keysets
     .filter((keyset) => {
-      return (
-        keyset.active &&
-        keyset.unit === unit &&
-        isHexString(String(keyset.id ?? ""))
-      );
+      return keyset.active && keyset.unit === unit && isHexString(keyset.id);
     })
     .sort((left, right) => {
       return (left.input_fee_ppk ?? 0) - (right.input_fee_ppk ?? 0);
@@ -148,7 +106,7 @@ const loadWalletFromFallbackMintData = async <
   // Every same-unit hex keyset, active AND inactive: inactive keysets still
   // decode old proofs, so their keys must be present in the cache too.
   const fallbackKeysets = keysetsResponse.keysets.filter((candidate) => {
-    return candidate.unit === unit && isHexString(String(candidate.id ?? ""));
+    return candidate.unit === unit && isHexString(candidate.id);
   });
 
   const keysById = new Map<string, MintKeys>();
@@ -171,7 +129,7 @@ const loadWalletFromFallbackMintData = async <
           console.warn(
             "[linkshu] fallback keyset keys unavailable, continuing",
             {
-              error: unknownErrorMessage(error, ""),
+              error: errorMessage(error, ""),
               keysetId: candidate.id,
               mintUrl: args.mintUrl,
               unit,
@@ -223,7 +181,7 @@ export const loadWallet = async <
     if (!isKeysetVerificationError(error)) throw error;
 
     console.warn("[linkshu] keyset verification failed, using fallback", {
-      error: unknownErrorMessage(error, ""),
+      error: errorMessage(error, ""),
       mintUrl: args.mintUrl,
       unit: options.unit ?? "sat",
     });

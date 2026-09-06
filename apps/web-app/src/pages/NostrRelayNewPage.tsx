@@ -19,7 +19,7 @@ export function NostrRelayNewPage(): React.ReactElement {
         spellCheck={false}
       />
 
-      <div className="panel-header" style={{ marginTop: 14 }}>
+      <div className="panel-header panel-header-layout">
         {canSaveNewRelay ? (
           <button onClick={saveNewRelay}>{t("saveChanges")}</button>
         ) : null}

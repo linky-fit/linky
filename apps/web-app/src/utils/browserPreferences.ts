@@ -16,9 +16,7 @@ const getPrimaryBrowserLanguage = (): string => {
     if (normalized) return normalized;
   }
 
-  return String(navigator.language ?? "")
-    .trim()
-    .toLowerCase();
+  return navigator.language.trim().toLowerCase();
 };
 
 export const getDefaultLang = (): Lang => {

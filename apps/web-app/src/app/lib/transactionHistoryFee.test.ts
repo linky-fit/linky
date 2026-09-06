@@ -1,16 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { buildCashuToken } from "../../testUtils/cashuToken";
 import { calculateTransactionHistoryFee } from "./transactionHistoryFee";
-
-const buildCashuAToken = (amount: number): string => {
-  const json = JSON.stringify({
-    token: [{ mint: "https://mint.example", proofs: [{ amount }] }],
-  });
-  const encoded = btoa(json)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/u, "");
-  return `cashuA${encoded}`;
-};
 
 describe("calculateTransactionHistoryFee", () => {
   it("derives cashu send fee from used tokens minus sent amount minus change", () => {
@@ -19,7 +9,7 @@ describe("calculateTransactionHistoryFee", () => {
         amount: 60,
         fallbackFee: null,
         gainedTokens: [],
-        usedTokens: [buildCashuAToken(61)],
+        usedTokens: [buildCashuToken({ amounts: [61] })],
       }),
     ).toBe(1);
   });
@@ -29,8 +19,8 @@ describe("calculateTransactionHistoryFee", () => {
       calculateTransactionHistoryFee({
         amount: 950,
         fallbackFee: null,
-        gainedTokens: [buildCashuAToken(37)],
-        usedTokens: [buildCashuAToken(1000)],
+        gainedTokens: [buildCashuToken({ amounts: [37] })],
+        usedTokens: [buildCashuToken({ amounts: [1000] })],
       }),
     ).toBe(13);
   });

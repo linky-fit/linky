@@ -1,10 +1,6 @@
 import { Effect, Schema } from "effect";
 import { MintRejected } from "../domain/errors";
-import {
-  CurrencyUnit,
-  KeysetId,
-  NonNegativeAmount,
-} from "../domain/primitives";
+import { KeysetId, NonNegativeAmount } from "../domain/primitives";
 import type { MintUrl, TokenRowId } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import {
@@ -43,9 +39,7 @@ import {
   RESTORE_GAP_LIMIT,
   scanKeyset,
 } from "./internal/scan";
-
-/** Linky wallets are sat-denominated today (see README). */
-const sat = CurrencyUnit.make("sat");
+import { sat } from "../internal/units";
 
 const isKeysetId = Schema.is(KeysetId);
 

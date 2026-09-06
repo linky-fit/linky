@@ -15,8 +15,7 @@ import {
 import { navigateTo } from "../../../hooks/useRouting";
 import {
   buildProfileGeneralStatus,
-  parseProfileExchangeStatusCurrencies,
-  parseProfileGeneralStatusText,
+  parseProfileGeneralStatus,
 } from "../../../nostrStatus";
 import {
   cacheProfileAvatarFromUrl,
@@ -33,6 +32,8 @@ import {
 } from "../../../utils/npubCashUsernameClaim";
 import { isHttpUrl } from "../../../utils/validation";
 import { applyLightningAddressToProfileMetadata } from "../../lib/profileMetadata";
+import { nowSeconds } from "../../../utils/time";
+import type { Translate } from "../../../i18n";
 
 interface UseProfileEditorParams {
   currentNpub: string | null;
@@ -53,7 +54,7 @@ interface UseProfileEditorParams {
   setMyProfilePicture: React.Dispatch<React.SetStateAction<string | null>>;
   setMyProfileStatus: React.Dispatch<React.SetStateAction<string | null>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 interface PersistProfileValuesArgs {
@@ -117,15 +118,17 @@ export const useProfileEditor = ({
     const initialName = bestName ?? effectiveProfileName ?? "";
     const initialLn = effectiveMyLightningAddress ?? "";
 
-    const metaPic = String(
-      myProfileMetadata?.picture ?? effectiveProfilePicture ?? "",
+    const metaPic = (
+      myProfileMetadata?.picture ??
+      effectiveProfilePicture ??
+      ""
     ).trim();
 
     const generatedAvatar = deriveGeneratedAvatar(currentNpub ?? initialName);
     const initialPicture = metaPic || generatedAvatar.pictureUrl;
     const customPicture =
       metaPic && metaPic !== generatedAvatar.pictureUrl ? metaPic : "";
-    const initialStatus = parseProfileGeneralStatusText(myProfileStatus) ?? "";
+    const initialStatus = parseProfileGeneralStatus(myProfileStatus).text ?? "";
 
     setProfileAvatarSelection(generatedAvatar.selection);
     setProfileCustomPictureUrl(customPicture);
@@ -187,7 +190,7 @@ export const useProfileEditor = ({
 
   const ownLightningAddressMatchesCurrentIdentity = React.useCallback(
     (candidate: OwnLightningAddressInputCandidate): boolean => {
-      const normalizedDefault = String(defaultLightningAddress ?? "")
+      const normalizedDefault = (defaultLightningAddress ?? "")
         .trim()
         .toLowerCase();
       if (
@@ -198,9 +201,7 @@ export const useProfileEditor = ({
       }
 
       for (const lightningAddress of ownedLightningAddresses) {
-        const normalizedOwned = String(lightningAddress ?? "")
-          .trim()
-          .toLowerCase();
+        const normalizedOwned = lightningAddress.trim().toLowerCase();
         if (normalizedOwned && candidate.lightningAddress === normalizedOwned) {
           return true;
         }
@@ -270,7 +271,7 @@ export const useProfileEditor = ({
         const trimmedPicture = picture.trim();
         const trimmedStatus = status.trim();
         const nextStatus = buildProfileGeneralStatus({
-          currencies: parseProfileExchangeStatusCurrencies(myProfileStatus),
+          currencies: parseProfileGeneralStatus(myProfileStatus).currencies,
           text: status,
         });
 
@@ -279,7 +280,7 @@ export const useProfileEditor = ({
           myProfileMetadata ?? loadCachedProfile(currentNpub)?.metadata ?? null;
         const keptNip05 =
           nextNip05 ??
-          (getDefaultNip05IdentifierFromAddress(prev?.nip05)
+          (getDefaultNip05IdentifierFromAddress(prev?.nip05 ?? "")
             ? undefined
             : prev?.nip05);
 
@@ -308,7 +309,7 @@ export const useProfileEditor = ({
         const profileExit = await publishProfile(nextMetadata);
         if (Exit.isFailure(profileExit)) throw new Error("publish failed");
 
-        const nowSec = Math.floor(Date.now() / 1000);
+        const nowSec = nowSeconds();
         saveCachedProfile(currentNpub, nextMetadata, nowSec);
         saveCachedStatus(currentNpub, nextStatus ?? "", nowSec);
         setMyProfileMetadata(nextMetadata);
@@ -405,16 +406,15 @@ export const useProfileEditor = ({
         if (Exit.isFailure(publishExit)) throw new Error("publish failed");
 
         const bestName = getBestNostrName(next.metadata);
-        const picture = String(
-          next.metadata.picture ?? effectiveProfilePicture ?? "",
+        const picture = (
+          next.metadata.picture ??
+          effectiveProfilePicture ??
+          ""
         ).trim();
-        const statusText = parseProfileGeneralStatusText(myProfileStatus) ?? "";
+        const statusText =
+          parseProfileGeneralStatus(myProfileStatus).text ?? "";
 
-        saveCachedProfile(
-          currentNpub,
-          next.metadata,
-          Math.floor(Date.now() / 1000),
-        );
+        saveCachedProfile(currentNpub, next.metadata, nowSeconds());
         setMyProfileMetadata(next.metadata);
         setMyProfileLnAddress(next.lightningAddress || null);
         setMyProfileName(bestName ?? effectiveProfileName);
@@ -505,7 +505,6 @@ export const useProfileEditor = ({
     setProfileEditLnAddress,
     setProfileEditName,
     setProfileEditStatus,
-    setProfileEditPicture,
     toggleProfileEditing,
   };
 };

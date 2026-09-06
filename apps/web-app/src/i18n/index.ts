@@ -6,6 +6,7 @@ import { en } from "./en";
 export const translations = { cs, de, en } as const;
 export type Lang = keyof typeof translations;
 export type I18nKey = keyof typeof translations.cs;
+export type Translate = (key: I18nKey) => string;
 
 const STORAGE_KEY = "linky.lang";
 

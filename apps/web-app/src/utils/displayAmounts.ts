@@ -1,6 +1,8 @@
+import type { FiatRates } from "@linky/linkshu";
+export type { FiatRates } from "@linky/linkshu";
 import { formatInteger, normalizeLocale } from "./formatting";
 
-export type FiatDisplayCurrency = "czk" | "eur" | "chf" | "usd";
+type FiatDisplayCurrency = "czk" | "eur" | "chf" | "usd";
 
 export type DisplayCurrency = "sat" | "btc" | FiatDisplayCurrency | "hidden";
 
@@ -13,14 +15,6 @@ export const DISPLAY_CURRENCIES: ReadonlyArray<DisplayCurrency> = [
   "usd",
   "hidden",
 ];
-
-export interface FiatRates {
-  chfPerBtc: number;
-  czkPerBtc: number;
-  eurPerBtc: number;
-  fetchedAtMs: number;
-  usdPerBtc: number;
-}
 
 export interface DisplayAmountOptions {
   displayCurrency: DisplayCurrency;
@@ -62,24 +56,13 @@ const getRateForCurrency = (
 
 const fiatFormatters = new Map<string, Intl.NumberFormat>();
 
-const isDisplayCurrency = (value: unknown): value is DisplayCurrency => {
-  return (
-    value === "sat" ||
-    value === "btc" ||
-    value === "czk" ||
-    value === "eur" ||
-    value === "chf" ||
-    value === "usd" ||
-    value === "hidden"
-  );
-};
+const isDisplayCurrency = (value: unknown): value is DisplayCurrency =>
+  DISPLAY_CURRENCIES.some((currency) => currency === value);
 
 export const parseDisplayCurrency = (
   value: string | null | undefined,
 ): DisplayCurrency | null => {
-  const normalized = String(value ?? "")
-    .trim()
-    .toLowerCase();
+  const normalized = (value ?? "").trim().toLowerCase();
   if (normalized === "sat") return "sat";
   if (normalized === "btc" || normalized === "b") return "btc";
   if (normalized === "czk") return "czk";
@@ -190,7 +173,7 @@ const getFiatValue = (
 };
 
 const parsePositiveInteger = (value: string): number => {
-  const digitsOnly = String(value ?? "").replace(/\D/g, "");
+  const digitsOnly = value.replace(/\D/g, "");
   if (!digitsOnly) return 0;
   const parsed = Number.parseInt(digitsOnly, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return 0;
@@ -198,16 +181,14 @@ const parsePositiveInteger = (value: string): number => {
 };
 
 const parsePositiveDisplayNumber = (value: string): number => {
-  const normalized = String(value ?? "")
-    .trim()
-    .replace(",", ".");
+  const normalized = value.trim().replace(",", ".");
   if (!/^\d+(?:\.\d*)?$/.test(normalized)) return 0;
   const parsed = Number.parseFloat(normalized);
   if (!Number.isFinite(parsed) || parsed <= 0) return 0;
   return parsed;
 };
 
-export const getDisplayAmountInputValue = (
+const getDisplayAmountInputValue = (
   amountSat: number,
   options: DisplayAmountOptions,
 ): string => {
@@ -232,7 +213,7 @@ export const getDisplayAmountInputValue = (
   return String(normalizedAmount);
 };
 
-export const toAmountSatFromDisplayInput = (
+const toAmountSatFromDisplayInput = (
   displayValue: string,
   options: DisplayAmountOptions,
 ): number => {
@@ -248,7 +229,7 @@ export const toAmountSatFromDisplayInput = (
   return parsedDisplayValue;
 };
 
-export interface AmountInputKeyResult {
+interface AmountInputKeyResult {
   amountSat: string;
   displayValue: string;
 }
@@ -354,10 +335,7 @@ export const formatDisplayAmountText = (
   options: DisplayAmountOptions,
 ): string => {
   const parts = formatDisplayAmountParts(amountSat, options);
-  return [
-    `${parts.approxPrefix}${parts.amountText}`,
-    String(parts.unitLabel ?? "").trim(),
-  ]
+  return [`${parts.approxPrefix}${parts.amountText}`, parts.unitLabel.trim()]
     .filter(Boolean)
     .join(" ");
 };

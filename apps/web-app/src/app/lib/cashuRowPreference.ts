@@ -9,17 +9,14 @@ interface CashuRowPreferenceInput {
   ownerRank: ReadonlyMap<string, number>;
 }
 
-const readOwnerId = (row: Pick<CashuTokenRow, "ownerId">): string =>
-  String(row.ownerId);
-
 export const isCashuRowCandidateBetter = ({
   activeOwnerId,
   candidate,
   existing,
   ownerRank,
 }: CashuRowPreferenceInput): boolean => {
-  const candidateOwnerId = readOwnerId(candidate);
-  const existingOwnerId = readOwnerId(existing);
+  const candidateOwnerId = candidate.ownerId;
+  const existingOwnerId = existing.ownerId;
   const candidateRank = ownerRank.get(candidateOwnerId) ?? -1;
   const existingRank = ownerRank.get(existingOwnerId) ?? -1;
   const candidateIsDeleted = candidate.isDeleted === Evolu.sqliteTrue;

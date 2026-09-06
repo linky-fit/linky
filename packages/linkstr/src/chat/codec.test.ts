@@ -1,16 +1,9 @@
 import { Either } from "effect";
-import { generateSecretKey, getEventHash, getPublicKey } from "nostr-tools";
+import { getEventHash } from "nostr-tools";
 import { encrypt, getConversationKey } from "nostr-tools/nip44";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RumorId,
-  UnixSeconds,
-} from "../domain/primitives";
+import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
 import { Rumor } from "../internal/nostrEvent";
 import type { NostrTags } from "../internal/nostrEvent";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
 import {
   decodeChatRumor,
   encodeEditRumor,
@@ -27,11 +20,7 @@ import {
   TextMessageDraft,
   TokenMessageDraft,
 } from "./domain";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
+import { makeIdentity } from "../testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();

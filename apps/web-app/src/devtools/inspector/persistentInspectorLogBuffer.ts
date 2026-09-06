@@ -1,7 +1,7 @@
 import type { CollectedInspectorRow, InspectorRow } from "./inspectorRows";
 
-export const INSPECTOR_LOG_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
-export const INSPECTOR_LOG_MAX_SIZE = 25 * 1024 * 1024;
+const INSPECTOR_LOG_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
+const INSPECTOR_LOG_MAX_SIZE = 25 * 1024 * 1024;
 
 export interface IncomingPersistentInspectorRow {
   client: string;
@@ -19,13 +19,13 @@ export interface PersistentInspectorLogState {
   totalSize: number;
 }
 
-export interface PersistentInspectorLogMutation {
+interface PersistentInspectorLogMutation {
   appendedRows: CollectedInspectorRow[];
   deletedRows: CollectedInspectorRow[];
   state: PersistentInspectorLogState;
 }
 
-export interface PersistentInspectorLogLimits {
+interface PersistentInspectorLogLimits {
   maxAgeMs: number;
   maxSize: number;
 }

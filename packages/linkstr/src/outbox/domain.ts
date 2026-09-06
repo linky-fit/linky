@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { identity, Predicate, Schema } from "effect";
 import {
   ChatMessageReceipt,
   EditMessageDraft,
@@ -79,24 +79,21 @@ export type RumorFixedOperation = Exclude<
   PaymentTelemetryOperation
 >;
 
-export class EnqueueReceipt extends Schema.Class<EnqueueReceipt>(
+export class EnqueueReceipt extends Schema.TaggedClass<EnqueueReceipt>()(
   "EnqueueReceipt",
-)({
-  jobId: OutboxJobId,
-  ref: OutboxRef,
-  /** Deterministic: every delivery retry publishes this exact rumor id. */
-  messageId: RumorId,
-  clientId: ClientId,
-  sentAt: UnixSeconds,
-}) {}
+  {
+    jobId: OutboxJobId,
+    ref: OutboxRef,
+    /** Deterministic: every delivery retry publishes this exact rumor id. */
+    rumorId: RumorId,
+    clientId: ClientId,
+    sentAt: UnixSeconds,
+  },
+) {}
 
-// MessageEditReceipt before ChatMessageReceipt: the union decodes
-// structurally and the edit receipt is a field superset of the chat one.
-// PaymentTelemetryReceipt is unambiguous anywhere: it is the only member with
-// `telemetryId` and the only one without `selfCopy`.
 export const OutboxReceipt = Schema.Union(
-  MessageEditReceipt,
   ChatMessageReceipt,
+  MessageEditReceipt,
   ReactionReceipt,
   PaymentTelemetryReceipt,
 );
@@ -148,3 +145,75 @@ export class StoredOutboxJob extends Schema.Class<StoredOutboxJob>(
   enqueuedAt: UnixSeconds,
   state: OutboxJobState,
 }) {}
+
+const receiptTagOf = (
+  operationTag: unknown,
+): OutboxReceipt["_tag"] | undefined => {
+  switch (operationTag) {
+    case "chat.text":
+    case "chat.token":
+    case "chat.image":
+      return "ChatMessageReceipt";
+    case "chat.edit":
+      return "MessageEditReceipt";
+    case "reaction":
+      return "ReactionReceipt";
+    case "paymentTelemetry":
+      return "PaymentTelemetryReceipt";
+    default:
+      return undefined;
+  }
+};
+
+const LEGACY_RUMOR_ID_KEYS = ["messageId", "reactionId", "telemetryId"];
+
+const withRumorIdKey = (
+  receipt: Record<string, unknown>,
+): Record<string, unknown> => {
+  const legacyKey = LEGACY_RUMOR_ID_KEYS.find((key) => key in receipt);
+  if (legacyKey === undefined) return receipt;
+  const { [legacyKey]: rumorId, ...rest } = receipt;
+  return { ...rest, rumorId };
+};
+
+/**
+ * Two older generations of persisted receipts still decode: receipts without
+ * a `_tag` (the job's operation names the kind), and before that receipts
+ * keyed by a per-vertical id (`messageId`, `reactionId`, `telemetryId`)
+ * instead of `rumorId`.
+ */
+const upgradeLegacyReceipt = (
+  job: Record<string, unknown>,
+): Record<string, unknown> => {
+  const { operation, state } = job;
+  if (!Predicate.isRecord(operation) || !Predicate.isRecord(state)) return job;
+  const { result } = state;
+  if (!Predicate.isRecord(result)) return job;
+  const { receipt } = result;
+  if (!Predicate.isRecord(receipt) || "_tag" in receipt) return job;
+  const _tag = receiptTagOf(operation._tag);
+  if (_tag === undefined) return job;
+  return {
+    ...job,
+    state: {
+      ...state,
+      result: { ...result, receipt: { _tag, ...withRumorIdKey(receipt) } },
+    },
+  };
+};
+
+const UnknownRecord = Schema.Record({
+  key: Schema.String,
+  value: Schema.Unknown,
+});
+
+/** `StoredOutboxJob` as read from storage, upgrading legacy receipts first. */
+export const PersistedOutboxJob = Schema.compose(
+  Schema.transform(UnknownRecord, UnknownRecord, {
+    strict: true,
+    decode: upgradeLegacyReceipt,
+    encode: identity,
+  }),
+  StoredOutboxJob,
+  { strict: false },
+);

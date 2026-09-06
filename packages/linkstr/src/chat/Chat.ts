@@ -1,17 +1,7 @@
 import { Effect } from "effect";
 import type { NoRelayReachable, RecipientNotReached } from "../domain/errors";
-import { RumorId } from "../domain/primitives";
-import { Inspector } from "../inspector/Inspector";
-import {
-  freshClientId,
-  inspectOperation,
-  nowSeconds,
-} from "../internal/operations";
-import type { OperationReceiptSummary } from "../internal/operations";
-import { deliverRumorToPeer } from "../internal/wrapDelivery";
-import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import { NostrTransport } from "../services/NostrTransport";
-import { RelayPolicy } from "../services/RelayPolicy";
+import { makeWrapSendContext, sendToPeer } from "../internal/wrapSend";
+import type { PeerSendOutcome } from "../internal/wrapSend";
 import {
   encodeEditRumor,
   encodeImageMessageRumor,
@@ -27,24 +17,12 @@ import {
   type TokenMessageDraft,
 } from "./domain";
 
-const summarizeReceipt = (
-  receipt: ChatMessageReceipt | MessageEditReceipt,
-): OperationReceiptSummary => ({
-  rumorId: receipt.messageId,
-  clientId: receipt.clientId,
-  sentAt: receipt.sentAt,
-  selfCopy: receipt.selfCopy,
-  recipientCopy: receipt.recipientCopy,
-});
+const chatReceipt = (outcome: PeerSendOutcome): ChatMessageReceipt =>
+  new ChatMessageReceipt(outcome);
 
 export class Chat extends Effect.Service<Chat>()("linkstr/Chat", {
   effect: Effect.gen(function* () {
-    const context = {
-      identity: yield* LinkstrIdentity,
-      transport: yield* NostrTransport,
-      relayPolicy: yield* RelayPolicy,
-    };
-    const inspector = yield* Inspector.orNoop;
+    const context = yield* makeWrapSendContext;
 
     const sendText = (
       draft: TextMessageDraft,
@@ -52,31 +30,11 @@ export class Chat extends Effect.Service<Chat>()("linkstr/Chat", {
       ChatMessageReceipt,
       RecipientNotReached | NoRelayReachable
     > =>
-      Effect.gen(function* () {
-        const clientId = draft.clientId ?? (yield* freshClientId);
-        const sentAt = draft.sentAt ?? (yield* nowSeconds);
-        const rumor = encodeTextMessageRumor(
-          draft,
-          context.identity.pubkey,
-          sentAt,
-          clientId,
-        );
-        const copies = yield* deliverRumorToPeer(context, {
-          rumor,
-          peer: draft.to,
-          clientId,
-          sentAt,
-          pushMarkRecipientCopy: true,
-        });
-        return new ChatMessageReceipt({
-          messageId: RumorId.make(rumor.id),
-          clientId,
-          sentAt,
-          ...copies,
-        });
-      }).pipe(
-        inspectOperation(inspector, "chat.sendText", draft, summarizeReceipt),
-      );
+      sendToPeer(context, "chat.sendText", draft, {
+        encode: encodeTextMessageRumor,
+        receipt: chatReceipt,
+        pushMarkRecipientCopy: true,
+      });
 
     const sendImage = (
       draft: ImageMessageDraft,
@@ -84,31 +42,11 @@ export class Chat extends Effect.Service<Chat>()("linkstr/Chat", {
       ChatMessageReceipt,
       RecipientNotReached | NoRelayReachable
     > =>
-      Effect.gen(function* () {
-        const clientId = draft.clientId ?? (yield* freshClientId);
-        const sentAt = draft.sentAt ?? (yield* nowSeconds);
-        const rumor = encodeImageMessageRumor(
-          draft,
-          context.identity.pubkey,
-          sentAt,
-          clientId,
-        );
-        const copies = yield* deliverRumorToPeer(context, {
-          rumor,
-          peer: draft.to,
-          clientId,
-          sentAt,
-          pushMarkRecipientCopy: true,
-        });
-        return new ChatMessageReceipt({
-          messageId: RumorId.make(rumor.id),
-          clientId,
-          sentAt,
-          ...copies,
-        });
-      }).pipe(
-        inspectOperation(inspector, "chat.sendImage", draft, summarizeReceipt),
-      );
+      sendToPeer(context, "chat.sendImage", draft, {
+        encode: encodeImageMessageRumor,
+        receipt: chatReceipt,
+        pushMarkRecipientCopy: true,
+      });
 
     const sendToken = (
       draft: TokenMessageDraft,
@@ -116,30 +54,10 @@ export class Chat extends Effect.Service<Chat>()("linkstr/Chat", {
       ChatMessageReceipt,
       RecipientNotReached | NoRelayReachable
     > =>
-      Effect.gen(function* () {
-        const clientId = draft.clientId ?? (yield* freshClientId);
-        const sentAt = draft.sentAt ?? (yield* nowSeconds);
-        const rumor = encodeTokenMessageRumor(
-          draft,
-          context.identity.pubkey,
-          sentAt,
-          clientId,
-        );
-        const copies = yield* deliverRumorToPeer(context, {
-          rumor,
-          peer: draft.to,
-          clientId,
-          sentAt,
-        });
-        return new ChatMessageReceipt({
-          messageId: RumorId.make(rumor.id),
-          clientId,
-          sentAt,
-          ...copies,
-        });
-      }).pipe(
-        inspectOperation(inspector, "chat.sendToken", draft, summarizeReceipt),
-      );
+      sendToPeer(context, "chat.sendToken", draft, {
+        encode: encodeTokenMessageRumor,
+        receipt: chatReceipt,
+      });
 
     const edit = (
       draft: EditMessageDraft,
@@ -147,31 +65,11 @@ export class Chat extends Effect.Service<Chat>()("linkstr/Chat", {
       MessageEditReceipt,
       RecipientNotReached | NoRelayReachable
     > =>
-      Effect.gen(function* () {
-        const clientId = draft.clientId ?? (yield* freshClientId);
-        const sentAt = draft.sentAt ?? (yield* nowSeconds);
-        const rumor = encodeEditRumor(
-          draft,
-          context.identity.pubkey,
-          sentAt,
-          clientId,
-        );
-        const copies = yield* deliverRumorToPeer(context, {
-          rumor,
-          peer: draft.to,
-          clientId,
-          sentAt,
-        });
-        return new MessageEditReceipt({
-          messageId: RumorId.make(rumor.id),
-          editOf: draft.editOf,
-          clientId,
-          sentAt,
-          ...copies,
-        });
-      }).pipe(
-        inspectOperation(inspector, "chat.edit", draft, summarizeReceipt),
-      );
+      sendToPeer(context, "chat.edit", draft, {
+        encode: encodeEditRumor,
+        receipt: (outcome) =>
+          new MessageEditReceipt({ ...outcome, editOf: draft.editOf }),
+      });
 
     return { sendText, sendImage, sendToken, edit } as const;
   }),

@@ -1,16 +1,12 @@
-import { Clock, Effect } from "effect";
+import { Effect } from "effect";
 import type { WrapDelivery } from "../domain/delivery";
-import { ClientId, UnixSeconds } from "../domain/primitives";
-import type { RumorId } from "../domain/primitives";
+import { ClientId } from "../domain/primitives";
+import type { RumorId, UnixSeconds } from "../domain/primitives";
 import type { InspectorService } from "../inspector/Inspector";
 import { OperationFailed, OperationSucceeded } from "../inspector/events";
 
 export const freshClientId = Effect.sync(() =>
   ClientId.make(crypto.randomUUID()),
-);
-
-export const nowSeconds = Clock.currentTimeMillis.pipe(
-  Effect.map((millis) => UnixSeconds.make(Math.floor(millis / 1000))),
 );
 
 export interface OperationReceiptSummary {

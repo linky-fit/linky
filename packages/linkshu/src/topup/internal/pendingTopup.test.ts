@@ -10,14 +10,10 @@ import {
 } from "../../domain/primitives";
 import { makeInMemoryKeyValueStore } from "../../ports/inMemoryKeyValueStore";
 import {
-  deadlineOf,
   PENDING_TOPUP_KEY_PREFIX,
   PENDING_TOPUP_TTL_SECONDS,
   PendingTopup,
-  pendingTopupKey,
-  readPendingTopups,
-  removePendingTopup,
-  writePendingTopup,
+  pendingTopups,
 } from "./pendingTopup";
 
 const mint = MintUrl.make("https://mint.example");
@@ -43,16 +39,16 @@ const pending = (fields?: {
     mintCounter: fields?.mintCounter ?? null,
   });
 
-describe("pendingTopupKey", () => {
+describe("pendingTopups.key", () => {
   it("namespaces and escapes the mint and quote id", () => {
-    expect(pendingTopupKey(mint, QuoteId.make("a/b c"))).toBe(
+    expect(pendingTopups.key(mint, QuoteId.make("a/b c"))).toBe(
       `${PENDING_TOPUP_KEY_PREFIX}https%3A%2F%2Fmint.example.a%2Fb%20c`,
     );
   });
 
   it("keeps two quotes at one mint apart", () => {
-    expect(pendingTopupKey(mint, QuoteId.make("one"))).not.toBe(
-      pendingTopupKey(mint, QuoteId.make("two")),
+    expect(pendingTopups.key(mint, QuoteId.make("one"))).not.toBe(
+      pendingTopups.key(mint, QuoteId.make("two")),
     );
   });
 });
@@ -62,37 +58,39 @@ describe("pending topup records", () => {
     const kv = makeInMemoryKeyValueStore();
     const record = pending({ mintCounter: 7, expiresAt: createdAt + 600 });
 
-    await Effect.runPromise(writePendingTopup(kv, record));
-    const [stored] = await Effect.runPromise(readPendingTopups(kv));
+    await Effect.runPromise(pendingTopups.write(kv, record));
+    const [stored] = await Effect.runPromise(pendingTopups.readAll(kv));
 
     expect(stored).toEqual(record);
     expect(stored?.mintCounter).toBe(7);
 
-    await Effect.runPromise(removePendingTopup(kv, record));
-    expect(await Effect.runPromise(readPendingTopups(kv))).toEqual([]);
+    await Effect.runPromise(pendingTopups.remove(kv, record));
+    expect(await Effect.runPromise(pendingTopups.readAll(kv))).toEqual([]);
   });
 
   it("drops entries that no longer decode instead of failing the read", async () => {
     const kv = makeInMemoryKeyValueStore();
-    await Effect.runPromise(writePendingTopup(kv, pending()));
+    await Effect.runPromise(pendingTopups.write(kv, pending()));
     await Effect.runPromise(
       kv.set(`${PENDING_TOPUP_KEY_PREFIX}corrupt`, "{not json"),
     );
 
-    const stored = await Effect.runPromise(readPendingTopups(kv));
+    const stored = await Effect.runPromise(pendingTopups.readAll(kv));
     expect(stored).toHaveLength(1);
     expect(stored[0]?.quoteId).toBe("quote-1");
   });
 });
 
-describe("deadlineOf", () => {
+describe("pendingTopups.deadlineOf", () => {
   it("uses the mint-stated expiry when there is one", () => {
-    expect(deadlineOf(pending({ expiresAt: createdAt + 600 }))).toBe(
-      createdAt + 600,
-    );
+    expect(
+      pendingTopups.deadlineOf(pending({ expiresAt: createdAt + 600 })),
+    ).toBe(createdAt + 600);
   });
 
   it("falls back to the day-long ttl when the mint states no expiry", () => {
-    expect(deadlineOf(pending())).toBe(createdAt + PENDING_TOPUP_TTL_SECONDS);
+    expect(pendingTopups.deadlineOf(pending())).toBe(
+      createdAt + PENDING_TOPUP_TTL_SECONDS,
+    );
   });
 });

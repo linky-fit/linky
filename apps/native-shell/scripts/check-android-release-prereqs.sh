@@ -38,7 +38,7 @@ if [[ -f "$keystore_properties_path" ]]; then
   fi
 else
   print_error "Missing apps/native-shell/android/keystore.properties"
-  print_error "Create it from apps/native-shell/android/keystore.properties.example or set LINKY_UPLOAD_* environment variables."
+  print_error "Copy apps/native-shell/android/keystore.properties.example to keystore.properties and fill it in, or set the LINKY_UPLOAD_* environment variables."
 fi
 
 if [[ -f "$google_services_path" ]]; then

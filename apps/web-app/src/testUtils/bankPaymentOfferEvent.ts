@@ -1,11 +1,21 @@
+import {
+  BANK_OFFER_KIND,
+  BANK_OFFER_VALUE,
+  BankOfferId,
+  encodeBankOfferContent,
+  Pubkey,
+  UnixSeconds,
+} from "@linky/linkstr";
 import type { UnsignedEvent } from "nostr-tools";
 import {
   getLinkyBankPaymentOfferMessageText,
-  LINKY_BANK_PAYMENT_OFFER_KIND,
-  LINKY_BANK_PAYMENT_OFFER_VALUE,
   type LinkyBankPaymentOfferStatus,
 } from "../app/lib/bankPaymentOffer";
 
+const unixSeconds = (value: number | null | undefined): UnixSeconds | null =>
+  value === null || value === undefined ? null : UnixSeconds.make(value);
+
+/** Offer event with the production wire encoding; pubkeys must be real hex keys. */
 export const createLinkyBankPaymentOfferEvent = (args: {
   amountText: string;
   amountSat?: number | null;
@@ -23,80 +33,45 @@ export const createLinkyBankPaymentOfferEvent = (args: {
   status?: LinkyBankPaymentOfferStatus;
 }): UnsignedEvent => {
   const status = args.status ?? "offered";
-  const offerId = String(args.offerId ?? args.clientId).trim();
-  const offererPublicKey =
-    String(args.offererPublicKey ?? "").trim() || args.senderPublicKey;
-  const contentPayload: Record<string, unknown> = {
+  const offerId = BankOfferId.make(args.offerId ?? args.clientId);
+  const offerer = Pubkey.make(args.offererPublicKey ?? args.senderPublicKey);
+  const sentAt = UnixSeconds.make(args.createdAt);
+  const content = encodeBankOfferContent({
+    amountSat: args.amountSat ?? null,
     amountText: args.amountText,
+    bankPaidAtSec:
+      unixSeconds(args.bankPaidAtSec) ??
+      (status === "bank_paid" ? sentAt : null),
+    expiresAtSec: unixSeconds(args.expiresAtSec),
+    extensionSec: args.extensionSec ?? null,
+    initiatedAtSec:
+      unixSeconds(args.initiatedAtSec) ??
+      (status === "offered" ? sentAt : null),
     offerId,
-    offererPublicKey,
+    offerer,
+    spdPayload: args.spdPayload ?? null,
     status,
-    statusUpdatedAtSec: args.createdAt,
+    statusUpdatedAtSec: sentAt,
     text: getLinkyBankPaymentOfferMessageText(
       args.amountText,
       status,
       args.extensionSec,
     ),
-    type: "linky.bank_payment_offer",
-    version: 1,
-  };
-  const initiatedAtSec =
-    typeof args.initiatedAtSec === "number" &&
-    Number.isFinite(args.initiatedAtSec) &&
-    args.initiatedAtSec > 0
-      ? Math.trunc(args.initiatedAtSec)
-      : status === "offered"
-        ? Math.trunc(args.createdAt)
-        : null;
-  if (initiatedAtSec !== null) contentPayload.initiatedAtSec = initiatedAtSec;
-
-  const bankPaidAtSec =
-    typeof args.bankPaidAtSec === "number" &&
-    Number.isFinite(args.bankPaidAtSec) &&
-    args.bankPaidAtSec > 0
-      ? Math.trunc(args.bankPaidAtSec)
-      : status === "bank_paid"
-        ? Math.trunc(args.createdAt)
-        : null;
-  if (bankPaidAtSec !== null) contentPayload.bankPaidAtSec = bankPaidAtSec;
-
-  if (
-    typeof args.expiresAtSec === "number" &&
-    Number.isFinite(args.expiresAtSec) &&
-    args.expiresAtSec > 0
-  ) {
-    contentPayload.expiresAtSec = Math.trunc(args.expiresAtSec);
-  }
-  if (
-    typeof args.extensionSec === "number" &&
-    Number.isFinite(args.extensionSec) &&
-    args.extensionSec > 0
-  ) {
-    contentPayload.extensionSec = Math.trunc(args.extensionSec);
-  }
-  if (
-    typeof args.amountSat === "number" &&
-    Number.isFinite(args.amountSat) &&
-    args.amountSat > 0
-  ) {
-    contentPayload.amountSat = Math.round(args.amountSat);
-  }
-  const spdPayload = String(args.spdPayload ?? "").trim();
-  if (spdPayload) contentPayload.spdPayload = spdPayload;
+  });
 
   return {
+    content,
     created_at: args.createdAt,
-    kind: LINKY_BANK_PAYMENT_OFFER_KIND,
+    kind: BANK_OFFER_KIND,
     pubkey: args.senderPublicKey,
     tags: [
       ["p", args.recipientPublicKey],
       ["p", args.senderPublicKey],
       ["client", args.clientId],
       ["offer", offerId],
-      ["offerer", offererPublicKey],
-      ["linky", LINKY_BANK_PAYMENT_OFFER_VALUE],
+      ["offerer", offerer],
+      ["linky", BANK_OFFER_VALUE],
       ["status", status],
     ],
-    content: JSON.stringify(contentPayload),
   };
 };

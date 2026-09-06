@@ -1,4 +1,6 @@
-export interface QrCameraConstraintCandidate {
+import { readField } from "../../utils/unknown";
+import { asNonEmptyString } from "../../utils/validation";
+interface QrCameraConstraintCandidate {
   constraints: MediaStreamConstraints;
   strategy: "device-exact" | "rear-exact" | "rear-ideal" | "any-camera";
 }
@@ -73,15 +75,11 @@ export const buildQrCameraConstraintCandidates = (
   return candidates;
 };
 
-const readString = (source: unknown, key: string): string | null => {
-  if (typeof source !== "object" || source === null) return null;
-  const value = Reflect.get(source, key);
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-};
+const readString = (source: unknown, key: string): string | null =>
+  asNonEmptyString(readField(source, key));
 
 const readNumber = (source: unknown, key: string): number | null => {
-  if (typeof source !== "object" || source === null) return null;
-  const value = Reflect.get(source, key);
+  const value = readField(source, key);
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 };
 

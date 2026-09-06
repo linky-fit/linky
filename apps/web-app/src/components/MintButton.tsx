@@ -1,20 +1,13 @@
 import React from "react";
-import type { MintUrlInput } from "../app/types/appTypes";
+import type { MintIcon } from "../utils/mint";
 import { getNextMintIconUrl } from "../utils/mint";
-
-interface MintIcon {
-  failed: boolean;
-  host: string | null;
-  origin: string | null;
-  url: string | null;
-}
 
 interface MintButtonProps {
   badgeLabel?: string;
   badgeTone?: "recommended" | "test";
   disabled?: boolean;
   fallbackLetter: string;
-  getMintIconUrl: (mint: MintUrlInput) => MintIcon;
+  getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   isSelected: boolean;
   isTestMint?: boolean;
   label: string;
@@ -56,10 +49,7 @@ export function MintButton({
           alt=""
           width={14}
           height={14}
-          style={{
-            borderRadius: 9999,
-            objectFit: "cover",
-          }}
+          className="mint-icon"
           loading="lazy"
           referrerPolicy="no-referrer"
           onError={() => {
@@ -72,20 +62,7 @@ export function MintButton({
           }}
         />
       ) : (
-        <span
-          aria-hidden="true"
-          style={{
-            width: 14,
-            height: 14,
-            borderRadius: 9999,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 9,
-            background: "rgba(148,163,184,0.25)",
-            color: "#e2e8f0",
-          }}
-        >
+        <span aria-hidden="true" className="mint-icon-fallback">
           {fallbackLetter}
         </span>
       )}

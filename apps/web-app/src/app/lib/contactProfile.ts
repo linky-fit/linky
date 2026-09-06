@@ -3,23 +3,19 @@ import type { ProfileMetadata } from "@linky/linkstr";
 import { getBestNostrName } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import type { ContactRowLike } from "../types/appTypes";
+import { trimString } from "../../utils/validation";
 
-export interface ContactPublicProfile {
+interface ContactPublicProfile {
   lnAddress: string;
   name: string;
 }
 
-export interface ResolvedContactProfile extends ContactPublicProfile {
+interface ResolvedContactProfile extends ContactPublicProfile {
   hasLocalLnAddress: boolean;
   hasLocalName: boolean;
   localLnAddress: string;
   localName: string;
 }
-
-const readText = (value: unknown): string => {
-  if (typeof value !== "string") return "";
-  return value.trim();
-};
 
 const readSqliteBool = (value: unknown): boolean => {
   const parsed = Evolu.SqliteBoolean.fromUnknown(value);
@@ -30,7 +26,7 @@ export const getContactPublicProfile = (
   npub: string | null | undefined,
   metadata: ProfileMetadata | null | undefined,
 ): ContactPublicProfile => {
-  const normalizedNpub = normalizeNpubIdentifier(npub);
+  const normalizedNpub = normalizeNpubIdentifier(npub ?? "");
   if (!normalizedNpub || !metadata) {
     return { lnAddress: "", name: "" };
   }
@@ -52,9 +48,9 @@ export const resolveContactProfile = (
   contact: ContactRowLike,
   metadata: ProfileMetadata | null | undefined,
 ): ResolvedContactProfile => {
-  const normalizedNpub = normalizeNpubIdentifier(contact.npub);
-  const storedName = readText(contact.name);
-  const storedLnAddress = readText(contact.lnAddress);
+  const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
+  const storedName = trimString(contact.name);
+  const storedLnAddress = trimString(contact.lnAddress);
 
   if (!normalizedNpub) {
     return {

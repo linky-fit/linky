@@ -1,5 +1,12 @@
+import {
+  Camera,
+  ImageUp,
+  Languages,
+  Copy as PasteIcon,
+  Settings,
+  Smile,
+} from "lucide-react";
 import React from "react";
-import { Camera, ImageUp, Languages, Settings, Smile } from "lucide-react";
 import type {
   OnboardingStep,
   PendingOnboardingProfile,
@@ -9,14 +16,18 @@ import { type AvatarEditorControlId } from "../derivedProfile";
 import type { Lang } from "../i18n";
 import { getInitials } from "../utils/formatting";
 import { analyzeSlip39Input, SLIP39_WORD_COUNT } from "../utils/slip39Input";
+import { Avatar } from "./Avatar";
+import { AvatarControlGrid } from "./AvatarControlGrid";
+import { AvatarPhotoInput } from "./AvatarPhotoInput";
+import { ModalSheet } from "./ModalSheet";
 import {
   PasswordManagerSaveForm,
   type PasswordManagerSaveFormHandle,
 } from "./PasswordManagerSaveForm";
-import { AvatarControlGrid } from "./AvatarControlGrid";
-import { AvatarPhotoInput } from "./AvatarPhotoInput";
 import { SelfieCaptureModal } from "./SelfieCaptureModal";
-import { PasteIcon } from "./icons";
+
+import type { Translate } from "../i18n";
+import { sleep } from "../utils/time";
 
 type UnauthenticatedLayoutProps = {
   confirmPendingOnboardingProfile: () => Promise<void>;
@@ -44,13 +55,11 @@ type UnauthenticatedLayoutProps = {
   setLang: (lang: Lang) => void;
   setPendingOnboardingName: (value: string) => void;
   submitReturningSlip39: (inputOverride?: string) => Promise<void>;
-  t: (key: string) => string;
+  t: Translate;
 };
 
 const formatTemplate = (template: string, vars: Record<string, string>) =>
-  template.replace(/\{(\w+)\}/g, (_match, key: string) =>
-    String(vars[key] ?? ""),
-  );
+  template.replace(/\{(\w+)\}/g, (_match, key: string) => vars[key] ?? "");
 
 export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
   confirmPendingOnboardingProfile,
@@ -95,45 +104,40 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     if (!pickerMenuIsOpen) return null;
 
     return (
-      <div
+      <ModalSheet
         className="menu-modal-overlay"
-        role="dialog"
+        sheetClassName="menu-modal-sheet"
         aria-modal="false"
         aria-label={t("menu")}
         onClick={() => setPickerMenuIsOpen(false)}
       >
-        <div
-          className="menu-modal-sheet"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="settings-row">
-            <div className="settings-left">
-              <span className="settings-icon" aria-hidden="true">
-                <Languages size={18} />
-              </span>
-              <span className="settings-label">{t("language")}</span>
-            </div>
-            <div className="settings-right">
-              <select
-                className="select"
-                value={lang}
-                onChange={(event) =>
-                  setLang(
-                    event.target.value === "cs" || event.target.value === "de"
-                      ? event.target.value
-                      : "en",
-                  )
-                }
-                aria-label={t("language")}
-              >
-                <option value="cs">{t("czech")}</option>
-                <option value="de">{t("german")}</option>
-                <option value="en">{t("english")}</option>
-              </select>
-            </div>
+        <div className="settings-row">
+          <div className="settings-left">
+            <span className="settings-icon" aria-hidden="true">
+              <Languages size={18} />
+            </span>
+            <span className="settings-label">{t("language")}</span>
+          </div>
+          <div className="settings-right">
+            <select
+              className="select"
+              value={lang}
+              onChange={(event) =>
+                setLang(
+                  event.target.value === "cs" || event.target.value === "de"
+                    ? event.target.value
+                    : "en",
+                )
+              }
+              aria-label={t("language")}
+            >
+              <option value="cs">{t("czech")}</option>
+              <option value="de">{t("german")}</option>
+              <option value="en">{t("english")}</option>
+            </select>
           </div>
         </div>
-      </div>
+      </ModalSheet>
     );
   };
 
@@ -438,9 +442,7 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
         passwordManagerSaveFormRef.current?.requestSave();
         await savePendingOnboardingBackupToPasswordManager(username, password);
 
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, 150);
-        });
+        await sleep(150);
       }
 
       await confirmPendingOnboardingProfile();
@@ -483,18 +485,12 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
               className="contact-avatar is-xl onboarding-avatar-previewImage"
               aria-hidden="true"
             >
-              {profile.pictureUrl ? (
-                <img
-                  src={profile.pictureUrl}
-                  alt=""
-                  loading="eager"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span className="contact-avatar-fallback">
-                  {getInitials(profile.name || t("profileNoName"))}
-                </span>
-              )}
+              <Avatar
+                pictureUrl={profile.pictureUrl}
+                fallback={getInitials(profile.name || t("profileNoName"))}
+                fallbackClassName="contact-avatar-fallback"
+                loading="eager"
+              />
             </div>
           </div>
 

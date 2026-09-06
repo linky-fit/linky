@@ -1,3 +1,4 @@
+import { asNonEmptyString } from "./validation";
 const PUSH_NSEC_DB_NAME = "linky-push-secrets-v1";
 const PUSH_NSEC_DB_VERSION = 1;
 const PUSH_NSEC_STORE_NAME = "kv";
@@ -9,11 +10,6 @@ function canUseIndexedDb(): boolean {
   } catch {
     return false;
   }
-}
-
-function normalizeNsec(value: string | null | undefined): string | null {
-  const normalized = String(value ?? "").trim();
-  return normalized || null;
 }
 
 function openPushNsecDb(): Promise<IDBDatabase> {
@@ -67,7 +63,7 @@ function awaitTransaction(transaction: IDBTransaction): Promise<void> {
 }
 
 export async function setStoredPushNsec(nsec: string): Promise<void> {
-  const normalized = normalizeNsec(nsec);
+  const normalized = asNonEmptyString(nsec);
   if (!normalized || !canUseIndexedDb()) {
     return;
   }
@@ -96,7 +92,7 @@ export async function getStoredPushNsec(): Promise<string | null> {
       transaction.objectStore(PUSH_NSEC_STORE_NAME).get(PUSH_NSEC_KEY),
     );
     await awaitTransaction(transaction);
-    return typeof value === "string" ? normalizeNsec(value) : null;
+    return typeof value === "string" ? asNonEmptyString(value) : null;
   } finally {
     db.close();
   }

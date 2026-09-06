@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 /** 1 CZK -> 40 sat, so the fixture's AM:1.00 CC:CZK is a round number. */
-export const CZK_PER_BTC = 2_500_000;
+const CZK_PER_BTC = 2_500_000;
 export const FIXTURE_AMOUNT_SAT = 40;
 
 const TRANSPARENT_PNG = Buffer.from(

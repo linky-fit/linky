@@ -1,7 +1,10 @@
+import { EvoluHistoryTable } from "../components/EvoluHistoryTable";
+import { base64 } from "@scure/base";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
 import { loadEvoluHistoryData, type EvoluHistoryRow } from "../evolu";
+import { decodeBase64Url } from "../utils/base64";
 
 const BATCH_SIZE = 50;
 
@@ -16,19 +19,13 @@ export function EvoluHistoryDataPage(): React.ReactElement {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
 
   const normalizeOwnerId = useCallback((value: string): string => {
-    const raw = String(value ?? "").trim();
-    if (!raw) return "";
-
-    const replaced = raw.replace(/-/g, "+").replace(/_/g, "/");
-    const remainder = replaced.length % 4;
-    if (remainder === 0) return replaced;
-    if (remainder === 1) return replaced;
-    return replaced.padEnd(replaced.length + (4 - remainder), "=");
+    const bytes = decodeBase64Url(value);
+    return bytes?.length ? base64.encode(bytes) : value.trim();
   }, []);
 
   const allowedOwnerIds = useMemo(() => {
     const values = evoluHistoryAllowedOwnerIds
-      .map((ownerId) => String(ownerId ?? "").trim())
+      .map((ownerId) => ownerId.trim())
       .filter(Boolean);
 
     const out = new Set<string>();
@@ -59,7 +56,7 @@ export function EvoluHistoryDataPage(): React.ReactElement {
   }, []);
 
   const visibleHistoryData = useMemo(() => {
-    if (allowedOwnerIds.size === 0) return [] as EvoluHistoryRow[];
+    if (allowedOwnerIds.size === 0) return [];
     return historyData.filter((row) =>
       allowedOwnerIds.has(readRowOwnerId(row)),
     );
@@ -110,12 +107,11 @@ export function EvoluHistoryDataPage(): React.ReactElement {
   }
 
   return (
-    <section className="panel" style={{ paddingTop: 8 }}>
+    <section className="panel panel-layout">
       {tableNames.length > 0 && (
         <nav
-          className="group-filter-bar"
+          className="group-filter-bar evolu-data-table-group"
           aria-label={t("filterByTable")}
-          style={{ marginBottom: 16 }}
         >
           <div className="group-filter-inner">
             <button
@@ -148,130 +144,15 @@ export function EvoluHistoryDataPage(): React.ReactElement {
         </nav>
       )}
 
-      <div style={{ maxHeight: 600, overflow: "auto" }}>
+      <div className="evolu-data-scroll">
         {filteredData.length > 0 ? (
-          <table
-            style={{
-              width: "100%",
-              fontSize: 11,
-              borderCollapse: "collapse",
-            }}
-          >
-            <thead>
-              <tr style={{ backgroundColor: "var(--color-bg-tertiary)" }}>
-                <th
-                  style={{
-                    padding: 4,
-                    textAlign: "left",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
-                  {t("evoluTable")}
-                </th>
-                <th
-                  style={{
-                    padding: 4,
-                    textAlign: "left",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
-                  {t("evoluColumn")}
-                </th>
-                <th
-                  style={{
-                    padding: 4,
-                    textAlign: "left",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
-                  {t("evoluId")}
-                </th>
-                <th
-                  style={{
-                    padding: 4,
-                    textAlign: "left",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
-                  {t("evoluValue")}
-                </th>
-                <th
-                  style={{
-                    padding: 4,
-                    textAlign: "left",
-                    borderBottom: "1px solid var(--color-border)",
-                  }}
-                >
-                  {t("evoluTimestamp")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData.map((row, idx) => (
-                <tr key={idx}>
-                  <td
-                    style={{
-                      padding: 4,
-                      borderBottom: "1px solid var(--color-border)",
-                    }}
-                  >
-                    {row.table}
-                  </td>
-                  <td
-                    style={{
-                      padding: 4,
-                      borderBottom: "1px solid var(--color-border)",
-                    }}
-                  >
-                    {row.column}
-                  </td>
-                  <td
-                    style={{
-                      padding: 4,
-                      borderBottom: "1px solid var(--color-border)",
-                      fontSize: 10,
-                      maxWidth: 100,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                    title={row.id}
-                  >
-                    {row.id}
-                  </td>
-                  <td
-                    style={{
-                      padding: 4,
-                      borderBottom: "1px solid var(--color-border)",
-                      maxWidth: 150,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                    title={String(row.value ?? "")}
-                  >
-                    {typeof row.value === "object" && row.value !== null
-                      ? JSON.stringify(row.value).slice(0, 40)
-                      : String(row.value ?? "").slice(0, 40)}
-                  </td>
-                  <td
-                    style={{
-                      padding: 4,
-                      borderBottom: "1px solid var(--color-border)",
-                      fontSize: 10,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {row.timestamp}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <EvoluHistoryTable rows={filteredData} t={t} />
         ) : (
           <p className="muted">{t("evoluNoDataYet")}</p>
         )}
 
         {hasMore && (
-          <div style={{ marginTop: 16, textAlign: "center" }}>
+          <div className="evolu-data-load-more">
             <button
               onClick={handleLoadMore}
               disabled={isLoadingMore}
@@ -283,9 +164,7 @@ export function EvoluHistoryDataPage(): React.ReactElement {
         )}
 
         {!hasMore && historyData.length > 0 && (
-          <p className="muted" style={{ marginTop: 16, textAlign: "center" }}>
-            {t("allRecordsLoaded")}
-          </p>
+          <p className="muted evolu-data-load-more">{t("allRecordsLoaded")}</p>
         )}
       </div>
     </section>

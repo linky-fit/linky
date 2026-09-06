@@ -12,7 +12,6 @@
   "scripts": {
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
-    "tslint": "bun run eslint",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },

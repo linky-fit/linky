@@ -1,52 +1,39 @@
-import React from "react";
-import { useNavigation } from "../hooks/useRouting";
 import {
-  GalleryIcon,
-  IssueTokenIcon,
-  KeyboardIcon,
-  PasteIcon,
-  SwitchCameraIcon,
-  TopupIcon,
-} from "./icons";
+  Images as GalleryIcon,
+  BadgePlus as IssueTokenIcon,
+  Keyboard as KeyboardIcon,
+  Copy as PasteIcon,
+  SwitchCamera as SwitchCameraIcon,
+  ArrowDownToLine as TopupIcon,
+} from "lucide-react";
+import React from "react";
+import {
+  useAppShellActions,
+  useAppShellCore,
+} from "../app/context/AppShellContexts";
+import { navigateTo } from "../hooks/useRouting";
 
-interface ScanModalProps {
-  closeScan: () => void;
-  cycleScanCamera: () => void;
-  onIssueToken: () => void;
-  onPickScanImage: () => void;
-  onScanImageSelected: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onTypePayment: () => void;
-  onTypeManually: () => void;
-  pasteScanValue: () => Promise<void>;
-  scanCameraLabel: string | null;
-  scanCanSwitchCamera: boolean;
-  scanEntryPoint: "contacts" | "receive" | "send" | null;
-  scanImageInputRef: React.RefObject<HTMLInputElement | null>;
-  scanVideoRef: React.RefObject<HTMLVideoElement | null>;
-  showTypeAction: boolean;
-  showWalletActions: boolean;
-  t: (key: string) => string;
-}
-
-export function ScanModal({
-  closeScan,
-  cycleScanCamera,
-  onIssueToken,
-  onPickScanImage,
-  onScanImageSelected,
-  onTypePayment,
-  onTypeManually,
-  pasteScanValue,
-  scanCameraLabel,
-  scanCanSwitchCamera,
-  scanEntryPoint,
-  scanImageInputRef,
-  scanVideoRef,
-  showTypeAction,
-  showWalletActions,
-  t,
-}: ScanModalProps): React.ReactElement {
-  const navigateTo = useNavigation();
+export function ScanModal(): React.ReactElement {
+  const {
+    closeScan,
+    cycleScanCamera,
+    openIssueTokenFromScan: onIssueToken,
+    onPickScanImage,
+    onScanImageSelected,
+    openManualPayFromScan: onTypePayment,
+    openManualContactFromScan: onTypeManually,
+    pasteScanValue,
+  } = useAppShellActions();
+  const {
+    scanCameraLabel,
+    scanCanSwitchCamera,
+    scanEntryPoint,
+    scanImageInputRef,
+    scanVideoRef,
+    scanAllowsManualContact: showTypeAction,
+    t,
+  } = useAppShellCore();
+  const showWalletActions = !showTypeAction;
   const isReceiveScan = scanEntryPoint === "receive";
   const isSendScan = scanEntryPoint === "send";
   const handleClose = React.useCallback(() => {
@@ -89,7 +76,7 @@ export function ScanModal({
               aria-label={t("scanSwitchCamera")}
               title={scanCameraLabel ?? t("scanSwitchCamera")}
             >
-              <SwitchCameraIcon aria-hidden="true" />
+              <SwitchCameraIcon size={22} aria-hidden="true" />
               <span>{t("scanSwitchCamera")}</span>
             </button>
           ) : null}

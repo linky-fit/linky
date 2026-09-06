@@ -7,6 +7,7 @@ import {
 import { Effect, Exit } from "effect";
 import { CurrencyUnit, MintUrl } from "../../domain/primitives";
 import type { KeyValueStoreService } from "../../ports/KeyValueStore";
+import { fakeWallet as stubWallet } from "../../testing/fakeWallet";
 import type { LoadedWallet, WalletLoader } from "./WalletInstances";
 import {
   classifyMintError,
@@ -29,22 +30,8 @@ const infoFixture: GetInfoResponse = {
   },
 };
 
-const fakeWallet = (keysetId: string): LoadedWallet => ({
-  keysetId,
-  keyChain: { getKeysets: () => [] },
-  getMintInfo: () => new CashuMintInfo(infoFixture),
-  receive: () => Promise.reject(new Error("not under test")),
-  send: () => Promise.reject(new Error("not under test")),
-  checkProofsStates: () => Promise.reject(new Error("not under test")),
-  restore: () => Promise.reject(new Error("not under test")),
-  createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-  createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-  batchRestore: () => Promise.reject(new Error("not under test")),
-});
+const fakeWallet = (keysetId: string): LoadedWallet =>
+  stubWallet({ keysetId, getMintInfo: () => new CashuMintInfo(infoFixture) });
 
 const stubKv = (sets: Array<[string, string]>): KeyValueStoreService => ({
   get: () => Effect.succeed(null),
@@ -76,8 +63,7 @@ describe("makeWalletInstances", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(calls).toBe(1);
     expect(exit.value[0]).toBe(wallet);
     expect(exit.value[1]).toBe(wallet);

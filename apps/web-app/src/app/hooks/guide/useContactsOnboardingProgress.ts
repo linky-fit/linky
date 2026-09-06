@@ -5,6 +5,7 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "../../../utils/storage";
+import type { Translate } from "../../../i18n";
 
 interface UseContactsOnboardingProgressParams {
   cashuBalance: number;
@@ -16,7 +17,7 @@ interface UseContactsOnboardingProgressParams {
   persistContactsOnboardingDismissed: () => void;
   routeKind: Route["kind"];
   stopContactsGuide: () => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 interface ContactsOnboardingTask {

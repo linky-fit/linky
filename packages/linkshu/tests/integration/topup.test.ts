@@ -1,58 +1,22 @@
 import { Mint, Wallet } from "@cashu/cashu-ts";
 import type { MintQuoteBolt11Response } from "@cashu/cashu-ts";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { createECDH } from "node:crypto";
 import {
   Amount,
-  Bip39Seed,
   Bolt11Invoice,
-  KeyValueStore,
-  makeInMemoryKeyValueStore,
-  makeInMemoryTokenStore,
-  MintUrl,
   PaidQuoteDraft,
   QuoteId,
   QuoteLockingKey,
   Send,
   SendDraft,
-  TokenStore,
   Topup,
   TopupDraft,
   UnixSeconds,
   runLinkshu,
 } from "../../src";
-import type { Bip39Seed as Bip39SeedType } from "../../src";
 import { PENDING_TOPUP_KEY_PREFIX } from "../../src/topup/internal/pendingTopup";
-
-// The dev-stack Nutshell FakeWallet mint (docker-compose.dev.yml `cashu-mint`)
-// auto-settles every bolt11 invoice it issues, so a fresh quote turns PAID
-// without anything paying it.
-const mintUrl = MintUrl.make(
-  process.env.LINKSHU_MINT_URL ?? "http://localhost:3338",
-);
-
-// Fresh seed per run: deterministic counters live at the mint, so a reused
-// seed would start every run inside an already-signed counter range.
-const randomSeed = (): Bip39SeedType =>
-  Bip39Seed.make(crypto.getRandomValues(new Uint8Array(64)));
-
-/**
- * Storage that outlives the runtime using it. Two `runLinkshu` calls over one
- * of these are a process restart: nothing survives in memory, everything
- * survives in the ports.
- */
-const durableStorage = () => {
-  const kv = makeInMemoryKeyValueStore();
-  const tokens = makeInMemoryTokenStore();
-  return {
-    kv,
-    tokens,
-    layers: {
-      keyValueStore: Layer.succeed(KeyValueStore, kv),
-      tokenStore: Layer.succeed(TokenStore, tokens),
-    },
-  };
-};
+import { durableStorage, mintUrl, randomSeed } from "./helpers";
 
 describe("topup vertical against the local mint", () => {
   it("drives quote, poll, and mint into one accepted row", async () => {

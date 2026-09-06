@@ -2,19 +2,18 @@ import type {
   ChatReactionChip,
   LocalNostrReaction,
 } from "../../types/appTypes";
-
-const normalizeText = (value: unknown): string => String(value ?? "").trim();
+import { trimString } from "../../../utils/validation";
 
 export const aggregateReactions = (
   reactions: readonly LocalNostrReaction[],
   ownPubkey: string | null,
 ): ChatReactionChip[] => {
-  const own = normalizeText(ownPubkey);
+  const own = trimString(ownPubkey);
 
   // One reaction per user: keep only the latest reaction per reactor
   const latestByUser = new Map<string, LocalNostrReaction>();
   for (const reaction of reactions) {
-    const reactor = normalizeText(reaction.reactorPubkey);
+    const reactor = trimString(reaction.reactorPubkey);
     if (!reactor) continue;
     const prev = latestByUser.get(reactor);
     if (!prev || reaction.createdAtSec > prev.createdAtSec) {
@@ -31,8 +30,8 @@ export const aggregateReactions = (
   >();
 
   for (const reaction of latestByUser.values()) {
-    const emoji = normalizeText(reaction.emoji);
-    const reactor = normalizeText(reaction.reactorPubkey);
+    const emoji = trimString(reaction.emoji);
+    const reactor = trimString(reaction.reactorPubkey);
     if (!emoji || !reactor) continue;
 
     const bucket = buckets.get(emoji) ?? {

@@ -1,17 +1,11 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ManualPayPage } from "./ManualPayPage";
 
 vi.mock("../hooks/useRouting", () => ({
-  useNavigation: () => vi.fn(),
+  navigateTo: vi.fn(),
 }));
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  value: true,
-  configurable: true,
-  writable: true,
-});
 
 const translate = (key: string): string => {
   switch (key) {
@@ -51,20 +45,14 @@ describe("ManualPayPage", () => {
   });
 
   it("autofocuses the recipient input", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <ManualPayPage
-          contacts={[]}
-          nostrPictureByNpub={{}}
-          onSubmitText={async () => {}}
-          t={translate}
-        />,
-      );
-    });
+    const { container } = await renderIntoDocument(
+      <ManualPayPage
+        contacts={[]}
+        nostrPictureByNpub={{}}
+        onSubmitText={async () => {}}
+        t={translate}
+      />,
+    );
 
     const input = container.querySelector("input");
     expect(input).toBeInstanceOf(HTMLInputElement);
@@ -73,20 +61,15 @@ describe("ManualPayPage", () => {
 
   it("expands a bare alias to linky.fit before submit", async () => {
     const onSubmitText = vi.fn<ManualPayPagePropsSubmit>();
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
 
-    await act(async () => {
-      root.render(
-        <ManualPayPage
-          contacts={[]}
-          nostrPictureByNpub={{}}
-          onSubmitText={onSubmitText}
-          t={translate}
-        />,
-      );
-    });
+    const { container } = await renderIntoDocument(
+      <ManualPayPage
+        contacts={[]}
+        nostrPictureByNpub={{}}
+        onSubmitText={onSubmitText}
+        t={translate}
+      />,
+    );
 
     const input = container.querySelector("input");
     if (!(input instanceof HTMLInputElement)) {
@@ -112,20 +95,15 @@ describe("ManualPayPage", () => {
 
   it("submits invoices without linky.fit expansion", async () => {
     const onSubmitText = vi.fn<ManualPayPagePropsSubmit>();
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
 
-    await act(async () => {
-      root.render(
-        <ManualPayPage
-          contacts={[]}
-          nostrPictureByNpub={{}}
-          onSubmitText={onSubmitText}
-          t={translate}
-        />,
-      );
-    });
+    const { container } = await renderIntoDocument(
+      <ManualPayPage
+        contacts={[]}
+        nostrPictureByNpub={{}}
+        onSubmitText={onSubmitText}
+        t={translate}
+      />,
+    );
 
     const input = container.querySelector("input");
     if (!(input instanceof HTMLInputElement)) {

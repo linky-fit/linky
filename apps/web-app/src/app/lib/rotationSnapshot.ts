@@ -1,18 +1,13 @@
+import { Schema, Option } from "effect";
+import { UnknownRecord } from "../../utils/schema";
 // Cross-device propagation of independent, pointer-only owner-lane rotations.
 // Each scope writes one synced `ownerMeta` row so adopters converge on the
 // active index and its rotation boundary without copying historical rows.
-//
-// Historically the `value` column was a plain `"contacts-N"` string carrying
-// only the index. Adopters then defaulted baseline / editCount / rotatedAt
-// to zero, which made `delta = currentRowCount` after Evolu sync pulled in
-// the migrated rows — large enough to fire the auto-rotation threshold a
-// second time on the adopting device, cascading rotations across the fleet.
-//
-// The structured snapshot below fixes that. Legacy `"contacts-N"` values
-// still parse (with the missing fields nulled), so old clients keep working
-// while new clients reap the full benefit.
+// Legacy plain `"<scope>-N"` values still decode, with the fields they lack
+// nulled rather than zeroed, so an adopter never mistakes them for a fresh
+// baseline.
 
-export type RotationScope = "cashu" | "contacts" | "messages" | "transactions";
+type RotationScope = "cashu" | "contacts" | "messages" | "transactions";
 
 export interface RotationSnapshot {
   /** New owner lane index (e.g. 3 → owner derivation path uses `<scope>-3`). */
@@ -79,8 +74,10 @@ export const decodeRotationSnapshot = (
     } catch {
       return null;
     }
-    if (typeof parsed !== "object" || parsed === null) return null;
-    const obj = parsed as Record<string, unknown>;
+    const obj = Option.getOrNull(
+      Schema.decodeUnknownOption(UnknownRecord)(parsed),
+    );
+    if (!obj) return null;
     const index = sanitizeNonNegativeInt(obj.index);
     if (index === null) return null;
     return {

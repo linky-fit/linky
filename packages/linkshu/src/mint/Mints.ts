@@ -1,19 +1,17 @@
 import { Effect } from "effect";
 import type { MintRejected, MintUnreachable } from "../domain/errors";
-import { CurrencyUnit } from "../domain/primitives";
 import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { inspectOperation } from "../internal/operations";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { TokenStore } from "../ports/TokenStore";
+import { findMintInfoIconValue, isTestMintUrl } from "./icons";
 import { MintInfo } from "./domain";
 import { collectKnownMints } from "./internal/knownMints";
 import { boundKeysetInputFeePpk } from "./internal/keysetFees";
 import { WalletInstances } from "./internal/WalletInstances";
 import type { LoadedWallet } from "./internal/WalletInstances";
-
-/** Linky wallets are sat-denominated today (see README). */
-const sat = CurrencyUnit.make("sat");
+import { sat } from "../internal/units";
 
 const nullableString = (value: unknown): string | null =>
   typeof value === "string" && value.length > 0 ? value : null;
@@ -21,12 +19,27 @@ const nullableString = (value: unknown): string | null =>
 const buildMintInfo = (mint: MintUrl, wallet: LoadedWallet): MintInfo => {
   const published = wallet.getMintInfo();
   const raw = published.cache;
+  const advertisedInfo = JSON.stringify(raw).toLowerCase();
   return new MintInfo({
     url: mint,
     name: nullableString(raw.name),
     inputFeePpk: boundKeysetInputFeePpk(wallet),
     supportsMpp: published.isSupported(15).supported,
-    iconUrl: nullableString(raw.icon_url),
+    isFakeLightning:
+      isTestMintUrl(mint) ||
+      advertisedInfo.includes("fakewallet") ||
+      advertisedInfo.includes(
+        "all your lightning invoices will always be marked paid",
+      ),
+    iconUrl: (() => {
+      const icon = findMintInfoIconValue(raw, new Set());
+      if (!icon) return null;
+      try {
+        return new URL(icon, mint).toString();
+      } catch {
+        return null;
+      }
+    })(),
   });
 };
 

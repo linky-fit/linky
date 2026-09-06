@@ -1,7 +1,8 @@
 import { parseTokenText } from "@linky/linkshu";
 import { normalizeNpubIdentifier } from "./nostrNpub";
+import { safeDecodeURIComponent } from "./url";
 
-export interface NativeDeepLinkScanText {
+interface NativeDeepLinkScanText {
   kind: "scan-text";
   rawUrl: string;
   text: string;
@@ -10,16 +11,8 @@ export interface NativeDeepLinkScanText {
 const NOSTR_SCHEME_PREFIX = /^nostr:(\/\/)?/i;
 const CASHU_SCHEME_PREFIX = /^cashu:(\/\/)?/i;
 
-const safeDecode = (value: string): string => {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-};
-
 const normalizeCandidate = (value: string): string => {
-  return safeDecode(value).trim();
+  return safeDecodeURIComponent(value).trim();
 };
 
 const normalizeStrictNpub = (value: string): string | null => {
@@ -35,14 +28,14 @@ const normalizeStrictCashuToken = (value: string): string | null => {
   return parseTokenText(normalized) ? normalized : null;
 };
 
-export const buildCashuDeepLink = (rawToken: unknown): string | null => {
-  const token = normalizeStrictCashuToken(String(rawToken ?? ""));
+export const buildCashuDeepLink = (rawToken: string): string | null => {
+  const token = normalizeStrictCashuToken(rawToken);
   if (!token) return null;
   return `cashu://${token}`;
 };
 
-export const buildCashuShareUrl = (rawToken: unknown): string | null => {
-  const token = normalizeStrictCashuToken(String(rawToken ?? ""));
+export const buildCashuShareUrl = (rawToken: string): string | null => {
+  const token = normalizeStrictCashuToken(rawToken);
   if (!token) return null;
   return `https://linky.fit/cashu/#${encodeURIComponent(token)}`;
 };
@@ -61,7 +54,7 @@ const extractNpubFromCandidate = (value: string): string | null => {
 
   if (segments.length === 0) return null;
 
-  const head = String(segments[0] ?? "").toLowerCase();
+  const head = (segments[0] ?? "").toLowerCase();
   if ((head === "contact" || head === "npub") && segments.length > 1) {
     return normalizeStrictNpub(segments[1] ?? "");
   }
@@ -196,9 +189,9 @@ const parseCashuDeepLinkUrl = (
 };
 
 export const parseNativeDeepLinkUrl = (
-  rawUrl: unknown,
+  rawUrl: string,
 ): NativeDeepLinkScanText | null => {
-  const normalizedRawUrl = String(rawUrl ?? "").trim();
+  const normalizedRawUrl = rawUrl.trim();
   if (!normalizedRawUrl) {
     return null;
   }

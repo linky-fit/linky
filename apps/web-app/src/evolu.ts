@@ -1,42 +1,46 @@
+import { ContactId, TransactionId } from "./evoluIds";
+export { ContactId, TransactionId } from "./evoluIds";
+import { Schema as EffectSchema } from "effect";
 import * as Evolu from "@evolu/common";
 import { createEvolu, SimpleName } from "@evolu/common";
 import { createUseEvolu, EvoluProvider } from "@evolu/react";
 import { evoluReactWebDeps } from "@evolu/react-web";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "./mnemonic";
 import { shouldUseInMemoryEvoluStorage } from "./platform/evoluWebStorage";
 import type { JsonValue } from "./types/json";
+import { base64 } from "@scure/base";
+import { decodeBase64Url } from "./utils/base64";
 import {
+  safeLocalStorageGet,
   safeLocalStorageGetJson,
   safeLocalStorageSetJson,
 } from "./utils/storage";
+import { isRecord } from "./utils/unknown";
+import { getInspectorEmissionEnabled } from "./devtools/inspector/inspectorEnabled";
+import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
 
 const isEvoluLoggingEnabled = (): boolean => {
   if (!import.meta.env.DEV) return false;
 
   // Enable only when explicitly requested, because SQL logging is very noisy.
   // Toggle in devtools: localStorage.setItem('linky_debug_evolu_sql', '1')
-  try {
-    return localStorage.getItem("linky_debug_evolu_sql") === "1";
-  } catch {
-    return false;
-  }
+  return safeLocalStorageGet("linky_debug_evolu_sql") === "1";
 };
 
-export const EVOLU_SERVERS_STORAGE_KEY = "linky.evoluServers.v1";
+const EVOLU_SERVERS_STORAGE_KEY = "linky.evoluServers.v1";
 
 // Backwards-compatible flag that allows removing the built-in default servers.
 // Without this, we can only store "extras" and the defaults would always be re-added.
-export const EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY =
+const EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY =
   "linky.evoluServers.defaultRemoved.v1";
 
-export const EVOLU_SERVERS_DISABLED_STORAGE_KEY =
-  "linky.evoluServers.disabled.v1";
+const EVOLU_SERVERS_DISABLED_STORAGE_KEY = "linky.evoluServers.disabled.v1";
 
 export type EvoluServerStatus = "checking" | "connected" | "disconnected";
 
-export type EvoluDatabaseInfo = {
+type EvoluDatabaseInfo = {
   bytes: number | null;
   tableCounts: Record<string, number | null>;
   historyCount: number | null;
@@ -48,7 +52,7 @@ const envEvoluServerUrls = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
   .map((url) => url.trim())
   .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
 
-export const DEFAULT_EVOLU_SERVER_URLS: ReadonlyArray<string> =
+const DEFAULT_EVOLU_SERVER_URLS: ReadonlyArray<string> =
   envEvoluServerUrls.length > 0
     ? envEvoluServerUrls
     : ["wss://evolu.linky.fit", "wss://free.evoluhq.com"];
@@ -79,9 +83,6 @@ type Stringifiable =
 
 type EvoluServerUrlInput = Stringifiable;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
 const isJsonValue = (value: unknown): value is JsonValue => {
   if (
     value === null ||
@@ -104,16 +105,20 @@ const toJsonValue = (value: unknown): JsonValue => {
 
 type EvoluQueryRow = Record<string, unknown>;
 
-const readCount = (rows: ReadonlyArray<EvoluQueryRow>): number => {
-  const first = rows[0];
-  if (!first) return 0;
-  return Number(first.count ?? 0);
+const readCount = (rows: ReadonlyArray<EvoluQueryRow>): number | null => {
+  const count = rows[0]?.count;
+  return typeof count === "number" && Number.isFinite(count) && count >= 0
+    ? count
+    : null;
 };
 
 const toByteArray = (value: unknown): number[] => {
   if (value instanceof Uint8Array) return Array.from(value);
-  if (!isRecord(value)) return [];
-  const entries = Object.values(value);
+  const entries = Array.isArray(value)
+    ? value
+    : isRecord(value)
+      ? Object.values(value)
+      : [];
   if (entries.some((entry) => typeof entry !== "number")) return [];
   const out: number[] = [];
   for (const entry of entries) {
@@ -204,19 +209,6 @@ export const normalizeEvoluServerUrl = (
   }
 };
 
-export const formatBytes = (bytes: number): string => {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const units = ["B", "KiB", "MiB", "GiB"];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const digits = unitIndex === 0 ? 0 : value < 10 ? 2 : value < 100 ? 1 : 0;
-  return `${value.toFixed(digits)} ${units[unitIndex]}`;
-};
-
 const normalizeUrlList = (
   urls: ReadonlyArray<EvoluServerUrlInput>,
 ): ReadonlyArray<string> => {
@@ -236,19 +228,13 @@ const normalizeUrlList = (
   return unique;
 };
 
-export const getEvoluDisabledServerUrls = (): ReadonlyArray<string> => {
-  const stored = safeLocalStorageGetJson<ReadonlyArray<EvoluServerUrlInput>>(
+const getEvoluDisabledServerUrls = (): ReadonlyArray<string> => {
+  const stored = safeLocalStorageGetJson(
     EVOLU_SERVERS_DISABLED_STORAGE_KEY,
+    EffectSchema.Array(EffectSchema.String),
     [],
   );
   return normalizeUrlList(stored);
-};
-
-export const isEvoluServerDisabled = (url: string): boolean => {
-  const normalized = normalizeEvoluServerUrl(url);
-  if (!normalized) return false;
-  const disabled = getEvoluDisabledServerUrls();
-  return disabled.some((u) => u.toLowerCase() === normalized.toLowerCase());
 };
 
 export const setEvoluServerDisabled = (
@@ -265,23 +251,17 @@ export const setEvoluServerDisabled = (
   safeLocalStorageSetJson(EVOLU_SERVERS_DISABLED_STORAGE_KEY, next);
 };
 
-export const toggleEvoluServerDisabled = (url: string): boolean => {
-  const next = !isEvoluServerDisabled(url);
-  setEvoluServerDisabled(url, next);
-  return next;
-};
-
-export const getEvoluConfiguredServerUrls = (): ReadonlyArray<string> => {
-  const stored = safeLocalStorageGetJson<ReadonlyArray<EvoluServerUrlInput>>(
+const getEvoluConfiguredServerUrls = (): ReadonlyArray<string> => {
+  const stored = safeLocalStorageGetJson(
     EVOLU_SERVERS_STORAGE_KEY,
+    EffectSchema.Array(EffectSchema.String),
     [],
   );
 
-  const defaultRemoved = Boolean(
-    safeLocalStorageGetJson<boolean>(
-      EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY,
-      false,
-    ),
+  const defaultRemoved = safeLocalStorageGetJson(
+    EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY,
+    EffectSchema.Boolean,
+    false,
   );
 
   const combined = [
@@ -295,20 +275,14 @@ export const getEvoluConfiguredServerUrls = (): ReadonlyArray<string> => {
   return unique;
 };
 
-export const getEvoluServerUrls = (): ReadonlyArray<string> => {
-  // Back-compat alias: historically used as "the server list".
-  // Now returns configured (including disabled) so UIs can display everything.
-  return getEvoluConfiguredServerUrls();
-};
-
-export const getEvoluActiveServerUrls = (): ReadonlyArray<string> => {
+const getEvoluActiveServerUrls = (): ReadonlyArray<string> => {
   const configured = getEvoluConfiguredServerUrls();
   const disabled = getEvoluDisabledServerUrls();
   const disabledLower = new Set(disabled.map((u) => u.toLowerCase()));
   return configured.filter((u) => !disabledLower.has(u.toLowerCase()));
 };
 
-export const setEvoluServerUrls = (urls: ReadonlyArray<string>): void => {
+const setEvoluServerUrls = (urls: ReadonlyArray<string>): void => {
   const normalized = urls
     .map(normalizeEvoluServerUrl)
     .filter((v): v is string => Boolean(v));
@@ -336,20 +310,19 @@ export const setEvoluServerUrls = (urls: ReadonlyArray<string>): void => {
   safeLocalStorageSetJson(EVOLU_SERVERS_STORAGE_KEY, extras);
 };
 
-export const EVOLU_SERVER_URLS: ReadonlyArray<string> =
-  getEvoluActiveServerUrls();
+const EVOLU_SERVER_URLS: ReadonlyArray<string> = getEvoluActiveServerUrls();
 
-export const buildEvoluTransports = (
+const buildEvoluTransports = (
   urls: ReadonlyArray<string>,
 ): ReadonlyArray<{ type: "WebSocket"; url: string }> =>
   urls.map((url) => ({ type: "WebSocket", url }));
 
-export const EVOLU_TRANSPORTS: ReadonlyArray<{
+const EVOLU_TRANSPORTS: ReadonlyArray<{
   type: "WebSocket";
   url: string;
 }> = buildEvoluTransports(EVOLU_SERVER_URLS);
 
-export const probeWebSocketConnection = (
+const probeWebSocketConnection = (
   url: string,
   timeoutMs = 2500,
 ): Promise<boolean> => {
@@ -394,35 +367,21 @@ export const probeWebSocketConnection = (
   });
 };
 
-// Primary key pro Contact tabulku
-const ContactId = Evolu.id("Contact");
-export type ContactId = typeof ContactId.Type;
-
-// Primary key pro CashuToken tabulku
 const CashuTokenId = Evolu.id("CashuToken");
 export type CashuTokenId = typeof CashuTokenId.Type;
 
-// Primary key pro NostrIdentity tabulku
 const NostrIdentityId = Evolu.id("NostrIdentity");
-export type NostrIdentityId = typeof NostrIdentityId.Type;
+type NostrIdentityId = typeof NostrIdentityId.Type;
 
-// Primary key pro NostrMessage tabulku
 const NostrMessageId = Evolu.id("NostrMessage");
-export type NostrMessageId = typeof NostrMessageId.Type;
+type NostrMessageId = typeof NostrMessageId.Type;
 
-// Primary key pro NostrReaction tabulku
 const NostrReactionId = Evolu.id("NostrReaction");
-export type NostrReactionId = typeof NostrReactionId.Type;
+type NostrReactionId = typeof NostrReactionId.Type;
 
-// Primary key pro OwnerMeta tabulku (metadata pro owner lane routing)
 const OwnerMetaId = Evolu.id("OwnerMeta");
-export type OwnerMetaId = typeof OwnerMetaId.Type;
+type OwnerMetaId = typeof OwnerMetaId.Type;
 
-// Primary key pro Transaction tabulku
-const TransactionId = Evolu.id("Transaction");
-export type TransactionId = typeof TransactionId.Type;
-
-// Schema pro Linky app
 export const Schema = {
   contact: {
     id: ContactId,
@@ -553,13 +512,10 @@ export const Schema = {
   },
 };
 
-// Create Evolu instance for a specific user (mnemonic)
-// Each user gets their own SQLite database file based on their mnemonic
-export const createEvoluForUser = (mnemonic: string | null) => {
+const createEvoluForUser = (mnemonic: string | null) => {
   const dbName = mnemonic ? generateDbNameFromMnemonic(mnemonic) : "linky-anon";
 
   const validatedName = SimpleName.from(dbName);
-  // Fallback to a safe name if generation fails
   const finalName = validatedName.ok
     ? validatedName.value
     : SimpleName.orThrow("linky-default");
@@ -581,42 +537,51 @@ export const createEvoluForUser = (mnemonic: string | null) => {
   });
 };
 
-// Type for the Evolu instance
 type EvoluInstance = ReturnType<typeof createEvoluForUser>;
 
-// Global evolu instance - will be set when user is determined
 let globalEvoluInstance: EvoluInstance | null = null;
 
-// Initialize or get the Evolu instance for current user
-export const getEvolu = (mnemonic?: string | null): EvoluInstance => {
+const getEvolu = (mnemonic?: string | null): EvoluInstance => {
   if (mnemonic !== undefined) {
-    // Create new instance for this specific mnemonic
     globalEvoluInstance = createEvoluForUser(mnemonic);
   }
 
   if (!globalEvoluInstance) {
-    // Try to get mnemonic from storage on first call
-    const storedMnemonic = (() => {
-      if (typeof localStorage === "undefined") return null;
-      try {
-        return localStorage.getItem(INITIAL_MNEMONIC_STORAGE_KEY);
-      } catch {
-        return null;
-      }
-    })();
-    globalEvoluInstance = createEvoluForUser(storedMnemonic);
+    globalEvoluInstance = createEvoluForUser(
+      safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY),
+    );
   }
 
   return globalEvoluInstance;
 };
 
-// Legacy export for backward compatibility - gets the current global instance
 export const evolu = getEvolu();
 
 export const createCashuTokensAllQuery = () =>
   evolu.createQuery((db) =>
     db.selectFrom("cashuToken").selectAll().orderBy("createdAt", "desc"),
   );
+
+export const createContactsAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("contact").selectAll());
+export const createNostrMessagesAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("nostrMessage").selectAll());
+export const createNostrReactionsAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("nostrReaction").selectAll());
+export const createTransactionsAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("transaction").selectAll());
+export type ContactRow = Evolu.InferRow<
+  ReturnType<typeof createContactsAllQuery>
+>;
+export type NostrMessageRow = Evolu.InferRow<
+  ReturnType<typeof createNostrMessagesAllQuery>
+>;
+export type NostrReactionRow = Evolu.InferRow<
+  ReturnType<typeof createNostrReactionsAllQuery>
+>;
+export type TransactionRow = Evolu.InferRow<
+  ReturnType<typeof createTransactionsAllQuery>
+>;
 
 export type CashuTokenRow = Evolu.InferRow<
   ReturnType<typeof createCashuTokensAllQuery>
@@ -648,26 +613,33 @@ export const useEvoluSyncOwner = (enabled: boolean): Evolu.SyncOwner | null => {
   return enabled ? syncOwner : null;
 };
 
-type EvoluLastError = Error | string | null;
-
-const toEvoluLastError = (value: unknown): EvoluLastError => {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Error) return value;
-  return String(value);
-};
-
 export const useEvoluLastError = (opts?: {
   logToConsole?: boolean;
-}): EvoluLastError => {
+}): Evolu.EvoluError | null => {
   const logToConsole = opts?.logToConsole ?? false;
-  const [lastError, setLastError] = useState<EvoluLastError>(null);
+  const [lastError, setLastError] = useState<Evolu.EvoluError | null>(() =>
+    getEvolu().getError(),
+  );
 
   useEffect(() => {
     const instance = getEvolu();
     const unsub = instance.subscribeError(() => {
-      const err = toEvoluLastError(instance.getError());
+      const err = instance.getError();
       setLastError(err);
-      if (logToConsole && err) console.log("[linky][evolu] error", err);
+      if (!err) return;
+      if (logToConsole) console.log("[linky][evolu] error", err.type);
+      if (getInspectorEmissionEnabled()) {
+        reportInspectorRows([
+          {
+            at: Date.now(),
+            channel: "evolu.sync",
+            tag: "EvoluError",
+            summary: `Evolu reported ${err.type}`,
+            links: "ownerId" in err ? { owner: err.ownerId } : {},
+            payload: { type: err.type },
+          },
+        ]);
+      }
     });
 
     return () => {
@@ -682,7 +654,9 @@ export const useEvoluLastError = (opts?: {
   return lastError;
 };
 
-export const getEvoluDatabaseInfo = async (): Promise<{
+const getEvoluDatabaseInfo = async (
+  isCurrent: () => boolean,
+): Promise<{
   bytes: number;
   tableCounts: Record<string, number | null>;
   historyCount: number | null;
@@ -699,30 +673,15 @@ export const getEvoluDatabaseInfo = async (): Promise<{
 
   const instance = getEvolu();
 
-  // Get SQLite file size from OPFS for current user only
   const dbBytesPromise = (async () => {
     try {
       const root = await navigator.storage?.getDirectory?.();
       if (!root) return 0;
 
-      // Get current user's mnemonic
-      const mnemonic = (() => {
-        try {
-          return localStorage.getItem(INITIAL_MNEMONIC_STORAGE_KEY);
-        } catch {
-          return null;
-        }
-      })();
+      const mnemonic = safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY);
 
-      // Generate expected directory name
       const expectedDir = mnemonic
-        ? (() => {
-            let hash = 0;
-            for (let i = 0; i < mnemonic.length; i++) {
-              hash = ((hash << 5) - hash + mnemonic.charCodeAt(i)) | 0;
-            }
-            return `.linky-${Math.abs(hash).toString(16).padStart(8, "0").slice(0, 8)}`;
-          })()
+        ? `.${generateDbNameFromMnemonic(mnemonic)}`
         : ".linky-anon";
 
       let totalSize = 0;
@@ -755,6 +714,7 @@ export const getEvoluDatabaseInfo = async (): Promise<{
   const tableCountsPromise = (async () => {
     const out: Record<string, number | null> = {};
     for (const table of tables) {
+      if (!isCurrent()) break;
       try {
         const q = createUntypedQuery(instance, (db) =>
           db.selectFrom(table).select((eb) => eb.fn.countAll().as("count")),
@@ -792,17 +752,8 @@ export const getEvoluDatabaseInfo = async (): Promise<{
   return { bytes, tableCounts, historyCount };
 };
 
-// Helper to convert Uint8Array to base64
-const uint8ArrayToBase64 = (bytes: unknown): string => {
-  const arr = toByteArray(bytes);
-  if (arr.length === 0) return "";
-  try {
-    const binString = arr.map((x) => String.fromCharCode(x)).join("");
-    return btoa(binString);
-  } catch {
-    return "";
-  }
-};
+const uint8ArrayToBase64 = (bytes: unknown): string =>
+  base64.encode(Uint8Array.from(toByteArray(bytes)));
 
 const timestampToMs = (timestampBytes: unknown): number | null => {
   const arr = toByteArray(timestampBytes);
@@ -846,28 +797,12 @@ export interface EvoluHistoryRow {
   [key: string]: JsonValue;
 }
 
-export interface EvoluHistoryMutationCountRequest {
+interface EvoluHistoryMutationCountRequest {
   key: string;
   ownerId: string;
   rotatedAtMs: number;
   tables: readonly string[];
 }
-
-const base64ToUint8Array = (value: string): Uint8Array | null => {
-  const normalized = value.trim().replace(/-/g, "+").replace(/_/g, "/");
-  if (!normalized) return null;
-  const padded = normalized.padEnd(
-    normalized.length + ((4 - (normalized.length % 4)) % 4),
-    "=",
-  );
-
-  try {
-    const decoded = atob(padded);
-    return Uint8Array.from(decoded, (char) => char.charCodeAt(0));
-  } catch {
-    return null;
-  }
-};
 
 const timestampAfterMs = (timestampMs: number): Uint8Array => {
   const bytes = new Uint8Array(16);
@@ -887,11 +822,11 @@ export const loadEvoluHistoryMutationCounts = async (
 
   await Promise.all(
     requests.map(async (request) => {
-      const ownerId = base64ToUint8Array(request.ownerId);
+      const ownerId = decodeBase64Url(request.ownerId);
       const tables = request.tables
         .map((table) => table.trim())
         .filter(Boolean);
-      if (!ownerId || tables.length === 0) {
+      if (!ownerId?.length || tables.length === 0) {
         counts[request.key] = 0;
         return;
       }
@@ -935,7 +870,6 @@ export const subscribeEvoluHistoryMutationVersion = (
   return typeof unsubscribe === "function" ? unsubscribe : () => {};
 };
 
-// Load history data from evolu_history table with pagination support
 export const loadEvoluHistoryData = async (
   limit = 100,
   offset = 0,
@@ -968,7 +902,6 @@ export const loadEvoluHistoryData = async (
   }
 };
 
-// Load current data from all tables
 export const loadEvoluCurrentData = async (): Promise<
   Record<string, Record<string, JsonValue>[]>
 > => {
@@ -1001,24 +934,11 @@ export const loadEvoluCurrentData = async (): Promise<
 };
 
 export const wipeEvoluStorage = (): void => {
-  const storedMnemonic = (() => {
-    try {
-      return localStorage.getItem(INITIAL_MNEMONIC_STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  })();
+  const storedMnemonic = safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY);
 
   const mnemonicResult = Evolu.Mnemonic.fromUnknown(storedMnemonic);
   if (!mnemonicResult.ok) {
     throw new Error("Missing stored mnemonic");
-  }
-
-  // Clear any leftover internal snapshot from older builds.
-  try {
-    localStorage.removeItem("linky.evolu.compactionSnapshot.v1");
-  } catch {
-    // ignore
   }
 
   // Hard wipe Evolu local storage (journal + state) and reload.
@@ -1039,30 +959,73 @@ export const useEvoluDatabaseInfoState = (opts?: {
     updatedAtMs: null,
   }));
   const [isBusy, setIsBusy] = useState(false);
+  const refreshing = useRef(false);
+  const refreshRequested = useRef(false);
+  const refreshGeneration = useRef(0);
+  const queryFailed = useRef(false);
 
   const refresh = useCallback(async () => {
-    if (isBusy) return;
+    if (!enabled || queryFailed.current) return;
+    refreshRequested.current = true;
+    if (refreshing.current) return;
+    refreshing.current = true;
+    const generation = ++refreshGeneration.current;
     setIsBusy(true);
     try {
-      const next = await getEvoluDatabaseInfo();
-      setInfo({
-        bytes: next.bytes,
-        tableCounts: next.tableCounts,
-        historyCount: next.historyCount,
-        updatedAtMs: Date.now(),
-      });
+      do {
+        refreshRequested.current = false;
+        const next = await getEvoluDatabaseInfo(
+          () => generation === refreshGeneration.current,
+        );
+        if (generation !== refreshGeneration.current) return;
+        setInfo({ ...next, updatedAtMs: Date.now() });
+      } while (refreshRequested.current);
     } catch (err) {
-      onError?.(err);
+      if (generation === refreshGeneration.current) onError?.(err);
     } finally {
-      setIsBusy(false);
+      if (generation === refreshGeneration.current) {
+        refreshing.current = false;
+        setIsBusy(false);
+      }
     }
-  }, [isBusy, onError]);
+  }, [enabled, onError]);
 
   useEffect(() => {
     if (!enabled) return;
-    if (info.bytes !== null) return;
+    if (queryFailed.current) return;
+    const cancelRefresh = () => {
+      refreshGeneration.current += 1;
+      refreshing.current = false;
+      refreshRequested.current = false;
+      setIsBusy(false);
+    };
+    const instance = getEvolu();
+    let unsubscribe = () => {};
+    const unsubscribeError = instance.subscribeError(() => {
+      const error = instance.getError();
+      if (error?.type !== "SqliteError") return;
+      // Evolu leaves a failed loadQuery promise cached and unresolved until reload.
+      queryFailed.current = true;
+      unsubscribe();
+      cancelRefresh();
+      setInfo({
+        bytes: null,
+        tableCounts: {},
+        historyCount: null,
+        updatedAtMs: null,
+      });
+      onError?.(error);
+    });
+    unsubscribe = subscribeEvoluHistoryMutationVersion(() => {
+      void refresh();
+    });
     void refresh();
-  }, [enabled, info.bytes, refresh]);
+    return () => {
+      unsubscribe();
+      unsubscribeError();
+      cancelRefresh();
+    };
+  }, [enabled, onError, refresh]);
 
   return {
     info,
@@ -1198,8 +1161,6 @@ export const useEvoluServersManager = (opts?: {
   } as const;
 };
 
-// Export EvoluProvider pro použití v main.tsx
 export { EvoluProvider };
 
-// Vytvoř typovaný React Hook - now using getEvolu() to ensure we get the right instance
 export const useEvolu = createUseEvolu(getEvolu());

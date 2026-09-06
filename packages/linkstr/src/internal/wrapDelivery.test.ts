@@ -1,26 +1,15 @@
 import { Effect, Exit } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
 import { NoRelayReachable } from "../domain/errors";
+import { ClientId, RelayUrl, UnixSeconds } from "../domain/primitives";
+import type { NostrTransportService } from "../services/NostrTransport";
 import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  UnixSeconds,
-} from "../domain/primitives";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import {
-  RelayPublishResult,
-  type NostrTransportService,
-} from "../services/NostrTransport";
-import { firstTagValue, SignedWrapEvent } from "./nostrEvent";
+  makeIdentity,
+  recipientOf,
+  stubWrapTransportService,
+} from "../testing";
+import type { SignedWrapEvent } from "./nostrEvent";
 import { rumorWithHash } from "./nostrEvent";
 import { deliverRumorToPeer } from "./wrapDelivery";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -40,32 +29,17 @@ const rumor = rumorWithHash({
   content: "hello",
 });
 
-const recipientOf = (wrap: SignedWrapEvent): string | null =>
-  firstTagValue(wrap.tags, "p");
-
+/** Records the recipient of every published wrap, in publish order. */
 const stubTransport = (
   publishedRecipients: Array<string | null>,
   acceptFor: (recipient: string | null) => boolean,
-): NostrTransportService => ({
-  publish: (relays, wrap) =>
-    Effect.sync(() => {
-      if (!(wrap instanceof SignedWrapEvent)) {
-        throw new Error("delivery publishes only gift wraps");
-      }
-      const recipient = recipientOf(wrap);
-      publishedRecipients.push(recipient);
-      return relays.map(
-        (r) =>
-          new RelayPublishResult({
-            relay: r,
-            accepted: acceptFor(recipient),
-            detail: acceptFor(recipient) ? null : "blocked",
-          }),
-      );
-    }),
-  subscribe: () => Effect.die("unused"),
-  fetch: () => Effect.die("unused"),
-});
+): NostrTransportService => {
+  const published: Array<SignedWrapEvent> = [];
+  return stubWrapTransportService(published, (wrap) => {
+    publishedRecipients.push(recipientOf(wrap));
+    return acceptFor(recipientOf(wrap));
+  });
+};
 
 const deliver = (
   transport: NostrTransportService,
@@ -97,7 +71,7 @@ describe("deliverRumorToPeer with order recipientFirst", () => {
     );
 
     expect(publishedRecipients).toEqual([bob.pubkey, alice.pubkey]);
-    if (!Exit.isSuccess(exit)) throw new Error("expected success");
+    assert(Exit.isSuccess(exit));
     expect(exit.value.recipientCopy.accepted).toBe(true);
     expect(exit.value.selfCopy.accepted).toBe(true);
   });
@@ -110,8 +84,7 @@ describe("deliverRumorToPeer with order recipientFirst", () => {
     );
 
     expect(publishedRecipients).toEqual([bob.pubkey]);
-    if (!Exit.isFailure(exit)) throw new Error("expected failure");
-    if (exit.cause._tag !== "Fail") throw new Error("expected typed failure");
+    assert(Exit.isFailure(exit) && exit.cause._tag === "Fail");
     const failure = exit.cause.error;
     expect(failure).toBeInstanceOf(NoRelayReachable);
     expect(failure.selfCopy.acceptedBy).toEqual([]);
@@ -130,7 +103,7 @@ describe("deliverRumorToPeer with order recipientFirst", () => {
     );
 
     expect(publishedRecipients).toEqual([bob.pubkey, alice.pubkey]);
-    if (!Exit.isSuccess(exit)) throw new Error("expected success");
+    assert(Exit.isSuccess(exit));
     expect(exit.value.recipientCopy.accepted).toBe(true);
     expect(exit.value.selfCopy.accepted).toBe(false);
   });
@@ -144,6 +117,44 @@ describe("deliverRumorToPeer default order", () => {
     expect(publishedRecipients).toHaveLength(2);
     expect(publishedRecipients).toContain(bob.pubkey);
     expect(publishedRecipients).toContain(alice.pubkey);
-    if (!Exit.isSuccess(exit)) throw new Error("expected success");
+    assert(Exit.isSuccess(exit));
+  });
+
+  it("fails with RecipientNotReached when only the self copy lands", async () => {
+    const exit = await deliver(
+      stubTransport([], (recipient) => recipient === alice.pubkey),
+    );
+
+    expect(exit).toEqual(
+      Exit.fail(
+        expect.objectContaining({
+          _tag: "RecipientNotReached",
+          rumorId: rumor.id,
+          clientId,
+          sentAt,
+          selfCopy: expect.objectContaining({ acceptedBy: [relay] }),
+          recipientCopy: expect.objectContaining({
+            acceptedBy: [],
+            rejectedBy: [expect.objectContaining({ relay, detail: "blocked" })],
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("fails with NoRelayReachable when nothing lands", async () => {
+    const exit = await deliver(stubTransport([], () => false));
+
+    expect(exit).toEqual(
+      Exit.fail(
+        expect.objectContaining({
+          _tag: "NoRelayReachable",
+          rumorId: rumor.id,
+          clientId,
+          selfCopy: expect.objectContaining({ acceptedBy: [] }),
+          recipientCopy: expect.objectContaining({ acceptedBy: [] }),
+        }),
+      ),
+    );
   });
 });

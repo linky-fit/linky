@@ -1,29 +1,19 @@
 import { Either } from "effect";
-import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
+import { finalizeEvent } from "nostr-tools";
 import { encrypt, getConversationKey } from "nostr-tools/nip44";
 import { createWrap } from "nostr-tools/nip59";
 import { decodeWrapEvent } from "../inbox/decodeWrapEvent";
 import { wrapRumorFor } from "../internal/giftWrap";
 import { Rumor } from "../internal/nostrEvent";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RumorId,
-  UnixSeconds,
-} from "../domain/primitives";
+import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
 import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
 import {
   decodeReactionRumor,
   encodeReactionRumor,
   encodeRetractionRumor,
 } from "./codec";
+import { makeIdentity } from "../testing";
 import { Emoji, ReactionDraft, RetractionDraft } from "./domain";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const decodeWrap = (input: unknown, identity: LinkstrIdentityService) =>
   decodeWrapEvent(input, identity).event;

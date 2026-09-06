@@ -1,4 +1,5 @@
-import type { JsonValue } from "../types/json";
+import { Schema } from "effect";
+import { JsonValue } from "../types/json";
 import { asRecord, isHttpUrl } from "./validation";
 
 /**
@@ -127,7 +128,9 @@ export const listUpstreamPaidQuotes = async (args: {
       headers: { Authorization: auth },
     });
     if (!res.ok) return null;
-    const parsed = parseUpstreamQuotesPage((await res.json()) as JsonValue);
+    const parsed = parseUpstreamQuotesPage(
+      Schema.decodeUnknownSync(JsonValue)(await res.json()),
+    );
     if (parsed === null) return null;
     paid.push(...parsed.paid);
     offset += parsed.count;

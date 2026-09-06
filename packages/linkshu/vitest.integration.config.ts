@@ -1,7 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-// Runs against the local docker mint (docker-compose.dev.yml `cashu-mint`,
-// Nutshell FakeWallet on :3338); bring it up before running this project.
+// Requires docker-compose.dev.yml cashu-mint and cashu-mint-target.
 export default defineConfig({
   test: {
     globals: true,

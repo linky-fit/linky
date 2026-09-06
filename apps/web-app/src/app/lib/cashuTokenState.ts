@@ -1,4 +1,5 @@
 import { isStoredCashuErrorTokenSpent } from "./cashuStoredError";
+import { getUnknownErrorMessage } from "../../utils/unknown";
 
 export const CASHU_TOKEN_STATE_ACCEPTED = "accepted";
 export const CASHU_TOKEN_STATE_ERROR = "error";
@@ -7,7 +8,7 @@ const CASHU_TOKEN_STATE_ISSUED = "issued";
 const CASHU_TOKEN_STATE_PENDING = "pending";
 const CASHU_TOKEN_STATE_RESERVED = "reserved";
 
-export type CashuTokenState =
+type CashuTokenState =
   | typeof CASHU_TOKEN_STATE_ACCEPTED
   | typeof CASHU_TOKEN_STATE_ERROR
   | typeof CASHU_TOKEN_STATE_EXTERNALIZED
@@ -74,13 +75,6 @@ const DEFINITIVE_INVALID_CODES = new Set<number>([
   11001, // TokenAlreadySpentError
 ]);
 
-const getCashuErrorMessage = (error: unknown): string => {
-  if (typeof error === "object" && error !== null && "message" in error) {
-    return String(Reflect.get(error, "message") ?? "");
-  }
-  return String(error ?? "");
-};
-
 const isDefinitiveCashuError = (error: unknown): boolean => {
   if (typeof error === "object" && error !== null && "code" in error) {
     const code = Reflect.get(error, "code");
@@ -89,7 +83,7 @@ const isDefinitiveCashuError = (error: unknown): boolean => {
     }
   }
 
-  const message = getCashuErrorMessage(error).trim().toLowerCase();
+  const message = getUnknownErrorMessage(error, "").trim().toLowerCase();
   return SPENT_OR_INVALID_ERROR_PATTERNS.some((pattern) =>
     message.includes(pattern),
   );

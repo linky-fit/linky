@@ -16,7 +16,8 @@ import {
   resolveSyncedNostrIdentity,
 } from "../../lib/nostrIdentitySync";
 import { useEvoluContactsOwnerRotation } from "../useEvoluContactsOwnerRotation";
-import { useProfileAuthComposition } from "./useProfileAuthComposition";
+import { useProfileAuthDomain } from "../useProfileAuthDomain";
+import type { Translate } from "../../../i18n";
 
 interface IdentityOwnersNavigation {
   reload: () => void;
@@ -29,7 +30,7 @@ interface UseIdentityOwnersCompositionParams {
   navigation: IdentityOwnersNavigation;
   pushToast: (message: string) => void;
   setCurrentNsec: (currentNsec: string | null) => void;
-  t: (key: string) => string;
+  t: Translate;
   upsert: ReturnType<typeof useEvolu>["upsert"];
 }
 
@@ -64,7 +65,7 @@ export const useIdentityOwnersComposition = ({
 
   const myProfileMetadataRef = React.useRef<ProfileMetadata | null>(null);
 
-  const profileAuth = useProfileAuthComposition({
+  const profileAuth = useProfileAuthDomain({
     appendIdentityChangeNoticesRef,
     currentNsec,
     lang,
@@ -145,9 +146,7 @@ export const useIdentityOwnersComposition = ({
   );
   const nostrIdentityRows = useQuery(nostrIdentityQuery);
 
-  const activeIdentityOwnerId = String(
-    ownerRotation.identityOwnerId ?? "",
-  ).trim();
+  const activeIdentityOwnerId = (ownerRotation.identityOwnerId ?? "").trim();
   const legacyNostrIdentityOwnerIds = React.useMemo(
     () =>
       new Set(
@@ -157,7 +156,7 @@ export const useIdentityOwnersComposition = ({
           ownerRotation.legacyMessagesIdentityOwnerId,
           ownerRotation.metaOwnerId,
         ]
-          .map((ownerId) => String(ownerId ?? "").trim())
+          .map((ownerId) => (ownerId ?? "").trim())
           .filter(Boolean),
       ),
     [
@@ -182,7 +181,7 @@ export const useIdentityOwnersComposition = ({
 
     const localSource = getInitialNostrIdentitySource();
     const localSwitchedAtSec = getInitialNostrIdentitySwitchedAtSec();
-    const localNsec = String(currentNsec ?? "").trim();
+    const localNsec = currentNsec.trim();
     const syncedSwitchedAtSec = activeSyncedNostrIdentity.switchedAtSec;
     const switchedAtMatches =
       localSwitchedAtSec === syncedSwitchedAtSec ||
@@ -253,7 +252,6 @@ export const useIdentityOwnersComposition = ({
     messagesOwnerIdRef,
     myProfileMetadataRef,
     nostrIdentityRows,
-    setCurrentNsec,
     syncedNostrIdentityMatchesLocal,
     syncedNostrIdentityResolution,
     syncOwner,

@@ -1,3 +1,4 @@
+import { useLatest } from "../../hooks/useLatest";
 import React from "react";
 
 interface UseShowProfileQrOnTiltParams {
@@ -92,12 +93,8 @@ export const useShowProfileQrOnTilt = ({
   const lastOpenedAtRef = React.useRef(0);
   const motionTiltedRef = React.useRef(false);
   const orientationTiltedRef = React.useRef(false);
-  const onShowProfileQrRef = React.useRef(onShowProfileQr);
+  const onShowProfileQrRef = useLatest(onShowProfileQr);
   const screenTiltedRef = React.useRef(false);
-
-  React.useEffect(() => {
-    onShowProfileQrRef.current = onShowProfileQr;
-  }, [onShowProfileQr]);
 
   React.useEffect(() => {
     if (!enabled) {
@@ -229,5 +226,5 @@ export const useShowProfileQrOnTilt = ({
       );
       window.removeEventListener("resize", onScreenOrientationChange);
     };
-  }, [enabled]);
+  }, [enabled, onShowProfileQrRef]);
 };

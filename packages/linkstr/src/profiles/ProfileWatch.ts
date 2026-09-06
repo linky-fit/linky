@@ -10,7 +10,7 @@ import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { firstTagValue } from "../internal/nostrEvent";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
 import { resubscribeForever } from "../internal/resubscribe";
-import { nowUnixSeconds } from "../internal/time";
+import { nowSeconds } from "../internal/time";
 import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import {
@@ -113,7 +113,7 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
                     return Either.left("other-d-tag");
                   }
                   if (isStale(event)) return Either.left("stale");
-                  return decodeStatusEvent(event, yield* nowUnixSeconds);
+                  return decodeStatusEvent(event, yield* nowSeconds);
                 }
                 default:
                   return Either.left("unsupported-kind");

@@ -3,7 +3,7 @@ const IN_MEMORY_SESSION_STORAGE_KEY = "linky.in_memory_session.v1";
 
 export type OpfsProbeIssue = "unavailable" | "stalled";
 
-export interface PrepareEvoluWebStorageOptions {
+interface PrepareEvoluWebStorageOptions {
   /**
    * Shows the temporary-session consent UI. The returned promise resolves
    * once the user opts into an in-memory session; it may never resolve when

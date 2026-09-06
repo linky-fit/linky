@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cacheProfileAvatarFromUrl,
   loadCachedProfileAvatarObjectUrl,
-  peekAvatarObjectUrl,
   releaseAllAvatarObjectUrls,
   releaseAvatarObjectUrl,
 } from "./profileCache";
@@ -101,12 +100,6 @@ describe("avatar object url identity", () => {
     expect(a).toBeTruthy();
     expect(b).toBeTruthy();
     expect(a).not.toBe(b);
-    expect(peekAvatarObjectUrl(TEST_NPUB)).toBe(a);
-    expect(peekAvatarObjectUrl(OTHER_NPUB)).toBe(b);
-  });
-
-  it("peek reports nothing before an avatar is loaded", () => {
-    expect(peekAvatarObjectUrl(TEST_NPUB)).toBeNull();
   });
 
   it("revokes the previous url only when the avatar bytes are replaced", async () => {
@@ -117,20 +110,19 @@ describe("avatar object url identity", () => {
 
     expect(replaced).not.toBe(first);
     expect(revoked).toEqual([first]);
-    expect(peekAvatarObjectUrl(TEST_NPUB)).toBe(replaced);
+    expect(await loadCachedProfileAvatarObjectUrl(TEST_NPUB)).toBe(replaced);
   });
 
   it("releases a single npub without touching the others", async () => {
-    await seedCachedAvatar(TEST_NPUB, "one");
-    await seedCachedAvatar(OTHER_NPUB, "two");
-    const a = peekAvatarObjectUrl(TEST_NPUB);
-    const b = peekAvatarObjectUrl(OTHER_NPUB);
+    const a = await seedCachedAvatar(TEST_NPUB, "one");
+    const b = await seedCachedAvatar(OTHER_NPUB, "two");
 
     releaseAvatarObjectUrl(TEST_NPUB);
 
     expect(revoked).toEqual([a]);
-    expect(peekAvatarObjectUrl(TEST_NPUB)).toBeNull();
-    expect(peekAvatarObjectUrl(OTHER_NPUB)).toBe(b);
+    expect(await loadCachedProfileAvatarObjectUrl(OTHER_NPUB)).toBe(b);
+    // The released npub re-mints from CacheStorage instead of reviving the url.
+    expect(await loadCachedProfileAvatarObjectUrl(TEST_NPUB)).not.toBe(a);
   });
 
   it("releases every npub on identity change", async () => {
@@ -140,8 +132,6 @@ describe("avatar object url identity", () => {
     releaseAllAvatarObjectUrls();
 
     expect(new Set(revoked)).toEqual(new Set([a, b]));
-    expect(peekAvatarObjectUrl(TEST_NPUB)).toBeNull();
-    expect(peekAvatarObjectUrl(OTHER_NPUB)).toBeNull();
 
     // A later load re-mints from CacheStorage rather than resurrecting state.
     const reloaded = await loadCachedProfileAvatarObjectUrl(TEST_NPUB);

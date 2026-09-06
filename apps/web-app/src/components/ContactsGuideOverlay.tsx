@@ -1,4 +1,5 @@
 import React from "react";
+import type { I18nKey, Translate } from "../i18n";
 
 interface ContactsGuideOverlayProps {
   currentIdx: number;
@@ -11,9 +12,9 @@ interface ContactsGuideOverlayProps {
   onBack: () => void;
   onNext: () => void;
   onSkip: () => void;
-  stepBodyKey: string;
-  stepTitleKey: string;
-  t: (key: string) => string;
+  stepBodyKey: I18nKey;
+  stepTitleKey: I18nKey;
+  t: Translate;
   totalSteps: number;
 }
 

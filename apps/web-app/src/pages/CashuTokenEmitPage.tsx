@@ -15,7 +15,6 @@ interface CashuTokenEmitPageProps {
   emitCashuToken: () => Promise<void>;
   meltLargestForeignMintToMainMint: () => Promise<void>;
   setCashuEmitAmount: Dispatch<SetStateAction<string>>;
-  t: (key: string) => string;
 }
 
 export const CashuTokenEmitPage: FC<CashuTokenEmitPageProps> = ({
@@ -29,9 +28,8 @@ export const CashuTokenEmitPage: FC<CashuTokenEmitPageProps> = ({
   emitCashuToken,
   meltLargestForeignMintToMainMint,
   setCashuEmitAmount,
-  t,
 }) => {
-  const { formatDisplayedAmountText } = useAppShellCore();
+  const { formatDisplayedAmountText, t } = useAppShellCore();
   const [mintWarningDismissed, setMintWarningDismissed] = useState(false);
   const amountSat = Number.parseInt(cashuEmitAmount.trim(), 10);
   const invalid =

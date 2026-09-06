@@ -10,8 +10,7 @@ export interface LoadedSeed {
   readonly source: string;
 }
 
-const toHex = (bytes: Uint8Array): string =>
-  Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+const toHex = (bytes: Uint8Array): string => Buffer.from(bytes).toString("hex");
 
 const fromHex = (value: string, origin: string): Bip39Seed => {
   const hex = value.trim().toLowerCase();
@@ -19,10 +18,7 @@ const fromHex = (value: string, origin: string): Bip39Seed => {
     throw new Error(
       `${origin} must hold ${SEED_BYTES * 2} hex characters (a ${SEED_BYTES}-byte bip39 seed)`,
     );
-  const bytes = new Uint8Array(SEED_BYTES);
-  for (let index = 0; index < SEED_BYTES; index += 1)
-    bytes[index] = Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16);
-  return Bip39Seed.make(bytes);
+  return Bip39Seed.make(new Uint8Array(Buffer.from(hex, "hex")));
 };
 
 /**

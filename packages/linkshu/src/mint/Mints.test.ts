@@ -5,7 +5,7 @@ import {
   Keyset,
   MintInfo as CashuMintInfo,
 } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, Stream } from "effect";
+import { Effect, Exit, Layer } from "effect";
 import {
   MintUrl,
   TokenRowId,
@@ -13,9 +13,10 @@ import {
   UnixSeconds,
 } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
-import type { LinkshuInspectorEvent } from "../inspector/events";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { StoredTokenRow, TokenStore } from "../ports/TokenStore";
+import { fakeWallet } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
 import { MintInfo } from "./domain";
 import type { LoadedWallet } from "./internal/WalletInstances";
 import { seenMintKey, WalletInstances } from "./internal/WalletInstances";
@@ -32,20 +33,6 @@ const baseInfo: GetInfoResponse = {
     "4": { methods: [], disabled: false },
     "5": { methods: [], disabled: false },
   },
-};
-
-const walletStubMethods = {
-  receive: () => Promise.reject(new Error("not under test")),
-  send: () => Promise.reject(new Error("not under test")),
-  checkProofsStates: () => Promise.reject(new Error("not under test")),
-  restore: () => Promise.reject(new Error("not under test")),
-  createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-  createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-  batchRestore: () => Promise.reject(new Error("not under test")),
 };
 
 const stubInstances = (loaded: LoadedWallet): Layer.Layer<WalletInstances> =>
@@ -77,16 +64,6 @@ const stubKv = (entries: Record<string, string>): Layer.Layer<KeyValueStore> =>
     releaseLease: () => Effect.die("not under test"),
   });
 
-const recordingInspector = (
-  events: Array<LinkshuInspectorEvent>,
-): Layer.Layer<Inspector> =>
-  Layer.succeed(Inspector, {
-    emit: (build) => {
-      events.push(build());
-    },
-    events: Stream.empty,
-  });
-
 const runMints = <A, E>(
   deps: Layer.Layer<WalletInstances | KeyValueStore | TokenStore | Inspector>,
   program: Effect.Effect<A, E, Mints>,
@@ -101,8 +78,7 @@ const runMints = <A, E>(
 
 describe("Mints.info", () => {
   it("builds MintInfo from the loaded wallet's bound keyset and published info", async () => {
-    const loaded: LoadedWallet = {
-      ...walletStubMethods,
+    const loaded = fakeWallet({
       // Bound to the pricier keyset on purpose: info must report the bound
       // keyset's fee, not the cheapest one.
       keysetId: "01aaaa",
@@ -121,15 +97,15 @@ describe("Mints.info", () => {
             "15": { methods: [{ method: "bolt11", unit: "sat" }] },
           },
         }),
-    };
-    const events: Array<LinkshuInspectorEvent> = [];
+    });
+    const inspector = recordingInspector();
 
     const exit = await runMints(
       Layer.mergeAll(
         stubInstances(loaded),
         stubTokenStore([]),
         stubKv({}),
-        recordingInspector(events),
+        inspector.layer,
       ),
       Effect.gen(function* () {
         const mints = yield* Mints;
@@ -137,19 +113,19 @@ describe("Mints.info", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual(
       new MintInfo({
         url: mint,
         name: "Test mint",
         inputFeePpk: 120,
         supportsMpp: true,
+        isFakeLightning: false,
         iconUrl: "https://mint.example/icon.png",
       }),
     );
 
-    expect(events).toEqual([
+    expect(inspector.events).toEqual([
       expect.objectContaining({
         _tag: "OperationSucceeded",
         name: "mints.info",
@@ -159,16 +135,42 @@ describe("Mints.info", () => {
     ]);
   });
 
+  it.each([
+    { url: "https://mint.example", description: "Uses FakeWallet for testing" },
+    {
+      url: "https://mint.example",
+      description: "All your Lightning invoices will always be marked paid",
+    },
+    { url: "https://testnut.cashu.space", description: "Testing" },
+  ])(
+    "identifies simulated Lightning at $url from $description",
+    async ({ url, description }) => {
+      const loaded = fakeWallet({
+        getMintInfo: () => new CashuMintInfo({ ...baseInfo, description }),
+      });
+      const exit = await runMints(
+        Layer.mergeAll(
+          stubInstances(loaded),
+          stubTokenStore([]),
+          stubKv({}),
+          Inspector.disabled,
+        ),
+        Effect.flatMap(Mints, (mints) => mints.info(MintUrl.make(url))),
+      );
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.isFakeLightning).toBe(true);
+    },
+  );
+
   it("reports absent optional mint fields as null and mpp as false", async () => {
-    const loaded: LoadedWallet = {
-      ...walletStubMethods,
+    const loaded = fakeWallet({
       keysetId: "01aaaa",
       keyChain: {
         // No published input_fee_ppk on the bound keyset.
         getKeysets: () => [new Keyset("01aaaa", "sat", true)],
       },
       getMintInfo: () => new CashuMintInfo(baseInfo),
-    };
+    });
 
     const exit = await runMints(
       Layer.mergeAll(
@@ -183,14 +185,14 @@ describe("Mints.info", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual(
       new MintInfo({
         url: mint,
         name: "Test mint",
         inputFeePpk: null,
         supportsMpp: false,
+        isFakeLightning: false,
         iconUrl: null,
       }),
     );
@@ -223,12 +225,12 @@ describe("Mints.knownMints", () => {
     const seen = MintUrl.make("https://seen.example");
     const exit = await runMints(
       Layer.mergeAll(
-        stubInstances({
-          ...walletStubMethods,
-          keysetId: "01aaaa",
-          keyChain: { getKeysets: () => [] },
-          getMintInfo: () => new CashuMintInfo(baseInfo),
-        }),
+        stubInstances(
+          fakeWallet({
+            keysetId: "01aaaa",
+            getMintInfo: () => new CashuMintInfo(baseInfo),
+          }),
+        ),
         stubTokenStore([
           row("row-1", encoded),
           // Undecodable rows are skipped, not fatal.

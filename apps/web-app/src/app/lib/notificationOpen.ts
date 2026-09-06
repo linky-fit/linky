@@ -1,8 +1,4 @@
-const readField = (value: unknown, field: string): unknown => {
-  if (typeof value !== "object" || value === null) return undefined;
-  return Reflect.get(value, field);
-};
-
+import { readField } from "../../utils/unknown";
 export const unwrapNotificationOpenValue = (value: unknown): unknown => {
   if (typeof value !== "string") {
     return value;

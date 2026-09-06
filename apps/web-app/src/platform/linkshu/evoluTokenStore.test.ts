@@ -28,21 +28,28 @@ const newRow = (input: {
 /**
  * In-memory stand-in for the Evolu `cashuToken` table, faithful to the parts
  * the adapter depends on: rows are keyed by `(ownerId, id)` and an update
- * through the wrong owner lane leaves the real row untouched.
+ * through the wrong owner lane leaves the real row untouched. With `lagging`,
+ * `loadTokenRows` serves a stale snapshot that only advances on `sync()` — the
+ * React render state the real adapter reads lags Evolu mutations the same way.
  */
-const makeFakeCashuTable = () => {
+const makeFakeCashuTable = ({ lagging = false } = {}) => {
   const rows = new Map<string, CashuTokenRow>();
+  let snapshot: CashuTokenRow[] = [];
   const keyOf = (ownerId: string, id: string) => `${ownerId}|${id}`;
 
   const seed = (row: CashuTokenRow): void => {
-    rows.set(keyOf(String(row.ownerId), String(row.id)), row);
+    rows.set(keyOf(row.ownerId, row.id), row);
+  };
+  const sync = (): void => {
+    snapshot = [...rows.values()];
   };
 
   const store: TokenStoreService = makeEvoluTokenStore({
     getWriteOwnerId: () => activeOwnerId,
-    loadTokenRows: () => Promise.resolve([...rows.values()]),
+    loadTokenRows: () =>
+      Promise.resolve(lagging ? snapshot : [...rows.values()]),
     update: (_table, payload, options) => {
-      const key = keyOf(String(options.ownerId), String(payload.id));
+      const key = keyOf(options.ownerId, payload.id);
       const existing = rows.get(key);
       if (existing === undefined) return { ok: true };
       rows.set(key, {
@@ -57,14 +64,14 @@ const makeFakeCashuTable = () => {
       return { ok: true };
     },
     upsert: (_table, payload, options) => {
-      const key = keyOf(String(options.ownerId), String(payload.id));
+      const key = keyOf(options.ownerId, payload.id);
       const existing = rows.get(key);
       const base =
         existing ??
         createCashuTokenRowFixture({
           createdAt: new Date().toISOString(),
-          ownerId: String(options.ownerId),
-          token: String(payload.token),
+          ownerId: options.ownerId,
+          token: payload.token,
         });
       rows.set(key, {
         ...base,
@@ -78,7 +85,7 @@ const makeFakeCashuTable = () => {
     },
   });
 
-  return { seed, store };
+  return { seed, store, sync };
 };
 
 const loadAll = (store: TokenStoreService) => Effect.runPromise(store.loadAll);
@@ -269,64 +276,8 @@ describe("makeEvoluTokenStore", () => {
   });
 
   describe("write overlay over a lagging read model", () => {
-    /**
-     * Like the fake table, but `loadTokenRows` serves a stale snapshot that
-     * only advances on `sync()` — the React render state the real adapter
-     * reads lags Evolu mutations the same way.
-     */
-    const makeLaggingCashuTable = () => {
-      const rows = new Map<string, CashuTokenRow>();
-      let snapshot: CashuTokenRow[] = [];
-      const keyOf = (ownerId: string, id: string) => `${ownerId}|${id}`;
-
-      const store: TokenStoreService = makeEvoluTokenStore({
-        getWriteOwnerId: () => activeOwnerId,
-        loadTokenRows: () => Promise.resolve(snapshot),
-        update: (_table, payload, options) => {
-          const key = keyOf(String(options.ownerId), String(payload.id));
-          const existing = rows.get(key);
-          if (existing === undefined) return { ok: true };
-          rows.set(key, {
-            ...existing,
-            ...(payload.error !== undefined ? { error: payload.error } : {}),
-            ...(payload.isDeleted !== undefined
-              ? { isDeleted: payload.isDeleted }
-              : {}),
-            ...(payload.state !== undefined ? { state: payload.state } : {}),
-            ...(payload.token !== undefined ? { token: payload.token } : {}),
-          });
-          return { ok: true };
-        },
-        upsert: (_table, payload, options) => {
-          const key = keyOf(String(options.ownerId), String(payload.id));
-          const existing = rows.get(key);
-          const base =
-            existing ??
-            createCashuTokenRowFixture({
-              ownerId: String(options.ownerId),
-              token: String(payload.token),
-            });
-          rows.set(key, {
-            ...base,
-            error: payload.error ?? null,
-            id: payload.id,
-            originalTokenText: payload.originalTokenText,
-            state: payload.state,
-            token: payload.token,
-          });
-          return { ok: true };
-        },
-      });
-
-      const sync = (): void => {
-        snapshot = [...rows.values()];
-      };
-
-      return { store, sync };
-    };
-
     it("updates a just-inserted row before the read model shows it", async () => {
-      const { store, sync } = makeLaggingCashuTable();
+      const { store, sync } = makeFakeCashuTable({ lagging: true });
       const inserted = await Effect.runPromise(
         store.insert(newRow({ state: "pending", tokenText: "cashuAfresh" })),
       );
@@ -355,7 +306,7 @@ describe("makeEvoluTokenStore", () => {
     });
 
     it("keeps serving the overlay row until the read model reflects it", async () => {
-      const { store, sync } = makeLaggingCashuTable();
+      const { store, sync } = makeFakeCashuTable({ lagging: true });
       const inserted = await Effect.runPromise(
         store.insert(newRow({ state: "pending", tokenText: "cashuAlagging" })),
       );
@@ -372,7 +323,7 @@ describe("makeEvoluTokenStore", () => {
     });
 
     it("hides a removed row the read model still contains", async () => {
-      const { store, sync } = makeLaggingCashuTable();
+      const { store, sync } = makeFakeCashuTable({ lagging: true });
       const inserted = await Effect.runPromise(
         store.insert(newRow({ tokenText: "cashuAremoveLag" })),
       );
@@ -386,7 +337,7 @@ describe("makeEvoluTokenStore", () => {
     });
 
     it("dedups against a row inserted but not yet visible", async () => {
-      const { store } = makeLaggingCashuTable();
+      const { store } = makeFakeCashuTable({ lagging: true });
       await Effect.runPromise(
         store.insert(newRow({ tokenText: "cashuAinvisible" })),
       );
@@ -396,7 +347,7 @@ describe("makeEvoluTokenStore", () => {
     });
 
     it("serves updates of already-visible rows before the read model catches up", async () => {
-      const { store, sync } = makeLaggingCashuTable();
+      const { store, sync } = makeFakeCashuTable({ lagging: true });
       const inserted = await Effect.runPromise(
         store.insert(newRow({ state: "accepted", tokenText: "cashuAcatchUp" })),
       );
@@ -415,7 +366,7 @@ describe("makeEvoluTokenStore", () => {
     const { seed, store } = makeFakeCashuTable();
     seed(
       createCashuTokenRowFixture({
-        ownerId: String(oldOwnerId),
+        ownerId: oldOwnerId,
         state: "accepted",
         token: "cashuAoldLane",
       }),

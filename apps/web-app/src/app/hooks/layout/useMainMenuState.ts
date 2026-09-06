@@ -80,7 +80,6 @@ export const useMainMenuState = ({
     closeMenu,
     menuIsOpen,
     navigateToMainReturn,
-    openMenu,
     toggleMenu,
   };
 };

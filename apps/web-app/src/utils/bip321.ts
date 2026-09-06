@@ -15,8 +15,9 @@
  */
 
 import { isLightningAddress } from "../lnurlPay";
+import { safeDecodeURIComponent, stripLightningPrefix } from "./url";
 
-export interface Bip321Parsed {
+interface Bip321Parsed {
   address: string | null;
   amountBtc: number | null;
   amountSat: number | null;
@@ -46,14 +47,6 @@ const BIP321_RESERVED_PARAMS: ReadonlySet<string> = new Set([
 
 const BIP321_SCHEME_RE = /^bitcoin:/i;
 
-const safeDecode = (value: string): string => {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-};
-
 const parseAmountBtcToSat = (raw: string | null): number | null => {
   if (!raw) return null;
   const trimmed = raw.trim();
@@ -67,16 +60,13 @@ const parseAmountBtcToSat = (raw: string | null): number | null => {
   return sat >= 0 ? sat : null;
 };
 
-const stripLightningPrefix = (value: string): string =>
-  value.replace(/^lightning:/i, "").trim();
-
 /**
  * Returns `null` if the input is not a `bitcoin:` URI. Otherwise returns
  * the parsed components. Unknown extension params land in `extensions` so
  * future BIP 321 add-ons can be inspected without re-parsing.
  */
-export const parseBip321Uri = (input: unknown): Bip321Parsed | null => {
-  const value = String(input ?? "").trim();
+export const parseBip321Uri = (input: string): Bip321Parsed | null => {
+  const value = input.trim();
   if (!BIP321_SCHEME_RE.test(value)) return null;
 
   const body = value.slice("bitcoin:".length);
@@ -93,7 +83,7 @@ export const parseBip321Uri = (input: unknown): Bip321Parsed | null => {
   const get = (key: string): string | null => {
     const raw = params.get(key);
     if (raw === null) return null;
-    const decoded = safeDecode(raw).trim();
+    const decoded = safeDecodeURIComponent(raw).trim();
     return decoded || null;
   };
 
@@ -115,7 +105,7 @@ export const parseBip321Uri = (input: unknown): Bip321Parsed | null => {
   const extensions: Record<string, string> = {};
   for (const [key, raw] of params.entries()) {
     if (BIP321_RESERVED_PARAMS.has(key.toLowerCase())) continue;
-    extensions[key] = safeDecode(raw);
+    extensions[key] = safeDecodeURIComponent(raw);
   }
 
   return {
@@ -138,8 +128,8 @@ export const buildBip321PaymentUri = (args: {
   lightning?: string | null;
 }): string | null => {
   const params = new URLSearchParams();
-  const lightning = String(args.lightning ?? "").trim();
-  const creq = String(args.creq ?? "").trim();
+  const lightning = (args.lightning ?? "").trim();
+  const creq = (args.creq ?? "").trim();
 
   if (lightning) params.set("lightning", stripLightningPrefix(lightning));
   if (creq) params.set("creq", creq);
@@ -148,7 +138,7 @@ export const buildBip321PaymentUri = (args: {
   return query ? `bitcoin:?${query}` : null;
 };
 
-export interface Bip321PayableLeg {
+interface Bip321PayableLeg {
   kind: "cashu-request" | "lightning" | "lnurl" | "ln-address";
   value: string;
 }

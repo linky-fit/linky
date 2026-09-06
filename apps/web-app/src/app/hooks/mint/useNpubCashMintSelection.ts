@@ -13,6 +13,8 @@ import {
   NPUB_CASH_SERVER_BASE_URL,
 } from "../../../utils/npubCashServer";
 import { safeLocalStorageSet } from "../../../utils/storage";
+import { nowSeconds } from "../../../utils/time";
+import type { Translate } from "../../../i18n";
 
 interface UseNpubCashMintSelectionParams {
   currentNpub: string | null;
@@ -26,7 +28,7 @@ interface UseNpubCashMintSelectionParams {
   setDefaultMintUrl: React.Dispatch<React.SetStateAction<string | null>>;
   setDefaultMintUrlDraft: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const useNpubCashMintSelection = ({
@@ -45,7 +47,7 @@ export const useNpubCashMintSelection = ({
 }: UseNpubCashMintSelectionParams) => {
   React.useEffect(() => {
     if (!defaultMintUrl) return;
-    const draft = String(defaultMintUrlDraft ?? "").trim();
+    const draft = defaultMintUrlDraft.trim();
     if (draft) return;
     setDefaultMintUrlDraft(normalizeMintUrl(defaultMintUrl));
   }, [defaultMintUrl, defaultMintUrlDraft, setDefaultMintUrlDraft]);
@@ -59,7 +61,7 @@ export const useNpubCashMintSelection = ({
       return makeLinkstrNip98AuthHeader(
         payload === undefined ? { url, method } : { url, method, payload },
         secretKey,
-        UnixSeconds.make(Math.floor(Date.now() / 1000)),
+        UnixSeconds.make(nowSeconds()),
       );
     },
     [currentNsec],

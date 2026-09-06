@@ -1,0 +1,2 @@
+export const PAYMENT_ANALYTICS_RECIPIENT_NPUB =
+  "npub1xuxvcnmw4drf8duzalvalxrfxjvwtrjdmwxy0ez2e62uje4drrvqu6pz2w";

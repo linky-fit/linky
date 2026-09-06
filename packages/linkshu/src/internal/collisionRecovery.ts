@@ -5,7 +5,10 @@ import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import { advanceCounterTo } from "./counters";
 import type { CounterScope } from "./counters";
-import { isOutputsAlreadySignedError } from "./outputCollisions";
+import {
+  isDuplicateOutputsError,
+  isOutputsAlreadySignedError,
+} from "./outputCollisions";
 
 /** NUT-09 window scanned to find the last signed slot past a collision. */
 const COLLISION_RESTORE_WINDOW = 100;
@@ -42,7 +45,7 @@ const probeLastSignedCounter = (
 
 /**
  * Moves the counter past a recoverable output collision: for `outputs
- * already signed` failures a targeted NUT-09 probe locates the last signed
+ * already signed` and CDK `duplicate outputs` failures a NUT-09 probe locates the last signed
  * slot; otherwise (or when the probe fails) the counter jumps `fallbackBump`
  * ahead. Caller must hold the counter lock. Returns the counter now in
  * effect.
@@ -53,9 +56,10 @@ export const recoverFromCollision = (
   raw: unknown,
 ): Effect.Effect<number> =>
   Effect.gen(function* () {
-    const lastSigned = isOutputsAlreadySignedError(raw)
-      ? yield* probeLastSignedCounter(ctx.wallet, counter, ctx.scope.keysetId)
-      : null;
+    const lastSigned =
+      isOutputsAlreadySignedError(raw) || isDuplicateOutputsError(raw)
+        ? yield* probeLastSignedCounter(ctx.wallet, counter, ctx.scope.keysetId)
+        : null;
     const target =
       lastSigned === null ? counter + ctx.fallbackBump : lastSigned + 1;
     return yield* advanceCounterTo(

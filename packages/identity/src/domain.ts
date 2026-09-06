@@ -3,26 +3,15 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { Schema } from "effect";
 import { Slip39 } from "slip39-ts";
 
-const Uint8ArraySchema = Schema.declare(
-  (input: unknown): input is Uint8Array => input instanceof Uint8Array,
-);
+const bytesOfLength = (expected: number) =>
+  Schema.Uint8ArrayFromSelf.pipe(
+    Schema.filter((bytes) => bytes.length === expected, {
+      description: `${expected} bytes`,
+    }),
+  );
 
-const hasLengthBetween =
-  (min: number, max: number) =>
-  (input: unknown): input is Uint8Array =>
-    input instanceof Uint8Array && input.length >= min && input.length <= max;
-
-const hasLength =
-  (expected: number) =>
-  (input: unknown): input is Uint8Array =>
-    input instanceof Uint8Array && input.length === expected;
-
-const toWords = (value: string): ReadonlyArray<string> =>
-  value
-    .trim()
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter((word) => word.length > 0);
+export const toWords = (value: string): ReadonlyArray<string> =>
+  value.split(/\s+/).filter((word) => word.length > 0);
 
 const isNormalizedShare = (value: unknown): value is string => {
   if (typeof value !== "string") return false;
@@ -49,28 +38,18 @@ const isBip39MnemonicWithWordCount =
     return validateMnemonic(words.join(" "), wordlist);
   };
 
-const isOwnerLaneIndex = (value: unknown): value is number => {
-  if (typeof value !== "number") return false;
-  if (!Number.isInteger(value)) return false;
-  return value >= 0;
-};
-
-export const MasterSecret = Uint8ArraySchema.pipe(
-  Schema.filter(hasLengthBetween(16, 64)),
+export const MasterSecret = Schema.Uint8ArrayFromSelf.pipe(
+  Schema.filter((bytes) => bytes.length >= 16 && bytes.length <= 64, {
+    description: "16 to 64 bytes",
+  }),
   Schema.brand("MasterSecret"),
 );
 export type MasterSecret = typeof MasterSecret.Type;
 
-export const CashuSeed = Uint8ArraySchema.pipe(
-  Schema.filter(hasLength(64)),
-  Schema.brand("CashuSeed"),
-);
+export const CashuSeed = bytesOfLength(64).pipe(Schema.brand("CashuSeed"));
 export type CashuSeed = typeof CashuSeed.Type;
 
-export const OwnerKey = Uint8ArraySchema.pipe(
-  Schema.filter(hasLength(16)),
-  Schema.brand("OwnerKey"),
-);
+export const OwnerKey = bytesOfLength(16).pipe(Schema.brand("OwnerKey"));
 export type OwnerKey = typeof OwnerKey.Type;
 
 export const Slip39Share = Schema.String.pipe(
@@ -83,8 +62,7 @@ export const Slip39Passphrase = Schema.String.pipe(
 );
 export type Slip39Passphrase = typeof Slip39Passphrase.Type;
 
-export const OwnerLaneIndex = Schema.Number.pipe(
-  Schema.filter(isOwnerLaneIndex),
+export const OwnerLaneIndex = Schema.NonNegativeInt.pipe(
   Schema.brand("OwnerLaneIndex"),
 );
 export type OwnerLaneIndex = typeof OwnerLaneIndex.Type;

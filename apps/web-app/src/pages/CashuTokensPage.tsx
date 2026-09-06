@@ -1,18 +1,18 @@
 import * as Evolu from "@evolu/common";
 import type { TokenRowId, WalletToken } from "@linky/linkshu";
+import { CirclePlus as TokenAddIcon } from "lucide-react";
 import type { Dispatch, FC, SetStateAction } from "react";
 import { useCallback, useEffect, useRef } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import type { MintUrlInput } from "../app/types/appTypes";
-import { CashuTokenPill } from "../components/CashuTokenPill";
-import { TokenAddIcon } from "../components/icons";
-import { useNavigation } from "../hooks/useRouting";
+import { WalletTokenPill } from "../components/CashuTokenPill";
+import type { MintIcon } from "../utils/mint";
+
+import { navigateTo } from "../hooks/useRouting";
 
 const CashuTokenIdType = Evolu.id("CashuToken");
 
 interface CashuTokensPageProps {
   canRestoreTokens: boolean;
-  cashuBalance: number;
   cashuTotalBalance: number;
   cashuBulkCheckIsBusy: boolean;
   cashuIsBusy: boolean;
@@ -26,16 +26,10 @@ interface CashuTokensPageProps {
   }>;
   deleteSpentCashuTokens: () => Promise<void>;
   deleteSpentCashuTokensIsBusy: boolean;
-  getMintIconUrl: (mint: MintUrlInput) => {
-    origin: string | null;
-    url: string | null;
-    host: string | null;
-    failed: boolean;
-  };
+  getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   meltLargestForeignMintToMainMint: () => Promise<void>;
   restoreMissingTokens: () => Promise<void>;
   setMintIconUrlByMint: Dispatch<SetStateAction<Record<string, string | null>>>;
-  t: (key: string) => string;
   tokensRestoreIsBusy: boolean;
 }
 
@@ -56,11 +50,10 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
   meltLargestForeignMintToMainMint,
   restoreMissingTokens,
   setMintIconUrlByMint,
-  t,
   tokensRestoreIsBusy,
 }) => {
-  const { formatDisplayedAmountText } = useAppShellCore();
-  const navigateTo = useNavigation();
+  const { formatDisplayedAmountText, t } = useAppShellCore();
+
   const issuedBalance = cashuIssuedTokens.reduce(
     (sum, token) => sum + token.amount,
     0,
@@ -80,16 +73,6 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
       setMintIconUrlByMint((prev) => ({
         ...prev,
         [origin]: url,
-      }));
-    },
-    [setMintIconUrlByMint],
-  );
-
-  const handleMintIconError = useCallback(
-    (origin: string, nextUrl: string | null) => {
-      setMintIconUrlByMint((prev) => ({
-        ...prev,
-        [origin]: nextUrl,
       }));
     },
     [setMintIconUrlByMint],
@@ -118,13 +101,13 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
     return (
       <div className="ln-tags">
         {tokens.map((token) => (
-          <CashuTokenPill
+          <WalletTokenPill
             key={token.id}
             token={token}
             getMintIconUrl={getMintIconUrl}
             isError={token.state === "error"}
             onMintIconLoad={handleMintIconLoad}
-            onMintIconError={handleMintIconError}
+            onMintIconError={handleMintIconLoad}
             onOpenToken={handleOpenToken}
             ariaLabel={t("cashuToken")}
           />
@@ -156,7 +139,7 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
           </div>
           {renderTokenList(cashuOwnTokens, t("cashuEmpty"))}
           {cashuOwnSpentTokensCount > 0 ? (
-            <div className="settings-row" style={{ marginTop: 12 }}>
+            <div className="settings-row section-actions">
               <button
                 type="button"
                 className="btn-wide secondary"
@@ -171,7 +154,7 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
             </div>
           ) : null}
           {cashuMeltToMainMintButtonLabel ? (
-            <div className="settings-row" style={{ marginTop: 12 }}>
+            <div className="settings-row section-actions">
               <button
                 type="button"
                 className="btn-wide secondary"
@@ -182,7 +165,7 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
               </button>
             </div>
           ) : null}
-          <div className="settings-row" style={{ marginTop: 12 }}>
+          <div className="settings-row section-actions">
             <button
               type="button"
               className="btn-wide secondary"
@@ -209,7 +192,7 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
             </button>
           </div>
           {renderTokenList(cashuIssuedTokens, t("cashuIssuedEmpty"))}
-          <div className="settings-row" style={{ marginTop: 12 }}>
+          <div className="settings-row section-actions">
             <button
               type="button"
               className="btn-wide"

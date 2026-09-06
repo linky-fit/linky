@@ -5,13 +5,13 @@ import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContext
 import { AmountDisplay } from "../components/AmountDisplay";
 import { Keypad } from "../components/Keypad";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
-import { useNavigation } from "../hooks/useRouting";
+import { navigateTo } from "../hooks/useRouting";
 
 export const AdvancedAutoPayLimitPage: FC = () => {
   const { lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit } =
     useAdvancedSettingsContext();
   const { displayUnit, t } = useAppShellCore();
-  const navigateTo = useNavigation();
+
   const [amount, setAmount] = useState<string>(() =>
     lightningInvoiceAutoPayLimit > 0
       ? String(lightningInvoiceAutoPayLimit)

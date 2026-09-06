@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
 import { Bug, Download, FlaskConical, Trash2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { SettingsLinkRow, SettingsToggleRow } from "../components/SettingsRows";
 import {
   setInspectorEnabled,
   setInspectorLogsEnabled,
@@ -9,14 +10,8 @@ import {
   useInspectorLogsEnabled,
 } from "../devtools/inspector/inspectorEnabled";
 import type { PersistentInspectorLogStats } from "../devtools/inspector/persistentInspectorLogBuffer";
-import { SettingsLinkRow, SettingsToggleRow } from "../components/SettingsRows";
-import { useNavigation } from "../hooks/useRouting";
-
-const formatInspectorLogSize = (size: number): string => {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KiB`;
-  return `${(size / (1024 * 1024)).toFixed(1)} MiB`;
-};
+import { navigateTo } from "../hooks/useRouting";
+import { formatBytes } from "../utils/formatting";
 
 const formatInspectorLogAge = (
   oldestAt: number | null,
@@ -35,7 +30,7 @@ export function InspectorSettingsPage(): React.ReactElement {
   const inspectorLogsEnabled = useInspectorLogsEnabled();
   const { pushToast } = useAdvancedSettingsContext();
   const { t } = useAppShellCore();
-  const navigateTo = useNavigation();
+
   const [inspectorLogStats, setInspectorLogStats] =
     useState<PersistentInspectorLogStats | null>(null);
   const [inspectorLogActionIsBusy, setInspectorLogActionIsBusy] =
@@ -44,7 +39,7 @@ export function InspectorSettingsPage(): React.ReactElement {
   const inspectorLogStatsLabel = inspectorLogStats
     ? t("nostrInspectorLogsStats")
         .replace("{count}", String(inspectorLogStats.rowCount))
-        .replace("{size}", formatInspectorLogSize(inspectorLogStats.totalSize))
+        .replace("{size}", formatBytes(inspectorLogStats.totalSize))
         .replace(
           "{age}",
           formatInspectorLogAge(inspectorLogStats.oldestAt, Date.now()),

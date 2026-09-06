@@ -1,11 +1,7 @@
 import React from "react";
 import { parseStatusFilterValue } from "../../../nostrStatus";
 import { ARCHIVED_CONTACTS_FILTER } from "../../../utils/constants";
-import type {
-  ContactIdLike,
-  ContactNameRowLike,
-  OptionalNumber,
-} from "../../types/appTypes";
+import type { ContactIdLike, ContactNameRowLike } from "../../types/appTypes";
 
 type ContactRow = ContactNameRowLike;
 
@@ -18,7 +14,7 @@ interface ContactsSearchItem<TContact extends ContactRow> {
 }
 
 interface LastMessageRow {
-  createdAtSec?: OptionalNumber;
+  createdAtSec?: number | null | undefined;
 }
 
 interface UseVisibleContactsParams<TContact extends ContactRow> {
@@ -51,7 +47,7 @@ export const useVisibleContacts = <TContact extends ContactRow>({
 }: UseVisibleContactsParams<TContact>): VisibleContactsResult<TContact> => {
   return React.useMemo(() => {
     const isArchivedContact = (contact: TContact): boolean => {
-      const archivedAtSec = Number(contact.archivedAtSec ?? 0);
+      const archivedAtSec = contact.archivedAtSec ?? 0;
       return Number.isFinite(archivedAtSec) && archivedAtSec > 0;
     };
 
@@ -102,7 +98,7 @@ export const useVisibleContacts = <TContact extends ContactRow>({
       ? filtered.filter(matchesSearch)
       : filtered;
 
-    const pinnedIdKey = String(pinnedContactId ?? "");
+    const pinnedIdKey = pinnedContactId ?? "";
     const pinned: TContact[] = [];
     const withConversation: TContact[] = [];
     const withoutConversation: TContact[] = [];
@@ -122,39 +118,33 @@ export const useVisibleContacts = <TContact extends ContactRow>({
     }
 
     const sortWithConversation = (a: TContact, b: TContact) => {
-      const aKey = String(a.id ?? "");
-      const bKey = String(b.id ?? "");
+      const aKey = a.id ?? "";
+      const bKey = b.id ?? "";
       const aUnreadAt = aKey ? (unreadByContactId.get(aKey) ?? 0) : 0;
       const bUnreadAt = bKey ? (unreadByContactId.get(bKey) ?? 0) : 0;
       if (aUnreadAt !== bUnreadAt) return bUnreadAt - aUnreadAt;
 
       const aMsg = aKey ? lastMessageByContactId.get(aKey) : null;
       const bMsg = bKey ? lastMessageByContactId.get(bKey) : null;
-      const aAt = aMsg ? Number(aMsg.createdAtSec ?? 0) || 0 : 0;
-      const bAt = bMsg ? Number(bMsg.createdAtSec ?? 0) || 0 : 0;
+      const aAt = aMsg ? (aMsg.createdAtSec ?? 0) || 0 : 0;
+      const bAt = bMsg ? (bMsg.createdAtSec ?? 0) || 0 : 0;
       if (aAt !== bAt) return bAt - aAt;
 
-      return contactNameCollator.compare(
-        String(a.name ?? ""),
-        String(b.name ?? ""),
-      );
+      return contactNameCollator.compare(a.name ?? "", b.name ?? "");
     };
 
     const sortWithoutConversation = (a: TContact, b: TContact) => {
-      const aKey = String(a.id ?? "");
-      const bKey = String(b.id ?? "");
+      const aKey = a.id ?? "";
+      const bKey = b.id ?? "";
       const aUnreadAt = aKey ? (unreadByContactId.get(aKey) ?? 0) : 0;
       const bUnreadAt = bKey ? (unreadByContactId.get(bKey) ?? 0) : 0;
       if (aUnreadAt !== bUnreadAt) return bUnreadAt - aUnreadAt;
 
-      const aCreatedAt = Number(a.createdAt ?? 0) || 0;
-      const bCreatedAt = Number(b.createdAt ?? 0) || 0;
+      const aCreatedAt = a.createdAt ? Date.parse(a.createdAt) : 0;
+      const bCreatedAt = b.createdAt ? Date.parse(b.createdAt) : 0;
       if (aCreatedAt !== bCreatedAt) return bCreatedAt - aCreatedAt;
 
-      return contactNameCollator.compare(
-        String(a.name ?? ""),
-        String(b.name ?? ""),
-      );
+      return contactNameCollator.compare(a.name ?? "", b.name ?? "");
     };
 
     return {

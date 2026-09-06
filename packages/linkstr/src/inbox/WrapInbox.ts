@@ -1,5 +1,4 @@
 import {
-  Clock,
   Duration,
   Effect,
   Either,
@@ -23,6 +22,7 @@ import { inspectPlainOperation } from "../internal/inspectPlainOperation";
 import type { InspectedPlainResult } from "../internal/inspectPlainOperation";
 import { fetchRawEvents } from "../internal/plainFetch";
 import { resubscribeForever } from "../internal/resubscribe";
+import { nowSeconds } from "../internal/time";
 import {
   DEFAULT_SEEN_WRAP_IDS_CAPACITY,
   makeSeenWrapIds,
@@ -202,7 +202,6 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                 }),
           });
 
-          // PushInbox's sibling loop intentionally diverges on refreshes/status callbacks versus this cursor.
           // The phase is scoped to one subscription attempt: after a
           // reconnect the relay replays its stored window, which is backfill
           // again until its next EOSE.
@@ -236,13 +235,10 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
 
           const advanceCursor = (wrapCreatedAt: number): Effect.Effect<void> =>
             Effect.gen(function* () {
-              const nowSeconds = Math.floor(
-                (yield* Clock.currentTimeMillis) / 1000,
-              );
               // Clamped: a sender-controlled future timestamp must not push
               // the cursor past real time, or restarts would skip everything
               // published before it.
-              const next = Math.min(wrapCreatedAt, nowSeconds);
+              const next = Math.min(wrapCreatedAt, yield* nowSeconds);
               const advanced = yield* Ref.modify(cursor, (current) =>
                 next > (current ?? 0)
                   ? [UnixSeconds.make(next), UnixSeconds.make(next)]

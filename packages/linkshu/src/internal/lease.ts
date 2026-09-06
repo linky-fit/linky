@@ -1,4 +1,4 @@
-import { Clock, Data, Effect } from "effect";
+import { Data, Effect, Schedule } from "effect";
 import type { KeyValueStoreService, LeaseId } from "../ports/KeyValueStore";
 
 /** Internal; the counter vertical maps it to the public `CounterLockTimeout`. */
@@ -23,17 +23,11 @@ const acquireLease = (
   acquireTimeoutMs: number,
   pollMs: number,
 ): Effect.Effect<LeaseId, LeaseLockTimeout> =>
-  Effect.gen(function* () {
-    const deadline = (yield* Clock.currentTimeMillis) + acquireTimeoutMs;
-    while (true) {
-      const lease = yield* kv.tryAcquireLease(key, ttlMs);
-      if (lease !== null) return lease;
-      if ((yield* Clock.currentTimeMillis) >= deadline) {
-        return yield* new LeaseLockTimeout({ key });
-      }
-      yield* Effect.sleep(pollMs);
-    }
-  });
+  Effect.flatMap(kv.tryAcquireLease(key, ttlMs), (lease) =>
+    lease === null ? new LeaseLockTimeout({ key }) : Effect.succeed(lease),
+  ).pipe(
+    Effect.retry(Schedule.spaced(pollMs).pipe(Schedule.upTo(acquireTimeoutMs))),
+  );
 
 /**
  * Mutual exclusion on a `KeyValueStore` key, built on the port's two lease

@@ -1,12 +1,7 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { useCurrentNsec } from "./useCurrentNsec";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-});
 
 const mocks = vi.hoisted(() => ({
   clearStoredPushNsec: vi.fn(),
@@ -57,13 +52,7 @@ describe("useCurrentNsec", () => {
     mocks.isNativePlatform.mockReturnValue(true);
     mocks.readStoredNostrNsec.mockReturnValue(nativeRead);
 
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(<CurrentNsecProbe />);
-    });
+    const { container, root } = await renderIntoDocument(<CurrentNsecProbe />);
 
     expect(container.textContent).toBe("false:nsec1stale");
 
@@ -82,13 +71,7 @@ describe("useCurrentNsec", () => {
     mocks.isNativePlatform.mockReturnValue(true);
     mocks.readStoredNostrNsec.mockRejectedValue(new Error("bridge failed"));
 
-    const container = document.createElement("div");
-    document.body.append(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(<CurrentNsecProbe />);
-    });
+    const { container, root } = await renderIntoDocument(<CurrentNsecProbe />);
 
     expect(container.textContent).toBe("true:nsec1local");
 

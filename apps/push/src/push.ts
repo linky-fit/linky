@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import * as webpush from "web-push";
 
 import { isRecord } from "./guards";
+import { hashSecret } from "./hashSecret";
 import { PushStorage } from "./storage";
 import type {
   PushNotificationData,
@@ -26,9 +27,10 @@ interface PushDeliveryServiceOptions {
 }
 
 const DELIVERY_TTL_SECONDS = 24 * 60 * 60;
+const NOTIFICATION_BODY = "Nová aktivita v Linky";
 
 function formatShortNpub(value: string): string {
-  const trimmed = String(value ?? "").trim();
+  const trimmed = value.trim();
   if (!trimmed) return "";
   if (trimmed.length <= 18) return trimmed;
   return `${trimmed.slice(0, 10)}...${trimmed.slice(-6)}`;
@@ -122,10 +124,6 @@ function buildPushTopic(payloadData: PushNotificationData): string {
     .slice(0, 32);
 }
 
-function hashEndpoint(endpoint: string): string {
-  return createHash("sha256").update(endpoint).digest("hex").slice(0, 16);
-}
-
 function readErrorStatusCode(error: unknown): number | null {
   if (!isRecord(error)) {
     return null;
@@ -166,10 +164,10 @@ export class PushDeliveryService {
     subscription: StoredSubscription,
     payloadData: PushNotificationData,
   ): Promise<void> {
-    const endpointHash = hashEndpoint(subscription.endpoint);
+    const endpointHash = hashSecret(subscription.endpoint);
     const payload: PushNotificationEnvelope = {
       title: buildNotificationTitle(payloadData),
-      body: "Nová aktivita v Linky",
+      body: NOTIFICATION_BODY,
       data: payloadData,
     };
 
@@ -214,11 +212,11 @@ export class PushDeliveryService {
       throw new Error("Native push delivery is not configured");
     }
 
-    const tokenHash = hashEndpoint(subscription.token);
+    const tokenHash = hashSecret(subscription.token);
     const message: Message = {
       token: subscription.token,
       data: {
-        body: "Nová aktivita v Linky",
+        body: NOTIFICATION_BODY,
         createdAt: String(payloadData.createdAt),
         outerEventId: payloadData.outerEventId,
         recipientNpub: payloadData.recipientNpub,

@@ -1,12 +1,7 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { useEvoluNostrBootstrapReady } from "./useEvoluNostrBootstrapReady";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-});
 
 interface HarnessProps {
   identityReady?: boolean;
@@ -51,11 +46,10 @@ describe("useEvoluNostrBootstrapReady", () => {
   it("waits for the minimum Evolu bootstrap window", async () => {
     vi.useFakeTimers();
     let ready = false;
-    const root = createRoot(document.createElement("div"));
 
-    await act(async () => {
-      root.render(<Harness onReady={(value) => (ready = value)} />);
-    });
+    const { root } = await renderIntoDocument(
+      <Harness onReady={(value) => (ready = value)} />,
+    );
     expect(ready).toBe(false);
 
     await act(async () => {
@@ -74,12 +68,9 @@ describe("useEvoluNostrBootstrapReady", () => {
   it("restarts the quiet window when an Evolu snapshot changes", async () => {
     vi.useFakeTimers();
     let ready = false;
-    const root = createRoot(document.createElement("div"));
     const onReady = (value: boolean) => (ready = value);
 
-    await act(async () => {
-      root.render(<Harness onReady={onReady} />);
-    });
+    const { root } = await renderIntoDocument(<Harness onReady={onReady} />);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(240);
     });
@@ -105,12 +96,11 @@ describe("useEvoluNostrBootstrapReady", () => {
   it("does not release while an identity migration is pending", async () => {
     vi.useFakeTimers();
     let ready = false;
-    const root = createRoot(document.createElement("div"));
     const onReady = (value: boolean) => (ready = value);
 
-    await act(async () => {
-      root.render(<Harness identityReady={false} onReady={onReady} />);
-    });
+    const { root } = await renderIntoDocument(
+      <Harness identityReady={false} onReady={onReady} />,
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000);
     });
@@ -135,11 +125,10 @@ describe("useEvoluNostrBootstrapReady", () => {
   it("restarts Evolu bootstrap after coming online", async () => {
     vi.useFakeTimers();
     let ready = false;
-    const root = createRoot(document.createElement("div"));
 
-    await act(async () => {
-      root.render(<Harness onReady={(value) => (ready = value)} />);
-    });
+    const { root } = await renderIntoDocument(
+      <Harness onReady={(value) => (ready = value)} />,
+    );
     await act(async () => {
       window.dispatchEvent(new Event("offline"));
     });

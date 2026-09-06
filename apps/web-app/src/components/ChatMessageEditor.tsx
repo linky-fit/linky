@@ -8,7 +8,6 @@ import {
   setMessageEditorCaret,
 } from "../app/lib/messageEditorDom";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
-import type { MintUrlInput } from "../app/types/appTypes";
 import { deriveDefaultProfile } from "../derivedProfile";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import type { NpubMessageContactInfo } from "./ChatMessage";
@@ -19,7 +18,7 @@ const ENTITY_PATTERN =
 interface ChatMessageEditorProps {
   disabled: boolean;
   getCashuTokenMessageInfo: (text: string) => CashuTokenMessageInfo | null;
-  getMintIconUrl: (mint: MintUrlInput) => { url: string | null };
+  getMintIconUrl: (mint: string | null | undefined) => { url: string | null };
   getNpubMessageContactInfo: (npub: string) => NpubMessageContactInfo | null;
   onCaretChange: (caret: number) => void;
   onChange: (value: string) => void;
@@ -95,8 +94,8 @@ const appendCashuPill = (
 ) => {
   const pill = document.createElement("span");
   pill.className = info.isValid
-    ? "pill chat-token-pill chat-compose-inline-pill"
-    : "pill pill-muted chat-token-pill chat-compose-inline-pill";
+    ? "pill cashu-token-pill chat-token-pill chat-compose-inline-pill"
+    : "pill pill-muted cashu-token-pill chat-token-pill chat-compose-inline-pill";
   pill.contentEditable = "false";
   pill.dataset.messageEntityValue = rawValue;
   pill.setAttribute("aria-label", amountText);
@@ -175,7 +174,7 @@ export const ChatMessageEditor = React.forwardRef<
     const fragment = document.createDocumentFragment();
     let cursor = 0;
     for (const match of value.matchAll(ENTITY_PATTERN)) {
-      const rawValue = String(match[0] ?? "");
+      const rawValue = match[0];
       const start = match.index ?? 0;
       if (start > cursor)
         fragment.append(document.createTextNode(value.slice(cursor, start)));
@@ -226,7 +225,7 @@ export const ChatMessageEditor = React.forwardRef<
     ).map((element) => element.dataset.messageEntityValue ?? "");
     const expectedValues: string[] = [];
     for (const match of nextValue.matchAll(ENTITY_PATTERN)) {
-      const rawValue = String(match[0] ?? "");
+      const rawValue = match[0];
       const { contactInfo, tokenInfo } = resolveEntity(rawValue);
       if (contactInfo || tokenInfo) expectedValues.push(rawValue);
     }

@@ -1,10 +1,9 @@
 import type { MainSwipeRoutesProps } from "../../routes/AppRouteContent";
-import { buildMainSwipeRouteProps } from "../../routes/props/buildMainSwipeRouteProps";
 import { useRouteDerivedShellState } from "../useRouteDerivedShellState";
 import { useMemoizedRouteBuilder } from "./useMemoizedRouteBundle";
 
 type MainSwipeRouteBuilderInput = Omit<
-  Parameters<typeof buildMainSwipeRouteProps>[0],
+  MainSwipeRoutesProps["mainSwipeProps"],
   "bottomTabActive" | "showGroupFilter" | "showNoGroupFilter"
 >;
 
@@ -16,7 +15,7 @@ interface UseRoutingViewCompositionParams {
   ungroupedCount: number;
 }
 
-export interface RoutingViewCompositionResult {
+interface RoutingViewCompositionResult {
   mainSwipeRouteProps: MainSwipeRoutesProps;
   pageClassNameWithSwipe: string;
 }
@@ -49,7 +48,7 @@ export const useRoutingViewComposition = ({
   return {
     mainSwipeRouteProps: useMemoizedRouteBuilder(
       routeBuilderInput,
-      buildMainSwipeRouteProps,
+      (mainSwipeProps) => ({ mainSwipeProps }),
     ),
     pageClassNameWithSwipe,
   };

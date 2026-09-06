@@ -11,8 +11,9 @@ import type { EnqueueOutboxInput } from "@linky/linkstr-react";
 import { Exit } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import React, { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createSecretKey } from "../../../testUtils/nostrKeys";
+import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type {
   ContactIdentityRowLike,
   UpdateLocalNostrMessage,
@@ -33,10 +34,8 @@ vi.mock("@linky/linkstr-react", () => ({
 
 import { useEditChatMessage } from "./useEditChatMessage";
 
-Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
-
-const MY_PRIVATE_KEY = new Uint8Array(32).fill(3);
-const CONTACT_PRIVATE_KEY = new Uint8Array(32).fill(4);
+const MY_PRIVATE_KEY = createSecretKey(3);
+const CONTACT_PRIVATE_KEY = createSecretKey(4);
 const CONTACT_PUBKEY = getPublicKey(CONTACT_PRIVATE_KEY);
 const CURRENT_NSEC = nip19.nsecEncode(MY_PRIVATE_KEY);
 const CONTACT_NPUB = nip19.npubEncode(CONTACT_PUBKEY);
@@ -48,7 +47,7 @@ const receipt = (clientId: ClientId, ref: OutboxRef): EnqueueReceipt =>
   new EnqueueReceipt({
     jobId: OutboxJobId.make("job-1"),
     ref,
-    messageId: EDIT_MESSAGE_ID,
+    rumorId: EDIT_MESSAGE_ID,
     clientId,
     sentAt: SENT_AT,
   });
@@ -90,10 +89,7 @@ const setup = async () => {
     return null;
   };
 
-  const root = createRoot(document.createElement("div"));
-  await act(async () => {
-    root.render(<Harness />);
-  });
+  const { root } = await renderIntoDocument(<Harness />);
 
   return {
     getEdit: () => editChatMessage,
@@ -160,7 +156,7 @@ describe("useEditChatMessage", () => {
       "local-message",
       {
         createdAtSec: SENT_AT,
-        rumorId: EDIT_MESSAGE_ID,
+        rumorId: EDITED_FROM,
       },
     );
     expect(harness.setChatDraft).toHaveBeenCalledWith("");

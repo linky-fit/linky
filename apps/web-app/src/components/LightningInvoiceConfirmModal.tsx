@@ -1,6 +1,7 @@
 import React from "react";
-import { WalletBalance } from "../components/WalletBalance";
-import type { LightningInvoicePreview } from "../utils/lightningInvoice";
+import type { Translate } from "../i18n";
+import type { LightningInvoicePreview } from "@linky/linkshu";
+import { PaymentConfirmDialog } from "./PaymentConfirmDialog";
 
 interface LightningInvoiceConfirmModalProps {
   cashuBalance: number;
@@ -8,7 +9,7 @@ interface LightningInvoiceConfirmModalProps {
   confirmation: LightningInvoicePreview;
   onClose: () => void;
   onConfirm: () => Promise<void>;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 const formatRemainingLifetime = (
@@ -63,66 +64,19 @@ export function LightningInvoiceConfirmModal({
     confirmation.amountSat !== null && confirmation.amountSat > cashuBalance;
 
   return (
-    <div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("pay")}
-      onClick={onClose}
-    >
-      <div
-        className="modal-sheet lightning-invoice-confirm-sheet"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="lightning-invoice-confirm-summary">
-          <div className="lightning-invoice-confirm-amount">
-            {confirmation.amountSat === null ? (
-              <div className="lightning-invoice-confirm-unknown-amount">
-                {t("lightningInvoiceConfirmUnknownAmount")}
-              </div>
-            ) : (
-              <WalletBalance
-                ariaLabel={t("pay")}
-                balance={confirmation.amountSat}
-              />
-            )}
-          </div>
-
-          <div className="lightning-invoice-confirm-meta">
-            {confirmation.description ? (
-              <div className="lightning-invoice-confirm-description">
-                {confirmation.description}
-              </div>
-            ) : null}
-
-            {expiresLabel ? (
-              <div className="lightning-invoice-confirm-expiry muted">
-                {expiresLabel}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="modal-actions">
-          <button
-            className="btn-wide"
-            onClick={() => {
-              void onConfirm();
-            }}
-            disabled={cashuIsBusy || insufficientBalance}
-            title={insufficientBalance ? t("payInsufficient") : undefined}
-          >
-            {t("paySend")}
-          </button>
-          <button
-            className="btn-wide secondary"
-            onClick={onClose}
-            disabled={cashuIsBusy}
-          >
-            {t("payCancel")}
-          </button>
-        </div>
-      </div>
-    </div>
+    <PaymentConfirmDialog
+      amountSat={confirmation.amountSat}
+      label={t("pay")}
+      confirmLabel={t("paySend")}
+      cancelLabel={t("payCancel")}
+      description={confirmation.description}
+      meta={expiresLabel}
+      unknownAmountLabel={t("lightningInvoiceConfirmUnknownAmount")}
+      isBusy={cashuIsBusy}
+      disabled={insufficientBalance}
+      {...(insufficientBalance ? { disabledReason: t("payInsufficient") } : {})}
+      onClose={onClose}
+      onConfirm={onConfirm}
+    />
   );
 }

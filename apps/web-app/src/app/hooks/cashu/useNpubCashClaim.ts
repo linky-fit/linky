@@ -1,8 +1,10 @@
+import { useLatest } from "../../../hooks/useLatest";
+import { Schema } from "effect";
 import * as Evolu from "@evolu/common";
 import { Either } from "effect";
 import React from "react";
 import { parseTokenText } from "@linky/linkshu";
-import type { JsonValue } from "../../../types/json";
+import { JsonValue } from "../../../types/json";
 import {
   LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX,
   LOCAL_NPUB_CASH_CLAIM_LOCK_STORAGE_KEY_PREFIX,
@@ -41,6 +43,8 @@ import type {
   PaymentTelemetryMethod,
 } from "../../types/appTypes";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
+import { nowSeconds } from "../../../utils/time";
+import type { Translate } from "../../../i18n";
 import type {
   AdoptPaidCashuQuote,
   ReceiveCashuToken,
@@ -78,7 +82,7 @@ interface UseNpubCashClaimParams {
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   showPaidOverlay: (title?: string) => void;
-  t: (key: string) => string;
+  t: Translate;
   touchMintInfo: (mintUrl: string, nowSec: number) => void;
 }
 
@@ -169,11 +173,11 @@ export const useNpubCashClaim = ({
     ({ amount, mint, unit, method, details }: ReceivedPayment) => {
       const cleanedMint = mint.trim().replace(/\/+$/, "");
       if (cleanedMint && !isMintDeleted(cleanedMint)) {
-        const nowSec = Math.floor(Date.now() / 1000);
+        const nowSec = nowSeconds();
         const existing = mintInfoByUrl.get(cleanedMint);
         touchMintInfo(cleanedMint, nowSec);
 
-        const lastChecked = Number(existing?.lastCheckedAtSec ?? 0) || 0;
+        const lastChecked = (existing?.lastCheckedAtSec ?? 0) || 0;
         if (existing && !lastChecked) void refreshMintInfo(cleanedMint);
       }
 
@@ -305,7 +309,7 @@ export const useNpubCashClaim = ({
       headers: { Authorization: auth },
     });
     if (!res.ok) return;
-    const json = (await res.json()) as JsonValue;
+    const json = Schema.decodeUnknownSync(JsonValue)(await res.json());
     for (const tokenText of extractUniqueClaimTokens(json)) {
       await acceptAndStoreCashuToken(tokenText);
     }
@@ -477,10 +481,7 @@ export const useNpubCashClaim = ({
     sweepUpstreamPaidQuotes,
   ]);
 
-  const claimNpubCashOnceLatestRef = React.useRef(claimNpubCashOnce);
-  React.useEffect(() => {
-    claimNpubCashOnceLatestRef.current = claimNpubCashOnce;
-  }, [claimNpubCashOnce]);
+  const claimNpubCashOnceLatestRef = useLatest(claimNpubCashOnce);
 
   return {
     claimNpubCashOnce,

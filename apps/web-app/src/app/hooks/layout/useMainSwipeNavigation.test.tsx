@@ -14,11 +14,6 @@ vi.mock("../../../hooks/useRouting", () => ({
   navigateTo: vi.fn(),
 }));
 
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-});
-
 interface MockMainSwipeElement {
   clientWidth: number;
   scrollToCalls: Array<{ behavior: ScrollBehavior; left: number }>;

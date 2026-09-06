@@ -1,21 +1,21 @@
 import React from "react";
+import { useAppShellActions } from "../app/context/AppShellContexts";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { WalletActionButton } from "../components/WalletActionButton";
 import { WalletBalance } from "../components/WalletBalance";
 import { WalletWarning } from "../components/WalletWarning";
-import { useAppShellActions } from "../app/context/AppShellContexts";
-import { useNavigation } from "../hooks/useRouting";
+import { navigateTo } from "../hooks/useRouting";
+import type { Translate } from "../i18n";
 
 interface WalletPageProps {
   bottomTabActive: "wallet" | "contacts" | null;
-  cashuBalance: number;
   cashuTotalBalance: number;
   dismissWalletWarning: () => void;
   openScan: () => void;
   scanIsOpen: boolean;
   showWalletWarning: boolean;
   showBottomTabBar?: boolean;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const WalletPage: React.FC<WalletPageProps> = React.memo(
@@ -29,7 +29,6 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
     showBottomTabBar = true,
     t,
   }) => {
-    const navigateTo = useNavigation();
     const { openFeedbackContact } = useAppShellActions();
     return (
       <section className="panel panel-plain wallet-panel">

@@ -15,7 +15,7 @@ export const applyLightningAddressToProfileMetadata = (
   );
   const keptNip05 =
     nextNip05 ??
-    (getDefaultNip05IdentifierFromAddress(previous.nip05)
+    (getDefaultNip05IdentifierFromAddress(previous.nip05 ?? "")
       ? undefined
       : previous.nip05);
 

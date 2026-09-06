@@ -3,15 +3,15 @@ import type {
   MintQuoteBolt11Response,
 } from "@cashu/cashu-ts";
 import { Amount as CashuAmount } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, Stream } from "effect";
+import { Effect, Exit, Layer } from "effect";
 import { Amount, MintUrl, NonNegativeAmount } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { makeInMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
+import { fakeWallet } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
 import { FeeProbeDraft, LightningFeeProbeResult } from "./domain";
 import { FeeProbe } from "./FeeProbe";
 import { writeCachedFeeProbe } from "./internal/feeProbeCache";
@@ -52,30 +52,17 @@ interface FakeMintsArgs {
 
 const makeWallets = (args: FakeMintsArgs) => {
   const calls: string[] = [];
-  const wallet = (url: MintUrl): LoadedWallet => ({
-    keysetId: "009a1f293253e41e",
-    keyChain: { getKeysets: () => [] },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
-    receive: () => Promise.reject(new Error("not under test")),
-    send: () => Promise.reject(new Error("not under test")),
-    checkProofsStates: () => Promise.reject(new Error("not under test")),
-    createMintQuoteBolt11: () => {
-      calls.push(`mintQuote:${url}`);
-      return args.createMintQuote?.() ?? Promise.resolve(mintQuote());
-    },
-    checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-    createMeltQuoteBolt11: () => {
-      calls.push(`meltQuote:${url}`);
-      return args.createMeltQuote?.() ?? Promise.resolve(meltQuote());
-    },
-    checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-    restore: () => Promise.reject(new Error("not under test")),
-    batchRestore: () => Promise.reject(new Error("not under test")),
-  });
+  const wallet = (url: MintUrl): LoadedWallet =>
+    fakeWallet({
+      createMintQuoteBolt11: () => {
+        calls.push(`mintQuote:${url}`);
+        return args.createMintQuote?.() ?? Promise.resolve(mintQuote());
+      },
+      createMeltQuoteBolt11: () => {
+        calls.push(`meltQuote:${url}`);
+        return args.createMeltQuote?.() ?? Promise.resolve(meltQuote());
+      },
+    });
   return { calls, wallet };
 };
 
@@ -83,7 +70,7 @@ const makeHarness = (
   args: FakeMintsArgs,
   kv: KeyValueStoreService = makeInMemoryKeyValueStore(),
 ) => {
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const { calls, wallet } = makeWallets(args);
   const layer = FeeProbe.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -93,18 +80,13 @@ const makeHarness = (
           WalletInstances.make({ get: (url) => Effect.succeed(wallet(url)) }),
         ),
         Layer.succeed(KeyValueStore, kv),
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
   const run = <A, E>(program: Effect.Effect<A, E, FeeProbe>) =>
     Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
-  return { run, events, calls, kv };
+  return { run, events: inspector.events, calls, kv };
 };
 
 const probe = (input: FeeProbeDraft = draft) =>

@@ -1,4 +1,4 @@
-import { reportInspectorRows } from "../../devtools/inspector";
+import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
 
 /**

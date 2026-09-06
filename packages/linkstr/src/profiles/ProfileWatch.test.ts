@@ -1,12 +1,8 @@
-import { Duration, Effect, Exit, Layer, Stream } from "effect";
-import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
+import { Effect, Exit, Layer, Stream } from "effect";
+import { finalizeEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
-import {
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  UnixSeconds,
-} from "../domain/primitives";
+import { RelayUrl, UnixSeconds } from "../domain/primitives";
+import type { Pubkey } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { InspectorEvent } from "../inspector/events";
 import { AUTHOR_FILTER_LIMIT } from "../internal/authorChunks";
@@ -14,14 +10,10 @@ import { NostrTransport } from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
+import { eventually, makeIdentity } from "../testing";
 import { ProfileEventDropped } from "./events";
 import type { ProfileWatchEvent } from "./events";
 import { ProfileWatch } from "./ProfileWatch";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const carol = makeIdentity();
@@ -70,20 +62,6 @@ const watchTransport = (
     }),
   fetch: () => Effect.die("fetch not under test"),
 });
-
-const eventually = (predicate: () => boolean): Effect.Effect<void, Error> => {
-  const poll: Effect.Effect<void> = Effect.suspend(() =>
-    predicate()
-      ? Effect.void
-      : Effect.sleep(Duration.millis(2)).pipe(Effect.andThen(() => poll)),
-  );
-  return poll.pipe(
-    Effect.timeoutFail({
-      duration: Duration.seconds(2),
-      onTimeout: () => new Error("condition not met within 2s"),
-    }),
-  );
-};
 
 interface WatchContext {
   readonly subscriptions: Array<FakeSubscription>;
@@ -220,8 +198,8 @@ describe("ProfileWatch", () => {
           const overflowSubscription = subscriptions.find((subscription) =>
             subscription.filter.authors?.includes(overflow.pubkey),
           );
-          expect(overflowSubscription).toBeDefined();
-          overflowSubscription?.onEvent(
+          assert(overflowSubscription !== undefined);
+          overflowSubscription.onEvent(
             profileEvent(overflow, JSON.stringify({ name: "overflow" }), base),
           );
           yield* eventually(() => facts.length === 1);

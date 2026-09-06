@@ -5,13 +5,12 @@ import type { ProofStateEntry } from "../../internal/proofStates";
 import type { Proof } from "../../token/domain";
 
 /**
- * NUT-09 scan of one keyset's derivation tree, ported from the web app's
- * `cashuRestoreScanner`. Kept free of services so the scan strategy itself
- * stays testable: the mint calls arrive as two effects.
+ * NUT-09 scan of one keyset's derivation tree. Kept free of services so the
+ * scan strategy itself stays testable: the mint calls arrive as two effects.
  */
 
 /** Counter positions scanned behind the cursor/counter high water. */
-export const RESTORE_RESCAN_WINDOW = 4000;
+const RESTORE_RESCAN_WINDOW = 4000;
 /** Consecutive empty positions tolerated before a scan gives up. */
 export const RESTORE_GAP_LIMIT = 300;
 /** Positions per restore request; cashu-ts issues one request per batch. */

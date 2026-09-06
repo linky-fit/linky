@@ -16,8 +16,8 @@ import { RelayPolicy } from "../services/RelayPolicy";
 import { FetchedRelayLists, RelayListEntry, RelayListsReceipt } from "./domain";
 import type { RelayListsDraft } from "./domain";
 
-export const RELAY_LIST_KIND = 10002;
-export const DM_RELAY_LIST_KIND = 10050;
+const RELAY_LIST_KIND = 10002;
+const DM_RELAY_LIST_KIND = 10050;
 
 /**
  * The fetched lists gate the app's relay configuration, so one slow relay

@@ -3,7 +3,6 @@ import {
   deriveCashuMnemonicFromMasterSecret,
   deriveOwnerMnemonicsFromMasterSecret,
   IdentityProvider,
-  looksLikeSlip39Share,
   MasterSecretProvider,
   parseOwnerLaneIndex,
   parseSlip39Share,
@@ -18,7 +17,7 @@ interface DerivedNostrKeys {
   nsec: string;
 }
 
-export interface EvoluOwnerMnemonicRequest {
+interface EvoluOwnerMnemonicRequest {
   readonly index?: number;
   readonly role: OwnerRole;
 }
@@ -37,9 +36,6 @@ const pendingOwnerMnemonicRequests = new Map<
 const parseShare = async (rawText: string) => {
   return Effect.runPromise(parseSlip39Share(rawText));
 };
-
-export const looksLikeSlip39Seed = (rawText: string): boolean =>
-  looksLikeSlip39Share(rawText);
 
 export const deriveNostrKeysFromSlip39 = async (
   rawText: string,
@@ -85,7 +81,7 @@ export const deriveCashuBip85MnemonicFromSlip39 = async (
   }
 };
 
-export const deriveEvoluOwnerMnemonicsFromSlip39 = async (
+const deriveEvoluOwnerMnemonicsFromSlip39 = async (
   rawText: string,
   requests: ReadonlyArray<EvoluOwnerMnemonicRequest>,
 ): Promise<ReadonlyArray<string> | null> => {

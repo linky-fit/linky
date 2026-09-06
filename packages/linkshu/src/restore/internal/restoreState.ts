@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { KeysetId } from "../../domain/primitives";
 import type { CurrencyUnit, MintUrl } from "../../domain/primitives";
-import { scopeSuffix } from "../../internal/counters";
+import { readStoredInteger, scopeSuffix } from "../../internal/counters";
 import type { CounterScope } from "../../internal/counters";
 import type { KeyValueStoreService } from "../../ports/KeyValueStore";
 
@@ -16,7 +16,7 @@ import type { KeyValueStoreService } from "../../ports/KeyValueStore";
  */
 
 export const RESTORE_CURSOR_KEY_PREFIX = "linkshu.restoreCursor.";
-export const SEEN_KEYSETS_KEY_PREFIX = "linkshu.seenKeysets.";
+const SEEN_KEYSETS_KEY_PREFIX = "linkshu.seenKeysets.";
 
 export const restoreCursorKey = (scope: CounterScope): string =>
   RESTORE_CURSOR_KEY_PREFIX + scopeSuffix(scope);
@@ -25,11 +25,7 @@ export const restoreCursorKey = (scope: CounterScope): string =>
 export const readRestoreCursor = (
   kv: KeyValueStoreService,
   scope: CounterScope,
-): Effect.Effect<number> =>
-  Effect.map(kv.get(restoreCursorKey(scope)), (raw) => {
-    const value = raw === null ? Number.NaN : Number(raw);
-    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-  });
+): Effect.Effect<number> => readStoredInteger(kv, restoreCursorKey(scope), 0);
 
 /** Cursors never move backwards; a lower one would only redo covered ground. */
 export const advanceRestoreCursor = (

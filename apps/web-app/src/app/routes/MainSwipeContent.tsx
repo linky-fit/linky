@@ -1,15 +1,18 @@
+import { UserPlus as ContactAddIcon } from "lucide-react";
 import React from "react";
 import { BottomTabBar } from "../../components/BottomTabBar";
-import { ContactAddIcon } from "../../components/icons";
+
 import { ContactsChecklist } from "../../components/ContactsChecklist";
+import { useDesktopSplitView } from "../../hooks/useDesktopSplitView";
+import type { Translate } from "../../i18n";
 import { ContactsPage } from "../../pages/ContactsPage";
 import { WalletPage } from "../../pages/WalletPage";
-import { useDesktopSplitView } from "../../hooks/useDesktopSplitView";
 import type { Route } from "../../types/route";
+import { nowSeconds } from "../../utils/time";
 import { useMainSwipeRoutes } from "../context/AppShellContexts";
+import { useShowProfileQrOnTilt } from "../hooks/useShowProfileQrOnTilt";
 import { getActiveBankPaymentOfferContacts } from "../lib/bankPaymentOffer";
 import { useMainSwipeProgress } from "../lib/mainSwipeProgressStore";
-import { useShowProfileQrOnTilt } from "../hooks/useShowProfileQrOnTilt";
 import type {
   ContactRowLike,
   ContactsGuideKey,
@@ -20,7 +23,6 @@ export interface MainSwipeRouteProps {
   activeGroup: string | null;
   bottomTabActive: "contacts" | "wallet" | null;
   canAddContact: boolean;
-  cashuBalance: number;
   cashuTotalBalance: number;
   bankPaymentOfferMessages: readonly LocalNostrMessage[];
   contactsOnboardingCelebrating: boolean;
@@ -51,7 +53,7 @@ export interface MainSwipeRouteProps {
   showGroupFilter: boolean;
   showProfileQrOnTiltEnabled: boolean;
   startContactsGuide: (task: ContactsGuideKey) => void;
-  t: (key: string) => string;
+  t: Translate;
   visibleContacts: {
     conversations: ContactRowLike[];
     others: ContactRowLike[];
@@ -78,9 +80,7 @@ const useVisibleContactSections = (
   bankPaymentOfferMessages: readonly LocalNostrMessage[],
   visibleContacts: MainSwipeRouteProps["visibleContacts"],
 ): VisibleContactSections => {
-  const [nowSec, setNowSec] = React.useState(() =>
-    Math.floor(Date.now() / 1_000),
-  );
+  const [nowSec, setNowSec] = React.useState(() => nowSeconds());
   const activeOffers = React.useMemo(
     () => getActiveBankPaymentOfferContacts(bankPaymentOfferMessages, nowSec),
     [bankPaymentOfferMessages, nowSec],
@@ -89,7 +89,7 @@ const useVisibleContactSections = (
   React.useEffect(() => {
     if (activeOffers.nextExpiryAtSec === null) return;
     const timeoutId = window.setTimeout(
-      () => setNowSec(Math.floor(Date.now() / 1_000)),
+      () => setNowSec(nowSeconds()),
       Math.max(0, activeOffers.nextExpiryAtSec * 1_000 - Date.now() + 25),
     );
     return () => window.clearTimeout(timeoutId);
@@ -98,7 +98,7 @@ const useVisibleContactSections = (
   return React.useMemo(() => {
     const isProxyPaymentContact = (contact: ContactRowLike): boolean =>
       contact.isUnknownContact !== true &&
-      activeOffers.contactIds.has(String(contact.id ?? "").trim());
+      activeOffers.contactIds.has((contact.id ?? "").trim());
     const proxyPayments = [
       ...visibleContacts.pinned,
       ...visibleContacts.conversations,
@@ -127,7 +127,7 @@ interface MainSwipeBottomTabBarProps {
   activeTab: "contacts" | "wallet" | null;
   contactsLabel: string;
   onTabChange: (tab: "contacts" | "wallet") => void;
-  t: (key: string) => string;
+  t: Translate;
   walletLabel: string;
 }
 
@@ -189,7 +189,6 @@ export const MainSwipeContent = (): React.ReactElement => {
     activeGroup,
     bottomTabActive,
     canAddContact,
-    cashuBalance,
     cashuTotalBalance,
     bankPaymentOfferMessages,
     contactsOnboardingCelebrating,
@@ -287,7 +286,6 @@ export const MainSwipeContent = (): React.ReactElement => {
         >
           <h2 className="desktop-main-pane-title">{t("wallet")}</h2>
           <WalletPage
-            cashuBalance={cashuBalance}
             cashuTotalBalance={cashuTotalBalance}
             openScan={openWalletScan}
             scanIsOpen={scanIsOpen}
@@ -398,7 +396,6 @@ export const DesktopContactsPane = (): React.ReactElement => {
 export const DesktopWalletPane = (): React.ReactElement => {
   const { mainSwipeProps } = useMainSwipeRoutes();
   const {
-    cashuBalance,
     cashuTotalBalance,
     dismissWalletWarning,
     openWalletScan,
@@ -410,7 +407,6 @@ export const DesktopWalletPane = (): React.ReactElement => {
   return (
     <div className="desktop-primary-content desktop-wallet-pane">
       <WalletPage
-        cashuBalance={cashuBalance}
         cashuTotalBalance={cashuTotalBalance}
         openScan={openWalletScan}
         scanIsOpen={scanIsOpen}

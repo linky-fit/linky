@@ -1,3 +1,4 @@
+import type { ContactRowLike } from "../app/types/appTypes";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useFiatRates } from "../app/hooks/useFiatRates";
@@ -6,9 +7,11 @@ import {
   LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC,
   LINKY_BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC,
 } from "../app/lib/bankPaymentOffer";
+import { Avatar } from "../components/Avatar";
 import { BankPaymentAmount } from "../components/BankPaymentAmount";
 import { SettingsStepper } from "../components/SettingsStepper";
 import { navigateTo } from "../hooks/useRouting";
+import type { I18nKey, Translate } from "../i18n";
 import { formatDomesticBankAccount } from "../utils/bankAccount";
 import type { FiatRates } from "../utils/displayAmounts";
 import { formatInteger, getInitials } from "../utils/formatting";
@@ -25,26 +28,18 @@ interface SpdPaymentPageProps {
   initialOfferContactCount: number;
   initialOfferDelaySec: number;
   isEditing: boolean;
-  offerContacts: {
-    id?: unknown;
-    lastBankPaymentResponseSec?: unknown;
-    name?: unknown;
-    npub?: unknown;
-    pictureUrl?: unknown;
-  }[];
+  offerContacts: readonly (ContactRowLike & {
+    lastBankPaymentResponseSec?: number | null;
+    pictureUrl?: string | null;
+  })[];
   onRequestReimbursement: (args: {
     amountSat: number | null;
     amountText: string;
-    contacts: {
-      id?: unknown;
-      name?: unknown;
-      npub?: unknown;
-    }[];
+    contacts: ContactRowLike[];
     spdPayload: string;
     staggerDelaySec: number;
   }) => Promise<{ chatId: string; offerId: string } | null>;
   spdPayload: string;
-  t: (key: string) => string;
 }
 
 interface SpdPaymentFieldRow {
@@ -54,7 +49,7 @@ interface SpdPaymentFieldRow {
 }
 
 const getSpdField = (payment: BankPayment, key: string): string =>
-  String(payment.fields[key] ?? "").trim();
+  (payment.fields[key] ?? "").trim();
 
 // Czech and Slovak accounts are shown the way their banks display them.
 const getDisplayedFieldValue = (payment: BankPayment, key: string): string => {
@@ -64,13 +59,10 @@ const getDisplayedFieldValue = (payment: BankPayment, key: string): string => {
 
 const SATS_PER_BTC = 100_000_000;
 
-const getOfferContactKey = (contact: {
-  id?: unknown;
-  npub?: unknown;
-}): string => {
-  const id = String(contact.id ?? "").trim();
+const getOfferContactKey = (contact: ContactRowLike): string => {
+  const id = (contact.id ?? "").trim();
   if (id) return `id:${id}`;
-  return `npub:${String(contact.npub ?? "").trim()}`;
+  return `npub:${(contact.npub ?? "").trim()}`;
 };
 
 // Selection keeps insertion order: the offer is extended to recipients in
@@ -145,7 +137,7 @@ const getSpdAmountSat = (
   return Number.isFinite(amountSat) && amountSat > 0 ? amountSat : null;
 };
 
-const FIELD_LABEL_KEYS: Record<BankPaymentFieldKey, string> = {
+const FIELD_LABEL_KEYS: Record<BankPaymentFieldKey, I18nKey> = {
   ACC: "spdPaymentAccount",
   AM: "spdPaymentAmount",
   BIC: "spdPaymentBic",
@@ -160,7 +152,7 @@ const FIELD_LABEL_KEYS: Record<BankPaymentFieldKey, string> = {
 
 const buildSpdRows = (
   payment: BankPayment,
-  t: (key: string) => string,
+  t: Translate,
 ): SpdPaymentFieldRow[] =>
   getBankPaymentEditableFieldKeys(payment.format).flatMap((key) => {
     const value = getDisplayedFieldValue(payment, key);
@@ -187,7 +179,7 @@ const createDraftFields = (payment: BankPayment): BankPaymentFields =>
 
 interface BankPaymentEditError {
   field: string | null;
-  key: string;
+  key: I18nKey;
 }
 
 const EDIT_ERRORS: Record<string, BankPaymentEditError> = {
@@ -229,9 +221,8 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
   offerContacts,
   onRequestReimbursement,
   spdPayload,
-  t,
 }) => {
-  const { displayCurrency, displayUnit, formatDisplayedAmountText, lang } =
+  const { displayCurrency, displayUnit, formatDisplayedAmountText, lang, t } =
     useAppShellCore();
   const fiatRates = useFiatRates();
   const [isRequestingOffer, setIsRequestingOffer] = React.useState(false);
@@ -529,9 +520,9 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
               contact.lastBankPaymentResponseSec >= 0
                 ? contact.lastBankPaymentResponseSec
                 : null;
-            const name = String(contact.name ?? "").trim();
-            const npub = String(contact.npub ?? "").trim();
-            const pictureUrl = String(contact.pictureUrl ?? "").trim();
+            const name = (contact.name ?? "").trim();
+            const npub = (contact.npub ?? "").trim();
+            const pictureUrl = (contact.pictureUrl ?? "").trim();
             const orderIndex = selectedOfferContactKeys.indexOf(key);
             const isSelected = orderIndex !== -1;
 
@@ -563,18 +554,12 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
                   aria-hidden="true"
                 >
                   <span className="contact-avatar">
-                    {pictureUrl ? (
-                      <img
-                        src={pictureUrl}
-                        alt=""
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <span className="contact-avatar-fallback">
-                        {getInitials(name)}
-                      </span>
-                    )}
+                    <Avatar
+                      pictureUrl={pictureUrl}
+                      fallback={getInitials(name)}
+                      fallbackClassName="contact-avatar-fallback"
+                      loading="lazy"
+                    />
                   </span>
                   {isSelected ? (
                     <span className="bank-payment-offer-contact-order">

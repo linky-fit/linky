@@ -69,11 +69,12 @@ export class PaymentTelemetryDraft extends Schema.Class<PaymentTelemetryDraft>(
   appVersion: Schema.String,
 }) {}
 
-export class PaymentTelemetryReceipt extends Schema.Class<PaymentTelemetryReceipt>(
+export class PaymentTelemetryReceipt extends Schema.TaggedClass<PaymentTelemetryReceipt>()(
   "PaymentTelemetryReceipt",
-)({
-  telemetryId: RumorId,
-  clientId: ClientId,
-  sentAt: UnixSeconds,
-  recipientCopy: WrapDelivery,
-}) {}
+  {
+    rumorId: RumorId,
+    clientId: ClientId,
+    sentAt: UnixSeconds,
+    recipientCopy: WrapDelivery,
+  },
+) {}

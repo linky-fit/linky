@@ -12,6 +12,7 @@ import {
   UNIT_TOGGLE_STORAGE_KEY,
 } from "../../utils/constants";
 import type { DisplayCurrency } from "../../utils/displayAmounts";
+import { safeLocalStorageSet } from "../../utils/storage";
 
 interface UseAppPreferencesParams {
   allowedDisplayCurrencies: readonly DisplayCurrency[];
@@ -37,99 +38,67 @@ export const useAppPreferences = ({
   showProfileQrOnTiltEnabled,
 }: UseAppPreferencesParams): void => {
   React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        DECIMAL_AMOUNT_INPUT_STORAGE_KEY,
-        decimalAmountInputEnabled ? "1" : "0",
-      );
-    } catch {
-      // ignore
-    }
+    safeLocalStorageSet(
+      DECIMAL_AMOUNT_INPUT_STORAGE_KEY,
+      decimalAmountInputEnabled ? "1" : "0",
+    );
   }, [decimalAmountInputEnabled]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem(DISPLAY_CURRENCY_STORAGE_KEY, displayCurrency);
-      localStorage.setItem(
-        DISPLAY_ALLOWED_CURRENCIES_STORAGE_KEY,
-        JSON.stringify(allowedDisplayCurrencies),
-      );
-      localStorage.setItem(
-        UNIT_TOGGLE_STORAGE_KEY,
-        displayCurrency === "btc" ? "1" : "0",
-      );
-    } catch {
-      // ignore
-    }
+    safeLocalStorageSet(DISPLAY_CURRENCY_STORAGE_KEY, displayCurrency);
+    safeLocalStorageSet(
+      DISPLAY_ALLOWED_CURRENCIES_STORAGE_KEY,
+      JSON.stringify(allowedDisplayCurrencies),
+    );
+    safeLocalStorageSet(
+      UNIT_TOGGLE_STORAGE_KEY,
+      displayCurrency === "btc" ? "1" : "0",
+    );
   }, [allowedDisplayCurrencies, displayCurrency]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        PAY_WITH_CASHU_STORAGE_KEY,
-        payWithCashuEnabled ? "1" : "0",
-      );
-    } catch {
-      // ignore
-    }
+    safeLocalStorageSet(
+      PAY_WITH_CASHU_STORAGE_KEY,
+      payWithCashuEnabled ? "1" : "0",
+    );
   }, [payWithCashuEnabled]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY,
-        String(lightningInvoiceAutoPayLimit),
-      );
-    } catch {
-      // ignore
-    }
+    safeLocalStorageSet(
+      LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY,
+      String(lightningInvoiceAutoPayLimit),
+    );
   }, [lightningInvoiceAutoPayLimit]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY,
-        String(bankPaymentOfferRecipientCount),
-      );
-    } catch {
-      // ignore
-    }
+    safeLocalStorageSet(
+      BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY,
+      String(bankPaymentOfferRecipientCount),
+    );
   }, [bankPaymentOfferRecipientCount]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY,
-        String(bankPaymentOfferStaggerDelaySec),
-      );
-    } catch {
-      // ignore
-    }
+    safeLocalStorageSet(
+      BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY,
+      String(bankPaymentOfferStaggerDelaySec),
+    );
   }, [bankPaymentOfferStaggerDelaySec]);
 
   React.useEffect(() => {
-    try {
-      // "0" (not key removal) persists the off state: an absent key means
-      // "never decided" and re-enables by default on the next launch.
-      localStorage.setItem(
-        SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY,
-        seenReceiptsEnabledAtSec === null
-          ? "0"
-          : String(seenReceiptsEnabledAtSec),
-      );
-    } catch {
-      // ignore
-    }
+    // "0" (not key removal) persists the off state: an absent key means
+    // "never decided" and re-enables by default on the next launch.
+    safeLocalStorageSet(
+      SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY,
+      seenReceiptsEnabledAtSec === null
+        ? "0"
+        : String(seenReceiptsEnabledAtSec),
+    );
   }, [seenReceiptsEnabledAtSec]);
 
   React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY,
-        showProfileQrOnTiltEnabled ? "1" : "0",
-      );
-    } catch {
-      // ignore
-    }
+    safeLocalStorageSet(
+      SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY,
+      showProfileQrOnTiltEnabled ? "1" : "0",
+    );
   }, [showProfileQrOnTiltEnabled]);
 };

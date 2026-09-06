@@ -1,13 +1,9 @@
+import { DEFAULT_NOSTR_RELAYS } from "@linky/linkstr";
 import { RelayUrl } from "@linky/linkstr";
-import { Option, Schema } from "effect";
+import { Schema } from "effect";
+import { safeLocalStorageGetJson, safeLocalStorageSetJson } from "./storage";
 
 const isRelayUrl = Schema.is(RelayUrl);
-
-const DEFAULT_NOSTR_RELAYS = [
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-  "wss://relay.0xchat.com",
-];
 
 const envRelays = Array.from(
   new Set(
@@ -55,42 +51,25 @@ const CachedRelayListsSchema = Schema.Struct({
   dmRelaysUpdatedAt: Schema.NullOr(Schema.Number),
 });
 
-export type CachedRelayLists = typeof CachedRelayListsSchema.Type;
-
-const decodeCachedRelayLists = Schema.decodeUnknownOption(
-  CachedRelayListsSchema,
-);
+type CachedRelayLists = typeof CachedRelayListsSchema.Type;
 
 export const loadCachedRelayLists = (
   pubkey: string,
 ): CachedRelayLists | null => {
-  const raw = localStorage.getItem(`${RELAY_CACHE_KEY_PREFIX}.${pubkey}`);
-  if (raw === null) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  const decoded = decodeCachedRelayLists(parsed);
-  if (Option.isNone(decoded)) return null;
-  const relayUrls = Array.from(
-    new Set(decoded.value.relayUrls.filter(isRelayUrl)),
+  const cached = safeLocalStorageGetJson(
+    `${RELAY_CACHE_KEY_PREFIX}.${pubkey}`,
+    Schema.NullOr(CachedRelayListsSchema),
+    null,
   );
+  if (cached === null) return null;
+  const relayUrls = Array.from(new Set(cached.relayUrls.filter(isRelayUrl)));
   if (relayUrls.length === 0) return null;
-  return { ...decoded.value, relayUrls };
+  return { ...cached, relayUrls };
 };
 
 export const saveCachedRelayLists = (
   pubkey: string,
   lists: CachedRelayLists,
 ): void => {
-  try {
-    localStorage.setItem(
-      `${RELAY_CACHE_KEY_PREFIX}.${pubkey}`,
-      JSON.stringify(lists),
-    );
-  } catch {
-    // Best-effort cache: quota or private-mode failures just skip it.
-  }
+  safeLocalStorageSetJson(`${RELAY_CACHE_KEY_PREFIX}.${pubkey}`, lists);
 };

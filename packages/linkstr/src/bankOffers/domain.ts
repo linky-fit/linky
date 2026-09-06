@@ -40,19 +40,20 @@ export class BankOfferDraft extends Schema.Class<BankOfferDraft>(
   clientId: Schema.optional(ClientId),
 }) {}
 
-export class BankOfferReceipt extends Schema.Class<BankOfferReceipt>(
+export class BankOfferReceipt extends Schema.TaggedClass<BankOfferReceipt>()(
   "BankOfferReceipt",
-)({
-  snapshotId: RumorId,
-  offerId: BankOfferId,
-  status: BankOfferStatus,
-  /** The encoded snapshot JSON; the app persists it as the offer's local state. */
-  content: Schema.String,
-  clientId: ClientId,
-  sentAt: UnixSeconds,
-  selfCopy: WrapDelivery,
-  recipientCopy: WrapDelivery,
-}) {}
+  {
+    rumorId: RumorId,
+    offerId: BankOfferId,
+    status: BankOfferStatus,
+    /** The encoded snapshot JSON; the app persists it as the offer's local state. */
+    content: Schema.String,
+    clientId: ClientId,
+    sentAt: UnixSeconds,
+    selfCopy: WrapDelivery,
+    recipientCopy: WrapDelivery,
+  },
+) {}
 
 export const shouldPushBankOfferStatus = (status: BankOfferStatus): boolean =>
   status === "offered" ||

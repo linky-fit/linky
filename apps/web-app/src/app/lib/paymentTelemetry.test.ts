@@ -61,9 +61,7 @@ describe("createLocalPaymentTelemetryEvent", () => {
     const expectedAppHost =
       typeof window === "undefined"
         ? null
-        : String(window.location.host ?? "")
-            .trim()
-            .toLowerCase() || null;
+        : window.location.host.trim().toLowerCase() || null;
 
     expect(
       createLocalPaymentTelemetryEvent(

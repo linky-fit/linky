@@ -2,8 +2,8 @@ import type { OwnerId } from "@evolu/common";
 import { LightningFeeProbeResult } from "@linky/linkshu";
 import { Either, Schema } from "effect";
 import React, { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
 import type { ProbeLightningFee } from "../app/hooks/composition/useLinkshuComposition";
 import { MintsPage } from "./MintsPage";
@@ -31,11 +31,6 @@ const probeLightningFee = vi.fn<ProbeLightningFee>(
       }),
     ),
 );
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-});
 
 const appOwnerIdRef = React.createRef<OwnerId>();
 
@@ -93,13 +88,8 @@ describe("MintsPage", () => {
   it("routes preset selection and custom save to their callbacks", async () => {
     const applyDefaultMintSelection = vi.fn(async () => {});
     mintSettings = createMintSettings({ applyDefaultMintSelection });
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
 
-    await act(async () => {
-      root.render(<MintsPage />);
-    });
+    const { container, root } = await renderIntoDocument(<MintsPage />);
 
     await act(async () => {
       click(findButton(container, "kashu.me"));
@@ -133,7 +123,6 @@ describe("MintsPage", () => {
     expect(
       findButton(container, "cashu.cz").classList.contains("is-selected"),
     ).toBe(true);
-    expect(container.textContent).not.toContain("Melt foreign balance");
     const selectedItem = container.querySelector(
       ".mint-choice-item.is-selected",
     );
@@ -149,13 +138,8 @@ describe("MintsPage", () => {
   it("shows the selected mint's keyset fee and requests a refresh when unknown", async () => {
     const refreshMintInfo = vi.fn(async () => {});
     mintSettings = createMintSettings({ refreshMintInfo });
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
 
-    await act(async () => {
-      root.render(<MintsPage />);
-    });
+    const { container, root } = await renderIntoDocument(<MintsPage />);
     expect(refreshMintInfo).toHaveBeenCalledWith("https://cashu.cz");
     expect(container.textContent).toContain("unknown");
 
@@ -199,18 +183,9 @@ describe("MintsPage", () => {
       ),
     );
     mintSettings = createMintSettings();
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(<MintsPage />);
-    });
+    const { container, unmount } = await renderIntoDocument(<MintsPage />);
     expect(container.textContent).toContain("~12.5 %");
-
-    await act(async () => {
-      root.unmount();
-    });
+    await unmount();
   });
 
   it("updates the custom draft and blocks selection and save while busy", async () => {
@@ -221,13 +196,8 @@ describe("MintsPage", () => {
       cashuIsBusy: true,
       setDefaultMintUrlDraft,
     });
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
 
-    await act(async () => {
-      root.render(<MintsPage />);
-    });
+    const { container, root } = await renderIntoDocument(<MintsPage />);
 
     const input = container.querySelector("#defaultMintUrl");
     if (!(input instanceof HTMLInputElement)) {

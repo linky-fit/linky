@@ -24,8 +24,8 @@ export const useContactPayMethod = ({
       return;
     }
 
-    const npub = String(selectedContactNpub ?? "").trim();
-    const ln = String(selectedContactLnAddress ?? "").trim();
+    const npub = selectedContactNpub.trim();
+    const ln = selectedContactLnAddress.trim();
     const canUseCashu = payWithCashuEnabled && Boolean(npub);
     const canUseLightning = Boolean(ln);
 

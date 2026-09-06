@@ -1,10 +1,8 @@
-type ErrorDetailsRecord = Record<string, string | undefined>;
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
-export const isUnknownRecord = (
-  value: unknown,
-): value is ErrorDetailsRecord => {
-  return value !== null && typeof value === "object";
-};
+export const readField = (value: unknown, field: string): unknown =>
+  isRecord(value) ? value[field] : undefined;
 
 export const getUnknownErrorMessage = (
   value: unknown,
@@ -17,11 +15,10 @@ export const getUnknownErrorMessage = (
   }
 
   if (value instanceof Error) {
-    const message = String(value);
-    return message || fallback;
+    return value.message || fallback;
   }
 
-  if (isUnknownRecord(value) && typeof value.message === "string") {
+  if (isRecord(value) && typeof value.message === "string") {
     return value.message || fallback;
   }
 

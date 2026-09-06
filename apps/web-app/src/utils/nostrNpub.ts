@@ -1,19 +1,24 @@
 const NOSTR_URI_PREFIX = "nostr:";
 
+export const stripNostrUriPrefix = (value: string): string => {
+  const trimmed = value.trim();
+  return trimmed.slice(0, NOSTR_URI_PREFIX.length).toLowerCase() ===
+    NOSTR_URI_PREFIX
+    ? trimmed.slice(NOSTR_URI_PREFIX.length).trim()
+    : trimmed;
+};
+
 const normalizeNpubCase = (value: string): string => {
   const trimmed = value.trim();
   if (!trimmed) return "";
   return /^npub1/i.test(trimmed) ? trimmed.toLowerCase() : trimmed;
 };
 
-export const normalizeNpubIdentifier = (value: unknown): string | null => {
-  const raw = String(value ?? "").trim();
+export const normalizeNpubIdentifier = (value: string): string | null => {
+  const raw = value.trim();
   if (!raw) return null;
 
-  const withoutPrefix =
-    raw.slice(0, NOSTR_URI_PREFIX.length).toLowerCase() === NOSTR_URI_PREFIX
-      ? raw.slice(NOSTR_URI_PREFIX.length).trim()
-      : raw;
+  const withoutPrefix = stripNostrUriPrefix(raw);
   if (!withoutPrefix) return null;
 
   const atIndex = withoutPrefix.indexOf("@");

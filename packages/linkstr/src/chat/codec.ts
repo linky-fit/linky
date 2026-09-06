@@ -1,10 +1,18 @@
 import { Either, Schema } from "effect";
 import { decrypt, getConversationKey } from "nostr-tools/nip44";
-import { ClientId, Pubkey, RumorId } from "../domain/primitives";
+import {
+  ClientId,
+  isClientId,
+  isPubkey,
+  isRumorId,
+  Pubkey,
+  RumorId,
+} from "../domain/primitives";
 import type { UnixSeconds } from "../domain/primitives";
 import type { DropReason } from "../inbox/events";
 import {
   firstTagValue,
+  firstTrimmedTagValue,
   Rumor,
   rumorWithHash,
   tagValues,
@@ -32,9 +40,6 @@ import type { ChatInboxEvent, MessageBody } from "./events";
 export const CHAT_TEXT_KIND = 14;
 export const CHAT_IMAGE_KIND = 15;
 
-const isPubkey = Schema.is(Pubkey);
-const isRumorId = Schema.is(RumorId);
-const isClientId = Schema.is(ClientId);
 const decodePrivateImage = Schema.decodeUnknownEither(PrivateImage);
 const isCashuTokenText = Schema.is(CashuTokenText);
 
@@ -149,15 +154,6 @@ export const encodeEditRumor = (
     ],
     content: draft.content,
   });
-
-const firstTrimmedTagValue = (tags: NostrTags, name: string): string | null => {
-  for (const tag of tags) {
-    if (tag[0] !== name) continue;
-    const value = tag[1]?.trim();
-    if (value) return value;
-  }
-  return null;
-};
 
 const resolvePeer = (
   rumor: Rumor,

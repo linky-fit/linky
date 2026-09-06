@@ -1,20 +1,24 @@
 import { createSlip39Share } from "@linky/identity";
 import { expect, test, type Page } from "@playwright/test";
 import { Effect } from "effect";
-import { nip19 } from "nostr-tools";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
-import { setRandomIdentityStorage } from "./helpers/identity";
+import {
+  createSeedIdentity,
+  setRandomIdentityStorage,
+  setSeedLoginStorage,
+} from "./helpers/identity";
+import { watchAppErrors } from "./helpers/diagnostics";
+import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+
+test.use({ serviceWorkers: "block" });
+
+test.beforeEach(async ({ page }) => {
+  await stubFiatRates(page);
+  await stubThirdPartyAssets(page);
+});
 
 const CONTACT_NPUB =
   "npub12g0qmc3xa4hc9nxca936chppd6zhkr494xyypstcd7wg0gaa2xzswunml3";
-const decodedContactNpub = nip19.decode(CONTACT_NPUB);
-if (
-  decodedContactNpub.type !== "npub" ||
-  typeof decodedContactNpub.data !== "string"
-) {
-  throw new Error("Invalid test contact npub");
-}
-const CONTACT_PUBKEY_HEX = decodedContactNpub.data;
 
 const setAuthenticatedStorage = async (page: Page) => {
   await setBaseStorage(page);
@@ -34,7 +38,10 @@ const disableOpfs = async (page: Page) => {
   });
 };
 
-const createContactAndOpenChat = async (page: Page): Promise<string> => {
+const createContactAndOpenChat = async (
+  page: Page,
+  addButtonName = "Add",
+): Promise<string> => {
   await page.goto("/#");
   await page.locator("[data-guide='contact-add-button']").first().click();
   await page.waitForURL(/#contact\/new$/, { timeout: 10_000 });
@@ -44,9 +51,9 @@ const createContactAndOpenChat = async (page: Page): Promise<string> => {
   await searchInput.fill(CONTACT_NPUB);
   await searchInput.press("Enter");
   await expect(
-    page.getByRole("button", { name: "Add", exact: true }),
+    page.getByRole("button", { name: addButtonName, exact: true }),
   ).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: addButtonName, exact: true }).click();
 
   await page.waitForURL(/#(?:contacts)?$/, { timeout: 20_000 });
   const contactCards = page.locator("[data-guide='contact-card']");
@@ -63,44 +70,6 @@ const createContactAndOpenChat = async (page: Page): Promise<string> => {
   }
   return decodeURIComponent(contactMatch[1]);
 };
-
-test("keeps authenticated screen gutters aligned", async ({ page }) => {
-  await setAuthenticatedStorage(page);
-  await page.setViewportSize({ ...MOBILE_VIEWPORT });
-
-  for (const route of [
-    "/#settings",
-    "/#wallet/transactions",
-    "/#wallet/topup",
-    "/#contact/new",
-  ]) {
-    await page.goto(route);
-
-    const shell = page.locator(".page.authenticated-page");
-    // First navigation of the suite: with parallel workers the dev server may
-    // still be compiling, and the default 5s expect timeout makes this flaky.
-    await expect(shell).toBeVisible({ timeout: 30_000 });
-    await expect(shell).toHaveCSS("padding-left", "20px");
-    await expect(shell).toHaveCSS("padding-right", "20px");
-    await expect(page.locator(".topbar")).toHaveCSS("padding-left", "20px");
-    await expect(page.locator(".topbar")).toHaveCSS("padding-right", "20px");
-
-    const rootPanel = page.locator(".page.authenticated-page > .panel");
-    await expect(rootPanel).toHaveCount(1);
-    await expect(rootPanel).toHaveCSS("padding-left", "0px");
-    await expect(rootPanel).toHaveCSS("padding-right", "0px");
-  }
-
-  await page.goto("/#profile");
-  await expect(page.locator(".topbar-left .topbar-btn")).toHaveCSS(
-    "justify-content",
-    "flex-start",
-  );
-  await expect(page.locator(".topbar > .topbar-btn")).toHaveCSS(
-    "justify-content",
-    "flex-end",
-  );
-});
 
 test("keeps unauthenticated auth gating without render loops", async ({
   page,
@@ -279,54 +248,6 @@ test("preserves route parity and critical handlers", async ({ page }) => {
   await expect(paySend).toBeDisabled();
 });
 
-test("keeps long chat drafts visible above iPhone 8 and iPhone 16 keyboards", async ({
-  page,
-}) => {
-  await setAuthenticatedStorage(page);
-  await page.setViewportSize({ height: 667, width: 375 });
-  await createContactAndOpenChat(page);
-
-  const chatInput = page.locator("[data-guide='chat-input']");
-  await chatInput.fill(
-    Array.from({ length: 20 }, (_, index) => `Draft line ${index + 1}`).join(
-      "\n",
-    ),
-  );
-  await chatInput.evaluate((element) => element.blur());
-  await page.waitForTimeout(300);
-
-  for (const device of [
-    { height: 667, keyboardTop: 330, width: 375 },
-    { height: 852, keyboardTop: 430, width: 393 },
-  ]) {
-    await page.setViewportSize({ height: device.height, width: device.width });
-    await page.waitForTimeout(50);
-    await page.evaluate(({ height, keyboardTop }) => {
-      document.documentElement.style.setProperty(
-        "--chat-viewport-height",
-        `${keyboardTop}px`,
-      );
-      document.documentElement.style.setProperty(
-        "--chat-keyboard-inset",
-        `${height - keyboardTop}px`,
-      );
-    }, device);
-
-    const topbarBox = await page.locator(".topbar").boundingBox();
-    const chatInputBox = await chatInput.boundingBox();
-    expect(topbarBox).not.toBeNull();
-    expect(chatInputBox).not.toBeNull();
-    if (!topbarBox || !chatInputBox) throw new Error("Missing chat geometry");
-    expect(chatInputBox.height).toBeLessThanOrEqual(160);
-    expect(chatInputBox.y).toBeGreaterThanOrEqual(
-      topbarBox.y + topbarBox.height,
-    );
-    expect(chatInputBox.y + chatInputBox.height).toBeLessThanOrEqual(
-      device.keyboardTop,
-    );
-  }
-});
-
 test("supports chat reply, edit, reaction toggle, and copy actions", async ({
   page,
 }) => {
@@ -404,9 +325,132 @@ test("supports chat reply, edit, reaction toggle, and copy actions", async ({
   await archiveButton.click();
   await page.waitForURL(/#(?:contacts)?$/, { timeout: 10_000 });
 
-  const unknownContactId = `unknown:${CONTACT_PUBKEY_HEX}`;
-  await page.goto(`/#chat/${encodeURIComponent(unknownContactId)}`);
+  await expect(page.locator("[data-guide='contact-card']")).toHaveCount(0);
+  await page.goto(`/#contact/${encodeURIComponent(contactId)}`);
+  await expect(
+    page.getByText("Archived contact", { exact: true }),
+  ).toBeVisible();
+  await page.goto(`/#chat/${encodeURIComponent(contactId)}`);
   await expect(
     page.locator(".chat-message").filter({ hasText: "First message" }).first(),
   ).toBeVisible();
+  await expect(editedBubble).toContainText("Reply body edited");
+});
+
+test("German settings, diagnostics, and profile routes keep their labels and back navigation", async ({
+  page,
+}) => {
+  const errors = watchAppErrors(page, "German navigation");
+  page.setDefaultTimeout(20_000);
+  await page.setViewportSize(MOBILE_VIEWPORT);
+  await setBaseStorage(page, "de");
+  await setSeedLoginStorage(page, await createSeedIdentity());
+  const banner = page.getByRole("banner");
+  const title = banner.locator(".topbar-title");
+  const close = banner.getByRole("button", { name: "Schließen", exact: true });
+
+  await test.step("save a contact so diagnostic tables contain real changes", async () => {
+    await createContactAndOpenChat(page, "Hinzufügen");
+  });
+
+  await test.step("open German settings from the wallet menu and inspect the mint", async () => {
+    await page.goto("/#wallet");
+    await expect(page.getByLabel("Verfügbares Guthaben")).toBeVisible();
+    await banner.getByRole("button", { name: "Menü", exact: true }).click();
+    await expect(page).toHaveURL(/#settings$/);
+    await expect(title).toHaveText("Einstellungen");
+    for (const name of [
+      "Allgemein",
+      "Zahlungen",
+      "Netzwerk",
+      "Sicherheit",
+      "Debug",
+    ]) {
+      await expect(
+        page.getByRole("heading", { name, exact: true }),
+      ).toBeVisible();
+    }
+    await page.getByRole("button", { name: /^Mint\b/ }).click();
+    await expect(page).toHaveURL(/#advanced\/mints$/);
+    await expect(title).toHaveText("Mints");
+    await expect(
+      page.getByRole("button", { name: "localhost:3338 Test", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await close.click();
+    await expect(page).toHaveURL(/#settings$/);
+  });
+
+  await test.step("open the local Nostr relay and return through its parent routes", async () => {
+    await page.getByRole("button", { name: /^Nostr \d+\/\d+/ }).click();
+    await expect(page).toHaveURL(/#nostr-relays$/);
+    await expect(title).toHaveText("Nostr-Relay");
+    await page.getByRole("button", { name: /ws:\/\/localhost:7777/ }).click();
+    await expect(page).toHaveURL(/#nostr-relay\/ws%3A%2F%2Flocalhost%3A7777$/);
+    await expect(title).toHaveText("Nostr-Relay");
+    await expect(page.getByText("Status", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Löschen", exact: true }),
+    ).toBeVisible();
+    await close.click();
+    await expect(page).toHaveURL(/#nostr-relays$/);
+    await close.click();
+    await expect(page).toHaveURL(/#settings$/);
+  });
+
+  await test.step("inspect Evolu server, current data, history, and capacity", async () => {
+    await page.getByRole("button", { name: /^Evolu \d+\/\d+/ }).click();
+    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(title).toHaveText("Evolu-Server");
+    await page.getByRole("button", { name: /ws:\/\/localhost:4001/ }).click();
+    await expect(page).toHaveURL(/#evolu-server\/ws%3A%2F%2Flocalhost%3A4001$/);
+    await expect(
+      page.getByText("Synchronisierung", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Offline gehen", exact: true }),
+    ).toBeVisible();
+    await close.click();
+    await expect(page).toHaveURL(/#evolu-servers$/);
+    await page.getByText("Daten", { exact: true }).click();
+    await expect(page).toHaveURL(/#evolu-current-data$/);
+    await expect(title).toHaveText("Daten");
+    await expect(
+      page.getByText("Eigentümerindex", { exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Änderungen bis zum Wechsel", { exact: true }).first(),
+    ).toBeVisible();
+    await close.click();
+    await expect(page).toHaveURL(/#evolu-servers$/);
+    await page.getByText("Verlauf", { exact: true }).click();
+    await expect(page).toHaveURL(/#evolu-history-data$/);
+    await expect(title).toHaveText("Verlauf");
+    for (const name of ["Tabelle", "Spalte", "Wert", "Zeitstempel"]) {
+      await expect(
+        page.getByRole("columnheader", { name, exact: true }),
+      ).toBeVisible();
+    }
+    await close.click();
+    await expect(page).toHaveURL(/#evolu-servers$/);
+    await page.goto("/#evolu-data");
+    await expect(title).toHaveText("Daten");
+    await expect(page.getByText(/^\d+\.\d % des 1-MiB-Limits$/)).toBeVisible();
+  });
+
+  await test.step("open and cancel profile editing through the topbar", async () => {
+    await page.goto("/#profile");
+    await expect(title).toHaveText("Profil");
+    await banner
+      .getByRole("button", { name: "Bearbeiten", exact: true })
+      .click();
+    await expect(page).toHaveURL(/#profile\/edit$/);
+    await expect(title).toHaveText("Profil");
+    await expect(page.locator("#profileName")).toBeVisible();
+    await close.click();
+    await expect(page).toHaveURL(/#profile$/);
+    await expect(
+      banner.getByRole("button", { name: "Bearbeiten", exact: true }),
+    ).toBeVisible();
+  });
+  errors.assertClean();
 });

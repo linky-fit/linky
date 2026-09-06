@@ -6,6 +6,7 @@ import type {
   RelaySettingsContextValue,
 } from "../../context/SystemSettingsContexts";
 import { useMemoizedContextValue } from "./useMemoizedRouteBundle";
+import type { Translate } from "../../../i18n";
 
 type EvoluSettingsInput = Omit<
   EvoluSettingsContextValue,
@@ -17,7 +18,7 @@ interface UseSystemSettingsCompositionParams {
   evoluSettingsInput: EvoluSettingsInput;
   mintSettingsInput: MintSettingsContextValue;
   relaySettingsInput: RelaySettingsContextValue;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export interface SystemSettingsCompositionResult {

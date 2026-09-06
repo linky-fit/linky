@@ -170,8 +170,3 @@ export const ENGLISH_FIRST_NAMES: readonly string[] = [
   "Thomas",
   "William",
 ];
-
-export const FIRST_NAMES: readonly string[] = [
-  ...CZECH_FIRST_NAMES,
-  ...ENGLISH_FIRST_NAMES,
-];

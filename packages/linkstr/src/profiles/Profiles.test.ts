@@ -1,32 +1,19 @@
-import { Effect, Exit, Layer } from "effect";
-import {
-  finalizeEvent,
-  generateSecretKey,
-  getPublicKey,
-  verifyEvent,
-} from "nostr-tools";
+import { Effect, Exit, Layer, Option } from "effect";
+import { finalizeEvent, verifyEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
-import {
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  UnixSeconds,
-} from "../domain/primitives";
-import { firstTagValue, SignedPlainEvent } from "../internal/nostrEvent";
+import { Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
+import { AUTHOR_FILTER_LIMIT } from "../internal/authorChunks";
+import { firstTagValue } from "../internal/nostrEvent";
+import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
 import { RelayUnreachable } from "../services/NostrTransport";
+import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
-import { AUTHOR_FILTER_LIMIT } from "../internal/authorChunks";
+import { makeIdentity, stubPlainTransport } from "../testing";
 import { decodeProfileMetadata } from "./codec";
 import { ProfileMetadata, StatusDraft } from "./domain";
 import { Profiles } from "./Profiles";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -77,23 +64,7 @@ const stubTransport = (
     silent?: ReadonlyArray<RelayUrl>;
   },
 ): Layer.Layer<NostrTransport> =>
-  Layer.succeed(NostrTransport, {
-    publish: (relays, event) =>
-      Effect.sync(() => {
-        if (!(event instanceof SignedPlainEvent)) {
-          throw new Error("profiles publish only plain events");
-        }
-        published.push(event);
-        return relays.map((relay) => {
-          const accepted = options?.accept?.(event, relay) ?? true;
-          return new RelayPublishResult({
-            relay,
-            accepted,
-            detail: accepted ? null : "blocked",
-          });
-        });
-      }),
-    subscribe: () => Effect.die("subscribe not under test"),
+  stubPlainTransport(published, options?.accept ?? (() => true), {
     fetch: (relay, filter) =>
       Effect.suspend(() => {
         options?.fetchLog?.push(filter);
@@ -130,14 +101,13 @@ describe("decodeProfileMetadata", () => {
     const metadata = decodeProfileMetadata(
       JSON.stringify({ image: "https://pic.test/a.png" }),
     );
-    expect(metadata._tag).toBe("Some");
-    if (metadata._tag !== "Some") return;
+    assert(Option.isSome(metadata));
     expect(metadata.value.picture).toBe("https://pic.test/a.png");
 
     const both = decodeProfileMetadata(
       JSON.stringify({ picture: "https://pic.test/p.png", image: "x" }),
     );
-    if (both._tag !== "Some") throw new Error("expected Some");
+    assert(Option.isSome(both));
     expect(both.value.picture).toBe("https://pic.test/p.png");
   });
 });
@@ -159,8 +129,7 @@ describe("Profiles.publishProfile", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(published).toHaveLength(1);
     const event = published[0];
     if (event === undefined) return;
@@ -268,8 +237,7 @@ describe("Profiles.fetchProfile", () => {
       Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(bob.pubkey)),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.profile).toEqual(
       expect.objectContaining({
         _tag: "ProfileUpdated",
@@ -304,40 +272,9 @@ describe("Profiles.fetchProfile", () => {
       Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(bob.pubkey)),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.profile).toBeNull();
     expect(exit.value.status).toBeNull();
-  });
-
-  it("fails with AllRelaysUnreachable when no relay answers", async () => {
-    const exit = await runWith(
-      stubTransport([], { unreachable: [relayA, relayB] }),
-      Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(bob.pubkey)),
-    );
-
-    expect(exit).toEqual(
-      Exit.fail(
-        expect.objectContaining({
-          _tag: "AllRelaysUnreachable",
-          failures: [
-            expect.objectContaining({ relay: relayA, detail: "down" }),
-            expect.objectContaining({ relay: relayB, detail: "down" }),
-          ],
-        }),
-      ),
-    );
-  });
-
-  it("fails with NoReadRelaysConfigured without read relays", async () => {
-    const exit = await runWith(
-      stubTransport([]),
-      Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(bob.pubkey)),
-      [],
-    );
-    expect(exit).toEqual(
-      Exit.fail(expect.objectContaining({ _tag: "NoReadRelaysConfigured" })),
-    );
   });
 });
 
@@ -372,8 +309,7 @@ describe("Profiles.fetchProfiles", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual([
       expect.objectContaining({
         pubkey: bob.pubkey,
@@ -407,8 +343,7 @@ describe("Profiles.fetchProfiles", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toHaveLength(2);
     expect(fetchLog).toEqual([
       { kinds: [0, 30315], authors: [bob.pubkey, carol.pubkey] },
@@ -417,8 +352,9 @@ describe("Profiles.fetchProfiles", () => {
   });
 
   it("splits authors into filter chunks at the author cap", async () => {
-    const pubkeys = Array.from({ length: AUTHOR_FILTER_LIMIT + 1 }, () =>
-      Pubkey.make(getPublicKey(generateSecretKey())),
+    const pubkeys = Array.from(
+      { length: AUTHOR_FILTER_LIMIT + 1 },
+      () => makeIdentity().pubkey,
     );
     const fetchLog: Array<Filter> = [];
 
@@ -427,8 +363,7 @@ describe("Profiles.fetchProfiles", () => {
       Effect.flatMap(Profiles, (profiles) => profiles.fetchProfiles(pubkeys)),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toHaveLength(pubkeys.length);
 
     // Two chunks, each queried on both relays.
@@ -453,31 +388,6 @@ describe("Profiles.fetchProfiles", () => {
     );
     expect(exit).toEqual(Exit.succeed([]));
     expect(fetchLog).toHaveLength(0);
-  });
-
-  it("fails with AllRelaysUnreachable when no relay answers", async () => {
-    const exit = await runWith(
-      stubTransport([], { unreachable: [relayA, relayB] }),
-      Effect.flatMap(Profiles, (profiles) =>
-        profiles.fetchProfiles([bob.pubkey]),
-      ),
-    );
-    expect(exit).toEqual(
-      Exit.fail(expect.objectContaining({ _tag: "AllRelaysUnreachable" })),
-    );
-  });
-
-  it("fails with NoReadRelaysConfigured without read relays", async () => {
-    const exit = await runWith(
-      stubTransport([]),
-      Effect.flatMap(Profiles, (profiles) =>
-        profiles.fetchProfiles([bob.pubkey]),
-      ),
-      [],
-    );
-    expect(exit).toEqual(
-      Exit.fail(expect.objectContaining({ _tag: "NoReadRelaysConfigured" })),
-    );
   });
 });
 
@@ -508,8 +418,7 @@ describe("Profiles.discoverActiveProfiles", () => {
       Effect.flatMap(Profiles, (profiles) => profiles.discoverActiveProfiles()),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual([
       expect.objectContaining({
         pubkey: bob.pubkey,
@@ -547,8 +456,7 @@ describe("Profiles.discoverActiveProfiles", () => {
       Effect.flatMap(Profiles, (profiles) => profiles.discoverActiveProfiles()),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual([
       expect.objectContaining({ pubkey: bob.pubkey }),
     ]);
@@ -638,27 +546,6 @@ describe("Profiles.discoverActiveProfiles", () => {
     // No authors, so the kind-0 stage is skipped: one activity fetch per relay.
     expect(fetchLog).toHaveLength(2);
   });
-
-  it("fails with AllRelaysUnreachable when no relay answers", async () => {
-    const exit = await runWith(
-      stubTransport([], { unreachable: [relayA, relayB] }),
-      Effect.flatMap(Profiles, (profiles) => profiles.discoverActiveProfiles()),
-    );
-    expect(exit).toEqual(
-      Exit.fail(expect.objectContaining({ _tag: "AllRelaysUnreachable" })),
-    );
-  });
-
-  it("fails with NoReadRelaysConfigured without read relays", async () => {
-    const exit = await runWith(
-      stubTransport([]),
-      Effect.flatMap(Profiles, (profiles) => profiles.discoverActiveProfiles()),
-      [],
-    );
-    expect(exit).toEqual(
-      Exit.fail(expect.objectContaining({ _tag: "NoReadRelaysConfigured" })),
-    );
-  });
 });
 
 describe("Profiles.searchProfiles", () => {
@@ -691,8 +578,7 @@ describe("Profiles.searchProfiles", () => {
       [relayA],
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.map((hit) => hit.pubkey)).toEqual([
       alice.pubkey,
       bob.pubkey,
@@ -842,8 +728,7 @@ describe("Profiles.searchProfiles", () => {
       [relayA],
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.map((hit) => hit.pubkey)).toEqual([
       carol.pubkey,
       bob.pubkey,
@@ -906,8 +791,7 @@ describe("Profiles.searchProfiles", () => {
       [relayA],
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toHaveLength(2);
     expect(exit.value[0]?.pubkey).toBe(alice.pubkey);
   });
@@ -986,15 +870,56 @@ describe("Profiles.searchProfiles", () => {
       Exit.fail(expect.objectContaining({ _tag: "AllRelaysUnreachable" })),
     );
   });
+});
 
-  it("fails when neither read nor search relays are configured", async () => {
-    const exit = await runWith(
-      stubTransport([]),
-      Effect.flatMap(Profiles, (profiles) => profiles.searchProfiles("alice")),
-      [],
-    );
-    expect(exit).toEqual(
-      Exit.fail(expect.objectContaining({ _tag: "NoReadRelaysConfigured" })),
-    );
-  });
+describe("Profiles read guards", () => {
+  const reads: ReadonlyArray<{
+    readonly name: string;
+    readonly read: (
+      profiles: Profiles,
+    ) => Effect.Effect<unknown, { readonly _tag: string }>;
+  }> = [
+    { name: "fetchProfile", read: (p) => p.fetchProfile(bob.pubkey) },
+    { name: "fetchProfiles", read: (p) => p.fetchProfiles([bob.pubkey]) },
+    {
+      name: "discoverActiveProfiles",
+      read: (p) => p.discoverActiveProfiles(),
+    },
+    { name: "searchProfiles", read: (p) => p.searchProfiles("alice") },
+  ];
+
+  it.each(reads)(
+    "$name fails with NoReadRelaysConfigured without read relays",
+    async ({ read }) => {
+      const exit = await runWith(
+        stubTransport([]),
+        Effect.flatMap(Profiles, read),
+        [],
+      );
+      expect(exit).toEqual(
+        Exit.fail(expect.objectContaining({ _tag: "NoReadRelaysConfigured" })),
+      );
+    },
+  );
+
+  it.each(reads.filter(({ name }) => name !== "searchProfiles"))(
+    "$name fails with AllRelaysUnreachable when no relay answers",
+    async ({ read }) => {
+      const exit = await runWith(
+        stubTransport([], { unreachable: [relayA, relayB] }),
+        Effect.flatMap(Profiles, read),
+      );
+      expect(exit).toEqual(
+        Exit.fail(
+          expect.objectContaining({
+            _tag: "AllRelaysUnreachable",
+            failures: [
+              expect.objectContaining({ relay: relayA, detail: "down" }),
+              expect.objectContaining({ relay: relayB, detail: "down" }),
+            ],
+          }),
+        ),
+      );
+    },
+  );
 });

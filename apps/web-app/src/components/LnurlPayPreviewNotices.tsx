@@ -1,11 +1,12 @@
 import type { FC } from "react";
 import type { LnurlPayPreview } from "../lnurlPay";
+import type { Translate } from "../i18n";
 
 interface LnurlPayPreviewNoticesProps {
   error: string | null;
   loading: boolean;
   preview: LnurlPayPreview | null;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 /** Loading/error state and amount constraints of an LNURL-pay target. */

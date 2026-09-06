@@ -34,14 +34,12 @@ export interface ChallengeRecord {
 export interface StoredSubscription {
   id: number;
   endpoint: string;
-  installationId: string | null;
   expirationTime: number | null;
   keys: WebPushSubscriptionKeys;
 }
 
 export interface StoredNativeSubscription {
   id: number;
-  installationId: string | null;
   platform: NativePushPlatform;
   token: string;
 }

@@ -1,5 +1,7 @@
+import { getPublicKey } from "nostr-tools";
 import { describe, expect, it } from "vitest";
 import { createLinkyBankPaymentOfferEvent } from "../../testUtils/bankPaymentOfferEvent";
+import { createSecretKey } from "../../testUtils/nostrKeys";
 import { formatChatMessagePreviewText } from "./chatMessageDisplay";
 
 const translatePreview = (key: string): string => {
@@ -20,8 +22,8 @@ const createOfferContent = (status: "canceled" | "offered"): string =>
     amountText: "123 Kč",
     clientId: `client-${status}`,
     createdAt: 1_700_000_000,
-    recipientPublicKey: "recipient",
-    senderPublicKey: "sender",
+    recipientPublicKey: getPublicKey(createSecretKey(2)),
+    senderPublicKey: getPublicKey(createSecretKey(1)),
     status,
   }).content;
 

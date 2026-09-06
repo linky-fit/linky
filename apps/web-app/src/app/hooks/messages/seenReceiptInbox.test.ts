@@ -7,6 +7,7 @@ import {
 } from "@linky/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
+import { createSecretKey } from "../../../testUtils/nostrKeys";
 import {
   applyOwnSeenReceiptConfirmed,
   applySeenReceiptReceived,
@@ -14,12 +15,6 @@ import {
   type PeerSeenWindow,
   type SeenReceiptInboxContext,
 } from "./seenReceiptInbox";
-
-const createSecretKey = (lastByte: number): Uint8Array => {
-  const secretKey = new Uint8Array(32);
-  secretKey[31] = lastByte;
-  return secretKey;
-};
 
 const peerPubkey = getPublicKey(createSecretKey(2));
 const RECEIPT_ID = "b".repeat(64);

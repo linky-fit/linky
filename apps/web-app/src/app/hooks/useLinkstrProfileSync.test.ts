@@ -29,7 +29,10 @@ const profileUpdated = (
 type SyncContext = Parameters<typeof applyProfileWatchEvent>[1];
 
 const makeCtx = (contacts: SyncContext["contacts"], routeKind = "contacts") => {
-  const update = vi.fn<SyncContext["update"]>(() => undefined);
+  const update = vi.fn<SyncContext["update"]>(() => ({
+    ok: true,
+    value: undefined,
+  }));
   const ctx: SyncContext = {
     contacts,
     contactsOwnerId: null,

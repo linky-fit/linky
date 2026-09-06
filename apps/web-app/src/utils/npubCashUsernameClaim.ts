@@ -1,11 +1,12 @@
 import type { JsonValue } from "../types/json";
-import type { LightningInvoicePreview } from "./lightningInvoice";
-import { getLightningInvoicePreview } from "./lightningInvoice";
+import type { LightningInvoicePreview } from "@linky/linkshu";
+import { getLightningInvoicePreview } from "@linky/linkshu";
 import { getUnknownErrorMessage } from "./unknown";
 import { asNonEmptyString, asRecord } from "./validation";
+import { sleep } from "./time";
 
-export const OWN_LIGHTNING_ADDRESS_DOMAIN = "linky.fit";
-export const OWN_LIGHTNING_USERNAME_MIN_LENGTH = 3;
+const OWN_LIGHTNING_ADDRESS_DOMAIN = "linky.fit";
+const OWN_LIGHTNING_USERNAME_MIN_LENGTH = 3;
 
 const OWN_LIGHTNING_USERNAME_RE = /^(?!npub1)[a-z0-9]+$/i;
 const USERNAME_TAKEN_MESSAGE = "This username is already taken";
@@ -14,7 +15,7 @@ const USERNAME_INVALID_MESSAGE = "Invalid username";
 const PAYMENT_REQUIRED_MESSAGE = "Payment required";
 const INVOICE_UNPAID_MESSAGE = "Invoice unpaid...";
 
-export type OwnLightningUsernameValidationIssue =
+type OwnLightningUsernameValidationIssue =
   | "empty"
   | "invalid_format"
   | "too_short";
@@ -33,14 +34,14 @@ export interface OwnLightningAddressInputCandidate {
   username: string;
 }
 
-export type OwnLightningClaimPreviewResult =
+type OwnLightningClaimPreviewResult =
   | OwnLightningClaimAvailableResult
   | { kind: "already_set"; message: string }
   | { kind: "error"; message: string }
   | { kind: "invalid"; issue: OwnLightningUsernameValidationIssue }
   | { kind: "taken"; message: string };
 
-export type OwnLightningClaimFinalizeResult =
+type OwnLightningClaimFinalizeResult =
   | { kind: "already_set" }
   | { kind: "error"; message: string }
   | { kind: "success" }
@@ -78,9 +79,7 @@ const getResponseMessage = (json: JsonValue, fallback: string): string => {
 };
 
 export const normalizeOwnLightningUsername = (value: string): string => {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
+  return value.trim().toLowerCase();
 };
 
 export const getOwnLightningUsernameValidationIssue = (
@@ -101,7 +100,7 @@ export const getOwnLightningAddressFromUsername = (value: string): string => {
 export const getOwnLightningAddressInputCandidate = (
   value: string,
 ): OwnLightningAddressInputCandidate | null => {
-  const input = String(value ?? "").trim();
+  const input = value.trim();
   if (!input) return null;
 
   const atIndex = input.indexOf("@");
@@ -210,7 +209,7 @@ export const finalizeOwnLightningAddressClaim = async (args: {
   username: string;
 }): Promise<OwnLightningClaimFinalizeResult> => {
   const username = normalizeOwnLightningUsername(args.username);
-  const paymentToken = String(args.paymentToken ?? "").trim();
+  const paymentToken = args.paymentToken.trim();
   const issue = getOwnLightningUsernameValidationIssue(username);
   if (issue || !paymentToken) {
     return { kind: "error", message: "Missing claim data" };
@@ -257,12 +256,6 @@ export const finalizeOwnLightningAddressClaim = async (args: {
 const CLAIM_CONFIRM_RETRY_DELAY_MS = 1_000;
 const CLAIM_CONFIRM_RETRY_LIMIT = 5;
 
-const wait = (ms: number): Promise<void> => {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-};
-
 export const purchaseOwnLightningAddressClaim = async (args: {
   makeNip98AuthHeader: Nip98AuthHeaderFactory;
   payLightningInvoiceWithCashu: (invoice: string) => Promise<boolean>;
@@ -293,7 +286,7 @@ export const purchaseOwnLightningAddressClaim = async (args: {
     }
 
     if (result.kind === "unpaid" && attempt + 1 < CLAIM_CONFIRM_RETRY_LIMIT) {
-      await wait(CLAIM_CONFIRM_RETRY_DELAY_MS);
+      await sleep(CLAIM_CONFIRM_RETRY_DELAY_MS);
       continue;
     }
 

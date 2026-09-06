@@ -15,6 +15,7 @@ import type {
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
 import { resolveNostrChatIdentity } from "./contactIdentity";
+import type { Translate } from "../../../i18n";
 
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
@@ -40,7 +41,7 @@ interface UseEditChatMessageParams<
   setChatSendIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setEditContext: React.Dispatch<React.SetStateAction<EditChatContext | null>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: (key: string) => string;
+  t: Translate;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
 }
 
@@ -70,7 +71,7 @@ export const useEditChatMessage = <
     if (!selectedContact) return;
     if (!editContext) return;
 
-    const editedFromId = String(editContext.rumorId ?? "").trim();
+    const editedFromId = editContext.rumorId.trim();
     if (!isRumorId(editedFromId)) return;
 
     const text = chatDraft.trim();
@@ -102,7 +103,7 @@ export const useEditChatMessage = <
       const clientId = ClientId.make(makeLocalId());
       const editedAtSec = Math.ceil(Date.now() / 1e3);
 
-      updateLocalNostrMessage(String(editContext.messageId ?? ""), {
+      updateLocalNostrMessage(editContext.messageId, {
         content: text,
         status: "pending",
         wrapId: `pending:edit:${clientId}`,
@@ -112,7 +113,7 @@ export const useEditChatMessage = <
         isEdited: true,
         editedAtSec,
         editedFromId,
-        originalContent: String(editContext.originalContent ?? "").trim()
+        originalContent: editContext.originalContent.trim()
           ? editContext.originalContent
           : null,
       });
@@ -135,9 +136,9 @@ export const useEditChatMessage = <
         return;
       }
 
-      updateLocalNostrMessage(String(editContext.messageId ?? ""), {
+      updateLocalNostrMessage(editContext.messageId, {
         createdAtSec: exit.value.sentAt,
-        rumorId: exit.value.messageId,
+        rumorId: editedFromId,
       });
 
       if (typeof navigator !== "undefined" && navigator.onLine === false) {

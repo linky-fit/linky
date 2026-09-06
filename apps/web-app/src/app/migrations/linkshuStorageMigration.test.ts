@@ -1,4 +1,4 @@
-// ONE-TIME MIGRATION — DELETE ME EVENTUALLY (with linkshuStorageMigration.ts)
+// Legacy migration; removal gate in docs/architecture.md
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {

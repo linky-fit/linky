@@ -1,3 +1,4 @@
+import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
 import * as Evolu from "@evolu/common";
 import { useQuery } from "@evolu/react";
 import React, { useMemo, useState } from "react";
@@ -55,9 +56,9 @@ import {
   type DisplayContact,
 } from "./hooks/composition/useContactsMessagingComposition";
 import { useIdentityOwnersComposition } from "./hooks/composition/useIdentityOwnersComposition";
-import { usePaymentMoneyComposition } from "./hooks/composition/usePaymentMoneyComposition";
+import { buildMoneyRouteProps } from "./routes/props/buildMoneyRouteProps";
 import { useProfileComposition } from "./hooks/composition/useProfileComposition";
-import { useProfilePeopleComposition } from "./hooks/composition/useProfilePeopleComposition";
+import { buildPeopleRouteProps } from "./routes/props/buildPeopleRouteProps";
 import { useRoutingViewComposition } from "./hooks/composition/useRoutingViewComposition";
 import { useScanNativeComposition } from "./hooks/composition/useScanNativeComposition";
 import { useSystemSettingsComposition } from "./hooks/composition/useSystemSettingsComposition";
@@ -93,6 +94,7 @@ import {
 } from "./lib/topbarConfig";
 import { getDesktopActiveContactId } from "./routes/desktopRouteSection";
 import type { ContactRowLike } from "./types/appTypes";
+import { nowSeconds } from "../utils/time";
 
 const AppContactId = Evolu.id("Contact");
 
@@ -266,7 +268,7 @@ export const useAppShellComposition = ({
   // reported as seen, so pre-enable history stays unreported.
   const toggleSendReadReceipts = React.useCallback(() => {
     setSeenReceiptsEnabledAtSec((current) =>
-      current === null ? Math.floor(Date.now() / 1e3) : null,
+      current === null ? nowSeconds() : null,
     );
   }, []);
 
@@ -325,7 +327,7 @@ export const useAppShellComposition = ({
       return;
     }
     const key = "linky.evolu.autoWipeOnWasmOom.v1";
-    const alreadyTried = String(safeLocalStorageGet(key) ?? "").trim() === "1";
+    const alreadyTried = (safeLocalStorageGet(key) ?? "").trim() === "1";
     if (alreadyTried) return;
     safeLocalStorageSet(key, "1");
     // Last-resort recovery: wipe local Evolu storage and reload.
@@ -336,14 +338,21 @@ export const useAppShellComposition = ({
     }
   }, [evoluLastError]);
 
-  const evoluDbInfo = useEvoluDatabaseInfoState({ enabled: true });
+  const evoluDbInfo = useEvoluDatabaseInfoState({
+    enabled:
+      route.kind === "evoluServers" ||
+      route.kind === "evoluServer" ||
+      route.kind === "evoluServerNew" ||
+      route.kind === "evoluData" ||
+      route.kind === "evoluCurrentData" ||
+      route.kind === "evoluHistoryData",
+  });
 
   const evoluConnectedServerCount = useMemo(() => {
-    if (evoluHasError) return 0;
     return evoluActiveServerUrls.reduce((sum, url) => {
       return sum + (evoluServerStatusByUrl[url] === "connected" ? 1 : 0);
     }, 0);
-  }, [evoluActiveServerUrls, evoluHasError, evoluServerStatusByUrl]);
+  }, [evoluActiveServerUrls, evoluServerStatusByUrl]);
 
   const evoluOverallStatus = useMemo(() => {
     if (!syncOwner) return "disconnected" as const;
@@ -357,12 +366,14 @@ export const useAppShellComposition = ({
     return "disconnected" as const;
   }, [evoluActiveServerUrls, evoluHasError, evoluServerStatusByUrl, syncOwner]);
 
-  // Evolu error subscription handled by useEvoluLastError.
-
   const [evoluWipeStorageIsBusy, setEvoluWipeStorageIsBusy] =
     useState<boolean>(false);
 
   const wipeEvoluStorage = React.useCallback(async () => {
+    if (evoluLastError?.type === "ProtocolQuotaError") {
+      pushToast(t("evoluQuotaRecoveryHint"));
+      return;
+    }
     if (evoluWipeStorageIsBusy) return;
     setEvoluWipeStorageIsBusy(true);
 
@@ -373,7 +384,7 @@ export const useAppShellComposition = ({
     } finally {
       setEvoluWipeStorageIsBusy(false);
     }
-  }, [evoluWipeStorageIsBusy, pushToast, t]);
+  }, [evoluLastError, evoluWipeStorageIsBusy, pushToast, t]);
 
   const [contactPaymentIntent, setContactPaymentIntent] = useState<
     "pay" | "request"
@@ -412,14 +423,12 @@ export const useAppShellComposition = ({
 
   const evoluHistoryAllowedOwnerIds = React.useMemo(() => {
     const ids = [
-      String(appOwnerId ?? "").trim(),
-      ...cashuVisibleOwnerIds.map((ownerId) => String(ownerId ?? "").trim()),
-      ...messagesVisibleOwnerIds.map((ownerId) => String(ownerId ?? "").trim()),
-      ...transactionsVisibleOwnerIds.map((ownerId) =>
-        String(ownerId ?? "").trim(),
-      ),
-      String(metaOwnerId ?? "").trim(),
-      ...contactsVisibleOwnerIds.map((ownerId) => String(ownerId ?? "").trim()),
+      (appOwnerId ?? "").trim(),
+      ...cashuVisibleOwnerIds.map((ownerId) => ownerId.trim()),
+      ...messagesVisibleOwnerIds.map((ownerId) => ownerId.trim()),
+      ...transactionsVisibleOwnerIds.map((ownerId) => ownerId.trim()),
+      (metaOwnerId ?? "").trim(),
+      ...contactsVisibleOwnerIds.map((ownerId) => ownerId.trim()),
     ].filter(Boolean);
     return Array.from(new Set(ids));
   }, [
@@ -473,7 +482,7 @@ export const useAppShellComposition = ({
   );
 
   const {
-    activeContactsOwnerContactCount,
+    saveNpubContact,
     activeGroup,
     addNewContactFromIdentifier,
     addNewContactFromSearchResult,
@@ -490,7 +499,6 @@ export const useAppShellComposition = ({
     bankPaymentOfferStaggerDelaySec,
     blockArchivedContact,
     blockUnknownContactFromChat,
-    buildSavedContactName,
     canAddContact,
     canSaveNewRelay,
     chatDidInitialScrollForContactRef,
@@ -583,7 +591,6 @@ export const useAppShellComposition = ({
     setPendingDeleteId,
     statusFilterCurrencies,
     ungroupedCount,
-    unknownNameByNpub,
     unreadByContactId,
     updateLocalNostrMessage,
     visibleContacts,
@@ -638,7 +645,7 @@ export const useAppShellComposition = ({
       if (!Number.isFinite(changedAtSec) || changedAtSec <= 0) return;
 
       for (const contactId of lastMessageByContactId.keys()) {
-        const normalizedContactId = String(contactId ?? "").trim();
+        const normalizedContactId = contactId.trim();
         if (!normalizedContactId) continue;
         if (isUnknownContactId(normalizedContactId)) continue;
 
@@ -845,9 +852,8 @@ export const useAppShellComposition = ({
     cashuTokensAll,
     contactPayBackToChatRef,
     contactsMessaging: {
-      activeContactsOwnerContactCount,
+      saveNpubContact,
       appendLocalNostrMessage,
-      buildSavedContactName,
       chatMessages,
       contacts,
       enqueuePendingPayment,
@@ -864,7 +870,6 @@ export const useAppShellComposition = ({
       selectedContact,
       sendChatMessage,
       setContactsOnboardingHasPaid,
-      unknownNameByNpub,
       updateLocalNostrMessage,
     },
     formatDisplayedAmountParts,
@@ -875,15 +880,12 @@ export const useAppShellComposition = ({
       cashuOwnerId,
       cashuOwnerIdRef,
       cashuVisibleOwnerIds,
-      contactsOwnerId,
       currentNpub,
       currentNsec,
       isSeedLogin,
       metaOwnerId,
       transactionsOwnerId,
     },
-    insert,
-    lang,
     maybeShowPwaNotification,
     ownerScopedStorage: {
       logPaymentEvent,
@@ -1051,12 +1053,12 @@ export const useAppShellComposition = ({
 
   const renderContactCard = React.useCallback(
     (contact: DisplayContact) => {
-      const npub = normalizeNpubIdentifier(contact.npub);
+      const npub = normalizeNpubIdentifier(contact.npub ?? "");
       const avatarUrl = npub ? nostrPictureByNpub[npub] : null;
       const statusText = npub ? (nostrStatusByNpub[npub] ?? null) : null;
-      const contactId = String(contact.id ?? "").trim();
+      const contactId = (contact.id ?? "").trim();
       const last = contactId ? lastMessageByContactId.get(contactId) : null;
-      const lastText = String(last?.content ?? "").trim();
+      const lastText = (last?.content ?? "").trim();
       const tokenInfo =
         lastText && !parsePrivateImageMessage(lastText)
           ? getCashuTokenMessageInfo(lastText)
@@ -1065,14 +1067,12 @@ export const useAppShellComposition = ({
 
       return (
         <ContactCard
-          key={String(contact.id ?? "")}
+          key={contact.id ?? ""}
           contact={contact}
           avatarUrl={avatarUrl}
           lastMessage={last ?? null}
           hasAttention={hasAttention}
-          isActive={
-            String(contact.id ?? "") === getDesktopActiveContactId(route)
-          }
+          isActive={(contact.id ?? "") === getDesktopActiveContactId(route)}
           isUnknownContact={Boolean(contact.isUnknownContact)}
           statusText={statusText}
           tokenInfo={tokenInfo}
@@ -1101,7 +1101,7 @@ export const useAppShellComposition = ({
 
   const renderMainSwipeContactCard = React.useCallback(
     (contact: ContactRowLike): React.ReactNode => {
-      const id = String(contact.id ?? "").trim();
+      const id = (contact.id ?? "").trim();
       if (!id) return null;
       const matched = displayContactById.get(id) ?? null;
       if (!matched) return null;
@@ -1129,14 +1129,14 @@ export const useAppShellComposition = ({
     });
 
   const copyNostrKeys = async () => {
-    const nsec = String(currentNsec ?? "").trim();
+    const nsec = currentNsec.trim();
     if (!nsec) return;
     await navigator.clipboard?.writeText(nsec);
     pushToast(t("nostrKeysCopied"));
   };
 
   const copySeed = async () => {
-    const value = String(slip39Seed ?? "").trim();
+    const value = (slip39Seed ?? "").trim();
     if (value) {
       await navigator.clipboard?.writeText(value);
       safeLocalStorageSet(
@@ -1153,8 +1153,8 @@ export const useAppShellComposition = ({
 
   const saveSeedToPasswordManager =
     async (): Promise<PasswordManagerSaveResult> => {
-      const password = String(slip39Seed ?? "").trim();
-      const username = String(effectiveProfileName ?? currentNpub ?? "").trim();
+      const password = (slip39Seed ?? "").trim();
+      const username = (effectiveProfileName ?? currentNpub ?? "").trim();
       if (!password || !username) return "failed";
 
       return triggerPasswordManagerSeedSave({
@@ -1265,8 +1265,8 @@ export const useAppShellComposition = ({
               ? null
               : parseContactId(selectedContact?.id),
             isUnknownContact: Boolean(selectedChatContact.isUnknownContact),
-            name: String(selectedChatContact.name ?? "").trim() || null,
-            npub: normalizeNpubIdentifier(selectedChatContact.npub),
+            name: (selectedChatContact.name ?? "").trim() || null,
+            npub: normalizeNpubIdentifier(selectedChatContact.npub ?? ""),
           }
         : null,
     [route.kind, selectedChatContact, selectedContact?.id],
@@ -1292,9 +1292,9 @@ export const useAppShellComposition = ({
     selectedContact: selectedChatContact,
   });
 
-  const { moneyRouteProps } = usePaymentMoneyComposition({
-    moneyRouteBuilderInput: {
-      canRestoreTokens: String(seedMnemonic ?? "").trim().length > 0,
+  const moneyRouteProps = useMemoizedRouteBuilder(
+    {
+      canRestoreTokens: (seedMnemonic ?? "").trim().length > 0,
       canSendCashuTokenToContact: contacts.length > 0,
       canWriteNfc,
       canPayWithCashu,
@@ -1325,8 +1325,6 @@ export const useAppShellComposition = ({
       copyText,
       currentNpub,
       displayUnit,
-      effectiveProfileName,
-      effectiveProfilePicture,
       emitCashuToken,
       getMintIconUrl,
       knownLnAddressPayContact,
@@ -1367,7 +1365,8 @@ export const useAppShellComposition = ({
       tokensRestoreIsBusy,
       writeCashuTokenToNfc,
     },
-  });
+    buildMoneyRouteProps,
+  );
 
   const restoreEditingContact = React.useCallback(() => {
     if (!editingId) return;
@@ -1434,8 +1433,8 @@ export const useAppShellComposition = ({
       ],
     );
 
-  const { peopleRouteProps } = useProfilePeopleComposition({
-    peopleRouteBuilderInput: {
+  const peopleRouteProps = useMemoizedRouteBuilder(
+    {
       cashuBalance,
       cashuBalanceAfterMelt,
       cashuIsBusy,
@@ -1471,7 +1470,6 @@ export const useAppShellComposition = ({
       groupNames,
       handleSaveContact,
       isProfileEditing,
-      isBankPaymentOfferCanceled,
       isSavingContact,
       lang,
       mentionContacts,
@@ -1509,7 +1507,7 @@ export const useAppShellComposition = ({
       ownedLightningAddresses: ownedProfileLightningAddresses,
       route,
       selectedContactStatusText: (() => {
-        const npub = normalizeNpubIdentifier(peopleSelectedContact?.npub);
+        const npub = normalizeNpubIdentifier(peopleSelectedContact?.npub ?? "");
         return npub ? (nostrStatusByNpub[npub] ?? null) : null;
       })(),
       pendingDeleteId,
@@ -1549,7 +1547,8 @@ export const useAppShellComposition = ({
       toggleProfileStatusCurrency,
       writeCurrentNpubToNfc,
     },
-  });
+    buildPeopleRouteProps,
+  );
 
   const { mainSwipeRouteProps, pageClassNameWithSwipe } =
     useRoutingViewComposition({
@@ -1558,7 +1557,6 @@ export const useAppShellComposition = ({
       mainSwipeRouteBuilderInput: {
         activeGroup,
         bankPaymentOfferMessages,
-        cashuBalance,
         cashuTotalBalance,
         contactsOnboardingCelebrating,
         contactsOnboardingTasks,
@@ -1600,8 +1598,10 @@ export const useAppShellComposition = ({
     advancedSettingsInput: {
       copyNostrKeys,
       copySeed,
-      passwordManagerSeedUsername: String(
-        effectiveProfileName ?? currentNpub ?? "",
+      passwordManagerSeedUsername: (
+        effectiveProfileName ??
+        currentNpub ??
+        ""
       ).trim(),
       dedupeContacts,
       dedupeContactsIsBusy,
@@ -1638,6 +1638,7 @@ export const useAppShellComposition = ({
       evoluContactsOwnerPointer: contactsOwnerPointer,
       evoluDatabaseBytes: evoluDbInfo.info.bytes,
       evoluHasError,
+      evoluErrorType: evoluLastError?.type ?? null,
       evoluHistoryAllowedOwnerIds,
       evoluHistoryCount: evoluDbInfo.info.historyCount,
       evoluMessagesOwnerEditsUntilRotation: messagesOwnerEditsUntilRotation,
@@ -1707,7 +1708,7 @@ export const useAppShellComposition = ({
   });
 
   const evoluTransactionsVisibleOwnerIds = React.useMemo(
-    () => transactionsVisibleOwnerIds.map((ownerId) => String(ownerId)),
+    () => transactionsVisibleOwnerIds.map((ownerId) => ownerId),
     [transactionsVisibleOwnerIds],
   );
 
@@ -1735,7 +1736,7 @@ export const useAppShellComposition = ({
       effectiveMyLightningAddress,
       effectiveProfileName,
       effectiveProfilePicture,
-      evoluAppOwnerId: appOwnerId ? String(appOwnerId) : null,
+      evoluAppOwnerId: appOwnerId ? appOwnerId : null,
       evoluTransactionsVisibleOwnerIds,
       formatDisplayedAmountParts,
       formatDisplayedAmountText,

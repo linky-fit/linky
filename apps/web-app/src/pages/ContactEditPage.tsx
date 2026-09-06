@@ -2,6 +2,7 @@ import { Archive, RefreshCcw, Save } from "lucide-react";
 import type { FC } from "react";
 import type { ContactId } from "../evolu";
 import { ContactFields, type ContactFormData } from "./ContactNewPage";
+import type { Translate } from "../i18n";
 
 interface Contact {
   archivedAtSec?: number | string | null;
@@ -25,7 +26,7 @@ interface ContactEditPageProps {
   resetEditedContactFieldFromNostr: (field: "name" | "lnAddress") => void;
   selectedContact: Contact | null;
   setForm: (value: ContactFormData) => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const ContactEditPage: FC<ContactEditPageProps> = ({
@@ -47,9 +48,7 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
   t,
 }) => {
   const isArchivedContact = Number(selectedContact?.archivedAtSec ?? 0) > 0;
-  const canBlockArchivedContact = Boolean(
-    String(selectedContact?.npub ?? "").trim(),
-  );
+  const canBlockArchivedContact = Boolean((selectedContact?.npub ?? "").trim());
   const showPublicName = Boolean(
     publicName && form.name.trim() && form.name.trim() !== publicName,
   );
@@ -71,8 +70,7 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
             includeNpub
             lightningPublicValue={showPublicLnAddress ? publicLnAddress : ""}
             nameLabelAction={
-              String(form.npub ?? "").trim() &&
-              String(form.name ?? "").trim() ? (
+              form.npub.trim() && form.name.trim() ? (
                 <button
                   type="button"
                   className="icon-only-ghost"
@@ -87,8 +85,7 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
             namePlaceholder={publicName || t("namePlaceholder")}
             namePublicValue={showPublicName ? publicName : ""}
             lightningLabelAction={
-              String(form.npub ?? "").trim() &&
-              String(form.lnAddress ?? "").trim() ? (
+              form.npub.trim() && form.lnAddress.trim() ? (
                 <button
                   type="button"
                   className="icon-only-ghost"

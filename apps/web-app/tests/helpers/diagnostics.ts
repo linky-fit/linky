@@ -12,6 +12,7 @@ const FATAL_CONSOLE_PATTERNS = [
   /^ErrorBoundary caught:/,
   /^\[linky\] post-mount/,
   /Maximum update depth exceeded/,
+  /SQLiteError/,
 ];
 
 /** Dynamic-import recovery reloads the page; that must never happen mid-test. */

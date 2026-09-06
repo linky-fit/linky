@@ -1,6 +1,7 @@
 import { Effect, Exit } from "effect";
 import { Amount, KeysetId, MintUrl } from "../domain/primitives";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
+import { fakeWallet } from "../testing/fakeWallet";
 import { Proof } from "../token/domain";
 import {
   checkProofStates,
@@ -141,14 +142,8 @@ const walletAnswering = (
   answer: (secrets: ReadonlyArray<string>) => Promise<Array<StateName>>,
 ): { wallet: LoadedWallet; calls: Array<ReadonlyArray<string>> } => {
   const calls: Array<ReadonlyArray<string>> = [];
-  const wallet: LoadedWallet = {
+  const wallet = fakeWallet({
     keysetId: keysetHex,
-    keyChain: { getKeysets: () => [] },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
-    receive: () => Promise.reject(new Error("not under test")),
-    send: () => Promise.reject(new Error("not under test")),
     checkProofsStates: (proofs) => {
       const secrets = proofs.map((entry) => entry.secret ?? "");
       calls.push(secrets);
@@ -160,15 +155,7 @@ const walletAnswering = (
         })),
       );
     },
-    restore: () => Promise.reject(new Error("not under test")),
-    createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-    createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-    batchRestore: () => Promise.reject(new Error("not under test")),
-  };
+  });
   return { wallet, calls };
 };
 

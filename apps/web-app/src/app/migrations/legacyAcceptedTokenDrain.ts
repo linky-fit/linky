@@ -1,4 +1,4 @@
-// ONE-TIME MIGRATION — DELETE ME EVENTUALLY
+// Legacy migration; removal gate in docs/architecture.md
 //
 // Pre-cutover releases parked the last accepted token text in
 // `linky.lastAcceptedCashuToken.v1` as crash insurance: the Evolu row write

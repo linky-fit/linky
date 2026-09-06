@@ -1,5 +1,6 @@
 import type { LinkshuInspectorEvent } from "@linky/linkshu";
 import type { InspectorRow } from "./inspectorRows";
+import { isRecord } from "../../utils/unknown";
 
 const short = (id: string): string =>
   id.length > 9 ? `${id.slice(0, 8)}…` : id;
@@ -11,9 +12,6 @@ const errorTag = (error: unknown): string | null =>
   typeof error._tag === "string"
     ? error._tag
     : null;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const MAX_ID_SCAN_DEPTH = 3;
 

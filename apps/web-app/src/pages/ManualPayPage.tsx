@@ -1,6 +1,8 @@
 import React, { type FC } from "react";
+import { Avatar } from "../components/Avatar";
 import type { ContactId } from "../evolu";
-import { useNavigation } from "../hooks/useRouting";
+import { navigateTo } from "../hooks/useRouting";
+import type { Translate } from "../i18n";
 import { formatMiddleDots, getInitials } from "../utils/formatting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 
@@ -15,7 +17,7 @@ interface ManualPayPageProps {
   contacts: readonly ManualPayContact[];
   nostrPictureByNpub: Record<string, string | null>;
   onSubmitText: (text: string) => Promise<void>;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 const scanLikePrefix =
@@ -23,14 +25,12 @@ const scanLikePrefix =
 const linkyAliasPattern = /^[a-z0-9._-]+$/i;
 
 const normalizeSearch = (value: string | null | undefined): string =>
-  String(value ?? "")
-    .trim()
-    .toLocaleLowerCase();
+  (value ?? "").trim().toLocaleLowerCase();
 
 const getLightningLocalPart = (
   value: string | null | undefined,
 ): string | null => {
-  const normalized = String(value ?? "").trim();
+  const normalized = (value ?? "").trim();
   const at = normalized.indexOf("@");
   if (at <= 0) return null;
   return normalized.slice(0, at);
@@ -47,13 +47,13 @@ const shouldTryLinkyAlias = (raw: string): boolean => {
 };
 
 const contactSearchFields = (contact: ManualPayContact): string[] => {
-  const lnAddress = String(contact.lnAddress ?? "").trim();
+  const lnAddress = (contact.lnAddress ?? "").trim();
   const lnLocal = getLightningLocalPart(lnAddress);
   return [
-    String(contact.name ?? "").trim(),
+    (contact.name ?? "").trim(),
     lnAddress,
-    String(lnLocal ?? "").trim(),
-    String(contact.npub ?? "").trim(),
+    (lnLocal ?? "").trim(),
+    (contact.npub ?? "").trim(),
   ].filter((field) => field.length > 0);
 };
 
@@ -79,7 +79,6 @@ export const ManualPayPage: FC<ManualPayPageProps> = ({
   onSubmitText,
   t,
 }) => {
-  const navigateTo = useNavigation();
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const [value, setValue] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -167,17 +166,17 @@ export const ManualPayPage: FC<ManualPayPageProps> = ({
           </div>
           <div className="contact-list">
             {suggestions.map((contact) => {
-              const npub = normalizeNpubIdentifier(contact.npub);
+              const npub = normalizeNpubIdentifier(contact.npub ?? "");
               const pictureUrl = npub
                 ? (nostrPictureByNpub[npub] ?? null)
                 : null;
-              const name = String(contact.name ?? "").trim();
-              const lnAddress = String(contact.lnAddress ?? "").trim();
-              const subtitle = lnAddress || String(contact.npub ?? "").trim();
+              const name = (contact.name ?? "").trim();
+              const lnAddress = (contact.lnAddress ?? "").trim();
+              const subtitle = lnAddress || (contact.npub ?? "").trim();
 
               return (
                 <button
-                  key={String(contact.id)}
+                  key={contact.id}
                   type="button"
                   className="contact-card is-clickable manual-pay-contact"
                   onClick={() =>
@@ -185,18 +184,12 @@ export const ManualPayPage: FC<ManualPayPageProps> = ({
                   }
                 >
                   <div className="contact-avatar" aria-hidden="true">
-                    {pictureUrl ? (
-                      <img
-                        src={pictureUrl}
-                        alt=""
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <span className="contact-avatar-fallback">
-                        {getInitials(name)}
-                      </span>
-                    )}
+                    <Avatar
+                      pictureUrl={pictureUrl}
+                      fallback={getInitials(name)}
+                      fallbackClassName="contact-avatar-fallback"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="contact-main">
                     <div className="contact-name">{name || t("contact")}</div>

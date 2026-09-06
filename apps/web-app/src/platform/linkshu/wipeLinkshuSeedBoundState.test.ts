@@ -36,7 +36,7 @@ describe("wipeLinkshuSeedBoundState", () => {
     }
   });
 
-  // ONE-TIME MIGRATION — DELETE ME EVENTUALLY (with linkshuStorageMigration.ts)
+  // Legacy migration; removal gate in docs/architecture.md
   it("kills not-yet-migrated legacy counter keys with the seed they were bound to", async () => {
     const legacyKey =
       "linky.cashu.detCounter.v1:https%3A%2F%2Fmint.example:sat:00ff";

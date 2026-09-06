@@ -8,14 +8,13 @@ import { collectRowProofs } from "../token/internal/rowProofs";
 import type { RowProofs } from "../token/internal/rowProofs";
 import { checkProofStates, partitionGroupsByState } from "./proofStates";
 import type { StatePartition } from "./proofStates";
+import { sat } from "./units";
 
 /**
  * Asking mints about stored rows: the grouping that decides who to ask, and
  * the batched NUT-07 call itself. Shared by validation and by
  * `Tokens.deleteSpent`, which sweeps before it deletes.
  */
-
-const sat = CurrencyUnit.make("sat");
 
 /** Rows that share a mint and unit, and therefore one checkstate call. */
 export interface MintRowGroup {

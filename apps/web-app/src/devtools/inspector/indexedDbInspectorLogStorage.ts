@@ -7,12 +7,12 @@ const DATABASE_NAME = "linky.inspector_logs";
 const DATABASE_VERSION = 1;
 const ROW_STORE_NAME = "rows";
 
-export interface InspectorLogStorageMutation {
+interface InspectorLogStorageMutation {
   appendedRows: CollectedInspectorRow[];
   deletedRows: CollectedInspectorRow[];
 }
 
-export interface InspectorLogStorage {
+interface InspectorLogStorage {
   apply: (mutation: InspectorLogStorageMutation) => Promise<void>;
   clear: () => Promise<void>;
   load: () => Promise<CollectedInspectorRow[]>;

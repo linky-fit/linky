@@ -1,14 +1,15 @@
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
-import { useNavigation } from "../hooks/useRouting";
-import { deriveEvoluServerState } from "./evoluServerState";
+import { deriveEvoluServerState } from "../app/lib/evoluServerState";
+import { navigateTo } from "../hooks/useRouting";
+import { EvoluReloadNotice } from "./EvoluReloadNotice";
+import { EvoluSyncErrorNotice } from "./EvoluSyncErrorNotice";
 
 export function EvoluServerPage(): React.ReactElement {
   const {
     evoluHasError,
     evoluServerStatusByUrl,
-    evoluServersReloadRequired,
     evoluServerUrls,
     isEvoluServerOffline,
     pendingEvoluServerDeleteUrl,
@@ -20,25 +21,11 @@ export function EvoluServerPage(): React.ReactElement {
   } = useEvoluSettingsContext();
   const { route, t } = useAppShellCore();
   const selectedEvoluServerUrl = route.kind === "evoluServer" ? route.id : null;
-  const navigateTo = useNavigation();
+
   return (
     <section className="panel">
-      {evoluServersReloadRequired ? (
-        <>
-          <p className="muted" style={{ marginTop: 2 }}>
-            {t("evoluServersReloadHint")}
-          </p>
-          <div className="settings-row">
-            <button
-              type="button"
-              className="btn-wide secondary"
-              onClick={() => window.location.reload()}
-            >
-              {t("evoluServersReloadButton")}
-            </button>
-          </div>
-        </>
-      ) : null}
+      <EvoluSyncErrorNotice />
+      <EvoluReloadNotice />
 
       {selectedEvoluServerUrl ? (
         <>
@@ -106,11 +93,11 @@ export function EvoluServerPage(): React.ReactElement {
                 </div>
 
                 {isLastServer ? (
-                  <p className="muted" style={{ marginTop: 10 }}>
+                  <p className="muted settings-error-note">
                     {t("evoluDefaultServerCannotRemove")}
                   </p>
                 ) : (
-                  <div className="settings-row" style={{ marginTop: 10 }}>
+                  <div className="settings-row settings-error-note">
                     <button
                       type="button"
                       className="btn-wide danger"

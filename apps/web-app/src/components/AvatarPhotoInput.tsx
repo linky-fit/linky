@@ -1,5 +1,7 @@
 import React from "react";
+import type { Translate } from "../i18n";
 import { createSquareAvatarDataUrl } from "../utils/image";
+import { ModalSheet } from "./ModalSheet";
 
 interface PendingPhoto {
   file: File;
@@ -12,7 +14,7 @@ interface AvatarPhotoInputProps {
   inputRef: React.RefObject<HTMLInputElement | null>;
   onError: (error: unknown) => void;
   onSelected: (dataUrl: string) => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 const loadPhoto = async (file: File): Promise<PendingPhoto> => {
@@ -148,111 +150,105 @@ export function AvatarPhotoInput({
         type="file"
         accept="image/*"
         onChange={(event) => void handleFileChange(event)}
-        style={{ display: "none" }}
+        className="hidden-input"
       />
 
       {pendingPhoto ? (
-        <div
+        <ModalSheet
           className="modal-overlay avatar-crop-overlay"
-          role="dialog"
-          aria-modal="true"
           aria-label={t("avatarCropTitle")}
           onClick={closeCrop}
+          sheetClassName="modal-sheet avatar-crop-sheet"
         >
+          <div className="modal-title">{t("avatarCropTitle")}</div>
+          <p className="modal-body avatar-crop-help">{t("avatarCropHelp")}</p>
           <div
-            className="modal-sheet avatar-crop-sheet"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="modal-title">{t("avatarCropTitle")}</div>
-            <p className="modal-body avatar-crop-help">{t("avatarCropHelp")}</p>
-            <div
-              ref={viewportRef}
-              className="avatar-crop-viewport"
-              onPointerDown={(event) => {
-                dragRef.current = {
-                  pointerId: event.pointerId,
-                  x: event.clientX,
-                  y: event.clientY,
-                };
-                event.currentTarget.setPointerCapture(event.pointerId);
-              }}
-              onPointerMove={(event) => {
-                const drag = dragRef.current;
-                if (!drag || drag.pointerId !== event.pointerId) return;
-                const dx = event.clientX - drag.x;
-                const dy = event.clientY - drag.y;
-                dragRef.current = {
-                  ...drag,
-                  x: event.clientX,
-                  y: event.clientY,
-                };
-                setCenter((current) =>
-                  constrainCenter(
-                    {
-                      x: current.x - dx / imageScale,
-                      y: current.y - dy / imageScale,
-                    },
-                    zoom,
-                  ),
-                );
-              }}
-              onPointerUp={(event) => {
-                if (dragRef.current?.pointerId === event.pointerId) {
-                  dragRef.current = null;
-                }
-              }}
-              onPointerCancel={() => {
+            ref={viewportRef}
+            className="avatar-crop-viewport"
+            onPointerDown={(event) => {
+              dragRef.current = {
+                pointerId: event.pointerId,
+                x: event.clientX,
+                y: event.clientY,
+              };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const drag = dragRef.current;
+              if (!drag || drag.pointerId !== event.pointerId) return;
+              const dx = event.clientX - drag.x;
+              const dy = event.clientY - drag.y;
+              dragRef.current = {
+                ...drag,
+                x: event.clientX,
+                y: event.clientY,
+              };
+              setCenter((current) =>
+                constrainCenter(
+                  {
+                    x: current.x - dx / imageScale,
+                    y: current.y - dy / imageScale,
+                  },
+                  zoom,
+                ),
+              );
+            }}
+            onPointerUp={(event) => {
+              if (dragRef.current?.pointerId === event.pointerId) {
                 dragRef.current = null;
+              }
+            }}
+            onPointerCancel={() => {
+              dragRef.current = null;
+            }}
+          >
+            <img
+              src={pendingPhoto.objectUrl}
+              alt=""
+              draggable={false}
+              style={{
+                height: pendingPhoto.height * imageScale,
+                left: viewportSize / 2 - center.x * imageScale,
+                top: viewportSize / 2 - center.y * imageScale,
+                width: pendingPhoto.width * imageScale,
               }}
-            >
-              <img
-                src={pendingPhoto.objectUrl}
-                alt=""
-                draggable={false}
-                style={{
-                  height: pendingPhoto.height * imageScale,
-                  left: viewportSize / 2 - center.x * imageScale,
-                  top: viewportSize / 2 - center.y * imageScale,
-                  width: pendingPhoto.width * imageScale,
-                }}
-              />
-              <span className="avatar-crop-frame" aria-hidden="true" />
-            </div>
-            <label className="avatar-crop-zoom">
-              <span>{t("avatarCropZoom")}</span>
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="0.01"
-                value={zoom}
-                onChange={(event) => {
-                  const nextZoom = Number(event.target.value);
-                  setZoom(nextZoom);
-                  setCenter((current) => constrainCenter(current, nextZoom));
-                }}
-              />
-            </label>
-            <div className="modal-actions avatar-crop-actions">
-              <button
-                type="button"
-                className="btn-wide"
-                disabled={isSaving}
-                onClick={() => void saveCrop()}
-              >
-                {isSaving ? t("saving") : t("avatarCropConfirm")}
-              </button>
-              <button
-                type="button"
-                className="btn-wide secondary"
-                disabled={isSaving}
-                onClick={closeCrop}
-              >
-                {t("cancel")}
-              </button>
-            </div>
+            />
+            <span className="avatar-crop-frame" aria-hidden="true" />
           </div>
-        </div>
+          <label className="avatar-crop-zoom">
+            <span>{t("avatarCropZoom")}</span>
+            <input
+              type="range"
+              min="1"
+              max="3"
+              step="0.01"
+              value={zoom}
+              onChange={(event) => {
+                const nextZoom = Number(event.target.value);
+                setZoom(nextZoom);
+                setCenter((current) => constrainCenter(current, nextZoom));
+              }}
+            />
+          </label>
+          <div className="modal-actions avatar-crop-actions">
+            <button
+              type="button"
+              className="btn-wide"
+              disabled={isSaving}
+              onClick={() => void saveCrop()}
+            >
+              {isSaving ? t("saving") : t("avatarCropConfirm")}
+            </button>
+            <button
+              type="button"
+              className="btn-wide secondary"
+              disabled={isSaving}
+              onClick={closeCrop}
+            >
+              {t("cancel")}
+            </button>
+          </div>
+        </ModalSheet>
       ) : null}
     </>
   );

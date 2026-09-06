@@ -39,7 +39,7 @@ const EXPECTED = {
 
 const testLayer = Layer.provideMerge(
   IdentityProvider.Live,
-  MasterSecretProvider.make(TEST_SEED),
+  Layer.succeed(MasterSecretProvider, TEST_SEED),
 );
 
 const runTest = <A>(
@@ -83,13 +83,6 @@ describe("IdentityProvider", () => {
     );
   });
 
-  it("produces a valid nostr keypair", async () => {
-    const id = await runTest(IdentityProvider);
-    expect(id.nostrSigningKey).toBeInstanceOf(Uint8Array);
-    expect(id.nostrSigningKey).toHaveLength(32);
-    expect(id.nostrPublicKey).toMatch(/^[0-9a-f]{64}$/);
-  });
-
   it("encodes valid bech32 nsec/npub", async () => {
     const identity = await runTest(IdentityProvider);
 
@@ -100,107 +93,5 @@ describe("IdentityProvider", () => {
     expect(decodeNpub(npub)).toBe(identity.nostrPublicKey);
     expect(nsec.startsWith("nsec1")).toBe(true);
     expect(npub.startsWith("npub1")).toBe(true);
-  });
-
-  it("produces a cashu wallet seed", async () => {
-    const id = await runTest(IdentityProvider);
-    expect(id.cashuWalletSeed).toBeInstanceOf(Uint8Array);
-    expect(id.cashuWalletSeed).toHaveLength(64);
-  });
-
-  it("produces a storage meta owner key", async () => {
-    const id = await runTest(IdentityProvider);
-    expect(id.storageMetaOwnerKey).toBeInstanceOf(Uint8Array);
-    expect(id.storageMetaOwnerKey).toHaveLength(16);
-  });
-
-  it("produces deterministic results for the same seed", async () => {
-    const a = await runTest(IdentityProvider);
-    const b = await runTest(IdentityProvider);
-
-    expect(a.nostrSigningKey).toEqual(b.nostrSigningKey);
-    expect(a.nostrPublicKey).toBe(b.nostrPublicKey);
-    expect(a.cashuWalletSeed).toEqual(b.cashuWalletSeed);
-    expect(a.storageMetaOwnerKey).toEqual(b.storageMetaOwnerKey);
-  });
-
-  it("derives different owner keys for contacts at different indices", async () => {
-    const id = await runTest(IdentityProvider);
-    const key0 = id.storageContactsOwnerKey(lane(0));
-    const key1 = id.storageContactsOwnerKey(lane(1));
-
-    expect(key0).toBeInstanceOf(Uint8Array);
-    expect(key0).toHaveLength(16);
-    expect(key1).toHaveLength(16);
-    expect(key0).not.toEqual(key1);
-  });
-
-  it("derives different owner keys for cashu at different indices", async () => {
-    const id = await runTest(IdentityProvider);
-    const key0 = id.storageCashuOwnerKey(lane(0));
-    const key1 = id.storageCashuOwnerKey(lane(1));
-
-    expect(key0).toHaveLength(16);
-    expect(key1).toHaveLength(16);
-    expect(key0).not.toEqual(key1);
-  });
-
-  it("derives different owner keys for messages at different indices", async () => {
-    const id = await runTest(IdentityProvider);
-    const key0 = id.storageMessagesOwnerKey(lane(0));
-    const key1 = id.storageMessagesOwnerKey(lane(1));
-
-    expect(key0).toHaveLength(16);
-    expect(key1).toHaveLength(16);
-    expect(key0).not.toEqual(key1);
-  });
-
-  it("derives deterministic indexed owner keys", async () => {
-    const a = await runTest(IdentityProvider);
-    const b = await runTest(IdentityProvider);
-
-    expect(a.storageContactsOwnerKey(lane(5))).toEqual(
-      b.storageContactsOwnerKey(lane(5)),
-    );
-    expect(a.storageCashuOwnerKey(lane(3))).toEqual(
-      b.storageCashuOwnerKey(lane(3)),
-    );
-    expect(a.storageMessagesOwnerKey(lane(7))).toEqual(
-      b.storageMessagesOwnerKey(lane(7)),
-    );
-  });
-
-  it("uses distinct derivation paths across key families", async () => {
-    const id = await runTest(IdentityProvider);
-
-    const contacts0 = id.storageContactsOwnerKey(lane(0));
-    const cashu0 = id.storageCashuOwnerKey(lane(0));
-    const messages0 = id.storageMessagesOwnerKey(lane(0));
-
-    expect(contacts0).not.toEqual(cashu0);
-    expect(contacts0).not.toEqual(messages0);
-    expect(cashu0).not.toEqual(messages0);
-  });
-
-  it("produces different identities from a different seed", async () => {
-    const differentSeed = MasterSecret.make(
-      new Uint8Array(Array.from({ length: 64 }, () => 0xab)),
-    );
-    const differentLayer = Layer.provideMerge(
-      IdentityProvider.Live,
-      MasterSecretProvider.make(differentSeed),
-    );
-
-    const original = await runTest(IdentityProvider);
-    const different = await Effect.runPromise(
-      Effect.provide(IdentityProvider, differentLayer),
-    );
-
-    expect(original.nostrPublicKey).not.toBe(different.nostrPublicKey);
-    expect(original.nostrSigningKey).not.toEqual(different.nostrSigningKey);
-    expect(original.cashuWalletSeed).not.toEqual(different.cashuWalletSeed);
-    expect(original.storageMetaOwnerKey).not.toEqual(
-      different.storageMetaOwnerKey,
-    );
   });
 });

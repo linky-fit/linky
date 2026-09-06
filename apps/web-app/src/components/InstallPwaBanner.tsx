@@ -1,3 +1,9 @@
+import {
+  SquarePlus as AddToHomeIcon,
+  EllipsisVertical as BrowserMenuIcon,
+  Compass as SafariIcon,
+  Share2 as ShareIcon,
+} from "lucide-react";
 import React from "react";
 import {
   getTelemetryAppRuntime,
@@ -11,10 +17,11 @@ import {
   INSTALL_PWA_FIRST_SHOW_DELAY_MS,
 } from "../utils/constants";
 import { safeLocalStorageGet, safeLocalStorageSet } from "../utils/storage";
-import { AddToHomeIcon, BrowserMenuIcon, SafariIcon, ShareIcon } from "./icons";
+
+import type { Translate } from "../i18n";
 
 interface InstallPwaBannerProps {
-  t: (key: string) => string;
+  t: Translate;
 }
 
 interface InstallStep {
@@ -49,7 +56,7 @@ const isStandaloneDisplay = (): boolean => {
 
 const getUserAgent = (): string => {
   if (typeof navigator === "undefined") return "";
-  return String(navigator.userAgent ?? "");
+  return navigator.userAgent;
 };
 
 const isMobileBrowser = (): boolean => {

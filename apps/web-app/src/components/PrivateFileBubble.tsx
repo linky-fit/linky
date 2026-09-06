@@ -1,4 +1,5 @@
-import { Download, FileText } from "lucide-react";
+import { useLatest } from "../hooks/useLatest";
+import { Download, FileText, Share2 as ShareIcon } from "lucide-react";
 import React from "react";
 import {
   renderPdfPages,
@@ -14,13 +15,14 @@ import {
   decryptPrivateImageMessage,
   type PrivateImageMessagePayload,
 } from "../app/lib/privateImageMessage";
-import { ShareIcon } from "./icons";
+
+import type { Translate } from "../i18n";
 
 interface PrivateFileBubbleProps {
   onBlobChange: (blob: Blob | null) => void;
   payload: PrivateImageMessagePayload;
   rumorId: string | null;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 const PREVIEW_WIDTH_PX = 260;
@@ -53,10 +55,7 @@ export function PrivateFileBubble({
     null,
   );
 
-  const onBlobChangeRef = React.useRef(onBlobChange);
-  React.useEffect(() => {
-    onBlobChangeRef.current = onBlobChange;
-  }, [onBlobChange]);
+  const onBlobChangeRef = useLatest(onBlobChange);
 
   React.useEffect(() => {
     if (shouldLoad || typeof IntersectionObserver === "undefined") return;
@@ -107,7 +106,7 @@ export function PrivateFileBubble({
       cancelled = true;
       revokePdfPages(rendered);
     };
-  }, [payload, shouldLoad]);
+  }, [payload, shouldLoad, onBlobChangeRef]);
 
   React.useEffect(() => {
     if (!viewerOpen || !fileBlob) return;

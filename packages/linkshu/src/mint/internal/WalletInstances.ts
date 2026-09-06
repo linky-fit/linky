@@ -31,7 +31,8 @@ import {
   KeyValueStore,
   type KeyValueStoreService,
 } from "../../ports/KeyValueStore";
-import { loadWallet, unknownErrorMessage } from "./loadWallet";
+import { errorMessage } from "../../internal/errorMessage";
+import { loadWallet } from "./loadWallet";
 
 export const SEEN_MINTS_KEY_PREFIX = "linkshu.seenMints.";
 
@@ -128,7 +129,7 @@ export const classifyMintError = (
   mint: MintUrl,
   error: unknown,
 ): MintUnreachable | MintRejected => {
-  const detail = unknownErrorMessage(error, "unknown mint error");
+  const detail = errorMessage(error, "unknown mint error");
   if (error instanceof MintOperationError) {
     return new MintRejected({ mint, code: error.code, detail });
   }

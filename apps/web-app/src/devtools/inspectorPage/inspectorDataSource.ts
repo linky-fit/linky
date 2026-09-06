@@ -6,7 +6,7 @@ import {
 } from "../inspector/inspectorRows";
 import type { InspectorStore } from "../inspector/inspectorStore";
 
-export interface InspectorDataSourceHandlers {
+interface InspectorDataSourceHandlers {
   onClear: () => void;
   onConnectionChange: (connected: boolean) => void;
   onRows: (rows: CollectedInspectorRow[]) => void;

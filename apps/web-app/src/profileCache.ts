@@ -1,5 +1,9 @@
 import { ProfileMetadata } from "@linky/linkstr";
-import { Option, Schema } from "effect";
+import { Schema } from "effect";
+import {
+  safeLocalStorageGetJson,
+  safeLocalStorageSetJson,
+} from "./utils/storage";
 import { isHttpUrl } from "./utils/validation";
 
 /**
@@ -15,55 +19,43 @@ const CachedProfile = Schema.Struct({
   metadata: ProfileMetadata,
   updatedAt: Schema.Number,
 });
-export type CachedProfile = typeof CachedProfile.Type;
+type CachedProfile = typeof CachedProfile.Type;
 
 const CachedStatus = Schema.Struct({
   /** Raw kind-30315 content; empty string means the status was cleared. */
   content: Schema.String,
   updatedAt: Schema.Number,
 });
-export type CachedStatus = typeof CachedStatus.Type;
-
-const decodeCachedProfile = Schema.decodeUnknownOption(CachedProfile);
-const decodeCachedStatus = Schema.decodeUnknownOption(CachedStatus);
-
-const readJson = (key: string): unknown => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const writeJson = (key: string, value: unknown): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Cache writes are best effort.
-  }
-};
+type CachedStatus = typeof CachedStatus.Type;
 
 export const loadCachedProfile = (npub: string): CachedProfile | null =>
-  Option.getOrNull(decodeCachedProfile(readJson(PROFILE_PREFIX + npub)));
+  safeLocalStorageGetJson(
+    PROFILE_PREFIX + npub,
+    Schema.NullOr(CachedProfile),
+    null,
+  );
 
 export const saveCachedProfile = (
   npub: string,
   metadata: ProfileMetadata,
   updatedAt: number,
 ): void => {
-  writeJson(PROFILE_PREFIX + npub, { metadata, updatedAt });
+  safeLocalStorageSetJson(PROFILE_PREFIX + npub, { metadata, updatedAt });
 };
 
 export const loadCachedStatus = (npub: string): CachedStatus | null =>
-  Option.getOrNull(decodeCachedStatus(readJson(STATUS_PREFIX + npub)));
+  safeLocalStorageGetJson(
+    STATUS_PREFIX + npub,
+    Schema.NullOr(CachedStatus),
+    null,
+  );
 
 export const saveCachedStatus = (
   npub: string,
   content: string,
   updatedAt: number,
 ): void => {
-  writeJson(STATUS_PREFIX + npub, { content, updatedAt });
+  safeLocalStorageSetJson(STATUS_PREFIX + npub, { content, updatedAt });
 };
 
 const isDataImageUrl = (value: string): boolean => {
@@ -166,9 +158,6 @@ const registerAvatarObjectUrl = (npub: string, blob: Blob): string => {
   avatarObjectUrlByNpub.set(npub, url);
   return url;
 };
-
-export const peekAvatarObjectUrl = (npub: string): string | null =>
-  avatarObjectUrlByNpub.get(npub.trim()) ?? null;
 
 export const releaseAvatarObjectUrl = (npub: string): void => {
   const trimmed = npub.trim();

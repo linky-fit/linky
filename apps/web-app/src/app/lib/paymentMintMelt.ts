@@ -1,9 +1,9 @@
-export interface PaymentMintBalance {
+interface PaymentMintBalance {
   mint: string;
   sum: number;
 }
 
-export interface PaymentMintMeltPlan {
+interface PaymentMintMeltPlan {
   fromMint: string;
   maxBalanceAfterMelt: number;
   sourceBalance: number;
@@ -15,14 +15,14 @@ export const getPaymentMintMeltPlan = (args: {
   balances: readonly PaymentMintBalance[];
   mainMint: string | null;
 }): PaymentMintMeltPlan | null => {
-  const mainMint = String(args.mainMint ?? "").trim();
+  const mainMint = (args.mainMint ?? "").trim();
   if (!mainMint) return null;
 
   let targetBalance = 0;
   let source: PaymentMintBalance | null = null;
 
   for (const balance of args.balances) {
-    const mint = String(balance.mint ?? "").trim();
+    const mint = balance.mint.trim();
     const sum =
       Number.isFinite(balance.sum) && balance.sum > 0 ? balance.sum : 0;
     if (!mint || sum <= 0) continue;

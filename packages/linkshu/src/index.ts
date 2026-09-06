@@ -8,12 +8,12 @@ export * from "./feeProbe/FeeProbe";
 export * from "./headless";
 export * from "./inspector/events";
 export * from "./inspector/Inspector";
+export * from "./invoice/preview";
 export * from "./melt/domain";
 export * from "./melt/Melt";
 export * from "./mint/domain";
 export * from "./mint/Mints";
 export * from "./ports/CashuSeed";
-export * from "./ports/deterministicIdTokenStore";
 export * from "./ports/inMemoryKeyValueStore";
 export * from "./ports/inMemoryTokenStore";
 export * from "./ports/KeyValueStore";
@@ -31,3 +31,13 @@ export * from "./topup/domain";
 export * from "./topup/Topup";
 export * from "./validation/domain";
 export * from "./validation/Validation";
+
+export * from "./lnurl/lnurlPay";
+export * from "./invoice/paymentAmountFallback";
+export * from "./mint/icons";
+export * from "./fiatRates";
+export {
+  getLightningAddressRequestUrl,
+  splitLightningAddress,
+  stripLightningPrefix,
+} from "./lnurl/lightningAddress";

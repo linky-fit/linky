@@ -3,23 +3,20 @@ import { StrictMode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
-import { BootCommitSignal } from "./components/BootCommitSignal";
-import { installIosViewportHeal } from "./platform/iosViewportHeal";
 import "./index.css";
 import {
   type OpfsProbeIssue,
   prepareEvoluWebStorage,
   shouldUseInMemoryEvoluStorage,
 } from "./platform/evoluWebStorage";
+import { installIosViewportHeal } from "./platform/iosViewportHeal";
 import type {
   BroadcastChannelLike,
   BroadcastMessageHandler,
-  GlobalWithOptionalBroadcastChannel,
   LockManagerLike,
-  NavigatorWithOptionalLocks,
-  NavigatorWithOptionalStorage,
 } from "./types/browser";
 import type { JsonValue } from "./types/json";
+import { decodeBase64Url, encodeBase64Url } from "./utils/base64";
 import { appendPushDebugLog } from "./utils/pushDebugLog";
 import {
   handlePwaUpdateAvailable,
@@ -27,6 +24,7 @@ import {
   recordPwaControllerChange,
   recordPwaRegistered,
 } from "./utils/pwaUpdate";
+import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 
 type BufferFromArgs =
   | [arrayLike: ArrayLike<number> | ArrayBufferView]
@@ -51,10 +49,10 @@ const getGlobalBuffer = (): typeof Buffer | null => {
   return isBufferConstructor(candidate) ? candidate : null;
 };
 
-const getGlobalProcess = (): ProcessLike | null => {
+const getGlobalProcess = (): object | null => {
   const candidate = Reflect.get(globalThis, "process");
   if (candidate && typeof candidate === "object") {
-    return candidate as ProcessLike;
+    return candidate;
   }
   return null;
 };
@@ -109,15 +107,6 @@ if (!getGlobalProcess()) {
   const patchMarker = "__linkyBase64UrlPatched";
   if (Reflect.get(B.prototype, patchMarker) === true) return;
 
-  const toBase64Url = (base64: string) =>
-    base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-
-  const fromBase64Url = (base64url: string) => {
-    const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = base64.length % 4;
-    return pad === 0 ? base64 : base64 + "=".repeat(4 - pad);
-  };
-
   const origToString = B.prototype.toString;
   Object.defineProperty(B.prototype, "toString", {
     configurable: true,
@@ -128,7 +117,7 @@ if (!getGlobalProcess()) {
       end?: number,
     ) {
       if (encoding === "base64url") {
-        return toBase64Url(origToString.call(this, "base64", start, end));
+        return encodeBase64Url(this.subarray(start, end));
       }
       return origToString.call(this, encoding, start, end);
     },
@@ -141,7 +130,9 @@ if (!getGlobalProcess()) {
     value: function (this: typeof Buffer, ...args: BufferFromArgs) {
       const [value, encodingOrOffset] = args;
       if (typeof value === "string" && encodingOrOffset === "base64url") {
-        return Reflect.apply(origFrom, this, [fromBase64Url(value), "base64"]);
+        return Reflect.apply(origFrom, this, [
+          decodeBase64Url(value) ?? new Uint8Array(0),
+        ]);
       }
       return Reflect.apply(origFrom, this, args);
     },
@@ -154,23 +145,14 @@ if (!getGlobalProcess()) {
 const updateSW = registerSW({
   immediate: true,
   onOfflineReady() {
-    console.log("[linky][pwa] offline ready");
-    void appendPushDebugLog("client", "pwa offline ready");
+    appendPushDebugLog("client", "pwa offline ready");
   },
   onNeedRefresh() {
-    console.log("[linky][pwa] update available");
-    void appendPushDebugLog("client", "pwa update available");
+    appendPushDebugLog("client", "pwa update available");
     void handlePwaUpdateAvailable();
   },
   onRegisteredSW(swUrl, registration) {
-    console.log("[linky][pwa] sw registered", {
-      swUrl,
-      scope: registration?.scope,
-      hasActive: Boolean(registration?.active),
-      hasWaiting: Boolean(registration?.waiting),
-      hasInstalling: Boolean(registration?.installing),
-    });
-    void appendPushDebugLog("client", "pwa sw registered", {
+    appendPushDebugLog("client", "pwa sw registered", {
       hasActive: Boolean(registration?.active),
       hasInstalling: Boolean(registration?.installing),
       hasWaiting: Boolean(registration?.waiting),
@@ -194,7 +176,7 @@ const updateSW = registerSW({
         return;
       }
       void registration.update().catch((error) => {
-        console.log("[linky][pwa] sw update check failed", { error });
+        appendPushDebugLog("client", "pwa sw update check failed", { error });
       });
     };
     setInterval(checkForUpdate, 30_000);
@@ -208,39 +190,34 @@ const updateSW = registerSW({
       });
     }
     if (registration.waiting) {
-      console.log("[linky][pwa] waiting worker present at registration");
+      appendPushDebugLog(
+        "client",
+        "pwa waiting worker present at registration",
+      );
       void handlePwaUpdateAvailable();
     }
   },
   onRegisterError(error) {
-    console.log("[linky][pwa] sw register error", { error });
-    void appendPushDebugLog("client", "pwa sw register error", { error });
+    appendPushDebugLog("client", "pwa sw register error", { error });
   },
 });
 recordPwaRegistered(updateSW);
 
 if ("serviceWorker" in navigator) {
   const hadControllerAtLoad = Boolean(navigator.serviceWorker.controller);
-  console.log("[linky][pwa] controller", {
-    hasController: hadControllerAtLoad,
-  });
-  void appendPushDebugLog("client", "pwa controller snapshot", {
+  appendPushDebugLog("client", "pwa controller snapshot", {
     hasController: hadControllerAtLoad,
   });
 
   navigator.serviceWorker.addEventListener("message", (event) => {
-    console.log("[linky][pwa] sw message", event.data);
-    void appendPushDebugLog("client", "pwa sw message", {
+    appendPushDebugLog("client", "pwa sw message", {
       data: event.data,
     });
   });
 
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     recordPwaControllerChange();
-    console.log("[linky][pwa] controller change", {
-      hasController: Boolean(navigator.serviceWorker.controller),
-    });
-    void appendPushDebugLog("client", "pwa controller change", {
+    appendPushDebugLog("client", "pwa controller change", {
       hasController: Boolean(navigator.serviceWorker.controller),
     });
     // An update accepted in another tab activated a new SW for every tab.
@@ -254,11 +231,7 @@ if ("serviceWorker" in navigator) {
 
   void navigator.serviceWorker.ready
     .then(async (reg) => {
-      console.log("[linky][pwa] sw ready", {
-        scope: reg.scope,
-        hasActive: Boolean(reg.active),
-      });
-      await appendPushDebugLog("client", "pwa sw ready", {
+      appendPushDebugLog("client", "pwa sw ready", {
         hasActive: Boolean(reg.active),
         scope: reg.scope,
       });
@@ -268,15 +241,13 @@ if ("serviceWorker" in navigator) {
         const relevant = keys.filter(
           (k) => k.includes("workbox") || k.includes("linky"),
         );
-        console.log("[linky][pwa] cache keys", { keys: relevant });
-        await appendPushDebugLog("client", "pwa cache keys", {
+        appendPushDebugLog("client", "pwa cache keys", {
           keys: relevant,
         });
       }
     })
     .catch((error) => {
-      console.log("[linky][pwa] sw ready error", { error });
-      void appendPushDebugLog("client", "pwa sw ready error", { error });
+      appendPushDebugLog("client", "pwa sw ready error", { error });
     });
 }
 
@@ -287,10 +258,6 @@ const escapeHtml = (value: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null;
-};
 
 const getErrorName = (value: unknown): string | null => {
   if (value instanceof DOMException) {
@@ -306,26 +273,9 @@ const getErrorName = (value: unknown): string | null => {
   return typeof name === "string" ? name : null;
 };
 
-const getErrorMessage = (value: unknown): string | null => {
-  if (value instanceof DOMException) {
-    return value.message;
-  }
-  if (value instanceof Error) {
-    return value.message;
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (!isRecord(value)) {
-    return null;
-  }
-  const message = value.message;
-  return typeof message === "string" ? message : null;
-};
-
 const isClipboardReadPermissionError = (value: unknown): boolean => {
   const name = getErrorName(value);
-  const message = getErrorMessage(value)?.toLowerCase() ?? "";
+  const message = getUnknownErrorMessage(value, "").toLowerCase();
 
   if (name !== "NotAllowedError") {
     return false;
@@ -336,7 +286,7 @@ const isClipboardReadPermissionError = (value: unknown): boolean => {
 
 const isBenignFetchAbortError = (value: unknown): boolean => {
   const name = getErrorName(value);
-  const message = getErrorMessage(value)?.toLowerCase() ?? "";
+  const message = getUnknownErrorMessage(value, "").toLowerCase();
 
   if (name === "AbortError") return true;
   // Safari surfaces aborted/cancelled fetches as plain `TypeError: Load failed`
@@ -359,7 +309,7 @@ const isLocalDevOrigin = (): boolean => {
 };
 
 const isDynamicImportFetchError = (value: unknown): boolean => {
-  const message = getErrorMessage(value)?.toLowerCase() ?? "";
+  const message = getUnknownErrorMessage(value, "").toLowerCase();
   return (
     message.includes("failed to fetch dynamically imported module") ||
     message.includes("error loading dynamically imported module")
@@ -449,8 +399,7 @@ const applyEvoluWebCompatPolyfills = () => {
   if (typeof document === "undefined") return;
 
   const ensureBroadcastChannel = () => {
-    const BC = (globalThis as GlobalWithOptionalBroadcastChannel)
-      .BroadcastChannel;
+    const BC = globalThis.BroadcastChannel;
     if (typeof BC === "undefined") return false;
     try {
       const test = new BC("__linky_test__");
@@ -470,7 +419,7 @@ const applyEvoluWebCompatPolyfills = () => {
       onmessage: Listener = null;
 
       constructor(name: string) {
-        this.name = String(name);
+        this.name = name;
         const set = channelsByName.get(this.name) ?? new Set();
         set.add(this);
         channelsByName.set(this.name, set);
@@ -497,39 +446,24 @@ const applyEvoluWebCompatPolyfills = () => {
         if (set.size === 0) channelsByName.delete(this.name);
       }
 
-      addEventListener(
-        _type: string,
-        _listener: EventListenerOrEventListenerObject | null,
-        _options?: boolean | AddEventListenerOptions,
-      ) {
-        void _type;
-        void _listener;
-        void _options;
-        // Not used by Evolu.
-      }
+      // Evolu only assigns onmessage, so the EventTarget surface is inert.
+      addEventListener() {}
 
-      removeEventListener(
-        _type: string,
-        _listener: EventListenerOrEventListenerObject | null,
-        _options?: boolean | EventListenerOptions,
-      ) {
-        void _type;
-        void _listener;
-        void _options;
-        // Not used by Evolu.
-      }
+      removeEventListener() {}
 
-      dispatchEvent(_event: Event) {
-        void _event;
+      dispatchEvent() {
         return false;
       }
     }
 
-    (globalThis as GlobalWithOptionalBroadcastChannel).BroadcastChannel =
-      PolyBroadcastChannel;
+    Object.defineProperty(globalThis, "BroadcastChannel", {
+      value: PolyBroadcastChannel,
+      configurable: true,
+      writable: true,
+    });
   }
 
-  const nav = navigator as NavigatorWithOptionalLocks;
+  const nav = navigator;
   const locks = nav.locks;
 
   if (!locks?.request) {
@@ -537,7 +471,8 @@ const applyEvoluWebCompatPolyfills = () => {
       request: async (_name: string, cb: () => Promise<JsonValue>) => cb(),
     };
     try {
-      (navigator as NavigatorWithOptionalLocks).locks = lockPolyfill;
+      if (!Reflect.set(navigator, "locks", lockPolyfill))
+        throw new Error("Cannot assign navigator.locks");
     } catch {
       try {
         Object.defineProperty(navigator, "locks", {
@@ -570,16 +505,10 @@ const renderBootError = (error: unknown) => {
         ? globalThis.isSecureContext
         : null,
     hasWorker: typeof globalThis.Worker !== "undefined",
-    hasBroadcastChannel:
-      typeof (globalThis as GlobalWithOptionalBroadcastChannel)
-        .BroadcastChannel !== "undefined",
-    hasLocks: Boolean(
-      (globalThis.navigator as NavigatorWithOptionalLocks)?.locks,
-    ),
+    hasBroadcastChannel: typeof globalThis.BroadcastChannel !== "undefined",
+    hasLocks: Boolean(globalThis.navigator?.locks),
     hasIndexedDB: typeof globalThis.indexedDB !== "undefined",
-    hasStorage:
-      typeof (globalThis.navigator as NavigatorWithOptionalStorage)?.storage !==
-      "undefined",
+    hasStorage: typeof globalThis.navigator?.storage !== "undefined",
   };
 
   root.innerHTML = `
@@ -733,8 +662,7 @@ const bootstrap = async () => {
         <StrictMode>
           <EvoluProvider value={evolu}>
             <ErrorBoundary>
-              <BootCommitSignal onCommit={recordAppCommit} />
-              <App />
+              <App onCommit={recordAppCommit} />
             </ErrorBoundary>
           </EvoluProvider>
         </StrictMode>,

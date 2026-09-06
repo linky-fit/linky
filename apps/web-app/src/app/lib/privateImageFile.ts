@@ -1,5 +1,4 @@
-import { reportInspectorRows } from "../../devtools/inspector";
-import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
+import { reportAppLog } from "../../devtools/inspector/appLog";
 
 const PDF_FILE_TYPE = "application/pdf";
 const EXTENSION_BY_IMAGE_TYPE: Record<string, string> = {
@@ -10,7 +9,7 @@ const EXTENSION_BY_IMAGE_TYPE: Record<string, string> = {
 };
 const MAX_EXPORT_FILE_NAME_LENGTH = 120;
 
-export interface PrivateImageExportLinks {
+interface PrivateImageExportLinks {
   rumor?: string;
 }
 
@@ -60,22 +59,17 @@ const reportPrivateImageExport = (
   links: PrivateImageExportLinks,
   error?: unknown,
 ): void => {
-  if (!getInspectorEmissionEnabled()) return;
-  reportInspectorRows([
-    {
-      at: Date.now(),
-      channel: "app.log",
-      tag: exportTag(file, event),
-      summary,
-      links: links.rumor ? { rumor: links.rumor } : {},
-      payload: {
-        fileName: file.name,
-        fileType: file.type,
-        size: file.size,
-        ...(error !== undefined ? { error } : {}),
-      },
+  reportAppLog({
+    tag: exportTag(file, event),
+    summary,
+    links: links.rumor ? { rumor: links.rumor } : {},
+    payload: {
+      fileName: file.name,
+      fileType: file.type,
+      size: file.size,
+      ...(error !== undefined ? { error } : {}),
     },
-  ]);
+  });
 };
 
 export const isCancelledShareError = (error: unknown): boolean => {

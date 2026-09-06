@@ -1,5 +1,5 @@
 import type { RelayDotState } from "../app/hooks/useRelayHealth";
-import { useNavigation } from "../hooks/useRouting";
+import { navigateTo } from "../hooks/useRouting";
 
 interface NostrRelayRowProps {
   detail: string | null;
@@ -8,8 +8,6 @@ interface NostrRelayRowProps {
 }
 
 export function NostrRelayRow({ detail, state, url }: NostrRelayRowProps) {
-  const navigateTo = useNavigation();
-
   return (
     <button
       type="button"

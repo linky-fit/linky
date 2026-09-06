@@ -8,9 +8,7 @@ export const isOpenChatForContact = (
   route: InboxNotificationRoute,
   contactId: string,
 ): boolean =>
-  route.kind === "chat" &&
-  Boolean(contactId) &&
-  String(route.id ?? "") === contactId;
+  route.kind === "chat" && Boolean(contactId) && (route.id ?? "") === contactId;
 
 export const isOpenBankPaymentOffer = (
   route: InboxNotificationRoute,
@@ -18,4 +16,4 @@ export const isOpenBankPaymentOffer = (
 ): boolean =>
   route.kind === "bankPaymentOffer" &&
   Boolean(offerId) &&
-  String(route.offerId ?? "") === offerId;
+  (route.offerId ?? "") === offerId;

@@ -7,7 +7,7 @@ export const buildIdentityChangeMessageContent = (args: {
   changedAtSec: number;
   source: IdentityChangeMessageSource;
 }): string => {
-  const changedAtSec = Math.max(1, Math.trunc(Number(args.changedAtSec) || 0));
+  const changedAtSec = Math.max(1, Math.trunc(args.changedAtSec || 0));
   return `[[linky:identity-change:${args.source}:${changedAtSec}]]`;
 };
 
@@ -16,15 +16,15 @@ export const buildIdentityChangeMessageWrapId = (args: {
   contactId: string;
   source: IdentityChangeMessageSource;
 }): string => {
-  const changedAtSec = Math.max(1, Math.trunc(Number(args.changedAtSec) || 0));
-  const contactId = String(args.contactId ?? "").trim();
+  const changedAtSec = Math.max(1, Math.trunc(args.changedAtSec || 0));
+  const contactId = args.contactId.trim();
   return `system:identity-change:${args.source}:${changedAtSec}:${contactId}`;
 };
 
 export const parseIdentityChangeMessageContent = (
   content: string,
 ): { changedAtSec: number; source: IdentityChangeMessageSource } | null => {
-  const normalized = String(content ?? "").trim();
+  const normalized = content.trim();
   const match = IDENTITY_CHANGE_MESSAGE_PATTERN.exec(normalized);
   if (!match) return null;
 

@@ -15,13 +15,13 @@ export interface InspectorQuery {
   limit?: number;
 }
 
-export interface InspectorQueryResult {
+interface InspectorQueryResult {
   /** Pass as the next query's cursor to resume where this one ended. */
   cursor: number;
   rows: CollectedInspectorRow[];
 }
 
-export type InspectorStoreChange =
+type InspectorStoreChange =
   | { kind: "append"; rows: CollectedInspectorRow[] }
   | { kind: "clear" };
 

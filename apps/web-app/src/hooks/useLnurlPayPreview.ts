@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchLnurlPayPreview, type LnurlPayPreview } from "../lnurlPay";
+import type { Translate } from "../i18n";
 
 interface PreviewState {
   error: string | null;
@@ -72,7 +73,7 @@ export const useLnurlPayPreview = (
 export const getLnurlPayAmountRangeError = (
   preview: LnurlPayPreview | null,
   amountSat: number,
-  t: (key: string) => string,
+  t: Translate,
 ): string | null => {
   if (!preview || !Number.isFinite(amountSat) || amountSat <= 0) return null;
   if (amountSat < preview.minSendableSat) {

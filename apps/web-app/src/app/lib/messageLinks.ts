@@ -1,4 +1,4 @@
-export interface MessageLinkMatch {
+interface MessageLinkMatch {
   displayText: string;
   end: number;
   start: number;
@@ -66,7 +66,7 @@ export const normalizeMessageLinkMatch = (
 export const extractMessageLinks = (content: string): MessageLinkMatch[] => {
   const links: MessageLinkMatch[] = [];
   for (const match of content.matchAll(MESSAGE_LINK_PATTERN)) {
-    const rawMatch = String(match[0] ?? "");
+    const rawMatch = match[0];
     const normalized = normalizeMessageLinkMatch(rawMatch);
     if (!normalized) continue;
     const start = match.index ?? 0;

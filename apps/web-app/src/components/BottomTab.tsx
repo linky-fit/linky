@@ -1,5 +1,5 @@
+import { Users as ContactsIcon, Wallet as WalletIcon } from "lucide-react";
 import type { Ref } from "react";
-import { ContactsIcon, WalletIcon } from "./icons";
 
 interface BottomTabProps {
   icon: "contacts" | "wallet";

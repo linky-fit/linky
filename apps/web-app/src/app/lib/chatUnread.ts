@@ -1,4 +1,4 @@
-export interface ConversationReadMessage {
+interface ConversationReadMessage {
   createdAtSec: number;
   direction: "in" | "out";
 }
@@ -10,7 +10,7 @@ export interface ConversationReadTimes {
 }
 
 const toPositiveSec = (value: number | null | undefined): number => {
-  const parsed = Number(value ?? 0);
+  const parsed = value ?? 0;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 };
 
@@ -70,7 +70,7 @@ export const collectUnreadNewestIncomingByContactId = (
 ): Map<string, number> => {
   const timesByContactId = new Map<string, ConversationReadTimes>();
   for (const message of messages) {
-    const contactId = String(message.contactId ?? "").trim();
+    const contactId = message.contactId.trim();
     if (!contactId) continue;
     let times = timesByContactId.get(contactId);
     if (!times) {

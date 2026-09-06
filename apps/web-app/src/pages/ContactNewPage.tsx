@@ -1,8 +1,16 @@
-import { ArrowLeft, Save, User, UserPlus } from "lucide-react";
+import {
+  ArrowLeft,
+  Copy as PasteIcon,
+  Save,
+  User,
+  UserPlus,
+} from "lucide-react";
 import type { FC } from "react";
 import React from "react";
 import { getContactQueryPrefill } from "../app/lib/contactQueryPrefill";
-import { PasteIcon } from "../components/icons";
+import { Avatar } from "../components/Avatar";
+
+import type { Translate } from "../i18n";
 import { readClipboardText } from "../platform/clipboard";
 import { normalizeContactGroups } from "../utils/contactGroups";
 import {
@@ -30,7 +38,7 @@ interface ContactFieldsProps {
   namePlaceholder?: string;
   namePublicValue?: string;
   setForm: (value: ContactFormData) => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export function ContactFields({
@@ -64,13 +72,7 @@ export function ContactFields({
     action === undefined ? (
       <label>{label}</label>
     ) : (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
+      <div className="form-field-heading">
         <label>{label}</label>
         {action}
       </div>
@@ -218,7 +220,7 @@ interface ContactNewPageProps {
     onProgress?: (result: ContactSearchResult) => void,
   ) => Promise<ContactSearchResult>;
   setForm: (value: ContactFormData) => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const ContactNewPage: FC<ContactNewPageProps> = ({
@@ -328,7 +330,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
 
   const pasteSearch = async () => {
     const text = await readClipboardText();
-    const queryText = String(text ?? "").trim();
+    const queryText = (text ?? "").trim();
     if (!queryText) return;
     searchQueryRef.current = queryText;
     setForm({ ...form, npub: queryText });
@@ -433,8 +435,10 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
               {searchResults ? (
                 <div className="contact-new-search-results">
                   {searchResults.contacts.map((candidate) => {
-                    const displayName = String(
-                      candidate.name || candidate.query || "",
+                    const displayName = (
+                      candidate.name ||
+                      candidate.query ||
+                      ""
                     ).trim();
                     return (
                       <div
@@ -450,18 +454,12 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                             className="contact-avatar is-large"
                             aria-hidden="true"
                           >
-                            {candidate.pictureUrl ? (
-                              <img
-                                src={candidate.pictureUrl}
-                                alt=""
-                                loading="lazy"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <span className="contact-avatar-fallback">
-                                {getInitials(displayName)}
-                              </span>
-                            )}
+                            <Avatar
+                              pictureUrl={candidate.pictureUrl}
+                              fallback={getInitials(displayName)}
+                              fallbackClassName="contact-avatar-fallback"
+                              loading="lazy"
+                            />
                           </div>
                           <div className="contact-new-search-result-body">
                             <strong>{displayName || t("contact")}</strong>
@@ -544,8 +542,10 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                   </div>
                   <div className="contact-new-suggestion-list">
                     {contactSuggestions.map((suggestion) => {
-                      const displayName = String(
-                        suggestion.name || suggestion.query || "",
+                      const displayName = (
+                        suggestion.name ||
+                        suggestion.query ||
+                        ""
                       ).trim();
                       const avatarUrl = suggestion.pictureUrl ?? null;
 
@@ -556,18 +556,12 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                         >
                           <div className="contact-new-suggestion-main">
                             <span className="contact-avatar" aria-hidden="true">
-                              {avatarUrl ? (
-                                <img
-                                  src={avatarUrl}
-                                  alt=""
-                                  loading="lazy"
-                                  referrerPolicy="no-referrer"
-                                />
-                              ) : (
-                                <span className="contact-avatar-fallback">
-                                  {getInitials(displayName)}
-                                </span>
-                              )}
+                              <Avatar
+                                pictureUrl={avatarUrl}
+                                fallback={getInitials(displayName)}
+                                fallbackClassName="contact-avatar-fallback"
+                                loading="lazy"
+                              />
                             </span>
                             <span className="contact-new-suggestion-body">
                               <strong>{displayName || t("contact")}</strong>

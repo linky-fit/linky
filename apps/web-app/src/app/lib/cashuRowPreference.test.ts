@@ -6,8 +6,8 @@ import { isCashuRowCandidateBetter } from "./cashuRowPreference";
 const owner0 = Evolu.OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA");
 const owner1 = Evolu.OwnerId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ");
 const ownerRank = new Map([
-  [String(owner0), 0],
-  [String(owner1), 1],
+  [owner0, 0],
+  [owner1, 1],
 ]);
 
 describe("isCashuRowCandidateBetter", () => {

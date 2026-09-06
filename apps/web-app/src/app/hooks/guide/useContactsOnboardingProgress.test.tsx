@@ -1,13 +1,8 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY } from "../../../utils/constants";
 import { useContactsOnboardingProgress } from "./useContactsOnboardingProgress";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-});
 
 type OnboardingProgress = ReturnType<typeof useContactsOnboardingProgress>;
 
@@ -50,18 +45,15 @@ describe("useContactsOnboardingProgress", () => {
     localStorage.setItem(CONTACTS_ONBOARDING_DISMISSED_STORAGE_KEY, "1");
     const persistDismissed = vi.fn();
     const progressSnapshots: OnboardingProgress[] = [];
-    const root = createRoot(document.createElement("div"));
 
-    await act(async () => {
-      root.render(
-        <Harness
-          dismissedSynced={false}
-          onProgress={(value) => progressSnapshots.push(value)}
-          persistDismissed={persistDismissed}
-          stopGuide={vi.fn()}
-        />,
-      );
-    });
+    const { root } = await renderIntoDocument(
+      <Harness
+        dismissedSynced={false}
+        onProgress={(value) => progressSnapshots.push(value)}
+        persistDismissed={persistDismissed}
+        stopGuide={vi.fn()}
+      />,
+    );
 
     expect(progressSnapshots.at(-1)?.showContactsOnboarding).toBe(false);
     expect(persistDismissed).toHaveBeenCalled();
@@ -74,18 +66,15 @@ describe("useContactsOnboardingProgress", () => {
     const progressSnapshots: OnboardingProgress[] = [];
     const onProgress = (value: OnboardingProgress) =>
       progressSnapshots.push(value);
-    const root = createRoot(document.createElement("div"));
 
-    await act(async () => {
-      root.render(
-        <Harness
-          dismissedSynced={false}
-          onProgress={onProgress}
-          persistDismissed={persistDismissed}
-          stopGuide={stopGuide}
-        />,
-      );
-    });
+    const { root } = await renderIntoDocument(
+      <Harness
+        dismissedSynced={false}
+        onProgress={onProgress}
+        persistDismissed={persistDismissed}
+        stopGuide={stopGuide}
+      />,
+    );
     expect(progressSnapshots.at(-1)?.showContactsOnboarding).toBe(true);
 
     await act(async () => {

@@ -8,7 +8,8 @@ export default defineConfig({
     globals: true,
     setupFiles: "./vitest.setup.ts",
     css: true,
-    // *.spec.ts files in tests/ are Playwright E2E suites, not vitest tests.
-    exclude: [...configDefaults.exclude, "tests/**/*.spec.ts"],
+    // tests/ holds the Playwright suites and their helpers; unit tests sit
+    // next to their subject under src/.
+    exclude: [...configDefaults.exclude, "tests/**"],
   },
 });

@@ -1,24 +1,24 @@
 import type { Proof as CashuProof, SendResponse } from "@cashu/cashu-ts";
-import { Amount, getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, Stream } from "effect";
+import { getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
+import { Effect, Exit, Layer } from "effect";
 import {
   Amount as SendAmount,
   CurrencyUnit,
   KeysetId,
   MintUrl,
-  TokenText,
 } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
-import { deterministicIdTokenStore } from "../ports/deterministicIdTokenStore";
+import { deterministicIdTokenStore } from "../testing/deterministicIdTokenStore";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { NewTokenRow, TokenStore } from "../ports/TokenStore";
+import { TokenStore } from "../ports/TokenStore";
 import type { StoredTokenRow } from "../ports/TokenStore";
+import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
+import { seedRow } from "../testing/rows";
 import { parseTokenText } from "../token/codec";
 import { encodeCashuProofs } from "../token/internal/cashuProofs";
 import type { TokenState } from "../token/domain";
@@ -26,18 +26,10 @@ import { SendDraft } from "./domain";
 import { Send } from "./Send";
 
 const mint = MintUrl.make("https://mint.example");
-const keysetHex = "009a1f293253e41e";
 const counterKey = deterministicCounterKey({
   mint,
   unit: CurrencyUnit.make("sat"),
-  keysetId: KeysetId.make(keysetHex),
-});
-
-const proof = (amount: number, secret: string): CashuProof => ({
-  id: keysetHex,
-  amount: Amount.from(amount),
-  secret,
-  C: "02" + "ab".repeat(32),
+  keysetId: KeysetId.make(KEYSET_HEX),
 });
 
 // Row A (4+2) and row B (8): 14 sats available at the mint under test.
@@ -81,13 +73,8 @@ interface SendCall {
 const makeWallet = (args: FakeWalletArgs) => {
   const sendCalls: SendCall[] = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
-  const wallet: LoadedWallet = {
-    keysetId: keysetHex,
-    keyChain: { getKeysets: () => [] },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
-    receive: () => Promise.reject(new Error("not under test")),
+  const wallet = fakeWallet({
+    keysetId: KEYSET_HEX,
     checkProofsStates: (proofs) =>
       args.checkStatesError !== undefined
         ? Promise.reject(args.checkStatesError)
@@ -122,14 +109,7 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.restore()
         : Promise.reject(new Error("restore unavailable"));
     },
-    createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-    createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-    batchRestore: () => Promise.reject(new Error("not under test")),
-  };
+  });
   return { wallet, sendCalls, restoreCalls };
 };
 
@@ -137,7 +117,7 @@ const makeHarness = (
   wallet: LoadedWallet,
   tokenStore: Layer.Layer<TokenStore> = inMemoryTokenStore,
 ) => {
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const layer = Send.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -147,12 +127,7 @@ const makeHarness = (
         ),
         inMemoryKeyValueStore,
         tokenStore,
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
@@ -163,20 +138,8 @@ const makeHarness = (
       Send | TokenStore | KeyValueStore | WalletInstances
     >,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
-  return { run, events };
+  return { run, events: inspector.events };
 };
-
-const seedRow = (tokenText: string, state: TokenState = "accepted") =>
-  Effect.flatMap(TokenStore, (store) =>
-    store.insert(
-      new NewTokenRow({
-        originalTokenText: TokenText.make(tokenText),
-        tokenText: TokenText.make(tokenText),
-        state,
-        error: null,
-      }),
-    ),
-  );
 
 const sendAndInspect = (draft: SendDraft, seeds: ReadonlyArray<string>) =>
   Effect.gen(function* () {
@@ -215,12 +178,10 @@ describe("Send.send", () => {
     const exit = await run(
       sendAndInspect(draft(5), [tokenA, tokenB, otherMintToken]),
     );
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { receipt, rows, counter } = exit.value;
 
-    expect(receipt._tag).toBe("Right");
-    if (receipt._tag !== "Right") return;
+    assert(receipt._tag === "Right");
     expect(receipt.right.mint).toBe(mint);
     expect(receipt.right.unit).toBe("sat");
     expect(receipt.right.amount).toBe(5);
@@ -289,8 +250,7 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(sendAndInspect(draft(6, "pending"), [tokenA]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     // Exact spend: no change row, only the pending send row remains.
     expect(exit.value.rows).toHaveLength(1);
@@ -311,12 +271,10 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(sendAndInspect(draft(3), [tokenA, spentToken]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { receipt, rows } = exit.value;
 
-    expect(receipt._tag).toBe("Right");
-    if (receipt._tag !== "Right") return;
+    assert(receipt._tag === "Right");
     // Only the unspent a1 proof was offered; available was 4, fee 4-3-0.
     expect(sendCalls[0]?.secrets).toEqual(["src-a1"]);
     expect(receipt.right.feePaid).toBe(1);
@@ -336,10 +294,8 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(sendAndInspect(draft(15), [tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "InsufficientFunds",
       required: 15,
@@ -357,10 +313,8 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(sendAndInspect(draft(14), [tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "InsufficientFunds",
       required: 14,
@@ -376,10 +330,8 @@ describe("Send.send", () => {
     const { run, events } = makeHarness(wallet);
 
     const exit = await run(sendAndInspect(draft(5), [tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
     expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
     expect(events.map((event) => event._tag)).toEqual(["OperationFailed"]);
@@ -392,10 +344,8 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(sendAndInspect(draft(5), [tokenA]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
     expect(sendCalls).toEqual([]);
   });
@@ -408,10 +358,8 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(sendAndInspect(draft(5), [tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "MintRejected",
       code: 20003,
@@ -419,37 +367,67 @@ describe("Send.send", () => {
     expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
   });
 
-  it("recovers a stale counter via NUT-09 restore and retries", async () => {
+  it.each([
+    outputsAlreadySigned(),
+    new MintOperationError(11008, "Duplicate outputs"),
+    new Error("Duplicate outputs"),
+  ])(
+    "recovers a stale counter via NUT-09 restore and retries: %s",
+    async (collision) => {
+      const { wallet, sendCalls, restoreCalls } = makeWallet({
+        send: (call) =>
+          call.sendCounter < 40
+            ? Promise.reject(collision)
+            : Promise.resolve({
+                keep: [proof(9, "k1")],
+                send: [proof(4, "s1")],
+              }),
+        restore: () =>
+          Promise.resolve({ proofs: [], lastCounterWithSignature: 39 }),
+      });
+      const { run, events } = makeHarness(wallet);
+
+      const exit = await run(sendAndInspect(draft(4), [tokenA, tokenB]));
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.receipt._tag).toBe("Right");
+      expect(sendCalls.map((call) => call.sendCounter)).toEqual([1, 40]);
+      expect(sendCalls[1]?.keepCounter).toBe(104);
+      expect(restoreCalls).toEqual([{ start: 1, count: 100 }]);
+      expect(exit.value.counter).toBe("105"); // 40 + 64 + 1 fresh keep output
+
+      const counterEvents = events.filter(
+        (event) => event._tag === "CounterAdvanced",
+      );
+      expect(counterEvents).toEqual([
+        expect.objectContaining({
+          from: 1,
+          to: 40,
+          reason: "collision-recovery",
+        }),
+        expect.objectContaining({ from: 40, to: 105, reason: "used" }),
+      ]);
+    },
+  );
+
+  it("bounds duplicate-output retries and preserves source rows on rejection", async () => {
     const { wallet, sendCalls, restoreCalls } = makeWallet({
-      send: (call) =>
-        call.sendCounter < 40
-          ? Promise.reject(outputsAlreadySigned())
-          : Promise.resolve({ keep: [proof(9, "k1")], send: [proof(4, "s1")] }),
-      restore: () =>
-        Promise.resolve({ proofs: [], lastCounterWithSignature: 39 }),
+      send: () =>
+        Promise.reject(new MintOperationError(11008, "Duplicate outputs")),
+      restore: () => Promise.resolve({ proofs: [] }),
     });
-    const { run, events } = makeHarness(wallet);
-
+    const { run } = makeHarness(wallet);
     const exit = await run(sendAndInspect(draft(4), [tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Right");
-    expect(sendCalls.map((call) => call.sendCounter)).toEqual([1, 40]);
-    expect(sendCalls[1]?.keepCounter).toBe(104);
-    expect(restoreCalls).toEqual([{ start: 1, count: 100 }]);
-    expect(exit.value.counter).toBe("105"); // 40 + 64 + 1 fresh keep output
-
-    const counterEvents = events.filter(
-      (event) => event._tag === "CounterAdvanced",
-    );
-    expect(counterEvents).toEqual([
-      expect.objectContaining({
-        from: 1,
-        to: 40,
-        reason: "collision-recovery",
-      }),
-      expect.objectContaining({ from: 40, to: 105, reason: "used" }),
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "MintRejected",
+      code: 11008,
+    });
+    expect(sendCalls.map((call) => call.sendCounter)).toEqual([
+      1, 129, 257, 385, 513,
     ]);
+    expect(restoreCalls).toHaveLength(5);
+    expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
   });
 
   it("offers proofs shared by twin rows only once and consumes both rows", async () => {
@@ -460,8 +438,7 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(sendAndInspect(draft(5), [tokenA, tokenA]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2"]);
     // Both twin rows consumed; only the issued send row remains.
@@ -490,12 +467,10 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet, deterministicIdTokenStore);
 
     const exit = await run(sendAndInspect(draft(8), [collisionText, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { receipt, rows } = exit.value;
 
-    expect(receipt._tag).toBe("Right");
-    if (receipt._tag !== "Right") return;
+    assert(receipt._tag === "Right");
     expect(receipt.right.changeAmount).toBe(6);
     expect(rows).toHaveLength(2);
     // The change landed on the source row's own id and survived the removal.

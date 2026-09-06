@@ -1,3 +1,5 @@
+import { Schema } from "effect";
+import { isLocalPaymentTelemetryEvent } from "./useAnonymousPaymentTelemetry";
 import type { OwnerId } from "@evolu/common";
 import React from "react";
 import type { JsonValue } from "../../types/json";
@@ -10,21 +12,23 @@ import {
   normalizeMintUrl,
 } from "../../utils/mint";
 import {
-  safeLocalStorageGetJson,
-  safeLocalStorageSetJson,
-} from "../../utils/storage";
-import {
   createLocalPaymentTelemetryEvent,
   normalizePaymentTelemetryStatus,
 } from "../lib/paymentTelemetry";
 import { createCashuTokenId } from "../lib/cashuTokenIdentity";
 import type {
   LocalPaymentEvent,
-  LocalPaymentTelemetryEvent,
   LoggedPaymentEventParams,
-  MintUrlInput,
 } from "../types/appTypes";
 import { isUnknownContactId } from "./messages/contactIdentity";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageGetJson,
+  safeLocalStorageSet,
+  safeLocalStorageSetJson,
+} from "../../utils/storage";
+import { isRecord } from "../../utils/unknown";
+import { nowSeconds } from "../../utils/time";
 
 type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
 
@@ -59,9 +63,6 @@ type TransactionEventLike = {
 };
 
 const LEGACY_PAYMENT_EVENTS_MIGRATED_SUFFIX = ".migratedToEvolu.v2";
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const serializeJsonValue = (
   value: JsonValue | null | undefined,
@@ -117,21 +118,21 @@ const compactTransactionDetails = (
   copyString("lnurlSuccessUrlDescription");
 
   const usedTokenIds = readDetailStrings(value, "usedInputTokens").map(
-    (token) => String(createCashuTokenId(token)),
+    (token) => createCashuTokenId(token),
   );
   if (usedTokenIds.length > 0) compact.usedTokenIds = usedTokenIds;
 
   const gainedTokenIds = [
     readDetailString(value, "gainedToken"),
     readDetailString(value, "acceptedToken"),
-  ].flatMap((token) => (token ? [String(createCashuTokenId(token))] : []));
+  ].flatMap((token) => (token ? [createCashuTokenId(token)] : []));
   if (gainedTokenIds.length > 0) {
     compact.gainedTokenIds = Array.from(new Set(gainedTokenIds));
   }
 
   const issuedToken = readDetailString(value, "issuedToken");
   if (issuedToken) {
-    compact.issuedTokenId = String(createCashuTokenId(issuedToken));
+    compact.issuedTokenId = createCashuTokenId(issuedToken);
   }
 
   return Object.keys(compact).length > 0 ? compact : null;
@@ -170,9 +171,9 @@ export const buildTransactionInsertPayload = (args: {
     typeof args.event.fee === "number" && args.event.fee > 0
       ? Math.floor(args.event.fee)
       : null;
-  const mint = String(args.event.mint ?? "").trim();
-  const unit = String(args.event.unit ?? "").trim();
-  const error = String(args.event.error ?? "").trim();
+  const mint = (args.event.mint ?? "").trim();
+  const unit = (args.event.unit ?? "").trim();
+  const error = (args.event.error ?? "").trim();
   const status = normalizePaymentTelemetryStatus({
     error: args.event.error,
     status:
@@ -183,8 +184,8 @@ export const buildTransactionInsertPayload = (args: {
         : "error",
   });
 
-  const method = String(args.event.method ?? "").trim();
-  const phase = String(args.event.phase ?? "").trim();
+  const method = (args.event.method ?? "").trim();
+  const phase = (args.event.phase ?? "").trim();
   const storedMethod =
     method === "unknown" && phase === "swap" ? "cashu_emit" : method;
   const transactionStatus =
@@ -196,7 +197,7 @@ export const buildTransactionInsertPayload = (args: {
     status: transactionStatus,
   };
 
-  const contactId = String(args.event.contactId ?? "").trim();
+  const contactId = (args.event.contactId ?? "").trim();
   const storedContactId = isUnknownContactId(contactId) ? "" : contactId;
   const detailsJson = serializeJsonValue(
     compactTransactionDetails(args.event.details),
@@ -228,7 +229,7 @@ interface UseOwnerScopedStorageResult {
     transactionOwnerId: OwnerId | null,
   ) => void;
   readSeenMintsFromStorage: () => string[];
-  rememberSeenMint: (mintUrl: MintUrlInput) => void;
+  rememberSeenMint: (mintUrl: string | null | undefined) => void;
 }
 
 export const useOwnerScopedStorage = ({
@@ -241,42 +242,33 @@ export const useOwnerScopedStorage = ({
   const makeLocalStorageKey = React.useCallback(
     (prefix: string): string => {
       const ownerId = appOwnerIdRef.current;
-      return `${prefix}.${String(ownerId ?? "anon")}`;
+      return `${prefix}.${ownerId ?? "anon"}`;
     },
     [appOwnerIdRef],
   );
 
-  const readSeenMintsFromStorage = React.useCallback((): string[] => {
-    try {
-      const raw = localStorage.getItem(
+  const readSeenMintsFromStorage = React.useCallback(
+    (): string[] =>
+      safeLocalStorageGetJson(
         makeLocalStorageKey(CASHU_SEEN_MINTS_STORAGE_KEY),
-      );
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed
-        .map((value) => normalizeMintUrl(String(value ?? "")))
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  }, [makeLocalStorageKey]);
+        Schema.Array(Schema.String),
+        [],
+      )
+        .map((value) => normalizeMintUrl(value))
+        .filter(Boolean),
+    [makeLocalStorageKey],
+  );
 
   const rememberSeenMint = React.useCallback(
-    (mintUrl: MintUrlInput): void => {
+    (mintUrl: string | null | undefined): void => {
       const cleaned = normalizeMintUrl(mintUrl);
       if (!cleaned) return;
-      try {
-        const key = makeLocalStorageKey(CASHU_SEEN_MINTS_STORAGE_KEY);
-        const existing = new Set(readSeenMintsFromStorage());
-        existing.add(cleaned);
-        localStorage.setItem(
-          key,
-          JSON.stringify(Array.from(existing).slice(0, 50)),
-        );
-      } catch {
-        // ignore
-      }
+      const existing = new Set(readSeenMintsFromStorage());
+      existing.add(cleaned);
+      safeLocalStorageSetJson(
+        makeLocalStorageKey(CASHU_SEEN_MINTS_STORAGE_KEY),
+        Array.from(existing).slice(0, 50),
+      );
     },
     [makeLocalStorageKey, readSeenMintsFromStorage],
   );
@@ -286,12 +278,12 @@ export const useOwnerScopedStorage = ({
       const ownerId = appOwnerIdRef.current ?? transactionsOwnerIdRef.current;
       if (!ownerId) return;
 
-      const nowSec = Math.floor(Date.now() / 1000);
+      const nowSec = nowSeconds();
       const transactionPayload = buildTransactionInsertPayload({
         createdAtSec: nowSec,
         event: {
           amount: event.amount ?? null,
-          contactId: event.contactId ? String(event.contactId) : null,
+          contactId: event.contactId ? event.contactId : null,
           details: event.details ?? null,
           direction: event.direction,
           error: event.error ?? null,
@@ -319,11 +311,11 @@ export const useOwnerScopedStorage = ({
       }
 
       const telemetryEntry = createLocalPaymentTelemetryEvent(event, nowSec);
-      const emptyTelemetryQueue: LocalPaymentTelemetryEvent[] = [];
       const telemetryQueue = safeLocalStorageGetJson(
         makeLocalStorageKey(LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX),
-        emptyTelemetryQueue,
-      );
+        Schema.Array(Schema.Unknown),
+        [],
+      ).filter(isLocalPaymentTelemetryEvent);
       const nextTelemetryQueue = [telemetryEntry, ...telemetryQueue].slice(
         0,
         250,
@@ -338,30 +330,23 @@ export const useOwnerScopedStorage = ({
 
   const migrateLegacyPaymentEventsToEvolu = React.useCallback(
     (ownerId: OwnerId, transactionOwnerId: OwnerId | null) => {
-      const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${String(ownerId)}`;
+      const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${ownerId}`;
       const migratedKey = `${legacyStorageKey}${LEGACY_PAYMENT_EVENTS_MIGRATED_SUFFIX}`;
 
       if (migratedLegacyPaymentsKeyRef.current === migratedKey) return;
 
-      try {
-        if (localStorage.getItem(migratedKey) === "1") {
-          migratedLegacyPaymentsKeyRef.current = migratedKey;
-          return;
-        }
-      } catch {
+      if (safeLocalStorageGet(migratedKey) === "1") {
+        migratedLegacyPaymentsKeyRef.current = migratedKey;
         return;
       }
 
-      const legacyItems = safeLocalStorageGetJson<readonly JsonValue[]>(
+      const legacyItems = safeLocalStorageGetJson(
         legacyStorageKey,
+        Schema.Array(Schema.Unknown),
         [],
       );
-      if (!Array.isArray(legacyItems) || legacyItems.length === 0) {
-        try {
-          localStorage.setItem(migratedKey, "1");
-        } catch {
-          // ignore
-        }
+      if (legacyItems.length === 0) {
+        safeLocalStorageSet(migratedKey, "1");
         migratedLegacyPaymentsKeyRef.current = migratedKey;
         return;
       }
@@ -372,7 +357,7 @@ export const useOwnerScopedStorage = ({
         if (!isLegacyPaymentEvent(legacyItem)) continue;
 
         const transactionPayload = buildTransactionInsertPayload({
-          createdAtSec: Math.trunc(Number(legacyItem.createdAtSec)),
+          createdAtSec: Math.trunc(legacyItem.createdAtSec),
           event: legacyItem,
         });
 
@@ -389,11 +374,7 @@ export const useOwnerScopedStorage = ({
         }
       }
 
-      try {
-        localStorage.setItem(migratedKey, "1");
-      } catch {
-        // ignore
-      }
+      safeLocalStorageSet(migratedKey, "1");
       migratedLegacyPaymentsKeyRef.current = migratedKey;
     },
     [insert],

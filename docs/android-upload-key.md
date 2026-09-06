@@ -16,10 +16,10 @@ mkdir -p "$HOME/.keys/linky"
 keytool -genkeypair -v -keystore "$HOME/.keys/linky/linky-upload-key.jks" -alias linky-upload -keyalg RSA -keysize 4096 -validity 10000 -storetype JKS -dname "CN=Linky, OU=Mobile, O=Linky, L=Prague, S=Prague, C=CZ"
 ```
 
-Po vygenerovani vytvorte lokalni soubor `apps/native-shell/android/keystore.properties`:
+Po vygenerovani zkopirujte `apps/native-shell/android/keystore.properties.example` na `apps/native-shell/android/keystore.properties` a doplnte hodnoty:
 
 ```properties
-storeFile=/Users/hynekjina/.keys/linky/linky-upload-key.jks
+storeFile=/Users/<you>/.keys/linky/linky-upload-key.jks
 storePassword=VASE_HESLO
 keyAlias=linky-upload
 keyPassword=VASE_HESLO_NEBO_JINE

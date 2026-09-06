@@ -13,6 +13,7 @@ import {
   requestNotificationPermission,
   unregisterPushNotifications,
 } from "../utils/pushNotifications";
+import { safeLocalStorageGet } from "../utils/storage";
 
 interface PushDebugMessage {
   receivedAtIso: string;
@@ -205,7 +206,7 @@ export function PushDebugPage(): React.ReactElement {
       setStatus(
         result.success
           ? t("notificationsRegistered")
-          : String(result.error ?? t("notificationsError")),
+          : (result.error ?? t("notificationsError")),
       );
       await refreshReport();
     } finally {
@@ -247,7 +248,7 @@ export function PushDebugPage(): React.ReactElement {
     setIsBusy(true);
     try {
       await clearPushDebugLog();
-      await appendPushDebugLog("client", "debug log cleared from UI");
+      appendPushDebugLog("client", "debug log cleared from UI");
       setStatus("Debug log cleared");
       await refreshReport();
     } finally {
@@ -263,8 +264,7 @@ export function PushDebugPage(): React.ReactElement {
           import.meta.env.VITE_PUSH_SERVER_URL ??
           import.meta.env.VITE_NOTIFICATION_SERVER_URL ??
           null,
-        vapidPublicKey:
-          localStorage.getItem("linky.push_vapid_public_key") ?? null,
+        vapidPublicKey: safeLocalStorageGet("linky.push_vapid_public_key"),
       },
       recentMessages: messages,
     },
@@ -351,23 +351,11 @@ export function PushDebugPage(): React.ReactElement {
 
       {status ? (
         <div className="settings-row">
-          <div style={{ padding: "8px", fontSize: "12px", color: "#666" }}>
-            {status}
-          </div>
+          <div className="push-debug-empty">{status}</div>
         </div>
       ) : null}
 
-      <pre
-        style={{
-          overflowX: "auto",
-          overflowWrap: "anywhere",
-          whiteSpace: "pre-wrap",
-          fontSize: 12,
-          lineHeight: 1.4,
-        }}
-      >
-        {reportText}
-      </pre>
+      <pre className="push-debug-details">{reportText}</pre>
     </section>
   );
 }

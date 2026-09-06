@@ -235,17 +235,7 @@ interface EmojiPickerProps {
 
 export const EmojiPicker: FC<EmojiPickerProps> = ({ emojis, onSelect }) => {
   const [expanded, setExpanded] = React.useState(false);
-  const quickItems = React.useMemo(() => {
-    if (emojis && emojis.length > 0) return emojis;
-    return DEFAULT_EMOJIS;
-  }, [emojis]);
-
-  const handleSelect = React.useCallback(
-    (emoji: string) => {
-      onSelect(emoji);
-    },
-    [onSelect],
-  );
+  const quickItems = emojis?.length ? emojis : DEFAULT_EMOJIS;
 
   if (expanded) {
     return (
@@ -259,7 +249,7 @@ export const EmojiPicker: FC<EmojiPickerProps> = ({ emojis, onSelect }) => {
             key={emoji}
             type="button"
             className="emoji-picker-btn"
-            onClick={() => handleSelect(emoji)}
+            onClick={() => onSelect(emoji)}
             aria-label={emoji}
           >
             {emoji}
@@ -276,7 +266,7 @@ export const EmojiPicker: FC<EmojiPickerProps> = ({ emojis, onSelect }) => {
           key={emoji}
           type="button"
           className="emoji-picker-btn"
-          onClick={() => handleSelect(emoji)}
+          onClick={() => onSelect(emoji)}
           aria-label={emoji}
         >
           {emoji}

@@ -19,10 +19,9 @@ import {
 } from "./internal/v3Json";
 
 /**
- * The one token codec. Handles v3 (`cashuA`, base64url JSON), v4 (`cashuB`,
- * base64url CBOR), and legacy cashu.me plain-JSON proof bundles, which are
- * normalized to standard token text. There is exactly one parser in linky;
- * the app's hand-rolled decoders get deleted when it migrates here.
+ * The one token codec in linky. Handles v3 (`cashuA`, base64url JSON), v4
+ * (`cashuB`, base64url CBOR), and legacy cashu.me plain-JSON proof bundles,
+ * which are normalized to standard token text.
  *
  * All functions are pure and total: malformed input yields `null`, never a
  * throw.

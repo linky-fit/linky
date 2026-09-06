@@ -1,8 +1,5 @@
-import type {
-  MintProofsConfig,
-  MintQuoteBolt11Response,
-} from "@cashu/cashu-ts";
-import { Clock, Duration, Effect, Either, Fiber, Schema } from "effect";
+import type { MintProofsConfig } from "@cashu/cashu-ts";
+import { Duration, Effect, Either, Fiber } from "effect";
 import type { Scope } from "effect";
 import {
   MintRejected,
@@ -10,21 +7,18 @@ import {
   QuoteExpired,
 } from "../domain/errors";
 import type { MintUnreachable } from "../domain/errors";
-import {
-  Bolt11Invoice,
-  CurrencyUnit,
-  QuoteId,
-  UnixSeconds,
-} from "../domain/primitives";
-import { QuoteStateChanged } from "../inspector/events";
+import { UnixSeconds } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
-import { inspectOperationWith } from "../internal/operations";
+import { inspectOperationWith, redactReceipt } from "../internal/operations";
 import {
   checkMintQuote,
   claimMintQuote,
   QUOTE_ISSUED,
   QUOTE_UNPAID,
 } from "../internal/quoteClaim";
+import { decodeMintQuote, emitQuoteState } from "../internal/quotes";
+import { nowSeconds } from "../internal/time";
+import { sat } from "../internal/units";
 import type {
   QuoteClaimContext,
   QuoteClaimError,
@@ -46,33 +40,12 @@ import type {
   TopupHandle,
   TopupLockingOptions,
 } from "./domain";
-import {
-  deadlineOf,
-  PendingTopup,
-  readPendingTopup,
-  readPendingTopups,
-  removePendingTopup,
-  writePendingTopup,
-} from "./internal/pendingTopup";
+import { PendingTopup, pendingTopups } from "./internal/pendingTopup";
 
-const sat = CurrencyUnit.make("sat");
-
-/** Mirrors the web app's claim poll; bolt11 mint quotes settle in seconds. */
+/** Bolt11 mint quotes settle in seconds. */
 const POLL_INTERVAL = Duration.seconds(5);
 /** Transient poll failures are expected offline; a run of them is not. */
 const MAX_CONSECUTIVE_POLL_FAILURES = 10;
-
-const decodeQuoteId = Schema.decodeUnknownOption(QuoteId);
-const decodeInvoice = Schema.decodeUnknownOption(Bolt11Invoice);
-const decodeExpiry = Schema.decodeUnknownOption(UnixSeconds);
-
-/** Token text carries proof secrets; the receipt's other fields are safe. */
-const redactReceipt = (receipt: TopupReceipt): unknown => ({
-  rowId: receipt.rowId,
-  mint: receipt.mint,
-  amount: receipt.amount,
-  quoteId: receipt.quoteId,
-});
 
 const quoteOf = (pending: PendingTopup): TopupQuote =>
   new TopupQuote({
@@ -82,11 +55,6 @@ const quoteOf = (pending: PendingTopup): TopupQuote =>
     invoice: pending.invoice,
     expiresAt: pending.expiresAt,
   });
-
-const nowSeconds: Effect.Effect<number> = Effect.map(
-  Clock.currentTimeMillis,
-  (millis) => Math.floor(millis / 1000),
-);
 
 /**
  * A locked quote can only be minted with its key, so a record missing it is
@@ -128,21 +96,6 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
     const instances = yield* WalletInstances;
     const inspector = yield* Inspector.orNoop;
 
-    const emitQuoteState = (pending: PendingTopup, state: string): void => {
-      inspector.emit(
-        () =>
-          new QuoteStateChanged(
-            {
-              flow: "topup",
-              quoteId: pending.quoteId,
-              mint: pending.mint,
-              state,
-            },
-            { disableValidation: true },
-          ),
-      );
-    };
-
     /**
      * Polls until the mint reports the invoice settled. Transient failures
      * keep the poll alive — a topup must survive going offline — while a
@@ -173,12 +126,12 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
             const state = outcome.right.state;
             if (state !== lastState) {
               lastState = state;
-              emitQuoteState(pending, state);
+              emitQuoteState(inspector, "topup", pending, state);
             }
             // PAID and ISSUED both mean the invoice settled; the mint step
             // decides between minting and reclaiming.
             if (state !== QUOTE_UNPAID) return;
-            if ((yield* nowSeconds) > deadlineOf(pending)) {
+            if ((yield* nowSeconds) > pendingTopups.deadlineOf(pending)) {
               return yield* new QuoteExpired({
                 quoteId: pending.quoteId,
                 mint: pending.mint,
@@ -201,8 +154,7 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
       mintConfig,
       withMintCounter: (record, mintCounter) =>
         new PendingTopup({ ...record, mintCounter }),
-      persist: (record) => writePendingTopup(kv, record),
-      clear: (record) => removePendingTopup(kv, record),
+      records: pendingTopups,
     });
 
     /** The shared claim, wearing topup's receipt. */
@@ -236,7 +188,7 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
         Effect.tapError((error) =>
           // An expired quote that never reserved slots was never paid.
           error._tag === "QuoteExpired" && pending.mintCounter === null
-            ? removePendingTopup(kv, pending)
+            ? pendingTopups.remove(kv, pending)
             : Effect.void,
         ),
         inspectOperationWith(
@@ -265,40 +217,6 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
         result: Fiber.join(fiber),
       }));
 
-    const toPendingTopup = (
-      draft: TopupDraft,
-      keysetId: PendingTopup["keysetId"],
-      quote: MintQuoteBolt11Response,
-      createdAt: number,
-    ): Effect.Effect<PendingTopup, MintRejected> => {
-      const quoteId = decodeQuoteId(quote.quote);
-      const invoice = decodeInvoice(quote.request);
-      if (quoteId._tag === "None" || invoice._tag === "None") {
-        return Effect.fail(
-          new MintRejected({
-            mint: draft.mint,
-            code: null,
-            detail: "mint returned a mint quote without a usable invoice",
-          }),
-        );
-      }
-      const expiry = decodeExpiry(quote.expiry);
-      return Effect.succeed(
-        new PendingTopup({
-          quoteId: quoteId.value,
-          mint: draft.mint,
-          unit: sat,
-          keysetId,
-          amount: draft.amount,
-          invoice: invoice.value,
-          expiresAt: expiry._tag === "Some" ? expiry.value : null,
-          createdAt: UnixSeconds.make(createdAt),
-          mintCounter: null,
-          locked: false,
-        }),
-      );
-    };
-
     /**
      * The record is persisted before the handle exists, so the invoice the
      * caller can act on is always one the package can finish or resume.
@@ -313,18 +231,24 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
       Effect.gen(function* () {
         const wallet = yield* instances.get(draft.mint, sat);
         const keysetId = yield* boundKeysetId(draft.mint, wallet);
-        const quote = yield* Effect.tryPromise({
+        const raw = yield* Effect.tryPromise({
           try: () => wallet.createMintQuoteBolt11(draft.amount),
           catch: (error) => classifyMintError(draft.mint, error),
         });
-        const pending = yield* toPendingTopup(
-          draft,
+        const quote = yield* decodeMintQuote(draft.mint, raw);
+        const pending = new PendingTopup({
+          quoteId: quote.quoteId,
+          mint: draft.mint,
+          unit: sat,
           keysetId,
-          quote,
-          yield* nowSeconds,
-        );
-        yield* writePendingTopup(kv, pending);
-        emitQuoteState(pending, quote.state);
+          amount: draft.amount,
+          invoice: quote.invoice,
+          expiresAt: quote.expiresAt,
+          createdAt: UnixSeconds.make(yield* nowSeconds),
+          mintCounter: null,
+        });
+        yield* pendingTopups.write(kv, pending);
+        emitQuoteState(inspector, "topup", pending, quote.state);
         return yield* handleFor(pending, {});
       }).pipe(
         inspectOperationWith(
@@ -373,12 +297,16 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
     ): Effect.Effect<TopupReceipt, TopupAdoptError> =>
       Effect.gen(function* () {
         const wallet = yield* instances.get(draft.mint, sat);
-        const existing = yield* readPendingTopup(kv, draft.mint, draft.quoteId);
+        const existing = yield* pendingTopups.read(
+          kv,
+          draft.mint,
+          draft.quoteId,
+        );
         const pending = existing ?? (yield* toAdoptedPending(draft, wallet));
         const mintConfig = yield* mintConfigFor(pending, options);
         if (existing === null) {
           const quote = yield* checkMintQuote(wallet, pending);
-          emitQuoteState(pending, quote.state);
+          emitQuoteState(inspector, "topup", pending, quote.state);
           if (quote.state === QUOTE_ISSUED) {
             return yield* new QuoteAlreadyIssued({
               quoteId: pending.quoteId,
@@ -392,7 +320,7 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
               detail: "mint reports the adopted quote as unpaid",
             });
           }
-          yield* writePendingTopup(kv, pending);
+          yield* pendingTopups.write(kv, pending);
         }
         return yield* mintUnderLock(wallet, pending, mintConfig);
       }).pipe(
@@ -420,7 +348,7 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
     ): Effect.Effect<ReadonlyArray<TopupHandle>, never, Scope.Scope> =>
       Effect.gen(function* () {
         const handles: TopupHandle[] = [];
-        for (const pending of yield* readPendingTopups(kv)) {
+        for (const pending of yield* pendingTopups.readAll(kv)) {
           handles.push(yield* handleFor(pending, options));
         }
         return handles;

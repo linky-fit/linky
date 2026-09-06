@@ -26,7 +26,7 @@ export function isRecord(
   return typeof value === "object" && value !== null;
 }
 
-export function isHexString(value: string, length: number): boolean {
+function isHexString(value: string, length: number): boolean {
   const pattern = new RegExp(`^[a-f0-9]{${length}}$`);
   return pattern.test(value);
 }
@@ -170,9 +170,7 @@ export function readPubkey(value: unknown, fieldName = "pubkey"): string {
   return pubkey;
 }
 
-export function readWebPushSubscription(
-  value: unknown,
-): WebPushSubscriptionData {
+function readWebPushSubscription(value: unknown): WebPushSubscriptionData {
   if (!isRecord(value)) {
     throw new RequestError(
       400,
@@ -203,7 +201,7 @@ export function readWebPushSubscription(
   };
 }
 
-export function readNativePushSubscription(
+function readNativePushSubscription(
   value: unknown,
 ): NativePushSubscriptionData {
   if (!isRecord(value)) {
@@ -225,7 +223,7 @@ export function readNativePushSubscription(
   };
 }
 
-export function readOwnershipProofs(value: unknown): OwnershipProofInput[] {
+function readOwnershipProofs(value: unknown): OwnershipProofInput[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new RequestError(
       400,
@@ -251,13 +249,18 @@ export function readOwnershipProofs(value: unknown): OwnershipProofInput[] {
   return out;
 }
 
-export function readSubscribeRequest(value: unknown): SubscribeRequestBody {
+type RequestBody = Record<string | number | symbol, unknown>;
+
+function readRequestBody(value: unknown): RequestBody {
   if (!isRecord(value)) {
     throw new RequestError(400, "invalid_request", "Body must be an object");
   }
+  return value;
+}
 
+function readRecipientPubkeys(value: unknown): string[] {
   const recipientPubkeys = uniqueStrings(
-    readStringArray(value.recipientPubkeys, "recipientPubkeys").map((pubkey) =>
+    readStringArray(value, "recipientPubkeys").map((pubkey) =>
       readPubkey(pubkey, "recipientPubkeys[]"),
     ),
   );
@@ -270,56 +273,55 @@ export function readSubscribeRequest(value: unknown): SubscribeRequestBody {
     );
   }
 
+  return recipientPubkeys;
+}
+
+function readOwnershipRequest(body: RequestBody): {
+  recipientPubkeys: string[];
+  proofs: OwnershipProofInput[];
+} {
   return {
+    recipientPubkeys: readRecipientPubkeys(body.recipientPubkeys),
+    proofs: readOwnershipProofs(body.proofs),
+  };
+}
+
+function readSubscribeRequestBase(body: RequestBody): {
+  cleanupLegacySubscriptions: boolean;
+  installationId: string | null;
+  recipientPubkeys: string[];
+  proofs: OwnershipProofInput[];
+} {
+  return {
+    ...readOwnershipRequest(body),
     cleanupLegacySubscriptions: readBoolean(
-      value.cleanupLegacySubscriptions,
+      body.cleanupLegacySubscriptions,
       "cleanupLegacySubscriptions",
       false,
     ),
-    installationId: readOptionalString(value.installationId),
-    subscription: readWebPushSubscription(value.subscription),
-    recipientPubkeys,
-    proofs: readOwnershipProofs(value.proofs),
+    installationId: readOptionalString(body.installationId),
+  };
+}
+
+export function readSubscribeRequest(value: unknown): SubscribeRequestBody {
+  const body = readRequestBody(value);
+  return {
+    ...readSubscribeRequestBase(body),
+    subscription: readWebPushSubscription(body.subscription),
   };
 }
 
 export function readNativeSubscribeRequest(
   value: unknown,
 ): NativeSubscribeRequestBody {
-  if (!isRecord(value)) {
-    throw new RequestError(400, "invalid_request", "Body must be an object");
-  }
-
-  const recipientPubkeys = uniqueStrings(
-    readStringArray(value.recipientPubkeys, "recipientPubkeys").map((pubkey) =>
-      readPubkey(pubkey, "recipientPubkeys[]"),
-    ),
-  );
-
-  if (recipientPubkeys.length === 0) {
-    throw new RequestError(
-      400,
-      "invalid_request",
-      "recipientPubkeys must contain at least one pubkey",
-    );
-  }
-
+  const body = readRequestBody(value);
   return {
-    cleanupLegacySubscriptions: readBoolean(
-      value.cleanupLegacySubscriptions,
-      "cleanupLegacySubscriptions",
-      false,
-    ),
-    installationId: readOptionalString(value.installationId),
-    device: readNativePushSubscription(value.device),
-    recipientPubkeys,
-    proofs: readOwnershipProofs(value.proofs),
+    ...readSubscribeRequestBase(body),
+    device: readNativePushSubscription(body.device),
   };
 }
 
-function readEndpointOrSubscriptionEndpoint(
-  value: Record<string | number | symbol, unknown>,
-): string {
+function readEndpointOrSubscriptionEndpoint(value: RequestBody): string {
   const endpoint = readOptionalString(value.endpoint);
   const subscriptionValue = value.subscription;
 
@@ -346,54 +348,19 @@ function readEndpointOrSubscriptionEndpoint(
 }
 
 export function readUnsubscribeRequest(value: unknown): UnsubscribeRequestBody {
-  if (!isRecord(value)) {
-    throw new RequestError(400, "invalid_request", "Body must be an object");
-  }
-
-  const endpoint = readEndpointOrSubscriptionEndpoint(value);
-  const recipientPubkeys = uniqueStrings(
-    readStringArray(value.recipientPubkeys, "recipientPubkeys").map((pubkey) =>
-      readPubkey(pubkey, "recipientPubkeys[]"),
-    ),
-  );
-  if (recipientPubkeys.length === 0) {
-    throw new RequestError(
-      400,
-      "invalid_request",
-      "recipientPubkeys must contain at least one pubkey",
-    );
-  }
-
+  const body = readRequestBody(value);
   return {
-    endpoint,
-    recipientPubkeys,
-    proofs: readOwnershipProofs(value.proofs),
+    ...readOwnershipRequest(body),
+    endpoint: readEndpointOrSubscriptionEndpoint(body),
   };
 }
 
 export function readNativeUnsubscribeRequest(
   value: unknown,
 ): NativeUnsubscribeRequestBody {
-  if (!isRecord(value)) {
-    throw new RequestError(400, "invalid_request", "Body must be an object");
-  }
-
-  const recipientPubkeys = uniqueStrings(
-    readStringArray(value.recipientPubkeys, "recipientPubkeys").map((pubkey) =>
-      readPubkey(pubkey, "recipientPubkeys[]"),
-    ),
-  );
-  if (recipientPubkeys.length === 0) {
-    throw new RequestError(
-      400,
-      "invalid_request",
-      "recipientPubkeys must contain at least one pubkey",
-    );
-  }
-
+  const body = readRequestBody(value);
   return {
-    token: readStringWithMaxLength(value.token, "token", 4096),
-    recipientPubkeys,
-    proofs: readOwnershipProofs(value.proofs),
+    ...readOwnershipRequest(body),
+    token: readStringWithMaxLength(body.token, "token", 4096),
   };
 }

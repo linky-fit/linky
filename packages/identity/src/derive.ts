@@ -78,28 +78,6 @@ export const parseOwnerLaneIndex = (
     "Invalid owner lane index (expected non-negative integer)",
   );
 
-export const deriveOwnerKeyFromMasterSecret = (
-  masterSecret: MasterSecret,
-  role: OwnerRole,
-  index: OwnerLaneIndex = ZERO_OWNER_LANE_INDEX,
-): Effect.Effect<OwnerKey, IdentityDerivationError> =>
-  Effect.sync(() => HDKey.fromMasterSeed(masterSecret)).pipe(
-    Effect.flatMap((root) =>
-      deriveOwnerKeyFromPath(root, deriveOwnerPath(role, index)),
-    ),
-  );
-
-export const deriveOwnerMnemonicFromMasterSecret = (
-  masterSecret: MasterSecret,
-  role: OwnerRole,
-  index: OwnerLaneIndex = ZERO_OWNER_LANE_INDEX,
-): Effect.Effect<Bip39Mnemonic12, IdentityDerivationError> =>
-  Effect.sync(() => HDKey.fromMasterSeed(masterSecret)).pipe(
-    Effect.flatMap((root) =>
-      deriveOwnerMnemonicFromPath(root, deriveOwnerPath(role, index)),
-    ),
-  );
-
 export const deriveOwnerMnemonicsFromMasterSecret = (
   masterSecret: MasterSecret,
   requests: ReadonlyArray<OwnerMnemonicRequest>,

@@ -1,8 +1,9 @@
 import React from "react";
+import type { Translate } from "../i18n";
 
 interface PaidOverlayProps {
   paidOverlayTitle: string | null;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export function PaidOverlay({

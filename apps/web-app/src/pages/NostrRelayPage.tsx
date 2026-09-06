@@ -56,9 +56,7 @@ export function NostrRelayPage(): React.ReactElement {
       </div>
 
       {health?.state === "unreachable" && health.detail ? (
-        <p className="muted" style={{ marginTop: 2 }}>
-          {health.detail}
-        </p>
+        <p className="muted nostr-relay-note">{health.detail}</p>
       ) : null}
 
       {lastPublish ? (

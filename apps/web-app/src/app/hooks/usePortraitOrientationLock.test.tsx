@@ -1,12 +1,7 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { usePortraitOrientationLock } from "./usePortraitOrientationLock";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-});
 
 interface HarnessProps {
   enabled: boolean;
@@ -29,10 +24,7 @@ describe("portrait orientation lock preference", () => {
       value: { lock },
     });
 
-    const root = createRoot(document.createElement("div"));
-    await act(async () => {
-      root.render(<Harness enabled={false} />);
-    });
+    const { root } = await renderIntoDocument(<Harness enabled={false} />);
     expect(lock).not.toHaveBeenCalled();
 
     await act(async () => {

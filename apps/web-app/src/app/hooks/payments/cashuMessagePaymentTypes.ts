@@ -5,7 +5,7 @@ export interface CashuMessagePaymentSendBatch {
   unit: string | null;
 }
 
-export interface CashuMessagePaymentPublishError {
+interface CashuMessagePaymentPublishError {
   clientId: string;
   error: string;
   token: string;

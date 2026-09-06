@@ -1,6 +1,6 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import {
   decryptPrivateImageMessage,
   type PrivateImageMessagePayload,
@@ -16,12 +16,6 @@ vi.mock("../app/lib/privateImageMessage", async (importOriginal) => {
       async () => new Blob(["img"], { type: "image/jpeg" }),
     ),
   };
-});
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
 });
 
 const decryptMock = vi.mocked(decryptPrivateImageMessage);
@@ -61,54 +55,38 @@ describe("PrivateImageBubble", () => {
   });
 
   it("decrypts once even when the parent re-renders with a fresh onBlobChange", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    const render = async () => {
-      await act(async () => {
-        root.render(
-          <PrivateImageBubble
-            onBlobChange={() => undefined}
-            payload={payload}
-            rumorId={null}
-            t={(key) => key}
-          />,
-        );
-      });
-    };
-
-    await render();
+    const bubble = () => (
+      <PrivateImageBubble
+        onBlobChange={() => undefined}
+        payload={payload}
+        rumorId={null}
+        t={(key) => key}
+      />
+    );
+    const rendered = await renderIntoDocument(bubble());
     expect(decryptMock).toHaveBeenCalledTimes(1);
 
     // The bank offer detail page re-renders every second for its countdown,
     // passing a new inline callback each time.
-    await render();
-    await render();
+    await rendered.rerender(bubble());
+    await rendered.rerender(bubble());
 
     expect(decryptMock).toHaveBeenCalledTimes(1);
 
-    await act(async () => {
-      root.unmount();
-    });
+    await rendered.unmount();
   });
 
   it("reports the decrypted blob to the parent", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
     const onBlobChange = vi.fn();
 
-    await act(async () => {
-      root.render(
-        <PrivateImageBubble
-          onBlobChange={onBlobChange}
-          payload={payload}
-          rumorId={null}
-          t={(key) => key}
-        />,
-      );
-    });
+    const { root } = await renderIntoDocument(
+      <PrivateImageBubble
+        onBlobChange={onBlobChange}
+        payload={payload}
+        rumorId={null}
+        t={(key) => key}
+      />,
+    );
 
     expect(onBlobChange).toHaveBeenLastCalledWith(expect.any(Blob));
 

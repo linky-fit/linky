@@ -1,10 +1,11 @@
 import { Effect } from "effect";
 import { InsufficientFunds, MintRejected } from "../domain/errors";
-import { CurrencyUnit, NonNegativeAmount } from "../domain/primitives";
+import { NonNegativeAmount } from "../domain/primitives";
 import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { CounterScope } from "../internal/counters";
-import { inspectOperationWith } from "../internal/operations";
+import { inspectOperationWith, redactReceipt } from "../internal/operations";
+import { sat } from "../internal/units";
 import {
   removeConsumedRows,
   selectSpendableProofs,
@@ -20,18 +21,6 @@ import { encodeCashuProofs } from "../token/internal/cashuProofs";
 import { insertRowInState } from "../token/internal/lifecycle";
 import { SendReceipt } from "./domain";
 import type { SendDraft, SendError } from "./domain";
-
-const sat = CurrencyUnit.make("sat");
-
-/** Token text carries proof secrets; the receipt's other fields are safe. */
-const redactReceipt = (receipt: SendReceipt): unknown => ({
-  rowId: receipt.rowId,
-  mint: receipt.mint,
-  unit: receipt.unit,
-  amount: receipt.amount,
-  changeAmount: receipt.changeAmount,
-  feePaid: receipt.feePaid,
-});
 
 const malformedSwapProofs = (mint: MintUrl): MintRejected =>
   new MintRejected({

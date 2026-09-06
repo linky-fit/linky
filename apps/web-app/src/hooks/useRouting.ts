@@ -158,26 +158,20 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "mint":
       window.location.assign(
-        `#advanced/mint/${encodeURIComponent(String(action.mintUrl ?? "").trim())}`,
+        `#advanced/mint/${encodeURIComponent(action.mintUrl.trim())}`,
       );
       break;
     case "contact":
-      window.location.assign(
-        `#contact/${encodeURIComponent(String(action.id))}`,
-      );
+      window.location.assign(`#contact/${encodeURIComponent(action.id)}`);
       break;
     case "contactEdit":
-      window.location.assign(
-        `#contact/${encodeURIComponent(String(action.id))}/edit`,
-      );
+      window.location.assign(`#contact/${encodeURIComponent(action.id)}/edit`);
       break;
     case "contactPay":
-      window.location.assign(
-        `#contact/${encodeURIComponent(String(action.id))}/pay`,
-      );
+      window.location.assign(`#contact/${encodeURIComponent(action.id)}/pay`);
       break;
     case "chat":
-      window.location.assign(`#chat/${encodeURIComponent(String(action.id))}`);
+      window.location.assign(`#chat/${encodeURIComponent(action.id)}`);
       break;
     case "contactNew":
       window.location.assign("#contact/new");
@@ -201,22 +195,20 @@ export const navigateTo = (action: NavigationAction): void => {
       window.location.assign("#wallet/tokens");
       break;
     case "lnAddressPay":
-      window.location.assign(
-        `#payln/${encodeURIComponent(String(action.lnAddress))}`,
-      );
+      window.location.assign(`#payln/${encodeURIComponent(action.lnAddress)}`);
       break;
     case "manualPay":
       window.location.assign("#wallet/pay");
       break;
     case "bankPayment":
       window.location.assign(
-        `#wallet/bank-payment/${encodeURIComponent(String(action.spdPayload ?? "").trim())}${action.editing ? BANK_PAYMENT_EDIT_SUFFIX : ""}`,
+        `#wallet/bank-payment/${encodeURIComponent(action.spdPayload.trim())}${action.editing ? BANK_PAYMENT_EDIT_SUFFIX : ""}`,
       );
       break;
     case "bankPaymentOffer":
       rememberBankPaymentOfferReturnHash();
       window.location.assign(
-        `#chat/${encodeURIComponent(String(action.chatId ?? "").trim())}/bank-payment-offer/${encodeURIComponent(String(action.offerId ?? "").trim())}`,
+        `#chat/${encodeURIComponent(action.chatId.trim())}/bank-payment-offer/${encodeURIComponent(action.offerId.trim())}`,
       );
       break;
     case "cashuTokenNew":
@@ -226,9 +218,7 @@ export const navigateTo = (action: NavigationAction): void => {
       window.location.assign("#wallet/token/emit");
       break;
     case "cashuToken":
-      window.location.assign(
-        `#wallet/token/${encodeURIComponent(String(action.id))}`,
-      );
+      window.location.assign(`#wallet/token/${encodeURIComponent(action.id)}`);
       break;
     case "profile":
       window.location.assign("#profile");
@@ -258,14 +248,10 @@ export const navigateTo = (action: NavigationAction): void => {
       window.location.assign("#evolu-history-data");
       break;
     case "evoluServer":
-      window.location.assign(
-        `#evolu-server/${encodeURIComponent(String(action.id))}`,
-      );
+      window.location.assign(`#evolu-server/${encodeURIComponent(action.id)}`);
       break;
     case "evoluServerNew":
       window.location.assign("#evolu-server/new");
       break;
   }
 };
-
-export const useNavigation = () => navigateTo;

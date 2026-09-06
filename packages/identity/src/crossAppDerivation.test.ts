@@ -11,7 +11,7 @@ import { IdentityProvider } from "./IdentityProvider";
 import { MasterSecretProvider } from "./MasterSecretProvider";
 import { OwnerLaneIndex, type OwnerRole } from "./domain";
 import { encodeNpub, encodeNsec } from "@linky/linkstr";
-import { deriveOwnerMnemonicFromMasterSecret } from "./derive";
+import { deriveOwnerMnemonicsFromMasterSecret } from "./derive";
 import { parseSlip39Share, recoverMasterSecretFromSlip39Share } from "./slip39";
 
 /**
@@ -203,7 +203,7 @@ describe("@linky/identity API matches the cross-app vectors", () => {
         IdentityProvider,
         Layer.provideMerge(
           IdentityProvider.Live,
-          MasterSecretProvider.make(masterSecret),
+          MasterSecretProvider.fromSlip39Share(share),
         ),
       ),
     );
@@ -274,8 +274,8 @@ describe("@linky/identity API matches the cross-app vectors", () => {
       ["linkyTransactionsOwner1", "transactions", lane(1)],
     ];
     for (const [name, role, index] of roleLanes) {
-      const mnemonic = await Effect.runPromise(
-        deriveOwnerMnemonicFromMasterSecret(masterSecret, role, index),
+      const [mnemonic] = await Effect.runPromise(
+        deriveOwnerMnemonicsFromMasterSecret(masterSecret, [{ role, index }]),
       );
       expect(`${name}:${mnemonic}`).toBe(
         `${name}:${BIP85_VECTORS[name]?.mnemonic}`,

@@ -35,23 +35,3 @@ export const readCashuTokenAliases = (
 export const isDeletedCashuRow = (
   row: Pick<CashuTokenRow, "isDeleted">,
 ): boolean => row.isDeleted === Evolu.sqliteTrue;
-
-export const hasMatchingCashuToken = (
-  rows: readonly Pick<
-    CashuTokenRow,
-    "id" | "isDeleted" | "rawToken" | "token"
-  >[],
-  value: CashuTokenIdentityLike | null | undefined,
-): boolean => {
-  const aliases = new Set(readCashuTokenAliases(value));
-  if (aliases.size === 0) return false;
-  const candidateIds = new Set(
-    Array.from(aliases, (alias) => String(createCashuTokenId(alias))),
-  );
-
-  return rows.some((row) => {
-    if (candidateIds.has(String(row.id))) return true;
-    if (isDeletedCashuRow(row)) return false;
-    return readCashuTokenAliases(row).some((alias) => aliases.has(alias));
-  });
-};

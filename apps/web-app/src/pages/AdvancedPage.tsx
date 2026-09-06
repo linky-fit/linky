@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Bell,
   Bean,
+  Bell,
   Bitcoin,
   BrushCleaning,
   Bug,
@@ -10,6 +9,7 @@ import {
   Coins,
   Copy,
   Download,
+  MessageCircle as FeedbackIcon,
   Landmark,
   Languages,
   LogOut,
@@ -20,6 +20,7 @@ import {
   UserRound,
   Zap,
 } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   useAppShellActions,
   useAppShellCore,
@@ -30,9 +31,10 @@ import {
   overallRelayStatus,
   useRelayHealth,
 } from "../app/hooks/useRelayHealth";
-import { FeedbackIcon } from "../components/icons";
+
 import { SettingsLinkRow, SettingsToggleRow } from "../components/SettingsRows";
-import { useNavigation } from "../hooks/useRouting";
+import { navigateTo } from "../hooks/useRouting";
+import type { I18nKey } from "../i18n";
 import { getNativeNotificationPermissionState } from "../platform/nativeBridge";
 import { isNativePlatform } from "../platform/runtime";
 
@@ -62,7 +64,7 @@ export function AdvancedPage(): React.ReactElement {
   const relayHealth = useRelayHealth();
   const connectedRelayCount = countConnectedRelays(relayUrls, relayHealth);
   const nostrRelayOverallStatus = overallRelayStatus(relayUrls, relayHealth);
-  const navigateTo = useNavigation();
+
   const {
     currentNsec,
     formatDisplayedAmountParts,
@@ -76,8 +78,8 @@ export function AdvancedPage(): React.ReactElement {
     "copyNostr" | "pasteNostr" | null
   >(null);
   const armTimeoutRef = useRef<number | null>(null);
-  const hasSeedMnemonic = String(seedMnemonic ?? "").trim().length > 0;
-  const hasCurrentNsec = String(currentNsec ?? "").trim().length > 0;
+  const hasSeedMnemonic = (seedMnemonic ?? "").trim().length > 0;
+  const hasCurrentNsec = (currentNsec ?? "").trim().length > 0;
   const appVersionLabel = __APP_COMMIT_SHA__
     ? `${__APP_VERSION__} (${__APP_COMMIT_SHA__})`
     : `${__APP_VERSION__}`;
@@ -116,7 +118,7 @@ export function AdvancedPage(): React.ReactElement {
     (
       action: "copyNostr" | "pasteNostr",
       run: () => void | Promise<void>,
-      hintKey = "sensitiveActionArmedHint",
+      hintKey: I18nKey = "sensitiveActionArmedHint",
     ) => {
       if (armedSecurityAction === action) {
         clearArmTimeout();
@@ -231,7 +233,7 @@ export function AdvancedPage(): React.ReactElement {
           pushToast(t("notificationsRegistered"));
         } else {
           setPushNotificationsDisabledByUser(true);
-          pushToast(String(result.error ?? t("notificationsError")));
+          pushToast(result.error ?? t("notificationsError"));
         }
         return;
       }
@@ -388,7 +390,7 @@ export function AdvancedPage(): React.ReactElement {
           ref={importDataFileInputRef}
           type="file"
           accept=".txt,.json,application/json,text/plain"
-          style={{ display: "none" }}
+          className="hidden-input"
           onChange={(e) => {
             const file = e.target.files?.[0] ?? null;
             e.currentTarget.value = "";

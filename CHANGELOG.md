@@ -380,7 +380,16 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Nabídky bankovní platby zobrazují v chatu svůj průběh a stav.
 - Cashu tokeny ve zprávách se rozpoznávají a zobrazují přehledněji.
 
-[unreleased]: https://github.com/hynek-jina/linky/compare/v26.8.2...HEAD
+[unreleased]: https://github.com/hynek-jina/linky/compare/v26.9.5...HEAD
+[26.9.5]: https://github.com/hynek-jina/linky/compare/v26.9.4...v26.9.5
+[26.9.4]: https://github.com/hynek-jina/linky/compare/v26.9.3...v26.9.4
+[26.9.3]: https://github.com/hynek-jina/linky/compare/v26.9.2...v26.9.3
+[26.9.2]: https://github.com/hynek-jina/linky/compare/v26.9.1...v26.9.2
+[26.9.1]: https://github.com/hynek-jina/linky/compare/v26.9.0...v26.9.1
+[26.9.0]: https://github.com/hynek-jina/linky/compare/v26.8.5...v26.9.0
+[26.8.5]: https://github.com/hynek-jina/linky/compare/v26.8.4...v26.8.5
+[26.8.4]: https://github.com/hynek-jina/linky/compare/v26.8.3...v26.8.4
+[26.8.3]: https://github.com/hynek-jina/linky/compare/v26.8.2...v26.8.3
 [26.8.2]: https://github.com/hynek-jina/linky/compare/v26.8.1...v26.8.2
 [26.8.1]: https://github.com/hynek-jina/linky/compare/v26.7.10...v26.8.1
 [26.7.10]: https://github.com/hynek-jina/linky/compare/v26.7.9...v26.7.10

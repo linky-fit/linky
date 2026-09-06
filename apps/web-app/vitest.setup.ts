@@ -1,4 +1,3 @@
-import "@testing-library/jest-dom/vitest";
 import { Buffer } from "buffer";
 
 if (typeof globalThis.Buffer === "undefined") {
@@ -32,3 +31,10 @@ if (typeof globalThis.Worker === "undefined") {
   // @ts-expect-error assign polyfill
   globalThis.Worker = MockWorker;
 }
+
+// React's act() only works when the test environment opts in.
+Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
+  configurable: true,
+  value: true,
+  writable: true,
+});

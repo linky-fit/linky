@@ -11,6 +11,7 @@ import {
 } from "@linky/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
+import { createSecretKey } from "../../../testUtils/nostrKeys";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,
@@ -22,12 +23,6 @@ import {
   retryDeferredReactions,
   type ReactionInboxContext,
 } from "./reactionInbox";
-
-const createSecretKey = (lastByte: number): Uint8Array => {
-  const secretKey = new Uint8Array(32);
-  secretKey[31] = lastByte;
-  return secretKey;
-};
 
 const myPubkey = getPublicKey(createSecretKey(1));
 const peerPubkey = getPublicKey(createSecretKey(2));

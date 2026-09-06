@@ -10,6 +10,7 @@ import type {
   NewLocalNostrReaction,
   UpdateLocalNostrReaction,
 } from "../../types/appTypes";
+import { trimString } from "../../../utils/validation";
 
 const MAX_DEFERRED_REACTIONS = 100;
 
@@ -21,7 +22,7 @@ export type ReactionInboxEvent =
 
 type DeferrableReactionEvent = ReactionAdded | OwnReactionConfirmed;
 
-export interface ReactionInboxSessionState {
+interface ReactionInboxSessionState {
   deferredReactions: Map<string, DeferrableReactionEvent>;
   /** reactionId → retractor. Suppression is authorship-scoped: a peer's
    * retraction must not block reactions they did not author. */
@@ -49,9 +50,6 @@ export interface ReactionInboxContext {
   updateLocalNostrReaction: UpdateLocalNostrReaction;
 }
 
-const trimmed = (value: string | null | undefined): string =>
-  (value ?? "").trim();
-
 const reactorOf = (
   event: DeferrableReactionEvent,
   ctx: ReactionInboxContext,
@@ -73,7 +71,7 @@ const applyReaction = (
   }
 
   const rowByWrapId = ctx.reactions.find(
-    (row) => trimmed(row.wrapId) === event.reactionId,
+    (row) => trimString(row.wrapId) === event.reactionId,
   );
   if (rowByWrapId) {
     if ((rowByWrapId.status ?? "sent") === "pending") {
@@ -88,7 +86,7 @@ const applyReaction = (
     event._tag === "OwnReactionConfirmed" ? event.clientId : null;
   if (clientId !== null) {
     const rowByClientId = ctx.reactions.find(
-      (row) => trimmed(row.clientId) === clientId,
+      (row) => trimString(row.clientId) === clientId,
     );
     if (rowByClientId) {
       ctx.updateLocalNostrReaction(rowByClientId.id, {
@@ -104,14 +102,14 @@ const applyReaction = (
 
   const isDuplicate = ctx.reactions.some(
     (row) =>
-      trimmed(row.messageId) === event.target &&
-      trimmed(row.reactorPubkey) === reactorPubkey &&
-      trimmed(row.emoji) === event.emoji,
+      trimString(row.messageId) === event.target &&
+      trimString(row.reactorPubkey) === reactorPubkey &&
+      trimString(row.emoji) === event.emoji,
   );
   if (isDuplicate) return "done";
 
   const targetIsLocal = ctx.messages.some(
-    (message) => trimmed(message.rumorId) === event.target,
+    (message) => trimString(message.rumorId) === event.target,
   );
   if (!targetIsLocal) return "deferred";
 
@@ -153,8 +151,8 @@ const applyRetraction = (
     }
     const owned = ctx.reactions.some(
       (row) =>
-        trimmed(row.wrapId) === reactionId &&
-        trimmed(row.reactorPubkey) === retractor,
+        trimString(row.wrapId) === reactionId &&
+        trimString(row.reactorPubkey) === retractor,
     );
     if (owned) ownedIds.push(reactionId);
   }

@@ -10,8 +10,6 @@ import { Amount } from "../domain/primitives";
 import type {
   CurrencyUnit,
   KeysetId,
-  MintUrl,
-  QuoteId,
   TokenRowId,
   TokenText,
 } from "../domain/primitives";
@@ -35,6 +33,7 @@ import { recoverFromCollision } from "./collisionRecovery";
 import { advanceCounterTo, readCounter, withCounterLock } from "./counters";
 import type { CounterScope } from "./counters";
 import { isRecoverableOutputCollision } from "./outputCollisions";
+import type { PendingRecord, PendingRecordStore } from "./pendingRecords";
 import { checkProofStates, unspentProofs } from "./proofStates";
 
 /**
@@ -50,16 +49,14 @@ import { checkProofStates, unspentProofs } from "./proofStates";
  * Deterministic slots reserved per mint attempt, and therefore the NUT-09
  * window a reclaim scans: the outputs of one claim always fall inside it.
  */
-export const QUOTE_OUTPUT_BLOCK = 64;
+const QUOTE_OUTPUT_BLOCK = 64;
 const MAX_MINT_ATTEMPTS = 5;
 
 export const QUOTE_UNPAID = "UNPAID";
 export const QUOTE_ISSUED = "ISSUED";
 
 /** The durable record's claim-relevant slice; flows carry their own extras. */
-export interface ClaimableQuote {
-  readonly quoteId: QuoteId;
-  readonly mint: MintUrl;
+export interface ClaimableQuote extends PendingRecord {
   readonly unit: CurrencyUnit;
   readonly keysetId: KeysetId;
   readonly amount: Amount;
@@ -91,11 +88,10 @@ export interface QuoteClaimContext<R extends ClaimableQuote> {
   /** Passed to the mint call as-is, e.g. the NUT-20 key of a locked quote. */
   readonly mintConfig?: MintProofsConfig | undefined;
   readonly withMintCounter: (record: R, counter: number) => R;
-  readonly persist: (record: R) => Effect.Effect<void>;
-  readonly clear: (record: R) => Effect.Effect<void>;
+  readonly records: PendingRecordStore<R>;
 }
 
-export const counterScopeOf = (record: ClaimableQuote): CounterScope => ({
+const counterScopeOf = (record: ClaimableQuote): CounterScope => ({
   mint: record.mint,
   unit: record.unit,
   keysetId: record.keysetId,
@@ -137,7 +133,7 @@ const persistMinted = <R extends ClaimableQuote>(
     });
     // Row first: a crash before the record is cleared costs one reclaim scan
     // on resume, never the funds.
-    yield* ctx.clear(record);
+    yield* ctx.records.remove(ctx.kv, record);
     return {
       rowId: row.id,
       tokenText: encoded.tokenText,
@@ -192,7 +188,7 @@ const reclaimIssued = <R extends ClaimableQuote>(
       stored.some((proof) => restoredSecrets.has(proof.secret)),
     );
     if (known !== undefined) {
-      yield* ctx.clear(record);
+      yield* ctx.records.remove(ctx.kv, record);
       return {
         rowId: known.row.id,
         tokenText: known.row.tokenText,
@@ -253,7 +249,7 @@ export const claimMintQuote = <R extends ClaimableQuote>(
         record = ctx.withMintCounter(record, counter);
         // Both writes land before the outputs are derived: a crash now
         // resumes onto the same slots instead of burning a second block.
-        yield* ctx.persist(record);
+        yield* ctx.records.write(ctx.kv, record);
         yield* advanceCounterTo(
           ctx.kv,
           ctx.inspector,
@@ -296,7 +292,7 @@ export const claimMintQuote = <R extends ClaimableQuote>(
             raw,
           ),
         );
-        yield* ctx.persist(record);
+        yield* ctx.records.write(ctx.kv, record);
       }
       return yield* Effect.fail(classifyMintError(record.mint, lastCollision));
     }),

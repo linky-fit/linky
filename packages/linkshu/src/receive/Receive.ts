@@ -1,11 +1,11 @@
 import { Effect } from "effect";
 import { Inspector } from "../inspector/Inspector";
-import { inspectOperationWith } from "../internal/operations";
+import { inspectOperationWith, redactReceipt } from "../internal/operations";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { TokenStore } from "../ports/TokenStore";
 import type { ReceiveDraft, ReceiveError, ReceiveReceipt } from "./domain";
-import { receiveTokenText, redactReceipt } from "./internal/acceptFlow";
+import { receiveTokenText } from "./internal/acceptFlow";
 import type { ReceiveContext } from "./internal/acceptFlow";
 
 /**

@@ -5,21 +5,19 @@ import {
   useEvoluSettingsContext,
 } from "../app/context/SystemSettingsContexts";
 import { normalizeEvoluServerUrl } from "../evolu";
-import { useNavigation } from "../hooks/useRouting";
+import { navigateTo } from "../hooks/useRouting";
 
 export function EvoluServerNewPage(): React.ReactElement {
   const {
     evoluServerUrls,
-    evoluWipeStorageIsBusy,
     newEvoluServerUrl,
     saveEvoluServerUrls,
     setNewEvoluServerUrl,
     setStatus,
-    wipeEvoluStorage,
   } = useEvoluSettingsContext();
   const { t } = useAppShellCore();
   const { pushToast } = useAdvancedSettingsContext();
-  const navigateTo = useNavigation();
+
   return (
     <section className="panel">
       <label htmlFor="evoluServerUrl">{t("evoluAddServerLabel")}</label>
@@ -33,7 +31,7 @@ export function EvoluServerNewPage(): React.ReactElement {
         spellCheck={false}
       />
 
-      <div className="panel-header" style={{ marginTop: 14 }}>
+      <div className="panel-header panel-header-layout">
         <button
           type="button"
           onClick={() => {
@@ -60,21 +58,6 @@ export function EvoluServerNewPage(): React.ReactElement {
           disabled={!normalizeEvoluServerUrl(newEvoluServerUrl)}
         >
           {t("evoluAddServerButton")}
-        </button>
-      </div>
-
-      <div className="settings-row">
-        <button
-          type="button"
-          className="btn-wide danger"
-          onClick={() => {
-            void wipeEvoluStorage();
-          }}
-          disabled={evoluWipeStorageIsBusy}
-        >
-          {evoluWipeStorageIsBusy
-            ? t("evoluWipeStorageBusy")
-            : t("evoluWipeStorage")}
         </button>
       </div>
     </section>

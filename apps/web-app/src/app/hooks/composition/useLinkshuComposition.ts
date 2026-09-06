@@ -103,7 +103,7 @@ export type ReceiveCashuToken = (
   text: string,
 ) => Promise<Either.Either<ReceiveReceipt, ReceiveError>>;
 
-export interface SendCashuTokenArgs {
+interface SendCashuTokenArgs {
   readonly amountSat: number;
   readonly mint: string;
   /** `issued` for QR/share (claim-watched), `pending` for messenger sends. */
@@ -115,7 +115,7 @@ export type SendCashuToken = (
   args: SendCashuTokenArgs,
 ) => Promise<Either.Either<SendReceipt, SendError>>;
 
-export interface MeltCashuInvoiceArgs {
+interface MeltCashuInvoiceArgs {
   readonly invoice: string;
   readonly mint: string;
 }
@@ -125,7 +125,7 @@ export type MeltCashuInvoice = (
   args: MeltCashuInvoiceArgs,
 ) => Promise<Either.Either<MeltReceipt, MeltError>>;
 
-export interface ProbeLightningFeeArgs {
+interface ProbeLightningFeeArgs {
   readonly mint: string;
   /** A different, Lightning-backed mint that issues the probe invoice. */
   readonly probeMint: string;
@@ -136,7 +136,7 @@ export type ProbeLightningFee = (
   args: ProbeLightningFeeArgs,
 ) => Promise<Either.Either<LightningFeeProbeResult, FeeProbeError>>;
 
-export interface StartCashuTopupArgs {
+interface StartCashuTopupArgs {
   readonly amountSat: number;
   readonly mint: string;
 }
@@ -179,18 +179,18 @@ export type AdoptPaidCashuQuote = (
   args: AdoptPaidCashuQuoteArgs,
 ) => Promise<Either.Either<TopupReceipt, TopupAdoptError>>;
 
-export interface AutoswapCashuArgs {
+interface AutoswapCashuArgs {
   readonly sourceMint: string;
   readonly targetMint: string;
 }
 
 /** linkshu Autoswap claim; invalid mint input and defects reject. */
-export type AutoswapCashu = (
+type AutoswapCashu = (
   args: AutoswapCashuArgs,
 ) => Promise<Either.Either<AutoswapReceipt, AutoswapError>>;
 
 /** Drains persisted pending claims (linkshu `Autoswap.resumePendingClaims`). */
-export type ResumePendingCashuAutoswapClaims = () => Promise<
+type ResumePendingCashuAutoswapClaims = () => Promise<
   ReadonlyArray<AutoswapClaimResult>
 >;
 
@@ -207,7 +207,7 @@ export type RestoreCashuTokens = (
   mints: ReadonlyArray<string>,
 ) => Promise<RestoreReport>;
 
-export type TokenTransitionError = TokenRowNotFound | InvalidTokenTransition;
+type TokenTransitionError = TokenRowNotFound | InvalidTokenTransition;
 
 /**
  * Lifecycle operations over stored token rows, keyed by the row id linkshu
@@ -283,10 +283,8 @@ export const useLinkshuComposition = ({
 
   React.useEffect(() => {
     if (!currentNsec) return;
-    // ONE-TIME MIGRATION — DELETE ME EVENTUALLY (see linkshuStorageMigration
-    // .ts): runs before seed resolution, and the runtime only exists after
-    // the resolved seed lands, so linkshu can never read a counter that
-    // still lives under a legacy key.
+    // Migrate before seed resolution so the runtime sees the copied counters.
+    // Removal gate in docs/architecture.md.
     migrateLegacyCashuLocalState();
     let cancelled = false;
     void resolveLinkshuSeed()
@@ -552,7 +550,6 @@ export const useLinkshuComposition = ({
     cashuTokenLifecycle: operations?.cashuTokenLifecycle ?? null,
     checkAllCashuTokens: operations?.checkAllCashuTokens ?? null,
     checkCashuTokenRow: operations?.checkCashuTokenRow ?? null,
-    linkshuRuntime,
     meltCashuInvoice: operations?.meltCashuInvoice ?? null,
     probeLightningFee: operations?.probeLightningFee ?? null,
     receiveCashuToken: operations?.receiveCashuToken ?? null,
