@@ -1,12 +1,9 @@
 import { Buffer } from "buffer";
-import { StrictMode, Suspense } from "react";
+import { StrictMode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
-import {
-  BootCommitSignal,
-  BootLoadingFallback,
-} from "./components/BootCommitSignal";
+import { BootCommitSignal } from "./components/BootCommitSignal";
 import "./index.css";
 import {
   enableInMemoryEvoluStorageForSession,
@@ -303,9 +300,53 @@ const isBenignFetchAbortError = (value: unknown): boolean => {
 
 let appHasMounted = false;
 
-const DYNAMIC_IMPORT_FETCH_RELOAD_KEY =
-  "linky.boot.dynamic_import_fetch_reload_at.v2";
-const DYNAMIC_IMPORT_FETCH_RETRY_COOLDOWN_MS = 10_000;
+const RELOAD_RETRY_WINDOW_MS = 30_000;
+
+// Bounded reloads per cause, tracked in sessionStorage as "<attempts>:<first
+// attempt ms>" so a reload that keeps failing ends on an error screen
+// instead of looping.
+const createReloadGuard = (key: string, maxAttempts: number) => {
+  const readAttempts = (): number => {
+    try {
+      const [attempts, firstAt] = (
+        window.sessionStorage.getItem(key) ?? ""
+      ).split(":");
+      const recent = Date.now() - Number(firstAt) < RELOAD_RETRY_WINDOW_MS;
+      return recent ? Number(attempts) || 0 : 0;
+    } catch {
+      return 0;
+    }
+  };
+  return {
+    attempts: readAttempts,
+    canRetry: (): boolean => readAttempts() < maxAttempts,
+    markRetry: (): void => {
+      try {
+        const attempts = readAttempts();
+        const firstAt =
+          attempts === 0
+            ? Date.now()
+            : Number(window.sessionStorage.getItem(key)?.split(":")[1]);
+        window.sessionStorage.setItem(key, `${attempts + 1}:${firstAt}`);
+      } catch {
+        // ignore storage failures; the reload is still worth a try
+      }
+    },
+    clear: (): void => {
+      try {
+        window.sessionStorage.removeItem(key);
+      } catch {
+        // ignore
+      }
+    },
+  };
+};
+
+const dynamicImportFetchRetry = createReloadGuard(
+  "linky.boot.dynamic_import_fetch_reload.v3",
+  1,
+);
+const evoluOpenRetry = createReloadGuard("linky.boot.evolu_open_reload.v1", 3);
 
 const isLocalDevOrigin = (): boolean => {
   const host = window.location.hostname;
@@ -320,40 +361,6 @@ const isDynamicImportFetchError = (value: unknown): boolean => {
   );
 };
 
-const hasRecentlyRetriedDynamicImportFetch = (): boolean => {
-  try {
-    const raw = window.sessionStorage.getItem(DYNAMIC_IMPORT_FETCH_RELOAD_KEY);
-    if (!raw) return false;
-
-    const lastRetryAt = Number(raw);
-    return (
-      Number.isFinite(lastRetryAt) &&
-      Date.now() - lastRetryAt < DYNAMIC_IMPORT_FETCH_RETRY_COOLDOWN_MS
-    );
-  } catch {
-    return false;
-  }
-};
-
-const markDynamicImportFetchRetry = () => {
-  try {
-    window.sessionStorage.setItem(
-      DYNAMIC_IMPORT_FETCH_RELOAD_KEY,
-      String(Date.now()),
-    );
-  } catch {
-    // ignore storage failures; the reload is still useful in dev
-  }
-};
-
-const clearDynamicImportFetchRetry = () => {
-  try {
-    window.sessionStorage.removeItem(DYNAMIC_IMPORT_FETCH_RELOAD_KEY);
-  } catch {
-    // ignore
-  }
-};
-
 const recoverFromLocalDynamicImportFetch = async (
   stage: string,
   error: unknown,
@@ -362,12 +369,12 @@ const recoverFromLocalDynamicImportFetch = async (
     stage !== "import-app" ||
     !isLocalDevOrigin() ||
     !isDynamicImportFetchError(error) ||
-    hasRecentlyRetriedDynamicImportFetch()
+    !dynamicImportFetchRetry.canRetry()
   ) {
     return false;
   }
 
-  markDynamicImportFetchRetry();
+  dynamicImportFetchRetry.markRetry();
   console.warn(
     "[linky][boot] retrying after dev dynamic import fetch failure",
     {
@@ -747,7 +754,7 @@ const bootstrap = async () => {
     const { evolu, EvoluProvider } = await import("./evolu.ts");
     console.log("[linky][boot] evolu loaded");
 
-    setStage("await-render-commit");
+    setStage("await-initial-local-data");
     const root = createRoot(document.getElementById("root")!);
     const recordAppCommit = () => {
       if (appCommitRecorded) return;
@@ -756,12 +763,8 @@ const bootstrap = async () => {
       window.clearTimeout(stuckTimer);
       appHasMounted = true;
       window.dispatchEvent(new Event("linky-app-mounted"));
-      clearDynamicImportFetchRetry();
-    };
-    const recordInitialDataWait = () => {
-      if (stage !== "await-initial-local-data") {
-        setStage("await-initial-local-data");
-      }
+      dynamicImportFetchRetry.clear();
+      evoluOpenRetry.clear();
     };
     flushSync(() => {
       root.render(
@@ -773,20 +776,47 @@ const bootstrap = async () => {
                 signalBootFailure();
               }}
             >
-              <Suspense
-                fallback={
-                  <BootLoadingFallback onSuspend={recordInitialDataWait} />
-                }
-              >
-                <BootCommitSignal onCommit={recordAppCommit} />
-                <App />
-              </Suspense>
+              <BootCommitSignal onCommit={recordAppCommit} />
+              <App />
             </ErrorBoundary>
           </EvoluProvider>
         </StrictMode>,
       );
     });
     console.log("[linky][boot] render scheduled");
+    // No root Suspense boundary on purpose: Evolu's useQuery suspends on every
+    // new query (owner-lane rotations included), and a boundary above the app
+    // would swap the mounted tree for a fallback. The probe tells a database
+    // that never answers apart from a render that never commits.
+    const localDataProbe = evolu.createQuery((db) =>
+      db.selectFrom("ownerMeta").select("id").limit(1),
+    );
+    void evolu.loadQuery(localDataProbe).then(() => {
+      if (!appCommitRecorded) setStage("await-render-commit");
+    });
+    // A reload can start the new database worker while the previous page's
+    // worker still holds the OPFS access handles (it may be mid-transaction
+    // and take seconds to die); the open then fails and Evolu reports a
+    // SqliteError instead of ever answering a query. Retry with a growing
+    // pause, then land on the boot-error screen with the temporary-session
+    // option.
+    const unsubscribeEvoluError = evolu.subscribeError(() => {
+      const error = evolu.getError();
+      if (appCommitRecorded || error?.type !== "SqliteError") return;
+      unsubscribeEvoluError();
+      window.clearTimeout(stuckTimer);
+      if (!evoluOpenRetry.canRetry()) {
+        renderBootError(error.error, "evolu-sqlite");
+        return;
+      }
+      recordBootError(error.error, "evolu-sqlite");
+      const delayMs = 500 * 2 ** evoluOpenRetry.attempts();
+      evoluOpenRetry.markRetry();
+      console.warn("[linky][boot] local database failed to open, reloading", {
+        delayMs,
+      });
+      window.setTimeout(() => window.location.reload(), delayMs);
+    });
   } catch (error) {
     window.clearTimeout(stuckTimer);
     console.error(`Boot failed at stage ${stage}:`, error);

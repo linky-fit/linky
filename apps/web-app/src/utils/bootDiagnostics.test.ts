@@ -67,16 +67,18 @@ describe("boot diagnostics", () => {
     expect(serialized).not.toContain("hash-secret");
   });
 
-  it("keeps the prior attempt across a recovery reload", async () => {
-    const firstAttempt = await loadBootDiagnostics();
-    firstAttempt.recordBootStage("import-evolu");
+  it("reports the previous attempt retained by the HTML shell", async () => {
+    sessionStorage.setItem(
+      "linky.boot.diagnostics.previous.v1",
+      JSON.stringify({ currentStage: "import-evolu" }),
+    );
+    const diagnostics = await loadBootDiagnostics();
 
-    const secondAttempt = await loadBootDiagnostics();
-    const report = await secondAttempt.collectBootDiagnostics();
+    const report = await diagnostics.collectBootDiagnostics();
 
-    expect(report.previousAttempt).toMatchObject({
-      app: { commit: "test-commit", version: "test-version" },
-      currentStage: "import-evolu",
-    });
+    expect(report.previousAttempt).toEqual({ currentStage: "import-evolu" });
+    expect(
+      sessionStorage.getItem("linky.boot.diagnostics.current.v1"),
+    ).toContain('"module-loaded"');
   });
 });

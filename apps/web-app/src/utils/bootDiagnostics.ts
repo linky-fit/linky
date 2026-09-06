@@ -1,5 +1,7 @@
 import { getUnknownErrorMessage } from "./unknown";
 
+// index.html moves `current` to `previous` before this module loads, so the
+// previous attempt survives even a reload whose bundle never starts.
 const CURRENT_BOOT_DIAGNOSTICS_KEY = "linky.boot.diagnostics.current.v1";
 const PREVIOUS_BOOT_DIAGNOSTICS_KEY = "linky.boot.diagnostics.previous.v1";
 const MAX_BOOT_EVENTS = 40;
@@ -139,17 +141,6 @@ const persistSnapshot = (): void => {
     );
   } catch {
     // Diagnostics still remain available in memory.
-  }
-};
-
-const retainPreviousAttempt = (): void => {
-  try {
-    const previous = sessionStorage.getItem(CURRENT_BOOT_DIAGNOSTICS_KEY);
-    if (previous !== null) {
-      sessionStorage.setItem(PREVIOUS_BOOT_DIAGNOSTICS_KEY, previous);
-    }
-  } catch {
-    // A browser storage failure is itself covered by the environment report.
   }
 };
 
@@ -312,5 +303,4 @@ export const downloadBootDiagnostics = async (): Promise<void> => {
   globalThis.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 };
 
-retainPreviousAttempt();
 recordBootStage("module-loaded");

@@ -16,6 +16,7 @@ export const en = {
   nostrInspectorLogsStats: "{count} rows · {size} · oldest row {age} old",
   nostrInspectorLogsLoading: "Loading log statistics…",
   downloadNostrInspectorLogs: "Download logs",
+  downloadBootDiagnostics: "Download diagnostics",
   clearNostrInspectorLogs: "Clear logs",
   nostrInspectorLogsDownloaded: "Inspector logs downloaded.",
   nostrInspectorLogsCleared: "Inspector logs cleared.",

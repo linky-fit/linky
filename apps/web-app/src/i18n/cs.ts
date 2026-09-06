@@ -15,6 +15,7 @@ export const cs = {
     "{count} řádků · {size} · nejstarší řádek je starý {age}",
   nostrInspectorLogsLoading: "Načítám statistiky logů…",
   downloadNostrInspectorLogs: "Stáhnout logy",
+  downloadBootDiagnostics: "Stáhnout diagnostiku",
   clearNostrInspectorLogs: "Smazat logy",
   nostrInspectorLogsDownloaded: "Logy inspectoru byly staženy.",
   nostrInspectorLogsCleared: "Logy inspectoru byly smazány.",

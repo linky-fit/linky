@@ -15,6 +15,7 @@ export const de = {
   nostrInspectorLogsStats: "{count} Zeilen · {size} · älteste Zeile {age} alt",
   nostrInspectorLogsLoading: "Protokollstatistik wird geladen…",
   downloadNostrInspectorLogs: "Protokolle herunterladen",
+  downloadBootDiagnostics: "Diagnose herunterladen",
   clearNostrInspectorLogs: "Protokolle löschen",
   nostrInspectorLogsDownloaded: "Inspektorprotokolle heruntergeladen.",
   nostrInspectorLogsCleared: "Inspektorprotokolle gelöscht.",

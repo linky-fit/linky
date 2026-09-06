@@ -87,6 +87,20 @@
           }
         };
 
+        // Rotated here rather than in the app bundle so the previous attempt
+        // survives a reload whose bundle never loads.
+        const retainPreviousDiagnosticAttempt = () => {
+          try {
+            const current = sessionStorage.getItem(currentDiagnosticsKey);
+            if (current === null) return;
+            sessionStorage.setItem(previousDiagnosticsKey, current);
+            sessionStorage.removeItem(currentDiagnosticsKey);
+          } catch {
+            // ignore storage failures
+          }
+        };
+        retainPreviousDiagnosticAttempt();
+
         const readDiagnosticAttempt = (key) => {
           try {
             const stored = sessionStorage.getItem(key);

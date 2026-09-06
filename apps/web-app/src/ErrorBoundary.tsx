@@ -49,7 +49,7 @@ export class ErrorBoundary extends React.Component<
               type="button"
               onClick={() => void downloadBootDiagnostics()}
             >
-              {text.downloadNostrInspectorLogs}
+              {text.downloadBootDiagnostics}
             </button>
             <button
               className="secondary"

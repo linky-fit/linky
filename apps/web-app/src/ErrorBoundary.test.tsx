@@ -36,7 +36,7 @@ describe("ErrorBoundary", () => {
     });
 
     expect(container.textContent).toContain("original render failure");
-    expect(container.textContent).toContain("Download logs");
+    expect(container.textContent).toContain("Download diagnostics");
     expect(onError).toHaveBeenCalledOnce();
     act(() => root.unmount());
   });
