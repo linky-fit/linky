@@ -6,6 +6,14 @@ action it expects are defined here as Effect `Schema` types. Raw nostr events
 never cross the package boundary: callers hand in drafts and get receipts;
 listeners consume a tagged union of app-level facts.
 
+## Documentation
+
+Usage guides live in [`docs/`](./docs/README.md): start with
+[getting started](./docs/getting-started.md), the [React guide](./docs/react.md)
+for `@linky/linkstr-react`, then the guide for the vertical you need (chat,
+reactions, profiles, …). This README holds the design rules; the guides show
+how to call the package.
+
 ## Verticals
 
 Gift-wrapped (NIP-17/NIP-59, kind 1059 on the wire):

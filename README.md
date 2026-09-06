@@ -5,6 +5,11 @@ It is local-first: data is stored in Evolu (SQLite) and syncs between devices.
 
 The repo also contains a separate public website in `apps/site/` intended for `linky.fit`, while the product app remains a distinct deployment on `app.linky.fit`. Its `/cashu/` redemption page uses the shared linkshu wallet and linkstr delivery packages, with local recovery for interrupted payments.
 
+## Packages
+
+- [`packages/linkstr`](./packages/linkstr/README.md) — Nostr protocol library; usage guides in [`packages/linkstr/docs/`](./packages/linkstr/docs/README.md) (also covers `@linky/linkstr-react`)
+- [`packages/linkshu`](./packages/linkshu/README.md) — cashu wallet library; usage guides in [`packages/linkshu/docs/`](./packages/linkshu/docs/README.md)
+
 ## Protocols and stack
 
 - Nostr (chat, profile, auth-related flows)

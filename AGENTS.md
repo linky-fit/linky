@@ -38,6 +38,10 @@ IMPORTANT: When you make or change an architectural decision, document it in `do
 - Comments should not duplicate the code! The code should be self explanatory, use function names, proper code split into logical chunks
 - Explain unidiomatic code in comments - keep the comments brief and to the point if you need to write it!
 
+## Package docs
+
+`packages/linkshu/docs/` and `packages/linkstr/docs/` hold usage guides for the two libraries (linkstr-react is documented in `packages/linkstr/docs/react.md`). Read the relevant guide before using or changing a package, and follow the package's `AGENTS.md`: a change to an exported surface or documented behavior updates the matching guide in the same commit.
+
 ## Inspector events
 
 When implementing or refactoring a meaningful operation — user-initiated actions, network/relay/mint traffic, sync, push, notable state transitions — emit an inspector event for it. Follow the `adding-inspector-events` skill (`.agents/skills/adding-inspector-events/`) for row design, correlation links, and the no-key-material rule.

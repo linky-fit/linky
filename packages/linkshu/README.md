@@ -6,6 +6,13 @@ restore, …) is defined here as an Effect service over branded `Schema` types.
 Raw cashu-ts types never cross the package boundary: callers hand in drafts
 and get receipts; token text is the currency of the API.
 
+## Documentation
+
+Usage guides live in [`docs/`](./docs/README.md): start with
+[getting started](./docs/getting-started.md), then the guide for the
+operation you need (receive, send, melt, top up, restore, …). This README
+holds the design rules; the guides show how to call the package.
+
 ## Verticals
 
 - `receive/` — one call from pasted/scanned text to an `accepted` row:
