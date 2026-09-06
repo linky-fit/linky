@@ -66,6 +66,15 @@ For Android native builds: Java 17
 - `bun run dev:services` — just the docker stack, attached.
 - The `e2e` and `quota` Compose profiles also start an isolated Evolu relay on :4002 with a 16 KiB per-owner quota for recovery tests. The normal :4001 relay stays unlimited unless `EVOLU_OWNER_QUOTA_BYTES` sets a positive byte limit.
 
+### Local error tracker
+
+`bun run errors:dev` starts the Nostr error tracker at `http://127.0.0.1:5190`.
+Sign in with the telemetry collector account's 20-word Linky recovery phrase.
+The seed is saved in this browser until sign-out. Inspect existing encrypted
+errors across versions and dates, mark issues solved, and sync resolutions through
+Evolu. New occurrences reopen solved issues. See
+[`tools/nostr-error-tracker/README.md`](./tools/nostr-error-tracker/README.md).
+
 ### linkshu CLI wallet
 
 `apps/linkshu-cli/` is a terminal cashu wallet and `@linky/linkshu`'s first consumer — it runs

@@ -14,6 +14,7 @@ COPY packages/linkshu/package.json packages/linkshu/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/linkstr/package.json packages/linkstr/package.json
 COPY packages/linkstr-react/package.json packages/linkstr-react/package.json
+COPY tools/nostr-error-tracker/package.json tools/nostr-error-tracker/package.json
 
 RUN bun install --frozen-lockfile
 

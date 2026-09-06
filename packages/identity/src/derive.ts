@@ -8,6 +8,7 @@ import {
   cashuOwnerPath,
   contactsOwnerPath,
   IDENTITY_OWNER_PATH,
+  ERROR_TRACKER_OWNER_PATH,
   messagesOwnerPath,
   META_OWNER_PATH,
   transactionsOwnerPath,
@@ -36,6 +37,7 @@ const deriveOwnerPath = (
   Match.value(role).pipe(
     Match.when("meta", () => META_OWNER_PATH),
     Match.when("identity", () => IDENTITY_OWNER_PATH),
+    Match.when("errorTracker", () => ERROR_TRACKER_OWNER_PATH),
     Match.when("contacts", () => contactsOwnerPath(index)),
     Match.when("cashu", () => cashuOwnerPath(index)),
     Match.when("transactions", () => transactionsOwnerPath(index)),

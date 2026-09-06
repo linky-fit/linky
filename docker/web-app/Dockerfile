@@ -23,6 +23,7 @@ COPY packages/identity/package.json packages/identity/
 COPY packages/linkshu/package.json packages/linkshu/
 COPY packages/linkstr/package.json packages/linkstr/
 COPY packages/linkstr-react/package.json packages/linkstr-react/
+COPY tools/nostr-error-tracker/package.json tools/nostr-error-tracker/
 RUN bun install --frozen-lockfile
 
 COPY . .

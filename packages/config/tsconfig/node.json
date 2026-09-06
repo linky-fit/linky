@@ -1,5 +1,5 @@
 {
-  "extends": "@linky/config/tsconfig/base",
+  "extends": "./base.json",
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023"],

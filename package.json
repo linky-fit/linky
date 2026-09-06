@@ -6,7 +6,8 @@
   "packageManager": "bun@1.3.9",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "tools/*"
   ],
   "scripts": {
     "dev": "docker compose -f docker-compose.dev.yml up -d --wait && bun run --filter @linky/web-app --filter @linky/push dev",
@@ -17,6 +18,7 @@
     "site:dev": "bun run --filter @linky/site dev",
     "site:build": "bun run --filter @linky/site build",
     "site:preview": "bun run --filter @linky/site preview",
+    "errors:dev": "bun run --filter @linky/nostr-error-tracker dev",
     "native:android:release:check": "bun run --filter @linky/native-shell android:release:check",
     "native:android:icons": "bun run --filter @linky/native-shell android:icons",
     "native:android:add": "bun run --filter @linky/native-shell android:add",

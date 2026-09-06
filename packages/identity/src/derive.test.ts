@@ -4,6 +4,7 @@ import {
   deriveCashuMnemonicFromMasterSecret,
   deriveOwnerMnemonicsFromMasterSecret,
   parseOwnerLaneIndex,
+  type OwnerMnemonicRequest,
 } from "./derive";
 import { MasterSecret } from "./domain";
 
@@ -34,6 +35,32 @@ describe("identity derivation", () => {
     expect(lane0?.split(/\s+/)).toHaveLength(12);
     expect(lane2?.split(/\s+/)).toHaveLength(12);
     expect(lane0).not.toBe(lane2);
+  });
+
+  it("keeps the error tracker owner deterministic and separate from app lanes", async () => {
+    const requests = [
+      { role: "meta" },
+      { role: "identity" },
+      { role: "contacts" },
+      { role: "cashu" },
+      { role: "transactions" },
+      { role: "messages" },
+      { role: "errorTracker" },
+    ] satisfies OwnerMnemonicRequest[];
+    const mnemonics = await Effect.runPromise(
+      deriveOwnerMnemonicsFromMasterSecret(TEST_SEED, requests),
+    );
+    const [tracker] = await Effect.runPromise(
+      deriveOwnerMnemonicsFromMasterSecret(TEST_SEED, [
+        { role: "errorTracker" },
+      ]),
+    );
+    expect(tracker).toBe(
+      "decorate business lift trust month music sentence lottery music crush silent forward",
+    );
+    expect(tracker).toBe(mnemonics.at(-1));
+    expect(new Set(mnemonics).size).toBe(requests.length);
+    expect(tracker?.split(/\s+/)).toHaveLength(12);
   });
 
   it("derives deterministic cashu mnemonic from master secret", async () => {
