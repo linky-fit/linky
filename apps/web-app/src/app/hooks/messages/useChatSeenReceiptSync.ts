@@ -5,15 +5,14 @@ import React from "react";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type {
   LocalNostrMessage,
-  OptionalText,
   RouteWithOptionalId,
 } from "../../types/appTypes";
 import { resolveSeenReceiptAdvance } from "../../lib/chatSeenReceipt";
 import { summarizeConversationReadTimes } from "../../lib/chatUnread";
 
 interface SeenReceiptContact {
-  id: unknown;
-  npub?: OptionalText;
+  id?: string | null;
+  npub?: string | null | undefined;
 }
 
 interface UseChatSeenReceiptSyncParams {
@@ -47,13 +46,13 @@ export const useChatSeenReceiptSync = ({
 
   React.useEffect(() => {
     if (!documentVisible || route.kind !== "chat" || !selectedContact) return;
-    const contactId = String(selectedContact.id ?? "").trim();
-    if (!contactId || contactId !== String(route.id ?? "").trim()) return;
+    const contactId = (selectedContact.id ?? "").trim();
+    if (!contactId || contactId !== (route.id ?? "").trim()) return;
 
-    const enabledAtSec = Math.floor(Number(seenReceiptsEnabledAtSec ?? 0));
+    const enabledAtSec = Math.floor(seenReceiptsEnabledAtSec ?? 0);
     if (enabledAtSec <= 0) return;
 
-    const npub = normalizeNpubIdentifier(selectedContact.npub);
+    const npub = normalizeNpubIdentifier(selectedContact.npub ?? "");
     const peerPubkey = npub ? decodeNpub(npub) : null;
     if (!peerPubkey) return;
 

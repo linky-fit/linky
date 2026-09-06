@@ -1,8 +1,9 @@
-import type { ContactId } from "../../evolu";
+import type { ContactId, ContactRow } from "../../evolu";
+import type { I18nKey } from "../../i18n";
 import type {
-  TelemetryAppRuntime,
-  TelemetryDevicePlatform,
-} from "../../platform/runtime";
+  PaymentTelemetryAppRuntime,
+  PaymentTelemetryDevicePlatform,
+} from "@linky/linkstr";
 import type { JsonValue } from "../../types/json";
 
 export type PaymentTelemetryStatus = "declined" | "error" | "ok";
@@ -58,10 +59,10 @@ export type LoggedPaymentEventParams = {
 export type LocalPaymentTelemetryEvent = {
   amountBucket: string | null;
   appHost?: string | null;
-  appRuntime?: TelemetryAppRuntime | null;
+  appRuntime?: PaymentTelemetryAppRuntime | null;
   appVersion: string;
   createdAtSec: number;
-  devicePlatform?: TelemetryDevicePlatform | null;
+  devicePlatform?: PaymentTelemetryDevicePlatform | null;
   direction: "in" | "out";
   errorCode: string | null;
   errorDetail: string | null;
@@ -113,23 +114,6 @@ export type LocalPendingPayment = {
   messageId?: string;
 };
 
-export type OptionalText =
-  | string
-  | number
-  | boolean
-  | bigint
-  | symbol
-  | { toString(): string }
-  | null
-  | undefined;
-export type OptionalNumber =
-  | number
-  | string
-  | bigint
-  | boolean
-  | { toString(): string }
-  | null
-  | undefined;
 export type OptionalBooleanTextNumber =
   | boolean
   | string
@@ -138,82 +122,30 @@ export type OptionalBooleanTextNumber =
   | undefined;
 export type ContactIdLike = ContactId | string | null | undefined;
 
-export type PaymentLogField = JsonValue;
+type PaymentLogField = JsonValue;
 export type PaymentLogData = Record<string, PaymentLogField>;
 
-export type PublishWrappedResult = {
-  anySuccess: boolean;
-  error:
-    | string
-    | number
-    | boolean
-    | bigint
-    | symbol
-    | { toString(): string }
-    | null
-    | undefined;
-};
-
+type ContactDisplayValue<T> = T extends string
+  ? string
+  : T extends number
+    ? number
+    : T;
+// Display rows also include unsaved Nostr contacts and selected contact fields.
 export type ContactRowLike = {
-  archivedAtSec?: OptionalNumber;
-  createdAt?: OptionalNumber;
-  groupName?: OptionalText;
-  groupNamesJson?: OptionalText;
-  id?: ContactIdLike;
-  isUnknownContact?: boolean;
-  lnAddress?: OptionalText;
-  lnAddressSetByUser?: OptionalNumber;
-  name?: OptionalText;
-  nameSetByUser?: OptionalNumber;
-  npub?: OptionalText;
-  ownerId?: OptionalText;
-};
-
-export type ContactIdentityRowLike = {
-  id?: ContactIdLike;
-  npub?: OptionalText;
-  ownerId?: OptionalText;
-};
-
-export type ContactNameRowLike = {
-  archivedAtSec?: OptionalNumber;
-  createdAt?: OptionalNumber;
-  id?: ContactIdLike;
-  isUnknownContact?: boolean;
-  name?: OptionalText;
-};
-
-export type ContactPayRowLike = {
-  id?: ContactIdLike;
-  lnAddress?: OptionalText;
-  name?: OptionalText;
-};
-
-export type ChatMessageRowLike = {
-  clientId?: OptionalText;
-  content?: OptionalText;
-  editedAtSec?: OptionalNumber;
-  editedFromId?: OptionalText;
-  direction?: OptionalText;
-  id?: OptionalText;
-  isEdited?: OptionalText;
-  localOnly?: OptionalText;
-  originalContent?: OptionalText;
-  pubkey?: OptionalText;
-  replyToContent?: OptionalText;
-  replyToId?: OptionalText;
-  rootMessageId?: OptionalText;
-  rumorId?: OptionalText;
-  status?: OptionalText;
-  wrapId?: OptionalText;
-};
-
-export type NostrMessageSummaryRow = {
-  content?: OptionalText;
-  direction?: OptionalText;
-  id?: OptionalText;
-  wrapId?: OptionalText;
-};
+  [K in keyof ContactRow]?: ContactDisplayValue<ContactRow[K]> | null;
+} & { isUnknownContact?: boolean };
+export type ContactIdentityRowLike = Pick<
+  ContactRowLike,
+  "id" | "npub" | "ownerId"
+> & { unknownPubkeyHex?: string | null };
+export type ContactNameRowLike = Pick<
+  ContactRowLike,
+  "archivedAtSec" | "createdAt" | "id" | "isUnknownContact" | "name"
+>;
+export type ContactPayRowLike = Pick<
+  ContactRowLike,
+  "id" | "lnAddress" | "name"
+>;
 
 export type RouteWithOptionalId = {
   id?: ContactIdLike;
@@ -221,25 +153,16 @@ export type RouteWithOptionalId = {
   offerId?: string;
 };
 
-export type MintUrlInput =
-  | string
-  | number
-  | boolean
-  | bigint
-  | symbol
-  | { toString(): string }
-  | null
-  | undefined;
-export type MintSupportsMppValue = OptionalBooleanTextNumber;
+type MintSupportsMppValue = OptionalBooleanTextNumber;
 
 export type LocalMintInfoRow = {
-  feesJson?: OptionalText;
-  firstSeenAtSec?: OptionalNumber;
+  feesJson?: string | null | undefined;
+  firstSeenAtSec?: number | null | undefined;
   id: string;
-  infoJson?: OptionalText;
-  isDeleted?: OptionalText;
-  lastCheckedAtSec?: OptionalNumber;
-  lastSeenAtSec?: OptionalNumber;
+  infoJson?: string | null | undefined;
+  isDeleted?: OptionalBooleanTextNumber;
+  lastCheckedAtSec?: number | null | undefined;
+  lastSeenAtSec?: number | null | undefined;
   supportsMpp?: MintSupportsMppValue;
   url: string;
 };
@@ -252,11 +175,11 @@ export type ContactsGuideKey =
   | "backup_keys";
 
 export type ContactsGuideStep = {
-  bodyKey: string;
+  bodyKey: I18nKey;
   ensure?: () => void;
   id: string;
   selector: string;
-  titleKey: string;
+  titleKey: I18nKey;
 };
 
 export type ContactFormState = {
@@ -283,7 +206,7 @@ export type NewLocalNostrMessage = Omit<LocalNostrMessage, "id" | "status"> & {
   status?: "sent" | "pending";
 };
 
-export type UpdateLocalNostrMessageFields = Pick<
+type UpdateLocalNostrMessageFields = Pick<
   LocalNostrMessage,
   | "clientId"
   | "content"
@@ -314,7 +237,7 @@ export type NewLocalNostrReaction = Omit<
   status?: "sent" | "pending";
 };
 
-export type UpdateLocalNostrReactionFields = Pick<
+type UpdateLocalNostrReactionFields = Pick<
   LocalNostrReaction,
   "clientId" | "emoji" | "messageId" | "reactorPubkey" | "status" | "wrapId"
 >;

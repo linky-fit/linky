@@ -6,7 +6,6 @@ import {
   parseBankPayment,
   parseSpdPayment,
   tryParseBankPayment,
-  tryParseSpdPayment,
   updateBankPaymentFields,
 } from "./spdPayment";
 
@@ -38,7 +37,6 @@ describe("spdPayment", () => {
     expect(() => parseSpdPayment("SPD*1.0*AM:480.50*CC:CZK")).toThrow(
       "spd-missing-account",
     );
-    expect(tryParseSpdPayment("SPD*1.0*AM:480.50*CC:CZK")).toBeNull();
     expect(isBankPaymentPayload("SPD*1.0*AM:480.50*CC:CZK")).toBe(true);
   });
 

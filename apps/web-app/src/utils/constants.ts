@@ -6,8 +6,10 @@ export const DECIMAL_AMOUNT_INPUT_STORAGE_KEY = "linky.decimal_amount_input.v1";
 // Epoch seconds when "send read receipts" was enabled; absent = off.
 export const SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY =
   "linky.seen_receipts_enabled_at_sec.v1";
-export const FIAT_RATES_CACHE_STORAGE_KEY = "linky.fiat_rates.v1";
-export const FIAT_RATES_TTL_MS = 10 * 60 * 1000;
+export {
+  FIAT_RATES_CACHE_STORAGE_KEY,
+  FIAT_RATES_TTL_MS,
+} from "@linky/linkshu";
 export const NOSTR_NSEC_STORAGE_KEY = "linky.nostr_nsec";
 export const NOSTR_SLIP39_SEED_STORAGE_KEY = "linky.nostr_slip39_seed";
 export const CASHU_BIP85_MNEMONIC_STORAGE_KEY = "linky.cashu_bip85_mnemonic";
@@ -31,12 +33,6 @@ export const EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY =
   "linky.evolu.messages_owner_baseline_count.v1";
 export const EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY =
   "linky.evolu.transactions_owner_baseline_count.v1";
-export const EVOLU_CONTACTS_OWNER_EDIT_COUNT_STORAGE_KEY =
-  "linky.evolu.contacts_owner_edit_count.v1";
-export const EVOLU_MESSAGES_OWNER_EDIT_COUNT_STORAGE_KEY =
-  "linky.evolu.messages_owner_edit_count.v1";
-export const EVOLU_TRANSACTIONS_OWNER_EDIT_COUNT_STORAGE_KEY =
-  "linky.evolu.transactions_owner_edit_count.v1";
 export const EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY =
   "linky.evolu.contacts_owner_last_rotated_at_ms.v1";
 export const EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY =
@@ -75,8 +71,7 @@ export const BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY =
   "linky.bank_payment_offer_stagger_delay_sec.v1";
 export const FEEDBACK_CONTACT_NPUB =
   "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
-export const PAYMENT_ANALYTICS_RECIPIENT_NPUB =
-  "npub1xuxvcnmw4drf8duzalvalxrfxjvwtrjdmwxy0ez2e62uje4drrvqu6pz2w";
+export { PAYMENT_ANALYTICS_RECIPIENT_NPUB } from "@linky/linkstr";
 export const NO_GROUP_FILTER = "__linky_no_group__";
 export const ARCHIVED_CONTACTS_FILTER = "__linky_archived_contacts__";
 

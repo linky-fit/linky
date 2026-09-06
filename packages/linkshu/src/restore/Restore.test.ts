@@ -1,6 +1,6 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { Amount, getEncodedToken, Keyset } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, Stream } from "effect";
+import { getEncodedToken, Keyset } from "@cashu/cashu-ts";
+import { Effect, Exit, Layer } from "effect";
 import { MintUnreachable } from "../domain/errors";
 import {
   CurrencyUnit,
@@ -8,15 +8,14 @@ import {
   MintUrl,
   TokenText,
 } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
 import { deterministicCounterKey } from "../internal/counters";
 import { seenMintKey, WalletInstances } from "../mint/internal/WalletInstances";
-import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { NewTokenRow, TokenStore } from "../ports/TokenStore";
+import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
 import { parseTokenText } from "../token/codec";
 import { RestoreDraft } from "./domain";
 import { restoreCursorKey, seenKeysetKey } from "./internal/restoreState";
@@ -24,19 +23,12 @@ import { Restore } from "./Restore";
 
 const mint = MintUrl.make("https://mint.example");
 const sat = CurrencyUnit.make("sat");
-const keysetHex = KeysetId.make("009a1f293253e41e");
+const keysetHex = KeysetId.make(KEYSET_HEX);
 const otherKeysetHex = KeysetId.make("009a1f293253e41f");
 
 const scope = { mint, unit: sat, keysetId: keysetHex };
 const counterKey = deterministicCounterKey(scope);
 const cursorKey = restoreCursorKey(scope);
-
-const proof = (amount: number, secret: string): CashuProof => ({
-  id: keysetHex,
-  amount: Amount.from(amount),
-  secret,
-  C: "02" + "ab".repeat(32),
-});
 
 /** A blinded slot the mint has a signature for. */
 interface SignedSlot {
@@ -59,22 +51,16 @@ interface HarnessArgs {
 
 const makeHarness = (args: HarnessArgs) => {
   const restoreCalls: Array<RestoreCall> = [];
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const signed = args.signed ?? [];
 
-  const wallet: LoadedWallet = {
+  const wallet = fakeWallet({
     keysetId: keysetHex,
     keyChain: {
       getKeysets: () => [
         ...(args.keysets ?? [new Keyset(keysetHex, "sat", true, 0)]),
       ],
     },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
-    receive: () => Promise.reject(new Error("not under test")),
-    send: () => Promise.reject(new Error("not under test")),
-    restore: () => Promise.reject(new Error("not under test")),
     checkProofsStates: (proofs) =>
       Promise.resolve(
         proofs.map((entry) => ({
@@ -83,12 +69,6 @@ const makeHarness = (args: HarnessArgs) => {
           witness: null,
         })),
       ),
-    createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-    createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    meltProofsBolt11: () => Promise.reject(new Error("not under test")),
     batchRestore: (_gapLimit, _batchSize, counter = 0, keysetId = "") => {
       restoreCalls.push({ start: counter, keysetId });
       if (args.restoreError !== undefined) {
@@ -106,7 +86,7 @@ const makeHarness = (args: HarnessArgs) => {
           : {}),
       });
     },
-  };
+  });
 
   const layer = Restore.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -124,12 +104,7 @@ const makeHarness = (args: HarnessArgs) => {
         ),
         inMemoryKeyValueStore,
         inMemoryTokenStore,
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
@@ -138,7 +113,7 @@ const makeHarness = (args: HarnessArgs) => {
     program: Effect.Effect<A, E, Restore | TokenStore | KeyValueStore>,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
 
-  return { run, restoreCalls, events };
+  return { run, restoreCalls, events: inspector.events };
 };
 
 const restoreAt = (mints: ReadonlyArray<MintUrl> = [mint]) =>
@@ -165,8 +140,7 @@ describe("Restore.restore", () => {
 
     const exit = await run(restoreAt());
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { report, rows, counter, cursor } = exit.value;
 
     expect(report.restoredAmount).toBe(12);
@@ -197,8 +171,7 @@ describe("Restore.restore", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.first.report.restoredAmount).toBe(4);
     expect(exit.value.second.report.restoredAmount).toBe(0);
     expect(exit.value.second.report.rows).toEqual([]);
@@ -217,8 +190,7 @@ describe("Restore.restore", () => {
 
     const exit = await run(restoreAt());
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.report.restoredAmount).toBe(8);
     expect(parseTokenText(exit.value.rows[0]?.tokenText ?? "")?.amount).toBe(8);
   });
@@ -250,8 +222,7 @@ describe("Restore.restore", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.report.restoredAmount).toBe(8);
   });
 
@@ -263,8 +234,7 @@ describe("Restore.restore", () => {
 
     const exit = await run(restoreAt());
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.report).toMatchObject({
       restoredAmount: 0,
       scannedMints: [],
@@ -279,8 +249,7 @@ describe("Restore.restore", () => {
 
     const exit = await run(restoreAt());
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.report.unavailableMints).toEqual([mint]);
     expect(restoreCalls).toEqual([]);
   });
@@ -305,8 +274,7 @@ describe("Restore.restore", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     // Inactive keysets still hold old proofs; other units are not ours.
     expect(restoreCalls.map((call) => call.keysetId)).toEqual([
       keysetHex,
@@ -328,8 +296,7 @@ describe("Restore.restore", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.scannedMints).toEqual([mint]);
     expect(exit.value.restoredAmount).toBe(4);
     expect(restoreCalls).toHaveLength(1);

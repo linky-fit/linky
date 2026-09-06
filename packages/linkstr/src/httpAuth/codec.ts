@@ -3,6 +3,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { Either } from "effect";
 import { getPublicKey } from "nostr-tools";
 import type { NostrSecretKey, UnixSeconds } from "../domain/primitives";
+import { singleTagValue } from "../internal/nostrEvent";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
 import { signPlainEvent } from "../internal/plainEvent";
@@ -93,15 +94,6 @@ export const makePushOwnershipProof = (
   );
 };
 
-const singleTagValue = (
-  event: SignedPlainEvent,
-  name: string,
-): string | null => {
-  const values = event.tags.filter((tag) => tag[0] === name);
-  if (values.length !== 1) return null;
-  return values[0]?.[1] ?? null;
-};
-
 /** Verifies the complete kind-27235 wire contract shared by client and server. */
 export const verifyPushOwnershipProof = (
   input: unknown,
@@ -113,15 +105,15 @@ export const verifyPushOwnershipProof = (
     if (event.kind !== HTTP_AUTH_KIND) {
       return yield* Either.left<PushOwnershipProofFailure>("wrong-kind");
     }
-    const challenge = singleTagValue(event, "challenge");
+    const challenge = singleTagValue(event.tags, "challenge");
     if (challenge === null || challenge.length === 0) {
       return yield* Either.left<PushOwnershipProofFailure>("invalid-challenge");
     }
-    const action = singleTagValue(event, "action");
+    const action = singleTagValue(event.tags, "action");
     if (action !== "subscribe" && action !== "unsubscribe") {
       return yield* Either.left<PushOwnershipProofFailure>("invalid-action");
     }
-    const pubkey = singleTagValue(event, "pubkey");
+    const pubkey = singleTagValue(event.tags, "pubkey");
     if (pubkey === null) {
       return yield* Either.left<PushOwnershipProofFailure>(
         "invalid-pubkey-tag",

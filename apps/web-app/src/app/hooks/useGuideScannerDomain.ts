@@ -1,3 +1,4 @@
+import { useLatest } from "../../hooks/useLatest";
 import React from "react";
 import {
   startNativeQrScan,
@@ -14,6 +15,7 @@ import {
   configureQrCameraTrack,
 } from "../lib/qrCamera";
 import { useContactsGuide } from "./guide/useContactsGuide";
+import type { Translate } from "../../i18n";
 
 interface UseGuideScannerDomainParams {
   cashuBalance: number;
@@ -25,10 +27,10 @@ interface UseGuideScannerDomainParams {
   onScannedText: (rawValue: string) => Promise<void>;
   pushToast: (message: string) => void;
   route: Route;
-  t: (key: string) => string;
+  t: Translate;
 }
 
-export type ScanEntryPoint = "contacts" | "receive" | "send";
+type ScanEntryPoint = "contacts" | "receive" | "send";
 
 type UseGuideScannerDomainResult = ReturnType<typeof useContactsGuide> & {
   closeScan: () => void;
@@ -73,31 +75,10 @@ const readNativeScanViewport = (): NativeScanViewport | null => {
   };
 };
 
-const formatScanDebugDetails = (details?: Record<string, unknown>) => {
-  if (!details) {
-    return null;
-  }
-
-  try {
-    return JSON.stringify(details);
-  } catch {
-    return "[unserializable scan details]";
-  }
-};
-
 const readCameraPermissionState = async (): Promise<string | null> => {
-  const permissions = Reflect.get(navigator, "permissions");
-  if (typeof permissions !== "object" || permissions === null) return null;
-
-  const query = Reflect.get(permissions, "query");
-  if (typeof query !== "function") return null;
-
-  const result: unknown = await Reflect.apply(query, permissions, [
-    { name: "camera" },
-  ]);
-  if (typeof result !== "object" || result === null) return null;
-
-  return String(Reflect.get(result, "state") ?? "").trim() || null;
+  if (!navigator.permissions?.query) return null;
+  const result = await navigator.permissions.query({ name: "camera" });
+  return result.state;
 };
 
 export const useGuideScannerDomain = ({
@@ -145,8 +126,7 @@ export const useGuideScannerDomain = ({
 
   const logScanDebug = React.useCallback(
     (message: string, details?: Record<string, unknown>) => {
-      console.log("[linky][scan]", message, formatScanDebugDetails(details));
-      void appendPushDebugLog("client", `scan ${message}`, details);
+      appendPushDebugLog("client", `scan ${message}`, details);
     },
     [],
   );
@@ -200,15 +180,15 @@ export const useGuideScannerDomain = ({
     stopScanStream();
   }, [stopScanStream]);
 
-  const handleScannedTextRef = React.useRef(onScannedText);
-  React.useEffect(() => {
-    handleScannedTextRef.current = onScannedText;
-  }, [onScannedText]);
+  const handleScannedTextRef = useLatest(onScannedText);
 
-  const handleDetectedScanValue = React.useCallback(async (value: string) => {
-    await handleScannedTextRef.current(value);
-    return true;
-  }, []);
+  const handleDetectedScanValue = React.useCallback(
+    async (value: string) => {
+      await handleScannedTextRef.current(value);
+      return true;
+    },
+    [handleScannedTextRef],
+  );
 
   const handleNativeScanResult = React.useCallback(
     async (
@@ -226,7 +206,7 @@ export const useGuideScannerDomain = ({
         return;
       }
 
-      const value = String(result.value ?? "").trim();
+      const value = (result.value ?? "").trim();
       if (value) {
         const nativeScanHandle = nativeScanHandleRef.current;
         nativeScanHandleRef.current = null;
@@ -245,7 +225,7 @@ export const useGuideScannerDomain = ({
         return;
       }
 
-      const message = String(result.message ?? "").trim();
+      const message = (result.message ?? "").trim();
       logScanDebug("native scan failed", {
         message,
       });
@@ -611,7 +591,7 @@ export const useGuideScannerDomain = ({
 
           if (detector) {
             const codes = await detector.detect(video);
-            const value = String(codes?.[0]?.rawValue ?? "").trim();
+            const value = (codes?.[0]?.rawValue ?? "").trim();
             if (value) {
               const didHandle = await handleDetectedScanValue(value);
               if (didHandle) {
@@ -645,7 +625,7 @@ export const useGuideScannerDomain = ({
                 decodeHeight,
               );
               const result = jsQr(imageData.data, decodeWidth, decodeHeight);
-              const value = String(result?.data ?? "").trim();
+              const value = (result?.data ?? "").trim();
               if (value) {
                 const didHandle = await handleDetectedScanValue(value);
                 if (didHandle) {

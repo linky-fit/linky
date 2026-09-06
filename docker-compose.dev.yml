@@ -27,9 +27,11 @@ services:
     build: docker/evolu-relay
     ports:
       - "4001:4000"
+    environment:
+      EVOLU_OWNER_QUOTA_BYTES: ${EVOLU_OWNER_QUOTA_BYTES:-0}
     volumes:
       - evolu-relay-data:/app/data
-    healthcheck:
+    healthcheck: &evolu-relay-healthcheck
       test:
         [
           "CMD",
@@ -41,14 +43,25 @@ services:
       timeout: 2s
       retries: 25
 
-  cashu-mint:
+  evolu-relay-quota:
+    profiles: [e2e, quota]
+    image: linky-evolu-relay
+    ports:
+      - "4002:4000"
+    environment:
+      EVOLU_OWNER_QUOTA_BYTES: "16384"
+    volumes:
+      - evolu-relay-quota-data:/app/data
+    healthcheck: *evolu-relay-healthcheck
+
+  cashu-mint: &cashu-mint
     image: docker.io/cashubtc/nutshell:0.20.3
     command: ["poetry", "run", "mint"]
     ports:
       - "3338:3338"
     volumes:
       - cashu-mint-data:/app/data
-    environment:
+    environment: &cashu-mint-environment
       MINT_BACKEND_BOLT11_SAT: FakeWallet
       MINT_LISTEN_HOST: "0.0.0.0"
       MINT_LISTEN_PORT: "3338"
@@ -79,6 +92,17 @@ services:
       retries: 45
       start_period: 10s
 
+  cashu-mint-target:
+    <<: *cashu-mint
+    profiles: ["integration", "e2e"]
+    ports:
+      - "3339:3338"
+    volumes:
+      - cashu-mint-target-data:/app/data
+    environment:
+      <<: *cashu-mint-environment
+      MINT_PRIVATE_KEY: LOCAL_DEV_ONLY_TARGET_MINT_KEY
+
   # Production build of the web app for the `local-stack` Playwright project;
   # not used by `bun run dev`. Endpoints are build args because Vite inlines
   # import.meta.env; the browser runs on the host, so these are host-published
@@ -107,4 +131,6 @@ services:
 volumes:
   nostr-relay-data:
   evolu-relay-data:
+  evolu-relay-quota-data:
   cashu-mint-data:
+  cashu-mint-target-data:

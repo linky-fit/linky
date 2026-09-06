@@ -5,11 +5,9 @@ import { MasterSecretProvider } from "./MasterSecretProvider";
 import {
   createSlip39Share,
   looksLikeSlip39Share,
-  normalizeSlip39Share,
   parseSlip39Share,
   recoverMasterSecretFromSlip39Share,
   recoverMasterSecretFromSlip39Shares,
-  validateSlip39Share,
 } from "./slip39";
 
 const runIdentity = <E>(
@@ -23,16 +21,10 @@ const runIdentity = <E>(
   );
 
 describe("SLIP-39", () => {
-  it("normalizes slip39 shares", () => {
-    expect(normalizeSlip39Share("  ALPHA   BETA gamma ")).toBe(
-      "alpha beta gamma",
-    );
-  });
-
-  it("detects and validates slip39 shares", async () => {
+  it("generates a share that parses back as one", async () => {
     const share = await Effect.runPromise(createSlip39Share());
     expect(looksLikeSlip39Share(share)).toBe(true);
-    expect(validateSlip39Share(share)).toBe(true);
+    expect(await Effect.runPromise(parseSlip39Share(share))).toBe(share);
   });
 
   it("rejects invalid slip39 shares", async () => {
@@ -62,24 +54,27 @@ describe("SLIP-39", () => {
     ).rejects.toThrow();
   });
 
-  it("creates MasterSecretProvider layers from share and share text", async () => {
+  it("derives the same identity from a share pasted with case and spacing noise", async () => {
     const share = await Effect.runPromise(createSlip39Share());
-    const parsed = await Effect.runPromise(parseSlip39Share(share));
-    const normalizedWithNoise = `  ${share
+    const noisy = `  ${share
       .split(/\s+/)
       .map((word) => word.toUpperCase())
       .join("   ")}  `;
 
-    const viaShare = await runIdentity(
-      MasterSecretProvider.fromSlip39Share(parsed),
+    const clean = await runIdentity(
+      MasterSecretProvider.fromSlip39Share(
+        await Effect.runPromise(parseSlip39Share(share)),
+      ),
     );
-    const viaText = await runIdentity(
-      MasterSecretProvider.fromSlip39RawShare(normalizedWithNoise),
+    const fromNoisy = await runIdentity(
+      MasterSecretProvider.fromSlip39Share(
+        await Effect.runPromise(parseSlip39Share(noisy)),
+      ),
     );
 
-    expect(viaShare.nostrPublicKey).toBe(viaText.nostrPublicKey);
-    expect(viaShare.nostrSigningKey).toEqual(viaText.nostrSigningKey);
-    expect(viaShare.cashuWalletSeed).toEqual(viaText.cashuWalletSeed);
-    expect(viaShare.storageMetaOwnerKey).toEqual(viaText.storageMetaOwnerKey);
+    expect(fromNoisy.nostrPublicKey).toBe(clean.nostrPublicKey);
+    expect(fromNoisy.nostrSigningKey).toEqual(clean.nostrSigningKey);
+    expect(fromNoisy.cashuWalletSeed).toEqual(clean.cashuWalletSeed);
+    expect(fromNoisy.storageMetaOwnerKey).toEqual(clean.storageMetaOwnerKey);
   });
 });

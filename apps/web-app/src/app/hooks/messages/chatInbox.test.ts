@@ -11,6 +11,7 @@ import {
 } from "@linky/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
+import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { parsePrivateImageMessage } from "../../lib/privateImageMessage";
 import type {
   LocalNostrMessage,
@@ -22,12 +23,6 @@ import {
   type ChatInboxContext,
 } from "./chatInbox";
 import { buildUnknownContactId } from "./contactIdentity";
-
-const createSecretKey = (lastByte: number): Uint8Array => {
-  const secretKey = new Uint8Array(32);
-  secretKey[31] = lastByte;
-  return secretKey;
-};
 
 const peerPubkey = getPublicKey(createSecretKey(2));
 const strangerPubkey = getPublicKey(createSecretKey(3));

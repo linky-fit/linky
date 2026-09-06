@@ -1,6 +1,6 @@
 import type { Route } from "../../types/route";
 
-export type DesktopRouteSection = "contacts" | "wallet" | "settings";
+type DesktopRouteSection = "contacts" | "wallet" | "settings";
 
 export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
   switch (route.kind) {
@@ -92,7 +92,7 @@ export const getDesktopActiveContactId = (route: Route): string | null => {
     case "contact":
     case "contactEdit":
     case "contactPay":
-      return String(route.id);
+      return route.id;
 
     case "chat":
       return route.id;

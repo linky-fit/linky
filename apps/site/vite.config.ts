@@ -1,16 +1,28 @@
 import react from "@vitejs/plugin-react-swc";
+import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import http from "node:http";
-import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin, ViteDevServer } from "vite";
 import { defineConfig } from "vite";
+import { parseJsonObject } from "./api/_npubcash.js";
+import lnurlpHandler from "./api/lnurlp.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 type NextFunction = () => void;
+
+const readRootPackageVersion = (): string => {
+  const rootPackage = parseJsonObject(
+    readFileSync(path.resolve(__dirname, "../../package.json"), "utf8"),
+  );
+  const version = rootPackage?.version;
+  if (typeof version !== "string") {
+    throw new Error("Root package.json has no version");
+  }
+  return version;
+};
 
 const cashuRedirect = (): Plugin => ({
   name: "cashu-redirect",
@@ -36,8 +48,8 @@ const lnurlProxy = (): Plugin => ({
   configureServer(server: ViteDevServer) {
     server.middlewares.use(
       async (req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
-        const url = req.url ?? "";
-        if (!url.startsWith("/api/lnurlp")) return next();
+        const url = new URL(req.url ?? "", "http://localhost");
+        if (url.pathname !== "/api/lnurlp") return next();
 
         if (req.method !== "GET") {
           res.statusCode = 405;
@@ -45,65 +57,26 @@ const lnurlProxy = (): Plugin => ({
           return;
         }
 
-        const parsed = new URL(url, "http://localhost");
-        const target = String(parsed.searchParams.get("url") ?? "").trim();
-        if (!/^https?:\/\//i.test(target)) {
-          res.statusCode = 400;
-          res.end("Invalid url");
-          return;
-        }
-
-        try {
-          const targetUrl = new URL(target);
-          const isHttps = targetUrl.protocol === "https:";
-          const client = isHttps ? https : http;
-
-          const proxyReq = client.request(
-            {
-              method: "GET",
-              hostname: targetUrl.hostname,
-              port: targetUrl.port
-                ? Number(targetUrl.port)
-                : isHttps
-                  ? 443
-                  : 80,
-              path: `${targetUrl.pathname}${targetUrl.search}`,
-              headers: {
-                Accept: "application/json",
-              },
-              timeout: 12_000,
+        await lnurlpHandler(
+          { query: Object.fromEntries(url.searchParams) },
+          {
+            setHeader: (name, value) => {
+              res.setHeader(name, value);
             },
-            (proxyRes) => {
-              res.statusCode = proxyRes.statusCode ?? 502;
-              const contentType = proxyRes.headers["content-type"];
-              if (contentType) {
-                res.setHeader("Content-Type", contentType);
-              } else {
-                res.setHeader("Content-Type", "application/json");
-              }
-              res.setHeader("Cache-Control", "no-store");
-              proxyRes.pipe(res);
+            status: (code) => {
+              res.statusCode = code;
+              return {
+                json: (body) => {
+                  res.setHeader("Content-Type", "application/json");
+                  res.end(JSON.stringify(body));
+                },
+                send: (body) => {
+                  res.end(body);
+                },
+              };
             },
-          );
-
-          proxyReq.on("timeout", () => {
-            proxyReq.destroy(new Error("Proxy timeout"));
-          });
-
-          proxyReq.on("error", (error) => {
-            if (res.headersSent) return;
-            res.statusCode = 502;
-            res.end(`Proxy error: ${String(error ?? "")}`);
-          });
-
-          proxyReq.end();
-        } catch (error) {
-          server.config.logger.error(
-            `LNURL proxy error: ${String(error ?? "unknown")}`,
-          );
-          res.statusCode = 502;
-          res.end(`Proxy error: ${String(error ?? "")}`);
-        }
+          },
+        );
       },
     );
   },
@@ -120,7 +93,7 @@ export default defineConfig({
     },
   },
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "0.1.0"),
+    __APP_VERSION__: JSON.stringify(readRootPackageVersion()),
   },
   plugins: [react(), cashuRedirect(), lnurlProxy()],
 });

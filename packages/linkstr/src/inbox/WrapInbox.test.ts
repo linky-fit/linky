@@ -1,12 +1,10 @@
 import { Duration, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect";
-import { generateSecretKey, getEventHash, getPublicKey } from "nostr-tools";
+import { getEventHash } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { encodeBankOfferRumor } from "../bankOffers/codec";
 import { BankOfferDraft, BankOfferId } from "../bankOffers/domain";
 import {
   ClientId,
-  NostrSecretKey,
-  Pubkey,
   RelayUrl,
   RumorId,
   UnixSeconds,
@@ -20,18 +18,13 @@ import { PaymentNoticeDraft } from "../paymentNotices/domain";
 import { encodeReactionRumor } from "../reactions/codec";
 import { Emoji, ReactionDraft } from "../reactions/domain";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
 import {
   makeRelayPoolTransport,
   NostrTransport,
 } from "../services/NostrTransport";
-import type {
-  RelayConnection,
-  RelayPool,
-  RelaySubscriptionParams,
-  NostrTransportService,
-} from "../services/NostrTransport";
+import type { NostrTransportService } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import { eventually, FakeRelay, makeIdentity, poolFor } from "../testing";
 import { InboxCursorStore } from "./InboxCursorStore";
 import { NIP59_BACKDATE_MARGIN_SECONDS, WrapInbox } from "./WrapInbox";
 import type {
@@ -39,11 +32,6 @@ import type {
   WrapInboxEvent,
   WrapInboxFeed,
 } from "./WrapInbox";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -125,62 +113,6 @@ const withRumorContent = (rumor: Rumor, content: string): Rumor => {
   return new Rumor({ ...fields, id: getEventHash(fields) });
 };
 
-interface FakeSubscription {
-  readonly filters: Array<Filter>;
-  readonly params: RelaySubscriptionParams;
-  closed: boolean;
-}
-
-class FakeRelay {
-  readonly subs: Array<FakeSubscription> = [];
-  connectAttempts = 0;
-  down = false;
-
-  readonly connection: RelayConnection = {
-    publish: () => Promise.resolve("stored"),
-    subscribe: (filters, params) => {
-      const subscription: FakeSubscription = { filters, params, closed: false };
-      this.subs.push(subscription);
-      return {
-        close: () => {
-          subscription.closed = true;
-        },
-      };
-    },
-  };
-
-  emit(event: NostrToolsEvent): void {
-    for (const subscription of this.subs) {
-      if (!subscription.closed) subscription.params.onevent(event);
-    }
-  }
-
-  eose(): void {
-    for (const subscription of this.subs) {
-      if (!subscription.closed) subscription.params.oneose?.();
-    }
-  }
-
-  closeFromRelay(reason: string): void {
-    for (const subscription of this.subs) {
-      if (!subscription.closed) {
-        subscription.closed = true;
-        subscription.params.onclose?.(reason);
-      }
-    }
-  }
-}
-
-const poolFor = (fakes: ReadonlyMap<string, FakeRelay>): RelayPool => ({
-  ensureRelay: (url) => {
-    const relay = fakes.get(url);
-    if (relay === undefined) return Promise.reject(new Error("unknown relay"));
-    relay.connectAttempts++;
-    if (relay.down) return Promise.reject(new Error("connection refused"));
-    return Promise.resolve(relay.connection);
-  },
-});
-
 const recordingCursorStore = (initial: UnixSeconds | null = null) => {
   const saved: Array<UnixSeconds> = [];
   let cursor = initial;
@@ -215,20 +147,6 @@ const dependenciesFor = (
       ),
     ),
   );
-
-const eventually = (predicate: () => boolean): Effect.Effect<void, Error> => {
-  const poll: Effect.Effect<void> = Effect.suspend(() =>
-    predicate()
-      ? Effect.void
-      : Effect.sleep(Duration.millis(2)).pipe(Effect.andThen(() => poll)),
-  );
-  return poll.pipe(
-    Effect.timeoutFail({
-      duration: Duration.seconds(2),
-      onTimeout: () => new Error("condition not met within 2s"),
-    }),
-  );
-};
 
 interface Harness {
   readonly feed: WrapInboxFeed;
@@ -470,8 +388,8 @@ describe("WrapInbox", () => {
       { cursorStore: store.layer },
       ({ collected }) =>
         Effect.gen(function* () {
-          yield* eventually(() => fakeA.subs.length === 1);
-          expect(fakeA.subs[0]?.filters).toEqual([
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          expect(fakeA.subscriptions[0]?.filters).toEqual([
             { kinds: [1059], "#p": [alice.pubkey] },
           ]);
 
@@ -500,8 +418,8 @@ describe("WrapInbox", () => {
       { since: UnixSeconds.make(1_755_000_000), cursorStore: store.layer },
       () =>
         Effect.gen(function* () {
-          yield* eventually(() => fakeA.subs.length === 1);
-          expect(fakeA.subs[0]?.filters[0]?.since).toBe(
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          expect(fakeA.subscriptions[0]?.filters[0]?.since).toBe(
             stored - NIP59_BACKDATE_MARGIN_SECONDS,
           );
         }),
@@ -523,7 +441,9 @@ describe("WrapInbox", () => {
       ({ collected }) =>
         Effect.gen(function* () {
           yield* eventually(
-            () => fakeA.subs.length === 1 && fakeB.subs.length === 1,
+            () =>
+              fakeA.subscriptions.length === 1 &&
+              fakeB.subscriptions.length === 1,
           );
           fakeA.emit(wrap);
           fakeB.emit(wrap);
@@ -545,7 +465,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.emit(misaddressed);
         fakeA.emit(forged);
         fakeA.emit({
@@ -594,7 +514,9 @@ describe("WrapInbox", () => {
       ({ collected }) =>
         Effect.gen(function* () {
           yield* eventually(
-            () => fakeA.subs.length === 1 && fakeB.subs.length === 1,
+            () =>
+              fakeA.subscriptions.length === 1 &&
+              fakeB.subscriptions.length === 1,
           );
           fakeA.emit(tampered);
           yield* eventually(() => collected.length === 1);
@@ -618,7 +540,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.emit(wrap);
         yield* eventually(() => collected.length === 1);
         expect(collected[0]?.event).toEqual(
@@ -639,7 +561,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.emit(wrap);
         yield* eventually(() => collected.length === 1);
         expect(collected[0]?.event).toEqual(
@@ -661,7 +583,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.emit(wrap);
         yield* eventually(() => collected.length === 1);
         expect(collected[0]?.event).toEqual(
@@ -686,7 +608,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.emit(wrap);
         yield* eventually(() => collected.length === 1);
         expect(collected[0]?.event).toEqual(
@@ -706,7 +628,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.emit(wrap);
         yield* eventually(() => collected.length === 1);
         expect(collected[0]?.event).toEqual(
@@ -728,8 +650,8 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], { since }, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
-        expect(fakeA.subs[0]?.filters[0]?.since).toBe(
+        yield* eventually(() => fakeA.subscriptions.length === 1);
+        expect(fakeA.subscriptions[0]?.filters[0]?.since).toBe(
           since - NIP59_BACKDATE_MARGIN_SECONDS,
         );
 
@@ -737,8 +659,8 @@ describe("WrapInbox", () => {
         yield* eventually(() => collected.length === 1);
 
         fakeA.closeFromRelay("connection reset");
-        yield* eventually(() => fakeA.subs.length === 2);
-        expect(fakeA.subs[1]?.filters[0]?.since).toBe(
+        yield* eventually(() => fakeA.subscriptions.length === 2);
+        expect(fakeA.subscriptions[1]?.filters[0]?.since).toBe(
           firstWrap.created_at - NIP59_BACKDATE_MARGIN_SECONDS,
         );
 
@@ -759,7 +681,7 @@ describe("WrapInbox", () => {
     await runOpen([[relayA, fakeA]], {}, () =>
       eventually(() => fakeA.connectAttempts >= 2),
     );
-    expect(fakeA.subs).toHaveLength(0);
+    expect(fakeA.subscriptions).toHaveLength(0);
   });
 
   it("tags wraps backfill before EOSE and live after", async () => {
@@ -769,7 +691,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.emit(storedWrap);
         fakeA.eose();
         fakeA.emit(liveWrap);
@@ -795,7 +717,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.eose();
         fakeA.emit(firstWrap);
         yield* eventually(() => collected.length === 1);
@@ -803,7 +725,7 @@ describe("WrapInbox", () => {
 
         // The reconnected relay replays its stored window: backfill again.
         fakeA.closeFromRelay("connection reset");
-        yield* eventually(() => fakeA.subs.length === 2);
+        yield* eventually(() => fakeA.subscriptions.length === 2);
         fakeA.emit(secondWrap);
         yield* eventually(() => collected.length === 2);
         expect(collected[1]?.delivery).toBe("backfill");
@@ -826,7 +748,9 @@ describe("WrapInbox", () => {
       ({ collected }) =>
         Effect.gen(function* () {
           yield* eventually(
-            () => fakeA.subs.length === 1 && fakeB.subs.length === 1,
+            () =>
+              fakeA.subscriptions.length === 1 &&
+              fakeB.subscriptions.length === 1,
           );
           fakeA.eose();
           fakeB.emit(wrap);
@@ -858,7 +782,7 @@ describe("WrapInbox", () => {
 
     await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
       Effect.gen(function* () {
-        yield* eventually(() => fakeA.subs.length === 1);
+        yield* eventually(() => fakeA.subscriptions.length === 1);
         fakeA.emit(firstWrap);
         fakeA.emit(secondWrap);
         yield* eventually(() => collected.length === 2);
@@ -882,18 +806,19 @@ describe("WrapInbox", () => {
         .pipe(Scope.extend(scope));
       const consumer = yield* Effect.fork(Stream.runDrain(feed.events));
       yield* eventually(
-        () => fakeA.subs.length === 1 && fakeB.subs.length === 1,
+        () =>
+          fakeA.subscriptions.length === 1 && fakeB.subscriptions.length === 1,
       );
 
       yield* Scope.close(scope, Exit.void);
       yield* Fiber.join(consumer);
 
-      expect(fakeA.subs.every((subscription) => subscription.closed)).toBe(
-        true,
-      );
-      expect(fakeB.subs.every((subscription) => subscription.closed)).toBe(
-        true,
-      );
+      expect(
+        fakeA.subscriptions.every((subscription) => subscription.closed),
+      ).toBe(true);
+      expect(
+        fakeB.subscriptions.every((subscription) => subscription.closed),
+      ).toBe(true);
     }).pipe(
       Effect.provide(
         dependenciesFor([

@@ -1,29 +1,19 @@
 import { Effect, Either, Exit, Layer } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-} from "../domain/primitives";
-import {
-  LINKY_PUSH_MARKER_TAG,
-  LINKY_PUSH_MARKER_VALUE,
-  unwrapToRumor,
-} from "../internal/giftWrap";
-import { firstTagValue, SignedWrapEvent } from "../internal/nostrEvent";
+import { ClientId, RelayUrl } from "../domain/primitives";
+import { unwrapToRumor } from "../internal/giftWrap";
+import type { SignedWrapEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import {
+  hasPushMarker,
+  makeIdentity,
+  recipientOf,
+  stubWrapTransport,
+} from "../testing";
 import { BankOffers } from "./BankOffers";
 import { BankOfferDraft, BankOfferId } from "./domain";
 import type { BankOfferStatus } from "./domain";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -31,40 +21,6 @@ const relayA = RelayUrl.make("wss://relay-a.test");
 const relayB = RelayUrl.make("wss://relay-b.test");
 const clientId = ClientId.make("client-42");
 const offerId = BankOfferId.make("offer-1");
-
-const recipientOf = (wrap: SignedWrapEvent): string | null =>
-  firstTagValue(wrap.tags, "p");
-
-const hasPushMarker = (wrap: SignedWrapEvent): boolean =>
-  wrap.tags.some(
-    (tag) =>
-      tag[0] === LINKY_PUSH_MARKER_TAG && tag[1] === LINKY_PUSH_MARKER_VALUE,
-  );
-
-const stubTransport = (
-  published: Array<SignedWrapEvent>,
-  acceptFor: (recipient: string | null) => boolean,
-): Layer.Layer<NostrTransport> =>
-  Layer.succeed(NostrTransport, {
-    publish: (relays, wrap) =>
-      Effect.sync(() => {
-        if (!(wrap instanceof SignedWrapEvent)) {
-          throw new Error("bank offers publish only gift wraps");
-        }
-        published.push(wrap);
-        const accepted = acceptFor(recipientOf(wrap));
-        return relays.map(
-          (relay) =>
-            new RelayPublishResult({
-              relay,
-              accepted,
-              detail: accepted ? null : "blocked",
-            }),
-        );
-      }),
-    subscribe: () => Effect.die("subscribe not under test"),
-    fetch: () => Effect.die("fetch not under test"),
-  });
 
 const runWith = <A, E>(
   transport: Layer.Layer<NostrTransport>,
@@ -104,15 +60,14 @@ describe("BankOffers.send", () => {
   it("publishes recipient-first and returns the snapshot receipt", async () => {
     const published: Array<SignedWrapEvent> = [];
     const exit = await runWith(
-      stubTransport(published, () => true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const bankOffers = yield* BankOffers;
         return yield* bankOffers.send(makeDraft("offered"));
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(published.map(recipientOf)).toEqual([bob.pubkey, alice.pubkey]);
     expect(exit.value).toEqual(
       expect.objectContaining({
@@ -126,11 +81,11 @@ describe("BankOffers.send", () => {
       }),
     );
     const recipientWrap = published[0];
-    if (recipientWrap === undefined) return;
+    assert(recipientWrap !== undefined);
     const rumor = Either.getOrThrow(
       unwrapToRumor(recipientWrap, bob.secretKey),
     );
-    expect(exit.value.snapshotId).toBe(rumor.id);
+    expect(exit.value.rumorId).toBe(rumor.id);
     expect(exit.value.content).toBe(rumor.content);
     expect(rumor.kind).toBe(24135);
     expect(JSON.parse(rumor.content)).toEqual(
@@ -153,7 +108,7 @@ describe("BankOffers.send", () => {
   ])("sets the $status push default", async ({ status, expected }) => {
     const published: Array<SignedWrapEvent> = [];
     await runWith(
-      stubTransport(published, () => true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const bankOffers = yield* BankOffers;
         return yield* bankOffers.send(makeDraft(status));
@@ -176,7 +131,7 @@ describe("BankOffers.send", () => {
     async ({ status, pushMark, expected }) => {
       const published: Array<SignedWrapEvent> = [];
       await runWith(
-        stubTransport(published, () => true),
+        stubWrapTransport(published),
         Effect.gen(function* () {
           const bankOffers = yield* BankOffers;
           return yield* bankOffers.send(makeDraft(status, pushMark));
@@ -192,7 +147,7 @@ describe("BankOffers.send", () => {
   it("does not publish the self copy when the recipient is rejected", async () => {
     const published: Array<SignedWrapEvent> = [];
     const exit = await runWith(
-      stubTransport(published, () => false),
+      stubWrapTransport(published, () => false),
       Effect.gen(function* () {
         const bankOffers = yield* BankOffers;
         return yield* bankOffers.send(makeDraft("accepted"));
@@ -224,15 +179,14 @@ describe("BankOffers.send", () => {
   it("succeeds when the recipient lands and the best-effort self copy fails", async () => {
     const published: Array<SignedWrapEvent> = [];
     const exit = await runWith(
-      stubTransport(published, (recipient) => recipient === bob.pubkey),
+      stubWrapTransport(published, (wrap) => recipientOf(wrap) === bob.pubkey),
       Effect.gen(function* () {
         const bankOffers = yield* BankOffers;
         return yield* bankOffers.send(makeDraft("settled"));
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.recipientCopy.accepted).toBe(true);
     expect(exit.value.selfCopy.accepted).toBe(false);
   });

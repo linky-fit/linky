@@ -87,23 +87,25 @@ export class EditMessageDraft extends Schema.Class<EditMessageDraft>(
   sentAt: Schema.optional(UnixSeconds),
 }) {}
 
-export class ChatMessageReceipt extends Schema.Class<ChatMessageReceipt>(
+export class ChatMessageReceipt extends Schema.TaggedClass<ChatMessageReceipt>()(
   "ChatMessageReceipt",
-)({
-  messageId: RumorId,
-  clientId: ClientId,
-  sentAt: UnixSeconds,
-  selfCopy: WrapDelivery,
-  recipientCopy: WrapDelivery,
-}) {}
+  {
+    rumorId: RumorId,
+    clientId: ClientId,
+    sentAt: UnixSeconds,
+    selfCopy: WrapDelivery,
+    recipientCopy: WrapDelivery,
+  },
+) {}
 
-export class MessageEditReceipt extends Schema.Class<MessageEditReceipt>(
+export class MessageEditReceipt extends Schema.TaggedClass<MessageEditReceipt>()(
   "MessageEditReceipt",
-)({
-  messageId: RumorId,
-  editOf: RumorId,
-  clientId: ClientId,
-  sentAt: UnixSeconds,
-  selfCopy: WrapDelivery,
-  recipientCopy: WrapDelivery,
-}) {}
+  {
+    rumorId: RumorId,
+    editOf: RumorId,
+    clientId: ClientId,
+    sentAt: UnixSeconds,
+    selfCopy: WrapDelivery,
+    recipientCopy: WrapDelivery,
+  },
+) {}

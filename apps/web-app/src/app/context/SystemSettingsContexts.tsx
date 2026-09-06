@@ -1,10 +1,11 @@
+import type { MintIcon } from "../../utils/mint";
 /* eslint-disable react-refresh/only-export-components */
-import type { OwnerId, SyncOwner } from "@evolu/common";
+import type { EvoluError, OwnerId, SyncOwner } from "@evolu/common";
 import React from "react";
 import type { EvoluServerStatus } from "../../evolu";
 import type { PasswordManagerSaveResult } from "../../platform/passwordManager";
 import type { ProbeLightningFee } from "../hooks/composition/useLinkshuComposition";
-import type { LocalMintInfoRow, MintUrlInput } from "../types/appTypes";
+import type { LocalMintInfoRow } from "../types/appTypes";
 
 export interface AdvancedSettingsContextValue {
   copyNostrKeys: () => Promise<void>;
@@ -47,6 +48,7 @@ export interface EvoluSettingsContextValue {
   evoluContactsOwnerPointer: string;
   evoluDatabaseBytes: number | null;
   evoluHasError: boolean;
+  evoluErrorType: EvoluError["type"] | null;
   evoluHistoryAllowedOwnerIds: readonly string[];
   evoluHistoryCount: number | null;
   evoluMessagesOwnerEditsUntilRotation: number;
@@ -84,13 +86,6 @@ export interface EvoluSettingsContextValue {
   wipeEvoluStorage: () => Promise<void>;
 }
 
-interface MintIcon {
-  failed: boolean;
-  host: string | null;
-  origin: string | null;
-  url: string | null;
-}
-
 export interface MintSettingsContextValue {
   appOwnerIdRef: React.RefObject<OwnerId | null>;
   applyDefaultMintSelection: (mint: string) => Promise<void>;
@@ -98,7 +93,7 @@ export interface MintSettingsContextValue {
   cashuMeltToMainMintButtonLabel: string | null;
   defaultMintUrl: string | null;
   defaultMintUrlDraft: string;
-  getMintIconUrl: (mint: MintUrlInput) => MintIcon;
+  getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   getMintRuntime: (
     url: string,
   ) => { lastCheckedAtSec: number; latencyMs: number | null } | null;

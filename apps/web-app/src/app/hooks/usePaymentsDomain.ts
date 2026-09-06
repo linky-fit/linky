@@ -3,6 +3,7 @@ import type {
   ContactIdentityRowLike,
   LocalPendingPayment,
 } from "../types/appTypes";
+import type { Translate } from "../../i18n";
 
 interface PayResult {
   error?: string;
@@ -25,7 +26,7 @@ interface UsePaymentsDomainParams<TContact extends ContactIdentityRowLike> {
   pushToast: (message: string) => void;
   removePendingPayment: (id: string) => void;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
@@ -53,8 +54,7 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
       try {
         for (const pending of pendingPayments) {
           const contact = contacts.find(
-            (candidate) =>
-              String(candidate.id ?? "") === String(pending.contactId ?? ""),
+            (candidate) => (candidate.id ?? "") === pending.contactId,
           );
 
           if (!contact) {
@@ -62,7 +62,7 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
             continue;
           }
 
-          const amountSat = Number(pending.amountSat ?? 0) || 0;
+          const amountSat = pending.amountSat || 0;
           if (amountSat <= 0) {
             removePendingPayment(pending.id);
             continue;
@@ -126,8 +126,4 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
   React.useEffect(() => {
     void flushPendingPayments();
   }, [currentNsec, contacts, pendingPayments.length, flushPendingPayments]);
-
-  return {
-    flushPendingPayments,
-  };
 };

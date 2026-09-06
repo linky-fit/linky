@@ -10,8 +10,6 @@ describe("parseBip321Uri", () => {
     expect(parseBip321Uri("")).toBeNull();
     expect(parseBip321Uri("lnbc1...")).toBeNull();
     expect(parseBip321Uri("https://example.com")).toBeNull();
-    expect(parseBip321Uri(null)).toBeNull();
-    expect(parseBip321Uri(undefined)).toBeNull();
   });
 
   it("accepts a bare address (BIP 21 style)", () => {
@@ -123,8 +121,8 @@ describe("parseBip321Uri", () => {
     });
 
     expect(uri).toBe("bitcoin:?lightning=lnbc1abc&creq=creqAabc123");
-    expect(parseBip321Uri(uri)?.lightning).toBe("lnbc1abc");
-    expect(parseBip321Uri(uri)?.creq).toBe("creqAabc123");
+    expect(parseBip321Uri(uri ?? "")?.lightning).toBe("lnbc1abc");
+    expect(parseBip321Uri(uri ?? "")?.creq).toBe("creqAabc123");
   });
 });
 

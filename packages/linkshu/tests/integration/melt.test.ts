@@ -1,62 +1,24 @@
-import { Mint, Wallet, getEncodedToken } from "@cashu/cashu-ts";
 import { Effect } from "effect";
 import {
   Amount,
-  Bip39Seed,
-  Bolt11Invoice,
   Melt,
   MeltDraft,
-  MintUrl,
   Receive,
   ReceiveDraft,
   Restore,
   RestoreDraft,
+  runLinkshu,
   Send,
   SendDraft,
   TokenStore,
-  parseTokenText,
-  runLinkshu,
 } from "../../src";
-import type { Bip39Seed as Bip39SeedType, StoredTokenRow } from "../../src";
-
-// The dev-stack Nutshell FakeWallet mint (docker-compose.dev.yml `cashu-mint`)
-// can pay any bolt11 invoice with fake sats, so a mint quote's `request` is a
-// payable invoice for the melt under test.
-const mintUrl = MintUrl.make(
-  process.env.LINKSHU_MINT_URL ?? "http://localhost:3338",
-);
-
-// Fresh seed per run: deterministic counters live at the mint, so a reused
-// seed would start every run inside an already-signed counter range.
-const randomSeed = (): Bip39SeedType =>
-  Bip39Seed.make(crypto.getRandomValues(new Uint8Array(64)));
-
-/** Mints fresh sats via a bolt11 quote the FakeWallet backend auto-settles. */
-const fundToken = async (amountSat: number): Promise<string> => {
-  const wallet = new Wallet(new Mint(mintUrl), { unit: "sat" });
-  await wallet.loadMint();
-  const quote = await wallet.createMintQuoteBolt11(amountSat);
-  const proofs = await wallet.mintProofsBolt11(amountSat, quote, undefined, {
-    type: "random",
-  });
-  return getEncodedToken({ mint: mintUrl, unit: "sat", proofs });
-};
-
-/** A bolt11 invoice the FakeWallet backend can "pay": a mint quote's request. */
-const invoiceFor = async (amountSat: number): Promise<Bolt11Invoice> => {
-  const wallet = new Wallet(new Mint(mintUrl), { unit: "sat" });
-  await wallet.loadMint();
-  const quote = await wallet.createMintQuoteBolt11(amountSat);
-  return Bolt11Invoice.make(quote.request);
-};
-
-const acceptedTotalOf = (rows: ReadonlyArray<StoredTokenRow>): number =>
-  rows
-    .filter((row) => row.state === "accepted")
-    .reduce(
-      (sum, row) => sum + (parseTokenText(row.tokenText)?.amount ?? 0),
-      0,
-    );
+import {
+  acceptedTotalOf,
+  fundToken,
+  invoiceFor,
+  mintUrl,
+  randomSeed,
+} from "./helpers";
 
 describe("melt vertical against the local mint", () => {
   it("pays a bolt11 invoice with correct fee and change accounting, and restore reproduces the state", async () => {

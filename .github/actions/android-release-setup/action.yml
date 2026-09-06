@@ -1,0 +1,66 @@
+name: Android release setup
+description: Restore the Firebase config and upload keystore from secrets and set a CI-unique Android version code
+
+inputs:
+  google-services-json-base64:
+    description: Base64-encoded google-services.json
+    required: true
+  upload-keystore-base64:
+    description: Base64-encoded upload keystore (.jks)
+    required: true
+  upload-store-password:
+    description: Upload keystore password
+    required: true
+  upload-key-alias:
+    description: Upload key alias
+    required: true
+  upload-key-password:
+    description: Upload key password
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Restore Android Firebase config
+      shell: bash
+      env:
+        ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ inputs.google-services-json-base64 }}
+      run: |
+        if [[ -z "${ANDROID_GOOGLE_SERVICES_JSON_BASE64}" ]]; then
+          echo "Missing ANDROID_GOOGLE_SERVICES_JSON_BASE64 secret" >&2
+          exit 1
+        fi
+
+        echo "${ANDROID_GOOGLE_SERVICES_JSON_BASE64}" | base64 --decode > apps/native-shell/android/app/google-services.json
+
+    - name: Restore Android signing key
+      shell: bash
+      env:
+        ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ inputs.upload-keystore-base64 }}
+        ANDROID_UPLOAD_STORE_PASSWORD: ${{ inputs.upload-store-password }}
+        ANDROID_UPLOAD_KEY_ALIAS: ${{ inputs.upload-key-alias }}
+        ANDROID_UPLOAD_KEY_PASSWORD: ${{ inputs.upload-key-password }}
+      run: |
+        if [[ -z "${ANDROID_UPLOAD_KEYSTORE_BASE64}" ]]; then
+          echo "Missing ANDROID_UPLOAD_KEYSTORE_BASE64 secret" >&2
+          exit 1
+        fi
+
+        if [[ -z "${ANDROID_UPLOAD_STORE_PASSWORD}" || -z "${ANDROID_UPLOAD_KEY_ALIAS}" || -z "${ANDROID_UPLOAD_KEY_PASSWORD}" ]]; then
+          echo "Missing Android signing password or alias secret" >&2
+          exit 1
+        fi
+
+        keystore_path="$RUNNER_TEMP/linky-upload-key.jks"
+        echo "${ANDROID_UPLOAD_KEYSTORE_BASE64}" | base64 --decode > "$keystore_path"
+
+        cat > apps/native-shell/android/keystore.properties <<EOF
+        storeFile=$keystore_path
+        storePassword=${ANDROID_UPLOAD_STORE_PASSWORD}
+        keyAlias=${ANDROID_UPLOAD_KEY_ALIAS}
+        keyPassword=${ANDROID_UPLOAD_KEY_PASSWORD}
+        EOF
+
+    - name: Compute CI Android version code
+      shell: bash
+      run: echo "LINKY_ANDROID_VERSION_CODE=$((100000000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"

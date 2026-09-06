@@ -4,7 +4,7 @@ import { useEvolu } from "../evolu";
 import { useToasts } from "../hooks/useToasts";
 import type { IdentityChangeMessageSource } from "./lib/identityChangeMessage";
 import { useAppLanguage } from "./hooks/useAppLanguage";
-import { useProfileAuthComposition } from "./hooks/composition/useProfileAuthComposition";
+import { useProfileAuthDomain } from "./hooks/useProfileAuthDomain";
 
 export const useUnauthenticatedAppShellComposition = () => {
   const { upsert } = useEvolu();
@@ -18,7 +18,7 @@ export const useUnauthenticatedAppShellComposition = () => {
     | null
   >(null);
   const myProfileMetadataRef = React.useRef<ProfileMetadata | null>(null);
-  const onboarding = useProfileAuthComposition({
+  const onboarding = useProfileAuthDomain({
     appendIdentityChangeNoticesRef,
     currentNsec: null,
     lang,

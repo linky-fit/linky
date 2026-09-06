@@ -1,5 +1,10 @@
+import type { Translate } from "../../i18n";
 import { formatShortNpub, previewTokenText } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
+import {
+  getBankPaymentOfferStatusLabel,
+  getLinkyBankPaymentOfferInfo,
+} from "./bankPaymentOffer";
 import {
   parseCashuPaymentRequestMessage,
   parseLinkyPaymentRequestDeclineMessage,
@@ -9,10 +14,6 @@ import {
   privateImagePreviewText,
 } from "./privateImageMessage";
 import { extractCashuTokenFromText } from "./tokenText";
-import {
-  getLinkyBankPaymentOfferInfo,
-  type LinkyBankPaymentOfferStatus,
-} from "./bankPaymentOffer";
 
 const PREVIEW_NPUB_PATTERN =
   /(?:nostr:)?npub1[023456789acdefghjklmnpqrstuvwxyz]+(?:@npub\.cash)?/gi;
@@ -34,30 +35,8 @@ interface FormatChatMessagePreviewArgs {
   content: string;
   direction?: "in" | "out" | null;
   formatDisplayedAmountText: (amountSat: number) => string;
-  t: (key: string) => string;
+  t: Translate;
 }
-
-const getBankPaymentOfferStatusPreviewKey = (
-  status: LinkyBankPaymentOfferStatus,
-): string => {
-  switch (status) {
-    case "accepted":
-      return "bankPaymentOfferStatusAccepted";
-    case "accepted_by_other":
-      return "bankPaymentOfferStatusAcceptedByOther";
-    case "bank_details_sent":
-      return "bankPaymentOfferStatusBankDetailsSent";
-    case "bank_paid":
-      return "bankPaymentOfferStatusBankPaid";
-    case "declined":
-      return "bankPaymentOfferStatusDeclined";
-    case "settled":
-      return "bankPaymentOfferStatusSettled";
-    case "canceled":
-    case "offered":
-      return "";
-  }
-};
 
 export const formatChatMessagePreviewText = ({
   content,
@@ -83,10 +62,7 @@ export const formatChatMessagePreviewText = ({
       return t("bankPaymentOfferPreviewCanceled");
     }
 
-    const statusKey = getBankPaymentOfferStatusPreviewKey(
-      bankPaymentOffer.status,
-    );
-    return `${t("bankPaymentOfferTitle")}: ${t(statusKey)}`;
+    return `${t("bankPaymentOfferTitle")}: ${getBankPaymentOfferStatusLabel(bankPaymentOffer.status, false, t)}`;
   }
 
   const paymentRequest = parseCashuPaymentRequestMessage(content);

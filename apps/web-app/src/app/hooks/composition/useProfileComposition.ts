@@ -12,6 +12,7 @@ import { getInitialShowProfileQrOnTiltEnabled } from "../../../utils/storage";
 import { usePortraitOrientationLock } from "../usePortraitOrientationLock";
 import { useProfileEditor } from "../profile/useProfileEditor";
 import { useProfileStatusEditor } from "../profile/useProfileStatusEditor";
+import type { Translate } from "../../../i18n";
 
 interface UseProfileCompositionParams {
   currentNpub: string | null;
@@ -23,7 +24,7 @@ interface UseProfileCompositionParams {
   nostrStatusByNpub: Record<string, string | null>;
   route: ReturnType<typeof useRouting>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const useProfileComposition = ({
@@ -129,7 +130,7 @@ export const useProfileComposition = ({
   // The own pubkey is part of the profile watch; mirror its map entries into
   // the my-profile state the editor also writes optimistically.
   const ownNpub = React.useMemo(
-    () => normalizeNpubIdentifier(currentNpub),
+    () => normalizeNpubIdentifier(currentNpub ?? ""),
     [currentNpub],
   );
   const watchedMetadata = ownNpub
@@ -194,25 +195,18 @@ export const useProfileComposition = ({
     }
   }, [isProfileEditing, route.kind, toggleProfileEditing]);
 
-  // Intentionally no automatic publishing of kind-0 profile metadata.
-  // We only publish profile changes when the user does so explicitly.
-
   const openProfileQr = React.useCallback(() => {
     navigateTo({ route: "profile" });
   }, []);
 
   return {
     cycleProfileAvatarControl,
-    defaultLightningAddress,
     derivedProfile,
     effectiveMyLightningAddress,
     effectiveProfileName,
     effectiveProfilePicture,
     isProfileEditing,
-    myProfileLnAddress,
     myProfileMetadata,
-    myProfileName,
-    myProfilePicture,
     myProfileQr,
     myProfileStatus,
     npubCashInfoInFlightRef,
@@ -239,12 +233,7 @@ export const useProfileComposition = ({
     saveProfileEdits,
     selectedProfileStatusCurrencies,
     setIsProfileEditing,
-    setMyProfileLnAddress,
-    setMyProfileMetadata,
-    setMyProfileName,
-    setMyProfilePicture,
     setMyProfileQr,
-    setMyProfileStatus,
     setOwnedProfileLightningAddresses,
     setOwnedProfileLightningAddressesLoading,
     setProfileEditLnAddress,

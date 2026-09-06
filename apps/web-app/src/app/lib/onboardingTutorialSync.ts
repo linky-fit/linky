@@ -36,7 +36,7 @@ export const hasDismissedOnboardingTutorialOwnerMetaRow = (
   ownerId: Evolu.OwnerId | null,
 ): boolean => {
   if (!ownerId) return false;
-  const expectedOwnerId = String(ownerId);
+  const expectedOwnerId = ownerId;
 
   return rows.some((row) => {
     if (!("ownerId" in row) || String(row.ownerId) !== expectedOwnerId) {

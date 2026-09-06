@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { InspectorRow } from "../../devtools/inspector";
-import { reportInspectorRows } from "../../devtools/inspector";
+import type { InspectorRow } from "../../devtools/inspector/inspectorRows";
+import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
 import {
   downloadPrivateImageBlob,
   isCancelledShareError,
@@ -8,7 +8,7 @@ import {
   sharePrivateImageBlob,
 } from "./privateImageFile";
 
-vi.mock("../../devtools/inspector", () => ({
+vi.mock("../../devtools/inspector/reportInspectorRows", () => ({
   reportInspectorRows: vi.fn(),
 }));
 

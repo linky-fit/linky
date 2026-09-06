@@ -6,6 +6,7 @@ const SW_BUILD_TAG = "linky-sw-2026-08-14T00:00-linkstr-wrap-fetch";
 const NOTIFICATION_OPEN_URL = "/#contacts";
 const NOTIFICATION_OPEN_HASH_PARAM = "notificationOpen";
 
+import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import {
   encodeNpub,
   identityFromNsec,
@@ -24,16 +25,17 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { CacheFirst } from "workbox-strategies";
 import { normalizePubkeyHex } from "./app/hooks/messages/contactIdentity";
 import { getLinkyBankPaymentOfferMessageText } from "./app/lib/bankPaymentOffer";
+import { extractCashuTokenFromText } from "./app/lib/tokenText";
 import {
   getBankPaymentReimbursementCopyForLanguage,
   getChatAttachmentCopyForLanguage,
   getReceivedMoneyCopyForLanguage,
-  isCashuNotificationMessage,
 } from "./app/lib/cashuNotificationCopy";
 import { NOSTR_RELAYS } from "./utils/nostrRelays";
 import { getStoredPushContactName } from "./utils/pushContactNamesStorage";
-import { appendPushDebugLog } from "./utils/pushDebugLog";
+import { appendPushDebugLog, flushPushDebugLog } from "./utils/pushDebugLog";
 import { getStoredPushNsec } from "./utils/pushNsecStorage";
+import { formatShortNpub } from "./utils/formatting";
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -65,16 +67,6 @@ interface DecryptedPushMessage {
   isCashu: boolean;
   isPaymentNotice: boolean;
   senderPub: string;
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error ?? "");
-}
-
-function readEnvelopeDebugMeta(
-  envelope: PushNotificationEnvelope,
-): PushNotificationData {
-  return envelope.data ?? {};
 }
 
 function readPushNotificationData(value: unknown): PushNotificationData {
@@ -156,14 +148,8 @@ function hasVisibleWindowClient(clientList: readonly WindowClient[]): boolean {
   );
 }
 
-async function logSw(message: string, details?: unknown): Promise<void> {
-  await appendPushDebugLog("sw", message, details);
-}
-
-function isRecord(
-  value: unknown,
-): value is Record<string | number | symbol, unknown> {
-  return typeof value === "object" && value !== null;
+function logSw(message: string, details?: unknown): void {
+  appendPushDebugLog("sw", message, details);
 }
 
 function readPushEnvelope(value: unknown): PushNotificationEnvelope | null {
@@ -190,15 +176,8 @@ function truncateNotificationBody(value: string): string {
   return `${normalized.slice(0, 140)}…`;
 }
 
-function formatShortNpub(value: string): string {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) return "";
-  if (trimmed.length <= 18) return trimmed;
-  return `${trimmed.slice(0, 10)}...${trimmed.slice(-6)}`;
-}
-
 function formatNotificationPeerLabel(pubkeyHex: string): string {
-  const normalized = String(pubkeyHex ?? "").trim();
+  const normalized = pubkeyHex.trim();
   if (!normalized) return "";
 
   const pubkey = parsePubkey(normalized);
@@ -210,7 +189,7 @@ function buildNotificationTitle(
   decryptedMessage: DecryptedPushMessage | null,
   senderContactName: string | null,
 ): string {
-  const contactName = String(senderContactName ?? "").trim();
+  const contactName = (senderContactName ?? "").trim();
   if (contactName) return `Linky - ${contactName}`;
 
   const senderLabel = decryptedMessage
@@ -256,10 +235,10 @@ async function fetchWrapInboxEvent(
   envelope: PushNotificationEnvelope,
   secretKey: NostrSecretKey,
 ): Promise<WrapInboxEvent | null> {
-  const outerEventId = String(envelope.data?.outerEventId ?? "").trim();
+  const outerEventId = (envelope.data?.outerEventId ?? "").trim();
   if (!isWrapId(outerEventId)) {
-    void logSw("sw decrypt fetch skipped because push envelope is incomplete", {
-      data: readEnvelopeDebugMeta(envelope),
+    logSw("sw decrypt fetch skipped because push envelope is incomplete", {
+      data: envelope.data ?? {},
     });
     return null;
   }
@@ -268,14 +247,14 @@ async function fetchWrapInboxEvent(
   const extraRelays = (envelope.data?.relayHints ?? []).filter(isRelayUrl);
   const relays = Array.from(new Set([...readRelays, ...extraRelays]));
   if (relays.length === 0) {
-    void logSw("sw decrypt fetch skipped because no relays were available", {
-      data: readEnvelopeDebugMeta(envelope),
+    logSw("sw decrypt fetch skipped because no relays were available", {
+      data: envelope.data ?? {},
     });
     return null;
   }
 
-  void logSw("sw decrypt fetching outer wrap", {
-    data: readEnvelopeDebugMeta(envelope),
+  logSw("sw decrypt fetching outer wrap", {
+    data: envelope.data ?? {},
     relayCount: relays.length,
     relays,
   });
@@ -290,16 +269,16 @@ async function fetchWrapInboxEvent(
         }),
       ),
     );
-    void logSw("sw decrypt outer wrap fetch completed", {
-      data: readEnvelopeDebugMeta(envelope),
+    logSw("sw decrypt outer wrap fetch completed", {
+      data: envelope.data ?? {},
       found: event !== null,
       routedTag: event?._tag ?? null,
     });
     return event;
   } catch (error) {
-    void logSw("sw decrypt outer wrap fetch failed", {
-      data: readEnvelopeDebugMeta(envelope),
-      error: describeError(error),
+    logSw("sw decrypt outer wrap fetch failed", {
+      data: envelope.data ?? {},
+      error: getUnknownErrorMessage(error, ""),
     });
     return null;
   }
@@ -311,7 +290,7 @@ function buildChatPushMessage(
   const { body } = event;
   if (
     body._tag === "TokenBody" ||
-    (body._tag === "TextBody" && isCashuNotificationMessage(body.text))
+    (body._tag === "TextBody" && extractCashuTokenFromText(body.text) !== null)
   ) {
     return {
       body: getReceivedMoneyCopyForLanguage(self.navigator.language),
@@ -377,22 +356,22 @@ function buildDecryptedPushMessage(
 async function decryptIncomingMessageBody(
   envelope: PushNotificationEnvelope,
 ): Promise<DecryptedPushMessage | null> {
-  void logSw("sw decrypt started", {
-    data: readEnvelopeDebugMeta(envelope),
+  logSw("sw decrypt started", {
+    data: envelope.data ?? {},
   });
 
   const nsec = await getStoredPushNsec();
   if (!nsec) {
-    void logSw("sw decrypt failed because nsec is missing from indexeddb", {
-      data: readEnvelopeDebugMeta(envelope),
+    logSw("sw decrypt failed because nsec is missing from indexeddb", {
+      data: envelope.data ?? {},
     });
     return null;
   }
 
   const identity = identityFromNsec(nsec);
   if (!identity) {
-    void logSw("sw decrypt failed because stored nsec is invalid", {
-      data: readEnvelopeDebugMeta(envelope),
+    logSw("sw decrypt failed because stored nsec is invalid", {
+      data: envelope.data ?? {},
     });
     return null;
   }
@@ -400,8 +379,8 @@ async function decryptIncomingMessageBody(
   const { pubkey: myPubHex, secretKey } = identity;
   const recipientPubkey = normalizePubkeyHex(envelope.data?.recipientPubkey);
   if (!recipientPubkey || recipientPubkey !== myPubHex) {
-    void logSw("sw decrypt failed because recipient pubkey did not match", {
-      data: readEnvelopeDebugMeta(envelope),
+    logSw("sw decrypt failed because recipient pubkey did not match", {
+      data: envelope.data ?? {},
       derivedPubkey: myPubHex,
       hasRecipientPubkey: Boolean(recipientPubkey),
     });
@@ -410,23 +389,23 @@ async function decryptIncomingMessageBody(
 
   const event = await fetchWrapInboxEvent(envelope, secretKey);
   if (event === null) {
-    void logSw("sw decrypt failed because outer wrap event was not fetched", {
-      data: readEnvelopeDebugMeta(envelope),
+    logSw("sw decrypt failed because outer wrap event was not fetched", {
+      data: envelope.data ?? {},
     });
     return null;
   }
 
   const message = buildDecryptedPushMessage(event);
   if (message === null) {
-    void logSw("sw decrypt produced no notification copy for routed event", {
-      data: readEnvelopeDebugMeta(envelope),
+    logSw("sw decrypt produced no notification copy for routed event", {
+      data: envelope.data ?? {},
       routedTag: event._tag,
     });
     return null;
   }
 
-  void logSw("sw decrypt succeeded", {
-    data: readEnvelopeDebugMeta(envelope),
+  logSw("sw decrypt succeeded", {
+    data: envelope.data ?? {},
     isCashuMessage: message.isCashu,
     isPaymentNotice: message.isPaymentNotice,
     senderPub: message.senderPub,
@@ -467,21 +446,34 @@ registerRoute(
   }),
 );
 
+// Debug entries are written in batches; lifecycle handlers hold the worker
+// open until the batch lands so a stopped worker does not lose them.
 self.addEventListener("install", (event) => {
-  event.waitUntil(logSw("service worker install", { build: SW_BUILD_TAG }));
+  logSw("service worker install", { build: SW_BUILD_TAG });
+  event.waitUntil(flushPushDebugLog());
 });
 
 // vite-plugin-pwa registerType:"prompt" — the client posts SKIP_WAITING when
 // the user accepts the update banner; without this the new SW would sit in
 // the waiting state forever.
 self.addEventListener("message", (event: ExtendableMessageEvent) => {
-  const data = event.data as { type?: unknown } | null;
-  if (data && typeof data === "object" && data.type === "SKIP_WAITING") {
+  const data: unknown = event.data;
+  if (
+    data &&
+    typeof data === "object" &&
+    "type" in data &&
+    data.type === "SKIP_WAITING"
+  ) {
     void self.skipWaiting();
   }
   // Lets a freshly loaded tab check whether it is the only open client
   // before silently applying a pending update (see utils/pwaUpdate.ts).
-  if (data && typeof data === "object" && data.type === "CLIENT_COUNT") {
+  if (
+    data &&
+    typeof data === "object" &&
+    "type" in data &&
+    data.type === "CLIENT_COUNT"
+  ) {
     const port = event.ports[0];
     if (!port) return;
     event.waitUntil(
@@ -495,13 +487,12 @@ self.addEventListener("message", (event: ExtendableMessageEvent) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    Promise.all([self.clients.claim(), logSw("service worker activate")]),
-  );
+  logSw("service worker activate");
+  event.waitUntil(Promise.all([self.clients.claim(), flushPushDebugLog()]));
 });
 
 self.addEventListener("error", (event: ErrorEvent) => {
-  void logSw("service worker error", {
+  logSw("service worker error", {
     filename: event.filename,
     line: event.lineno,
     message: event.message,
@@ -509,14 +500,15 @@ self.addEventListener("error", (event: ErrorEvent) => {
 });
 
 self.addEventListener("unhandledrejection", (event: PromiseRejectionEvent) => {
-  void logSw("service worker unhandled rejection", {
-    reason: describeError(event.reason),
+  logSw("service worker unhandled rejection", {
+    reason: getUnknownErrorMessage(event.reason, ""),
   });
 });
 
 self.addEventListener("push", (event) => {
   if (!event.data) {
-    event.waitUntil(logSw("push event without data"));
+    logSw("push event without data");
+    event.waitUntil(flushPushDebugLog());
     return;
   }
 
@@ -524,25 +516,22 @@ self.addEventListener("push", (event) => {
   try {
     envelope = readPushEnvelope(event.data.json());
   } catch (error) {
-    event.waitUntil(
-      logSw("push event JSON parse failed", {
-        error: describeError(error),
-      }),
-    );
+    logSw("push event JSON parse failed", {
+      error: getUnknownErrorMessage(error, ""),
+    });
     envelope = null;
   }
   if (!envelope) {
-    event.waitUntil(logSw("push event ignored because envelope was invalid"));
+    logSw("push event ignored because envelope was invalid");
+    event.waitUntil(flushPushDebugLog());
     return;
   }
 
   const data = envelope.data ?? { type: "nostr_inbox" };
-  event.waitUntil(
-    logSw("push event parsed", {
-      data,
-      title: envelope.title ?? "Linky",
-    }),
-  );
+  logSw("push event parsed", {
+    data,
+    title: envelope.title ?? "Linky",
+  });
 
   if ("setAppBadge" in navigator) {
     navigator.setAppBadge().catch(() => {
@@ -556,16 +545,14 @@ self.addEventListener("push", (event) => {
       const clientList = await getWindowClients();
       const shouldSuppressNotification = hasVisibleWindowClient(clientList);
       if (shouldSuppressNotification) {
-        await Promise.all([
-          logSw("notification suppressed because app client is visible", {
-            data,
-            tag: data.outerEventId ?? "linky-inbox",
-          }),
-          postClientMessage({
-            data,
-            type: "push-received",
-          }),
-        ]);
+        logSw("notification suppressed because app client is visible", {
+          data,
+          tag: data.outerEventId ?? "linky-inbox",
+        });
+        await postClientMessage({
+          data,
+          type: "push-received",
+        });
         return;
       }
 
@@ -601,20 +588,19 @@ self.addEventListener("push", (event) => {
         tag: data.outerEventId ?? "linky-inbox",
       };
 
+      logSw("push received", {
+        data,
+        hasDecryptedBody: Boolean(decryptedMessage),
+        hasSenderContactName: Boolean(senderContactName),
+        hasWindowClient: clientList.length > 0,
+        isCashuMessage: decryptedMessage?.isCashu ?? false,
+        isPaymentNotice: decryptedMessage?.isPaymentNotice ?? false,
+        shouldSuppressNotification,
+        usedFallbackBody: decryptedMessage === null && fallbackBody.length > 0,
+        tag: options.tag ?? null,
+        title: notificationTitle,
+      });
       await Promise.all([
-        logSw("push received", {
-          data,
-          hasDecryptedBody: Boolean(decryptedMessage),
-          hasSenderContactName: Boolean(senderContactName),
-          hasWindowClient: clientList.length > 0,
-          isCashuMessage: decryptedMessage?.isCashu ?? false,
-          isPaymentNotice: decryptedMessage?.isPaymentNotice ?? false,
-          shouldSuppressNotification,
-          usedFallbackBody:
-            decryptedMessage === null && fallbackBody.length > 0,
-          tag: options.tag ?? null,
-          title: notificationTitle,
-        }),
         postClientMessage({
           data,
           type: "push-received",
@@ -634,21 +620,20 @@ self.addEventListener("push", (event) => {
           .catch((error) =>
             logSw("notification display failed", {
               data,
-              error: describeError(error),
+              error: getUnknownErrorMessage(error, ""),
             }),
           ),
       ]);
-    })(),
+    })().finally(flushPushDebugLog),
   );
 });
 
 self.addEventListener("notificationclose", (event) => {
-  event.waitUntil(
-    logSw("notification close", {
-      data: event.notification.data ?? null,
-      tag: event.notification.tag,
-    }),
-  );
+  logSw("notification close", {
+    data: event.notification.data ?? null,
+    tag: event.notification.tag,
+  });
+  event.waitUntil(flushPushDebugLog());
 });
 
 self.addEventListener("notificationclick", (event) => {
@@ -665,12 +650,13 @@ self.addEventListener("notificationclick", (event) => {
   const notificationOpenDetail = buildNotificationOpenDetail(notificationData);
   const notificationOpenUrl = buildNotificationOpenUrl(notificationData);
 
+  logSw("notification click", {
+    data: event.notification.data ?? null,
+    tag: event.notification.tag,
+  });
   event.waitUntil(
     Promise.all([
-      logSw("notification click", {
-        data: event.notification.data ?? null,
-        tag: event.notification.tag,
-      }),
+      flushPushDebugLog(),
       postClientMessage({
         detail: notificationOpenDetail,
         type: "notification-open",
@@ -694,12 +680,13 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 self.addEventListener("pushsubscriptionchange", (event) => {
+  logSw("push subscription change", {
+    hadNewSubscription: event.newSubscription !== null,
+    hadOldSubscription: event.oldSubscription !== null,
+  });
   event.waitUntil(
     Promise.all([
-      logSw("push subscription change", {
-        hadNewSubscription: event.newSubscription !== null,
-        hadOldSubscription: event.oldSubscription !== null,
-      }),
+      flushPushDebugLog(),
       postClientMessage({
         hadNewSubscription: event.newSubscription !== null,
         hadOldSubscription: event.oldSubscription !== null,

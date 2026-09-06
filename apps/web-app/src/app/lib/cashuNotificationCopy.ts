@@ -1,15 +1,7 @@
-import { extractCashuTokenFromText } from "./tokenText";
-
-export const isCashuNotificationMessage = (text: string): boolean => {
-  return extractCashuTokenFromText(text) !== null;
-};
-
 export const getReceivedMoneyCopyForLanguage = (
   language: string | null | undefined,
 ): string => {
-  const normalized = String(language ?? "")
-    .trim()
-    .toLowerCase();
+  const normalized = (language ?? "").trim().toLowerCase();
   if (normalized.startsWith("cs")) {
     return "Přijali jste peníze";
   }
@@ -23,9 +15,7 @@ export const getChatAttachmentCopyForLanguage = (
   language: string | null | undefined,
   kind: "image" | "pdf",
 ): string => {
-  const normalized = String(language ?? "")
-    .trim()
-    .toLowerCase();
+  const normalized = (language ?? "").trim().toLowerCase();
   if (normalized.startsWith("cs")) {
     return kind === "pdf" ? "PDF" : "Obrázek";
   }
@@ -38,9 +28,7 @@ export const getChatAttachmentCopyForLanguage = (
 export const getBankPaymentReimbursementCopyForLanguage = (
   language: string | null | undefined,
 ): string => {
-  const normalized = String(language ?? "")
-    .trim()
-    .toLowerCase();
+  const normalized = (language ?? "").trim().toLowerCase();
   if (normalized.startsWith("cs")) {
     return "Dorazily ti saty za bankovní platbu";
   }

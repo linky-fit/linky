@@ -1,13 +1,7 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { TopupInvoicePage } from "./TopupInvoicePage";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
-});
 
 vi.mock("../components/WalletBalance", () => ({
   WalletBalance: ({ balance }: { balance: number }) => (
@@ -65,54 +59,45 @@ describe("TopupInvoicePage", () => {
   });
 
   it("shows loading instead of a stale QR while a fresh invoice is loading", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <TopupInvoicePage
-          copyText={async () => {}}
-          t={translate}
-          topupAmount="21"
-          topupInvoice="lnbc-old"
-          topupInvoiceCashuRequest="creqAold"
-          topupInvoiceError={null}
-          topupInvoiceIsBusy={true}
-          topupInvoiceQr="data:image/png;base64,old"
-          topupInvoiceQrPayload="bitcoin:?lightning=lnbc-old"
-          topupMintUrl="https://mint.example"
-        />,
-      );
-    });
+    const { container } = await renderIntoDocument(
+      <TopupInvoicePage
+        copyText={async () => {}}
+        t={translate}
+        topupAmount="21"
+        topupInvoice="lnbc-old"
+        topupInvoiceCashuRequest="creqAold"
+        topupInvoiceError={null}
+        topupInvoiceIsBusy={true}
+        topupInvoiceQr="data:image/png;base64,old"
+        topupInvoiceQrPayload="bitcoin:?lightning=lnbc-old"
+        topupMintUrl="https://mint.example"
+      />,
+    );
 
     expect(container.textContent).toContain("Loading invoice...");
     expect(container.querySelector(".topup-invoice-qr")).toBeNull();
   });
 
   it("defaults to the universal QR and switches to Cashu or Lightning only", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
     const copied: string[] = [];
 
+    const { container, root } = await renderIntoDocument(
+      <TopupInvoicePage
+        copyText={async (text) => {
+          copied.push(text);
+        }}
+        t={translate}
+        topupAmount="21"
+        topupInvoice="lnbc-invoice"
+        topupInvoiceCashuRequest="creqArequest"
+        topupInvoiceError={null}
+        topupInvoiceIsBusy={false}
+        topupInvoiceQr="data:image/png;base64,universal"
+        topupInvoiceQrPayload="bitcoin:?lightning=lnbc-invoice&creq=creqArequest"
+        topupMintUrl="https://mint.example"
+      />,
+    );
     await act(async () => {
-      root.render(
-        <TopupInvoicePage
-          copyText={async (text) => {
-            copied.push(text);
-          }}
-          t={translate}
-          topupAmount="21"
-          topupInvoice="lnbc-invoice"
-          topupInvoiceCashuRequest="creqArequest"
-          topupInvoiceError={null}
-          topupInvoiceIsBusy={false}
-          topupInvoiceQr="data:image/png;base64,universal"
-          topupInvoiceQrPayload="bitcoin:?lightning=lnbc-invoice&creq=creqArequest"
-          topupMintUrl="https://mint.example"
-        />,
-      );
       await Promise.resolve();
     });
 

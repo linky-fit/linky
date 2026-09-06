@@ -3,11 +3,9 @@ import type { MintUrl } from "@linky/linkshu";
 import React from "react";
 import type { CashuTokenRow } from "../../../evolu";
 import { MAIN_MINT_URL } from "../../../utils/mint";
-import type {
-  LoggedPaymentEventParams,
-  MintUrlInput,
-} from "../../types/appTypes";
+import type { LoggedPaymentEventParams } from "../../types/appTypes";
 import type { RestoreCashuTokens } from "../composition/useLinkshuComposition";
+import type { Translate } from "../../../i18n";
 
 interface UseRestoreMissingTokensParams {
   cashuIsBusy: boolean;
@@ -19,12 +17,12 @@ interface UseRestoreMissingTokensParams {
   mintInfoDeduped: readonly { canonicalUrl?: string | null }[];
   pushToast: (message: string) => void;
   readSeenMintsFromStorage: () => string[];
-  rememberSeenMint: (mintUrl: MintUrlInput) => void;
+  rememberSeenMint: (mintUrl: string | null | undefined) => void;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   restoreCashuTokens: RestoreCashuTokens | null;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setTokensRestoreIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
-  t: (key: string) => string;
+  t: Translate;
   tokensRestoreIsBusy: boolean;
 }
 
@@ -71,17 +69,17 @@ export const useRestoreMissingTokens = ({
         // locally must not exclude that mint from a seed recovery.
         const candidates = new Set<MintUrl>();
         for (const row of cashuTokensAll) {
-          const fromColumn = parseMintUrl(String(row.mint ?? ""));
+          const fromColumn = parseMintUrl(row.mint ?? "");
           if (fromColumn !== null) {
             candidates.add(fromColumn);
             continue;
           }
-          const tokenText = String(row.token ?? row.rawToken ?? "").trim();
+          const tokenText = (row.token ?? row.rawToken ?? "").trim();
           const mint = tokenText ? parseTokenText(tokenText)?.mint : null;
           if (mint != null) candidates.add(mint);
         }
         for (const info of mintInfoDeduped) {
-          const mint = parseMintUrl(String(info.canonicalUrl ?? ""));
+          const mint = parseMintUrl(info.canonicalUrl ?? "");
           if (mint !== null) candidates.add(mint);
         }
         for (const seen of readSeenMintsFromStorage()) {

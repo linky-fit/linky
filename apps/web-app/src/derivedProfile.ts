@@ -19,7 +19,7 @@ export type AvatarEditorControlId =
   | "skin"
   | "clothing";
 
-export interface AvatarEditorControl {
+interface AvatarEditorControl {
   id: AvatarEditorControlId;
   label: string;
 }
@@ -92,7 +92,7 @@ const hash32 = (input: string): number => {
 };
 
 const normalizeSeed = (seedValue: string): string => {
-  return String(seedValue ?? "").trim() || "linky";
+  return seedValue.trim() || "linky";
 };
 
 const HAIR_TOP_VALUES = [
@@ -481,7 +481,7 @@ const buildAvatarUrl = (selection: DerivedAvatarSelection): string => {
   return `https://api.dicebear.com/9.x/avataaars/svg?${params.toString()}`;
 };
 
-export const deriveInitialAvatarSelection = (
+const deriveInitialAvatarSelection = (
   seedSource: string,
 ): DerivedAvatarSelection => {
   const seed = normalizeSeed(seedSource);
@@ -593,7 +593,7 @@ export const cycleGeneratedAvatar = (
 };
 
 const pickDeterministicName = (npub: string, lang: Lang): string => {
-  const key = String(npub ?? "").trim();
+  const key = npub.trim();
   const list = lang === "cs" ? CZECH_FIRST_NAMES : ENGLISH_FIRST_NAMES;
   if (!key) return list[0] ?? "Linky";
   if (!list.length) return "Linky";
@@ -606,14 +606,14 @@ const dicebearAvataaarsUrlForNpub = (npub: string): string => {
 };
 
 export const deriveDefaultLightningAddress = (npub: string): string => {
-  const normalized = String(npub ?? "").trim();
+  const normalized = npub.trim();
   return normalized ? `${normalized}@${DEFAULT_LIGHTNING_ADDRESS_DOMAIN}` : "";
 };
 
 export const parseDefaultLightningAddressNpub = (
   lightningAddress: string,
 ): string | null => {
-  const normalized = String(lightningAddress ?? "").trim();
+  const normalized = lightningAddress.trim();
   const suffix = `@${DEFAULT_LIGHTNING_ADDRESS_DOMAIN}`;
   if (!normalized.toLowerCase().endsWith(suffix)) return null;
   const npub = normalized.slice(0, -suffix.length).trim();
@@ -624,12 +624,10 @@ export const omitSyntheticContactLightningAddress = (
   lightningAddress: string,
   npub: string,
 ): string => {
-  const normalizedLightningAddress = String(lightningAddress ?? "").trim();
+  const normalizedLightningAddress = lightningAddress.trim();
   if (!normalizedLightningAddress) return "";
 
-  const normalizedNpub = String(npub ?? "")
-    .trim()
-    .toLowerCase();
+  const normalizedNpub = npub.trim().toLowerCase();
   if (!normalizedNpub) return normalizedLightningAddress;
 
   const defaultLightningAddressNpub = parseDefaultLightningAddressNpub(
@@ -646,7 +644,7 @@ export const deriveDefaultProfile = (
   npub: string,
   lang: Lang = "en",
 ): DerivedProfileDefaults => {
-  const normalized = String(npub ?? "").trim();
+  const normalized = npub.trim();
   const name = pickDeterministicName(normalized, lang);
   const pictureUrl = dicebearAvataaarsUrlForNpub(normalized);
   const lnAddress = deriveDefaultLightningAddress(normalized);

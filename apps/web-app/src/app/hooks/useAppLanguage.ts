@@ -3,18 +3,14 @@ import {
   getInitialLang,
   persistLang,
   translations,
+  type I18nKey,
   type Lang,
 } from "../../i18n";
-
-type TranslationKey = keyof (typeof translations)["cs"];
-
-const hasTranslationKey = (key: string): key is TranslationKey =>
-  Object.prototype.hasOwnProperty.call(translations.cs, key);
 
 export const useAppLanguage = () => {
   const [lang, setLang] = React.useState<Lang>(() => getInitialLang());
   const t = React.useCallback(
-    (key: string) => (hasTranslationKey(key) ? translations[lang][key] : key),
+    (key: I18nKey) => translations[lang][key],
     [lang],
   );
 

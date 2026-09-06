@@ -1,15 +1,18 @@
-import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { getPublicKey } from "nostr-tools";
+import { act, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LinkyBankPaymentOfferStatus } from "../app/lib/bankPaymentOffer";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import { createLinkyBankPaymentOfferEvent } from "../testUtils/bankPaymentOfferEvent";
+import { createSecretKey } from "../testUtils/nostrKeys";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { BankPaymentOfferDetailPage } from "./BankPaymentOfferDetailPage";
 
 const { appShellMock } = vi.hoisted(() => ({
   appShellMock: {
-    allowedDisplayCurrencies: ["sat"] as string[],
+    allowedDisplayCurrencies: ["sat"],
     cycleDisplayCurrency: vi.fn(),
+    t: (key: string): string => key,
   },
 }));
 
@@ -23,7 +26,7 @@ vi.mock("../app/context/AppShellContexts", () => ({
     nostrPictureByNpub: {
       npub1alice: "https://example.com/alice.jpg",
     },
-    t: (key: string) => key,
+    t: (key: string) => appShellMock.t(key),
   }),
 }));
 
@@ -31,20 +34,11 @@ vi.mock("../components/PrivateImageBubble", () => ({
   PrivateImageBubble: () => <div data-testid="payment-confirmation-image" />,
 }));
 
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
-});
+const OFFERER_PUBKEY = getPublicKey(createSecretKey(1));
+const RECIPIENT_PUBKEY = getPublicKey(createSecretKey(2));
 
 const createOfferMessage = (
-  status:
-    | "accepted"
-    | "accepted_by_other"
-    | "bank_details_sent"
-    | "bank_paid"
-    | "offered"
-    | "settled" = "offered",
+  status: LinkyBankPaymentOfferStatus = "offered",
 ): LocalNostrMessage => {
   const createdAtSec = Math.floor(Date.now() / 1_000);
   const event = createLinkyBankPaymentOfferEvent({
@@ -53,9 +47,9 @@ const createOfferMessage = (
     clientId: "client-offer-1",
     createdAt: createdAtSec,
     offerId: "offer-1",
-    offererPublicKey: "offerer-pubkey",
-    recipientPublicKey: "recipient-pubkey",
-    senderPublicKey: "offerer-pubkey",
+    offererPublicKey: OFFERER_PUBKEY,
+    recipientPublicKey: RECIPIENT_PUBKEY,
+    senderPublicKey: OFFERER_PUBKEY,
     spdPayload:
       status === "bank_details_sent"
         ? "SPD*1.0*ACC:CZ6508000000192000145399*AM:100.00*CC:CZK"
@@ -69,52 +63,38 @@ const createOfferMessage = (
     createdAtSec,
     direction: "in",
     id: "message-1",
-    pubkey: "offerer-pubkey",
+    pubkey: OFFERER_PUBKEY,
     rumorId: `rumor-${status}`,
     wrapId: "wrap-1",
   };
 };
 
-const renderOffer = async (
-  onRespondBankPaymentOffer: (
-    message: LocalNostrMessage,
-    nextStatus: LinkyBankPaymentOfferStatus,
-    options?: {
-      expiresAtSec?: number | null;
-      extensionSec?: number | null;
-      withPush?: boolean;
-    },
-  ) => Promise<boolean>,
-  status:
-    | "accepted_by_other"
-    | "bank_details_sent"
-    | "bank_paid"
-    | "offered" = "offered",
-) => {
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  const root = createRoot(container);
+type PageProps = ComponentProps<typeof BankPaymentOfferDetailPage>;
 
-  await act(async () => {
-    root.render(
-      <BankPaymentOfferDetailPage
-        bankPaymentOfferMessages={[createOfferMessage(status)]}
-        chatId="contact-1"
-        chatMessages={[]}
-        chatOwnPubkeyHex={
-          status === "bank_paid" ? "offerer-pubkey" : "recipient-pubkey"
-        }
-        contacts={[{ id: "contact-1", name: "Alice", npub: "npub1alice" }]}
-        offerId="offer-1"
-        onCopyText={() => undefined}
-        onRespondBankPaymentOffer={onRespondBankPaymentOffer}
-        onSendChatImage={async () => undefined}
-        onSettleBankPaymentOffer={async () => undefined}
-        t={(key) => key}
-      />,
-    );
-  });
+interface RenderOfferOptions extends Partial<PageProps> {
+  status?: LinkyBankPaymentOfferStatus;
+}
 
+/** Renders the recipient's view of a fresh offer from Alice unless overridden. */
+const renderOffer = async ({
+  status = "offered",
+  ...overrides
+}: RenderOfferOptions = {}) => {
+  const { container } = await renderIntoDocument(
+    <BankPaymentOfferDetailPage
+      bankPaymentOfferMessages={[createOfferMessage(status)]}
+      chatId="contact-1"
+      chatMessages={[]}
+      chatOwnPubkeyHex={RECIPIENT_PUBKEY}
+      contacts={[{ id: "contact-1", name: "Alice", npub: "npub1alice" }]}
+      offerId="offer-1"
+      onCopyText={() => undefined}
+      onRespondBankPaymentOffer={async () => true}
+      onSendChatImage={async () => undefined}
+      onSettleBankPaymentOffer={async () => undefined}
+      {...overrides}
+    />,
+  );
   return container;
 };
 
@@ -125,6 +105,7 @@ describe("BankPaymentOfferDetailPage", () => {
     localStorage.clear();
     appShellMock.allowedDisplayCurrencies = ["sat"];
     appShellMock.cycleDisplayCurrency.mockClear();
+    appShellMock.t = (key) => key;
   });
 
   it("keeps the offerer's countdown ticking while the own chat is accepted_by_other", async () => {
@@ -134,36 +115,23 @@ describe("BankPaymentOfferDetailPage", () => {
         key === "bankPaymentOfferTimeRemainingClock"
           ? "{minutes}:{seconds}"
           : key;
-      const ownEntry = createOfferMessage("accepted_by_other");
+      appShellMock.t = clock;
       const acceptedEntry: LocalNostrMessage = {
         ...createOfferMessage("accepted"),
         contactId: "contact-2",
         id: "message-2",
         wrapId: "wrap-2",
       };
-      const container = document.createElement("div");
-      document.body.appendChild(container);
-      const root = createRoot(container);
-
-      await act(async () => {
-        root.render(
-          <BankPaymentOfferDetailPage
-            bankPaymentOfferMessages={[ownEntry, acceptedEntry]}
-            chatId="contact-1"
-            chatMessages={[]}
-            chatOwnPubkeyHex="offerer-pubkey"
-            contacts={[
-              { id: "contact-1", name: "Alice" },
-              { id: "contact-2", name: "Bob" },
-            ]}
-            offerId="offer-1"
-            onCopyText={() => undefined}
-            onRespondBankPaymentOffer={async () => true}
-            onSendChatImage={async () => undefined}
-            onSettleBankPaymentOffer={async () => undefined}
-            t={clock}
-          />,
-        );
+      const container = await renderOffer({
+        bankPaymentOfferMessages: [
+          createOfferMessage("accepted_by_other"),
+          acceptedEntry,
+        ],
+        chatOwnPubkeyHex: OFFERER_PUBKEY,
+        contacts: [
+          { id: "contact-1", name: "Alice" },
+          { id: "contact-2", name: "Bob" },
+        ],
       });
 
       expect(container.textContent).toContain("5:00");
@@ -181,10 +149,9 @@ describe("BankPaymentOfferDetailPage", () => {
 
   it("shows a rejected-payout screen with only a back-to-chat action after paying", async () => {
     window.location.hash = "#chat/contact-1/bank-payment-offer/offer-1";
-    const paid = createOfferMessage("bank_paid");
     const createdAtSec = Math.floor(Date.now() / 1_000);
     const canceled: LocalNostrMessage = {
-      ...paid,
+      ...createOfferMessage("bank_paid"),
       content: createLinkyBankPaymentOfferEvent({
         amountSat: 1_000,
         amountText: "1,000 sat",
@@ -192,33 +159,15 @@ describe("BankPaymentOfferDetailPage", () => {
         clientId: "client-offer-1",
         createdAt: createdAtSec,
         offerId: "offer-1",
-        offererPublicKey: "offerer-pubkey",
-        recipientPublicKey: "recipient-pubkey",
-        senderPublicKey: "offerer-pubkey",
+        offererPublicKey: OFFERER_PUBKEY,
+        recipientPublicKey: RECIPIENT_PUBKEY,
+        senderPublicKey: OFFERER_PUBKEY,
         spdPayload: null,
         status: "canceled",
       }).content,
     };
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <BankPaymentOfferDetailPage
-          bankPaymentOfferMessages={[canceled]}
-          chatId="contact-1"
-          chatMessages={[]}
-          chatOwnPubkeyHex="recipient-pubkey"
-          contacts={[{ id: "contact-1", name: "Alice" }]}
-          offerId="offer-1"
-          onCopyText={() => undefined}
-          onRespondBankPaymentOffer={async () => true}
-          onSendChatImage={async () => undefined}
-          onSettleBankPaymentOffer={async () => undefined}
-          t={(key) => key}
-        />,
-      );
+    const container = await renderOffer({
+      bankPaymentOfferMessages: [canceled],
     });
 
     expect(container.textContent).toContain("bankPaymentOfferRejectedTitle");
@@ -236,10 +185,7 @@ describe("BankPaymentOfferDetailPage", () => {
   });
 
   it("shows that another candidate accepted first as a closed state", async () => {
-    const container = await renderOffer(
-      vi.fn(async () => true),
-      "accepted_by_other",
-    );
+    const container = await renderOffer({ status: "accepted_by_other" });
 
     expect(container.textContent).toContain(
       "bankPaymentOfferStatusAcceptedByOther",
@@ -251,7 +197,7 @@ describe("BankPaymentOfferDetailPage", () => {
   it("stays on the payment detail after accepting an offer", async () => {
     window.location.hash = "#chat/contact-1/bank-payment-offer/offer-1";
     const onRespondBankPaymentOffer = vi.fn(async () => true);
-    const container = await renderOffer(onRespondBankPaymentOffer);
+    const container = await renderOffer({ onRespondBankPaymentOffer });
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".btn-wide")?.click();
@@ -269,7 +215,7 @@ describe("BankPaymentOfferDetailPage", () => {
   it("returns to the chat after declining an offer", async () => {
     window.location.hash = "#chat/contact-1/bank-payment-offer/offer-1";
     const onRespondBankPaymentOffer = vi.fn(async () => true);
-    const container = await renderOffer(onRespondBankPaymentOffer);
+    const container = await renderOffer({ onRespondBankPaymentOffer });
     const buttons = container.querySelectorAll<HTMLButtonElement>(".btn-wide");
 
     await act(async () => {
@@ -284,11 +230,7 @@ describe("BankPaymentOfferDetailPage", () => {
   });
 
   it("does not mark the fiat step complete before the recipient confirms payment", async () => {
-    const onRespondBankPaymentOffer = vi.fn(async () => true);
-    const container = await renderOffer(
-      onRespondBankPaymentOffer,
-      "bank_details_sent",
-    );
+    const container = await renderOffer({ status: "bank_details_sent" });
     const steps = container.querySelectorAll(
       ".bank-payment-offer-progress-step",
     );
@@ -307,10 +249,7 @@ describe("BankPaymentOfferDetailPage", () => {
   });
 
   it("keeps the confirm action visible and hides the payment rows behind a toggle", async () => {
-    const container = await renderOffer(
-      vi.fn(async () => true),
-      "bank_details_sent",
-    );
+    const container = await renderOffer({ status: "bank_details_sent" });
 
     expect(container.querySelector(".bank-payment-fields")).toBeNull();
     const detailsToggle = container.querySelector<HTMLButtonElement>(
@@ -336,10 +275,7 @@ describe("BankPaymentOfferDetailPage", () => {
 
   it("cycles the display unit when the amount is tapped", async () => {
     appShellMock.allowedDisplayCurrencies = ["sat", "czk"];
-    const container = await renderOffer(
-      vi.fn(async () => true),
-      "bank_details_sent",
-    );
+    const container = await renderOffer({ status: "bank_details_sent" });
 
     const amountButton = container.querySelector<HTMLButtonElement>(
       ".bank-payment-amount-button",
@@ -352,30 +288,14 @@ describe("BankPaymentOfferDetailPage", () => {
   });
 
   it("names the accepting contact in the offerer summary", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
     const named = (key: string) =>
       key === "bankPaymentOfferProgressAcceptedByName"
         ? "{name} has already accepted the offer."
         : key;
-
-    await act(async () => {
-      root.render(
-        <BankPaymentOfferDetailPage
-          bankPaymentOfferMessages={[createOfferMessage("accepted")]}
-          chatId="contact-1"
-          chatMessages={[]}
-          chatOwnPubkeyHex="offerer-pubkey"
-          contacts={[{ id: "contact-1", name: "Alice", npub: "npub1alice" }]}
-          offerId="offer-1"
-          onCopyText={() => undefined}
-          onRespondBankPaymentOffer={async () => true}
-          onSendChatImage={async () => undefined}
-          onSettleBankPaymentOffer={async () => undefined}
-          t={named}
-        />,
-      );
+    appShellMock.t = named;
+    const container = await renderOffer({
+      chatOwnPubkeyHex: OFFERER_PUBKEY,
+      status: "accepted",
     });
 
     expect(container.textContent).toContain(
@@ -396,7 +316,7 @@ describe("BankPaymentOfferDetailPage", () => {
         createdAtSec: nowSec,
         expiresAtSec: nowSec + 300,
         offerId: "offer-1",
-        ownerPubkey: "offerer-pubkey",
+        ownerPubkey: OFFERER_PUBKEY,
         pending: [
           {
             contactId: "contact-2",
@@ -407,28 +327,12 @@ describe("BankPaymentOfferDetailPage", () => {
       }),
     );
 
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-    await act(async () => {
-      root.render(
-        <BankPaymentOfferDetailPage
-          bankPaymentOfferMessages={[createOfferMessage("offered")]}
-          chatId="contact-1"
-          chatMessages={[]}
-          chatOwnPubkeyHex="offerer-pubkey"
-          contacts={[
-            { id: "contact-1", name: "Alice" },
-            { id: "contact-2", name: "Bob" },
-          ]}
-          offerId="offer-1"
-          onCopyText={() => undefined}
-          onRespondBankPaymentOffer={async () => true}
-          onSendChatImage={async () => undefined}
-          onSettleBankPaymentOffer={async () => undefined}
-          t={(key) => key}
-        />,
-      );
+    const container = await renderOffer({
+      chatOwnPubkeyHex: OFFERER_PUBKEY,
+      contacts: [
+        { id: "contact-1", name: "Alice" },
+        { id: "contact-2", name: "Bob" },
+      ],
     });
 
     const recipients = container.querySelectorAll(
@@ -444,10 +348,10 @@ describe("BankPaymentOfferDetailPage", () => {
 
   it("requests one more minute without changing the active offer phase", async () => {
     const onRespondBankPaymentOffer = vi.fn(async () => true);
-    const container = await renderOffer(
+    const container = await renderOffer({
       onRespondBankPaymentOffer,
-      "bank_details_sent",
-    );
+      status: "bank_details_sent",
+    });
     const extendButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>("button"),
     ).find(
@@ -473,7 +377,11 @@ describe("BankPaymentOfferDetailPage", () => {
 
   it("lets the requester extend the active phase from the compact timer control", async () => {
     const onRespondBankPaymentOffer = vi.fn(async () => true);
-    const container = await renderOffer(onRespondBankPaymentOffer, "bank_paid");
+    const container = await renderOffer({
+      chatOwnPubkeyHex: OFFERER_PUBKEY,
+      onRespondBankPaymentOffer,
+      status: "bank_paid",
+    });
     const extendButton = container.querySelector<HTMLButtonElement>(
       ".bank-payment-offer-timer-row .bank-payment-offer-extend",
     );
@@ -492,7 +400,11 @@ describe("BankPaymentOfferDetailPage", () => {
 
   it("shows settlement confirmation and unpaid actions after the peer marks the bank payment paid", async () => {
     const onRespondBankPaymentOffer = vi.fn(async () => true);
-    const container = await renderOffer(onRespondBankPaymentOffer, "bank_paid");
+    const container = await renderOffer({
+      chatOwnPubkeyHex: OFFERER_PUBKEY,
+      onRespondBankPaymentOffer,
+      status: "bank_paid",
+    });
     const buttons = container.querySelectorAll<HTMLButtonElement>(".btn-wide");
     const recipientAvatar = container.querySelector<HTMLImageElement>(
       ".bank-payment-offer-recipient-avatar img",
@@ -515,9 +427,6 @@ describe("BankPaymentOfferDetailPage", () => {
 
   it("keeps the recipient flow open while sending an attached confirmation", async () => {
     window.location.hash = "#chat/contact-1/bank-payment-offer/offer-1";
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
     const onSendChatImage = vi.fn(async () => undefined);
     const createObjectUrl = vi
       .spyOn(URL, "createObjectURL")
@@ -526,22 +435,9 @@ describe("BankPaymentOfferDetailPage", () => {
       .spyOn(URL, "revokeObjectURL")
       .mockImplementation(() => undefined);
 
-    await act(async () => {
-      root.render(
-        <BankPaymentOfferDetailPage
-          bankPaymentOfferMessages={[createOfferMessage("bank_paid")]}
-          chatId="contact-1"
-          chatMessages={[]}
-          chatOwnPubkeyHex="recipient-pubkey"
-          contacts={[{ id: "contact-1", name: "Alice" }]}
-          offerId="offer-1"
-          onCopyText={() => undefined}
-          onRespondBankPaymentOffer={async () => true}
-          onSendChatImage={onSendChatImage}
-          onSettleBankPaymentOffer={async () => undefined}
-          t={(key) => key}
-        />,
-      );
+    const container = await renderOffer({
+      onSendChatImage,
+      status: "bank_paid",
     });
 
     expect(container.textContent).toContain(
@@ -586,8 +482,8 @@ describe("BankPaymentOfferDetailPage", () => {
   });
 
   it.each([
-    ["offerer-pubkey", "requester"],
-    ["recipient-pubkey", "recipient"],
+    [OFFERER_PUBKEY, "requester"],
+    [RECIPIENT_PUBKEY, "recipient"],
   ])("shows an attached confirmation to the %s flow", async (ownPubkey) => {
     const offerMessage = createOfferMessage("bank_paid");
     const confirmationMessage: LocalNostrMessage = {
@@ -607,34 +503,18 @@ describe("BankPaymentOfferDetailPage", () => {
         width: 100,
       }),
       createdAtSec: offerMessage.createdAtSec + 1,
-      direction: ownPubkey === "recipient-pubkey" ? "out" : "in",
+      direction: ownPubkey === RECIPIENT_PUBKEY ? "out" : "in",
       id: "confirmation-message",
-      pubkey: "recipient-pubkey",
+      pubkey: RECIPIENT_PUBKEY,
       replyToId: "rumor-bank_paid",
       rootMessageId: "rumor-bank_paid",
       rumorId: "confirmation-rumor",
       wrapId: "confirmation-wrap",
     };
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <BankPaymentOfferDetailPage
-          bankPaymentOfferMessages={[offerMessage]}
-          chatId="contact-1"
-          chatMessages={[offerMessage, confirmationMessage]}
-          chatOwnPubkeyHex={ownPubkey}
-          contacts={[{ id: "contact-1", name: "Alice" }]}
-          offerId="offer-1"
-          onCopyText={() => undefined}
-          onRespondBankPaymentOffer={async () => true}
-          onSendChatImage={async () => undefined}
-          onSettleBankPaymentOffer={async () => undefined}
-          t={(key) => key}
-        />,
-      );
+    const container = await renderOffer({
+      bankPaymentOfferMessages: [offerMessage],
+      chatMessages: [offerMessage, confirmationMessage],
+      chatOwnPubkeyHex: ownPubkey,
     });
 
     expect(container.textContent).toContain("bankPaymentOfferConfirmation");
@@ -648,27 +528,7 @@ describe("BankPaymentOfferDetailPage", () => {
 
   it("closes the payment detail when the recipient receives the sats", async () => {
     window.location.hash = "#chat/contact-1/bank-payment-offer/offer-1";
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <BankPaymentOfferDetailPage
-          bankPaymentOfferMessages={[createOfferMessage("settled")]}
-          chatId="contact-1"
-          chatMessages={[]}
-          chatOwnPubkeyHex="recipient-pubkey"
-          contacts={[{ id: "contact-1", name: "Alice" }]}
-          offerId="offer-1"
-          onCopyText={() => undefined}
-          onRespondBankPaymentOffer={async () => true}
-          onSendChatImage={async () => undefined}
-          onSettleBankPaymentOffer={async () => undefined}
-          t={(key) => key}
-        />,
-      );
-    });
+    await renderOffer({ status: "settled" });
 
     expect(window.location.hash).toBe("#chat/contact-1");
   });

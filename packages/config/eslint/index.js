@@ -20,6 +20,10 @@ export const webAppEslintConfig = defineConfig([
       globals: globals.browser,
     },
     rules: {
+      "@typescript-eslint/consistent-type-assertions": [
+        "error",
+        { assertionStyle: "never" },
+      ],
       // Unknown is allowed at parse/input boundaries only after guard narrowing.
       // Internal placeholders like Promise<unknown> / unknown[] are disallowed.
       "@typescript-eslint/no-explicit-any": [

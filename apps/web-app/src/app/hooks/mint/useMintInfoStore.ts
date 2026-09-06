@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import * as Evolu from "@evolu/common";
 import React from "react";
 import type { CashuTokenRow } from "../../../evolu";
@@ -8,12 +9,7 @@ import {
   normalizeMintUrl,
   PRESET_MINTS,
 } from "../../../utils/mint";
-import {
-  safeLocalStorageGetJson,
-  safeLocalStorageSetJson,
-} from "../../../utils/storage";
-import { makeLocalId } from "../../../utils/validation";
-import type { LocalMintInfoRow, MintUrlInput } from "../../types/appTypes";
+import type { LocalMintInfoRow } from "../../types/appTypes";
 import {
   buildMintDedupeSignature,
   dedupeMintInfoRows,
@@ -24,13 +20,40 @@ import {
   isMintDeletedRow,
   parseMintInfoPayload,
 } from "./mintInfoHelpers";
+import {
+  safeLocalStorageGetJson,
+  safeLocalStorageSetJson,
+} from "../../../utils/storage";
+import { makeLocalId } from "../../../utils/validation";
+import { nowSeconds } from "../../../utils/time";
+
+const OptionalStoredValue = Schema.optional(
+  Schema.NullOr(Schema.Union(Schema.String, Schema.Number, Schema.Boolean)),
+);
+
+const StoredMintInfoRow = Schema.Struct({
+  feesJson: Schema.optional(Schema.NullOr(Schema.String)),
+  firstSeenAtSec: Schema.optional(Schema.NullOr(Schema.Number)),
+  id: Schema.String,
+  infoJson: Schema.optional(Schema.NullOr(Schema.String)),
+  isDeleted: OptionalStoredValue,
+  lastCheckedAtSec: Schema.optional(Schema.NullOr(Schema.Number)),
+  lastSeenAtSec: Schema.optional(Schema.NullOr(Schema.Number)),
+  supportsMpp: OptionalStoredValue,
+  url: Schema.String,
+});
+
+const isStoredMintInfoRow = (
+  value: unknown,
+): value is typeof StoredMintInfoRow.Type =>
+  Schema.is(StoredMintInfoRow)(value);
 
 interface UseMintInfoStoreParams {
   appOwnerId: Evolu.OwnerId | null;
   appOwnerIdRef: React.MutableRefObject<Evolu.OwnerId | null>;
   cashuTokensAll: readonly CashuTokenRow[];
   defaultMintUrl: string | null;
-  rememberSeenMint: (mintUrl: MintUrlInput) => void;
+  rememberSeenMint: (mintUrl: string | null | undefined) => void;
 }
 
 interface UseMintInfoStoreResult {
@@ -38,7 +61,6 @@ interface UseMintInfoStoreResult {
     mintUrl: string,
   ) => { lastCheckedAtSec: number; latencyMs: number | null } | null;
   isMintDeleted: (mintUrl: string) => boolean;
-  mintInfoAll: LocalMintInfoRow[];
   mintInfoByUrl: Map<string, LocalMintInfoRow>;
   mintInfoDeduped: Array<{ canonicalUrl: string; row: LocalMintInfoRow }>;
   refreshMintInfo: (mintUrl: string) => Promise<void>;
@@ -67,9 +89,10 @@ export const useMintInfoStore = ({
 
     setMintInfoAll(
       safeLocalStorageGetJson(
-        `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${String(ownerId)}`,
-        [] as LocalMintInfoRow[],
-      ),
+        `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${ownerId}`,
+        Schema.Array(Schema.Unknown),
+        [],
+      ).filter(isStoredMintInfoRow),
     );
   }, [appOwnerId, appOwnerIdRef]);
 
@@ -94,7 +117,7 @@ export const useMintInfoStore = ({
       if (!cleaned) return false;
 
       return mintInfoAll.some((row) => {
-        const rowUrl = normalizeMintUrl(String(row.url ?? ""));
+        const rowUrl = normalizeMintUrl(row.url);
         return rowUrl === cleaned && isMintDeletedRow(row);
       });
     },
@@ -110,7 +133,7 @@ export const useMintInfoStore = ({
 
       const existing = mintInfoByUrl.get(cleaned);
 
-      const now = Math.floor(nowSec) as typeof Evolu.PositiveInt.Type;
+      const now = Evolu.PositiveInt.orThrow(Math.floor(nowSec));
       const ownerId = appOwnerIdRef.current;
       if (!ownerId) return;
 
@@ -118,21 +141,18 @@ export const useMintInfoStore = ({
         const next = [...prev];
 
         const firstSeen =
-          existing && Number(existing.firstSeenAtSec ?? 0) > 0
+          existing && (existing.firstSeenAtSec ?? 0) > 0
             ? Math.floor(Number(existing?.firstSeenAtSec))
             : now;
 
-        if (
-          existing &&
-          String(existing?.isDeleted ?? "") !== String(Evolu.sqliteTrue)
-        ) {
-          const id = String(existing?.id ?? "");
-          const idx = next.findIndex((row) => String(row.id ?? "") === id);
+        if (existing && !isMintDeletedRow(existing)) {
+          const id = existing?.id ?? "";
+          const idx = next.findIndex((row) => row.id === id);
           if (idx >= 0) {
             const prevRow = next[idx];
-            const prevUrl = String(prevRow.url ?? "");
-            const prevFirst = Number(prevRow.firstSeenAtSec ?? 0) || 0;
-            const prevLast = Number(prevRow.lastSeenAtSec ?? 0) || 0;
+            const prevUrl = prevRow.url;
+            const prevFirst = (prevRow.firstSeenAtSec ?? 0) || 0;
+            const prevLast = (prevRow.lastSeenAtSec ?? 0) || 0;
 
             if (
               prevUrl === cleaned &&
@@ -162,7 +182,7 @@ export const useMintInfoStore = ({
         }
 
         safeLocalStorageSetJson(
-          `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${String(ownerId)}`,
+          `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${ownerId}`,
           next,
         );
 
@@ -233,7 +253,7 @@ export const useMintInfoStore = ({
           ? performance.now()
           : Date.now();
 
-      const nowSec = Math.floor(Date.now() / 1000);
+      const nowSec = nowSeconds();
       recordMintRuntime(cleaned, { lastCheckedAtSec: nowSec, latencyMs: null });
 
       try {
@@ -274,7 +294,7 @@ export const useMintInfoStore = ({
         setMintInfoAll((prev) => {
           const next = [...prev];
           const idx = next
-            .map((row) => normalizeMintUrl(String(row.url ?? "")))
+            .map((row) => normalizeMintUrl(row.url))
             .findIndex((url) => url === cleaned);
 
           if (idx >= 0) {
@@ -285,10 +305,7 @@ export const useMintInfoStore = ({
               infoJson: parsed.infoJson,
               lastCheckedAtSec: nowSec,
             };
-          } else if (
-            !existing ||
-            String(existing.isDeleted ?? "") === String(Evolu.sqliteTrue)
-          ) {
+          } else if (!existing || isMintDeletedRow(existing)) {
             next.push({
               id: makeLocalId(),
               url: cleaned,
@@ -302,7 +319,7 @@ export const useMintInfoStore = ({
           }
 
           safeLocalStorageSetJson(
-            `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${String(ownerId)}`,
+            `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${ownerId}`,
             next,
           );
 
@@ -338,7 +355,7 @@ export const useMintInfoStore = ({
     if (!cleaned || isMintDeleted(cleaned)) return;
 
     const existing = mintInfoByUrl.get(cleaned);
-    const nowSec = Math.floor(Date.now() / 1000);
+    const nowSec = nowSeconds();
     if (!existing) {
       touchMintInfo(cleaned, nowSec);
       return;
@@ -346,7 +363,8 @@ export const useMintInfoStore = ({
 
     const lastSuccessful =
       mintInfoLastSuccessfulRefreshRef.current.get(cleaned) ??
-      Number(existing.lastCheckedAtSec ?? 0);
+      existing.lastCheckedAtSec ??
+      0;
     const lastAttempt = getMintRuntime(cleaned)?.lastCheckedAtSec ?? 0;
     if (
       canRunNetworkWork &&
@@ -368,21 +386,19 @@ export const useMintInfoStore = ({
   React.useEffect(() => {
     if (encounteredMintUrls.length === 0) return;
 
-    const nowSec = Math.floor(Date.now() / 1000);
+    const nowSec = nowSeconds();
     const candidates = new Set<string>();
 
     for (const mintUrl of encounteredMintUrls) candidates.add(mintUrl);
     for (const mintUrl of PRESET_MINTS) candidates.add(mintUrl);
     if (defaultMintUrl) candidates.add(defaultMintUrl);
     for (const mintInfoRow of mintInfoDeduped) {
-      const url = String(mintInfoRow.canonicalUrl ?? "").trim();
+      const url = mintInfoRow.canonicalUrl.trim();
       if (url) candidates.add(url);
     }
 
     for (const mintUrl of candidates) {
-      const cleaned = String(mintUrl ?? "")
-        .trim()
-        .replace(/\/+$/, "");
+      const cleaned = mintUrl.trim().replace(/\/+$/, "");
       if (!cleaned || isMintDeleted(cleaned)) continue;
 
       const existing = mintInfoByUrl.get(cleaned);
@@ -395,7 +411,8 @@ export const useMintInfoStore = ({
 
       const lastSuccessful =
         mintInfoLastSuccessfulRefreshRef.current.get(cleaned) ??
-        Number(existing.lastCheckedAtSec ?? 0);
+        existing.lastCheckedAtSec ??
+        0;
       const lastAttempt = getMintRuntime(cleaned)?.lastCheckedAtSec ?? 0;
       const oneDay = 86_400;
       if (
@@ -435,7 +452,7 @@ export const useMintInfoStore = ({
 
     setMintInfoAll(deduped);
     safeLocalStorageSetJson(
-      `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${String(ownerId)}`,
+      `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${ownerId}`,
       deduped,
     );
   }, [appOwnerIdRef, mintInfoAll]);
@@ -443,7 +460,6 @@ export const useMintInfoStore = ({
   return {
     getMintRuntime,
     isMintDeleted,
-    mintInfoAll,
     mintInfoByUrl,
     mintInfoDeduped,
     refreshMintInfo,

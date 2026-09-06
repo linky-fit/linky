@@ -1,10 +1,12 @@
 import React from "react";
+import type { Translate } from "../i18n";
+import { ModalSheet } from "./ModalSheet";
 
 interface SelfieCaptureModalProps {
   onCancel: () => void;
   onCaptured: (dataUrl: string) => void;
   onError: (error: unknown) => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 const AVATAR_SIZE_PX = 160;
@@ -97,46 +99,36 @@ export function SelfieCaptureModal({
   };
 
   return (
-    <div
+    <ModalSheet
       className="modal-overlay avatar-crop-overlay"
-      role="dialog"
-      aria-modal="true"
       aria-label={t("onboardingTakePhoto")}
       onClick={onCancel}
+      sheetClassName="modal-sheet avatar-crop-sheet"
     >
-      <div
-        className="modal-sheet avatar-crop-sheet"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="modal-title">{t("onboardingTakePhoto")}</div>
-        <div className="avatar-crop-viewport selfie-viewport">
-          <video
-            ref={videoRef}
-            className="selfie-video"
-            autoPlay
-            muted
-            playsInline
-          />
-          <span className="avatar-crop-frame" aria-hidden="true" />
-        </div>
-        <div className="modal-actions avatar-crop-actions">
-          <button
-            type="button"
-            className="btn-wide"
-            disabled={!isReady}
-            onClick={capture}
-          >
-            {t("onboardingCapturePhoto")}
-          </button>
-          <button
-            type="button"
-            className="btn-wide secondary"
-            onClick={onCancel}
-          >
-            {t("cancel")}
-          </button>
-        </div>
+      <div className="modal-title">{t("onboardingTakePhoto")}</div>
+      <div className="avatar-crop-viewport selfie-viewport">
+        <video
+          ref={videoRef}
+          className="selfie-video"
+          autoPlay
+          muted
+          playsInline
+        />
+        <span className="avatar-crop-frame" aria-hidden="true" />
       </div>
-    </div>
+      <div className="modal-actions avatar-crop-actions">
+        <button
+          type="button"
+          className="btn-wide"
+          disabled={!isReady}
+          onClick={capture}
+        >
+          {t("onboardingCapturePhoto")}
+        </button>
+        <button type="button" className="btn-wide secondary" onClick={onCancel}>
+          {t("cancel")}
+        </button>
+      </div>
+    </ModalSheet>
   );
 }

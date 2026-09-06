@@ -6,6 +6,7 @@ import type {
   CheckAllCashuTokens,
   CheckCashuTokenRow,
 } from "../composition/useLinkshuComposition";
+import type { Translate } from "../../../i18n";
 
 interface UseCashuTokenChecksParams {
   cashuBulkCheckIsBusy: boolean;
@@ -23,7 +24,7 @@ interface UseCashuTokenChecksParams {
     React.SetStateAction<CashuTokenId | null>
   >;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 /**
@@ -54,7 +55,7 @@ export const useCashuTokenChecks = ({
         return;
       }
       try {
-        await forgetCashuToken(String(id));
+        await forgetCashuToken(id);
       } catch (error) {
         setStatus(`${t("errorPrefix")}: ${String(error)}`);
         return;
@@ -78,7 +79,7 @@ export const useCashuTokenChecks = ({
       setCashuIsBusy(true);
       setStatus(t("cashuChecking"));
       try {
-        const outcome = await checkCashuTokenRow(String(id));
+        const outcome = await checkCashuTokenRow(id);
         if (Either.isLeft(outcome)) {
           pushToast(t("errorPrefix"));
           return "skipped";

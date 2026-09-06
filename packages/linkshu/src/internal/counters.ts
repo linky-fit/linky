@@ -51,6 +51,17 @@ export const withCounterLock =
       ),
     );
 
+/** Stored integer at `key`; absent, malformed, or below `floor` reads as `floor`. */
+export const readStoredInteger = (
+  kv: KeyValueStoreService,
+  key: string,
+  floor: number,
+): Effect.Effect<number> =>
+  Effect.map(kv.get(key), (raw) => {
+    const value = Number(raw ?? Number.NaN);
+    return Number.isFinite(value) && value > floor ? Math.floor(value) : floor;
+  });
+
 /**
  * Stored counter of the scope; absent or malformed values read as 1. Slot 0
  * is never used: cashu-ts treats a deterministic counter of 0 as "auto-assign
@@ -61,10 +72,7 @@ export const readCounter = (
   kv: KeyValueStoreService,
   scope: CounterScope,
 ): Effect.Effect<number> =>
-  Effect.map(kv.get(deterministicCounterKey(scope)), (raw) => {
-    const value = raw === null ? Number.NaN : Number(raw);
-    return Number.isFinite(value) && value > 1 ? Math.floor(value) : 1;
-  });
+  readStoredInteger(kv, deterministicCounterKey(scope), 1);
 
 /**
  * Advances the stored counter to `target`, never backwards (a gap costs a

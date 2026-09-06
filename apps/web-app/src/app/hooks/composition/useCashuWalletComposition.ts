@@ -1,3 +1,4 @@
+import { useLatest } from "../../../hooks/useLatest";
 import * as Evolu from "@evolu/common";
 import { useQuery } from "@evolu/react";
 import {
@@ -21,7 +22,6 @@ import {
 import { decodeTokenText } from "@linky/linkshu";
 import { Cause, Either, Exit, Option, Schema } from "effect";
 import React, { useMemo, useState } from "react";
-import { deriveDefaultProfile } from "../../../derivedProfile";
 import {
   evolu,
   useEvolu,
@@ -30,7 +30,6 @@ import {
   type ContactId,
 } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
-import type { Lang } from "../../../i18n";
 import {
   inferLightningAddressFromLnurlTarget,
   redeemLnurlWithdraw,
@@ -40,7 +39,6 @@ import { NOSTR_RELAYS } from "../../../utils/nostrRelays";
 import {
   CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
-  MAX_CONTACTS_PER_OWNER,
   WALLET_WARNING_BALANCE_THRESHOLD_SAT,
   WALLET_WARNING_DISMISSED_STORAGE_KEY,
 } from "../../../utils/constants";
@@ -52,9 +50,10 @@ import {
 import {
   getLightningInvoicePreview,
   type LightningInvoicePreview,
-} from "../../../utils/lightningInvoice";
+} from "@linky/linkshu";
 import {
   CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
+  formatMintHost,
   MAIN_MINT_URL,
   normalizeMintUrl,
 } from "../../../utils/mint";
@@ -88,7 +87,6 @@ import { usePaidOverlayState } from "../usePaidOverlayState";
 import { usePaymentsDomain } from "../usePaymentsDomain";
 import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
 import { getLinkyBankPaymentOfferInfo } from "../../lib/bankPaymentOffer";
-import { readCashuRowOwnerId } from "../../lib/cashuOwnerLane";
 import { isCashuRowCandidateBetter } from "../../lib/cashuRowPreference";
 import { readCashuTokenAliases as readCashuRowAliases } from "../../lib/cashuTokenIdentity";
 import { reportCashuSendRowForgotten } from "../../lib/cashuSendInspector";
@@ -126,17 +124,25 @@ import { seedLinkshuSeenMintsFromTokenRows } from "../../migrations/linkshuStora
 import { useLinkshuComposition } from "./useLinkshuComposition";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
+import type { Translate } from "../../../i18n";
 
+import { reportAppLog } from "../../../devtools/inspector/appLog";
 const isPubkey = Schema.is(Pubkey);
 const CashuTokenIdFromUnknown = Evolu.id("CashuToken");
 const decodeCashuTokenText = Schema.decodeUnknownEither(CashuTokenText);
 
 export const logPayStep = (step: string, data?: PaymentLogData): void => {
-  try {
-    console.log("[linky][pay]", step, data ?? {});
-  } catch {
-    // ignore logging errors
-  }
+  const clientId = data?.clientId;
+  const messageId = data?.messageId;
+  reportAppLog({
+    tag: "pay.step",
+    summary: `Contact payment: ${step}`,
+    links: {
+      ...(typeof clientId === "string" ? { client: clientId } : {}),
+      ...(typeof messageId === "string" ? { message: messageId } : {}),
+    },
+    payload: { step, ...data },
+  });
 };
 
 type IdentityOwnersCompositionResult = ReturnType<
@@ -154,9 +160,8 @@ interface UseCashuWalletCompositionParams {
   contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   contactsMessaging: Pick<
     ContactsMessagingCompositionResult,
-    | "activeContactsOwnerContactCount"
+    | "saveNpubContact"
     | "appendLocalNostrMessage"
-    | "buildSavedContactName"
     | "chatMessages"
     | "contacts"
     | "enqueuePendingPayment"
@@ -173,7 +178,6 @@ interface UseCashuWalletCompositionParams {
     | "selectedContact"
     | "sendChatMessage"
     | "setContactsOnboardingHasPaid"
-    | "unknownNameByNpub"
     | "updateLocalNostrMessage"
   >;
   formatDisplayedAmountParts: (
@@ -187,15 +191,12 @@ interface UseCashuWalletCompositionParams {
     | "cashuOwnerId"
     | "cashuOwnerIdRef"
     | "cashuVisibleOwnerIds"
-    | "contactsOwnerId"
     | "currentNpub"
     | "currentNsec"
     | "isSeedLogin"
     | "metaOwnerId"
     | "transactionsOwnerId"
   >;
-  insert: EvoluMutations["insert"];
-  lang: Lang;
   maybeShowPwaNotification: (
     title: string,
     body: string,
@@ -227,7 +228,7 @@ interface UseCashuWalletCompositionParams {
   >;
   setPayAmount: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: (key: string) => string;
+  t: Translate;
   update: EvoluMutations["update"];
   upsert: EvoluMutations["upsert"];
 }
@@ -239,8 +240,6 @@ export const useCashuWalletComposition = ({
   formatDisplayedAmountParts,
   formatDisplayedAmountText,
   identity,
-  insert,
-  lang,
   maybeShowPwaNotification,
   ownerScopedStorage,
   payAmount,
@@ -266,7 +265,6 @@ export const useCashuWalletComposition = ({
     cashuOwnerId,
     cashuOwnerIdRef,
     cashuVisibleOwnerIds,
-    contactsOwnerId,
     currentNpub,
     currentNsec,
     isSeedLogin,
@@ -274,9 +272,8 @@ export const useCashuWalletComposition = ({
     transactionsOwnerId,
   } = identity;
   const {
-    activeContactsOwnerContactCount,
+    saveNpubContact,
     appendLocalNostrMessage,
-    buildSavedContactName,
     chatMessages,
     contacts,
     enqueuePendingPayment,
@@ -293,7 +290,6 @@ export const useCashuWalletComposition = ({
     selectedContact,
     sendChatMessage,
     setContactsOnboardingHasPaid,
-    unknownNameByNpub,
     updateLocalNostrMessage,
   } = contactsMessaging;
   const {
@@ -451,11 +447,7 @@ export const useCashuWalletComposition = ({
           .selectFrom("ownerMeta")
           .selectAll()
           .where("isDeleted", "is not", Evolu.sqliteTrue)
-          .where(
-            "scope",
-            "=",
-            "defaultMint" as typeof Evolu.NonEmptyString100.Type,
-          ),
+          .where("scope", "=", Evolu.NonEmptyString100.orThrow("defaultMint")),
       ),
     [],
   );
@@ -465,7 +457,7 @@ export const useCashuWalletComposition = ({
     for (const row of ownerMetaDefaultMintRows) {
       if (typeof row !== "object" || row === null) continue;
       if (!("value" in row)) continue;
-      const raw = String(row.value ?? "").trim();
+      const raw = (row.value ?? "").trim();
       if (!raw) continue;
       const cleaned = normalizeMintUrl(raw);
       if (cleaned) return cleaned;
@@ -516,8 +508,8 @@ export const useCashuWalletComposition = ({
         "ownerMeta",
         {
           id: ownerMetaDefaultMintRowId,
-          scope: "defaultMint" as typeof Evolu.NonEmptyString100.Type,
-          value: cleaned as typeof Evolu.NonEmptyString1000.Type,
+          scope: Evolu.NonEmptyString100.orThrow("defaultMint"),
+          value: Evolu.NonEmptyString1000.orThrow(cleaned),
         },
         { ownerId: metaOwnerId },
       );
@@ -561,13 +553,11 @@ export const useCashuWalletComposition = ({
     return pubkey ? encodeNprofile(pubkey, NOSTR_RELAYS) : null;
   }, [currentNpub]);
 
-  const activeCashuOwnerId = String(cashuOwnerId ?? "").trim();
+  const activeCashuOwnerId = (cashuOwnerId ?? "").trim();
   const visibleCashuOwnerIds = React.useMemo(
     () =>
       new Set(
-        cashuVisibleOwnerIds
-          .map((ownerId) => String(ownerId ?? "").trim())
-          .filter(Boolean),
+        cashuVisibleOwnerIds.map((ownerId) => ownerId.trim()).filter(Boolean),
       ),
     [cashuVisibleOwnerIds],
   );
@@ -588,7 +578,7 @@ export const useCashuWalletComposition = ({
       const canonicalByAlias = new Map<string, string>();
       const bestByCanonical = new Map<string, CashuTokenRow>();
       const readRowCandidates = (row: CashuTokenRow): string[] => [
-        String(row.id),
+        row.id,
         ...readCashuRowAliases(row),
       ];
 
@@ -605,7 +595,7 @@ export const useCashuWalletComposition = ({
       };
 
       for (const row of rows) {
-        const ownerId = readCashuRowOwnerId(row);
+        const ownerId = row.ownerId;
         if (!visibleCashuOwnerIds.has(ownerId)) continue;
 
         const rowCandidates = readRowCandidates(row);
@@ -671,12 +661,12 @@ export const useCashuWalletComposition = ({
     writeOwnerId: cashuOwnerId,
   });
 
-  // ONE-TIME MIGRATION — DELETE ME EVENTUALLY (see linkshuStorageMigration.ts)
+  // Legacy migration; removal gate in docs/architecture.md
   React.useEffect(() => {
     seedLinkshuSeenMintsFromTokenRows(cashuTokensAll);
   }, [cashuTokensAll]);
 
-  // ONE-TIME MIGRATION — DELETE ME EVENTUALLY (see legacyAcceptedTokenDrain.ts)
+  // Legacy migration; removal gate in docs/architecture.md
   React.useEffect(() => {
     if (receiveCashuToken === null) return;
     void drainLegacyAcceptedCashuToken(receiveCashuToken);
@@ -710,69 +700,30 @@ export const useCashuWalletComposition = ({
     rememberSeenMint,
   });
 
-  // Tutorial progress remains local-only.
-
-  React.useEffect(() => {
-    if (!import.meta.env.DEV) return;
-
-    try {
-      if (localStorage.getItem("linky_debug_evolu_snapshot") !== "1") return;
-    } catch {
-      return;
-    }
-
-    // Debug: log Evolu state without secrets.
-    // NOTE: Relays and derived npub are Nostr/runtime state, not stored in Evolu.
-    console.log("[linky][evolu] snapshot", {
-      nostrIdentity: {
-        hasNsec: Boolean(currentNsec),
-        hasNpub: Boolean(currentNpub),
-      },
-      cashuTokens: cashuTokensFiltered.map((t) => ({
-        id: String(t.id ?? ""),
-        mint: String(t.mint ?? ""),
-        amount: Number(t.amount ?? 0) || 0,
-        state: String(t.state ?? ""),
-      })),
-      cashuTokensAll: {
-        count: cashuTokensAllFiltered.length,
-        newest10: cashuTokensAllFiltered.slice(0, 10).map((t) => ({
-          id: String(t.id ?? ""),
-          mint: String(t.mint ?? ""),
-          amount: Number(t.amount ?? 0) || 0,
-          state: String(t.state ?? ""),
-          isDeleted: Boolean(t.isDeleted),
-        })),
-      },
-    });
-  }, [cashuTokensAllFiltered, cashuTokensFiltered, currentNpub, currentNsec]);
-
   React.useEffect(() => {
     if (cashuTokenLifecycle === null) return;
     const pendingTokens = cashuTokensAllFiltered.filter((row) => {
-      const state = String(row.state ?? "");
+      const state = row.state ?? "";
       if (state !== "pending") return false;
       const isDeleted = Boolean(row.isDeleted);
       return !isDeleted;
     });
 
     for (const row of pendingTokens) {
-      const tokenText = String(row.token ?? row.rawToken ?? "").trim();
+      const tokenText = (row.token ?? row.rawToken ?? "").trim();
       if (!tokenText) continue;
       const hasMessage = nostrMessagesLocal.some((m) => {
-        const isOut = String(m.direction ?? "") === "out";
-        const matches = String(m.content ?? "").trim() === tokenText;
-        const status = String(m.status ?? "sent");
+        const isOut = m.direction === "out";
+        const matches = m.content.trim() === tokenText;
+        const status = m.status ?? "sent";
         return isOut && matches && status !== "pending";
       });
       if (!hasMessage) continue;
       // Deleting through linkshu keeps the token store's write overlay in
       // sync; a raw Evolu delete would leave the overlay serving the row.
-      void cashuTokenLifecycle.forget(String(row.id));
+      void cashuTokenLifecycle.forget(row.id);
     }
   }, [cashuTokenLifecycle, cashuTokensAllFiltered, nostrMessagesLocal]);
-
-  // lastMessageByContactId provided by the derived Nostr index above.
 
   const cashuTotalBalance: number = walletBalances.total;
   const cashuBalance: number = walletBalances.spendable;
@@ -1062,8 +1013,8 @@ export const useCashuWalletComposition = ({
   useContactPayMethod({
     payWithCashuEnabled,
     routeKind: route.kind,
-    selectedContactLnAddress: String(selectedContact?.lnAddress ?? ""),
-    selectedContactNpub: String(selectedContact?.npub ?? ""),
+    selectedContactLnAddress: selectedContact?.lnAddress ?? "",
+    selectedContactNpub: selectedContact?.npub ?? "",
     setContactPayMethod,
   });
 
@@ -1095,9 +1046,7 @@ export const useCashuWalletComposition = ({
     async (message: LocalNostrMessage) => {
       if (cashuIsBusy) return;
 
-      const offerInfo = getLinkyBankPaymentOfferInfo(
-        String(message.content ?? ""),
-      );
+      const offerInfo = getLinkyBankPaymentOfferInfo(message.content);
       if (!offerInfo || offerInfo.status !== "bank_paid") {
         setStatus(t("spdPaymentOfferFailed"));
         return;
@@ -1111,11 +1060,9 @@ export const useCashuWalletComposition = ({
         return;
       }
 
-      const contactId = String(message.contactId ?? "").trim();
+      const contactId = message.contactId.trim();
       const contact =
-        contacts.find(
-          (candidate) => String(candidate.id ?? "").trim() === contactId,
-        ) ?? null;
+        contacts.find((candidate) => candidate.id.trim() === contactId) ?? null;
       if (!contact) {
         setStatus(t("contactNotFound"));
         return;
@@ -1167,7 +1114,7 @@ export const useCashuWalletComposition = ({
     if (route.kind !== "contactPay") return;
     if (!selectedContact) return;
 
-    const amountSat = Number.parseInt(String(payAmount ?? "").trim(), 10);
+    const amountSat = Number.parseInt(payAmount.trim(), 10);
     if (!Number.isFinite(amountSat) || amountSat <= 0) {
       setStatus(t("payInvalidAmount"));
       return;
@@ -1186,7 +1133,7 @@ export const useCashuWalletComposition = ({
         : "cashu";
 
     if (normalizedMethod === "lightning") {
-      const lnAddress = String(selectedContact.lnAddress ?? "").trim();
+      const lnAddress = (selectedContact.lnAddress ?? "").trim();
       if (!lnAddress) {
         setStatus(t("payMissingLn"));
         return;
@@ -1228,7 +1175,7 @@ export const useCashuWalletComposition = ({
       if (!requestPubkeyHex) return null;
 
       for (const contact of contacts) {
-        const normalizedNpub = normalizeNpubIdentifier(contact.npub);
+        const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
         if (!normalizedNpub) continue;
 
         if (decodeNpub(normalizedNpub) === requestPubkeyHex) return contact;
@@ -1253,74 +1200,15 @@ export const useCashuWalletComposition = ({
       if (!pubkey) return null;
       const npub = encodeNpub(pubkey);
 
-      const normalizedNpub = normalizeNpubIdentifier(npub);
-      if (!normalizedNpub) return null;
-
-      const duplicate = contacts.find(
-        (contact) => normalizeNpubIdentifier(contact.npub) === normalizedNpub,
-      );
-      if (duplicate?.id) return duplicate;
-
-      if (activeContactsOwnerContactCount >= MAX_CONTACTS_PER_OWNER) {
-        setStatus(
-          t("contactsLimitReached").replace(
-            "{max}",
-            String(MAX_CONTACTS_PER_OWNER),
-          ),
-        );
-        return null;
-      }
-
-      const defaultProfile = deriveDefaultProfile(normalizedNpub, lang);
-      const contactName = buildSavedContactName(
-        unknownNameByNpub[normalizedNpub] ?? defaultProfile.name,
-        normalizedNpub,
-      );
-      const payload = {
-        name: contactName as typeof Evolu.NonEmptyString1000.Type,
-        npub: normalizedNpub as typeof Evolu.NonEmptyString1000.Type,
-        lnAddress: null,
-        groupName: null,
-      };
-
-      const result = contactsOwnerId
-        ? (() => {
-            const scoped = insert("contact", payload, {
-              ownerId: contactsOwnerId,
-            });
-            if (scoped.ok) return scoped;
-            return insert("contact", payload);
-          })()
-        : insert("contact", payload);
-
-      if (!result.ok) {
-        setStatus(`${t("errorPrefix")}: ${String(result.error ?? "")}`);
-        return null;
-      }
-
-      openScannedContactPendingNpubRef.current = normalizedNpub;
-
-      return {
-        id: result.value.id,
-        name: contactName,
-        npub: normalizedNpub,
-        lnAddress: null,
-        groupName: null,
-        ownerId: contactsOwnerId,
-      };
+      const saved = saveNpubContact(npub);
+      if (!saved) return null;
+      if (saved.created) openScannedContactPendingNpubRef.current = saved.npub;
+      return saved.contact;
     },
     [
-      activeContactsOwnerContactCount,
-      buildSavedContactName,
-      contacts,
-      contactsOwnerId,
       findContactForCashuPaymentRequest,
-      insert,
-      lang,
       openScannedContactPendingNpubRef,
-      setStatus,
-      t,
-      unknownNameByNpub,
+      saveNpubContact,
     ],
   );
 
@@ -1329,11 +1217,11 @@ export const useCashuWalletComposition = ({
       requestInfo: CashuPaymentRequestMessageInfo,
       contactId: string,
     ): LocalNostrMessage | null => {
-      const normalizedContactId = String(contactId ?? "").trim();
+      const normalizedContactId = contactId.trim();
       if (!normalizedContactId) return null;
 
-      const requestId = String(requestInfo.requestId ?? "").trim();
-      const encodedRequest = String(requestInfo.encodedRequest ?? "").trim();
+      const requestId = (requestInfo.requestId ?? "").trim();
+      const encodedRequest = requestInfo.encodedRequest.trim();
       if (!requestId && !encodedRequest) return null;
 
       const candidates = [
@@ -1344,25 +1232,23 @@ export const useCashuWalletComposition = ({
 
       for (let index = candidates.length - 1; index >= 0; index -= 1) {
         const message = candidates[index];
-        if (String(message.contactId ?? "").trim() !== normalizedContactId) {
+        if (message.contactId.trim() !== normalizedContactId) {
           continue;
         }
-        if (String(message.direction ?? "").trim() !== "in") continue;
+        if (message.direction.trim() !== "in") continue;
 
-        const rumorId = String(message.rumorId ?? "").trim();
+        const rumorId = (message.rumorId ?? "").trim();
         if (!rumorId) continue;
 
-        const previousInfo = parseCashuPaymentRequestMessage(
-          String(message.content ?? ""),
-        );
+        const previousInfo = parseCashuPaymentRequestMessage(message.content);
         if (!previousInfo) continue;
 
-        const previousRequestId = String(previousInfo.requestId ?? "").trim();
+        const previousRequestId = (previousInfo.requestId ?? "").trim();
         if (requestId && previousRequestId === requestId) return message;
 
         if (
           !requestId &&
-          String(previousInfo.encodedRequest ?? "").trim() === encodedRequest
+          previousInfo.encodedRequest.trim() === encodedRequest
         ) {
           return message;
         }
@@ -1375,7 +1261,7 @@ export const useCashuWalletComposition = ({
 
   const payCashuPaymentRequestViaPost = React.useCallback(
     async (requestInfo: CashuPaymentRequestMessageInfo): Promise<boolean> => {
-      const postUrlRaw = String(requestInfo.transportPostUrl ?? "").trim();
+      const postUrlRaw = (requestInfo.transportPostUrl ?? "").trim();
       if (!postUrlRaw) return false;
 
       let postUrl: URL;
@@ -1502,7 +1388,7 @@ export const useCashuWalletComposition = ({
           // The POST recipient may hold the proofs now; re-receiving kills
           // that encoding at the mint before the funds return to balance.
           const restored = await cashuTokenLifecycle.returnToWallet(
-            String(receipt.rowId),
+            receipt.rowId,
           );
           if (Either.isLeft(restored)) {
             console.warn("[linky][payment-request] return-to-wallet failed", {
@@ -1512,11 +1398,11 @@ export const useCashuWalletComposition = ({
           throw error;
         }
 
-        await cashuTokenLifecycle.forget(String(receipt.rowId));
+        await cashuTokenLifecycle.forget(receipt.rowId);
         reportCashuSendRowForgotten({
           mint: receipt.mint,
           reason: "payment-request-posted",
-          rowId: String(receipt.rowId),
+          rowId: receipt.rowId,
         });
 
         logPaymentEvent({
@@ -1612,10 +1498,10 @@ export const useCashuWalletComposition = ({
       try {
         const previousRequestMessage = findPreviousCashuPaymentRequestMessage(
           requestInfo,
-          String(contact.id ?? ""),
+          contact.id,
         );
-        const previousRequestRumorId = String(
-          previousRequestMessage?.rumorId ?? "",
+        const previousRequestRumorId = (
+          previousRequestMessage?.rumorId ?? ""
         ).trim();
 
         await payContactWithCashuMessage({
@@ -1627,12 +1513,10 @@ export const useCashuWalletComposition = ({
                 replyContext: {
                   replyToId: previousRequestRumorId,
                   rootMessageId:
-                    String(
-                      previousRequestMessage?.rootMessageId ?? "",
-                    ).trim() || previousRequestRumorId,
+                    (previousRequestMessage?.rootMessageId ?? "").trim() ||
+                    previousRequestRumorId,
                   replyToContent:
-                    String(previousRequestMessage?.content ?? "").trim() ||
-                    null,
+                    (previousRequestMessage?.content ?? "").trim() || null,
                 },
               }
             : {}),
@@ -1853,7 +1737,7 @@ export const useCashuWalletComposition = ({
       .then((report) => ({
         claimed: report.claimed.map((entry) => ({
           amount: entry.amount,
-          id: String(entry.rowId),
+          id: entry.rowId,
         })),
       }))
       .finally(() => {
@@ -1866,7 +1750,7 @@ export const useCashuWalletComposition = ({
   const checkSingleIssuedCashuTokenIsClaimed = React.useCallback(
     async (id: CashuTokenId): Promise<boolean> => {
       const outcome = await checkIssuedCashuTokensAndDeleteClaimed();
-      return outcome.claimed.some((entry) => entry.id === String(id));
+      return outcome.claimed.some((entry) => entry.id === id);
     },
     [checkIssuedCashuTokensAndDeleteClaimed],
   );
@@ -1877,24 +1761,12 @@ export const useCashuWalletComposition = ({
   // user isn't sitting on #wallet/tokens; the ref keeps the 60s interval
   // from being torn down whenever the callback identity churns.
   const hasAnyIssuedTokensForBackgroundCheck = cashuIssuedTokens.length > 0;
-  const checkIssuedCashuTokensRef = React.useRef(
+  const checkIssuedCashuTokensRef = useLatest(
     checkIssuedCashuTokensAndDeleteClaimed,
   );
-  React.useEffect(() => {
-    checkIssuedCashuTokensRef.current = checkIssuedCashuTokensAndDeleteClaimed;
-  }, [checkIssuedCashuTokensAndDeleteClaimed]);
-  const formatDisplayedAmountTextRef = React.useRef(formatDisplayedAmountText);
-  React.useEffect(() => {
-    formatDisplayedAmountTextRef.current = formatDisplayedAmountText;
-  }, [formatDisplayedAmountText]);
-  const pushToastRef = React.useRef(pushToast);
-  React.useEffect(() => {
-    pushToastRef.current = pushToast;
-  }, [pushToast]);
-  const claimToastTRef = React.useRef(t);
-  React.useEffect(() => {
-    claimToastTRef.current = t;
-  }, [t]);
+  const formatDisplayedAmountTextRef = useLatest(formatDisplayedAmountText);
+  const pushToastRef = useLatest(pushToast);
+  const claimToastTRef = useLatest(t);
   React.useEffect(() => {
     if (!hasAnyIssuedTokensForBackgroundCheck) return;
     let cancelled = false;
@@ -1932,7 +1804,13 @@ export const useCashuWalletComposition = ({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [hasAnyIssuedTokensForBackgroundCheck]);
+  }, [
+    checkIssuedCashuTokensRef,
+    claimToastTRef,
+    formatDisplayedAmountTextRef,
+    pushToastRef,
+    hasAnyIssuedTokensForBackgroundCheck,
+  ]);
 
   const returnCashuTokenToWallet = React.useCallback(
     async (id: CashuTokenId) => {
@@ -1940,7 +1818,7 @@ export const useCashuWalletComposition = ({
         setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
         return;
       }
-      const outcome = await cashuTokenLifecycle.returnToWallet(String(id));
+      const outcome = await cashuTokenLifecycle.returnToWallet(id);
       if (Either.isLeft(outcome)) {
         const message =
           describeTaggedCashuError(outcome.left) ?? outcome.left._tag;
@@ -1965,7 +1843,7 @@ export const useCashuWalletComposition = ({
     if (!row) return null;
 
     const meta = extractCashuTokenMeta(row);
-    const amountSat = Number(meta.amount ?? row.amount ?? 0);
+    const amountSat = meta.amount ?? row.amount ?? 0;
     if (!Number.isFinite(amountSat) || amountSat <= 0) return null;
 
     return {
@@ -1991,7 +1869,7 @@ export const useCashuWalletComposition = ({
         setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
         return false;
       }
-      const outcome = await cashuTokenLifecycle[transition](String(id));
+      const outcome = await cashuTokenLifecycle[transition](id);
       if (Either.isLeft(outcome)) {
         const message =
           describeTaggedCashuError(outcome.left) ?? outcome.left._tag;
@@ -2074,10 +1952,10 @@ export const useCashuWalletComposition = ({
       try {
         if (rowsToDelete.length > 0) {
           for (const row of rowsToDelete) {
-            await cashuTokenLifecycle.forget(String(row.id));
+            await cashuTokenLifecycle.forget(row.id);
           }
         } else {
-          await cashuTokenLifecycle.forget(String(id));
+          await cashuTokenLifecycle.forget(id);
         }
       } catch (error) {
         setStatus(`${t("errorPrefix")}: ${String(error)}`);
@@ -2106,14 +1984,14 @@ export const useCashuWalletComposition = ({
         (candidate) => candidate.id === tokenId && !candidate.isDeleted,
       );
       const tokenMeta = row ? extractCashuTokenMeta(row) : null;
-      const tokenText = String(tokenMeta?.tokenText ?? "").trim();
+      const tokenText = (tokenMeta?.tokenText ?? "").trim();
 
       if (!row || !tokenText || !isCashuTokenIssuedState(row.state)) {
         setStatus(t("cashuInvalid"));
         return;
       }
 
-      const contactId = String(contact.id ?? "").trim();
+      const contactId = (contact.id ?? "").trim();
       if (!contactId) {
         setStatus(t("contactNotFound"));
         return;
@@ -2125,7 +2003,7 @@ export const useCashuWalletComposition = ({
       }
 
       let contactPubHex = normalizePubkeyHex(contact.unknownPubkeyHex);
-      const contactNpub = normalizeNpubIdentifier(contact.npub);
+      const contactNpub = normalizeNpubIdentifier(contact.npub ?? "");
 
       if (!contactPubHex && contactNpub) {
         contactPubHex = decodeNpub(contactNpub);
@@ -2137,9 +2015,7 @@ export const useCashuWalletComposition = ({
       }
 
       const transactionNote =
-        String(contact.name ?? "").trim() ||
-        String(contact.lnAddress ?? "").trim() ||
-        null;
+        (contact.name ?? "").trim() || (contact.lnAddress ?? "").trim() || null;
       const logIssuedTokenSendTransaction = (phase: "complete" | "publish") => {
         logPaymentEvent({
           amount: tokenMeta?.amount ?? null,
@@ -2205,7 +2081,7 @@ export const useCashuWalletComposition = ({
 
         updateLocalNostrMessage(pendingId, {
           createdAtSec: exit.value.sentAt,
-          rumorId: exit.value.messageId,
+          rumorId: exit.value.rumorId,
         });
 
         const isOffline =
@@ -2320,19 +2196,11 @@ export const useCashuWalletComposition = ({
     return selected;
   }, [cashuAcceptedMintBalances, mainMintForTokenList]);
 
-  const formatMintButtonLabel = React.useCallback((mintUrl: string) => {
-    try {
-      return new URL(mintUrl).host || mintUrl.replace(/^https?:\/\//i, "");
-    } catch {
-      return mintUrl.replace(/^https?:\/\//i, "");
-    }
-  }, []);
-
   const cashuMeltToMainMintButtonLabel =
     mainMintForTokenList && largestForeignMintForTokenList
       ? t("cashuMeltToMainMint").replace(
           "{mint}",
-          formatMintButtonLabel(mainMintForTokenList),
+          formatMintHost(mainMintForTokenList),
         )
       : null;
 
@@ -2419,9 +2287,7 @@ export const useCashuWalletComposition = ({
 
       setCashuEmitAmount("");
       setStatus(null);
-      const routeId = CashuTokenIdFromUnknown.fromUnknown(
-        String(receipt.rowId),
-      );
+      const routeId = CashuTokenIdFromUnknown.fromUnknown(receipt.rowId);
       navigateTo(
         routeId.ok
           ? { route: "cashuToken", id: routeId.value }
@@ -2477,7 +2343,7 @@ export const useCashuWalletComposition = ({
           t("cashuMeltToMainMintDone")
             .replace("{amount}", `${moved.approxPrefix}${moved.amountText}`)
             .replace("{unit}", moved.unitLabel)
-            .replace("{mint}", formatMintButtonLabel(targetMint)),
+            .replace("{mint}", formatMintHost(targetMint)),
         );
         return;
       }
@@ -2519,7 +2385,6 @@ export const useCashuWalletComposition = ({
     cashuIsBusy,
     defaultMintUrl,
     formatDisplayedAmountParts,
-    formatMintButtonLabel,
     largestForeignMintForTokenList,
     rememberSeenMint,
     setCashuIsBusy,
@@ -2558,13 +2423,13 @@ export const useCashuWalletComposition = ({
     if (route.kind !== "contactPay") return;
     if (!selectedContact) return;
 
-    const amountSat = Number.parseInt(String(payAmount ?? "").trim(), 10);
+    const amountSat = Number.parseInt(payAmount.trim(), 10);
     if (!Number.isFinite(amountSat) || amountSat <= 0) {
       setStatus(t("payInvalidAmount"));
       return;
     }
 
-    const normalizedNpub = normalizeNpubIdentifier(selectedContact.npub);
+    const normalizedNpub = normalizeNpubIdentifier(selectedContact.npub ?? "");
     if (!normalizedNpub) {
       setStatus(t("chatMissingContactNpub"));
       return;
@@ -2610,7 +2475,7 @@ export const useCashuWalletComposition = ({
       unit: "sat",
     });
 
-    if (String(contactPayBackToChatRef.current ?? "") === String(route.id)) {
+    if ((contactPayBackToChatRef.current ?? "") === route.id) {
       navigateTo({ route: "chat", id: route.id });
       return;
     }
@@ -2638,7 +2503,7 @@ export const useCashuWalletComposition = ({
       if (!selectedChatContact || selectedChatContact.isUnknownContact) return;
       if (!selectedContact) return;
 
-      const requestRumorId = String(message.rumorId ?? "").trim();
+      const requestRumorId = (message.rumorId ?? "").trim();
       if (!requestRumorId) return;
 
       setCashuIsBusy(true);
@@ -2650,8 +2515,8 @@ export const useCashuWalletComposition = ({
           replyContext: {
             replyToId: requestRumorId,
             rootMessageId:
-              String(message.rootMessageId ?? "").trim() || requestRumorId,
-            replyToContent: String(message.content ?? "").trim() || null,
+              (message.rootMessageId ?? "").trim() || requestRumorId,
+            replyToContent: message.content.trim() || null,
           },
         });
       } finally {
@@ -2684,14 +2549,13 @@ export const useCashuWalletComposition = ({
     return (
       contacts.find(
         (contact) =>
-          String(contact.lnAddress ?? "")
-            .trim()
-            .toLowerCase() === inferredLnAddress.toLowerCase(),
+          (contact.lnAddress ?? "").trim().toLowerCase() ===
+          inferredLnAddress.toLowerCase(),
       ) ?? null
     );
   }, [contacts, route]);
   const knownLnAddressPayContactPictureUrl = React.useMemo(() => {
-    const npub = normalizeNpubIdentifier(knownLnAddressPayContact?.npub);
+    const npub = normalizeNpubIdentifier(knownLnAddressPayContact?.npub ?? "");
     return npub ? (nostrPictureByNpub[npub] ?? null) : null;
   }, [knownLnAddressPayContact, nostrPictureByNpub]);
 

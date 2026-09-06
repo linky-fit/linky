@@ -1,3 +1,4 @@
+import { Option, Schema } from "effect";
 import {
   getDefaultAllowedDisplayCurrencies,
   getDefaultDisplayCurrency,
@@ -23,50 +24,9 @@ import {
   parseDisplayCurrency,
   type DisplayCurrency,
 } from "./displayAmounts";
+import { asNonEmptyString, trimString } from "./validation";
 
-interface StorageStructuredValue {
-  toString(): string;
-}
-
-interface StorageObjectPayload {
-  [key: string]: StoragePayload;
-}
-
-type StoragePayload =
-  | boolean
-  | number
-  | StorageObjectPayload
-  | StorageStructuredValue
-  | StoragePayload[]
-  | string
-  | null
-  | undefined;
-
-interface LocalStorageLeaseLockRecord {
-  expiresAtMs: number;
-  owner: string;
-}
-
-const isLocalStorageLeaseLockRecord = (
-  value: unknown,
-): value is LocalStorageLeaseLockRecord => {
-  if (typeof value !== "object" || value === null) return false;
-  const owner = Reflect.get(value, "owner");
-  const expiresAtMs = Reflect.get(value, "expiresAtMs");
-  return typeof owner === "string" && typeof expiresAtMs === "number";
-};
-
-const createLeaseLockOwner = (): string => {
-  const randomUuid = globalThis.crypto?.randomUUID?.();
-  if (typeof randomUuid === "string" && randomUuid.trim()) return randomUuid;
-  return `${Date.now()}:${Math.random().toString(36).slice(2)}`;
-};
-
-const sleep = async (delayMs: number): Promise<void> => {
-  await new Promise<void>((resolve) => {
-    globalThis.setTimeout(resolve, delayMs);
-  });
-};
+import { nowSeconds, sleep } from "./time";
 
 export const safeLocalStorageGet = (key: string): string | null => {
   try {
@@ -80,7 +40,7 @@ export const safeLocalStorageSet = (key: string, value: string): void => {
   try {
     localStorage.setItem(key, value);
   } catch {
-    // ignore
+    // Storage can be unavailable or full in privacy-restricted browsers.
   }
 };
 
@@ -88,47 +48,63 @@ export const safeLocalStorageRemove = (key: string): void => {
   try {
     localStorage.removeItem(key);
   } catch {
-    // ignore
+    // Storage can be unavailable in privacy-restricted browsers.
   }
 };
 
-export const safeLocalStorageGetJson = <T extends StoragePayload>(
+export const safeLocalStorageKeys = (): string[] => {
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key !== null) keys.push(key);
+    }
+    return keys;
+  } catch {
+    return [];
+  }
+};
+
+export const safeLocalStorageGetJson = <A, I>(
   key: string,
-  fallback: T,
-): T => {
+  schema: Schema.Schema<A, I>,
+  fallback: A,
+): A => {
   const raw = safeLocalStorageGet(key);
   if (!raw) return fallback;
+  let parsed: unknown;
   try {
-    return JSON.parse(raw) as T;
+    parsed = JSON.parse(raw);
   } catch {
     return fallback;
   }
+  return Option.getOrElse(
+    Schema.decodeUnknownOption(schema)(parsed),
+    () => fallback,
+  );
 };
 
-export const safeLocalStorageSetJson = (
-  key: string,
-  value: StoragePayload,
-): void => {
+export const safeLocalStorageSetJson = (key: string, value: unknown): void => {
   try {
     safeLocalStorageSet(key, JSON.stringify(value));
   } catch {
-    // ignore
+    // Circular or non-serializable values are not persisted.
   }
 };
 
-const readLocalStorageLeaseLock = (
-  key: string,
-): LocalStorageLeaseLockRecord | null => {
-  const raw = safeLocalStorageGet(key);
-  if (!raw) return null;
+const LeaseLockRecord = Schema.Struct({
+  expiresAtMs: Schema.Number,
+  owner: Schema.String,
+});
 
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return isLocalStorageLeaseLockRecord(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+const createLeaseLockOwner = (): string => {
+  const randomUuid = globalThis.crypto?.randomUUID?.();
+  if (typeof randomUuid === "string" && randomUuid.trim()) return randomUuid;
+  return `${Date.now()}:${Math.random().toString(36).slice(2)}`;
 };
+
+const readLocalStorageLeaseLock = (key: string) =>
+  safeLocalStorageGetJson(key, Schema.NullOr(LeaseLockRecord), null);
 
 export const withLocalStorageLeaseLock = async <T>(args: {
   key: string;
@@ -197,187 +173,109 @@ export const withLocalStorageLeaseLock = async <T>(args: {
   }
 };
 
+const readStoredInt = (key: string): number | null => {
+  const parsed = Number.parseInt(trimString(safeLocalStorageGet(key)), 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const getLegacyDefaultDisplayCurrency = (): DisplayCurrency =>
+  safeLocalStorageGet(UNIT_TOGGLE_STORAGE_KEY) === "1"
+    ? "btc"
+    : getDefaultDisplayCurrency();
+
 export const getInitialDisplayCurrency = (): DisplayCurrency => {
-  try {
-    const allowedCurrencies = getInitialAllowedDisplayCurrencies();
-    const stored = parseDisplayCurrency(
-      localStorage.getItem(DISPLAY_CURRENCY_STORAGE_KEY),
-    );
-    if (stored && allowedCurrencies.includes(stored)) return stored;
+  const allowedCurrencies = getInitialAllowedDisplayCurrencies();
+  const stored = parseDisplayCurrency(
+    safeLocalStorageGet(DISPLAY_CURRENCY_STORAGE_KEY),
+  );
+  if (stored && allowedCurrencies.includes(stored)) return stored;
 
-    const legacyDefault =
-      localStorage.getItem(UNIT_TOGGLE_STORAGE_KEY) === "1"
-        ? "btc"
-        : getDefaultDisplayCurrency();
+  const legacyDefault = getLegacyDefaultDisplayCurrency();
+  if (allowedCurrencies.includes(legacyDefault)) return legacyDefault;
 
-    if (allowedCurrencies.includes(legacyDefault)) return legacyDefault;
-
-    return allowedCurrencies[0] ?? legacyDefault;
-  } catch {
-    return getDefaultDisplayCurrency();
-  }
+  return allowedCurrencies[0] ?? legacyDefault;
 };
 
 export const getInitialAllowedDisplayCurrencies = (): DisplayCurrency[] => {
-  try {
-    const rawStored = localStorage.getItem(
-      DISPLAY_ALLOWED_CURRENCIES_STORAGE_KEY,
-    );
-    if (rawStored) {
-      const parsed: unknown = JSON.parse(rawStored);
-      if (Array.isArray(parsed)) {
-        const fallbackCurrency = getDefaultDisplayCurrency();
-        const parsedCurrencies = parsed.filter(
-          (value): value is string => typeof value === "string",
-        );
-        return normalizeAllowedDisplayCurrencies(
-          parsedCurrencies,
-          fallbackCurrency,
-        );
-      }
-    }
-
-    const storedCurrency = parseDisplayCurrency(
-      localStorage.getItem(DISPLAY_CURRENCY_STORAGE_KEY),
-    );
-    const legacyDefault =
-      storedCurrency ??
-      (localStorage.getItem(UNIT_TOGGLE_STORAGE_KEY) === "1"
-        ? "btc"
-        : getDefaultDisplayCurrency());
-
+  const stored = safeLocalStorageGetJson(
+    DISPLAY_ALLOWED_CURRENCIES_STORAGE_KEY,
+    Schema.NullOr(Schema.Array(Schema.String)),
+    null,
+  );
+  if (stored) {
     return normalizeAllowedDisplayCurrencies(
-      getDefaultAllowedDisplayCurrencies().concat(legacyDefault),
-      legacyDefault,
+      stored,
+      getDefaultDisplayCurrency(),
     );
-  } catch {
-    return getDefaultAllowedDisplayCurrencies();
   }
+
+  const legacyDefault =
+    parseDisplayCurrency(safeLocalStorageGet(DISPLAY_CURRENCY_STORAGE_KEY)) ??
+    getLegacyDefaultDisplayCurrency();
+
+  return normalizeAllowedDisplayCurrencies(
+    getDefaultAllowedDisplayCurrencies().concat(legacyDefault),
+    legacyDefault,
+  );
 };
 
-export const getInitialDecimalAmountInputEnabled = (): boolean => {
-  try {
-    return localStorage.getItem(DECIMAL_AMOUNT_INPUT_STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
+export const getInitialDecimalAmountInputEnabled = (): boolean =>
+  safeLocalStorageGet(DECIMAL_AMOUNT_INPUT_STORAGE_KEY) === "1";
 
 // Default ON: an absent key self-initializes to "enabled now", so both fresh
 // installs and updated ones start sending receipts with a baseline of first
 // launch — history older than the feature is still never reported. "0" is the
 // explicit off state.
 export const getInitialSeenReceiptsEnabledAtSec = (): number | null => {
-  const nowSec = Math.floor(Date.now() / 1e3);
-  try {
-    const raw = (
-      localStorage.getItem(SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY) ?? ""
-    ).trim();
-    if (raw === "0") return null;
-    const parsed = Number(raw);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : nowSec;
-  } catch {
-    return nowSec;
-  }
+  const raw = trimString(
+    safeLocalStorageGet(SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY),
+  );
+  if (raw === "0") return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : nowSeconds();
 };
 
 export const getInitialPayWithCashuEnabled = (): boolean => {
-  try {
-    const raw = localStorage.getItem(PAY_WITH_CASHU_STORAGE_KEY);
-    const v = String(raw ?? "").trim();
-    // Default: enabled.
-    if (!v) return true;
-    return v === "1";
-  } catch {
-    return true;
-  }
+  const stored = trimString(safeLocalStorageGet(PAY_WITH_CASHU_STORAGE_KEY));
+  return !stored || stored === "1";
 };
 
-export const getInitialShowProfileQrOnTiltEnabled = (): boolean => {
-  try {
-    return localStorage.getItem(SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
+export const getInitialShowProfileQrOnTiltEnabled = (): boolean =>
+  safeLocalStorageGet(SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY) === "1";
 
 export const getInitialLightningInvoiceAutoPayLimit = (): number => {
-  try {
-    const raw = localStorage.getItem(
-      LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY,
-    );
-    const parsed = Number.parseInt(String(raw ?? "").trim(), 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      return parsed;
-    }
-    return LIGHTNING_INVOICE_AUTO_PAY_LIMIT_SAT;
-  } catch {
-    return LIGHTNING_INVOICE_AUTO_PAY_LIMIT_SAT;
-  }
+  const stored = readStoredInt(LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY);
+  return stored !== null && stored >= 0
+    ? stored
+    : LIGHTNING_INVOICE_AUTO_PAY_LIMIT_SAT;
 };
 
 export const getInitialBankPaymentOfferRecipientCount = (
   fallback: number,
 ): number => {
-  try {
-    const raw = localStorage.getItem(
-      BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY,
-    );
-    const parsed = Number.parseInt(String(raw ?? "").trim(), 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return parsed;
-    }
-    return fallback;
-  } catch {
-    return fallback;
-  }
+  const stored = readStoredInt(BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY);
+  return stored !== null && stored > 0 ? stored : fallback;
 };
 
 export const getInitialBankPaymentOfferStaggerDelaySec = (
   fallback: number,
 ): number => {
-  try {
-    const raw = localStorage.getItem(
-      BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY,
-    );
-    const parsed = Number.parseInt(String(raw ?? "").trim(), 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      return parsed;
-    }
-    return fallback;
-  } catch {
-    return fallback;
-  }
+  const stored = readStoredInt(
+    BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY,
+  );
+  return stored !== null && stored >= 0 ? stored : fallback;
 };
 
-export const getInitialNostrNsec = (): string | null => {
-  try {
-    const raw = localStorage.getItem(NOSTR_NSEC_STORAGE_KEY);
-    const v = String(raw ?? "").trim();
-    return v ? v : null;
-  } catch {
-    return null;
-  }
-};
+export const getInitialNostrNsec = (): string | null =>
+  asNonEmptyString(safeLocalStorageGet(NOSTR_NSEC_STORAGE_KEY));
 
-export const getInitialNostrIdentitySource = (): "custom" | "derived" => {
-  try {
-    const raw = localStorage.getItem(NOSTR_IDENTITY_SOURCE_STORAGE_KEY);
-    return String(raw ?? "").trim() === "custom" ? "custom" : "derived";
-  } catch {
-    return "derived";
-  }
-};
+export const getInitialNostrIdentitySource = (): "custom" | "derived" =>
+  trimString(safeLocalStorageGet(NOSTR_IDENTITY_SOURCE_STORAGE_KEY)) ===
+  "custom"
+    ? "custom"
+    : "derived";
 
 export const getInitialNostrIdentitySwitchedAtSec = (): number | null => {
-  try {
-    const raw = localStorage.getItem(
-      NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY,
-    );
-    const parsed = Number.parseInt(String(raw ?? "").trim(), 10);
-    if (!Number.isFinite(parsed) || parsed <= 0) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  const stored = readStoredInt(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
+  return stored !== null && stored > 0 ? stored : null;
 };

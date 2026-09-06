@@ -1,12 +1,13 @@
-import React from "react";
 import { Copy, Radio, RefreshCcw, Save } from "lucide-react";
+import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { Avatar } from "../components/Avatar";
 import { ProfileAvatarEditor } from "../components/ProfileAvatarEditor";
 import { ProfileQrButton } from "../components/ProfileQrButton";
 import type { AvatarEditorControlId } from "../derivedProfile";
 import {
-  parseProfileGeneralStatusText,
   type ProfileStatusCurrency,
+  parseProfileGeneralStatus,
 } from "../nostrStatus";
 import {
   formatShortLightningAddress,
@@ -66,7 +67,6 @@ interface ProfilePageProps {
   setProfileEditLnAddress: (value: string) => void;
   setProfileEditName: (value: string) => void;
   setProfileEditStatus: (value: string) => void;
-  t: (key: string) => string;
   toggleProfileStatusCurrency: (
     currency: ProfileStatusCurrency,
   ) => Promise<void>;
@@ -112,11 +112,10 @@ export function ProfilePage({
   setProfileEditLnAddress,
   setProfileEditName,
   setProfileEditStatus,
-  t,
   toggleProfileStatusCurrency,
   writeCurrentNpubToNfc,
 }: ProfilePageProps): React.ReactElement {
-  const { formatDisplayedAmountParts } = useAppShellCore();
+  const { formatDisplayedAmountParts, t } = useAppShellCore();
   const [inlineClaimError, setInlineClaimError] = React.useState<string | null>(
     null,
   );
@@ -127,12 +126,10 @@ export function ProfilePage({
   const [inlineClaimPreview, setInlineClaimPreview] =
     React.useState<OwnLightningClaimAvailableResult | null>(null);
   const inlineClaimRequestSeqRef = React.useRef(0);
-  const profileStatusText = parseProfileGeneralStatusText(profileStatus);
+  const profileStatusText = parseProfileGeneralStatus(profileStatus).text;
   const restoreLightningAddress = React.useMemo(() => {
     for (const lightningAddress of ownedLightningAddresses) {
-      const normalized = String(lightningAddress ?? "")
-        .trim()
-        .toLowerCase();
+      const normalized = lightningAddress.trim().toLowerCase();
       if (normalized) return normalized;
     }
 
@@ -282,13 +279,7 @@ export function ProfilePage({
                 t={t}
               />
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+              <div className="form-field-heading">
                 <label htmlFor="profileName">{t("name")}</label>
               </div>
               <input
@@ -298,15 +289,9 @@ export function ProfilePage({
                 placeholder={t("name")}
               />
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+              <div className="form-field-heading">
                 <label htmlFor="profileLn">{t("lightningAddress")}</label>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div className="profile-field-label">
                   {canRestoreDefaultLightningAddress &&
                   restoreLightningAddress ? (
                     <button
@@ -366,18 +351,10 @@ export function ProfilePage({
                 ) : null}
               </div>
               {inlineClaimError ? (
-                <p className="muted" style={{ marginTop: 8 }}>
-                  {inlineClaimError}
-                </p>
+                <p className="muted section-note">{inlineClaimError}</p>
               ) : null}
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
+              <div className="form-field-heading">
                 <label htmlFor="profileStatus">{t("status")}</label>
               </div>
               <input
@@ -387,7 +364,7 @@ export function ProfilePage({
                 placeholder={t("status")}
               />
 
-              <div className="panel-header" style={{ marginTop: 14 }}>
+              <div className="panel-header panel-header-layout">
                 {canSaveProfileEdits ? (
                   <button onClick={() => void saveProfileEdits()}>
                     <span className="btn-label-with-icon">
@@ -404,20 +381,14 @@ export function ProfilePage({
             <>
               <div className="profile-detail">
                 <div className="contact-avatar is-xl" aria-hidden="true">
-                  {effectiveProfilePicture ? (
-                    <img
-                      src={effectiveProfilePicture}
-                      alt=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="contact-avatar-fallback">
-                      {getInitials(
-                        effectiveProfileName ?? formatShortNpub(currentNpub),
-                      )}
-                    </span>
-                  )}
+                  <Avatar
+                    pictureUrl={effectiveProfilePicture}
+                    fallback={getInitials(
+                      effectiveProfileName ?? formatShortNpub(currentNpub),
+                    )}
+                    fallbackClassName="contact-avatar-fallback"
+                    loading="lazy"
+                  />
                 </div>
 
                 <h2 className="contact-detail-name">
@@ -478,9 +449,7 @@ export function ProfilePage({
                 ) : null}
 
                 {profileStatusText ? (
-                  <p className="muted" style={{ marginTop: 8 }}>
-                    {profileStatusText}
-                  </p>
+                  <p className="muted section-note">{profileStatusText}</p>
                 ) : null}
               </div>
             </>

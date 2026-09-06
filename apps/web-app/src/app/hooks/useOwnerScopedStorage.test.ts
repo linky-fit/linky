@@ -1,7 +1,8 @@
 import * as Evolu from "@evolu/common";
 import React, { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import type { Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import {
   LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX,
   LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX,
@@ -11,12 +12,6 @@ import {
   buildTransactionInsertPayload,
   useOwnerScopedStorage,
 } from "./useOwnerScopedStorage";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
-});
 
 beforeAll(() => {
   vi.stubGlobal("__APP_VERSION__", "test");
@@ -67,22 +62,18 @@ const renderStorageHook = async (
   transactionsOwnerId: Evolu.OwnerId,
   insert: EvoluInsert,
 ): Promise<OwnerScopedStorage> => {
-  const root = createRoot(document.createElement("div"));
-  mountedRoots.add(root);
   const resultRef: { current: OwnerScopedStorage | null } = { current: null };
-
-  await act(async () => {
-    root.render(
-      React.createElement(HookHarness, {
-        appOwnerId,
-        insert,
-        onRender: (storage) => {
-          resultRef.current = storage;
-        },
-        transactionsOwnerId,
-      }),
-    );
-  });
+  const { root } = await renderIntoDocument(
+    React.createElement(HookHarness, {
+      appOwnerId,
+      insert,
+      onRender: (storage) => {
+        resultRef.current = storage;
+      },
+      transactionsOwnerId,
+    }),
+  );
+  mountedRoots.add(root);
 
   if (!resultRef.current) {
     throw new Error("Owner-scoped storage hook did not render");
@@ -132,8 +123,8 @@ describe("buildTransactionInsertPayload", () => {
       detailsJson: JSON.stringify({
         requestId: "request-1",
         lightningInvoice: "lnbc1invoice",
-        usedTokenIds: [String(createCashuTokenId(usedToken))],
-        gainedTokenIds: [String(createCashuTokenId(gainedToken))],
+        usedTokenIds: [createCashuTokenId(usedToken)],
+        gainedTokenIds: [createCashuTokenId(gainedToken)],
       }),
       direction: "out",
       fee: 1,
@@ -142,7 +133,7 @@ describe("buildTransactionInsertPayload", () => {
     });
   });
 
-  it("uses status pending instead of phase and pendingLabel", () => {
+  it("stores publish-phase events as pending", () => {
     expect(
       buildTransactionInsertPayload({
         createdAtSec: 456,
@@ -212,7 +203,7 @@ describe("useOwnerScopedStorage", () => {
     );
     expect(
       localStorage.getItem(
-        `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${String(appOwnerId)}`,
+        `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${appOwnerId}`,
       ),
     ).not.toBeNull();
   });
@@ -236,7 +227,7 @@ describe("useOwnerScopedStorage", () => {
     }).not.toThrow();
     expect(
       localStorage.getItem(
-        `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${String(appOwnerId)}`,
+        `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${appOwnerId}`,
       ),
     ).not.toBeNull();
   });
@@ -248,7 +239,7 @@ describe("useOwnerScopedStorage", () => {
       transactionsOwnerId,
       insert,
     );
-    const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${String(appOwnerId)}`;
+    const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${appOwnerId}`;
     localStorage.setItem(
       legacyStorageKey,
       JSON.stringify([

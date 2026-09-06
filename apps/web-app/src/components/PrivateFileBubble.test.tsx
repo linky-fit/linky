@@ -1,6 +1,6 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { renderPdfPages } from "../app/lib/pdfPreview";
 import {
   decryptPrivateImageMessage,
@@ -26,12 +26,6 @@ vi.mock("../app/lib/pdfPreview", () => ({
   revokePdfPages: vi.fn(),
 }));
 
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
-});
-
 const renderMock = vi.mocked(renderPdfPages);
 const decryptMock = vi.mocked(decryptPrivateImageMessage);
 
@@ -50,19 +44,14 @@ const payload: PrivateImageMessagePayload = {
 };
 
 const render = async () => {
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  const root = createRoot(container);
-  await act(async () => {
-    root.render(
-      <PrivateFileBubble
-        onBlobChange={() => undefined}
-        payload={payload}
-        rumorId="rumor-1"
-        t={(key) => key}
-      />,
-    );
-  });
+  const { container } = await renderIntoDocument(
+    <PrivateFileBubble
+      onBlobChange={() => undefined}
+      payload={payload}
+      rumorId="rumor-1"
+      t={(key) => key}
+    />,
+  );
   return container;
 };
 

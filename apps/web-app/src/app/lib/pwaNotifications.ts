@@ -30,10 +30,10 @@ export const showPwaNotification = async ({
   }
   if (permission !== "granted") return;
 
-  const safeTitle = String(title ?? "").trim() || String(appTitle ?? "").trim();
-  const safeBody = String(body ?? "").trim();
+  const safeTitle = title.trim() || appTitle.trim();
+  const safeBody = body.trim();
   const options: NotificationOptions = tag
-    ? { body: safeBody, tag: String(tag) }
+    ? { body: safeBody, tag: tag }
     : { body: safeBody };
 
   try {

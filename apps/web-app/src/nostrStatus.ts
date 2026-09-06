@@ -1,3 +1,4 @@
+import { asNonEmptyString } from "./utils/validation";
 /**
  * Linky's kind-30315 status conventions: the last status line may carry a
  * comma-separated exchange-currency list; everything transport-level lives in
@@ -6,27 +7,21 @@
 
 export const PROFILE_STATUS_CURRENCIES = ["BTC", "CZK", "EUR"] as const;
 const LEGACY_PROFILE_STATUS_CURRENCIES = ["USD"] as const;
-export const STATUS_FILTER_PREFIX = "status:";
+const STATUS_FILTER_PREFIX = "status:";
 
 export type ProfileStatusCurrency = (typeof PROFILE_STATUS_CURRENCIES)[number];
 
-export interface ParsedProfileGeneralStatus {
+interface ParsedProfileGeneralStatus {
   currencies: ProfileStatusCurrency[];
   text: string | null;
 }
-
-const normalizeStatusText = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-};
 
 const CURRENCY_CODE_PATTERN = /^[A-Z0-9]{2,10}$/;
 
 const parseCurrencyStatusCodes = (
   status: string | null | undefined,
 ): string[] | null => {
-  const normalizedStatus = normalizeStatusText(status);
+  const normalizedStatus = asNonEmptyString(status);
   if (!normalizedStatus) return null;
 
   const parts = normalizedStatus
@@ -66,7 +61,7 @@ const parseLinkyProfileExchangeStatus = (
 export const parseProfileGeneralStatus = (
   status: string | null | undefined,
 ): ParsedProfileGeneralStatus => {
-  const normalizedStatus = normalizeStatusText(status);
+  const normalizedStatus = asNonEmptyString(status);
   if (!normalizedStatus) {
     return {
       currencies: [],
@@ -79,7 +74,7 @@ export const parseProfileGeneralStatus = (
     const maybeCurrencies = parseLinkyProfileExchangeStatus(lines[index]);
     if (!maybeCurrencies) continue;
 
-    const text = normalizeStatusText(lines.slice(0, index).join("\n"));
+    const text = asNonEmptyString(lines.slice(0, index).join("\n"));
     return {
       currencies: maybeCurrencies,
       text,
@@ -90,18 +85,6 @@ export const parseProfileGeneralStatus = (
     currencies: [],
     text: normalizedStatus,
   };
-};
-
-export const parseProfileExchangeStatusCurrencies = (
-  status: string | null | undefined,
-): ProfileStatusCurrency[] => {
-  return parseProfileGeneralStatus(status).currencies;
-};
-
-export const parseProfileGeneralStatusText = (
-  status: string | null | undefined,
-): string | null => {
-  return parseProfileGeneralStatus(status).text;
 };
 
 export const formatDisplayGeneralStatus = (params: {
@@ -120,31 +103,21 @@ export const formatDisplayGeneralStatus = (params: {
   return `${params.providesLabel} ${parsed.currencies.join(", ")}`;
 };
 
-export const extractStatusFilterCurrencies = (
-  status: string | null | undefined,
-): string[] => {
-  return parseProfileGeneralStatus(status).currencies;
-};
-
 export const buildStatusFilterValue = (currency: string): string => {
-  return `${STATUS_FILTER_PREFIX}${String(currency ?? "")
-    .trim()
-    .toUpperCase()}`;
+  return `${STATUS_FILTER_PREFIX}${currency.trim().toUpperCase()}`;
 };
 
 export const isStatusFilterValue = (
   value: string | null | undefined,
 ): boolean => {
-  return String(value ?? "").startsWith(STATUS_FILTER_PREFIX);
+  return (value ?? "").startsWith(STATUS_FILTER_PREFIX);
 };
 
 export const parseStatusFilterValue = (
   value: string | null | undefined,
 ): string | null => {
   if (!isStatusFilterValue(value)) return null;
-  const currency = String(value ?? "")
-    .slice(STATUS_FILTER_PREFIX.length)
-    .trim();
+  const currency = (value ?? "").slice(STATUS_FILTER_PREFIX.length).trim();
   return currency || null;
 };
 
@@ -152,7 +125,7 @@ export const buildProfileGeneralStatus = (params: {
   currencies: readonly ProfileStatusCurrency[];
   text: string | null | undefined;
 }): string | null => {
-  const text = normalizeStatusText(params.text);
+  const text = asNonEmptyString(params.text);
   const selected = PROFILE_STATUS_CURRENCIES.filter((currency) =>
     params.currencies.includes(currency),
   );
@@ -164,10 +137,4 @@ export const buildProfileGeneralStatus = (params: {
   if (text) return text;
 
   return selected.length > 0 ? selected.join(", ") : null;
-};
-
-export const buildProfileExchangeStatus = (
-  currencies: readonly ProfileStatusCurrency[],
-): string | null => {
-  return buildProfileGeneralStatus({ currencies, text: null });
 };

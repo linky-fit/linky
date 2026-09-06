@@ -7,18 +7,7 @@ import {
   parseCashuPaymentRequestMessage,
   parseLinkyPaymentRequestDeclineMessage,
 } from "./paymentRequestMessage";
-
-const bytesToBase64Url = (bytes: Uint8Array): string => {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-};
+import { encodeBase64Url } from "../../utils/base64";
 
 describe("paymentRequestMessage", () => {
   it("round-trips a cashu payment request message", () => {
@@ -52,7 +41,7 @@ describe("paymentRequestMessage", () => {
   });
 
   it("parses a cashu payment request with HTTP POST transport", () => {
-    const message = `creqA${bytesToBase64Url(
+    const message = `creqA${encodeBase64Url(
       encode({
         a: 21,
         u: "sat",

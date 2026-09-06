@@ -1,27 +1,11 @@
 import { Effect, Layer } from "effect";
 import { UnixSeconds } from "../domain/primitives";
+import { stubStorage } from "../testing";
 import { InboxCursorStore } from "./InboxCursorStore";
 import type { InboxCursorStoreService } from "./InboxCursorStore";
 
 const storageKey = "test.inbox_cursor";
 const cursor = UnixSeconds.make(1_756_000_000);
-
-interface StubStorage {
-  readonly map: Map<string, string>;
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-}
-
-const stubStorage = (): StubStorage => {
-  const map = new Map<string, string>();
-  return {
-    map,
-    getItem: (key) => map.get(key) ?? null,
-    setItem: (key, value) => {
-      map.set(key, value);
-    },
-  };
-};
 
 const buildStore = (
   layer: Layer.Layer<InboxCursorStore>,

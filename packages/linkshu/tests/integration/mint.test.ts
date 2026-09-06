@@ -1,10 +1,6 @@
 import { Effect } from "effect";
-import { Bip39Seed, MintUrl, Mints, runLinkshu } from "../../src";
-
-// The dev-stack Nutshell FakeWallet mint (docker-compose.dev.yml `cashu-mint`).
-const mintUrl = MintUrl.make(
-  process.env.LINKSHU_MINT_URL ?? "http://localhost:3338",
-);
+import { Bip39Seed, Mints, runLinkshu } from "../../src";
+import { mintUrl } from "./helpers";
 
 const seed = Bip39Seed.make(new Uint8Array(64).fill(7));
 

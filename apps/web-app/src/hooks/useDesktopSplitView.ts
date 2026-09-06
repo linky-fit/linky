@@ -1,6 +1,6 @@
 import React from "react";
 
-export const DESKTOP_SPLIT_VIEW_QUERY = "(min-width: 961px)";
+const DESKTOP_SPLIT_VIEW_QUERY = "(min-width: 961px)";
 
 const subscribe = (onStoreChange: () => void): (() => void) => {
   if (typeof window === "undefined" || !window.matchMedia) return () => {};

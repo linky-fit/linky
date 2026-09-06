@@ -1,35 +1,29 @@
+import {
+  contactsLimitMessage,
+  useSaveNpubContact,
+} from "../contacts/useSaveNpubContact";
+import { writeContact } from "../../lib/writeContact";
 import * as Evolu from "@evolu/common";
 import type { ProfileMetadata } from "@linky/linkstr";
 import {
-  BankOfferDraft,
-  BankOfferId,
-  ChatMessageReceipt,
-  ClientId,
   decodeNpub,
   encodeNpub,
   identityFromNsec,
-  MessageEditReceipt,
-  OutboxJobFailed,
-  OutboxJobSucceeded,
   Pubkey,
-  ReactionReceipt,
-  UnixSeconds,
 } from "@linky/linkstr";
 import {
   fetchProfilesAtom,
   publishMuteListAtom,
-  sendBankOfferAtom,
   useAtomSet,
   useOutboxResults,
 } from "@linky/linkstr-react";
-import { Exit, Schema } from "effect";
+import { Schema } from "effect";
 import React, { useMemo, useState } from "react";
 import {
   deriveDefaultProfile,
   omitSyntheticContactLightningAddress,
 } from "../../../derivedProfile";
-import { reportInspectorRows } from "../../../devtools/inspector";
-import { getInspectorEmissionEnabled } from "../../../devtools/inspector/inspectorEnabled";
+import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { useLinkstrInspectorBridge } from "../../../devtools/inspector/useLinkstrInspectorBridge";
 import { useEvolu, type ContactId } from "../../../evolu";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
@@ -39,7 +33,7 @@ import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import { type Lang } from "../../../i18n";
 import {
   buildStatusFilterValue,
-  extractStatusFilterCurrencies,
+  parseProfileGeneralStatus,
   isStatusFilterValue,
   parseStatusFilterValue,
 } from "../../../nostrStatus";
@@ -64,47 +58,12 @@ import {
 import { formatShortNpub, getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorage";
-import { appendPushDebugLog } from "../../../utils/pushDebugLog";
 import { getBankPaymentOfferCurrency } from "../../../utils/spdPayment";
 import {
-  getInitialBankPaymentOfferRecipientCount,
-  getInitialBankPaymentOfferStaggerDelaySec,
-  safeLocalStorageGet,
-  safeLocalStorageGetJson,
-  safeLocalStorageSetJson,
-  withLocalStorageLeaseLock,
-} from "../../../utils/storage";
-import { getUnknownErrorMessage } from "../../../utils/unknown";
-import { makeLocalId } from "../../../utils/validation";
-import {
-  forgetLinkyBankPaymentOfferSpdPayload,
   getLastBankPaymentOfferResponseSecByContactId,
-  getLinkyBankPaymentOfferExpiresAtSec,
-  getLinkyBankPaymentOfferInfo,
-  getLinkyBankPaymentOfferMessageText,
-  getLinkyBankPaymentOfferStatusRank,
-  isLinkyBankPaymentOfferExpired,
-  isLinkyBankPaymentOfferTerminalStatus,
-  isLinkyBankPaymentOfferWholeOfferTerminalStatus,
-  forgetLinkyBankPaymentOfferStaggerQueue,
-  LINKY_BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
-  LINKY_BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
-  LINKY_BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX,
-  LINKY_BANK_PAYMENT_OFFER_MAX_RECIPIENT_COUNT,
-  LINKY_BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
-  LINKY_BANK_PAYMENT_OFFER_MIN_RECIPIENT_COUNT,
-  LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC,
-  LINKY_BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
-  LINKY_BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX,
-  markLinkyBankPaymentOfferBankDetailsSent,
   mergeBankPaymentOffersIntoLastMessageByContactId,
-  readLinkyBankPaymentOfferSpdRecord,
-  readLinkyBankPaymentOfferStaggerRecords,
-  rememberLinkyBankPaymentOfferSpdPayload,
-  rememberLinkyBankPaymentOfferStaggerQueue,
-  removeLinkyBankPaymentOfferStaggerRecipients,
-  type LinkyBankPaymentOfferStatus,
 } from "../../lib/bankPaymentOffer";
+import { useBankPaymentOffers } from "../useBankPaymentOffers";
 import { collectUnreadNewestIncomingByContactId } from "../../lib/chatUnread";
 import { findUniqueContactByLightningAddress } from "../../lib/contactIdentity";
 import { resolveContactRowOwnerLane } from "../../lib/contactOwnerLane";
@@ -128,6 +87,7 @@ import {
 } from "../messages/contactIdentity";
 import type { PeerSeenWindow } from "../messages/seenReceiptInbox";
 import { useChatReadCursorSync } from "../messages/useChatReadCursorSync";
+import { applyOutboxResult } from "../messages/outboxResults";
 import { useChatSeenReceiptSync } from "../messages/useChatSeenReceiptSync";
 import {
   useEditChatMessage,
@@ -151,52 +111,22 @@ import { useMessagesDomain } from "../useMessagesDomain";
 import { usePushRegistrationLifecycle } from "../usePushRegistrationLifecycle";
 import { useRelayDomain } from "../useRelayDomain";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageGetJson,
+  safeLocalStorageSetJson,
+} from "../../../utils/storage";
+import type { Translate } from "../../../i18n";
 
 const inMemoryNostrPictureCache = new Map<string, string | null>();
 
 const isPubkey = Schema.is(Pubkey);
-const isBankOfferId = Schema.is(BankOfferId);
-const isNonEmptyTrimmedString = Schema.is(Schema.NonEmptyTrimmedString);
-const isPositiveInt = Schema.is(Schema.Int.pipe(Schema.positive()));
-const isUnixSeconds = Schema.is(UnixSeconds);
-
-type ParsedOutboxRef =
-  | { id: string; kind: "message" }
-  | { id: string; kind: "reaction" };
-
-const parseOutboxRef = (ref: string): ParsedOutboxRef | null => {
-  for (const kind of ["message", "reaction"] as const) {
-    const prefix = `${kind}:`;
-    if (!ref.startsWith(prefix)) continue;
-    const id = ref.slice(prefix.length).trim();
-    return id ? { id, kind } : null;
-  }
-  return null;
-};
-
-const positiveInt = (value: unknown): number | undefined => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    return undefined;
-  }
-  const integer = Math.trunc(value);
-  return isPositiveInt(integer) ? integer : undefined;
-};
-
-const positiveUnixSeconds = (value: unknown): UnixSeconds | undefined => {
-  const integer = positiveInt(value);
-  return integer !== undefined && isUnixSeconds(integer) ? integer : undefined;
-};
 
 const INLINE_NPUB_PATTERN =
   /(?:nostr:)?npub1[023456789acdefghjklmnpqrstuvwxyz]+(?:@npub\.cash)?/gi;
 
-const readObjectField = (value: unknown, field: string): unknown => {
-  if (typeof value !== "object" || value === null) return undefined;
-  return Reflect.get(value, field);
-};
-
 const extractMentionedNpubs = (content: string): string[] => {
-  const matches = String(content ?? "").match(INLINE_NPUB_PATTERN);
+  const matches = content.match(INLINE_NPUB_PATTERN);
   if (!matches) return [];
 
   const seen = new Set<string>();
@@ -211,80 +141,6 @@ const extractMentionedNpubs = (content: string): string[] => {
 
   return npubs;
 };
-
-const BANK_PAYMENT_OFFER_RESPONDER_RETRY_MS = 30_000;
-
-const hasPendingBankPaymentOfferResponderWork = (
-  messages: readonly LocalNostrMessage[],
-  offererPubkeyHex: string,
-  nowSec: number,
-): boolean => {
-  const entriesByOfferId = new Map<
-    string,
-    { hasPendingAccepted: boolean; wholeOfferTerminal: boolean }
-  >();
-  for (const message of messages) {
-    const info = getLinkyBankPaymentOfferInfo(String(message.content ?? ""));
-    if (
-      !info ||
-      String(info.offererPublicKey ?? "").trim() !== offererPubkeyHex
-    ) {
-      continue;
-    }
-
-    const entry = entriesByOfferId.get(info.offerId) ?? {
-      hasPendingAccepted: false,
-      wholeOfferTerminal: false,
-    };
-    if (isLinkyBankPaymentOfferWholeOfferTerminalStatus(info.status)) {
-      entry.wholeOfferTerminal = true;
-    } else if (
-      info.status === "accepted" &&
-      !isLinkyBankPaymentOfferExpired(
-        info,
-        Number(message.createdAtSec ?? 0),
-        nowSec,
-      )
-    ) {
-      entry.hasPendingAccepted = true;
-    }
-    entriesByOfferId.set(info.offerId, entry);
-  }
-
-  return Array.from(entriesByOfferId.values()).some(
-    (entry) => entry.hasPendingAccepted && !entry.wholeOfferTerminal,
-  );
-};
-
-const clampBankPaymentOfferRecipientCount = (value: number): number => {
-  if (!Number.isFinite(value)) {
-    return LINKY_BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT;
-  }
-
-  return Math.min(
-    LINKY_BANK_PAYMENT_OFFER_MAX_RECIPIENT_COUNT,
-    Math.max(LINKY_BANK_PAYMENT_OFFER_MIN_RECIPIENT_COUNT, Math.round(value)),
-  );
-};
-
-const clampBankPaymentOfferStaggerDelaySec = (value: number): number => {
-  if (!Number.isFinite(value)) {
-    return LINKY_BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC;
-  }
-
-  return Math.min(
-    LINKY_BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
-    Math.max(LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC, Math.round(value)),
-  );
-};
-
-const BANK_PAYMENT_OFFER_STAGGER_RETRY_MS = 5_000;
-
-// Statuses that keep the offer open for more recipients: anything else means a
-// winner exists or the whole offer ended, so extending it would be pointless.
-const bankPaymentOfferStaggerQueueStillWanted = (
-  status: LinkyBankPaymentOfferStatus,
-): boolean => status === "offered" || status === "declined";
 
 interface UnknownChatContact extends ContactRowLike {
   id: string;
@@ -328,7 +184,7 @@ interface SavedContactRef {
   ownerId: IdentityOwnersCompositionResult["contactsOwnerId"] | null;
 }
 
-export interface PendingContactsGroupAssignment {
+interface PendingContactsGroupAssignment {
   messageId: string;
   savedContacts: SavedContactRef[];
 }
@@ -337,18 +193,13 @@ const reportContactsAddedToGroup = (
   pending: PendingContactsGroupAssignment,
   group: string,
 ): void => {
-  if (!getInspectorEmissionEnabled()) return;
-  const contactIds = pending.savedContacts.map(({ id }) => String(id));
-  reportInspectorRows([
-    {
-      at: Date.now(),
-      channel: "app.log",
-      tag: "contacts.addToGroup",
-      summary: `${contactIds.length} contacts from a chat message added to group "${group}"`,
-      links: { contact: contactIds, message: pending.messageId },
-      payload: { contactIds, group, messageId: pending.messageId },
-    },
-  ]);
+  const contactIds = pending.savedContacts.map(({ id }) => id);
+  reportAppLog({
+    tag: "contacts.addToGroup",
+    summary: `${contactIds.length} contacts from a chat message added to group "${group}"`,
+    links: { contact: contactIds, message: pending.messageId },
+    payload: { contactIds, group, messageId: pending.messageId },
+  });
 };
 type NostrBootstrapParams = Parameters<typeof useEvoluNostrBootstrapReady>[0];
 
@@ -395,7 +246,7 @@ interface UseContactsMessagingCompositionParams {
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   syncedNostrIdentityMatchesLocal: boolean;
   syncedNostrIdentityResolution: IdentityOwnersCompositionResult["syncedNostrIdentityResolution"];
-  t: (key: string) => string;
+  t: Translate;
   transactionsBootstrapSnapshot: NostrBootstrapParams["transactionsSnapshot"];
   transactionsOwnerId: IdentityOwnersCompositionResult["transactionsOwnerId"];
   update: EvoluMutations["update"];
@@ -444,9 +295,6 @@ export const useContactsMessagingComposition = ({
   update,
   upsert,
 }: UseContactsMessagingCompositionParams) => {
-  const sendBankOffer = useAtomSet(sendBankOfferAtom, {
-    mode: "promiseExit",
-  });
   const [pendingDeleteId, setPendingDeleteId] = useState<ContactId | null>(
     null,
   );
@@ -469,62 +317,11 @@ export const useContactsMessagingComposition = ({
       "1",
   );
 
-  const [
-    bankPaymentOfferRecipientCount,
-    setBankPaymentOfferRecipientCountState,
-  ] = useState<number>(() =>
-    clampBankPaymentOfferRecipientCount(
-      getInitialBankPaymentOfferRecipientCount(
-        LINKY_BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
-      ),
-    ),
+  const chatOwnPubkeyHex = React.useMemo(
+    () =>
+      currentNsec ? (identityFromNsec(currentNsec)?.pubkey ?? null) : null,
+    [currentNsec],
   );
-
-  const setBankPaymentOfferRecipientCount = React.useCallback(
-    (value: number) => {
-      setBankPaymentOfferRecipientCountState(
-        clampBankPaymentOfferRecipientCount(value),
-      );
-    },
-    [],
-  );
-
-  const [
-    bankPaymentOfferStaggerDelaySec,
-    setBankPaymentOfferStaggerDelaySecState,
-  ] = useState<number>(() =>
-    clampBankPaymentOfferStaggerDelaySec(
-      getInitialBankPaymentOfferStaggerDelaySec(
-        LINKY_BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
-      ),
-    ),
-  );
-
-  const setBankPaymentOfferStaggerDelaySec = React.useCallback(
-    (value: number) => {
-      setBankPaymentOfferStaggerDelaySecState(
-        clampBankPaymentOfferStaggerDelaySec(value),
-      );
-    },
-    [],
-  );
-
-  const [chatOwnPubkeyHex, setChatOwnPubkeyHex] = useState<string | null>(null);
-
-  React.useEffect(() => {
-    if (!currentNsec) {
-      setChatOwnPubkeyHex(null);
-      return;
-    }
-
-    let cancelled = false;
-    const identity = identityFromNsec(currentNsec);
-    if (!cancelled) setChatOwnPubkeyHex(identity?.pubkey ?? null);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentNsec]);
 
   const [nostrPictureByNpub, setNostrPictureByNpub] = useState<
     Record<string, string | null>
@@ -557,7 +354,7 @@ export const useContactsMessagingComposition = ({
 
   const autoAcceptedChatMessageIdsRef = React.useRef<Set<string>>(new Set());
 
-  const activeChatRouteId = route.kind === "chat" ? String(route.id ?? "") : "";
+  const activeChatRouteId = route.kind === "chat" ? route.id : "";
 
   React.useEffect(() => {
     if (route.kind === "chat") return;
@@ -586,12 +383,6 @@ export const useContactsMessagingComposition = ({
   const chatMessageElByIdRef = React.useRef<Map<string, HTMLDivElement>>(
     new Map(),
   );
-
-  const [bankPaymentOfferMessages, setBankPaymentOfferMessages] = useState<
-    LocalNostrMessage[]
-  >([]);
-
-  const bankPaymentOfferExpiryInFlightRef = React.useRef(false);
 
   const chatDidInitialScrollForContactRef = React.useRef<string | null>(null);
 
@@ -626,121 +417,6 @@ export const useContactsMessagingComposition = ({
     requestAnimationFrame(() => tryScroll(0));
   }, []);
 
-  const upsertBankPaymentOfferMessage = React.useCallback(
-    (message: LocalNostrMessage) => {
-      const messageContactId = String(message.contactId ?? "").trim();
-      const messageWrapId = String(message.wrapId ?? "").trim();
-      const messageClientId = String(message.clientId ?? "").trim();
-      const messageId = String(message.id ?? "").trim();
-      const messageOfferId =
-        getLinkyBankPaymentOfferInfo(String(message.content ?? ""))?.offerId ??
-        "";
-      const messageOfferKey =
-        messageOfferId && messageContactId
-          ? `${messageContactId}:${messageOfferId}`
-          : "";
-
-      setBankPaymentOfferMessages((prev) => {
-        const existingOfferMessage = messageOfferKey
-          ? (prev.find((existing) => {
-              const existingContactId = String(existing.contactId ?? "").trim();
-              const existingOfferId = getLinkyBankPaymentOfferInfo(
-                String(existing.content ?? ""),
-              )?.offerId;
-              return (
-                `${existingContactId}:${existingOfferId ?? ""}` ===
-                messageOfferKey
-              );
-            }) ?? null)
-          : null;
-        const next = prev.filter((existing) => {
-          const existingContactId = String(existing.contactId ?? "").trim();
-          const existingOfferId = getLinkyBankPaymentOfferInfo(
-            String(existing.content ?? ""),
-          )?.offerId;
-          if (
-            messageOfferKey &&
-            `${existingContactId}:${existingOfferId ?? ""}` === messageOfferKey
-          ) {
-            return false;
-          }
-
-          const existingWrapId = String(existing.wrapId ?? "").trim();
-          const existingClientId = String(existing.clientId ?? "").trim();
-          const existingId = String(existing.id ?? "").trim();
-
-          if (messageWrapId && existingWrapId === messageWrapId) return false;
-          if (messageClientId && existingClientId === messageClientId) {
-            return false;
-          }
-          if (messageId && existingId === messageId) return false;
-          return true;
-        });
-
-        const mergedMessage = existingOfferMessage
-          ? (() => {
-              const existingInfo = getLinkyBankPaymentOfferInfo(
-                String(existingOfferMessage.content ?? ""),
-              );
-              const messageInfo = getLinkyBankPaymentOfferInfo(
-                String(message.content ?? ""),
-              );
-              const existingCreatedAt =
-                Number(existingOfferMessage.createdAtSec ?? 0) || 0;
-              const messageCreatedAt = Number(message.createdAtSec ?? 0) || 0;
-              const existingUpdatedAt =
-                existingInfo?.statusUpdatedAtSec ?? existingCreatedAt;
-              const messageUpdatedAt =
-                messageInfo?.statusUpdatedAtSec ?? messageCreatedAt;
-              const latest =
-                messageUpdatedAt > existingUpdatedAt
-                  ? message
-                  : messageUpdatedAt < existingUpdatedAt
-                    ? existingOfferMessage
-                    : messageInfo && existingInfo
-                      ? getLinkyBankPaymentOfferStatusRank(
-                          messageInfo.status,
-                        ) >=
-                        getLinkyBankPaymentOfferStatusRank(existingInfo.status)
-                        ? message
-                        : existingOfferMessage
-                      : messageCreatedAt >= existingCreatedAt
-                        ? message
-                        : existingOfferMessage;
-
-              return {
-                ...existingOfferMessage,
-                ...latest,
-                contactId: existingOfferMessage.contactId,
-                createdAtSec:
-                  existingCreatedAt && messageCreatedAt
-                    ? Math.min(existingCreatedAt, messageCreatedAt)
-                    : existingCreatedAt || messageCreatedAt,
-                direction: existingOfferMessage.direction,
-                id: messageOfferKey
-                  ? `bank-payment-offer:${messageOfferKey}`
-                  : latest.id,
-              };
-            })()
-          : messageOfferKey
-            ? {
-                ...message,
-                id: `bank-payment-offer:${messageOfferKey}`,
-              }
-            : message;
-
-        next.push(mergedMessage);
-        next.sort((a, b) => {
-          const createdA = Number(a.createdAtSec ?? 0);
-          const createdB = Number(b.createdAtSec ?? 0);
-          return createdA - createdB;
-        });
-        return next;
-      });
-    },
-    [],
-  );
-
   const nostrMetadataInFlight = React.useRef<Set<string>>(new Set());
 
   const pendingUnknownContactAddRef = React.useRef<{
@@ -750,8 +426,8 @@ export const useContactsMessagingComposition = ({
 
   const visibleMessageOwnerIds = React.useMemo(() => {
     const ids = [
-      String(appOwnerId ?? "").trim(),
-      ...messagesVisibleOwnerIds.map((ownerId) => String(ownerId ?? "").trim()),
+      (appOwnerId ?? "").trim(),
+      ...messagesVisibleOwnerIds.map((ownerId) => ownerId.trim()),
     ].filter(Boolean);
     return Array.from(new Set(ids));
   }, [appOwnerId, messagesVisibleOwnerIds]);
@@ -810,8 +486,8 @@ export const useContactsMessagingComposition = ({
     const records = [];
 
     for (const contact of contacts) {
-      const name = String(contact.name ?? "").trim();
-      const npub = normalizeNpubIdentifier(contact.npub);
+      const name = (contact.name ?? "").trim();
+      const npub = normalizeNpubIdentifier(contact.npub ?? "");
       if (!name || !npub) continue;
 
       const pubkey = decodeNpub(npub);
@@ -828,11 +504,8 @@ export const useContactsMessagingComposition = ({
     appendLocalNostrMessage,
     appendLocalNostrReaction,
     chatMessages,
-    chatMessagesLatestRef,
     enqueuePendingPayment,
-    knownNostrMessageIdentityIndex,
     lastMessageByContactId,
-    nostrMessageWrapIdsRef,
     nostrMessagesLatestRef,
     nostrMessagesLocal,
     nostrMessagesRecent,
@@ -857,45 +530,6 @@ export const useContactsMessagingComposition = ({
     route,
     visibleMessageOwnerIds,
   });
-
-  const reassignNostrConversationContactId = React.useCallback(
-    (fromContactId: string, toContactId: string): number => {
-      const normalizedFrom = String(fromContactId ?? "").trim();
-      const normalizedTo = String(toContactId ?? "").trim();
-      if (!normalizedFrom || !normalizedTo || normalizedFrom === normalizedTo) {
-        return 0;
-      }
-
-      const movedMessageCount = reassignLocalNostrMessagesContactId(
-        normalizedFrom,
-        normalizedTo,
-      );
-      setBankPaymentOfferMessages((previous) => {
-        let changed = false;
-        const next = previous.map((message) => {
-          if (String(message.contactId ?? "").trim() !== normalizedFrom) {
-            return message;
-          }
-          changed = true;
-          return { ...message, contactId: normalizedTo };
-        });
-        return changed ? next : previous;
-      });
-      return movedMessageCount;
-    },
-    [reassignLocalNostrMessagesContactId],
-  );
-
-  reassignContactMessagesRef.current = reassignNostrConversationContactId;
-
-  const lastVisibleMessageByContactId = React.useMemo(
-    () =>
-      mergeBankPaymentOffersIntoLastMessageByContactId(
-        lastMessageByContactId,
-        bankPaymentOfferMessages,
-      ),
-    [bankPaymentOfferMessages, lastMessageByContactId],
-  );
 
   const evoluOwnersReadyForNostr = isSeedLogin
     ? Boolean(
@@ -925,7 +559,7 @@ export const useContactsMessagingComposition = ({
       metaOwnerId,
       transactionsOwnerId,
     ]
-      .map((value) => String(value ?? "").trim())
+      .map((value) => (value ?? "").trim())
       .filter(Boolean)
       .join("|");
   }, [
@@ -1025,6 +659,55 @@ export const useContactsMessagingComposition = ({
     update,
   });
 
+  const {
+    bankPaymentOfferMessages,
+    bankPaymentOfferRecipientCount,
+    bankPaymentOfferStaggerDelaySec,
+    chatMessagesWithBankPaymentOffers,
+    isBankPaymentOfferCanceled,
+    reassignBankPaymentOfferMessages,
+    requestBankPaymentOffer,
+    respondToBankPaymentOfferWithGroupState,
+    upsertBankPaymentOfferMessage,
+  } = useBankPaymentOffers({
+    chatMessages,
+    contacts,
+    currentNpub,
+    currentNsec,
+    route,
+    setStatus,
+    t,
+  });
+
+  const reassignNostrConversationContactId = React.useCallback(
+    (fromContactId: string, toContactId: string): number => {
+      const normalizedFrom = fromContactId.trim();
+      const normalizedTo = toContactId.trim();
+      if (!normalizedFrom || !normalizedTo || normalizedFrom === normalizedTo) {
+        return 0;
+      }
+
+      const movedMessageCount = reassignLocalNostrMessagesContactId(
+        normalizedFrom,
+        normalizedTo,
+      );
+      reassignBankPaymentOfferMessages(normalizedFrom, normalizedTo);
+      return movedMessageCount;
+    },
+    [reassignBankPaymentOfferMessages, reassignLocalNostrMessagesContactId],
+  );
+
+  reassignContactMessagesRef.current = reassignNostrConversationContactId;
+
+  const lastVisibleMessageByContactId = React.useMemo(
+    () =>
+      mergeBankPaymentOffersIntoLastMessageByContactId(
+        lastMessageByContactId,
+        bankPaymentOfferMessages,
+      ),
+    [bankPaymentOfferMessages, lastMessageByContactId],
+  );
+
   const [contactNewPrefill, setContactNewPrefill] = React.useState<null | {
     lnAddress: string;
     npub: string | null;
@@ -1038,7 +721,7 @@ export const useContactsMessagingComposition = ({
   const buildUnknownDisplayName = React.useCallback(
     (name: string | null, npub: string | null) => {
       const prefix = t("unknownContactNamePrefix");
-      const normalizedName = String(name ?? "").trim();
+      const normalizedName = (name ?? "").trim();
       const fallback = npub ? formatShortNpub(npub) : t("unknownContactTitle");
       return `${prefix} ${normalizedName || fallback}`.trim();
     },
@@ -1047,7 +730,7 @@ export const useContactsMessagingComposition = ({
 
   const buildSavedContactName = React.useCallback(
     (name: string | null, npub: string | null) => {
-      const normalizedName = String(name ?? "").trim();
+      const normalizedName = (name ?? "").trim();
       return (
         normalizedName ||
         (npub ? formatShortNpub(npub) : t("unknownContactTitle"))
@@ -1056,9 +739,25 @@ export const useContactsMessagingComposition = ({
     [t],
   );
 
+  const saveNpubContact = useSaveNpubContact({
+    contacts,
+    contactsOwnerId,
+    activeContactsOwnerContactCount,
+    buildSavedContactName,
+    unknownNameByNpub,
+    insert,
+    lang,
+    setStatus,
+    t,
+  });
+
   const unknownContacts = React.useMemo<UnknownChatContact[]>(() => {
     const blockedPubkeys = new Set(
-      safeLocalStorageGetJson(BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY, [])
+      safeLocalStorageGetJson(
+        BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
+        Schema.Array(Schema.String),
+        [],
+      )
         .map((entry) => normalizePubkeyHex(entry))
         .filter((entry): entry is string => Boolean(entry)),
     );
@@ -1066,7 +765,7 @@ export const useContactsMessagingComposition = ({
     const unknownById = new Map<string, UnknownChatContact>();
 
     for (const [contactId, lastMessage] of lastVisibleMessageByContactId) {
-      const normalizedContactId = String(contactId ?? "").trim();
+      const normalizedContactId = contactId.trim();
       if (!normalizedContactId) continue;
       if (!isUnknownContactId(normalizedContactId)) continue;
 
@@ -1074,10 +773,7 @@ export const useContactsMessagingComposition = ({
       const candidatePubkeyFromId =
         readUnknownContactIdPubkey(normalizedContactId);
       const candidatePubkeyFromThread = nostrMessagesLocal
-        .filter(
-          (message) =>
-            String(message.contactId ?? "").trim() === normalizedContactId,
-        )
+        .filter((message) => message.contactId.trim() === normalizedContactId)
         .map((message) => normalizePubkeyHex(message.pubkey))
         .find((pubkey) => {
           if (!pubkey) return false;
@@ -1128,21 +824,21 @@ export const useContactsMessagingComposition = ({
     // only considers active contacts; a direct npub match also reclaims
     // threads of archived contacts.
     const activeContacts = contacts.filter((contact) => {
-      const archivedAtSec = Number(contact.archivedAtSec ?? 0);
+      const archivedAtSec = contact.archivedAtSec ?? 0;
       return !Number.isFinite(archivedAtSec) || archivedAtSec <= 0;
     });
 
     for (const unknownContact of unknownContacts) {
-      const unknownContactId = String(unknownContact.id ?? "").trim();
-      const unknownNpub = normalizeNpubIdentifier(unknownContact.npub);
+      const unknownContactId = unknownContact.id.trim();
+      const unknownNpub = normalizeNpubIdentifier(unknownContact.npub ?? "");
       if (!unknownContactId || !unknownNpub) continue;
 
       let knownContact = contacts.find((contact) => {
-        const knownContactId = String(contact.id ?? "").trim();
+        const knownContactId = contact.id.trim();
         if (!knownContactId || knownContactId === unknownContactId) {
           return false;
         }
-        return normalizeNpubIdentifier(contact.npub) === unknownNpub;
+        return normalizeNpubIdentifier(contact.npub ?? "") === unknownNpub;
       });
 
       let matchedByLightningAddress = false;
@@ -1151,8 +847,8 @@ export const useContactsMessagingComposition = ({
         matchedMetadata = loadCachedProfile(unknownNpub)?.metadata ?? null;
         const profileLightningAddress = matchedMetadata
           ? omitSyntheticContactLightningAddress(
-              String(matchedMetadata.lud16 ?? "").trim() ||
-                String(matchedMetadata.lud06 ?? "").trim(),
+              (matchedMetadata.lud16 ?? "").trim() ||
+                (matchedMetadata.lud06 ?? "").trim(),
               unknownNpub,
             )
           : "";
@@ -1166,7 +862,7 @@ export const useContactsMessagingComposition = ({
         }
       }
 
-      const knownContactId = String(knownContact?.id ?? "").trim();
+      const knownContactId = (knownContact?.id ?? "").trim();
       if (!knownContactId) continue;
 
       if (matchedByLightningAddress && knownContact) {
@@ -1184,13 +880,11 @@ export const useContactsMessagingComposition = ({
         const payload = {
           id: knownContact.id,
           npub: parsedNpub.value,
-          ...(!String(knownContact.name ?? "").trim() && parsedName?.ok
+          ...(!(knownContact.name ?? "").trim() && parsedName?.ok
             ? { name: parsedName.value }
             : {}),
         };
-        const result = ownerId
-          ? update("contact", payload, { ownerId })
-          : update("contact", payload);
+        const result = writeContact(update, payload, ownerId);
         if (!result.ok) continue;
       }
 
@@ -1210,7 +904,7 @@ export const useContactsMessagingComposition = ({
     const npubs: string[] = [];
 
     for (const contact of unknownContacts) {
-      const npub = normalizeNpubIdentifier(contact.npub);
+      const npub = normalizeNpubIdentifier(contact.npub ?? "");
       if (!npub) continue;
       if (seen.has(npub)) continue;
       seen.add(npub);
@@ -1225,7 +919,7 @@ export const useContactsMessagingComposition = ({
     const npubs: string[] = [];
 
     for (const message of chatMessages) {
-      for (const npub of extractMentionedNpubs(String(message.content ?? ""))) {
+      for (const npub of extractMentionedNpubs(message.content)) {
         if (seen.has(npub)) continue;
         seen.add(npub);
         npubs.push(npub);
@@ -1325,7 +1019,7 @@ export const useContactsMessagingComposition = ({
   const displayContactById = React.useMemo(() => {
     const byId = new Map<string, DisplayContact>();
     for (const contact of displayContacts) {
-      const id = String(contact.id ?? "").trim();
+      const id = (contact.id ?? "").trim();
       if (!id) continue;
       byId.set(id, contact);
     }
@@ -1335,33 +1029,30 @@ export const useContactsMessagingComposition = ({
   const selectedChatContact = React.useMemo<ChatSelectedContact | null>(() => {
     if (route.kind !== "chat" && route.kind !== "bankPaymentOffer") return null;
 
-    const chatId = String(
-      route.kind === "chat" ? route.id : route.chatId,
-    ).trim();
+    const chatId = (route.kind === "chat" ? route.id : route.chatId).trim();
     if (!chatId) return null;
 
     const source = displayContactById.get(chatId) ?? null;
     if (!source) return null;
 
-    const normalizedId = String(source.id ?? "").trim();
+    const normalizedId = (source.id ?? "").trim();
     if (!normalizedId) return null;
 
-    const normalizedNpub = normalizeNpubIdentifier(source.npub);
+    const normalizedNpub = normalizeNpubIdentifier(source.npub ?? "");
     const normalizedUnknownPubkeyHex = normalizePubkeyHex(
-      readObjectField(source, "unknownPubkeyHex"),
+      source.unknownPubkeyHex,
     );
-    const sourceGroupName = String(source.groupName ?? "").trim();
-    const isUnknownContact =
-      readObjectField(source, "isUnknownContact") === true;
+    const sourceGroupName = (source.groupName ?? "").trim();
+    const isUnknownContact = source.isUnknownContact === true;
 
     return {
       id: normalizedId,
       ...(sourceGroupName ? { groupName: sourceGroupName } : {}),
       ...(source.name !== undefined
-        ? { name: String(source.name ?? "").trim() || null }
+        ? { name: (source.name ?? "").trim() || null }
         : {}),
       ...(source.lnAddress !== undefined
-        ? { lnAddress: String(source.lnAddress ?? "").trim() || null }
+        ? { lnAddress: (source.lnAddress ?? "").trim() || null }
         : {}),
       ...(normalizedNpub ? { npub: normalizedNpub } : {}),
       ...(normalizedUnknownPubkeyHex
@@ -1371,8 +1062,8 @@ export const useContactsMessagingComposition = ({
       ...(selectedContact?.chatPeerSeenSinceSec != null &&
       selectedContact.chatPeerSeenAtSec != null
         ? {
-            chatPeerSeenSinceSec: Number(selectedContact.chatPeerSeenSinceSec),
-            chatPeerSeenAtSec: Number(selectedContact.chatPeerSeenAtSec),
+            chatPeerSeenSinceSec: selectedContact.chatPeerSeenSinceSec,
+            chatPeerSeenAtSec: selectedContact.chatPeerSeenAtSec,
           }
         : {}),
     };
@@ -1380,11 +1071,12 @@ export const useContactsMessagingComposition = ({
 
   const displayContactsSearchData = React.useMemo(() => {
     return displayContacts.map((contact) => {
-      const idKey = String(contact.id ?? "").trim();
+      const idKey = (contact.id ?? "").trim();
       const groupNames = getContactGroups(contact);
-      const normalizedNpub = normalizeNpubIdentifier(contact.npub);
+      const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
       const statusFilterValues = normalizedNpub
-        ? extractStatusFilterCurrencies(nostrStatusByNpub[normalizedNpub])
+        ? parseProfileGeneralStatus(nostrStatusByNpub[normalizedNpub])
+            .currencies
         : [];
       const haystack = [
         contact.name,
@@ -1394,11 +1086,7 @@ export const useContactsMessagingComposition = ({
         contact.unknownPubkeyHex,
         ...statusFilterValues,
       ]
-        .map((value) =>
-          String(value ?? "")
-            .trim()
-            .toLowerCase(),
-        )
+        .map((value) => (value ?? "").trim().toLowerCase())
         .filter(Boolean)
         .join(" ");
 
@@ -1416,13 +1104,13 @@ export const useContactsMessagingComposition = ({
     const currencyCounts = new Map<string, number>();
 
     for (const contact of displayContacts) {
-      if (Number(contact.archivedAtSec ?? 0) > 0) continue;
-      const normalizedNpub = normalizeNpubIdentifier(contact.npub);
+      if ((contact.archivedAtSec ?? 0) > 0) continue;
+      const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
       if (!normalizedNpub) continue;
 
-      for (const currency of extractStatusFilterCurrencies(
+      for (const currency of parseProfileGeneralStatus(
         nostrStatusByNpub[normalizedNpub],
-      )) {
+      ).currencies) {
         currencyCounts.set(currency, (currencyCounts.get(currency) ?? 0) + 1);
       }
     }
@@ -1449,7 +1137,7 @@ export const useContactsMessagingComposition = ({
       });
     }
     const archivedCount = displayContacts.filter(
-      (contact) => Number(contact.archivedAtSec ?? 0) > 0,
+      (contact) => (contact.archivedAtSec ?? 0) > 0,
     ).length;
     if (archivedCount > 0) {
       options.push({
@@ -1519,8 +1207,8 @@ export const useContactsMessagingComposition = ({
   const chatLastSeenAtSecByContactId = React.useMemo(() => {
     const byContactId = new Map<string, number>();
     for (const contact of contacts) {
-      const contactId = String(contact.id ?? "").trim();
-      const lastSeenAtSec = Number(contact.chatLastSeenAtSec ?? 0);
+      const contactId = contact.id.trim();
+      const lastSeenAtSec = contact.chatLastSeenAtSec ?? 0;
       if (!contactId || !Number.isFinite(lastSeenAtSec) || lastSeenAtSec <= 0) {
         continue;
       }
@@ -1573,12 +1261,12 @@ export const useContactsMessagingComposition = ({
       ...visibleContacts.others,
     ];
     return sortedContacts.flatMap((contact) => {
-      const normalizedNpub = normalizeNpubIdentifier(contact.npub);
+      const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
       if (!normalizedNpub) return [];
       if (
-        !extractStatusFilterCurrencies(
+        !parseProfileGeneralStatus(
           nostrStatusByNpub[normalizedNpub],
-        ).includes(bankPaymentOfferCurrency)
+        ).currencies.includes(bankPaymentOfferCurrency)
       ) {
         return [];
       }
@@ -1588,7 +1276,7 @@ export const useContactsMessagingComposition = ({
           ...contact,
           lastBankPaymentResponseSec:
             lastBankPaymentOfferResponseSecByContactId.get(
-              String(contact.id ?? "").trim(),
+              (contact.id ?? "").trim(),
             ) ?? null,
           pictureUrl: nostrPictureByNpub[normalizedNpub] ?? null,
         },
@@ -1604,7 +1292,9 @@ export const useContactsMessagingComposition = ({
     visibleContacts.others,
   ]);
 
-  const selectedContactNpub = normalizeNpubIdentifier(selectedContact?.npub);
+  const selectedContactNpub = normalizeNpubIdentifier(
+    selectedContact?.npub ?? "",
+  );
   // Memoized for identity stability: the cache fallback would otherwise
   // produce a fresh object every render and retrigger effects downstream.
   const selectedContactMetadata = React.useMemo(() => {
@@ -1658,10 +1348,7 @@ export const useContactsMessagingComposition = ({
 
   const openNewContactPage = React.useCallback(() => {
     if (activeContactsOwnerContactCount >= MAX_CONTACTS_PER_OWNER) {
-      const message = t("contactsLimitReached").replace(
-        "{max}",
-        String(MAX_CONTACTS_PER_OWNER),
-      );
+      const message = contactsLimitMessage(t);
       pushToast(message);
       return;
     }
@@ -1673,9 +1360,9 @@ export const useContactsMessagingComposition = ({
     setContactNewPrefill(null);
     if (prefill) {
       setForm({
-        name: String(prefill.suggestedName ?? ""),
-        npub: String(prefill.npub ?? ""),
-        lnAddress: String(prefill.lnAddress ?? ""),
+        name: prefill.suggestedName ?? "",
+        npub: prefill.npub ?? "",
+        lnAddress: prefill.lnAddress,
         groups: [],
       });
     }
@@ -1694,1033 +1381,22 @@ export const useContactsMessagingComposition = ({
   const canAddContact =
     activeContactsOwnerContactCount < MAX_CONTACTS_PER_OWNER;
 
-  const sendBankPaymentOfferedMessage = React.useCallback(
-    async (args: {
-      amountSat: number | null;
-      amountText: string;
-      contactId: string;
-      contactPubHex: string;
-      expiresAtSec?: number;
-      myPubHex: string;
-      offerId: string;
-    }): Promise<number | null> => {
-      const { amountSat, amountText, contactId, contactPubHex, myPubHex } =
-        args;
-      const offerId = args.offerId;
-      if (
-        !isPubkey(contactPubHex) ||
-        !isPubkey(myPubHex) ||
-        !isBankOfferId(offerId) ||
-        !isNonEmptyTrimmedString(amountText)
-      ) {
-        return null;
-      }
-
-      const text = getLinkyBankPaymentOfferMessageText(amountText, "offered");
-      if (!isNonEmptyTrimmedString(text)) return null;
-
-      const clientId = ClientId.make(makeLocalId());
-      const expiresAtSec = positiveUnixSeconds(args.expiresAtSec);
-      const exit = await sendBankOffer(
-        new BankOfferDraft({
-          to: contactPubHex,
-          offerId,
-          offerer: myPubHex,
-          status: "offered",
-          amountText,
-          text,
-          ...(amountSat !== null && isPositiveInt(amountSat)
-            ? { amountSat }
-            : {}),
-          ...(expiresAtSec === undefined ? {} : { expiresAtSec }),
-        }),
-      );
-      if (!Exit.isSuccess(exit)) return null;
-
-      upsertBankPaymentOfferMessage({
-        clientId,
-        contactId,
-        content: exit.value.content,
-        createdAtSec: exit.value.sentAt,
-        direction: "out",
-        id: `bank-payment-offer:${contactId}:${offerId}`,
-        localOnly: true,
-        pubkey: myPubHex,
-        rumorId: exit.value.snapshotId,
-        status: "sent",
-        wrapId: exit.value.selfCopy.wrapId,
-      });
-      return exit.value.sentAt;
-    },
-    [sendBankOffer, upsertBankPaymentOfferMessage],
-  );
-
-  const [bankPaymentOfferStaggerTick, setBankPaymentOfferStaggerTick] =
-    useState(0);
-
-  const requestBankPaymentOffer = React.useCallback(
-    async (args: {
-      amountSat?: unknown;
-      amountText: string;
-      contacts: readonly { id?: unknown; name?: unknown; npub?: unknown }[];
-      spdPayload?: unknown;
-      staggerDelaySec?: unknown;
-    }): Promise<{ chatId: string; offerId: string } | null> => {
-      const amountSatRaw = Number(args.amountSat ?? 0);
-      const amountSat =
-        Number.isFinite(amountSatRaw) && amountSatRaw > 0
-          ? Math.round(amountSatRaw)
-          : null;
-      const amountText = String(args.amountText ?? "").trim();
-      const spdPayload = String(args.spdPayload ?? "").trim();
-      const staggerDelaySec = clampBankPaymentOfferStaggerDelaySec(
-        Number(args.staggerDelaySec ?? 0),
-      );
-      if (!amountText) {
-        setStatus(t("spdPaymentOfferMissingAmount"));
-        return null;
-      }
-      if (args.contacts.length === 0) {
-        setStatus(t("spdPaymentOfferFailed"));
-        return null;
-      }
-      if (!currentNsec) {
-        setStatus(t("profileMissingNpub"));
-        return null;
-      }
-
-      try {
-        const identity = identityFromNsec(currentNsec);
-        if (!identity) throw new Error("invalid nsec");
-        const myPubHex = identity.pubkey;
-
-        const recipients: {
-          contactId: string;
-          contactPubHex: string;
-        }[] = [];
-        for (const contact of args.contacts) {
-          const contactId = String(contact.id ?? "").trim();
-          const contactNpub = normalizeNpubIdentifier(contact.npub);
-          if (!contactId || !contactNpub) continue;
-
-          const contactPubHex = decodeNpub(contactNpub);
-          if (!contactPubHex) continue;
-          recipients.push({ contactId, contactPubHex });
-        }
-
-        if (recipients.length === 0) {
-          setStatus(t("chatMissingContactNpub"));
-          return null;
-        }
-
-        const offerId = makeLocalId();
-        if (!isBankOfferId(offerId)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return null;
-        }
-        if (spdPayload) {
-          // Persisted so the offer survives an app reload: the auto-responder
-          // needs this payload when a recipient's acceptance arrives later.
-          rememberLinkyBankPaymentOfferSpdPayload({
-            offerId,
-            ownerPubkey: myPubHex,
-            spdPayload,
-          });
-        }
-
-        let sentCount = 0;
-        let firstSentContactId = "";
-        let firstSentAtSec: number | null = null;
-        const queuedRecipients: { contactId: string; contactPubHex: string }[] =
-          [];
-
-        for (const recipient of recipients) {
-          // With a stagger delay only the first reachable recipient gets the
-          // offer now; the rest wait in the persisted queue.
-          if (staggerDelaySec > 0 && firstSentAtSec !== null) {
-            queuedRecipients.push(recipient);
-            continue;
-          }
-
-          const sentAtSec = await sendBankPaymentOfferedMessage({
-            amountSat,
-            amountText,
-            contactId: recipient.contactId,
-            contactPubHex: recipient.contactPubHex,
-            myPubHex,
-            offerId,
-          });
-          if (sentAtSec === null) continue;
-
-          sentCount += 1;
-          if (firstSentAtSec === null) {
-            firstSentAtSec = sentAtSec;
-            firstSentContactId = recipient.contactId;
-          }
-        }
-
-        if (sentCount === 0 || firstSentAtSec === null) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return null;
-        }
-
-        if (queuedRecipients.length > 0) {
-          // Delayed recipients share the first send's expiry, so extending
-          // the offer never extends its total lifetime.
-          const staggerBaseSec = firstSentAtSec;
-          rememberLinkyBankPaymentOfferStaggerQueue({
-            amountSat,
-            amountText,
-            createdAtSec: staggerBaseSec,
-            expiresAtSec:
-              staggerBaseSec + LINKY_BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
-            offerId,
-            ownerPubkey: myPubHex,
-            pending: queuedRecipients.map((recipient, index) => ({
-              contactId: recipient.contactId,
-              contactPubHex: recipient.contactPubHex,
-              dueAtSec: staggerBaseSec + (index + 1) * staggerDelaySec,
-            })),
-          });
-          setBankPaymentOfferStaggerTick((tick) => tick + 1);
-        }
-
-        setBankPaymentOfferRecipientCount(args.contacts.length);
-        setBankPaymentOfferStaggerDelaySec(staggerDelaySec);
-        return { chatId: firstSentContactId, offerId };
-      } catch (error) {
-        setStatus(
-          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "publish failed")}`,
-        );
-        return null;
-      }
-    },
-    [
-      currentNsec,
-      sendBankPaymentOfferedMessage,
-      setBankPaymentOfferRecipientCount,
-      setBankPaymentOfferStaggerDelaySec,
-      setStatus,
-      t,
-    ],
-  );
-
-  const respondToBankPaymentOffer = React.useCallback(
-    async (
-      message: LocalNostrMessage,
-      nextStatus: LinkyBankPaymentOfferStatus,
-      options?: {
-        expiresAtSec?: number | null;
-        extensionSec?: number | null;
-        spdPayload?: string | null;
-        withPush?: boolean;
-      },
-    ): Promise<boolean> => {
-      const offerInfo = getLinkyBankPaymentOfferInfo(
-        String(message.content ?? ""),
-      );
-      if (!offerInfo) {
-        setStatus(t("spdPaymentOfferFailed"));
-        return false;
-      }
-      if (!currentNsec) {
-        setStatus(t("profileMissingNpub"));
-        return false;
-      }
-
-      try {
-        const identity = identityFromNsec(currentNsec);
-        if (!identity) throw new Error("invalid nsec");
-        const myPubHex = identity.pubkey;
-        const messageDirection = String(message.direction ?? "").trim();
-        const offererPublicKey =
-          String(offerInfo.offererPublicKey ?? "").trim() ||
-          (messageDirection === "out"
-            ? myPubHex
-            : String(message.pubkey ?? "").trim());
-
-        if (!isPubkey(offererPublicKey)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        const messageContactId = String(message.contactId ?? "").trim();
-        const messageContact =
-          contacts.find(
-            (contact) => String(contact.id ?? "").trim() === messageContactId,
-          ) ?? null;
-        const contactNpub = normalizeNpubIdentifier(messageContact?.npub);
-        let contactPubkey: string | null = null;
-        if (contactNpub) {
-          contactPubkey = decodeNpub(contactNpub);
-        }
-
-        const messagePubkey = String(message.pubkey ?? "").trim();
-        const recipientPublicKey =
-          offererPublicKey === myPubHex
-            ? (contactPubkey ??
-              (messagePubkey !== myPubHex ? messagePubkey : ""))
-            : offererPublicKey;
-        if (!isPubkey(recipientPublicKey) || recipientPublicKey === myPubHex) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        const offerId = offerInfo.offerId;
-        const amountText = offerInfo.amountText;
-        if (!isBankOfferId(offerId) || !isNonEmptyTrimmedString(amountText)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        const clientId = ClientId.make(makeLocalId());
-        const initiatedAtSec = positiveUnixSeconds(
-          offerInfo.initiatedAtSec ?? Number(message.createdAtSec ?? 0),
-        );
-        const bankPaidAtSec = positiveUnixSeconds(
-          offerInfo.bankPaidAtSec ??
-            (offerInfo.status === "bank_paid"
-              ? offerInfo.statusUpdatedAtSec
-              : null),
-        );
-        const expiresAtSec = positiveUnixSeconds(options?.expiresAtSec);
-        const extensionSec = positiveInt(options?.extensionSec);
-        const amountSat = positiveInt(offerInfo.amountSat);
-        const spdPayload = String(
-          options?.spdPayload ?? offerInfo.spdPayload ?? "",
-        ).trim();
-        const text = getLinkyBankPaymentOfferMessageText(
-          amountText,
-          nextStatus,
-          extensionSec,
-        );
-        if (!isNonEmptyTrimmedString(text)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        const exit = await sendBankOffer(
-          new BankOfferDraft({
-            to: recipientPublicKey,
-            offerId,
-            offerer: offererPublicKey,
-            status: nextStatus,
-            amountText,
-            text,
-            ...(amountSat === undefined ? {} : { amountSat }),
-            ...(initiatedAtSec === undefined ? {} : { initiatedAtSec }),
-            ...(bankPaidAtSec === undefined ? {} : { bankPaidAtSec }),
-            ...(expiresAtSec === undefined ? {} : { expiresAtSec }),
-            ...(extensionSec === undefined ? {} : { extensionSec }),
-            ...(isNonEmptyTrimmedString(spdPayload) ? { spdPayload } : {}),
-            ...(options?.withPush === undefined
-              ? {}
-              : { pushMark: options.withPush }),
-            clientId,
-          }),
-        );
-        if (!Exit.isSuccess(exit)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        upsertBankPaymentOfferMessage({
-          clientId,
-          contactId: String(message.contactId ?? "").trim(),
-          content: exit.value.content,
-          createdAtSec: exit.value.sentAt,
-          direction: offererPublicKey === myPubHex ? "out" : "in",
-          id: `bank-payment-offer:${offerInfo.offerId}`,
-          localOnly: true,
-          pubkey: offererPublicKey === myPubHex ? myPubHex : offererPublicKey,
-          rumorId: exit.value.snapshotId,
-          status: "sent",
-          wrapId: exit.value.selfCopy.wrapId,
-        });
-
-        return true;
-      } catch (error) {
-        setStatus(
-          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "publish failed")}`,
-        );
-        return false;
-      }
-    },
-    [
-      currentNsec,
-      contacts,
-      sendBankOffer,
-      setStatus,
-      t,
-      upsertBankPaymentOfferMessage,
-    ],
-  );
-
-  const getBankPaymentOfferGroupMessages = React.useCallback(
-    (message: LocalNostrMessage): LocalNostrMessage[] => {
-      const offerInfo = getLinkyBankPaymentOfferInfo(
-        String(message.content ?? ""),
-      );
-      if (!offerInfo) return [message];
-
-      const group = bankPaymentOfferMessages.filter((candidate) => {
-        const candidateInfo = getLinkyBankPaymentOfferInfo(
-          String(candidate.content ?? ""),
-        );
-        return candidateInfo?.offerId === offerInfo.offerId;
-      });
-
-      if (
-        !group.some(
-          (candidate) =>
-            String(candidate.contactId ?? "").trim() ===
-            String(message.contactId ?? "").trim(),
-        )
-      ) {
-        group.push(message);
-      }
-
-      return group;
-    },
-    [bankPaymentOfferMessages],
-  );
-
-  const isBankPaymentOfferCanceled = React.useCallback(
-    (offerId: string): boolean => {
-      const normalizedOfferId = String(offerId ?? "").trim();
-      if (!normalizedOfferId) return false;
-
-      return bankPaymentOfferMessages.some((message) => {
-        const info = getLinkyBankPaymentOfferInfo(
-          String(message.content ?? ""),
-        );
-        return (
-          info?.offerId === normalizedOfferId && info.status === "canceled"
-        );
-      });
-    },
-    [bankPaymentOfferMessages],
-  );
-
-  const respondToBankPaymentOfferWithGroupState = React.useCallback(
-    async (
-      message: LocalNostrMessage,
-      nextStatus: LinkyBankPaymentOfferStatus,
-      options?: {
-        expiresAtSec?: number | null;
-        extensionSec?: number | null;
-        spdPayload?: string | null;
-        withPush?: boolean;
-      },
-    ): Promise<boolean> => {
-      if (nextStatus !== "canceled" && nextStatus !== "settled") {
-        return await respondToBankPaymentOffer(message, nextStatus, options);
-      }
-
-      const group = getBankPaymentOfferGroupMessages(message);
-      const cancellationPushContactId =
-        nextStatus === "canceled"
-          ? (group
-              .filter((candidate) => {
-                const info = getLinkyBankPaymentOfferInfo(
-                  String(candidate.content ?? ""),
-                );
-                return (
-                  info?.status === "accepted" ||
-                  info?.status === "bank_details_sent" ||
-                  info?.status === "bank_paid"
-                );
-              })
-              .sort((left, right) => {
-                const leftInfo = getLinkyBankPaymentOfferInfo(
-                  String(left.content ?? ""),
-                );
-                const rightInfo = getLinkyBankPaymentOfferInfo(
-                  String(right.content ?? ""),
-                );
-                const rank = (status: LinkyBankPaymentOfferStatus): number =>
-                  status === "bank_paid"
-                    ? 0
-                    : status === "bank_details_sent"
-                      ? 1
-                      : 2;
-                const rankDifference =
-                  rank(leftInfo?.status ?? "accepted") -
-                  rank(rightInfo?.status ?? "accepted");
-                if (rankDifference !== 0) return rankDifference;
-                return (
-                  Number(leftInfo?.statusUpdatedAtSec ?? left.createdAtSec) -
-                  Number(rightInfo?.statusUpdatedAtSec ?? right.createdAtSec)
-                );
-              })[0]?.contactId ?? null)
-          : null;
-      let sentAny = false;
-
-      for (const groupMessage of group) {
-        const info = getLinkyBankPaymentOfferInfo(
-          String(groupMessage.content ?? ""),
-        );
-        if (!info) continue;
-        if (info.status === nextStatus) {
-          sentAny = true;
-          continue;
-        }
-        if (nextStatus === "canceled" && info.status === "settled") continue;
-
-        const sent = await respondToBankPaymentOffer(groupMessage, nextStatus, {
-          ...(options?.spdPayload !== undefined
-            ? { spdPayload: options.spdPayload }
-            : {}),
-          withPush:
-            nextStatus === "canceled" &&
-            String(groupMessage.contactId ?? "").trim() ===
-              String(cancellationPushContactId ?? "").trim(),
-        });
-        sentAny = sentAny || sent;
-      }
-
-      return sentAny;
-    },
-    [getBankPaymentOfferGroupMessages, respondToBankPaymentOffer],
-  );
-
-  React.useEffect(() => {
-    if (!currentNsec) return;
-    if (bankPaymentOfferMessages.length === 0) return;
-
-    let cancelled = false;
-    let retryTimeoutHandle: number | undefined;
-
-    const run = async () => {
-      try {
-        const identity = identityFromNsec(currentNsec);
-        if (!identity) return;
-        const myPubHex = identity.pubkey;
-        const groups = new Map<
-          string,
-          {
-            info: ReturnType<typeof getLinkyBankPaymentOfferInfo>;
-            message: LocalNostrMessage;
-          }[]
-        >();
-
-        for (const message of bankPaymentOfferMessages) {
-          const info = getLinkyBankPaymentOfferInfo(
-            String(message.content ?? ""),
-          );
-          if (!info) continue;
-          if (String(info.offererPublicKey ?? "").trim() !== myPubHex) {
-            continue;
-          }
-
-          const group = groups.get(info.offerId) ?? [];
-          group.push({ info, message });
-          groups.set(info.offerId, group);
-        }
-
-        for (const [offerId, group] of groups) {
-          if (cancelled) return;
-
-          if (
-            group.some(
-              (entry) =>
-                entry.info &&
-                isLinkyBankPaymentOfferWholeOfferTerminalStatus(
-                  entry.info.status,
-                ),
-            )
-          ) {
-            forgetLinkyBankPaymentOfferSpdPayload(offerId);
-            continue;
-          }
-
-          const notifyNonWinningCandidates = async (
-            winner: LocalNostrMessage,
-          ): Promise<void> => {
-            const winnerContactId = String(winner.contactId ?? "").trim();
-            for (const entry of group) {
-              const contactId = String(entry.message.contactId ?? "").trim();
-              if (!contactId || contactId === winnerContactId) continue;
-              if (
-                entry.info?.status !== "offered" &&
-                entry.info?.status !== "accepted"
-              ) {
-                continue;
-              }
-
-              await respondToBankPaymentOffer(
-                entry.message,
-                "accepted_by_other",
-              );
-            }
-          };
-
-          const activeBankDetails = group
-            .filter(
-              (entry) =>
-                entry.info?.status === "bank_details_sent" ||
-                entry.info?.status === "bank_paid",
-            )
-            .sort((left, right) => {
-              const leftSec =
-                left.info?.statusUpdatedAtSec ??
-                Number(left.message.createdAtSec ?? 0);
-              const rightSec =
-                right.info?.statusUpdatedAtSec ??
-                Number(right.message.createdAtSec ?? 0);
-              return leftSec - rightSec;
-            })[0];
-          if (activeBankDetails) {
-            try {
-              await withLocalStorageLeaseLock({
-                key: `${LINKY_BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.${offerId}`,
-                timeoutMs: 0,
-                fn: async () => {
-                  await notifyNonWinningCandidates(activeBankDetails.message);
-                },
-              });
-            } catch {
-              // Another tab is already closing the non-winning candidates.
-            }
-            continue;
-          }
-
-          const accepted = group
-            .filter((entry) => entry.info?.status === "accepted")
-            .sort((a, b) => {
-              const aSec =
-                a.info?.statusUpdatedAtSec ??
-                Number(a.message.createdAtSec ?? 0);
-              const bSec =
-                b.info?.statusUpdatedAtSec ??
-                Number(b.message.createdAtSec ?? 0);
-              if (aSec !== bSec) return aSec - bSec;
-              return String(a.message.contactId ?? "").localeCompare(
-                String(b.message.contactId ?? ""),
-              );
-            });
-
-          const candidate = accepted[0] ?? null;
-          if (!candidate?.info) continue;
-
-          const candidateKey = `${offerId}:${String(candidate.message.contactId ?? "").trim()}`;
-          const record = readLinkyBankPaymentOfferSpdRecord({
-            offerId,
-            ownerPubkey: myPubHex,
-          });
-          // Details go to exactly one winner, so any recorded send blocks the
-          // offer — a per-candidate check would let a tab with a lagging
-          // message view send the same bank details to a second recipient.
-          if (!record || record.sentCandidateKeys.length > 0) {
-            continue;
-          }
-
-          try {
-            await withLocalStorageLeaseLock({
-              key: `${LINKY_BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.${offerId}`,
-              timeoutMs: 0,
-              fn: async () => {
-                // Re-read under the lock: another tab may have just sent.
-                const lockedRecord = readLinkyBankPaymentOfferSpdRecord({
-                  offerId,
-                  ownerPubkey: myPubHex,
-                });
-                if (!lockedRecord) return;
-                if (lockedRecord.sentCandidateKeys.length > 0) return;
-
-                const sent = await respondToBankPaymentOffer(
-                  candidate.message,
-                  "bank_details_sent",
-                  {
-                    spdPayload: lockedRecord.spdPayload,
-                  },
-                );
-                // Marked only after a successful publish so an interrupted
-                // send retries; the lease lock covers the concurrent window.
-                if (sent) {
-                  markLinkyBankPaymentOfferBankDetailsSent({
-                    candidateKey,
-                    offerId,
-                  });
-                  await notifyNonWinningCandidates(candidate.message);
-                }
-              },
-            });
-          } catch {
-            // Another tab holds the send lock for this offer; let it finish.
-          }
-        }
-
-        if (cancelled) return;
-        // A failed publish or a skipped lease lock leaves the message state
-        // unchanged, so nothing re-runs this effect; keep retrying while an
-        // accepted entry of my own offer is still waiting for bank details.
-        if (
-          hasPendingBankPaymentOfferResponderWork(
-            bankPaymentOfferMessages,
-            myPubHex,
-            Math.floor(Date.now() / 1e3),
-          )
-        ) {
-          retryTimeoutHandle = window.setTimeout(() => {
-            void run();
-          }, BANK_PAYMENT_OFFER_RESPONDER_RETRY_MS);
-        }
-      } catch {
-        // Best effort; the sender can retry when the accepted event reappears.
-      }
-    };
-
-    void run();
-
-    return () => {
-      cancelled = true;
-      if (retryTimeoutHandle !== undefined) {
-        window.clearTimeout(retryTimeoutHandle);
-      }
-    };
-  }, [bankPaymentOfferMessages, currentNsec, respondToBankPaymentOffer]);
-
-  // Staggered proxy payment offers: queued recipients (persisted by
-  // requestBankPaymentOffer) receive the offer once their delay elapses,
-  // unless the offer meanwhile found a winner or ended.
-  React.useEffect(() => {
-    if (!currentNsec) return;
-    const identity = identityFromNsec(currentNsec);
-    if (!identity) return;
-    const myPubHex = identity.pubkey;
-
-    const records = readLinkyBankPaymentOfferStaggerRecords(myPubHex);
-    if (records.length === 0) return;
-
-    const closedOfferIds = new Set<string>();
-    const offeredContactIdsByOfferId = new Map<string, Set<string>>();
-    for (const message of bankPaymentOfferMessages) {
-      const info = getLinkyBankPaymentOfferInfo(String(message.content ?? ""));
-      if (!info) continue;
-      if (!bankPaymentOfferStaggerQueueStillWanted(info.status)) {
-        closedOfferIds.add(info.offerId);
-      }
-      const contactId = String(message.contactId ?? "").trim();
-      if (contactId) {
-        const contactIds =
-          offeredContactIdsByOfferId.get(info.offerId) ?? new Set<string>();
-        contactIds.add(contactId);
-        offeredContactIdsByOfferId.set(info.offerId, contactIds);
-      }
-    }
-
-    let cancelled = false;
-    let timeoutId: number | undefined;
-    const bumpTick = () => setBankPaymentOfferStaggerTick((tick) => tick + 1);
-
-    const nowSec = Math.floor(Date.now() / 1000);
-    const dueRecords: typeof records = [];
-    let nextDueAtSec: number | null = null;
-    for (const record of records) {
-      if (closedOfferIds.has(record.offerId)) {
-        forgetLinkyBankPaymentOfferStaggerQueue(record.offerId);
-        if (getInspectorEmissionEnabled()) {
-          reportInspectorRows([
-            {
-              at: Date.now(),
-              channel: "nostr.operation",
-              tag: "bankOffer.staggerDropped",
-              summary: `proxy payment offer is no longer open — dropped ${record.pending.length} queued recipients`,
-              links: {
-                contact: record.pending.map((recipient) => recipient.contactId),
-                offer: record.offerId,
-              },
-              payload: {
-                offerId: record.offerId,
-                pendingContactIds: record.pending.map(
-                  (recipient) => recipient.contactId,
-                ),
-              },
-            },
-          ]);
-        }
-        continue;
-      }
-
-      const dueAtSec = Math.min(
-        ...record.pending.map((recipient) => recipient.dueAtSec),
-      );
-      if (dueAtSec <= nowSec) {
-        dueRecords.push(record);
-      } else {
-        nextDueAtSec =
-          nextDueAtSec === null ? dueAtSec : Math.min(nextDueAtSec, dueAtSec);
-      }
-    }
-
-    const dispatchDue = async () => {
-      let progressed = false;
-      for (const record of dueRecords) {
-        if (cancelled) return;
-        try {
-          await withLocalStorageLeaseLock({
-            key: `${LINKY_BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX}.${record.offerId}`,
-            timeoutMs: 0,
-            fn: async () => {
-              // Re-read under the lock: another tab may have just sent.
-              const lockedRecord = readLinkyBankPaymentOfferStaggerRecords(
-                myPubHex,
-              ).find((candidate) => candidate.offerId === record.offerId);
-              if (!lockedRecord) {
-                progressed = true;
-                return;
-              }
-
-              const dueNowSec = Math.floor(Date.now() / 1000);
-              const sentContactIds: string[] = [];
-              for (const recipient of lockedRecord.pending) {
-                if (cancelled) return;
-                if (recipient.dueAtSec > dueNowSec) continue;
-                if (
-                  offeredContactIdsByOfferId
-                    .get(record.offerId)
-                    ?.has(recipient.contactId)
-                ) {
-                  // Already offered (e.g. by another tab); just dequeue.
-                  sentContactIds.push(recipient.contactId);
-                  continue;
-                }
-
-                const sentAtSec = await sendBankPaymentOfferedMessage({
-                  amountSat: lockedRecord.amountSat,
-                  amountText: lockedRecord.amountText,
-                  contactId: recipient.contactId,
-                  contactPubHex: recipient.contactPubHex,
-                  expiresAtSec: lockedRecord.expiresAtSec,
-                  myPubHex,
-                  offerId: lockedRecord.offerId,
-                });
-                if (sentAtSec === null) continue;
-
-                sentContactIds.push(recipient.contactId);
-                if (getInspectorEmissionEnabled()) {
-                  reportInspectorRows([
-                    {
-                      at: Date.now(),
-                      channel: "nostr.operation",
-                      tag: "bankOffer.staggerExtended",
-                      summary:
-                        "proxy payment offer extended to the next queued recipient",
-                      links: {
-                        contact: recipient.contactId,
-                        offer: lockedRecord.offerId,
-                      },
-                      payload: {
-                        contactId: recipient.contactId,
-                        dueAtSec: recipient.dueAtSec,
-                        offerId: lockedRecord.offerId,
-                        sentAtSec,
-                      },
-                    },
-                  ]);
-                }
-              }
-
-              if (sentContactIds.length > 0) {
-                removeLinkyBankPaymentOfferStaggerRecipients(
-                  record.offerId,
-                  sentContactIds,
-                );
-                progressed = true;
-              }
-            },
-          });
-        } catch {
-          // Another tab holds the stagger lock for this offer; let it finish.
-        }
-      }
-
-      if (cancelled) return;
-      if (progressed) {
-        // Successful sends also re-run this effect via the message upsert;
-        // the tick covers dequeues that left the messages untouched.
-        bumpTick();
-      } else {
-        // A failed publish leaves both queue and messages unchanged, so
-        // nothing re-runs this effect on its own; nudge a retry.
-        timeoutId = window.setTimeout(
-          bumpTick,
-          BANK_PAYMENT_OFFER_STAGGER_RETRY_MS,
-        );
-      }
-    };
-
-    if (dueRecords.length > 0) {
-      void dispatchDue();
-    } else if (nextDueAtSec !== null) {
-      timeoutId = window.setTimeout(
-        bumpTick,
-        Math.max(0, nextDueAtSec * 1000 - Date.now()),
-      );
-    }
-
-    return () => {
-      cancelled = true;
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [
-    bankPaymentOfferMessages,
-    bankPaymentOfferStaggerTick,
-    currentNsec,
-    sendBankPaymentOfferedMessage,
-  ]);
-
-  const bankPaymentOfferExpiryGroups = React.useMemo(() => {
-    if (!currentNpub || bankPaymentOfferMessages.length === 0) return [];
-
-    const myPubHex = decodeNpub(currentNpub);
-    if (!myPubHex) return [];
-
-    const groups = new Map<
-      string,
-      {
-        info: NonNullable<ReturnType<typeof getLinkyBankPaymentOfferInfo>>;
-        message: LocalNostrMessage;
-      }[]
-    >();
-    for (const message of bankPaymentOfferMessages) {
-      const info = getLinkyBankPaymentOfferInfo(String(message.content ?? ""));
-      if (
-        !info ||
-        String(info.offererPublicKey ?? "").trim() !== myPubHex ||
-        isLinkyBankPaymentOfferTerminalStatus(info.status)
-      ) {
-        continue;
-      }
-      const group = groups.get(info.offerId) ?? [];
-      group.push({ info, message });
-      groups.set(info.offerId, group);
-    }
-
-    const nowSec = Math.floor(Date.now() / 1e3);
-    const statusPriority: LinkyBankPaymentOfferStatus[] = [
-      "bank_paid",
-      "bank_details_sent",
-      "accepted",
-      "offered",
-    ];
-    return Array.from(groups.values()).flatMap((group) => {
-      const activeStatus = statusPriority.find((status) =>
-        group.some((entry) => entry.info.status === status),
-      );
-      if (!activeStatus) return [];
-
-      const expiresAtSec = Math.max(
-        ...group
-          .filter((entry) => entry.info.status === activeStatus)
-          .map(
-            (entry) =>
-              getLinkyBankPaymentOfferExpiresAtSec(
-                entry.info,
-                Number(entry.message.createdAtSec ?? 0),
-              ) ?? nowSec,
-          ),
-      );
-      return [
-        {
-          expiresAtMs: expiresAtSec * 1_000,
-          messages: group.map((entry) => entry.message),
-        },
-      ];
-    });
-  }, [bankPaymentOfferMessages, currentNpub]);
-
-  React.useEffect(() => {
-    const nextExpiryMs = Math.min(
-      ...bankPaymentOfferExpiryGroups.map((group) => group.expiresAtMs),
-    );
-    if (!Number.isFinite(nextExpiryMs)) return;
-
-    let cancelled = false;
-    let timeoutId = 0;
-    const expireDueGroups = () => {
-      if (cancelled) return;
-      if (bankPaymentOfferExpiryInFlightRef.current) {
-        timeoutId = window.setTimeout(expireDueGroups, 100);
-        return;
-      }
-
-      bankPaymentOfferExpiryInFlightRef.current = true;
-      void (async () => {
-        try {
-          const nowMs = Date.now();
-          for (const group of bankPaymentOfferExpiryGroups) {
-            if (group.expiresAtMs > nowMs) continue;
-            for (const message of group.messages) {
-              if (cancelled) return;
-              await respondToBankPaymentOffer(message, "canceled");
-            }
-          }
-        } finally {
-          bankPaymentOfferExpiryInFlightRef.current = false;
-        }
-      })();
-    };
-    timeoutId = window.setTimeout(
-      expireDueGroups,
-      Math.max(0, nextExpiryMs - Date.now()),
-    );
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [bankPaymentOfferExpiryGroups, respondToBankPaymentOffer]);
-
   useOutboxResults(async (result) => {
-    const ref = String(result.ref);
-    const parsedRef = parseOutboxRef(ref);
-    if (!parsedRef) return;
-
-    if (result instanceof OutboxJobFailed) {
-      void appendPushDebugLog("client", "outbox job failed", {
-        detail: result.detail,
-        reason: result.reason,
-        ref,
-      });
-      return;
-    }
-    if (!(result instanceof OutboxJobSucceeded)) return;
-
-    const receipt = result.receipt;
-    if (
-      parsedRef.kind === "message" &&
-      (receipt instanceof ChatMessageReceipt ||
-        receipt instanceof MessageEditReceipt)
-    ) {
-      updateLocalNostrMessage(parsedRef.id, {
-        rumorId: receipt.messageId,
-        status: "sent",
-        wrapId: receipt.selfCopy.wrapId,
-      });
-      return;
-    }
-    if (parsedRef.kind === "reaction" && receipt instanceof ReactionReceipt) {
-      updateLocalNostrReaction(parsedRef.id, {
-        status: "sent",
-        wrapId: receipt.reactionId,
-      });
-    }
+    applyOutboxResult(result, {
+      updateLocalNostrMessage,
+      updateLocalNostrReaction,
+    });
   });
 
   const contactsOnboardingHasSentMessage = useMemo(() => {
-    return nostrMessagesRecent.some((m) => String(m.direction ?? "") === "out");
+    return nostrMessagesRecent.some((m) => m.direction === "out");
   }, [nostrMessagesRecent]);
 
   const handleDelete = (id: ContactId) => {
-    const normalizedContactId = String(id ?? "").trim();
+    const normalizedContactId = id.trim();
     const contactToArchive =
-      contacts.find(
-        (contact) => String(contact.id ?? "").trim() === normalizedContactId,
-      ) ?? null;
+      contacts.find((contact) => contact.id.trim() === normalizedContactId) ??
+      null;
 
     const archivedAtSec = Math.ceil(Date.now() / 1e3);
     const storedContactOwnerId = contactToArchive
@@ -2734,12 +1410,10 @@ export const useContactsMessagingComposition = ({
       archivedAtSec,
       chatLastSeenAtSec: Math.max(
         archivedAtSec,
-        Number(contactToArchive?.chatLastSeenAtSec ?? 0) || 0,
+        (contactToArchive?.chatLastSeenAtSec ?? 0) || 0,
       ),
     };
-    const result = archiveOwnerId
-      ? update("contact", payload, { ownerId: archiveOwnerId })
-      : update("contact", payload);
+    const result = writeContact(update, payload, archiveOwnerId);
     if (result.ok) {
       setStatus(t("contactArchived"));
       closeContactDetail();
@@ -2756,22 +1430,22 @@ export const useContactsMessagingComposition = ({
         ? resolveContactRowOwnerLane(contactToRestore, contactsVisibleOwnerIds)
         : null;
       const restoreOwnerId = storedContactOwnerId ?? contactsOwnerId;
-      const result = restoreOwnerId
-        ? update(
-            "contact",
-            { id, archivedAtSec: null },
-            { ownerId: restoreOwnerId },
-          )
-        : update("contact", { id, archivedAtSec: null });
+      const result = writeContact(
+        update,
+        { id, archivedAtSec: null },
+        restoreOwnerId,
+      );
 
       if (result.ok) {
-        const restoredNpub = normalizeNpubIdentifier(contactToRestore?.npub);
+        const restoredNpub = normalizeNpubIdentifier(
+          contactToRestore?.npub ?? "",
+        );
         if (restoredNpub) {
           const unknownContactId = buildUnknownContactId(
             decodeNpub(restoredNpub),
           );
           if (unknownContactId) {
-            reassignNostrConversationContactId(unknownContactId, String(id));
+            reassignNostrConversationContactId(unknownContactId, id);
           }
         }
       }
@@ -2810,7 +1484,11 @@ export const useContactsMessagingComposition = ({
 
       const mergedBlockedPubkeys = Array.from(
         new Set(
-          safeLocalStorageGetJson(BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY, [])
+          safeLocalStorageGetJson(
+            BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
+            Schema.Array(Schema.String),
+            [],
+          )
             .map((entry) => normalizePubkeyHex(entry))
             .filter((entry): entry is string => Boolean(entry))
             .concat(normalizedPubkey),
@@ -2856,9 +1534,9 @@ export const useContactsMessagingComposition = ({
   // An incoming message newer than the archive brings the contact back.
   React.useEffect(() => {
     for (const contact of contacts) {
-      const archivedAtSec = Number(contact.archivedAtSec ?? 0);
+      const archivedAtSec = contact.archivedAtSec ?? 0;
       if (!Number.isFinite(archivedAtSec) || archivedAtSec <= 0) continue;
-      const contactId = String(contact.id ?? "").trim();
+      const contactId = contact.id.trim();
       if (!contactId) continue;
       const newestIncomingAtSec = unreadByContactId.get(contactId) ?? 0;
       if (newestIncomingAtSec <= archivedAtSec) continue;
@@ -2870,7 +1548,7 @@ export const useContactsMessagingComposition = ({
     if (route.kind !== "contactEdit") return;
     if (!selectedContact?.id) return;
 
-    const normalizedNpub = normalizeNpubIdentifier(selectedContact.npub);
+    const normalizedNpub = normalizeNpubIdentifier(selectedContact.npub ?? "");
     if (!normalizedNpub) {
       setStatus(t("chatMissingContactNpub"));
       return;
@@ -2888,28 +1566,19 @@ export const useContactsMessagingComposition = ({
 
     await blockPubkeyAndPublishMuteList(blockedPubkey);
 
-    const contactId = String(selectedContact.id ?? "").trim();
+    const contactId = selectedContact.id.trim();
     if (contactId) {
       removeLocalNostrMessagesByContactId(contactId);
     }
 
-    const result = contactsOwnerId
-      ? (() => {
-          const scoped = update(
-            "contact",
-            { id: selectedContact.id, isDeleted: Evolu.sqliteTrue },
-            { ownerId: contactsOwnerId },
-          );
-          if (scoped.ok) return scoped;
-          return update("contact", {
-            id: selectedContact.id,
-            isDeleted: Evolu.sqliteTrue,
-          });
-        })()
-      : update("contact", {
-          id: selectedContact.id,
-          isDeleted: Evolu.sqliteTrue,
-        });
+    const ownerId =
+      resolveContactRowOwnerLane(selectedContact, contactsVisibleOwnerIds) ??
+      contactsOwnerId;
+    const result = writeContact(
+      update,
+      { id: selectedContact.id, isDeleted: Evolu.sqliteTrue },
+      ownerId,
+    );
 
     if (result.ok) {
       setStatus(t("contactBlocked"));
@@ -2919,6 +1588,7 @@ export const useContactsMessagingComposition = ({
 
     setStatus(`${t("errorPrefix")}: ${String(result.error)}`);
   }, [
+    contactsVisibleOwnerIds,
     blockPubkeyAndPublishMuteList,
     closeContactDetail,
     contactsOwnerId,
@@ -2937,8 +1607,7 @@ export const useContactsMessagingComposition = ({
       intent: "pay" | "request" = "pay",
     ) => {
       const knownContact =
-        contacts.find((row) => String(row.id ?? "").trim() === contactId) ??
-        null;
+        contacts.find((row) => row.id.trim() === contactId) ?? null;
       if (!knownContact) return;
 
       contactPayBackToChatRef.current = fromChat ? knownContact.id : null;
@@ -2950,7 +1619,7 @@ export const useContactsMessagingComposition = ({
 
   const openContactDetail = React.useCallback(
     (contact: DisplayContact) => {
-      const contactId = String(contact.id ?? "").trim();
+      const contactId = (contact.id ?? "").trim();
       if (!contactId) return;
 
       setPendingDeleteId(null);
@@ -2962,15 +1631,14 @@ export const useContactsMessagingComposition = ({
       }
 
       const knownContact =
-        contacts.find((row) => String(row.id ?? "").trim() === contactId) ??
-        null;
+        contacts.find((row) => row.id.trim() === contactId) ?? null;
       if (!knownContact) {
         navigateTo({ route: "contacts" });
         return;
       }
 
-      const npub = String(knownContact.npub ?? "").trim();
-      const ln = String(knownContact.lnAddress ?? "").trim();
+      const npub = (knownContact.npub ?? "").trim();
+      const ln = (knownContact.lnAddress ?? "").trim();
       if (!npub) {
         if (ln) {
           openContactPay(knownContact.id);
@@ -2979,7 +1647,7 @@ export const useContactsMessagingComposition = ({
         navigateTo({ route: "contact", id: knownContact.id });
         return;
       }
-      navigateTo({ route: "chat", id: String(knownContact.id) });
+      navigateTo({ route: "chat", id: knownContact.id });
     },
     [contactPayBackToChatRef, contacts, openContactPay],
   );
@@ -2988,65 +1656,32 @@ export const useContactsMessagingComposition = ({
     if (route.kind !== "chat") return;
     if (!selectedChatContact?.isUnknownContact) return;
 
-    const contactId = String(selectedChatContact.id ?? "").trim();
-    const npub = normalizeNpubIdentifier(selectedChatContact.npub);
+    const contactId = selectedChatContact.id.trim();
+    const npub = normalizeNpubIdentifier(selectedChatContact.npub ?? "");
     if (!contactId || !npub) {
       setStatus(t("chatUnknownContactAddFailed"));
       return;
     }
 
-    const existing = contacts.find(
-      (contact) => normalizeNpubIdentifier(contact.npub) === npub,
-    );
-
-    if (existing?.id) {
-      reassignNostrConversationContactId(contactId, existing.id);
+    const saved = saveNpubContact(npub);
+    if (!saved) return;
+    if (!saved.created) {
+      reassignNostrConversationContactId(contactId, saved.contact.id);
       setStatus(t("contactSaved"));
-      navigateTo({ route: "chat", id: String(existing.id) });
+      navigateTo({ route: "chat", id: saved.contact.id });
       return;
     }
-
-    const bestName = unknownNameByNpub[npub] ?? null;
-    const savedName = buildSavedContactName(bestName, npub);
-    const payload = {
-      name: savedName as typeof Evolu.NonEmptyString1000.Type,
-      npub: npub as typeof Evolu.NonEmptyString1000.Type,
-      lnAddress: null,
-      groupName: null,
-    };
-
     pendingUnknownContactAddRef.current = {
       sourceContactId: contactId,
       targetNpub: npub,
     };
-
-    const result = contactsOwnerId
-      ? (() => {
-          const scoped = insert("contact", payload, {
-            ownerId: contactsOwnerId,
-          });
-          if (scoped.ok) return scoped;
-          return insert("contact", payload);
-        })()
-      : insert("contact", payload);
-
-    if (!result.ok) {
-      pendingUnknownContactAddRef.current = null;
-      setStatus(`${t("errorPrefix")}: ${String(result.error ?? "")}`);
-      return;
-    }
   }, [
-    contactsOwnerId,
-    buildSavedContactName,
-    contacts,
-    insert,
-    pendingUnknownContactAddRef,
     reassignNostrConversationContactId,
     route.kind,
+    saveNpubContact,
     selectedChatContact,
     setStatus,
     t,
-    unknownNameByNpub,
   ]);
 
   const blockUnknownContactFromChat = React.useCallback(async () => {
@@ -3056,7 +1691,7 @@ export const useContactsMessagingComposition = ({
     const confirmed = window.confirm(t("chatUnknownContactBlockConfirm"));
     if (!confirmed) return;
 
-    const contactId = String(selectedChatContact.id ?? "").trim();
+    const contactId = selectedChatContact.id.trim();
     if (!contactId) return;
 
     const unknownPubkeyHex = (() => {
@@ -3065,7 +1700,9 @@ export const useContactsMessagingComposition = ({
       );
       if (directPubkey) return directPubkey;
 
-      const normalizedNpub = normalizeNpubIdentifier(selectedChatContact.npub);
+      const normalizedNpub = normalizeNpubIdentifier(
+        selectedChatContact.npub ?? "",
+      );
       if (!normalizedNpub) return null;
 
       return decodeNpub(normalizedNpub);
@@ -3094,13 +1731,11 @@ export const useContactsMessagingComposition = ({
 
       const knownContact =
         contacts.find(
-          (contact) => normalizeNpubIdentifier(contact.npub) === npub,
+          (contact) => normalizeNpubIdentifier(contact.npub ?? "") === npub,
         ) ?? null;
       const derivedProfile = deriveDefaultProfile(npub, lang);
       const displayName = buildSavedContactName(
-        String(knownContact?.name ?? "").trim() ||
-          unknownNameByNpub[npub] ||
-          null,
+        (knownContact?.name ?? "").trim() || unknownNameByNpub[npub] || null,
         npub,
       );
       const pictureUrl =
@@ -3110,28 +1745,28 @@ export const useContactsMessagingComposition = ({
         displayName,
         isSaved:
           Boolean(knownContact) ||
-          normalizeNpubIdentifier(currentNpub) === npub,
+          normalizeNpubIdentifier(currentNpub ?? "") === npub,
         npub,
         pictureUrl,
       };
     },
     [
       buildSavedContactName,
+      unknownNameByNpub,
       contacts,
       currentNpub,
       lang,
       nostrPictureByNpub,
-      unknownNameByNpub,
     ],
   );
 
   const mentionContacts = React.useMemo(
     () =>
       contacts.flatMap((contact) => {
-        const name = String(contact.name ?? "").trim();
-        const npub = normalizeNpubIdentifier(contact.npub);
+        const name = (contact.name ?? "").trim();
+        const npub = normalizeNpubIdentifier(contact.npub ?? "");
         if (!name || !npub) return [];
-        const groupName = String(contact.groupName ?? "").trim();
+        const groupName = (contact.groupName ?? "").trim();
         const groupNames = getContactGroups(contact);
         return [
           {
@@ -3139,7 +1774,8 @@ export const useContactsMessagingComposition = ({
             npub,
             groupName: groupName || null,
             groupNames,
-            statusNames: extractStatusFilterCurrencies(nostrStatusByNpub[npub]),
+            statusNames: parseProfileGeneralStatus(nostrStatusByNpub[npub])
+              .currencies,
           },
         ];
       }),
@@ -3152,70 +1788,31 @@ export const useContactsMessagingComposition = ({
       if (!npub) return;
 
       const existing = contacts.find(
-        (contact) => normalizeNpubIdentifier(contact.npub) === npub,
+        (contact) => normalizeNpubIdentifier(contact.npub ?? "") === npub,
       );
       if (existing?.id) {
-        navigateTo({ route: "contact", id: existing.id as ContactId });
+        navigateTo({ route: "contact", id: existing.id });
         return;
       }
 
-      const myNpub = normalizeNpubIdentifier(currentNpub);
+      const myNpub = normalizeNpubIdentifier(currentNpub ?? "");
       if (myNpub && myNpub === npub) {
         navigateTo({ route: "profile" });
         return;
       }
 
-      if (activeContactsOwnerContactCount >= MAX_CONTACTS_PER_OWNER) {
-        setStatus(
-          t("contactsLimitReached").replace(
-            "{max}",
-            String(MAX_CONTACTS_PER_OWNER),
-          ),
-        );
-        return;
-      }
-
-      const defaultProfile = deriveDefaultProfile(npub, lang);
-      const payload = {
-        name: buildSavedContactName(
-          unknownNameByNpub[npub] ?? defaultProfile.name,
-          npub,
-        ) as typeof Evolu.NonEmptyString1000.Type,
-        npub: npub as typeof Evolu.NonEmptyString1000.Type,
-        lnAddress: null,
-        groupName: null,
-      };
-
-      const result = contactsOwnerId
-        ? (() => {
-            const scoped = insert("contact", payload, {
-              ownerId: contactsOwnerId,
-            });
-            if (scoped.ok) return scoped;
-            return insert("contact", payload);
-          })()
-        : insert("contact", payload);
-
-      if (!result.ok) {
-        setStatus(`${t("errorPrefix")}: ${String(result.error ?? "")}`);
-        return;
-      }
-
-      openScannedContactPendingNpubRef.current = npub;
+      const saved = saveNpubContact(npub);
+      if (!saved) return;
+      openScannedContactPendingNpubRef.current = saved.npub;
       setStatus(t("contactSaved"));
     },
     [
-      activeContactsOwnerContactCount,
-      buildSavedContactName,
       contacts,
-      contactsOwnerId,
       currentNpub,
-      insert,
-      lang,
       openScannedContactPendingNpubRef,
+      saveNpubContact,
       setStatus,
       t,
-      unknownNameByNpub,
     ],
   );
 
@@ -3226,11 +1823,11 @@ export const useContactsMessagingComposition = ({
     (rawNpubs: readonly string[], messageId: string) => {
       const savedNpubs = new Set(
         contacts.flatMap((contact) => {
-          const npub = normalizeNpubIdentifier(contact.npub);
+          const npub = normalizeNpubIdentifier(contact.npub ?? "");
           return npub ? [npub] : [];
         }),
       );
-      const myNpub = normalizeNpubIdentifier(currentNpub);
+      const myNpub = normalizeNpubIdentifier(currentNpub ?? "");
       if (myNpub) savedNpubs.add(myNpub);
 
       const newNpubs: string[] = [];
@@ -3246,55 +1843,15 @@ export const useContactsMessagingComposition = ({
         activeContactsOwnerContactCount + newNpubs.length >
         MAX_CONTACTS_PER_OWNER
       ) {
-        setStatus(
-          t("contactsLimitReached").replace(
-            "{max}",
-            String(MAX_CONTACTS_PER_OWNER),
-          ),
-        );
-        return;
-      }
-
-      const payloads = newNpubs.flatMap((npub) => {
-        const defaultProfile = deriveDefaultProfile(npub, lang);
-        const name = Evolu.NonEmptyString1000.fromUnknown(
-          buildSavedContactName(
-            unknownNameByNpub[npub] ?? defaultProfile.name,
-            npub,
-          ),
-        );
-        const parsedNpub = Evolu.NonEmptyString1000.fromUnknown(npub);
-        if (!name.ok || !parsedNpub.ok) return [];
-
-        return [
-          {
-            name: name.value,
-            npub: parsedNpub.value,
-            lnAddress: null,
-            groupName: null,
-          },
-        ];
-      });
-      if (payloads.length !== newNpubs.length) {
-        setStatus(`${t("errorPrefix")}: ${t("invalidNpub")}`);
+        setStatus(contactsLimitMessage(t));
         return;
       }
 
       const savedContacts: SavedContactRef[] = [];
-      for (const payload of payloads) {
-        const scoped = contactsOwnerId
-          ? insert("contact", payload, { ownerId: contactsOwnerId })
-          : null;
-        if (scoped?.ok) {
-          savedContacts.push({ id: scoped.value.id, ownerId: contactsOwnerId });
-          continue;
-        }
-        const result = insert("contact", payload);
-        if (!result.ok) {
-          setStatus(`${t("errorPrefix")}: ${String(result.error ?? "")}`);
-          return;
-        }
-        savedContacts.push({ id: result.value.id, ownerId: null });
+      for (const npub of newNpubs) {
+        const saved = saveNpubContact(npub);
+        if (!saved) return;
+        savedContacts.push({ id: saved.contact.id, ownerId: saved.ownerId });
       }
 
       setPendingContactsGroupAssignment({ messageId, savedContacts });
@@ -3304,15 +1861,11 @@ export const useContactsMessagingComposition = ({
     },
     [
       activeContactsOwnerContactCount,
-      buildSavedContactName,
       contacts,
-      contactsOwnerId,
       currentNpub,
-      insert,
-      lang,
+      saveNpubContact,
       setStatus,
       t,
-      unknownNameByNpub,
     ],
   );
 
@@ -3343,9 +1896,7 @@ export const useContactsMessagingComposition = ({
           groupName: groupName.value,
           groupNamesJson: groupNamesJson.value,
         };
-        const result = ownerId
-          ? update("contact", payload, { ownerId })
-          : update("contact", payload);
+        const result = writeContact(update, payload, ownerId);
         if (!result.ok) {
           setStatus(`${t("errorPrefix")}: ${String(result.error ?? "")}`);
           return;
@@ -3369,7 +1920,7 @@ export const useContactsMessagingComposition = ({
 
     const existing = contacts.find(
       (contact) =>
-        normalizeNpubIdentifier(contact.npub) === pending.targetNpub &&
+        normalizeNpubIdentifier(contact.npub ?? "") === pending.targetNpub &&
         Boolean(contact.id),
     );
     if (!existing?.id) return;
@@ -3377,7 +1928,7 @@ export const useContactsMessagingComposition = ({
     pendingUnknownContactAddRef.current = null;
     reassignNostrConversationContactId(pending.sourceContactId, existing.id);
     setStatus(t("contactSaved"));
-    navigateTo({ route: "chat", id: String(existing.id) });
+    navigateTo({ route: "chat", id: existing.id });
   }, [contacts, reassignNostrConversationContactId, setStatus, t]);
 
   const sendChatMessage = useSendChatMessage({
@@ -3439,7 +1990,7 @@ export const useContactsMessagingComposition = ({
   const sendChatImage = React.useCallback(
     async (file: File, replyToMessage?: LocalNostrMessage) => {
       if (editContext) return;
-      const replyToId = String(replyToMessage?.rumorId ?? "").trim();
+      const replyToId = (replyToMessage?.rumorId ?? "").trim();
       await sendChatMessage({
         clearDraft: false,
         imageFile: file,
@@ -3448,10 +1999,8 @@ export const useContactsMessagingComposition = ({
               replyContext: {
                 replyToId,
                 rootMessageId:
-                  String(replyToMessage?.rootMessageId ?? "").trim() ||
-                  replyToId,
-                replyToContent:
-                  String(replyToMessage?.content ?? "").trim() || null,
+                  (replyToMessage?.rootMessageId ?? "").trim() || replyToId,
+                replyToContent: (replyToMessage?.content ?? "").trim() || null,
               },
             }
           : {}),
@@ -3462,41 +2011,40 @@ export const useContactsMessagingComposition = ({
 
   const onReplyToChatMessage = React.useCallback(
     (message: LocalNostrMessage) => {
-      const rumorId = String(message.rumorId ?? "").trim();
+      const rumorId = (message.rumorId ?? "").trim();
       if (!rumorId) return;
       setEditContext(null);
       setReplyContext({
         replyToId: rumorId,
-        rootMessageId: String(message.rootMessageId ?? "").trim() || rumorId,
-        replyToContent: String(message.content ?? "").trim() || null,
+        rootMessageId: (message.rootMessageId ?? "").trim() || rumorId,
+        replyToContent: message.content.trim() || null,
       });
     },
     [],
   );
 
   const onEditChatMessage = React.useCallback((message: LocalNostrMessage) => {
-    const isOut = String(message.direction ?? "") === "out";
+    const isOut = message.direction === "out";
     if (!isOut) return;
-    const rumorId = String(message.rumorId ?? "").trim();
+    const rumorId = (message.rumorId ?? "").trim();
     if (!rumorId) return;
-    const messageId = String(message.id ?? "").trim();
+    const messageId = message.id.trim();
     if (!messageId) return;
 
     setReplyContext(null);
-    const content = String(message.content ?? "");
+    const content = message.content;
     setEditContext({
       messageId,
       rumorId,
-      originalContent:
-        String(message.originalContent ?? "").trim() || content || "",
+      originalContent: (message.originalContent ?? "").trim() || content || "",
     });
     setChatDraft(content);
   }, []);
 
   const onReactToChatMessage = React.useCallback(
     (message: LocalNostrMessage, emoji: string) => {
-      const messageRumorId = String(message.rumorId ?? "").trim();
-      const messageAuthorPubkey = String(message.pubkey ?? "").trim();
+      const messageRumorId = (message.rumorId ?? "").trim();
+      const messageAuthorPubkey = message.pubkey.trim();
       if (!messageRumorId || !messageAuthorPubkey) return;
       void sendReaction({
         emoji,
@@ -3512,7 +2060,7 @@ export const useContactsMessagingComposition = ({
 
   const onCopyChatMessage = React.useCallback(
     (message: LocalNostrMessage) => {
-      const content = String(message.content ?? "");
+      const content = message.content;
       const privateImage = parsePrivateImageMessage(content);
       const copyContent = privateImage
         ? privateImagePreviewText(t, privateImage)
@@ -3524,16 +2072,15 @@ export const useContactsMessagingComposition = ({
 
   const onDeclineChatPaymentRequest = React.useCallback(
     async (message: LocalNostrMessage) => {
-      const requestRumorId = String(message.rumorId ?? "").trim();
+      const requestRumorId = (message.rumorId ?? "").trim();
       if (!requestRumorId) return;
 
       await sendChatMessage({
         clearDraft: false,
         replyContext: {
           replyToId: requestRumorId,
-          rootMessageId:
-            String(message.rootMessageId ?? "").trim() || requestRumorId,
-          replyToContent: String(message.content ?? "").trim() || null,
+          rootMessageId: (message.rootMessageId ?? "").trim() || requestRumorId,
+          replyToContent: message.content.trim() || null,
         },
         text: buildLinkyPaymentRequestDeclineMessage(requestRumorId),
       });
@@ -3552,9 +2099,9 @@ export const useContactsMessagingComposition = ({
 
   const openInboxMessageToast = React.useCallback(
     (params: { contactId: string; messageId?: string }) => {
-      const contactId = String(params.contactId ?? "").trim();
+      const contactId = params.contactId.trim();
       if (!contactId) return;
-      const messageId = String(params.messageId ?? "").trim();
+      const messageId = (params.messageId ?? "").trim();
 
       navigateTo({ route: "chat", id: contactId });
       triggerChatScrollToBottom(messageId || undefined);
@@ -3571,7 +2118,7 @@ export const useContactsMessagingComposition = ({
 
   const recordSentSeenReceipt = React.useCallback(
     (peerPubkey: string, seenUpToSec: number) => {
-      const key = String(peerPubkey).trim();
+      const key = peerPubkey.trim();
       if (!key) return;
       const sent = peerSeenSentUpToSecByPubkeyRef.current;
       if (seenUpToSec > (sent.get(key) ?? 0)) sent.set(key, seenUpToSec);
@@ -3582,10 +2129,10 @@ export const useContactsMessagingComposition = ({
   const getPeerSeenWindow = React.useCallback(
     (contactId: string): PeerSeenWindow | null => {
       const row = contactsLatestRef.current.find(
-        (contact) => String(contact.id).trim() === contactId,
+        (contact) => contact.id.trim() === contactId,
       );
-      const sinceSec = Number(row?.chatPeerSeenSinceSec ?? 0);
-      const seenUpToSec = Number(row?.chatPeerSeenAtSec ?? 0);
+      const sinceSec = row?.chatPeerSeenSinceSec ?? 0;
+      const seenUpToSec = row?.chatPeerSeenAtSec ?? 0;
       const stored =
         sinceSec > 0 && seenUpToSec > sinceSec
           ? { sinceSec, seenUpToSec }
@@ -3602,7 +2149,7 @@ export const useContactsMessagingComposition = ({
   const advanceContactPeerSeen = React.useCallback(
     (contactId: string, seenWindow: PeerSeenWindow) => {
       const row = contactsLatestRef.current.find(
-        (contact) => String(contact.id).trim() === contactId,
+        (contact) => contact.id.trim() === contactId,
       );
       if (!row) return;
       const ownerId =
@@ -3613,9 +2160,7 @@ export const useContactsMessagingComposition = ({
         chatPeerSeenSinceSec: seenWindow.sinceSec,
         chatPeerSeenAtSec: seenWindow.seenUpToSec,
       };
-      const result = ownerId
-        ? update("contact", payload, { ownerId })
-        : update("contact", payload);
+      const result = writeContact(update, payload, ownerId);
       if (result.ok) {
         peerSeenWrittenByContactIdRef.current.set(contactId, seenWindow);
       }
@@ -3650,61 +2195,6 @@ export const useContactsMessagingComposition = ({
     updateLocalNostrReaction,
   });
 
-  const chatMessagesWithBankPaymentOffers = React.useMemo(() => {
-    if (route.kind !== "chat") return chatMessages;
-
-    const activeContactId = String(route.id ?? "").trim();
-    if (!activeContactId) return chatMessages;
-
-    const offerMessages = bankPaymentOfferMessages.filter(
-      (message) => String(message.contactId ?? "").trim() === activeContactId,
-    );
-    if (offerMessages.length === 0) return chatMessages;
-
-    const seenKeys = new Set<string>();
-    for (const message of chatMessages) {
-      const offerId = getLinkyBankPaymentOfferInfo(
-        String(message.content ?? ""),
-      )?.offerId;
-      if (offerId) seenKeys.add(`offer:${offerId}`);
-      const wrapId = String(message.wrapId ?? "").trim();
-      if (wrapId) seenKeys.add(`wrap:${wrapId}`);
-      const clientId = String(message.clientId ?? "").trim();
-      if (clientId) seenKeys.add(`client:${clientId}`);
-      const id = String(message.id ?? "").trim();
-      if (id) seenKeys.add(`id:${id}`);
-    }
-
-    const merged = [...chatMessages];
-    for (const message of offerMessages) {
-      const offerId = getLinkyBankPaymentOfferInfo(
-        String(message.content ?? ""),
-      )?.offerId;
-      const wrapId = String(message.wrapId ?? "").trim();
-      const clientId = String(message.clientId ?? "").trim();
-      const id = String(message.id ?? "").trim();
-      if (offerId && seenKeys.has(`offer:${offerId}`)) continue;
-      if (wrapId && seenKeys.has(`wrap:${wrapId}`)) continue;
-      if (clientId && seenKeys.has(`client:${clientId}`)) continue;
-      if (id && seenKeys.has(`id:${id}`)) continue;
-
-      merged.push(message);
-      if (offerId) seenKeys.add(`offer:${offerId}`);
-      if (wrapId) seenKeys.add(`wrap:${wrapId}`);
-      if (clientId) seenKeys.add(`client:${clientId}`);
-      if (id) seenKeys.add(`id:${id}`);
-    }
-
-    merged.sort((a, b) => {
-      const createdA = Number(a.createdAtSec ?? 0);
-      const createdB = Number(b.createdAtSec ?? 0);
-      if (createdA !== createdB) return createdA - createdB;
-      return String(a.id ?? "").localeCompare(String(b.id ?? ""));
-    });
-
-    return merged;
-  }, [bankPaymentOfferMessages, chatMessages, route]);
-
   const documentVisible = useDocumentVisible();
 
   useChatReadCursorSync({
@@ -3727,14 +2217,13 @@ export const useContactsMessagingComposition = ({
   });
 
   return {
-    activeContactsOwnerContactCount,
+    saveNpubContact,
     activeGroup,
     addNewContactFromIdentifier,
     addNewContactFromSearchResult,
     addNpubMessageContacts,
     addUnknownContactFromChat,
     appendLocalNostrMessage,
-    appendLocalNostrReaction,
     assignPendingContactsToGroup,
     closeContactsGroupAssignment,
     pendingContactsGroupAssignment,
@@ -3745,7 +2234,6 @@ export const useContactsMessagingComposition = ({
     bankPaymentOfferStaggerDelaySec,
     blockArchivedContact,
     blockUnknownContactFromChat,
-    buildSavedContactName,
     canAddContact,
     canSaveNewRelay,
     chatDidInitialScrollForContactRef,
@@ -3754,7 +2242,6 @@ export const useContactsMessagingComposition = ({
     chatLastMessageCountRef,
     chatMessageElByIdRef,
     chatMessages,
-    chatMessagesLatestRef,
     chatMessagesRef,
     chatMessagesWithBankPaymentOffers,
     chatOwnPubkeyHex,
@@ -3775,7 +2262,6 @@ export const useContactsMessagingComposition = ({
     dedupeContactsIsBusy,
     dispatchInboxEvent,
     displayContactById,
-    displayContacts,
     editContext,
     editingId,
     enqueuePendingPayment,
@@ -3785,20 +2271,14 @@ export const useContactsMessagingComposition = ({
     handleSaveContact,
     isBankPaymentOfferCanceled,
     isSavingContact,
-    knownNostrMessageIdentityIndex,
     lastMessageByContactId: lastVisibleMessageByContactId,
     mentionContacts,
     newRelayUrl,
     nostrBootstrapReady,
-    nostrFetchRelays,
-    nostrMessageWrapIdsRef,
-    nostrMessagesLatestRef,
     nostrMessagesLocal,
     nostrMessagesRecent,
     nostrMetadataByNpub,
     nostrPictureByNpub,
-    nostrReactionWrapIdsRef,
-    nostrReactionsLocal,
     nostrStatusByNpub,
     onCancelEdit,
     onCancelReply,
@@ -3810,7 +2290,6 @@ export const useContactsMessagingComposition = ({
     openContactDetail,
     openContactPay,
     openFeedbackContact,
-    openInboxMessageToast,
     openNewContactPage,
     openNpubMessageContact,
     openScannedContactPendingNpubRef,
@@ -3818,9 +2297,7 @@ export const useContactsMessagingComposition = ({
     pendingPayments,
     pendingRelayDeleteUrl,
     reactionsByMessageId,
-    reassignLocalNostrMessagesContactId: reassignNostrConversationContactId,
     relayUrls,
-    removeLocalNostrMessagesByContactId,
     removePendingPayment,
     replyContext,
     requestBankPaymentOffer,
@@ -3847,16 +2324,10 @@ export const useContactsMessagingComposition = ({
     setForm,
     setNewRelayUrl,
     setPendingDeleteId,
-    softDeleteLocalNostrReaction,
-    softDeleteLocalNostrReactionsByWrapIds,
     statusFilterCurrencies,
-    triggerChatScrollToBottom,
     ungroupedCount,
-    unknownNameByNpub,
     unreadByContactId,
     updateLocalNostrMessage,
-    updateLocalNostrReaction,
-    upsertBankPaymentOfferMessage,
     visibleContacts,
   };
 };

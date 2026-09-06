@@ -2,7 +2,7 @@ import { Clipboard } from "@capacitor/clipboard";
 import { isNativePlatform } from "./runtime";
 
 export const writeClipboardText = async (value: string): Promise<boolean> => {
-  const text = String(value ?? "");
+  const text = value;
 
   if (isNativePlatform()) {
     try {
@@ -29,7 +29,7 @@ export const readClipboardText = async (): Promise<string | null> => {
   if (isNativePlatform()) {
     try {
       const result = await Clipboard.read();
-      const text = String(result.value ?? "");
+      const text = result.value;
       return text;
     } catch {
       // Fall through to browser clipboard when available.

@@ -1,28 +1,19 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { Amount, getEncodedToken } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, Stream } from "effect";
+import { getEncodedToken } from "@cashu/cashu-ts";
+import { Effect, Exit, Layer } from "effect";
 import { MintUnreachable } from "../domain/errors";
-import { MintUrl, TokenRowId, TokenText } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
+import { MintUrl, TokenRowId } from "../domain/primitives";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
-import { NewTokenRow, TokenStore } from "../ports/TokenStore";
-import type { StoredTokenRow } from "../ports/TokenStore";
-import { parseTokenText } from "../token/codec";
+import { TokenStore } from "../ports/TokenStore";
+import { fakeWallet, proof } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
+import { amountOf, seedRow } from "../testing/rows";
 import type { TokenState } from "../token/domain";
 import { Validation } from "./Validation";
 
 const mint = MintUrl.make("https://mint.example");
-const keysetHex = "009a1f293253e41e";
-
-const proof = (amount: number, secret: string): CashuProof => ({
-  id: keysetHex,
-  amount: Amount.from(amount),
-  secret,
-  C: "02" + "ab".repeat(32),
-});
 
 const tokenOf = (...proofs: ReadonlyArray<CashuProof>): string =>
   getEncodedToken({ mint, unit: "sat", proofs: [...proofs] });
@@ -46,36 +37,22 @@ interface HarnessArgs {
   walletUnreachable?: boolean;
 }
 
-const makeWallet = (args: HarnessArgs): LoadedWallet => ({
-  keysetId: keysetHex,
-  keyChain: { getKeysets: () => [] },
-  getMintInfo: () => {
-    throw new Error("not under test");
-  },
-  receive: () => Promise.reject(new Error("not under test")),
-  send: () => Promise.reject(new Error("not under test")),
-  restore: () => Promise.reject(new Error("not under test")),
-  createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-  createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-  meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-  batchRestore: () => Promise.reject(new Error("not under test")),
-  checkProofsStates: (proofs) =>
-    args.checkStatesError !== undefined
-      ? Promise.reject(args.checkStatesError)
-      : Promise.resolve(
-          proofs.slice(0, args.truncateTo ?? proofs.length).map((entry) => ({
-            Y: entry.secret ?? "",
-            state: args.stateOf?.(entry.secret ?? "") ?? "UNSPENT",
-            witness: null,
-          })),
-        ),
-});
+const makeWallet = (args: HarnessArgs): LoadedWallet =>
+  fakeWallet({
+    checkProofsStates: (proofs) =>
+      args.checkStatesError !== undefined
+        ? Promise.reject(args.checkStatesError)
+        : Promise.resolve(
+            proofs.slice(0, args.truncateTo ?? proofs.length).map((entry) => ({
+              Y: entry.secret ?? "",
+              state: args.stateOf?.(entry.secret ?? "") ?? "UNSPENT",
+              witness: null,
+            })),
+          ),
+  });
 
 const makeHarness = (args: HarnessArgs) => {
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const wallet = makeWallet(args);
   const layer = Validation.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -94,31 +71,14 @@ const makeHarness = (args: HarnessArgs) => {
           }),
         ),
         inMemoryTokenStore,
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
   const run = <A, E>(program: Effect.Effect<A, E, Validation | TokenStore>) =>
     Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
-  return { run, events };
+  return { run, events: inspector.events };
 };
-
-const seedRow = (tokenText: string, state: TokenState) =>
-  Effect.flatMap(TokenStore, (store) =>
-    store.insert(
-      new NewTokenRow({
-        originalTokenText: TokenText.make(tokenText),
-        tokenText: TokenText.make(tokenText),
-        state,
-        error: null,
-      }),
-    ),
-  );
 
 /** Seeds rows, runs one validation call, and reports the resulting store. */
 const withRows = <A, E>(
@@ -141,9 +101,6 @@ const checkSeededRow = (tokenText: string, state: TokenState = "accepted") =>
     return { result, rows: yield* (yield* TokenStore).loadAll };
   });
 
-const amountOf = (row: StoredTokenRow | undefined): number | undefined =>
-  row === undefined ? undefined : parseTokenText(row.tokenText)?.amount;
-
 describe("Validation.checkAll", () => {
   it("marks fully spent rows error and merges the survivors into one row", async () => {
     const { run, events } = makeHarness({
@@ -162,8 +119,7 @@ describe("Validation.checkAll", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { result, rows } = exit.value;
 
     expect(result.checkedRows).toBe(3);
@@ -204,8 +160,7 @@ describe("Validation.checkAll", () => {
       withRows([[tokenA, "accepted"]], (validation) => validation.checkAll),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.markedSpent).toEqual([]);
     expect(exit.value.rows).toHaveLength(1);
     expect(exit.value.rows[0]?.state).toBe("accepted");
@@ -219,8 +174,7 @@ describe("Validation.checkAll", () => {
       withRows([[tokenA, "accepted"]], (validation) => validation.checkAll),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.mergedRows).toEqual([]);
     expect(exit.value.rows[0]?.tokenText).toBe(tokenA);
   });
@@ -238,8 +192,7 @@ describe("Validation.checkAll", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     // Only one of the three proofs was answered, so no row is fully covered.
     expect(exit.value.result.markedSpent).toEqual([]);
     expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
@@ -254,8 +207,7 @@ describe("Validation.checkAll", () => {
       withRows([[tokenA, "accepted"]], (validation) => validation.checkAll),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.markedSpent).toEqual([]);
     expect(exit.value.rows[0]?.state).toBe("accepted");
   });
@@ -269,8 +221,7 @@ describe("Validation.checkAll", () => {
       withRows([[tokenA, "accepted"]], (validation) => validation.checkAll),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.unavailableMints).toEqual([mint]);
     expect(exit.value.result.checkedRows).toBe(0);
     expect(exit.value.rows[0]?.tokenText).toBe(tokenA);
@@ -283,8 +234,7 @@ describe("Validation.checkAll", () => {
       withRows([[tokenA, "accepted"]], (validation) => validation.checkAll),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.unavailableMints).toEqual([mint]);
     expect(exit.value.rows[0]?.state).toBe("accepted");
   });
@@ -302,8 +252,7 @@ describe("Validation.checkAll", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.checkedRows).toBe(0);
     expect(exit.value.rows.map((row) => row.state)).toEqual([
       "issued",
@@ -318,8 +267,7 @@ describe("Validation.checkRow", () => {
 
     const exit = await run(checkSeededRow(tokenA));
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.status).toBe("spent");
     expect(exit.value.rows[0]?.state).toBe("error");
   });
@@ -329,8 +277,7 @@ describe("Validation.checkRow", () => {
 
     const exit = await run(checkSeededRow(tokenA, "reserved"));
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.status).toBe("spent");
     expect(exit.value.rows[0]?.state).toBe("error");
   });
@@ -342,8 +289,7 @@ describe("Validation.checkRow", () => {
 
     const exit = await run(checkSeededRow(tokenA));
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.status).toBe("live");
     expect(amountOf(exit.value.rows[0])).toBe(2);
   });
@@ -355,8 +301,7 @@ describe("Validation.checkRow", () => {
 
     const exit = await run(checkSeededRow(tokenA));
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.status).toBe("unavailable");
     expect(exit.value.rows[0]?.state).toBe("accepted");
   });
@@ -370,8 +315,7 @@ describe("Validation.checkRow", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toMatchObject({ _tag: "TokenRowNotFound" });
   });
 });
@@ -392,8 +336,7 @@ describe("Validation.checkIssued", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.claimed).toHaveLength(1);
     expect(exit.value.result.claimed[0]?.amount).toBe(8);
     expect(exit.value.rows).toHaveLength(1);
@@ -407,8 +350,7 @@ describe("Validation.checkIssued", () => {
       withRows([[tokenA, "issued"]], (validation) => validation.checkIssued),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result.claimed).toEqual([]);
     expect(exit.value.rows[0]?.state).toBe("issued");
   });

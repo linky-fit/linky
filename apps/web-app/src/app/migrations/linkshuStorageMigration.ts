@@ -1,4 +1,4 @@
-// ONE-TIME MIGRATION — DELETE ME EVENTUALLY
+// Legacy migration; removal gate in docs/architecture.md
 //
 // Carries a device's legacy cashu localStorage state to the key formats
 // @linky/linkshu reads through the localStorage KeyValueStore adapter (#307).
@@ -17,12 +17,12 @@
 // mints UI still owns them); linkshu's per-mint seen keys are seeded from
 // them plus the mints of stored token rows.
 //
-// Removal condition: delete this folder (including legacyAcceptedTokenDrain)
-// and its marked call sites (useLinkshuComposition, useCashuWalletComposition
-// twice, wipeLinkshuSeedBoundState) once production devices have all launched
-// a post-cutover build; the done flags make later runs no-ops either way.
+// Removal requires the supported-upgrade evidence in docs/architecture.md.
+// Keep the seed-bound wipe itself after removing its migration prologue.
 
 import { parseMintUrl, parseTokenText } from "@linky/linkshu";
+import { readField } from "../../utils/unknown";
+import { asNonEmptyString } from "../../utils/validation";
 
 const DONE_STORAGE_KEY = "linky.linkshu_storage_migration_v1";
 const ROW_MINTS_DONE_STORAGE_KEY = "linky.linkshu_seen_mints_backfill_v1";
@@ -129,23 +129,12 @@ const buildLegacyKeysetLookup = (keys: string[]): Map<string, string> => {
   return lookup;
 };
 
-const readField = (value: unknown, field: string): unknown =>
-  typeof value === "object" && value !== null
-    ? Reflect.get(value, field)
-    : undefined;
-
 const tryParseJson = (raw: string): unknown => {
   try {
     return JSON.parse(raw);
   } catch {
     return undefined;
   }
-};
-
-const nonEmptyTrimmed = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
 };
 
 interface ConvertedPendingQuote {
@@ -168,10 +157,10 @@ const convertPendingQuote = (
   value: unknown,
   keysetLookup: Map<string, string>,
 ): ConvertedPendingQuote | null => {
-  const rawMint = nonEmptyTrimmed(readField(value, "mintUrl"));
+  const rawMint = asNonEmptyString(readField(value, "mintUrl"));
   const mint = rawMint === null ? null : parseMintUrl(rawMint);
-  const quoteId = nonEmptyTrimmed(readField(value, "quote"));
-  const invoice = nonEmptyTrimmed(readField(value, "invoice"));
+  const quoteId = asNonEmptyString(readField(value, "quote"));
+  const invoice = asNonEmptyString(readField(value, "invoice"));
   const amount = readField(value, "amount");
   const createdAtMs = readField(value, "createdAtMs");
   if (
@@ -189,7 +178,7 @@ const convertPendingQuote = (
   }
   const createdAt = Math.floor(createdAtMs / 1000);
   if (createdAt <= 0) return null;
-  const unit = nonEmptyTrimmed(readField(value, "unit")) ?? "sat";
+  const unit = asNonEmptyString(readField(value, "unit")) ?? "sat";
   const scope = `${encodeURIComponent(mint)}.${encodeURIComponent(unit)}`;
   return {
     quoteId,

@@ -1,9 +1,8 @@
-import { Effect, Exit, Stream } from "effect";
+import { Effect, Exit } from "effect";
 import { TokenText } from "../../domain/primitives";
-import type { LinkshuInspectorEvent } from "../../inspector/events";
-import type { InspectorService } from "../../inspector/Inspector";
 import { inMemoryTokenStore } from "../../ports/inMemoryTokenStore";
 import { TokenStore } from "../../ports/TokenStore";
+import { recordingInspector } from "../../testing/inspector";
 import {
   findRowByTokenText,
   insertRowInState,
@@ -13,15 +12,6 @@ import {
 
 const original = TokenText.make("cashuAoriginal");
 const reSigned = TokenText.make("cashuBresigned");
-
-const recordingInspector = (
-  events: Array<LinkshuInspectorEvent>,
-): InspectorService => ({
-  emit: (build) => {
-    events.push(build());
-  },
-  events: Stream.empty,
-});
 
 describe("isLegalTransition", () => {
   it("allows the documented lifecycle moves and rejects the rest", () => {
@@ -37,8 +27,7 @@ describe("isLegalTransition", () => {
 
 describe("insertRowInState / transitionRow", () => {
   it("persists transitions, clears error outside `error`, and emits events", async () => {
-    const events: Array<LinkshuInspectorEvent> = [];
-    const inspector = recordingInspector(events);
+    const { events, service: inspector } = recordingInspector();
 
     const exit = await Effect.runPromiseExit(
       Effect.gen(function* () {
@@ -60,8 +49,7 @@ describe("insertRowInState / transitionRow", () => {
       }).pipe(Effect.provide(inMemoryTokenStore)),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const stored = exit.value.rows[0];
     expect(stored.state).toBe("accepted");
     expect(stored.error).toBeNull();
@@ -84,8 +72,7 @@ describe("insertRowInState / transitionRow", () => {
   });
 
   it("fails illegal transitions with InvalidTokenTransition", async () => {
-    const events: Array<LinkshuInspectorEvent> = [];
-    const inspector = recordingInspector(events);
+    const { service: inspector } = recordingInspector();
 
     const exit = await Effect.runPromiseExit(
       Effect.gen(function* () {
@@ -102,8 +89,7 @@ describe("insertRowInState / transitionRow", () => {
       }).pipe(Effect.provide(inMemoryTokenStore)),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toMatchObject({
       _tag: "InvalidTokenTransition",
       from: "accepted",
@@ -114,7 +100,7 @@ describe("insertRowInState / transitionRow", () => {
 
 describe("findRowByTokenText", () => {
   it("matches the original encoding and the current one", async () => {
-    const inspector = recordingInspector([]);
+    const { service: inspector } = recordingInspector();
     const exit = await Effect.runPromiseExit(
       Effect.gen(function* () {
         const store = yield* TokenStore;
@@ -133,8 +119,7 @@ describe("findRowByTokenText", () => {
         };
       }).pipe(Effect.provide(inMemoryTokenStore)),
     );
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.byOriginal).toBe(exit.value.rowId);
     expect(exit.value.byCurrent).toBe(exit.value.rowId);
     expect(exit.value.miss).toBeNull();

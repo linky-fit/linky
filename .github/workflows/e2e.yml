@@ -1,9 +1,10 @@
 name: E2E
 
-# Runs standalone on every push to main (Vercel Deployment Checks reads the
+# Runs on pull requests and every push to main (Vercel Deployment Checks reads the
 # `e2e` check to gate production promotion) and as a reusable job for the
 # Android release workflows.
 on:
+  pull_request:
   push:
     branches:
       - main
@@ -91,9 +92,10 @@ jobs:
 
       - name: Run e2e tests
         working-directory: apps/web-app
-        env:
-          E2E_SKIP_WEBSERVER: "1"
         run: bunx playwright test --project=local-stack
+
+      - name: Run site redemption and recovery tests
+        run: bun run --filter @linky/site test:e2e
 
       - name: Dump service logs
         if: failure()
@@ -104,5 +106,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: e2e-test-results
-          path: apps/web-app/test-results/
+          path: |
+            apps/web-app/test-results/
+            apps/site/test-results/
           retention-days: 7

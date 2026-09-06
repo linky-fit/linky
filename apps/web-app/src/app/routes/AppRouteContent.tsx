@@ -1,8 +1,12 @@
 import React from "react";
+import { DesktopNavigation } from "../../components/DesktopNavigation";
+import { ScanModal } from "../../components/ScanModal";
+import { Topbar } from "../../components/Topbar";
+import { useDesktopSplitView } from "../../hooks/useDesktopSplitView";
 import {
   AdvancedAutoPayLimitPage,
-  BankPaymentOfferDetailPage,
   AdvancedPage,
+  BankPaymentOfferDetailPage,
   CashuTokenEmitPage,
   CashuTokenNewPage,
   CashuTokenPage,
@@ -19,8 +23,8 @@ import {
   EvoluServerPage,
   EvoluServersPage,
   InspectorSettingsPage,
-  LnAddressPayPage,
   LanguagePage,
+  LnAddressPayPage,
   ManualPayPage,
   MasterKeysPage,
   MintDetailPage,
@@ -37,10 +41,6 @@ import {
   TopupPage,
   TransactionsPage,
 } from "../../pages";
-import { AppTopbar } from "../../components/AppTopbar";
-import { AppScanModal } from "../../components/AppScanModal";
-import { DesktopNavigation } from "../../components/DesktopNavigation";
-import { useDesktopSplitView } from "../../hooks/useDesktopSplitView";
 import {
   useAppShellCore,
   useMoneyRoutes,
@@ -220,10 +220,10 @@ export const AppRouteContent = (): React.ReactElement => {
       {secondaryIsOpen ? (
         <section className="desktop-secondary-pane" aria-label={t("detail")}>
           {scanIsOpen ? (
-            <AppScanModal />
+            <ScanModal />
           ) : (
             <>
-              <AppTopbar className="desktop-app-topbar" desktopDetail={true} />
+              <Topbar className="desktop-app-topbar" desktopDetail={true} />
               <div className="desktop-secondary-content">
                 <RoutePage />
               </div>

@@ -22,13 +22,18 @@ IMPORTANT: When you make or change an architectural decision, document it in `do
 - **NEVER use `as` or `any` to cast types** - validate with a runtime type guard instead of casting
 - Branded ID types from Evolu (`ContactId`, `CashuTokenId`, `MintId`, etc.) - don't use plain strings
 - Components use `interface` for props, not `type`
-- LocalStorage keys use `linky.` prefix (e.g., `linky.nostr_nsec`, `linky.lang`)
+- New browser storage names use the `linky.` prefix (e.g., `linky.nostr_nsec`, `linky.lang`). Existing exceptions are listed in `docs/architecture.md` under "Compatibility and audit decisions"; preserve those names for upgrades.
 - Use types from libraries (e.g., Evolu, Cashu, Nostr) instead of redefining them - look up the library's exported types first
 - Prefer sparse Evolu mutation payloads: omit optional fields when empty instead of writing explicit `null` (especially `cashuToken` optional columns like `rawToken`, `mint`, `unit`, `amount`, `error`)
 - Plain CSS in `App.css` - no CSS-in-JS or utility framework
+- `localStorage` goes through `utils/storage.ts` (`safeLocalStorageGet/Set/Remove`, `safeLocalStorageGetJson` with a Schema); raw access is reserved for the one-time linkshu migration and the linkshu `KeyValueStore` port
+- Validate stored and wire JSON with effect `Schema` (shared pieces in `utils/schema.ts`), not hand-rolled `typeof` guards
+- `nowSeconds()` and `sleep()` come from `utils/time.ts`
+- Translation keys are `I18nKey` and translators are `Translate` (both from `src/i18n`); `cs.ts` is the reference locale and `en.ts`/`de.ts` must `satisfies` its key set, so a missing or misspelled key is a type error, never a runtime fallback
 
 
 ### Commenting the code
+
 - If you need to add comment to a code to justify the code being overcomplicated, the code is bad and you should do it differently - unless instructed otherwise or we specifically agree on going with this implementation. Good comments do not excuse unclear code.
 - Comments should not duplicate the code! The code should be self explanatory, use function names, proper code split into logical chunks
 - Explain unidiomatic code in comments - keep the comments brief and to the point if you need to write it!
@@ -52,10 +57,7 @@ Exception: August 2026 accidentally shipped as `26.9.0`, so keep releasing as `2
 
 ## E2E tests
 
-Two Playwright projects in `apps/web-app/playwright.config.ts`:
-
-- `prod-services` — the original suite. Playwright starts `vite --mode prod-services` on :5174 and the tests hit production relays/mints.
-- `local-stack` — `tests/proxy-payment.spec.ts` and `tests/linkshu-migration.spec.ts`, against the docker stack with the app served as a **production build** on :5176. It declares no `webServer`; compose owns the app, so bring the stack up first.
+The `local-stack` project in `apps/web-app/playwright.config.ts` runs the suites listed in `LOCAL_STACK_SPECS` against the Docker stack. The app is served as a **production build** on :5176; bring the stack up first.
 
 ```bash
 # once, and again after changing app source (VITE_* values are inlined at build time)
@@ -73,15 +75,17 @@ The default reporter prints every `[linky]` console line prefixed with the accou
 
 The run is ~20s, so `--headed` mostly shows a blur; `--ui` and the trace viewer are the useful tools. Do not reintroduce a slow-motion knob: a per-action delay pushes the top-up quote and the offer's phase timers past their deadlines, so the test fails for reasons unrelated to the code under test.
 
-Playwright starts *every* `webServer` entry regardless of `--project`, so a Vite dev server also boots on :5174 even when running only `local-stack`; set `E2E_SKIP_WEBSERVER=1` to skip it (CI does).
-
-`.github/workflows/e2e.yml` runs the `local-stack` project on every push to main and is reused (`workflow_call`) as a required job by both Android release workflows. The Vercel production deploy is gated on the same `e2e` check via Deployment Checks in the Vercel dashboard.
+`.github/workflows/e2e.yml` runs the `local-stack` project and site redemption/recovery tests on pull requests and every push to main, and is reused (`workflow_call`) as a required job by both Android release workflows. The Vercel production deploy is gated on the same `e2e` check via Deployment Checks in the Vercel dashboard.
 
 Shared helpers live in `tests/helpers/`. Use `setSeedLoginStorage` when a test needs a real seed login (deterministic Evolu owner lanes); `setRandomIdentityStorage` is the cheaper "just be logged in" variant and leaves `isSeedLogin` false.
 
+## Site E2E tests
+
+`bun run --filter @linky/site test:e2e` uses the existing mints on :3338/:3339 and Nostr relay on :7777, and builds the site on :5180 with `VITE_ALLOW_TEST_MINT=1`.
+
 ## linkshu integration tests
 
-`packages/linkshu` has a second vitest project (`tests/integration/`, excluded from `bun run test`) that needs the dev-stack mint: `docker compose -f docker-compose.dev.yml up -d --wait cashu-mint`, then `bun run --filter @linky/linkshu test:integration`. CI runs it as the `linkshu-integration` job in `.github/workflows/tests.yml`.
+`packages/linkshu` has a second vitest project (`tests/integration/`, excluded from `bun run test`) that needs both dev-stack mints: `docker compose -f docker-compose.dev.yml up -d --wait cashu-mint cashu-mint-target`, then `bun run --filter @linky/linkshu test:integration`. CI runs it as the `linkshu-integration` job in `.github/workflows/tests.yml`.
 
 ## linkshu CLI wallet
 
@@ -90,9 +94,14 @@ Shared helpers live in `tests/helpers/`. Use `setSeedLoginStorage` when a test n
 ## Gotchas
 
 - Evolu requires a Worker polyfill in test environments (jsdom + polyfill live in `vitest.setup.ts`)
-- Vitest excludes `tests/**/*.spec.ts` — those are Playwright E2E suites run separately
+- Vitest excludes `tests/**` — that directory holds only the Playwright suites plus `tests/helpers` and `tests/fixtures`; unit tests live next to their subject under `src/`
+- linkstr test helpers (`makeIdentity`, publish stubs, `FakeRelay`, `eventually`, `stubStorage`) live in `packages/linkstr/src/testing`, exported as `@linky/linkstr/testing` and excluded from the app build; `packages/linkstr-react/src/testing` adds `settle`/`configWith`/`fakeTransport`. Extend them instead of redeclaring fixtures per test file, and never import them from production code
 - In this workspace/Bun setup, `bunx --cwd apps/web-app playwright test tests` can resolve incorrectly; run `cd apps/web-app && bunx playwright test tests` instead
 - Playwright cannot intercept requests made by a service worker, and `src/sw.ts` has a Workbox `CacheFirst` route for image destinations that matches cross-origin URLs — any test stubbing remote images must use `serviceWorkers: "block"`
+- Payment integration tests use source mint :3338 and target mint :3339, with separate keys and databases. `cashu-mint-target` starts with the `integration` or `e2e` profile. Use the target mint for payable invoices; the source mint auto-pays its own quotes, so same-mint tests race its three-second timer
+- Evolu quota recovery tests use the isolated :4002 relay from the `e2e` or `quota` profile, capped at 16 KiB per owner. The normal :4001 relay defaults to unlimited; `EVOLU_OWNER_QUOTA_BYTES=0` means unlimited, and a positive value limits encrypted history bytes per owner.
+- The local Nginx server accepts the password-save form POST only at `/password-save.html` and serves the empty static document. Keep this exception scoped so other unsupported POST requests still fail
+- The local Nginx server must serve `.mjs` as JavaScript; PDF previews load a module worker and fail when it is served as `application/octet-stream`
 - The local Nutshell mint charges `input_fee_ppk: 100`, so it is **not** fee-free; a receiver nets slightly less than the amount sent
 - The dev mint runs with `MINT_RATE_LIMIT=FALSE`; nutshell's defaults (60 requests/minute globally, 20/minute for transactions) answer 429 partway through any full integration run
 - The `nostr-rs-relay` image's `/bin/sh` is dash, so its healthcheck must invoke `bash` explicitly for `/dev/tcp`
@@ -100,9 +109,10 @@ Shared helpers live in `tests/helpers/`. Use `setSeedLoginStorage` when a test n
 - `docker/web-app/Dockerfile` copies every workspace `package.json` before `bun install --frozen-lockfile`; adding a new workspace without adding its manifest COPY there breaks the e2e image build
 - SQLite WASM files served from `public/sqlite-wasm/` with `cache-control: no-store` in dev
 - Debug APKs install side-by-side as `fit.linky.app.debug`; native push in them requires a `fit.linky.app.debug` client in `google-services.json` (register that package in the Firebase console), otherwise the google-services plugin is skipped for debug-only builds and push is unsupported
-- Play upload bundles require release signing via `apps/native-shell/android/keystore.properties` or `LINKY_UPLOAD_STORE_FILE` / `LINKY_UPLOAD_STORE_PASSWORD` / `LINKY_UPLOAD_KEY_ALIAS` / `LINKY_UPLOAD_KEY_PASSWORD`; `bun run native:aab:release` fails fast when those credentials are missing
+- Play upload bundles require release signing via `apps/native-shell/android/keystore.properties` (template: `keystore.properties.example` next to it) or `LINKY_UPLOAD_STORE_FILE` / `LINKY_UPLOAD_STORE_PASSWORD` / `LINKY_UPLOAD_KEY_ALIAS` / `LINKY_UPLOAD_KEY_PASSWORD`; `bun run native:aab:release` fails fast when those credentials are missing
 - Dev mode now keeps the registered PWA service worker alive for push testing; use `#advanced/push-debug` to inspect persistent client/SW push logs and manually reset service workers/caches when needed
 - The pinned versions in `docker/evolu-relay/package.json` must stay protocol-compatible with the web app's `@evolu/common` — check upstream `apps/relay/CHANGELOG.md` when bumping Evolu packages
+- Outbound HTTP in `apps/site/api/` must go through `safeFetch` from `api/_safeFetch.ts` (resolve → validate → pinned connect, manual redirects); a raw `fetch` there reintroduces the SSRF hole, and the target must be `https:` on a public host, so an `http://localhost` `NPUBCASH_BASE_URL` is rejected by design
 - `apps/push/.env.development` and `apps/web-app/.env.development` are intentionally committed (localhost-only config; the VAPID keypair in there is dev-only, never reuse it in production)
 
 ## Maintaining This File

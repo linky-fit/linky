@@ -23,6 +23,7 @@ import type {
   UpdateLocalNostrReaction,
 } from "../../types/appTypes";
 import { resolveNostrChatIdentity } from "./contactIdentity";
+import type { Translate } from "../../../i18n";
 
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
@@ -48,7 +49,7 @@ interface UseSendReactionParams<
   selectedContact: TContact | null;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   softDeleteLocalNostrReaction: (id: string) => void;
-  t: (key: string) => string;
+  t: Translate;
   updateLocalNostrReaction: UpdateLocalNostrReaction;
 }
 
@@ -81,7 +82,7 @@ export const useSendReaction = <
       }
 
       const messageRumorId = args.messageRumorId.trim();
-      const emoji = String(args.emoji ?? "").trim();
+      const emoji = args.emoji.trim();
       const messageAuthorPubkey = args.messageAuthorPubkey.trim();
       if (
         !isRumorId(messageRumorId) ||
@@ -108,12 +109,9 @@ export const useSendReaction = <
         // the same emoji. UX policy lives here, not in linkstr.
         const myReactions = (
           reactionsByMessageId.get(messageRumorId) ?? []
-        ).filter(
-          (reaction) =>
-            String(reaction.reactorPubkey ?? "").trim() === myPubHex,
-        );
+        ).filter((reaction) => reaction.reactorPubkey.trim() === myPubHex);
         const hasSameEmoji = myReactions.some(
-          (reaction) => String(reaction.emoji ?? "").trim() === emoji,
+          (reaction) => reaction.emoji.trim() === emoji,
         );
 
         if (myReactions.length > 0) {
@@ -121,7 +119,7 @@ export const useSendReaction = <
             softDeleteLocalNostrReaction(reaction.id);
           }
           const [head, ...tail] = myReactions
-            .map((reaction) => String(reaction.wrapId ?? "").trim())
+            .map((reaction) => reaction.wrapId.trim())
             .filter(isRumorId);
           if (head !== undefined && !isOffline) {
             const exit = await linkstrRetract(
@@ -166,7 +164,7 @@ export const useSendReaction = <
         }
 
         updateLocalNostrReaction(pendingReactionId, {
-          wrapId: exit.value.messageId,
+          wrapId: exit.value.rumorId,
         });
 
         if (isOffline) {

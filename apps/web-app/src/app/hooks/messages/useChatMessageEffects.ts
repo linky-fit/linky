@@ -58,13 +58,11 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
     const byRumorId = new Map<string, string>();
 
     for (const message of [...nostrMessagesRecent, ...chatMessages]) {
-      const rumorId = String(message.rumorId ?? "").trim();
+      const rumorId = (message.rumorId ?? "").trim();
       if (!rumorId) continue;
 
-      const requestInfo = parseCashuPaymentRequestMessage(
-        String(message.content ?? ""),
-      );
-      const requestId = String(requestInfo?.requestId ?? "").trim();
+      const requestInfo = parseCashuPaymentRequestMessage(message.content);
+      const requestId = (requestInfo?.requestId ?? "").trim();
       if (!requestId) continue;
 
       byRumorId.set(rumorId, requestId);
@@ -75,12 +73,12 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
 
   const getRequestIdForPaymentReply = React.useCallback(
     (message: LocalNostrMessage): string | null => {
-      const replyToId = String(message.replyToId ?? "").trim();
+      const replyToId = (message.replyToId ?? "").trim();
       if (replyToId) {
         return requestIdByMessageRumorId.get(replyToId) ?? null;
       }
 
-      const rootMessageId = String(message.rootMessageId ?? "").trim();
+      const rootMessageId = (message.rootMessageId ?? "").trim();
       if (rootMessageId) {
         return requestIdByMessageRumorId.get(rootMessageId) ?? null;
       }
@@ -95,12 +93,12 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
       const candidates = newestFirst ? [...messages].reverse() : messages;
 
       for (const message of candidates) {
-        const id = String(message.id ?? "");
+        const id = message.id;
         if (!id) continue;
         if (autoAcceptedChatMessageIdsRef.current.has(id)) continue;
-        if (String(message.direction ?? "") !== "in") continue;
+        if (message.direction !== "in") continue;
 
-        const content = String(message.content ?? "");
+        const content = message.content;
         if (getLinkyBankPaymentOfferInfo(content)) continue;
         if (parsePrivateImageMessage(content)) continue;
 
@@ -113,7 +111,7 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
         if (isCashuTokenStored(info.tokenRaw)) continue;
 
         const requestId = getRequestIdForPaymentReply(message);
-        const contactId = String(message.contactId ?? "").trim();
+        const contactId = message.contactId.trim();
         void saveCashuFromText(info.tokenRaw, {
           ...(contactId ? { contactId } : {}),
           ...(requestId ? { requestId } : {}),
@@ -168,10 +166,10 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
     if (route.kind !== "chat") return;
     if (!selectedContact) return;
 
-    const routeContactId = String(route.id ?? "").trim();
+    const routeContactId = route.id.trim();
     if (!routeContactId) return;
 
-    const contactId = String(selectedContact.id ?? "").trim();
+    const contactId = (selectedContact.id ?? "").trim();
     if (!contactId) return;
     if (contactId !== routeContactId) return;
 
@@ -193,7 +191,7 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
       chatDidInitialScrollForContactRef.current = routeContactId;
 
       const target = last;
-      const targetId = String(target.id ?? "");
+      const targetId = target.id;
 
       const tryScroll = (attempt: number) => {
         const el = targetId ? chatMessageElByIdRef.current.get(targetId) : null;
@@ -246,8 +244,7 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
     }
 
     if (chatMessages.length > prevCount) {
-      const isOut =
-        String((last as LocalNostrMessage).direction ?? "") === "out";
+      const isOut = last.direction === "out";
       if (isOut) {
         requestAnimationFrame(() => {
           const chatContainer = chatMessagesRef.current;

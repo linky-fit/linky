@@ -8,6 +8,7 @@ import {
 } from "../domain/primitives";
 import { wrapRumorFor } from "../internal/giftWrap";
 import { Rumor } from "../internal/nostrEvent";
+import { eventually } from "../testing";
 import { makeRelayPoolTransport } from "./NostrTransport";
 import type { RelayPool, RelaySubscriptionParams } from "./NostrTransport";
 
@@ -122,20 +123,6 @@ const makeSubscribingPool = (): {
     },
   };
   return { pool, subscriptions };
-};
-
-const eventually = (predicate: () => boolean): Effect.Effect<void, Error> => {
-  const poll: Effect.Effect<void> = Effect.suspend(() =>
-    predicate()
-      ? Effect.void
-      : Effect.sleep(Duration.millis(2)).pipe(Effect.andThen(() => poll)),
-  );
-  return poll.pipe(
-    Effect.timeoutFail({
-      duration: Duration.seconds(2),
-      onTimeout: () => new Error("condition not met within 2s"),
-    }),
-  );
 };
 
 describe("makeRelayPoolTransport subscribe", () => {

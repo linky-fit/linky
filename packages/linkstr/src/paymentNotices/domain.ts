@@ -14,11 +14,12 @@ export class PaymentNoticeDraft extends Schema.Class<PaymentNoticeDraft>(
   clientId: Schema.optional(ClientId),
 }) {}
 
-export class PaymentNoticeReceipt extends Schema.Class<PaymentNoticeReceipt>(
+export class PaymentNoticeReceipt extends Schema.TaggedClass<PaymentNoticeReceipt>()(
   "PaymentNoticeReceipt",
-)({
-  noticeId: RumorId,
-  clientId: ClientId,
-  sentAt: UnixSeconds,
-  recipientCopy: WrapDelivery,
-}) {}
+  {
+    rumorId: RumorId,
+    clientId: ClientId,
+    sentAt: UnixSeconds,
+    recipientCopy: WrapDelivery,
+  },
+) {}

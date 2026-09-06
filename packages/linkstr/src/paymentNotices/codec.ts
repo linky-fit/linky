@@ -1,14 +1,14 @@
-import { Either, Schema } from "effect";
-import { RumorId } from "../domain/primitives";
+import { Either } from "effect";
+import { isRumorId } from "../domain/primitives";
 import type { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import type { DropReason } from "../inbox/events";
 import {
   firstTagValue,
+  firstTrimmedTagValue,
   Rumor,
   rumorWithHash,
   tagValues,
 } from "../internal/nostrEvent";
-import type { NostrTags } from "../internal/nostrEvent";
 import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
 import type { PaymentNoticeDraft } from "./domain";
 import { PaymentNoticeReceived } from "./events";
@@ -16,8 +16,6 @@ import type { PaymentNoticeInboxEvent } from "./events";
 
 export const PAYMENT_NOTICE_KIND = 24133;
 export const PAYMENT_NOTICE_VALUE = "payment_notice";
-
-const isRumorId = Schema.is(RumorId);
 
 export const encodePaymentNoticeRumor = (
   draft: PaymentNoticeDraft,
@@ -39,15 +37,6 @@ export const encodePaymentNoticeRumor = (
     ],
     content: PAYMENT_NOTICE_VALUE,
   });
-
-const firstTrimmedTagValue = (tags: NostrTags, name: string): string | null => {
-  for (const tag of tags) {
-    if (tag[0] !== name) continue;
-    const value = tag[1]?.trim();
-    if (value) return value;
-  }
-  return null;
-};
 
 export const decodePaymentNoticeRumor = (
   rumor: Rumor,

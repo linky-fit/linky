@@ -1,5 +1,6 @@
+import { Schema } from "effect";
 import React from "react";
-import type { JsonValue } from "../../types/json";
+import { JsonValue } from "../../types/json";
 import { normalizeMintUrl } from "../../utils/mint";
 import {
   isNpubCashDisabled,
@@ -149,7 +150,7 @@ export const useProfileNpubCashEffects = ({
           signal: infoController.signal,
         });
         if (!res.ok) return;
-        const data = (await res.json()) as JsonValue;
+        const data = Schema.decodeUnknownSync(JsonValue)(await res.json());
         const mintUrl = (() => {
           const root = asRecord(data);
           if (!root) return "";
@@ -225,8 +226,4 @@ export const useProfileNpubCashEffects = ({
       window.clearInterval(intervalId);
     };
   }, [claimNpubCashOnce, networkEnabled, routeKind]);
-
-  return {
-    showProfileQr,
-  };
 };

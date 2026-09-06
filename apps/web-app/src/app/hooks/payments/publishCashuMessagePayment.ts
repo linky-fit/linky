@@ -113,19 +113,17 @@ export const publishCashuMessagePayment = async ({
 
   const canReusePendingMessage = Boolean(
     pendingMessageId &&
-    nostrMessagesLocal.some(
-      (message) => String(message.id ?? "") === pendingMessageId,
-    ),
+    nostrMessagesLocal.some((message) => message.id === pendingMessageId),
   );
 
-  const replyToRaw = String(replyContext?.replyToId ?? "").trim();
+  const replyToRaw = (replyContext?.replyToId ?? "").trim();
   const replyTo = isRumorId(replyToRaw) ? replyToRaw : undefined;
-  const rootRaw = String(replyContext?.rootMessageId ?? "").trim();
+  const rootRaw = (replyContext?.rootMessageId ?? "").trim();
   const root =
     replyTo !== undefined && isRumorId(rootRaw) ? rootRaw : undefined;
 
   for (const batch of [...batches].reverse()) {
-    const messageText = String(batch.token ?? "").trim();
+    const messageText = batch.token.trim();
     logPayStep("plan-send-token", {
       amount: batch.amount,
       mint: batch.mint,
@@ -164,12 +162,12 @@ export const publishCashuMessagePayment = async ({
                   replyToContent: replyContext.replyToContent,
                   replyToId: replyContext.replyToId,
                   rootMessageId:
-                    String(replyContext.rootMessageId ?? "").trim() ||
+                    (replyContext.rootMessageId ?? "").trim() ||
                     replyContext.replyToId,
                 }
               : {}),
             clientId,
-            contactId: String(contactId),
+            contactId: contactId,
             content: messageText,
             createdAtSec: nowSec(),
             direction: "out",
@@ -193,10 +191,10 @@ export const publishCashuMessagePayment = async ({
           ref: OutboxRef.make(`message:${localMessageId}`),
         });
         if (Exit.isSuccess(exit)) {
-          messageId = exit.value.messageId;
+          messageId = exit.value.rumorId;
           updateLocalNostrMessage(localMessageId, {
             createdAtSec: exit.value.sentAt,
-            rumorId: exit.value.messageId,
+            rumorId: exit.value.rumorId,
           });
         } else {
           sendError = failureMessage(exit.cause);
@@ -222,7 +220,7 @@ export const publishCashuMessagePayment = async ({
   let paymentNoticeError: string | null = null;
   if (publishedAnyTokenMessage) {
     const clientId = ClientId.make(createId());
-    const offerId = String(paymentNoticeOfferId ?? "").trim();
+    const offerId = (paymentNoticeOfferId ?? "").trim();
     let anySuccess = false;
     let error: string | null = null;
     let wrapId: string | null = null;

@@ -5,6 +5,12 @@ import {
 } from "@linky/linkstr";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { Schema } from "effect";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
+import { decodeBase64Url, encodeBase64Url } from "../../utils/base64";
+import { getUnknownErrorMessage, isRecord } from "../../utils/unknown";
+import { asNonEmptyString } from "../../utils/validation";
+import { nowSeconds } from "../../utils/time";
+import type { I18nKey, Translate } from "../../i18n";
 
 const PRIVATE_IMAGE_MESSAGE_TYPE = "linky.private_image.v1";
 const PRIVATE_IMAGE_COMPACT_PREFIX = "linky:image:v1:";
@@ -88,7 +94,7 @@ interface BlossomUploadAuth {
   privateKey: Uint8Array;
 }
 
-export interface PrivateImageSendResult {
+interface PrivateImageSendResult {
   content: string;
 }
 
@@ -96,59 +102,23 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const isNostrSecretKey = Schema.is(NostrSecretKey);
 
-const bytesToHex = (bytes: Uint8Array): string =>
-  Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-
-const hexToBytes = (hex: string): Uint8Array | null => {
-  const normalized = hex.trim().toLowerCase();
-  if (!/^[0-9a-f]+$/.test(normalized)) return null;
-  if (normalized.length % 2 !== 0) return null;
-
-  const bytes = new Uint8Array(normalized.length / 2);
-  for (let index = 0; index < bytes.length; index += 1) {
-    const value = Number.parseInt(
-      normalized.slice(index * 2, index * 2 + 2),
-      16,
-    );
-    if (!Number.isFinite(value)) return null;
-    bytes[index] = value;
-  }
-  return bytes;
-};
-
-const sha256Hex = (bytes: Uint8Array): string => bytesToHex(sha256(bytes));
-
-const bytesToBase64Url = (bytes: Uint8Array): string => {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-};
-
-const base64UrlToBytes = (value: string): Uint8Array | null => {
-  const normalized = value.trim().replace(/-/g, "+").replace(/_/g, "/");
-  const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
+const hexToBytesOrNull = (hex: string): Uint8Array | null => {
   try {
-    const binary = atob(`${normalized}${padding}`);
-    return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return hexToBytes(hex.trim());
   } catch {
     return null;
   }
 };
 
+const sha256Hex = (bytes: Uint8Array): string => bytesToHex(sha256(bytes));
+
 const base64UrlToText = (value: string): string | null => {
-  const bytes = base64UrlToBytes(value);
+  const bytes = decodeBase64Url(value);
   return bytes ? textDecoder.decode(bytes) : null;
 };
 
 const textToBase64Url = (value: string): string =>
-  bytesToBase64Url(textEncoder.encode(value));
+  encodeBase64Url(textEncoder.encode(value));
 
 const randomHex = (byteLength: number): string => {
   const bytes = new Uint8Array(byteLength);
@@ -177,15 +147,6 @@ const getBlossomUploadProxyUrl = (): string => {
   }
 
   return `${LINKY_WEB_APP_ORIGIN}/api/blossom-upload`;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const readString = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed || null;
 };
 
 const readPositiveInteger = (value: unknown): number | null => {
@@ -224,8 +185,7 @@ const canvasToBlob = async (
     );
   });
 
-export const isPdfFileType = (fileType: string): boolean =>
-  fileType === PDF_FILE_TYPE;
+const isPdfFileType = (fileType: string): boolean => fileType === PDF_FILE_TYPE;
 
 export const isPrivatePdfPayload = (
   payload: PrivateImageMessagePayload,
@@ -235,7 +195,7 @@ const isPdfFile = (file: File): boolean =>
   isPdfFileType(file.type) || (file.type === "" && /\.pdf$/i.test(file.name));
 
 /** i18n key of the reason the file can't be sent, or null when it can. */
-export const getChatAttachmentRejection = (file: File): string | null => {
+export const getChatAttachmentRejection = (file: File): I18nKey | null => {
   if (isPdfFile(file)) {
     return file.size > MAX_PDF_BYTES ? "chatPdfTooLarge" : null;
   }
@@ -243,8 +203,8 @@ export const getChatAttachmentRejection = (file: File): string | null => {
   return file.size > MAX_IMAGE_SOURCE_BYTES ? "chatImageTooLarge" : null;
 };
 
-export const chatAttachmentErrorKey = (error: unknown): string | null => {
-  const message = error instanceof Error ? error.message : String(error ?? "");
+export const chatAttachmentErrorKey = (error: unknown): I18nKey | null => {
+  const message = getUnknownErrorMessage(error, "");
   if (message === "chat-file-too-large") return "chatPdfTooLarge";
   if (message === "chat-image-too-large") return "chatImageTooLarge";
   if (message === "chat-image-unsupported") return "chatAttachmentUnsupported";
@@ -316,8 +276,8 @@ const encryptImageBytes = async (file: File): Promise<PreparedPrivateImage> => {
     : await resizeImageToJpegBytes(file);
   const key = randomHex(32);
   const nonce = randomHex(12);
-  const keyBytes = hexToBytes(key);
-  const nonceBytes = hexToBytes(nonce);
+  const keyBytes = hexToBytesOrNull(key);
+  const nonceBytes = hexToBytesOrNull(nonce);
   if (!keyBytes || !nonceBytes) throw new Error("chat-image-encryption-failed");
 
   const cryptoKey = await crypto.subtle.importKey(
@@ -333,7 +293,7 @@ const encryptImageBytes = async (file: File): Promise<PreparedPrivateImage> => {
     copyToArrayBuffer(source.bytes),
   );
   const encryptedBytes = new Uint8Array(encryptedBuffer);
-  const storedBytes = textEncoder.encode(bytesToBase64Url(encryptedBytes));
+  const storedBytes = textEncoder.encode(encodeBase64Url(encryptedBytes));
 
   return {
     encryptedBytes: storedBytes,
@@ -366,7 +326,7 @@ const uploadToBlossom = async (
       const authHeader = makeBlossomUploadAuthHeader(
         { sha256: prepared.encryptedSha256, serverDomain },
         auth.privateKey,
-        UnixSeconds.make(Math.floor(Date.now() / 1000)),
+        UnixSeconds.make(nowSeconds()),
       );
       const uploadBody = copyToArrayBuffer(prepared.encryptedBytes);
       let response: Response;
@@ -398,8 +358,8 @@ const uploadToBlossom = async (
       const json = await response.json();
       if (!isRecord(json)) throw new Error("upload-invalid-response");
 
-      const url = readString(json.url);
-      const sha = readString(json.sha256);
+      const url = asNonEmptyString(json.url);
+      const sha = asNonEmptyString(json.sha256);
       if (!url || !sha) throw new Error("upload-invalid-response");
       if (sha.toLowerCase() !== prepared.encryptedSha256) {
         throw new Error("upload-hash-mismatch");
@@ -474,19 +434,19 @@ const parsePrivateImageRecord = (
   const isCompact = parsed.t === "i1";
   if (!isCompact && parsed.type !== PRIVATE_IMAGE_MESSAGE_TYPE) return null;
 
-  const url = readString(isCompact ? parsed.u : parsed.url);
-  const fileType = readString(isCompact ? parsed.m : parsed.fileType);
+  const url = asNonEmptyString(isCompact ? parsed.u : parsed.url);
+  const fileType = asNonEmptyString(isCompact ? parsed.m : parsed.fileType);
   const encryptionAlgorithm = isCompact
     ? parsed.a === "g"
       ? "aes-gcm"
       : null
-    : readString(parsed.encryptionAlgorithm);
-  const key = readString(isCompact ? parsed.k : parsed.key);
-  const nonce = readString(isCompact ? parsed.n : parsed.nonce);
-  const encryptedSha256 = readString(
+    : asNonEmptyString(parsed.encryptionAlgorithm);
+  const key = asNonEmptyString(isCompact ? parsed.k : parsed.key);
+  const nonce = asNonEmptyString(isCompact ? parsed.n : parsed.nonce);
+  const encryptedSha256 = asNonEmptyString(
     isCompact ? parsed.x : parsed.encryptedSha256,
   );
-  const originalSha256 = readString(
+  const originalSha256 = asNonEmptyString(
     isCompact ? parsed.o : parsed.originalSha256,
   );
   const storageEncodingValue = isCompact ? parsed.e : parsed.storageEncoding;
@@ -504,7 +464,7 @@ const parsePrivateImageRecord = (
   const hasDimensions = widthValue !== undefined || heightValue !== undefined;
   const width = readPositiveInteger(widthValue);
   const height = readPositiveInteger(heightValue);
-  const fileName = readString(isCompact ? parsed.f : parsed.fileName);
+  const fileName = asNonEmptyString(isCompact ? parsed.f : parsed.fileName);
 
   if (
     !url ||
@@ -541,7 +501,7 @@ const parsePrivateImageRecord = (
 export const parsePrivateImageMessage = (
   content: unknown,
 ): PrivateImageMessagePayload | null => {
-  const text = readString(content);
+  const text = asNonEmptyString(content);
   if (!text) return null;
 
   if (text.startsWith(PRIVATE_IMAGE_COMPACT_PREFIX)) {
@@ -612,12 +572,12 @@ export const decryptPrivateImageMessage = async (
   }
   const encryptedBytes =
     payload.storageEncoding === "base64"
-      ? base64UrlToBytes(textDecoder.decode(storedBytes))
+      ? decodeBase64Url(textDecoder.decode(storedBytes))
       : storedBytes;
   if (!encryptedBytes) throw new Error("chat-image-invalid-encoding");
 
-  const keyBytes = hexToBytes(payload.key);
-  const nonceBytes = hexToBytes(payload.nonce);
+  const keyBytes = hexToBytesOrNull(payload.key);
+  const nonceBytes = hexToBytesOrNull(payload.nonce);
   if (!keyBytes || !nonceBytes) throw new Error("chat-image-invalid-key");
 
   const cryptoKey = await crypto.subtle.importKey(
@@ -645,17 +605,7 @@ export const decryptPrivateImageMessage = async (
 };
 
 export const privateImagePreviewText = (
-  t: (key: string) => string,
+  t: Translate,
   payload: PrivateImageMessagePayload,
 ): string =>
   isPrivatePdfPayload(payload) ? t("chatPdfMessage") : t("chatImageMessage");
-
-export const privateImageUploadDebugPayload = (payload: {
-  encryptedSha256: string;
-  encryptedSize: number;
-  url: string;
-}) => ({
-  encryptedSha256: payload.encryptedSha256,
-  encryptedSize: payload.encryptedSize,
-  urlHash: sha256Hex(textEncoder.encode(payload.url)),
-});

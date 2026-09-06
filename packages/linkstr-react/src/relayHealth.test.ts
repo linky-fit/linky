@@ -1,58 +1,24 @@
-import {
-  ClientId,
-  Emoji,
-  NostrSecretKey,
-  NostrTransport,
-  Pubkey,
-  ReactionDraft,
-  RelayPublishResult,
-  RelayUrl,
-  RumorId,
-} from "@linky/linkstr";
-import type { NostrTransportService, RelayHealthState } from "@linky/linkstr";
-import { Effect, Exit, Layer } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
-import type { LinkstrConfig } from "./config";
+import { ClientId, RetractionDraft, RumorId } from "@linky/linkstr";
+import type { RelayHealthState } from "@linky/linkstr";
+import { stubWrapTransport } from "@linky/linkstr/testing";
+import { Exit } from "effect";
 import { linkstrConfigAtom } from "./config";
 import { Registry, Result } from "./index";
-import { sendReactionAtom } from "./reactions";
+import { retractReactionAtom } from "./reactions";
 import { relayHealthAtom } from "./relayHealth";
+import { configWith, makeIdentity, relayA, settle } from "./testing";
 
-const aliceKey = NostrSecretKey.make(generateSecretKey());
-const bobPubkey = Pubkey.make(getPublicKey(generateSecretKey()));
+const alice = makeIdentity();
+const bob = makeIdentity();
 
-const relayA = RelayUrl.make("wss://relay-a.test");
-
-const acceptingTransport: NostrTransportService = {
-  publish: (relays) =>
-    Effect.succeed(
-      relays.map(
-        (relay) =>
-          new RelayPublishResult({ relay, accepted: true, detail: null }),
-      ),
-    ),
-  subscribe: () => Effect.die("subscribe not under test"),
-  fetch: () => Effect.die("fetch not under test"),
-};
-
-const config: LinkstrConfig = {
-  secretKey: aliceKey,
-  readRelays: [relayA],
-  writeRelays: [relayA],
-  transport: Layer.succeed(NostrTransport, acceptingTransport),
-};
-
-const draft = new ReactionDraft({
-  to: bobPubkey,
-  target: RumorId.make("ab".repeat(32)),
-  targetKind: "text",
-  targetAuthor: bobPubkey,
-  emoji: Emoji.make("🔥"),
+const draft = new RetractionDraft({
+  to: bob.pubkey,
+  reactionIds: [RumorId.make("ab".repeat(32))],
   clientId: ClientId.make("client-relay-health"),
 });
 
 const healthOf = (
-  registry: ReturnType<typeof Registry.make>,
+  registry: Registry.Registry,
   relay: string,
 ): RelayHealthState | undefined => {
   const result = registry.get(relayHealthAtom);
@@ -62,7 +28,7 @@ const healthOf = (
 describe("relayHealthAtom", () => {
   it("reflects traffic-derived relay health after a publish", async () => {
     const registry = Registry.make();
-    registry.set(linkstrConfigAtom, config);
+    registry.set(linkstrConfigAtom, configWith(alice, stubWrapTransport([])));
     const unmount = registry.mount(relayHealthAtom);
 
     await expect
@@ -70,13 +36,9 @@ describe("relayHealthAtom", () => {
       .toBe(true);
     expect(healthOf(registry, relayA)).toBeUndefined();
 
-    registry.set(sendReactionAtom, draft);
-    const exit = await Effect.runPromiseExit(
-      Registry.getResult(registry, sendReactionAtom, {
-        suspendOnWaiting: true,
-      }),
-    );
-    if (Exit.isFailure(exit)) throw new Error("send failed");
+    registry.set(retractReactionAtom, draft);
+    const exit = await settle(registry, retractReactionAtom);
+    assert(Exit.isSuccess(exit));
 
     await expect
       .poll(() => healthOf(registry, relayA)?.state)

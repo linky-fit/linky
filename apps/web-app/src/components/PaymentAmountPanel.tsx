@@ -1,6 +1,8 @@
+import { HandCoins as PayIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { AmountDisplay } from "./AmountDisplay";
-import { PayIcon } from "./icons";
+
+import type { Translate } from "../i18n";
 import { Keypad } from "./Keypad";
 import { useAmountInputKeypad } from "./useAmountInputKeypad";
 
@@ -19,7 +21,7 @@ interface PaymentAmountPanelProps {
   submitIcon?: ReactNode | undefined;
   submitLabel?: string | undefined;
   submitTitle?: string | undefined;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({

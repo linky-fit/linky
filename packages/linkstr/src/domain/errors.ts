@@ -26,26 +26,14 @@ export class RecipientNotReached extends Schema.TaggedError<RecipientNotReached>
   deliveryFailureFields,
 ) {}
 
-export const WrapSendError = Schema.Union(
-  RecipientNotReached,
-  NoRelayReachable,
-);
-export type WrapSendError = typeof WrapSendError.Type;
-
-export class PaymentNoticeNotDelivered extends Schema.TaggedError<PaymentNoticeNotDelivered>()(
-  "PaymentNoticeNotDelivered",
+/**
+ * Single-copy sibling of `RecipientNotReached`: no relay accepted the only
+ * wrap of a rumor that has no self copy (payment notices, telemetry).
+ */
+export class WrapNotDelivered extends Schema.TaggedError<WrapNotDelivered>()(
+  "WrapNotDelivered",
   {
-    noticeId: RumorId,
-    clientId: ClientId,
-    sentAt: UnixSeconds,
-    recipientCopy: WrapDelivery,
-  },
-) {}
-
-export class PaymentTelemetryNotDelivered extends Schema.TaggedError<PaymentTelemetryNotDelivered>()(
-  "PaymentTelemetryNotDelivered",
-  {
-    telemetryId: RumorId,
+    rumorId: RumorId,
     clientId: ClientId,
     sentAt: UnixSeconds,
     recipientCopy: WrapDelivery,

@@ -12,7 +12,7 @@ export function TopupNoAmountPage(): React.ReactElement {
 
   React.useEffect(() => {
     let cancelled = false;
-    const target = String(effectiveMyLightningAddress ?? "").trim();
+    const target = (effectiveMyLightningAddress ?? "").trim();
 
     if (!target) {
       setQrDataUrl(null);
@@ -46,7 +46,7 @@ export function TopupNoAmountPage(): React.ReactElement {
     };
   }, [effectiveMyLightningAddress]);
 
-  const target = String(effectiveMyLightningAddress ?? "").trim();
+  const target = (effectiveMyLightningAddress ?? "").trim();
 
   return (
     <section className="panel topup-invoice-panel topup-no-amount-panel">

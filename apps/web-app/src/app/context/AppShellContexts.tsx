@@ -13,7 +13,7 @@ import type {
   DisplayAmountParts,
   DisplayCurrency,
 } from "../../utils/displayAmounts";
-import type { LightningInvoicePreview } from "../../utils/lightningInvoice";
+import type { LightningInvoicePreview } from "@linky/linkshu";
 import type {
   MainSwipeRoutesProps,
   MoneyRoutesProps,
@@ -27,6 +27,7 @@ import {
   type MintSettingsContextValue,
   type RelaySettingsContextValue,
 } from "./SystemSettingsContexts";
+import type { Translate } from "../../i18n";
 
 interface ChatContact {
   contactId: ContactId | null;
@@ -119,7 +120,7 @@ export interface AppShellCoreContextValue {
   scanIsOpen: boolean;
   scanVideoRef: React.RefObject<HTMLVideoElement | null>;
   shareOptionsText: string | null;
-  t: (key: string) => string;
+  t: Translate;
   topbar: TopbarButton | null;
   topbarRight: TopbarButton | null;
   topbarTitle: string | null;
@@ -262,7 +263,7 @@ export const useAppShellActions = (): AppShellActionsContextValue =>
     "useAppShellActions",
   );
 
-export const useAppShellRouteContext = (): AppShellRouteContextValue =>
+const useAppShellRouteContext = (): AppShellRouteContextValue =>
   useContextValue(
     React.useContext(AppShellRouteContext),
     "useAppShellRouteContext",

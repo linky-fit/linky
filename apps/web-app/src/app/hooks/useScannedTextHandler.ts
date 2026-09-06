@@ -1,8 +1,9 @@
+import { writeContact } from "../lib/writeContact";
 import type { OwnerId } from "@evolu/common";
 import * as Evolu from "@evolu/common";
 import { decodeNpub } from "@linky/linkstr";
 import React from "react";
-import type { ContactId } from "../../evolu";
+import { ContactId } from "../../evoluIds";
 import { navigateTo } from "../../hooks/useRouting";
 import {
   fetchLnurlWithdrawPreview,
@@ -17,13 +18,14 @@ import { parseNativeDeepLinkUrl } from "../../utils/deepLinks";
 import {
   getLightningInvoicePreview,
   type LightningInvoicePreview,
-} from "../../utils/lightningInvoice";
+} from "@linky/linkshu";
 import { isBankPaymentPayload, parseBankPayment } from "../../utils/spdPayment";
 import {
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,
 } from "../lib/paymentRequestMessage";
 import type { ContactRowLike } from "../types/appTypes";
+import type { Translate } from "../../i18n";
 
 type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
 
@@ -54,7 +56,7 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   scanAcceptsBankPayment: boolean;
   scanEntryPoint: "contacts" | "receive" | "send" | null;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const useScannedTextHandler = <TContact extends ContactRowLike>({
@@ -79,11 +81,11 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
 }: UseScannedTextHandlerParams<TContact>) => {
   return React.useCallback(
     async (rawValue: string) => {
-      const raw = String(rawValue ?? "").trim();
+      const raw = rawValue.trim();
       if (!raw) return;
 
       const parsedDeepLink = parseNativeDeepLinkUrl(raw);
-      let scanText = String(parsedDeepLink?.text ?? raw).trim();
+      let scanText = (parsedDeepLink?.text ?? raw).trim();
 
       // BIP 321 / BIP 21 — unified `bitcoin:` URI. The address part is
       // onchain (Linky doesn't settle onchain) so we promote the best
@@ -169,7 +171,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       try {
         const pubkey = decodeNpub(normalized);
         if (pubkey) {
-          const ownNpub = String(currentNpub ?? "").trim();
+          const ownNpub = (currentNpub ?? "").trim();
           if (ownNpub && ownNpub === normalized) {
             setStatus(t("contactIsYou"));
             closeScan();
@@ -178,16 +180,19 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           }
 
           const already = contacts.some(
-            (contact) => String(contact.npub ?? "").trim() === normalized,
+            (contact) => (contact.npub ?? "").trim() === normalized,
           );
           if (already) {
             setStatus(t("contactExists"));
             const existing = contacts.find(
-              (contact) => String(contact.npub ?? "").trim() === normalized,
+              (contact) => (contact.npub ?? "").trim() === normalized,
             );
             closeScan();
             if (existing?.id) {
-              navigateTo({ route: "contact", id: existing.id as ContactId });
+              navigateTo({
+                route: "contact",
+                id: ContactId.orThrow(existing.id),
+              });
             }
             return;
           }
@@ -198,23 +203,11 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
             return;
           }
 
-          const result = appOwnerId
-            ? insert(
-                "contact",
-                {
-                  name: null,
-                  npub: normalized as typeof Evolu.NonEmptyString1000.Type,
-                  lnAddress: null,
-                  groupName: null,
-                },
-                { ownerId: appOwnerId },
-              )
-            : insert("contact", {
-                name: null,
-                npub: normalized as typeof Evolu.NonEmptyString1000.Type,
-                lnAddress: null,
-                groupName: null,
-              });
+          const result = writeContact(
+            insert,
+            { npub: Evolu.NonEmptyString1000.orThrow(normalized) },
+            appOwnerId,
+          );
 
           if (result.ok) {
             setStatus(t("contactSaved"));
@@ -228,7 +221,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
         // ignore
       }
 
-      const maybeLnAddress = String(normalized ?? "").trim();
+      const maybeLnAddress = normalized.trim();
       const isLnAddress = isLightningAddress(maybeLnAddress);
       if (isLnAddress) {
         if (scanEntryPoint === "receive") {
@@ -240,14 +233,15 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
         const needle = maybeLnAddress.toLowerCase();
         const existing = contacts.find(
           (contact) =>
-            String(contact.lnAddress ?? "")
-              .trim()
-              .toLowerCase() === needle,
+            (contact.lnAddress ?? "").trim().toLowerCase() === needle,
         );
 
         closeScan();
         if (existing?.id) {
-          navigateTo({ route: "contactPay", id: existing.id as ContactId });
+          navigateTo({
+            route: "contactPay",
+            id: ContactId.orThrow(existing.id),
+          });
           return;
         }
 
@@ -286,15 +280,17 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
         const existing = inferredLnAddress
           ? contacts.find(
               (contact) =>
-                String(contact.lnAddress ?? "")
-                  .trim()
-                  .toLowerCase() === inferredLnAddress.toLowerCase(),
+                (contact.lnAddress ?? "").trim().toLowerCase() ===
+                inferredLnAddress.toLowerCase(),
             )
           : null;
 
         closeScan();
         if (existing?.id) {
-          navigateTo({ route: "contactPay", id: existing.id as ContactId });
+          navigateTo({
+            route: "contactPay",
+            id: ContactId.orThrow(existing.id),
+          });
           return;
         }
         navigateTo({ route: "lnAddressPay", lnAddress: maybeLnAddress });

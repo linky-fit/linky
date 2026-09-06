@@ -1,5 +1,6 @@
 import type { FC, RefObject } from "react";
 import { extractCashuTokenFromText } from "../app/lib/tokenText";
+import type { Translate } from "../i18n";
 
 interface CashuTokenNewPageProps {
   cashuDraft: string;
@@ -10,7 +11,7 @@ interface CashuTokenNewPageProps {
     opts: { navigateToTokens?: boolean; navigateToWallet?: boolean },
   ) => Promise<void>;
   setCashuDraft: (value: string) => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const CashuTokenNewPage: FC<CashuTokenNewPageProps> = ({

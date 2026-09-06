@@ -1,18 +1,22 @@
+import {
+  Users as ContactsIcon,
+  Settings,
+  Wallet as WalletIcon,
+} from "lucide-react";
 import React from "react";
-import { Settings } from "lucide-react";
 import {
   useAppShellActions,
   useAppShellCore,
 } from "../app/context/AppShellContexts";
 import { getDesktopRouteSection } from "../app/routes/desktopRouteSection";
-import { useNavigation } from "../hooks/useRouting";
+import { navigateTo } from "../hooks/useRouting";
 import { formatShortNpub, getInitials } from "../utils/formatting";
-import { ContactsIcon, WalletIcon } from "./icons";
+import { Avatar } from "./Avatar";
 
 export function DesktopNavigation(): React.ReactElement {
   const actions = useAppShellActions();
   const state = useAppShellCore();
-  const navigateTo = useNavigation();
+
   const activeSection = getDesktopRouteSection(state.route);
   const profileInitials = getInitials(
     state.effectiveProfileName ??
@@ -28,16 +32,11 @@ export function DesktopNavigation(): React.ReactElement {
         aria-label={state.t("profile")}
         title={state.t("profile")}
       >
-        {state.effectiveProfilePicture ? (
-          <img
-            src={state.effectiveProfilePicture}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <span>{profileInitials}</span>
-        )}
+        <Avatar
+          pictureUrl={state.effectiveProfilePicture}
+          fallback={profileInitials}
+          fallbackClassName=""
+        />
       </button>
 
       <div className="desktop-navigation-main">

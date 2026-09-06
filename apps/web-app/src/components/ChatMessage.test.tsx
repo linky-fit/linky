@@ -1,6 +1,6 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import type { LinkyBankPaymentOfferInfo } from "../app/lib/bankPaymentOffer";
 import { serializePrivateImageMessage } from "../app/lib/privateImageMessage";
 import type { LocalNostrMessage } from "../app/types/appTypes";
@@ -36,12 +36,6 @@ vi.mock("../app/context/AppShellContexts", () => ({
     t: (key: string) => key,
   }),
 }));
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
-});
 
 const makeMessage = (
   content: string,
@@ -82,73 +76,67 @@ const renderChatMessage = async (
   content: string,
   options: RenderChatMessageOptions = {},
 ) => {
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(
-      <ChatMessage
-        contactsGroupAssignment={options.contactsGroupAssignment ?? null}
-        actionLabels={{
-          copy: "copy",
-          edit: "edit",
-          edited: "edited",
-          react: "react",
-          reply: "reply",
-          save: "save",
-          share: "share",
-        }}
-        bankPaymentOfferInfo={options.bankPaymentOfferInfo ?? null}
-        bankPaymentOfferPeerNotice={null}
-        canOpenBankPaymentOfferDetails={true}
-        canSettleBankPaymentOffer={options.canSettleBankPaymentOffer ?? false}
-        canActOnPaymentRequest={false}
-        canEdit={false}
-        canReplyOrReact={options.canReplyOrReact ?? false}
-        chatPendingLabel="pending"
-        chatSeenLabel="seen"
-        declineInfo={null}
-        formatChatDayLabel={() => "day"}
-        getCashuTokenMessageInfo={() => null}
-        getMintIconUrl={() => ({
-          failed: false,
-          host: null,
-          origin: null,
-          url: null,
-        })}
-        getNpubMessageContactInfo={
-          options.getNpubMessageContactInfo ?? ((npub) => contactInfo(npub))
-        }
-        isSeen={false}
-        locale="en"
-        message={makeMessage(content, options.direction)}
-        nextMessage={null}
-        onAddNpubContacts={options.onAddNpubContacts ?? (() => undefined)}
-        onCopy={() => undefined}
-        onDeclinePaymentRequest={() => undefined}
-        onEdit={() => undefined}
-        onMintIconError={() => undefined}
-        onMintIconLoad={() => undefined}
-        onOpenBankPaymentOfferDetails={() => undefined}
-        onOpenNpubContact={() => undefined}
-        onPayPaymentRequest={() => undefined}
-        onReact={() => undefined}
-        onReply={() => undefined}
-        onSettleBankPaymentOffer={
-          options.onSettleBankPaymentOffer ?? (async () => undefined)
-        }
-        payPaymentRequestBusy={false}
-        payPaymentRequestDisabled={false}
-        paymentRequestInfo={null}
-        paymentRequestStatus={null}
-        previousMessage={null}
-        reactions={[]}
-        replyQuoteText={null}
-        settleBankPaymentOfferBusy={false}
-      />,
-    );
-  });
+  const { container } = await renderIntoDocument(
+    <ChatMessage
+      contactsGroupAssignment={options.contactsGroupAssignment ?? null}
+      actionLabels={{
+        copy: "copy",
+        edit: "edit",
+        edited: "edited",
+        react: "react",
+        reply: "reply",
+        save: "save",
+        share: "share",
+      }}
+      bankPaymentOfferInfo={options.bankPaymentOfferInfo ?? null}
+      bankPaymentOfferPeerNotice={null}
+      canOpenBankPaymentOfferDetails={true}
+      canSettleBankPaymentOffer={options.canSettleBankPaymentOffer ?? false}
+      canActOnPaymentRequest={false}
+      canEdit={false}
+      canReplyOrReact={options.canReplyOrReact ?? false}
+      chatPendingLabel="pending"
+      chatSeenLabel="seen"
+      declineInfo={null}
+      formatChatDayLabel={() => "day"}
+      getCashuTokenMessageInfo={() => null}
+      getMintIconUrl={() => ({
+        failed: false,
+        host: null,
+        origin: null,
+        url: null,
+      })}
+      getNpubMessageContactInfo={
+        options.getNpubMessageContactInfo ?? ((npub) => contactInfo(npub))
+      }
+      isSeen={false}
+      locale="en"
+      message={makeMessage(content, options.direction)}
+      nextMessage={null}
+      onAddNpubContacts={options.onAddNpubContacts ?? (() => undefined)}
+      onCopy={() => undefined}
+      onDeclinePaymentRequest={() => undefined}
+      onEdit={() => undefined}
+      onMintIconError={() => undefined}
+      onMintIconLoad={() => undefined}
+      onOpenBankPaymentOfferDetails={() => undefined}
+      onOpenNpubContact={() => undefined}
+      onPayPaymentRequest={() => undefined}
+      onReact={() => undefined}
+      onReply={() => undefined}
+      onSettleBankPaymentOffer={
+        options.onSettleBankPaymentOffer ?? (async () => undefined)
+      }
+      payPaymentRequestBusy={false}
+      payPaymentRequestDisabled={false}
+      paymentRequestInfo={null}
+      paymentRequestStatus={null}
+      previousMessage={null}
+      reactions={[]}
+      replyQuoteText={null}
+      settleBankPaymentOfferBusy={false}
+    />,
+  );
 
   return container;
 };

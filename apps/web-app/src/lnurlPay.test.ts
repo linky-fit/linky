@@ -4,9 +4,12 @@ import {
   fetchLnurlInvoiceForTarget,
   fetchLnurlPayPreview,
   fetchLnurlWithdrawPreview,
+  getLnurlPayDisplayText,
   inferLightningAddressFromLnurlTarget,
+  isLightningAddress,
   LnurlTagMismatchError,
   redeemLnurlWithdraw,
+  resolveLnurlPayRequestUrl,
 } from "./lnurlPay";
 
 const encodeLnurl = (url: string): string => {
@@ -310,5 +313,42 @@ describe("redeemLnurlWithdraw", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       "https://withdraw.example/cb?foo=bar&k1=nonce-2&pr=lnbc1testinvoice",
     );
+  });
+});
+
+describe("LNURL-pay target helpers", () => {
+  it("recognizes lightning addresses", () => {
+    expect(isLightningAddress("alice@example.com")).toBe(true);
+    expect(
+      isLightningAddress("https://example.com/.well-known/lnurlp/alice"),
+    ).toBe(false);
+  });
+
+  it("resolves lowercase LNURL bech32 targets to request URLs", () => {
+    const requestUrl = "https://pay.example.com/lnurl/callback";
+
+    expect(
+      resolveLnurlPayRequestUrl(encodeLnurl(requestUrl).toLowerCase()),
+    ).toBe(requestUrl);
+  });
+
+  it("builds a readable display label for LNURL targets", () => {
+    expect(
+      getLnurlPayDisplayText("https://pay.example.com/lnurl/callback"),
+    ).toBe("pay.example.com/lnurl/callback");
+  });
+
+  it("infers a lightning address from well-known LNURL pay urls", () => {
+    expect(
+      inferLightningAddressFromLnurlTarget(
+        "https://walletofsatoshi.com/.well-known/lnurlp/poorjames425",
+      ),
+    ).toBe("poorjames425@walletofsatoshi.com");
+  });
+
+  it("supports lnurlp scheme with a lightning address target", () => {
+    expect(
+      resolveLnurlPayRequestUrl("lnurlp://poorjames425@walletofsatoshi.com"),
+    ).toBe("https://walletofsatoshi.com/.well-known/lnurlp/poorjames425");
   });
 });

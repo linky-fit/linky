@@ -3,7 +3,6 @@
 export * from "@effect-atom/atom-react";
 
 export * from "./bankOffers";
-export * from "./chat";
 export * from "./config";
 export * from "./errors";
 export * from "./inbox";

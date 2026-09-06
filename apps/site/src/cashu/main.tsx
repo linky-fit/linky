@@ -1,6 +1,5 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "../browserPolyfills";
 import "../index.css";
 import CashuPage from "./CashuPage";
 

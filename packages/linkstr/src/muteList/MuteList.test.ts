@@ -1,47 +1,19 @@
 import { Effect, Exit, Layer } from "effect";
-import { generateSecretKey, getPublicKey, verifyEvent } from "nostr-tools";
-import { NostrSecretKey, Pubkey, RelayUrl } from "../domain/primitives";
-import { SignedPlainEvent, tagValues } from "../internal/nostrEvent";
+import { verifyEvent } from "nostr-tools";
+import { RelayUrl } from "../domain/primitives";
+import { tagValues } from "../internal/nostrEvent";
+import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import { makeIdentity, stubPlainTransport } from "../testing";
 import { MuteList } from "./MuteList";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
 const carol = makeIdentity();
 
 const relayA = RelayUrl.make("wss://relay-a.test");
-
-const stubTransport = (
-  published: Array<SignedPlainEvent>,
-  accept: boolean,
-): Layer.Layer<NostrTransport> =>
-  Layer.succeed(NostrTransport, {
-    publish: (relays, event) =>
-      Effect.sync(() => {
-        if (!(event instanceof SignedPlainEvent)) {
-          throw new Error("mute list publishes only plain events");
-        }
-        published.push(event);
-        return relays.map(
-          (relay) =>
-            new RelayPublishResult({
-              relay,
-              accepted: accept,
-              detail: accept ? null : "blocked",
-            }),
-        );
-      }),
-    subscribe: () => Effect.die("subscribe not under test"),
-    fetch: () => Effect.die("fetch not under test"),
-  });
 
 const runWith = <A, E>(
   transport: Layer.Layer<NostrTransport>,
@@ -70,16 +42,15 @@ describe("MuteList.publishMuteList", () => {
   it("publishes a signed kind 10000 with p tags and empty content", async () => {
     const published: Array<SignedPlainEvent> = [];
     const exit = await runWith(
-      stubTransport(published, true),
+      stubPlainTransport(published),
       Effect.flatMap(MuteList, (muteList) =>
         muteList.publishMuteList([bob.pubkey, carol.pubkey]),
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const event = published[0];
-    if (event === undefined) throw new Error("nothing published");
+    assert(event !== undefined);
     expect(event.kind).toBe(10000);
     expect(event.content).toBe("");
     expect(verifyEvent(event)).toBe(true);
@@ -92,7 +63,7 @@ describe("MuteList.publishMuteList", () => {
 
   it("fails with NoRelayAcceptedEvent when no relay accepts", async () => {
     const exit = await runWith(
-      stubTransport([], false),
+      stubPlainTransport([], () => false),
       Effect.flatMap(MuteList, (muteList) =>
         muteList.publishMuteList([bob.pubkey]),
       ),

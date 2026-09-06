@@ -1,4 +1,4 @@
-// ONE-TIME MIGRATION — DELETE ME EVENTUALLY (with legacyAcceptedTokenDrain.ts)
+// Legacy migration; removal gate in docs/architecture.md
 
 import {
   MintUnreachable,

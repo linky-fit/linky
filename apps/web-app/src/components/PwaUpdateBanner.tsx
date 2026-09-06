@@ -1,8 +1,9 @@
 import React from "react";
 import { applyPwaUpdate, subscribePwaNeedRefresh } from "../utils/pwaUpdate";
+import type { Translate } from "../i18n";
 
 interface PwaUpdateBannerProps {
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const PwaUpdateBanner: React.FC<PwaUpdateBannerProps> = ({ t }) => {

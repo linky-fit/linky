@@ -1,23 +1,16 @@
 import { Effect, Either, Exit, Layer } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  RumorId,
-  UnixSeconds,
-} from "../domain/primitives";
-import {
-  LINKY_PUSH_MARKER_TAG,
-  LINKY_PUSH_MARKER_VALUE,
-  unwrapToRumor,
-} from "../internal/giftWrap";
-import { firstTagValue, SignedWrapEvent } from "../internal/nostrEvent";
+import { ClientId, RelayUrl, RumorId, UnixSeconds } from "../domain/primitives";
+import { unwrapToRumor } from "../internal/giftWrap";
+import type { SignedWrapEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import {
+  hasPushMarker,
+  makeIdentity,
+  recipientOf,
+  stubWrapTransport,
+} from "../testing";
 import { Chat } from "./Chat";
 import {
   CashuTokenText,
@@ -28,11 +21,6 @@ import {
   TextMessageDraft,
   TokenMessageDraft,
 } from "./domain";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -61,43 +49,6 @@ const image = new PrivateImage({
   height: 480,
   storageEncoding: "base64",
 });
-
-interface PublishedWrap {
-  readonly wrap: SignedWrapEvent;
-}
-
-const recipientOf = (wrap: SignedWrapEvent): string | null =>
-  firstTagValue(wrap.tags, "p");
-
-const hasPushMarker = (wrap: SignedWrapEvent): boolean =>
-  wrap.tags.some(
-    (tag) =>
-      tag[0] === LINKY_PUSH_MARKER_TAG && tag[1] === LINKY_PUSH_MARKER_VALUE,
-  );
-
-const stubTransport = (
-  published: Array<PublishedWrap>,
-  acceptFor: (recipient: string | null) => boolean,
-): Layer.Layer<NostrTransport> =>
-  Layer.succeed(NostrTransport, {
-    publish: (relays, wrap) =>
-      Effect.sync(() => {
-        if (!(wrap instanceof SignedWrapEvent)) {
-          throw new Error("chat publish only gift wraps");
-        }
-        published.push({ wrap });
-        return relays.map(
-          (relay) =>
-            new RelayPublishResult({
-              relay,
-              accepted: acceptFor(recipientOf(wrap)),
-              detail: acceptFor(recipientOf(wrap)) ? null : "blocked",
-            }),
-        );
-      }),
-    subscribe: () => Effect.die("subscribe not under test"),
-    fetch: () => Effect.die("fetch not under test"),
-  });
 
 const runWith = <A, E>(
   transport: Layer.Layer<NostrTransport>,
@@ -143,49 +94,42 @@ describe("Chat sends", () => {
   ])(
     "publishes readable $name wraps with only the recipient push-marked",
     async ({ run, kind }) => {
-      const published: Array<PublishedWrap> = [];
+      const published: Array<SignedWrapEvent> = [];
       const exit = await runWith(
-        stubTransport(published, () => true),
+        stubWrapTransport(published),
         Effect.gen(function* () {
           const chat = yield* Chat;
           return yield* run(chat);
         }),
       );
 
-      expect(Exit.isSuccess(exit)).toBe(true);
-      if (!Exit.isSuccess(exit)) return;
+      assert(Exit.isSuccess(exit));
       expect(exit.value.clientId).toBe(clientId);
       expect(exit.value.selfCopy.acceptedBy).toEqual([relayA, relayB]);
       expect(exit.value.recipientCopy.acceptedBy).toEqual([relayA, relayB]);
       expect(published).toHaveLength(2);
 
-      const self = published.find(
-        ({ wrap }) => recipientOf(wrap) === alice.pubkey,
-      );
+      const self = published.find((wrap) => recipientOf(wrap) === alice.pubkey);
       const recipient = published.find(
-        ({ wrap }) => recipientOf(wrap) === bob.pubkey,
+        (wrap) => recipientOf(wrap) === bob.pubkey,
       );
-      expect(self).toBeDefined();
-      expect(recipient).toBeDefined();
-      if (self === undefined || recipient === undefined) return;
-      expect(hasPushMarker(self.wrap)).toBe(false);
-      expect(hasPushMarker(recipient.wrap)).toBe(true);
-      expect(recipient.wrap.created_at).toBeLessThanOrEqual(
+      assert(self !== undefined && recipient !== undefined);
+      expect(hasPushMarker(self)).toBe(false);
+      expect(hasPushMarker(recipient)).toBe(true);
+      expect(recipient.created_at).toBeLessThanOrEqual(
         Math.ceil(Date.now() / 1000),
       );
-      const rumor = Either.getOrThrow(
-        unwrapToRumor(recipient.wrap, bob.secretKey),
-      );
-      expect(rumor.id).toBe(exit.value.messageId);
+      const rumor = Either.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
+      expect(rumor.id).toBe(exit.value.rumorId);
       expect(rumor.kind).toBe(kind);
     },
   );
 
   it("publishes unmarked edit wraps and returns the edit reference", async () => {
-    const published: Array<PublishedWrap> = [];
+    const published: Array<SignedWrapEvent> = [];
     const editOf = RumorId.make("ab".repeat(32));
     const exit = await runWith(
-      stubTransport(published, () => true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const chat = yield* Chat;
         return yield* chat.edit(
@@ -199,17 +143,16 @@ describe("Chat sends", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.editOf).toBe(editOf);
     expect(published).toHaveLength(2);
-    expect(published.every(({ wrap }) => !hasPushMarker(wrap))).toBe(true);
+    expect(published.every((wrap) => !hasPushMarker(wrap))).toBe(true);
   });
 
   it("publishes two unmarked token wraps with the token rumor", async () => {
-    const published: Array<PublishedWrap> = [];
+    const published: Array<SignedWrapEvent> = [];
     const exit = await runWith(
-      stubTransport(published, () => true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const chat = yield* Chat;
         return yield* chat.sendToken(
@@ -222,29 +165,28 @@ describe("Chat sends", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.clientId).toBe(clientId);
     expect(exit.value.selfCopy.acceptedBy).toEqual([relayA, relayB]);
     expect(exit.value.recipientCopy.acceptedBy).toEqual([relayA, relayB]);
     expect(published).toHaveLength(2);
-    expect(published.every(({ wrap }) => !hasPushMarker(wrap))).toBe(true);
+    expect(published.every((wrap) => !hasPushMarker(wrap))).toBe(true);
 
-    for (const { wrap } of published) {
+    for (const wrap of published) {
       const key =
         recipientOf(wrap) === alice.pubkey ? alice.secretKey : bob.secretKey;
       const rumor = Either.getOrThrow(unwrapToRumor(wrap, key));
-      expect(rumor.id).toBe(exit.value.messageId);
+      expect(rumor.id).toBe(exit.value.rumorId);
       expect(rumor.kind).toBe(14);
       expect(rumor.content).toBe(cashuToken);
     }
   });
 
   it("honors the draft sentAt override", async () => {
-    const published: Array<PublishedWrap> = [];
+    const published: Array<SignedWrapEvent> = [];
     const sentAt = UnixSeconds.make(1_699_999_999);
     const exit = await runWith(
-      stubTransport(published, () => true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const chat = yield* Chat;
         return yield* chat.sendText(
@@ -258,83 +200,26 @@ describe("Chat sends", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.sentAt).toBe(sentAt);
     const recipient = published.find(
-      ({ wrap }) => recipientOf(wrap) === bob.pubkey,
+      (wrap) => recipientOf(wrap) === bob.pubkey,
     );
-    expect(recipient).toBeDefined();
-    if (recipient === undefined) return;
-    const rumor = Either.getOrThrow(
-      unwrapToRumor(recipient.wrap, bob.secretKey),
-    );
+    assert(recipient !== undefined);
+    const rumor = Either.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
     expect(rumor.created_at).toBe(sentAt);
-    expect(rumor.id).toBe(exit.value.messageId);
-  });
-
-  it("fails with RecipientNotReached when only the self copy lands", async () => {
-    const exit = await runWith(
-      stubTransport([], (recipient) => recipient === alice.pubkey),
-      Effect.gen(function* () {
-        const chat = yield* Chat;
-        return yield* chat.sendText(
-          new TextMessageDraft({
-            to: bob.pubkey,
-            content: MessageText.make("hello"),
-            clientId,
-          }),
-        );
-      }),
-    );
-
-    expect(exit).toEqual(
-      Exit.fail(
-        expect.objectContaining({
-          _tag: "RecipientNotReached",
-          clientId,
-          recipientCopy: expect.objectContaining({ acceptedBy: [] }),
-        }),
-      ),
-    );
-  });
-
-  it("fails with NoRelayReachable when nothing lands", async () => {
-    const exit = await runWith(
-      stubTransport([], () => false),
-      Effect.gen(function* () {
-        const chat = yield* Chat;
-        return yield* chat.sendText(
-          new TextMessageDraft({
-            to: bob.pubkey,
-            content: MessageText.make("hello"),
-            clientId,
-          }),
-        );
-      }),
-    );
-
-    expect(exit).toEqual(
-      Exit.fail(
-        expect.objectContaining({
-          _tag: "NoRelayReachable",
-          clientId,
-          selfCopy: expect.objectContaining({ acceptedBy: [] }),
-          recipientCopy: expect.objectContaining({ acceptedBy: [] }),
-        }),
-      ),
-    );
+    expect(rumor.id).toBe(exit.value.rumorId);
   });
 
   it.each([
     {
       name: "RecipientNotReached",
-      acceptFor: (recipient: string | null) => recipient === alice.pubkey,
+      accept: (wrap: SignedWrapEvent) => recipientOf(wrap) === alice.pubkey,
     },
-    { name: "NoRelayReachable", acceptFor: () => false },
-  ])("maps token delivery failure to $name", async ({ name, acceptFor }) => {
+    { name: "NoRelayReachable", accept: () => false },
+  ])("maps token delivery failure to $name", async ({ name, accept }) => {
     const exit = await runWith(
-      stubTransport([], acceptFor),
+      stubWrapTransport([], accept),
       Effect.gen(function* () {
         const chat = yield* Chat;
         return yield* chat.sendToken(

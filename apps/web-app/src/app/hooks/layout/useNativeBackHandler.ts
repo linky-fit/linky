@@ -1,7 +1,8 @@
+import { useLatest } from "../../../hooks/useLatest";
 import React from "react";
 import { NATIVE_BACK_BUTTON_EVENT } from "../../../hooks/useRouting";
 
-export interface NativeBackTargets {
+interface NativeBackTargets {
   closeMenu: () => void;
   closeScan: () => void;
   dismissTopModal: (() => void) | null;
@@ -53,11 +54,7 @@ export const useNativeBackHandler = (targets: NativeBackTargets) => {
 
   // Keep the newest action in a ref so the listener registers only once and
   // never runs against a stale route or a dismissed overlay.
-  const backActionRef = React.useRef(backAction);
-
-  React.useEffect(() => {
-    backActionRef.current = backAction;
-  }, [backAction]);
+  const backActionRef = useLatest(backAction);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -73,5 +70,5 @@ export const useNativeBackHandler = (targets: NativeBackTargets) => {
     window.addEventListener(NATIVE_BACK_BUTTON_EVENT, onNativeBack);
     return () =>
       window.removeEventListener(NATIVE_BACK_BUTTON_EVENT, onNativeBack);
-  }, []);
+  }, [backActionRef]);
 };

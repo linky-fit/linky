@@ -6,13 +6,19 @@ import { createConsole } from "@evolu/common";
 import { createNodeJsRelay } from "@evolu/nodejs";
 import { mkdirSync } from "node:fs";
 
+const ownerQuotaBytes = Number(process.env.EVOLU_OWNER_QUOTA_BYTES ?? 0);
+if (!Number.isSafeInteger(ownerQuotaBytes) || ownerQuotaBytes < 0) {
+  throw new Error("EVOLU_OWNER_QUOTA_BYTES must be a non-negative integer");
+}
+
 mkdirSync("data", { recursive: true });
 process.chdir("data");
 
 const relay = await createNodeJsRelay({ console: createConsole() })({
   port: 4000,
   enableLogging: true,
-  isOwnerWithinQuota: () => true,
+  isOwnerWithinQuota: (_ownerId, requiredBytes) =>
+    ownerQuotaBytes === 0 || requiredBytes <= ownerQuotaBytes,
 });
 
 if (!relay.ok) {

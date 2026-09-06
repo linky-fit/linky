@@ -1,3 +1,4 @@
+import { writeContact } from "../../lib/writeContact";
 import type { OwnerId } from "@evolu/common";
 import React from "react";
 import type { ContactId } from "../../../evolu";
@@ -51,10 +52,10 @@ export const useChatReadCursorSync = ({
     // A chat open in a background tab does not count as read.
     if (!documentVisible) return;
     if (route.kind !== "chat" || !selectedContact) return;
-    const contactId = String(selectedContact.id).trim();
-    if (!contactId || contactId !== String(route.id ?? "").trim()) return;
+    const contactId = selectedContact.id.trim();
+    if (!contactId || contactId !== (route.id ?? "").trim()) return;
 
-    const storedAtSec = Number(selectedContact.chatLastSeenAtSec ?? 0);
+    const storedAtSec = selectedContact.chatLastSeenAtSec ?? 0;
     const lastSeenAtSec = Math.max(
       Number.isFinite(storedAtSec) && storedAtSec > 0 ? storedAtSec : 0,
       lastWrittenAtSecByContactIdRef.current.get(contactId) ?? 0,
@@ -70,9 +71,7 @@ export const useChatReadCursorSync = ({
       resolveContactRowOwnerLane(selectedContact, contactsVisibleOwnerIds) ??
       contactsOwnerId;
     const payload = { id: selectedContact.id, chatLastSeenAtSec: target };
-    const result = ownerId
-      ? update("contact", payload, { ownerId })
-      : update("contact", payload);
+    const result = writeContact(update, payload, ownerId);
     if (result.ok) {
       lastWrittenAtSecByContactIdRef.current.set(contactId, target);
     }

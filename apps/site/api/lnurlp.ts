@@ -1,50 +1,83 @@
-const isSafeUrl = (value: string): boolean => {
-  if (!value) return false;
-  if (!/^https?:\/\//i.test(value)) return false;
-  if (value.length > 2000) return false;
-  return true;
+// Relative source import: Vercel compiles traced .ts files to .js, but the package
+// exports map still points at .ts, so the package specifier fails at runtime.
+import {
+  isLightningAddress,
+  getLightningAddressRequestUrl,
+} from "../../../packages/linkshu/src/lnurl/lightningAddress.js";
+import {
+  getFirstQueryValue,
+  parseJsonObject,
+  sendProxyFailure,
+  sendProxyResult,
+  type ApiRequest,
+  type ApiResponse,
+} from "./_npubcash.js";
+import { isAllowedTarget, safeFetch } from "./_safeFetch.js";
+
+const MILLISAT_AMOUNT_PATTERN = /^\d{1,15}$/;
+const MAX_COMMENT_LENGTH = 1000;
+
+const getLnurlpEndpoint = (lightningAddress: string): URL | null => {
+  if (!isLightningAddress(lightningAddress)) return null;
+  try {
+    const endpoint = new URL(getLightningAddressRequestUrl(lightningAddress));
+    return isAllowedTarget(endpoint) ? endpoint : null;
+  } catch {
+    return null;
+  }
 };
 
-export default async function handler(
-  req: { query?: Record<string, string | string[] | undefined> },
-  res: {
-    status: (code: number) => {
-      json: (body: Record<string, unknown>) => void;
-      send: (body: string) => void;
-    };
-    setHeader: (name: string, value: string) => void;
-  },
-) {
+const readCallbackUrl = (payRequestText: string): URL | null => {
+  const callback = parseJsonObject(payRequestText)?.callback;
+  if (typeof callback !== "string") return null;
   try {
-    const raw = Array.isArray(req.query?.url)
-      ? req.query.url[0]
-      : req.query?.url;
-    const target = String(raw ?? "").trim();
+    const url = new URL(callback);
+    return isAllowedTarget(url) ? url : null;
+  } catch {
+    return null;
+  }
+};
 
-    if (!isSafeUrl(target)) {
-      res.status(400).json({ error: "Invalid url" });
+// Same-origin helper for `/cashu/`: it performs the LNURL-pay hops itself so the
+// only URLs ever fetched are the address's well-known endpoint, the callback
+// that endpoint returned, and redirects of those that pass the same checks.
+export default async function handler(req: ApiRequest, res: ApiResponse) {
+  const address = getFirstQueryValue(req.query?.address)?.toLowerCase();
+  const endpoint = address ? getLnurlpEndpoint(address) : null;
+  if (!endpoint) {
+    res.status(400).json({ error: "Invalid lightning address" });
+    return;
+  }
+
+  const amount = getFirstQueryValue(req.query?.amount);
+  if (amount && !MILLISAT_AMOUNT_PATTERN.test(amount)) {
+    res.status(400).json({ error: "Invalid amount" });
+    return;
+  }
+
+  try {
+    const payRequest = await safeFetch(endpoint);
+    if (!amount) {
+      sendProxyResult(res, payRequest);
       return;
     }
 
-    const response = await fetch(target, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-    });
+    const callback = readCallbackUrl(payRequest.text);
+    if (!callback) {
+      res.status(502).json({ error: "LNURL callback missing or not allowed" });
+      return;
+    }
 
-    const text = await response.text();
-    const contentType = response.headers.get("content-type");
-
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "no-store");
-    if (contentType) res.setHeader("Content-Type", contentType);
-
-    res.status(response.status).send(text);
+    callback.searchParams.set("amount", amount);
+    const comment = getFirstQueryValue(req.query?.comment);
+    if (comment) {
+      callback.searchParams.set(
+        "comment",
+        comment.slice(0, MAX_COMMENT_LENGTH),
+      );
+    }
+    sendProxyResult(res, await safeFetch(callback));
   } catch (error) {
-    res.status(502).json({
-      error: "Proxy fetch failed",
-      detail: String(error ?? "unknown"),
-    });
+    sendProxyFailure(res, error);
   }
 }

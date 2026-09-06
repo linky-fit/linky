@@ -1,4 +1,5 @@
-import { Effect } from "effect";
+import { Effect, Struct } from "effect";
+import type { TokenText } from "../domain/primitives";
 import type { InspectorService } from "../inspector/Inspector";
 import { OperationFailed, OperationSucceeded } from "../inspector/events";
 
@@ -51,3 +52,8 @@ export const inspectOperation =
       params,
       (result) => result,
     )(operation);
+
+/** Token text carries proof secrets; a receipt's other fields are safe. */
+export const redactReceipt = <R extends { readonly tokenText: TokenText }>(
+  receipt: R,
+) => Struct.omit(receipt, "tokenText");

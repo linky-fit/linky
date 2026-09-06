@@ -13,7 +13,7 @@ import { inspectPlainOperation } from "../internal/inspectPlainOperation";
 import type { NostrTags, SignedPlainEvent } from "../internal/nostrEvent";
 import { deliverPlainEvent } from "../internal/plainDelivery";
 import { fetchPlainEvents } from "../internal/plainFetch";
-import { nowUnixSeconds } from "../internal/time";
+import { nowSeconds } from "../internal/time";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
@@ -46,11 +46,11 @@ export class ProfileFetchEntry extends Schema.Class<ProfileFetchEntry>(
   status: Schema.NullOr(StatusUpdated),
 }) {}
 
-export const DISCOVERY_ACTIVITY_KINDS: ReadonlyArray<number> = [
+const DISCOVERY_ACTIVITY_KINDS: ReadonlyArray<number> = [
   0, 1, 6, 7, 9735, 30315,
 ];
-export const DISCOVERY_ACTIVE_WINDOW_SECONDS = 45 * 24 * 60 * 60;
-export const DISCOVERY_AUTHOR_SCAN_LIMIT = 64;
+const DISCOVERY_ACTIVE_WINDOW_SECONDS = 45 * 24 * 60 * 60;
+const DISCOVERY_AUTHOR_SCAN_LIMIT = 64;
 
 export interface DiscoverActiveProfilesOptions {
   readonly activityKinds?: ReadonlyArray<number>;
@@ -172,7 +172,7 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
           // Bounded: each chunk already fans out to every read relay.
           { concurrency: 4 },
         );
-        const now: UnixSeconds = yield* nowUnixSeconds;
+        const now: UnixSeconds = yield* nowSeconds;
 
         // Chunks hold disjoint authors, so concatenation keeps each author's
         // events newest-first (fetchPlainEvents sorts within a chunk).
@@ -245,7 +245,7 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
       Effect.gen(function* () {
         const relays = context.relayPolicy.readRelays;
         if (relays.length === 0) return yield* new NoReadRelaysConfigured();
-        const now: UnixSeconds = yield* nowUnixSeconds;
+        const now: UnixSeconds = yield* nowSeconds;
         const activityEvents = yield* fetchPlainEvents(
           context.transport,
           relays,

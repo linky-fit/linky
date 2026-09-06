@@ -1,58 +1,23 @@
 import { Effect, Either, Exit, Layer } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-} from "../domain/primitives";
+import { ClientId, RelayUrl } from "../domain/primitives";
 import {
   LINKY_PUSH_MARKER_TAG,
   LINKY_PUSH_MARKER_VALUE,
   unwrapToRumor,
 } from "../internal/giftWrap";
-import { firstTagValue, SignedWrapEvent } from "../internal/nostrEvent";
+import type { SignedWrapEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import { makeIdentity, recipientOf, stubWrapTransport } from "../testing";
 import { PaymentNoticeDraft } from "./domain";
 import { PaymentNotices } from "./PaymentNotices";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
 const relayA = RelayUrl.make("wss://relay-a.test");
 const relayB = RelayUrl.make("wss://relay-b.test");
 const clientId = ClientId.make("client-42");
-
-const stubTransport = (
-  published: Array<SignedWrapEvent>,
-  accepted: boolean,
-): Layer.Layer<NostrTransport> =>
-  Layer.succeed(NostrTransport, {
-    publish: (relays, wrap) =>
-      Effect.sync(() => {
-        if (!(wrap instanceof SignedWrapEvent)) {
-          throw new Error("payment notices publish only gift wraps");
-        }
-        published.push(wrap);
-        return relays.map(
-          (relay) =>
-            new RelayPublishResult({
-              relay,
-              accepted,
-              detail: accepted ? null : "blocked",
-            }),
-        );
-      }),
-    subscribe: () => Effect.die("subscribe not under test"),
-    fetch: () => Effect.die("fetch not under test"),
-  });
 
 const runWith = <A, E>(
   transport: Layer.Layer<NostrTransport>,
@@ -77,7 +42,7 @@ describe("PaymentNotices.send", () => {
   it("publishes one push-marked recipient wrap and returns its receipt", async () => {
     const published: Array<SignedWrapEvent> = [];
     const exit = await runWith(
-      stubTransport(published, true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const paymentNotices = yield* PaymentNotices;
         return yield* paymentNotices.send(
@@ -91,12 +56,11 @@ describe("PaymentNotices.send", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(published).toHaveLength(1);
     const wrap = published[0];
-    if (wrap === undefined) return;
-    expect(firstTagValue(wrap.tags, "p")).toBe(bob.pubkey);
+    assert(wrap !== undefined);
+    expect(recipientOf(wrap)).toBe(bob.pubkey);
     expect(wrap.tags).toContainEqual([
       LINKY_PUSH_MARKER_TAG,
       LINKY_PUSH_MARKER_VALUE,
@@ -114,15 +78,15 @@ describe("PaymentNotices.send", () => {
       ["context", "bank_payment_offer"],
       ["offer", "offer-1"],
     ]);
-    expect(exit.value.noticeId).toBe(rumor.id);
+    expect(exit.value.rumorId).toBe(rumor.id);
     expect(exit.value.clientId).toBe(clientId);
     expect(exit.value.recipientCopy.wrapId).toBe(wrap.id);
     expect(exit.value.recipientCopy.acceptedBy).toEqual([relayA, relayB]);
   });
 
-  it("fails with PaymentNoticeNotDelivered when every relay rejects", async () => {
+  it("fails with WrapNotDelivered when every relay rejects", async () => {
     const exit = await runWith(
-      stubTransport([], false),
+      stubWrapTransport([], () => false),
       Effect.gen(function* () {
         const paymentNotices = yield* PaymentNotices;
         return yield* paymentNotices.send(
@@ -134,7 +98,7 @@ describe("PaymentNotices.send", () => {
     expect(exit).toEqual(
       Exit.fail(
         expect.objectContaining({
-          _tag: "PaymentNoticeNotDelivered",
+          _tag: "WrapNotDelivered",
           clientId,
           recipientCopy: expect.objectContaining({
             acceptedBy: [],

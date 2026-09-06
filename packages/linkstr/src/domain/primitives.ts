@@ -21,6 +21,7 @@ export const Pubkey = Schema.String.pipe(
   Schema.brand("Pubkey"),
 );
 export type Pubkey = typeof Pubkey.Type;
+export const isPubkey = Schema.is(Pubkey);
 
 /**
  * Id of the inner (unsigned) rumor — the stable identity of a message or
@@ -32,6 +33,7 @@ export const RumorId = Schema.String.pipe(
   Schema.brand("RumorId"),
 );
 export type RumorId = typeof RumorId.Type;
+export const isRumorId = Schema.is(RumorId);
 
 /** Id of a signed outer gift-wrap event — transport-level identity only. */
 export const WrapId = Schema.String.pipe(
@@ -55,6 +57,7 @@ export const ClientId = Schema.NonEmptyTrimmedString.pipe(
   Schema.brand("ClientId"),
 );
 export type ClientId = typeof ClientId.Type;
+export const isClientId = Schema.is(ClientId);
 
 const isRelayUrl = (value: string): boolean => {
   try {
@@ -81,6 +84,7 @@ export const UnixSeconds = Schema.Int.pipe(
   Schema.brand("UnixSeconds"),
 );
 export type UnixSeconds = typeof UnixSeconds.Type;
+export const isUnixSeconds = Schema.is(UnixSeconds);
 
 const isUsableSecretKey = (bytes: Uint8Array): boolean => {
   if (bytes.length !== 32) return false;

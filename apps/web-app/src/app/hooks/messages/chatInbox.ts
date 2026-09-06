@@ -11,11 +11,9 @@ import type {
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
 import { buildUnknownContactId, normalizePubkeyHex } from "./contactIdentity";
+import { trimString } from "../../../utils/validation";
 
-const trimmed = (value: string | null | undefined): string =>
-  (value ?? "").trim();
-
-export const chatMessageContentFromBody = (body: MessageBody): string => {
+const chatMessageContentFromBody = (body: MessageBody): string => {
   switch (body._tag) {
     case "TextBody":
       return body.text;
@@ -68,8 +66,8 @@ const matchesIncomingConversation = (
   contactId: string,
   peerPubkey: string,
 ): boolean =>
-  trimmed(message.direction) === "in" &&
-  (trimmed(message.contactId) === contactId ||
+  trimString(message.direction) === "in" &&
+  (trimString(message.contactId) === contactId ||
     normalizePubkeyHex(message.pubkey) === peerPubkey);
 
 export const applyChatMessageReceived = (
@@ -93,18 +91,18 @@ export const applyChatMessageReceived = (
     const editOf = event.editOf;
     const target = scoped.find(
       (message) =>
-        trimmed(message.rumorId) === editOf ||
-        trimmed(message.editedFromId) === editOf,
+        trimString(message.rumorId) === editOf ||
+        trimString(message.editedFromId) === editOf,
     );
     if (target) {
       // A replayed backfill must not roll an already-applied newer edit back.
       if (target.isEdited && (target.editedAtSec ?? 0) >= event.sentAt) {
         return null;
       }
-      const targetId = trimmed(target.id);
+      const targetId = trimString(target.id);
       if (!targetId) return null;
       const existingOriginal =
-        trimmed(target.originalContent) || String(target.content ?? "");
+        trimString(target.originalContent) || target.content;
       ctx.updateLocalNostrMessage(targetId, {
         content,
         status: "sent",
@@ -119,11 +117,11 @@ export const applyChatMessageReceived = (
     }
   } else {
     const editedVersion = scoped.find(
-      (message) => trimmed(message.editedFromId) === event.messageId,
+      (message) => trimString(message.editedFromId) === event.messageId,
     );
     if (editedVersion) {
-      const editedVersionId = trimmed(editedVersion.id);
-      if (!trimmed(editedVersion.originalContent) && editedVersionId) {
+      const editedVersionId = trimString(editedVersion.id);
+      if (!trimString(editedVersion.originalContent) && editedVersionId) {
         ctx.updateLocalNostrMessage(editedVersionId, {
           originalContent: content,
         });
@@ -134,11 +132,11 @@ export const applyChatMessageReceived = (
 
   const stableRumorId = event.editOf ?? event.messageId;
   const existing = scoped.find(
-    (message) => trimmed(message.rumorId) === stableRumorId,
+    (message) => trimString(message.rumorId) === stableRumorId,
   );
   if (existing) {
     if ((existing.status ?? "sent") === "pending") {
-      ctx.updateLocalNostrMessage(trimmed(existing.id), { status: "sent" });
+      ctx.updateLocalNostrMessage(trimString(existing.id), { status: "sent" });
     }
     return null;
   }
@@ -187,24 +185,26 @@ export const applyOwnChatMessageConfirmed = (
     return;
   }
   const outgoing = ctx.messages.filter(
-    (message) => trimmed(message.direction) === "out",
+    (message) => trimString(message.direction) === "out",
   );
   const row =
     (event.clientId !== null
-      ? outgoing.find((message) => trimmed(message.clientId) === event.clientId)
+      ? outgoing.find(
+          (message) => trimString(message.clientId) === event.clientId,
+        )
       : undefined) ??
-    outgoing.find((message) => trimmed(message.rumorId) === event.messageId);
+    outgoing.find((message) => trimString(message.rumorId) === event.messageId);
   if (!row) return;
   if ((row.status ?? "sent") !== "pending") return;
 
-  ctx.updateLocalNostrMessage(trimmed(row.id), {
+  ctx.updateLocalNostrMessage(trimString(row.id), {
     status: "sent",
-    ...(trimmed(row.rumorId)
+    ...(trimString(row.rumorId)
       ? {}
       : { rumorId: event.editOf ?? event.messageId }),
   });
   ctx.logPayStep("message-ack", {
-    contactId: trimmed(row.contactId),
+    contactId: trimString(row.contactId),
     clientId: event.clientId,
     rumorId: event.messageId,
   });

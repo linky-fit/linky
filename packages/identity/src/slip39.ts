@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 import { Slip39 } from "slip39-ts";
-import { MasterSecret, Slip39Passphrase, Slip39Share } from "./domain";
+import { MasterSecret, Slip39Passphrase, Slip39Share, toWords } from "./domain";
 
 const EMPTY_PASSPHRASE = Slip39Passphrase.make("");
 
@@ -19,44 +19,18 @@ export const decodeUnknown = <A, I>(
   input: unknown,
   message: string,
 ): Effect.Effect<A, IdentityDerivationError> =>
-  Effect.try({
-    try: () => Schema.decodeUnknownSync(schema)(input),
-    catch: (cause) => new IdentityDerivationError({ cause, message }),
-  });
+  Schema.decodeUnknown(schema)(input).pipe(
+    Effect.mapError((cause) => new IdentityDerivationError({ cause, message })),
+  );
 
-const toWordList = (rawText: string): ReadonlyArray<string> =>
-  rawText
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter((word) => word.length > 0);
+/** slip39-ts hands the recovered secret back as a plain byte array. */
+const MasterSecretFromBytes = Schema.compose(Schema.Uint8Array, MasterSecret);
 
-const toSecretBytes = (value: unknown): Uint8Array | null => {
-  if (!Array.isArray(value)) return null;
-
-  const out: number[] = [];
-  for (const item of value) {
-    if (typeof item !== "number") return null;
-    if (!Number.isInteger(item)) return null;
-    if (item < 0 || item > 255) return null;
-    out.push(item);
-  }
-
-  return Uint8Array.from(out);
-};
-
-export const normalizeSlip39Share = (rawText: string): string =>
-  toWordList(rawText).join(" ");
+const normalizeSlip39Share = (rawText: string): string =>
+  toWords(rawText.toLowerCase()).join(" ");
 
 export const looksLikeSlip39Share = (rawText: string): boolean =>
-  toWordList(rawText).length === 20;
-
-export const validateSlip39Share = (rawText: string): boolean => {
-  const normalized = normalizeSlip39Share(rawText);
-  if (!looksLikeSlip39Share(normalized)) return false;
-  return Slip39.validateMnemonic(normalized);
-};
+  toWords(rawText).length === 20;
 
 export const parseSlip39Share = (
   input: string,
@@ -68,11 +42,6 @@ export const parseSlip39Share = (
     "Invalid SLIP-39 share (expected a valid 20-word share)",
   );
 };
-
-export const parseSlip39Passphrase = (
-  input: unknown,
-): Effect.Effect<Slip39Passphrase, IdentityDerivationError> =>
-  decodeUnknown(Slip39Passphrase, input, "Invalid SLIP-39 passphrase");
 
 export const recoverMasterSecretFromSlip39Share = (
   share: Slip39Share,
@@ -94,23 +63,19 @@ export const recoverMasterSecretFromSlip39Shares = (
       );
     }
 
-    const sharesList = Array.from(shares);
-
-    return yield* Effect.tryPromise({
-      try: async () => {
-        const recovered = await Slip39.recoverSecret(sharesList, passphrase);
-        const bytes = toSecretBytes(recovered);
-        if (!bytes) {
-          throw new Error("Recovered SLIP-39 secret has invalid byte shape");
-        }
-        return Schema.decodeUnknownSync(MasterSecret)(bytes);
-      },
+    const recovered = yield* Effect.tryPromise({
+      try: () => Slip39.recoverSecret(Array.from(shares), passphrase),
       catch: (cause) =>
         new IdentityDerivationError({
           cause,
           message: "Failed to recover master secret from SLIP-39 shares",
         }),
     });
+    return yield* decodeUnknown(
+      MasterSecretFromBytes,
+      recovered,
+      "Recovered SLIP-39 secret has invalid byte shape",
+    );
   });
 
 export const createSlip39Share = (
@@ -125,7 +90,7 @@ export const createSlip39Share = (
       cryptoApi.getRandomValues(entropy);
 
       const passphrase = options?.passphrase ?? EMPTY_PASSPHRASE;
-      const title = String(options?.title ?? "Linky").trim() || "Linky";
+      const title = (options?.title ?? "Linky").trim() || "Linky";
 
       const slip = await Slip39.fromArray(Array.from(entropy), {
         groupThreshold: 1,

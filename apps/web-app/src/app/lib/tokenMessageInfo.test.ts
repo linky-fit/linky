@@ -1,46 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { buildCashuToken } from "../../testUtils/cashuToken";
 import { createCashuTokenRowFixture } from "../../testUtils/cashuTokenRow";
 import {
   serializePrivateImageMessage,
   type PrivateImageMessagePayload,
 } from "./privateImageMessage";
 import { getCashuTokenMessageInfo } from "./tokenMessageInfo";
-
-const buildCashuToken = (): string => {
-  const payload = JSON.stringify({
-    token: [
-      {
-        mint: "https://mint.example",
-        proofs: [{ amount: 21, secret: "secret", C: "c", id: "keyset" }],
-      },
-    ],
-  });
-
-  const base64Url = btoa(payload)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-
-  return `cashuA${base64Url}`;
-};
-
-const buildEmptyCashuToken = (): string => {
-  const payload = JSON.stringify({
-    token: [
-      {
-        mint: "https://mint.example",
-        proofs: [],
-      },
-    ],
-  });
-
-  const base64Url = btoa(payload)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-
-  return `cashuA${base64Url}`;
-};
 
 describe("getCashuTokenMessageInfo", () => {
   it("renders cashu.me legacy proof bundles as claimable tokens", () => {
@@ -100,7 +65,9 @@ describe("getCashuTokenMessageInfo", () => {
   });
 
   it("ignores empty zero-value Cashu payloads", () => {
-    expect(getCashuTokenMessageInfo(buildEmptyCashuToken(), [])).toBeNull();
+    expect(
+      getCashuTokenMessageInfo(buildCashuToken({ amounts: [] }), []),
+    ).toBeNull();
   });
 
   it("treats accepted matching tokens as already known", () => {

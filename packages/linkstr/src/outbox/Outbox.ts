@@ -14,20 +14,20 @@ import {
 } from "../chat/domain";
 import type {
   NoRelayReachable,
-  PaymentTelemetryNotDelivered,
   RecipientNotReached,
+  WrapNotDelivered,
 } from "../domain/errors";
 import { EventId, RumorId } from "../domain/primitives";
 import type { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { OperationFailed, PlainOperationSucceeded } from "../inspector/events";
 import type { Rumor } from "../internal/nostrEvent";
-import { freshClientId, nowSeconds } from "../internal/operations";
+import { freshClientId } from "../internal/operations";
+import { nowSeconds } from "../internal/time";
 import type { PaymentTelemetryDraft } from "../paymentTelemetry/domain";
-import { PaymentTelemetryReceipt } from "../paymentTelemetry/domain";
 import { PaymentTelemetry } from "../paymentTelemetry/PaymentTelemetry";
 import { encodeReactionRumor } from "../reactions/codec";
-import { ReactionDraft, ReactionReceipt } from "../reactions/domain";
+import { ReactionDraft } from "../reactions/domain";
 import { Reactions } from "../reactions/Reactions";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import {
@@ -108,12 +108,6 @@ const encodeOperationRumor = (
   }
 };
 
-const receiptRumorId = (receipt: OutboxReceipt): RumorId => {
-  if (receipt instanceof ReactionReceipt) return receipt.reactionId;
-  if (receipt instanceof PaymentTelemetryReceipt) return receipt.telemetryId;
-  return receipt.messageId;
-};
-
 interface OnlineEventTarget {
   addEventListener(type: string, listener: () => void): void;
   removeEventListener(type: string, listener: () => void): void;
@@ -130,7 +124,7 @@ const isOnlineEventTarget = (value: unknown): value is OnlineEventTarget =>
 /**
  * Durable send queue over the Chat, Reactions and PaymentTelemetry verticals.
  * `enqueue` persists
- * a normalized job and precomputes its rumor, so the returned `messageId` is
+ * a normalized job and precomputes its rumor, so the returned `rumorId` is
  * what every delivery retry publishes; a background worker delivers jobs
  * strictly FIFO with invisible backoff retries on delivery errors. Terminal
  * outcomes surface on `results` — a single-consumer stream — and a terminal
@@ -172,7 +166,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
       operation: OutboxOperation,
     ): Effect.Effect<
       OutboxReceipt,
-      RecipientNotReached | NoRelayReachable | PaymentTelemetryNotDelivered
+      RecipientNotReached | NoRelayReachable | WrapNotDelivered
     > => {
       switch (operation._tag) {
         case "chat.text":
@@ -211,7 +205,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
                 {
                   name: "outbox.job",
                   params: { jobId: job.jobId, ref: job.ref },
-                  eventIds: [EventId.make(receiptRumorId(result.receipt))],
+                  eventIds: [EventId.make(result.receipt.rumorId)],
                   result,
                 },
                 { disableValidation: true },
@@ -330,7 +324,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
         const receipt = new EnqueueReceipt({
           jobId: job.jobId,
           ref,
-          messageId: RumorId.make(rumor.id),
+          rumorId: RumorId.make(rumor.id),
           clientId,
           sentAt,
         });

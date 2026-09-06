@@ -35,7 +35,7 @@ const MAX_SWAP_ATTEMPTS = 5;
  * outputs start right after it. Advancing past `block + freshKeepCount`
  * therefore clears every counter either side could have used.
  */
-export const SWAP_OUTPUT_BLOCK = 64;
+const SWAP_OUTPUT_BLOCK = 64;
 /** A failed attempt may have burned both blocks. */
 const COLLISION_FALLBACK_BUMP = SWAP_OUTPUT_BLOCK * 2;
 

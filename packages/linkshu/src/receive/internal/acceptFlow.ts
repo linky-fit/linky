@@ -8,6 +8,7 @@ import {
 } from "../../domain/errors";
 import type { CounterLockTimeout, MintUnreachable } from "../../domain/errors";
 import { CurrencyUnit } from "../../domain/primitives";
+import { sat } from "../../internal/units";
 import type { Amount, MintUrl, TokenText } from "../../domain/primitives";
 import { TokenLifecycleChanged } from "../../inspector/events";
 import type { InspectorService } from "../../inspector/Inspector";
@@ -41,8 +42,6 @@ import {
   transitionRow,
 } from "../../token/internal/lifecycle";
 import { ReceiveError, ReceiveReceipt } from "../domain";
-
-const sat = CurrencyUnit.make("sat");
 
 const MAX_SWAP_ATTEMPTS = 5;
 /** Fallback bump (one output block) when restore cannot locate the collision. */
@@ -100,13 +99,6 @@ export const parseReceivable = (
   });
 
 /** Token text (draft and receipt encodings) carries proof secrets. */
-export const redactReceipt = (receipt: ReceiveReceipt): unknown => ({
-  rowId: receipt.rowId,
-  mint: receipt.mint,
-  unit: receipt.unit,
-  amount: receipt.amount,
-});
-
 export interface ReceiveContext {
   readonly kv: KeyValueStoreService;
   readonly tokenStore: TokenStoreService;

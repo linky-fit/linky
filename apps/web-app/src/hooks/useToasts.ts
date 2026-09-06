@@ -27,7 +27,7 @@ export const useToasts = () => {
 
   const pushToast = useCallback(
     (message: string, options?: PushToastOptions) => {
-      const text = String(message ?? "").trim();
+      const text = message.trim();
       if (!text) return;
 
       const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;

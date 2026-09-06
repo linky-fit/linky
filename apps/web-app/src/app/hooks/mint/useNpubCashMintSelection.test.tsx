@@ -1,14 +1,9 @@
 import React, { act } from "react";
-import { createRoot } from "react-dom/client";
 import { nip19 } from "nostr-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY } from "../../../utils/mint";
 import { useNpubCashMintSelection } from "./useNpubCashMintSelection";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-});
 
 interface SelectionHarnessProps {
   applyRef: React.RefObject<((mintUrl: string) => Promise<void>) | null>;
@@ -82,21 +77,18 @@ const renderSelectionHarness = async ({
   const applyRef = React.createRef<
     ((mintUrl: string) => Promise<void>) | null
   >();
-  const root = createRoot(document.createElement("div"));
 
-  await act(async () => {
-    root.render(
-      <SelectionHarness
-        applyRef={applyRef}
-        defaultMintUrl={defaultMintUrl}
-        makeLocalStorageKey={makeLocalStorageKey}
-        pushToast={pushToast}
-        setDefaultMintUrl={setDefaultMintUrl}
-        setDefaultMintUrlDraft={setDefaultMintUrlDraft}
-        setStatus={setStatus}
-      />,
-    );
-  });
+  const { root } = await renderIntoDocument(
+    <SelectionHarness
+      applyRef={applyRef}
+      defaultMintUrl={defaultMintUrl}
+      makeLocalStorageKey={makeLocalStorageKey}
+      pushToast={pushToast}
+      setDefaultMintUrl={setDefaultMintUrl}
+      setDefaultMintUrlDraft={setDefaultMintUrlDraft}
+      setStatus={setStatus}
+    />,
+  );
 
   return {
     applyRef,

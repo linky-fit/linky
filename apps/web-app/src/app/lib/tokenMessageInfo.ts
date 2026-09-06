@@ -1,6 +1,5 @@
 import { parseTokenText } from "@linky/linkshu";
 import type { CashuTokenRow } from "../../evolu";
-import type { MintUrlInput } from "../types/appTypes";
 import { getLinkyBankPaymentOfferInfo } from "./bankPaymentOffer";
 import { createCashuTokenId } from "./cashuTokenIdentity";
 import { parsePrivateImageMessage } from "./privateImageMessage";
@@ -15,8 +14,10 @@ export interface CashuTokenMessageInfo {
   unit: string | null;
 }
 
-const getMintDisplay = (mintValue: MintUrlInput): string | null => {
-  const mintText = String(mintValue ?? "").trim();
+export const getMintDisplay = (
+  mintValue: string | null | undefined,
+): string | null => {
+  const mintText = (mintValue ?? "").trim();
   if (!mintText) return null;
   try {
     return new URL(mintText).host;
@@ -29,12 +30,12 @@ const isKnownCashuToken = (
   cashuTokensAll: readonly Pick<CashuTokenRow, "id" | "rawToken" | "token">[],
   tokenRaw: string,
 ): boolean => {
-  const tokenId = String(createCashuTokenId(tokenRaw));
+  const tokenId = createCashuTokenId(tokenRaw);
   return cashuTokensAll.some((row) => {
-    const storedRaw = String(row.rawToken ?? "").trim();
-    const storedToken = String(row.token ?? "").trim();
+    const storedRaw = (row.rawToken ?? "").trim();
+    const storedToken = (row.token ?? "").trim();
     return (
-      String(row.id ?? "") === tokenId ||
+      row.id === tokenId ||
       (storedRaw !== "" && storedRaw === tokenRaw) ||
       (storedToken !== "" && storedToken === tokenRaw)
     );

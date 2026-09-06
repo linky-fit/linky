@@ -11,5 +11,7 @@ export class MintInfo extends Schema.Class<MintInfo>("MintInfo")({
   inputFeePpk: Schema.NullOr(Schema.Int.pipe(Schema.nonNegative())),
   /** NUT-15 multi-path payments. */
   supportsMpp: Schema.Boolean,
+  /** Known test URL or published metadata advertising simulated Lightning. */
+  isFakeLightning: Schema.Boolean,
   iconUrl: Schema.NullOr(Schema.String),
 }) {}

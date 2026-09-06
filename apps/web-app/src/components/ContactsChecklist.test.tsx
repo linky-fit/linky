@@ -1,13 +1,7 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ContactsChecklist } from "./ContactsChecklist";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
-});
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -15,29 +9,24 @@ afterEach(() => {
 
 describe("ContactsChecklist", () => {
   it("shows only the first incomplete task", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
     const onShowHow = vi.fn();
 
-    await act(async () => {
-      root.render(
-        <ContactsChecklist
-          contactsOnboardingCelebrating={false}
-          dismissContactsOnboarding={() => undefined}
-          onShowHow={onShowHow}
-          progressPercent={20}
-          t={(key) => key}
-          tasks={[
-            { done: true, key: "done", label: "Completed task" },
-            { done: false, key: "next", label: "Next task" },
-            { done: false, key: "later", label: "Later task" },
-          ]}
-          tasksCompleted={1}
-          tasksTotal={3}
-        />,
-      );
-    });
+    const { container, root } = await renderIntoDocument(
+      <ContactsChecklist
+        contactsOnboardingCelebrating={false}
+        dismissContactsOnboarding={() => undefined}
+        onShowHow={onShowHow}
+        progressPercent={20}
+        t={(key) => key}
+        tasks={[
+          { done: true, key: "done", label: "Completed task" },
+          { done: false, key: "next", label: "Next task" },
+          { done: false, key: "later", label: "Later task" },
+        ]}
+        tasksCompleted={1}
+        tasksTotal={3}
+      />,
+    );
 
     const items = container.querySelectorAll('[role="listitem"]');
     expect(items).toHaveLength(1);

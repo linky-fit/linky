@@ -1,25 +1,15 @@
 import { Either } from "effect";
-import { generateSecretKey, getEventHash, getPublicKey } from "nostr-tools";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  UnixSeconds,
-} from "../domain/primitives";
+import { getEventHash } from "nostr-tools";
+import { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import { Rumor } from "../internal/nostrEvent";
 import type { NostrTags } from "../internal/nostrEvent";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
 import {
   decodeBankOfferRumor,
   encodeBankOfferContent,
   encodeBankOfferRumor,
 } from "./codec";
+import { makeIdentity } from "../testing";
 import { BankOfferDraft, BankOfferId } from "./domain";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();

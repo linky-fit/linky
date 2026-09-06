@@ -1,13 +1,6 @@
-import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { LinkPreviewCard } from "./LinkPreviewCard";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
-});
 
 describe("LinkPreviewCard", () => {
   afterEach(() => {
@@ -34,16 +27,12 @@ describe("LinkPreviewCard", () => {
       ),
     );
 
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(<LinkPreviewCard url="https://linky.fit/test-preview" />);
-      await Promise.resolve();
-      await new Promise<void>((resolve) => {
-        window.setTimeout(resolve, 0);
-      });
+    const { container } = await renderIntoDocument(
+      <LinkPreviewCard url="https://linky.fit/test-preview" />,
+    );
+    await Promise.resolve();
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 0);
     });
 
     const link = container.querySelector("a.chat-link-preview");

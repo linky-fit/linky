@@ -3,11 +3,9 @@ import {
   useAppShellActions,
   useAppShellCore,
 } from "../app/context/AppShellContexts";
-import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
 import { useDesktopSplitView } from "../hooks/useDesktopSplitView";
-import { AppScanModal } from "./AppScanModal";
+import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
 import { ContactsGuideOverlay } from "./ContactsGuideOverlay";
-import { AppTopbar } from "./AppTopbar";
 import { LightningInvoiceConfirmModal } from "./LightningInvoiceConfirmModal";
 import { LnurlWithdrawConfirmModal } from "./LnurlWithdrawConfirmModal";
 import { MenuModal } from "./MenuModal";
@@ -15,7 +13,9 @@ import { NfcWriteModal } from "./NfcWriteModal";
 import { PaidOverlay } from "./PaidOverlay";
 import { PaymentMintMeltConfirmModal } from "./PaymentMintMeltConfirmModal";
 import { SaveContactPromptModal } from "./SaveContactPromptModal";
+import { ScanModal } from "./ScanModal";
 import { ShareOptionsModal } from "./ShareOptionsModal";
+import { Topbar } from "./Topbar";
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
@@ -30,7 +30,7 @@ export function AuthenticatedLayout({
 
   return (
     <>
-      <AppTopbar className="mobile-app-topbar" />
+      <Topbar className="mobile-app-topbar" />
 
       {state.contactsGuide && state.contactsGuideActiveStep?.step ? (
         <ContactsGuideOverlay
@@ -56,7 +56,7 @@ export function AuthenticatedLayout({
 
       {children}
 
-      {!isDesktopSplitView ? <AppScanModal /> : null}
+      {!isDesktopSplitView && state.scanIsOpen ? <ScanModal /> : null}
 
       {state.postPaySaveContact && !state.paidOverlayIsOpen ? (
         <SaveContactPromptModal
@@ -64,7 +64,6 @@ export function AuthenticatedLayout({
           lnAddress={state.postPaySaveContact.lnAddress}
           onClose={() => actions.setPostPaySaveContact(null)}
           setContactNewPrefill={actions.setContactNewPrefill}
-          t={state.t}
         />
       ) : null}
 

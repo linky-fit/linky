@@ -1,20 +1,16 @@
 import React from "react";
 
 import { clientInspectorStore } from "./clientInspectorStore";
+import { safeLocalStorageGet, safeLocalStorageSet } from "../../utils/storage";
 
-export const INSPECTOR_ENABLED_STORAGE_KEY = "linky.inspector_enabled";
-export const INSPECTOR_LOGS_ENABLED_STORAGE_KEY =
-  "linky.inspector_logs_enabled";
+const INSPECTOR_ENABLED_STORAGE_KEY = "linky.inspector_enabled";
+const INSPECTOR_LOGS_ENABLED_STORAGE_KEY = "linky.inspector_logs_enabled";
 
 const readPreference = (key: string): boolean | null => {
-  try {
-    const stored = globalThis.localStorage.getItem(key);
-    if (stored === "true") return true;
-    if (stored === "false") return false;
-    return null;
-  } catch {
-    return null;
-  }
+  const stored = safeLocalStorageGet(key);
+  if (stored === "true") return true;
+  if (stored === "false") return false;
+  return null;
 };
 
 let preference = readPreference(INSPECTOR_ENABLED_STORAGE_KEY);
@@ -49,14 +45,7 @@ export const getInspectorEmissionEnabled = (): boolean =>
 export const setInspectorEnabled = (enabled: boolean): void => {
   const changed = preference !== enabled;
   preference = enabled;
-  try {
-    globalThis.localStorage.setItem(
-      INSPECTOR_ENABLED_STORAGE_KEY,
-      String(enabled),
-    );
-  } catch {
-    // The setting still applies for this session when storage is unavailable.
-  }
+  safeLocalStorageSet(INSPECTOR_ENABLED_STORAGE_KEY, String(enabled));
 
   if (!enabled) clientInspectorStore.clear();
   if (changed) {
@@ -67,14 +56,7 @@ export const setInspectorEnabled = (enabled: boolean): void => {
 export const setInspectorLogsEnabled = (enabled: boolean): void => {
   const changed = logsPreference !== enabled;
   logsPreference = enabled;
-  try {
-    globalThis.localStorage.setItem(
-      INSPECTOR_LOGS_ENABLED_STORAGE_KEY,
-      String(enabled),
-    );
-  } catch {
-    // The setting still applies for this session when storage is unavailable.
-  }
+  safeLocalStorageSet(INSPECTOR_LOGS_ENABLED_STORAGE_KEY, String(enabled));
 
   if (!enabled) {
     void import("./persistentInspectorLogSink")

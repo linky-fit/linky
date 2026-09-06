@@ -7,7 +7,7 @@ import {
   getEncodedToken,
   MintOperationError,
 } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, Stream } from "effect";
+import { Effect, Exit, Layer } from "effect";
 import { InsufficientFunds } from "../domain/errors";
 import {
   Amount,
@@ -20,42 +20,38 @@ import {
   TokenText,
   UnixSeconds,
 } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
 import { MeltReceipt } from "../melt/domain";
 import type { MeltDraft } from "../melt/domain";
 import { Melt } from "../melt/Melt";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
-import { makeInMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { makeInMemoryTokenStore } from "../ports/inMemoryTokenStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import { NewTokenRow, TokenStore } from "../ports/TokenStore";
-import type { TokenStoreService } from "../ports/TokenStore";
+import {
+  answerProofStates,
+  fakeWallet,
+  KEYSET_HEX,
+  proof,
+} from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
+import { freshStorage } from "../testing/storage";
+import type { Storage } from "../testing/storage";
 import { Autoswap } from "./Autoswap";
 import { AutoswapDraft } from "./domain";
 import {
   PENDING_AUTOSWAP_CLAIM_KEY_PREFIX,
   PendingAutoswapClaim,
-  writePendingClaim,
+  pendingClaims,
 } from "./internal/pendingClaim";
 
 const sourceMint = MintUrl.make("https://source.example");
 const targetMint = MintUrl.make("https://target.example");
-const keysetHex = "009a1f293253e41e";
 const sat = CurrencyUnit.make("sat");
 const draft = new AutoswapDraft({ sourceMint, targetMint });
 
 const invoice = "lnbc1pexampleinvoice";
 const targetQuoteId = "target-quote-1";
-
-const proof = (amount: number, secret: string): CashuProof => ({
-  id: keysetHex,
-  amount: CashuAmount.from(amount),
-  secret,
-  C: "02" + "ab".repeat(32),
-});
 
 /** 100 sat sitting at the source mint. */
 const sourceToken = getEncodedToken({
@@ -94,52 +90,36 @@ const makeWallets = (args: FakeWalletArgs) => {
   const mintCounters: number[] = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
   let checks = 0;
-  const wallet = (): LoadedWallet => ({
-    keysetId: keysetHex,
-    keyChain: { getKeysets: () => [] },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
-    receive: () => Promise.reject(new Error("not under test")),
-    send: () => Promise.reject(new Error("not under test")),
-    checkProofsStates: (proofs) =>
-      Promise.resolve(
-        proofs.map((entry) => ({
-          Y: entry.secret ?? "",
-          state: "UNSPENT" as const,
-          witness: null,
-        })),
-      ),
-    createMintQuoteBolt11: (amount) => {
-      quotedAmounts.push(typeof amount === "number" ? amount : -1);
-      return Promise.resolve(mintQuoteResponse("UNPAID"));
-    },
-    checkMintQuoteBolt11: () => {
-      if (args.check !== undefined) return args.check();
-      const states = args.states ?? ["PAID"];
-      const state = states[Math.min(checks, states.length - 1)] ?? "PAID";
-      checks += 1;
-      return Promise.resolve(mintQuoteResponse(state));
-    },
-    mintProofsBolt11: (_amount, _quote, _config, outputType) => {
-      const counter =
-        outputType?.type === "deterministic" ? outputType.counter : -1;
-      mintCounters.push(counter);
-      return args.mintProofs
-        ? args.mintProofs(counter)
-        : Promise.resolve(mintedProofs);
-    },
-    restore: (start, count) => {
-      restoreCalls.push({ start, count });
-      return args.restore
-        ? args.restore()
-        : Promise.reject(new Error("restore unavailable"));
-    },
-    createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-    batchRestore: () => Promise.reject(new Error("not under test")),
-  });
+  const wallet = (): LoadedWallet =>
+    fakeWallet({
+      keysetId: KEYSET_HEX,
+      checkProofsStates: answerProofStates(),
+      createMintQuoteBolt11: (amount) => {
+        quotedAmounts.push(typeof amount === "number" ? amount : -1);
+        return Promise.resolve(mintQuoteResponse("UNPAID"));
+      },
+      checkMintQuoteBolt11: () => {
+        if (args.check !== undefined) return args.check();
+        const states = args.states ?? ["PAID"];
+        const state = states[Math.min(checks, states.length - 1)] ?? "PAID";
+        checks += 1;
+        return Promise.resolve(mintQuoteResponse(state));
+      },
+      mintProofsBolt11: (_amount, _quote, _config, outputType) => {
+        const counter =
+          outputType?.type === "deterministic" ? outputType.counter : -1;
+        mintCounters.push(counter);
+        return args.mintProofs
+          ? args.mintProofs(counter)
+          : Promise.resolve(mintedProofs);
+      },
+      restore: (start, count) => {
+        restoreCalls.push({ start, count });
+        return args.restore
+          ? args.restore()
+          : Promise.reject(new Error("restore unavailable"));
+      },
+    });
   return { wallet, quotedAmounts, mintCounters, restoreCalls };
 };
 
@@ -151,6 +131,7 @@ const makeMelt = (
 ) => {
   const invoices: string[] = [];
   const service = Melt.make({
+    status: () => Effect.succeed("UNPAID"),
     quote: () => Effect.die("melt.quote not under test"),
     melt: (draft: MeltDraft) => {
       const index = invoices.length;
@@ -187,23 +168,13 @@ const short = (
     }),
   );
 
-interface Storage {
-  readonly kv: KeyValueStoreService;
-  readonly tokens: TokenStoreService;
-}
-
-const freshStorage = (): Storage => ({
-  kv: makeInMemoryKeyValueStore(),
-  tokens: makeInMemoryTokenStore(),
-});
-
 /** One runtime over the given storage — a second one models a restart. */
 const makeHarness = (
   storage: Storage,
   walletArgs: FakeWalletArgs,
   melt: ReturnType<typeof makeMelt>,
 ) => {
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const wallets = makeWallets(walletArgs);
   const layer = Autoswap.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -217,18 +188,13 @@ const makeHarness = (
         Layer.succeed(Melt, melt.service),
         Layer.succeed(KeyValueStore, storage.kv),
         Layer.succeed(TokenStore, storage.tokens),
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
   const run = <A, E>(program: Effect.Effect<A, E, Autoswap>) =>
     Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
-  return { run, events, ...wallets };
+  return { run, events: inspector.events, ...wallets };
 };
 
 const seedSourceRow = (storage: Storage) =>
@@ -259,7 +225,7 @@ const pendingClaimRecord = (
     quoteId: QuoteId.make(targetQuoteId),
     mint: targetMint,
     unit: sat,
-    keysetId: KeysetId.make(keysetHex),
+    keysetId: KeysetId.make(KEYSET_HEX),
     amount: Amount.make(96),
     invoice: Bolt11Invoice.make(invoice),
     sourceMint,
@@ -439,7 +405,7 @@ describe("Autoswap.resumePendingClaims", () => {
     // The row was written but the record never cleared — the one window the
     // claim leaves open. Resuming must find the stored proofs.
     await Effect.runPromise(
-      writePendingClaim(storage.kv, pendingClaimRecord(1)),
+      pendingClaims.write(storage.kv, pendingClaimRecord(1)),
     );
 
     const resuming = makeHarness(
@@ -466,7 +432,7 @@ describe("Autoswap.resumePendingClaims", () => {
   it("keeps an unpaid quote for the next pass", async () => {
     const storage = freshStorage();
     await Effect.runPromise(
-      writePendingClaim(storage.kv, pendingClaimRecord(null)),
+      pendingClaims.write(storage.kv, pendingClaimRecord(null)),
     );
 
     const harness = makeHarness(storage, { states: ["UNPAID"] }, makeMelt([]));
@@ -481,7 +447,7 @@ describe("Autoswap.resumePendingClaims", () => {
   it("keeps a fresh record even when the mint rejects the quote check", async () => {
     const storage = freshStorage();
     await Effect.runPromise(
-      writePendingClaim(storage.kv, pendingClaimRecord(1)),
+      pendingClaims.write(storage.kv, pendingClaimRecord(1)),
     );
 
     const harness = makeHarness(
@@ -506,7 +472,7 @@ describe("Autoswap.resumePendingClaims", () => {
     const storage = freshStorage();
     const dayOld = Math.floor(Date.now() / 1000) - 25 * 3600;
     await Effect.runPromise(
-      writePendingClaim(storage.kv, pendingClaimRecord(1, dayOld)),
+      pendingClaims.write(storage.kv, pendingClaimRecord(1, dayOld)),
     );
 
     const harness = makeHarness(
@@ -527,7 +493,7 @@ describe("Autoswap.resumePendingClaims", () => {
     const storage = freshStorage();
     const dayOld = Math.floor(Date.now() / 1000) - 25 * 3600;
     await Effect.runPromise(
-      writePendingClaim(storage.kv, pendingClaimRecord(null, dayOld)),
+      pendingClaims.write(storage.kv, pendingClaimRecord(null, dayOld)),
     );
 
     const harness = makeHarness(storage, { states: ["UNPAID"] }, makeMelt([]));
@@ -556,7 +522,9 @@ describe("Autoswap.resumePendingClaims", () => {
     // A rejection may be transient (a 4xx classifies the same way), so a
     // fresh record survives it for the next pass.
     const fresh = freshStorage();
-    await Effect.runPromise(writePendingClaim(fresh.kv, pendingClaimRecord(1)));
+    await Effect.runPromise(
+      pendingClaims.write(fresh.kv, pendingClaimRecord(1)),
+    );
     const kept = await rejecting(fresh).run(resume);
     assert(Exit.isSuccess(kept));
     expect(kept.value[0].status).toBe("not-claimable-yet");
@@ -567,7 +535,7 @@ describe("Autoswap.resumePendingClaims", () => {
     const aged = freshStorage();
     const dayOld = Math.floor(Date.now() / 1000) - 25 * 3600;
     await Effect.runPromise(
-      writePendingClaim(aged.kv, pendingClaimRecord(1, dayOld)),
+      pendingClaims.write(aged.kv, pendingClaimRecord(1, dayOld)),
     );
     const exit = await rejecting(aged).run(resume);
     assert(Exit.isSuccess(exit));

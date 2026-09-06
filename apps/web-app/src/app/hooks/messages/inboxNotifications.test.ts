@@ -8,6 +8,8 @@ import {
 } from "@linky/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
+import { createSecretKey } from "../../../testUtils/nostrKeys";
+import { buildCashuToken } from "../../../testUtils/cashuToken";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { getLinkyBankPaymentOfferInfo } from "../../lib/bankPaymentOffer";
 import type { LocalNostrMessage } from "../../types/appTypes";
@@ -19,31 +21,10 @@ import {
   type InboxNotificationsContext,
 } from "./inboxNotifications";
 
-const createSecretKey = (lastByte: number): Uint8Array => {
-  const secretKey = new Uint8Array(32);
-  secretKey[31] = lastByte;
-  return secretKey;
-};
-
 const peerPubkey = getPublicKey(createSecretKey(2));
 const NOTICE_RUMOR_ID = "a".repeat(64);
 const SNAPSHOT_RUMOR_ID = "b".repeat(64);
 const SENT_AT = 1_700_000_100;
-
-const buildCashuToken = (): string => {
-  const payload = JSON.stringify({
-    token: [
-      {
-        mint: "https://mint.example",
-        proofs: [{ amount: 8, secret: "secret-a", C: "c-a", id: "keyset" }],
-      },
-    ],
-  });
-  return `cashuA${btoa(payload)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "")}`;
-};
 
 interface HarnessOptions {
   bankPaymentOfferMessages?: LocalNostrMessage[];
@@ -141,7 +122,7 @@ describe("notifyInsertedChatMessage", () => {
     const harness = createHarness();
 
     notifyInsertedChatMessage(
-      { ...insertedMessage, content: buildCashuToken() },
+      { ...insertedMessage, content: buildCashuToken({ amounts: [8] }) },
       harness.ctx,
     );
 
@@ -211,7 +192,7 @@ describe("handlePaymentNoticeReceived", () => {
       messages: [
         {
           contactId: "contact-1",
-          content: buildCashuToken(),
+          content: buildCashuToken({ amounts: [8] }),
           createdAtSec: SENT_AT - 30,
           direction: "in",
           id: "message-token",

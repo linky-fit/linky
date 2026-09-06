@@ -3,7 +3,7 @@
 Linky is a mobile-first PWA for contacts, Nostr messaging, and Lightning/Cashu payments.
 It is local-first: data is stored in Evolu (SQLite) and syncs between devices.
 
-The repo also contains a separate public website in `apps/site/` intended for `linky.fit`, while the product app remains a distinct deployment on `app.linky.fit`.
+The repo also contains a separate public website in `apps/site/` intended for `linky.fit`, while the product app remains a distinct deployment on `app.linky.fit`. Its `/cashu/` redemption page uses the shared linkshu wallet and linkstr delivery packages, with local recovery for interrupted payments.
 
 ## Protocols and stack
 
@@ -28,15 +28,12 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 
 ## Owner rotation and limits
 
-- Contacts/cashu/messages owner lanes auto-rotate when owner-local write delta reaches:
-  - `OWNER_ROTATION_TRIGGER_WRITE_COUNT = 1000`
-- Per-type rotation cooldown:
-  - `OWNER_ROTATION_COOLDOWN_MS = 60000` (1 minute)
-- Contacts and valid token data migrate forward; messages are pointer-rotated (no message copy).
-- App reads active + previous message owner for continuity.
-- Stale owners are pruned locally (`n-2`) after rotation.
-- Contact cap:
-  - `MAX_CONTACTS_PER_OWNER = 500`
+Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `docs/architecture.md` ("Evolu persistence and owner lanes").
+
+- Each Evolu owner lane rotates on its own historical mutation threshold: contacts `220`, cashu `170`, messages `160`, transactions `220` (`*_OWNER_ROTATION_TRIGGER_WRITE_COUNT`), with a per-scope `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown.
+- Existing quota failures need relay capacity before rejected history can sync. Keep the device's local data, increase the relay's quota or add a relay with capacity, then reload normally.
+- Rotation is pointer-only for every scope: the active lane index moves forward in `ownerMeta`, nothing is copied, and older lanes stay readable instead of being pruned.
+- Contacts are additionally capped at `MAX_CONTACTS_PER_OWNER = 100` per active lane; a full lane triggers rotation to the next one.
 
 ## Features
 
@@ -62,6 +59,7 @@ For Android native builds: Java 17
 - `bun run dev` — full local environment: starts `docker-compose.dev.yml` (local Nostr relay :7777, Evolu sync relay :4001, Cashu Nutshell **FakeWallet** mint :3338 that auto-settles invoices with fake sats), then runs the web app (:5173) and push service (:8787) against it via the committed `.env.development` files. npub.cash flows are disabled locally (#219); the mint has no real Lightning backend (#220).
 - `bun run dev:prod` — web app only, on :5175, against production services. The separate port keeps browser storage isolated from local-dev sessions.
 - `bun run dev:services` — just the docker stack, attached.
+- The `e2e` and `quota` Compose profiles also start an isolated Evolu relay on :4002 with a 16 KiB per-owner quota for recovery tests. The normal :4001 relay stays unlimited unless `EVOLU_OWNER_QUOTA_BYTES` sets a positive byte limit.
 
 ### linkshu CLI wallet
 
@@ -127,25 +125,11 @@ curl -X POST "http://localhost:5173/__inspector/clear"
 tail -f apps/web-app/.inspector/rows-5173.ndjson
 ```
 
-Android shell currently adds:
-
-- encrypted native secret storage for identity data
-- native QR scanning in the Capacitor shell
-- native Android notification permission + FCM token bridge
-
-Native push delivery now works end-to-end when:
-
-- `apps/native-shell/android/app/google-services.json` is present for the Android shell build
-- `apps/push` is configured with `PUSH_FIREBASE_SERVICE_ACCOUNT_JSON`
-
 ```bash
 bun install
 bun run dev
 bun run site:dev
 bun run push:dev
-bun run native:android:add
-bun run native:apk:debug
-bun run native:apk:release
 ```
 
 Build:
@@ -155,30 +139,13 @@ bun run build
 bun run site:build
 ```
 
-Android native shell debug APK:
+### Native shells
 
-```bash
-bun run native:android:add
-bun run native:apk:debug
-```
-
-Android signed release APK:
-
-```bash
-bun run native:apk:release
-```
-
-Latest built debug APK ends up at:
-
-```bash
-apps/native-shell/android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-Public download URL for the latest GitHub Release APK:
-
-```bash
-https://github.com/hynek-jina/linky/releases/latest/download/linky.apk
-```
+Android APK/AAB builds, signing, Firebase push setup, and the iOS project are documented in
+[`apps/native-shell/README.md`](./apps/native-shell/README.md). The root `native:*` scripts
+(`bun run native:apk:debug`, `bun run native:apk:release`, `bun run native:aab:release`, ...) forward
+to that workspace. Native push delivery additionally needs `apps/push` configured with
+`PUSH_FIREBASE_SERVICE_ACCOUNT_JSON`.
 
 Start the push service once:
 
@@ -195,22 +162,22 @@ bun run test
 ```
 
 `@linky/linkshu` additionally has an integration suite against the local
-docker mint (started via `docker compose -f docker-compose.dev.yml up -d
---wait cashu-mint`): `bun run --filter @linky/linkshu test:integration`.
+docker mints (started via `docker compose -f docker-compose.dev.yml up -d
+--wait cashu-mint cashu-mint-target`): `bun run --filter @linky/linkshu test:integration`.
 
 `@linky/linkshu-cli` runs its port and argument-parsing tests under `bun test` (no mint needed);
 they are part of `bun run test`.
 
-End-to-end tests (Playwright) live in `apps/web-app/tests/*.spec.ts` and are split into two
-projects. `prod-services` is the original suite and runs against production relays and mints:
-
-```bash
-cd apps/web-app && bunx playwright test --project=prod-services
-```
-
-`local-stack` runs the proxy-payment flow — three accounts on one machine, talking over the local
+End-to-end tests (Playwright) live in `apps/web-app/tests/*.spec.ts`.
+The `local-stack` runs the proxy-payment flow — three accounts on one machine, talking over the local
 Nostr relay and paying each other with the local Cashu mint — plus the linkshu storage-migration
-scenario (legacy wallet keys seeded before first launch, wallet must keep working). It needs the
+scenario, chat/edit/offline-reaction and top-up recovery, and signup with a real password-save
+form submission. Attachment tests send encrypted images and PDFs between browsers and verify
+decryption, seen receipts, downloads, and bytes handed to the browser sharing API. Owner-lane
+tests verify old and new contacts, messages, transactions, and tokens across devices and reloads.
+Boot and route tests cover fresh profiles, restore, unavailable browser storage, and navigation.
+The full suite and site redemption tests run on pull requests and pushes to main.
+Payments use separate local mints on :3338 and :3339. It needs the
 docker stack up first, because the app is served from it as a production build on :5176:
 
 ```bash
@@ -264,7 +231,10 @@ Workspace-scoped commands (public site only):
 bun run --filter @linky/site dev
 bun run --filter @linky/site build
 bun run --filter @linky/site preview
+bun run --filter @linky/site test:e2e
 ```
+
+The site smoke suite needs the local mints on 3338/3339 and Nostr relay on 7777. It builds and serves the site on 5180, enabling test-mint redemption only for that build. It covers direct and proxied LNURL payments plus reload recovery after lost swap and melt responses.
 
 Workspace-scoped commands (native shell):
 

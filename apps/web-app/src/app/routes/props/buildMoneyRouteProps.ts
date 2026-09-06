@@ -1,3 +1,4 @@
+import type { Translate } from "../../../i18n";
 import type { Route } from "../../../types/route";
 import type { MoneyRoutesProps } from "../AppRouteContent";
 
@@ -11,7 +12,7 @@ interface BuildMoneyRoutePropsParams {
   bankPaymentOfferContacts: MoneyRoutesProps["spdPaymentProps"]["offerContacts"];
   bankPaymentOfferRecipientCount: MoneyRoutesProps["spdPaymentProps"]["initialOfferContactCount"];
   bankPaymentOfferStaggerDelaySec: MoneyRoutesProps["spdPaymentProps"]["initialOfferDelaySec"];
-  cashuBalance: MoneyRoutesProps["cashuTokensProps"]["cashuBalance"];
+  cashuBalance: MoneyRoutesProps["lnAddressPayProps"]["cashuBalance"];
   cashuBalanceAfterMelt: MoneyRoutesProps["lnAddressPayProps"]["cashuBalanceAfterMelt"];
   cashuTotalBalance: MoneyRoutesProps["cashuTokensProps"]["cashuTotalBalance"];
   cashuBulkCheckIsBusy: MoneyRoutesProps["cashuTokensProps"]["cashuBulkCheckIsBusy"];
@@ -43,8 +44,6 @@ interface BuildMoneyRoutePropsParams {
   copyText: ReturnType<MoneyRoutesProps["cashuTokenProps"]>["copyText"];
   currentNpub: MoneyRoutesProps["topupProps"]["currentNpub"];
   displayUnit: MoneyRoutesProps["lnAddressPayProps"]["displayUnit"];
-  effectiveProfileName: MoneyRoutesProps["topupProps"]["effectiveProfileName"];
-  effectiveProfilePicture: MoneyRoutesProps["topupProps"]["effectiveProfilePicture"];
   emitCashuToken: MoneyRoutesProps["cashuTokenEmitProps"]["emitCashuToken"];
   getMintIconUrl: MoneyRoutesProps["cashuTokensProps"]["getMintIconUrl"];
   knownLnAddressPayContact: MoneyRoutesProps["lnAddressPayProps"]["knownContact"];
@@ -84,7 +83,7 @@ interface BuildMoneyRoutePropsParams {
       : never
     : never;
   setTopupAmount: MoneyRoutesProps["topupProps"]["setTopupAmount"];
-  t: MoneyRoutesProps["cashuTokensProps"]["t"];
+  t: Translate;
   topupAmount: MoneyRoutesProps["topupProps"]["topupAmount"];
   topupInvoice: MoneyRoutesProps["topupInvoiceProps"]["topupInvoice"];
   topupInvoiceCashuRequest: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceCashuRequest"];
@@ -133,8 +132,6 @@ export const buildMoneyRouteProps = ({
   copyText,
   currentNpub,
   displayUnit,
-  effectiveProfileName,
-  effectiveProfilePicture,
   emitCashuToken,
   getMintIconUrl,
   knownLnAddressPayContact,
@@ -184,7 +181,6 @@ export const buildMoneyRouteProps = ({
       emitCashuToken,
       meltLargestForeignMintToMainMint,
       setCashuEmitAmount,
-      t,
     },
     cashuTokenNewProps: {
       cashuDraft,
@@ -196,7 +192,6 @@ export const buildMoneyRouteProps = ({
     },
     cashuTokensProps: {
       canRestoreTokens,
-      cashuBalance,
       cashuTotalBalance,
       cashuBulkCheckIsBusy,
       cashuIsBusy,
@@ -212,7 +207,6 @@ export const buildMoneyRouteProps = ({
       meltLargestForeignMintToMainMint,
       restoreMissingTokens,
       setMintIconUrlByMint,
-      t,
       tokensRestoreIsBusy,
     },
     cashuTokenProps: () => {
@@ -235,7 +229,6 @@ export const buildMoneyRouteProps = ({
         returnCashuTokenToWallet,
         startSendCashuTokenToContact,
         shareTokenText: shareCashuTokenText,
-        t,
         writeToNfc: writeCashuTokenToNfc,
       };
     },
@@ -251,7 +244,6 @@ export const buildMoneyRouteProps = ({
       setLnAddressPayAmount,
       displayUnit,
       payLightningAddressWithCashu,
-      t,
     },
     manualPayProps: {
       contacts: manualPayContacts,
@@ -267,7 +259,6 @@ export const buildMoneyRouteProps = ({
       offerContacts: bankPaymentOfferContacts,
       onRequestReimbursement: onRequestBankPaymentOffer,
       spdPayload: route.kind === "bankPayment" ? route.spdPayload : "",
-      t,
     },
     topupInvoiceProps: {
       topupAmount,
@@ -282,8 +273,6 @@ export const buildMoneyRouteProps = ({
       t,
     },
     topupProps: {
-      effectiveProfilePicture,
-      effectiveProfileName,
       currentNpub,
       topupAmount,
       setTopupAmount,

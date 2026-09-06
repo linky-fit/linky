@@ -1,19 +1,14 @@
 import { Effect, Exit, Layer } from "effect";
-import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
+import { finalizeEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
-import { NostrSecretKey, Pubkey, RelayUrl } from "../domain/primitives";
-import { SignedPlainEvent } from "../internal/nostrEvent";
+import { RelayUrl } from "../domain/primitives";
+import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import { makeIdentity, stubPlainTransport } from "../testing";
 import { RelayListEntry, RelayListsDraft } from "./domain";
 import { RelayLists } from "./RelayLists";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 
@@ -31,23 +26,7 @@ const stubTransport = (
     stored?: ReadonlyArray<NostrToolsEvent>;
   },
 ): Layer.Layer<NostrTransport> =>
-  Layer.succeed(NostrTransport, {
-    publish: (relays, event) =>
-      Effect.sync(() => {
-        if (!(event instanceof SignedPlainEvent)) {
-          throw new Error("relay lists publish only plain events");
-        }
-        published.push(event);
-        return relays.map((relay) => {
-          const accepted = options?.accept?.(event) ?? true;
-          return new RelayPublishResult({
-            relay,
-            accepted,
-            detail: accepted ? null : "blocked",
-          });
-        });
-      }),
-    subscribe: () => Effect.die("subscribe not under test"),
+  stubPlainTransport(published, options?.accept ?? (() => true), {
     fetch: () => Effect.succeed(options?.stored ?? []),
   });
 
@@ -92,8 +71,7 @@ describe("RelayLists.publishRelayLists", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
 
     const relayList = published.find((event) => event.kind === 10002);
     const dmRelayList = published.find((event) => event.kind === 10050);
@@ -178,8 +156,7 @@ describe("RelayLists.fetchOwnRelayLists", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.relays).toEqual([
       expect.objectContaining({ relay: relayOne, marker: "read" }),
       expect.objectContaining({ relay: relayTwo, marker: null }),
@@ -199,8 +176,7 @@ describe("RelayLists.fetchOwnRelayLists", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual(
       expect.objectContaining({
         relays: null,

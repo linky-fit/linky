@@ -17,10 +17,8 @@ import { localStorageKeyValueStore } from "./localStorageKeyValueStore";
 export const wipeLinkshuSeedBoundState = async (
   mnemonic: string,
 ): Promise<void> => {
-  // ONE-TIME MIGRATION — DELETE ME EVENTUALLY (see linkshuStorageMigration
-  // .ts): migrating first parks any legacy counter keys under the linkshu
-  // prefixes this wipe clears, so state bound to the replaced seed dies here
-  // instead of surviving to be migrated under the new seed later.
+  // Migrate first so the wipe also clears counters bound to the old seed.
+  // Removal gate for this prologue is in docs/architecture.md.
   migrateLegacyCashuLocalState();
   try {
     await runLinkshu(

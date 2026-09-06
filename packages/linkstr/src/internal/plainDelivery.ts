@@ -6,7 +6,7 @@ import type { NostrTransportService } from "../services/NostrTransport";
 import type { RelayPolicyService } from "../services/RelayPolicy";
 import { signPlainEvent } from "./plainEvent";
 import type { PlainEventTemplate } from "./plainEvent";
-import { nowUnixSeconds } from "./time";
+import { nowSeconds } from "./time";
 
 export interface PlainDeliveryContext {
   readonly identity: LinkstrIdentityService;
@@ -23,7 +23,7 @@ export const deliverPlainEvent = (
   template: PlainEventTemplate,
 ): Effect.Effect<PlainEventReceipt, NoRelayAcceptedEvent> =>
   Effect.gen(function* () {
-    const sentAt = yield* nowUnixSeconds;
+    const sentAt = yield* nowSeconds;
     const event = signPlainEvent(template, sentAt, identity.secretKey);
     const results = yield* transport.publish(relayPolicy.writeRelays, event);
     const receipt = new PlainEventReceipt({

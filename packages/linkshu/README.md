@@ -6,32 +6,6 @@ restore, …) is defined here as an Effect service over branded `Schema` types.
 Raw cashu-ts types never cross the package boundary: callers hand in drafts
 and get receipts; token text is the currency of the API.
 
-> **Status: foundation (#287), token codec (#288), the receive vertical
-> (#289), the send vertical (#290), validation + restore (#291), the topup
-> flow (#292), the melt vertical (#293), autoswap + the fee probe (#294), and
-> the `Tokens` read model and lifecycle transitions implemented — no
-> interface-contract stub (#286) is left.** The ports with
-> their in-memory defaults, the inspector, mint/wallet management (including
-> the single shared wallet-instance cache), the canonical token codec, the
-> token lifecycle state machine, `receive` (deterministic re-signing with
-> counter-collision recovery over the lease-locked counter), `send` (NUT-07
-> pre-filter, disjoint send/keep counter blocks, change persisted before the
-> receipt resolves), `validation` (batched NUT-07 checks, spent marking,
-> local merge), `restore` (NUT-09 recovery from seed with persisted
-> cursors), `topup` (self-recovering quote → poll → mint, with the reserved
-> counter slots persisted before the outputs are derived) and `melt` (bolt11
-> payment over the shared send machinery: fee-inclusive exact swap, the
-> inputs held as a `reserved` row while the mint has them, NUT-08 blank
-> outputs burned deterministically before the melt call so restore
-> reproduces the state, lost responses and pending payments resolved from
-> the mint's own quote state), `autoswap` (melt-then-mint over the melt
-> vertical, with the pending claim persisted before the invoice can be paid
-> and drained by `resumePendingClaims`), `feeProbe` (a melt quote against
-> another mint's unpaid invoice, cached per mint for a day) and `Tokens`
-> (the enriched row list and balances, the lifecycle transitions,
-> `returnToWallet` over the shared accept flow, and a NUT-07 sweep behind
-> `deleteSpent`) are real.
-
 ## Verticals
 
 - `receive/` — one call from pasted/scanned text to an `accepted` row:
@@ -68,6 +42,14 @@ and get receipts; token text is the currency of the API.
   `deleteSpent`, which asks the mints before it deletes anything
 - `mint/` — mint info (name, `input_fee_ppk`, MPP) and the known-mint set;
   internally the single wallet-instance cache every vertical shares
+
+## Invoice previews
+
+`getLightningInvoicePreview`, `parseBolt11AmountMsat`, and
+`getLightningInvoiceDescriptionHashHex` are pure exports for displaying invoice
+amounts, descriptions and expiry, and checking LNURL description hashes. They
+need no wallet runtime. These preserve the app's permissive preview behavior;
+they do not validate signatures or authorize payment.
 
 ## Token lifecycle
 
@@ -142,22 +124,25 @@ already injectable).
 Unit tests are colocated (`src/**/*.test.ts`) and run with
 `bun run --filter @linky/linkshu test` (included in the root `bun run test`).
 The integration suite in `tests/integration/` exercises the public API
-against the dev-stack docker mint:
+against two dev-stack docker mints:
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d --wait cashu-mint
+docker compose -f docker-compose.dev.yml up -d --wait cashu-mint cashu-mint-target
 bun run --filter @linky/linkshu test:integration
 ```
 
-CI runs it as the `linkshu-integration` job in `tests.yml`.
+CI runs it as the `linkshu-integration` job in `tests.yml`. Source and target
+use separate keys and databases on :3338 and :3339. Override their URLs with
+`LINKSHU_MINT_URL` and `LINKSHU_TARGET_MINT_URL`. Autoswap verifies source
+proofs are spent and target proofs can be redeemed; FakeWallet simulates
+Lightning settlement.
 
 ## Usage
 
 Service assembly has one home: `linkshuServices(config)` layers every
-vertical over the ports. React apps will use `@linky/linkshu-react` (phase
-two, mirroring linkstr-react's atom architecture) instead of wiring layers
-themselves. Non-React environments use the headless one-shot runner, which
-also takes the optional `inspector` layer:
+vertical over the ports; the web app keeps a `ManagedRuntime` over it.
+Non-React environments use the headless one-shot runner, which also takes the
+optional `inspector` layer:
 
 ```ts
 import { Effect } from "effect";

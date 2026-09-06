@@ -17,7 +17,7 @@ const getBlockLinePrefix = (node: Node): string =>
     ? "\n"
     : "";
 
-export const getMessageEditorNodeValue = (node: Node): string => {
+const getMessageEditorNodeValue = (node: Node): string => {
   if (node instanceof HTMLElement) {
     const entityValue = node.dataset.messageEntityValue;
     if (entityValue !== undefined) return entityValue;
@@ -33,7 +33,7 @@ export const getMessageEditorNodeValue = (node: Node): string => {
 export const getMessageEditorValue = (editor: HTMLElement): string =>
   Array.from(editor.childNodes).map(getMessageEditorNodeValue).join("");
 
-export interface MessageEditorEntityRange {
+interface MessageEditorEntityRange {
   end: number;
   start: number;
   value: string;

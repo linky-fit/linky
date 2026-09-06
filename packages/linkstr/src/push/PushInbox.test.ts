@@ -9,28 +9,18 @@ import {
 import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { Pubkey, RelayUrl } from "../domain/primitives";
-import type {
-  RelayConnection,
-  RelayPool,
-  RelaySubscriptionParams,
-} from "../services/NostrTransport";
 import {
   makeRelayPoolTransport,
   NostrTransport,
 } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import { eventually, FakeRelay, poolFor } from "../testing";
 import type {
   DeliveredPushWrap,
   PushRelayStatusEvent,
   PushWrapFailure,
 } from "./PushInbox";
 import { PushInbox } from "./PushInbox";
-
-interface FakeSubscription {
-  readonly filters: Array<Filter>;
-  readonly params: RelaySubscriptionParams;
-  closed: boolean;
-}
 
 const STRICT_FILTER_CLOSE_REASON = "bad req: unindexed tag filter";
 
@@ -41,63 +31,12 @@ const hasMultiLetterTagFilter = (filters: ReadonlyArray<Filter>): boolean =>
     ),
   );
 
-class FakeRelay {
-  readonly subscriptions: Array<FakeSubscription> = [];
-  readonly alreadyHaveChecks: Array<string> = [];
-
-  readonly connection: RelayConnection = {
-    publish: () => Promise.resolve("stored"),
-    subscribe: (filters, params) => {
-      const subscription = { filters, params, closed: false };
-      this.subscriptions.push(subscription);
-      if (hasMultiLetterTagFilter(filters)) {
-        subscription.closed = true;
-        params.onclose?.(STRICT_FILTER_CLOSE_REASON);
-      }
-      return { close: () => (subscription.closed = true) };
-    },
-  };
-
-  emit(event: NostrToolsEvent): void {
-    for (const subscription of this.subscriptions) {
-      if (subscription.closed) continue;
-      const alreadyHaveEvent = subscription.params.alreadyHaveEvent;
-      if (alreadyHaveEvent !== undefined) {
-        this.alreadyHaveChecks.push(event.id);
-        if (alreadyHaveEvent(event.id)) continue;
-      }
-      subscription.params.onevent(event);
-    }
-  }
-
-  eose(): void {
-    for (const subscription of this.subscriptions) {
-      if (!subscription.closed) subscription.params.oneose?.();
-    }
-  }
-
-  close(reason: string): void {
-    for (const subscription of this.subscriptions) {
-      if (subscription.closed) continue;
-      subscription.closed = true;
-      subscription.params.onclose?.(reason);
-    }
-  }
-}
-
-const eventually = (predicate: () => boolean): Effect.Effect<void, Error> => {
-  const poll: Effect.Effect<void> = Effect.suspend(() =>
-    predicate()
-      ? Effect.void
-      : Effect.sleep(Duration.millis(2)).pipe(Effect.andThen(() => poll)),
-  );
-  return poll.pipe(
-    Effect.timeoutFail({
-      duration: Duration.seconds(2),
-      onTimeout: () => new Error("condition not met within 2s"),
-    }),
-  );
-};
+/** Refuses multi-letter tag filters like strfry does. */
+const strictRelay = (): FakeRelay =>
+  new FakeRelay({
+    rejectFilters: (filters) =>
+      hasMultiLetterTagFilter(filters) ? STRICT_FILTER_CLOSE_REASON : null,
+  });
 
 const secretKey = generateSecretKey();
 const recipient = Pubkey.make(getPublicKey(generateSecretKey()));
@@ -119,10 +58,8 @@ const pushWrap = (content: string): NostrToolsEvent =>
 describe("PushInbox", () => {
   it("rejects multi-letter tag filters like a strict production relay", async () => {
     const relay = RelayUrl.make("wss://strict-relay.test");
-    const fake = new FakeRelay();
-    const pool: RelayPool = {
-      ensureRelay: () => Promise.resolve(fake.connection),
-    };
+    const fake = strictRelay();
+    const pool = poolFor(new Map([[relay, fake]]));
     const transport = makeRelayPoolTransport(pool);
     let delivered = 0;
 
@@ -145,18 +82,12 @@ describe("PushInbox", () => {
     const relayB = RelayUrl.make("wss://relay-b.test");
     const fakeA = new FakeRelay();
     const fakeB = new FakeRelay();
-    const relays = new Map<string, FakeRelay>([
-      [relayA, fakeA],
-      [relayB, fakeB],
-    ]);
-    const pool: RelayPool = {
-      ensureRelay: (url) => {
-        const relay = relays.get(url);
-        return relay === undefined
-          ? Promise.reject(new Error("unknown relay"))
-          : Promise.resolve(relay.connection);
-      },
-    };
+    const pool = poolFor(
+      new Map([
+        [relayA, fakeA],
+        [relayB, fakeB],
+      ]),
+    );
     const layer = PushInbox.Default.pipe(
       Layer.provide(
         Layer.mergeAll(
@@ -240,18 +171,12 @@ describe("PushInbox", () => {
     const relayB = RelayUrl.make("wss://relay-b.test");
     const fakeA = new FakeRelay();
     const fakeB = new FakeRelay();
-    const relays = new Map<string, FakeRelay>([
-      [relayA, fakeA],
-      [relayB, fakeB],
-    ]);
-    const pool: RelayPool = {
-      ensureRelay: (url) => {
-        const relay = relays.get(url);
-        return relay === undefined
-          ? Promise.reject(new Error("unknown relay"))
-          : Promise.resolve(relay.connection);
-      },
-    };
+    const pool = poolFor(
+      new Map([
+        [relayA, fakeA],
+        [relayB, fakeB],
+      ]),
+    );
     const layer = PushInbox.Default.pipe(
       Layer.provide(
         Layer.mergeAll(
@@ -293,10 +218,8 @@ describe("PushInbox", () => {
 
   it("refreshes a subscription that stays open", async () => {
     const relay = RelayUrl.make("wss://refresh-relay.test");
-    const fake = new FakeRelay();
-    const pool: RelayPool = {
-      ensureRelay: () => Promise.resolve(fake.connection),
-    };
+    const fake = strictRelay();
+    const pool = poolFor(new Map([[relay, fake]]));
     const layer = PushInbox.Default.pipe(
       Layer.provide(
         Layer.mergeAll(
@@ -308,6 +231,8 @@ describe("PushInbox", () => {
     const refreshInterval = Duration.minutes(1);
 
     await Effect.gen(function* () {
+      // TestClock starts at epoch 0, which is not a valid UnixSeconds.
+      yield* TestClock.setTime(1_754_000_000_000);
       const inbox = yield* PushInbox;
       const events = yield* inbox.open({
         lookback: Duration.days(3),
@@ -338,10 +263,8 @@ describe("PushInbox", () => {
 
   it("reports anomalous wraps and relay statuses", async () => {
     const relay = RelayUrl.make("wss://reporting-relay.test");
-    const fake = new FakeRelay();
-    const pool: RelayPool = {
-      ensureRelay: () => Promise.resolve(fake.connection),
-    };
+    const fake = strictRelay();
+    const pool = poolFor(new Map([[relay, fake]]));
     const layer = PushInbox.Default.pipe(
       Layer.provide(
         Layer.mergeAll(
@@ -378,7 +301,7 @@ describe("PushInbox", () => {
       yield* eventually(() => relayStatuses.length === 1);
       expect(relayStatuses).toEqual([{ type: "eose", relay }]);
 
-      fake.close("relay maintenance");
+      fake.closeFromRelay("relay maintenance");
       yield* eventually(() => relayStatuses.length === 2);
       expect(relayStatuses).toEqual([
         { type: "eose", relay },

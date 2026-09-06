@@ -9,16 +9,20 @@
     "build": "tsc -b && vite build",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
+    "test": "vitest run",
     "typecheck": "tsc -b",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@cashu/cashu-ts": "^4.0.0",
-    "buffer": "^6.0.3",
-    "nostr-tools": "^2.17.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "undici": "^7.22.0",
+    "@linky/linkshu": "workspace:*",
+    "@linky/linkstr": "workspace:*",
+    "effect": "^3.19.19",
+    "@noble/hashes": "^2.0.1"
   },
   "devDependencies": {
     "@linky/config": "workspace:*",
@@ -29,6 +33,9 @@
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",
     "typescript": "~5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^4.0.18",
+    "@playwright/test": "^1.58.1",
+    "@cashu/cashu-ts": "^4.0.0"
   }
 }

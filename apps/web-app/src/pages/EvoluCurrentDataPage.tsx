@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
+import { readRowOwnerId } from "../app/lib/rowOwnerId";
 import { loadEvoluCurrentData } from "../evolu";
 import { writeClipboardText } from "../platform/clipboard";
 import {
@@ -19,14 +20,6 @@ interface EvoluDataSectionConfig {
   rotateLabel: string | null;
   rotatingLabel: string | null;
   rotationLimit: number | null;
-}
-
-function readRowOwnerId(row: unknown): string {
-  if (typeof row !== "object" || row === null) return "";
-  if (!("ownerId" in row)) return "";
-  const ownerId = row.ownerId;
-  if (typeof ownerId !== "string") return "";
-  return ownerId.trim();
 }
 
 function isTrackedTable(tableName: string): boolean {
@@ -106,58 +99,66 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   }, [copiedCellKey]);
 
   const filteredCurrentData = React.useMemo(() => {
-    const activeContactsOwnerId = String(evoluContactsOwnerId ?? "").trim();
+    const activeContactsOwnerId = (evoluContactsOwnerId ?? "").trim();
     const visibleCashuOwnerIds = new Set(
       [evoluCashuOwnerId, ...evoluCashuVisibleOwnerIds]
-        .map((ownerId) => String(ownerId ?? "").trim())
+        .map((ownerId) => (ownerId ?? "").trim())
         .filter(Boolean),
     );
     const visibleMessageOwnerIds = new Set(
       [evoluMessagesOwnerId, ...evoluMessagesVisibleOwnerIds]
-        .map((ownerId) => String(ownerId ?? "").trim())
+        .map((ownerId) => (ownerId ?? "").trim())
         .filter(Boolean),
     );
     const visibleTransactionOwnerIds = new Set(
       [evoluTransactionsOwnerId, ...evoluTransactionsVisibleOwnerIds]
-        .map((ownerId) => String(ownerId ?? "").trim())
+        .map((ownerId) => (ownerId ?? "").trim())
         .filter(Boolean),
     );
 
     return Object.fromEntries(
-      Object.entries(currentData).map(([tableName, rows]) => {
-        if (!isTrackedTable(tableName)) {
-          return [tableName, rows];
-        }
-        if (tableName === "contact") {
-          if (!activeContactsOwnerId) return [tableName, []];
-          return [
-            tableName,
-            rows.filter((row) => readRowOwnerId(row) === activeContactsOwnerId),
-          ];
-        }
-        if (tableName === "cashuToken") {
-          if (visibleCashuOwnerIds.size === 0) return [tableName, []];
-          return [
-            tableName,
-            rows.filter((row) => visibleCashuOwnerIds.has(readRowOwnerId(row))),
-          ];
-        }
-        if (tableName === "transaction") {
-          if (visibleTransactionOwnerIds.size === 0) return [tableName, []];
+      Object.entries(currentData).map(
+        ([tableName, rows]): [string, typeof rows] => {
+          if (!isTrackedTable(tableName)) {
+            return [tableName, rows];
+          }
+          if (tableName === "contact") {
+            if (!activeContactsOwnerId) return [tableName, []];
+            return [
+              tableName,
+              rows.filter(
+                (row) => readRowOwnerId(row) === activeContactsOwnerId,
+              ),
+            ];
+          }
+          if (tableName === "cashuToken") {
+            if (visibleCashuOwnerIds.size === 0) return [tableName, []];
+            return [
+              tableName,
+              rows.filter((row) =>
+                visibleCashuOwnerIds.has(readRowOwnerId(row)),
+              ),
+            ];
+          }
+          if (tableName === "transaction") {
+            if (visibleTransactionOwnerIds.size === 0) return [tableName, []];
+            return [
+              tableName,
+              rows.filter((row) =>
+                visibleTransactionOwnerIds.has(readRowOwnerId(row)),
+              ),
+            ];
+          }
+          if (visibleMessageOwnerIds.size === 0) return [tableName, []];
           return [
             tableName,
             rows.filter((row) =>
-              visibleTransactionOwnerIds.has(readRowOwnerId(row)),
+              visibleMessageOwnerIds.has(readRowOwnerId(row)),
             ),
           ];
-        }
-        if (visibleMessageOwnerIds.size === 0) return [tableName, []];
-        return [
-          tableName,
-          rows.filter((row) => visibleMessageOwnerIds.has(readRowOwnerId(row))),
-        ];
-      }),
-    ) as Awaited<ReturnType<typeof loadEvoluCurrentData>>;
+        },
+      ),
+    );
   }, [
     currentData,
     evoluCashuOwnerId,
@@ -275,8 +276,8 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   }
 
   return (
-    <section className="panel" style={{ paddingTop: 8 }}>
-      <div style={{ maxHeight: 600, overflow: "auto" }}>
+    <section className="panel panel-layout">
+      <div className="evolu-data-scroll">
         {dataSections.map(
           ({
             tableName,
@@ -319,38 +320,12 @@ export function EvoluCurrentDataPage(): React.ReactElement {
             };
 
             return (
-              <div
-                key={tableName}
-                style={{
-                  marginBottom: 24,
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  backgroundColor: "var(--color-bg-secondary)",
-                }}
-              >
-                <div
-                  style={{
-                    padding: 14,
-                    borderBottom: "1px solid var(--color-border)",
-                    background:
-                      "linear-gradient(180deg, var(--color-bg-tertiary) 0%, var(--color-bg-secondary) 100%)",
-                  }}
-                >
+              <div key={tableName} className="evolu-data-card">
+                <div className="evolu-data-card-header">
                   <div
-                    style={{
-                      alignItems: "center",
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 10,
-                      justifyContent: "space-between",
-                      marginBottom:
-                        ownerIndex !== null || editsUntilRotation !== null
-                          ? 12
-                          : 0,
-                    }}
+                    className={`evolu-data-title-row${ownerIndex !== null || editsUntilRotation !== null ? " has-owner-summary" : ""}`}
                   >
-                    <h3 style={{ margin: 0 }}>{label}</h3>
+                    <h3 className="unspaced">{label}</h3>
 
                     {onRotate && rotateLabel && rotatingLabel && (
                       <button
@@ -368,78 +343,24 @@ export function EvoluCurrentDataPage(): React.ReactElement {
                   </div>
 
                   {(ownerIndex !== null || editsUntilRotation !== null) && (
-                    <div
-                      style={{
-                        display: "grid",
-                        gap: 10,
-                        gridTemplateColumns:
-                          "repeat(auto-fit, minmax(180px, 1fr))",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "grid",
-                          gap: 10,
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: "9px 11px",
-                            borderRadius: 12,
-                            backgroundColor: "var(--color-bg-primary)",
-                            border: "1px solid var(--color-border)",
-                          }}
-                        >
-                          <div
-                            style={{
-                              alignItems: "baseline",
-                              display: "flex",
-                              gap: 8,
-                              justifyContent: "space-between",
-                            }}
-                          >
+                    <div className="evolu-owner-summary-grid">
+                      <div className="evolu-owner-summary-stack">
+                        <div className="evolu-owner-stat">
+                          <div className="evolu-owner-stat-line">
                             <span className="muted">Rows</span>
-                            <span
-                              style={{
-                                fontSize: 15,
-                                fontWeight: 600,
-                                marginLeft: "auto",
-                                textAlign: "right",
-                              }}
-                            >
+                            <span className="evolu-owner-stat-value">
                               {rows.length}
                             </span>
                           </div>
                         </div>
 
                         {ownerIndex !== null && (
-                          <div
-                            style={{
-                              padding: "9px 11px",
-                              borderRadius: 12,
-                              backgroundColor: "var(--color-bg-primary)",
-                              border: "1px solid var(--color-border)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                alignItems: "baseline",
-                                display: "flex",
-                                gap: 8,
-                                justifyContent: "space-between",
-                              }}
-                            >
+                          <div className="evolu-owner-stat">
+                            <div className="evolu-owner-stat-line">
                               <span className="muted">
                                 {t("evoluOwnerIndex")}
                               </span>
-                              <span
-                                style={{
-                                  fontSize: 15,
-                                  fontWeight: 600,
-                                  marginLeft: "auto",
-                                  textAlign: "right",
-                                }}
-                              >
+                              <span className="evolu-owner-stat-value">
                                 {ownerIndex}
                               </span>
                             </div>
@@ -449,91 +370,39 @@ export function EvoluCurrentDataPage(): React.ReactElement {
 
                       {editsUntilRotation !== null &&
                         rotationLimit !== null && (
-                          <div
-                            style={{
-                              padding: "9px 11px",
-                              borderRadius: 12,
-                              backgroundColor: "var(--color-bg-primary)",
-                              border: "1px solid var(--color-border)",
-                            }}
-                          >
-                            <div
-                              style={{
-                                alignItems: "baseline",
-                                display: "flex",
-                                gap: 8,
-                                justifyContent: "space-between",
-                                marginBottom: 8,
-                              }}
-                            >
+                          <div className="evolu-owner-stat">
+                            <div className="evolu-owner-progress-label">
                               <span className="muted">
                                 {t("evoluEditsUntilRotation")}
                               </span>
-                              <span
-                                style={{
-                                  fontSize: 15,
-                                  fontWeight: 600,
-                                  marginLeft: "auto",
-                                  textAlign: "right",
-                                }}
-                              >
+                              <span className="evolu-owner-stat-value">
                                 {editsUntilRotation}/{rotationLimit}
                               </span>
                             </div>
 
-                            <div
-                              style={{
-                                width: "100%",
-                                height: 8,
-                                backgroundColor: "var(--color-border)",
-                                borderRadius: 999,
-                                overflow: "hidden",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: `${progressPercent}%`,
-                                  height: "100%",
-                                  backgroundColor:
-                                    editsUntilRotation <=
-                                    Math.round(rotationLimit * 0.1)
-                                      ? "var(--color-error)"
-                                      : editsUntilRotation <=
-                                          Math.round(rotationLimit * 0.3)
-                                        ? "var(--color-warning)"
-                                        : "var(--color-success)",
-                                }}
-                              />
-                            </div>
+                            <progress
+                              className={`evolu-usage-progress ${editsUntilRotation <= Math.round(rotationLimit * 0.1) ? "is-error" : editsUntilRotation <= Math.round(rotationLimit * 0.3) ? "is-warning" : "is-success"}`}
+                              value={progressPercent}
+                              max={100}
+                            />
                           </div>
                         )}
                     </div>
                   )}
                 </div>
 
-                <div style={{ padding: 12 }}>
+                <div className="evolu-data-card-body">
                   {rows.length > 0 ? (
                     <>
-                      <table
-                        style={{
-                          width: "100%",
-                          fontSize: 11,
-                          borderCollapse: "collapse",
-                        }}
-                      >
+                      <table className="evolu-data-table">
                         <thead>
-                          <tr
-                            style={{
-                              backgroundColor: "var(--color-bg-tertiary)",
-                              borderBottom: "1px solid var(--color-border)",
-                            }}
-                          >
+                          <tr className="evolu-data-row">
                             {Object.keys(rows[0])
                               .filter((key) => key !== "createdAt")
                               .map((key) => (
                                 <th
                                   key={key}
-                                  style={{ padding: 4, textAlign: "left" }}
+                                  className="evolu-data-heading-cell"
                                 >
                                   {key}
                                 </th>
@@ -554,11 +423,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
                                   return (
                                     <td
                                       key={valueIdx}
-                                      style={{
-                                        padding: 4,
-                                        borderBottom:
-                                          "1px solid var(--color-border)",
-                                      }}
+                                      className="evolu-data-cell"
                                     >
                                       {isCashuTokenTable ? (
                                         <button
@@ -581,18 +446,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
                                               ? t("copiedToClipboard")
                                               : t("copy")
                                           }
-                                          style={{
-                                            appearance: "none",
-                                            background: "none",
-                                            border: 0,
-                                            color: "inherit",
-                                            cursor: "pointer",
-                                            font: "inherit",
-                                            padding: 0,
-                                            textAlign: "left",
-                                            width: "100%",
-                                            wordBreak: "break-all",
-                                          }}
+                                          className="evolu-data-button"
                                         >
                                           {isCopied
                                             ? t("copiedToClipboard")
@@ -610,15 +464,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
                       </table>
 
                       {(rows.length > previewRowCount || isExpanded) && (
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: 12,
-                            marginTop: 10,
-                          }}
-                        >
+                        <div className="evolu-data-pagination">
                           <span className="muted">
                             {isExpanded
                               ? t("evoluShowingAllRows")
@@ -643,9 +489,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
                       )}
                     </>
                   ) : (
-                    <p className="muted" style={{ margin: 0 }}>
-                      {t("evoluNoDataYet")}
-                    </p>
+                    <p className="muted unspaced">{t("evoluNoDataYet")}</p>
                   )}
                 </div>
               </div>

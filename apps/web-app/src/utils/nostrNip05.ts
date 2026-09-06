@@ -1,32 +1,23 @@
+import { isRecord } from "./unknown";
+import { asNonEmptyString } from "./validation";
 import { encodeNpub, parsePubkey, RelayUrl } from "@linky/linkstr";
 import { Schema } from "effect";
-import type { JsonRecord } from "../types/json";
+import { stripNostrUriPrefix } from "./nostrNpub";
 
 export const DEFAULT_NIP05_DOMAIN = "linky.fit";
 
-const NOSTR_URI_PREFIX = "nostr:";
 const NIP05_LOCAL_PART_RE = /^[a-z0-9._-]+$/i;
 const NIP05_DOMAIN_RE = /^[a-z0-9.-]+$/i;
 
 const isRelayUrl = Schema.is(RelayUrl);
 
-const isJsonRecord = (value: unknown): value is JsonRecord => {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-};
-
-const readText = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-};
-
-export interface Nip05Identifier {
+interface Nip05Identifier {
   domain: string;
   identifier: string;
   localPart: string;
 }
 
-export type Nip05ResolutionResult =
+type Nip05ResolutionResult =
   | {
       identifier: Nip05Identifier;
       kind: "resolved";
@@ -36,14 +27,6 @@ export type Nip05ResolutionResult =
   | { identifier: Nip05Identifier; kind: "not_found" }
   | { identifier: Nip05Identifier; kind: "error"; message: string }
   | { kind: "none" };
-
-const stripNostrUriPrefix = (value: string): string => {
-  const trimmed = value.trim();
-  return trimmed.slice(0, NOSTR_URI_PREFIX.length).toLowerCase() ===
-    NOSTR_URI_PREFIX
-    ? trimmed.slice(NOSTR_URI_PREFIX.length).trim()
-    : trimmed;
-};
 
 const looksLikeDirectNpub = (value: string): boolean => {
   const normalized = stripNostrUriPrefix(value);
@@ -75,9 +58,9 @@ const normalizeDomain = (value: string): string | null => {
 };
 
 export const parseNip05IdentifierInput = (
-  value: unknown,
+  value: string,
 ): Nip05Identifier | null => {
-  const input = stripNostrUriPrefix(String(value ?? ""));
+  const input = stripNostrUriPrefix(value);
   if (!input) return null;
   if (looksLikeDirectNpub(input)) return null;
 
@@ -107,9 +90,9 @@ export const parseNip05IdentifierInput = (
 };
 
 export const getDefaultNip05IdentifierFromAddress = (
-  value: unknown,
+  value: string,
 ): string | null => {
-  const input = stripNostrUriPrefix(String(value ?? ""));
+  const input = stripNostrUriPrefix(value);
   const atIndex = input.indexOf("@");
   if (atIndex < 0 || atIndex !== input.lastIndexOf("@")) return null;
 
@@ -121,7 +104,7 @@ export const getDefaultNip05IdentifierFromAddress = (
 };
 
 const readRelays = (value: unknown, pubkeyHex: string): string[] => {
-  if (!isJsonRecord(value)) return [];
+  if (!isRecord(value)) return [];
 
   const rawList = value[pubkeyHex];
   if (!Array.isArray(rawList)) return [];
@@ -130,7 +113,7 @@ const readRelays = (value: unknown, pubkeyHex: string): string[] => {
   const seen = new Set<string>();
 
   for (const item of rawList) {
-    const relay = readText(item);
+    const relay = asNonEmptyString(item);
     if (!relay || !isRelayUrl(relay)) continue;
     if (seen.has(relay)) continue;
     seen.add(relay);
@@ -140,7 +123,7 @@ const readRelays = (value: unknown, pubkeyHex: string): string[] => {
   return out;
 };
 
-export const resolveNip05Identifier = async (
+const resolveNip05Identifier = async (
   identifier: Nip05Identifier,
   options?: { signal?: AbortSignal },
 ): Promise<Nip05ResolutionResult> => {
@@ -162,12 +145,12 @@ export const resolveNip05Identifier = async (
     }
 
     const body: unknown = await response.json();
-    if (!isJsonRecord(body)) return { identifier, kind: "not_found" };
+    if (!isRecord(body)) return { identifier, kind: "not_found" };
 
     const names = body.names;
-    if (!isJsonRecord(names)) return { identifier, kind: "not_found" };
+    if (!isRecord(names)) return { identifier, kind: "not_found" };
 
-    const rawPubkey = readText(names[identifier.localPart]);
+    const rawPubkey = asNonEmptyString(names[identifier.localPart]);
     const pubkeyHex = parsePubkey(rawPubkey?.toLowerCase() ?? "");
     if (!pubkeyHex) {
       return { identifier, kind: "not_found" };
@@ -190,7 +173,7 @@ export const resolveNip05Identifier = async (
 };
 
 export const resolveNip05Input = async (
-  value: unknown,
+  value: string,
   options?: { signal?: AbortSignal },
 ): Promise<Nip05ResolutionResult> => {
   const identifier = parseNip05IdentifierInput(value);
@@ -199,7 +182,7 @@ export const resolveNip05Input = async (
 };
 
 export const resolveVerifiedNip05Identifier = async (
-  value: unknown,
+  value: string,
   expectedNpub: string,
   options?: { signal?: AbortSignal },
 ): Promise<string | null> => {

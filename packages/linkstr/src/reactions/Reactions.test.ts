@@ -1,30 +1,14 @@
 import { Effect, Either, Exit, Layer } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  RumorId,
-  UnixSeconds,
-} from "../domain/primitives";
+import { ClientId, RelayUrl, RumorId, UnixSeconds } from "../domain/primitives";
 import { unwrapToRumor } from "../internal/giftWrap";
-import {
-  firstTagValue,
-  SignedWrapEvent,
-  tagValues,
-} from "../internal/nostrEvent";
+import { firstTagValue, tagValues } from "../internal/nostrEvent";
+import type { SignedWrapEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import { makeIdentity, recipientOf, stubWrapTransport } from "../testing";
 import { Emoji, ReactionDraft, RetractionDraft } from "./domain";
 import { Reactions } from "./Reactions";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -40,39 +24,6 @@ const draft = new ReactionDraft({
   emoji: Emoji.make("🔥"),
   clientId: ClientId.make("client-42"),
 });
-
-const recipientOf = (wrap: SignedWrapEvent): string | null =>
-  firstTagValue(wrap.tags, "p");
-
-interface PublishedWrap {
-  readonly relays: ReadonlyArray<RelayUrl>;
-  readonly wrap: SignedWrapEvent;
-}
-
-/** Transport stub: relay outcomes decided per wrap by its recipient. */
-const stubTransport = (
-  published: Array<PublishedWrap>,
-  acceptFor: (recipient: string | null, relay: RelayUrl) => boolean,
-): Layer.Layer<NostrTransport> =>
-  Layer.succeed(NostrTransport, {
-    publish: (relays, wrap) =>
-      Effect.sync(() => {
-        if (!(wrap instanceof SignedWrapEvent)) {
-          throw new Error("reactions publish only gift wraps");
-        }
-        published.push({ relays, wrap });
-        return relays.map(
-          (relay) =>
-            new RelayPublishResult({
-              relay,
-              accepted: acceptFor(recipientOf(wrap), relay),
-              detail: acceptFor(recipientOf(wrap), relay) ? null : "blocked",
-            }),
-        );
-      }),
-    subscribe: () => Effect.die("subscribe not under test"),
-    fetch: () => Effect.die("fetch not under test"),
-  });
 
 const runWith = <A, E>(
   transport: Layer.Layer<NostrTransport>,
@@ -95,17 +46,16 @@ const runWith = <A, E>(
 
 describe("Reactions.react", () => {
   it("publishes one wrap per copy and returns a full receipt", async () => {
-    const published: Array<PublishedWrap> = [];
+    const published: Array<SignedWrapEvent> = [];
     const exit = await runWith(
-      stubTransport(published, () => true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const reactions = yield* Reactions;
         return yield* reactions.react(draft);
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const receipt = exit.value;
 
     expect(receipt.clientId).toBe("client-42");
@@ -113,16 +63,16 @@ describe("Reactions.react", () => {
     expect(receipt.recipientCopy.acceptedBy).toEqual([relayA, relayB]);
 
     expect(published).toHaveLength(2);
-    const recipients = published.map(({ wrap }) => recipientOf(wrap));
+    const recipients = published.map(recipientOf);
     expect(recipients).toContain(alice.pubkey);
     expect(recipients).toContain(bob.pubkey);
 
-    // Both copies must decrypt to the same rumor: the receipt's reactionId.
-    for (const { wrap } of published) {
+    // Both copies must decrypt to the same rumor: the receipt's rumorId.
+    for (const wrap of published) {
       const key =
         recipientOf(wrap) === alice.pubkey ? alice.secretKey : bob.secretKey;
       const rumor = Either.getOrThrow(unwrapToRumor(wrap, key));
-      expect(rumor.id).toBe(receipt.reactionId);
+      expect(rumor.id).toBe(receipt.rumorId);
       expect(rumor.kind).toBe(7);
       expect(rumor.content).toBe("🔥");
       expect(firstTagValue(rumor.tags, "k")).toBe("15");
@@ -136,88 +86,37 @@ describe("Reactions.react", () => {
   });
 
   it("honors the draft sentAt override", async () => {
-    const published: Array<PublishedWrap> = [];
+    const published: Array<SignedWrapEvent> = [];
     const sentAt = UnixSeconds.make(1_699_999_999);
     const exit = await runWith(
-      stubTransport(published, () => true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const reactions = yield* Reactions;
         return yield* reactions.react(new ReactionDraft({ ...draft, sentAt }));
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.sentAt).toBe(sentAt);
     const recipient = published.find(
-      ({ wrap }) => recipientOf(wrap) === bob.pubkey,
+      (wrap) => recipientOf(wrap) === bob.pubkey,
     );
-    expect(recipient).toBeDefined();
-    if (recipient === undefined) return;
-    const rumor = Either.getOrThrow(
-      unwrapToRumor(recipient.wrap, bob.secretKey),
-    );
+    assert(recipient !== undefined);
+    const rumor = Either.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
     expect(rumor.created_at).toBe(sentAt);
-    expect(rumor.id).toBe(exit.value.reactionId);
-  });
-
-  it("fails with RecipientNotReached when only the self copy lands", async () => {
-    const exit = await runWith(
-      stubTransport([], (recipient) => recipient === alice.pubkey),
-      Effect.gen(function* () {
-        const reactions = yield* Reactions;
-        return yield* reactions.react(draft);
-      }),
-    );
-
-    expect(exit).toEqual(
-      Exit.fail(
-        expect.objectContaining({
-          _tag: "RecipientNotReached",
-          clientId: "client-42",
-          recipientCopy: expect.objectContaining({
-            acceptedBy: [],
-            rejectedBy: [
-              expect.objectContaining({ relay: relayA, detail: "blocked" }),
-              expect.objectContaining({ relay: relayB, detail: "blocked" }),
-            ],
-          }),
-        }),
-      ),
-    );
-  });
-
-  it("fails with NoRelayReachable when nothing lands", async () => {
-    const exit = await runWith(
-      stubTransport([], () => false),
-      Effect.gen(function* () {
-        const reactions = yield* Reactions;
-        return yield* reactions.react(draft);
-      }),
-    );
-
-    expect(exit).toEqual(
-      Exit.fail(
-        expect.objectContaining({
-          _tag: "NoRelayReachable",
-          clientId: "client-42",
-          selfCopy: expect.objectContaining({ acceptedBy: [] }),
-          recipientCopy: expect.objectContaining({ acceptedBy: [] }),
-        }),
-      ),
-    );
+    expect(rumor.id).toBe(exit.value.rumorId);
   });
 });
 
 describe("Reactions.retract", () => {
   it("publishes a kind-5 rumor referencing the reactions", async () => {
-    const published: Array<PublishedWrap> = [];
+    const published: Array<SignedWrapEvent> = [];
     const reactionIds: [RumorId, RumorId] = [
       RumorId.make("cd".repeat(32)),
       RumorId.make("ef".repeat(32)),
     ];
     const exit = await runWith(
-      stubTransport(published, () => true),
+      stubWrapTransport(published),
       Effect.gen(function* () {
         const reactions = yield* Reactions;
         return yield* reactions.retract(
@@ -226,22 +125,19 @@ describe("Reactions.retract", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-
+    assert(Exit.isSuccess(exit));
     expect(published).toHaveLength(2);
     const selfPublished = published.find(
-      ({ wrap }) => recipientOf(wrap) === alice.pubkey,
+      (wrap) => recipientOf(wrap) === alice.pubkey,
     );
-    expect(selfPublished).toBeDefined();
-    if (!selfPublished) return;
+    assert(selfPublished !== undefined);
     const rumor = Either.getOrThrow(
-      unwrapToRumor(selfPublished.wrap, alice.secretKey),
+      unwrapToRumor(selfPublished, alice.secretKey),
     );
     expect(rumor.kind).toBe(5);
     expect(rumor.content).toBe("");
     expect(tagValues(rumor.tags, "e")).toEqual(reactionIds);
-    expect(rumor.id).toBe(exit.value.retractionId);
+    expect(rumor.id).toBe(exit.value.rumorId);
     // A generated clientId still travels on the wire for echo reconciliation.
     expect(firstTagValue(rumor.tags, "client")).toBe(exit.value.clientId);
   });

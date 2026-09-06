@@ -29,9 +29,10 @@ import {
 } from "@linky/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it } from "vitest";
+import { createSecretKey } from "../../testUtils/nostrKeys";
 import { linkstrEventToRow } from "./linkstrRows";
 
-const pubkey = Pubkey.make(getPublicKey(new Uint8Array(32).fill(7)));
+const pubkey = Pubkey.make(getPublicKey(createSecretKey(7)));
 const relay = RelayUrl.make("wss://relay.test");
 const rumorId = RumorId.make("ab".repeat(32));
 const clientId = ClientId.make("client-1");

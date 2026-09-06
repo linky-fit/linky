@@ -1,46 +1,15 @@
-import { Mint, Wallet, getEncodedToken } from "@cashu/cashu-ts";
 import { Effect } from "effect";
 import {
   Amount,
-  Bip39Seed,
-  MintUrl,
   Receive,
   ReceiveDraft,
+  runLinkshu,
   Send,
   SendDraft,
   TokenStore,
   Validation,
-  runLinkshu,
 } from "../../src";
-import type { Bip39Seed as Bip39SeedType } from "../../src";
-
-// The dev-stack Nutshell FakeWallet mint (docker-compose.dev.yml `cashu-mint`).
-const mintUrl = MintUrl.make(
-  process.env.LINKSHU_MINT_URL ?? "http://localhost:3338",
-);
-
-// Fresh seed per run: deterministic counters live at the mint, so a reused
-// seed would start every run inside an already-signed counter range.
-const randomSeed = (): Bip39SeedType =>
-  Bip39Seed.make(crypto.getRandomValues(new Uint8Array(64)));
-
-/** Mints fresh sats via a bolt11 quote the FakeWallet backend auto-settles. */
-const fundToken = async (amountSat: number): Promise<string> => {
-  const wallet = new Wallet(new Mint(mintUrl), { unit: "sat" });
-  await wallet.loadMint();
-  const quote = await wallet.createMintQuoteBolt11(amountSat);
-  const proofs = await wallet.mintProofsBolt11(amountSat, quote, undefined, {
-    type: "random",
-  });
-  return getEncodedToken({ mint: mintUrl, unit: "sat", proofs });
-};
-
-/** Somebody else claims the token: its proofs are spent at the mint. */
-const claimExternally = async (tokenText: string): Promise<void> => {
-  const wallet = new Wallet(new Mint(mintUrl), { unit: "sat" });
-  await wallet.loadMint();
-  await wallet.receive(tokenText, undefined, { type: "random" });
-};
+import { claimExternally, fundToken, mintUrl, randomSeed } from "./helpers";
 
 describe("validation vertical against the local mint", () => {
   it("detects an externally spent row on refresh and marks it error", async () => {

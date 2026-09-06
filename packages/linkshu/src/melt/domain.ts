@@ -19,6 +19,7 @@ import {
 export class MeltDraft extends Schema.Class<MeltDraft>("MeltDraft")({
   mint: MintUrl,
   invoice: Bolt11Invoice,
+  quoteId: Schema.optional(QuoteId),
 }) {}
 
 /** A priced melt offer — what a confirmation UI shows before paying. */

@@ -1,3 +1,4 @@
+import { writeContact } from "../lib/writeContact";
 import * as Evolu from "@evolu/common";
 import type {
   ProfileFetchEntry,
@@ -33,7 +34,7 @@ import { resolveContactRowOwnerLane } from "../lib/contactOwnerLane";
 import { getContactPublicProfile } from "../lib/contactProfile";
 import type { ContactRowLike } from "../types/appTypes";
 
-export const decodeNpubToPubkey = (npub: string): Pubkey | null => {
+const decodeNpubToPubkey = (npub: string): Pubkey | null => {
   return decodeNpub(npub);
 };
 
@@ -107,8 +108,6 @@ type SetByNpub<T> = React.Dispatch<
   React.SetStateAction<Record<string, T | null>>
 >;
 
-// Structural subset of `EvoluMutations["update"]` (the sync only writes
-// contact rows and ignores the result), so tests can substitute it.
 type ContactRowUpdate = (
   table: "contact",
   props: {
@@ -117,7 +116,7 @@ type ContactRowUpdate = (
     name?: typeof Evolu.NonEmptyString1000.Type | null;
   },
   options?: { readonly ownerId?: Evolu.OwnerId },
-) => unknown;
+) => Evolu.Result<unknown, unknown>;
 
 interface ProfileSyncContext {
   contacts: readonly (ContactRowLike & { id: string })[];
@@ -152,7 +151,7 @@ const syncContactsFromProfile = (
   ).lnAddress.toLowerCase();
 
   for (const contact of ctx.contacts) {
-    if (normalizeNpubIdentifier(contact.npub) !== npub) continue;
+    if (normalizeNpubIdentifier(contact.npub ?? "") !== npub) continue;
 
     const patch: Partial<{
       lnAddress: typeof Evolu.NonEmptyString1000.Type | null;
@@ -163,7 +162,7 @@ const syncContactsFromProfile = (
     // provided (legacy manual entry, search fallback) is never cleared:
     // clearing requires that the row still holds what the previous profile
     // said, i.e. the profile itself dropped the field.
-    const currentName = String(contact.name ?? "").trim();
+    const currentName = (contact.name ?? "").trim();
     if (!contact.nameSetByUser) {
       if (bestName && bestName !== currentName) {
         const parsedName = Evolu.NonEmptyString1000.fromUnknown(bestName);
@@ -179,9 +178,7 @@ const syncContactsFromProfile = (
     const hasLocalLnAddress =
       parsedLnAddressSetByUser.ok &&
       parsedLnAddressSetByUser.value === Evolu.sqliteTrue;
-    const currentLn = String(contact.lnAddress ?? "")
-      .trim()
-      .toLowerCase();
+    const currentLn = (contact.lnAddress ?? "").trim().toLowerCase();
     if (!hasLocalLnAddress) {
       if (profileLn && profileLn.toLowerCase() !== currentLn) {
         const parsedLn = Evolu.NonEmptyString1000.fromUnknown(profileLn);
@@ -196,8 +193,7 @@ const syncContactsFromProfile = (
       resolveContactRowOwnerLane(contact, ctx.contactsVisibleOwnerIds) ??
       ctx.contactsOwnerId;
     const payload = { id: contact.id, ...patch };
-    if (ownerId) ctx.update("contact", payload, { ownerId });
-    else ctx.update("contact", payload);
+    writeContact(ctx.update, payload, ownerId);
   }
 };
 
@@ -285,10 +281,10 @@ export const useLinkstrProfileSync = ({
   const watchedNpubsKey = React.useMemo(() => {
     const npubs = new Set<string>();
     for (const contact of contacts) {
-      const npub = normalizeNpubIdentifier(contact.npub);
+      const npub = normalizeNpubIdentifier(contact.npub ?? "");
       if (npub) npubs.add(npub);
     }
-    const ownNpub = normalizeNpubIdentifier(currentNpub);
+    const ownNpub = normalizeNpubIdentifier(currentNpub ?? "");
     if (ownNpub) npubs.add(ownNpub);
     return [...npubs].sort().join("|");
   }, [contacts, currentNpub]);

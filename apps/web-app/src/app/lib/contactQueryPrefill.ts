@@ -1,4 +1,5 @@
 import { isLightningAddress } from "../../lnurlPay";
+import { stripLightningPrefix } from "../../utils/url";
 
 interface ContactQueryPrefill {
   lnAddress: string;
@@ -12,7 +13,7 @@ export const getContactQueryPrefill = (query: string): ContactQueryPrefill => {
   }
 
   return {
-    lnAddress: normalized.replace(/^lightning:/i, "").trim(),
+    lnAddress: stripLightningPrefix(normalized),
     name: "",
   };
 };

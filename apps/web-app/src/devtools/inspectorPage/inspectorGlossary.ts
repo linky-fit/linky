@@ -1,5 +1,6 @@
 import type { CollectedInspectorRow } from "../inspector/inspectorRows";
 import { nostrKindLabel } from "../nostrKindNames";
+import { isRecord } from "../../utils/unknown";
 
 // Human vocabulary for inspector rows: per-tag and per-kind explanations shown
 // by the inspector UI.
@@ -17,6 +18,14 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
 };
 
 const TAG_DESCRIPTIONS: Record<string, string> = {
+  "contacts.npubSaved":
+    "A Nostr contact was saved after duplicate and active owner limit checks. The contact link identifies the new row.",
+  "evolu.ownerRotated":
+    "The active write owner moved to the next lane. Previous lanes remain visible for reads; owner links join the rotation to sync diagnostics.",
+  EvoluSyncRetry:
+    "The user reloads the app to retry Evolu sync after a quota or server configuration change. Local history is preserved.",
+  EvoluError:
+    "Evolu reported a database or sync error. The owner link identifies the affected sync account when available; relay reachability alone does not confirm its data synced.",
   WirePublished:
     "Outgoing: linkstr signed a gift wrap and handed it to the listed relays; the payload includes per-relay accepted/failed results. One operation usually produces two wraps: a copy for the recipient and a copy for the sender's own devices.",
   WireSubscribed:
@@ -41,6 +50,16 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The queued recipients of a staggered proxy payment offer were discarded because the offer stopped being open — someone accepted it, it ended, or it expired.",
   "profiles.searchProfiles":
     "Add-contact text search: a NIP-50 kind-0 query fanned out to the read relays plus the configured search relays; relays without NIP-50 answer with unrelated profiles, so only hits that match the query locally are returned (the params carry the query and limit).",
+  "contacts.dedupeFailed":
+    "The contact dedupe the user started threw before finishing; the payload carries the error. Contacts already merged before the failure stay merged.",
+  "contacts.ownerMigrated":
+    "One-time move of legacy contact rows into the app owner lane after a seed login; the payload counts the rows that were rewritten and those that failed.",
+  "relayList.publishFailed":
+    "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
+  "relayList.syncFailed":
+    "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
+  "pay.step":
+    "One step of paying a contact with a cashu token sent as a chat message (start, mint-selected, swap-ok, plan-send-token, publish-pending, publish-ok, publish-failed, payment-notice-publish, message-ack, queued-offline). The client and message links tie the steps to the gift wraps they produced.",
   "contacts.addToGroup":
     "User assigned the contacts just saved from a chat message to a group; the payload lists the contact ids and the group name.",
   ChatImageShareFailed:
@@ -63,10 +82,6 @@ const describeTag = (row: CollectedInspectorRow): string => {
   const known = TAG_DESCRIPTIONS[row.tag];
   if (known) return known;
   return `An inspector event tagged "${row.tag}" on the "${row.channel}" channel. Rows sharing any of its link ids are related.`;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 };
 
 const MAX_KIND_SCAN_DEPTH = 4;
@@ -97,7 +112,7 @@ const scanForKinds = (
   }
 };
 
-export const collectNostrKinds = (payload: unknown): number[] => {
+const collectNostrKinds = (payload: unknown): number[] => {
   const kinds = new Set<number>();
   scanForKinds(payload, 0, kinds);
   return [...kinds].sort((left, right) => left - right);

@@ -32,8 +32,23 @@ import {
   encodeRotationSnapshot,
   type RotationSnapshot,
 } from "../lib/rotationSnapshot";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageGetJson,
+  safeLocalStorageSet,
+  safeLocalStorageSetJson,
+} from "../../utils/storage";
+import { readRowOwnerId } from "../lib/rowOwnerId";
+import { UnknownRecord } from "../../utils/schema";
+import { getUnknownErrorMessage } from "../../utils/unknown";
+import { reportAppLog } from "../../devtools/inspector/appLog";
+import type { I18nKey, Translate } from "../../i18n";
 
-type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
+type UpsertOwnerMeta = (
+  table: "ownerMeta",
+  payload: { id: string; scope: string; value: string },
+  options: { ownerId: Evolu.OwnerId },
+) => Evolu.Result<unknown, unknown>;
 
 type CounterMap = Record<string, number>;
 
@@ -44,15 +59,6 @@ interface RotationSnapshotsByScope {
   transactions: RotationSnapshot | null;
 }
 
-interface OwnerSyncData {
-  cashuOwner: Evolu.AppOwner;
-  contactsOwner: Evolu.AppOwner;
-  identityOwner: Evolu.AppOwner;
-  messagesOwner: Evolu.AppOwner;
-  metaOwner: Evolu.AppOwner;
-  transactionsOwner: Evolu.AppOwner;
-}
-
 interface FixedOwnerSyncData {
   identityOwner: Evolu.AppOwner;
   legacyIdentitiesOwner: Evolu.AppOwner;
@@ -60,47 +66,21 @@ interface FixedOwnerSyncData {
   metaOwner: Evolu.AppOwner;
 }
 
-interface VisibleOwnerSyncData {
-  ownerIds: Evolu.OwnerId[];
-  syncOwners: Evolu.SyncOwner[];
-}
-
-type DeriveOwnerMnemonic = (
-  role: Parameters<typeof deriveEvoluOwnerMnemonicFromSlip39>[1],
-  index: number,
-) => Promise<string | null>;
-
-const createCachedOwnerMnemonicDeriver = (
-  slip39Seed: string,
-): DeriveOwnerMnemonic => {
-  const cache = new Map<string, Promise<string | null>>();
-  return (role, index) => {
-    const key = `${role}:${index}`;
-    const cached = cache.get(key);
-    if (cached) return cached;
-    const pending = deriveEvoluOwnerMnemonicFromSlip39(slip39Seed, role, index);
-    cache.set(key, pending);
-    return pending;
-  };
-};
-
 interface UseEvoluContactsOwnerRotationParams {
   appOwnerId: Evolu.OwnerId | null;
   isSeedLogin: boolean;
   pushToast: (message: string) => void;
   slip39Seed: string | null;
-  t: (key: string) => string;
-  upsert: EvoluMutations["upsert"];
+  t: Translate;
+  upsert: UpsertOwnerMeta;
 }
 
 interface UseEvoluContactsOwnerRotationResult {
   cashuOwnerId: Evolu.OwnerId | null;
   cashuOwnerEditsUntilRotation: number;
   cashuOwnerIndex: number;
-  cashuOwnerPointer: string;
   cashuSyncOwner: Evolu.SyncOwner | null;
   cashuVisibleOwnerIds: Evolu.OwnerId[];
-  contactsBackupOwnerId: Evolu.OwnerId | null;
   contactsOwnerEditCount: number;
   contactsOwnerEditsUntilRotation: number;
   contactsOwnerId: Evolu.OwnerId | null;
@@ -116,10 +96,8 @@ interface UseEvoluContactsOwnerRotationResult {
   legacyMessagesIdentityOwnerId: Evolu.OwnerId | null;
   metaOwnerId: Evolu.OwnerId | null;
   metaSyncOwner: Evolu.SyncOwner | null;
-  messagesBackupOwnerId: Evolu.OwnerId | null;
   messagesOwnerId: Evolu.OwnerId | null;
   messagesOwnerIndex: number;
-  messagesOwnerPointer: string;
   messagesOwnerEditsUntilRotation: number;
   messagesSyncOwner: Evolu.SyncOwner | null;
   messagesVisibleOwnerIds: Evolu.OwnerId[];
@@ -131,7 +109,6 @@ interface UseEvoluContactsOwnerRotationResult {
   rotateContactsOwnerIsBusy: boolean;
   rotateMessagesOwnerIsBusy: boolean;
   rotateTransactionsOwnerIsBusy: boolean;
-  transactionsBackupOwnerId: Evolu.OwnerId | null;
   transactionsOwnerEditsUntilRotation: number;
   transactionsOwnerId: Evolu.OwnerId | null;
   transactionsOwnerIndex: number;
@@ -150,24 +127,6 @@ const createMetaPointerRowId = (scope: string): Evolu.Id =>
 // render loops on the unauthenticated shell.
 const EMPTY_OWNER_IDS: Evolu.OwnerId[] = [];
 const EMPTY_SYNC_OWNERS: Evolu.SyncOwner[] = [];
-
-const formatMutationError = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
-};
-
-const readRowOwnerId = (row: unknown): string => {
-  if (typeof row !== "object" || row === null) return "";
-  if (!("ownerId" in row)) return "";
-  const ownerId = row.ownerId;
-  if (typeof ownerId !== "string") return "";
-  return ownerId.trim();
-};
 
 const readRowPointerValue = (row: unknown): unknown => {
   if (typeof row !== "object" || row === null) return null;
@@ -231,7 +190,7 @@ const needsStructuredSnapshotUpgrade = (
 };
 
 const upsertOwnerMetaSnapshot = (
-  upsert: EvoluMutations["upsert"],
+  upsert: UpsertOwnerMeta,
   ownerId: Evolu.OwnerId,
   scope: "cashu" | "contacts" | "messages" | "transactions",
   snapshot: RotationSnapshot,
@@ -240,45 +199,26 @@ const upsertOwnerMetaSnapshot = (
     "ownerMeta",
     {
       id: createMetaPointerRowId(scope),
-      scope: scope as typeof Evolu.NonEmptyString100.Type,
-      value: encodeRotationSnapshot(
-        snapshot,
-      ) as typeof Evolu.NonEmptyString1000.Type,
+      scope: Evolu.NonEmptyString100.orThrow(scope),
+      value: Evolu.NonEmptyString1000.orThrow(encodeRotationSnapshot(snapshot)),
     },
     { ownerId },
   );
 
-const parseCounterMap = (raw: string | null): CounterMap => {
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return {};
-    const out: CounterMap = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-        out[key] = Math.trunc(value);
-      }
-    }
-    return out;
-  } catch {
-    return {};
-  }
-};
-
 const readCounterMap = (storageKey: string): CounterMap => {
-  try {
-    return parseCounterMap(localStorage.getItem(storageKey));
-  } catch {
-    return {};
+  const out: CounterMap = {};
+  for (const [key, value] of Object.entries(
+    safeLocalStorageGetJson(storageKey, UnknownRecord, {}),
+  )) {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      out[key] = Math.trunc(value);
+    }
   }
+  return out;
 };
 
 const writeCounterMap = (storageKey: string, map: CounterMap): void => {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(map));
-  } catch {
-    // ignore
-  }
+  safeLocalStorageSetJson(storageKey, map);
 };
 
 const getCounterValue = (storageKey: string, index: number): number => {
@@ -301,22 +241,14 @@ const hasCounterValue = (storageKey: string, index: number): boolean => {
   return Object.prototype.hasOwnProperty.call(map, String(index));
 };
 
-const getStoredTimestampMs = (storageKey: string): number => {
-  try {
-    const raw = Number(localStorage.getItem(storageKey));
-    if (!Number.isFinite(raw) || raw < 0) return 0;
-    return Math.trunc(raw);
-  } catch {
-    return 0;
-  }
+const readStoredNonNegativeInt = (storageKey: string): number => {
+  const raw = Number(safeLocalStorageGet(storageKey));
+  if (!Number.isFinite(raw) || raw < 0) return 0;
+  return Math.trunc(raw);
 };
 
-const setStoredTimestampMs = (storageKey: string, value: number): void => {
-  try {
-    localStorage.setItem(storageKey, String(Math.max(0, Math.trunc(value))));
-  } catch {
-    // ignore
-  }
+const writeStoredNonNegativeInt = (storageKey: string, value: number): void => {
+  safeLocalStorageSet(storageKey, String(Math.max(0, Math.trunc(value))));
 };
 
 const getCooldownRemainingMs = (
@@ -324,40 +256,18 @@ const getCooldownRemainingMs = (
   nowMs: number,
   cooldownMs: number,
 ): number => {
-  const lastMs = getStoredTimestampMs(storageKey);
+  const lastMs = readStoredNonNegativeInt(storageKey);
   if (lastMs <= 0) return 0;
   const elapsed = Math.max(0, nowMs - lastMs);
   return Math.max(0, cooldownMs - elapsed);
 };
 
-const getStoredIndex = (storageKey: string): number => {
-  try {
-    const raw = Number(localStorage.getItem(storageKey));
-    if (!Number.isFinite(raw) || raw < 0) return 0;
-    return Math.trunc(raw);
-  } catch {
-    return 0;
-  }
-};
-
 const getStoredOptionalIndex = (storageKey: string): number | null => {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (raw === null) return null;
-    const parsed = Number(raw);
-    if (!Number.isFinite(parsed) || parsed < 0) return 0;
-    return Math.trunc(parsed);
-  } catch {
-    return null;
-  }
-};
-
-const setStoredIndex = (storageKey: string, value: number): void => {
-  try {
-    localStorage.setItem(storageKey, String(Math.max(0, Math.trunc(value))));
-  } catch {
-    // ignore
-  }
+  const raw = safeLocalStorageGet(storageKey);
+  if (raw === null) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.trunc(parsed);
 };
 
 const toAppOwnerFromMnemonic = (mnemonic: string): Evolu.AppOwner | null => {
@@ -418,163 +328,394 @@ const deriveFixedOwnerSyncDataFromSeed = async (
   };
 };
 
-const deriveOwnerSyncDataFromSeed = async (
-  slip39Seed: string,
-  contactsOwnerIndex: number,
-  cashuOwnerIndex: number,
-  messagesOwnerIndex: number,
-  transactionsOwnerIndex: number,
-  deriveOwnerMnemonic: DeriveOwnerMnemonic = createCachedOwnerMnemonicDeriver(
-    slip39Seed,
-  ),
-): Promise<OwnerSyncData | null> => {
-  const [
-    metaMnemonic,
-    identityMnemonic,
-    contactsMnemonic,
-    cashuMnemonic,
-    messagesMnemonic,
-    transactionsMnemonic,
-  ] = await Promise.all([
-    deriveOwnerMnemonic("meta", 0),
-    deriveOwnerMnemonic("identity", 0),
-    deriveOwnerMnemonic("contacts", contactsOwnerIndex),
-    deriveOwnerMnemonic("cashu", cashuOwnerIndex),
-    deriveOwnerMnemonic("messages", messagesOwnerIndex),
-    deriveOwnerMnemonic("transactions", transactionsOwnerIndex),
-  ]);
-
-  if (
-    !metaMnemonic ||
-    !identityMnemonic ||
-    !contactsMnemonic ||
-    !cashuMnemonic ||
-    !messagesMnemonic ||
-    !transactionsMnemonic
-  )
-    return null;
-  const metaOwner = toAppOwnerFromMnemonic(metaMnemonic);
-  const identityOwner = toAppOwnerFromMnemonic(identityMnemonic);
-  const contactsOwner = toAppOwnerFromMnemonic(contactsMnemonic);
-  const cashuOwner = toAppOwnerFromMnemonic(cashuMnemonic);
-  const messagesOwner = toAppOwnerFromMnemonic(messagesMnemonic);
-  const transactionsOwner = toAppOwnerFromMnemonic(transactionsMnemonic);
-
-  if (
-    !metaOwner ||
-    !identityOwner ||
-    !contactsOwner ||
-    !cashuOwner ||
-    !messagesOwner ||
-    !transactionsOwner
-  )
-    return null;
-
-  return {
-    cashuOwner,
-    contactsOwner,
-    identityOwner,
-    messagesOwner,
-    metaOwner,
-    transactionsOwner,
-  };
-};
-
 type RotatingOwnerRole = "contacts" | "cashu" | "messages" | "transactions";
 
 const deriveVisibleOwnerSyncDataFromSeed = async (
   slip39Seed: string,
   role: RotatingOwnerRole,
   activeOwnerIndex: number,
-  deriveOwnerMnemonic: DeriveOwnerMnemonic = createCachedOwnerMnemonicDeriver(
-    slip39Seed,
-  ),
-): Promise<VisibleOwnerSyncData> => {
+) => {
   const mnemonics = await Promise.all(
     Array.from({ length: activeOwnerIndex + 1 }, (_value, index) =>
-      deriveOwnerMnemonic(role, index),
+      deriveEvoluOwnerMnemonicFromSlip39(slip39Seed, role, index),
     ),
   );
-
-  const ownerIds: Evolu.OwnerId[] = [];
-  const syncOwners: Evolu.SyncOwner[] = [];
-
-  for (const mnemonic of mnemonics) {
-    if (!mnemonic) continue;
-    const owner = toAppOwnerFromMnemonic(mnemonic);
-    if (!owner) continue;
-    ownerIds.push(owner.id);
-    syncOwners.push(owner);
-  }
-
-  return { ownerIds, syncOwners };
+  const owners = mnemonics.map((mnemonic) =>
+    mnemonic ? toAppOwnerFromMnemonic(mnemonic) : null,
+  );
+  return {
+    activeOwner: owners.at(-1) ?? null,
+    syncOwners: owners.filter(
+      (owner): owner is Evolu.AppOwner => owner !== null,
+    ),
+  };
 };
 
-export const useEvoluContactsOwnerRotation = ({
+interface OwnerLaneConfig {
+  indexKey: string;
+  baselineKey: string;
+  rotatedAtKey: string;
+  threshold: number;
+  rotatedLabel: I18nKey;
+  tables: string[];
+}
+
+const OWNER_LANES: Record<RotatingOwnerRole, OwnerLaneConfig> = {
+  contacts: {
+    indexKey: EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
+    baselineKey: EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
+    rotatedAtKey: EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
+    threshold: CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+    rotatedLabel: "evoluContactsOwnerRotated",
+    tables: ["contact"],
+  },
+  cashu: {
+    indexKey: EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
+    baselineKey: EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
+    rotatedAtKey: EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
+    threshold: CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+    rotatedLabel: "evoluCashuOwnerRotated",
+    tables: ["cashuToken"],
+  },
+  messages: {
+    indexKey: EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
+    baselineKey: EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
+    rotatedAtKey: EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
+    threshold: MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+    rotatedLabel: "evoluMessagesOwnerRotated",
+    tables: ["nostrMessage", "nostrReaction"],
+  },
+  transactions: {
+    indexKey: EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
+    baselineKey: EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
+    rotatedAtKey: EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
+    threshold: TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+    rotatedLabel: "evoluTransactionsOwnerRotated",
+    tables: ["transaction"],
+  },
+};
+
+interface UseOwnerLaneParams extends UseEvoluContactsOwnerRotationParams {
+  scope: RotatingOwnerRole;
+  metaOwner: Evolu.AppOwner | null;
+  snapshot: RotationSnapshot | null;
+  rows: readonly object[];
+  historyCount: number | undefined;
+  allowMissingOwnerMetaBootstrap: boolean;
+  cashuWriteCount?: number;
+}
+
+const countOwnerRows = (rows: readonly object[], ownerId: string): number =>
+  ownerId ? rows.filter((row) => readRowOwnerId(row) === ownerId).length : 0;
+
+export const useOwnerLane = ({
+  scope,
   appOwnerId,
   isSeedLogin,
-  pushToast,
   slip39Seed,
+  pushToast,
   t,
   upsert,
-}: UseEvoluContactsOwnerRotationParams): UseEvoluContactsOwnerRotationResult => {
-  const initialContactsOwnerIndex = React.useMemo(
-    () => getStoredIndex(EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY),
+  metaOwner,
+  snapshot,
+  rows,
+  historyCount,
+  allowMissingOwnerMetaBootstrap,
+  cashuWriteCount = 0,
+}: UseOwnerLaneParams) => {
+  const config = OWNER_LANES[scope];
+  const [initialIndex] = React.useState(() =>
+    scope === "cashu"
+      ? (getStoredOptionalIndex(config.indexKey) ??
+        readStoredNonNegativeInt(OWNER_LANES.contacts.indexKey))
+      : readStoredNonNegativeInt(config.indexKey),
+  );
+  const [index, setIndex] = React.useState(initialIndex);
+  const pendingTarget = React.useRef<number | null>(null);
+  const bootstrapRecoveryPending = React.useRef(scope === "cashu");
+  const [owner, setOwner] = React.useState<Evolu.AppOwner | null>(null);
+  const [visibleOwners, setVisibleOwners] = React.useState<Evolu.SyncOwner[]>(
     [],
   );
-  const [contactsOwnerIndex, setContactsOwnerIndex] = React.useState<number>(
-    () => initialContactsOwnerIndex,
+  const [isBusy, setIsBusy] = React.useState(false);
+  const rotationInFlight = React.useRef(false);
+  const resolvedIndex = Math.max(
+    snapshot?.index ?? index,
+    pendingTarget.current ?? 0,
   );
-  const [cashuOwnerIndex, setCashuOwnerIndex] = React.useState<number>(
+  const currentSnapshot = readSnapshotForCurrentIndex(snapshot, resolvedIndex);
+  const ownerId = isSeedLogin ? (owner?.id ?? null) : appOwnerId;
+  const writeCount = React.useMemo(
+    () => countOwnerRows(rows, ownerId ?? ""),
+    [ownerId, rows],
+  );
+  const baseline = React.useMemo(
     () =>
-      getStoredOptionalIndex(EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY) ??
-      initialContactsOwnerIndex,
+      currentSnapshot?.baseline ?? getCounterValue(config.baselineKey, index),
+    [config.baselineKey, currentSnapshot, index],
   );
-  const [messagesOwnerIndex, setMessagesOwnerIndex] = React.useState<number>(
-    () => getStoredIndex(EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY),
-  );
-  const [transactionsOwnerIndex, setTransactionsOwnerIndex] =
-    React.useState<number>(() =>
-      getStoredIndex(EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY),
+  const editCount = historyCount ?? Math.max(0, writeCount - baseline);
+
+  React.useEffect(() => {
+    if (!isSeedLogin || !slip39Seed?.trim()) {
+      setOwner(null);
+      setVisibleOwners([]);
+      return;
+    }
+    let cancelled = false;
+    void deriveVisibleOwnerSyncDataFromSeed(
+      slip39Seed.trim(),
+      scope,
+      resolvedIndex,
+    ).then((visible) => {
+      if (cancelled) return;
+      setOwner(visible.activeOwner);
+      setVisibleOwners(visible.syncOwners);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSeedLogin, resolvedIndex, scope, slip39Seed]);
+
+  React.useEffect(() => {
+    if (!isSeedLogin || !snapshot || !metaOwner) return;
+    if (pendingTarget.current !== null) {
+      if (snapshot.index < pendingTarget.current) return;
+      pendingTarget.current = null;
+    }
+    if (snapshot.index === index) return;
+    writeStoredNonNegativeInt(config.indexKey, snapshot.index);
+    setCounterValue(config.baselineKey, snapshot.index, snapshot.baseline ?? 0);
+    writeStoredNonNegativeInt(
+      config.rotatedAtKey,
+      snapshot.rotatedAtMs ?? Date.now(),
     );
+    setIndex(snapshot.index);
+  }, [config, index, isSeedLogin, metaOwner, snapshot]);
+
+  React.useEffect(() => {
+    if (!isSeedLogin || hasCounterValue(config.baselineKey, index)) return;
+    setCounterValue(config.baselineKey, index, writeCount);
+  }, [config.baselineKey, index, isSeedLogin, writeCount]);
+
+  React.useEffect(() => {
+    if (!bootstrapRecoveryPending.current || !isSeedLogin) return;
+    if (snapshot || index !== initialIndex) {
+      bootstrapRecoveryPending.current = false;
+      return;
+    }
+    if (!allowMissingOwnerMetaBootstrap || !metaOwner || !owner || isBusy)
+      return;
+    bootstrapRecoveryPending.current = false;
+    if (index <= 0 || writeCount > 0) return;
+    writeStoredNonNegativeInt(config.indexKey, 0);
+    setCounterValue(config.baselineKey, 0, 0);
+    writeStoredNonNegativeInt(config.rotatedAtKey, 0);
+    setIndex(0);
+  }, [
+    allowMissingOwnerMetaBootstrap,
+    config,
+    index,
+    initialIndex,
+    isBusy,
+    isSeedLogin,
+    metaOwner,
+    owner,
+    snapshot,
+    writeCount,
+  ]);
+
+  React.useEffect(() => {
+    if (!isSeedLogin || !metaOwner || !owner) return;
+    const shouldWrite = snapshot
+      ? needsStructuredSnapshotUpgrade(snapshot, resolvedIndex)
+      : allowMissingOwnerMetaBootstrap && resolvedIndex > 0 && writeCount > 0;
+    if (!shouldWrite) return;
+    upsertOwnerMetaSnapshot(upsert, metaOwner.id, scope, {
+      index: resolvedIndex,
+      baseline: writeCount,
+      cashuBaseline: scope === "contacts" ? cashuWriteCount : null,
+      rotatedAtMs: Date.now(),
+    });
+  }, [
+    allowMissingOwnerMetaBootstrap,
+    cashuWriteCount,
+    isSeedLogin,
+    metaOwner,
+    owner,
+    resolvedIndex,
+    scope,
+    snapshot,
+    upsert,
+    writeCount,
+  ]);
+
+  const rotate = React.useCallback(async () => {
+    if (
+      rotationInFlight.current ||
+      !isSeedLogin ||
+      !slip39Seed?.trim() ||
+      !metaOwner
+    )
+      return;
+    const nowMs = Date.now();
+    if (
+      getCooldownRemainingMs(
+        config.rotatedAtKey,
+        nowMs,
+        OWNER_ROTATION_COOLDOWN_MS,
+      ) > 0
+    )
+      return;
+    rotationInFlight.current = true;
+    setIsBusy(true);
+    try {
+      const nextIndex = resolvedIndex + 1;
+      const mnemonic = await deriveEvoluOwnerMnemonicFromSlip39(
+        slip39Seed.trim(),
+        scope,
+        nextIndex,
+      );
+      const nextOwner = mnemonic ? toAppOwnerFromMnemonic(mnemonic) : null;
+      if (!nextOwner) {
+        pushToast(t("restoreFailed"));
+        return;
+      }
+      const result = upsertOwnerMetaSnapshot(upsert, metaOwner.id, scope, {
+        index: nextIndex,
+        baseline: 0,
+        cashuBaseline: scope === "contacts" ? cashuWriteCount : null,
+        rotatedAtMs: nowMs,
+      });
+      if (!result.ok) {
+        pushToast(
+          `${t("errorPrefix")}: ${getUnknownErrorMessage(result.error, "unknown")}`,
+        );
+        return;
+      }
+      pendingTarget.current = nextIndex;
+      writeStoredNonNegativeInt(config.indexKey, nextIndex);
+      setCounterValue(
+        config.baselineKey,
+        nextIndex,
+        scope === "contacts" ? 0 : countOwnerRows(rows, nextOwner.id),
+      );
+      writeStoredNonNegativeInt(config.rotatedAtKey, nowMs);
+      setOwner(nextOwner);
+      setVisibleOwners((previous) =>
+        previous.some((entry) => entry.id === nextOwner.id)
+          ? previous
+          : [...previous, nextOwner],
+      );
+      setIndex(nextIndex);
+      reportAppLog({
+        tag: "evolu.ownerRotated",
+        summary: `Rotated ${scope} owner to lane ${nextIndex}`,
+        links: { owner: ownerId ? [ownerId, nextOwner.id] : nextOwner.id },
+        payload: { scope, previousIndex: resolvedIndex, index: nextIndex },
+      });
+      pushToast(
+        `${t(config.rotatedLabel)}${scope === "contacts" ? "" : " (0)"}`,
+      );
+    } finally {
+      rotationInFlight.current = false;
+      setIsBusy(false);
+    }
+  }, [
+    cashuWriteCount,
+    config,
+    isSeedLogin,
+    metaOwner,
+    ownerId,
+    pushToast,
+    resolvedIndex,
+    rows,
+    scope,
+    slip39Seed,
+    t,
+    upsert,
+  ]);
+
+  const requestManualRotate = React.useCallback(async () => {
+    if (!isSeedLogin || !slip39Seed?.trim()) {
+      pushToast(t("seedMissing"));
+      return;
+    }
+    const remaining = getCooldownRemainingMs(
+      config.rotatedAtKey,
+      Date.now(),
+      OWNER_ROTATION_COOLDOWN_MS,
+    );
+    if (remaining > 0) {
+      pushToast(
+        t("evoluRotateCooldown").replace(
+          "{seconds}",
+          String(Math.ceil(remaining / 1000)),
+        ),
+      );
+      return;
+    }
+    await rotate();
+  }, [config.rotatedAtKey, isSeedLogin, pushToast, rotate, slip39Seed, t]);
+
+  React.useEffect(() => {
+    if (!isSeedLogin || isBusy) return;
+    if (
+      editCount < config.threshold &&
+      !(scope === "contacts" && writeCount >= MAX_CONTACTS_PER_OWNER)
+    )
+      return;
+    void rotate();
+  }, [
+    config.threshold,
+    editCount,
+    isBusy,
+    isSeedLogin,
+    rotate,
+    scope,
+    writeCount,
+  ]);
+
+  const visibleOwnerIds = React.useMemo(
+    () =>
+      isSeedLogin
+        ? visibleOwners.map((entry) => entry.id)
+        : appOwnerId
+          ? [appOwnerId]
+          : EMPTY_OWNER_IDS,
+    [appOwnerId, isSeedLogin, visibleOwners],
+  );
+  const historicalOwners = React.useMemo(
+    () => visibleOwners.slice(0, -1),
+    [visibleOwners],
+  );
+  return {
+    ownerId,
+    index: resolvedIndex,
+    syncOwner: isSeedLogin ? owner : null,
+    visibleOwnerIds,
+    historicalOwners,
+    isBusy,
+    requestManualRotate,
+    writeCount,
+    editCount,
+    editsUntilRotation: Math.max(0, config.threshold - editCount),
+    rotatedAtMs: currentSnapshot?.rotatedAtMs ?? 0,
+  };
+};
+
+export const useEvoluContactsOwnerRotation = (
+  params: UseEvoluContactsOwnerRotationParams,
+): UseEvoluContactsOwnerRotationResult => {
+  const { appOwnerId, isSeedLogin, slip39Seed } = params;
   const [fixedOwnerSyncData, setFixedOwnerSyncData] =
     React.useState<FixedOwnerSyncData | null>(null);
-  const [ownerSyncData, setOwnerSyncData] =
-    React.useState<OwnerSyncData | null>(null);
-  const [cashuVisibleOwnerIds, setCashuVisibleOwnerIds] = React.useState<
-    Evolu.OwnerId[]
-  >([]);
-  const [contactsVisibleOwnerIds, setContactsVisibleOwnerIds] = React.useState<
-    Evolu.OwnerId[]
-  >([]);
-  const [messagesVisibleOwnerIds, setMessagesVisibleOwnerIds] = React.useState<
-    Evolu.OwnerId[]
-  >([]);
-  const [transactionsVisibleOwnerIds, setTransactionsVisibleOwnerIds] =
-    React.useState<Evolu.OwnerId[]>([]);
-  const [historicalBootstrapSyncOwners, setHistoricalBootstrapSyncOwners] =
-    React.useState<Evolu.SyncOwner[]>([]);
-  const [contactsBackupOwnerId, setContactsBackupOwnerId] =
-    React.useState<Evolu.OwnerId | null>(null);
-  const [messagesBackupOwnerId, setMessagesBackupOwnerId] =
-    React.useState<Evolu.OwnerId | null>(null);
-  const [transactionsBackupOwnerId, setTransactionsBackupOwnerId] =
-    React.useState<Evolu.OwnerId | null>(null);
-  const [rotateContactsOwnerIsBusy, setRotateContactsOwnerIsBusy] =
-    React.useState(false);
-  const [rotateCashuOwnerIsBusy, setRotateCashuOwnerIsBusy] =
-    React.useState(false);
-  const [rotateMessagesOwnerIsBusy, setRotateMessagesOwnerIsBusy] =
-    React.useState(false);
-  const [rotateTransactionsOwnerIsBusy, setRotateTransactionsOwnerIsBusy] =
-    React.useState(false);
   const [allowMissingOwnerMetaBootstrap, setAllowMissingOwnerMetaBootstrap] =
     React.useState(false);
   const [historyMutationCounts, setHistoryMutationCounts] = React.useState<
     Readonly<Record<string, number>>
   >({});
   const [historyMutationVersion, setHistoryMutationVersion] = React.useState(0);
-
   const ownerMetaQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -586,7 +727,6 @@ export const useEvoluContactsOwnerRotation = ({
     [],
   );
   const ownerMetaRows = useQuery(ownerMetaQuery);
-
   const allContactsQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -598,7 +738,6 @@ export const useEvoluContactsOwnerRotation = ({
     [],
   );
   const allContactsRows = useQuery(allContactsQuery);
-
   const allCashuTokensQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -610,7 +749,6 @@ export const useEvoluContactsOwnerRotation = ({
     [],
   );
   const allCashuTokensRows = useQuery(allCashuTokensQuery);
-
   const allNostrMessagesQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -622,7 +760,6 @@ export const useEvoluContactsOwnerRotation = ({
     [],
   );
   const allNostrMessagesRows = useQuery(allNostrMessagesQuery);
-
   const allNostrReactionsQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -634,7 +771,6 @@ export const useEvoluContactsOwnerRotation = ({
     [],
   );
   const allNostrReactionsRows = useQuery(allNostrReactionsQuery);
-
   const allTransactionsQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -646,1488 +782,200 @@ export const useEvoluContactsOwnerRotation = ({
     [],
   );
   const allTransactionsRows = useQuery(allTransactionsQuery);
-
   React.useEffect(
     () =>
-      subscribeEvoluHistoryMutationVersion(() => {
-        setHistoryMutationVersion((version) => version + 1);
-      }),
+      subscribeEvoluHistoryMutationVersion(() =>
+        setHistoryMutationVersion((value) => value + 1),
+      ),
     [],
   );
-
   React.useEffect(() => {
-    if (!isSeedLogin) {
+    if (!isSeedLogin || !slip39Seed?.trim()) {
       setFixedOwnerSyncData(null);
       return;
     }
-
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!normalizedSeed) {
-      setFixedOwnerSyncData(null);
-      return;
-    }
-
     let cancelled = false;
-
-    void deriveFixedOwnerSyncDataFromSeed(normalizedSeed).then((derived) => {
-      if (cancelled) return;
-      setFixedOwnerSyncData(derived);
+    void deriveFixedOwnerSyncDataFromSeed(slip39Seed.trim()).then((derived) => {
+      if (!cancelled) setFixedOwnerSyncData(derived);
     });
-
     return () => {
       cancelled = true;
     };
   }, [isSeedLogin, slip39Seed]);
-
   React.useEffect(() => {
-    if (!isSeedLogin) {
-      setAllowMissingOwnerMetaBootstrap(false);
-      return;
-    }
-
-    const metaOwnerId = String(fixedOwnerSyncData?.metaOwner.id ?? "").trim();
-    if (!metaOwnerId) {
-      setAllowMissingOwnerMetaBootstrap(false);
-      return;
-    }
-
     setAllowMissingOwnerMetaBootstrap(false);
-    const timeoutId = window.setTimeout(() => {
-      setAllowMissingOwnerMetaBootstrap(true);
-    }, 2500);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    if (!isSeedLogin || !fixedOwnerSyncData?.metaOwner.id) return;
+    const timer = window.setTimeout(
+      () => setAllowMissingOwnerMetaBootstrap(true),
+      2500,
+    );
+    return () => window.clearTimeout(timer);
   }, [fixedOwnerSyncData?.metaOwner.id, isSeedLogin]);
-
-  const metaOwnerIdText = String(fixedOwnerSyncData?.metaOwner.id ?? "").trim();
-  const rotationSnapshots = React.useMemo(
-    () => readRotationSnapshotsByScope(ownerMetaRows, metaOwnerIdText),
-    [metaOwnerIdText, ownerMetaRows],
+  const metaOwner = fixedOwnerSyncData?.metaOwner ?? null;
+  const snapshots = React.useMemo(
+    () => readRotationSnapshotsByScope(ownerMetaRows, metaOwner?.id ?? ""),
+    [metaOwner?.id, ownerMetaRows],
   );
-
-  const resolvedContactsOwnerIndex =
-    rotationSnapshots.contacts?.index ?? contactsOwnerIndex;
-  const resolvedCashuOwnerIndex =
-    rotationSnapshots.cashu?.index ?? cashuOwnerIndex;
-  const resolvedMessagesOwnerIndex =
-    rotationSnapshots.messages?.index ?? messagesOwnerIndex;
-  const resolvedTransactionsOwnerIndex =
-    rotationSnapshots.transactions?.index ?? transactionsOwnerIndex;
-
-  const contactsRotationSnapshot = readSnapshotForCurrentIndex(
-    rotationSnapshots.contacts,
-    resolvedContactsOwnerIndex,
+  const messageRows = React.useMemo(
+    () => [...allNostrMessagesRows, ...allNostrReactionsRows],
+    [allNostrMessagesRows, allNostrReactionsRows],
   );
-  const cashuRotationSnapshot = readSnapshotForCurrentIndex(
-    rotationSnapshots.cashu,
-    resolvedCashuOwnerIndex,
-  );
-  const messagesRotationSnapshot = readSnapshotForCurrentIndex(
-    rotationSnapshots.messages,
-    resolvedMessagesOwnerIndex,
-  );
-  const transactionsRotationSnapshot = readSnapshotForCurrentIndex(
-    rotationSnapshots.transactions,
-    resolvedTransactionsOwnerIndex,
-  );
-
-  const contactsOwnerBaselineCount = React.useMemo(
-    () =>
-      contactsRotationSnapshot?.baseline ??
-      getCounterValue(
-        EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        contactsOwnerIndex,
-      ),
-    [contactsOwnerIndex, contactsRotationSnapshot],
-  );
-  const cashuOwnerBaselineCount = React.useMemo(
-    () =>
-      cashuRotationSnapshot?.baseline ??
-      getCounterValue(
-        EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        cashuOwnerIndex,
-      ),
-    [cashuOwnerIndex, cashuRotationSnapshot],
-  );
-  const messagesOwnerBaselineCount = React.useMemo(
-    () =>
-      messagesRotationSnapshot?.baseline ??
-      getCounterValue(
-        EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        messagesOwnerIndex,
-      ),
-    [messagesOwnerIndex, messagesRotationSnapshot],
-  );
-  const transactionsOwnerBaselineCount = React.useMemo(
-    () =>
-      transactionsRotationSnapshot?.baseline ??
-      getCounterValue(
-        EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        transactionsOwnerIndex,
-      ),
-    [transactionsOwnerIndex, transactionsRotationSnapshot],
-  );
-
-  const contactsActiveOwnerId = isSeedLogin
-    ? String(ownerSyncData?.contactsOwner.id ?? "").trim()
-    : String(appOwnerId ?? "").trim();
-  const cashuActiveOwnerId = isSeedLogin
-    ? String(ownerSyncData?.cashuOwner.id ?? "").trim()
-    : String(appOwnerId ?? "").trim();
-  const messagesActiveOwnerId = isSeedLogin
-    ? String(ownerSyncData?.messagesOwner.id ?? "").trim()
-    : String(appOwnerId ?? "").trim();
-  const transactionsActiveOwnerId = isSeedLogin
-    ? String(ownerSyncData?.transactionsOwner.id ?? "").trim()
-    : String(appOwnerId ?? "").trim();
-
+  const shared = { ...params, metaOwner, allowMissingOwnerMetaBootstrap };
+  const cashu = useOwnerLane({
+    ...shared,
+    scope: "cashu",
+    snapshot: snapshots.cashu,
+    rows: allCashuTokensRows,
+    historyCount: historyMutationCounts.cashu,
+  });
+  const contacts = useOwnerLane({
+    ...shared,
+    scope: "contacts",
+    snapshot: snapshots.contacts,
+    rows: allContactsRows,
+    historyCount: historyMutationCounts.contacts,
+    cashuWriteCount: cashu.writeCount,
+  });
+  const messages = useOwnerLane({
+    ...shared,
+    scope: "messages",
+    snapshot: snapshots.messages,
+    rows: messageRows,
+    historyCount: historyMutationCounts.messages,
+  });
+  const transactions = useOwnerLane({
+    ...shared,
+    scope: "transactions",
+    snapshot: snapshots.transactions,
+    rows: allTransactionsRows,
+    historyCount: historyMutationCounts.transactions,
+  });
   React.useEffect(() => {
     const requests = [
       {
         key: "contacts",
-        ownerId: contactsActiveOwnerId,
-        rotatedAtMs: contactsRotationSnapshot?.rotatedAtMs ?? null,
-        tables: ["contact"],
+        ownerId: contacts.ownerId,
+        rotatedAtMs: contacts.rotatedAtMs,
+        tables: OWNER_LANES.contacts.tables,
       },
       {
         key: "cashu",
-        ownerId: cashuActiveOwnerId,
-        rotatedAtMs: cashuRotationSnapshot?.rotatedAtMs ?? null,
-        tables: ["cashuToken"],
+        ownerId: cashu.ownerId,
+        rotatedAtMs: cashu.rotatedAtMs,
+        tables: OWNER_LANES.cashu.tables,
       },
       {
         key: "messages",
-        ownerId: messagesActiveOwnerId,
-        rotatedAtMs: messagesRotationSnapshot?.rotatedAtMs ?? null,
-        tables: ["nostrMessage", "nostrReaction"],
+        ownerId: messages.ownerId,
+        rotatedAtMs: messages.rotatedAtMs,
+        tables: OWNER_LANES.messages.tables,
       },
       {
         key: "transactions",
-        ownerId: transactionsActiveOwnerId,
-        rotatedAtMs: transactionsRotationSnapshot?.rotatedAtMs ?? null,
-        tables: ["transaction"],
+        ownerId: transactions.ownerId,
+        rotatedAtMs: transactions.rotatedAtMs,
+        tables: OWNER_LANES.transactions.tables,
       },
     ].flatMap((request) =>
-      request.ownerId && request.rotatedAtMs !== null
-        ? [
-            {
-              key: request.key,
-              ownerId: request.ownerId,
-              rotatedAtMs: request.rotatedAtMs,
-              tables: request.tables,
-            },
-          ]
+      isSeedLogin && request.ownerId
+        ? [{ ...request, ownerId: request.ownerId }]
         : [],
     );
-
-    if (requests.length === 0) {
+    if (!requests.length) {
       setHistoryMutationCounts((prev) =>
-        Object.keys(prev).length === 0 ? prev : {},
+        Object.keys(prev).length ? {} : prev,
       );
       return;
     }
-
     let cancelled = false;
-    const timeoutId = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       void loadEvoluHistoryMutationCounts(requests).then((counts) => {
         if (!cancelled) setHistoryMutationCounts(counts);
       });
     }, 150);
-
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      window.clearTimeout(timer);
     };
   }, [
-    cashuActiveOwnerId,
-    cashuRotationSnapshot?.rotatedAtMs,
-    contactsActiveOwnerId,
-    contactsRotationSnapshot?.rotatedAtMs,
+    cashu.ownerId,
+    cashu.rotatedAtMs,
+    contacts.ownerId,
+    contacts.rotatedAtMs,
+    messages.ownerId,
+    messages.rotatedAtMs,
+    transactions.ownerId,
+    transactions.rotatedAtMs,
     historyMutationVersion,
-    messagesActiveOwnerId,
-    messagesRotationSnapshot?.rotatedAtMs,
-    transactionsActiveOwnerId,
-    transactionsRotationSnapshot?.rotatedAtMs,
-  ]);
-
-  const contactsOwnerWriteCount = React.useMemo(() => {
-    if (!contactsActiveOwnerId) return 0;
-    let count = 0;
-    for (const row of allContactsRows) {
-      if (readRowOwnerId(row) === contactsActiveOwnerId) count += 1;
-    }
-    return count;
-  }, [allContactsRows, contactsActiveOwnerId]);
-
-  const cashuOwnerWriteCount = React.useMemo(() => {
-    if (!cashuActiveOwnerId) return 0;
-    let count = 0;
-    for (const row of allCashuTokensRows) {
-      if (readRowOwnerId(row) === cashuActiveOwnerId) count += 1;
-    }
-    return count;
-  }, [allCashuTokensRows, cashuActiveOwnerId]);
-
-  const messagesOwnerWriteCount = React.useMemo(() => {
-    if (!messagesActiveOwnerId) return 0;
-    let count = 0;
-    for (const row of allNostrMessagesRows) {
-      if (readRowOwnerId(row) === messagesActiveOwnerId) count += 1;
-    }
-    for (const row of allNostrReactionsRows) {
-      if (readRowOwnerId(row) === messagesActiveOwnerId) count += 1;
-    }
-    return count;
-  }, [allNostrMessagesRows, allNostrReactionsRows, messagesActiveOwnerId]);
-
-  const transactionsOwnerWriteCount = React.useMemo(() => {
-    if (!transactionsActiveOwnerId) return 0;
-    let count = 0;
-    for (const row of allTransactionsRows) {
-      if (readRowOwnerId(row) === transactionsActiveOwnerId) count += 1;
-    }
-    return count;
-  }, [allTransactionsRows, transactionsActiveOwnerId]);
-
-  const contactsOwnerEditCount =
-    contactsRotationSnapshot?.rotatedAtMs !== null &&
-    contactsRotationSnapshot?.rotatedAtMs !== undefined &&
-    historyMutationCounts.contacts !== undefined
-      ? historyMutationCounts.contacts
-      : Math.max(0, contactsOwnerWriteCount - contactsOwnerBaselineCount);
-
-  const cashuOwnerWriteDelta =
-    cashuRotationSnapshot?.rotatedAtMs !== null &&
-    cashuRotationSnapshot?.rotatedAtMs !== undefined &&
-    historyMutationCounts.cashu !== undefined
-      ? historyMutationCounts.cashu
-      : Math.max(0, cashuOwnerWriteCount - cashuOwnerBaselineCount);
-
-  const messagesOwnerWriteDelta =
-    messagesRotationSnapshot?.rotatedAtMs !== null &&
-    messagesRotationSnapshot?.rotatedAtMs !== undefined &&
-    historyMutationCounts.messages !== undefined
-      ? historyMutationCounts.messages
-      : Math.max(0, messagesOwnerWriteCount - messagesOwnerBaselineCount);
-
-  const transactionsOwnerWriteDelta =
-    transactionsRotationSnapshot?.rotatedAtMs !== null &&
-    transactionsRotationSnapshot?.rotatedAtMs !== undefined &&
-    historyMutationCounts.transactions !== undefined
-      ? historyMutationCounts.transactions
-      : Math.max(
-          0,
-          transactionsOwnerWriteCount - transactionsOwnerBaselineCount,
-        );
-  const contactsOwnerWriteDelta = contactsOwnerEditCount;
-
-  React.useEffect(() => {
-    if (!isSeedLogin) return;
-
-    if (
-      !hasCounterValue(
-        EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        contactsOwnerIndex,
-      )
-    ) {
-      setCounterValue(
-        EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        contactsOwnerIndex,
-        contactsOwnerWriteCount,
-      );
-    }
-
-    if (
-      !hasCounterValue(
-        EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        cashuOwnerIndex,
-      )
-    ) {
-      setCounterValue(
-        EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        cashuOwnerIndex,
-        cashuOwnerWriteCount,
-      );
-    }
-
-    if (
-      !hasCounterValue(
-        EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        messagesOwnerIndex,
-      )
-    ) {
-      setCounterValue(
-        EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        messagesOwnerIndex,
-        messagesOwnerWriteCount,
-      );
-    }
-
-    if (
-      !hasCounterValue(
-        EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        transactionsOwnerIndex,
-      )
-    ) {
-      setCounterValue(
-        EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        transactionsOwnerIndex,
-        transactionsOwnerWriteCount,
-      );
-    }
-  }, [
-    cashuOwnerWriteCount,
-    cashuOwnerIndex,
-    contactsOwnerIndex,
-    contactsOwnerWriteCount,
     isSeedLogin,
-    messagesOwnerIndex,
-    messagesOwnerWriteCount,
-    transactionsOwnerIndex,
-    transactionsOwnerWriteCount,
   ]);
-
-  React.useEffect(() => {
-    if (!isSeedLogin) {
-      setOwnerSyncData(null);
-      setCashuVisibleOwnerIds([]);
-      setContactsVisibleOwnerIds([]);
-      setMessagesVisibleOwnerIds([]);
-      setTransactionsVisibleOwnerIds([]);
-      setHistoricalBootstrapSyncOwners([]);
-      setContactsBackupOwnerId(null);
-      setMessagesBackupOwnerId(null);
-      setTransactionsBackupOwnerId(null);
-      return;
-    }
-
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!normalizedSeed) {
-      setOwnerSyncData(null);
-      setCashuVisibleOwnerIds([]);
-      setContactsVisibleOwnerIds([]);
-      setMessagesVisibleOwnerIds([]);
-      setTransactionsVisibleOwnerIds([]);
-      setHistoricalBootstrapSyncOwners([]);
-      setContactsBackupOwnerId(null);
-      setMessagesBackupOwnerId(null);
-      setTransactionsBackupOwnerId(null);
-      return;
-    }
-
-    let cancelled = false;
-    const deriveOwnerMnemonic =
-      createCachedOwnerMnemonicDeriver(normalizedSeed);
-    void Promise.all([
-      deriveOwnerSyncDataFromSeed(
-        normalizedSeed,
-        resolvedContactsOwnerIndex,
-        resolvedCashuOwnerIndex,
-        resolvedMessagesOwnerIndex,
-        resolvedTransactionsOwnerIndex,
-        deriveOwnerMnemonic,
-      ),
-      deriveVisibleOwnerSyncDataFromSeed(
-        normalizedSeed,
-        "cashu",
-        resolvedCashuOwnerIndex,
-        deriveOwnerMnemonic,
-      ),
-      deriveVisibleOwnerSyncDataFromSeed(
-        normalizedSeed,
-        "contacts",
-        resolvedContactsOwnerIndex,
-        deriveOwnerMnemonic,
-      ),
-      deriveVisibleOwnerSyncDataFromSeed(
-        normalizedSeed,
-        "messages",
-        resolvedMessagesOwnerIndex,
-        deriveOwnerMnemonic,
-      ),
-      deriveVisibleOwnerSyncDataFromSeed(
-        normalizedSeed,
-        "transactions",
-        resolvedTransactionsOwnerIndex,
-        deriveOwnerMnemonic,
-      ),
-      resolvedContactsOwnerIndex > 0
-        ? deriveOwnerSyncDataFromSeed(
-            normalizedSeed,
-            resolvedContactsOwnerIndex - 1,
-            resolvedCashuOwnerIndex,
-            resolvedMessagesOwnerIndex,
-            resolvedTransactionsOwnerIndex,
-            deriveOwnerMnemonic,
-          )
-        : Promise.resolve(null),
-      resolvedMessagesOwnerIndex > 0
-        ? deriveOwnerSyncDataFromSeed(
-            normalizedSeed,
-            resolvedContactsOwnerIndex,
-            resolvedCashuOwnerIndex,
-            resolvedMessagesOwnerIndex - 1,
-            resolvedTransactionsOwnerIndex,
-            deriveOwnerMnemonic,
-          )
-        : Promise.resolve(null),
-      resolvedTransactionsOwnerIndex > 0
-        ? deriveOwnerSyncDataFromSeed(
-            normalizedSeed,
-            resolvedContactsOwnerIndex,
-            resolvedCashuOwnerIndex,
-            resolvedMessagesOwnerIndex,
-            resolvedTransactionsOwnerIndex - 1,
-            deriveOwnerMnemonic,
-          )
-        : Promise.resolve(null),
-    ]).then(
-      ([
-        derived,
-        visibleCashuOwners,
-        visibleContactOwners,
-        visibleMessagesOwners,
-        visibleTransactionsOwners,
-        contactsBackup,
-        messagesBackup,
-        transactionsBackup,
-      ]) => {
-        if (cancelled) return;
-        setOwnerSyncData(derived);
-        setCashuVisibleOwnerIds(visibleCashuOwners.ownerIds);
-        setContactsVisibleOwnerIds(visibleContactOwners.ownerIds);
-        setMessagesVisibleOwnerIds(visibleMessagesOwners.ownerIds);
-        setTransactionsVisibleOwnerIds(visibleTransactionsOwners.ownerIds);
-        const historicalOwners = [
-          ...visibleCashuOwners.syncOwners.slice(0, -1),
-          ...visibleContactOwners.syncOwners.slice(0, -1),
-          ...visibleMessagesOwners.syncOwners.slice(0, -1),
-          ...visibleTransactionsOwners.syncOwners.slice(0, -1),
-        ];
-        const uniqueHistoricalOwners = historicalOwners.filter(
-          (owner, index) =>
-            historicalOwners.findIndex(
-              (candidate) => candidate.id === owner.id,
-            ) === index,
-        );
-        setHistoricalBootstrapSyncOwners(uniqueHistoricalOwners);
-        setContactsBackupOwnerId(contactsBackup?.contactsOwner.id ?? null);
-        setMessagesBackupOwnerId(messagesBackup?.messagesOwner.id ?? null);
-        setTransactionsBackupOwnerId(
-          transactionsBackup?.transactionsOwner.id ?? null,
-        );
-      },
+  const historicalBootstrapSyncOwners = React.useMemo(() => {
+    if (!isSeedLogin) return EMPTY_SYNC_OWNERS;
+    const owners = [
+      ...cashu.historicalOwners,
+      ...contacts.historicalOwners,
+      ...messages.historicalOwners,
+      ...transactions.historicalOwners,
+    ];
+    return owners.filter(
+      (owner, index) =>
+        owners.findIndex((candidate) => candidate.id === owner.id) === index,
     );
-
-    return () => {
-      cancelled = true;
-    };
   }, [
+    cashu.historicalOwners,
+    contacts.historicalOwners,
+    messages.historicalOwners,
+    transactions.historicalOwners,
     isSeedLogin,
-    resolvedCashuOwnerIndex,
-    resolvedContactsOwnerIndex,
-    resolvedMessagesOwnerIndex,
-    resolvedTransactionsOwnerIndex,
-    slip39Seed,
   ]);
-
-  // Cashu writes stay on the active cashu owner only. Older duplicates can
-  // remain from earlier versions, but new writes no longer mirror into a
-  // contacts-aligned legacy lane.
-
-  React.useEffect(() => {
-    if (!fixedOwnerSyncData) return;
-
-    const metaOwnerId = String(fixedOwnerSyncData.metaOwner.id).trim();
-    if (!metaOwnerId) return;
-
-    let cashuSnap: RotationSnapshot | null = null;
-    let contactsSnap: RotationSnapshot | null = null;
-    let messagesSnap: RotationSnapshot | null = null;
-    let transactionsSnap: RotationSnapshot | null = null;
-    for (const row of ownerMetaRows) {
-      if (readRowOwnerId(row) !== metaOwnerId) continue;
-      const scope =
-        typeof row === "object" && row !== null && "scope" in row
-          ? row.scope
-          : null;
-      const scopeText = typeof scope === "string" ? scope.trim() : "";
-      const rawValue = readRowPointerValue(row);
-      if (scopeText === "cashu") {
-        const decoded = decodeRotationSnapshot(rawValue, "cashu");
-        if (decoded) cashuSnap = decoded;
-      } else if (scopeText === "contacts") {
-        const decoded = decodeRotationSnapshot(rawValue, "contacts");
-        if (decoded) contactsSnap = decoded;
-      } else if (scopeText === "messages") {
-        const decoded = decodeRotationSnapshot(rawValue, "messages");
-        if (decoded) messagesSnap = decoded;
-      } else if (scopeText === "transactions") {
-        const decoded = decodeRotationSnapshot(rawValue, "transactions");
-        if (decoded) transactionsSnap = decoded;
-      }
-    }
-
-    // When adopting a rotation from another device we must reset baseline +
-    // lastRotatedAt for the new index. Otherwise the adopter sees
-    // `delta = currentRowCount - 0` once Evolu sync pulls in the migrated
-    // rows and immediately re-rotates, cascading divergent owner lanes
-    // across the fleet.
-    //
-    // JSON snapshots carry the authoritative baseline values. Legacy
-    // `<scope>-N` values lose them — we fall back to baseline=0 and prime
-    // the cooldown with `now`, which matches the existing behaviour and is
-    // the best we can do without a baseline hint from the rotator.
-    const adoptIndex = (params: {
-      indexStorageKey: string;
-      baselineStorageKey: string;
-      lastRotatedStorageKey: string;
-      currentIndex: number;
-      nextIndex: number;
-      baseline: number | null;
-      rotatedAtMs: number | null;
-      setCurrentIndex: (next: number) => void;
-      extra?: () => void;
-    }) => {
-      const {
-        indexStorageKey,
-        baselineStorageKey,
-        lastRotatedStorageKey,
-        currentIndex,
-        nextIndex,
-        baseline,
-        rotatedAtMs,
-        setCurrentIndex,
-        extra,
-      } = params;
-      if (nextIndex === currentIndex) return;
-      setStoredIndex(indexStorageKey, nextIndex);
-      setCounterValue(baselineStorageKey, nextIndex, baseline ?? 0);
-      setStoredTimestampMs(lastRotatedStorageKey, rotatedAtMs ?? Date.now());
-      setCurrentIndex(nextIndex);
-      extra?.();
-    };
-
-    if (cashuSnap && cashuSnap.index !== cashuOwnerIndex) {
-      adoptIndex({
-        indexStorageKey: EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
-        baselineStorageKey: EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        lastRotatedStorageKey: EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-        currentIndex: cashuOwnerIndex,
-        nextIndex: cashuSnap.index,
-        baseline: cashuSnap.baseline,
-        rotatedAtMs: cashuSnap.rotatedAtMs,
-        setCurrentIndex: setCashuOwnerIndex,
-      });
-    }
-
-    if (contactsSnap && contactsSnap.index !== contactsOwnerIndex) {
-      const snap = contactsSnap;
-      adoptIndex({
-        indexStorageKey: EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
-        baselineStorageKey: EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        lastRotatedStorageKey:
-          EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-        currentIndex: contactsOwnerIndex,
-        nextIndex: snap.index,
-        baseline: snap.baseline,
-        rotatedAtMs: snap.rotatedAtMs,
-        setCurrentIndex: setContactsOwnerIndex,
-      });
-    }
-
-    if (messagesSnap && messagesSnap.index !== messagesOwnerIndex) {
-      adoptIndex({
-        indexStorageKey: EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
-        baselineStorageKey: EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        lastRotatedStorageKey:
-          EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-        currentIndex: messagesOwnerIndex,
-        nextIndex: messagesSnap.index,
-        baseline: messagesSnap.baseline,
-        rotatedAtMs: messagesSnap.rotatedAtMs,
-        setCurrentIndex: setMessagesOwnerIndex,
-      });
-    }
-
-    if (transactionsSnap && transactionsSnap.index !== transactionsOwnerIndex) {
-      adoptIndex({
-        indexStorageKey: EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
-        baselineStorageKey: EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        lastRotatedStorageKey:
-          EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-        currentIndex: transactionsOwnerIndex,
-        nextIndex: transactionsSnap.index,
-        baseline: transactionsSnap.baseline,
-        rotatedAtMs: transactionsSnap.rotatedAtMs,
-        setCurrentIndex: setTransactionsOwnerIndex,
-      });
-    }
-  }, [
-    cashuOwnerIndex,
-    contactsOwnerIndex,
-    fixedOwnerSyncData,
-    messagesOwnerIndex,
-    ownerMetaRows,
-    slip39Seed,
-    transactionsOwnerIndex,
-  ]);
-
-  React.useEffect(() => {
-    if (!isSeedLogin) return;
-    if (!fixedOwnerSyncData) return;
-    if (!ownerSyncData) return;
-    if (rotationSnapshots.cashu) return;
-    if (cashuOwnerIndex <= 0) return;
-    if (cashuOwnerWriteCount > 0) return;
-
-    setStoredIndex(EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY, 0);
-    setCounterValue(EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY, 0, 0);
-    setStoredTimestampMs(EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY, 0);
-    setCashuOwnerIndex(0);
-  }, [
-    cashuOwnerIndex,
-    cashuOwnerWriteCount,
-    fixedOwnerSyncData,
-    isSeedLogin,
-    ownerSyncData,
-    rotationSnapshots.cashu,
-  ]);
-
-  // Bootstrap or upgrade the active scope snapshots in ownerMeta.
-  //
-  // Users who joined before rotation pointers existed (or who never crossed
-  // a rotation threshold post-deploy) have local `*OwnerIndex` values that
-  // diverge across devices silently, because the reconciler above has
-  // nothing in ownerMeta to read. Without a manual `Rotate ... owner` click
-  // from Advanced > Evolu data, devices can stay out of sync indefinitely.
-  //
-  // Write the current local snapshot once per scope when the entry is
-  // missing, or when a legacy / incomplete snapshot lacks baseline or
-  // rotatedAtMs. The first device to upgrade seeds ownerMeta with its
-  // current lane index + row counts and resets the deterministic history
-  // window to "from now".
-  //
-  // If two devices boot at the same time and both write their own snapshot
-  // (different local indices), CRDT LWW picks one and the loser adopts
-  // through the same reconciler + heal path. Same convergence outcome.
-  React.useEffect(() => {
-    if (!isSeedLogin) return;
-    if (!fixedOwnerSyncData) return;
-    if (!ownerSyncData) return;
-    const metaOwnerId = fixedOwnerSyncData.metaOwner.id;
-    const metaOwnerIdStr = String(metaOwnerId).trim();
-    if (!metaOwnerIdStr) return;
-
-    const readSnapshotForScope = (
-      scope: "cashu" | "contacts" | "messages" | "transactions",
-    ): RotationSnapshot | null => {
-      for (const row of ownerMetaRows) {
-        if (readRowOwnerId(row) !== metaOwnerIdStr) continue;
-        const rowScope =
-          typeof row === "object" && row !== null && "scope" in row
-            ? row.scope
-            : null;
-        const rowScopeText =
-          typeof rowScope === "string" ? rowScope.trim() : "";
-        if (rowScopeText !== scope) continue;
-        const decoded = decodeRotationSnapshot(readRowPointerValue(row), scope);
-        if (decoded) return decoded;
-      }
-      return null;
-    };
-
-    const nowMs = Date.now();
-
-    const shouldWriteSnapshot = (
-      snapshot: RotationSnapshot | null,
-      currentIndex: number,
-      currentWriteCount: number,
-    ): boolean => {
-      if (snapshot) {
-        return needsStructuredSnapshotUpgrade(snapshot, currentIndex);
-      }
-      return (
-        allowMissingOwnerMetaBootstrap &&
-        currentIndex > 0 &&
-        currentWriteCount > 0
-      );
-    };
-
-    if (
-      shouldWriteSnapshot(
-        readSnapshotForScope("cashu"),
-        resolvedCashuOwnerIndex,
-        cashuOwnerWriteCount,
-      )
-    ) {
-      upsertOwnerMetaSnapshot(upsert, metaOwnerId, "cashu", {
-        index: resolvedCashuOwnerIndex,
-        baseline: cashuOwnerWriteCount,
-        cashuBaseline: null,
-        rotatedAtMs: nowMs,
-      });
-    }
-
-    if (
-      shouldWriteSnapshot(
-        readSnapshotForScope("contacts"),
-        resolvedContactsOwnerIndex,
-        contactsOwnerWriteCount,
-      )
-    ) {
-      upsertOwnerMetaSnapshot(upsert, metaOwnerId, "contacts", {
-        index: resolvedContactsOwnerIndex,
-        baseline: contactsOwnerWriteCount,
-        cashuBaseline: cashuOwnerWriteCount,
-        rotatedAtMs: nowMs,
-      });
-    }
-
-    if (
-      shouldWriteSnapshot(
-        readSnapshotForScope("messages"),
-        resolvedMessagesOwnerIndex,
-        messagesOwnerWriteCount,
-      )
-    ) {
-      upsertOwnerMetaSnapshot(upsert, metaOwnerId, "messages", {
-        index: resolvedMessagesOwnerIndex,
-        baseline: messagesOwnerWriteCount,
-        cashuBaseline: null,
-        rotatedAtMs: nowMs,
-      });
-    }
-
-    if (
-      shouldWriteSnapshot(
-        readSnapshotForScope("transactions"),
-        resolvedTransactionsOwnerIndex,
-        transactionsOwnerWriteCount,
-      )
-    ) {
-      upsertOwnerMetaSnapshot(upsert, metaOwnerId, "transactions", {
-        index: resolvedTransactionsOwnerIndex,
-        baseline: transactionsOwnerWriteCount,
-        cashuBaseline: null,
-        rotatedAtMs: nowMs,
-      });
-    }
-  }, [
-    allowMissingOwnerMetaBootstrap,
-    cashuOwnerIndex,
-    cashuOwnerWriteCount,
-    contactsOwnerIndex,
-    contactsOwnerWriteCount,
-    fixedOwnerSyncData,
-    isSeedLogin,
-    messagesOwnerIndex,
-    messagesOwnerWriteCount,
-    ownerMetaRows,
-    ownerSyncData,
-    resolvedCashuOwnerIndex,
-    resolvedContactsOwnerIndex,
-    resolvedMessagesOwnerIndex,
-    resolvedTransactionsOwnerIndex,
-    transactionsOwnerIndex,
-    transactionsOwnerWriteCount,
-    upsert,
-  ]);
-
-  const rotateContactsOwner = React.useCallback(async () => {
-    if (rotateContactsOwnerIsBusy) return;
-
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!isSeedLogin || !normalizedSeed) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) {
-      return;
-    }
-
-    setRotateContactsOwnerIsBusy(true);
-    try {
-      const nextIndex = contactsOwnerIndex + 1;
-      const derived = await deriveOwnerSyncDataFromSeed(
-        normalizedSeed,
-        nextIndex,
-        cashuOwnerIndex,
-        messagesOwnerIndex,
-        transactionsOwnerIndex,
-      );
-      if (!derived) {
-        pushToast(t("restoreFailed"));
-        return;
-      }
-
-      // cashuBaseline remains on the wire for older clients that still decode
-      // contacts and cashu as a coupled rotation.
-      const contactsPointerResult = upsertOwnerMetaSnapshot(
-        upsert,
-        derived.metaOwner.id,
-        "contacts",
-        {
-          index: nextIndex,
-          baseline: 0,
-          cashuBaseline: cashuOwnerWriteCount,
-          rotatedAtMs: nowMs,
-        },
-      );
-
-      if (!contactsPointerResult.ok) {
-        pushToast(
-          `${t("errorPrefix")}: ${formatMutationError(contactsPointerResult.error)}`,
-        );
-        return;
-      }
-
-      setStoredIndex(EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY, nextIndex);
-      setCounterValue(
-        EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        nextIndex,
-        0,
-      );
-      setStoredTimestampMs(
-        EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-        nowMs,
-      );
-
-      setOwnerSyncData(derived);
-      setContactsVisibleOwnerIds((previous) => {
-        const nextIds = [...previous, derived.contactsOwner.id];
-        return Array.from(new Set(nextIds));
-      });
-      setContactsOwnerIndex(nextIndex);
-      pushToast(t("evoluContactsOwnerRotated"));
-    } finally {
-      setRotateContactsOwnerIsBusy(false);
-    }
-  }, [
-    cashuOwnerIndex,
-    cashuOwnerWriteCount,
-    contactsOwnerIndex,
-    isSeedLogin,
-    pushToast,
-    rotateContactsOwnerIsBusy,
-    messagesOwnerIndex,
-    slip39Seed,
-    t,
-    transactionsOwnerIndex,
-    upsert,
-  ]);
-
-  const rotateCashuOwner = React.useCallback(async () => {
-    if (rotateCashuOwnerIsBusy) return;
-
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!isSeedLogin || !normalizedSeed) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) {
-      return;
-    }
-
-    setRotateCashuOwnerIsBusy(true);
-    try {
-      const nextIndex = cashuOwnerIndex + 1;
-      const derived = await deriveOwnerSyncDataFromSeed(
-        normalizedSeed,
-        contactsOwnerIndex,
-        nextIndex,
-        messagesOwnerIndex,
-        transactionsOwnerIndex,
-      );
-      if (!derived) {
-        pushToast(t("restoreFailed"));
-        return;
-      }
-
-      const cashuPointerResult = upsertOwnerMetaSnapshot(
-        upsert,
-        derived.metaOwner.id,
-        "cashu",
-        {
-          index: nextIndex,
-          baseline: 0,
-          cashuBaseline: null,
-          rotatedAtMs: nowMs,
-        },
-      );
-
-      if (!cashuPointerResult.ok) {
-        pushToast(
-          `${t("errorPrefix")}: ${formatMutationError(cashuPointerResult.error)}`,
-        );
-        return;
-      }
-
-      setStoredIndex(EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY, nextIndex);
-      const nextOwnerCashuRows = allCashuTokensRows.reduce(
-        (count, row) =>
-          readRowOwnerId(row) === String(derived.cashuOwner.id).trim()
-            ? count + 1
-            : count,
-        0,
-      );
-      setCounterValue(
-        EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        nextIndex,
-        nextOwnerCashuRows,
-      );
-      setStoredTimestampMs(
-        EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-        nowMs,
-      );
-
-      setOwnerSyncData(derived);
-      setCashuVisibleOwnerIds((previous) => {
-        const nextIds = [...previous, derived.cashuOwner.id];
-        return Array.from(new Set(nextIds));
-      });
-      setCashuOwnerIndex(nextIndex);
-      pushToast(`${t("evoluCashuOwnerRotated")} (0)`);
-    } finally {
-      setRotateCashuOwnerIsBusy(false);
-    }
-  }, [
-    allCashuTokensRows,
-    cashuOwnerIndex,
-    contactsOwnerIndex,
-    isSeedLogin,
-    messagesOwnerIndex,
-    pushToast,
-    rotateCashuOwnerIsBusy,
-    slip39Seed,
-    t,
-    transactionsOwnerIndex,
-    upsert,
-  ]);
-
-  const requestManualRotateContactsOwner = React.useCallback(async () => {
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!isSeedLogin || !normalizedSeed) {
-      pushToast(t("seedMissing"));
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-
-    if (cooldownRemainingMs > 0) {
-      pushToast(
-        t("evoluRotateCooldown").replace(
-          "{seconds}",
-          String(Math.ceil(cooldownRemainingMs / 1000)),
-        ),
-      );
-      return;
-    }
-
-    await rotateContactsOwner();
-  }, [isSeedLogin, pushToast, rotateContactsOwner, slip39Seed, t]);
-
-  const requestManualRotateCashuOwner = React.useCallback(async () => {
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!isSeedLogin || !normalizedSeed) {
-      pushToast(t("seedMissing"));
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-
-    if (cooldownRemainingMs > 0) {
-      pushToast(
-        t("evoluRotateCooldown").replace(
-          "{seconds}",
-          String(Math.ceil(cooldownRemainingMs / 1000)),
-        ),
-      );
-      return;
-    }
-
-    await rotateCashuOwner();
-  }, [isSeedLogin, pushToast, rotateCashuOwner, slip39Seed, t]);
-
-  const rotateMessagesOwner = React.useCallback(async () => {
-    if (rotateMessagesOwnerIsBusy) return;
-
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!isSeedLogin || !normalizedSeed) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) {
-      return;
-    }
-
-    setRotateMessagesOwnerIsBusy(true);
-    try {
-      const nextIndex = messagesOwnerIndex + 1;
-      const derived = await deriveOwnerSyncDataFromSeed(
-        normalizedSeed,
-        contactsOwnerIndex,
-        cashuOwnerIndex,
-        nextIndex,
-        transactionsOwnerIndex,
-      );
-      if (!derived) {
-        pushToast(t("restoreFailed"));
-        return;
-      }
-
-      // Messages rotation is pointer-only (no row copy), so baseline = 0
-      // for the new lane. rotatedAtMs primes the adopter's cooldown.
-      const pointerResult = upsertOwnerMetaSnapshot(
-        upsert,
-        derived.metaOwner.id,
-        "messages",
-        {
-          index: nextIndex,
-          baseline: 0,
-          cashuBaseline: null,
-          rotatedAtMs: nowMs,
-        },
-      );
-
-      if (!pointerResult.ok) {
-        pushToast(
-          `${t("errorPrefix")}: ${formatMutationError(pointerResult.error)}`,
-        );
-        return;
-      }
-
-      setStoredIndex(EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY, nextIndex);
-      const nextOwnerMessageRows = allNostrMessagesRows.reduce(
-        (count, row) =>
-          readRowOwnerId(row) === String(derived.messagesOwner.id).trim()
-            ? count + 1
-            : count,
-        0,
-      );
-      const nextOwnerReactionRows = allNostrReactionsRows.reduce(
-        (count, row) =>
-          readRowOwnerId(row) === String(derived.messagesOwner.id).trim()
-            ? count + 1
-            : count,
-        0,
-      );
-      setCounterValue(
-        EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        nextIndex,
-        nextOwnerMessageRows + nextOwnerReactionRows,
-      );
-      setStoredTimestampMs(
-        EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-        nowMs,
-      );
-
-      setOwnerSyncData(derived);
-      setMessagesVisibleOwnerIds((previous) => {
-        const nextIds = [...previous, derived.messagesOwner.id];
-        return Array.from(new Set(nextIds));
-      });
-      setMessagesOwnerIndex(nextIndex);
-      pushToast(`${t("evoluMessagesOwnerRotated")} (0)`);
-    } finally {
-      setRotateMessagesOwnerIsBusy(false);
-    }
-  }, [
-    allNostrMessagesRows,
-    allNostrReactionsRows,
-    cashuOwnerIndex,
-    contactsOwnerIndex,
-    isSeedLogin,
-    messagesOwnerIndex,
-    pushToast,
-    rotateMessagesOwnerIsBusy,
-    slip39Seed,
-    t,
-    transactionsOwnerIndex,
-    upsert,
-  ]);
-
-  const requestManualRotateMessagesOwner = React.useCallback(async () => {
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!isSeedLogin || !normalizedSeed) {
-      pushToast(t("seedMissing"));
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) {
-      pushToast(
-        t("evoluRotateCooldown").replace(
-          "{seconds}",
-          String(Math.ceil(cooldownRemainingMs / 1000)),
-        ),
-      );
-      return;
-    }
-
-    await rotateMessagesOwner();
-  }, [isSeedLogin, pushToast, rotateMessagesOwner, slip39Seed, t]);
-
-  const rotateTransactionsOwner = React.useCallback(async () => {
-    if (rotateTransactionsOwnerIsBusy) return;
-
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!isSeedLogin || !normalizedSeed) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) {
-      return;
-    }
-
-    setRotateTransactionsOwnerIsBusy(true);
-    try {
-      const nextIndex = transactionsOwnerIndex + 1;
-      const derived = await deriveOwnerSyncDataFromSeed(
-        normalizedSeed,
-        contactsOwnerIndex,
-        cashuOwnerIndex,
-        messagesOwnerIndex,
-        nextIndex,
-      );
-      if (!derived) {
-        pushToast(t("restoreFailed"));
-        return;
-      }
-
-      // Transactions rotation is pointer-only (no row copy). Baseline =
-      // 0 + rotatedAtMs primes the adopter's cooldown so it doesn't
-      // re-rotate when Evolu sync floods rows into the new lane.
-      const pointerResult = upsertOwnerMetaSnapshot(
-        upsert,
-        derived.metaOwner.id,
-        "transactions",
-        {
-          index: nextIndex,
-          baseline: 0,
-          cashuBaseline: null,
-          rotatedAtMs: nowMs,
-        },
-      );
-
-      if (!pointerResult.ok) {
-        pushToast(
-          `${t("errorPrefix")}: ${formatMutationError(pointerResult.error)}`,
-        );
-        return;
-      }
-
-      setStoredIndex(EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY, nextIndex);
-      const nextOwnerTransactionRows = allTransactionsRows.reduce(
-        (count, row) =>
-          readRowOwnerId(row) === String(derived.transactionsOwner.id).trim()
-            ? count + 1
-            : count,
-        0,
-      );
-      setCounterValue(
-        EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-        nextIndex,
-        nextOwnerTransactionRows,
-      );
-      setStoredTimestampMs(
-        EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-        nowMs,
-      );
-
-      setOwnerSyncData(derived);
-      setTransactionsVisibleOwnerIds((previous) => {
-        const nextIds = [...previous, derived.transactionsOwner.id];
-        return Array.from(new Set(nextIds));
-      });
-      setTransactionsOwnerIndex(nextIndex);
-      pushToast(`${t("evoluTransactionsOwnerRotated")} (0)`);
-    } finally {
-      setRotateTransactionsOwnerIsBusy(false);
-    }
-  }, [
-    allTransactionsRows,
-    cashuOwnerIndex,
-    contactsOwnerIndex,
-    isSeedLogin,
-    messagesOwnerIndex,
-    pushToast,
-    rotateTransactionsOwnerIsBusy,
-    slip39Seed,
-    t,
-    transactionsOwnerIndex,
-    upsert,
-  ]);
-
-  const requestManualRotateTransactionsOwner = React.useCallback(async () => {
-    const normalizedSeed = String(slip39Seed ?? "").trim();
-    if (!isSeedLogin || !normalizedSeed) {
-      pushToast(t("seedMissing"));
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) {
-      pushToast(
-        t("evoluRotateCooldown").replace(
-          "{seconds}",
-          String(Math.ceil(cooldownRemainingMs / 1000)),
-        ),
-      );
-      return;
-    }
-
-    await rotateTransactionsOwner();
-  }, [isSeedLogin, pushToast, rotateTransactionsOwner, slip39Seed, t]);
-
-  React.useEffect(() => {
-    if (!isSeedLogin) return;
-    if (rotateContactsOwnerIsBusy) return;
-    const reachedEditLimit =
-      contactsOwnerWriteDelta >= CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT;
-    const reachedRecordLimit =
-      contactsOwnerWriteCount >= MAX_CONTACTS_PER_OWNER;
-    if (!reachedEditLimit && !reachedRecordLimit) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) return;
-
-    void rotateContactsOwner();
-  }, [
-    contactsOwnerWriteCount,
-    contactsOwnerWriteDelta,
-    isSeedLogin,
-    rotateContactsOwner,
-    rotateContactsOwnerIsBusy,
-  ]);
-
-  React.useEffect(() => {
-    if (!isSeedLogin) return;
-    if (rotateCashuOwnerIsBusy) return;
-    if (cashuOwnerWriteDelta < CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) return;
-
-    void rotateCashuOwner();
-  }, [
-    cashuOwnerWriteDelta,
-    isSeedLogin,
-    rotateCashuOwner,
-    rotateCashuOwnerIsBusy,
-  ]);
-
-  React.useEffect(() => {
-    if (!isSeedLogin) return;
-    if (rotateMessagesOwnerIsBusy) return;
-    if (messagesOwnerWriteDelta < MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT)
-      return;
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) return;
-
-    void rotateMessagesOwner();
-  }, [
-    isSeedLogin,
-    messagesOwnerWriteDelta,
-    rotateMessagesOwner,
-    rotateMessagesOwnerIsBusy,
-  ]);
-
-  React.useEffect(() => {
-    if (!isSeedLogin) return;
-    if (rotateTransactionsOwnerIsBusy) return;
-    if (
-      transactionsOwnerWriteDelta <
-      TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT
-    ) {
-      return;
-    }
-
-    const nowMs = Date.now();
-    const cooldownRemainingMs = getCooldownRemainingMs(
-      EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-      nowMs,
-      OWNER_ROTATION_COOLDOWN_MS,
-    );
-    if (cooldownRemainingMs > 0) return;
-
-    void rotateTransactionsOwner();
-  }, [
-    isSeedLogin,
-    rotateTransactionsOwner,
-    rotateTransactionsOwnerIsBusy,
-    transactionsOwnerWriteDelta,
-  ]);
-
-  const contactsOwnerNewContactsCount = Math.max(0, contactsOwnerWriteCount);
-  const contactsOwnerEditsUntilRotation = Math.max(
-    0,
-    CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT - contactsOwnerWriteDelta,
-  );
-  const cashuOwnerEditsUntilRotation = Math.max(
-    0,
-    CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT - cashuOwnerWriteDelta,
-  );
-  const messagesOwnerEditsUntilRotation = Math.max(
-    0,
-    MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT - messagesOwnerWriteDelta,
-  );
-  const transactionsOwnerEditsUntilRotation = Math.max(
-    0,
-    TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT -
-      transactionsOwnerWriteDelta,
-  );
-
-  const nonSeedVisibleOwnerIds = React.useMemo(
-    () => (appOwnerId ? [appOwnerId] : EMPTY_OWNER_IDS),
-    [appOwnerId],
-  );
-
   return {
-    cashuOwnerId: isSeedLogin
-      ? (ownerSyncData?.cashuOwner.id ?? null)
-      : appOwnerId,
-    cashuOwnerEditsUntilRotation,
-    cashuOwnerIndex: resolvedCashuOwnerIndex,
-    cashuOwnerPointer: `cashu-${resolvedCashuOwnerIndex}`,
-    cashuSyncOwner: isSeedLogin ? (ownerSyncData?.cashuOwner ?? null) : null,
-    cashuVisibleOwnerIds: isSeedLogin
-      ? cashuVisibleOwnerIds
-      : nonSeedVisibleOwnerIds,
-    contactsBackupOwnerId: isSeedLogin ? contactsBackupOwnerId : null,
-    contactsOwnerEditCount,
-    contactsOwnerEditsUntilRotation,
-    contactsSyncOwner: isSeedLogin
-      ? (ownerSyncData?.contactsOwner ?? null)
-      : null,
-    contactsOwnerId: isSeedLogin
-      ? (ownerSyncData?.contactsOwner.id ?? null)
-      : appOwnerId,
-    contactsOwnerIndex: resolvedContactsOwnerIndex,
-    contactsOwnerNewContactsCount,
-    contactsOwnerPointer: `contacts-${resolvedContactsOwnerIndex}`,
-    contactsVisibleOwnerIds: isSeedLogin
-      ? contactsVisibleOwnerIds
-      : nonSeedVisibleOwnerIds,
+    cashuOwnerId: cashu.ownerId,
+    cashuOwnerEditsUntilRotation: cashu.editsUntilRotation,
+    cashuOwnerIndex: cashu.index,
+    cashuSyncOwner: cashu.syncOwner,
+    cashuVisibleOwnerIds: cashu.visibleOwnerIds,
+    requestManualRotateCashuOwner: cashu.requestManualRotate,
+    rotateCashuOwnerIsBusy: cashu.isBusy,
+    contactsOwnerId: contacts.ownerId,
+    contactsOwnerEditsUntilRotation: contacts.editsUntilRotation,
+    contactsOwnerIndex: contacts.index,
+    contactsSyncOwner: contacts.syncOwner,
+    contactsVisibleOwnerIds: contacts.visibleOwnerIds,
+    requestManualRotateContactsOwner: contacts.requestManualRotate,
+    rotateContactsOwnerIsBusy: contacts.isBusy,
+    messagesOwnerId: messages.ownerId,
+    messagesOwnerEditsUntilRotation: messages.editsUntilRotation,
+    messagesOwnerIndex: messages.index,
+    messagesSyncOwner: messages.syncOwner,
+    messagesVisibleOwnerIds: messages.visibleOwnerIds,
+    requestManualRotateMessagesOwner: messages.requestManualRotate,
+    rotateMessagesOwnerIsBusy: messages.isBusy,
+    transactionsOwnerId: transactions.ownerId,
+    transactionsOwnerEditsUntilRotation: transactions.editsUntilRotation,
+    transactionsOwnerIndex: transactions.index,
+    transactionsSyncOwner: transactions.syncOwner,
+    transactionsVisibleOwnerIds: transactions.visibleOwnerIds,
+    requestManualRotateTransactionsOwner: transactions.requestManualRotate,
+    rotateTransactionsOwnerIsBusy: transactions.isBusy,
+    contactsOwnerEditCount: contacts.editCount,
+    contactsOwnerNewContactsCount: contacts.writeCount,
+    contactsOwnerPointer: `contacts-${contacts.index}`,
+    transactionsOwnerPointer: `transactions-${transactions.index}`,
+    transactionsBootstrapSnapshot: allTransactionsRows,
     identityOwnerId: isSeedLogin
       ? (fixedOwnerSyncData?.identityOwner.id ?? null)
       : appOwnerId,
     identitySyncOwner: isSeedLogin
       ? (fixedOwnerSyncData?.identityOwner ?? null)
       : null,
-    historicalBootstrapSyncOwners: isSeedLogin
-      ? historicalBootstrapSyncOwners
-      : EMPTY_SYNC_OWNERS,
+    historicalBootstrapSyncOwners,
     legacyIdentitiesOwnerId: isSeedLogin
       ? (fixedOwnerSyncData?.legacyIdentitiesOwner.id ?? null)
       : null,
     legacyMessagesIdentityOwnerId: isSeedLogin
       ? (fixedOwnerSyncData?.legacyMessagesIdentityOwner.id ?? null)
       : null,
-    metaOwnerId: isSeedLogin
-      ? (fixedOwnerSyncData?.metaOwner.id ?? null)
-      : null,
-    metaSyncOwner: isSeedLogin ? (fixedOwnerSyncData?.metaOwner ?? null) : null,
-    messagesBackupOwnerId: isSeedLogin ? messagesBackupOwnerId : null,
-    messagesOwnerId: isSeedLogin
-      ? (ownerSyncData?.messagesOwner.id ?? null)
-      : appOwnerId,
-    messagesOwnerIndex: resolvedMessagesOwnerIndex,
-    messagesOwnerPointer: `messages-${resolvedMessagesOwnerIndex}`,
-    messagesOwnerEditsUntilRotation,
-    messagesSyncOwner: isSeedLogin
-      ? (ownerSyncData?.messagesOwner ?? null)
-      : null,
-    messagesVisibleOwnerIds: isSeedLogin
-      ? messagesVisibleOwnerIds
-      : nonSeedVisibleOwnerIds,
-    requestManualRotateCashuOwner,
-    requestManualRotateContactsOwner,
-    requestManualRotateMessagesOwner,
-    requestManualRotateTransactionsOwner,
-    rotateCashuOwnerIsBusy,
-    rotateContactsOwnerIsBusy,
-    rotateMessagesOwnerIsBusy,
-    rotateTransactionsOwnerIsBusy,
-    transactionsBackupOwnerId: isSeedLogin ? transactionsBackupOwnerId : null,
-    transactionsOwnerEditsUntilRotation,
-    transactionsOwnerId: isSeedLogin
-      ? (ownerSyncData?.transactionsOwner.id ?? null)
-      : appOwnerId,
-    transactionsOwnerIndex: resolvedTransactionsOwnerIndex,
-    transactionsOwnerPointer: `transactions-${resolvedTransactionsOwnerIndex}`,
-    transactionsSyncOwner: isSeedLogin
-      ? (ownerSyncData?.transactionsOwner ?? null)
-      : null,
-    transactionsBootstrapSnapshot: allTransactionsRows,
-    transactionsVisibleOwnerIds: isSeedLogin
-      ? transactionsVisibleOwnerIds
-      : nonSeedVisibleOwnerIds,
+    metaOwnerId: isSeedLogin ? (metaOwner?.id ?? null) : null,
+    metaSyncOwner: isSeedLogin ? metaOwner : null,
   };
 };

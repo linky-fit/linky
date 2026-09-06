@@ -1,6 +1,6 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { Amount, getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Either, Exit, Layer, Schema, Stream } from "effect";
+import { getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
+import { Effect, Either, Exit, Layer, Schema } from "effect";
 import { MintRejected, TokenAlreadySpent } from "../domain/errors";
 import {
   MintUrl,
@@ -8,30 +8,21 @@ import {
   TokenText,
   UnixSeconds,
 } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
 import { WalletInstances } from "../mint/internal/WalletInstances";
-import type { LoadedWallet } from "../mint/internal/WalletInstances";
-import { deterministicIdTokenStore } from "../ports/deterministicIdTokenStore";
+import { deterministicIdTokenStore } from "../testing/deterministicIdTokenStore";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import {
   inMemoryTokenStore,
   makeInMemoryTokenStore,
 } from "../ports/inMemoryTokenStore";
 import { NewTokenRow, StoredTokenRow, TokenStore } from "../ports/TokenStore";
-import { parseTokenText } from "./codec";
+import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
+import { amountOf, seedRow as seedTokenRow } from "../testing/rows";
 import type { TokenState } from "./domain";
 import { Tokens } from "./Tokens";
 
 const mint = MintUrl.make("https://mint.example");
-const keysetHex = "009a1f293253e41e";
-
-const proof = (amount: number, secret: string): CashuProof => ({
-  id: keysetHex,
-  amount: Amount.from(amount),
-  secret,
-  C: "02" + "ab".repeat(32),
-});
 
 const tokenOf = (...proofs: ReadonlyArray<CashuProof>): TokenText =>
   TokenText.make(getEncodedToken({ mint, unit: "sat", proofs: [...proofs] }));
@@ -66,15 +57,11 @@ interface HarnessArgs {
 }
 
 const makeHarness = (args: HarnessArgs = {}) => {
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const checkedSecrets: string[][] = [];
   let receiveCalls = 0;
-  const wallet: LoadedWallet = {
-    keysetId: keysetHex,
-    keyChain: { getKeysets: () => [] },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
+  const wallet = fakeWallet({
+    keysetId: KEYSET_HEX,
     receive: () => {
       receiveCalls += 1;
       return args.receive?.() ?? Promise.reject(new Error("not under test"));
@@ -91,16 +78,7 @@ const makeHarness = (args: HarnessArgs = {}) => {
             })),
           );
     },
-    send: () => Promise.reject(new Error("not under test")),
-    restore: () => Promise.reject(new Error("not under test")),
-    createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-    createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-    batchRestore: () => Promise.reject(new Error("not under test")),
-  };
+  });
 
   const layer = Tokens.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -111,12 +89,7 @@ const makeHarness = (args: HarnessArgs = {}) => {
         ),
         inMemoryKeyValueStore,
         args.tokenStore ?? inMemoryTokenStore,
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
@@ -124,7 +97,12 @@ const makeHarness = (args: HarnessArgs = {}) => {
   const run = <A, E>(program: Effect.Effect<A, E, Tokens | TokenStore>) =>
     Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
 
-  return { run, events, checkedSecrets, receiveCalls: () => receiveCalls };
+  return {
+    run,
+    events: inspector.events,
+    checkedSecrets,
+    receiveCalls: () => receiveCalls,
+  };
 };
 
 interface Seed {
@@ -134,16 +112,7 @@ interface Seed {
 }
 
 const seedRow = (seed: Seed) =>
-  Effect.flatMap(TokenStore, (store) =>
-    store.insert(
-      new NewTokenRow({
-        originalTokenText: seed.tokenText,
-        tokenText: seed.tokenText,
-        state: seed.state,
-        error: seed.error ?? null,
-      }),
-    ),
-  );
+  seedTokenRow(seed.tokenText, seed.state, seed.error ?? null);
 
 /** Seeds rows, runs one Tokens call, and reports the resulting store. */
 const withRows = <A, E>(
@@ -157,9 +126,6 @@ const withRows = <A, E>(
     const result = yield* Effect.either(operation(yield* Tokens));
     return { rowIds, result, rows: yield* (yield* TokenStore).loadAll };
   });
-
-const amountOf = (row: StoredTokenRow | undefined): number | undefined =>
-  row === undefined ? undefined : parseTokenText(row.tokenText)?.amount;
 
 describe("Tokens.list", () => {
   const storedRow = (
@@ -366,8 +332,7 @@ describe("Tokens lifecycle transitions", () => {
       outcomesFromEveryState((tokens, rowId) => tokens.reserve(rowId)),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.map(([from, outcome]) => [from, outcome])).toEqual([
       ["pending", "InvalidTokenTransition"],
       ["accepted", "reserved"],
@@ -385,8 +350,7 @@ describe("Tokens lifecycle transitions", () => {
       outcomesFromEveryState((tokens, rowId) => tokens.markIssued(rowId)),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.map(([from, outcome]) => [from, outcome])).toEqual([
       ["pending", "InvalidTokenTransition"],
       ["accepted", "issued"],
@@ -404,8 +368,7 @@ describe("Tokens lifecycle transitions", () => {
       outcomesFromEveryState((tokens, rowId) => tokens.markExternalized(rowId)),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.map(([from, outcome]) => [from, outcome])).toEqual([
       ["pending", "InvalidTokenTransition"],
       ["accepted", "externalized"],
@@ -437,8 +400,7 @@ describe("Tokens lifecycle transitions", () => {
       }),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value?.state).toBe("reserved");
     expect(exit.value?.error).toBeNull();
     expect(events.map((event) => event._tag)).toEqual([
@@ -460,8 +422,7 @@ describe("Tokens lifecycle transitions", () => {
       ),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toMatchObject({ _tag: "TokenRowNotFound" });
   });
 });
@@ -480,343 +441,258 @@ const onSeededRow = <A, E>(
 const returnRow = (seed: Seed) =>
   onSeededRow(seed, (tokens, rowId) => tokens.returnToWallet(rowId));
 
-describe("Tokens.returnToWallet", () => {
-  it("drops a reservation locally, without contacting the mint", async () => {
-    const { run, receiveCalls } = makeHarness();
+interface StoreCase {
+  readonly name: string;
+  readonly tokenStore: Layer.Layer<TokenStore>;
+  /** The Evolu adapter derives ids from `originalTokenText`, so a re-receive lands on the replaced row's own id. */
+  readonly reusesRowId: boolean;
+}
 
-    const exit = await run(returnRow({ tokenText: tokenA, state: "reserved" }));
+const storeCases: ReadonlyArray<StoreCase> = [
+  {
+    name: "a unique-id store",
+    tokenStore: inMemoryTokenStore,
+    reusesRowId: false,
+  },
+  {
+    name: "a deterministic-id store",
+    tokenStore: deterministicIdTokenStore,
+    reusesRowId: true,
+  },
+];
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(receiveCalls()).toBe(0);
-    expect(result._tag).toBe("Right");
-    if (result._tag !== "Right") return;
-    expect(result.right).toMatchObject({
-      rowId: row.id,
-      tokenText: tokenA,
-      mint,
-      unit: "sat",
-      amount: 6,
-    });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ id: row.id, state: "accepted" });
-  });
+describe.each(storeCases)(
+  "Tokens.returnToWallet with $name",
+  ({ tokenStore, reusesRowId }) => {
+    const harness = (args: HarnessArgs = {}) =>
+      makeHarness({ ...args, tokenStore });
 
-  it("keeps a reservation whose token text no longer parses", async () => {
-    const { run, receiveCalls } = makeHarness();
+    it("drops a reservation locally, without contacting the mint", async () => {
+      const { run, receiveCalls } = harness();
 
-    const exit = await run(
-      returnRow({
-        tokenText: TokenText.make("cashuBnotatoken"),
-        state: "reserved",
-      }),
-    );
+      const exit = await run(
+        returnRow({ tokenText: tokenA, state: "reserved" }),
+      );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(receiveCalls()).toBe(0);
-    expect(result._tag).toBe("Left");
-    if (result._tag !== "Left") return;
-    expect(result.left._tag).toBe("TokenParseFailed");
-    // The parse runs before the flip: the row must still be reserved.
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ id: row.id, state: "reserved" });
-  });
-
-  it("re-receives an issued row and drops the handed-out encoding", async () => {
-    const { run, events } = makeHarness({
-      receive: () => Promise.resolve(swappedProofs),
-    });
-
-    const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(result._tag).toBe("Right");
-    if (result._tag !== "Right") return;
-    expect(result.right.amount).toBe(5);
-    expect(result.right.rowId).not.toBe(row.id);
-
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: result.right.rowId,
-      state: "accepted",
-      tokenText: result.right.tokenText,
-    });
-    expect(rows[0]?.tokenText).not.toBe(tokenA);
-    // The replaced row only goes away once the fresh proofs are stored.
-    expect(
-      events
-        .filter((event) => event._tag === "TokenLifecycleChanged")
-        .map((event) => [event.from, event.to]),
-    ).toEqual([
-      [null, "pending"],
-      ["pending", "accepted"],
-    ]);
-
-    const serialized = JSON.stringify(events);
-    expect(serialized).not.toContain("cashu");
-    expect(serialized).not.toContain("fresh-1");
-  });
-
-  it("re-receives an errored row", async () => {
-    const { run } = makeHarness({
-      receive: () => Promise.resolve(swappedProofs),
-    });
-
-    const exit = await run(
-      returnRow({
+      assert(Exit.isSuccess(exit));
+      const { row, result, rows } = exit.value;
+      expect(receiveCalls()).toBe(0);
+      assert(result._tag === "Right");
+      expect(result.right).toMatchObject({
+        rowId: row.id,
         tokenText: tokenA,
+        mint,
+        unit: "sat",
+        amount: 6,
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ id: row.id, state: "accepted" });
+    });
+
+    it("keeps a reservation whose token text no longer parses", async () => {
+      const { run, receiveCalls } = harness();
+
+      const exit = await run(
+        returnRow({
+          tokenText: TokenText.make("cashuBnotatoken"),
+          state: "reserved",
+        }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      const { row, result, rows } = exit.value;
+      expect(receiveCalls()).toBe(0);
+      assert(result._tag === "Left");
+      expect(result.left._tag).toBe("TokenParseFailed");
+      // The parse runs before the flip: the row must still be reserved.
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ id: row.id, state: "reserved" });
+    });
+
+    it("re-receives an issued row and drops the handed-out encoding", async () => {
+      const { run, events } = harness({
+        receive: () => Promise.resolve(swappedProofs),
+      });
+
+      const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
+
+      assert(Exit.isSuccess(exit));
+      const { row, result, rows } = exit.value;
+      assert(result._tag === "Right");
+      expect(result.right.amount).toBe(5);
+      expect(result.right.rowId === row.id).toBe(reusesRowId);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: result.right.rowId,
+        state: "accepted",
+        tokenText: result.right.tokenText,
+        error: null,
+      });
+      expect(rows[0]?.tokenText).not.toBe(tokenA);
+      // The replaced row only goes away once the fresh proofs are stored.
+      expect(
+        events
+          .filter((event) => event._tag === "TokenLifecycleChanged")
+          .map((event) => [event.from, event.to]),
+      ).toEqual([
+        [null, "pending"],
+        ["pending", "accepted"],
+      ]);
+
+      const serialized = JSON.stringify(events);
+      expect(serialized).not.toContain("cashu");
+      expect(serialized).not.toContain("fresh-1");
+    });
+
+    it("re-receives an errored row", async () => {
+      const { run } = harness({
+        receive: () => Promise.resolve(swappedProofs),
+      });
+
+      const exit = await run(
+        returnRow({
+          tokenText: tokenA,
+          state: "error",
+          error: encodeRejected(
+            new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
+          ),
+        }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.result._tag).toBe("Right");
+      expect(exit.value.rows).toHaveLength(1);
+      expect(exit.value.rows[0]).toMatchObject({
+        state: "accepted",
+        error: null,
+      });
+    });
+
+    it("rejects an accepted row: there is nothing to bring back", async () => {
+      const { run, receiveCalls } = harness();
+
+      const exit = await run(
+        returnRow({ tokenText: tokenA, state: "accepted" }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      assert(exit.value.result._tag === "Left");
+      expect(exit.value.result.left).toMatchObject({
+        _tag: "InvalidTokenTransition",
+        from: "accepted",
+        to: "accepted",
+      });
+      expect(receiveCalls()).toBe(0);
+      expect(exit.value.rows[0]?.state).toBe("accepted");
+    });
+
+    it("marks the returned row spent when the mint says it is gone", async () => {
+      const { run } = harness({
+        receive: () =>
+          Promise.reject(new MintOperationError(11001, "Token already spent.")),
+      });
+
+      const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
+
+      assert(Exit.isSuccess(exit));
+      const { row, result, rows } = exit.value;
+      assert(result._tag === "Left");
+      expect(result.left).toMatchObject({ _tag: "TokenAlreadySpent", mint });
+
+      // Only the row the caller knows about survives, carrying the failure.
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: row.id,
         state: "error",
-        error: encodeRejected(
-          new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
+        tokenText: tokenA,
+      });
+      expect(JSON.parse(rows[0]?.error ?? "")).toMatchObject({
+        _tag: "TokenAlreadySpent",
+      });
+    });
+
+    it("leaves the issued row untouched when the mint is unreachable", async () => {
+      const { run } = harness({
+        receive: () => Promise.reject(new TypeError("fetch failed")),
+      });
+
+      const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
+
+      assert(Exit.isSuccess(exit));
+      const { row, result, rows } = exit.value;
+      assert(result._tag === "Left");
+      expect(result.left._tag).toBe("MintUnreachable");
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: row.id,
+        state: "issued",
+        tokenText: tokenA,
+        error: null,
+      });
+    });
+
+    it("restores an errored row's recorded error on a transient failure", async () => {
+      const recorded = encodeRejected(
+        new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
+      );
+      const { run } = harness({
+        receive: () => Promise.reject(new TypeError("fetch failed")),
+      });
+
+      const exit = await run(
+        returnRow({ tokenText: tokenA, state: "error", error: recorded }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      const { row, result, rows } = exit.value;
+      assert(result._tag === "Left");
+      expect(result.left._tag).toBe("MintUnreachable");
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: row.id,
+        state: "error",
+        tokenText: tokenA,
+        error: recorded,
+      });
+    });
+
+    it("keeps an externalized row in its state on a definitive failure", async () => {
+      const { run } = harness({
+        receive: () =>
+          Promise.reject(new MintOperationError(11001, "Token already spent.")),
+      });
+
+      const exit = await run(
+        returnRow({ tokenText: tokenA, state: "externalized" }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      const { row, result, rows } = exit.value;
+      expect(result._tag).toBe("Left");
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        id: row.id,
+        state: "externalized",
+        tokenText: tokenA,
+        error: null,
+      });
+    });
+
+    it("fails with TokenRowNotFound for an unknown row", async () => {
+      const { run } = harness();
+
+      const exit = await run(
+        Effect.flatMap(Tokens, (tokens) =>
+          Effect.flip(tokens.returnToWallet(TokenRowId.make("missing"))),
         ),
-      }),
-    );
+      );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.result._tag).toBe("Right");
-    expect(exit.value.rows).toHaveLength(1);
-    expect(exit.value.rows[0]).toMatchObject({
-      state: "accepted",
-      error: null,
+      assert(Exit.isSuccess(exit));
+      expect(exit.value).toMatchObject({ _tag: "TokenRowNotFound" });
     });
-  });
-
-  it("rejects an accepted row: there is nothing to bring back", async () => {
-    const { run, receiveCalls } = makeHarness();
-
-    const exit = await run(returnRow({ tokenText: tokenA, state: "accepted" }));
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.result._tag).toBe("Left");
-    if (exit.value.result._tag !== "Left") return;
-    expect(exit.value.result.left).toMatchObject({
-      _tag: "InvalidTokenTransition",
-      from: "accepted",
-      to: "accepted",
-    });
-    expect(receiveCalls()).toBe(0);
-    expect(exit.value.rows[0]?.state).toBe("accepted");
-  });
-
-  it("marks the returned row spent when the mint says it is gone", async () => {
-    const { run } = makeHarness({
-      receive: () =>
-        Promise.reject(new MintOperationError(11001, "Token already spent.")),
-    });
-
-    const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(result._tag).toBe("Left");
-    if (result._tag !== "Left") return;
-    expect(result.left).toMatchObject({ _tag: "TokenAlreadySpent", mint });
-
-    // Only the row the caller knows about survives, carrying the failure.
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: row.id,
-      state: "error",
-      tokenText: tokenA,
-    });
-    expect(JSON.parse(rows[0]?.error ?? "")).toMatchObject({
-      _tag: "TokenAlreadySpent",
-    });
-  });
-
-  it("leaves the row untouched when the mint is unreachable", async () => {
-    const { run } = makeHarness({
-      receive: () => Promise.reject(new TypeError("fetch failed")),
-    });
-
-    const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(result._tag).toBe("Left");
-    if (result._tag !== "Left") return;
-    expect(result.left._tag).toBe("MintUnreachable");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: row.id,
-      state: "issued",
-      tokenText: tokenA,
-      error: null,
-    });
-  });
-
-  it("keeps an externalized row in its state on a definitive failure", async () => {
-    const { run } = makeHarness({
-      receive: () =>
-        Promise.reject(new MintOperationError(11001, "Token already spent.")),
-    });
-
-    const exit = await run(
-      returnRow({ tokenText: tokenA, state: "externalized" }),
-    );
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.result._tag).toBe("Left");
-    expect(exit.value.rows).toHaveLength(1);
-    expect(exit.value.rows[0]?.state).toBe("externalized");
-  });
-
-  it("fails with TokenRowNotFound for an unknown row", async () => {
-    const { run } = makeHarness();
-
-    const exit = await run(
-      Effect.flatMap(Tokens, (tokens) =>
-        Effect.flip(tokens.returnToWallet(TokenRowId.make("missing"))),
-      ),
-    );
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value).toMatchObject({ _tag: "TokenRowNotFound" });
-  });
-});
-
-/**
- * The Evolu adapter derives row ids from `originalTokenText`, so the
- * re-receive's insert lands on the replaced row's own id: fresh and replaced
- * rows are one physical row, and removing it would destroy the funds.
- */
-describe("Tokens.returnToWallet with a deterministic-id store", () => {
-  const detHarness = (args: HarnessArgs = {}) =>
-    makeHarness({ ...args, tokenStore: deterministicIdTokenStore });
-
-  it("keeps the one shared row, accepted with the fresh proofs", async () => {
-    const { run } = detHarness({
-      receive: () => Promise.resolve(swappedProofs),
-    });
-
-    const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(result._tag).toBe("Right");
-    if (result._tag !== "Right") return;
-    // The insert reused the issued row's id, so the receipt names it.
-    expect(result.right.rowId).toBe(row.id);
-    expect(result.right.amount).toBe(5);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: row.id,
-      state: "accepted",
-      tokenText: result.right.tokenText,
-      error: null,
-    });
-    expect(rows[0]?.tokenText).not.toBe(tokenA);
-  });
-
-  it("restores the issued row untouched on a transient failure", async () => {
-    const { run } = detHarness({
-      receive: () => Promise.reject(new TypeError("fetch failed")),
-    });
-
-    const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(result._tag).toBe("Left");
-    if (result._tag !== "Left") return;
-    expect(result.left._tag).toBe("MintUnreachable");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: row.id,
-      state: "issued",
-      tokenText: tokenA,
-      error: null,
-    });
-  });
-
-  it("restores an errored row's recorded error on a transient failure", async () => {
-    const recorded = encodeRejected(
-      new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
-    );
-    const { run } = detHarness({
-      receive: () => Promise.reject(new TypeError("fetch failed")),
-    });
-
-    const exit = await run(
-      returnRow({ tokenText: tokenA, state: "error", error: recorded }),
-    );
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(result._tag).toBe("Left");
-    if (result._tag !== "Left") return;
-    expect(result.left._tag).toBe("MintUnreachable");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: row.id,
-      state: "error",
-      tokenText: tokenA,
-      error: recorded,
-    });
-  });
-
-  it("marks the shared row as error on a definitive failure", async () => {
-    const { run } = detHarness({
-      receive: () =>
-        Promise.reject(new MintOperationError(11001, "Token already spent.")),
-    });
-
-    const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(result._tag).toBe("Left");
-    if (result._tag !== "Left") return;
-    expect(result.left).toMatchObject({ _tag: "TokenAlreadySpent", mint });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: row.id,
-      state: "error",
-      tokenText: tokenA,
-    });
-    expect(JSON.parse(rows[0]?.error ?? "")).toMatchObject({
-      _tag: "TokenAlreadySpent",
-    });
-  });
-
-  it("keeps an externalized row in its state on a definitive failure", async () => {
-    const { run } = detHarness({
-      receive: () =>
-        Promise.reject(new MintOperationError(11001, "Token already spent.")),
-    });
-
-    const exit = await run(
-      returnRow({ tokenText: tokenA, state: "externalized" }),
-    );
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    const { row, result, rows } = exit.value;
-    expect(result._tag).toBe("Left");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: row.id,
-      state: "externalized",
-      tokenText: tokenA,
-      error: null,
-    });
-  });
-});
+  },
+);
 
 const deleteSpentOn = (seeds: ReadonlyArray<Seed>) =>
   withRows(seeds, (tokens) => tokens.deleteSpent);
@@ -834,11 +710,9 @@ describe("Tokens.deleteSpent", () => {
       ]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { rowIds, result, rows } = exit.value;
-    expect(result._tag).toBe("Right");
-    if (result._tag !== "Right") return;
+    assert(result._tag === "Right");
     expect(result.right).toHaveLength(1);
     expect(result.right[0]).toMatchObject({ rowId: rowIds[0], amount: 6 });
     expect(rows.map((row) => row.tokenText)).toEqual([tokenB]);
@@ -854,8 +728,7 @@ describe("Tokens.deleteSpent", () => {
       deleteSpentOn([{ tokenText: tokenA, state: "accepted" }]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result).toMatchObject({ right: [] });
     expect(amountOf(exit.value.rows[0])).toBe(6);
   });
@@ -874,8 +747,7 @@ describe("Tokens.deleteSpent", () => {
       ]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result).toMatchObject({ right: [] });
     expect(exit.value.rows).toHaveLength(1);
   });
@@ -893,8 +765,7 @@ describe("Tokens.deleteSpent", () => {
       ]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result).toMatchObject({
       right: [{ rowId: exit.value.rowIds[0], amount: 6 }],
     });
@@ -916,8 +787,7 @@ describe("Tokens.deleteSpent", () => {
       ]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result).toMatchObject({ right: [] });
     expect(exit.value.rows).toHaveLength(1);
   });
@@ -937,8 +807,7 @@ describe("Tokens.deleteSpent", () => {
       ]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result).toMatchObject({
       right: [{ rowId: exit.value.rowIds[1], amount: 8 }],
     });
@@ -954,8 +823,7 @@ describe("Tokens.deleteSpent", () => {
       deleteSpentOn([{ tokenText: tokenA, state: "accepted" }]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result).toMatchObject({ right: [] });
     expect(exit.value.rows).toHaveLength(1);
   });
@@ -970,8 +838,7 @@ describe("Tokens.deleteSpent", () => {
       ]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     // Only the first of the three proofs was answered: no row is covered.
     expect(exit.value.result).toMatchObject({ right: [] });
     expect(exit.value.rows).toHaveLength(2);
@@ -989,8 +856,7 @@ describe("Tokens.deleteSpent", () => {
       ]),
     );
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.result).toMatchObject({ right: [] });
     expect(exit.value.rows).toHaveLength(4);
     expect(checkedSecrets).toEqual([]);

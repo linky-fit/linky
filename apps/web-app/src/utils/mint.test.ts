@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  getGenericMintIconUrl,
+  GENERIC_MINT_ICON_DATA_URL,
   getNextMintIconUrl,
   isTestMintUrl,
 } from "./mint";
@@ -21,11 +21,11 @@ describe("getNextMintIconUrl", () => {
         "https://cashu.example/favicon.ico",
         "https://cashu.example",
       ),
-    ).toBe(getGenericMintIconUrl());
+    ).toBe(GENERIC_MINT_ICON_DATA_URL);
   });
 
   it("returns null when the generic placeholder already failed", () => {
-    expect(getNextMintIconUrl(getGenericMintIconUrl(), null)).toBe(null);
+    expect(getNextMintIconUrl(GENERIC_MINT_ICON_DATA_URL, null)).toBe(null);
   });
 });
 

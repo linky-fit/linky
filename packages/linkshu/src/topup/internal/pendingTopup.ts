@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
 import {
   Amount,
   Bolt11Invoice,
@@ -8,14 +8,13 @@ import {
   QuoteId,
   UnixSeconds,
 } from "../../domain/primitives";
-import type { KeyValueStoreService } from "../../ports/KeyValueStore";
+import { pendingRecordStore } from "../../internal/pendingRecords";
 
 /**
- * Topup's durable bookkeeping, next to the deterministic counters and keyed
- * the same way. A record is written before every network call that could
- * strand funds, so an interrupted topup is always reconstructible from
- * storage alone: the quote to poll, and the counter slots a mint attempt has
- * already burned.
+ * Topup's durable bookkeeping. A record is written before every network call
+ * that could strand funds, so an interrupted topup is always reconstructible
+ * from storage alone: the quote to poll, and the counter slots a mint attempt
+ * has already burned.
  */
 
 export const PENDING_TOPUP_KEY_PREFIX = "linkshu.pendingTopup.";
@@ -47,51 +46,8 @@ export class PendingTopup extends Schema.Class<PendingTopup>("PendingTopup")({
   locked: Schema.optionalWith(Schema.Boolean, { default: () => false }),
 }) {}
 
-export const pendingTopupKey = (mint: MintUrl, quoteId: QuoteId): string =>
-  PENDING_TOPUP_KEY_PREFIX + [mint, quoteId].map(encodeURIComponent).join(".");
-
-const encodePending = Schema.encodeSync(Schema.parseJson(PendingTopup));
-const decodePending = Schema.decodeUnknownOption(
-  Schema.parseJson(PendingTopup),
+export const pendingTopups = pendingRecordStore(
+  PENDING_TOPUP_KEY_PREFIX,
+  PendingTopup,
+  PENDING_TOPUP_TTL_SECONDS,
 );
-
-export const writePendingTopup = (
-  kv: KeyValueStoreService,
-  pending: PendingTopup,
-): Effect.Effect<void> =>
-  kv.set(
-    pendingTopupKey(pending.mint, pending.quoteId),
-    encodePending(pending),
-  );
-
-export const removePendingTopup = (
-  kv: KeyValueStoreService,
-  pending: PendingTopup,
-): Effect.Effect<void> =>
-  kv.remove(pendingTopupKey(pending.mint, pending.quoteId));
-
-export const readPendingTopup = (
-  kv: KeyValueStoreService,
-  mint: MintUrl,
-  quoteId: QuoteId,
-): Effect.Effect<PendingTopup | null> =>
-  Effect.map(kv.get(pendingTopupKey(mint, quoteId)), (raw) => {
-    const decoded = decodePending(raw);
-    return decoded._tag === "Some" ? decoded.value : null;
-  });
-
-/** Every stored record; entries that no longer decode are dropped. */
-export const readPendingTopups = (
-  kv: KeyValueStoreService,
-): Effect.Effect<ReadonlyArray<PendingTopup>> =>
-  Effect.gen(function* () {
-    const pendings: PendingTopup[] = [];
-    for (const key of yield* kv.listKeys(PENDING_TOPUP_KEY_PREFIX)) {
-      const decoded = decodePending(yield* kv.get(key));
-      if (decoded._tag === "Some") pendings.push(decoded.value);
-    }
-    return pendings;
-  });
-
-export const deadlineOf = (pending: PendingTopup): number =>
-  pending.expiresAt ?? pending.createdAt + PENDING_TOPUP_TTL_SECONDS;

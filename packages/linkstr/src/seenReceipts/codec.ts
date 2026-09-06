@@ -1,5 +1,11 @@
-import { Either, Schema } from "effect";
-import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
+import { Either } from "effect";
+import {
+  isClientId,
+  isPubkey,
+  isRumorId,
+  isUnixSeconds,
+} from "../domain/primitives";
+import type { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import type { DropReason } from "../inbox/events";
 import {
   firstTagValue,
@@ -13,11 +19,6 @@ import type { SeenReceiptDraft } from "./domain";
 
 export const SEEN_RECEIPT_KIND = 24136;
 export const SEEN_RECEIPT_VALUE = "seen_receipt";
-
-const isRumorId = Schema.is(RumorId);
-const isClientId = Schema.is(ClientId);
-const isPubkey = Schema.is(Pubkey);
-const isUnixSeconds = Schema.is(UnixSeconds);
 
 export const encodeSeenReceiptRumor = (
   draft: SeenReceiptDraft,

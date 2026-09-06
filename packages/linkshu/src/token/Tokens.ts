@@ -13,7 +13,11 @@ import { TokenRowNotFound } from "../domain/errors";
 import { Amount, NonNegativeAmount, TokenRowId } from "../domain/primitives";
 import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
-import { inspectOperation, inspectOperationWith } from "../internal/operations";
+import {
+  inspectOperation,
+  inspectOperationWith,
+  redactReceipt,
+} from "../internal/operations";
 import { checkMintRows, groupRowsByMint } from "../internal/rowStates";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
@@ -24,7 +28,6 @@ import type { ReceiveError } from "../receive/domain";
 import {
   parseReceivable,
   receiveTokenText,
-  redactReceipt,
 } from "../receive/internal/acceptFlow";
 import type { ReceiveContext } from "../receive/internal/acceptFlow";
 

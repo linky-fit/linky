@@ -1,21 +1,13 @@
 import { Chunk, Effect, Either, Layer, Option, Stream } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
 import { Chat } from "../chat/Chat";
 import {
   ChatMessageReceipt,
   MessageText,
   TextMessageDraft,
 } from "../chat/domain";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  RumorId,
-  UnixSeconds,
-} from "../domain/primitives";
+import { ClientId, RelayUrl, RumorId, UnixSeconds } from "../domain/primitives";
 import { unwrapToRumor } from "../internal/giftWrap";
-import { firstTagValue, SignedWrapEvent } from "../internal/nostrEvent";
+import type { SignedWrapEvent } from "../internal/nostrEvent";
 import {
   PaymentTelemetryDraft,
   PaymentTelemetryReceipt,
@@ -25,18 +17,19 @@ import { Emoji, ReactionDraft, ReactionReceipt } from "../reactions/domain";
 import { Reactions } from "../reactions/Reactions";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import {
+  eventually,
+  makeIdentity,
+  recipientOf,
+  stubWrapTransport,
+} from "../testing";
 import { OutboxRef } from "./domain";
 import type { RumorFixedOperation } from "./domain";
 import { Outbox } from "./Outbox";
 import { OutboxStore } from "./OutboxStore";
 import type { OutboxStoreService } from "./OutboxStore";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -45,29 +38,12 @@ const relay = RelayUrl.make("wss://relay.test");
 const makeStore = (): OutboxStoreService =>
   Effect.runSync(OutboxStore.pipe(Effect.provide(OutboxStore.inMemory)));
 
+/** `behavior.accept` is read per publish, so a test can flip it mid-run. */
 const stubTransport = (
   published: Array<SignedWrapEvent>,
   behavior: { accept: boolean },
 ): Layer.Layer<NostrTransport> =>
-  Layer.succeed(NostrTransport, {
-    publish: (relays, wrap) =>
-      Effect.sync(() => {
-        if (!(wrap instanceof SignedWrapEvent)) {
-          throw new Error("outbox publishes only gift wraps");
-        }
-        published.push(wrap);
-        return relays.map(
-          (relayUrl) =>
-            new RelayPublishResult({
-              relay: relayUrl,
-              accepted: behavior.accept,
-              detail: behavior.accept ? null : "blocked",
-            }),
-        );
-      }),
-    subscribe: () => Effect.die("subscribe not under test"),
-    fetch: () => Effect.die("fetch not under test"),
-  });
+  stubWrapTransport(published, () => behavior.accept);
 
 const outboxLayer = (
   identity: LinkstrIdentityService,
@@ -92,13 +68,6 @@ const runOutbox = <A>(
   layer: Layer.Layer<Outbox>,
   program: Effect.Effect<A, never, Outbox>,
 ): Promise<A> => Effect.runPromise(program.pipe(Effect.provide(layer)));
-
-const waitFor = (predicate: () => boolean): Effect.Effect<void> =>
-  Effect.suspend(() =>
-    predicate()
-      ? Effect.void
-      : Effect.sleep(5).pipe(Effect.andThen(waitFor(predicate))),
-  );
 
 const textOp = (
   content: string,
@@ -145,11 +114,11 @@ const telemetryDraft = (id: string): PaymentTelemetryDraft =>
 
 const rumorsForBob = (published: ReadonlyArray<SignedWrapEvent>) =>
   published
-    .filter((wrap) => firstTagValue(wrap.tags, "p") === bob.pubkey)
+    .filter((wrap) => recipientOf(wrap) === bob.pubkey)
     .map((wrap) => Either.getOrThrow(unwrapToRumor(wrap, bob.secretKey)));
 
 describe("Outbox", () => {
-  it("returns a deterministic messageId equal to the delivered rumor id", async () => {
+  it("returns a deterministic rumorId equal to the delivered rumor id", async () => {
     const published: Array<SignedWrapEvent> = [];
     const store = makeStore();
     const clientId = ClientId.make("client-outbox");
@@ -171,19 +140,17 @@ describe("Outbox", () => {
     expect(receipt.clientId).toBe(clientId);
     expect(receipt.sentAt).toBe(sentAt);
     const terminal = Option.getOrThrow(result);
-    expect(terminal._tag).toBe("OutboxJobSucceeded");
-    if (terminal._tag !== "OutboxJobSucceeded") return;
+    assert(terminal._tag === "OutboxJobSucceeded");
     expect(terminal.jobId).toBe(receipt.jobId);
     expect(terminal.ref).toBe("row-1");
-    expect(terminal.receipt).toBeInstanceOf(ChatMessageReceipt);
-    if (!(terminal.receipt instanceof ChatMessageReceipt)) return;
-    expect(terminal.receipt.messageId).toBe(receipt.messageId);
+    assert(terminal.receipt instanceof ChatMessageReceipt);
+    expect(terminal.receipt.rumorId).toBe(receipt.rumorId);
     expect(terminal.receipt.clientId).toBe(clientId);
     expect(terminal.receipt.sentAt).toBe(sentAt);
 
     const rumors = rumorsForBob(published);
     expect(rumors).toHaveLength(1);
-    expect(rumors[0]?.id).toBe(receipt.messageId);
+    expect(rumors[0]?.id).toBe(receipt.rumorId);
     expect(rumors[0]?.created_at).toBe(sentAt);
   });
 
@@ -201,7 +168,7 @@ describe("Outbox", () => {
           OutboxRef.make("row-1"),
         );
         // Both copies of the first attempt are published and rejected.
-        yield* waitFor(() => published.length >= 2);
+        yield* eventually(() => published.length >= 2);
         behavior.accept = true;
         // A new enqueue cuts the backoff sleep short.
         const second = yield* outbox.enqueue(
@@ -220,7 +187,7 @@ describe("Outbox", () => {
 
     expect(results.map((result) => result.ref)).toEqual(["row-1", "row-2"]);
     expect(results.every((r) => r._tag === "OutboxJobSucceeded")).toBe(true);
-    expect(second.messageId).not.toBe(first.messageId);
+    expect(second.rumorId).not.toBe(first.rumorId);
 
     // Every retry published the identical precomputed rumor.
     const firstRumors = rumorsForBob(published).filter(
@@ -228,7 +195,7 @@ describe("Outbox", () => {
     );
     expect(firstRumors.length).toBeGreaterThanOrEqual(2);
     for (const rumor of firstRumors) {
-      expect(rumor.id).toBe(first.messageId);
+      expect(rumor.id).toBe(first.rumorId);
       expect(rumor.created_at).toBe(first.sentAt);
     }
     expect(stored.every((job) => job.state._tag === "awaiting-ack")).toBe(true);
@@ -342,11 +309,9 @@ describe("Outbox", () => {
       "row-3",
     ]);
     const reaction = results[1];
-    expect(reaction?._tag).toBe("OutboxJobSucceeded");
-    if (reaction?._tag !== "OutboxJobSucceeded") return;
-    expect(reaction.receipt).toBeInstanceOf(ReactionReceipt);
-    if (!(reaction.receipt instanceof ReactionReceipt)) return;
-    expect(reaction.receipt.reactionId).toBe(receipts[1]?.messageId);
+    assert(reaction?._tag === "OutboxJobSucceeded");
+    assert(reaction.receipt instanceof ReactionReceipt);
+    expect(reaction.receipt.rumorId).toBe(receipts[1]?.rumorId);
   });
 
   it("delivers payment telemetry and forgets the job once acked", async () => {
@@ -369,12 +334,10 @@ describe("Outbox", () => {
     );
 
     const terminal = Option.getOrThrow(result);
-    expect(terminal._tag).toBe("OutboxJobSucceeded");
-    if (terminal._tag !== "OutboxJobSucceeded") return;
+    assert(terminal._tag === "OutboxJobSucceeded");
     expect(terminal.jobId).toBe(jobId);
     expect(terminal.ref).toBe("telemetry:1");
-    expect(terminal.receipt).toBeInstanceOf(PaymentTelemetryReceipt);
-    if (!(terminal.receipt instanceof PaymentTelemetryReceipt)) return;
+    assert(terminal.receipt instanceof PaymentTelemetryReceipt);
     expect(terminal.receipt.clientId).toBe("telemetry-1");
 
     // Telemetry has no self copy: one wrap, and it is not signed by alice.
@@ -399,7 +362,7 @@ describe("Outbox", () => {
           bob.pubkey,
           OutboxRef.make("telemetry:1"),
         );
-        yield* waitFor(() => published.length >= 1);
+        yield* eventually(() => published.length >= 1);
         behavior.accept = true;
         // A new enqueue cuts the backoff sleep short.
         yield* outbox.enqueueTelemetry(

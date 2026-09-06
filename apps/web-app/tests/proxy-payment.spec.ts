@@ -47,6 +47,7 @@ import {
   stubFiatRates,
   stubThirdPartyAssets,
 } from "./helpers/network";
+import { topUp } from "./helpers/wallet";
 import { waitForProfileStatusOnRelay } from "./helpers/relay";
 import {
   SPD_ACCOUNT,
@@ -100,17 +101,6 @@ const bootAccount = async (
   await expectSingleLoad(page, label);
 
   return { context, errors, identity, label, page };
-};
-
-const topUp = async (page: Page, sats: number): Promise<void> => {
-  await page.goto("/#wallet/topup");
-  for (const digit of String(sats).split("")) {
-    await page.getByRole("button", { exact: true, name: digit }).click();
-  }
-  await page.locator("[data-guide='topup-show-invoice']").click();
-  await page.locator("img.qr").waitFor({ state: "visible", timeout: 60_000 });
-  // Leave before the claim completes, exactly as a user would.
-  await page.goto("/#wallet");
 };
 
 /** Publish the NIP-38 CZK status, then prove it actually landed on the relay. */
@@ -293,8 +283,10 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
       expect(record, "A kept an SPD record for the offer").toBeTruthy();
       const parsed: unknown = JSON.parse(String(record));
       const sentTo =
-        typeof parsed === "object" && parsed !== null
-          ? (parsed as { sentCandidateKeys?: unknown }).sentCandidateKeys
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "sentCandidateKeys" in parsed
+          ? parsed.sentCandidateKeys
           : undefined;
       expect(
         Array.isArray(sentTo) ? sentTo.length : -1,
@@ -333,16 +325,15 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
         if (!ctx) return null;
         ctx.drawImage(img, 0, 0);
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const decode = (
-          window as unknown as {
-            jsQR?: (
-              d: Uint8ClampedArray,
-              w: number,
-              h: number,
-            ) => { data: string } | null;
-          }
-        ).jsQR;
-        return decode?.(data.data, canvas.width, canvas.height)?.data ?? null;
+        const decode: unknown = Reflect.get(window, "jsQR");
+        if (typeof decode !== "function") return null;
+        const result: unknown = decode(data.data, canvas.width, canvas.height);
+        return typeof result === "object" &&
+          result !== null &&
+          "data" in result &&
+          typeof result.data === "string"
+          ? result.data
+          : null;
       });
       expect(decoded).toBe(SPD_PAYLOAD);
     });

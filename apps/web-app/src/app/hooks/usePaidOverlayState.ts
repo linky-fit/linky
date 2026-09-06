@@ -1,8 +1,9 @@
 import React from "react";
-import { useInit } from "../../hooks/useInit";
+
+import type { Translate } from "../../i18n";
 
 interface UsePaidOverlayStateParams {
-  t: (key: string) => string;
+  t: Translate;
 }
 
 interface UsePaidOverlayStateResult {
@@ -22,7 +23,7 @@ export const usePaidOverlayState = ({
   const paidOverlayTimerRef = React.useRef<number | null>(null);
   const topupPaidNavTimerRef = React.useRef<number | null>(null);
 
-  useInit(() => {
+  React.useEffect(() => {
     const paidTimerRef = paidOverlayTimerRef;
     const topupNavTimerRef = topupPaidNavTimerRef;
     return () => {
@@ -44,7 +45,7 @@ export const usePaidOverlayState = ({
       }
       topupNavTimerRef.current = null;
     };
-  });
+  }, []);
 
   const showPaidOverlay = React.useCallback(
     (title?: string) => {

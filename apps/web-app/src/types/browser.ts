@@ -13,34 +13,11 @@ export interface BroadcastChannelLike<
   close(): void;
 }
 
-export interface BroadcastChannelConstructorLike<TMessage = JsonValue> {
-  new (name: string): BroadcastChannelLike<TMessage>;
-}
-
-export interface GlobalWithOptionalBroadcastChannel<TMessage = JsonValue> {
-  BroadcastChannel?: BroadcastChannelConstructorLike<TMessage>;
-}
-
 export interface LockManagerLike<TResult = JsonValue> {
   request?: (
     name: string,
     callback: () => Promise<TResult>,
   ) => Promise<TResult>;
-}
-
-export interface NavigatorWithOptionalLocks<TResult = JsonValue> {
-  locks?: LockManagerLike<TResult>;
-}
-
-export interface NavigatorWithOptionalStorage {
-  storage?: StorageManager;
-}
-
-// `navigator.standalone` is the iOS Safari signal for the page running from
-// the home-screen install. TS lib.dom doesn't include it because it isn't
-// in any spec, so type it as an optional boolean.
-export interface NavigatorWithOptionalStandalone {
-  standalone?: boolean;
 }
 
 // `beforeinstallprompt` event (Chromium-only). The spec is still draft, so
@@ -50,22 +27,22 @@ export interface BeforeInstallPromptEventLike extends Event {
   prompt(): Promise<void>;
 }
 
-export interface BarcodeDetectionLike {
+interface BarcodeDetectionLike {
   rawValue?: string;
 }
 
-export type BarcodeDetectSourceLike =
+type BarcodeDetectSourceLike =
   | HTMLCanvasElement
   | HTMLImageElement
   | HTMLVideoElement
   | ImageBitmap
   | OffscreenCanvas;
 
-export interface BarcodeDetectorLike {
+interface BarcodeDetectorLike {
   detect(image: BarcodeDetectSourceLike): Promise<BarcodeDetectionLike[]>;
 }
 
-export interface BarcodeDetectorConstructorLike {
+interface BarcodeDetectorConstructorLike {
   new (options: { formats: string[] }): BarcodeDetectorLike;
 }
 
@@ -73,16 +50,6 @@ declare global {
   interface Window {
     BarcodeDetector?: BarcodeDetectorConstructorLike;
   }
-}
-
-export interface CapacitorLike {
-  getPlatform?: () => string;
-  getServerUrl?: () => string | undefined;
-  isNativePlatform?: () => boolean;
-}
-
-export interface GlobalWithOptionalCapacitor {
-  Capacitor?: CapacitorLike;
 }
 
 export interface NativeSecretStorageBridge {
@@ -95,8 +62,4 @@ export interface NativeSecretStorageBridge {
 
 export interface LinkyNativeBridge {
   secretStorage?: NativeSecretStorageBridge;
-}
-
-export interface GlobalWithOptionalLinkyNativeBridge {
-  LinkyNative?: LinkyNativeBridge;
 }

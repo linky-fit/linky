@@ -1,5 +1,5 @@
 import { loadConfig } from "./config";
-import { createHttpHandler } from "./http";
+import { createHttpHandler, errorResponse } from "./http";
 import { OwnershipVerifier } from "./ownership";
 import { PushDeliveryService } from "./push";
 import { InMemoryRateLimiter } from "./rateLimit";
@@ -7,9 +7,6 @@ import { RelayWatcher } from "./relayWatcher";
 import { PushStorage } from "./storage";
 
 const config = loadConfig(Bun.env);
-const defaultCorsOrigin = config.corsOrigins.includes("*")
-  ? "*"
-  : (config.corsOrigins[0] ?? "*");
 const storage = new PushStorage(config.storagePath);
 const ownershipVerifier = new OwnershipVerifier({
   proofMaxAgeSeconds: config.proofMaxAgeSeconds,
@@ -47,22 +44,7 @@ const server = Bun.serve({
     pushDelivery,
   }),
   error(error: unknown) {
-    console.error("[push] server error", error);
-    return new Response(
-      JSON.stringify({
-        error: "internal_error",
-        message: "Internal server error",
-      }),
-      {
-        status: 500,
-        headers: {
-          "Access-Control-Allow-Origin": defaultCorsOrigin,
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-          "Content-Type": "application/json; charset=utf-8",
-        },
-      },
-    );
+    return errorResponse(config, null, error);
   },
 });
 

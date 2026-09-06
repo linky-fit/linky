@@ -21,7 +21,7 @@ export function MasterKeysPage(): React.ReactElement {
     useRef<PasswordManagerSaveFormHandle | null>(null);
   const seedWords = useMemo(
     () =>
-      String(seedMnemonic ?? "")
+      (seedMnemonic ?? "")
         .trim()
         .split(/\s+/)
         .filter((word) => word.length > 0),
@@ -58,7 +58,7 @@ export function MasterKeysPage(): React.ReactElement {
       <PasswordManagerSaveForm
         ref={passwordManagerSaveFormRef}
         username={passwordManagerSeedUsername}
-        password={String(seedMnemonic ?? "")}
+        password={seedMnemonic ?? ""}
       />
 
       <div className="master-keys-word-grid" aria-live="polite">

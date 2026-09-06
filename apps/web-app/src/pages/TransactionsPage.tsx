@@ -1,54 +1,40 @@
+import {
+  type TransactionItem,
+  readJsonRecord,
+  readStringArrayFromJson,
+  readRequestIdFromDetails,
+  isPaymentRequestTransaction,
+  buildTransactionHistory,
+  deriveDeclinedRequestIds,
+} from "../app/lib/transactionHistory";
 import * as Evolu from "@evolu/common";
 import { useQuery } from "@evolu/react";
+import { Copy as CompactCopyIcon } from "lucide-react";
 import React from "react";
 import {
   useAppShellActions,
   useAppShellCore,
 } from "../app/context/AppShellContexts";
-import { CompactCopyIcon } from "../components/icons";
-import {
-  parseCashuPaymentRequestMessage,
-  parseLinkyPaymentRequestDeclineMessage,
-} from "../app/lib/paymentRequestMessage";
+import { Avatar } from "../components/Avatar";
+
 import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
+import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
 import { deriveDefaultProfile } from "../derivedProfile";
 import { evolu } from "../evolu";
-import { getLightningInvoicePreview } from "../utils/lightningInvoice";
-import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
-import type { JsonValue } from "../types/json";
+import type { Translate } from "../i18n";
+import { getLightningInvoicePreview } from "@linky/linkshu";
 import {
   formatInteger,
   getInitials,
   normalizeLocale,
 } from "../utils/formatting";
-
-type TransactionStatus = "declined" | "error" | "ok" | "pending";
-type TransactionDirection = "in" | "out";
+import { asNonEmptyString } from "../utils/validation";
 
 interface ContactSummary {
   id: string;
   lnAddress: string | null;
   name: string | null;
   npub: string | null;
-}
-
-interface TransactionItem {
-  amount: number | null;
-  category: string;
-  contactId: string | null;
-  createdAtSec: number;
-  details: JsonValue | null;
-  direction: TransactionDirection;
-  error: string | null;
-  fee: number | null;
-  id: string;
-  method: string | null;
-  mint: string | null;
-  note: string | null;
-  pendingLabel: string | null;
-  phase: string | null;
-  status: TransactionStatus;
-  unit: string | null;
 }
 
 interface TransactionDetailValue {
@@ -66,115 +52,7 @@ interface TransactionStatusPill {
   label: string;
 }
 
-interface TransactionHistoryRow {
-  amount?: unknown;
-  category?: unknown;
-  contactId?: unknown;
-  createdAtSec?: unknown;
-  detailsJson?: unknown;
-  direction?: unknown;
-  error?: unknown;
-  fee?: unknown;
-  id?: unknown;
-  method?: unknown;
-  mint?: unknown;
-  note?: unknown;
-  ownerId?: unknown;
-  pendingLabel?: unknown;
-  phase?: unknown;
-  status?: unknown;
-  unit?: unknown;
-}
-
-interface NostrMessageHistoryRow {
-  content?: unknown;
-  createdAtSec?: unknown;
-  rumorId?: unknown;
-}
-
 const TRANSACTION_PAGE_SIZE = 50;
-
-const readText = (value: unknown): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-};
-
-const readPositiveInt = (value: unknown): number | null => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return Math.trunc(parsed);
-};
-
-const readAmount = (value: unknown): number | null => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return null;
-  return Math.trunc(parsed);
-};
-
-const readDirection = (value: unknown): TransactionDirection | null => {
-  return value === "in" || value === "out" ? value : null;
-};
-
-const readStatus = (value: unknown): TransactionStatus | null => {
-  return value === "declined" ||
-    value === "error" ||
-    value === "ok" ||
-    value === "pending"
-    ? value
-    : null;
-};
-
-const isJsonRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const isJsonValue = (value: unknown): value is JsonValue => {
-  if (value === null) return true;
-  if (
-    typeof value === "boolean" ||
-    typeof value === "number" ||
-    typeof value === "string"
-  ) {
-    return true;
-  }
-  if (Array.isArray(value)) return value.every(isJsonValue);
-  if (!isJsonRecord(value)) return false;
-  return Object.values(value).every(isJsonValue);
-};
-
-const parseJsonValue = (value: unknown): JsonValue | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
-    return isJsonValue(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
-const readJsonRecord = (
-  value: JsonValue | null,
-): Record<string, JsonValue> | null =>
-  value !== null && isJsonRecord(value) ? value : null;
-
-const readStringFromJson = (
-  value: JsonValue | null | undefined,
-): string | null => {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-};
-
-const readStringArrayFromJson = (
-  value: JsonValue | null | undefined,
-): string[] => {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => readStringFromJson(entry))
-    .filter((entry): entry is string => entry !== null);
-};
 
 const scoreContact = (contact: ContactSummary): number => {
   let score = 0;
@@ -194,279 +72,14 @@ const formatCompactLongString = (value: string): string => {
   return `${value.slice(0, 8)}...${value.slice(-6)}`;
 };
 
-const readRequestIdFromDetails = (details: JsonValue | null): string | null => {
-  const detailRecord = readJsonRecord(details);
-  return readStringFromJson(detailRecord?.requestId);
-};
-
-const readIssuedTokenFromDetails = (
-  details: JsonValue | null,
-): string | null => {
-  const detailRecord = readJsonRecord(details);
-  return readStringFromJson(detailRecord?.issuedToken);
-};
-
-const readTokenReferenceIds = (
-  details: JsonValue | null,
-  idKey: string,
-  legacyTokenKey: string,
-): string[] => {
-  const detailRecord = readJsonRecord(details);
-  const storedIds = readStringArrayFromJson(detailRecord?.[idKey]);
-  const legacyTokens = readStringArrayFromJson(detailRecord?.[legacyTokenKey]);
-  return Array.from(
-    new Set([
-      ...storedIds,
-      ...legacyTokens.map((token) => String(createCashuTokenId(token))),
-    ]),
-  );
-};
-
-const readIssuedTokenReferenceId = (
-  details: JsonValue | null,
-): string | null => {
-  const detailRecord = readJsonRecord(details);
-  const storedId = readStringFromJson(detailRecord?.issuedTokenId);
-  if (storedId) return storedId;
-  const legacyToken = readIssuedTokenFromDetails(details);
-  return legacyToken ? String(createCashuTokenId(legacyToken)) : null;
-};
-
-const deriveTransactionCategory = (
-  method: string | null,
-  legacyCategory: string | null,
-): string => {
-  if (method === "cashu_chat") return "contacts";
-  if (method === "lightning_address" || method === "lightning_invoice") {
-    return "lightning";
-  }
-  return legacyCategory || "cashu";
-};
-
-const mergeDetailRecords = (
-  primary: JsonValue | null,
-  secondary: JsonValue | null,
-): JsonValue | null => {
-  const primaryRecord = readJsonRecord(primary);
-  const secondaryRecord = readJsonRecord(secondary);
-
-  if (!primaryRecord && !secondaryRecord) return null;
-
-  return {
-    ...(primaryRecord ?? {}),
-    ...(secondaryRecord ?? {}),
-  };
-};
-
-const isPaymentRequestTransaction = (item: TransactionItem): boolean => {
-  return (
-    item.direction === "in" &&
-    item.method === "cashu_chat" &&
-    readRequestIdFromDetails(item.details) !== null
-  );
-};
-
-const buildTransactionHistory = (
-  transactionRows: readonly TransactionHistoryRow[],
-  evoluAppOwnerId: string | null | undefined,
-  evoluTransactionsVisibleOwnerIds: readonly (string | null | undefined)[],
-): {
-  fulfilledRequestIds: Set<string>;
-  transactions: TransactionItem[];
-} => {
-  const items: TransactionItem[] = [];
-  const visibleOwnerIds = new Set(
-    [evoluAppOwnerId, ...evoluTransactionsVisibleOwnerIds]
-      .map((ownerId) => readText(ownerId))
-      .filter((ownerId): ownerId is string => ownerId !== null),
-  );
-  for (const row of transactionRows) {
-    const ownerId = readText(row.ownerId);
-    if (ownerId && visibleOwnerIds.size > 0 && !visibleOwnerIds.has(ownerId)) {
-      continue;
-    }
-    const id = readText(row.id);
-    const createdAtSec = readPositiveInt(row.createdAtSec);
-    const direction = readDirection(row.direction);
-    const status = readStatus(row.status);
-    if (!id || !createdAtSec || !direction || !status) continue;
-    const method = readText(row.method);
-    items.push({
-      amount: readAmount(row.amount),
-      category: deriveTransactionCategory(method, readText(row.category)),
-      contactId: readText(row.contactId),
-      createdAtSec,
-      details: parseJsonValue(row.detailsJson),
-      direction,
-      error: readText(row.error),
-      fee: readAmount(row.fee),
-      id,
-      method,
-      mint: readText(row.mint),
-      note: readText(row.note),
-      pendingLabel: readText(row.pendingLabel),
-      phase: readText(row.phase),
-      status,
-      unit: readText(row.unit),
-    });
-  }
-  items.sort((left, right) => {
-    const createdAtDiff = right.createdAtSec - left.createdAtSec;
-    if (createdAtDiff !== 0) return createdAtDiff;
-    return right.id.localeCompare(left.id);
-  });
-
-  const requestByRequestId = new Map<string, TransactionItem>();
-  const fulfillmentByRequestId = new Map<string, TransactionItem>();
-  const emittedByToken = new Map<string, TransactionItem>();
-  const spendByUsedToken = new Map<string, TransactionItem>();
-
-  for (const item of items) {
-    const requestId = readRequestIdFromDetails(item.details);
-    if (!requestId) continue;
-
-    if (isPaymentRequestTransaction(item)) {
-      if (!requestByRequestId.has(requestId)) {
-        requestByRequestId.set(requestId, item);
-      }
-      continue;
-    }
-
-    if (item.status !== "ok") continue;
-    if (!fulfillmentByRequestId.has(requestId)) {
-      fulfillmentByRequestId.set(requestId, item);
-    }
-  }
-
-  for (const item of items) {
-    if (item.status !== "ok") continue;
-
-    const issuedTokenId = readIssuedTokenReferenceId(item.details);
-    if (issuedTokenId && !emittedByToken.has(issuedTokenId)) {
-      emittedByToken.set(issuedTokenId, item);
-    }
-
-    const usedTokenIds = readTokenReferenceIds(
-      item.details,
-      "usedTokenIds",
-      "usedInputTokens",
-    );
-    for (const tokenId of usedTokenIds) {
-      if (spendByUsedToken.has(tokenId)) continue;
-      spendByUsedToken.set(tokenId, item);
-    }
-  }
-
-  const transactions = items
-    .filter((item) => {
-      const requestId = readRequestIdFromDetails(item.details);
-      if (requestId) {
-        if (isPaymentRequestTransaction(item)) {
-          return requestByRequestId.get(requestId)?.id === item.id;
-        }
-        if (requestByRequestId.has(requestId)) return false;
-        if (item.status === "ok") {
-          return fulfillmentByRequestId.get(requestId)?.id === item.id;
-        }
-      }
-
-      const issuedTokenId = readIssuedTokenReferenceId(item.details);
-      if (!issuedTokenId) return true;
-      return !spendByUsedToken.has(issuedTokenId);
-    })
-    .map((item) => {
-      let mergedItem = item;
-
-      const usedTokenIds = readTokenReferenceIds(
-        mergedItem.details,
-        "usedTokenIds",
-        "usedInputTokens",
-      );
-      for (const tokenId of usedTokenIds) {
-        const emittedTransaction = emittedByToken.get(tokenId);
-        if (!emittedTransaction || emittedTransaction.id === mergedItem.id) {
-          continue;
-        }
-        mergedItem = {
-          ...mergedItem,
-          details: mergeDetailRecords(
-            mergedItem.details,
-            emittedTransaction.details,
-          ),
-        };
-        break;
-      }
-
-      const requestId = readRequestIdFromDetails(item.details);
-      if (!requestId || !isPaymentRequestTransaction(item)) {
-        return mergedItem;
-      }
-
-      const fulfillment = fulfillmentByRequestId.get(requestId);
-      if (!fulfillment) return mergedItem;
-
-      return {
-        ...mergedItem,
-        details: mergeDetailRecords(mergedItem.details, fulfillment.details),
-      };
-    });
-
-  return {
-    fulfilledRequestIds: new Set(fulfillmentByRequestId.keys()),
-    transactions,
-  };
-};
-
-const deriveDeclinedRequestIds = (
-  nostrMessageRows: readonly NostrMessageHistoryRow[],
-): Set<string> => {
-  const requestIdByRumorId = new Map<string, string>();
-  const latestDeclineAtByRequestId = new Map<string, number>();
-
-  for (const row of nostrMessageRows) {
-    const rumorId = readText(row.rumorId);
-    const content = readText(row.content) || "";
-    const requestInfo = parseCashuPaymentRequestMessage(content);
-    const requestId = String(requestInfo?.requestId ?? "").trim();
-
-    if (rumorId && requestId) {
-      requestIdByRumorId.set(rumorId, requestId);
-    }
-  }
-
-  for (const row of nostrMessageRows) {
-    const content = readText(row.content) || "";
-    const declineInfo = parseLinkyPaymentRequestDeclineMessage(content);
-    const requestRumorId = String(declineInfo?.requestRumorId ?? "").trim();
-    if (!requestRumorId) continue;
-
-    const requestId = requestIdByRumorId.get(requestRumorId);
-    if (!requestId) continue;
-
-    const createdAtSec = readPositiveInt(row.createdAtSec);
-    const previousCreatedAtSec = latestDeclineAtByRequestId.get(requestId);
-    if (
-      previousCreatedAtSec !== undefined &&
-      createdAtSec !== null &&
-      previousCreatedAtSec > createdAtSec
-    ) {
-      continue;
-    }
-
-    latestDeclineAtByRequestId.set(requestId, createdAtSec ?? 0);
-  }
-
-  return new Set(latestDeclineAtByRequestId.keys());
-};
-
 const readLnurlSuccessMessage = (item: TransactionItem): string | null => {
   const details = readJsonRecord(item.details);
   if (!details) return null;
-  const message = readStringFromJson(details.lnurlSuccessMessage);
+  const message = asNonEmptyString(details.lnurlSuccessMessage);
   if (message) return message;
-  const url = readStringFromJson(details.lnurlSuccessUrl);
+  const url = asNonEmptyString(details.lnurlSuccessUrl);
   if (!url) return null;
-  const description = readStringFromJson(details.lnurlSuccessUrlDescription);
+  const description = asNonEmptyString(details.lnurlSuccessUrlDescription);
   return description ? `${description} ${url}` : url;
 };
 
@@ -490,7 +103,7 @@ const hasTransactionDetails = (
     referenceKey: string,
   ): boolean => {
     if (
-      rawKeys.some((key) => readStringFromJson(details[key]) !== null) ||
+      rawKeys.some((key) => asNonEmptyString(details[key]) !== null) ||
       readStringArrayFromJson(details[referenceKey]).some((id) =>
         tokenByReferenceId.has(id),
       )
@@ -511,7 +124,7 @@ const hasTransactionDetails = (
       details.lightningPreimage,
       details.lnurlSuccessMessage,
       details.lnurlSuccessUrl,
-    ].some((value) => readStringFromJson(value) !== null)
+    ].some((value) => asNonEmptyString(value) !== null)
   );
 };
 
@@ -533,7 +146,7 @@ interface TransactionCardProps {
   item: TransactionItem;
   nostrPictureByNpub: Readonly<Record<string, string | null>>;
   onToggle: (id: string) => void;
-  t: (key: string) => string;
+  t: Translate;
   tokenByReferenceId: ReadonlyMap<string, string>;
 }
 
@@ -601,16 +214,12 @@ const TransactionCardView = ({
       <article className="transaction-row">
         <div className="contact-avatar transaction-avatar" aria-hidden="true">
           {contact ? (
-            pictureUrl ? (
-              <img
-                src={pictureUrl}
-                alt=""
-                loading="lazy"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span className="contact-avatar-fallback">{initials}</span>
-            )
+            <Avatar
+              pictureUrl={pictureUrl}
+              fallback={initials}
+              fallbackClassName="contact-avatar-fallback"
+              loading="lazy"
+            />
           ) : (
             <span className="contact-avatar-fallback transaction-icon-fallback">
               {item.category === "lightning" ? "⚡️" : "🥜"}
@@ -750,13 +359,10 @@ export function TransactionsPage(): React.ReactElement {
   const tokenByReferenceId = React.useMemo(() => {
     const tokens = new Map<string, string>();
     for (const row of cashuTokenRows) {
-      for (const candidate of [
-        "token" in row ? row.token : null,
-        "rawToken" in row ? row.rawToken : null,
-      ]) {
-        const token = readText(candidate);
+      for (const candidate of [row.token, row.rawToken]) {
+        const token = asNonEmptyString(candidate);
         if (!token) continue;
-        tokens.set(String(createCashuTokenId(token)), token);
+        tokens.set(createCashuTokenId(token), token);
       }
     }
     return tokens;
@@ -765,14 +371,13 @@ export function TransactionsPage(): React.ReactElement {
   const contactsById = React.useMemo(() => {
     const byId = new Map<string, ContactSummary>();
     for (const row of contactRows) {
-      if (typeof row !== "object" || row === null) continue;
-      const id = readText("id" in row ? row.id : null);
+      const id = asNonEmptyString(row.id);
       if (!id) continue;
       const candidate: ContactSummary = {
         id,
-        lnAddress: readText("lnAddress" in row ? row.lnAddress : null),
-        name: readText("name" in row ? row.name : null),
-        npub: readText("npub" in row ? row.npub : null),
+        lnAddress: asNonEmptyString(row.lnAddress),
+        name: asNonEmptyString(row.name),
+        npub: asNonEmptyString(row.npub),
       };
       const existing = byId.get(id);
       if (!existing || scoreContact(candidate) >= scoreContact(existing)) {
@@ -927,8 +532,8 @@ export function TransactionsPage(): React.ReactElement {
         ]),
       );
       const legacyGainedTokens = [
-        readStringFromJson(details?.gainedToken),
-        readStringFromJson(details?.acceptedToken),
+        asNonEmptyString(details?.gainedToken),
+        asNonEmptyString(details?.acceptedToken),
       ].filter((value): value is string => value !== null);
       const gainedTokens = Array.from(
         new Set([
@@ -949,18 +554,18 @@ export function TransactionsPage(): React.ReactElement {
             })
           : null;
       const feeText = fee !== null ? formatAmountText(fee, item.unit) : "";
-      const lightningInvoice = readStringFromJson(details?.lightningInvoice);
+      const lightningInvoice = asNonEmptyString(details?.lightningInvoice);
       const lightningMemo =
-        readStringFromJson(details?.lightningMemo) ??
+        asNonEmptyString(details?.lightningMemo) ??
         (lightningInvoice
           ? (getLightningInvoicePreview(lightningInvoice)?.description ?? null)
           : null);
-      const lightningPreimage = readStringFromJson(details?.lightningPreimage);
-      const lnurlSuccessMessage = readStringFromJson(
+      const lightningPreimage = asNonEmptyString(details?.lightningPreimage);
+      const lnurlSuccessMessage = asNonEmptyString(
         details?.lnurlSuccessMessage,
       );
-      const lnurlSuccessUrl = readStringFromJson(details?.lnurlSuccessUrl);
-      const lnurlSuccessUrlDescription = readStringFromJson(
+      const lnurlSuccessUrl = asNonEmptyString(details?.lnurlSuccessUrl);
+      const lnurlSuccessUrlDescription = asNonEmptyString(
         details?.lnurlSuccessUrlDescription,
       );
 

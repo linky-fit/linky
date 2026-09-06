@@ -1,44 +1,33 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ContactNewPage } from "./ContactNewPage";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  value: true,
-  configurable: true,
-  writable: true,
-});
 
 describe("ContactNewPage", () => {
   afterEach(() => {
+    vi.useRealTimers();
     document.body.innerHTML = "";
   });
 
   it("opens contact details when a lightning address is prefilled", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(
-        <ContactNewPage
-          addNewContactFromSearchResult={async () => {}}
-          contactSuggestions={[]}
-          form={{
-            groups: [],
-            lnAddress: "alice@example.com",
-            name: "",
-            npub: "",
-          }}
-          groupNames={[]}
-          handleSaveContact={() => {}}
-          isSavingContact={false}
-          searchNewContact={async () => ({ kind: "empty" })}
-          setForm={() => {}}
-          t={(key) => key}
-        />,
-      );
-    });
+    const { container, root } = await renderIntoDocument(
+      <ContactNewPage
+        addNewContactFromSearchResult={async () => {}}
+        contactSuggestions={[]}
+        form={{
+          groups: [],
+          lnAddress: "alice@example.com",
+          name: "",
+          npub: "",
+        }}
+        groupNames={[]}
+        handleSaveContact={() => {}}
+        isSavingContact={false}
+        searchNewContact={async () => ({ kind: "empty" })}
+        setForm={() => {}}
+        t={(key) => key}
+      />,
+    );
 
     const inputs = container.querySelectorAll("input");
     expect(inputs).toHaveLength(3);
@@ -48,9 +37,7 @@ describe("ContactNewPage", () => {
   });
 
   it("lists search candidates and highlights the verified exact match", async () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
+    vi.useFakeTimers();
     const exact = {
       isExactMatch: true,
       lnAddress: "alice@linky.fit",
@@ -68,26 +55,24 @@ describe("ContactNewPage", () => {
       query: "alice",
     };
 
+    const { container, root } = await renderIntoDocument(
+      <ContactNewPage
+        addNewContactFromSearchResult={async () => {}}
+        contactSuggestions={[]}
+        form={{ groups: [], lnAddress: "", name: "", npub: "alice" }}
+        groupNames={[]}
+        handleSaveContact={() => {}}
+        isSavingContact={false}
+        searchNewContact={async () => ({
+          contacts: [exact, similar],
+          kind: "found",
+        })}
+        setForm={() => {}}
+        t={(key) => key}
+      />,
+    );
     await act(async () => {
-      root.render(
-        <ContactNewPage
-          addNewContactFromSearchResult={async () => {}}
-          contactSuggestions={[]}
-          form={{ groups: [], lnAddress: "", name: "", npub: "alice" }}
-          groupNames={[]}
-          handleSaveContact={() => {}}
-          isSavingContact={false}
-          searchNewContact={async () => ({
-            contacts: [exact, similar],
-            kind: "found",
-          })}
-          setForm={() => {}}
-          t={(key) => key}
-        />,
-      );
-    });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await vi.advanceTimersByTimeAsync(900);
     });
 
     const rows = container.querySelectorAll(".contact-new-search-result");

@@ -1,10 +1,14 @@
+import { writeContact } from "../lib/writeContact";
+import { toContactTextFields } from "../lib/contactFields";
+import { Schema } from "effect";
 import * as Evolu from "@evolu/common";
 import React from "react";
-import type { CashuTokenRow, ContactId } from "../../evolu";
-import type { JsonValue } from "../../types/json";
+import type { CashuTokenRow } from "../../evolu";
+import { JsonValue } from "../../types/json";
 import { asRecord } from "../../utils/validation";
 import type { ContactRowLike } from "../types/appTypes";
 import { createCashuTokenId } from "../lib/cashuTokenIdentity";
+import type { Translate } from "../../i18n";
 
 type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
 
@@ -18,7 +22,7 @@ interface UseAppDataTransferParams<TContact extends ContactRowLike> {
   insert: EvoluMutations["insert"];
   upsert: EvoluMutations["upsert"];
   pushToast: (message: string) => void;
-  t: (key: string) => string;
+  t: Translate;
   update: EvoluMutations["update"];
 }
 
@@ -49,14 +53,14 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
         state?: typeof Evolu.NonEmptyString100.Type;
       } = {
         id: createCashuTokenId(args.rawToken || args.token),
-        token: args.token as typeof Evolu.NonEmptyString.Type,
+        token: Evolu.NonEmptyString.orThrow(args.token),
       };
 
-      const state = String(args.state ?? "").trim();
-      if (state) payload.state = state as typeof Evolu.NonEmptyString100.Type;
+      const state = (args.state ?? "").trim();
+      if (state) payload.state = Evolu.NonEmptyString100.orThrow(state);
 
-      const error = String(args.error ?? "").trim();
-      if (error) payload.error = error as typeof Evolu.NonEmptyString1000.Type;
+      const error = (args.error ?? "").trim();
+      if (error) payload.error = Evolu.NonEmptyString1000.orThrow(error);
 
       return payload;
     },
@@ -73,20 +77,20 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
         version: 1,
         exportedAt: now.toISOString(),
         contacts: contacts.map((contact) => ({
-          name: String(contact.name ?? "").trim() || null,
-          npub: String(contact.npub ?? "").trim() || null,
-          lnAddress: String(contact.lnAddress ?? "").trim() || null,
-          groupName: String(contact.groupName ?? "").trim() || null,
-          groupNamesJson: String(contact.groupNamesJson ?? "").trim() || null,
+          name: (contact.name ?? "").trim() || null,
+          npub: (contact.npub ?? "").trim() || null,
+          lnAddress: (contact.lnAddress ?? "").trim() || null,
+          groupName: (contact.groupName ?? "").trim() || null,
+          groupNamesJson: (contact.groupNamesJson ?? "").trim() || null,
         })),
         cashuTokens: cashuTokens.map((token) => {
-          const tokenText = String(token.token ?? "").trim();
-          const rawToken = String(token.rawToken ?? "").trim();
+          const tokenText = (token.token ?? "").trim();
+          const rawToken = (token.rawToken ?? "").trim();
           return {
             token: tokenText,
             rawToken: rawToken && rawToken !== tokenText ? rawToken : null,
-            state: String(token.state ?? "").trim() || null,
-            error: String(token.error ?? "").trim() || null,
+            state: (token.state ?? "").trim() || null,
+            error: (token.error ?? "").trim() || null,
           };
         }),
       };
@@ -134,7 +138,7 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
 
       let parsed: JsonValue;
       try {
-        parsed = JSON.parse(String(text ?? "")) as JsonValue;
+        parsed = Schema.decodeUnknownSync(Schema.parseJson(JsonValue))(text);
       } catch {
         pushToast(t("importInvalid"));
         return;
@@ -156,10 +160,8 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
       const existingByNpub = new Map<string, TContact>();
       const existingByLn = new Map<string, TContact>();
       for (const contact of contacts) {
-        const npub = String(contact.npub ?? "").trim();
-        const ln = String(contact.lnAddress ?? "")
-          .trim()
-          .toLowerCase();
+        const npub = (contact.npub ?? "").trim();
+        const ln = (contact.lnAddress ?? "").trim().toLowerCase();
         if (npub) existingByNpub.set(npub, contact);
         if (ln) existingByLn.set(ln, contact);
       }
@@ -169,11 +171,11 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
       const existingTokenSet = new Set<string>();
       const existingTokenIdSet = new Set<string>();
       for (const token of cashuTokensAll) {
-        const encoded = String(token.token ?? "").trim();
-        const raw = String(token.rawToken ?? "").trim();
+        const encoded = (token.token ?? "").trim();
+        const raw = (token.rawToken ?? "").trim();
         if (encoded) existingTokenSet.add(encoded);
         if (raw) existingTokenSet.add(raw);
-        existingTokenIdSet.add(String(token.id));
+        existingTokenIdSet.add(token.id);
       }
 
       let addedContacts = 0;
@@ -195,9 +197,7 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
 
         const existing =
           (npub ? existingByNpub.get(npub) : undefined) ??
-          (lnAddress
-            ? existingByLn.get(String(lnAddress).toLowerCase())
-            : undefined);
+          (lnAddress ? existingByLn.get(lnAddress.toLowerCase()) : undefined);
         const normalizedLnAddress = lnAddress?.toLowerCase() ?? null;
         if (
           !existing &&
@@ -208,69 +208,30 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
           continue;
         }
 
-        const payload = {
-          name: name ? (name as typeof Evolu.NonEmptyString1000.Type) : null,
-          npub: npub ? (npub as typeof Evolu.NonEmptyString1000.Type) : null,
-          lnAddress: lnAddress
-            ? (lnAddress as typeof Evolu.NonEmptyString1000.Type)
-            : null,
-          groupName: groupName
-            ? (groupName as typeof Evolu.NonEmptyString1000.Type)
-            : null,
-          groupNamesJson: groupNamesJson
-            ? (groupNamesJson as typeof Evolu.NonEmptyString1000.Type)
-            : null,
-        };
+        const payload = toContactTextFields({
+          name,
+          npub,
+          lnAddress,
+          groupName,
+          groupNamesJson,
+        });
 
         if (existing && existing.id) {
-          const id = existing.id as ContactId;
+          const id = existing.id;
+          const previous = toContactTextFields(existing);
           const merged = {
             id,
-            name:
-              payload.name ??
-              (String(existing.name ?? "").trim()
-                ? (String(
-                    existing.name ?? "",
-                  ).trim() as typeof Evolu.NonEmptyString1000.Type)
-                : null),
-            npub:
-              payload.npub ??
-              (String(existing.npub ?? "").trim()
-                ? (String(
-                    existing.npub ?? "",
-                  ).trim() as typeof Evolu.NonEmptyString1000.Type)
-                : null),
-            lnAddress:
-              payload.lnAddress ??
-              (String(existing.lnAddress ?? "").trim()
-                ? (String(
-                    existing.lnAddress ?? "",
-                  ).trim() as typeof Evolu.NonEmptyString1000.Type)
-                : null),
-            groupName:
-              payload.groupName ??
-              (String(existing.groupName ?? "").trim()
-                ? (String(
-                    existing.groupName ?? "",
-                  ).trim() as typeof Evolu.NonEmptyString1000.Type)
-                : null),
-            groupNamesJson:
-              payload.groupNamesJson ??
-              (String(existing.groupNamesJson ?? "").trim()
-                ? (String(
-                    existing.groupNamesJson ?? "",
-                  ).trim() as typeof Evolu.NonEmptyString1000.Type)
-                : null),
+            name: payload.name ?? previous.name,
+            npub: payload.npub ?? previous.npub,
+            lnAddress: payload.lnAddress ?? previous.lnAddress,
+            groupName: payload.groupName ?? previous.groupName,
+            groupNamesJson: payload.groupNamesJson ?? previous.groupNamesJson,
           };
 
-          const result = appOwnerId
-            ? update("contact", merged, { ownerId: appOwnerId })
-            : update("contact", merged);
+          const result = writeContact(update, merged, appOwnerId);
           if (result.ok) updatedContacts += 1;
         } else {
-          const result = appOwnerId
-            ? insert("contact", payload, { ownerId: appOwnerId })
-            : insert("contact", payload);
+          const result = writeContact(insert, payload, appOwnerId);
           if (result.ok) {
             addedContacts += 1;
             if (npub) insertedNpubs.add(npub);
@@ -289,7 +250,7 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
         if (existingTokenSet.has(token)) continue;
 
         const rawToken = sanitizeText(rec.rawToken, 100000);
-        const tokenId = String(createCashuTokenId(rawToken || token));
+        const tokenId = createCashuTokenId(rawToken || token);
         if (existingTokenIdSet.has(tokenId)) continue;
         const state = sanitizeText(rec.state, 100);
         const error = sanitizeText(rec.error, 1000);
@@ -350,7 +311,6 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
   return {
     exportAppData,
     handleImportAppDataFilePicked,
-    importAppDataFromText,
     requestImportAppData,
   };
 };

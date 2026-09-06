@@ -1,6 +1,6 @@
 import { Either, Schema } from "effect";
-import { ClientId, RumorId } from "../domain/primitives";
-import type { Pubkey, UnixSeconds } from "../domain/primitives";
+import { isClientId, isRumorId } from "../domain/primitives";
+import type { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import {
   firstTagValue,
   Rumor,
@@ -26,8 +26,6 @@ const targetKindTag: Record<TargetKind, "14" | "15"> = {
   image: "15",
 };
 
-const isRumorId = Schema.is(RumorId);
-const isClientId = Schema.is(ClientId);
 const isEmoji = Schema.is(Emoji);
 
 export const encodeReactionRumor = (

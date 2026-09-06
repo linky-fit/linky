@@ -13,8 +13,8 @@ import {
   type AppShellCoreContextValue,
   type AppShellRouteContextValue,
 } from "./context/AppShellContexts";
-import { AppRouteContent } from "./routes/AppRouteContent";
 import { useCurrentNsec } from "./hooks/useCurrentNsec";
+import { AppRouteContent } from "./routes/AppRouteContent";
 import { useAppShellComposition } from "./useAppShellComposition";
 import { useUnauthenticatedAppShellComposition } from "./useUnauthenticatedAppShellComposition";
 
@@ -167,8 +167,14 @@ const UnauthenticatedAppShell = () => {
   );
 };
 
-const AppShell = () => {
-  if (import.meta.env.DEV) console.log("[linky][render] AppShell");
+interface AppShellProps {
+  onCommit?: () => void;
+}
+
+const AppShell = ({ onCommit }: AppShellProps) => {
+  React.useEffect(() => {
+    onCommit?.();
+  }, [onCommit]);
   const { currentNsec, isResolved, setCurrentNsec } = useCurrentNsec();
   usePersistentInspectorLogStartup();
 

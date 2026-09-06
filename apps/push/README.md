@@ -46,6 +46,8 @@ Request:
 
 ```json
 {
+  "installationId": "<stable-installation-id>",
+  "cleanupLegacySubscriptions": true,
   "subscription": {
     "endpoint": "https://example.push/service",
     "expirationTime": null,
@@ -77,6 +79,8 @@ Request:
 ```
 
 Every pubkey listed in `recipientPubkeys` needs its own proof.
+
+`installationId` and `cleanupLegacySubscriptions` are optional. A stable `installationId` lets a device replace its previous endpoint or token in place; `cleanupLegacySubscriptions: true` additionally drops older subscriptions for the same pubkeys that were registered without an installation id.
 
 ### `POST /native/subscribe`
 
@@ -171,6 +175,10 @@ Every pubkey listed in `recipientPubkeys` needs its own unsubscribe proof. Full 
 }
 ```
 
+### `GET /vapid-public-key`
+
+Returns `{ "vapidPublicKey": "<base64url>" }` so web clients can subscribe with the server's VAPID key.
+
 ### `GET /health`
 
 Simple health check.
@@ -188,19 +196,22 @@ Every delivered Web Push message contains:
 
 ```json
 {
-  "title": "Linky",
-  "body": "New message",
+  "title": "Linky - npub1abcd...wxyz",
+  "body": "Nová aktivita v Linky",
   "data": {
     "type": "nostr_inbox",
     "outerEventId": "<outer-event-id>",
     "recipientPubkey": "<hex-pubkey>",
+    "recipientNpub": "<npub>",
     "createdAt": 1760000000,
     "relayHints": ["wss://relay.example"]
   }
 }
 ```
 
-Android FCM deliveries carry the same fields under the data payload, with `relayHints` encoded as a JSON string array.
+The title carries a shortened recipient npub so a device subscribed for several identities can tell them apart; the body is a fixed generic text because the service never sees message content.
+
+Android FCM deliveries carry `title`, `body`, and the same data fields in the FCM data payload, with `createdAt` as a string and `relayHints` encoded as a JSON string array.
 
 ## Environment
 

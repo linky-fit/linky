@@ -1,5 +1,10 @@
 name: Android APK Release
 
+# A release normally starts from the version-bump push to main; that run creates
+# the v<version> tag through `gh release create`, and tags created with the
+# workflow token do not trigger workflows again. The tag trigger covers manually
+# pushed tags; when such a tag already exists, the branch push skips so only one
+# run publishes a given version.
 on:
   push:
     branches:
@@ -20,14 +25,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.metadata.outputs.release_tag }}
+      publish: ${{ steps.metadata.outputs.publish }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve release tag
+        id: metadata
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.tag_name }}
+        run: |
+          publish=true
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            release_tag="$REQUESTED_RELEASE_TAG"
+          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            release_tag="$GITHUB_REF_NAME"
+          else
+            release_tag="v$(jq -r .version package.json)"
+            if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null; then
+              echo "Tag $release_tag already exists; the tag push owns this release."
+              publish=false
+            fi
+          fi
+
+          if [[ -z "$release_tag" || "$release_tag" == "v" ]]; then
+            echo "Missing release tag" >&2
+            exit 1
+          fi
+
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
   e2e:
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true'
     uses: ./.github/workflows/e2e.yml
 
   publish:
-    needs: e2e
+    needs: [resolve, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      APK_PATH: apps/native-shell/android/app/build/outputs/apk/release/app-release.apk
 
     steps:
       - name: Checkout
@@ -47,73 +93,22 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Resolve release metadata
-        env:
-          REQUESTED_RELEASE_TAG: ${{ inputs.tag_name }}
+      - name: Resolve release paths
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            release_tag="$REQUESTED_RELEASE_TAG"
-          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            release_tag="$GITHUB_REF_NAME"
-          else
-            workspace_version="$(bun -p 'require("./package.json").version')"
-            release_tag="v${workspace_version}"
-          fi
-
-          if [[ -z "$release_tag" ]]; then
-            echo "Missing release tag" >&2
-            exit 1
-          fi
-
-          echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
-          echo "APK_PATH=apps/native-shell/android/app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
           echo "APK_UPLOAD_PATH=$RUNNER_TEMP/linky.apk" >> "$GITHUB_ENV"
           echo "RELEASE_NOTES_PATH=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_ENV"
 
       - name: Prepare release notes
         run: apps/native-shell/scripts/extract-release-notes.sh "$RELEASE_TAG" "$RELEASE_NOTES_PATH"
 
-      - name: Restore Android Firebase config
-        env:
-          ANDROID_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
-        run: |
-          if [[ -z "${ANDROID_GOOGLE_SERVICES_JSON_BASE64}" ]]; then
-            echo "Missing ANDROID_GOOGLE_SERVICES_JSON_BASE64 secret" >&2
-            exit 1
-          fi
-
-          echo "${ANDROID_GOOGLE_SERVICES_JSON_BASE64}" | base64 --decode > apps/native-shell/android/app/google-services.json
-
-      - name: Restore Android signing key
-        env:
-          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
-          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
-          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
-        run: |
-          if [[ -z "${ANDROID_UPLOAD_KEYSTORE_BASE64}" ]]; then
-            echo "Missing ANDROID_UPLOAD_KEYSTORE_BASE64 secret" >&2
-            exit 1
-          fi
-
-          if [[ -z "${ANDROID_UPLOAD_STORE_PASSWORD}" || -z "${ANDROID_UPLOAD_KEY_ALIAS}" || -z "${ANDROID_UPLOAD_KEY_PASSWORD}" ]]; then
-            echo "Missing Android signing password or alias secret" >&2
-            exit 1
-          fi
-
-          keystore_path="$RUNNER_TEMP/linky-upload-key.jks"
-          echo "${ANDROID_UPLOAD_KEYSTORE_BASE64}" | base64 --decode > "$keystore_path"
-
-          cat > apps/native-shell/android/keystore.properties <<EOF
-          storeFile=$keystore_path
-          storePassword=${ANDROID_UPLOAD_STORE_PASSWORD}
-          keyAlias=${ANDROID_UPLOAD_KEY_ALIAS}
-          keyPassword=${ANDROID_UPLOAD_KEY_PASSWORD}
-          EOF
-
-      - name: Compute CI Android version code
-        run: |
-          echo "LINKY_ANDROID_VERSION_CODE=$((100000000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Restore Android release secrets
+        uses: ./.github/actions/android-release-setup
+        with:
+          google-services-json-base64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_BASE64 }}
+          upload-keystore-base64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          upload-store-password: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          upload-key-alias: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          upload-key-password: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
 
       - name: Run checks
         run: bun run check-code

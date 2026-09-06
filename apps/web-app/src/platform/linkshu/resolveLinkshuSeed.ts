@@ -19,11 +19,11 @@ let cachedSeed: { mnemonic: string; bip39seed: Uint8Array } | null = null;
  * `mnemonicToSeedSync` is PBKDF2 work.
  */
 const readStoredSeed = (): Uint8Array | null => {
-  const cashuMnemonic = String(
-    safeLocalStorageGet(CASHU_BIP85_MNEMONIC_STORAGE_KEY) ?? "",
+  const cashuMnemonic = (
+    safeLocalStorageGet(CASHU_BIP85_MNEMONIC_STORAGE_KEY) ?? ""
   ).trim();
-  const fallbackMnemonic = String(
-    safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY) ?? "",
+  const fallbackMnemonic = (
+    safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY) ?? ""
   ).trim();
 
   const mnemonic = cashuMnemonic || fallbackMnemonic;

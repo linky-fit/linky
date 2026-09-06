@@ -1,9 +1,7 @@
 import type { Proof } from "@cashu/cashu-ts";
-import { Amount, getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, Stream } from "effect";
+import { getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
+import { Effect, Exit, Layer } from "effect";
 import { CurrencyUnit, KeysetId, MintUrl } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
@@ -11,23 +9,17 @@ import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { TokenStore } from "../ports/TokenStore";
+import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
 import { parseTokenText } from "../token/codec";
 import { ReceiveDraft } from "./domain";
 import { Receive } from "./Receive";
 
 const mint = MintUrl.make("https://mint.example");
-const keysetHex = "009a1f293253e41e";
 const counterKey = deterministicCounterKey({
   mint,
   unit: CurrencyUnit.make("sat"),
-  keysetId: KeysetId.make(keysetHex),
-});
-
-const proof = (amount: number, secret: string): Proof => ({
-  id: keysetHex,
-  amount: Amount.from(amount),
-  secret,
-  C: "02" + "ab".repeat(32),
+  keysetId: KeysetId.make(KEYSET_HEX),
 });
 
 // 6 sats in; the "mint" hands back 5 (its input fee).
@@ -53,14 +45,8 @@ interface FakeWalletArgs {
 const makeWallet = (args: FakeWalletArgs) => {
   const receiveCounters: number[] = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
-  const wallet: LoadedWallet = {
-    keysetId: args.keysetId ?? keysetHex,
-    keyChain: { getKeysets: () => [] },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
-    send: () => Promise.reject(new Error("not under test")),
-    checkProofsStates: () => Promise.reject(new Error("not under test")),
+  const wallet = fakeWallet({
+    keysetId: args.keysetId ?? KEYSET_HEX,
     receive: (_token, _config, outputType) => {
       const counter =
         outputType?.type === "deterministic" ? outputType.counter : -1;
@@ -73,19 +59,12 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.restore()
         : Promise.reject(new Error("restore unavailable"));
     },
-    createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    mintProofsBolt11: () => Promise.reject(new Error("not under test")),
-    createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-    batchRestore: () => Promise.reject(new Error("not under test")),
-  };
+  });
   return { wallet, receiveCounters, restoreCalls };
 };
 
 const makeHarness = (wallet: LoadedWallet) => {
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const layer = Receive.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -95,12 +74,7 @@ const makeHarness = (wallet: LoadedWallet) => {
         ),
         inMemoryKeyValueStore,
         inMemoryTokenStore,
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
@@ -111,7 +85,7 @@ const makeHarness = (wallet: LoadedWallet) => {
       Receive | TokenStore | KeyValueStore | WalletInstances
     >,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
-  return { run, events };
+  return { run, events: inspector.events };
 };
 
 const receiveAndInspect = (text: string) =>
@@ -137,12 +111,10 @@ describe("Receive.receive", () => {
     const { run, events } = makeHarness(wallet);
 
     const exit = await run(receiveAndInspect(sourceToken));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { receipt, rows, counter } = exit.value;
 
-    expect(receipt._tag).toBe("Right");
-    if (receipt._tag !== "Right") return;
+    assert(receipt._tag === "Right");
     expect(receipt.right.mint).toBe(mint);
     expect(receipt.right.unit).toBe("sat");
     expect(receipt.right.amount).toBe(5);
@@ -190,8 +162,7 @@ describe("Receive.receive", () => {
     const exit = await run(
       receiveAndInspect(`here you go: cashu:${sourceToken} enjoy!`),
     );
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(exit.value.rows[0]?.originalTokenText).toBe(sourceToken);
   });
@@ -215,8 +186,7 @@ describe("Receive.receive", () => {
         return { empty, noToken, rows: yield* tokenStore.loadAll };
       }),
     );
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.empty).toMatchObject({
       _tag: "TokenParseFailed",
       reason: "empty",
@@ -248,8 +218,7 @@ describe("Receive.receive", () => {
         return { first, second, rows: yield* tokenStore.loadAll };
       }),
     );
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.second).toMatchObject({
       _tag: "TokenAlreadyKnown",
       rowId: exit.value.first.rowId,
@@ -276,8 +245,7 @@ describe("Receive.receive", () => {
         return { first, second };
       }),
     );
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.second).toMatchObject({
       _tag: "TokenAlreadyKnown",
       rowId: exit.value.first.rowId,
@@ -291,10 +259,8 @@ describe("Receive.receive", () => {
     const { run, events } = makeHarness(wallet);
 
     const exit = await run(receiveAndInspect(sourceToken));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
     expect(exit.value.rows).toEqual([]);
     expect(events.map((event) => event._tag)).toEqual([
@@ -311,10 +277,8 @@ describe("Receive.receive", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(receiveAndInspect(sourceToken));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "MintRejected",
       code: 20003,
@@ -338,10 +302,8 @@ describe("Receive.receive", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(receiveAndInspect(sourceToken));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "TokenAlreadySpent",
       mint,
@@ -364,8 +326,7 @@ describe("Receive.receive", () => {
     const { run, events } = makeHarness(wallet);
 
     const exit = await run(receiveAndInspect(sourceToken));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(receiveCounters).toEqual([1, 40]);
     expect(restoreCalls).toEqual([{ start: 1, count: 100 }]);
@@ -395,8 +356,7 @@ describe("Receive.receive", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(receiveAndInspect(sourceToken));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(receiveCounters).toEqual([1, 65]);
     expect(restoreCalls).toHaveLength(1);
@@ -413,8 +373,7 @@ describe("Receive.receive", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(receiveAndInspect(sourceToken));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(receiveCounters).toEqual([1, 65]);
     expect(restoreCalls).toEqual([]);
@@ -447,10 +406,8 @@ describe("Receive.receive", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(receiveAndInspect(sourceToken));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintRejected");
     expect(receiveCounters).toHaveLength(5);
     expect(exit.value.rows[0]?.state).toBe("error");

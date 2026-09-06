@@ -49,9 +49,9 @@ export const triggerPasswordManagerSeedSave = async ({
   if (!PasswordCredentialCtor) return "unsupported";
   if (!navigator.credentials?.store) return "unsupported";
 
-  const normalizedPassword = String(password ?? "").trim();
-  const normalizedUsername = String(username ?? "").trim();
-  const normalizedDisplayName = String(displayName ?? "").trim();
+  const normalizedPassword = password.trim();
+  const normalizedUsername = username.trim();
+  const normalizedDisplayName = displayName.trim();
   if (!normalizedPassword || !normalizedUsername) return "failed";
 
   try {

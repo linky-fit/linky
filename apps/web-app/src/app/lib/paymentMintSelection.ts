@@ -1,7 +1,5 @@
 const normalizeMint = (value: string): string =>
-  String(value ?? "")
-    .trim()
-    .replace(/\/+$/, "");
+  value.trim().replace(/\/+$/, "");
 
 export interface SendMintBalance {
   amount: number;

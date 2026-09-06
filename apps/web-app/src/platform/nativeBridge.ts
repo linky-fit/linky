@@ -8,6 +8,8 @@ import {
   getTelemetryDevicePlatform,
   isNativePlatform,
 } from "./runtime";
+import { isRecord } from "../utils/unknown";
+import { asNonEmptyString } from "../utils/validation";
 
 type NativeNotificationPermissionState =
   | "denied"
@@ -132,11 +134,11 @@ interface AndroidNfcBridge {
 }
 
 export const NATIVE_DEEP_LINK_EVENT = "linky-native-deep-link";
-export const NATIVE_NFC_WRITE_EVENT = "linky-native-nfc-write";
+const NATIVE_NFC_WRITE_EVENT = "linky-native-nfc-write";
 export const NATIVE_NOTIFICATION_OPEN_EVENT = "linky-native-notification-open";
 export const NATIVE_PUSH_ACTION_EVENT = "linky-native-push-action";
 
-export type NativeNfcWriteStatus =
+type NativeNfcWriteStatus =
   | "armed"
   | "busy"
   | "cancelled"
@@ -145,47 +147,20 @@ export type NativeNfcWriteStatus =
   | "success"
   | "unsupported";
 
-export interface NativeNfcWriteResult {
+interface NativeNfcWriteResult {
   message: string | null;
   prompt?: "web";
   status: NativeNfcWriteStatus;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null;
-};
-
-const isAndroidSecretStorageBridge = (
-  value: unknown,
-): value is AndroidSecretStorageBridge => {
-  return isRecord(value);
-};
-
-const isAndroidScannerBridge = (
-  value: unknown,
-): value is AndroidScannerBridge => {
-  return isRecord(value);
-};
-
-const isAndroidNotificationsBridge = (
-  value: unknown,
-): value is AndroidNotificationsBridge => {
-  return isRecord(value);
-};
-
-const normalizeString = (value: unknown): string | null => {
-  const normalized = String(value ?? "").trim();
-  return normalized || null;
-};
 
 const parseNativeScanResultEvent = (event: Event): NativeScanResult | null => {
   if (!(event instanceof CustomEvent) || !isRecord(event.detail)) {
     return null;
   }
 
-  const status = normalizeString(Reflect.get(event.detail, "status"));
-  const value = normalizeString(Reflect.get(event.detail, "value"));
-  const message = normalizeString(Reflect.get(event.detail, "message"));
+  const status = asNonEmptyString(Reflect.get(event.detail, "status"));
+  const value = asNonEmptyString(Reflect.get(event.detail, "value"));
+  const message = asNonEmptyString(Reflect.get(event.detail, "message"));
 
   if (status === "success" && value) {
     return message === null
@@ -259,17 +234,17 @@ const requestNativeBridgeEvent = <Result>({
 
 const getAndroidSecretStorageBridge = (): AndroidSecretStorageBridge | null => {
   const value = Reflect.get(globalThis, "LinkyNativeSecretStorage");
-  return isAndroidSecretStorageBridge(value) ? value : null;
+  return isRecord(value) ? value : null;
 };
 
 const getAndroidScannerBridge = (): AndroidScannerBridge | null => {
   const value = Reflect.get(globalThis, "LinkyNativeScanner");
-  return isAndroidScannerBridge(value) ? value : null;
+  return isRecord(value) ? value : null;
 };
 
 const getAndroidNotificationsBridge = (): AndroidNotificationsBridge | null => {
   const value = Reflect.get(globalThis, "LinkyNativeNotifications");
-  return isAndroidNotificationsBridge(value) ? value : null;
+  return isRecord(value) ? value : null;
 };
 
 const getAndroidWindowInsetsBridge = (): AndroidWindowInsetsBridge | null => {
@@ -321,7 +296,7 @@ export const readAndroidStoredSecret = async (
     return undefined;
   }
 
-  return normalizeString(bridge.get(key));
+  return asNonEmptyString(bridge.get(key));
 };
 
 export const writeAndroidStoredSecret = async (
@@ -420,7 +395,7 @@ if (typeof window !== "undefined") {
 
   if (supportsIosNativeNfcWrite() && LinkyNfc.addListener) {
     void LinkyNfc.addListener("deepLink", (event) => {
-      const url = normalizeString(event.url);
+      const url = asNonEmptyString(event.url);
       if (!url) return;
 
       window.dispatchEvent(
@@ -435,8 +410,8 @@ if (typeof window !== "undefined") {
 export const startNativeQrScan = (): Promise<NativeScanResult> | null => {
   if (supportsIosNativeQrScan()) {
     return LinkyScanner.scan().then((result) => {
-      const value = normalizeString(result.value);
-      const message = normalizeString(result.message);
+      const value = asNonEmptyString(result.value);
+      const message = asNonEmptyString(result.message);
       const cancelled = result.cancelled === true;
 
       return message === null
@@ -565,7 +540,7 @@ export const getNativeNotificationPermissionState =
       return null;
     }
 
-    const rawState = normalizeString(bridge.getPermissionState?.());
+    const rawState = asNonEmptyString(bridge.getPermissionState?.());
     if (
       rawState === "denied" ||
       rawState === "granted" ||
@@ -608,7 +583,7 @@ export const requestNativeNotificationPermission = async (): Promise<
         return null;
       }
 
-      const permission = normalizeString(
+      const permission = asNonEmptyString(
         Reflect.get(event.detail, "permission"),
       );
       if (
@@ -637,7 +612,7 @@ export const supportsNativeNfcWrite = (): boolean => {
   }
 
   try {
-    return Boolean(bridge.areSupported());
+    return bridge.areSupported();
   } catch {
     return false;
   }
@@ -669,17 +644,17 @@ export const startNativeNfcWrite = async (
       }
 
       const result = await LinkyNfc.writeUri({ url });
-      const status = normalizeString(result.status);
+      const status = asNonEmptyString(result.status);
 
       if (!isNativeNfcWriteStatus(status) || status === "armed") {
         return {
-          message: normalizeString(result.message),
+          message: asNonEmptyString(result.message),
           status: "error",
         };
       }
 
       return {
-        message: normalizeString(result.message),
+        message: asNonEmptyString(result.message),
         status,
       };
     } catch (error) {
@@ -705,13 +680,13 @@ export const startNativeNfcWrite = async (
         return;
       }
 
-      const rawStatus = normalizeString(Reflect.get(event.detail, "status"));
+      const rawStatus = asNonEmptyString(Reflect.get(event.detail, "status"));
       if (!isNativeNfcWriteStatus(rawStatus)) {
         return;
       }
 
       const result: NativeNfcWriteResult = {
-        message: normalizeString(Reflect.get(event.detail, "message")),
+        message: asNonEmptyString(Reflect.get(event.detail, "message")),
         status: rawStatus,
       };
 
@@ -775,7 +750,7 @@ export const consumePendingNativeDeepLinkUrl = (): string | null => {
   }
 
   try {
-    return normalizeString(bridge.consumePendingUrl());
+    return asNonEmptyString(bridge.consumePendingUrl());
   } catch {
     return null;
   }
@@ -788,7 +763,7 @@ export const consumePendingNativeNotificationRoute = (): string | null => {
   }
 
   try {
-    return normalizeString(bridge.consumePendingNotificationRoute());
+    return asNonEmptyString(bridge.consumePendingNotificationRoute());
   } catch {
     return null;
   }
@@ -801,7 +776,7 @@ export const consumePendingNativeNotificationOpenDetail = (): string | null => {
   }
 
   try {
-    return normalizeString(bridge.consumePendingNotificationOpenDetail());
+    return asNonEmptyString(bridge.consumePendingNotificationOpenDetail());
   } catch {
     return null;
   }
@@ -816,7 +791,7 @@ export const consumePendingIosNativeDeepLinkUrl = async (): Promise<
 
   try {
     const result = await LinkyNfc.consumePendingDeepLinkUrl();
-    return normalizeString(result.url);
+    return asNonEmptyString(result.url);
   } catch {
     return null;
   }

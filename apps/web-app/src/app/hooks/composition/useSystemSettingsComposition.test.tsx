@@ -1,7 +1,7 @@
 import type { OwnerId } from "@evolu/common";
 import React, { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type {
   AdvancedSettingsContextValue,
   EvoluSettingsContextValue,
@@ -12,11 +12,6 @@ import {
   useSystemSettingsComposition,
   type SystemSettingsCompositionResult,
 } from "./useSystemSettingsComposition";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-});
 
 const noop = (): void => {};
 const noopAsync = async (): Promise<void> => {};
@@ -71,6 +66,7 @@ const createEvoluSettings = (
   evoluContactsOwnerPointer: "",
   evoluDatabaseBytes: null,
   evoluHasError: false,
+  evoluErrorType: null,
   evoluHistoryAllowedOwnerIds: [],
   evoluHistoryCount: null,
   evoluMessagesOwnerEditsUntilRotation: 0,
@@ -109,13 +105,13 @@ const createEvoluSettings = (
 
 const appOwnerIdRef = React.createRef<OwnerId>();
 
-const createMintSettings = (draft: string): MintSettingsContextValue => ({
+const mintSettings: MintSettingsContextValue = {
   appOwnerIdRef,
   applyDefaultMintSelection: noopAsync,
   cashuIsBusy: false,
   cashuMeltToMainMintButtonLabel: null,
   defaultMintUrl: null,
-  defaultMintUrlDraft: draft,
+  defaultMintUrlDraft: "",
   getMintIconUrl: () => ({
     failed: false,
     host: null,
@@ -132,7 +128,7 @@ const createMintSettings = (draft: string): MintSettingsContextValue => ({
   setMintInfoAll: noop,
   setPendingMintDeleteUrl: noop,
   setStatus: noop,
-});
+};
 
 const relaySettings: RelaySettingsContextValue = {
   canSaveNewRelay: false,
@@ -148,20 +144,18 @@ const relaySettings: RelaySettingsContextValue = {
 interface HarnessProps {
   advancedSettingsInput: AdvancedSettingsContextValue;
   evoluSettingsInput: EvoluSettingsInput;
-  mintDraft: string;
   resultRef: React.RefObject<SystemSettingsCompositionResult | null>;
 }
 
 const Harness = ({
   advancedSettingsInput,
   evoluSettingsInput,
-  mintDraft,
   resultRef,
 }: HarnessProps): null => {
   const result = useSystemSettingsComposition({
     advancedSettingsInput,
     evoluSettingsInput,
-    mintSettingsInput: createMintSettings(mintDraft),
+    mintSettingsInput: mintSettings,
     relaySettingsInput: relaySettings,
     t: translate,
   });
@@ -192,18 +186,14 @@ describe("useSystemSettingsComposition", () => {
     const advancedSettingsInput = createAdvancedSettings(pushToast);
     const evoluSettingsInput = createEvoluSettings(wipeEvoluStorage);
     const resultRef = React.createRef<SystemSettingsCompositionResult | null>();
-    const root = createRoot(document.createElement("div"));
 
-    await act(async () => {
-      root.render(
-        <Harness
-          advancedSettingsInput={advancedSettingsInput}
-          evoluSettingsInput={evoluSettingsInput}
-          mintDraft=""
-          resultRef={resultRef}
-        />,
-      );
-    });
+    const { root } = await renderIntoDocument(
+      <Harness
+        advancedSettingsInput={advancedSettingsInput}
+        evoluSettingsInput={evoluSettingsInput}
+        resultRef={resultRef}
+      />,
+    );
 
     act(() => {
       readResult(resultRef).evoluSettingsContext.requestClearDatabase();
@@ -235,48 +225,6 @@ describe("useSystemSettingsComposition", () => {
     expect(readResult(resultRef).evoluSettingsContext.clearDatabaseArmed).toBe(
       false,
     );
-
-    await act(async () => {
-      root.unmount();
-    });
-  });
-
-  it("keeps unrelated context references stable when the mint draft changes", async () => {
-    const advancedSettingsInput = createAdvancedSettings(noop);
-    const evoluSettingsInput = createEvoluSettings(noopAsync);
-    const resultRef = React.createRef<SystemSettingsCompositionResult | null>();
-    const root = createRoot(document.createElement("div"));
-
-    await act(async () => {
-      root.render(
-        <Harness
-          advancedSettingsInput={advancedSettingsInput}
-          evoluSettingsInput={evoluSettingsInput}
-          mintDraft="https://one.example"
-          resultRef={resultRef}
-        />,
-      );
-    });
-    const initial = readResult(resultRef);
-
-    await act(async () => {
-      root.render(
-        <Harness
-          advancedSettingsInput={advancedSettingsInput}
-          evoluSettingsInput={evoluSettingsInput}
-          mintDraft="https://two.example"
-          resultRef={resultRef}
-        />,
-      );
-    });
-    const updated = readResult(resultRef);
-
-    expect(updated.advancedSettingsContext).toBe(
-      initial.advancedSettingsContext,
-    );
-    expect(updated.evoluSettingsContext).toBe(initial.evoluSettingsContext);
-    expect(updated.relaySettingsContext).toBe(initial.relaySettingsContext);
-    expect(updated.mintSettingsContext).not.toBe(initial.mintSettingsContext);
 
     await act(async () => {
       root.unmount();

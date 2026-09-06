@@ -1,11 +1,12 @@
 import React from "react";
 import { MessageCircle, ShieldCheck } from "lucide-react";
+import type { Translate } from "../i18n";
 
 interface WalletWarningProps {
   dismissed: boolean;
   onContactSupport: () => void;
   onDismiss: () => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export function WalletWarning({

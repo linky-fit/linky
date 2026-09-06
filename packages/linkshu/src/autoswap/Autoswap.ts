@@ -1,30 +1,22 @@
-import type { MintQuoteBolt11Response } from "@cashu/cashu-ts";
-import { Clock, Duration, Effect, Either, Schema } from "effect";
-import {
-  InsufficientFunds,
-  MintRejected,
-  PaymentFailed,
-} from "../domain/errors";
-import type { MintUnreachable } from "../domain/errors";
-import {
-  Amount,
-  Bolt11Invoice,
-  CurrencyUnit,
-  NonNegativeAmount,
-  QuoteId,
-  UnixSeconds,
-} from "../domain/primitives";
+import { Duration, Effect, Either } from "effect";
+import { InsufficientFunds, PaymentFailed } from "../domain/errors";
+import type { MintRejected, MintUnreachable } from "../domain/errors";
+import { Amount, NonNegativeAmount, UnixSeconds } from "../domain/primitives";
 import type { MintUrl } from "../domain/primitives";
-import { QuoteStateChanged } from "../inspector/events";
 import { Inspector } from "../inspector/Inspector";
 import { inspectOperationWith } from "../internal/operations";
+import { pollUntil } from "../internal/poll";
 import {
   checkMintQuote,
   claimMintQuote,
   QUOTE_UNPAID,
 } from "../internal/quoteClaim";
 import type { ClaimedQuote, QuoteClaimContext } from "../internal/quoteClaim";
+import { decodeMintQuote, emitQuoteState } from "../internal/quotes";
+import type { DecodedMintQuote } from "../internal/quotes";
 import { selectSpendableProofs } from "../internal/spend";
+import { nowSeconds } from "../internal/time";
+import { sat } from "../internal/units";
 import { Melt } from "../melt/Melt";
 import { MeltDraft } from "../melt/domain";
 import type { MeltError } from "../melt/domain";
@@ -39,15 +31,7 @@ import { KeyValueStore } from "../ports/KeyValueStore";
 import { TokenStore } from "../ports/TokenStore";
 import { AutoswapClaimResult, AutoswapReceipt } from "./domain";
 import type { AutoswapDraft, AutoswapError } from "./domain";
-import {
-  deadlineOf,
-  PendingAutoswapClaim,
-  readPendingClaims,
-  removePendingClaim,
-  writePendingClaim,
-} from "./internal/pendingClaim";
-
-const sat = CurrencyUnit.make("sat");
+import { PendingAutoswapClaim, pendingClaims } from "./internal/pendingClaim";
 
 /**
  * Attempts at sizing the swap. Every failed one only costs an unpaid mint
@@ -55,16 +39,8 @@ const sat = CurrencyUnit.make("sat");
  */
 const MAX_AMOUNT_ATTEMPTS = 4;
 /** The melt settled, so the target's quote flips within a poll or two. */
-const CLAIM_POLLS = 6;
+const CLAIM_POLL_ATTEMPTS = 6;
 const CLAIM_POLL_INTERVAL = Duration.millis(500);
-
-const decodeQuoteId = Schema.decodeUnknownOption(QuoteId);
-const decodeInvoice = Schema.decodeUnknownOption(Bolt11Invoice);
-
-const nowSeconds: Effect.Effect<number> = Effect.map(
-  Clock.currentTimeMillis,
-  (millis) => Math.floor(millis / 1000),
-);
 
 /** Melt failures wearing autoswap's error union. */
 const asAutoswapError = (error: MeltError): AutoswapError =>
@@ -94,24 +70,6 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
     const melt = yield* Melt;
     const inspector = yield* Inspector.orNoop;
 
-    const emitQuoteState = (
-      pending: PendingAutoswapClaim,
-      state: string,
-    ): void => {
-      inspector.emit(
-        () =>
-          new QuoteStateChanged(
-            {
-              flow: "autoswap",
-              quoteId: pending.quoteId,
-              mint: pending.mint,
-              state,
-            },
-            { disableValidation: true },
-          ),
-      );
-    };
-
     const claimContext = (
       wallet: LoadedWallet,
     ): QuoteClaimContext<PendingAutoswapClaim> => ({
@@ -122,38 +80,21 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       reason: "autoswap",
       withMintCounter: (record, mintCounter) =>
         new PendingAutoswapClaim({ ...record, mintCounter }),
-      persist: (record) => writePendingClaim(kv, record),
-      clear: (record) => removePendingClaim(kv, record),
+      records: pendingClaims,
     });
 
     const createTargetQuote = (
       wallet: LoadedWallet,
       mint: MintUrl,
       amount: number,
-    ): Effect.Effect<
-      {
-        raw: MintQuoteBolt11Response;
-        quoteId: QuoteId;
-        invoice: Bolt11Invoice;
-      },
-      MintUnreachable | MintRejected
-    > =>
-      Effect.gen(function* () {
-        const raw = yield* Effect.tryPromise({
+    ): Effect.Effect<DecodedMintQuote, MintUnreachable | MintRejected> =>
+      Effect.flatMap(
+        Effect.tryPromise({
           try: () => wallet.createMintQuoteBolt11(amount),
           catch: (error) => classifyMintError(mint, error),
-        });
-        const quoteId = decodeQuoteId(raw.quote);
-        const invoice = decodeInvoice(raw.request);
-        if (quoteId._tag === "None" || invoice._tag === "None") {
-          return yield* new MintRejected({
-            mint,
-            code: null,
-            detail: "mint returned a mint quote without a usable invoice",
-          });
-        }
-        return { raw, quoteId: quoteId.value, invoice: invoice.value };
-      });
+        }),
+        (raw) => decodeMintQuote(mint, raw),
+      );
 
     /**
      * The melt settled at the source, so the target mint sees the payment
@@ -166,23 +107,30 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
     ): Effect.Effect<ClaimedQuote, AutoswapError> =>
       Effect.gen(function* () {
         let lastState: string | null = null;
-        for (let poll = 0; poll < CLAIM_POLLS; poll += 1) {
-          const state = (yield* checkMintQuote(wallet, pending)).state;
-          if (state !== lastState) {
-            lastState = state;
-            emitQuoteState(pending, state);
-          }
-          if (state !== QUOTE_UNPAID) {
-            return yield* claimMintQuote(claimContext(wallet), pending);
-          }
-          yield* Effect.sleep(CLAIM_POLL_INTERVAL);
-        }
-        return yield* new PaymentFailed({
-          mint: pending.mint,
-          quoteId: pending.quoteId,
-          detail:
-            "the melt settled but the target mint still reports its quote unpaid; the pending claim resumes it",
+        const pollState = Effect.map(
+          checkMintQuote(wallet, pending),
+          (quote) => {
+            if (quote.state !== lastState) {
+              lastState = quote.state;
+              emitQuoteState(inspector, "autoswap", pending, quote.state);
+            }
+            return quote.state;
+          },
+        );
+        const state = yield* pollUntil(pollState, {
+          attempts: CLAIM_POLL_ATTEMPTS,
+          interval: CLAIM_POLL_INTERVAL,
+          settled: (state) => state !== QUOTE_UNPAID,
         });
+        if (state === QUOTE_UNPAID) {
+          return yield* new PaymentFailed({
+            mint: pending.mint,
+            quoteId: pending.quoteId,
+            detail:
+              "the melt settled but the target mint still reports its quote unpaid; the pending claim resumes it",
+          });
+        }
+        return yield* claimMintQuote(claimContext(wallet), pending);
       });
 
     /**
@@ -219,8 +167,8 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
           mintCounter: null,
         });
         // The record lands before the melt can pay the invoice.
-        yield* writePendingClaim(kv, record);
-        emitQuoteState(record, quote.raw.state);
+        yield* pendingClaims.write(kv, record);
+        emitQuoteState(inspector, "autoswap", record, quote.state);
 
         const paid = yield* Effect.either(
           melt.melt(
@@ -231,7 +179,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
           if (paid.left._tag !== "InsufficientFunds") {
             return yield* Effect.fail(asAutoswapError(paid.left));
           }
-          yield* removePendingClaim(kv, record);
+          yield* pendingClaims.remove(kv, record);
           return Either.left(paid.left);
         }
 
@@ -316,7 +264,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       pending: PendingAutoswapClaim,
     ): Effect.Effect<AutoswapClaimResult> =>
       Effect.as(
-        removePendingClaim(kv, pending),
+        pendingClaims.remove(kv, pending),
         resultOf(pending, "dropped", null),
       );
 
@@ -330,7 +278,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       pending: PendingAutoswapClaim,
     ): Effect.Effect<AutoswapClaimResult> =>
       Effect.flatMap(nowSeconds, (now) =>
-        now > deadlineOf(pending)
+        now > pendingClaims.deadlineOf(pending)
           ? dropClaim(pending)
           : Effect.succeed(resultOf(pending, "not-claimable-yet", null)),
       );
@@ -349,7 +297,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       Effect.gen(function* () {
         const wallet = yield* instances.get(pending.mint, pending.unit);
         const state = (yield* checkMintQuote(wallet, pending)).state;
-        emitQuoteState(pending, state);
+        emitQuoteState(inspector, "autoswap", pending, state);
         if (state === QUOTE_UNPAID) return yield* expireOrKeep(pending);
         return yield* claimMintQuote(claimContext(wallet), pending).pipe(
           Effect.map((claimed) => resultOf(pending, "claimed", claimed)),
@@ -369,7 +317,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       ReadonlyArray<AutoswapClaimResult>
     > = Effect.gen(function* () {
       const results: AutoswapClaimResult[] = [];
-      for (const pending of yield* readPendingClaims(kv)) {
+      for (const pending of yield* pendingClaims.readAll(kv)) {
         results.push(yield* resumeOne(pending));
       }
       return results;

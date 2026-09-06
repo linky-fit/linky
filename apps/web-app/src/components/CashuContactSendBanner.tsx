@@ -1,9 +1,10 @@
 import React from "react";
+import type { Translate } from "../i18n";
 
 interface CashuContactSendBannerProps {
   amountText: string | null;
   onCancel: () => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export const CashuContactSendBanner: React.FC<CashuContactSendBannerProps> = ({

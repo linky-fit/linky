@@ -1,39 +1,22 @@
 import { Registry } from "./index";
-import type { Atom, Result } from "./index";
 import {
   ClientId,
-  NostrSecretKey,
-  NostrTransport,
   OutboxRef,
   PaymentTelemetryDraft,
   PaymentTelemetryReceipt,
-  Pubkey,
-  RelayPublishResult,
-  RelayUrl,
   UnixSeconds,
 } from "@linky/linkstr";
-import type { NostrTransportService, OutboxResult } from "@linky/linkstr";
-import { Effect, Exit, Layer } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
-import type { LinkstrConfig } from "./config";
+import type { OutboxResult } from "@linky/linkstr";
+import { stubWrapTransport } from "@linky/linkstr/testing";
+import type { SignedWrapEvent } from "@linky/linkstr/testing";
+import { Exit } from "effect";
 import { linkstrConfigAtom } from "./config";
 import { outboxResultsAtom, outboxResultsHandlerAtom } from "./outbox";
 import { enqueuePaymentTelemetryAtom } from "./paymentTelemetry";
+import { configWith, makeIdentity, settle } from "./testing";
 
-type PublishedEvent = Parameters<NostrTransportService["publish"]>[1];
-
-const secretKey = NostrSecretKey.make(generateSecretKey());
-const recipientSecretKey = NostrSecretKey.make(generateSecretKey());
-const recipient = Pubkey.make(getPublicKey(recipientSecretKey));
-const relay = RelayUrl.make("wss://relay.test");
-
-const settle = <A, E>(
-  registry: Registry.Registry,
-  atom: Atom.Atom<Result.Result<A, E>>,
-): Promise<Exit.Exit<A, E>> =>
-  Effect.runPromiseExit(
-    Registry.getResult(registry, atom, { suspendOnWaiting: true }),
-  );
+const alice = makeIdentity();
+const collector = makeIdentity();
 
 const draft = new PaymentTelemetryDraft({
   id: ClientId.make("telemetry-react"),
@@ -55,31 +38,12 @@ const draft = new PaymentTelemetryDraft({
 
 describe("enqueuePaymentTelemetryAtom", () => {
   it("delivers through the outbox and reports a telemetry receipt", async () => {
-    const published: Array<PublishedEvent> = [];
-    const transport = Layer.succeed(NostrTransport, {
-      publish: (relays, event) =>
-        Effect.sync(() => {
-          published.push(event);
-          return relays.map(
-            (relayUrl) =>
-              new RelayPublishResult({
-                relay: relayUrl,
-                accepted: true,
-                detail: null,
-              }),
-          );
-        }),
-      subscribe: () => Effect.die("subscribe not under test"),
-      fetch: () => Effect.die("fetch not under test"),
-    });
-    const config: LinkstrConfig = {
-      secretKey,
-      readRelays: [relay],
-      writeRelays: [relay],
-      transport,
-    };
+    const published: Array<SignedWrapEvent> = [];
     const registry = Registry.make();
-    registry.set(linkstrConfigAtom, config);
+    registry.set(
+      linkstrConfigAtom,
+      configWith(alice, stubWrapTransport(published)),
+    );
 
     const handled: Array<OutboxResult> = [];
     registry.set(outboxResultsHandlerAtom, {
@@ -91,7 +55,7 @@ describe("enqueuePaymentTelemetryAtom", () => {
 
     registry.set(enqueuePaymentTelemetryAtom, {
       draft,
-      recipient,
+      recipient: collector.pubkey,
       ref: OutboxRef.make("telemetry:telemetry-react"),
     });
     const exit = await settle(registry, enqueuePaymentTelemetryAtom);
@@ -107,9 +71,8 @@ describe("enqueuePaymentTelemetryAtom", () => {
         ref: "telemetry:telemetry-react",
       }),
     );
-    if (result?._tag !== "OutboxJobSucceeded") return;
-    expect(result.receipt).toBeInstanceOf(PaymentTelemetryReceipt);
-    if (!(result.receipt instanceof PaymentTelemetryReceipt)) return;
+    assert(result?._tag === "OutboxJobSucceeded");
+    assert(result.receipt instanceof PaymentTelemetryReceipt);
     expect(result.receipt.clientId).toBe(draft.id);
     unmount();
   });

@@ -1,8 +1,9 @@
+import { asNonEmptyString } from "./validation";
 const PUSH_CONTACT_NAMES_DB_NAME = "linky-push-contact-names-v1";
 const PUSH_CONTACT_NAMES_DB_VERSION = 1;
 const PUSH_CONTACT_NAMES_STORE_NAME = "contacts";
 
-export interface PushContactNameRecordInput {
+interface PushContactNameRecordInput {
   name: string;
   npub: string;
   pubkey: string;
@@ -21,11 +22,6 @@ function canUseIndexedDb(): boolean {
   } catch {
     return false;
   }
-}
-
-function normalizeString(value: string | null | undefined): string | null {
-  const normalized = String(value ?? "").trim();
-  return normalized || null;
 }
 
 function isStoredPushContactNameRecord(
@@ -108,9 +104,9 @@ export async function setStoredPushContactNames(
   const updatedAt = Date.now();
 
   for (const contact of contacts) {
-    const pubkey = normalizeString(contact.pubkey);
-    const npub = normalizeString(contact.npub);
-    const name = normalizeString(contact.name);
+    const pubkey = asNonEmptyString(contact.pubkey);
+    const npub = asNonEmptyString(contact.npub);
+    const name = asNonEmptyString(contact.name);
     if (!pubkey || !npub || !name) continue;
     if (seenPubkeys.has(pubkey)) continue;
 
@@ -138,7 +134,7 @@ export async function setStoredPushContactNames(
 export async function getStoredPushContactName(
   pubkey: string,
 ): Promise<string | null> {
-  const normalizedPubkey = normalizeString(pubkey);
+  const normalizedPubkey = asNonEmptyString(pubkey);
   if (!normalizedPubkey || !canUseIndexedDb()) {
     return null;
   }
@@ -158,7 +154,7 @@ export async function getStoredPushContactName(
     if (!isStoredPushContactNameRecord(value)) {
       return null;
     }
-    return normalizeString(value.name);
+    return asNonEmptyString(value.name);
   } finally {
     db.close();
   }

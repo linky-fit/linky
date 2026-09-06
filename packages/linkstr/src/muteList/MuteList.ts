@@ -9,7 +9,7 @@ import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 
-export const MUTE_LIST_KIND = 10000;
+const MUTE_LIST_KIND = 10000;
 
 export class MuteList extends Effect.Service<MuteList>()("linkstr/MuteList", {
   effect: Effect.gen(function* () {

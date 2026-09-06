@@ -1,58 +1,25 @@
-import { Mint, Wallet, getEncodedToken } from "@cashu/cashu-ts";
+import { Mint } from "@cashu/cashu-ts";
 import { Effect } from "effect";
 import {
   Amount,
-  Bip39Seed,
-  MintUrl,
+  decodeTokenText,
   NewTokenRow,
+  parseTokenText,
   Receive,
   ReceiveDraft,
+  runLinkshu,
   Send,
   SendDraft,
   TokenStore,
   TokenText,
-  decodeTokenText,
-  parseTokenText,
-  runLinkshu,
 } from "../../src";
-import type { Bip39Seed as Bip39SeedType } from "../../src";
-
-// The dev-stack Nutshell FakeWallet mint (docker-compose.dev.yml `cashu-mint`).
-const mintUrl = MintUrl.make(
-  process.env.LINKSHU_MINT_URL ?? "http://localhost:3338",
-);
-
-// The local mint charges input_fee_ppk=100 on purpose (see CLAUDE.md).
-const INPUT_FEE_PPK = 100;
-const inputFee = (proofCount: number): number =>
-  Math.ceil((proofCount * INPUT_FEE_PPK) / 1000);
-
-// Fresh seed per run: deterministic counters live at the mint, so a reused
-// seed would start every run inside an already-signed counter range.
-const randomSeed = (): Bip39SeedType =>
-  Bip39Seed.make(crypto.getRandomValues(new Uint8Array(64)));
-
-/** Mints fresh sats via a bolt11 quote the FakeWallet backend auto-settles. */
-const fundToken = async (amountSat: number): Promise<string> => {
-  const wallet = new Wallet(new Mint(mintUrl), { unit: "sat" });
-  await wallet.loadMint();
-  const quote = await wallet.createMintQuoteBolt11(amountSat);
-  const proofs = await wallet.mintProofsBolt11(amountSat, quote, undefined, {
-    type: "random",
-  });
-  return getEncodedToken({ mint: mintUrl, unit: "sat", proofs });
-};
-
-const receiveOnce = (seed: Bip39SeedType, text: string) =>
-  runLinkshu(
-    { bip39Seed: seed },
-    Effect.gen(function* () {
-      const receive = yield* Receive;
-      const receipt = yield* receive.receive(new ReceiveDraft({ text }));
-      const rows = yield* (yield* TokenStore).loadAll;
-      return { receipt, rows };
-    }),
-  );
+import {
+  fundToken,
+  inputFee,
+  mintUrl,
+  randomSeed,
+  receiveOnce,
+} from "./helpers";
 
 describe("send vertical against the local mint", () => {
   it("sends an amount as a token another wallet can receive, keeping change", async () => {

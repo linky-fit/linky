@@ -1,7 +1,3 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import {
   derivePubkey,
   NostrSecretKey,
@@ -18,6 +14,7 @@ import {
 } from "./config";
 import { RelayWatcher } from "./relayWatcher";
 import { PushStorage } from "./storage";
+import { createStoragePath, removeStoragePath } from "./testSupport";
 import type {
   PushNotificationData,
   StoredNativeSubscription,
@@ -62,20 +59,8 @@ interface WatcherHarness {
   watcher: RelayWatcher;
 }
 
-function createStoragePath(): string {
-  const directory = mkdtempSync(join(tmpdir(), "linky-relay-watcher-"));
-  return join(directory, "push.sqlite");
-}
-
-function removeStoragePath(path: string): void {
-  rmSync(path, { force: true });
-  rmSync(`${path}-shm`, { force: true });
-  rmSync(`${path}-wal`, { force: true });
-  rmSync(join(path, ".."), { recursive: true, force: true });
-}
-
 function createHarness(): WatcherHarness {
-  const storagePath = createStoragePath();
+  const storagePath = createStoragePath("linky-relay-watcher-");
   const storage = new PushStorage(storagePath);
   const pushDelivery = new RecordingPushDelivery();
   const watcher = new RelayWatcher({

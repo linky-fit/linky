@@ -1,7 +1,7 @@
 import React from "react";
 
 interface UseStoragePersistRequestEffectParams {
-  refreshKey: ((key: string) => string) | string;
+  refreshKey: unknown;
 }
 
 export const useStoragePersistRequestEffect = ({

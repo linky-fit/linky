@@ -1,35 +1,26 @@
 import { Capacitor } from "@capacitor/core";
+import {
+  detectTelemetryEnvironment,
+  type PaymentTelemetryAppRuntime,
+  type PaymentTelemetryDevicePlatform,
+  type TelemetryEnvironment,
+  type TelemetryEnvironmentFacts,
+} from "@linky/linkstr";
 
-export type PlatformTarget = "android" | "ios" | "web";
-export type TelemetryAppRuntime = "native" | "pwa" | "web";
-export type TelemetryDevicePlatform =
-  | "android"
-  | "iphone"
-  | "ipad"
-  | "linux"
-  | "mac"
-  | "windows"
-  | "unknown";
+type PlatformTarget = "android" | "ios" | "web";
 
 export const getTelemetryAppHost = (): string | null => {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const host = String(window.location.host ?? "")
-    .trim()
-    .toLowerCase();
+  const host = window.location.host.trim().toLowerCase();
 
   return host ? host.slice(0, 255) : null;
 };
 
 const getNavigator = (): Navigator | null => {
   return typeof navigator === "undefined" ? null : navigator;
-};
-
-const getLowercaseUserAgent = (): string => {
-  const browserNavigator = getNavigator();
-  return String(browserNavigator?.userAgent ?? "").toLowerCase();
 };
 
 const getNavigatorStandalone = (): boolean => {
@@ -43,6 +34,15 @@ const getNavigatorMaxTouchPoints = (): number => {
   return typeof browserNavigator?.maxTouchPoints === "number"
     ? browserNavigator.maxTouchPoints
     : 0;
+};
+
+const matchesStandaloneDisplayMode = (): boolean => {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.matchMedia("(display-mode: standalone)").matches;
+  } catch {
+    return false;
+  }
 };
 
 export const getPlatformTarget = (): PlatformTarget => {
@@ -70,64 +70,22 @@ export const isNativePlatform = (): boolean => {
   return getPlatformTarget() !== "web";
 };
 
-export const getTelemetryAppRuntime = (): TelemetryAppRuntime => {
-  if (isNativePlatform()) {
-    return "native";
-  }
-
-  if (typeof window !== "undefined") {
-    try {
-      if (window.matchMedia("(display-mode: standalone)").matches) {
-        return "pwa";
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  if (getNavigatorStandalone()) {
-    return "pwa";
-  }
-
-  return "web";
+const getNativePlatform = (): TelemetryEnvironmentFacts["nativePlatform"] => {
+  const target = getPlatformTarget();
+  return target === "web" ? null : target;
 };
 
-export const getTelemetryDevicePlatform = (): TelemetryDevicePlatform => {
-  const platformTarget = getPlatformTarget();
-  const userAgent = getLowercaseUserAgent();
-  const maxTouchPoints = getNavigatorMaxTouchPoints();
+const getTelemetryEnvironment = (): TelemetryEnvironment =>
+  detectTelemetryEnvironment({
+    userAgent: getNavigator()?.userAgent ?? "",
+    maxTouchPoints: getNavigatorMaxTouchPoints(),
+    displayModeStandalone: matchesStandaloneDisplayMode(),
+    navigatorStandalone: getNavigatorStandalone(),
+    nativePlatform: getNativePlatform(),
+  });
 
-  if (platformTarget === "android" || userAgent.includes("android")) {
-    return "android";
-  }
+export const getTelemetryAppRuntime = (): PaymentTelemetryAppRuntime =>
+  getTelemetryEnvironment().appRuntime;
 
-  if (userAgent.includes("iphone") || userAgent.includes("ipod")) {
-    return "iphone";
-  }
-
-  if (userAgent.includes("ipad")) {
-    return "ipad";
-  }
-
-  if (platformTarget === "ios") {
-    return "iphone";
-  }
-
-  if (userAgent.includes("macintosh") && maxTouchPoints > 1) {
-    return "ipad";
-  }
-
-  if (userAgent.includes("macintosh") || userAgent.includes("mac os x")) {
-    return "mac";
-  }
-
-  if (userAgent.includes("windows")) {
-    return "windows";
-  }
-
-  if (userAgent.includes("linux") || userAgent.includes("x11")) {
-    return "linux";
-  }
-
-  return "unknown";
-};
+export const getTelemetryDevicePlatform = (): PaymentTelemetryDevicePlatform =>
+  getTelemetryEnvironment().devicePlatform;

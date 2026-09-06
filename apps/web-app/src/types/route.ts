@@ -74,9 +74,7 @@ export type Route =
 
 export const parseRouteFromHash = (): Route => {
   const rawHash = globalThis.location?.hash ?? "";
-  const hasExplicitEmptyHash = String(globalThis.location?.href ?? "").endsWith(
-    "#",
-  );
+  const hasExplicitEmptyHash = (globalThis.location?.href ?? "").endsWith("#");
   const hash = rawHash.split("?")[0] ?? rawHash;
   if (hash === "" && hasExplicitEmptyHash) return { kind: "contacts" };
   if (hash === "") return { kind: "wallet" };
@@ -170,7 +168,7 @@ export const parseRouteFromHash = (): Route => {
     const rest = hash.slice(chatPrefix.length);
     const [rawId, rawSub, rawOfferId] = rest.split("/");
     const id = decodeSegment(rawId ?? "");
-    const sub = String(rawSub ?? "").trim();
+    const sub = (rawSub ?? "").trim();
     const offerId = decodeSegment(rawOfferId ?? "");
     if (id && sub === "bank-payment-offer" && offerId) {
       if (id.toLowerCase().startsWith(UNKNOWN_CONTACT_ID_PREFIX)) {
@@ -188,7 +186,7 @@ export const parseRouteFromHash = (): Route => {
     const rest = hash.slice(contactPrefix.length);
     const [rawId, rawSub] = rest.split("/");
     const idText = decodeSegment(rawId ?? "");
-    const sub = String(rawSub ?? "").trim();
+    const sub = (rawSub ?? "").trim();
 
     if (idText) {
       const id = parseContactId(idText);

@@ -1,113 +1,107 @@
-import { Mint, Wallet, getEncodedToken } from "@cashu/cashu-ts";
-import { Effect, Layer } from "effect";
+import { getDecodedToken } from "@cashu/cashu-ts";
+import { Effect } from "effect";
 import {
   Amount,
   Autoswap,
   AutoswapDraft,
-  Bip39Seed,
   Bolt11Invoice,
   CurrencyUnit,
   KeysetId,
-  KeyValueStore,
-  makeInMemoryKeyValueStore,
-  makeInMemoryTokenStore,
-  MintUrl,
   QuoteId,
+  parseTokenText,
   Receive,
   ReceiveDraft,
-  TokenStore,
-  UnixSeconds,
-  parseTokenText,
   runLinkshu,
+  UnixSeconds,
 } from "../../src";
-import type { Bip39Seed as Bip39SeedType, StoredTokenRow } from "../../src";
+import type { KeyValueStoreService } from "../../src";
 import {
   PENDING_AUTOSWAP_CLAIM_KEY_PREFIX,
   PendingAutoswapClaim,
-  writePendingClaim,
+  pendingClaims,
 } from "../../src/autoswap/internal/pendingClaim";
+import {
+  acceptedTotalOf,
+  durableStorage,
+  fundToken,
+  loadMintWallet,
+  mintUrl,
+  randomSeed,
+  targetMintUrl,
+} from "./helpers";
 
-// The dev stack runs a single mint, so source and target are the same url: the
-// FakeWallet backend pays the target's mint-quote invoice out of the source's
-// melt, which is the shape of the cross-mint flow the app performs.
-const mintUrl = MintUrl.make(
-  process.env.LINKSHU_MINT_URL ?? "http://localhost:3338",
-);
-
-// Fresh seed per run: deterministic counters live at the mint, so a reused
-// seed would start every run inside an already-signed counter range.
-const randomSeed = (): Bip39SeedType =>
-  Bip39Seed.make(crypto.getRandomValues(new Uint8Array(64)));
-
-const loadWallet = async () => {
-  const wallet = new Wallet(new Mint(mintUrl), { unit: "sat" });
-  await wallet.loadMint();
-  return wallet;
-};
-
-/** Mints fresh sats via a bolt11 quote the FakeWallet backend auto-settles. */
-const fundToken = async (amountSat: number): Promise<string> => {
-  const wallet = await loadWallet();
-  const quote = await wallet.createMintQuoteBolt11(amountSat);
-  const proofs = await wallet.mintProofsBolt11(amountSat, quote, undefined, {
-    type: "random",
-  });
-  return getEncodedToken({ mint: mintUrl, unit: "sat", proofs });
-};
-
-const durableStorage = () => {
-  const kv = makeInMemoryKeyValueStore();
-  const tokens = makeInMemoryTokenStore();
-  return {
-    kv,
-    tokens,
-    layers: {
-      keyValueStore: Layer.succeed(KeyValueStore, kv),
-      tokenStore: Layer.succeed(TokenStore, tokens),
-    },
-  };
-};
-
-const acceptedTotalOf = (rows: ReadonlyArray<StoredTokenRow>): number =>
-  rows
-    .filter((row) => row.state === "accepted")
-    .reduce(
-      (sum, row) => sum + (parseTokenText(row.tokenText)?.amount ?? 0),
-      0,
-    );
-
-const pendingKeys = (kv: ReturnType<typeof makeInMemoryKeyValueStore>) =>
+const pendingKeys = (kv: KeyValueStoreService) =>
   Effect.runPromise(kv.listKeys(PENDING_AUTOSWAP_CLAIM_KEY_PREFIX));
 
-describe("autoswap against the local mint", () => {
-  it("moves a mint's balance through a melt into one claimed row", async () => {
+describe("autoswap between local mints", () => {
+  it("moves the source balance into spendable proofs at another mint", async () => {
+    expect(targetMintUrl).not.toBe(mintUrl);
     const { kv, tokens, layers } = durableStorage();
     const funded = await fundToken(256);
 
-    const receipt = await runLinkshu(
+    const { receipt, funding } = await runLinkshu(
       { bip39Seed: randomSeed(), ...layers },
       Effect.gen(function* () {
-        yield* (yield* Receive).receive(new ReceiveDraft({ text: funded }));
-        return yield* (yield* Autoswap).claim(
-          new AutoswapDraft({ sourceMint: mintUrl, targetMint: mintUrl }),
+        const funding = yield* (yield* Receive).receive(
+          new ReceiveDraft({ text: funded }),
         );
+        const receipt = yield* (yield* Autoswap).claim(
+          new AutoswapDraft({ sourceMint: mintUrl, targetMint: targetMintUrl }),
+        );
+        return { receipt, funding };
       }),
     );
 
     expect(receipt.sourceMint).toBe(mintUrl);
-    expect(receipt.targetMint).toBe(mintUrl);
+    expect(receipt.targetMint).toBe(targetMintUrl);
     expect(receipt.movedAmount).toBeGreaterThan(0);
 
     const rows = await Effect.runPromise(tokens.loadAll);
     const claimed = rows.find((row) => row.id === receipt.rowId);
     expect(claimed?.state).toBe("accepted");
+    if (!claimed) throw new Error("Missing target mint row");
+    expect(parseTokenText(claimed.tokenText)).toMatchObject({
+      mint: targetMintUrl,
+      amount: receipt.movedAmount,
+    });
 
-    // Everything that survived the swap is balance, and the fees it cost stay
-    // small: the mint charges a Lightning reserve plus input_fee_ppk = 100.
+    const sourceRows = rows.filter(
+      (row) => parseTokenText(row.tokenText)?.mint === mintUrl,
+    );
+    expect(acceptedTotalOf(sourceRows)).toBeLessThan(16);
+    expect(rows.every((row) => row.state === "accepted")).toBe(true);
+
     const accepted = acceptedTotalOf(rows);
     expect(accepted).toBeGreaterThanOrEqual(receipt.movedAmount);
-    expect(256 - accepted).toBeLessThanOrEqual(16);
+    expect(funding.amount - accepted).toBeGreaterThanOrEqual(receipt.feePaid);
+    expect(funding.amount - accepted).toBeLessThanOrEqual(16);
     expect(await pendingKeys(kv)).toEqual([]);
+
+    const source = await loadMintWallet();
+    const sourceStates = await source.checkProofsStates(
+      getDecodedToken(funding.tokenText, [source.keysetId]).proofs,
+    );
+    expect(sourceStates.every((proof) => proof.state === "SPENT")).toBe(true);
+
+    const receiver = await loadMintWallet(targetMintUrl);
+    expect(receiver.keysetId).not.toBe(source.keysetId);
+    const targetProofs = getDecodedToken(claimed.tokenText, [
+      receiver.keysetId,
+    ]).proofs;
+    const before = await receiver.checkProofsStates(targetProofs);
+    expect(before.every((proof) => proof.state === "UNSPENT")).toBe(true);
+    const received = await receiver.receive(claimed.tokenText, undefined, {
+      type: "random",
+    });
+    const receivedAmount = received.reduce(
+      (sum, proof) => sum + proof.amount.toNumber(),
+      0,
+    );
+    expect(receivedAmount).toBeGreaterThan(0);
+    expect(receivedAmount).toBeLessThanOrEqual(receipt.movedAmount);
+    expect(receipt.movedAmount - receivedAmount).toBeLessThanOrEqual(2);
+    const after = await receiver.checkProofsStates(targetProofs);
+    expect(after.every((proof) => proof.state === "SPENT")).toBe(true);
   });
 
   it("claims a pending record left behind by an interrupted run, exactly once", async () => {
@@ -117,14 +111,14 @@ describe("autoswap against the local mint", () => {
     // The state an interrupted claim leaves: the invoice is settled at the
     // mint (the FakeWallet backend pays its own quotes) and the record names
     // the quote to mint against, but no run ever minted it.
-    const wallet = await loadWallet();
+    const wallet = await loadMintWallet(targetMintUrl);
     const quote = await wallet.createMintQuoteBolt11(64);
     await Effect.runPromise(
-      writePendingClaim(
+      pendingClaims.write(
         kv,
         new PendingAutoswapClaim({
           quoteId: QuoteId.make(quote.quote),
-          mint: mintUrl,
+          mint: targetMintUrl,
           unit: CurrencyUnit.make("sat"),
           keysetId: KeysetId.make(wallet.keysetId),
           amount: Amount.make(64),
@@ -146,6 +140,7 @@ describe("autoswap against the local mint", () => {
     expect(first).toHaveLength(1);
     expect(first[0].status).toBe("claimed");
     expect(first[0].amount).toBe(64);
+    expect(first[0].targetMint).toBe(targetMintUrl);
     expect(await pendingKeys(kv)).toEqual([]);
 
     // The record is cleared, so a second pass has nothing left to claim and
@@ -154,5 +149,6 @@ describe("autoswap against the local mint", () => {
     const rows = await Effect.runPromise(tokens.loadAll);
     expect(rows).toHaveLength(1);
     expect(acceptedTotalOf(rows)).toBe(64);
+    expect(parseTokenText(rows[0].tokenText)?.mint).toBe(targetMintUrl);
   });
 });

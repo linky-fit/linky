@@ -1,5 +1,7 @@
 import React from "react";
 import { isNativePlatform } from "../platform/runtime";
+import { isRecord } from "../utils/unknown";
+import { asNonEmptyString } from "../utils/validation";
 
 interface LinkPreview {
   description: string | null;
@@ -26,22 +28,16 @@ interface PreviewCacheEntry {
 const previewCache = new Map<string, PreviewCacheEntry>();
 const previewRequests = new Map<string, Promise<LinkPreview | null>>();
 
-const isUnknownRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === "object";
-
-const nullableString = (value: unknown): string | null =>
-  typeof value === "string" && value.trim() ? value.trim() : null;
-
 const parseLinkPreview = (value: unknown): LinkPreview | null => {
-  if (!isUnknownRecord(value)) return null;
-  const title = nullableString(value.title);
-  const siteName = nullableString(value.siteName);
-  const url = nullableString(value.url);
+  if (!isRecord(value)) return null;
+  const title = asNonEmptyString(value.title);
+  const siteName = asNonEmptyString(value.siteName);
+  const url = asNonEmptyString(value.url);
   if (!title || !siteName || !url) return null;
   return {
-    description: nullableString(value.description),
-    faviconUrl: nullableString(value.faviconUrl),
-    imageUrl: nullableString(value.imageUrl),
+    description: asNonEmptyString(value.description),
+    faviconUrl: asNonEmptyString(value.faviconUrl),
+    imageUrl: asNonEmptyString(value.imageUrl),
     siteName,
     title,
     url,

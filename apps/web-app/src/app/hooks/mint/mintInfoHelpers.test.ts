@@ -1,22 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { buildCashuToken } from "../../../testUtils/cashuToken";
 import { createCashuTokenRowFixture } from "../../../testUtils/cashuTokenRow";
 import { getEncounteredMintUrls, getMintInfoIconUrl } from "./mintInfoHelpers";
-
-const buildCashuToken = (): string => {
-  const payload = JSON.stringify({
-    token: [
-      {
-        mint: "https://parsed.example",
-        proofs: [{ amount: 21, secret: "secret", C: "c", id: "keyset" }],
-      },
-    ],
-  });
-  const base64Url = btoa(payload)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-  return `cashuA${base64Url}`;
-};
 
 describe("getMintInfoIconUrl", () => {
   it("uses the direct icon URL returned by mint info", () => {
@@ -58,7 +43,7 @@ describe("getEncounteredMintUrls", () => {
         createCashuTokenRowFixture({
           mint: "https://stale.example",
           state: "accepted",
-          token: buildCashuToken(),
+          token: buildCashuToken({ mint: "https://parsed.example" }),
         }),
         createCashuTokenRowFixture({
           id: "error-token",

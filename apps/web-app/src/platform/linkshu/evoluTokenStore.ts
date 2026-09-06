@@ -8,7 +8,6 @@ import {
 } from "@linky/linkshu";
 import type { TokenRowPatch, TokenStoreService } from "@linky/linkshu";
 import { Effect, Layer, Schema } from "effect";
-import { resolveCashuRowStoredOwnerLane } from "../../app/lib/cashuOwnerLane";
 import {
   createCashuTokenId,
   isDeletedCashuRow,
@@ -19,6 +18,7 @@ import {
   normalizeCashuTokenState,
 } from "../../app/lib/cashuTokenState";
 import type { CashuTokenId, CashuTokenRow } from "../../evolu";
+import { nowSeconds } from "../../utils/time";
 
 /**
  * Linkshu's `TokenStore` port over the Evolu `cashuToken` table.
@@ -28,7 +28,7 @@ import type { CashuTokenId, CashuTokenRow } from "../../evolu";
  * deterministic id derived from `originalTokenText`, and removal is a soft
  * delete. Mutations target the owner lane the row is stored in — writing
  * through the active lane when the row lives in an older `cashu-n` lane
- * silently no-ops (see `resolveCashuRowStoredOwnerLane`).
+ * silently no-ops, so writes go to the lane recorded on the row itself.
  *
  * `loadTokenRows` serves the React render state, which lags Evolu mutations
  * by at least one render. Linkshu chains writes and reads within one
@@ -50,11 +50,11 @@ class LegacyError extends Schema.TaggedError<LegacyError>()("LegacyError", {
 const encodeLegacyError = Schema.encodeSync(Schema.parseJson(LegacyError));
 const decodeTokenText = Schema.decodeUnknownOption(TokenText);
 
-export type EvoluCashuMutationResult =
+type EvoluCashuMutationResult =
   | { readonly ok: true }
   | { readonly error: unknown; readonly ok: false };
 
-export interface EvoluCashuTokenInsertPayload {
+interface EvoluCashuTokenInsertPayload {
   readonly error?: typeof Evolu.NonEmptyString1000.Type;
   readonly id: CashuTokenId;
   readonly originalTokenText: typeof Evolu.NonEmptyString.Type;
@@ -62,7 +62,7 @@ export interface EvoluCashuTokenInsertPayload {
   readonly token: typeof Evolu.NonEmptyString.Type;
 }
 
-export interface EvoluCashuTokenUpdatePayload {
+interface EvoluCashuTokenUpdatePayload {
   readonly error?: typeof Evolu.NonEmptyString1000.Type | null;
   readonly id: CashuTokenId;
   readonly isDeleted?: typeof Evolu.sqliteTrue;
@@ -70,19 +70,19 @@ export interface EvoluCashuTokenUpdatePayload {
   readonly token?: typeof Evolu.NonEmptyString.Type;
 }
 
-export type EvoluCashuTokenUpsert = (
+type EvoluCashuTokenUpsert = (
   table: "cashuToken",
   payload: EvoluCashuTokenInsertPayload,
   options: { readonly ownerId: Evolu.OwnerId },
 ) => EvoluCashuMutationResult;
 
-export type EvoluCashuTokenUpdate = (
+type EvoluCashuTokenUpdate = (
   table: "cashuToken",
   payload: EvoluCashuTokenUpdatePayload,
   options: { readonly ownerId: Evolu.OwnerId },
 ) => EvoluCashuMutationResult;
 
-export interface EvoluTokenStoreDeps {
+interface EvoluTokenStoreDeps {
   /** All cashuToken rows visible to the wallet, across cashu owner lanes. */
   readonly loadTokenRows: () => Promise<ReadonlyArray<CashuTokenRow>>;
   readonly update: EvoluCashuTokenUpdate;
@@ -143,7 +143,7 @@ const toStoredTokenRow = (row: CashuTokenRow): StoredTokenRow | null => {
     createdAt: UnixSeconds.make(Math.floor(Date.parse(row.createdAt) / 1000)),
     error:
       state === CASHU_TOKEN_STATE_ERROR ? toPortableErrorText(row.error) : null,
-    id: TokenRowId.make(String(row.id)),
+    id: TokenRowId.make(row.id),
     originalTokenText,
     state,
     tokenText,
@@ -177,7 +177,7 @@ const reflectsOverlayRow = (
     normalizeCashuTokenState(evoluRow.state) ?? CASHU_TOKEN_STATE_ACCEPTED;
   return (
     state === overlayRow.state &&
-    String(evoluRow.token ?? "").trim() === overlayRow.tokenText
+    (evoluRow.token ?? "").trim() === overlayRow.tokenText
   );
 };
 
@@ -190,10 +190,10 @@ export const makeEvoluTokenStore = (
     (await deps.loadTokenRows()).filter((row) => !isDeletedCashuRow(row));
 
   const findRow = async (id: TokenRowId): Promise<CashuTokenRow | null> =>
-    (await loadLiveRows()).find((row) => String(row.id) === String(id)) ?? null;
+    (await loadLiveRows()).find((row) => String(row.id) === id) ?? null;
 
   const rowLane = (row: CashuTokenRow): Evolu.OwnerId =>
-    resolveCashuRowStoredOwnerLane(row) ?? deps.getWriteOwnerId();
+    row.ownerId ?? deps.getWriteOwnerId();
 
   const runUpdate = (
     payload: EvoluCashuTokenUpdatePayload,
@@ -242,14 +242,14 @@ export const makeEvoluTokenStore = (
           throw new Error(`cashuToken upsert failed: ${String(result.error)}`);
         }
         const stored = new StoredTokenRow({
-          createdAt: UnixSeconds.make(Math.floor(Date.now() / 1000)),
+          createdAt: UnixSeconds.make(nowSeconds()),
           error: row.error,
-          id: TokenRowId.make(String(id)),
+          id: TokenRowId.make(id),
           originalTokenText: row.originalTokenText,
           state: row.state,
           tokenText: row.tokenText,
         });
-        overlay.set(String(id), {
+        overlay.set(id, {
           row: stored,
           evoluId: id,
           lane,
@@ -260,7 +260,7 @@ export const makeEvoluTokenStore = (
 
     update: (id, patch) =>
       Effect.promise(async () => {
-        const entry = overlay.get(String(id));
+        const entry = overlay.get(id);
         if (entry !== undefined) {
           if (entry.removed) return;
           runUpdate(toUpdatePayload(entry.evoluId, patch), entry.lane);
@@ -273,7 +273,7 @@ export const makeEvoluTokenStore = (
         runUpdate(toUpdatePayload(target.id, patch), lane);
         const stored = toStoredTokenRow(target);
         if (stored !== null) {
-          overlay.set(String(id), {
+          overlay.set(id, {
             row: applyPatchToStoredRow(stored, patch),
             evoluId: target.id,
             lane,
@@ -284,7 +284,7 @@ export const makeEvoluTokenStore = (
 
     remove: (id) =>
       Effect.promise(async () => {
-        const entry = overlay.get(String(id));
+        const entry = overlay.get(id);
         if (entry !== undefined) {
           if (!entry.removed) {
             runUpdate(
@@ -301,7 +301,7 @@ export const makeEvoluTokenStore = (
         runUpdate({ id: target.id, isDeleted: Evolu.sqliteTrue }, lane);
         const stored = toStoredTokenRow(target);
         if (stored !== null) {
-          overlay.set(String(id), {
+          overlay.set(id, {
             row: stored,
             evoluId: target.id,
             lane,
@@ -315,7 +315,7 @@ export const makeEvoluTokenStore = (
       const seenIds = new Set<string>();
       const result: StoredTokenRow[] = [];
       for (const row of liveRows) {
-        const key = String(row.id);
+        const key = row.id;
         seenIds.add(key);
         const entry = overlay.get(key);
         if (entry !== undefined) {

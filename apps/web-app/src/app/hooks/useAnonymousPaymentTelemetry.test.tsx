@@ -1,10 +1,10 @@
-import type { OwnerId } from "@evolu/common";
+import * as Evolu from "@evolu/common";
 import { OutboxJobId } from "@linky/linkstr";
 import type { EnqueuePaymentTelemetryParams } from "@linky/linkstr-react";
 import { Exit } from "effect";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX } from "../../utils/constants";
 import type { LocalPaymentTelemetryEvent } from "../types/appTypes";
 
@@ -23,9 +23,7 @@ vi.mock("@linky/linkstr-react", () => ({
 
 import { useAnonymousPaymentTelemetry } from "./useAnonymousPaymentTelemetry";
 
-Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
-
-const APP_OWNER_ID = "owner-1" as OwnerId;
+const APP_OWNER_ID = Evolu.OwnerId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ");
 const storageKey = `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${APP_OWNER_ID}`;
 
 const pendingEvent = (id: string): LocalPaymentTelemetryEvent => ({
@@ -57,10 +55,7 @@ const mount = async (): Promise<void> => {
     });
     return null;
   };
-  const root = createRoot(document.createElement("div"));
-  await act(async () => {
-    root.render(<Harness />);
-  });
+  await renderIntoDocument(<Harness />);
   await act(async () => {
     await Promise.resolve();
   });

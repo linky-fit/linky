@@ -6,45 +6,38 @@ import type {
   SendResponse,
 } from "@cashu/cashu-ts";
 import { Amount, getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, Stream } from "effect";
+import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
 import {
   Bolt11Invoice,
   CurrencyUnit,
   KeysetId,
+  QuoteId,
   MintUrl,
-  TokenText,
 } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { NewTokenRow, TokenStore } from "../ports/TokenStore";
+import { TokenStore } from "../ports/TokenStore";
 import type { StoredTokenRow } from "../ports/TokenStore";
-import { parseTokenText } from "../token/codec";
+import { runOnTestClock } from "../testing/clock";
+import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
+import { amountOf, seedRow } from "../testing/rows";
 import type { TokenState } from "../token/domain";
 import { MeltDraft } from "./domain";
 import { Melt } from "./Melt";
 
 const mint = MintUrl.make("https://mint.example");
-const keysetHex = "009a1f293253e41e";
 const counterKey = deterministicCounterKey({
   mint,
   unit: CurrencyUnit.make("sat"),
-  keysetId: KeysetId.make(keysetHex),
+  keysetId: KeysetId.make(KEYSET_HEX),
 });
 const invoice = Bolt11Invoice.make("lnbc1fakeinvoice");
 const draft = new MeltDraft({ mint, invoice });
-
-const proof = (amount: number, secret: string): CashuProof => ({
-  id: keysetHex,
-  amount: Amount.from(amount),
-  secret,
-  C: "02" + "ab".repeat(32),
-});
 
 // Row A (4+2) and row B (8): 14 sats available at the mint under test.
 const tokenA = getEncodedToken({
@@ -129,13 +122,8 @@ const makeWallet = (args: FakeWalletArgs) => {
   const meltCalls: MeltCall[] = [];
   const checkQuoteCalls: string[] = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
-  const wallet: LoadedWallet = {
-    keysetId: keysetHex,
-    keyChain: { getKeysets: () => [] },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
-    receive: () => Promise.reject(new Error("not under test")),
+  const wallet = fakeWallet({
+    keysetId: KEYSET_HEX,
     checkProofsStates: (proofs) =>
       Promise.resolve(
         proofs.map((entry) => ({
@@ -169,9 +157,6 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.restore(start, count)
         : Promise.reject(new Error("restore unavailable"));
     },
-    createMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMintQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    mintProofsBolt11: () => Promise.reject(new Error("not under test")),
     createMeltQuoteBolt11: () =>
       args.quote ? args.quote() : Promise.resolve(quoteResponse()),
     checkMeltQuoteBolt11: (quote) => {
@@ -191,13 +176,12 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.melt(call)
         : Promise.reject(new Error("melt not stubbed"));
     },
-    batchRestore: () => Promise.reject(new Error("not under test")),
-  };
+  });
   return { wallet, sendCalls, meltCalls, checkQuoteCalls, restoreCalls };
 };
 
 const makeHarness = (wallet: LoadedWallet) => {
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const layer = Melt.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -207,12 +191,7 @@ const makeHarness = (wallet: LoadedWallet) => {
         ),
         inMemoryKeyValueStore,
         inMemoryTokenStore,
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
@@ -223,20 +202,8 @@ const makeHarness = (wallet: LoadedWallet) => {
       Melt | TokenStore | KeyValueStore | WalletInstances
     >,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
-  return { run, events };
+  return { run, events: inspector.events };
 };
-
-const seedRow = (tokenText: string, state: TokenState = "accepted") =>
-  Effect.flatMap(TokenStore, (store) =>
-    store.insert(
-      new NewTokenRow({
-        originalTokenText: TokenText.make(tokenText),
-        tokenText: TokenText.make(tokenText),
-        state,
-        error: null,
-      }),
-    ),
-  );
 
 const meltAndInspect = (seeds: ReadonlyArray<string>) =>
   Effect.gen(function* () {
@@ -257,9 +224,6 @@ const rowsByState = (
   state: TokenState,
 ): ReadonlyArray<StoredTokenRow> => rows.filter((row) => row.state === state);
 
-const amountOf = (row: StoredTokenRow | undefined): number | undefined =>
-  parseTokenText(row?.tokenText ?? "")?.amount;
-
 describe("Melt.quote", () => {
   it("prices the payment without touching stored tokens", async () => {
     const { wallet, sendCalls } = makeWallet({});
@@ -273,8 +237,7 @@ describe("Melt.quote", () => {
         return { quoted, rows: yield* (yield* TokenStore).loadAll };
       }),
     );
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.quoted).toMatchObject({
       quoteId: "quote-1",
       mint,
@@ -296,8 +259,7 @@ describe("Melt.quote", () => {
     const exit = await run(
       Effect.flatMap(Melt, (melt) => Effect.flip(melt.quote(draft))),
     );
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toMatchObject({ _tag: "MintRejected", mint });
   });
 });
@@ -311,12 +273,10 @@ describe("Melt.melt", () => {
     const { run, events } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { receipt, rows, counter } = exit.value;
 
-    expect(receipt._tag).toBe("Right");
-    if (receipt._tag !== "Right") return;
+    assert(receipt._tag === "Right");
     expect(receipt.right).toMatchObject({
       mint,
       quoteId: "quote-1",
@@ -385,10 +345,8 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "InsufficientFunds",
       required: 12,
@@ -405,10 +363,8 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "QuoteExpired",
       quoteId: "quote-1",
@@ -432,8 +388,7 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(meltCalls.map((call) => call.counter)).toEqual([66, 100]);
     expect(restoreCalls).toEqual([{ start: 66, count: 100 }]);
@@ -449,11 +404,9 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { receipt, rows } = exit.value;
-    expect(receipt._tag).toBe("Left");
-    if (receipt._tag !== "Left") return;
+    assert(receipt._tag === "Left");
     expect(receipt.left).toMatchObject({ _tag: "MintRejected", code: 20003 });
 
     // Nothing lost: the swap remainder and the released inputs are balance.
@@ -470,10 +423,8 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "PaymentFailed",
       quoteId: "quote-1",
@@ -494,11 +445,9 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { receipt, rows } = exit.value;
-    expect(receipt._tag).toBe("Right");
-    if (receipt._tag !== "Right") return;
+    assert(receipt._tag === "Right");
     expect(receipt.right).toMatchObject({ feePaid: 2, changeAmount: 1 });
     // The change came from re-deriving the melt's own blank range.
     expect(restoreCalls).toEqual([{ start: 66, count: 2 }]);
@@ -513,17 +462,24 @@ describe("Melt.melt", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    const exit = await run(
+      Effect.gen(function* () {
+        // Row timestamps are positive unix seconds; the TestClock starts at 0.
+        yield* TestClock.adjust("1000 seconds");
+        return yield* runOnTestClock(
+          meltAndInspect([tokenA, tokenB]),
+          "500 millis",
+        );
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("PaymentFailed");
     // Neither balance nor destroyed: NUT-07 validation resolves it later.
     const reserved = rowsByState(exit.value.rows, "reserved");
     expect(reserved).toHaveLength(1);
     expect(amountOf(reserved[0])).toBe(13);
-  }, 10_000);
+  });
 
   it("reclaims a lost melt response when the quote reports PAID", async () => {
     const { wallet, restoreCalls } = makeWallet({
@@ -535,11 +491,9 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     const { receipt, rows } = exit.value;
-    expect(receipt._tag).toBe("Right");
-    if (receipt._tag !== "Right") return;
+    assert(receipt._tag === "Right");
     expect(receipt.right).toMatchObject({ paidAmount: 10, changeAmount: 1 });
     expect(restoreCalls).toEqual([{ start: 66, count: 2 }]);
     expect(rowsByState(rows, "reserved")).toHaveLength(0);
@@ -554,10 +508,8 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
-    expect(exit.value.receipt._tag).toBe("Left");
-    if (exit.value.receipt._tag !== "Left") return;
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
     expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(1);
   });
@@ -576,8 +528,7 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
 
     const exit = await run(meltAndInspect([tokenA, tokenB, spentToken]));
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
 
@@ -587,5 +538,49 @@ describe("Melt.melt", () => {
       _tag: "TokenAlreadySpent",
       mint,
     });
+  });
+});
+
+describe("persisted melt quotes", () => {
+  it("uses the persisted quote and rejects an invoice mismatch before swapping", async () => {
+    const { wallet, sendCalls, checkQuoteCalls } = makeWallet({
+      quote: () => Promise.reject(new Error("must not issue another quote")),
+      checkQuote: () =>
+        Promise.resolve(quoteResponse({ request: "lnbc1another" })),
+    });
+    const { run } = makeHarness(wallet);
+    const result = await run(
+      Effect.flatMap(Melt, (melt) =>
+        Effect.flip(
+          melt.melt(
+            new MeltDraft({ ...draft, quoteId: QuoteId.make("quote-1") }),
+          ),
+        ),
+      ),
+    );
+    assert(Exit.isSuccess(result));
+    expect(result.value).toMatchObject({
+      _tag: "MintRejected",
+      detail: "melt quote does not match invoice",
+    });
+    expect(checkQuoteCalls).toEqual(["quote-1"]);
+    expect(sendCalls).toEqual([]);
+  });
+  it("reports a settled quote without creating a second payment or exposing invoice text", async () => {
+    const { wallet, sendCalls } = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),
+    });
+    const { run, events } = makeHarness(wallet);
+    const result = await run(
+      Effect.gen(function* () {
+        const melt = yield* Melt;
+        const quote = yield* melt.quote(draft);
+        return yield* melt.status(quote);
+      }),
+    );
+    assert(Exit.isSuccess(result));
+    expect(result.value).toBe("PAID");
+    expect(sendCalls).toEqual([]);
+    expect(JSON.stringify(events)).not.toContain(invoice);
   });
 });

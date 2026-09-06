@@ -19,12 +19,13 @@ export class SeenReceiptDraft extends Schema.Class<SeenReceiptDraft>(
   sentAt: Schema.optional(UnixSeconds),
 }) {}
 
-export class SeenReceiptSendReceipt extends Schema.Class<SeenReceiptSendReceipt>(
+export class SeenReceiptSendReceipt extends Schema.TaggedClass<SeenReceiptSendReceipt>()(
   "SeenReceiptSendReceipt",
-)({
-  receiptId: RumorId,
-  clientId: ClientId,
-  sentAt: UnixSeconds,
-  selfCopy: WrapDelivery,
-  recipientCopy: WrapDelivery,
-}) {}
+  {
+    rumorId: RumorId,
+    clientId: ClientId,
+    sentAt: UnixSeconds,
+    selfCopy: WrapDelivery,
+    recipientCopy: WrapDelivery,
+  },
+) {}

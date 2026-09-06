@@ -1,4 +1,7 @@
+import { Option, Schema } from "effect";
+import { isRecord } from "./unknown";
 import type { JsonRecord, JsonValue } from "../types/json";
+import { sleep } from "./time";
 
 const PUSH_DEBUG_CACHE_NAME = "linky-push-debug-v1";
 const PUSH_DEBUG_LOG_URL = "/__debug__/push-log.json";
@@ -14,11 +17,15 @@ export interface PushDebugLogEntry {
   timestamp: string;
 }
 
-function isRecord(
-  value: unknown,
-): value is Record<string | number | symbol, unknown> {
-  return typeof value === "object" && value !== null;
-}
+const StoredPushDebugLogEntry = Schema.Struct({
+  details: Schema.optional(Schema.Unknown),
+  message: Schema.String,
+  source: Schema.String,
+  timestamp: Schema.String,
+});
+const decodeStoredPushDebugLogEntry = Schema.decodeUnknownOption(
+  StoredPushDebugLogEntry,
+);
 
 function normalizeJsonValue(value: unknown): JsonValue {
   if (
@@ -68,24 +75,11 @@ async function readStoredLog(): Promise<PushDebugLogEntry[]> {
 
     const entries: PushDebugLogEntry[] = [];
     for (const entry of json) {
-      if (!isRecord(entry)) {
-        continue;
-      }
-      const timestamp = entry.timestamp;
-      const source = entry.source;
-      const message = entry.message;
-      const details = entry.details;
-      if (
-        typeof timestamp !== "string" ||
-        typeof source !== "string" ||
-        typeof message !== "string"
-      ) {
-        continue;
-      }
+      const decoded = decodeStoredPushDebugLogEntry(entry);
+      if (Option.isNone(decoded)) continue;
+      const { details, ...rest } = decoded.value;
       entries.push({
-        timestamp,
-        source,
-        message,
+        ...rest,
         ...(details === undefined
           ? {}
           : { details: normalizeJsonValue(details) }),
@@ -113,9 +107,7 @@ async function writeStoredLog(entries: PushDebugLogEntry[]): Promise<void> {
 function schedulePushDebugLogFlush(): Promise<void> {
   if (pushDebugLogFlushPromise) return pushDebugLogFlushPromise;
 
-  pushDebugLogFlushPromise = new Promise<void>((resolve) => {
-    setTimeout(resolve, PUSH_DEBUG_LOG_BATCH_DELAY_MS);
-  })
+  pushDebugLogFlushPromise = sleep(PUSH_DEBUG_LOG_BATCH_DELAY_MS)
     .then(async () => {
       const nextEntries = pendingPushDebugEntries.splice(0);
       if (nextEntries.length === 0) return;
@@ -142,11 +134,11 @@ function schedulePushDebugLogFlush(): Promise<void> {
   return pushDebugLogFlushPromise;
 }
 
-export async function appendPushDebugLog(
+export function appendPushDebugLog(
   source: string,
   message: string,
   details?: unknown,
-): Promise<void> {
+): void {
   if (!("caches" in globalThis)) {
     return;
   }
@@ -158,7 +150,12 @@ export async function appendPushDebugLog(
     ...(details === undefined ? {} : { details: normalizeJsonValue(details) }),
   });
 
-  await schedulePushDebugLogFlush();
+  void schedulePushDebugLogFlush();
+}
+
+/** Resolves once every entry appended so far has been written. */
+export function flushPushDebugLog(): Promise<void> {
+  return pushDebugLogFlushPromise ?? Promise.resolve();
 }
 
 export async function readPushDebugLog(): Promise<PushDebugLogEntry[]> {
@@ -166,7 +163,7 @@ export async function readPushDebugLog(): Promise<PushDebugLogEntry[]> {
     return [];
   }
 
-  await pushDebugLogFlushPromise;
+  await flushPushDebugLog();
   return readStoredLog();
 }
 
@@ -177,7 +174,7 @@ export async function clearPushDebugLog(): Promise<void> {
 
   try {
     pendingPushDebugEntries.length = 0;
-    await pushDebugLogFlushPromise;
+    await flushPushDebugLog();
     const cache = await caches.open(PUSH_DEBUG_CACHE_NAME);
     await cache.delete(PUSH_DEBUG_LOG_URL);
   } catch {

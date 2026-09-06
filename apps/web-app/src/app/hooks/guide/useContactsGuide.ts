@@ -1,5 +1,5 @@
 import React from "react";
-import type { ContactId } from "../../../evolu";
+import { ContactId } from "../../../evoluIds";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
 import type {
@@ -67,7 +67,9 @@ export const useContactsGuide = ({
   const contactsGuideSteps = React.useMemo(() => {
     if (!contactsGuide) return null;
 
-    const firstContactId = (contacts[0]?.id ?? null) as ContactId | null;
+    const firstContactId = contacts[0]?.id
+      ? ContactId.orThrow(contacts[0].id)
+      : null;
     const routeContactId = getRouteContactId(route);
 
     const targetContactId =
@@ -316,7 +318,7 @@ export const useContactsGuide = ({
       transition("contacts", "contact") &&
       current.id
     ) {
-      setContactsGuideTargetContactId(current.id as ContactId);
+      setContactsGuideTargetContactId(ContactId.orThrow(current.id));
     }
 
     if (id === "add_contact_1" && transition("contacts", "contactNew")) {

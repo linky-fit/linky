@@ -1,15 +1,8 @@
-import { Duration, Effect, Layer, Stream } from "effect";
+import { Effect, Layer, Stream } from "effect";
 import type { Scope } from "effect";
-import { generateSecretKey, getEventHash, getPublicKey } from "nostr-tools";
+import { getEventHash } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  RumorId,
-  UnixSeconds,
-} from "../domain/primitives";
+import { ClientId, RelayUrl, RumorId, UnixSeconds } from "../domain/primitives";
 import { InboxCursorStore } from "../inbox/InboxCursorStore";
 import { WrapInbox } from "../inbox/WrapInbox";
 import { wrapRumorFor } from "../internal/giftWrap";
@@ -21,18 +14,13 @@ import { Reactions } from "../reactions/Reactions";
 import { encodeReactionRumor } from "../reactions/codec";
 import { Emoji, ReactionDraft, RetractionDraft } from "../reactions/domain";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
 import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import { eventually, makeIdentity } from "../testing";
 import { Inspector } from "./Inspector";
 import type { InspectorEvent } from "./events";
 import { inspectTransport } from "./inspectTransport";
-
-const makeIdentity = (): LinkstrIdentityService => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -92,20 +80,6 @@ const servicesWith = (transport: NostrTransportService) =>
     ),
     Layer.provideMerge(Inspector.live),
   );
-
-const eventually = (predicate: () => boolean): Effect.Effect<void, Error> => {
-  const poll: Effect.Effect<void> = Effect.suspend(() =>
-    predicate()
-      ? Effect.void
-      : Effect.sleep(Duration.millis(2)).pipe(Effect.andThen(() => poll)),
-  );
-  return poll.pipe(
-    Effect.timeoutFail({
-      duration: Duration.seconds(2),
-      onTimeout: () => new Error("condition not met within 2s"),
-    }),
-  );
-};
 
 const withInspected = <A, E>(
   transport: NostrTransportService,
@@ -204,7 +178,7 @@ describe("Inspector", () => {
         }
         expect(operation.name).toBe("reactions.react");
         expect(operation.params).toBe(draft);
-        expect(operation.rumorId).toBe(receipt.reactionId);
+        expect(operation.rumorId).toBe(receipt.rumorId);
         expect(operation.clientId).toBe(receipt.clientId);
         if (operation.selfCopy === null) {
           throw new Error("reaction operation lost its self copy");
@@ -234,7 +208,7 @@ describe("Inspector", () => {
         ).toEqual(
           expect.objectContaining({
             name: "reactions.retract",
-            rumorId: receipt.retractionId,
+            rumorId: receipt.rumorId,
           }),
         );
       }),

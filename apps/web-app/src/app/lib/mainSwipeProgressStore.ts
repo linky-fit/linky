@@ -4,7 +4,7 @@ import React from "react";
  * Settled swipe progress lives outside the app shell so changing tabs only
  * updates the indicator and FAB. Native scroll frames do not publish here.
  */
-export interface MainSwipeProgressState {
+interface MainSwipeProgressState {
   progress: number;
 }
 

@@ -48,6 +48,9 @@ One event = one `InspectorRow`: `{ at, channel, tag, summary, links, context?, p
 - **payload** — the raw event data. It passes through `toJsonSafe` (string/array/depth
   truncation), so pass it as-is; don't pre-format or pre-truncate.
 
+For an `app.log` row call `reportAppLog` (`devtools/inspector/appLog.ts`); it stamps
+`at`, defaults `links`, and gates on `getInspectorEmissionEnabled()` for you.
+
 ## Hard rules
 
 - **NEVER put key material in any field** — nsec, seed words, derived private keys,

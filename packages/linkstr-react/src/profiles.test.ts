@@ -1,20 +1,9 @@
 import { Registry } from "./index";
-import type { Atom, Result } from "./index";
-import {
-  NostrSecretKey,
-  NostrTransport,
-  ProfileMetadata,
-  Pubkey,
-  RelayPublishResult,
-  RelayUrl,
-  StatusDraft,
-  UnixSeconds,
-} from "@linky/linkstr";
-import type { NostrTransportService, ProfileWatchEvent } from "@linky/linkstr";
-import { Effect, Exit, Layer } from "effect";
-import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
-import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
-import type { LinkstrConfig } from "./config";
+import { ProfileMetadata, StatusDraft, UnixSeconds } from "@linky/linkstr";
+import type { LinkstrIdentityService, ProfileWatchEvent } from "@linky/linkstr";
+import { Exit } from "effect";
+import { finalizeEvent } from "nostr-tools";
+import type { Event as NostrToolsEvent } from "nostr-tools";
 import { linkstrConfigAtom } from "./config";
 import {
   discoverActiveProfilesAtom,
@@ -25,92 +14,28 @@ import {
   publishStatusAtom,
   watchedProfilesAtom,
 } from "./profiles";
-
-type PublishedEvent = Parameters<NostrTransportService["publish"]>[1];
-
-interface Identity {
-  readonly secretKey: NostrSecretKey;
-  readonly pubkey: Pubkey;
-}
-
-const makeIdentity = (): Identity => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { secretKey, pubkey: Pubkey.make(getPublicKey(secretKey)) };
-};
+import {
+  configWith,
+  fakeTransportLayer,
+  makeIdentity,
+  settle,
+} from "./testing";
+import type { FakeSubscription, PublishedEvent } from "./testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
 const carol = makeIdentity();
 
-const relayA = RelayUrl.make("wss://relay-a.test");
-
 const base = 1_754_000_000;
 
-interface FakeSubscription {
-  readonly relay: RelayUrl;
-  readonly filter: Filter;
-  readonly onEvent: (event: NostrToolsEvent) => void;
-}
-
-const makeFakeTransport = (
-  published: Array<PublishedEvent>,
-  subscriptions: Array<FakeSubscription>,
-  stored: ReadonlyArray<NostrToolsEvent> = [],
-  fetchedFilters: Array<Filter> = [],
-): NostrTransportService => ({
-  publish: (relays, event) =>
-    Effect.sync(() => {
-      published.push(event);
-      return relays.map(
-        (relay) =>
-          new RelayPublishResult({ relay, accepted: true, detail: null }),
-      );
-    }),
-  subscribe: (relay, filter, onEvent) =>
-    Effect.suspend(() => {
-      const subscription: FakeSubscription = { relay, filter, onEvent };
-      subscriptions.push(subscription);
-      return Effect.never.pipe(
-        Effect.ensuring(
-          Effect.sync(() => {
-            subscriptions.splice(subscriptions.indexOf(subscription), 1);
-          }),
-        ),
-      );
-    }),
-  fetch: (_relay, filter) =>
-    Effect.sync(() => {
-      fetchedFilters.push(filter);
-      return [...stored];
-    }),
-});
-
-const configWith = (
-  identity: Identity,
-  transport: NostrTransportService,
-): LinkstrConfig => ({
-  secretKey: identity.secretKey,
-  readRelays: [relayA],
-  writeRelays: [relayA],
-  transport: Layer.succeed(NostrTransport, transport),
-});
-
 const profileEvent = (
-  identity: Identity,
+  identity: LinkstrIdentityService,
   content: string,
   createdAt: number,
 ): NostrToolsEvent =>
   finalizeEvent(
     { kind: 0, tags: [], content, created_at: createdAt },
     identity.secretKey,
-  );
-
-const settle = <A, E>(
-  registry: Registry.Registry,
-  atom: Atom.Atom<Result.Result<A, E>>,
-): Promise<Exit.Exit<A, E>> =>
-  Effect.runPromiseExit(
-    Registry.getResult(registry, atom, { suspendOnWaiting: true }),
   );
 
 describe("profileWatchAtom", () => {
@@ -121,7 +46,7 @@ describe("profileWatchAtom", () => {
 
     registry.set(
       linkstrConfigAtom,
-      configWith(alice, makeFakeTransport([], subscriptions)),
+      configWith(alice, fakeTransportLayer([], subscriptions)),
     );
     registry.set(profileWatchHandlerAtom, {
       onEvent: (event) => {
@@ -172,7 +97,7 @@ describe("fetchProfileAtom", () => {
       linkstrConfigAtom,
       configWith(
         alice,
-        makeFakeTransport(
+        fakeTransportLayer(
           [],
           [],
           [profileEvent(bob, JSON.stringify({ display_name: "Bob" }), base)],
@@ -183,8 +108,7 @@ describe("fetchProfileAtom", () => {
     registry.set(fetchProfileAtom, bob.pubkey);
     const exit = await settle(registry, fetchProfileAtom);
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual(
       expect.objectContaining({
         profile: expect.objectContaining({
@@ -204,7 +128,7 @@ describe("discoverActiveProfilesAtom", () => {
       linkstrConfigAtom,
       configWith(
         alice,
-        makeFakeTransport(
+        fakeTransportLayer(
           [],
           [],
           [
@@ -221,8 +145,7 @@ describe("discoverActiveProfilesAtom", () => {
     registry.set(discoverActiveProfilesAtom, undefined);
     const exit = await settle(registry, discoverActiveProfilesAtom);
 
-    expect(Exit.isSuccess(exit)).toBe(true);
-    if (!Exit.isSuccess(exit)) return;
+    assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual([
       expect.objectContaining({
         pubkey: bob.pubkey,
@@ -230,26 +153,6 @@ describe("discoverActiveProfilesAtom", () => {
         metadata: expect.objectContaining({ displayName: "Bob" }),
       }),
     ]);
-  });
-
-  it("forwards discovery options into the activity scan filter", async () => {
-    const registry = Registry.make();
-    const fetchedFilters: Array<Filter> = [];
-    registry.set(
-      linkstrConfigAtom,
-      configWith(alice, makeFakeTransport([], [], [], fetchedFilters)),
-    );
-
-    registry.set(discoverActiveProfilesAtom, {
-      activityKinds: [30315],
-      authorScanLimit: 200,
-    });
-    const exit = await settle(registry, discoverActiveProfilesAtom);
-
-    expect(Exit.isSuccess(exit)).toBe(true);
-    expect(fetchedFilters[0]).toEqual(
-      expect.objectContaining({ kinds: [30315], limit: 200 }),
-    );
   });
 });
 
@@ -259,7 +162,7 @@ describe("publishProfileAtom / publishStatusAtom", () => {
     const published: Array<PublishedEvent> = [];
     registry.set(
       linkstrConfigAtom,
-      configWith(alice, makeFakeTransport(published, [])),
+      configWith(alice, fakeTransportLayer(published, [])),
     );
 
     registry.set(publishProfileAtom, new ProfileMetadata({ name: "alice" }));

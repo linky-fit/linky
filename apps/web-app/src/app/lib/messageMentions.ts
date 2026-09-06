@@ -6,7 +6,7 @@ export interface MessageMentionContact {
   statusNames: string[];
 }
 
-export interface MessageMentionQuery {
+interface MessageMentionQuery {
   end: number;
   query: string;
   start: number;
@@ -60,7 +60,7 @@ export const getMessageMentionSuggestions = (
       ...contact.statusNames,
     ];
     for (const referenceName of referenceNames) {
-      const groupName = String(referenceName ?? "").trim();
+      const groupName = (referenceName ?? "").trim();
       if (!groupName || !contact.npub || !matches(groupName)) continue;
       if (contact.npub === groupExcludedNpub) continue;
       const existing = contactsByGroup.get(groupName) ?? [];

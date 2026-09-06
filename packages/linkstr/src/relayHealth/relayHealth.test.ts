@@ -1,4 +1,4 @@
-import { Duration, Effect, Fiber, Layer, Stream } from "effect";
+import { Effect, Fiber, Layer, Stream } from "effect";
 import type { Scope } from "effect";
 import { generateSecretKey, getEventHash, getPublicKey } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
@@ -19,6 +19,7 @@ import type {
   NostrTransportService,
   SubscribeOptions,
 } from "../services/NostrTransport";
+import { eventually } from "../testing";
 import { RelayHealth } from "./RelayHealth";
 import type { RelayHealthState } from "./RelayHealth";
 import { observeTransport } from "./observeTransport";
@@ -41,20 +42,6 @@ const wrapEvent = wrapRumorFor(
 
 const relayA = RelayUrl.make("wss://relay-a.test");
 const relayB = RelayUrl.make("wss://relay-b.test");
-
-const eventually = (predicate: () => boolean): Effect.Effect<void, Error> => {
-  const poll: Effect.Effect<void> = Effect.suspend(() =>
-    predicate()
-      ? Effect.void
-      : Effect.sleep(Duration.millis(2)).pipe(Effect.andThen(() => poll)),
-  );
-  return poll.pipe(
-    Effect.timeoutFail({
-      duration: Duration.seconds(2),
-      onTimeout: () => new Error("condition not met within 2s"),
-    }),
-  );
-};
 
 const withObserved = <A, E>(
   transport: NostrTransportService,

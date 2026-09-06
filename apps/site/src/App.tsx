@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SiteFooter } from "./SiteFooter";
 import { SiteHeaderMenu } from "./SiteHeaderMenu";
-import { getDefaultSiteLocale, type SiteLocale } from "./sitePreferences";
+import {
+  getInitialSiteLocale,
+  siteLocaleStorageKey,
+  type SiteLocale,
+} from "./sitePreferences";
 
 type CtaMode = "android-apk" | "google-play" | "web" | "zapstore";
-
-type Locale = SiteLocale;
 
 interface UspItemCopy {
   title: string;
@@ -27,7 +30,7 @@ interface LocaleCopy {
   zapstoreCta: string;
   ctaMenuLabel: string;
   privacyLabel: string;
-  imageTitle: string;
+  heroImageAlt: string;
   githubLabel: string;
   nostrLabel: string;
   uspSectionTitle: string;
@@ -37,13 +40,23 @@ interface LocaleCopy {
   closingImageAlt: string;
 }
 
-const latestAndroidApkUrl =
-  "https://github.com/hynek-jina/linky/releases/latest/download/linky.apk";
-const googlePlayUrl =
-  "https://play.google.com/store/apps/details?id=fit.linky.app&pli=1";
-const zapstoreUrl = "https://zapstore.dev/apps/fit.linky.app";
+const ctaModes: readonly CtaMode[] = [
+  "web",
+  "google-play",
+  "android-apk",
+  "zapstore",
+];
 
-const copy: Record<Locale, LocaleCopy> = {
+const ctaUrls: Record<CtaMode, string> = {
+  "android-apk":
+    "https://github.com/hynek-jina/linky/releases/latest/download/linky.apk",
+  "google-play":
+    "https://play.google.com/store/apps/details?id=fit.linky.app&pli=1",
+  web: "https://app.linky.fit",
+  zapstore: "https://zapstore.dev/apps/fit.linky.app",
+};
+
+const copy: Record<SiteLocale, LocaleCopy> = {
   cs: {
     czechLabel: "Čeština",
     englishLabel: "English",
@@ -59,7 +72,7 @@ const copy: Record<Locale, LocaleCopy> = {
     zapstoreCta: "Zapstore",
     ctaMenuLabel: "Možnosti otevření aplikace",
     privacyLabel: "Ochrana soukromí",
-    imageTitle: "Fotorealistické setkání lidí s aplikací Linky",
+    heroImageAlt: "Aplikace Linky na telefonu v ruce",
     githubLabel: "GitHub",
     nostrLabel: "Nostr profil",
     uspSectionTitle: "Proč Linky",
@@ -108,7 +121,7 @@ const copy: Record<Locale, LocaleCopy> = {
     zapstoreCta: "Zapstore",
     ctaMenuLabel: "App launch options",
     privacyLabel: "Privacy Policy",
-    imageTitle: "Photorealistic meeting of people with the Linky app",
+    heroImageAlt: "The Linky app on a phone held in hand",
     githubLabel: "GitHub",
     nostrLabel: "Nostr profile",
     uspSectionTitle: "Why Linky",
@@ -157,7 +170,7 @@ const copy: Record<Locale, LocaleCopy> = {
     zapstoreCta: "Zapstore",
     ctaMenuLabel: "Optionen zum Öffnen der App",
     privacyLabel: "Datenschutz",
-    imageTitle: "Fotorealistisches Treffen von Menschen mit der Linky-App",
+    heroImageAlt: "Die Linky-App auf einem Smartphone in der Hand",
     githubLabel: "GitHub",
     nostrLabel: "Nostr-Profil",
     uspSectionTitle: "Warum Linky",
@@ -194,21 +207,8 @@ const copy: Record<Locale, LocaleCopy> = {
   },
 };
 
-const localeStorageKey = "linky.lang";
-
 const isNodeTarget = (value: EventTarget | null): value is Node => {
   return value instanceof Node;
-};
-
-const getInitialLocale = (): Locale => {
-  if (typeof window !== "undefined") {
-    const savedLocale = window.localStorage.getItem(localeStorageKey);
-    if (savedLocale === "cs" || savedLocale === "de" || savedLocale === "en") {
-      return savedLocale;
-    }
-  }
-
-  return getDefaultSiteLocale();
 };
 
 const getDefaultCtaMode = (): CtaMode => {
@@ -224,36 +224,22 @@ const getDefaultCtaMode = (): CtaMode => {
 };
 
 interface AppCtaProps {
-  androidApkCta: string;
   ctaMenuLabel: string;
   ctaMode: CtaMode;
-  googlePlayCta: string;
+  labels: Record<CtaMode, string>;
   onPrimaryAction: () => void;
   onSelectMode: (mode: CtaMode) => void;
-  webCta: string;
-  zapstoreCta: string;
 }
 
 function AppCta({
-  androidApkCta,
   ctaMenuLabel,
   ctaMode,
-  googlePlayCta,
+  labels,
   onPrimaryAction,
   onSelectMode,
-  webCta,
-  zapstoreCta,
 }: AppCtaProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const ctaMenuRef = useRef<HTMLDivElement | null>(null);
-  const primaryCtaLabel =
-    ctaMode === "google-play"
-      ? googlePlayCta
-      : ctaMode === "android-apk"
-        ? androidApkCta
-        : ctaMode === "zapstore"
-          ? zapstoreCta
-          : webCta;
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -278,108 +264,59 @@ function AppCta({
     <div className="cta-row" ref={ctaMenuRef}>
       <div className="cta-group">
         <button className="primary-cta" type="button" onClick={onPrimaryAction}>
-          {primaryCtaLabel}
+          {labels[ctaMode]}
         </button>
-        <>
-          <button
-            className={menuOpen ? "cta-toggle is-open" : "cta-toggle"}
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            aria-label={ctaMenuLabel}
-            onClick={() => setMenuOpen((value) => !value)}
-          >
-            <span className="cta-toggle-icon" aria-hidden="true">
-              ▾
-            </span>
-          </button>
+        <button
+          className={menuOpen ? "cta-toggle is-open" : "cta-toggle"}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-label={ctaMenuLabel}
+          onClick={() => setMenuOpen((value) => !value)}
+        >
+          <span className="cta-toggle-icon" aria-hidden="true">
+            ▾
+          </span>
+        </button>
 
-          {menuOpen ? (
-            <div className="cta-menu" role="menu">
+        {menuOpen ? (
+          <div className="cta-menu" role="menu">
+            {ctaModes.map((mode) => (
               <button
+                key={mode}
                 className={
-                  ctaMode === "web" ? "cta-option is-selected" : "cta-option"
+                  ctaMode === mode ? "cta-option is-selected" : "cta-option"
                 }
                 type="button"
                 role="menuitemradio"
-                aria-checked={ctaMode === "web"}
+                aria-checked={ctaMode === mode}
                 onClick={() => {
-                  onSelectMode("web");
+                  onSelectMode(mode);
                   setMenuOpen(false);
                 }}
               >
-                <span className="cta-option-label">{webCta}</span>
+                <span className="cta-option-label">{labels[mode]}</span>
               </button>
-              <button
-                className={
-                  ctaMode === "google-play"
-                    ? "cta-option is-selected"
-                    : "cta-option"
-                }
-                type="button"
-                role="menuitemradio"
-                aria-checked={ctaMode === "google-play"}
-                onClick={() => {
-                  onSelectMode("google-play");
-                  setMenuOpen(false);
-                }}
-              >
-                <span className="cta-option-label">{googlePlayCta}</span>
-              </button>
-              <button
-                className={
-                  ctaMode === "android-apk"
-                    ? "cta-option is-selected"
-                    : "cta-option"
-                }
-                type="button"
-                role="menuitemradio"
-                aria-checked={ctaMode === "android-apk"}
-                onClick={() => {
-                  onSelectMode("android-apk");
-                  setMenuOpen(false);
-                }}
-              >
-                <span className="cta-option-label">{androidApkCta}</span>
-              </button>
-              <button
-                className={
-                  ctaMode === "zapstore"
-                    ? "cta-option is-selected"
-                    : "cta-option"
-                }
-                type="button"
-                role="menuitemradio"
-                aria-checked={ctaMode === "zapstore"}
-                onClick={() => {
-                  onSelectMode("zapstore");
-                  setMenuOpen(false);
-                }}
-              >
-                <span className="cta-option-label">{zapstoreCta}</span>
-              </button>
-            </div>
-          ) : null}
-        </>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function App() {
-  const [locale, setLocale] = useState<Locale>(getInitialLocale);
-  const [preferredCtaMode, setPreferredCtaMode] =
-    useState<CtaMode>(getDefaultCtaMode);
+  const [locale, setLocale] = useState<SiteLocale>(getInitialSiteLocale);
+  const [ctaMode, setCtaMode] = useState<CtaMode>(getDefaultCtaMode);
   const [brandIsCompact, setBrandIsCompact] = useState(false);
   const activeCopy = useMemo(() => copy[locale], [locale]);
-  const ctaMode = preferredCtaMode;
 
   useEffect(() => {
     document.documentElement.lang = activeCopy.htmlLang;
   }, [activeCopy.htmlLang]);
 
   useEffect(() => {
-    window.localStorage.setItem(localeStorageKey, locale);
+    window.localStorage.setItem(siteLocaleStorageKey, locale);
   }, [locale]);
 
   useEffect(() => {
@@ -394,39 +331,8 @@ function App() {
     };
   }, []);
 
-  const openWebApp = () => {
-    window.open("https://app.linky.fit", "_blank", "noopener,noreferrer");
-  };
-
-  const openAndroidApk = () => {
-    window.open(latestAndroidApkUrl, "_blank", "noopener,noreferrer");
-  };
-
-  const openGooglePlay = () => {
-    window.open(googlePlayUrl, "_blank", "noopener,noreferrer");
-  };
-
-  const openZapstore = () => {
-    window.open(zapstoreUrl, "_blank", "noopener,noreferrer");
-  };
-
   const handlePrimaryAction = () => {
-    if (ctaMode === "google-play") {
-      openGooglePlay();
-      return;
-    }
-
-    if (ctaMode === "android-apk") {
-      openAndroidApk();
-      return;
-    }
-
-    if (ctaMode === "zapstore") {
-      openZapstore();
-      return;
-    }
-
-    openWebApp();
+    window.open(ctaUrls[ctaMode], "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -450,16 +356,9 @@ function App() {
         </a>
 
         <SiteHeaderMenu
-          copy={{
-            czechLabel: activeCopy.czechLabel,
-            englishLabel: activeCopy.englishLabel,
-            germanLabel: activeCopy.germanLabel,
-            switchLabel: activeCopy.switchLabel,
-          }}
+          copy={activeCopy}
           locale={locale}
-          onLocaleChange={(nextLocale) => {
-            setLocale(nextLocale);
-          }}
+          onLocaleChange={setLocale}
         />
       </header>
 
@@ -470,11 +369,11 @@ function App() {
             <p className="lede">{activeCopy.subtitle}</p>
           </div>
 
-          <div className="hero-visual" aria-label={activeCopy.imageTitle}>
+          <div className="hero-visual">
             <img
               className="hero-image"
               src="/app_in_hand.png"
-              alt={activeCopy.imageTitle}
+              alt={activeCopy.heroImageAlt}
             />
           </div>
         </div>
@@ -515,32 +414,25 @@ function App() {
           </div>
         </div>
 
-        <footer className="footer-links">
-          <a href="/cashu/">Cashu</a>
-          <a
-            href="https://github.com/hynek-jina/linky"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {activeCopy.githubLabel}
-          </a>
-          <a href="nostr://npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8">
-            {activeCopy.nostrLabel}
-          </a>
-          <a href="/privacy.html">{activeCopy.privacyLabel}</a>
-        </footer>
+        <SiteFooter
+          githubLabel={activeCopy.githubLabel}
+          nostrLabel={activeCopy.nostrLabel}
+          privacyLabel={activeCopy.privacyLabel}
+        />
       </section>
 
       <div className="floating-cta">
         <AppCta
-          androidApkCta={activeCopy.androidApkCta}
           ctaMenuLabel={activeCopy.ctaMenuLabel}
           ctaMode={ctaMode}
-          googlePlayCta={activeCopy.googlePlayCta}
+          labels={{
+            "android-apk": activeCopy.androidApkCta,
+            "google-play": activeCopy.googlePlayCta,
+            web: activeCopy.webCta,
+            zapstore: activeCopy.zapstoreCta,
+          }}
           onPrimaryAction={handlePrimaryAction}
-          onSelectMode={setPreferredCtaMode}
-          webCta={activeCopy.webCta}
-          zapstoreCta={activeCopy.zapstoreCta}
+          onSelectMode={setCtaMode}
         />
       </div>
     </main>

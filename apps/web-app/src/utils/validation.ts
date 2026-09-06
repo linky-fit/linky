@@ -1,31 +1,12 @@
-import type { JsonRecord, JsonValue } from "../types/json";
+import { isRecord } from "./unknown";
 
-type StringConvertible =
-  | bigint
-  | boolean
-  | number
-  | string
-  | symbol
-  | { toString(): string }
-  | null
-  | undefined;
+export const trimString = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
 
-type ValidationValue = JsonValue | StringConvertible;
+export const asNonEmptyString = (value: unknown): string | null =>
+  trimString(value) || null;
 
-const isJsonRecord = (value: ValidationValue): value is JsonRecord => {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-};
-
-export const trimString = (value: StringConvertible): string => {
-  return String(value ?? "").trim();
-};
-
-export const asNonEmptyString = (value: StringConvertible): string | null => {
-  const text = trimString(value);
-  return text || null;
-};
-
-export const isHttpUrl = (value: StringConvertible): value is string => {
+export const isHttpUrl = (value: unknown): value is string => {
   if (typeof value !== "string") return false;
   try {
     const url = new URL(value);
@@ -35,10 +16,8 @@ export const isHttpUrl = (value: StringConvertible): value is string => {
   }
 };
 
-export const asRecord = (value: ValidationValue): JsonRecord | null => {
-  if (!isJsonRecord(value)) return null;
-  return value;
-};
+export const asRecord = (value: unknown): Record<string, unknown> | null =>
+  isRecord(value) ? value : null;
 
 export const makeLocalId = (): string => {
   try {

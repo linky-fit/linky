@@ -4,15 +4,7 @@ import type {
   Proof,
 } from "@cashu/cashu-ts";
 import { Amount as CashuAmount, MintOperationError } from "@cashu/cashu-ts";
-import {
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  Stream,
-  TestClock,
-  TestContext,
-} from "effect";
+import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
 import type { Scope } from "effect";
 import {
   Amount,
@@ -23,43 +15,40 @@ import {
   QuoteId,
   UnixSeconds,
 } from "../domain/primitives";
-import type { LinkshuInspectorEvent } from "../inspector/events";
-import { Inspector } from "../inspector/Inspector";
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
-import { makeInMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { makeInMemoryTokenStore } from "../ports/inMemoryTokenStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import { TokenStore } from "../ports/TokenStore";
-import type { TokenStoreService } from "../ports/TokenStore";
+import { runOnTestClock } from "../testing/clock";
+import {
+  answerProofStates,
+  fakeWallet,
+  KEYSET_HEX,
+  proof,
+} from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
+import { freshStorage } from "../testing/storage";
+import type { Storage } from "../testing/storage";
 import { PaidQuoteDraft, QuoteLockingKey, TopupDraft } from "./domain";
 import {
   PENDING_TOPUP_KEY_PREFIX,
   PendingTopup,
-  writePendingTopup,
+  pendingTopups,
 } from "./internal/pendingTopup";
 import { Topup } from "./Topup";
 
 const mint = MintUrl.make("https://mint.example");
-const keysetHex = "009a1f293253e41e";
 const sat = CurrencyUnit.make("sat");
 const counterKey = deterministicCounterKey({
   mint,
   unit: sat,
-  keysetId: KeysetId.make(keysetHex),
+  keysetId: KeysetId.make(KEYSET_HEX),
 });
 
 const invoice = "lnbc160n1pexampleinvoice";
 const quoteId = "quote-1";
-
-const proof = (amount: number, secret: string): Proof => ({
-  id: keysetHex,
-  amount: CashuAmount.from(amount),
-  secret,
-  C: "02" + "ab".repeat(32),
-});
 
 const mintedProofs = [proof(8, "topup-a"), proof(8, "topup-b")];
 
@@ -94,22 +83,9 @@ const makeWallet = (args: FakeWalletArgs) => {
   const mintConfigs: Array<MintProofsConfig | undefined> = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
   let checks = 0;
-  const wallet: LoadedWallet = {
-    keysetId: keysetHex,
-    keyChain: { getKeysets: () => [] },
-    getMintInfo: () => {
-      throw new Error("not under test");
-    },
-    receive: () => Promise.reject(new Error("not under test")),
-    send: () => Promise.reject(new Error("not under test")),
-    checkProofsStates: (proofs) =>
-      Promise.resolve(
-        proofs.map((entry) => ({
-          Y: entry.secret ?? "",
-          state: "UNSPENT" as const,
-          witness: null,
-        })),
-      ),
+  const wallet = fakeWallet({
+    keysetId: KEYSET_HEX,
+    checkProofsStates: answerProofStates(),
     createMintQuoteBolt11: () =>
       Promise.resolve(args.created ?? quoteResponse("UNPAID")),
     checkMintQuoteBolt11: () => {
@@ -135,27 +111,13 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.restore()
         : Promise.reject(new Error("restore unavailable"));
     },
-    createMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    checkMeltQuoteBolt11: () => Promise.reject(new Error("not under test")),
-    meltProofsBolt11: () => Promise.reject(new Error("not under test")),
-    batchRestore: () => Promise.reject(new Error("not under test")),
-  };
+  });
   return { wallet, mintCounters, mintConfigs, restoreCalls };
 };
 
-interface Storage {
-  readonly kv: KeyValueStoreService;
-  readonly tokens: TokenStoreService;
-}
-
-const freshStorage = (): Storage => ({
-  kv: makeInMemoryKeyValueStore(),
-  tokens: makeInMemoryTokenStore(),
-});
-
 /** One runtime over the given storage — a second one models a restart. */
 const makeHarness = (wallet: LoadedWallet, storage: Storage) => {
-  const events: Array<LinkshuInspectorEvent> = [];
+  const inspector = recordingInspector();
   const layer = Topup.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -165,18 +127,13 @@ const makeHarness = (wallet: LoadedWallet, storage: Storage) => {
         ),
         Layer.succeed(KeyValueStore, storage.kv),
         Layer.succeed(TokenStore, storage.tokens),
-        Layer.succeed(Inspector, {
-          emit: (build) => {
-            events.push(build());
-          },
-          events: Stream.empty,
-        }),
+        inspector.layer,
       ),
     ),
   );
   const run = <A, E>(program: Effect.Effect<A, E, Topup | Scope.Scope>) =>
     Effect.runPromiseExit(program.pipe(Effect.scoped, Effect.provide(layer)));
-  return { run, events };
+  return { run, events: inspector.events };
 };
 
 const draft = new TopupDraft({ mint, amount: Amount.make(16) });
@@ -331,13 +288,13 @@ describe("Topup", () => {
     // `persistMinted` leaves open. Resuming must find the stored proofs
     // rather than import them a second time.
     await Effect.runPromise(
-      writePendingTopup(
+      pendingTopups.write(
         storage.kv,
         new PendingTopup({
           quoteId: QuoteId.make(quoteId),
           mint,
           unit: sat,
-          keysetId: KeysetId.make(keysetHex),
+          keysetId: KeysetId.make(KEYSET_HEX),
           amount: Amount.make(16),
           invoice: Bolt11Invoice.make(invoice),
           expiresAt: null,
@@ -396,16 +353,7 @@ describe("Topup", () => {
     const exit = await run(
       Effect.gen(function* () {
         yield* TestClock.adjust("1000 seconds");
-        const fiber = yield* Effect.fork(Effect.either(startAndAwait));
-        // Flush the rejected check between adjustments so the poll reaches
-        // its next sleep before the clock moves.
-        for (let tick = 0; tick < 12; tick += 1) {
-          yield* Effect.promise(
-            () => new Promise((resolve) => setTimeout(resolve, 0)),
-          );
-          yield* TestClock.adjust("5 seconds");
-        }
-        return yield* Fiber.join(fiber);
+        return yield* runOnTestClock(Effect.either(startAndAwait), "5 seconds");
       }).pipe(Effect.provide(TestContext.TestContext)),
     );
 
@@ -423,13 +371,13 @@ describe("Topup", () => {
     // Crash window: the invoice was paid, but the process died before any
     // mint attempt reserved counters — the record must not be pruned on time.
     await Effect.runPromise(
-      writePendingTopup(
+      pendingTopups.write(
         storage.kv,
         new PendingTopup({
           quoteId: QuoteId.make(quoteId),
           mint,
           unit: sat,
-          keysetId: KeysetId.make(keysetHex),
+          keysetId: KeysetId.make(KEYSET_HEX),
           amount: Amount.make(16),
           invoice: Bolt11Invoice.make(invoice),
           expiresAt: UnixSeconds.make(expired),
@@ -455,13 +403,13 @@ describe("Topup", () => {
     const storage = freshStorage();
     const expired = Math.floor(Date.now() / 1000) - 3600;
     await Effect.runPromise(
-      writePendingTopup(
+      pendingTopups.write(
         storage.kv,
         new PendingTopup({
           quoteId: QuoteId.make(quoteId),
           mint,
           unit: sat,
-          keysetId: KeysetId.make(keysetHex),
+          keysetId: KeysetId.make(KEYSET_HEX),
           amount: Amount.make(16),
           invoice: Bolt11Invoice.make(invoice),
           expiresAt: UnixSeconds.make(expired),
@@ -704,7 +652,7 @@ describe("Topup.adopt", () => {
           quoteId,
           mint,
           unit: "sat",
-          keysetId: keysetHex,
+          keysetId: KEYSET_HEX,
           amount: 16,
           invoice,
           expiresAt: null,

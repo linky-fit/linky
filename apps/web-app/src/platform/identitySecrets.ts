@@ -16,6 +16,7 @@ import {
   removeStoredSecret,
   writeStoredSecret,
 } from "./secretStorage";
+import { safeLocalStorageRemove, safeLocalStorageSet } from "../utils/storage";
 
 const PUSH_SECRET_MIRROR_TIMEOUT_MS = 1_500;
 
@@ -46,7 +47,7 @@ const mirrorPushNsecBestEffort = async (nsec: string): Promise<void> => {
 const wipeCashuStateIfMnemonicChanged = async (
   nextCashuMnemonic: string,
 ): Promise<void> => {
-  const next = String(nextCashuMnemonic ?? "").trim();
+  const next = nextCashuMnemonic.trim();
   if (!next) return;
   const current = (
     await readStoredSecret(CASHU_BIP85_MNEMONIC_STORAGE_KEY)
@@ -89,6 +90,21 @@ export const writeStoredCashuMnemonic = async (
   await writeStoredSecret(CASHU_BIP85_MNEMONIC_STORAGE_KEY, cashuMnemonic);
 };
 
+const persistNostrIdentitySourceMarkers = (
+  identitySource: PersistIdentitySecretsParams["identitySource"],
+  switchedAtSec: PersistIdentitySecretsParams["switchedAtSec"],
+): void => {
+  safeLocalStorageSet(NOSTR_IDENTITY_SOURCE_STORAGE_KEY, identitySource);
+  if (switchedAtSec && switchedAtSec > 0) {
+    safeLocalStorageSet(
+      NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY,
+      String(switchedAtSec),
+    );
+  } else {
+    safeLocalStorageRemove(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
+  }
+};
+
 export const persistIdentitySecrets = async ({
   appMnemonic,
   cashuMnemonic,
@@ -106,19 +122,7 @@ export const persistIdentitySecrets = async ({
     writeStoredSecret(INITIAL_MNEMONIC_STORAGE_KEY, appMnemonic),
   ]);
 
-  try {
-    localStorage.setItem(NOSTR_IDENTITY_SOURCE_STORAGE_KEY, identitySource);
-    if (switchedAtSec && switchedAtSec > 0) {
-      localStorage.setItem(
-        NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY,
-        String(switchedAtSec),
-      );
-    } else {
-      localStorage.removeItem(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
-    }
-  } catch {
-    // ignore storage unavailability
-  }
+  persistNostrIdentitySourceMarkers(identitySource, switchedAtSec);
 
   // The push-service mirror is auxiliary. IndexedDB can remain blocked by a
   // suspended tab or service worker, so it must never hold account restore on
@@ -133,19 +137,7 @@ export const persistSyncedActiveNostrIdentity = async ({
 }: PersistSyncedActiveNostrIdentityParams): Promise<void> => {
   await writeStoredSecret(NOSTR_NSEC_STORAGE_KEY, nsec);
 
-  try {
-    localStorage.setItem(NOSTR_IDENTITY_SOURCE_STORAGE_KEY, identitySource);
-    if (switchedAtSec && switchedAtSec > 0) {
-      localStorage.setItem(
-        NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY,
-        String(switchedAtSec),
-      );
-    } else {
-      localStorage.removeItem(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
-    }
-  } catch {
-    // ignore storage unavailability
-  }
+  persistNostrIdentitySourceMarkers(identitySource, switchedAtSec);
 
   await mirrorPushNsecBestEffort(nsec);
 };
@@ -170,12 +162,8 @@ export const clearIdentitySecrets = async (): Promise<void> => {
     removeStoredSecret(INITIAL_MNEMONIC_STORAGE_KEY),
   ]);
 
-  try {
-    localStorage.removeItem(NOSTR_IDENTITY_SOURCE_STORAGE_KEY);
-    localStorage.removeItem(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
-  } catch {
-    // ignore storage unavailability
-  }
+  safeLocalStorageRemove(NOSTR_IDENTITY_SOURCE_STORAGE_KEY);
+  safeLocalStorageRemove(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
 
   await clearStoredPushNsec();
 };

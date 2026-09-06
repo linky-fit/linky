@@ -1,12 +1,7 @@
 import { Effect, Layer } from "effect";
-import { generateSecretKey, getEventHash, getPublicKey } from "nostr-tools";
+import { getEventHash } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
-import {
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  UnixSeconds,
-} from "./domain/primitives";
+import { RelayUrl, UnixSeconds } from "./domain/primitives";
 import { runLinkstr } from "./headless";
 import { WrapInbox } from "./inbox/WrapInbox";
 import { wrapRumorFor } from "./internal/giftWrap";
@@ -15,11 +10,7 @@ import type { NostrTags } from "./internal/nostrEvent";
 import { NostrTransport } from "./services/NostrTransport";
 import type { NostrTransportService } from "./services/NostrTransport";
 import { RelayPolicy } from "./services/RelayPolicy";
-
-const makeIdentity = () => {
-  const secretKey = NostrSecretKey.make(generateSecretKey());
-  return { pubkey: Pubkey.make(getPublicKey(secretKey)), secretKey };
-};
+import { makeIdentity } from "./testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();

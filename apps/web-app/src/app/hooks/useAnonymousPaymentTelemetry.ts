@@ -14,12 +14,12 @@ import {
   LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX,
   PAYMENT_ANALYTICS_RECIPIENT_NPUB,
 } from "../../utils/constants";
+import type { LocalPaymentTelemetryEvent } from "../types/appTypes";
 import {
   safeLocalStorageGetJson,
   safeLocalStorageSetJson,
   withLocalStorageLeaseLock,
 } from "../../utils/storage";
-import type { LocalPaymentTelemetryEvent } from "../types/appTypes";
 
 interface UseAnonymousPaymentTelemetryParams {
   appOwnerId: OwnerId | null;
@@ -33,117 +33,65 @@ const MAX_ITEMS_PER_FLUSH = 10;
 const isClientId = Schema.is(ClientId);
 const isUnixSeconds = Schema.is(UnixSeconds);
 
-const isTelemetryDirection = (value: unknown): value is "in" | "out" => {
-  return value === "in" || value === "out";
-};
+const LocalPaymentTelemetryEventSchema = Schema.Struct({
+  id: Schema.String,
+  createdAtSec: Schema.Number,
+  direction: Schema.Literal("in", "out"),
+  status: Schema.Literal("declined", "error", "ok"),
+  method: Schema.Literal(
+    "cashu_chat",
+    "cashu_receive",
+    "cashu_restore",
+    "lightning_address",
+    "lightning_invoice",
+    "unknown",
+  ),
+  phase: Schema.Literal(
+    "complete",
+    "invoice_fetch",
+    "melt",
+    "publish",
+    "receive",
+    "restore",
+    "swap",
+    "unknown",
+  ),
+  appVersion: Schema.String,
+  appHost: Schema.optional(Schema.NullOr(Schema.String)),
+  appRuntime: Schema.optional(
+    Schema.NullOr(Schema.Literal("native", "pwa", "web")),
+  ),
+  devicePlatform: Schema.optional(
+    Schema.NullOr(
+      Schema.Literal(
+        "android",
+        "iphone",
+        "ipad",
+        "linux",
+        "mac",
+        "windows",
+        "unknown",
+      ),
+    ),
+  ),
+  mint: Schema.NullOr(Schema.String),
+  amountBucket: Schema.NullOr(Schema.String),
+  feeBucket: Schema.NullOr(Schema.String),
+  errorCode: Schema.NullOr(Schema.String),
+  errorDetail: Schema.NullOr(Schema.String),
+});
 
-const isTelemetryStatus = (
+export const isLocalPaymentTelemetryEvent = (
   value: unknown,
-): value is "declined" | "error" | "ok" => {
-  return value === "declined" || value === "error" || value === "ok";
-};
-
-const isTelemetryMethod = (value: unknown): boolean => {
-  return (
-    value === "cashu_chat" ||
-    value === "cashu_receive" ||
-    value === "cashu_restore" ||
-    value === "lightning_address" ||
-    value === "lightning_invoice" ||
-    value === "unknown"
-  );
-};
-
-const isTelemetryPhase = (value: unknown): boolean => {
-  return (
-    value === "complete" ||
-    value === "invoice_fetch" ||
-    value === "melt" ||
-    value === "publish" ||
-    value === "receive" ||
-    value === "restore" ||
-    value === "swap" ||
-    value === "unknown"
-  );
-};
-
-const isTelemetryAppRuntime = (
-  value: unknown,
-): value is "native" | "pwa" | "web" => {
-  return value === "native" || value === "pwa" || value === "web";
-};
-
-const isTelemetryDevicePlatform = (
-  value: unknown,
-): value is
-  | "android"
-  | "iphone"
-  | "ipad"
-  | "linux"
-  | "mac"
-  | "windows"
-  | "unknown" => {
-  return (
-    value === "android" ||
-    value === "iphone" ||
-    value === "ipad" ||
-    value === "linux" ||
-    value === "mac" ||
-    value === "windows" ||
-    value === "unknown"
-  );
-};
-
-const isLocalPaymentTelemetryEvent = (
-  value: unknown,
-): value is LocalPaymentTelemetryEvent => {
-  if (typeof value !== "object" || value === null) return false;
-
-  const id = Reflect.get(value, "id");
-  const createdAtSec = Reflect.get(value, "createdAtSec");
-  const direction = Reflect.get(value, "direction");
-  const status = Reflect.get(value, "status");
-  const method = Reflect.get(value, "method");
-  const phase = Reflect.get(value, "phase");
-  const appVersion = Reflect.get(value, "appVersion");
-  const appHost = Reflect.get(value, "appHost");
-  const appRuntime = Reflect.get(value, "appRuntime");
-  const amountBucket = Reflect.get(value, "amountBucket");
-  const devicePlatform = Reflect.get(value, "devicePlatform");
-  const feeBucket = Reflect.get(value, "feeBucket");
-  const errorCode = Reflect.get(value, "errorCode");
-  const errorDetail = Reflect.get(value, "errorDetail");
-  const mint = Reflect.get(value, "mint");
-
-  return (
-    typeof id === "string" &&
-    typeof createdAtSec === "number" &&
-    isTelemetryDirection(direction) &&
-    isTelemetryStatus(status) &&
-    isTelemetryMethod(method) &&
-    isTelemetryPhase(phase) &&
-    typeof appVersion === "string" &&
-    (typeof appHost === "undefined" ||
-      appHost === null ||
-      typeof appHost === "string") &&
-    (typeof appRuntime === "undefined" ||
-      appRuntime === null ||
-      isTelemetryAppRuntime(appRuntime)) &&
-    (typeof mint === "string" || mint === null) &&
-    (typeof amountBucket === "string" || amountBucket === null) &&
-    (typeof devicePlatform === "undefined" ||
-      devicePlatform === null ||
-      isTelemetryDevicePlatform(devicePlatform)) &&
-    (typeof feeBucket === "string" || feeBucket === null) &&
-    (typeof errorCode === "string" || errorCode === null) &&
-    (typeof errorDetail === "string" || errorDetail === null)
-  );
-};
+): value is LocalPaymentTelemetryEvent =>
+  Schema.is(LocalPaymentTelemetryEventSchema)(value);
 
 const readQueue = (storageKey: string): LocalPaymentTelemetryEvent[] => {
-  const parsed = safeLocalStorageGetJson(storageKey, []);
-  if (!Array.isArray(parsed)) return [];
-  return parsed.filter(isLocalPaymentTelemetryEvent);
+  return safeLocalStorageGetJson(
+    storageKey,
+    Schema.Array(Schema.Unknown),
+    [],
+  ).filter(isLocalPaymentTelemetryEvent);
 };
 
 const writeQueue = (

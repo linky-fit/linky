@@ -1,3 +1,4 @@
+import type { Translate } from "../i18n";
 export const getInitials = (name: string): string => {
   const normalized = name.trim();
   if (!normalized) return "?";
@@ -8,15 +9,28 @@ export const getInitials = (name: string): string => {
   return letters.join("") || "?";
 };
 
+export const formatBytes = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const digits = unitIndex === 0 ? 0 : value < 10 ? 2 : value < 100 ? 1 : 0;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+};
+
 export const formatShortNpub = (npub: string): string => {
-  const trimmed = String(npub ?? "").trim();
+  const trimmed = npub.trim();
   if (!trimmed) return "";
   if (trimmed.length <= 18) return trimmed;
   return `${trimmed.slice(0, 10)}…${trimmed.slice(-6)}`;
 };
 
 export const formatShortLightningAddress = (value: string): string => {
-  const trimmed = String(value ?? "").trim();
+  const trimmed = value.trim();
   if (!trimmed) return "";
 
   const atIndex = trimmed.indexOf("@");
@@ -34,7 +48,7 @@ export const formatShortLightningAddress = (value: string): string => {
 };
 
 export const formatMiddleDots = (value: string, maxLen: number): string => {
-  const trimmed = String(value ?? "").trim();
+  const trimmed = value.trim();
   if (!trimmed) return "";
   if (!Number.isFinite(maxLen) || maxLen <= 0) return trimmed;
   if (trimmed.length <= maxLen) return trimmed;
@@ -46,29 +60,19 @@ export const formatMiddleDots = (value: string, maxLen: number): string => {
   return `${trimmed.slice(0, startLen)}...${trimmed.slice(-endLen)}`;
 };
 
-export const formatDurationShort = (seconds: number): string => {
-  const total = Math.max(0, Math.floor(seconds));
-  const days = Math.floor(total / 86400);
-  const hours = Math.floor((total % 86400) / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-};
-
 export const getBestNostrName = (metadata: {
   displayName?: string | undefined;
   name?: string | undefined;
 }): string | null => {
-  const display = String(metadata.displayName ?? "").trim();
+  const display = (metadata.displayName ?? "").trim();
   if (display) return display;
-  const name = String(metadata.name ?? "").trim();
+  const name = (metadata.name ?? "").trim();
   if (name) return name;
   return null;
 };
 
 export const normalizeLocale = (lang?: string): string => {
-  const raw = String(lang ?? "").trim();
+  const raw = (lang ?? "").trim();
   if (raw) {
     if (raw === "cs") return "cs-CZ";
     if (raw === "de") return "de-DE";
@@ -76,7 +80,7 @@ export const normalizeLocale = (lang?: string): string => {
     return raw;
   }
   if (typeof document !== "undefined") {
-    const docLang = String(document.documentElement?.lang ?? "").trim();
+    const docLang = (document.documentElement?.lang ?? "").trim();
     if (docLang) {
       if (docLang === "cs") return "cs-CZ";
       if (docLang === "de") return "de-DE";
@@ -84,7 +88,7 @@ export const normalizeLocale = (lang?: string): string => {
     }
   }
   if (typeof navigator !== "undefined") {
-    const navLang = String(navigator.language ?? "").trim();
+    const navLang = navigator.language.trim();
     if (navLang) {
       if (navLang === "cs") return "cs-CZ";
       if (navLang === "de") return "de-DE";
@@ -155,7 +159,7 @@ export const formatContactMessageTimestamp = (
   createdAtSec: number,
   lang?: string,
 ): string => {
-  const ms = Number(createdAtSec ?? 0) * 1000;
+  const ms = createdAtSec * 1000;
   if (!Number.isFinite(ms) || ms <= 0) return "";
   const d = new Date(ms);
   const now = new Date();
@@ -172,7 +176,7 @@ export const formatContactMessageTimestamp = (
 
 export const previewTokenText = (token: string | null): string | null => {
   if (!token) return null;
-  const trimmed = String(token).trim();
+  const trimmed = token.trim();
   if (!trimmed) return null;
   return trimmed.length > 16 ? `${trimmed.slice(0, 16)}…` : trimmed;
 };
@@ -180,7 +184,7 @@ export const previewTokenText = (token: string | null): string | null => {
 export const formatChatDayLabel = (
   ms: number,
   lang: string | undefined,
-  t: (key: string) => string,
+  t: Translate,
 ): string => {
   const d = new Date(ms);
   const now = new Date();

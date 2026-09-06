@@ -1,6 +1,7 @@
 import type { AvatarEditorControlId } from "../derivedProfile";
 import { AVATAR_EDITOR_CONTROLS } from "../derivedProfile";
 import { AvatarEditorIcon } from "./AvatarEditorIcon";
+import type { Translate } from "../i18n";
 
 interface AvatarControlGridCustomChoice {
   isSelected: boolean;
@@ -12,7 +13,7 @@ interface AvatarControlGridProps {
   custom?: AvatarControlGridCustomChoice;
   disabled?: boolean;
   onCycle: (controlId: AvatarEditorControlId) => void;
-  t: (key: string) => string;
+  t: Translate;
 }
 
 export function AvatarControlGrid({

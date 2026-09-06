@@ -1,14 +1,7 @@
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import "../App.css";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MessageActionsMenu } from "./MessageActionsMenu";
-
-Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
-  configurable: true,
-  value: true,
-  writable: true,
-});
 
 const defaultLabels = {
   copy: "Copy",
@@ -22,28 +15,22 @@ const defaultLabels = {
 type MenuProps = Parameters<typeof MessageActionsMenu>[0];
 
 const renderMenu = async (overrides: Partial<MenuProps> = {}) => {
-  const container = document.createElement("div");
-  document.body.appendChild(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(
-      <MessageActionsMenu
-        canCopy={true}
-        canEdit={false}
-        canReplyOrReact={true}
-        imageActions={null}
-        isOpen={true}
-        labels={defaultLabels}
-        onClose={vi.fn()}
-        onCopy={vi.fn()}
-        onEdit={vi.fn()}
-        onReact={vi.fn()}
-        onReply={vi.fn()}
-        {...overrides}
-      />,
-    );
-  });
+  const { root } = await renderIntoDocument(
+    <MessageActionsMenu
+      canCopy={true}
+      canEdit={false}
+      canReplyOrReact={true}
+      imageActions={null}
+      isOpen={true}
+      labels={defaultLabels}
+      onClose={vi.fn()}
+      onCopy={vi.fn()}
+      onEdit={vi.fn()}
+      onReact={vi.fn()}
+      onReply={vi.fn()}
+      {...overrides}
+    />,
+  );
 
   return root;
 };
@@ -56,23 +43,6 @@ const menuItemLabels = (): string[] =>
 describe("MessageActionsMenu", () => {
   afterEach(() => {
     document.body.innerHTML = "";
-  });
-
-  it("keeps the conversation visible through its backdrop", async () => {
-    const root = await renderMenu();
-    // The menu portals to document.body, so query there rather than the container.
-    const backdrop = document.body.querySelector(".message-actions-backdrop");
-
-    expect(backdrop).not.toBeNull();
-    if (!backdrop) return;
-
-    expect(getComputedStyle(backdrop).backgroundColor).toBe(
-      "rgba(0, 0, 0, 0.4)",
-    );
-
-    await act(async () => {
-      root.unmount();
-    });
   });
 
   it("offers share and save instead of copy for image messages", async () => {

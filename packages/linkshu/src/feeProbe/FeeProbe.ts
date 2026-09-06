@@ -1,18 +1,16 @@
 import type { MeltQuoteBolt11Response } from "@cashu/cashu-ts";
-import { Clock, Duration, Effect, Schema } from "effect";
+import { Duration, Effect, Schema } from "effect";
 import { MintRejected, MintUnreachable } from "../domain/errors";
-import {
-  Amount,
-  Bolt11Invoice,
-  CurrencyUnit,
-  NonNegativeAmount,
-  QuoteId,
-} from "../domain/primitives";
-import type { MintUrl } from "../domain/primitives";
+import { Amount, NonNegativeAmount } from "../domain/primitives";
+import type { MintUrl, QuoteId } from "../domain/primitives";
 import { LightningFeeProbed } from "../inspector/events";
 import { Inspector } from "../inspector/Inspector";
 import { cashuAmountToNumber } from "../internal/cashuAmounts";
 import { inspectOperationWith } from "../internal/operations";
+import { decodeMintQuote, decodeQuoteId } from "../internal/quotes";
+import type { DecodedMintQuote } from "../internal/quotes";
+import { nowSeconds } from "../internal/time";
+import { sat } from "../internal/units";
 import {
   classifyMintError,
   WalletInstances,
@@ -26,22 +24,13 @@ import {
   writeCachedFeeProbe,
 } from "./internal/feeProbeCache";
 
-const sat = CurrencyUnit.make("sat");
-
 /** Large enough that a mint's percentage fee is readable, as in the app. */
 const DEFAULT_PROBE_AMOUNT = 10_000;
 /** Two mints answer in series; past this the probe is not worth waiting on. */
 const PROBE_TIMEOUT = Duration.seconds(15);
 
-const decodeQuoteId = Schema.decodeUnknownOption(QuoteId);
-const decodeInvoice = Schema.decodeUnknownOption(Bolt11Invoice);
 const decodeAmount = Schema.decodeUnknownOption(Amount);
 const decodeReserve = Schema.decodeUnknownOption(NonNegativeAmount);
-
-const nowSeconds: Effect.Effect<number> = Effect.map(
-  Clock.currentTimeMillis,
-  (millis) => Math.floor(millis / 1000),
-);
 
 /**
  * Lightning fee estimation. NUT-06 publishes no Lightning fee, so the only
@@ -62,26 +51,14 @@ export class FeeProbe extends Effect.Service<FeeProbe>()("linkshu/FeeProbe", {
       wallet: LoadedWallet,
       probeMint: MintUrl,
       amount: number,
-    ): Effect.Effect<
-      { quoteId: QuoteId; invoice: Bolt11Invoice },
-      MintUnreachable | MintRejected
-    > =>
-      Effect.gen(function* () {
-        const raw = yield* Effect.tryPromise({
+    ): Effect.Effect<DecodedMintQuote, MintUnreachable | MintRejected> =>
+      Effect.flatMap(
+        Effect.tryPromise({
           try: () => wallet.createMintQuoteBolt11(amount),
           catch: (error) => classifyMintError(probeMint, error),
-        });
-        const quoteId = decodeQuoteId(raw.quote);
-        const invoice = decodeInvoice(raw.request);
-        if (quoteId._tag === "None" || invoice._tag === "None") {
-          return yield* new MintRejected({
-            mint: probeMint,
-            code: null,
-            detail: "probe mint returned a mint quote without a usable invoice",
-          });
-        }
-        return { quoteId: quoteId.value, invoice: invoice.value };
-      });
+        }),
+        (raw) => decodeMintQuote(probeMint, raw),
+      );
 
     /**
      * The melt quote priced. The mint's own `amount` is authoritative when it

@@ -2,19 +2,12 @@ import type { TokenRowId, WalletToken } from "@linky/linkshu";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { isCashuTokenUnavailableState } from "../app/lib/cashuTokenState";
-import type { MintUrlInput } from "../app/types/appTypes";
+import type { MintIcon } from "../utils/mint";
 import { getNextMintIconUrl } from "../utils/mint";
 
-interface MintIcon {
-  failed: boolean;
-  host: string | null;
-  origin: string | null;
-  url: string | null;
-}
-
-interface CashuTokenPillProps {
+interface WalletTokenPillProps {
   ariaLabel: string;
-  getMintIconUrl: (mint: MintUrlInput) => MintIcon;
+  getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   isError?: boolean;
   onMintIconError: (origin: string, nextUrl: string | null) => void;
   onMintIconLoad: (origin: string, url: string | null) => void;
@@ -22,39 +15,7 @@ interface CashuTokenPillProps {
   token: WalletToken;
 }
 
-function areMintIconsEqual(previous: MintIcon, next: MintIcon) {
-  return (
-    previous.failed === next.failed &&
-    previous.host === next.host &&
-    previous.origin === next.origin &&
-    previous.url === next.url
-  );
-}
-
-function arePropsEqual(
-  previous: CashuTokenPillProps,
-  next: CashuTokenPillProps,
-) {
-  if (
-    previous.ariaLabel !== next.ariaLabel ||
-    previous.isError !== next.isError ||
-    previous.onMintIconError !== next.onMintIconError ||
-    previous.onMintIconLoad !== next.onMintIconLoad ||
-    previous.onOpenToken !== next.onOpenToken ||
-    previous.token !== next.token
-  ) {
-    return false;
-  }
-
-  if (previous.getMintIconUrl === next.getMintIconUrl) return true;
-
-  return areMintIconsEqual(
-    previous.getMintIconUrl(next.token.mint),
-    next.getMintIconUrl(next.token.mint),
-  );
-}
-
-export const CashuTokenPill = React.memo(function CashuTokenPill({
+export const WalletTokenPill = React.memo(function WalletTokenPill({
   ariaLabel,
   getMintIconUrl,
   isError = false,
@@ -62,69 +23,88 @@ export const CashuTokenPill = React.memo(function CashuTokenPill({
   onMintIconLoad,
   onOpenToken,
   token,
-}: CashuTokenPillProps) {
-  const { formatDisplayedAmountParts } = useAppShellCore();
-
-  const icon = getMintIconUrl(token.mint);
-  const showMintFallback = icon.failed || !icon.url;
-  const displayAmount = formatDisplayedAmountParts(token.amount);
-  const isMuted = isCashuTokenUnavailableState(token.state);
-  const handleClick = React.useCallback(() => {
-    onOpenToken(token.id);
-  }, [onOpenToken, token.id]);
-
+}: WalletTokenPillProps) {
+  const { formatDisplayedAmountText } = useAppShellCore();
   return (
-    <button
-      className={
-        isError ? "pill pill-error" : isMuted ? "pill pill-muted" : "pill"
-      }
-      onClick={handleClick}
-      style={{ cursor: "pointer" }}
-      aria-label={ariaLabel}
-    >
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        {icon.url ? (
-          <img
-            src={icon.url}
-            alt=""
-            width={14}
-            height={14}
-            style={{
-              borderRadius: 9999,
-              objectFit: "cover",
-            }}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onLoad={() => {
-              if (icon.origin) {
-                onMintIconLoad(icon.origin, icon.url);
-              }
-            }}
-            onError={() => {
-              if (icon.origin) {
-                const next = getNextMintIconUrl(icon.url, icon.origin);
-                onMintIconError(icon.origin, next);
-              }
-            }}
-          />
-        ) : null}
-        {showMintFallback && icon.host ? (
-          <span className="muted" style={{ fontSize: 10, lineHeight: "14px" }}>
-            {icon.host}
-          </span>
-        ) : null}
-        <span>
-          {displayAmount.approxPrefix}
-          {displayAmount.amountText}
-          {displayAmount.unitLabel ? ` ${displayAmount.unitLabel}` : ""}
-        </span>
-      </span>
-    </button>
+    <CashuTokenPill
+      icon={getMintIconUrl(token.mint)}
+      amountText={formatDisplayedAmountText(token.amount)}
+      ariaLabel={ariaLabel}
+      isError={isError}
+      isMuted={isCashuTokenUnavailableState(token.state)}
+      onClick={() => onOpenToken(token.id)}
+      onMintIconLoad={onMintIconLoad}
+      onMintIconError={onMintIconError}
+    />
   );
-}, arePropsEqual);
+});
+
+interface CashuTokenPillProps {
+  amountText: string;
+  ariaLabel?: string;
+  className?: string;
+  compact?: boolean;
+  icon: Pick<MintIcon, "url"> & Partial<Omit<MintIcon, "url">>;
+  isError?: boolean;
+  isMuted?: boolean;
+  onClick?: () => void;
+  onMintIconLoad?: (origin: string, url: string | null) => void;
+  onMintIconError?: (origin: string, url: string | null) => void;
+}
+
+export function CashuTokenPill({
+  amountText,
+  ariaLabel,
+  className = "",
+  compact = false,
+  icon,
+  isError = false,
+  isMuted = false,
+  onClick,
+  onMintIconLoad,
+  onMintIconError,
+}: CashuTokenPillProps) {
+  const pillClassName = `pill cashu-token-pill${isError ? " pill-error" : isMuted ? " pill-muted" : ""}${compact ? " cashu-token-pill-compact" : ""}${className ? ` ${className}` : ""}`;
+  const content = (
+    <>
+      {icon.url ? (
+        <img
+          src={icon.url}
+          alt=""
+          width={14}
+          height={14}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onLoad={() => {
+            if (icon.origin) onMintIconLoad?.(icon.origin, icon.url);
+          }}
+          onError={() => {
+            if (icon.origin)
+              onMintIconError?.(
+                icon.origin,
+                getNextMintIconUrl(icon.url, icon.origin),
+              );
+          }}
+        />
+      ) : null}
+      {(icon.failed || !icon.url) && icon.host ? (
+        <span className="muted chat-token-pill-fallback">{icon.host}</span>
+      ) : null}
+      <span className="chat-token-pill-label">{amountText}</span>
+    </>
+  );
+  return onClick ? (
+    <button
+      type="button"
+      className={pillClassName}
+      aria-label={ariaLabel}
+      onClick={onClick}
+    >
+      {content}
+    </button>
+  ) : (
+    <span className={pillClassName} aria-label={ariaLabel}>
+      {content}
+    </span>
+  );
+}

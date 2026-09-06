@@ -43,15 +43,12 @@ import {
   EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
   EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
   EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_CONTACTS_OWNER_EDIT_COUNT_STORAGE_KEY,
   EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
   EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_EDIT_COUNT_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
   EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_TRANSACTIONS_OWNER_EDIT_COUNT_STORAGE_KEY,
   EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
   EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
 } from "../../utils/constants";
@@ -65,14 +62,17 @@ import {
   deriveCashuBip85MnemonicFromSlip39,
   deriveEvoluOwnerMnemonicFromSlip39,
   deriveNostrKeysFromSlip39,
-  looksLikeSlip39Seed,
 } from "../../utils/slip39Nostr";
-import {
-  getInitialNostrIdentitySource,
-  safeLocalStorageSet,
-} from "../../utils/storage";
+import { looksLikeSlip39Share } from "@linky/identity";
 import type { IdentityChangeMessageSource } from "../lib/identityChangeMessage";
 import { buildLinkstrConfig } from "./useLinkstrConfigSync";
+import {
+  getInitialNostrIdentitySource,
+  safeLocalStorageRemove,
+  safeLocalStorageSet,
+} from "../../utils/storage";
+import { nowSeconds } from "../../utils/time";
+import type { I18nKey, Translate } from "../../i18n";
 
 type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
 
@@ -130,7 +130,7 @@ interface UseProfileAuthDomainParams {
   lang: Lang;
   myProfileMetadataRef: React.MutableRefObject<ProfileMetadata | null>;
   pushToast: (message: string) => void;
-  t: (key: string) => string;
+  t: Translate;
   upsert: EvoluMutations["upsert"];
 }
 
@@ -176,9 +176,6 @@ const OWNER_ROTATION_STORAGE_KEYS = [
   EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
   EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_CONTACTS_OWNER_EDIT_COUNT_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_EDIT_COUNT_STORAGE_KEY,
-  EVOLU_TRANSACTIONS_OWNER_EDIT_COUNT_STORAGE_KEY,
   EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
   EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
@@ -186,12 +183,8 @@ const OWNER_ROTATION_STORAGE_KEYS = [
 ] as const;
 
 const resetStoredOwnerRotationState = (): void => {
-  try {
-    for (const storageKey of OWNER_ROTATION_STORAGE_KEYS) {
-      localStorage.removeItem(storageKey);
-    }
-  } catch {
-    // ignore storage unavailability
+  for (const storageKey of OWNER_ROTATION_STORAGE_KEYS) {
+    safeLocalStorageRemove(storageKey);
   }
 };
 
@@ -246,7 +239,7 @@ export const useProfileAuthDomain = ({
     };
   }, []);
   const decodeNsecPrivateBytes = React.useCallback(async (nsec: string) => {
-    const raw = String(nsec ?? "").trim();
+    const raw = nsec.trim();
     if (!raw) return null;
 
     return decodeNsec(raw);
@@ -267,7 +260,7 @@ export const useProfileAuthDomain = ({
       source: NostrIdentitySource,
       switchedAtSec: number | null,
     ): Promise<void> => {
-      const normalizedSlip39 = String(sourceSlip39Seed ?? "").trim();
+      const normalizedSlip39 = sourceSlip39Seed.trim();
       if (!normalizedSlip39) return;
 
       const identityMnemonic = await deriveEvoluOwnerMnemonicFromSlip39(
@@ -302,7 +295,7 @@ export const useProfileAuthDomain = ({
   );
 
   React.useEffect(() => {
-    const nsec = String(currentNsec ?? "").trim();
+    const nsec = (currentNsec ?? "").trim();
     if (!nsec) {
       setCurrentNpub(null);
       return;
@@ -326,7 +319,7 @@ export const useProfileAuthDomain = ({
 
   const deriveAppMnemonicFromSlip39 = React.useCallback(
     async (seed: string): Promise<Evolu.Mnemonic | null> => {
-      const normalizedSeed = String(seed ?? "").trim();
+      const normalizedSeed = seed.trim();
       if (!normalizedSeed) return null;
 
       const metaMnemonic = await deriveEvoluOwnerMnemonicFromSlip39(
@@ -344,7 +337,7 @@ export const useProfileAuthDomain = ({
   );
 
   React.useEffect(() => {
-    const normalizedSlip39 = String(slip39Seed ?? "").trim();
+    const normalizedSlip39 = (slip39Seed ?? "").trim();
     setSeedMnemonic(normalizedSlip39 || null);
   }, [slip39Seed]);
 
@@ -352,7 +345,7 @@ export const useProfileAuthDomain = ({
     if (!isSeedLogin) return;
     if (cashuSeedMnemonic) return;
 
-    const normalizedSlip39 = String(slip39Seed ?? "").trim();
+    const normalizedSlip39 = (slip39Seed ?? "").trim();
     if (!normalizedSlip39) return;
 
     let cancelled = false;
@@ -429,14 +422,14 @@ export const useProfileAuthDomain = ({
         });
       }
 
-      saveCachedProfile(npub, metadata, Math.floor(Date.now() / 1000));
+      saveCachedProfile(npub, metadata, nowSeconds());
 
       // Contact suggestions discover new users by their kind-30315 status,
       // so publish an empty one right away; failure only costs discovery
       // visibility, not the account, so it does not abort onboarding.
       const statusExit = await publishStatus(new StatusDraft({ content: "" }));
       if (Exit.isSuccess(statusExit)) {
-        saveCachedStatus(npub, "", Math.floor(Date.now() / 1000));
+        saveCachedStatus(npub, "", nowSeconds());
       }
     },
     [currentNsec, publishProfile, publishStatus, setLinkstrConfig, t],
@@ -444,7 +437,7 @@ export const useProfileAuthDomain = ({
 
   const republishProfileForNewKey = React.useCallback(
     async (newNsec: string): Promise<boolean> => {
-      const previousNsec = String(currentNsec ?? "").trim();
+      const previousNsec = (currentNsec ?? "").trim();
       if (!previousNsec || previousNsec === newNsec) return true;
 
       const previousNpub = await deriveNpubFromNsec(previousNsec);
@@ -468,7 +461,7 @@ export const useProfileAuthDomain = ({
 
       const newNpub = await deriveNpubFromNsec(newNsec);
       if (newNpub) {
-        saveCachedProfile(newNpub, metadata, Math.floor(Date.now() / 1000));
+        saveCachedProfile(newNpub, metadata, nowSeconds());
       }
       return true;
     },
@@ -487,7 +480,7 @@ export const useProfileAuthDomain = ({
       sourceSlip39Seed: string,
       options?: {
         identitySource?: NostrIdentitySource;
-        invalidMessageKey?: string;
+        invalidMessageKey?: I18nKey;
         persistSyncedIdentity?: boolean;
         recordChatNotice?: boolean;
         switchedAtSec?: number | null;
@@ -495,13 +488,13 @@ export const useProfileAuthDomain = ({
     ) => {
       const invalidMessageKey =
         options?.invalidMessageKey ?? "onboardingInvalidSeed";
-      const raw = String(nsec ?? "").trim();
+      const raw = nsec.trim();
       if (!raw) {
         pushToast(t(invalidMessageKey));
         return;
       }
 
-      const normalizedSlip39 = String(sourceSlip39Seed ?? "").trim();
+      const normalizedSlip39 = sourceSlip39Seed.trim();
       if (!normalizedSlip39) {
         pushToast(t(invalidMessageKey));
         return;
@@ -526,7 +519,7 @@ export const useProfileAuthDomain = ({
         identitySource === "custom"
           ? (options?.switchedAtSec ?? changedAtSec)
           : null;
-      const previousNsec = String(currentNsec ?? "").trim();
+      const previousNsec = (currentNsec ?? "").trim();
       const shouldRecordChatNotice =
         options?.recordChatNotice === true &&
         Boolean(previousNsec) &&
@@ -596,17 +589,17 @@ export const useProfileAuthDomain = ({
     if (!isSeedLogin) return;
     if (activeNostrIdentitySource === "custom") return;
 
-    const normalizedSeed = String(slip39Seed ?? "").trim();
+    const normalizedSeed = (slip39Seed ?? "").trim();
     if (!normalizedSeed) return;
 
-    const normalizedCurrentNsec = String(currentNsec ?? "").trim();
+    const normalizedCurrentNsec = (currentNsec ?? "").trim();
 
     let cancelled = false;
     void (async () => {
       const derived = await deriveNostrKeysFromSlip39(normalizedSeed);
       if (!derived || cancelled) return;
 
-      const normalizedDerivedNsec = String(derived.nsec ?? "").trim();
+      const normalizedDerivedNsec = derived.nsec.trim();
       if (!normalizedDerivedNsec) return;
       if (normalizedDerivedNsec === normalizedCurrentNsec) return;
 
@@ -668,7 +661,7 @@ export const useProfileAuthDomain = ({
       }
 
       const npub = derived.npub;
-      const normalizedNsec = String(derived.nsec ?? "").trim();
+      const normalizedNsec = derived.nsec.trim();
       if (!normalizedNsec) {
         pushToast(t("onboardingCreateFailed"));
         setOnboardingStep({
@@ -936,7 +929,7 @@ export const useProfileAuthDomain = ({
         return;
       }
 
-      if (!looksLikeSlip39Seed(normalizedSlip39)) {
+      if (!looksLikeSlip39Share(normalizedSlip39)) {
         const message = t("onboardingInvalidSeed");
         updateReturningOnboardingStep((current) => ({
           ...current,
@@ -993,7 +986,7 @@ export const useProfileAuthDomain = ({
         return;
       }
 
-      const raw = String(text ?? "").trim();
+      const raw = text.trim();
       if (!raw) {
         pushToast(t("pasteEmpty"));
         return;
@@ -1019,7 +1012,7 @@ export const useProfileAuthDomain = ({
   const requestPasteNostrKeys = React.useCallback(async () => {
     if (onboardingIsBusy) return;
 
-    const normalizedSeed = String(slip39Seed ?? "").trim();
+    const normalizedSeed = (slip39Seed ?? "").trim();
     if (!normalizedSeed) {
       pushToast(t("seedMissing"));
       return;
@@ -1033,7 +1026,7 @@ export const useProfileAuthDomain = ({
         return;
       }
 
-      const raw = String(text ?? "").trim();
+      const raw = text.trim();
       if (!raw) {
         pushToast(t("pasteEmpty"));
         return;

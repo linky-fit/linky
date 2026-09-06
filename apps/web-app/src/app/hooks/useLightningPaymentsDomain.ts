@@ -10,18 +10,16 @@ import {
 import { CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY } from "../../utils/constants";
 import type { DisplayAmountParts } from "../../utils/displayAmounts";
 import {
+  buildPaymentAmountAttempts,
+  buildPaymentFailureAmountAttempts,
   getLightningInvoicePreview,
+  isRetryablePaymentAmountFailure,
   type LightningInvoicePreview,
-} from "../../utils/lightningInvoice";
+} from "@linky/linkshu";
 import { normalizeMintUrl } from "../../utils/mint";
 import { safeLocalStorageSet } from "../../utils/storage";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { describeTaggedCashuError } from "../lib/cashuStoredError";
-import {
-  buildPaymentAmountAttempts,
-  buildPaymentFailureAmountAttempts,
-  isRetryablePaymentAmountFailure,
-} from "../lib/paymentAmountFallback";
 import { selectSendMintForAmount } from "../lib/paymentMintSelection";
 import type { SendMintBalance } from "../lib/paymentMintSelection";
 import type {
@@ -29,6 +27,7 @@ import type {
   LoggedPaymentEventParams,
 } from "../types/appTypes";
 import type { MeltCashuInvoice } from "./composition/useLinkshuComposition";
+import type { Translate } from "../../i18n";
 
 const describeMeltError = (error: MeltError): string =>
   describeTaggedCashuError(error) ?? error._tag;
@@ -50,7 +49,7 @@ interface UseLightningPaymentsDomainParams {
   >;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   showPaidOverlay: (title?: string) => void;
-  t: (key: string) => string;
+  t: Translate;
   /** Per-mint spendable balances from the linkshu read model. */
   walletMintBalances: readonly SendMintBalance[];
 }
@@ -212,7 +211,7 @@ export const useLightningPaymentsDomain = ({
 
   const payLightningAddressWithCashu = React.useCallback(
     async (lnAddress: string, amountSat: number) => {
-      const paymentTarget = String(lnAddress ?? "").trim();
+      const paymentTarget = lnAddress.trim();
       if (!paymentTarget) return false;
       if (!Number.isFinite(amountSat) || amountSat <= 0) {
         setStatus(`${t("errorPrefix")}: ${t("payInvalidAmount")}`);
@@ -328,9 +327,8 @@ export const useLightningPaymentsDomain = ({
           const knownContact = paidLightningAddress
             ? contacts.find(
                 (contact) =>
-                  String(contact.lnAddress ?? "")
-                    .trim()
-                    .toLowerCase() === paidLightningAddress.toLowerCase(),
+                  (contact.lnAddress ?? "").trim().toLowerCase() ===
+                  paidLightningAddress.toLowerCase(),
               )
             : null;
 
@@ -373,7 +371,7 @@ export const useLightningPaymentsDomain = ({
               .replace("{unit}", displayAmount.unitLabel)
               .replace(
                 "{name}",
-                String(knownContact?.name ?? "").trim() || displayTarget,
+                (knownContact?.name ?? "").trim() || displayTarget,
               ),
           );
 
@@ -425,9 +423,8 @@ export const useLightningPaymentsDomain = ({
             contacts.find(
               (contact) =>
                 resolvedLightningAddress !== null &&
-                String(contact.lnAddress ?? "")
-                  .trim()
-                  .toLowerCase() === resolvedLightningAddress.toLowerCase(),
+                (contact.lnAddress ?? "").trim().toLowerCase() ===
+                  resolvedLightningAddress.toLowerCase(),
             )?.id ?? null,
           method: "lightning_address",
           phase: finalErrorMint ? "melt" : "invoice_fetch",

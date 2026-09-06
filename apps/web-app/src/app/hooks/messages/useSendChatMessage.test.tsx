@@ -12,8 +12,9 @@ import type { EnqueueOutboxInput } from "@linky/linkstr-react";
 import { Exit } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import React, { act } from "react";
-import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createSecretKey } from "../../../testUtils/nostrKeys";
+import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type { PrivateImageMessagePayload } from "../../lib/privateImageMessage";
 import { serializePrivateImageMessage } from "../../lib/privateImageMessage";
 import type {
@@ -54,10 +55,8 @@ vi.mock("../../lib/privateImageMessage", async (importOriginal) => {
 
 import { useSendChatMessage } from "./useSendChatMessage";
 
-Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
-
-const MY_PRIVATE_KEY = new Uint8Array(32).fill(1);
-const CONTACT_PRIVATE_KEY = new Uint8Array(32).fill(2);
+const MY_PRIVATE_KEY = createSecretKey(1);
+const CONTACT_PRIVATE_KEY = createSecretKey(2);
 const MY_PUBKEY = getPublicKey(MY_PRIVATE_KEY);
 const CONTACT_PUBKEY = getPublicKey(CONTACT_PRIVATE_KEY);
 const CURRENT_NSEC = nip19.nsecEncode(MY_PRIVATE_KEY);
@@ -71,7 +70,7 @@ const receipt = (clientId: ClientId, ref: OutboxRef): EnqueueReceipt =>
   new EnqueueReceipt({
     jobId: OutboxJobId.make("job-1"),
     ref,
-    messageId: MESSAGE_ID,
+    rumorId: MESSAGE_ID,
     clientId,
     sentAt: SENT_AT,
   });
@@ -137,10 +136,7 @@ const setup = async (options: SetupOptions = {}) => {
     return null;
   };
 
-  const root = createRoot(document.createElement("div"));
-  await act(async () => {
-    root.render(<Harness />);
-  });
+  const { root } = await renderIntoDocument(<Harness />);
 
   return {
     appendLocalNostrMessage,

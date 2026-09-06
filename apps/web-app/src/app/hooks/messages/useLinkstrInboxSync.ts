@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 import { decodeNpub, identityFromNsec, UnixSeconds } from "@linky/linkstr";
 import type { InboxDelivery, WrapInboxEvent } from "@linky/linkstr";
 import {
@@ -10,18 +11,12 @@ import React from "react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY } from "../../../utils/constants";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
-import {
-  getInitialNostrIdentitySource,
-  getInitialNostrIdentitySwitchedAtSec,
-  safeLocalStorageGetJson,
-} from "../../../utils/storage";
 import type {
   ContactNameRowLike,
   LocalNostrMessage,
   LocalNostrReaction,
   NewLocalNostrMessage,
   NewLocalNostrReaction,
-  OptionalText,
   PaymentLogData,
   RouteWithOptionalId,
   UpdateLocalNostrMessage,
@@ -52,6 +47,14 @@ import {
   type PeerSeenWindow,
   type SeenReceiptInboxContext,
 } from "./seenReceiptInbox";
+import {
+  getInitialNostrIdentitySource,
+  getInitialNostrIdentitySwitchedAtSec,
+  safeLocalStorageGetJson,
+} from "../../../utils/storage";
+import { trimString } from "../../../utils/validation";
+import { nowSeconds } from "../../../utils/time";
+import type { Translate } from "../../../i18n";
 
 // Fallback backfill window for a first session without a persisted cursor.
 const INBOX_BACKFILL_SINCE_SEC = 3 * 24 * 60 * 60;
@@ -59,7 +62,11 @@ const INBOX_BACKFILL_SINCE_SEC = 3 * 24 * 60 * 60;
 const isBlockedPubkey = (pubkey: string): boolean => {
   const normalizedPubkey = normalizePubkeyHex(pubkey);
   if (!normalizedPubkey) return false;
-  return safeLocalStorageGetJson(BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY, [])
+  return safeLocalStorageGetJson(
+    BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
+    Schema.Array(Schema.String),
+    [],
+  )
     .map(normalizePubkeyHex)
     .filter((entry): entry is string => Boolean(entry))
     .includes(normalizedPubkey);
@@ -70,9 +77,9 @@ const deriveMyPubkey = (currentNsec: string | null): string | null => {
   return identityFromNsec(currentNsec.trim())?.pubkey ?? null;
 };
 
-type InboxContactRowLike = ContactNameRowLike & { npub?: OptionalText };
-
-const normalizeText = (value: unknown): string => String(value ?? "").trim();
+type InboxContactRowLike = ContactNameRowLike & {
+  npub?: string | null | undefined;
+};
 
 const buildContactIndex = (
   contacts: readonly InboxContactRowLike[],
@@ -81,14 +88,14 @@ const buildContactIndex = (
   // Archived contacts stay in the index: their incoming messages land on the
   // contact itself, which then restores it from the archive.
   for (const contact of contacts) {
-    const npub = normalizeNpubIdentifier(contact.npub);
+    const npub = normalizeNpubIdentifier(contact.npub ?? "");
     if (!npub) continue;
     const pubkey = decodeNpub(npub);
-    const id = normalizeText(contact.id);
+    const id = trimString(contact.id);
     if (!pubkey || !id) continue;
     contactByPubkey.set(pubkey, {
       id,
-      name: normalizeText(contact.name) || null,
+      name: trimString(contact.name) || null,
       npub,
     });
   }
@@ -124,7 +131,7 @@ interface UseLinkstrInboxSyncParams {
   recordSentSeenReceipt: (peerPubkey: string, seenUpToSec: number) => void;
   route: RouteWithOptionalId;
   softDeleteLocalNostrReactionsByWrapIds: (wrapIds: readonly string[]) => void;
-  t: (key: string) => string;
+  t: Translate;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
   updateLocalNostrReaction: UpdateLocalNostrReaction;
 }
@@ -210,7 +217,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
       getPeerSeenWindow: latest.getPeerSeenWindow,
       identitySinceSec: identitySinceSecRef.current,
       isBlockedPubkey,
-      nowSec: Math.floor(Date.now() / 1e3),
+      nowSec: nowSeconds(),
       recordSentSeenReceipt: latest.recordSentSeenReceipt,
     };
 
@@ -320,9 +327,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
     // The cursor store (configured in useLinkstrConfigSync) wins over `since`
     // once it holds a checkpoint.
     setWrapInboxHandler({
-      since: UnixSeconds.make(
-        Math.floor(Date.now() / 1e3) - INBOX_BACKFILL_SINCE_SEC,
-      ),
+      since: UnixSeconds.make(nowSeconds() - INBOX_BACKFILL_SINCE_SEC),
       onEvent: dispatchInboxEvent,
     });
     return () => setWrapInboxHandler(null);
