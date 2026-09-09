@@ -358,6 +358,14 @@ export const de = {
   myNpubQr: "Dein Kontakt",
   profileMissingNpub: "Nostr-Schlüssel fehlen.",
   profileUploadPhoto: "Foto hochladen",
+  onboard: "Onboarding",
+  onboardScanHint:
+    "Der Neuling scannt diesen Code mit der Handykamera. Linky öffnet sich und nach der Anmeldung gibt es ein Willkommensgeschenk.",
+  onboardGiftIncluded: "Der Code enthält ein Willkommensgeschenk von {amount}.",
+  onboardGiftSkipped:
+    "Nicht genug Guthaben für das Willkommensgeschenk von {amount}, der Code öffnet nur die App.",
+  onboardGiftClaimed: "Willkommensgeschenk eingelöst",
+  copyLink: "Link kopieren",
   language: "Sprache",
   czech: "Čeština",
   english: "English",

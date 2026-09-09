@@ -38,6 +38,7 @@ import { NOSTR_RELAYS } from "../../../utils/nostrRelays";
 import {
   CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
+  ONBOARDING_GIFT_SAT,
   WALLET_WARNING_BALANCE_THRESHOLD_SAT,
   WALLET_WARNING_DISMISSED_STORAGE_KEY,
 } from "../../../utils/constants";
@@ -2201,6 +2202,110 @@ export const useCashuWalletComposition = ({
         )
       : null;
 
+  const issueCashuToken = React.useCallback(
+    async (amountSat: number): Promise<CashuTokenId | null> => {
+      if (cashuIsBusy) return null;
+      if (cashuBalance < amountSat) {
+        setStatus(t("payInsufficient"));
+        return null;
+      }
+      if (sendCashuToken === null) {
+        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
+        return null;
+      }
+
+      const logIssueFailure = (error: string, mint: string | null): void => {
+        logPaymentEvent({
+          direction: "out",
+          status: "error",
+          amount: amountSat,
+          fee: null,
+          mint,
+          unit: "sat",
+          error,
+          contactId: null,
+          method: "unknown",
+          phase: "swap",
+        });
+      };
+
+      setCashuIsBusy(true);
+      setStatus(t("cashuEmitting"));
+
+      try {
+        const mint = selectSendMintForAmount(
+          walletBalances.perMint,
+          normalizeMintUrl(defaultMintUrl ?? ""),
+          amountSat,
+        );
+        if (mint === null) {
+          setStatus(t("payInsufficient"));
+          return null;
+        }
+
+        const outcome = await sendCashuToken({
+          amountSat,
+          mint,
+          produceAs: "issued",
+        });
+        if (Either.isLeft(outcome)) {
+          const sendError = outcome.left;
+          const errorMessage =
+            describeTaggedCashuError(sendError) ?? sendError._tag;
+          logIssueFailure(errorMessage, mint);
+          setStatus(
+            sendError._tag === "InsufficientFunds"
+              ? t("payInsufficient")
+              : `${t("payFailed")}: ${errorMessage}`,
+          );
+          return null;
+        }
+
+        const receipt = outcome.right;
+        logPaymentEvent({
+          direction: "out",
+          status: "ok",
+          amount: receipt.amount,
+          details: {
+            issuedToken: receipt.tokenText,
+          },
+          fee: null,
+          mint: receipt.mint,
+          unit: receipt.unit,
+          error: null,
+          contactId: null,
+          method: "unknown",
+          phase: "swap",
+        });
+        setStatus(null);
+
+        const rowId = CashuTokenIdFromUnknown.fromUnknown(receipt.rowId);
+        if (!rowId.ok) {
+          setStatus(`${t("payFailed")}: invalid token row id`);
+          return null;
+        }
+        return rowId.value;
+      } catch (error) {
+        const errorMessage = getUnknownErrorMessage(error, "unknown");
+        logIssueFailure(errorMessage, null);
+        setStatus(`${t("payFailed")}: ${errorMessage}`);
+        return null;
+      } finally {
+        setCashuIsBusy(false);
+      }
+    },
+    [
+      cashuBalance,
+      cashuIsBusy,
+      defaultMintUrl,
+      logPaymentEvent,
+      sendCashuToken,
+      setStatus,
+      t,
+      walletBalances.perMint,
+    ],
+  );
+
   const emitCashuToken = React.useCallback(async () => {
     const amountSat = Number.parseInt(cashuEmitAmount.trim(), 10);
     if (!Number.isFinite(amountSat) || amountSat <= 0) {
@@ -2208,107 +2313,30 @@ export const useCashuWalletComposition = ({
       return;
     }
 
+    const tokenId = await issueCashuToken(amountSat);
+    if (tokenId === null) return;
+
+    setCashuEmitAmount("");
+    navigateTo({ route: "cashuToken", id: tokenId });
+  }, [cashuEmitAmount, issueCashuToken, setCashuEmitAmount, setStatus, t]);
+
+  const startOnboarding = React.useCallback(async () => {
     if (cashuIsBusy) return;
-    if (cashuBalance < amountSat) {
-      setStatus(t("payInsufficient"));
-      return;
-    }
-    if (sendCashuToken === null) {
-      setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-      return;
-    }
 
-    const logEmitFailure = (error: string, mint: string | null): void => {
-      logPaymentEvent({
-        direction: "out",
-        status: "error",
-        amount: amountSat,
-        fee: null,
-        mint,
-        unit: "sat",
-        error,
-        contactId: null,
-        method: "unknown",
-        phase: "swap",
-      });
-    };
-
-    setCashuIsBusy(true);
-    setStatus(t("cashuEmitting"));
-
-    try {
-      const mint = selectSendMintForAmount(
-        walletBalances.perMint,
-        normalizeMintUrl(defaultMintUrl ?? ""),
-        amountSat,
-      );
-      if (mint === null) {
-        setStatus(t("payInsufficient"));
-        return;
-      }
-
-      const outcome = await sendCashuToken({
-        amountSat,
-        mint,
-        produceAs: "issued",
-      });
-      if (Either.isLeft(outcome)) {
-        const sendError = outcome.left;
-        const errorMessage =
-          describeTaggedCashuError(sendError) ?? sendError._tag;
-        logEmitFailure(errorMessage, mint);
-        setStatus(
-          sendError._tag === "InsufficientFunds"
-            ? t("payInsufficient")
-            : `${t("payFailed")}: ${errorMessage}`,
-        );
-        return;
-      }
-
-      const receipt = outcome.right;
-      logPaymentEvent({
-        direction: "out",
-        status: "ok",
-        amount: receipt.amount,
-        details: {
-          issuedToken: receipt.tokenText,
-        },
-        fee: null,
-        mint: receipt.mint,
-        unit: receipt.unit,
-        error: null,
-        contactId: null,
-        method: "unknown",
-        phase: "swap",
-      });
-
-      setCashuEmitAmount("");
-      setStatus(null);
-      const routeId = CashuTokenIdFromUnknown.fromUnknown(receipt.rowId);
-      navigateTo(
-        routeId.ok
-          ? { route: "cashuToken", id: routeId.value }
-          : { route: "cashuTokens" },
-      );
-    } catch (error) {
-      const errorMessage = getUnknownErrorMessage(error, "unknown");
-      logEmitFailure(errorMessage, null);
-      setStatus(`${t("payFailed")}: ${errorMessage}`);
-    } finally {
-      setCashuIsBusy(false);
-    }
-  }, [
-    cashuBalance,
-    cashuEmitAmount,
-    cashuIsBusy,
-    defaultMintUrl,
-    logPaymentEvent,
-    sendCashuToken,
-    setCashuEmitAmount,
-    setStatus,
-    t,
-    walletBalances.perMint,
-  ]);
+    const tokenId =
+      cashuBalance >= ONBOARDING_GIFT_SAT
+        ? await issueCashuToken(ONBOARDING_GIFT_SAT)
+        : null;
+    reportAppLog({
+      tag: "onboarding.start",
+      summary: tokenId
+        ? `Onboarding QR with a ${ONBOARDING_GIFT_SAT} sat welcome gift`
+        : "Onboarding QR without a welcome gift",
+      links: tokenId ? { row: tokenId } : {},
+      payload: { giftSat: tokenId ? ONBOARDING_GIFT_SAT : 0, cashuBalance },
+    });
+    navigateTo(tokenId ? { route: "onboard", tokenId } : { route: "onboard" });
+  }, [cashuBalance, cashuIsBusy, issueCashuToken]);
 
   const meltLargestForeignMintToMainMint = React.useCallback(async () => {
     if (cashuIsBusy) return;
@@ -2595,6 +2623,7 @@ export const useCashuWalletComposition = ({
     deleteSpentCashuTokensIsBusy,
     dismissWalletWarning,
     emitCashuToken,
+    startOnboarding,
     getCashuTokenMessageInfo,
     getMintIconUrl,
     getMintRuntime,

@@ -66,6 +66,7 @@ export const resolveBackAction = (
       return () => navigateTo({ route: "mints" });
 
     case "profileEdit":
+    case "onboard":
       return () => navigateTo({ route: "profile" });
 
     case "bankPayment":
@@ -209,6 +210,7 @@ const SHOWS_MENU_BUTTON: Record<
   nostrRelayNew: true,
   profile: true,
   profileEdit: false,
+  onboard: false,
   settings: false,
   settingsLanguage: false,
   settingsMasterKeys: false,
@@ -340,6 +342,7 @@ const TOPBAR_TITLE_KEY: Record<
   nostrRelays: "nostrRelay",
   profile: "profile",
   profileEdit: "profile",
+  onboard: "onboard",
   settings: "settings",
   settingsLanguage: "language",
   settingsMasterKeys: "masterKeys",

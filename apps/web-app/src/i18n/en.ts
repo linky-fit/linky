@@ -348,6 +348,14 @@ export const en = {
   myNpubQr: "Your contact",
   profileMissingNpub: "Missing Nostr keys.",
   profileUploadPhoto: "Upload photo",
+  onboard: "Onboard",
+  onboardScanHint:
+    "Let the newcomer scan this code with their phone camera. It opens Linky and, once they sign in, hands them a welcome gift.",
+  onboardGiftIncluded: "The code includes a {amount} welcome gift.",
+  onboardGiftSkipped:
+    "Not enough balance for the {amount} welcome gift, the code only opens the app.",
+  onboardGiftClaimed: "Welcome gift claimed",
+  copyLink: "Copy link",
 
   language: "Language",
   czech: "Čeština",

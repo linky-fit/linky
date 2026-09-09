@@ -1,4 +1,4 @@
-import { Copy, Radio, RefreshCcw, Save } from "lucide-react";
+import { Copy, Radio, RefreshCcw, Save, UserPlus } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { Avatar } from "../components/Avatar";
@@ -67,6 +67,7 @@ interface ProfilePageProps {
   setProfileEditLnAddress: (value: string) => void;
   setProfileEditName: (value: string) => void;
   setProfileEditStatus: (value: string) => void;
+  startOnboarding: () => Promise<void>;
   toggleProfileStatusCurrency: (
     currency: ProfileStatusCurrency,
   ) => Promise<void>;
@@ -112,6 +113,7 @@ export function ProfilePage({
   setProfileEditLnAddress,
   setProfileEditName,
   setProfileEditStatus,
+  startOnboarding,
   toggleProfileStatusCurrency,
   writeCurrentNpubToNfc,
 }: ProfilePageProps): React.ReactElement {
@@ -485,6 +487,24 @@ export function ProfilePage({
               })}
             </div>
           </div>
+
+          {!isProfileEditing ? (
+            <div className="actions">
+              <button
+                type="button"
+                className="btn-wide secondary"
+                onClick={() => void startOnboarding()}
+                disabled={cashuIsBusy}
+              >
+                <span className="btn-label-with-icon">
+                  <span className="btn-label-icon" aria-hidden="true">
+                    <UserPlus size={18} />
+                  </span>
+                  <span>{t("onboard")}</span>
+                </span>
+              </button>
+            </div>
+          ) : null}
         </>
       )}
     </section>

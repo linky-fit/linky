@@ -110,6 +110,18 @@ describe("parseRouteFromHash", () => {
       id: unknownChatId,
     });
   });
+  it("parses the onboarding route with an optional gift token id", () => {
+    replaceHash("#profile/onboard");
+    expect(parseRouteFromHash()).toEqual({ kind: "onboard" });
+
+    const tokenId = "AAAAAAAAAAAAAAAAAAAAAA";
+    replaceHash(`#profile/onboard/${tokenId}`);
+    expect(parseRouteFromHash()).toEqual({ kind: "onboard", tokenId });
+
+    replaceHash("#profile/onboard/not-an-id");
+    expect(parseRouteFromHash()).toEqual({ kind: "onboard" });
+  });
+
   it("parses the manual payment route", () => {
     replaceHash("#wallet/pay");
 

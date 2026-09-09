@@ -27,6 +27,7 @@ export { MintsPage } from "./MintsPage";
 export { NostrRelayNewPage } from "./NostrRelayNewPage";
 export { NostrRelayPage } from "./NostrRelayPage";
 export { NostrRelaysPage } from "./NostrRelaysPage";
+export { OnboardPage } from "./OnboardPage";
 export { ProfilePage } from "./ProfilePage";
 export { PushDebugPage } from "./PushDebugPage";
 export { SettingsPage } from "./SettingsPage";

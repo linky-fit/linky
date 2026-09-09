@@ -58,6 +58,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
   "relayList.syncFailed":
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
+  "onboarding.start":
+    "User opened the onboarding QR from their profile; the payload says whether a welcome-gift token was issued for it (the row link points at that issued token) or skipped for lack of balance.",
   "pay.step":
     "One step of paying a contact with a cashu token sent as a chat message (start, mint-selected, swap-ok, plan-send-token, publish-pending, publish-ok, publish-failed, payment-notice-publish, message-ack, queued-offline). The client and message links tie the steps to the gift wraps they produced.",
   "contacts.addToGroup":

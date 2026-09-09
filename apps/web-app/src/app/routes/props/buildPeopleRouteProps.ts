@@ -7,6 +7,8 @@ interface BuildPeopleRoutePropsParams {
   cashuBalance: PeopleRoutesProps["chatProps"]["cashuBalance"];
   cashuBalanceAfterMelt: PeopleRoutesProps["chatProps"]["cashuBalanceAfterMelt"];
   cashuIsBusy: PeopleRoutesProps["chatProps"]["cashuIsBusy"];
+  cashuTokensAll: PeopleRoutesProps["onboardProps"]["cashuTokensAll"];
+  checkSingleIssuedCashuTokenIsClaimed: PeopleRoutesProps["onboardProps"]["checkSingleIssuedCashuTokenIsClaimed"];
   canWriteNfc: PeopleRoutesProps["profileProps"]["canWriteToNfc"];
   chatSelectedContact: PeopleRoutesProps["chatProps"]["selectedContact"];
   chatDraft: PeopleRoutesProps["chatProps"]["chatDraft"];
@@ -116,6 +118,8 @@ interface BuildPeopleRoutePropsParams {
   setProfileEditLnAddress: PeopleRoutesProps["profileProps"]["setProfileEditLnAddress"];
   setProfileEditName: PeopleRoutesProps["profileProps"]["setProfileEditName"];
   setProfileEditStatus: PeopleRoutesProps["profileProps"]["setProfileEditStatus"];
+  showPaidOverlay: PeopleRoutesProps["onboardProps"]["showPaidOverlay"];
+  startOnboarding: PeopleRoutesProps["profileProps"]["startOnboarding"];
   t: Translate;
   toggleProfileStatusCurrency: PeopleRoutesProps["profileProps"]["toggleProfileStatusCurrency"];
   writeCurrentNpubToNfc: PeopleRoutesProps["profileProps"]["writeCurrentNpubToNfc"];
@@ -125,6 +129,8 @@ export const buildPeopleRouteProps = ({
   cashuBalance,
   cashuBalanceAfterMelt,
   cashuIsBusy,
+  cashuTokensAll,
+  checkSingleIssuedCashuTokenIsClaimed,
   canWriteNfc,
   chatSelectedContact,
   chatDraft,
@@ -227,6 +233,8 @@ export const buildPeopleRouteProps = ({
   setProfileEditLnAddress,
   setProfileEditName,
   setProfileEditStatus,
+  showPaidOverlay,
+  startOnboarding,
   t,
   toggleProfileStatusCurrency,
   writeCurrentNpubToNfc,
@@ -389,8 +397,16 @@ export const buildPeopleRouteProps = ({
       ownedLightningAddresses,
       saveProfileEdits,
       copyText,
+      startOnboarding,
       toggleProfileStatusCurrency,
       writeCurrentNpubToNfc,
+    },
+    onboardProps: {
+      cashuTokensAll,
+      checkSingleIssuedCashuTokenIsClaimed,
+      copyText,
+      giftTokenId: route.kind === "onboard" ? (route.tokenId ?? null) : null,
+      showPaidOverlay,
     },
   };
 };
