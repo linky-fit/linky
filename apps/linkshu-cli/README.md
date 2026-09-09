@@ -30,6 +30,7 @@ docker compose -f docker-compose.dev.yml up -d --wait cashu-mint
 | `receive <token>` | accept a cashu token                                      |
 | `send <amount>`   | swap out `<amount>` sat and print the token               |
 | `melt <invoice>`  | pay a bolt11 invoice                                      |
+| `melt`            | settle melts an earlier run left pending                  |
 | `restore`         | recover the wallet from the seed via NUT-09               |
 
 Options: `--data-dir <path>`, `--mint <url>`, `--verbose`, `--help`.

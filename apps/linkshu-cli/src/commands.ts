@@ -134,7 +134,13 @@ const send = (mint: MintUrl, amount: Amount): Command =>
     print(receipt.tokenText);
   });
 
-const melt = (mint: MintUrl, invoice: Bolt11Invoice): Command =>
+/** No invoice means "settle whatever an earlier run left pending". */
+const melt = (mint: MintUrl, operands: ReadonlyArray<string>): Command =>
+  operands.length === 0
+    ? resumeMelts
+    : payInvoice(mint, requireInvoice(operands));
+
+const payInvoice = (mint: MintUrl, invoice: Bolt11Invoice): Command =>
   Effect.gen(function* () {
     const draft = new MeltDraft({ mint, invoice });
     const meltService = yield* Melt;
@@ -145,6 +151,22 @@ const melt = (mint: MintUrl, invoice: Bolt11Invoice): Command =>
       `paid     ${receipt.paidAmount} sat  fee ${receipt.feePaid} sat  change ${receipt.changeAmount} sat`,
     );
   });
+
+const resumeMelts: Command = Effect.gen(function* () {
+  const results = yield* (yield* Melt).resumePending;
+  if (results.length === 0) {
+    print("no pending melts");
+    return;
+  }
+  for (const result of results) {
+    const receipt = result.receipt;
+    print(
+      receipt === null
+        ? `${result.status.padEnd(8)} ${result.quoteId} (${result.amount} sat)`
+        : `paid     ${receipt.paidAmount} sat  fee ${receipt.feePaid} sat  change ${receipt.changeAmount} sat`,
+    );
+  }
+});
 
 const restore = (mint: MintUrl): Command =>
   Effect.gen(function* () {
@@ -175,7 +197,7 @@ export const buildCommand = (
     case "send":
       return send(mint, requireAmount(operands));
     case "melt":
-      return melt(mint, requireInvoice(operands));
+      return melt(mint, operands);
     case "restore":
       return restore(mint);
     default:
