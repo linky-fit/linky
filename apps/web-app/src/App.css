@@ -6044,7 +6044,7 @@ button.bank-payment-amount-button:hover {
   .chat-compose {
     gap: 4px;
     padding: 0 var(--page-gutter);
-    padding-bottom: calc(6px + var(--floating-safe-area-bottom));
+    padding-bottom: calc(12px + var(--floating-safe-area-bottom));
     background: transparent;
     box-shadow: none;
   }
