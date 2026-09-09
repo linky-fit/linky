@@ -15,6 +15,7 @@ import {
   claimMintQuote,
   QUOTE_ISSUED,
   QUOTE_UNPAID,
+  UnpaidMintQuote,
 } from "../internal/quoteClaim";
 import { decodeMintQuote, emitQuoteState } from "../internal/quotes";
 import { nowSeconds } from "../internal/time";
@@ -214,8 +215,18 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
       Effect.gen(function* () {
         const mintConfig = yield* mintConfigFor(pending, options);
         const wallet = yield* instances.get(pending.mint, pending.unit);
-        yield* awaitSettled(wallet, pending);
-        return yield* mintUnderLock(wallet, pending, mintConfig);
+        for (;;) {
+          yield* awaitSettled(wallet, pending);
+          const outcome = yield* Effect.either(
+            mintUnderLock(wallet, pending, mintConfig),
+          );
+          if (Either.isRight(outcome)) return outcome.right;
+          if (!(outcome.left instanceof UnpaidMintQuote)) {
+            return yield* Effect.fail(outcome.left);
+          }
+          emitQuoteState(inspector, "topup", pending, QUOTE_UNPAID);
+          yield* Effect.sleep(POLL_INTERVAL);
+        }
       }).pipe(
         Effect.tapError((error) =>
           // An expired quote that never reserved slots was never paid.

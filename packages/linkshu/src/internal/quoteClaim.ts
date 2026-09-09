@@ -10,6 +10,7 @@ import { Amount } from "../domain/primitives";
 import type {
   CurrencyUnit,
   KeysetId,
+  MintUrl,
   TokenRowId,
   TokenText,
 } from "../domain/primitives";
@@ -54,6 +55,16 @@ const MAX_MINT_ATTEMPTS = 5;
 
 export const QUOTE_UNPAID = "UNPAID";
 export const QUOTE_ISSUED = "ISSUED";
+
+export class UnpaidMintQuote extends MintRejected {
+  constructor(mint: MintUrl) {
+    super({
+      mint,
+      code: null,
+      detail: "mint reported the settled quote as unpaid",
+    });
+  }
+}
 
 /** The durable record's claim-relevant slice; flows carry their own extras. */
 export interface ClaimableQuote extends PendingRecord {
@@ -237,11 +248,7 @@ export const claimMintQuote = <R extends ClaimableQuote>(
           return yield* reclaimIssued(ctx, record);
         }
         if (quote.state === QUOTE_UNPAID) {
-          return yield* new MintRejected({
-            mint: record.mint,
-            code: null,
-            detail: "mint reported the settled quote as unpaid",
-          });
+          return yield* new UnpaidMintQuote(record.mint);
         }
 
         const counter =

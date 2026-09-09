@@ -178,6 +178,36 @@ const resumeAndAwait = Effect.gen(function* () {
 });
 
 describe("Topup", () => {
+  it("keeps waiting when the claim sees stale UNPAID after settlement", async () => {
+    const storage = freshStorage();
+    const { wallet, mintCounters } = makeWallet({
+      states: [
+        quoteResponse("PAID"),
+        quoteResponse("UNPAID"),
+        quoteResponse("PAID"),
+      ],
+    });
+    const { run, events } = makeHarness(wallet, storage);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.adjust("1000 seconds");
+        return yield* runOnTestClock(startAndAwait, "5 seconds");
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.receipt.amount).toBe(16);
+    expect(mintCounters).toEqual([1]);
+    expect(await Effect.runPromise(storage.tokens.loadAll)).toHaveLength(1);
+    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(
+      events
+        .filter((event) => event._tag === "QuoteStateChanged")
+        .map((event) => event.state),
+    ).toEqual(["UNPAID", "PAID", "UNPAID", "PAID"]);
+  });
+
   it("mints an accepted row once the quote reports paid", async () => {
     const storage = freshStorage();
     const { wallet, mintCounters } = makeWallet({
