@@ -38,6 +38,7 @@ import type {
   LightningFeeProbeResult,
   MeltError,
   MeltReceipt,
+  MeltResumeResult,
   MintRejected,
   MintUnreachable,
   ReceiveError,
@@ -125,6 +126,11 @@ interface MeltCashuInvoiceArgs {
 export type MeltCashuInvoice = (
   args: MeltCashuInvoiceArgs,
 ) => Promise<Either.Either<MeltReceipt, MeltError>>;
+
+/** Settles persisted unsettled melts (linkshu `Melt.resumePending`). */
+export type ResumePendingCashuMelts = () => Promise<
+  ReadonlyArray<MeltResumeResult>
+>;
 
 interface ProbeLightningFeeArgs {
   readonly mint: string;
@@ -423,6 +429,9 @@ export const useLinkshuComposition = ({
         }),
       );
 
+    const resumePendingCashuMelts: ResumePendingCashuMelts = () =>
+      run(Effect.flatMap(Melt, (melt) => melt.resumePending));
+
     const startCashuTopup: StartCashuTopup = ({ amountSat, mint }) =>
       runEither(
         Effect.suspend(() => {
@@ -553,6 +562,7 @@ export const useLinkshuComposition = ({
       receiveCashuToken,
       restoreCashuTokens,
       resumePendingCashuAutoswapClaims,
+      resumePendingCashuMelts,
       resumePendingCashuTopups,
       sendCashuToken,
       startCashuTopup,
@@ -573,6 +583,7 @@ export const useLinkshuComposition = ({
     restoreCashuTokens: operations?.restoreCashuTokens ?? null,
     resumePendingCashuAutoswapClaims:
       operations?.resumePendingCashuAutoswapClaims ?? null,
+    resumePendingCashuMelts: operations?.resumePendingCashuMelts ?? null,
     resumePendingCashuTopups: operations?.resumePendingCashuTopups ?? null,
     sendCashuToken: operations?.sendCashuToken ?? null,
     startCashuTopup: operations?.startCashuTopup ?? null,

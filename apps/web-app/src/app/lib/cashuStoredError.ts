@@ -51,6 +51,8 @@ export const describeTaggedCashuError = (error: unknown): string | null => {
       return describeInsufficientFunds(error);
     case "PaymentFailed":
       return withDetail("Lightning payment failed", detail);
+    case "PaymentPending":
+      return "Lightning payment pending at the mint";
     case "QuoteExpired":
       return "The quote expired, try again";
     case "QuoteAlreadyIssued":

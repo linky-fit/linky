@@ -78,6 +78,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "linkshu measured a mint's Lightning fee by pricing another mint's unpaid invoice as a melt quote. Nothing is paid; links carry both quote ids.",
   "npubCash.upstreamQuotesListed":
     "The wallet asked upstream npub.cash which mint quotes for the user's <npub>@npub.cash address were paid; the payload counts what was listed and what was new. Each new quote is then minted by a linkshu topup.adopt operation sharing its quote link.",
+  "melt.resume":
+    "linkshu asked the mint about one persisted unsettled melt (a payment that stayed PENDING or whose response was lost). The result says what happened: paid (change reclaimed, reserved inputs dropped), unpaid (inputs back in balance), pending (left alone), or a failure when the mint gave no usable answer. Row and quote links tie it to the original melt.melt and its lifecycle rows.",
+  "melt.resumePending":
+    "One pass over every persisted unsettled melt, run when the wallet runtime comes up and when the browser comes back online; the payload lists each record's outcome.",
+  "melt.historyResolved":
+    "The app updated a pending Lightning payment in the transaction history after melt.resume settled it — to paid (amount and fee) or failed. The quote link connects it to the melt rows.",
   "send.rowForgotten":
     "The app dropped a pending send row because its token verifiably reached the recipient (chat message published, or payment request POSTed). Follow the row link back to the send.send operation that produced it.",
 };

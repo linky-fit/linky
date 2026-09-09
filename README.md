@@ -47,7 +47,7 @@ Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `d
 - Wallet: Cashu token ingest, restore, validation, spend; token list with available, pending-at-mint, and unknown amounts
 - Lightning address receive: payments to `<npub>@linky.fit` and `<npub>@npub.cash` both land in the wallet, whatever address the profile advertises
 - Payments:
-  - Lightning invoice and LN address payment
+  - Lightning invoice and LN address payment; a payment the mint has not settled shows as pending in the history and is finished (or refunded to the balance) on the next launch or reconnect
   - contact payment via Cashu message flow
   - proxy payment of a scanned bank QR (SPD, EPC, PAY by square) with editable fields before the offer is sent
 - Push: optional Bun push service in `apps/push/` for generic Web Push notifications on new outer inbox `kind: 1059` events

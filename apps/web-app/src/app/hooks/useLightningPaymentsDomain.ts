@@ -1,4 +1,4 @@
-import type { MeltError, MeltReceipt } from "@linky/linkshu";
+import type { MeltError, MeltReceipt, PaymentPending } from "@linky/linkshu";
 import { Either } from "effect";
 import React from "react";
 import {
@@ -25,12 +25,20 @@ import type { SendMintBalance } from "../lib/paymentMintSelection";
 import type {
   ContactPayRowLike,
   LoggedPaymentEventParams,
+  PaymentTelemetryMethod,
 } from "../types/appTypes";
+import type { JsonValue } from "../../types/json";
 import type { MeltCashuInvoice } from "./composition/useLinkshuComposition";
 import type { Translate } from "../../i18n";
 
 const describeMeltError = (error: MeltError): string =>
   describeTaggedCashuError(error) ?? error._tag;
+
+interface MeltFailure {
+  readonly message: string;
+  /** The melt was sent and the mint has not settled it; not a failure yet. */
+  readonly pending: PaymentPending | null;
+}
 
 interface UseLightningPaymentsDomainParams {
   canPayWithCashu: boolean;
@@ -59,7 +67,9 @@ interface UseLightningPaymentsDomainParams {
  * picks the mint, resolves LN addresses via LNURL, and records payment
  * history; linkshu owns proof selection, the melt itself, and persisting
  * change — a failed melt leaves the balance intact, so amount-degrade
- * retries never need recovery bookkeeping.
+ * retries never need recovery bookkeeping. A melt the mint has not settled
+ * is history as a `pending` payment keyed by its melt quote id, which
+ * `useMeltRecovery` updates once linkshu settles the record.
  */
 export const useLightningPaymentsDomain = ({
   canPayWithCashu,
@@ -88,17 +98,48 @@ export const useLightningPaymentsDomain = ({
       melt: MeltCashuInvoice,
       invoice: string,
       mint: string,
-    ): Promise<Either.Either<MeltReceipt, string>> => {
+    ): Promise<Either.Either<MeltReceipt, MeltFailure>> => {
       try {
         const outcome = await melt({ invoice, mint });
-        return Either.isRight(outcome)
-          ? Either.right(outcome.right)
-          : Either.left(describeMeltError(outcome.left));
+        if (Either.isRight(outcome)) return Either.right(outcome.right);
+        return Either.left({
+          message: describeMeltError(outcome.left),
+          pending: outcome.left._tag === "PaymentPending" ? outcome.left : null,
+        });
       } catch (error) {
-        return Either.left(getUnknownErrorMessage(error, "unknown"));
+        return Either.left({
+          message: getUnknownErrorMessage(error, "unknown"),
+          pending: null,
+        });
       }
     },
     [],
+  );
+
+  const recordPendingMelt = React.useCallback(
+    (
+      pending: PaymentPending,
+      method: PaymentTelemetryMethod,
+      details: Record<string, JsonValue>,
+      contactId: string | null,
+    ) => {
+      logPaymentEvent({
+        direction: "out",
+        status: "ok",
+        amount: pending.amount,
+        details: { ...details, meltQuoteId: pending.quoteId },
+        fee: null,
+        mint: pending.mint,
+        unit: "sat",
+        error: null,
+        contactId,
+        method,
+        phase: "melt",
+      });
+      setStatus(t("payPending"));
+      rememberFirstPayment();
+    },
+    [logPaymentEvent, rememberFirstPayment, setStatus, t],
   );
 
   const payLightningInvoiceWithCashu = React.useCallback(
@@ -132,28 +173,38 @@ export const useLightningPaymentsDomain = ({
           return false;
         }
 
+        const invoiceDetails = {
+          lightningInvoice: normalized,
+          ...(invoicePreview?.description
+            ? { lightningMemo: invoicePreview.description }
+            : {}),
+        };
         const outcome = await meltOnMint(meltCashuInvoice, normalized, mint);
 
         if (Either.isLeft(outcome)) {
+          if (outcome.left.pending !== null) {
+            recordPendingMelt(
+              outcome.left.pending,
+              "lightning_invoice",
+              invoiceDetails,
+              null,
+            );
+            return true;
+          }
           logPaymentEvent({
             direction: "out",
             status: "error",
             amount: null,
-            details: {
-              lightningInvoice: normalized,
-              ...(invoicePreview?.description
-                ? { lightningMemo: invoicePreview.description }
-                : {}),
-            },
+            details: invoiceDetails,
             fee: null,
             mint,
             unit: "sat",
-            error: outcome.left,
+            error: outcome.left.message,
             contactId: null,
             method: "lightning_invoice",
             phase: "melt",
           });
-          setStatus(`${t("payFailed")}: ${outcome.left}`);
+          setStatus(`${t("payFailed")}: ${outcome.left.message}`);
           return false;
         }
 
@@ -162,12 +213,7 @@ export const useLightningPaymentsDomain = ({
           direction: "out",
           status: "ok",
           amount: receipt.paidAmount,
-          details: {
-            lightningInvoice: normalized,
-            ...(invoicePreview?.description
-              ? { lightningMemo: invoicePreview.description }
-              : {}),
-          },
+          details: invoiceDetails,
           fee: receipt.feePaid,
           mint: receipt.mint,
           unit: "sat",
@@ -200,6 +246,7 @@ export const useLightningPaymentsDomain = ({
       logPaymentEvent,
       meltCashuInvoice,
       meltOnMint,
+      recordPendingMelt,
       rememberFirstPayment,
       setCashuIsBusy,
       setStatus,
@@ -303,9 +350,33 @@ export const useLightningPaymentsDomain = ({
             mint,
           );
 
+          const paidLightningAddress = resolvedLightningAddress;
+          const knownContact = paidLightningAddress
+            ? contacts.find(
+                (contact) =>
+                  (contact.lnAddress ?? "").trim().toLowerCase() ===
+                  paidLightningAddress.toLowerCase(),
+              )
+            : null;
+
           if (Either.isLeft(outcome)) {
-            if (canRetryLower(outcome.left)) continue;
-            finalErrorMessage = outcome.left;
+            if (outcome.left.pending !== null) {
+              recordPendingMelt(
+                outcome.left.pending,
+                "lightning_address",
+                {
+                  lightningAddress: paidLightningAddress,
+                  lightningInvoice: attemptInvoice,
+                  ...(attemptInvoicePreview?.description
+                    ? { lightningMemo: attemptInvoicePreview.description }
+                    : {}),
+                },
+                knownContact?.id ?? null,
+              );
+              return true;
+            }
+            if (canRetryLower(outcome.left.message)) continue;
+            finalErrorMessage = outcome.left.message;
             finalErrorMint = mint;
             break;
           }
@@ -323,14 +394,6 @@ export const useLightningPaymentsDomain = ({
             attemptSuccessAction?.tag === "url"
               ? attemptSuccessAction.description
               : null;
-          const paidLightningAddress = resolvedLightningAddress;
-          const knownContact = paidLightningAddress
-            ? contacts.find(
-                (contact) =>
-                  (contact.lnAddress ?? "").trim().toLowerCase() ===
-                  paidLightningAddress.toLowerCase(),
-              )
-            : null;
 
           logPaymentEvent({
             direction: "out",
@@ -444,6 +507,7 @@ export const useLightningPaymentsDomain = ({
       logPaymentEvent,
       meltCashuInvoice,
       meltOnMint,
+      recordPendingMelt,
       rememberFirstPayment,
       setCashuIsBusy,
       setPostPaySaveContact,

@@ -809,6 +809,11 @@ export const de = {
   payPaying: "Wird bezahlt…",
   payQueuedMessage: "Zahlung {amount} {unit} → {name} vorgemerkt.",
   payFailed: "Zahlung fehlgeschlagen",
+  payPending:
+    "Die Zahlung wartet auf die Bestätigung der Mint. Sie wird abgeschlossen, sobald die Mint antwortet.",
+  payPendingPaid: "Ausstehende Lightning-Zahlung ist durchgegangen.",
+  payPendingFailed:
+    "Ausstehende Lightning-Zahlung fehlgeschlagen; das Guthaben ist zurück in der Wallet.",
   paidSent: "{amount} {unit} gesendet.",
   paidSentTo: "{amount} {unit} an {name} gesendet.",
   paidQueuedTo: "{amount} {unit} → {name} vorgemerkt.",

@@ -121,6 +121,7 @@ import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 import { drainLegacyAcceptedCashuToken } from "../../migrations/legacyAcceptedTokenDrain";
 import { seedLinkshuSeenMintsFromTokenRows } from "../../migrations/linkshuStorageMigration";
 import { useLinkshuComposition } from "./useLinkshuComposition";
+import { useMeltRecovery } from "../payments/useMeltRecovery";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
 import type { Translate } from "../../../i18n";
@@ -648,6 +649,7 @@ export const useCashuWalletComposition = ({
     receiveCashuToken,
     restoreCashuTokens,
     resumePendingCashuAutoswapClaims,
+    resumePendingCashuMelts,
     resumePendingCashuTopups,
     sendCashuToken,
     startCashuTopup,
@@ -2415,6 +2417,14 @@ export const useCashuWalletComposition = ({
       };
     }, [resumePendingCashuAutoswapClaims]),
   );
+
+  useMeltRecovery({
+    pushToast,
+    resumePendingCashuMelts,
+    t,
+    transactionsOwnerId,
+    update,
+  });
 
   const requestSelectedContact = React.useCallback(async () => {
     if (route.kind !== "contactPay") return;

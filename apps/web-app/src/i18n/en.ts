@@ -802,6 +802,11 @@ export const en = {
   payPaying: "Paying…",
   payQueuedMessage: "Queued payment {amount} {unit} → {name}.",
   payFailed: "Payment failed",
+  payPending:
+    "Payment is waiting for the mint to confirm it. It finishes on its own once the mint answers.",
+  payPendingPaid: "Pending Lightning payment went through.",
+  payPendingFailed:
+    "Pending Lightning payment failed; the funds are back in the wallet.",
 
   paidSent: "Sent {amount} {unit}.",
   paidSentTo: "Sent {amount} {unit} to {name}.",

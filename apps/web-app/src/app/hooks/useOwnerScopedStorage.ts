@@ -113,6 +113,7 @@ const compactTransactionDetails = (
   copyString("requestId");
   copyString("lightningInvoice");
   copyString("lightningPreimage");
+  copyString("meltQuoteId");
   copyString("lnurlSuccessMessage");
   copyString("lnurlSuccessUrl");
   copyString("lnurlSuccessUrlDescription");
@@ -188,8 +189,12 @@ export const buildTransactionInsertPayload = (args: {
   const phase = (args.event.phase ?? "").trim();
   const storedMethod =
     method === "unknown" && phase === "swap" ? "cashu_emit" : method;
+  // An `ok` publish (token sent, delivery unconfirmed) or melt (request sent,
+  // mint undecided) step is a payment still in flight.
   const transactionStatus =
-    status === "ok" && phase === "publish" ? "pending" : status;
+    status === "ok" && (phase === "publish" || phase === "melt")
+      ? "pending"
+      : status;
 
   const payload: TransactionInsertPayload = {
     createdAtSec: args.createdAtSec,

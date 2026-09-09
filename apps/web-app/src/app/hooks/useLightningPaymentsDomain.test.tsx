@@ -5,7 +5,9 @@ import {
   MintRejected,
   MintUrl,
   NonNegativeAmount,
+  PaymentPending,
   QuoteId,
+  TokenRowId,
 } from "@linky/linkshu";
 import { Either } from "effect";
 import React, { act } from "react";
@@ -41,6 +43,16 @@ const meltReceipt = (paidAmount: number): MeltReceipt =>
     feePaid: NonNegativeAmount.make(1),
     changeAmount: NonNegativeAmount.make(1),
   });
+
+const paymentPending = (amount: number) =>
+  Either.left(
+    new PaymentPending({
+      mint: MintUrl.make(MINT_URL),
+      quoteId: QuoteId.make("quote-1"),
+      rowId: TokenRowId.make("row-1"),
+      amount: Amount.make(amount),
+    }),
+  );
 
 const insufficientFunds = (required: number, available: number) =>
   Either.left(
@@ -170,9 +182,71 @@ describe("payLightningInvoiceWithCashu", () => {
     expect(harness.showPaidOverlay).not.toHaveBeenCalled();
     await act(async () => harness.root.unmount());
   });
+
+  it("records an unsettled melt as a pending payment keyed by its quote", async () => {
+    const melt = vi.fn<MeltCashuInvoice>(async () => paymentPending(40));
+    const harness = await setup({ meltCashuInvoice: melt });
+
+    const paid =
+      await harness.payments.payLightningInvoiceWithCashu("lnbc-mock-invoice");
+
+    expect(paid).toBe(true);
+    expect(harness.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 40,
+        details: {
+          lightningInvoice: "lnbc-mock-invoice",
+          meltQuoteId: "quote-1",
+        },
+        error: null,
+        method: "lightning_invoice",
+        mint: MINT_URL,
+        phase: "melt",
+        status: "ok",
+      }),
+    );
+    expect(harness.setStatus).toHaveBeenCalledWith("payPending");
+    expect(harness.showPaidOverlay).not.toHaveBeenCalled();
+    await act(async () => harness.root.unmount());
+  });
 });
 
 describe("payLightningAddressWithCashu", () => {
+  it("stops the amount ladder on an unsettled melt and records it pending", async () => {
+    fetchLnurlInvoiceForTargetMock.mockImplementation(
+      async (_target, amountSat) => ({
+        lightningAddress: "alice@example.com",
+        pr: `lnbc-mock-${amountSat}`,
+        successAction: null,
+      }),
+    );
+    const melt = vi.fn<MeltCashuInvoice>(async () => paymentPending(40));
+    const harness = await setup({ meltCashuInvoice: melt });
+
+    const paid = await harness.payments.payLightningAddressWithCashu(
+      "alice@example.com",
+      40,
+    );
+
+    expect(paid).toBe(true);
+    expect(melt).toHaveBeenCalledTimes(1);
+    expect(harness.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 40,
+        details: {
+          lightningAddress: "alice@example.com",
+          lightningInvoice: "lnbc-mock-40",
+          meltQuoteId: "quote-1",
+        },
+        method: "lightning_address",
+        phase: "melt",
+        status: "ok",
+      }),
+    );
+    expect(harness.setPostPaySaveContact).not.toHaveBeenCalled();
+    await act(async () => harness.root.unmount());
+  });
+
   it("degrades a full-balance amount until the melt fits", async () => {
     fetchLnurlInvoiceForTargetMock.mockImplementation(
       async (_target, amountSat) => ({

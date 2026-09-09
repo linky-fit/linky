@@ -76,6 +76,15 @@ describe("describeTaggedCashuError", () => {
     expect(describeTaggedCashuError({ _tag: "QuoteExpired", mint: "m" })).toBe(
       "The quote expired, try again",
     );
+    expect(
+      describeTaggedCashuError({
+        _tag: "PaymentPending",
+        mint: "m",
+        quoteId: "q",
+        rowId: "r",
+        amount: 10,
+      }),
+    ).toBe("Lightning payment pending at the mint");
   });
 
   it("returns null for unknown tags and untagged values", () => {

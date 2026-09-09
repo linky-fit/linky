@@ -809,6 +809,11 @@ export const cs = {
   payPaying: "Platím…",
   payQueuedMessage: "Platba čeká: {amount} {unit} → {name}.",
   payFailed: "Platba se nepovedla",
+  payPending:
+    "Platba čeká na potvrzení mintem. Dokončí se sama, jakmile mint odpoví.",
+  payPendingPaid: "Čekající Lightning platba proběhla.",
+  payPendingFailed:
+    "Čekající Lightning platba se nepovedla, prostředky jsou zpět v peněžence.",
 
   paidSent: "Odesláno {amount} {unit}.",
   paidSentTo: "Odesláno {amount} {unit} → {name}.",

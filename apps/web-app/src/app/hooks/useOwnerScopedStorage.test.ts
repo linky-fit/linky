@@ -152,6 +152,34 @@ describe("buildTransactionInsertPayload", () => {
     });
   });
 
+  it("stores an ok melt step as pending and keeps the melt quote id", () => {
+    expect(
+      buildTransactionInsertPayload({
+        createdAtSec: 456,
+        event: {
+          amount: 40,
+          details: { lightningInvoice: "lnbc1invoice", meltQuoteId: "quote-1" },
+          direction: "out",
+          method: "lightning_invoice",
+          mint: "https://mint.example",
+          phase: "melt",
+          status: "ok",
+        },
+      }),
+    ).toEqual({
+      amount: 40,
+      createdAtSec: 456,
+      detailsJson: JSON.stringify({
+        lightningInvoice: "lnbc1invoice",
+        meltQuoteId: "quote-1",
+      }),
+      direction: "out",
+      method: "lightning_invoice",
+      mint: "https://mint.example",
+      status: "pending",
+    });
+  });
+
   it("omits a zero fee", () => {
     expect(
       buildTransactionInsertPayload({
