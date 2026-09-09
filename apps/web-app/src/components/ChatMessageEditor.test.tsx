@@ -1,6 +1,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
+import { setMessageEditorCaret } from "../app/lib/messageEditorDom";
 import { ChatMessageEditor } from "./ChatMessageEditor";
 
 vi.mock("../app/context/AppShellContexts", () => ({
@@ -19,6 +20,67 @@ describe("ChatMessageEditor", () => {
     document.body.innerHTML = "";
   });
 
+  it.each([
+    { kind: "image", disabled: false, expectedText: "Draft" },
+    { kind: "text", disabled: false, expectedText: "Drpasted textaft" },
+    { kind: "image", disabled: true, expectedText: "Draft" },
+  ])(
+    "pastes $kind with disabled=$disabled",
+    async ({ kind, disabled, expectedText }) => {
+      const onChange = vi.fn();
+      const onPasteImage = vi.fn();
+      const image = new File(["image bytes"], "image.png", {
+        type: "image/png",
+      });
+      const { container, root } = await renderIntoDocument(
+        <ChatMessageEditor
+          disabled={disabled}
+          getCashuTokenMessageInfo={() => null}
+          getMintIconUrl={() => ({ url: null })}
+          getNpubMessageContactInfo={() => null}
+          onCaretChange={() => undefined}
+          onChange={onChange}
+          onPasteImage={onPasteImage}
+          onSendShortcut={() => undefined}
+          placeholder="Message"
+          removeContactLabel="Remove contact from message"
+          value="Draft"
+        />,
+      );
+      const editor = container.querySelector<HTMLDivElement>("[role=textbox]");
+      if (!editor) throw new Error("Missing editor");
+      editor.focus();
+      setMessageEditorCaret(editor, 2);
+      const paste = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(paste, "clipboardData", {
+        value: {
+          files:
+            kind === "image"
+              ? [new File(["text"], "note.txt", { type: "text/plain" }), image]
+              : [],
+          getData: (format: string) =>
+            format === "text/plain" ? "pasted text" : "<b>pasted text</b>",
+        },
+      });
+      await act(async () => {
+        editor.dispatchEvent(paste);
+      });
+      expect(paste.defaultPrevented).toBe(true);
+      expect(editor.textContent).toBe(expectedText);
+      if (kind === "image" && !disabled) {
+        expect(onPasteImage).toHaveBeenCalledExactlyOnceWith(image);
+      } else {
+        expect(onPasteImage).not.toHaveBeenCalled();
+      }
+      if (kind === "text") {
+        expect(onChange).toHaveBeenCalledWith(expectedText);
+      } else {
+        expect(onChange).not.toHaveBeenCalled();
+      }
+      await act(async () => root.unmount());
+    },
+  );
+
   it("removes one contact pill from the draft when clicked", async () => {
     const onChange = vi.fn();
 
@@ -35,6 +97,7 @@ describe("ChatMessageEditor", () => {
         })}
         onCaretChange={() => undefined}
         onChange={onChange}
+        onPasteImage={() => undefined}
         onSendShortcut={() => undefined}
         placeholder="Message"
         removeContactLabel="Remove contact from message"

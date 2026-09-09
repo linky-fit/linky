@@ -109,6 +109,18 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
         selector: ".chat-private-image-button img",
       },
       {
+        name: "keyboard-paste.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(png, "base64"),
+        selector: ".chat-private-image-button img",
+      },
+      {
+        name: "system-paste.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(png, "base64"),
+        selector: ".chat-private-image-button img",
+      },
+      {
         name: "smoke.pdf",
         mimeType: "application/pdf",
         buffer: makePdf(),
@@ -117,11 +129,59 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
     ];
     for (const file of files) {
       await test.step(`send, decrypt and export ${file.name}`, async () => {
-        await sender.page.locator(".chat-image-input").setInputFiles({
-          name: file.name,
-          mimeType: file.mimeType,
-          buffer: file.buffer,
-        });
+        const editor = sender.page.getByRole("textbox");
+        const previousMessageCount = await receiver.page
+          .locator(".chat-message.in")
+          .count();
+        if (file.name === "keyboard-paste.png") {
+          await sender.page.bringToFront();
+          await editor.fill("Keep this draft");
+          await sender.context.grantPermissions([
+            "clipboard-read",
+            "clipboard-write",
+          ]);
+          await sender.page.evaluate(async (bytes) => {
+            // Restore the browser clipboard hidden by setBaseStorage's stub.
+            Reflect.deleteProperty(navigator, "clipboard");
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                "image/png": new Blob([new Uint8Array(bytes)], {
+                  type: "image/png",
+                }),
+              }),
+            ]);
+          }, Array.from(file.buffer));
+          await editor.press("ControlOrMeta+V");
+        } else if (file.name === "system-paste.png") {
+          // Exercise the paste event without a keydown, as system Paste does.
+          await editor.evaluate((element, bytes) => {
+            const clipboardData = new DataTransfer();
+            clipboardData.items.add(
+              new File([new Uint8Array(bytes)], "image.png", {
+                type: "image/png",
+              }),
+            );
+            clipboardData.setData("text/plain", "Image source URL");
+            element.dispatchEvent(
+              new ClipboardEvent("paste", {
+                bubbles: true,
+                cancelable: true,
+                clipboardData,
+              }),
+            );
+          }, Array.from(file.buffer));
+        } else {
+          await sender.page.locator(".chat-image-input").setInputFiles({
+            name: file.name,
+            mimeType: file.mimeType,
+            buffer: file.buffer,
+          });
+        }
+        await expect(receiver.page.locator(".chat-message.in")).toHaveCount(
+          previousMessageCount + 1,
+        );
+        if (file.name.includes("paste"))
+          await expect(editor).toHaveText("Keep this draft");
         const message = receiver.page.locator(".chat-message.in").last();
         await expect(message.locator(file.selector)).toBeVisible();
         await expect

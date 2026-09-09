@@ -809,6 +809,9 @@ const ChatComposer = memo(function ChatComposer({
           value={draft}
           onChange={setDraft}
           onCaretChange={setComposeCaret}
+          onPasteImage={(file) => {
+            if (canSendImage) void sendChatImage(file);
+          }}
           onSendShortcut={() => {
             if (isDesktop) requestSend();
           }}
