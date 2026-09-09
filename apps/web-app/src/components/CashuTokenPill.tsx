@@ -6,6 +6,7 @@ import type { MintIcon } from "../utils/mint";
 import { getNextMintIconUrl } from "../utils/mint";
 
 interface WalletTokenPillProps {
+  amount?: number;
   ariaLabel: string;
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   isError?: boolean;
@@ -17,6 +18,7 @@ interface WalletTokenPillProps {
 
 export const WalletTokenPill = React.memo(function WalletTokenPill({
   ariaLabel,
+  amount,
   getMintIconUrl,
   isError = false,
   onMintIconError,
@@ -28,7 +30,7 @@ export const WalletTokenPill = React.memo(function WalletTokenPill({
   return (
     <CashuTokenPill
       icon={getMintIconUrl(token.mint)}
-      amountText={formatDisplayedAmountText(token.amount)}
+      amountText={formatDisplayedAmountText(amount ?? token.amount)}
       ariaLabel={ariaLabel}
       isError={isError}
       isMuted={isCashuTokenUnavailableState(token.state)}

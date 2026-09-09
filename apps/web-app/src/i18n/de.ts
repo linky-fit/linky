@@ -718,6 +718,20 @@ export const de = {
   cashuMultipleMintsWarningTitle: "Token sind auf mehrere Mints verteilt",
   cashuMultipleMintsWarningBody:
     "Eine Zahlung kann nur Token eines einzelnen Mints verwenden.",
+  cashuNeedsRecovery: "Wiederherstellung erforderlich",
+  cashuAvailableProofs: "Verfügbar",
+  cashuPendingAtMint: "Bei der Mint ausstehend",
+  cashuPendingAtMintHint:
+    "Diese Beträge sind während einer laufenden Transaktion bei der Mint gesperrt.",
+  cashuNoPendingProofs: "Keine ausstehenden Token.",
+  cashuUnknownProofs: "Status unbekannt",
+  cashuUnknownProofsHint:
+    "Die Mint konnte den Status dieser Beträge nicht bestätigen. Erneut prüfen.",
+  cashuCheckingProofs: "Mint-Status wird geprüft…",
+  cashuProofGroupsHint:
+    "Beträge sind nach Mint-Status gruppiert. Ein Token mit unterschiedlichen Zuständen kann in mehreren Abschnitten erscheinen.",
+  cashuRefreshProofs: "Aktualisieren",
+  cashuSpentProofs: "Ausgegebene Token",
   cashuMine: "meine",
   cashuIssued: "ausgestellt",
   cashuPasteManualHint: "Füge deinen Cashu-Token hier ein",

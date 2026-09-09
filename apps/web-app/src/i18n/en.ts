@@ -711,6 +711,20 @@ export const en = {
   cashuMultipleMintsWarningTitle: "Tokens are split across mints",
   cashuMultipleMintsWarningBody:
     "Available shows the largest single mint because one token cannot be issued from several mints at once.",
+  cashuNeedsRecovery: "Needs recovery",
+  cashuAvailableProofs: "Available",
+  cashuPendingAtMint: "Pending at mint",
+  cashuPendingAtMintHint:
+    "These funds are locked by the mint while a transaction is in progress.",
+  cashuNoPendingProofs: "No pending tokens.",
+  cashuUnknownProofs: "Status unknown",
+  cashuUnknownProofsHint:
+    "The mint could not confirm the status of these funds. Refresh to check again.",
+  cashuCheckingProofs: "Checking mint status…",
+  cashuProofGroupsHint:
+    "Amounts are grouped by mint status. A token with mixed proofs can appear in more than one section.",
+  cashuRefreshProofs: "Refresh",
+  cashuSpentProofs: "Spent tokens",
   cashuMine: "mine",
   cashuIssued: "issued",
   cashuPasteManualHint: "Paste your Cashu token here",

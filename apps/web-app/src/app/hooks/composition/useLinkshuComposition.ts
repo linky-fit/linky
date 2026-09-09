@@ -47,6 +47,7 @@ import type {
   SendError,
   SendReceipt,
   TokenRowNotFound,
+  TokenProofStateAmounts,
   TopupAdoptError,
   TopupError,
   TopupHandle,
@@ -192,6 +193,11 @@ type AutoswapCashu = (
 /** Drains persisted pending claims (linkshu `Autoswap.resumePendingClaims`). */
 type ResumePendingCashuAutoswapClaims = () => Promise<
   ReadonlyArray<AutoswapClaimResult>
+>;
+
+/** Read-only mint status for the Tokens page. */
+export type InspectCashuTokenProofStates = () => Promise<
+  ReadonlyArray<TokenProofStateAmounts>
 >;
 
 /** linkshu `Validation.checkAll` over stored rows; only defects reject. */
@@ -482,6 +488,14 @@ export const useLinkshuComposition = ({
         }),
       );
 
+    const inspectCashuTokenProofStates: InspectCashuTokenProofStates = () =>
+      run(
+        Effect.flatMap(
+          Validation,
+          (validation) => validation.inspectProofStates,
+        ),
+      );
+
     const checkAllCashuTokens: CheckAllCashuTokens = () =>
       run(Effect.flatMap(Validation, (validation) => validation.checkAll));
 
@@ -532,6 +546,7 @@ export const useLinkshuComposition = ({
       autoswapCashu,
       cashuTokenLifecycle,
       checkAllCashuTokens,
+      inspectCashuTokenProofStates,
       checkCashuTokenRow,
       meltCashuInvoice,
       probeLightningFee,
@@ -549,6 +564,8 @@ export const useLinkshuComposition = ({
     autoswapCashu: operations?.autoswapCashu ?? null,
     cashuTokenLifecycle: operations?.cashuTokenLifecycle ?? null,
     checkAllCashuTokens: operations?.checkAllCashuTokens ?? null,
+    inspectCashuTokenProofStates:
+      operations?.inspectCashuTokenProofStates ?? null,
     checkCashuTokenRow: operations?.checkCashuTokenRow ?? null,
     meltCashuInvoice: operations?.meltCashuInvoice ?? null,
     probeLightningFee: operations?.probeLightningFee ?? null,

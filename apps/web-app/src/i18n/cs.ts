@@ -719,6 +719,20 @@ export const cs = {
   cashuMultipleMintsWarningTitle: "Tokeny jsou rozdělené mezi minty",
   cashuMultipleMintsWarningBody:
     "Dostupné ukazuje největší jeden mint, protože jeden token nejde emitovat z více mintů najednou.",
+  cashuNeedsRecovery: "Vyžaduje obnovu",
+  cashuAvailableProofs: "Dostupné",
+  cashuPendingAtMint: "Čekající v mincovně",
+  cashuPendingAtMintHint:
+    "Tyto prostředky mincovna blokuje během probíhající transakce.",
+  cashuNoPendingProofs: "Žádné čekající tokeny.",
+  cashuUnknownProofs: "Neznámý stav",
+  cashuUnknownProofsHint:
+    "Mincovna nepotvrdila stav těchto prostředků. Zkuste kontrolu obnovit.",
+  cashuCheckingProofs: "Kontroluji stav v mincovně…",
+  cashuProofGroupsHint:
+    "Částky jsou rozdělené podle stavu v mincovně. Token s různými stavy může být ve více sekcích.",
+  cashuRefreshProofs: "Obnovit",
+  cashuSpentProofs: "Utracené tokeny",
   cashuMine: "moje",
   cashuIssued: "emitované",
   cashuPasteManualHint: "Vložte sem Cashu token",

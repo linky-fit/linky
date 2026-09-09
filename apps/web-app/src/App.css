@@ -3339,6 +3339,15 @@ button.danger {
   gap: 10px;
 }
 
+.wallet-proof-status {
+  margin-top: 0;
+}
+
+.wallet-pending-tokens {
+  border-left: 2px solid var(--color-warning, #d49b32);
+  padding-left: 12px;
+}
+
 .wallet-token-list {
   margin-top: 44px;
 }

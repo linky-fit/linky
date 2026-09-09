@@ -44,7 +44,7 @@ Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `d
 
 - Contacts: add/edit/delete, QR scan/share, grouping
 - Messages: encrypted private chat (gift-wrap/NIP-17 flows)
-- Wallet: Cashu token ingest, restore, validation, spend
+- Wallet: Cashu token ingest, restore, validation, spend; token list with available, pending-at-mint, and unknown amounts
 - Lightning address receive: payments to `<npub>@linky.fit` and `<npub>@npub.cash` both land in the wallet, whatever address the profile advertises
 - Payments:
   - Lightning invoice and LN address payment
