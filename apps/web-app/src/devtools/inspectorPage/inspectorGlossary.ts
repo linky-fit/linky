@@ -64,6 +64,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "User assigned the contacts just saved from a chat message to a group; the payload lists the contact ids and the group name.",
   ChatImageShareFailed:
     "System share of a chat image failed for a reason other than the user cancelling; the app fell back to a file download when triggered from the message menu.",
+  "validation.inspectProofStates":
+    "Read-only mint status check for the token list or detail. Reports unspent, pending, spent and unknown amounts per token row; follows row links without exposing proofs or secrets.",
   TokenLifecycleChanged:
     "A stored cashu token row moved to a new lifecycle state inside linkshu (e.g. accepted → issued); the reason names the operation that caused it. A spend-retained rewrite keeps unresolved proofs in the source row after spending its unspent proofs. Follow the row link to the operation rows around it.",
   CounterAdvanced:

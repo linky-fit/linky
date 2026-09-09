@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { inspectStoredProofStates } from "./inspectProofStates";
 import { TokenAlreadySpent, TokenRowNotFound } from "../domain/errors";
 import { Amount } from "../domain/primitives";
 import type { CurrencyUnit, MintUrl, TokenRowId } from "../domain/primitives";
@@ -214,7 +215,11 @@ export class Validation extends Effect.Service<Validation>()(
         },
       ).pipe(inspectOperation(inspector, "validation.checkIssued", {}));
 
-      return { checkAll, checkRow, checkIssued } as const;
+      const inspectProofStates = Effect.flatMap(tokenStore.loadAll, (rows) =>
+        inspectStoredProofStates(instances, rows),
+      ).pipe(inspectOperation(inspector, "validation.inspectProofStates", {}));
+
+      return { checkAll, checkRow, checkIssued, inspectProofStates } as const;
     }),
   },
 ) {}

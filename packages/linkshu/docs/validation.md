@@ -1,6 +1,6 @@
 # Validation
 
-`Validation` asks mints which stored proofs are still unspent (NUT-07) and updates rows accordingly. Use it to verify the balance, to check one token, and to notice when an issued token has been claimed. It performs no swap and costs no signatures.
+`Validation` asks mints about stored proofs (NUT-07). Its checks update rows accordingly; `inspectProofStates` returns amounts without changing rows. Use it to verify the balance, to check one token, and to notice when an issued token has been claimed. It performs no swap and costs no signatures.
 
 ## Quick example
 
@@ -34,15 +34,18 @@ One batched checkstate call per mint+unit group. Per row:
 
 **Merge.** Surviving proofs of a mint group are collapsed into the first live row (its `tokenText` rewritten locally) and the sibling rows removed; their ids come back in `mergedRows`. The primary carries the merged proofs before any sibling is removed.
 
-### The three calls
+### The calls
 
-| Call              | Rows considered               | Returns                                                                                         |
-| ----------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
-| `checkAll`        | `accepted` only (the balance) | `ValidationReport`                                                                              |
-| `checkRow(rowId)` | the supplied row, any state   | `RowCheckResult`; `"unavailable"` when the mint gave no usable answer or the row states no mint |
-| `checkIssued`     | `issued` only                 | `IssuedClaimReport`; fully spent rows are **removed** (the recipient claimed them)              |
+| Call                 | Rows considered               | Returns                                                                                         |
+| -------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
+| `checkAll`           | `accepted` only (the balance) | `ValidationReport`                                                                              |
+| `checkRow(rowId)`    | the supplied row, any state   | `RowCheckResult`; `"unavailable"` when the mint gave no usable answer or the row states no mint |
+| `checkIssued`        | `issued` only                 | `IssuedClaimReport`; fully spent rows are **removed** (the recipient claimed them)              |
+| `inspectProofStates` | all stored rows               | `readonly TokenProofStateAmounts[]`; no row mutations                                           |
 
-The batch calls skip `pending` and `reserved` rows; `checkRow` checks whatever row you give it. That is how `reserved` rows left by an interrupted melt are resolved (also not covered by `Tokens.deleteSpent`): run `checkRow` on each — fully spent flips it to `error`, live leaves it `reserved` for `Tokens.returnToWallet`. See [melt.md](./melt.md#recovering-an-interrupted-melt) for the order of steps. `externalized` and dead `error` rows are only reported, never re-marked.
+`inspectProofStates` batches requests by mint and unit and returns `{ rowId, unspent, pending, spent, unknown }` for each row. Amounts use the token's unit. A mixed token contributes to several amounts. Missing or unrecognized answers count as `unknown`; an unreachable mint leaves its rows' full amounts unknown. These are current mint answers, separate from the stored row's lifecycle state. The result contains no proof secrets or token text.
+
+`checkAll` and `checkIssued` skip `pending` and `reserved` rows; `checkRow` checks whatever row you give it. That is how `reserved` rows left by an interrupted melt are resolved (also not covered by `Tokens.deleteSpent`): run `checkRow` on each — fully spent flips it to `error`, live leaves it `reserved` for `Tokens.returnToWallet`. See [melt.md](./melt.md#recovering-an-interrupted-melt) for the order of steps. `externalized` and dead `error` rows are only reported, never re-marked.
 
 Validation never resurrects a row: an `error` row with live proofs comes back only through `Tokens.returnToWallet`.
 
@@ -52,6 +55,7 @@ Validation never resurrects a row: an `error` row with live proofs comes back on
 - `checkRow`: when opening a token's detail page.
 - `checkIssued`: after handing out an `issued` token, while the token is on screen, and periodically in the background. Avoid overlapping runs: share one in-flight call instead of starting another.
 - `Tokens.deleteSpent` (see [tokens.md](./tokens.md)) when the user wants spent rows gone.
+- `inspectProofStates`: when opening or refreshing a token list that shows available and pending amounts. Keep the snapshot in UI memory and discard it when rows change; do not persist mint answers as row states.
 
 ## Inputs and outputs
 

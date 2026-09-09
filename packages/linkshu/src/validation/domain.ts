@@ -1,5 +1,10 @@
 import { Schema } from "effect";
-import { Amount, MintUrl, TokenRowId } from "../domain/primitives";
+import {
+  Amount,
+  MintUrl,
+  NonNegativeAmount,
+  TokenRowId,
+} from "../domain/primitives";
 
 export class SpentTokenReport extends Schema.Class<SpentTokenReport>(
   "SpentTokenReport",
@@ -33,4 +38,15 @@ export class IssuedClaimReport extends Schema.Class<IssuedClaimReport>(
 )({
   /** Issued rows found fully spent — i.e. claimed by the recipient — and removed. */
   claimed: Schema.Array(SpentTokenReport),
+}) {}
+
+/** Read-only NUT-07 amounts; no proofs or secrets leave the operation. */
+export class TokenProofStateAmounts extends Schema.Class<TokenProofStateAmounts>(
+  "TokenProofStateAmounts",
+)({
+  rowId: TokenRowId,
+  unspent: NonNegativeAmount,
+  pending: NonNegativeAmount,
+  spent: NonNegativeAmount,
+  unknown: NonNegativeAmount,
 }) {}

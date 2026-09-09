@@ -386,3 +386,92 @@ describe("Validation.checkIssued", () => {
     expect(exit.value.rows[0]?.state).toBe("issued");
   });
 });
+
+describe("Validation.inspectProofStates", () => {
+  it("reports mixed proof amounts without changing stored tokens or exposing secrets", async () => {
+    const { run, events } = makeHarness({
+      stateOf: (secret) =>
+        secret === "sec-a2"
+          ? "PENDING"
+          : secret === "sec-b1"
+            ? "SPENT"
+            : "UNSPENT",
+    });
+    const exit = await run(
+      withRows(
+        [
+          [tokenA, "accepted"],
+          [tokenB, "reserved"],
+          [foreignToken, "accepted"],
+        ],
+        (validation) => validation.inspectProofStates,
+      ),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.result).toEqual([
+      expect.objectContaining({ unspent: 4, pending: 2, spent: 0, unknown: 0 }),
+      expect.objectContaining({ unspent: 0, pending: 0, spent: 8, unknown: 0 }),
+      expect.objectContaining({
+        unspent: 0,
+        pending: 0,
+        spent: 0,
+        unknown: 16,
+      }),
+    ]);
+    expect(exit.value.rows.map((row) => row.tokenText)).toEqual([
+      tokenA,
+      tokenB,
+      foreignToken,
+    ]);
+    expect(exit.value.rows.map((row) => row.state)).toEqual([
+      "accepted",
+      "reserved",
+      "accepted",
+    ]);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        name: "validation.inspectProofStates",
+        result: exit.value.result,
+      }),
+    );
+    expect(JSON.stringify(events)).not.toContain("sec-a1");
+    expect(JSON.stringify(events)).not.toContain(tokenA);
+  });
+
+  it("reports unanswered proofs as unknown, not pending", async () => {
+    const { run } = makeHarness({ truncateTo: 1 });
+    const exit = await run(
+      withRows(
+        [[tokenA, "accepted"]],
+        (validation) => validation.inspectProofStates,
+      ),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.result[0]).toMatchObject({
+      unspent: 4,
+      pending: 0,
+      spent: 0,
+      unknown: 2,
+    });
+  });
+
+  it("rechecks a pending proof after the mint releases it", async () => {
+    let pending = true;
+    const { run } = makeHarness({
+      stateOf: () => (pending ? "PENDING" : "UNSPENT"),
+    });
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedRow(tokenA);
+        const validation = yield* Validation;
+        const before = yield* validation.inspectProofStates;
+        pending = false;
+        const after = yield* validation.inspectProofStates;
+        return { before, after };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.before[0]).toMatchObject({ pending: 6, unspent: 0 });
+    expect(exit.value.after[0]).toMatchObject({ pending: 0, unspent: 6 });
+  });
+});
