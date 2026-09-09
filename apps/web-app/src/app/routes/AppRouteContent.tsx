@@ -32,6 +32,7 @@ import {
   NostrRelayNewPage,
   NostrRelayPage,
   NostrRelaysPage,
+  OnboardPage,
   ProfilePage,
   PushDebugPage,
   SettingsPage,
@@ -68,6 +69,7 @@ export interface PeopleRoutesProps {
   contactNewProps: React.ComponentProps<typeof ContactNewPage>;
   contactPayProps: React.ComponentProps<typeof ContactPayPage>;
   contactProps: React.ComponentProps<typeof ContactPage>;
+  onboardProps: React.ComponentProps<typeof OnboardPage>;
   profileProps: React.ComponentProps<typeof ProfilePage>;
 }
 
@@ -184,6 +186,8 @@ const RoutePage = (): React.ReactElement => {
     case "profile":
     case "profileEdit":
       return <ProfilePage {...peopleRoutes.profileProps} />;
+    case "onboard":
+      return <OnboardPage {...peopleRoutes.onboardProps} />;
     default:
       return assertNever(route satisfies never);
   }

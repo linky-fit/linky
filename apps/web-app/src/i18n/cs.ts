@@ -351,6 +351,14 @@ export const cs = {
   myNpubQr: "Tvůj kontakt",
   profileMissingNpub: "Chybí Nostr klíče.",
   profileUploadPhoto: "Nahrát fotku",
+  onboard: "Onboarding",
+  onboardScanHint:
+    "Nový uživatel naskenuje kód fotoaparátem telefonu. Otevře se mu Linky a po přihlášení dostane uvítací dárek.",
+  onboardGiftIncluded: "Kód obsahuje uvítací dárek {amount}.",
+  onboardGiftSkipped:
+    "Na uvítací dárek {amount} není dost prostředků, kód jen otevře aplikaci.",
+  onboardGiftClaimed: "Uvítací dárek byl vyzvednut",
+  copyLink: "Kopírovat odkaz",
 
   language: "Jazyk",
   czech: "Čeština",

@@ -42,10 +42,8 @@ import {
   readNotificationOpenRoute,
   readNotificationOpenTarget,
 } from "../../lib/notificationOpenTarget";
-import {
-  extractCashuTokenFromText,
-  extractCashuTokenFromText as extractCashuTokenFromTextFromUrl,
-} from "../../lib/tokenText";
+import { consumeCashuTokenFromHash } from "../../lib/cashuHashDeepLink";
+import { extractCashuTokenFromText } from "../../lib/tokenText";
 import type { useCashuWalletComposition } from "./useCashuWalletComposition";
 import type { useContactsMessagingComposition } from "./useContactsMessagingComposition";
 import type { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
@@ -768,26 +766,11 @@ export const useScanNativeComposition = ({
   }, [nostrBootstrapReady, openNotificationChat]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const rawHash = window.location.hash;
-    const token = extractCashuTokenFromTextFromUrl(rawHash);
-    if (!token) {
-      return;
-    }
+    const token = consumeCashuTokenFromHash();
+    if (!token) return;
 
     setPendingDeleteId(null);
     updatePendingDeepLinkText(`cashu:${token}`);
-
-    const cleanHash = rawHash.split("?")[0] ?? "#wallet";
-    const nextHash = cleanHash || "#wallet";
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}${window.location.search}${nextHash}`,
-    );
   }, [setPendingDeleteId, updatePendingDeepLinkText]);
 
   React.useEffect(() => {

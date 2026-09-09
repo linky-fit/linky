@@ -43,6 +43,7 @@ Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `d
 ## Features
 
 - Contacts: add/edit/delete, QR scan/share, grouping
+- Onboarding QR on the profile page: links a newcomer to the app with a 100 sat cashu welcome gift that is claimed automatically after sign-up (skipped when the balance is too low)
 - Messages: encrypted private chat (gift-wrap/NIP-17 flows)
 - Wallet: Cashu token ingest, restore, validation, spend; token list with available, pending-at-mint, and unknown amounts
 - Lightning address receive: payments to `<npub>@linky.fit` and `<npub>@npub.cash` both land in the wallet, whatever address the profile advertises
@@ -185,8 +186,8 @@ they are part of `bun run test`.
 End-to-end tests (Playwright) live in `apps/web-app/tests/*.spec.ts`.
 The `local-stack` runs the proxy-payment flow — three accounts on one machine, talking over the local
 Nostr relay and paying each other with the local Cashu mint — plus the linkshu storage-migration
-scenario, chat/edit/offline-reaction and top-up recovery, and signup with a real password-save
-form submission. Attachment tests send encrypted images and PDFs between browsers and verify
+scenario, chat/edit/offline-reaction and top-up recovery, signup with a real password-save
+form submission, and the onboarding QR gift claimed by a fresh signup. Attachment tests send encrypted images and PDFs between browsers and verify
 decryption, seen receipts, downloads, and bytes handed to the browser sharing API. Owner-lane
 tests verify old and new contacts, messages, transactions, and tokens across devices and reloads.
 Boot and route tests cover fresh profiles, restore, unavailable browser storage, and navigation.

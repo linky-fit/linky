@@ -44,6 +44,7 @@ export type Route =
   | { kind: "mint"; mintUrl: string }
   | { kind: "profile" }
   | { kind: "profileEdit" }
+  | { kind: "onboard"; tokenId?: CashuTokenId }
   | { kind: "wallet" }
   | { kind: "transactions" }
   | { kind: "topup" }
@@ -106,6 +107,14 @@ export const parseRouteFromHash = (): Route => {
     return { kind: "profileEdit" };
   }
   if (hash === "#profile/edit") return { kind: "profileEdit" };
+  if (hash === "#profile/onboard") return { kind: "onboard" };
+
+  const onboardPrefix = "#profile/onboard/";
+  const onboardTokenIdText = decodeHashSegment(hash, onboardPrefix);
+  if (onboardTokenIdText) {
+    const tokenId = parseCashuTokenId(onboardTokenIdText);
+    return tokenId ? { kind: "onboard", tokenId } : { kind: "onboard" };
+  }
   if (hash === "#profile") return { kind: "profile" };
   if (hash === "#wallet") return { kind: "wallet" };
   if (hash === "#wallet/transactions") return { kind: "transactions" };

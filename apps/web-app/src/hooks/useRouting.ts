@@ -111,6 +111,7 @@ type NavigationAction =
   | { route: "nostrRelays" }
   | { route: "profile" }
   | { route: "profileEdit" }
+  | { route: "onboard"; tokenId?: CashuTokenId }
   | { route: "settings" }
   | { route: "settingsLanguage" }
   | { route: "settingsMasterKeys" }
@@ -225,6 +226,13 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "profileEdit":
       window.location.assign("#profile/edit");
+      break;
+    case "onboard":
+      window.location.assign(
+        action.tokenId
+          ? `#profile/onboard/${encodeURIComponent(action.tokenId)}`
+          : "#profile/onboard",
+      );
       break;
     case "nostrRelays":
       window.location.assign("#nostr-relays");

@@ -49,6 +49,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "chat":
     case "profile":
     case "profileEdit":
+    case "onboard":
       return "contacts";
   }
 };
