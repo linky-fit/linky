@@ -49,8 +49,7 @@ export class InvalidTokenTransition extends Schema.TaggedError<InvalidTokenTrans
 
 /**
  * A NUT-00 proof in linkshu's own serializable shape; `C` is the wire-format
- * field name. Appears in the public API only through the token codec — wallet
- * operations exchange token text, never proof lists.
+ * field name. The token codec and SendReceipt expose these proofs.
  */
 export class Proof extends Schema.Class<Proof>("Proof")({
   id: KeysetId,

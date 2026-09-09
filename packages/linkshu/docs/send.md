@@ -40,6 +40,10 @@ Run it with `runLinkshu` or on your `ManagedRuntime`.
 
 Linky's QR/share flow uses `issued`; contact payments over Nostr and payment-request POSTs use `pending`.
 
+For an HTTP POST payment request, use `receipt.proofs` in the JSON payload. These are the same proofs encoded in `receipt.tokenText`, with full keyset ids. Decoding v4 token text without the mint's keyset list fails for shortened v2 ids. Both fields contain spendable secrets; keep them out of logs and inspector events.
+
+If delivery fails, check the result of `Tokens.returnToWallet`: recovery is attempted, not guaranteed. Successful recovery returns fresh proofs to the spendable balance; a transient failure preserves the pending row for a retry. Linky's POST flow currently displays the original payment error even if recovery also fails, so that error alone does not confirm the funds were returned. See [tokens.md](./tokens.md#returntowallet).
+
 ### Fees
 
 Sends are exact-amount: the recipient receives `amount`. The mint's cashu input fee comes out of the change, so `receipt.feePaid = available - amount - changeAmount`. If the offered proofs cannot cover `amount` plus fees, the mint's own rejection is reported as `InsufficientFunds` (`required: amount`, `available`). There is no amount-degrade ladder in the package; the app decides whether to retry lower.
@@ -61,15 +65,16 @@ The `issued` row keeps the funds visible under "issued" but not in `balances`. T
 
 `SendReceipt`:
 
-| Field          | Type                | Notes                                                           |
-| -------------- | ------------------- | --------------------------------------------------------------- |
-| `rowId`        | `TokenRowId`        | the send row, in `produceAs` state                              |
-| `tokenText`    | `TokenText`         | v4 encoding to hand out                                         |
-| `mint`         | `MintUrl`           |                                                                 |
-| `unit`         | `CurrencyUnit`      | always `sat`                                                    |
-| `amount`       | `Amount`            | equals the drafted amount                                       |
-| `changeAmount` | `NonNegativeAmount` | persisted as a fresh `accepted` row before the receipt resolved |
-| `feePaid`      | `NonNegativeAmount` | cashu input fee the swap cost                                   |
+| Field          | Type                   | Notes                                                                        |
+| -------------- | ---------------------- | ---------------------------------------------------------------------------- |
+| `rowId`        | `TokenRowId`           | the send row, in `produceAs` state                                           |
+| `tokenText`    | `TokenText`            | v4 encoding to hand out                                                      |
+| `proofs`       | `ReadonlyArray<Proof>` | the encoded proofs with full keyset ids; use directly for HTTP POST payloads |
+| `mint`         | `MintUrl`              |                                                                              |
+| `unit`         | `CurrencyUnit`         | always `sat`                                                                 |
+| `amount`       | `Amount`               | equals the drafted amount                                                    |
+| `changeAmount` | `NonNegativeAmount`    | persisted as a fresh `accepted` row before the receipt resolved              |
+| `feePaid`      | `NonNegativeAmount`    | cashu input fee the swap cost                                                |
 
 ## Errors
 
