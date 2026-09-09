@@ -17,11 +17,14 @@ import { extractCashuTokenMeta } from "../app/lib/tokenText";
 
 import { getMintDisplay } from "../app/lib/tokenMessageInfo";
 import { WalletBalance } from "../components/WalletBalance";
+import { CashuTokenProofStatus } from "../components/CashuTokenProofStatus";
+import type { InspectCashuTokenProofStates } from "../app/hooks/composition/useLinkshuComposition";
 import type { CashuTokenId, CashuTokenRow } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 import { buildCashuShareUrl } from "../utils/deepLinks";
 
 interface CashuTokenPageProps {
+  inspectCashuTokenProofStates: InspectCashuTokenProofStates | null;
   canSendToContact: boolean;
   canWriteToNfc: boolean;
   cashuIsBusy: boolean;
@@ -43,6 +46,7 @@ interface CashuTokenPageProps {
 }
 
 export const CashuTokenPage: FC<CashuTokenPageProps> = ({
+  inspectCashuTokenProofStates,
   canSendToContact,
   canWriteToNfc,
   cashuIsBusy,
@@ -272,6 +276,13 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
       {isPending && (
         <p className="cashu-token-status">{t("cashuPendingHint")}</p>
       )}
+
+      <CashuTokenProofStatus
+        row={safeRow}
+        amount={tokenAmount}
+        inspect={inspectCashuTokenProofStates}
+        busy={cashuIsBusy}
+      />
 
       {tokenQr ? (
         <div className="topup-invoice-qr-shell cashu-token-qr-shell">

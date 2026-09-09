@@ -221,6 +221,7 @@ export const buildMoneyRouteProps = ({
         canWriteToNfc: canWriteNfc,
         cashuTokensAll,
         routeId: route.id,
+        inspectCashuTokenProofStates,
         cashuIsBusy,
         pendingCashuDeleteId,
         checkAndRefreshCashuToken,

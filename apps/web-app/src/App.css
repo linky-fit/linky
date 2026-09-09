@@ -1975,6 +1975,46 @@ button.settings-sensitive-action.is-armed {
   color: #fca5a5;
 }
 
+.cashu-token-proof-status {
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.cashu-token-proof-amounts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+}
+
+.cashu-token-proof-status dd {
+  margin: 0;
+}
+
+.cashu-token-proof-amounts dd {
+  text-align: right;
+}
+
+.cashu-token-pending-detail {
+  border-left: 2px solid var(--color-warning, #d49b32);
+  padding-left: 12px;
+}
+
+.cashu-token-pending-detail dt {
+  color: #94a3b8;
+  margin-top: 12px;
+}
+
+.cashu-token-proof-checked {
+  margin-bottom: 0;
+  font-size: 12px;
+}
+
 .cashu-token-qr-shell {
   margin-bottom: 16px;
 }

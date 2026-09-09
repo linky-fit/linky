@@ -721,6 +721,19 @@ export const de = {
   cashuNeedsRecovery: "Wiederherstellung erforderlich",
   cashuAvailableProofs: "Verfügbar",
   cashuPendingAtMint: "Bei der Mint ausstehend",
+  cashuProofStatus: "Proof-Status bei der Mint",
+  cashuUnspentProofs: "Bei der Mint ungenutzt",
+  cashuProofLastChecked: "Zuletzt geprüft",
+  cashuPendingOutcome:
+    "Die Mint verarbeitet eine Transaktion mit diesen Mitteln. Bei Erfolg sind sie ausgegeben, bei Fehlschlag wieder ungenutzt.",
+  cashuPendingRelease: "Wieder verfügbar",
+  cashuPendingReleaseUnknown: "Die Mint gibt kein Datum an",
+  cashuPendingSince: "Ausstehend seit",
+  cashuPendingNotRecorded: "Nicht erfasst",
+  cashuPendingOperation: "Sperrende Operation",
+  cashuPendingOperationUnknown: "Keine Operation mit diesem Token verknüpft",
+  cashuPendingQuoteExpiryHint:
+    "Das Ablaufdatum eines Zahlungsangebots ist keine Frist für die Freigabe ausstehender Mittel.",
   cashuPendingAtMintHint:
     "Diese Beträge sind während einer laufenden Transaktion bei der Mint gesperrt.",
   cashuNoPendingProofs: "Keine ausstehenden Token.",

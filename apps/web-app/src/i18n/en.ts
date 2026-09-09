@@ -714,6 +714,19 @@ export const en = {
   cashuNeedsRecovery: "Needs recovery",
   cashuAvailableProofs: "Available",
   cashuPendingAtMint: "Pending at mint",
+  cashuProofStatus: "Mint proof status",
+  cashuUnspentProofs: "Unspent at mint",
+  cashuProofLastChecked: "Last checked",
+  cashuPendingOutcome:
+    "The mint is processing a transaction using these funds. They become spent if it succeeds, or unspent if it fails.",
+  cashuPendingRelease: "Available again",
+  cashuPendingReleaseUnknown: "No date provided by the mint",
+  cashuPendingSince: "Pending since",
+  cashuPendingNotRecorded: "Not recorded",
+  cashuPendingOperation: "Locking operation",
+  cashuPendingOperationUnknown: "No operation linked to this token",
+  cashuPendingQuoteExpiryHint:
+    "A payment quote's expiry is not a deadline for releasing pending funds.",
   cashuPendingAtMintHint:
     "These funds are locked by the mint while a transaction is in progress.",
   cashuNoPendingProofs: "No pending tokens.",

@@ -1,12 +1,14 @@
 import type { TokenProofStateAmounts } from "@linky/linkshu";
 import { useEffect, useState } from "react";
 import type { InspectCashuTokenProofStates } from "../app/hooks/composition/useLinkshuComposition";
+import { nowSeconds } from "../utils/time";
 
 interface Snapshot<Token> {
   inspect: InspectCashuTokenProofStates;
   tokens: readonly Token[];
   revision: number;
   reports: readonly TokenProofStateAmounts[];
+  checkedAt: number;
 }
 
 export const useTokenProofStates = <Token>(
@@ -29,6 +31,7 @@ export const useTokenProofStates = <Token>(
           revision,
           reports,
           inspect,
+          checkedAt: nowSeconds(),
         });
     };
     void inspect()
@@ -40,6 +43,7 @@ export const useTokenProofStates = <Token>(
   }, [tokens, inspect, revision]);
   return {
     reports: current ? snapshot.reports : [],
+    checkedAt: current ? snapshot.checkedAt : null,
     loading: inspect !== null && !current,
     refresh: () => setRevision((value) => value + 1),
   };

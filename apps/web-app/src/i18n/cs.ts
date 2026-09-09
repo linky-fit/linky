@@ -722,6 +722,19 @@ export const cs = {
   cashuNeedsRecovery: "Vyžaduje obnovu",
   cashuAvailableProofs: "Dostupné",
   cashuPendingAtMint: "Čekající v mincovně",
+  cashuProofStatus: "Stav proofs v mincovně",
+  cashuUnspentProofs: "Neutracené v mincovně",
+  cashuProofLastChecked: "Poslední kontrola",
+  cashuPendingOutcome:
+    "Mincovna tyto prostředky právě používá ve zpracovávané transakci. Při úspěchu budou utracené, při neúspěchu opět neutracené.",
+  cashuPendingRelease: "Znovu k dispozici",
+  cashuPendingReleaseUnknown: "Mincovna datum neposkytuje",
+  cashuPendingSince: "Čekající od",
+  cashuPendingNotRecorded: "Není zaznamenáno",
+  cashuPendingOperation: "Blokující operace",
+  cashuPendingOperationUnknown: "K tokenu není přiřazena žádná operace",
+  cashuPendingQuoteExpiryHint:
+    "Vypršení platební nabídky neurčuje termín uvolnění čekajících prostředků.",
   cashuPendingAtMintHint:
     "Tyto prostředky mincovna blokuje během probíhající transakce.",
   cashuNoPendingProofs: "Žádné čekající tokeny.",
