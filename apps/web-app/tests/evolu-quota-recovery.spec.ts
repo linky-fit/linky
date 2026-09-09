@@ -73,7 +73,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     }
     await second.page.goto("/#wallet/tokens");
     await second.page
-      .getByRole("button", { name: "Token", exact: true })
+      .getByRole("button", { name: /^Available: 512 sat ·/ })
       .click();
     const originalTokenRoute = new URL(second.page.url()).hash;
     await expect(second.page).toHaveURL(/#wallet\/token\/[A-Za-z0-9_-]+$/);
