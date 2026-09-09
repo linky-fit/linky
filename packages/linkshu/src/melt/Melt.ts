@@ -523,16 +523,15 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           });
         }
 
-        const { liveRows, spendable, available } = yield* selectSpendableProofs(
-          {
-            tokenStore,
-            inspector,
-            wallet,
-            mint: draft.mint,
-            unit: sat,
-            reason: "melt",
-          },
-        );
+        const selection = yield* selectSpendableProofs({
+          tokenStore,
+          inspector,
+          wallet,
+          mint: draft.mint,
+          unit: sat,
+          reason: "melt",
+        });
+        const { spendable, available } = selection;
         const needed = quote.amount + quote.feeReserve;
         if (available < needed) {
           return yield* new InsufficientFunds({
@@ -599,8 +598,8 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           reason: "melt",
         });
         yield* removeConsumedRows(
-          tokenStore,
-          liveRows,
+          { tokenStore, inspector, mint: draft.mint, unit: sat },
+          selection,
           keepRow === null ? [inputsRow] : [keepRow, inputsRow],
         );
 

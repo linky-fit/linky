@@ -151,6 +151,27 @@ describe("Validation.checkAll", () => {
     expect(serialized).not.toContain("sec-a1");
   });
 
+  it("does not merge away pending proofs beside unspent proofs", async () => {
+    const { run } = makeHarness({
+      stateOf: (secret) => (secret === "sec-a2" ? "PENDING" : "UNSPENT"),
+    });
+    const exit = await run(
+      withRows(
+        [
+          [tokenA, "accepted"],
+          [tokenB, "accepted"],
+        ],
+        (validation) => validation.checkAll,
+      ),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.result.mergedRows).toEqual([]);
+    expect(exit.value.rows.map((row) => row.tokenText)).toEqual([
+      tokenA,
+      tokenB,
+    ]);
+  });
+
   it("keeps a partially spent row alive with only its surviving proofs", async () => {
     const { run } = makeHarness({
       stateOf: (secret) => (secret === "sec-a1" ? "SPENT" : "UNSPENT"),
@@ -262,6 +283,16 @@ describe("Validation.checkAll", () => {
 });
 
 describe("Validation.checkRow", () => {
+  it("leaves a mixed pending row intact until all proofs resolve", async () => {
+    const { run } = makeHarness({
+      stateOf: (secret) => (secret === "sec-a2" ? "PENDING" : "UNSPENT"),
+    });
+    const exit = await run(checkSeededRow(tokenA));
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.result.status).toBe("unavailable");
+    expect(exit.value.rows[0]?.tokenText).toBe(tokenA);
+  });
+
   it("marks a spent row and reports it", async () => {
     const { run } = makeHarness({ stateOf: () => "SPENT" });
 

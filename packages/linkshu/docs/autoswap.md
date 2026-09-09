@@ -45,7 +45,7 @@ const resumeSwaps = Effect.gen(function* () {
 
 ## How it works
 
-1. **Size.** `accepted` rows at the source are NUT-07 filtered (fully spent ones marked `error`). The starting amount is the balance minus the source's cashu input-fee allowance.
+1. **Size.** `accepted` rows at the source are NUT-07 filtered (only confirmed `UNSPENT` proofs are eligible; fully spent rows are marked `error`). The starting amount is the confirmed unspent balance minus the source's cashu input-fee allowance.
 2. **Quote at the target** for that amount.
 3. **Persist the claim** before the invoice can be paid.
 4. **Melt at the source** against the target's invoice through [`Melt`](./melt.md) — fee-inclusive swap, `reserved` inputs row, change persisted.

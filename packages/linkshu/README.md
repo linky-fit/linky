@@ -111,9 +111,9 @@ already injectable).
   outputs, collisions) — a gap costs a restore scan, a reuse costs a mint
   rejection loop.
 - **A missing NUT-07 answer is never a guess.** A proof state the mint did
-  not return falls the safe way for the caller asking: send still offers the
-  proof (the mint decides), restore never imports it, and validation never
-  marks the row. A truncated response therefore costs a retry, never funds.
+  not return is excluded from spending and restore. Validation leaves any
+  row containing an unresolved proof intact. Pending proofs are retained
+  for a later check, never treated as spent or offered to a swap.
 - **Serializable errors.** All errors are `Schema.TaggedError`, so failures
   can be persisted on token rows without ad-hoc stringification.
 - **No dependency edge to `@linky/linkstr`** in either direction. linkstr's

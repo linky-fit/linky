@@ -26,6 +26,7 @@ import { runOnTestClock } from "../testing/clock";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { amountOf, seedRow } from "../testing/rows";
+import { decodeTokenText } from "../token/codec";
 import type { TokenState } from "../token/domain";
 import { MeltDraft } from "./domain";
 import { Melt } from "./Melt";
@@ -338,6 +339,54 @@ describe("Melt.melt", () => {
     expect(serialized).not.toContain("cashu");
     expect(serialized).not.toContain("src-a1");
     expect(serialized).not.toContain("lnbc");
+  });
+
+  it("pays with unspent proofs from a mixed row and preserves pending inputs", async () => {
+    const mixed = getEncodedToken({
+      mint,
+      unit: "sat",
+      proofs: [proof(4, "src-a1"), proof(2, "src-a2"), proof(32, "locked")],
+    });
+    const { wallet, sendCalls } = makeWallet({
+      stateOf: (secret) => (secret === "locked" ? "PENDING" : "UNSPENT"),
+      send: () => Promise.resolve(swappedThirteen()),
+      melt: () => Promise.resolve(meltResponse("PAID", [proof(1, "change")])),
+    });
+    const { run, events } = makeHarness(wallet);
+    const exit = await run(meltAndInspect([mixed, tokenB]));
+    expect(exit).toMatchObject({ _tag: "Success" });
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
+    expect(exit.value.rows.map(amountOf).sort()).toEqual([1, 1, 32]);
+    const retained = exit.value.rows.find(
+      (row) => row.originalTokenText === mixed,
+    );
+    assert(retained !== undefined);
+    expect(
+      decodeTokenText(retained.tokenText)?.proofs.map((proof) => proof.secret),
+    ).toEqual(["locked"]);
+    expect(JSON.stringify(events)).not.toContain("locked");
+  });
+
+  it("does not swap or drop a mixed row when only pending funds cover the payment", async () => {
+    const { wallet, sendCalls, meltCalls } = makeWallet({
+      stateOf: (secret) => (secret === "src-a1" ? "PENDING" : "UNSPENT"),
+    });
+    const { run } = makeHarness(wallet);
+    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "InsufficientFunds",
+      available: 10,
+    });
+    expect(sendCalls).toEqual([]);
+    expect(meltCalls).toEqual([]);
+    expect(exit.value.rows.map((row) => row.tokenText)).toEqual([
+      tokenA,
+      tokenB,
+    ]);
   });
 
   it("fails with InsufficientFunds against amount + feeReserve before swapping", async () => {

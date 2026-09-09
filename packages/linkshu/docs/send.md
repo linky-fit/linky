@@ -31,6 +31,8 @@ Run it with `runLinkshu` or on your `ManagedRuntime`.
 4. **Persist change first.** The change proofs become a fresh `accepted` row (`send-change`).
 5. **Persist the send row** in `produceAs` state, then remove the consumed source rows. Funds are never outside the store, even if the process dies mid-flow.
 
+Only proofs explicitly reported `UNSPENT` are offered to the swap. `PENDING`, missing, and unrecognized states are excluded from its available amount. After a successful swap, unresolved proofs remain in their original rows; only the consumed part is removed. A failed swap leaves those rows intact. Stored balance can still include unresolved proofs until the mint resolves them.
+
 ### Choosing `produceAs`
 
 | Value       | Use when                                                                             | Then                                                                                                         |

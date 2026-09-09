@@ -10,7 +10,11 @@ import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import type { StoredTokenRow, TokenStoreService } from "../ports/TokenStore";
 import type { Proof } from "../token/domain";
-import { transitionRow } from "../token/internal/lifecycle";
+import { encodeProofs } from "../token/internal/cashuProofs";
+import {
+  rewriteRowTokenText,
+  transitionRow,
+} from "../token/internal/lifecycle";
 import { collectRowProofs } from "../token/internal/rowProofs";
 import type { RowProofs } from "../token/internal/rowProofs";
 import { recoverFromCollision } from "./collisionRecovery";
@@ -21,7 +25,12 @@ import {
   isInsufficientBalanceError,
   isRecoverableOutputCollision,
 } from "./outputCollisions";
-import { checkProofStates, dedupeProofs, spentSecrets } from "./proofStates";
+import {
+  checkProofStates,
+  dedupeProofs,
+  spentSecrets,
+  unspentProofs,
+} from "./proofStates";
 
 /**
  * Shared machinery for operations that spend `accepted` rows (send, melt):
@@ -62,23 +71,19 @@ export const dedupeSourceProofs = (
 ): ReadonlyArray<Proof> =>
   dedupeProofs(sources.flatMap((source) => source.proofs));
 
-export interface SpendablePartition {
+export interface SpendablePartition extends SpendSelection {
   /** Rows whose every proof the mint reports spent; dead, to be marked. */
   readonly fullySpentRows: ReadonlyArray<StoredTokenRow>;
-  /** Rows still holding an unspent proof; the swap consumes them. */
-  readonly liveRows: ReadonlyArray<StoredTokenRow>;
-  /** Unspent proofs offered to the swap, deduped by secret. */
-  readonly spendable: ReadonlyArray<Proof>;
-  /** Sum of `spendable`. */
-  readonly available: number;
 }
 
-export const partitionBySpentSecrets = (
+export const partitionByProofState = (
   sources: ReadonlyArray<AcceptedSource>,
   spentSecrets: ReadonlySet<string>,
+  unspentSecrets: ReadonlySet<string>,
 ): SpendablePartition => {
   const fullySpentRows: StoredTokenRow[] = [];
   const liveRows: StoredTokenRow[] = [];
+  const retainedRows: RowProofs[] = [];
   const seen = new Set<string>();
   const spendable: Proof[] = [];
   let available = 0;
@@ -87,15 +92,21 @@ export const partitionBySpentSecrets = (
       fullySpentRows.push(source.row);
       continue;
     }
+    const retained = source.proofs.filter(
+      (proof) =>
+        !spentSecrets.has(proof.secret) && !unspentSecrets.has(proof.secret),
+    );
+    if (retained.length > 0)
+      retainedRows.push({ row: source.row, proofs: retained });
     liveRows.push(source.row);
     for (const proof of source.proofs) {
-      if (spentSecrets.has(proof.secret) || seen.has(proof.secret)) continue;
+      if (!unspentSecrets.has(proof.secret) || seen.has(proof.secret)) continue;
       seen.add(proof.secret);
       spendable.push(proof);
       available += proof.amount;
     }
   }
-  return { fullySpentRows, liveRows, spendable, available };
+  return { fullySpentRows, liveRows, retainedRows, spendable, available };
 };
 
 /** Serialized onto rows NUT-07 reports fully spent. */
@@ -114,10 +125,12 @@ export interface SpendContext {
 }
 
 export interface SpendSelection {
-  /** Rows the swap will consume (they hold at least one unspent proof). */
+  /** Source rows to remove or rewrite after the swap is persisted. */
   readonly liveRows: ReadonlyArray<StoredTokenRow>;
   /** Unspent proofs offered to the swap, deduped by secret. */
   readonly spendable: ReadonlyArray<Proof>;
+  /** Proofs withheld from the swap, retained in their original rows. */
+  readonly retainedRows: ReadonlyArray<RowProofs>;
   /** Sum of `spendable`. */
   readonly available: number;
 }
@@ -139,9 +152,10 @@ export const selectSpendableProofs = (
     );
     const candidates = dedupeSourceProofs(sources);
     const states = yield* checkProofStates(ctx.wallet, ctx.mint, candidates);
-    const partition = partitionBySpentSecrets(
+    const partition = partitionByProofState(
       sources,
       spentSecrets(candidates, states),
+      new Set(unspentProofs(candidates, states).map((proof) => proof.secret)),
     );
     yield* Effect.forEach(
       partition.fullySpentRows,
@@ -165,31 +179,53 @@ export const selectSpendableProofs = (
     );
     return {
       liveRows: partition.liveRows,
+      retainedRows: partition.retainedRows,
       spendable: partition.spendable,
       available: partition.available,
     };
   });
 
 /**
- * Removes the source rows a swap consumed, sparing any physical row a fresh
- * post-swap insert reused: cashu-ts passes unselected proofs through to the
- * keep side unchanged, so a fully-unselected source row can re-encode
+ * Retains unresolved proofs in their source rows and removes consumed rows.
+ * Spares rows reused by fresh inserts: cashu-ts passes unselected proofs
+ * through to the keep side unchanged, so a fully-unselected source row can re-encode
  * byte-identically — a store deriving ids from `originalTokenText` then
  * hands the change insert that source row's own id, and removing it would
  * destroy the just-persisted funds.
  */
 export const removeConsumedRows = (
-  tokenStore: TokenStoreService,
-  liveRows: ReadonlyArray<StoredTokenRow>,
+  ctx: Pick<SpendContext, "tokenStore" | "inspector" | "mint" | "unit">,
+  selection: SpendSelection,
   inserted: ReadonlyArray<StoredTokenRow>,
-): Effect.Effect<void> => {
-  const insertedIds = new Set(inserted.map((row) => row.id));
-  return Effect.forEach(
-    liveRows.filter((row) => !insertedIds.has(row.id)),
-    (row) => tokenStore.remove(row.id),
-    { discard: true },
-  );
-};
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const preservedIds = new Set(inserted.map((row) => row.id));
+    for (const { row, proofs } of selection.retainedRows) {
+      preservedIds.add(row.id);
+      const encoded = encodeProofs({
+        mint: ctx.mint,
+        unit: ctx.unit,
+        memo: null,
+        proofs,
+      });
+      if (encoded === null)
+        return yield* Effect.die(new Error("Cannot encode retained proofs"));
+      if (encoded.tokenText !== row.tokenText) {
+        yield* rewriteRowTokenText(
+          ctx.tokenStore,
+          ctx.inspector,
+          row,
+          encoded.tokenText,
+          "spend-retained",
+        );
+      }
+    }
+    yield* Effect.forEach(
+      selection.liveRows.filter((row) => !preservedIds.has(row.id)),
+      (row) => ctx.tokenStore.remove(row.id),
+      { discard: true },
+    );
+  });
 
 export interface SwapContext {
   readonly kv: KeyValueStoreService;

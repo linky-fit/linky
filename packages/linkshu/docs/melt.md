@@ -50,6 +50,8 @@ The receipt carries `paidAmount`, `feePaid`, and `changeAmount`. Passing `quoteI
 
 `status(quote)` re-reads a quote's state (`"UNPAID" | "PENDING" | "PAID" | null`) without side effects.
 
+Only proofs explicitly reported `UNSPENT` are offered to the swap. `PENDING`, missing, and unrecognized states are excluded from its available amount. After a successful swap, unresolved proofs remain in their original rows; only the consumed part is removed. A failed swap leaves those rows intact. Stored balance can still include unresolved proofs until the mint resolves them.
+
 ### Recovering an interrupted melt
 
 A `reserved` row means the mint may still hold the inputs. Do not pay the invoice again until you know what happened; `melt` with the same `quoteId` fails with `PaymentFailed` while the quote is not `UNPAID`. In order:

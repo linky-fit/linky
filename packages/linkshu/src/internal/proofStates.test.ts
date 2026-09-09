@@ -87,6 +87,19 @@ describe("partitionGroupsByState", () => {
     expect(partition.live).toEqual([]);
   });
 
+  it.each(["PENDING", "UNKNOWN", ""])(
+    "preserves a mixed row containing an unresolved %s proof",
+    (state) => {
+      const partition = partitionGroupsByState(
+        [group("A", ["a1", "a2"]), group("B", ["b1"])],
+        states("UNSPENT", state, "UNSPENT"),
+      );
+      expect(idsOf(partition.unknown)).toEqual(["A"]);
+      expect(partition.live.map((entry) => entry.group.id)).toEqual(["B"]);
+      expect(partition.fullySpent).toEqual([]);
+    },
+  );
+
   it("flags rows with a truncated mint response as unknown", () => {
     const groups = [group("A", ["a1", "a2"]), group("B", ["b1"])];
 
@@ -131,7 +144,7 @@ describe("unspentProofs / spentSecrets", () => {
     expect(unspentProofs(proofs, short).map((entry) => entry.secret)).toEqual([
       "p1",
     ]);
-    // …while send excludes only what came back spent.
+    // Spent-row marking still requires an explicit SPENT answer.
     expect([...spentSecrets(proofs, short)]).toEqual([]);
   });
 });

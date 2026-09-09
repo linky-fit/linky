@@ -15,8 +15,8 @@ import type { Proof } from "../token/domain";
  * guess — but which way "no information" falls depends on what the caller is
  * about to do:
  *
- * - `spentSecrets` (send) excludes only proofs explicitly reported spent, so
- *   an unanswered proof is still offered to the swap and the mint decides.
+ * - Spending offers only confirmed unspent proofs; unresolved inputs remain
+ *   stored for a later check.
  * - `unspentProofs` (restore) keeps only proofs explicitly reported unspent,
  *   so an unanswered proof is never imported as balance.
  * - `partitionGroupsByState` (validation) marks a row spent only when every
@@ -114,7 +114,13 @@ export const partitionGroupsByState = <G extends ProofGroup>(
   for (const group of groups) {
     const groupStates = states.slice(offset, offset + group.proofs.length);
     offset += group.proofs.length;
-    if (groupStates.length < group.proofs.length) {
+    if (
+      groupStates.length < group.proofs.length ||
+      groupStates.some((_, index) => {
+        const state = stateAt(groupStates, index);
+        return state !== SPENT && state !== UNSPENT;
+      })
+    ) {
       unknown.push(group);
       continue;
     }

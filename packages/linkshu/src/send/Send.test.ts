@@ -164,6 +164,64 @@ const draft = (amount: number, produceAs: "issued" | "pending" = "issued") =>
   new SendDraft({ mint, amount: SendAmount.make(amount), produceAs });
 
 describe("Send.send", () => {
+  it("preserves locked proofs after sending from the same row", async () => {
+    const mixed = getEncodedToken({
+      mint,
+      unit: "sat",
+      proofs: [proof(4, "src-a1"), proof(2, "src-a2"), proof(32, "locked")],
+    });
+    const { wallet, sendCalls } = makeWallet({
+      stateOf: (secret) => (secret === "locked" ? "PENDING" : "UNSPENT"),
+      send: () =>
+        Promise.resolve({
+          keep: [proof(8, "keep")],
+          send: [proof(4, "out1"), proof(1, "out2")],
+        }),
+    });
+    const { run, events } = makeHarness(wallet, deterministicIdTokenStore);
+    const exit = await run(sendAndInspect(draft(5), [mixed, tokenB]));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    expect(exit.value.receipt.right).toMatchObject({
+      amount: 5,
+      feePaid: 1,
+      changeAmount: 8,
+    });
+    expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
+    const retained = exit.value.rows.find(
+      (row) => row.originalTokenText === mixed,
+    );
+    assert(retained !== undefined);
+    expect(
+      decodeTokenText(retained.tokenText)?.proofs.map((proof) => proof.secret),
+    ).toEqual(["locked"]);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: "TokenLifecycleChanged",
+        rowId: retained.id,
+        reason: "spend-retained",
+      }),
+    );
+    expect(JSON.stringify(events)).not.toContain("locked");
+  });
+
+  it("keeps all source proofs if the swap fails after filtering pending proofs", async () => {
+    const { wallet, sendCalls } = makeWallet({
+      stateOf: (secret) => (secret === "src-a2" ? "PENDING" : "UNSPENT"),
+      send: () =>
+        Promise.reject(new MintOperationError(11002, "proofs are pending")),
+    });
+    const { run } = makeHarness(wallet);
+    const exit = await run(sendAndInspect(draft(5), [tokenA, tokenB]));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-b1"]);
+    expect(exit.value.rows.map((row) => row.tokenText)).toEqual([
+      tokenA,
+      tokenB,
+    ]);
+  });
+
   it("swaps with disjoint counter blocks, persists change and send rows, removes sources", async () => {
     // keep mixes passthrough (a1) with one fresh change output (k1).
     const { wallet, sendCalls } = makeWallet({

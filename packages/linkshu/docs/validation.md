@@ -25,12 +25,12 @@ const checkWallet = Effect.gen(function* () {
 
 One batched checkstate call per mint+unit group. Per row:
 
-| Mint's answer for the row                       | What happens                                                                   |
-| ----------------------------------------------- | ------------------------------------------------------------------------------ |
-| every proof `SPENT`                             | row → `error` with a serialized `TokenAlreadySpent`; reported in `markedSpent` |
-| some proofs `UNSPENT`                           | row keeps only the unspent proofs                                              |
-| any proof unanswered / unrecognized / truncated | nothing changes — a missing answer is never a guess                            |
-| mint unreachable or rejects the query           | whole group untouched; mint listed in `unavailableMints`                       |
+| Mint's answer for the row                                   | What happens                                                                   |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| every proof `SPENT`                                         | row → `error` with a serialized `TokenAlreadySpent`; reported in `markedSpent` |
+| some proofs `UNSPENT`, all others `SPENT`                   | row keeps only the unspent proofs                                              |
+| any proof `PENDING` / unanswered / unrecognized / truncated | nothing changes — a missing answer is never a guess                            |
+| mint unreachable or rejects the query                       | whole group untouched; mint listed in `unavailableMints`                       |
 
 **Merge.** Surviving proofs of a mint group are collapsed into the first live row (its `tokenText` rewritten locally) and the sibling rows removed; their ids come back in `mergedRows`. The primary carries the merged proofs before any sibling is removed.
 

@@ -65,7 +65,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   ChatImageShareFailed:
     "System share of a chat image failed for a reason other than the user cancelling; the app fell back to a file download when triggered from the message menu.",
   TokenLifecycleChanged:
-    "A stored cashu token row moved to a new lifecycle state inside linkshu (e.g. accepted → issued); the reason names the operation that caused it. Follow the row link to the operation rows around it.",
+    "A stored cashu token row moved to a new lifecycle state inside linkshu (e.g. accepted → issued); the reason names the operation that caused it. A spend-retained rewrite keeps unresolved proofs in the source row after spending its unspent proofs. Follow the row link to the operation rows around it.",
   CounterAdvanced:
     "linkshu moved a deterministic derivation counter (NUT-13) for one mint/unit/keyset — the audit trail for output derivation and collision recovery.",
   QuoteStateChanged:

@@ -11,7 +11,7 @@ import type { TokenState } from "../token/domain";
 import {
   collectAcceptedSources,
   dedupeSourceProofs,
-  partitionBySpentSecrets,
+  partitionByProofState,
 } from "./spend";
 
 const mint = MintUrl.make("https://mint.example");
@@ -79,7 +79,7 @@ describe("dedupeSourceProofs", () => {
   });
 });
 
-describe("partitionBySpentSecrets", () => {
+describe("partitionByProofState", () => {
   it("splits fully spent rows from live ones and sums the unspent pool", () => {
     const partial = row(
       token(mint, [
@@ -90,7 +90,11 @@ describe("partitionBySpentSecrets", () => {
     const dead = row(token(mint, [[3, "z1"]]));
     const sources = collectAcceptedSources([partial, dead], mint, sat, []);
 
-    const partition = partitionBySpentSecrets(sources, new Set(["a2", "z1"]));
+    const partition = partitionByProofState(
+      sources,
+      new Set(["a2", "z1"]),
+      new Set(["a1"]),
+    );
     expect(partition.fullySpentRows.map((r) => r.id)).toEqual([dead.id]);
     expect(partition.liveRows.map((r) => r.id)).toEqual([partial.id]);
     expect(partition.spendable.map((proof) => proof.secret)).toEqual(["a1"]);
@@ -106,7 +110,11 @@ describe("partitionBySpentSecrets", () => {
       [],
     );
 
-    const partition = partitionBySpentSecrets(sources, new Set());
+    const partition = partitionByProofState(
+      sources,
+      new Set(),
+      new Set(["a1"]),
+    );
     expect(partition.liveRows).toHaveLength(2);
     expect(partition.spendable).toHaveLength(1);
     expect(partition.available).toBe(4);

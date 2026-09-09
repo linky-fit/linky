@@ -30,10 +30,11 @@ const malformedSwapProofs = (mint: MintUrl): MintRejected =>
   });
 
 /**
- * Sending is one call: select the mint's `accepted` rows, drop proofs NUT-07
- * reports spent, swap the amount out with disjoint send/keep deterministic
+ * Sending is one call: select confirmed unspent proofs from `accepted` rows,
+ * swap the amount out with disjoint send/keep deterministic
  * counter blocks, persist the change as a fresh `accepted` row, and persist
- * the send token as a row in the drafted state. The source rows are removed;
+ * the send token as a row in the drafted state. Consumed source rows are removed,
+ * while unresolved proofs stay in their source rows;
  * funds are never outside the store even when the caller crashes mid-flow.
  */
 export class Send extends Effect.Service<Send>()("linkshu/Send", {
@@ -50,16 +51,15 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
         const keysetId = yield* boundKeysetId(draft.mint, wallet);
         const scope: CounterScope = { mint: draft.mint, unit: sat, keysetId };
 
-        const { liveRows, spendable, available } = yield* selectSpendableProofs(
-          {
-            tokenStore,
-            inspector,
-            wallet,
-            mint: draft.mint,
-            unit: sat,
-            reason: "send",
-          },
-        );
+        const selection = yield* selectSpendableProofs({
+          tokenStore,
+          inspector,
+          wallet,
+          mint: draft.mint,
+          unit: sat,
+          reason: "send",
+        });
+        const { spendable, available } = selection;
         if (available < draft.amount) {
           return yield* new InsufficientFunds({
             mint: draft.mint,
@@ -117,8 +117,8 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
           reason: "send",
         });
         yield* removeConsumedRows(
-          tokenStore,
-          liveRows,
+          { tokenStore, inspector, mint: draft.mint, unit: sat },
+          selection,
           changeRow === null ? [sendRow] : [changeRow, sendRow],
         );
 
