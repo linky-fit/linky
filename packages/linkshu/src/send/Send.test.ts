@@ -19,7 +19,7 @@ import type { StoredTokenRow } from "../ports/TokenStore";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { seedRow } from "../testing/rows";
-import { parseTokenText } from "../token/codec";
+import { decodeTokenText, parseTokenText } from "../token/codec";
 import { encodeCashuProofs } from "../token/internal/cashuProofs";
 import type { TokenState } from "../token/domain";
 import { SendDraft } from "./domain";
@@ -255,6 +255,32 @@ describe("Send.send", () => {
     // Exact spend: no change row, only the pending send row remains.
     expect(exit.value.rows).toHaveLength(1);
     expect(exit.value.rows[0]?.state).toBe("pending");
+  });
+
+  it("carries the sent proofs with full v2 keyset ids, which the token text alone loses", async () => {
+    const v2KeysetId = "01" + "ab".repeat(32);
+    const sent = [proof(4, "s1"), proof(2, "s2")].map((sentProof) => ({
+      ...sentProof,
+      id: v2KeysetId,
+    }));
+    const { wallet } = makeWallet({
+      send: () => Promise.resolve({ keep: [], send: sent }),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(sendAndInspect(draft(6, "pending"), [tokenA]));
+    assert(Exit.isSuccess(exit));
+    const { receipt } = exit.value;
+    assert(receipt._tag === "Right");
+
+    expect(receipt.right.proofs).toMatchObject([
+      { id: v2KeysetId, amount: 4, secret: "s1" },
+      { id: v2KeysetId, amount: 2, secret: "s2" },
+    ]);
+    expect(decodeTokenText(receipt.right.tokenText)).toBeNull();
+    expect(
+      decodeTokenText(receipt.right.tokenText, [v2KeysetId])?.proofs,
+    ).toEqual(receipt.right.proofs);
   });
 
   it("excludes NUT-07 spent proofs and marks fully spent rows as error", async () => {

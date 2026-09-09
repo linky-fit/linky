@@ -13,6 +13,7 @@ import {
   TokenRowId,
   TokenText,
 } from "../domain/primitives";
+import { Proof } from "../token/domain";
 
 export class SendDraft extends Schema.Class<SendDraft>("SendDraft")({
   mint: MintUrl,
@@ -30,6 +31,12 @@ export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({
   /** Row holding the produced send token, in the drafted state. */
   rowId: TokenRowId,
   tokenText: TokenText,
+  /**
+   * The same proofs `tokenText` encodes, with full keyset ids. v4 text
+   * shortens v2 keyset ids, so callers that need the proofs themselves
+   * (NUT-18 POST transport) take them from here instead of decoding.
+   */
+  proofs: Schema.Array(Proof),
   mint: MintUrl,
   unit: CurrencyUnit,
   amount: Amount,

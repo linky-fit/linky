@@ -8,6 +8,7 @@ import { decodeTokenFields } from "./v3Json";
 
 export interface EncodedCashuProofs {
   readonly tokenText: TokenText;
+  readonly proofs: ReadonlyArray<Proof>;
   readonly amount: Amount;
 }
 
@@ -24,7 +25,11 @@ const encodeValidated = (
   const decoded = decodeTokenFields(args);
   if (decoded === null) return null;
   const total = decoded.proofs.reduce((sum, proof) => sum + proof.amount, 0);
-  return { tokenText: encodeToken(decoded), amount: Amount.make(total) };
+  return {
+    tokenText: encodeToken(decoded),
+    proofs: decoded.proofs,
+    amount: Amount.make(total),
+  };
 };
 
 const plainCashuProof = (proof: CashuProof): unknown => ({

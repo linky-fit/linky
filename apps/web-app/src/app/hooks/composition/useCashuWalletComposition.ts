@@ -19,7 +19,6 @@ import {
   sendPaymentNoticeAtom,
   useAtomSet,
 } from "@linky/linkstr-react";
-import { decodeTokenText } from "@linky/linkshu";
 import { Cause, Either, Exit, Option, Schema } from "effect";
 import React, { useMemo, useState } from "react";
 import {
@@ -1358,13 +1357,10 @@ export const useCashuWalletComposition = ({
         sentMint = receipt.mint;
 
         try {
-          const decoded = decodeTokenText(receipt.tokenText);
-          if (decoded === null) throw new Error("empty payment proofs");
-
           const body: Record<string, unknown> = {
             mint: receipt.mint,
             unit: receipt.unit,
-            proofs: decoded.proofs,
+            proofs: receipt.proofs,
           };
           if (requestInfo.requestId) body.id = requestInfo.requestId;
           if (requestInfo.description) body.memo = requestInfo.description;

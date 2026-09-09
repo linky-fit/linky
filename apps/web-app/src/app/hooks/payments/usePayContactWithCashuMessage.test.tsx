@@ -74,6 +74,7 @@ const sendTokenText = buildCashuToken({
 const sendReceipt = new SendReceipt({
   rowId: TokenRowId.make("send-row"),
   tokenText: TokenText.make(sendTokenText),
+  proofs: [],
   mint: MintUrl.make(MINT_URL),
   unit: CurrencyUnit.make("sat"),
   amount: Amount.make(600),

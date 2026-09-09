@@ -125,6 +125,7 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
         return new SendReceipt({
           rowId: sendRow.id,
           tokenText: sendEncoded.tokenText,
+          proofs: sendEncoded.proofs,
           mint: draft.mint,
           unit: sat,
           amount: sendEncoded.amount,
