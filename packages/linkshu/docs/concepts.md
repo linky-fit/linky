@@ -82,7 +82,7 @@ Who moves rows:
 
 - `Receive` inserts `pending`, swaps at the mint, then flips to `accepted` — or to `error` on a definitive rejection.
 - `Send` produces the outgoing row as `issued` or `pending` (your choice via `produceAs`) and the change as `accepted`; the source rows are removed.
-- `Melt` parks its inputs as `reserved` while the mint holds them; change comes back `accepted`.
+- `Melt` parks its inputs as `reserved` while the mint holds them; change comes back `accepted`. `Melt.resumePending` settles inputs left `reserved` by an unsettled payment.
 - `Topup`, `Restore`, `Autoswap` insert `accepted` rows.
 - `Tokens.reserve` / `markIssued` / `markExternalized` / `returnToWallet` are the transitions you call from UI actions ([tokens.md](./tokens.md)).
 - `Validation` marks fully spent rows `error` and rewrites partially spent ones; `checkIssued` removes claimed `issued` rows; `Tokens.deleteSpent` removes mint-confirmed spent rows.

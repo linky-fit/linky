@@ -99,6 +99,21 @@ export class PaymentFailed extends Schema.TaggedError<PaymentFailed>()(
 ) {}
 
 /**
+ * The melt request was sent and the mint has not settled it either way: the
+ * inputs stay `reserved` in `rowId` under a durable record that
+ * `Melt.resumePending` settles once the mint answers PAID or UNPAID.
+ */
+export class PaymentPending extends Schema.TaggedError<PaymentPending>()(
+  "PaymentPending",
+  {
+    mint: MintUrl,
+    quoteId: QuoteId,
+    rowId: TokenRowId,
+    amount: Amount,
+  },
+) {}
+
+/**
  * The mint already issued this quote's proofs and no attempt of this wallet
  * reserved counter slots for it, so another wallet holds them; nothing to
  * mint or reclaim here.

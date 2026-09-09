@@ -5,6 +5,7 @@ import {
   MintRejected,
   MintUnreachable,
   PaymentFailed,
+  PaymentPending,
   QuoteExpired,
 } from "../domain/errors";
 import {
@@ -13,6 +14,7 @@ import {
   MintUrl,
   NonNegativeAmount,
   QuoteId,
+  TokenRowId,
   UnixSeconds,
 } from "../domain/primitives";
 
@@ -42,11 +44,32 @@ export class MeltReceipt extends Schema.Class<MeltReceipt>("MeltReceipt")({
   changeAmount: NonNegativeAmount,
 }) {}
 
+/** What `resumePending` did with one persisted melt record. */
+export class MeltResumeResult extends Schema.Class<MeltResumeResult>(
+  "MeltResumeResult",
+)({
+  quoteId: QuoteId,
+  mint: MintUrl,
+  /** The `reserved` inputs row the record pointed at. */
+  rowId: TokenRowId,
+  amount: Amount,
+  /**
+   * `paid` — settled, change persisted, record dropped; `unpaid` — inputs
+   * back in balance, record dropped; `pending` — the mint still reports the
+   * payment in flight, record kept; `unresolved` — no usable mint answer,
+   * record kept for the next pass.
+   */
+  status: Schema.Literal("paid", "unpaid", "pending", "unresolved"),
+  /** Set only for `paid`. */
+  receipt: Schema.NullOr(MeltReceipt),
+}) {}
+
 export const MeltError = Schema.Union(
   InsufficientFunds,
   MintUnreachable,
   MintRejected,
   PaymentFailed,
+  PaymentPending,
   QuoteExpired,
   CounterLockTimeout,
 );

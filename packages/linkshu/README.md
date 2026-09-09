@@ -22,7 +22,10 @@ holds the design rules; the guides show how to call the package.
   disjoint send/keep counter blocks, change persisted before the receipt
   resolves
 - `melt/` — bolt11 payment: quote, fee-inclusive swap, NUT-08 blank-output
-  accounting that advances the counter past the full blank range
+  accounting that advances the counter past the full blank range. The melt
+  record — quote, reserved inputs row, blank slot — is persisted before the
+  request leaves, so `resumePending` settles a payment the mint had not
+  answered (change reclaimed via NUT-09, or inputs returned) on the next run
 - `validation/` — NUT-07 proof-state checks: batched checkstate, per-row
   spent marking, local (signature-free) merge of surviving proofs, issued
   tokens pruned once the recipient claims them

@@ -5,6 +5,7 @@ import {
   MintRejected,
   MintUnreachable,
   PaymentFailed,
+  PaymentPending,
 } from "../domain/errors";
 import {
   Amount,
@@ -52,6 +53,7 @@ export const AutoswapError = Schema.Union(
   MintUnreachable,
   MintRejected,
   PaymentFailed,
+  PaymentPending,
   CounterLockTimeout,
 );
 export type AutoswapError = typeof AutoswapError.Type;

@@ -118,7 +118,7 @@ All in `src/inspector/events.ts`; `LinkshuInspectorEvent` is their union.
 | `QuoteStateChanged`     | `flow`, `quoteId`, `mint`, `state`, `via`                                            | A mint/melt quote was observed in a new state while `topup`, `autoswap`, or `melt` watched it; `via` names the watcher (`poll`, or the NUT-17 `subscription`). |
 | `LightningFeeProbed`    | `mint`, `probeMint`, `meltQuoteId`, `mintQuoteId`, `amount`, `feeReserve`, `percent` | A fee probe measured a mint's Lightning fee.                                                                                                                   |
 
-Operation `name` is `<vertical>.<method>` in camelCase, matching the service and method you called: `receive.receive`, `topup.resumePending`. One operation usually produces several rows — a `send.send` is bracketed by the `CounterAdvanced` and `TokenLifecycleChanged` rows it caused.
+Operation `name` is `<vertical>.<method>` in camelCase, matching the service and method you called: `receive.receive`, `topup.resumePending`. One operation usually produces several rows — a `send.send` is bracketed by the `CounterAdvanced` and `TokenLifecycleChanged` rows it caused. `melt.resumePending` emits one `melt.resume` row per persisted record (params `mint`, `quoteId`, `rowId`; `OperationFailed` when the mint gave no usable answer) before its own summary row.
 
 `topup.subscribe` is an internal subscription attempt: an `OperationFailed` row records a setup failure or socket close before retrying. Its params contain only `mint` and `quoteId`; normal cancellation emits no failure, and settlement appears as `QuoteStateChanged` with `via: "subscription"`.
 

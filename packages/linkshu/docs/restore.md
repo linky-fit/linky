@@ -74,7 +74,7 @@ const switchSeed = async (
 };
 ```
 
-The wipe leaves token rows, seen mints/keysets, pending topup/autoswap records, and the fee-probe cache alone. Linky runs it from `platform/linkshu/wipeLinkshuSeedBoundState.ts` whenever the cashu mnemonic changes.
+The wipe leaves token rows, seen mints/keysets, pending topup/autoswap/melt records, and the fee-probe cache alone. Linky runs it from `platform/linkshu/wipeLinkshuSeedBoundState.ts` whenever the cashu mnemonic changes.
 
 ## Inputs and outputs
 

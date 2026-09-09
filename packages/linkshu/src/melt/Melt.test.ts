@@ -17,18 +17,20 @@ import {
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
-import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
+import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import { TokenStore } from "../ports/TokenStore";
 import type { StoredTokenRow } from "../ports/TokenStore";
 import { runOnTestClock } from "../testing/clock";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { amountOf, seedRow } from "../testing/rows";
+import { freshStorage } from "../testing/storage";
+import type { Storage } from "../testing/storage";
 import { decodeTokenText } from "../token/codec";
 import type { TokenState } from "../token/domain";
 import { MeltDraft } from "./domain";
+import { PENDING_MELT_KEY_PREFIX, pendingMelts } from "./internal/pendingMelt";
 import { Melt } from "./Melt";
 
 const mint = MintUrl.make("https://mint.example");
@@ -181,7 +183,11 @@ const makeWallet = (args: FakeWalletArgs) => {
   return { wallet, sendCalls, meltCalls, checkQuoteCalls, restoreCalls };
 };
 
-const makeHarness = (wallet: LoadedWallet) => {
+/** One runtime over the given storage — a second one models a restart. */
+const makeHarness = (
+  wallet: LoadedWallet,
+  storage: Storage = freshStorage(),
+) => {
   const inspector = recordingInspector();
   const layer = Melt.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -190,8 +196,8 @@ const makeHarness = (wallet: LoadedWallet) => {
           WalletInstances,
           WalletInstances.make({ get: () => Effect.succeed(wallet) }),
         ),
-        inMemoryKeyValueStore,
-        inMemoryTokenStore,
+        Layer.succeed(KeyValueStore, storage.kv),
+        Layer.succeed(TokenStore, storage.tokens),
         inspector.layer,
       ),
     ),
@@ -224,6 +230,38 @@ const rowsByState = (
   rows: ReadonlyArray<StoredTokenRow>,
   state: TokenState,
 ): ReadonlyArray<StoredTokenRow> => rows.filter((row) => row.state === state);
+
+const pendingKeys = (kv: KeyValueStoreService) =>
+  Effect.runPromise(kv.listKeys(PENDING_MELT_KEY_PREFIX));
+
+const pendingRecord = (kv: KeyValueStoreService) =>
+  Effect.runPromise(pendingMelts.read(kv, mint, QuoteId.make("quote-1")));
+
+const resumeAndInspect = Effect.gen(function* () {
+  const results = yield* (yield* Melt).resumePending;
+  return { results, rows: yield* (yield* TokenStore).loadAll };
+});
+
+/**
+ * A melt whose request left but whose outcome the process never learned:
+ * the response and the follow-up quote check both fail, so the runtime ends
+ * with `PaymentPending`, a `reserved` row, and a record naming both.
+ */
+const interruptMelt = async (storage: Storage) => {
+  const { wallet, meltCalls } = makeWallet({
+    send: () => Promise.resolve(swappedThirteen()),
+    melt: () => Promise.reject(new TypeError("fetch failed")),
+    checkQuote: () => Promise.reject(new TypeError("fetch failed")),
+  });
+  const exit = await makeHarness(wallet, storage).run(
+    meltAndInspect([tokenA, tokenB]),
+  );
+  assert(Exit.isSuccess(exit));
+  assert(exit.value.receipt._tag === "Left");
+  expect(exit.value.receipt.left._tag).toBe("PaymentPending");
+  expect(meltCalls).toHaveLength(1);
+  return exit.value;
+};
 
 describe("Melt.quote", () => {
   it("prices the payment without touching stored tokens", async () => {
@@ -267,15 +305,27 @@ describe("Melt.quote", () => {
 
 describe("Melt.melt", () => {
   it("pays the invoice with exact fee, change, and blank-output accounting", async () => {
+    const storage = freshStorage();
     const { wallet, sendCalls, meltCalls } = makeWallet({
       send: () => Promise.resolve(swappedThirteen()),
-      melt: () => Promise.resolve(meltResponse("PAID", [proof(1, "chg")])),
+      melt: async () => {
+        // The record is durable before the request reaches the mint.
+        expect(await pendingRecord(storage.kv)).toMatchObject({
+          quoteId: "quote-1",
+          amount: 10,
+          feeReserve: 2,
+          inputsTotal: 13,
+          blankCounter: 66,
+        });
+        return meltResponse("PAID", [proof(1, "chg")]);
+      },
     });
-    const { run, events } = makeHarness(wallet);
+    const { run, events } = makeHarness(wallet, storage);
 
     const exit = await run(meltAndInspect([tokenA, tokenB]));
     assert(Exit.isSuccess(exit));
     const { receipt, rows, counter } = exit.value;
+    expect(await pendingKeys(storage.kv)).toEqual([]);
 
     assert(receipt._tag === "Right");
     expect(receipt.right).toMatchObject({
@@ -503,13 +553,14 @@ describe("Melt.melt", () => {
     expect(rowsByState(rows, "reserved")).toHaveLength(0);
   });
 
-  it("keeps the inputs reserved when the payment stays pending", async () => {
+  it("hands a payment that stays pending to resume, inputs reserved under the record", async () => {
+    const storage = freshStorage();
     const { wallet } = makeWallet({
       send: () => Promise.resolve(swappedThirteen()),
       melt: () => Promise.resolve(meltResponse("PENDING", [])),
       checkQuote: () => Promise.resolve(quoteResponse({ state: "PENDING" })),
     });
-    const { run } = makeHarness(wallet);
+    const { run } = makeHarness(wallet, storage);
 
     const exit = await run(
       Effect.gen(function* () {
@@ -523,11 +574,21 @@ describe("Melt.melt", () => {
     );
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("PaymentFailed");
-    // Neither balance nor destroyed: NUT-07 validation resolves it later.
+    // Neither balance nor destroyed: the record lets `resumePending` settle it.
     const reserved = rowsByState(exit.value.rows, "reserved");
     expect(reserved).toHaveLength(1);
     expect(amountOf(reserved[0])).toBe(13);
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "PaymentPending",
+      mint,
+      quoteId: "quote-1",
+      rowId: reserved[0]?.id,
+      amount: 10,
+    });
+    expect(await pendingRecord(storage.kv)).toMatchObject({
+      rowId: reserved[0]?.id,
+      blankCounter: 66,
+    });
   });
 
   it("reclaims a lost melt response when the quote reports PAID", async () => {
@@ -548,19 +609,30 @@ describe("Melt.melt", () => {
     expect(rowsByState(rows, "reserved")).toHaveLength(0);
   });
 
-  it("keeps the inputs reserved when a lost response cannot be resolved", async () => {
+  it("keeps the inputs reserved under the record when a lost response cannot be resolved", async () => {
+    const storage = freshStorage();
+    const { rows } = await interruptMelt(storage);
+    expect(rowsByState(rows, "reserved")).toHaveLength(1);
+    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+  });
+
+  it("releases the inputs when the quote check after a lost response says UNPAID", async () => {
+    const storage = freshStorage();
     const { wallet } = makeWallet({
       send: () => Promise.resolve(swappedThirteen()),
       melt: () => Promise.reject(new TypeError("fetch failed")),
-      checkQuote: () => Promise.reject(new TypeError("fetch failed")),
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
     });
-    const { run } = makeHarness(wallet);
-
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await makeHarness(wallet, storage).run(
+      meltAndInspect([tokenA, tokenB]),
+    );
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
-    expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(1);
+    expect(exit.value.receipt.left._tag).toBe("PaymentFailed");
+    expect(rowsByState(exit.value.rows, "accepted").map(amountOf)).toContain(
+      13,
+    );
+    expect(await pendingKeys(storage.kv)).toEqual([]);
   });
 
   it("excludes NUT-07 spent rows and marks them before melting", async () => {
@@ -587,6 +659,155 @@ describe("Melt.melt", () => {
       _tag: "TokenAlreadySpent",
       mint,
     });
+  });
+});
+
+describe("Melt.resumePending", () => {
+  it("finishes a paid melt on a fresh runtime, reclaiming change from the recorded blank slots", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),
+      restore: () => Promise.resolve({ proofs: [proof(1, "chg")] }),
+    });
+    const { run, events } = makeHarness(resuming.wallet, storage);
+    const exit = await run(resumeAndInspect);
+    assert(Exit.isSuccess(exit));
+
+    const { results, rows } = exit.value;
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({
+      quoteId: "quote-1",
+      mint,
+      amount: 10,
+      status: "paid",
+      receipt: { paidAmount: 10, feePaid: 2, changeAmount: 1 },
+    });
+    expect(resuming.restoreCalls).toEqual([{ start: 66, count: 2 }]);
+    expect(resuming.meltCalls).toEqual([]);
+    // The swap remainder and the change are balance; the inputs are gone.
+    expect(rowsByState(rows, "accepted").map(amountOf).sort()).toEqual([1, 1]);
+    expect(rowsByState(rows, "reserved")).toHaveLength(0);
+    expect(await pendingKeys(storage.kv)).toEqual([]);
+
+    expect(events.map((event) => event._tag)).toEqual([
+      "QuoteStateChanged",
+      "TokenLifecycleChanged",
+      "OperationSucceeded",
+      "OperationSucceeded",
+    ]);
+    expect(events[2]).toMatchObject({
+      name: "melt.resume",
+      params: { mint, quoteId: "quote-1", rowId: results[0]?.rowId },
+    });
+    expect(events[3]).toMatchObject({ name: "melt.resumePending" });
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain("cashu");
+    expect(serialized).not.toContain("lnbc");
+  });
+
+  it("returns the inputs to balance when the mint reports UNPAID", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
+    });
+    const exit = await makeHarness(resuming.wallet, storage).run(
+      resumeAndInspect,
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results[0]).toMatchObject({
+      status: "unpaid",
+      receipt: null,
+    });
+    expect(resuming.restoreCalls).toEqual([]);
+    expect(
+      rowsByState(exit.value.rows, "accepted").map(amountOf).sort(),
+    ).toEqual([1, 13]);
+    expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(0);
+    expect(await pendingKeys(storage.kv)).toEqual([]);
+  });
+
+  it("leaves a PENDING payment and its row untouched", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "PENDING" })),
+    });
+    const exit = await makeHarness(resuming.wallet, storage).run(
+      resumeAndInspect,
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results[0]).toMatchObject({ status: "pending" });
+    expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(1);
+    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+  });
+
+  it("keeps the record when the mint gives no answer, even past the quote expiry", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+
+    const resuming = makeWallet({
+      checkQuote: () => Promise.reject(new TypeError("fetch failed")),
+    });
+    const { run, events } = makeHarness(resuming.wallet, storage);
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.adjust("48 hours");
+        return yield* resumeAndInspect;
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results[0]).toMatchObject({ status: "unresolved" });
+    expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(1);
+    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: "OperationFailed",
+        name: "melt.resume",
+        error: expect.objectContaining({ _tag: "MintUnreachable" }),
+      }),
+    );
+  });
+
+  it("does not import change twice when the change row landed before the record was cleared", async () => {
+    const storage = freshStorage();
+    await interruptMelt(storage);
+    const changeRow = getEncodedToken({
+      mint,
+      unit: "sat",
+      proofs: [proof(1, "chg")],
+    });
+    await Effect.runPromise(
+      seedRow(changeRow).pipe(
+        Effect.provide(Layer.succeed(TokenStore, storage.tokens)),
+      ),
+    );
+
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),
+      restore: () => Promise.resolve({ proofs: [proof(1, "chg")] }),
+    });
+    const exit = await makeHarness(resuming.wallet, storage).run(
+      resumeAndInspect,
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results[0]).toMatchObject({ status: "paid" });
+    expect(
+      rowsByState(exit.value.rows, "accepted").map(amountOf).sort(),
+    ).toEqual([1, 1]);
+    expect(await pendingKeys(storage.kv)).toEqual([]);
+  });
+
+  it("does nothing without records", async () => {
+    const { wallet, checkQuoteCalls } = makeWallet({});
+    const exit = await makeHarness(wallet).run(resumeAndInspect);
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results).toEqual([]);
+    expect(checkQuoteCalls).toEqual([]);
   });
 });
 

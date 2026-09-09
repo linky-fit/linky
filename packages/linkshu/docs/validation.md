@@ -45,7 +45,7 @@ One batched checkstate call per mint+unit group. Per row:
 
 `inspectProofStates` batches requests by mint and unit and returns `{ rowId, unspent, pending, spent, unknown }` for each row. Amounts use the token's unit. A mixed token contributes to several amounts. Missing or unrecognized answers count as `unknown`; an unreachable mint leaves its rows' full amounts unknown. These are current mint answers, separate from the stored row's lifecycle state. The result contains no proof secrets or token text.
 
-`checkAll` and `checkIssued` skip `pending` and `reserved` rows; `checkRow` checks whatever row you give it. That is how `reserved` rows left by an interrupted melt are resolved (also not covered by `Tokens.deleteSpent`): run `checkRow` on each — fully spent flips it to `error`, live leaves it `reserved` for `Tokens.returnToWallet`. See [melt.md](./melt.md#recovering-an-interrupted-melt) for the order of steps. `externalized` and dead `error` rows are only reported, never re-marked.
+`checkAll` and `checkIssued` skip `pending` and `reserved` rows; `checkRow` checks whatever row you give it. Validation never resolves the `reserved` inputs of an interrupted melt — `checkRow` on one only reports what the mint says — [`Melt.resumePending`](./melt.md#resumepending--run-it-at-startup) settles them from the quote's state. `externalized` and dead `error` rows are only reported, never re-marked.
 
 Validation never resurrects a row: an `error` row with live proofs comes back only through `Tokens.returnToWallet`.
 
@@ -84,5 +84,5 @@ Validation never resurrects a row: an `error` row with live proofs comes back on
 
 - [tokens.md](./tokens.md) — `deleteSpent`, `returnToWallet`, lifecycle
 - [send.md](./send.md) — `issued` rows come from here
-- [melt.md](./melt.md) — where `reserved` rows come from
+- [melt.md](./melt.md) — where `reserved` rows come from and who settles them
 - [../README.md](../README.md) — "A missing NUT-07 answer is never a guess"

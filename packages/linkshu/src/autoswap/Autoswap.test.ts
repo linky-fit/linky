@@ -133,6 +133,7 @@ const makeMelt = (
   const service = Melt.make({
     status: () => Effect.succeed("UNPAID"),
     quote: () => Effect.die("melt.quote not under test"),
+    resumePending: Effect.succeed([]),
     melt: (draft: MeltDraft) => {
       const index = invoices.length;
       invoices.push(draft.invoice);

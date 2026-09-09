@@ -50,11 +50,11 @@ Everything else (`pending` → `accepted`, `error` marking, removal of consumed 
 
 `returnToWallet(rowId)` brings a row back to `accepted` and returns a `ReceiveReceipt`. Its behavior depends on the state:
 
-| Row state                                    | What happens                                                                                                                                                                                |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accepted`                                   | `InvalidTokenTransition` — nothing to return                                                                                                                                                |
-| `reserved`                                   | released locally, without a mint check. For inputs of an interrupted melt, follow [the melt recovery procedure](./melt.md#recovering-an-interrupted-melt) first                             |
-| `issued`, `externalized`, `pending`, `error` | the row's text is **re-received** through the accept flow: a fresh `accepted` row gets swapped proofs, then the old row is removed. The copy someone else may hold is now spent at the mint |
+| Row state                                    | What happens                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accepted`                                   | `InvalidTokenTransition` — nothing to return                                                                                                                                                                                                                                                  |
+| `reserved`                                   | released locally, without a mint check. Inputs of an interrupted melt belong to [`Melt.resumePending`](./melt.md#resumepending--run-it-at-startup), which asks the mint first; returning them by hand while the mint still holds them makes the balance count funds that may already be spent |
+| `issued`, `externalized`, `pending`, `error` | the row's text is **re-received** through the accept flow: a fresh `accepted` row gets swapped proofs, then the old row is removed. The copy someone else may hold is now spent at the mint                                                                                                   |
 
 On a re-receive, dedup ignores the replaced row. A transient failure leaves it exactly as it was; a definitive failure (`TokenAlreadySpent`, `MintRejected`) lands on the replaced row as `error` where the state machine allows (an `externalized` row keeps its state). This is the recovery path for a `pending` message send that never confirmed, an unclaimed `issued` token, and an `error` row that still holds live proofs after a partial spend.
 
@@ -62,7 +62,7 @@ On a re-receive, dedup ignores the replaced row. A transient failure leaves it e
 
 Removes rows the mints confirm fully spent and returns `DeletedSpentToken[]` (`rowId`, `amount`). It sweeps `accepted` and `error` rows only. It runs its own NUT-07 check: rows already carrying a recorded `TokenAlreadySpent` are re-confirmed, because a receive rejected over a _partially_ spent token records that error while the text still holds live proofs. An unreachable mint or an unanswered proof keeps every row.
 
-Rows in other states are never swept: `issued` rows are pruned by `Validation.checkIssued` once claimed; `externalized` rows come back only through `returnToWallet`; `reserved` and `pending` rows belong to an operation in flight.
+Rows in other states are never swept: `issued` rows are pruned by `Validation.checkIssued` once claimed; `externalized` rows come back only through `returnToWallet`; `reserved` and `pending` rows belong to an operation in flight (a melt's `reserved` inputs are settled by `Melt.resumePending`).
 
 ## Token codec
 
