@@ -8,8 +8,6 @@ import type { Lang } from "../../../i18n";
 import { navigateTo, type useRouting } from "../../../hooks/useRouting";
 import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
-import { getInitialShowProfileQrOnTiltEnabled } from "../../../utils/storage";
-import { usePortraitOrientationLock } from "../usePortraitOrientationLock";
 import { useProfileEditor } from "../profile/useProfileEditor";
 import { useProfileStatusEditor } from "../profile/useProfileStatusEditor";
 import type { Translate } from "../../../i18n";
@@ -38,9 +36,6 @@ export const useProfileComposition = ({
   setStatus,
   t,
 }: UseProfileCompositionParams) => {
-  const [showProfileQrOnTiltEnabled] = React.useState<boolean>(() =>
-    getInitialShowProfileQrOnTiltEnabled(),
-  );
   const [myProfileName, setMyProfileName] = React.useState<string | null>(null);
   const [myProfilePicture, setMyProfilePicture] = React.useState<string | null>(
     null,
@@ -64,8 +59,6 @@ export const useProfileComposition = ({
   const npubCashInfoInFlightRef = React.useRef(false);
   const npubCashInfoLoadedForNpubRef = React.useRef<string | null>(null);
   const npubCashInfoLoadedAtMsRef = React.useRef<number>(0);
-
-  usePortraitOrientationLock(showProfileQrOnTiltEnabled);
 
   const defaultLightningAddress = React.useMemo(() => {
     if (!currentNpub) return null;
@@ -239,7 +232,6 @@ export const useProfileComposition = ({
     setProfileEditLnAddress,
     setProfileEditName,
     setProfileEditStatus,
-    showProfileQrOnTiltEnabled,
     toggleProfileEditing,
     toggleProfileStatusCurrency,
     unregisteredOwnLightningAddress,

@@ -54,6 +54,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The contact dedupe the user started threw before finishing; the payload carries the error. Contacts already merged before the failure stay merged.",
   "contacts.ownerMigrated":
     "One-time move of legacy contact rows into the app owner lane after a seed login; the payload counts the rows that were rewritten and those that failed.",
+  "profileShare.tiltOpened":
+    "The phone was held with the top of the screen pointing down, so the full-screen contact card opened for the person facing it. It closes on tap or when the phone comes back upright.",
   "lnurlAuth.requested":
     "A scanned LUD-04 login request was recognized and put in front of the user; nothing is signed and no key is derived until they approve it. The challenge link ties it to the approval or failure that follows.",
   "lnurlAuth.approved":

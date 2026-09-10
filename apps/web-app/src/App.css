@@ -6248,6 +6248,40 @@ dd {
   font: inherit;
 }
 
+.profile-share-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--app-flat-bg);
+}
+
+.profile-share-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(100vw, 480px);
+  padding: 24px;
+  text-align: center;
+}
+
+.profile-share-card.is-flipped {
+  transform: rotate(180deg);
+}
+
+.profile-share-qr {
+  width: min(78vw, 52vh, 420px);
+  height: auto;
+  border-radius: 16px;
+}
+
+.profile-share-npub {
+  word-break: break-all;
+}
+
 .paid-overlay {
   position: fixed;
   inset: 0;

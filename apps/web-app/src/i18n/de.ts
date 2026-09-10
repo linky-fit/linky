@@ -665,6 +665,8 @@ export const de = {
   unitManageInfo:
     "Wähle die Einheiten, zwischen denen du durch Tippen auf Beträge wechselst.",
   decimalInput: "Dezimalstellen",
+  showProfileQrOnTilt: "Meinen Kontakt beim Umdrehen des Telefons zeigen",
+  profileShareTapToClose: "Zum Schließen tippen",
   sendReadReceipts: "Lesebestätigungen senden",
   decimalPoint: ",",
 

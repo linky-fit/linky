@@ -16,6 +16,7 @@ import {
 } from "../evolu";
 import { useRouting } from "../hooks/useRouting";
 import { useToasts } from "../hooks/useToasts";
+import { reportAppLog } from "../devtools/inspector/appLog";
 import { writeClipboardText } from "../platform/clipboard";
 import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
 import {
@@ -44,6 +45,7 @@ import {
   getInitialDecimalAmountInputEnabled,
   getInitialDisplayCurrency,
   getInitialSeenReceiptsEnabledAtSec,
+  getInitialShowProfileQrOnTiltEnabled,
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "../utils/storage";
@@ -70,6 +72,7 @@ import { useChatMessageEffects } from "./hooks/messages/useChatMessageEffects";
 import { useAppDataTransfer } from "./hooks/useAppDataTransfer";
 import { useAppLanguage } from "./hooks/useAppLanguage";
 import { useAppPreferences } from "./hooks/useAppPreferences";
+import { useTopDownTilt } from "./hooks/useTopDownTilt";
 import { useArmedDeleteTimeouts } from "./hooks/useArmedDeleteTimeouts";
 import { useFiatRates } from "./hooks/useFiatRates";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
@@ -224,6 +227,10 @@ export const useAppShellComposition = ({
   const [seenReceiptsEnabledAtSec, setSeenReceiptsEnabledAtSec] = useState<
     number | null
   >(getInitialSeenReceiptsEnabledAtSec);
+  const [showProfileQrOnTiltEnabled, setShowProfileQrOnTiltEnabled] =
+    useState<boolean>(getInitialShowProfileQrOnTiltEnabled);
+  const [profileShareOverlayIsOpen, setProfileShareOverlayIsOpen] =
+    useState(false);
 
   React.useEffect(() => {
     if (allowedDisplayCurrencies.includes(displayCurrency)) return;
@@ -263,6 +270,14 @@ export const useAppShellComposition = ({
 
   const toggleDecimalAmountInput = React.useCallback(() => {
     setDecimalAmountInputEnabled((current) => !current);
+  }, []);
+
+  const toggleShowProfileQrOnTilt = React.useCallback(() => {
+    setShowProfileQrOnTiltEnabled((current) => !current);
+  }, []);
+
+  const closeProfileShareOverlay = React.useCallback(() => {
+    setProfileShareOverlayIsOpen(false);
   }, []);
 
   // Enabling records the baseline: only messages newer than it are ever
@@ -718,7 +733,6 @@ export const useAppShellComposition = ({
     setProfileEditLnAddress,
     setProfileEditName,
     setProfileEditStatus,
-    showProfileQrOnTiltEnabled,
     toggleProfileEditing,
     toggleProfileStatusCurrency,
     unregisteredOwnLightningAddress,
@@ -853,6 +867,7 @@ export const useAppShellComposition = ({
     walletWarningDismissed,
   } = useCashuWalletComposition({
     cashuTokensAll,
+    profileShareOverlayIsOpen,
     contactPayBackToChatRef,
     contactsMessaging: {
       saveNpubContact,
@@ -1193,6 +1208,20 @@ export const useAppShellComposition = ({
     ],
   );
 
+  useTopDownTilt({
+    enabled: showProfileQrOnTiltEnabled && !scanIsOpen,
+    onChange: (topDown) => {
+      setProfileShareOverlayIsOpen(topDown);
+      if (topDown) {
+        reportAppLog({
+          tag: "profileShare.tiltOpened",
+          summary: "Phone flipped top-down: showing the contact card",
+          payload: { route: route.kind },
+        });
+      }
+    },
+  });
+
   /**
    * The topmost dismissible modal in `AuthenticatedLayout`, or null.
    *
@@ -1204,6 +1233,7 @@ export const useAppShellComposition = ({
    */
   const dismissTopModal = ((): (() => void) | null => {
     if (shareOptionsText) return closeShareOptions;
+    if (profileShareOverlayIsOpen) return closeProfileShareOverlay;
     if (nfcWritePromptKind && shouldRenderNativeNfcWritePrompt()) {
       return cancelPendingNfcWrite;
     }
@@ -1582,13 +1612,11 @@ export const useAppShellComposition = ({
         mainSwipeRef,
         canAddContact,
         openNewContactPage,
-        openProfileQr,
         openWalletScan,
         otherContactsLabel,
         renderContactCard: renderMainSwipeContactCard,
         route,
         scanIsOpen,
-        showProfileQrOnTiltEnabled,
         setActiveGroup,
         setContactsSearch,
         showContactsOnboarding,
@@ -1778,6 +1806,7 @@ export const useAppShellComposition = ({
       profilePhotoInputRef,
       selectedProfileStatusCurrencies,
       profileSelectedPictureKind,
+      profileShareOverlayIsOpen,
       route,
       scanAllowsManualContact,
       scanCameraLabel,
@@ -1786,6 +1815,7 @@ export const useAppShellComposition = ({
       scanImageInputRef,
       scanIsOpen,
       shareOptionsText,
+      showProfileQrOnTiltEnabled,
       scanVideoRef,
       t,
       topbar,
@@ -1858,6 +1888,8 @@ export const useAppShellComposition = ({
       scanVideoRef,
       selectedProfileStatusCurrencies,
       shareOptionsText,
+      showProfileQrOnTiltEnabled,
+      profileShareOverlayIsOpen,
       t,
       topbar,
       topbarRight,
@@ -1869,6 +1901,7 @@ export const useAppShellComposition = ({
     () => ({
       cancelPendingNfcWrite,
       closePaymentMintMeltConfirmation,
+      closeProfileShareOverlay,
       closeLnurlAuthConfirmation,
       closeLnurlWithdrawConfirmation,
       closeMenu,
@@ -1917,6 +1950,7 @@ export const useAppShellComposition = ({
       toggleProfileEditing,
       toggleProfileStatusCurrency,
       toggleSendReadReceipts,
+      toggleShowProfileQrOnTilt,
       writeCurrentNpubToNfc,
     }),
     [
@@ -1926,6 +1960,7 @@ export const useAppShellComposition = ({
       closeLnurlWithdrawConfirmation,
       closeMenu,
       closePaymentMintMeltConfirmation,
+      closeProfileShareOverlay,
       closeScan,
       closeShareOptions,
       confirmLightningInvoicePayment,
@@ -1970,6 +2005,7 @@ export const useAppShellComposition = ({
       toggleProfileEditing,
       toggleProfileStatusCurrency,
       toggleSendReadReceipts,
+      toggleShowProfileQrOnTilt,
       writeCurrentNpubToNfc,
     ],
   );

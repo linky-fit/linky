@@ -113,6 +113,7 @@ export interface AppShellCoreContextValue {
   profilePhotoInputRef: React.RefObject<HTMLInputElement | null>;
   selectedProfileStatusCurrencies: readonly ProfileStatusCurrency[];
   profileSelectedPictureKind: "custom" | "generated";
+  profileShareOverlayIsOpen: boolean;
   route: Route;
   scanAllowsManualContact: boolean;
   scanCameraLabel: string | null;
@@ -122,6 +123,7 @@ export interface AppShellCoreContextValue {
   scanIsOpen: boolean;
   scanVideoRef: React.RefObject<HTMLVideoElement | null>;
   shareOptionsText: string | null;
+  showProfileQrOnTiltEnabled: boolean;
   t: Translate;
   topbar: TopbarButton | null;
   topbarRight: TopbarButton | null;
@@ -133,6 +135,7 @@ export interface AppShellCoreContextValue {
 export interface AppShellActionsContextValue {
   cancelPendingNfcWrite: () => void;
   closePaymentMintMeltConfirmation: () => void;
+  closeProfileShareOverlay: () => void;
   closeMenu: () => void;
   closeShareOptions: () => void;
   closeLnurlAuthConfirmation: () => void;
@@ -190,6 +193,7 @@ export interface AppShellActionsContextValue {
   toggleAllowedDisplayCurrency: (currency: DisplayCurrency) => void;
   toggleDecimalAmountInput: () => void;
   toggleSendReadReceipts: () => void;
+  toggleShowProfileQrOnTilt: () => void;
   toggleProfileEditing: () => void;
   toggleProfileStatusCurrency: (
     currency: ProfileStatusCurrency,

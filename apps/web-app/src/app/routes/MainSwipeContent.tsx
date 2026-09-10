@@ -10,7 +10,6 @@ import { WalletPage } from "../../pages/WalletPage";
 import type { Route } from "../../types/route";
 import { nowSeconds } from "../../utils/time";
 import { useMainSwipeRoutes } from "../context/AppShellContexts";
-import { useShowProfileQrOnTilt } from "../hooks/useShowProfileQrOnTilt";
 import { getActiveBankPaymentOfferContacts } from "../lib/bankPaymentOffer";
 import { useMainSwipeProgress } from "../lib/mainSwipeProgressStore";
 import type {
@@ -40,7 +39,6 @@ export interface MainSwipeRouteProps {
   handleMainSwipeTabChange: (target: "contacts" | "wallet") => void;
   mainSwipeRef: React.RefObject<HTMLDivElement | null>;
   openNewContactPage: () => void;
-  openProfileQr: () => void;
   openWalletScan: () => void;
   otherContactsLabel: string;
   renderContactCard: (contact: ContactRowLike) => React.ReactNode;
@@ -51,7 +49,6 @@ export interface MainSwipeRouteProps {
   showContactsOnboarding: boolean;
   showWalletWarning: boolean;
   showGroupFilter: boolean;
-  showProfileQrOnTiltEnabled: boolean;
   startContactsGuide: (task: ContactsGuideKey) => void;
   t: Translate;
   visibleContacts: {
@@ -202,7 +199,6 @@ export const MainSwipeContent = (): React.ReactElement => {
     handleMainSwipeTabChange,
     mainSwipeRef,
     openNewContactPage,
-    openProfileQr,
     openWalletScan,
     otherContactsLabel,
     renderContactCard,
@@ -213,7 +209,6 @@ export const MainSwipeContent = (): React.ReactElement => {
     showContactsOnboarding,
     showWalletWarning,
     showGroupFilter,
-    showProfileQrOnTiltEnabled,
     startContactsGuide,
     t,
     visibleContacts,
@@ -223,14 +218,6 @@ export const MainSwipeContent = (): React.ReactElement => {
     bankPaymentOfferMessages,
     visibleContacts,
   );
-
-  useShowProfileQrOnTilt({
-    enabled:
-      showProfileQrOnTiltEnabled &&
-      (route.kind === "contacts" || route.kind === "wallet") &&
-      !scanIsOpen,
-    onShowProfileQr: openProfileQr,
-  });
 
   return (
     <>

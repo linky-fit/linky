@@ -44,6 +44,7 @@ Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `d
 ## Features
 
 - Contacts: add/edit/delete, QR scan/share, grouping
+- Tilt to share: flip the phone so the top of the screen points down and a full-screen contact card (avatar, name, QR) appears rotated towards the other person; tap or turn the phone back to close. Works in the browser, the installed PWA, and the Android app; iOS asks for motion access on the first tap. Off switch in Settings
 - Messages: encrypted private chat (gift-wrap/NIP-17 flows), with image and PDF attachments. Paste an image into the message field with Cmd+V, Ctrl+V, or the phone's system Paste action to send it immediately; any text draft stays in the field.
 - Wallet: Cashu token ingest, restore, validation, spend; token list with available, pending-at-mint, and unknown amounts
 - Lightning address receive: payments to `<npub>@linky.fit` and `<npub>@npub.cash` both land in the wallet, whatever address the profile advertises

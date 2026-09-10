@@ -10,6 +10,7 @@ import {
   Copy,
   Download,
   MessageCircle as FeedbackIcon,
+  Smartphone,
   Landmark,
   Languages,
   LogOut,
@@ -69,9 +70,14 @@ export function AdvancedPage(): React.ReactElement {
     currentNsec,
     formatDisplayedAmountParts,
     sendReadReceiptsEnabled,
+    showProfileQrOnTiltEnabled,
     t,
   } = useAppShellCore();
-  const { openFeedbackContact, toggleSendReadReceipts } = useAppShellActions();
+  const {
+    openFeedbackContact,
+    toggleSendReadReceipts,
+    toggleShowProfileQrOnTilt,
+  } = useAppShellActions();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationsIsBusy, setNotificationsIsBusy] = useState(false);
   const [armedSecurityAction, setArmedSecurityAction] = useState<
@@ -288,6 +294,13 @@ export function AdvancedPage(): React.ReactElement {
           label={t("sendReadReceipts")}
           checked={sendReadReceiptsEnabled}
           onChange={toggleSendReadReceipts}
+        />
+
+        <SettingsToggleRow
+          icon={<Smartphone size={18} />}
+          label={t("showProfileQrOnTilt")}
+          checked={showProfileQrOnTiltEnabled}
+          onChange={toggleShowProfileQrOnTilt}
         />
       </div>
 

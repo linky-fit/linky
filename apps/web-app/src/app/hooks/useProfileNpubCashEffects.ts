@@ -20,6 +20,7 @@ interface UseProfileNpubCashEffectsParams {
   npubCashInfoInFlightRef: React.MutableRefObject<boolean>;
   npubCashInfoLoadedAtMsRef: React.MutableRefObject<number>;
   npubCashInfoLoadedForNpubRef: React.MutableRefObject<string | null>;
+  profileShareOverlayIsOpen: boolean;
   routeKind: string;
   setDefaultMintUrl: React.Dispatch<React.SetStateAction<string | null>>;
   setDefaultMintUrlDraft: React.Dispatch<React.SetStateAction<string>>;
@@ -38,6 +39,7 @@ export const useProfileNpubCashEffects = ({
   npubCashInfoInFlightRef,
   npubCashInfoLoadedAtMsRef,
   npubCashInfoLoadedForNpubRef,
+  profileShareOverlayIsOpen,
   routeKind,
   setDefaultMintUrl,
   setDefaultMintUrlDraft,
@@ -51,7 +53,7 @@ export const useProfileNpubCashEffects = ({
     }
   }, [routeKind, setIsProfileEditing]);
 
-  const showProfileQr = routeKind === "profile";
+  const showProfileQr = routeKind === "profile" || profileShareOverlayIsOpen;
 
   React.useEffect(() => {
     // Generate QR code for the current npub when profile QR is visible.

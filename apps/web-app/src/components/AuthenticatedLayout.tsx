@@ -13,6 +13,7 @@ import { MenuModal } from "./MenuModal";
 import { NfcWriteModal } from "./NfcWriteModal";
 import { PaidOverlay } from "./PaidOverlay";
 import { PaymentMintMeltConfirmModal } from "./PaymentMintMeltConfirmModal";
+import { ProfileShareOverlay } from "./ProfileShareOverlay";
 import { SaveContactPromptModal } from "./SaveContactPromptModal";
 import { ScanModal } from "./ScanModal";
 import { ShareOptionsModal } from "./ShareOptionsModal";
@@ -120,6 +121,17 @@ export function AuthenticatedLayout({
         <NfcWriteModal
           kind={state.nfcWritePromptKind}
           onCancel={actions.cancelPendingNfcWrite}
+          t={state.t}
+        />
+      ) : null}
+
+      {state.profileShareOverlayIsOpen && state.currentNpub ? (
+        <ProfileShareOverlay
+          name={state.effectiveProfileName}
+          npub={state.currentNpub}
+          onClose={actions.closeProfileShareOverlay}
+          pictureUrl={state.effectiveProfilePicture}
+          qrSrc={state.myProfileQr}
           t={state.t}
         />
       ) : null}

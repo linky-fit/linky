@@ -664,6 +664,8 @@ export const cs = {
   unitManageInfo:
     "Kliknutím na balanci v peněžence nebo při zadávání částky přepínáte mezi povolenými měnami.",
   decimalInput: "Desetinná místa",
+  showProfileQrOnTilt: "Ukázat můj kontakt při otočení telefonu",
+  profileShareTapToClose: "Klepnutím zavřete",
   sendReadReceipts: "Odesílat potvrzení o přečtení",
   decimalPoint: ",",
 
