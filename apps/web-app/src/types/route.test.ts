@@ -110,6 +110,12 @@ describe("parseRouteFromHash", () => {
       id: unknownChatId,
     });
   });
+  it("parses the onboarding gift settings route", () => {
+    replaceHash("#advanced/onboarding-gift");
+
+    expect(parseRouteFromHash()).toEqual({ kind: "advancedOnboardingGift" });
+  });
+
   it("parses the onboarding route with an optional gift token id", () => {
     replaceHash("#profile/onboard");
     expect(parseRouteFromHash()).toEqual({ kind: "onboard" });

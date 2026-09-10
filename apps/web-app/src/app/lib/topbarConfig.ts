@@ -52,6 +52,7 @@ export const resolveBackAction = (
     case "settingsUnits":
     case "settingsMasterKeys":
     case "advancedAutoPayLimit":
+    case "advancedOnboardingGift":
     case "advancedInspector":
     case "mints":
     case "nostrRelays":
@@ -185,6 +186,7 @@ const SHOWS_MENU_BUTTON: Record<
 > = {
   advanced: false,
   advancedAutoPayLimit: false,
+  advancedOnboardingGift: false,
   advancedInspector: false,
   advancedInspectorTimeline: false,
   advancedPushDebug: false,
@@ -313,6 +315,7 @@ const TOPBAR_TITLE_KEY: Record<
 > = {
   advanced: "settings",
   advancedAutoPayLimit: "lightningInvoiceAutoPayLimit",
+  advancedOnboardingGift: "onboardGiftAmount",
   advancedInspector: "nostrInspector",
   advancedInspectorTimeline: "nostrInspector",
   bankPayment: "spdPaymentTitle",

@@ -6,13 +6,18 @@ import {
   DISPLAY_ALLOWED_CURRENCIES_STORAGE_KEY,
   DISPLAY_CURRENCY_STORAGE_KEY,
   LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY,
+  ONBOARDING_GIFT_STORAGE_KEY,
   PAY_WITH_CASHU_STORAGE_KEY,
   SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY,
   SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY,
   UNIT_TOGGLE_STORAGE_KEY,
 } from "../../utils/constants";
 import type { DisplayCurrency } from "../../utils/displayAmounts";
-import { safeLocalStorageSet } from "../../utils/storage";
+import type { OnboardingGift } from "../../utils/onboardingGift";
+import {
+  safeLocalStorageSet,
+  safeLocalStorageSetJson,
+} from "../../utils/storage";
 
 interface UseAppPreferencesParams {
   allowedDisplayCurrencies: readonly DisplayCurrency[];
@@ -21,6 +26,7 @@ interface UseAppPreferencesParams {
   bankPaymentOfferRecipientCount: number;
   bankPaymentOfferStaggerDelaySec: number;
   lightningInvoiceAutoPayLimit: number;
+  onboardingGift: OnboardingGift | null;
   payWithCashuEnabled: boolean;
   seenReceiptsEnabledAtSec: number | null;
   showProfileQrOnTiltEnabled: boolean;
@@ -33,6 +39,7 @@ export const useAppPreferences = ({
   bankPaymentOfferRecipientCount,
   bankPaymentOfferStaggerDelaySec,
   lightningInvoiceAutoPayLimit,
+  onboardingGift,
   payWithCashuEnabled,
   seenReceiptsEnabledAtSec,
   showProfileQrOnTiltEnabled,
@@ -69,6 +76,12 @@ export const useAppPreferences = ({
       String(lightningInvoiceAutoPayLimit),
     );
   }, [lightningInvoiceAutoPayLimit]);
+
+  React.useEffect(() => {
+    // Absent key = never decided, which makes the first onboarding ask.
+    if (onboardingGift === null) return;
+    safeLocalStorageSetJson(ONBOARDING_GIFT_STORAGE_KEY, onboardingGift);
+  }, [onboardingGift]);
 
   React.useEffect(() => {
     safeLocalStorageSet(

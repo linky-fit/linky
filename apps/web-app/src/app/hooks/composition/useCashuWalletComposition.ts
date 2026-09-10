@@ -38,11 +38,15 @@ import { NOSTR_RELAYS } from "../../../utils/nostrRelays";
 import {
   CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
-  ONBOARDING_GIFT_SAT,
   WALLET_WARNING_BALANCE_THRESHOLD_SAT,
   WALLET_WARNING_DISMISSED_STORAGE_KEY,
 } from "../../../utils/constants";
 import { formatDisplayAmountParts } from "../../../utils/displayAmounts";
+import {
+  getInitialOnboardingGift,
+  onboardingGiftAmountSat,
+  type OnboardingGift,
+} from "../../../utils/onboardingGift";
 import {
   isNpubCashDisabled,
   NPUB_CASH_SERVER_BASE_URL,
@@ -322,6 +326,9 @@ export const useCashuWalletComposition = ({
   );
   const [lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit] =
     useState<number>(() => getInitialLightningInvoiceAutoPayLimit());
+  const [onboardingGift, setOnboardingGift] = useState<OnboardingGift | null>(
+    () => getInitialOnboardingGift(),
+  );
 
   useAnonymousPaymentTelemetry({
     appOwnerId,
@@ -2320,23 +2327,34 @@ export const useCashuWalletComposition = ({
     navigateTo({ route: "cashuToken", id: tokenId });
   }, [cashuEmitAmount, issueCashuToken, setCashuEmitAmount, setStatus, t]);
 
-  const startOnboarding = React.useCallback(async () => {
-    if (cashuIsBusy) return;
+  const startOnboarding = React.useCallback(
+    async (gift: OnboardingGift | null = onboardingGift) => {
+      if (cashuIsBusy) return;
+      // Never decided: the onboarding page asks first and calls back with the answer.
+      if (gift === null) {
+        navigateTo({ route: "onboard" });
+        return;
+      }
 
-    const tokenId =
-      cashuBalance >= ONBOARDING_GIFT_SAT
-        ? await issueCashuToken(ONBOARDING_GIFT_SAT)
-        : null;
-    reportAppLog({
-      tag: "onboarding.start",
-      summary: tokenId
-        ? `Onboarding QR with a ${ONBOARDING_GIFT_SAT} sat welcome gift`
-        : "Onboarding QR without a welcome gift",
-      links: tokenId ? { row: tokenId } : {},
-      payload: { giftSat: tokenId ? ONBOARDING_GIFT_SAT : 0, cashuBalance },
-    });
-    navigateTo(tokenId ? { route: "onboard", tokenId } : { route: "onboard" });
-  }, [cashuBalance, cashuIsBusy, issueCashuToken]);
+      const giftSat = onboardingGiftAmountSat(gift);
+      const tokenId =
+        giftSat > 0 && cashuBalance >= giftSat
+          ? await issueCashuToken(giftSat)
+          : null;
+      reportAppLog({
+        tag: "onboarding.start",
+        summary: tokenId
+          ? `Onboarding QR with a ${giftSat} sat welcome gift`
+          : "Onboarding QR without a welcome gift",
+        links: tokenId ? { row: tokenId } : {},
+        payload: { giftSat: tokenId ? giftSat : 0, cashuBalance },
+      });
+      navigateTo(
+        tokenId ? { route: "onboard", tokenId } : { route: "onboard" },
+      );
+    },
+    [cashuBalance, cashuIsBusy, issueCashuToken, onboardingGift],
+  );
 
   const meltLargestForeignMintToMainMint = React.useCallback(async () => {
     if (cashuIsBusy) return;
@@ -2635,6 +2653,8 @@ export const useCashuWalletComposition = ({
     knownLnAddressPayContact,
     knownLnAddressPayContactPictureUrl,
     lightningInvoiceAutoPayLimit,
+    onboardingGift,
+    setOnboardingGift,
     lnAddressPayAmount,
     lnurlWithdrawIsBusy,
     makeNip98AuthHeader,

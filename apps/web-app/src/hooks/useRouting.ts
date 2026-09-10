@@ -81,6 +81,7 @@ export const useRouting = () => {
 type NavigationAction =
   | { route: "advanced" }
   | { route: "advancedAutoPayLimit" }
+  | { route: "advancedOnboardingGift" }
   | { route: "advancedInspector" }
   | { route: "advancedInspectorTimeline" }
   | { route: "advancedPushDebug" }
@@ -144,6 +145,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "advancedAutoPayLimit":
       window.location.assign("#advanced/auto-pay-limit");
+      break;
+    case "advancedOnboardingGift":
+      window.location.assign("#advanced/onboarding-gift");
       break;
     case "advancedInspector":
       window.location.assign("#advanced/inspector");

@@ -1,12 +1,18 @@
 import { Copy } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import { OnboardingGiftForm } from "../components/OnboardingGiftForm";
 import { isCashuTokenIssuedState } from "../app/lib/cashuTokenState";
 import { extractCashuTokenMeta } from "../app/lib/tokenText";
 import type { CashuTokenId, CashuTokenRow } from "../evolu";
 import { useLatest } from "../hooks/useLatest";
 import { navigateTo } from "../hooks/useRouting";
-import { ONBOARDING_GIFT_SAT } from "../utils/constants";
+import {
+  DEFAULT_ONBOARDING_GIFT,
+  onboardingGiftAmountSat,
+  type OnboardingGift,
+} from "../utils/onboardingGift";
 import { buildOnboardingUrl } from "../utils/onboardingLink";
 
 interface OnboardPageProps {
@@ -15,6 +21,7 @@ interface OnboardPageProps {
   copyText: (text: string) => Promise<void>;
   giftTokenId: CashuTokenId | null;
   showPaidOverlay: (title?: string) => void;
+  startOnboarding: (gift: OnboardingGift) => Promise<void>;
 }
 
 const GIFT_ROW_LOAD_GRACE_MS = 750;
@@ -26,8 +33,10 @@ export function OnboardPage({
   copyText,
   giftTokenId,
   showPaidOverlay,
+  startOnboarding,
 }: OnboardPageProps): React.ReactElement | null {
   const { currentNpub, formatDisplayedAmountText, t } = useAppShellCore();
+  const { onboardingGift, setOnboardingGift } = useAdvancedSettingsContext();
   const [qrDataUrl, setQrDataUrl] = React.useState<string | null>(null);
 
   const giftRow = giftTokenId
@@ -121,9 +130,37 @@ export function OnboardPage({
     };
   }, [onboardingUrl]);
 
+  if (onboardingGift === null) {
+    return (
+      <section className="panel">
+        <h3>{t("onboardSetupTitle")}</h3>
+        <p className="muted">{t("onboardSetupHint")}</p>
+        <OnboardingGiftForm
+          initial={DEFAULT_ONBOARDING_GIFT}
+          submitLabel={t("onboardShowCode")}
+          onSubmit={(gift) => {
+            setOnboardingGift(gift);
+            void startOnboarding(gift);
+          }}
+        />
+      </section>
+    );
+  }
+
   if (!onboardingUrl) return null;
 
-  const giftAmountText = formatDisplayedAmountText(ONBOARDING_GIFT_SAT);
+  const giftSat = onboardingGiftAmountSat(onboardingGift);
+  const giftNote = giftTokenText
+    ? t("onboardGiftIncluded").replace(
+        "{amount}",
+        formatDisplayedAmountText(giftSat),
+      )
+    : giftSat > 0
+      ? t("onboardGiftSkipped").replace(
+          "{amount}",
+          formatDisplayedAmountText(giftSat),
+        )
+      : t("onboardGiftDisabled");
 
   return (
     <section className="panel topup-invoice-panel">
@@ -152,11 +189,7 @@ export function OnboardPage({
           <p className="muted topup-invoice-loading">{t("loading")}</p>
         )}
 
-        <p className="muted section-note">
-          {giftTokenText
-            ? t("onboardGiftIncluded").replace("{amount}", giftAmountText)
-            : t("onboardGiftSkipped").replace("{amount}", giftAmountText)}
-        </p>
+        <p className="muted section-note">{giftNote}</p>
 
         <button
           type="button"

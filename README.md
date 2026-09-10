@@ -43,7 +43,7 @@ Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `d
 ## Features
 
 - Contacts: add/edit/delete, QR scan/share, grouping
-- Onboarding QR on the profile page: links a newcomer to the app with a 100 sat cashu welcome gift that is claimed automatically after sign-up (skipped when the balance is too low); the newcomer also gets the onboarder as their first contact and sends them a greeting
+- Onboarding QR on the profile page: links a newcomer to the app with a cashu welcome gift (amount and on/off chosen on first use and in settings, default 100 sat) that is claimed automatically after sign-up (skipped when the balance is too low); the newcomer also gets the onboarder as their first contact and sends them a greeting
 - Messages: encrypted private chat (gift-wrap/NIP-17 flows)
 - Wallet: Cashu token ingest, restore, validation, spend; token list with available, pending-at-mint, and unknown amounts
 - Lightning address receive: payments to `<npub>@linky.fit` and `<npub>@npub.cash` both land in the wallet, whatever address the profile advertises

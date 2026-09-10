@@ -68,6 +68,12 @@ test("onboarding QR hands a fresh signup the welcome gift", async ({
       await test.step("onboarder issues the link with a 100 sat gift", async () => {
         await onboarder.page.goto("/#profile");
         await onboarder.page.getByRole("button", { name: "Onboard" }).click();
+        // First use asks about the gift; the default is 100 sat, on.
+        await expect(onboarder.page).toHaveURL(/#profile\/onboard$/);
+        await expect(
+          onboarder.page.getByLabel("Include welcome gift"),
+        ).toBeChecked();
+        await onboarder.page.getByRole("button", { name: "Show code" }).click();
         await expect(onboarder.page).toHaveURL(
           /#profile\/onboard\/[A-Za-z0-9_-]+$/,
         );
@@ -127,6 +133,7 @@ test("onboarding QR hands a fresh signup the welcome gift", async ({
     await test.step("without balance for the gift the code only opens the app", async () => {
       await newcomer.page.goto("/#profile");
       await newcomer.page.getByRole("button", { name: "Onboard" }).click();
+      await newcomer.page.getByRole("button", { name: "Show code" }).click();
       await expect(newcomer.page).toHaveURL(/#profile\/onboard$/);
       await expect(
         newcomer.page.getByText(
@@ -136,6 +143,19 @@ test("onboarding QR hands a fresh signup the welcome gift", async ({
       expect(await copyOnboardingLink(newcomer.page)).toMatch(
         /^http:\/\/localhost:\d+\/#wallet\?onboarder=npub1[a-z0-9]+$/,
       );
+    });
+
+    await test.step("the gift can be switched off in settings and the code says so", async () => {
+      await newcomer.page.goto("/#settings");
+      await newcomer.page.getByLabel("Include welcome gift").uncheck();
+      await expect(newcomer.page.getByText("No gift")).toBeVisible();
+      await newcomer.page.goto("/#profile");
+      await newcomer.page.getByRole("button", { name: "Onboard" }).click();
+      await expect(
+        newcomer.page.getByText(
+          "The code only opens the app, without a welcome gift.",
+        ),
+      ).toBeVisible();
     });
 
     onboarder.errors.assertClean();

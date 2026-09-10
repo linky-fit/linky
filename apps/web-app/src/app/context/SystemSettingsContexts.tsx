@@ -6,6 +6,7 @@ import type { EvoluServerStatus } from "../../evolu";
 import type { PasswordManagerSaveResult } from "../../platform/passwordManager";
 import type { ProbeLightningFee } from "../hooks/composition/useLinkshuComposition";
 import type { LocalMintInfoRow } from "../types/appTypes";
+import type { OnboardingGift } from "../../utils/onboardingGift";
 
 export interface AdvancedSettingsContextValue {
   copyNostrKeys: () => Promise<void>;
@@ -21,6 +22,7 @@ export interface AdvancedSettingsContextValue {
   importDataFileInputRef: React.RefObject<HTMLInputElement | null>;
   lightningInvoiceAutoPayLimit: number;
   logoutArmed: boolean;
+  onboardingGift: OnboardingGift | null;
   passwordManagerSeedUsername: string;
   payWithCashuEnabled: boolean;
   pushToast: (message: string) => void;
@@ -31,6 +33,7 @@ export interface AdvancedSettingsContextValue {
   saveSeedToPasswordManager: () => Promise<PasswordManagerSaveResult>;
   seedMnemonic: string | null;
   setLightningInvoiceAutoPayLimit: (value: number) => void;
+  setOnboardingGift: (value: OnboardingGift) => void;
   setPayWithCashuEnabled: (value: boolean) => void;
 }
 

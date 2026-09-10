@@ -80,6 +80,7 @@ export const PENDING_DEEP_LINK_TEXT_STORAGE_KEY =
 export const PENDING_ONBOARDER_NPUB_STORAGE_KEY =
   "linky.pendingOnboarderNpub.v1";
 export const ONBOARDING_GIFT_SAT = 100;
+export const ONBOARDING_GIFT_STORAGE_KEY = "linky.onboarding_gift.v1";
 
 export const WALLET_WARNING_BALANCE_THRESHOLD_SAT = 500_000;
 export const WALLET_WARNING_DISMISSED_STORAGE_KEY =

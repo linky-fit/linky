@@ -6,6 +6,7 @@ export const cs = {
   detail: "Detail",
   settingsGeneral: "Obecné",
   settingsPayments: "Platby",
+  settingsOnboarding: "Onboarding",
   settingsNetwork: "Síť",
   settingsSecurity: "Zabezpečení",
   settingsDebug: "Debug",
@@ -361,6 +362,14 @@ export const cs = {
   onboardJoinedMessage:
     "Ahoj! Právě jsem se přes tvůj onboarding kód připojil(a) do Linky 👋",
   copyLink: "Kopírovat odkaz",
+  onboardGiftEnabled: "Přibalit uvítací dárek",
+  onboardGiftAmount: "Výše dárku",
+  onboardGiftOff: "Bez dárku",
+  onboardGiftDisabled: "Kód jen otevře aplikaci, bez uvítacího dárku.",
+  onboardSetupTitle: "Uvítací dárek",
+  onboardSetupHint:
+    "Zvol, kolik satů nový uživatel dostane, když se přihlásí přes tvůj kód. Později to změníš v nastavení.",
+  onboardShowCode: "Zobrazit kód",
 
   language: "Jazyk",
   czech: "Čeština",

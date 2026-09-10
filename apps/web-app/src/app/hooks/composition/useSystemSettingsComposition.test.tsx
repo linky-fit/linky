@@ -32,6 +32,7 @@ const createAdvancedSettings = (
   handleImportAppDataFilePicked: noopAsync,
   importDataFileInputRef: React.createRef<HTMLInputElement>(),
   lightningInvoiceAutoPayLimit: 1,
+  onboardingGift: null,
   logoutArmed: false,
   passwordManagerSeedUsername: "",
   payWithCashuEnabled: true,
@@ -43,6 +44,7 @@ const createAdvancedSettings = (
   saveSeedToPasswordManager: async () => "saved",
   seedMnemonic: null,
   setLightningInvoiceAutoPayLimit: noop,
+  setOnboardingGift: noop,
   setPayWithCashuEnabled: noop,
 });
 

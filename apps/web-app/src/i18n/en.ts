@@ -8,6 +8,7 @@ export const en = {
   detail: "Detail",
   settingsGeneral: "General",
   settingsPayments: "Payments",
+  settingsOnboarding: "Onboarding",
   settingsNetwork: "Network",
   settingsSecurity: "Security",
   settingsDebug: "Debug",
@@ -358,6 +359,14 @@ export const en = {
   onboardJoinedMessage:
     "Hi! I just joined Linky through your onboarding code 👋",
   copyLink: "Copy link",
+  onboardGiftEnabled: "Include welcome gift",
+  onboardGiftAmount: "Gift amount",
+  onboardGiftOff: "No gift",
+  onboardGiftDisabled: "The code only opens the app, without a welcome gift.",
+  onboardSetupTitle: "Welcome gift",
+  onboardSetupHint:
+    "Choose how many sats a newcomer gets when they sign in through your code. You can change this later in settings.",
+  onboardShowCode: "Show code",
 
   language: "Language",
   czech: "Čeština",

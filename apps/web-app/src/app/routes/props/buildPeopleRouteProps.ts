@@ -407,6 +407,7 @@ export const buildPeopleRouteProps = ({
       copyText,
       giftTokenId: route.kind === "onboard" ? (route.tokenId ?? null) : null,
       showPaidOverlay,
+      startOnboarding,
     },
   };
 };

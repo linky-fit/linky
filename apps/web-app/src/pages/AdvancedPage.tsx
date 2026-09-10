@@ -10,6 +10,7 @@ import {
   Copy,
   Download,
   MessageCircle as FeedbackIcon,
+  Gift,
   Landmark,
   Languages,
   LogOut,
@@ -37,6 +38,7 @@ import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import { getNativeNotificationPermissionState } from "../platform/nativeBridge";
 import { isNativePlatform } from "../platform/runtime";
+import { DEFAULT_ONBOARDING_GIFT } from "../utils/onboardingGift";
 
 export function AdvancedPage(): React.ReactElement {
   const {
@@ -59,6 +61,8 @@ export function AdvancedPage(): React.ReactElement {
     requestLogout,
     requestPasteNostrKeys,
     seedMnemonic,
+    onboardingGift,
+    setOnboardingGift,
     setPayWithCashuEnabled,
   } = useAdvancedSettingsContext();
   const relayHealth = useRelayHealth();
@@ -308,6 +312,37 @@ export function AdvancedPage(): React.ReactElement {
           tail={
             <span className="settings-tail-content settings-value">
               {getAutoPayLimitLabel(lightningInvoiceAutoPayLimit)}
+            </span>
+          }
+        />
+      </div>
+
+      <div className="settings-section">
+        <h2 className="settings-section-title">{t("settingsOnboarding")}</h2>
+
+        <SettingsToggleRow
+          icon={<Gift size={18} />}
+          label={t("onboardGiftEnabled")}
+          checked={onboardingGift?.enabled ?? DEFAULT_ONBOARDING_GIFT.enabled}
+          onChange={(enabled) =>
+            setOnboardingGift({
+              ...(onboardingGift ?? DEFAULT_ONBOARDING_GIFT),
+              enabled,
+            })
+          }
+        />
+
+        <SettingsLinkRow
+          onClick={() => navigateTo({ route: "advancedOnboardingGift" })}
+          icon={<Coins size={18} />}
+          label={t("onboardGiftAmount")}
+          tail={
+            <span className="settings-tail-content settings-value">
+              {onboardingGift?.enabled === false
+                ? t("onboardGiftOff")
+                : getAutoPayLimitLabel(
+                    (onboardingGift ?? DEFAULT_ONBOARDING_GIFT).amountSat,
+                  )}
             </span>
           }
         />
