@@ -68,7 +68,7 @@ Apps own viewport sizing, scrolling, safe-area insets, keyboard avoidance, and p
 From the repository root:
 
 ```sh
-bun run --filter @linky/ui-book-next dev
+bun run --filter @linky/ui-book dev
 bun run --filter @linky/ui typecheck
 bun run --filter @linky/ui test
 ```

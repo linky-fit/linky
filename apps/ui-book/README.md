@@ -1,13 +1,13 @@
-# @linky/ui-book-next
+# @linky/ui-book
 
 Web catalog for `@linky/ui`. It previews every component, the wallet and conversation compositions, dark and light themes, and a 320px narrow example width. Search by component name or group. Source snippets sit below each group.
 
 From the repository root:
 
 ```sh
-bun run --filter @linky/ui-book-next dev
-bun run --filter @linky/ui-book-next build
-bun run --filter @linky/ui-book-next test:e2e
+bun run --filter @linky/ui-book dev
+bun run --filter @linky/ui-book build
+bun run --filter @linky/ui-book test:e2e
 ```
 
 Dev runs at http://127.0.0.1:5190. Production preview runs at http://127.0.0.1:5192. No service stack is needed. Examples use local state and reset on reload; no messages or payments leave the browser.

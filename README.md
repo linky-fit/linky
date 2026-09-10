@@ -7,7 +7,7 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 
 ## Packages
 
-- [`packages/ui`](./packages/ui/README.md) contains the Tamagui component library for the next design. Browse it in [`apps/ui-book-next`](./apps/ui-book-next/README.md). The product apps retain their original design.
+- [`packages/ui`](./packages/ui/README.md) contains the Tamagui component library for the next design. Browse it in [`apps/ui-book`](./apps/ui-book/README.md). The product apps retain their original design.
 - [`packages/linkstr`](./packages/linkstr/README.md) — Nostr protocol library; usage guides in [`packages/linkstr/docs/`](./packages/linkstr/docs/README.md) (also covers `@linky/linkstr-react`)
 - [`packages/linkshu`](./packages/linkshu/README.md) — cashu wallet library; usage guides in [`packages/linkshu/docs/`](./packages/linkshu/docs/README.md)
 
@@ -85,7 +85,7 @@ Evolu. New occurrences reopen solved issues. See
 It previews `@linky/ui` components and wallet/chat compositions in dark and light themes.
 Examples use local state and need no account or Docker services. Run `bun run ui:build`
 to build the catalog.
-See [`apps/ui-book-next/README.md`](./apps/ui-book-next/README.md) for browser checks.
+See [`apps/ui-book/README.md`](./apps/ui-book/README.md) for browser checks.
 
 ### linkshu CLI wallet
 

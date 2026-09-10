@@ -18,7 +18,7 @@ COPY apps/native-shell/package.json apps/native-shell/
 COPY apps/push/package.json apps/push/
 COPY apps/site/package.json apps/site/
 COPY packages/ui/package.json packages/ui/
-COPY apps/ui-book-next/package.json apps/ui-book-next/
+COPY apps/ui-book/package.json apps/ui-book/
 COPY apps/web-app/package.json apps/web-app/
 COPY packages/config/package.json packages/config/
 COPY packages/identity/package.json packages/identity/

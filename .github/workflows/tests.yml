@@ -53,7 +53,7 @@ jobs:
         if: failure()
         run: docker compose -f docker-compose.dev.yml logs cashu-mint cashu-mint-target
 
-  ui-book-next:
+  ui-book:
     runs-on: ubuntu-latest
 
     steps:
@@ -74,22 +74,22 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Check UI book types
-        run: bun run --filter @linky/ui-book-next typecheck
+        run: bun run --filter @linky/ui-book typecheck
 
       - name: Build UI book
         run: bun run ui:build
 
       - name: Install Chromium
-        working-directory: apps/ui-book-next
+        working-directory: apps/ui-book
         run: bunx playwright install --with-deps chromium
 
       - name: Exercise UI book
-        run: bun run --filter @linky/ui-book-next test:e2e
+        run: bun run --filter @linky/ui-book test:e2e
 
       - name: Upload browser traces
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-book-next-traces
-          path: apps/ui-book-next/test-results
+          name: ui-book-traces
+          path: apps/ui-book/test-results
           if-no-files-found: ignore

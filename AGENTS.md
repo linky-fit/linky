@@ -25,7 +25,7 @@ IMPORTANT: When you make or change an architectural decision, document it in `do
 - New browser storage names use the `linky.` prefix (e.g., `linky.nostr_nsec`, `linky.lang`). Existing exceptions are listed in `docs/architecture.md` under "Compatibility and audit decisions"; preserve those names for upgrades.
 - Use types from libraries (e.g., Evolu, Cashu, Nostr) instead of redefining them - look up the library's exported types first
 - Prefer sparse Evolu mutation payloads: omit optional fields when empty instead of writing explicit `null` (especially `cashuToken` optional columns like `rawToken`, `mint`, `unit`, `amount`, `error`)
-- The PWA uses plain CSS in `App.css`. Develop the next design separately in `packages/ui`, with live examples in `apps/ui-book-next`; shared component styles there use Tamagui tokens.
+- The PWA uses plain CSS in `App.css`. Develop the next design separately in `packages/ui`, with live examples in `apps/ui-book`; shared component styles there use Tamagui tokens.
 - `localStorage` goes through `utils/storage.ts` (`safeLocalStorageGet/Set/Remove`, `safeLocalStorageGetJson` with a Schema); raw access is reserved for the one-time linkshu migration and the linkshu `KeyValueStore` port
 - Validate stored and wire JSON with effect `Schema` (shared pieces in `utils/schema.ts`), not hand-rolled `typeof` guards
 - `nowSeconds()` and `sleep()` come from `utils/time.ts`
