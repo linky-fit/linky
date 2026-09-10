@@ -1929,6 +1929,17 @@ button.settings-sensitive-action.is-armed {
   margin: 14px 0 0;
 }
 
+/* Same footprint as the QR, note and copy button so the page does not jump. */
+.onboard-qr-placeholder {
+  width: min(100%, 290px);
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
 .topup-secondary-actions {
   display: flex;
   align-items: stretch;

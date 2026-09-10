@@ -19,6 +19,8 @@ interface OnboardPageProps {
   cashuTokensAll: readonly CashuTokenRow[];
   checkSingleIssuedCashuTokenIsClaimed: (id: CashuTokenId) => Promise<boolean>;
   copyText: (text: string) => Promise<void>;
+  /** The gift token is being issued; the page opened before it existed. */
+  giftIsIssuing: boolean;
   giftTokenId: CashuTokenId | null;
   showPaidOverlay: (title?: string) => void;
   startOnboarding: (gift: OnboardingGift) => Promise<void>;
@@ -31,6 +33,7 @@ export function OnboardPage({
   cashuTokensAll,
   checkSingleIssuedCashuTokenIsClaimed,
   copyText,
+  giftIsIssuing,
   giftTokenId,
   showPaidOverlay,
   startOnboarding,
@@ -47,7 +50,7 @@ export function OnboardPage({
     : null;
   const waitingForGiftRow = giftTokenId !== null && !giftRow;
   const onboardingUrl =
-    waitingForGiftRow || !currentNpub
+    giftIsIssuing || waitingForGiftRow || !currentNpub
       ? null
       : buildOnboardingUrl({
           giftToken: giftTokenText,
@@ -147,8 +150,6 @@ export function OnboardPage({
     );
   }
 
-  if (!onboardingUrl) return null;
-
   const giftSat = onboardingGiftAmountSat(onboardingGift);
   const giftNote = giftTokenText
     ? t("onboardGiftIncluded").replace(
@@ -171,8 +172,8 @@ export function OnboardPage({
         </div>
       </div>
 
-      <div className="topup-invoice-qr-shell">
-        {qrDataUrl ? (
+      {onboardingUrl && qrDataUrl ? (
+        <div className="topup-invoice-qr-shell">
           <button
             type="button"
             className="topup-invoice-qr-button"
@@ -185,25 +186,30 @@ export function OnboardPage({
               alt={t("onboard")}
             />
           </button>
-        ) : (
-          <p className="muted topup-invoice-loading">{t("loading")}</p>
-        )}
 
-        <p className="muted section-note">{giftNote}</p>
+          <p className="muted section-note">{giftNote}</p>
 
-        <button
-          type="button"
-          className="btn-wide secondary topup-invoice-copy"
-          onClick={() => void copyText(onboardingUrl)}
-        >
-          <span className="btn-label-with-icon">
-            <span className="btn-label-icon" aria-hidden="true">
-              <Copy size={16} />
+          <button
+            type="button"
+            className="btn-wide secondary topup-invoice-copy"
+            onClick={() => void copyText(onboardingUrl)}
+          >
+            <span className="btn-label-with-icon">
+              <span className="btn-label-icon" aria-hidden="true">
+                <Copy size={16} />
+              </span>
+              <span>{t("copyLink")}</span>
             </span>
-            <span>{t("copyLink")}</span>
-          </span>
-        </button>
-      </div>
+          </button>
+        </div>
+      ) : (
+        <div className="topup-invoice-qr-shell" role="status">
+          <div className="muted onboard-qr-placeholder">
+            <span className="btn-spinner" aria-hidden="true" />
+            <span>{t("cashuEmitting")}</span>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

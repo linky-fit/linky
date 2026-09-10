@@ -118,6 +118,7 @@ interface BuildPeopleRoutePropsParams {
   setProfileEditLnAddress: PeopleRoutesProps["profileProps"]["setProfileEditLnAddress"];
   setProfileEditName: PeopleRoutesProps["profileProps"]["setProfileEditName"];
   setProfileEditStatus: PeopleRoutesProps["profileProps"]["setProfileEditStatus"];
+  onboardingGiftIsIssuing: PeopleRoutesProps["onboardProps"]["giftIsIssuing"];
   showPaidOverlay: PeopleRoutesProps["onboardProps"]["showPaidOverlay"];
   startOnboarding: PeopleRoutesProps["profileProps"]["startOnboarding"];
   t: Translate;
@@ -233,6 +234,7 @@ export const buildPeopleRouteProps = ({
   setProfileEditLnAddress,
   setProfileEditName,
   setProfileEditStatus,
+  onboardingGiftIsIssuing,
   showPaidOverlay,
   startOnboarding,
   t,
@@ -405,6 +407,7 @@ export const buildPeopleRouteProps = ({
       cashuTokensAll,
       checkSingleIssuedCashuTokenIsClaimed,
       copyText,
+      giftIsIssuing: onboardingGiftIsIssuing,
       giftTokenId: route.kind === "onboard" ? (route.tokenId ?? null) : null,
       showPaidOverlay,
       startOnboarding,

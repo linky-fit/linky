@@ -329,6 +329,7 @@ export const useCashuWalletComposition = ({
   const [onboardingGift, setOnboardingGift] = useState<OnboardingGift | null>(
     () => getInitialOnboardingGift(),
   );
+  const [onboardingGiftIsIssuing, setOnboardingGiftIsIssuing] = useState(false);
 
   useAnonymousPaymentTelemetry({
     appOwnerId,
@@ -2337,10 +2338,18 @@ export const useCashuWalletComposition = ({
       }
 
       const giftSat = onboardingGiftAmountSat(gift);
-      const tokenId =
-        giftSat > 0 && cashuBalance >= giftSat
-          ? await issueCashuToken(giftSat)
-          : null;
+      const canIssueGift = giftSat > 0 && cashuBalance >= giftSat;
+      // Open the page first; it shows a placeholder until the gift is issued.
+      navigateTo({ route: "onboard" });
+      let tokenId: CashuTokenId | null = null;
+      if (canIssueGift) {
+        setOnboardingGiftIsIssuing(true);
+        try {
+          tokenId = await issueCashuToken(giftSat);
+        } finally {
+          setOnboardingGiftIsIssuing(false);
+        }
+      }
       reportAppLog({
         tag: "onboarding.start",
         summary: tokenId
@@ -2349,9 +2358,7 @@ export const useCashuWalletComposition = ({
         links: tokenId ? { row: tokenId } : {},
         payload: { giftSat: tokenId ? giftSat : 0, cashuBalance },
       });
-      navigateTo(
-        tokenId ? { route: "onboard", tokenId } : { route: "onboard" },
-      );
+      if (tokenId) navigateTo({ route: "onboard", tokenId });
     },
     [cashuBalance, cashuIsBusy, issueCashuToken, onboardingGift],
   );
@@ -2654,6 +2661,7 @@ export const useCashuWalletComposition = ({
     knownLnAddressPayContactPictureUrl,
     lightningInvoiceAutoPayLimit,
     onboardingGift,
+    onboardingGiftIsIssuing,
     setOnboardingGift,
     lnAddressPayAmount,
     lnurlWithdrawIsBusy,
