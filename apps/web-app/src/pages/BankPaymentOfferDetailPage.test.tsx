@@ -90,7 +90,7 @@ const renderOffer = async ({
       offerId="offer-1"
       onCopyText={() => undefined}
       onRespondBankPaymentOffer={async () => true}
-      onSendChatImage={async () => undefined}
+      onSendChatImage={async () => true}
       onSettleBankPaymentOffer={async () => undefined}
       {...overrides}
     />,
@@ -427,7 +427,7 @@ describe("BankPaymentOfferDetailPage", () => {
 
   it("keeps the recipient flow open while sending an attached confirmation", async () => {
     window.location.hash = "#chat/contact-1/bank-payment-offer/offer-1";
-    const onSendChatImage = vi.fn(async () => undefined);
+    const onSendChatImage = vi.fn(async () => true);
     const createObjectUrl = vi
       .spyOn(URL, "createObjectURL")
       .mockReturnValue("blob:confirmation-preview");

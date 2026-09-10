@@ -55,6 +55,7 @@ import type {
   LocalNostrReaction,
 } from "../app/types/appTypes";
 import { Avatar } from "../components/Avatar";
+import { ChatAttachmentPreview } from "../components/ChatAttachmentPreview";
 import {
   ChatMessage,
   type BankPaymentOfferPeerNotice,
@@ -85,6 +86,7 @@ interface ChatPageProps {
   cashuBalance: number;
   cashuBalanceAfterMelt: number;
   cashuIsBusy: boolean;
+  chatAttachment: File | null;
   chatDraft: string;
   chatMessageElByIdRef: React.MutableRefObject<Map<string, HTMLDivElement>>;
   chatMessages: LocalNostrMessage[];
@@ -128,8 +130,9 @@ interface ChatPageProps {
   sendChatImage: (
     file: File,
     replyToMessage?: LocalNostrMessage,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   sendChatMessage: () => Promise<void>;
+  setChatAttachment: (file: File | null) => void;
   setChatDraft: (value: string) => void;
   setMintIconUrlByMint: React.Dispatch<
     React.SetStateAction<Record<string, string | null>>
@@ -569,6 +572,7 @@ interface ChatComposerProps {
   canRequestThisContact: boolean;
   canStartPay: boolean;
   cashuIsBusy: boolean;
+  chatAttachment: File | null;
   chatDraft: string;
   chatSendIsBusy: boolean;
   composeContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -589,6 +593,7 @@ interface ChatComposerProps {
   selectedContact: Contact;
   sendChatImage: ChatPageProps["sendChatImage"];
   sendChatMessage: ChatPageProps["sendChatMessage"];
+  setChatAttachment: ChatPageProps["setChatAttachment"];
   setChatDraft: ChatPageProps["setChatDraft"];
   t: Translate;
 }
@@ -598,6 +603,7 @@ const ChatComposer = memo(function ChatComposer({
   canRequestThisContact,
   canStartPay,
   cashuIsBusy,
+  chatAttachment,
   chatDraft,
   chatSendIsBusy,
   composeContainerRef,
@@ -618,6 +624,7 @@ const ChatComposer = memo(function ChatComposer({
   selectedContact,
   sendChatImage,
   sendChatMessage,
+  setChatAttachment,
   setChatDraft,
   t,
 }: ChatComposerProps) {
@@ -645,12 +652,11 @@ const ChatComposer = memo(function ChatComposer({
     [mentionContacts, mentionQuery, npub],
   );
   const hasDraftText = Boolean(draft.trim());
-  const canSendChat = Boolean(
-    !chatSendIsBusy && hasDraftText && (npub || hasUnknownPubkeyHex),
-  );
-  const canSendImage = Boolean(
-    !chatSendIsBusy && !editContext && (npub || hasUnknownPubkeyHex),
-  );
+  const hasRecipient = Boolean(npub || hasUnknownPubkeyHex);
+  const hasAttachmentToSend = chatAttachment !== null && !editContext;
+  const canSendChat =
+    !chatSendIsBusy && hasRecipient && (hasDraftText || hasAttachmentToSend);
+  const canAttach = hasRecipient && !editContext && chatAttachment === null;
 
   useEffect(() => {
     setDraft(chatDraft);
@@ -684,8 +690,14 @@ const ChatComposer = memo(function ChatComposer({
     return document.activeElement === input;
   }, [composeInputRef]);
 
-  const requestSend = useCallback(() => {
+  const requestSend = useCallback(async () => {
     if (!canSendChat) return;
+    if (hasAttachmentToSend) {
+      const sent = await sendChatImage(chatAttachment);
+      if (!sent) return;
+      setChatAttachment(null);
+    }
+    if (!hasDraftText) return;
     if (draft === chatDraft) {
       void sendChatMessage();
       return;
@@ -693,7 +705,18 @@ const ChatComposer = memo(function ChatComposer({
 
     pendingSendDraftRef.current = draft;
     setChatDraft(draft);
-  }, [canSendChat, chatDraft, draft, sendChatMessage, setChatDraft]);
+  }, [
+    canSendChat,
+    chatAttachment,
+    chatDraft,
+    draft,
+    hasAttachmentToSend,
+    hasDraftText,
+    sendChatImage,
+    sendChatMessage,
+    setChatAttachment,
+    setChatDraft,
+  ]);
 
   const selectMentionSuggestion = useCallback(
     (suggestion: MessageMentionSuggestion) => {
@@ -737,6 +760,13 @@ const ChatComposer = memo(function ChatComposer({
           onCancel={onCancelEdit}
         />
       )}
+      {chatAttachment ? (
+        <ChatAttachmentPreview
+          file={chatAttachment}
+          onRemove={() => setChatAttachment(null)}
+          removeLabel={t("chatAttachmentRemove")}
+        />
+      ) : null}
       {mentionSuggestions.length > 0 ? (
         <div className="chat-mention-suggestions" role="listbox">
           {mentionSuggestions.map((suggestion) => {
@@ -799,8 +829,7 @@ const ChatComposer = memo(function ChatComposer({
           onChange={(event) => {
             const file = event.target.files?.[0] ?? null;
             event.currentTarget.value = "";
-            if (!file) return;
-            void sendChatImage(file);
+            if (file && canAttach) setChatAttachment(file);
           }}
           tabIndex={-1}
         />
@@ -810,10 +839,10 @@ const ChatComposer = memo(function ChatComposer({
           onChange={setDraft}
           onCaretChange={setComposeCaret}
           onPasteImage={(file) => {
-            if (canSendImage) void sendChatImage(file);
+            if (canAttach) setChatAttachment(file);
           }}
           onSendShortcut={() => {
-            if (isDesktop) requestSend();
+            if (isDesktop) void requestSend();
           }}
           placeholder={t("chatPlaceholder")}
           removeContactLabel={t("chatRemoveContactFromDraft")}
@@ -822,13 +851,13 @@ const ChatComposer = memo(function ChatComposer({
           getMintIconUrl={getMintIconUrl}
           getNpubMessageContactInfo={getNpubMessageContactInfo}
         />
-        {!hasDraftText ? (
+        {!hasDraftText && !chatAttachment ? (
           <button
             type="button"
             className="chat-compose-image-button"
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => imageInputRef.current?.click()}
-            disabled={!canSendImage}
+            disabled={!canAttach}
             aria-label={t("chatImageAttach")}
             title={t("chatImageAttach")}
           >
@@ -837,12 +866,12 @@ const ChatComposer = memo(function ChatComposer({
             </span>
           </button>
         ) : null}
-        {hasDraftText ? (
+        {hasDraftText || chatAttachment ? (
           <button
             type="button"
             className="chat-compose-send-button"
             onPointerDown={(event) => event.preventDefault()}
-            onClick={requestSend}
+            onClick={() => void requestSend()}
             disabled={!canSendChat}
             aria-label={editContext ? t("chatSaveAction") : t("send")}
             title={editContext ? t("chatSaveAction") : t("send")}
@@ -1123,6 +1152,7 @@ export const ChatPage: FC<ChatPageProps> = ({
   cashuBalance,
   cashuBalanceAfterMelt,
   cashuIsBusy,
+  chatAttachment,
   chatDraft,
   chatMessageElByIdRef,
   chatMessages,
@@ -1158,6 +1188,7 @@ export const ChatPage: FC<ChatPageProps> = ({
   selectedContact,
   sendChatImage,
   sendChatMessage,
+  setChatAttachment,
   setChatDraft,
   setMintIconUrlByMint,
 }) => {
@@ -1305,6 +1336,7 @@ export const ChatPage: FC<ChatPageProps> = ({
         canRequestThisContact={canRequestThisContact}
         canStartPay={canStartPay}
         cashuIsBusy={cashuIsBusy}
+        chatAttachment={chatAttachment}
         chatDraft={chatDraft}
         chatSendIsBusy={chatSendIsBusy}
         composeContainerRef={composeContainerRef}
@@ -1325,6 +1357,7 @@ export const ChatPage: FC<ChatPageProps> = ({
         selectedContact={selectedContact}
         sendChatImage={sendChatImage}
         sendChatMessage={sendChatMessage}
+        setChatAttachment={setChatAttachment}
         setChatDraft={setChatDraft}
         t={t}
       />

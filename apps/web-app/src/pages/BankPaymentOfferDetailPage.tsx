@@ -62,7 +62,7 @@ interface BankPaymentOfferDetailPageProps {
   onSendChatImage: (
     file: File,
     replyToMessage?: LocalNostrMessage,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   onSettleBankPaymentOffer: (message: LocalNostrMessage) => Promise<void>;
 }
 

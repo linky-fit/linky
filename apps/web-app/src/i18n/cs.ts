@@ -328,6 +328,7 @@ export const cs = {
   chatPdfSave: "Uložit",
   chatPdfTooLarge: "PDF je příliš velké (max. 2 MB).",
   chatImageTooLarge: "Obrázek je příliš velký (max. 20 MB).",
+  chatAttachmentRemove: "Odebrat přílohu",
   chatAttachmentUnsupported: "Odeslat lze jen obrázky a PDF soubory.",
   chatImageDecrypting: "Dešifruji obrázek…",
   chatImageLoadFailed: "Obrázek se nepodařilo načíst.",

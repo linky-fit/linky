@@ -68,6 +68,7 @@ import { collectUnreadNewestIncomingByContactId } from "../../lib/chatUnread";
 import { findUniqueContactByLightningAddress } from "../../lib/contactIdentity";
 import { resolveContactRowOwnerLane } from "../../lib/contactOwnerLane";
 import { buildLinkyPaymentRequestDeclineMessage } from "../../lib/paymentRequestMessage";
+import { getChatAttachmentRejection } from "../../lib/privateImageMessage";
 import {
   parsePrivateImageMessage,
   privateImagePreviewText,
@@ -343,6 +344,18 @@ export const useContactsMessagingComposition = ({
   }, [currentNsec]);
 
   const [chatDraft, setChatDraft] = useState<string>("");
+  const [chatAttachment, setChatAttachmentState] = useState<File | null>(null);
+  const setChatAttachment = React.useCallback(
+    (file: File | null) => {
+      const rejectionKey = file ? getChatAttachmentRejection(file) : null;
+      if (rejectionKey) {
+        setStatus(t(rejectionKey));
+        return;
+      }
+      setChatAttachmentState(file);
+    },
+    [setStatus, t],
+  );
 
   const [chatSendIsBusy, setChatSendIsBusy] = useState(false);
 
@@ -1989,10 +2002,11 @@ export const useContactsMessagingComposition = ({
 
   const sendChatImage = React.useCallback(
     async (file: File, replyToMessage?: LocalNostrMessage) => {
-      if (editContext) return;
+      if (editContext) return false;
       const replyToId = (replyToMessage?.rumorId ?? "").trim();
-      await sendChatMessage({
+      return sendChatMessage({
         clearDraft: false,
+        clearReplyContext: true,
         imageFile: file,
         ...(replyToId
           ? {
@@ -2236,6 +2250,7 @@ export const useContactsMessagingComposition = ({
     blockUnknownContactFromChat,
     canAddContact,
     canSaveNewRelay,
+    chatAttachment,
     chatDidInitialScrollForContactRef,
     chatDraft,
     chatForceScrollToBottomRef,
@@ -2316,6 +2331,7 @@ export const useContactsMessagingComposition = ({
     sendChatMessage,
     sendChatOrEditMessage,
     setActiveGroup,
+    setChatAttachment,
     setChatDraft,
     setContactNewPrefill,
     setContactsOnboardingHasBackedUpKeys,

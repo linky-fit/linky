@@ -177,12 +177,30 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
             buffer: file.buffer,
           });
         }
-        await expect(receiver.page.locator(".chat-message.in")).toHaveCount(
-          previousMessageCount + 1,
+        // Staging never sends; the composer's send button ships the attachment
+        // first and any typed text as a second message.
+        await expect(
+          sender.page.locator(".chat-attachment-preview"),
+        ).toBeVisible();
+        await expect(editor).toHaveText(
+          file.name === "keyboard-paste.png" ? "Keep this draft" : "",
         );
-        if (file.name.includes("paste"))
-          await expect(editor).toHaveText("Keep this draft");
-        const message = receiver.page.locator(".chat-message.in").last();
+        const followUpTextCount = file.name === "keyboard-paste.png" ? 1 : 0;
+        await sender.page.locator('[data-guide="chat-send"]').click();
+        await expect(receiver.page.locator(".chat-message.in")).toHaveCount(
+          previousMessageCount + 1 + followUpTextCount,
+        );
+        await expect(
+          sender.page.locator(".chat-attachment-preview"),
+        ).toHaveCount(0);
+        await expect(editor).toHaveText("");
+        if (followUpTextCount)
+          await expect(
+            receiver.page.locator(".chat-message.in").last(),
+          ).toContainText("Keep this draft");
+        const message = receiver.page
+          .locator(".chat-message.in")
+          .nth(previousMessageCount);
         await expect(message.locator(file.selector)).toBeVisible();
         await expect
           .poll(() =>

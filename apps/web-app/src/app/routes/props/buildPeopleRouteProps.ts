@@ -9,6 +9,7 @@ interface BuildPeopleRoutePropsParams {
   cashuIsBusy: PeopleRoutesProps["chatProps"]["cashuIsBusy"];
   canWriteNfc: PeopleRoutesProps["profileProps"]["canWriteToNfc"];
   chatSelectedContact: PeopleRoutesProps["chatProps"]["selectedContact"];
+  chatAttachment: PeopleRoutesProps["chatProps"]["chatAttachment"];
   chatDraft: PeopleRoutesProps["chatProps"]["chatDraft"];
   chatMessageElByIdRef: PeopleRoutesProps["chatProps"]["chatMessageElByIdRef"];
   chatMessages: PeopleRoutesProps["chatProps"]["chatMessages"];
@@ -108,6 +109,7 @@ interface BuildPeopleRoutePropsParams {
   };
   sendChatImage: PeopleRoutesProps["chatProps"]["sendChatImage"];
   sendChatMessage: PeopleRoutesProps["chatProps"]["sendChatMessage"];
+  setChatAttachment: PeopleRoutesProps["chatProps"]["setChatAttachment"];
   setChatDraft: PeopleRoutesProps["chatProps"]["setChatDraft"];
   setContactPayMethod: PeopleRoutesProps["contactPayProps"]["setContactPayMethod"];
   setForm: PeopleRoutesProps["contactEditProps"]["setForm"];
@@ -127,6 +129,7 @@ export const buildPeopleRouteProps = ({
   cashuIsBusy,
   canWriteNfc,
   chatSelectedContact,
+  chatAttachment,
   chatDraft,
   chatMessageElByIdRef,
   chatMessages,
@@ -219,6 +222,7 @@ export const buildPeopleRouteProps = ({
   selectedContactPublicProfile,
   sendChatImage,
   sendChatMessage,
+  setChatAttachment,
   setChatDraft,
   setContactPayMethod,
   setForm,
@@ -256,6 +260,8 @@ export const buildPeopleRouteProps = ({
       bankPaymentOfferMessages,
       chatMessagesRef,
       chatOwnPubkeyHex,
+      chatAttachment,
+      setChatAttachment,
       chatDraft,
       setChatDraft,
       chatSendIsBusy,

@@ -42,6 +42,7 @@ export interface ReplyContext {
 
 interface SendChatMessageOptions {
   clearDraft?: boolean;
+  clearReplyContext?: boolean;
   imageFile?: File | null;
   replyContext?: ReplyContext | null;
   text?: string;
@@ -93,32 +94,32 @@ export const useSendChatMessage = <
   });
 
   return React.useCallback(
-    async (options?: SendChatMessageOptions) => {
+    async (options?: SendChatMessageOptions): Promise<boolean> => {
       if (
         route.kind !== "chat" &&
         route.kind !== "contactPay" &&
         route.kind !== "bankPaymentOffer"
       )
-        return;
-      if (!selectedContact) return;
+        return false;
+      if (!selectedContact) return false;
 
       const imageFile = options?.imageFile ?? null;
       const text = (options?.text ?? chatDraft).trim();
-      if (!text && !imageFile) return;
+      if (!text && !imageFile) return false;
 
       if (!currentNsec) {
         setStatus(t("profileMissingNpub"));
-        return;
+        return false;
       }
 
-      if (chatSendIsBusy) return;
+      if (chatSendIsBusy) return false;
 
       const rejectionKey = imageFile
         ? getChatAttachmentRejection(imageFile)
         : null;
       if (rejectionKey) {
         setStatus(t(rejectionKey));
-        return;
+        return false;
       }
 
       setChatSendIsBusy(true);
@@ -130,7 +131,7 @@ export const useSendChatMessage = <
         );
         if (!identity || !isPubkey(identity.contactPubHex)) {
           setStatus(t("chatMissingContactNpub"));
-          return;
+          return false;
         }
         const { contactPubHex, myPubHex, privBytes } = identity;
 
@@ -213,8 +214,9 @@ export const useSendChatMessage = <
         });
         if (!pendingId) throw new Error("failed to persist message");
         triggerChatScrollToBottom(pendingId);
-        if (options?.clearDraft !== false) {
-          setChatDraft("");
+        const clearDraft = options?.clearDraft !== false;
+        if (clearDraft) setChatDraft("");
+        if (options?.clearReplyContext ?? clearDraft) {
           clearReplyContextIfCurrent();
         }
 
@@ -227,7 +229,7 @@ export const useSendChatMessage = <
         });
         if (Exit.isFailure(exit)) {
           setStatus(`${t("errorPrefix")}: ${Cause.pretty(exit.cause)}`);
-          return;
+          return true;
         }
 
         updateLocalNostrMessage(pendingId, {
@@ -243,6 +245,7 @@ export const useSendChatMessage = <
         if (typeof navigator !== "undefined" && navigator.onLine === false) {
           setStatus(t("chatQueued"));
         }
+        return true;
       } catch (e) {
         const attachmentErrorKey = chatAttachmentErrorKey(e);
         setStatus(
@@ -250,6 +253,7 @@ export const useSendChatMessage = <
             ? t(attachmentErrorKey)
             : `${t("errorPrefix")}: ${String(e ?? "unknown")}`,
         );
+        return false;
       } finally {
         setChatSendIsBusy(false);
       }

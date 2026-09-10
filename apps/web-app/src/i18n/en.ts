@@ -325,6 +325,7 @@ export const en = {
   chatPdfSave: "Save",
   chatPdfTooLarge: "The PDF is too large (max 2 MB).",
   chatImageTooLarge: "The image is too large (max 20 MB).",
+  chatAttachmentRemove: "Remove attachment",
   chatAttachmentUnsupported: "Only images and PDF files can be sent.",
   chatImageDecrypting: "Decrypting image…",
   chatImageLoadFailed: "Could not load image.",

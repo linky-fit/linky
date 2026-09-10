@@ -77,12 +77,13 @@ const receipt = (clientId: ClientId, ref: OutboxRef): EnqueueReceipt =>
 
 interface SendOptions {
   clearDraft?: boolean;
+  clearReplyContext?: boolean;
   imageFile?: File | null;
   replyContext?: ReplyContext | null;
   text?: string;
 }
 
-type SendChatMessage = (options?: SendOptions) => Promise<void>;
+type SendChatMessage = (options?: SendOptions) => Promise<boolean>;
 
 interface SetupOptions {
   chatDraft?: string;
@@ -225,7 +226,7 @@ describe("useSendChatMessage", () => {
     await act(async () => harness.root.unmount());
   });
 
-  it("sends an uploaded image draft and stores its compact content", async () => {
+  it("sends an uploaded image draft as a reply while keeping the text draft", async () => {
     const image: PrivateImageMessagePayload = {
       encryptedSha256: "44".repeat(32),
       encryptedSize: 128,
@@ -252,13 +253,26 @@ describe("useSendChatMessage", () => {
         ),
       ),
     );
-    const harness = await setup({ chatDraft: "caption ignored" });
+    const harness = await setup({
+      chatDraft: "caption ignored",
+      replyContext: {
+        replyToContent: "parent",
+        replyToId: REPLY_TO,
+        rootMessageId: ROOT,
+      },
+    });
     const file = new File(["image"], "photo.jpg", { type: "image/jpeg" });
 
+    let sent: boolean | undefined;
     await act(async () => {
-      await harness.getSend()?.({ imageFile: file });
+      sent = await harness.getSend()?.({
+        clearDraft: false,
+        clearReplyContext: true,
+        imageFile: file,
+      });
     });
 
+    expect(sent).toBe(true);
     const input = enqueueOutboxMock.mock.calls[0]?.[0];
     expect(input).toMatchObject({
       op: { _tag: "chat.image" },
@@ -267,6 +281,9 @@ describe("useSendChatMessage", () => {
     const draft = input?.op._tag === "chat.image" ? input.op.draft : undefined;
     expect(draft).toBeInstanceOf(ImageMessageDraft);
     expect(draft?.to).toBe(CONTACT_PUBKEY);
+    expect(draft).toMatchObject({ replyTo: REPLY_TO, root: ROOT });
+    expect(harness.setChatDraft).not.toHaveBeenCalled();
+    expect(harness.setReplyContext).toHaveBeenCalledOnce();
     expect(draft?.image).toMatchObject({
       encryptedSha256: image.encryptedSha256,
       encryptedSize: image.encryptedSize,
@@ -297,10 +314,12 @@ describe("useSendChatMessage", () => {
     );
     const harness = await setup();
 
+    let sent: boolean | undefined;
     await act(async () => {
-      await harness.getSend()?.();
+      sent = await harness.getSend()?.();
     });
 
+    expect(sent).toBe(true);
     expect(harness.appendLocalNostrMessage).toHaveBeenCalledOnce();
     expect(harness.updateLocalNostrMessage).not.toHaveBeenCalled();
     expect(harness.setStatus).toHaveBeenCalledWith(
