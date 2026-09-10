@@ -2,6 +2,12 @@
 
 Architectural decisions and behavioral constraints for Linky. Keep this file up to date: document new architectural decisions here (not in `AGENTS.md`) in the same commit as the change.
 
+## Next design system (`packages/ui/`, `apps/ui-book-next/`)
+
+- `@linky/ui` extracts the approved `linky-design` demo into an independent Tamagui library. It owns its config, semantic dark/light themes, Manrope typography, controls, people and wallet rows, chat and attachment components, payment presentations, navigation, and feedback. It replaces the first UI implementation; `apps/ui-book-next` replaces the old UI book. The site, PWA, Capacitor shell, and push service retain their original implementation. The PWA uses its own components and plain CSS, independently of this library.
+- Consumers supply translated labels, formatted amounts, delivery and payment state, and callbacks. App services retain validation, networking, storage, navigation, file selection, QR scanning, clipboard access, and safe-area/keyboard integration. Payment states determine presentation tones; the library never initiates or infers payment completion.
+- `@linky/ui-book-next` previews the actual exports with fictional fixtures and local state, without backend services. Its theme and viewport controls exercise the same components used in wallet/chat compositions. Consumers install one Linky UI configuration per application entry point.
+
 ## Local error tracker (`tools/nostr-error-tracker/`)
 
 - Standalone local Vite dashboard for the existing kind-24134 payment telemetry inbox. It only displays `status: error`; reporting producers and payloads are unchanged. Groups use error code, method, and phase, plus message for unknown errors; occurrences retain all received metadata and the original JSON, including older reports missing environment fields.

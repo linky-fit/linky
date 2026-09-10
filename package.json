@@ -37,7 +37,9 @@
     "prettier": "bun run --workspaces --if-present prettier",
     "typecheck": "bun run --workspaces --if-present typecheck",
     "test": "bun run --workspaces --if-present test",
-    "check-code": "bun run typecheck && bun run eslint && bun run prettier"
+    "check-code": "bun run typecheck && bun run eslint && bun run prettier",
+    "ui:dev": "bun run --filter @linky/ui-book-next dev",
+    "ui:build": "bun run --filter @linky/ui-book-next build"
   },
   "patchedDependencies": {
     "nostr-tools@2.23.3": "patches/nostr-tools@2.23.3.patch"

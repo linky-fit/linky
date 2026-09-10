@@ -1,0 +1,10 @@
+{
+  "extends": "@linky/config/tsconfig/base",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["react", "vite/client", "node"]
+  },
+  "include": ["src", "tests", "*.ts"]
+}
