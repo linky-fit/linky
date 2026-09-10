@@ -4,17 +4,21 @@ import { buildOnboardingUrl } from "./onboardingLink";
 
 vi.mock("../platform/runtime", () => ({ isNativePlatform: () => false }));
 
+const onboarderNpub =
+  "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
+const base = `${window.location.origin}${window.location.pathname}`;
+
 describe("buildOnboardingUrl", () => {
-  it("points at the current app origin without a gift", () => {
-    expect(buildOnboardingUrl(null)).toBe(
-      `${window.location.origin}${window.location.pathname}`,
+  it("carries only the onboarder without a gift", () => {
+    expect(buildOnboardingUrl({ giftToken: null, onboarderNpub })).toBe(
+      `${base}#wallet?onboarder=${onboarderNpub}`,
     );
   });
 
-  it("carries the gift token in the wallet cashu deep link", () => {
+  it("adds the gift token to the wallet cashu deep link", () => {
     const token = buildCashuToken();
-    expect(buildOnboardingUrl(token)).toBe(
-      `${window.location.origin}${window.location.pathname}#wallet?cashu=${encodeURIComponent(token)}`,
+    expect(buildOnboardingUrl({ giftToken: token, onboarderNpub })).toBe(
+      `${base}#wallet?onboarder=${onboarderNpub}&cashu=${encodeURIComponent(token)}`,
     );
   });
 });

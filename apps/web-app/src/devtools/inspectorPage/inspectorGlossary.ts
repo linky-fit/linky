@@ -60,6 +60,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
   "onboarding.start":
     "User opened the onboarding QR from their profile; the payload says whether a welcome-gift token was issued for it (the row link points at that issued token) or skipped for lack of balance.",
+  "onboarding.joined":
+    "A parked onboarding link was replayed after login: the onboarder was saved as a contact (or was already one) and a greeting message was sent to them; the contact link points at that row.",
   "pay.step":
     "One step of paying a contact with a cashu token sent as a chat message (start, mint-selected, swap-ok, plan-send-token, publish-pending, publish-ok, publish-failed, payment-notice-publish, message-ack, queued-offline). The client and message links tie the steps to the gift wraps they produced.",
   "contacts.addToGroup":

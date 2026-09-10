@@ -365,6 +365,8 @@ export const de = {
   onboardGiftSkipped:
     "Nicht genug Guthaben für das Willkommensgeschenk von {amount}, der Code öffnet nur die App.",
   onboardGiftClaimed: "Willkommensgeschenk eingelöst",
+  onboardJoinedMessage:
+    "Hallo! Ich bin gerade über deinen Onboarding-Code bei Linky beigetreten 👋",
   copyLink: "Link kopieren",
   language: "Sprache",
   czech: "Čeština",

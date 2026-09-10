@@ -47,20 +47,19 @@ interface SendChatMessageOptions {
   text?: string;
 }
 
-interface UseSendChatMessageParams<
-  TRoute extends { kind: string },
-  TContact extends ContactIdentityRowLike,
-> {
+interface SendChatMessageToArgs {
+  contact: ContactIdentityRowLike;
+  imageFile?: File | null;
+  /** Runs once the outgoing row is persisted locally, before publishing. */
+  onPersisted?: () => void;
+  replyContext?: ReplyContext | null;
+  text: string;
+}
+
+interface UseSendChatMessageToParams {
   appendLocalNostrMessage: AppendLocalNostrMessage;
-  chatDraft: string;
   chatSendIsBusy: boolean;
   currentNsec: string | null;
-  route: TRoute;
-  replyContext: ReplyContext | null;
-  replyContextRef: React.MutableRefObject<ReplyContext | null>;
-  selectedContact: TContact | null;
-  setReplyContext: React.Dispatch<React.SetStateAction<ReplyContext | null>>;
-  setChatDraft: React.Dispatch<React.SetStateAction<string>>;
   setChatSendIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
@@ -68,42 +67,42 @@ interface UseSendChatMessageParams<
   updateLocalNostrMessage: UpdateLocalNostrMessage;
 }
 
-export const useSendChatMessage = <
+interface UseSendChatMessageParams<
   TRoute extends { kind: string },
   TContact extends ContactIdentityRowLike,
->({
+> extends UseSendChatMessageToParams {
+  chatDraft: string;
+  route: TRoute;
+  replyContext: ReplyContext | null;
+  replyContextRef: React.MutableRefObject<ReplyContext | null>;
+  selectedContact: TContact | null;
+  setReplyContext: React.Dispatch<React.SetStateAction<ReplyContext | null>>;
+  setChatDraft: React.Dispatch<React.SetStateAction<string>>;
+}
+
+/** Sends a text or image message to an explicit contact, independent of the route. */
+export const useSendChatMessageTo = ({
   appendLocalNostrMessage,
-  chatDraft,
   chatSendIsBusy,
   currentNsec,
-  route,
-  replyContext,
-  replyContextRef,
-  selectedContact,
-  setReplyContext,
-  setChatDraft,
   setChatSendIsBusy,
   setStatus,
   t,
   triggerChatScrollToBottom,
   updateLocalNostrMessage,
-}: UseSendChatMessageParams<TRoute, TContact>) => {
+}: UseSendChatMessageToParams) => {
   const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
     mode: "promiseExit",
   });
 
   return React.useCallback(
-    async (options?: SendChatMessageOptions) => {
-      if (
-        route.kind !== "chat" &&
-        route.kind !== "contactPay" &&
-        route.kind !== "bankPaymentOffer"
-      )
-        return;
-      if (!selectedContact) return;
-
-      const imageFile = options?.imageFile ?? null;
-      const text = (options?.text ?? chatDraft).trim();
+    async ({
+      contact,
+      imageFile = null,
+      onPersisted,
+      replyContext = null,
+      text,
+    }: SendChatMessageToArgs) => {
       if (!text && !imageFile) return;
 
       if (!currentNsec) {
@@ -124,10 +123,7 @@ export const useSendChatMessage = <
       setChatSendIsBusy(true);
 
       try {
-        const identity = await resolveNostrChatIdentity(
-          currentNsec,
-          selectedContact,
-        );
+        const identity = await resolveNostrChatIdentity(currentNsec, contact);
         if (!identity || !isPubkey(identity.contactPubHex)) {
           setStatus(t("chatMissingContactNpub"));
           return;
@@ -142,26 +138,11 @@ export const useSendChatMessage = <
           : null;
         const messageContent = imagePayload?.content ?? text;
         const mediaInfo = parsePrivateImageMessage(messageContent);
-        const activeReplyContext =
-          options?.replyContext ??
-          replyContextRef.current ??
-          replyContext ??
-          null;
-        const activeReplyToId = (activeReplyContext?.replyToId ?? "").trim();
-        const replyTo = isRumorId(activeReplyToId)
-          ? activeReplyToId
-          : undefined;
-        const rootId =
-          (activeReplyContext?.rootMessageId ?? "").trim() || replyTo;
+        const replyToId = (replyContext?.replyToId ?? "").trim();
+        const replyTo = isRumorId(replyToId) ? replyToId : undefined;
+        const rootId = (replyContext?.rootMessageId ?? "").trim() || replyTo;
         const root =
           replyTo !== undefined && isRumorId(rootId) ? rootId : undefined;
-        const clearReplyContextIfCurrent = () => {
-          if (!activeReplyToId) return;
-          setReplyContext((previous) => {
-            const previousReplyToId = (previous?.replyToId ?? "").trim();
-            return previousReplyToId === activeReplyToId ? null : previous;
-          });
-        };
         const createdAtSec = Math.ceil(Date.now() / 1e3);
 
         let draft: TextMessageDraft | ImageMessageDraft;
@@ -192,7 +173,7 @@ export const useSendChatMessage = <
         }
 
         const pendingId = appendLocalNostrMessage({
-          contactId: String(selectedContact.id),
+          contactId: String(contact.id),
           direction: "out",
           content: messageContent,
           wrapId: `pending:${clientId}`,
@@ -201,22 +182,19 @@ export const useSendChatMessage = <
           createdAtSec,
           status: "pending",
           clientId,
-          ...(activeReplyContext?.replyToId
+          ...(replyContext?.replyToId
             ? {
-                replyToId: activeReplyContext.replyToId,
-                replyToContent: activeReplyContext.replyToContent,
+                replyToId: replyContext.replyToId,
+                replyToContent: replyContext.replyToContent,
                 rootMessageId:
-                  (activeReplyContext.rootMessageId ?? "").trim() ||
-                  activeReplyContext.replyToId,
+                  (replyContext.rootMessageId ?? "").trim() ||
+                  replyContext.replyToId,
               }
             : {}),
         });
         if (!pendingId) throw new Error("failed to persist message");
         triggerChatScrollToBottom(pendingId);
-        if (options?.clearDraft !== false) {
-          setChatDraft("");
-          clearReplyContextIfCurrent();
-        }
+        onPersisted?.();
 
         const exit = await enqueueOutbox({
           op:
@@ -256,21 +234,80 @@ export const useSendChatMessage = <
     },
     [
       appendLocalNostrMessage,
-      chatDraft,
       chatSendIsBusy,
       currentNsec,
-      replyContext,
-      replyContextRef,
-      route.kind,
-      selectedContact,
       enqueueOutbox,
-      setReplyContext,
-      setChatDraft,
       setChatSendIsBusy,
       setStatus,
       t,
       triggerChatScrollToBottom,
       updateLocalNostrMessage,
+    ],
+  );
+};
+
+/** The chat composer's send: targets the selected contact and clears the draft. */
+export const useSendChatMessage = <
+  TRoute extends { kind: string },
+  TContact extends ContactIdentityRowLike,
+>({
+  chatDraft,
+  route,
+  replyContext,
+  replyContextRef,
+  selectedContact,
+  setReplyContext,
+  setChatDraft,
+  ...sendParams
+}: UseSendChatMessageParams<TRoute, TContact>) => {
+  const sendChatMessageTo = useSendChatMessageTo(sendParams);
+
+  return React.useCallback(
+    async (options?: SendChatMessageOptions) => {
+      if (
+        route.kind !== "chat" &&
+        route.kind !== "contactPay" &&
+        route.kind !== "bankPaymentOffer"
+      )
+        return;
+      if (!selectedContact) return;
+
+      const imageFile = options?.imageFile ?? null;
+      const text = (options?.text ?? chatDraft).trim();
+      if (!text && !imageFile) return;
+
+      const activeReplyContext =
+        options?.replyContext ??
+        replyContextRef.current ??
+        replyContext ??
+        null;
+      const activeReplyToId = (activeReplyContext?.replyToId ?? "").trim();
+
+      await sendChatMessageTo({
+        contact: selectedContact,
+        imageFile,
+        replyContext: activeReplyContext,
+        text,
+        onPersisted: () => {
+          if (options?.clearDraft === false) return;
+          setChatDraft("");
+          if (!activeReplyToId) return;
+          setReplyContext((previous) => {
+            const previousReplyToId = (previous?.replyToId ?? "").trim();
+            return previousReplyToId === activeReplyToId ? null : previous;
+          });
+        },
+      });
+    },
+    [
+      chatDraft,
+      replyContext,
+      replyContextRef,
+      route.kind,
+      selectedContact,
+      sendChatMessageTo,
+      setChatDraft,
+      setReplyContext,
     ],
   );
 };

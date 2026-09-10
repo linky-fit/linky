@@ -1,6 +1,12 @@
+import { ONBOARDER_HASH_PARAM } from "../app/lib/deepLinkHash";
 import { isNativePlatform } from "../platform/runtime";
 
 const HOSTED_APP_ORIGIN = "https://app.linky.fit";
+
+interface OnboardingLinkParts {
+  readonly giftToken: string | null;
+  readonly onboarderNpub: string;
+}
 
 const appBaseUrl = (): string => {
   if (typeof window === "undefined" || isNativePlatform()) {
@@ -10,12 +16,15 @@ const appBaseUrl = (): string => {
 };
 
 /**
- * Link for the onboarding QR: opens the web app and, when a welcome-gift
- * token is attached, carries it in the `#wallet?cashu=` deep link that both
- * the unauthenticated and the authenticated shell consume.
+ * Link for the onboarding QR: opens the web app with the onboarder's npub
+ * and, when a welcome-gift token is attached, the token, both in the hash
+ * query that `parkDeepLinkFromHash` moves into storage at boot.
  */
-export const buildOnboardingUrl = (giftToken: string | null): string => {
-  const base = appBaseUrl();
-  if (!giftToken) return base;
-  return `${base}#wallet?cashu=${encodeURIComponent(giftToken)}`;
+export const buildOnboardingUrl = ({
+  giftToken,
+  onboarderNpub,
+}: OnboardingLinkParts): string => {
+  const params = new URLSearchParams({ [ONBOARDER_HASH_PARAM]: onboarderNpub });
+  if (giftToken) params.set("cashu", giftToken);
+  return `${appBaseUrl()}#wallet?${params.toString()}`;
 };

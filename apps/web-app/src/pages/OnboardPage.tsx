@@ -27,7 +27,7 @@ export function OnboardPage({
   giftTokenId,
   showPaidOverlay,
 }: OnboardPageProps): React.ReactElement | null {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { currentNpub, formatDisplayedAmountText, t } = useAppShellCore();
   const [qrDataUrl, setQrDataUrl] = React.useState<string | null>(null);
 
   const giftRow = giftTokenId
@@ -37,9 +37,13 @@ export function OnboardPage({
     ? extractCashuTokenMeta(giftRow).tokenText || null
     : null;
   const waitingForGiftRow = giftTokenId !== null && !giftRow;
-  const onboardingUrl = waitingForGiftRow
-    ? null
-    : buildOnboardingUrl(giftTokenText);
+  const onboardingUrl =
+    waitingForGiftRow || !currentNpub
+      ? null
+      : buildOnboardingUrl({
+          giftToken: giftTokenText,
+          onboarderNpub: currentNpub,
+        });
 
   // cashuTokensAll hydrates asynchronously, so a missing gift row right after
   // navigation is normal; only a row that stays missing means it was claimed

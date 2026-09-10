@@ -2,6 +2,7 @@ import {
   contactsLimitMessage,
   useSaveNpubContact,
 } from "../contacts/useSaveNpubContact";
+import { usePendingOnboarder } from "../contacts/usePendingOnboarder";
 import { writeContact } from "../../lib/writeContact";
 import * as Evolu from "@evolu/common";
 import type { ProfileMetadata } from "@linky/linkstr";
@@ -96,6 +97,7 @@ import {
 import { useLinkstrInboxSync } from "../messages/useLinkstrInboxSync";
 import {
   useSendChatMessage,
+  useSendChatMessageTo,
   type ReplyContext,
 } from "../messages/useSendChatMessage";
 import { useSendReaction } from "../messages/useSendReaction";
@@ -1930,6 +1932,25 @@ export const useContactsMessagingComposition = ({
     setStatus(t("contactSaved"));
     navigateTo({ route: "chat", id: existing.id });
   }, [contacts, reassignNostrConversationContactId, setStatus, t]);
+
+  const sendChatMessageTo = useSendChatMessageTo({
+    appendLocalNostrMessage,
+    chatSendIsBusy,
+    currentNsec,
+    setChatSendIsBusy,
+    setStatus,
+    t,
+    triggerChatScrollToBottom,
+    updateLocalNostrMessage,
+  });
+
+  usePendingOnboarder({
+    currentNpub,
+    ready: canRunNostrNetworkWork,
+    saveNpubContact,
+    sendChatMessageTo,
+    t,
+  });
 
   const sendChatMessage = useSendChatMessage({
     appendLocalNostrMessage,

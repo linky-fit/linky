@@ -77,6 +77,8 @@ export const ARCHIVED_CONTACTS_FILTER = "__linky_archived_contacts__";
 
 export const PENDING_DEEP_LINK_TEXT_STORAGE_KEY =
   "linky.pendingDeepLinkText.v1";
+export const PENDING_ONBOARDER_NPUB_STORAGE_KEY =
+  "linky.pendingOnboarderNpub.v1";
 export const ONBOARDING_GIFT_SAT = 100;
 
 export const WALLET_WARNING_BALANCE_THRESHOLD_SAT = 500_000;

@@ -5,7 +5,6 @@ import { useToasts } from "../hooks/useToasts";
 import type { IdentityChangeMessageSource } from "./lib/identityChangeMessage";
 import { useAppLanguage } from "./hooks/useAppLanguage";
 import { useProfileAuthDomain } from "./hooks/useProfileAuthDomain";
-import { parkCashuTokenFromHashForLogin } from "./lib/cashuHashDeepLink";
 
 export const useUnauthenticatedAppShellComposition = () => {
   const { upsert } = useEvolu();
@@ -19,7 +18,6 @@ export const useUnauthenticatedAppShellComposition = () => {
     | null
   >(null);
   const myProfileMetadataRef = React.useRef<ProfileMetadata | null>(null);
-  React.useEffect(parkCashuTokenFromHashForLogin, []);
   const onboarding = useProfileAuthDomain({
     appendIdentityChangeNoticesRef,
     currentNsec: null,

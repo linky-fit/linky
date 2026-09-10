@@ -54,9 +54,11 @@ test("onboarding QR hands a fresh signup the welcome gift", async ({
 
   const onboarder = await newPage("onboarder");
   const newcomer = await newPage("newcomer");
+  const greeting = "Hi! I just joined Linky through your onboarding code 👋";
 
   try {
-    await setSeedLoginStorage(onboarder.page, await createSeedIdentity());
+    const onboarderIdentity = await createSeedIdentity();
+    await setSeedLoginStorage(onboarder.page, onboarderIdentity);
     await onboarder.page.goto("/#wallet");
     await waitForNetworkReady(onboarder.page);
     await topUp(onboarder.page, 512);
@@ -73,7 +75,11 @@ test("onboarding QR hands a fresh signup the welcome gift", async ({
           onboarder.page.getByText("The code includes a 100 sat welcome gift."),
         ).toBeVisible();
         const link = await copyOnboardingLink(onboarder.page);
-        expect(link).toMatch(/^http:\/\/localhost:\d+\/#wallet\?cashu=cashu/);
+        expect(link).toMatch(
+          new RegExp(
+            `^http://localhost:\\d+/#wallet\\?onboarder=${onboarderIdentity.npub}&cashu=cashu`,
+          ),
+        );
         return link;
       });
 
@@ -94,8 +100,28 @@ test("onboarding QR hands a fresh signup the welcome gift", async ({
         .toBe(99);
     });
 
+    await test.step("newcomer has the onboarder as a contact and greeted them", async () => {
+      await newcomer.page.goto("/#contacts");
+      const cards = newcomer.page.locator("[data-guide='contact-card']");
+      await expect(cards).toHaveCount(1);
+      await cards.first().click();
+      await expect(
+        newcomer.page.locator(".chat-bubble").filter({ hasText: greeting }),
+      ).toBeVisible();
+    });
+
     await test.step("onboarder's page notices the claim and returns to the profile", async () => {
       await expect(onboarder.page).toHaveURL(/#profile$/, { timeout: 60_000 });
+    });
+
+    await test.step("onboarder receives the greeting from the newcomer", async () => {
+      await onboarder.page.goto("/#contacts");
+      const cards = onboarder.page.locator("[data-guide='contact-card']");
+      await expect(cards).toHaveCount(1, { timeout: 60_000 });
+      await cards.first().click();
+      await expect(
+        onboarder.page.locator(".chat-bubble").filter({ hasText: greeting }),
+      ).toBeVisible({ timeout: 60_000 });
     });
 
     await test.step("without balance for the gift the code only opens the app", async () => {
@@ -108,7 +134,7 @@ test("onboarding QR hands a fresh signup the welcome gift", async ({
         ),
       ).toBeVisible();
       expect(await copyOnboardingLink(newcomer.page)).toMatch(
-        /^http:\/\/localhost:\d+\/$/,
+        /^http:\/\/localhost:\d+\/#wallet\?onboarder=npub1[a-z0-9]+$/,
       );
     });
 

@@ -42,7 +42,6 @@ import {
   readNotificationOpenRoute,
   readNotificationOpenTarget,
 } from "../../lib/notificationOpenTarget";
-import { consumeCashuTokenFromHash } from "../../lib/cashuHashDeepLink";
 import { extractCashuTokenFromText } from "../../lib/tokenText";
 import type { useCashuWalletComposition } from "./useCashuWalletComposition";
 import type { useContactsMessagingComposition } from "./useContactsMessagingComposition";
@@ -764,14 +763,6 @@ export const useScanNativeComposition = ({
       window.removeEventListener(NATIVE_PUSH_ACTION_EVENT, onNotificationOpen);
     };
   }, [nostrBootstrapReady, openNotificationChat]);
-
-  React.useEffect(() => {
-    const token = consumeCashuTokenFromHash();
-    if (!token) return;
-
-    setPendingDeleteId(null);
-    updatePendingDeepLinkText(`cashu:${token}`);
-  }, [setPendingDeleteId, updatePendingDeepLinkText]);
 
   React.useEffect(() => {
     if (!pendingDeepLinkText) {

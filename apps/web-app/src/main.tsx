@@ -744,11 +744,14 @@ const bootstrap = async () => {
     });
 
     setStage("import-app");
-    const [{ default: App }, { ErrorBoundary }] = await Promise.all([
-      import("./App.tsx"),
-      import("./ErrorBoundary.tsx"),
-    ]);
+    const [{ default: App }, { ErrorBoundary }, { parkDeepLinkFromHash }] =
+      await Promise.all([
+        import("./App.tsx"),
+        import("./ErrorBoundary.tsx"),
+        import("./app/lib/deepLinkHash.ts"),
+      ]);
     console.log("[linky][boot] app modules loaded");
+    parkDeepLinkFromHash();
 
     setStage("import-evolu");
     const { evolu, EvoluProvider } = await import("./evolu.ts");

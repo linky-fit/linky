@@ -358,6 +358,8 @@ export const cs = {
   onboardGiftSkipped:
     "Na uvítací dárek {amount} není dost prostředků, kód jen otevře aplikaci.",
   onboardGiftClaimed: "Uvítací dárek byl vyzvednut",
+  onboardJoinedMessage:
+    "Ahoj! Právě jsem se přes tvůj onboarding kód připojil(a) do Linky 👋",
   copyLink: "Kopírovat odkaz",
 
   language: "Jazyk",
