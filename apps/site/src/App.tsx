@@ -50,8 +50,7 @@ const ctaModes: readonly CtaMode[] = [
 const ctaUrls: Record<CtaMode, string> = {
   "android-apk":
     "https://github.com/hynek-jina/linky/releases/latest/download/linky.apk",
-  "google-play":
-    "https://play.google.com/store/apps/details?id=fit.linky.app&pli=1",
+  "google-play": "https://play.google.com/store/apps/details?id=fit.linky.app",
   web: "https://app.linky.fit",
   zapstore: "https://zapstore.dev/apps/fit.linky.app",
 };
@@ -332,6 +331,13 @@ function App() {
   }, []);
 
   const handlePrimaryAction = () => {
+    if (ctaMode === "google-play" && /android/i.test(navigator.userAgent)) {
+      window.location.assign(
+        `intent://play.google.com/store/apps/details?id=fit.linky.app#Intent;scheme=https;package=com.android.vending;S.browser_fallback_url=${encodeURIComponent(ctaUrls.web)};end`,
+      );
+      return;
+    }
+
     window.open(ctaUrls[ctaMode], "_blank", "noopener,noreferrer");
   };
 
