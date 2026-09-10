@@ -1,6 +1,7 @@
 import React from "react";
 import type { Translate } from "../i18n";
 import { formatShortNpub, getInitials } from "../utils/formatting";
+import { renderNpubQr } from "../utils/npubQr";
 import { Avatar } from "./Avatar";
 
 interface ProfileShareOverlayProps {
@@ -8,7 +9,6 @@ interface ProfileShareOverlayProps {
   npub: string;
   onClose: () => void;
   pictureUrl: string | null;
-  qrSrc: string | null;
   t: Translate;
 }
 
@@ -31,7 +31,6 @@ export function ProfileShareOverlay({
   npub,
   onClose,
   pictureUrl,
-  qrSrc,
   t,
 }: ProfileShareOverlayProps): React.ReactElement {
   const screenUpsideDown = React.useSyncExternalStore(
@@ -39,7 +38,20 @@ export function ProfileShareOverlay({
     isScreenUpsideDown,
     () => false,
   );
+  const [qrSrc, setQrSrc] = React.useState<string | null>(null);
   const displayName = name ?? formatShortNpub(npub);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void renderNpubQr(npub, { cutout: false })
+      .then((url) => {
+        if (!cancelled) setQrSrc(url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [npub]);
 
   return (
     <div
@@ -69,7 +81,6 @@ export function ProfileShareOverlay({
         ) : (
           <p className="muted profile-share-npub">{npub}</p>
         )}
-        <p className="muted">{t("profileShareTapToClose")}</p>
       </div>
     </div>
   );

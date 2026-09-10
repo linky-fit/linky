@@ -18,6 +18,7 @@ import { useRouting } from "../hooks/useRouting";
 import { useToasts } from "../hooks/useToasts";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import { writeClipboardText } from "../platform/clipboard";
+import { requestDeviceMotionPermission } from "../platform/deviceMotion";
 import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
 import {
   triggerPasswordManagerSeedSave,
@@ -274,7 +275,9 @@ export const useAppShellComposition = ({
 
   const toggleShowProfileQrOnTilt = React.useCallback(() => {
     setShowProfileQrOnTiltEnabled((current) => !current);
-  }, []);
+    // Safari on iOS only prompts for motion access from a user gesture.
+    if (!showProfileQrOnTiltEnabled) void requestDeviceMotionPermission();
+  }, [showProfileQrOnTiltEnabled]);
 
   const closeProfileShareOverlay = React.useCallback(() => {
     setProfileShareOverlayIsOpen(false);
@@ -745,6 +748,7 @@ export const useAppShellComposition = ({
     nostrStatusByNpub,
     route,
     setStatus,
+    showProfileQrOnTiltEnabled,
     t,
   });
 
@@ -867,7 +871,6 @@ export const useAppShellComposition = ({
     walletWarningDismissed,
   } = useCashuWalletComposition({
     cashuTokensAll,
-    profileShareOverlayIsOpen,
     contactPayBackToChatRef,
     contactsMessaging: {
       saveNpubContact,

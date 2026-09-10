@@ -61,9 +61,8 @@ export const CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY =
 export const CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY =
   "linky.cashu_onboarding_set_main_mint.v1";
 export const PAY_WITH_CASHU_STORAGE_KEY = "linky.pay_with_cashu";
-// v1 is abandoned: the persist effect wrote "0" for every user before a toggle existed.
 export const SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY =
-  "linky.show_profile_qr_on_tilt.v2";
+  "linky.show_profile_qr_on_tilt.v1";
 export const LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY =
   "linky.lightning_invoice_auto_pay_limit";
 export const BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY =

@@ -69,11 +69,10 @@ describe("top-down tilt detection", () => {
     await rendered.unmount();
   });
 
-  it("retries a gesture-gated permission on the next tap before listening", async () => {
+  it("requests motion permission on enable and listens regardless of the answer", async () => {
     const requestPermission = vi
       .fn<() => Promise<PermissionState>>()
-      .mockRejectedValueOnce(new Error("needs a user gesture"))
-      .mockResolvedValueOnce("granted");
+      .mockRejectedValue(new Error("needs a user gesture"));
     vi.stubGlobal("DeviceMotionEvent", { requestPermission });
     const onChange = vi.fn();
     const rendered = await renderIntoDocument(
@@ -83,15 +82,7 @@ describe("top-down tilt detection", () => {
     act(() => {
       dispatchMotion(-9);
     });
-    expect(onChange).not.toHaveBeenCalled();
-
-    await act(async () => {
-      window.dispatchEvent(new MouseEvent("click"));
-    });
-    act(() => {
-      dispatchMotion(-9);
-    });
-    expect(requestPermission).toHaveBeenCalledTimes(2);
+    expect(requestPermission).toHaveBeenCalledTimes(1);
     expect(onChange.mock.calls).toEqual([[true]]);
 
     vi.unstubAllGlobals();

@@ -658,8 +658,7 @@ export const en = {
   unitManageInfo:
     "Tap the wallet balance or the amount while entering it to switch between allowed currencies.",
   decimalInput: "Decimal places",
-  showProfileQrOnTilt: "Show my contact when the phone is flipped",
-  profileShareTapToClose: "Tap to close",
+  showProfileQrOnTilt: "Tilt to show profile",
   sendReadReceipts: "Send read receipts",
   decimalPoint: ".",
 

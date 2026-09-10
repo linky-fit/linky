@@ -70,36 +70,15 @@ export const useTopDownTilt = ({
       }
     };
 
-    let disposed = false;
-    const listen = () => {
-      if (disposed) return;
-      window.addEventListener("devicemotion", onDeviceMotion, {
-        passive: true,
-      });
-      window.addEventListener("deviceorientation", onDeviceOrientation, {
-        passive: true,
-      });
-    };
-    // Safari on iOS rejects the request outside a user gesture; retry on the
-    // next tap, which is the gesture its prompt requires.
-    const requestOnNextClick = () => {
-      window.addEventListener(
-        "click",
-        () => {
-          void requestDeviceMotionPermission().then((granted) => {
-            if (granted) listen();
-          });
-        },
-        { once: true },
-      );
-    };
-    void requestDeviceMotionPermission().then((granted) => {
-      if (granted) listen();
-      else requestOnNextClick();
+    // Listeners are harmless without permission; events start flowing once a
+    // gesture-driven request (settings toggle, profile page) is granted.
+    void requestDeviceMotionPermission();
+    window.addEventListener("devicemotion", onDeviceMotion, { passive: true });
+    window.addEventListener("deviceorientation", onDeviceOrientation, {
+      passive: true,
     });
 
     return () => {
-      disposed = true;
       window.removeEventListener("devicemotion", onDeviceMotion);
       window.removeEventListener("deviceorientation", onDeviceOrientation);
       if (topDown) onChangeRef.current(false);

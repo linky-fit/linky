@@ -8,6 +8,7 @@ import type { Lang } from "../../../i18n";
 import { navigateTo, type useRouting } from "../../../hooks/useRouting";
 import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
+import { requestDeviceMotionPermission } from "../../../platform/deviceMotion";
 import { useProfileEditor } from "../profile/useProfileEditor";
 import { useProfileStatusEditor } from "../profile/useProfileStatusEditor";
 import type { Translate } from "../../../i18n";
@@ -22,6 +23,7 @@ interface UseProfileCompositionParams {
   nostrStatusByNpub: Record<string, string | null>;
   route: ReturnType<typeof useRouting>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
+  showProfileQrOnTiltEnabled: boolean;
   t: Translate;
 }
 
@@ -34,6 +36,7 @@ export const useProfileComposition = ({
   nostrStatusByNpub,
   route,
   setStatus,
+  showProfileQrOnTiltEnabled,
   t,
 }: UseProfileCompositionParams) => {
   const [myProfileName, setMyProfileName] = React.useState<string | null>(null);
@@ -189,8 +192,10 @@ export const useProfileComposition = ({
   }, [isProfileEditing, route.kind, toggleProfileEditing]);
 
   const openProfileQr = React.useCallback(() => {
+    // The avatar tap is a user gesture, which Safari on iOS needs to prompt.
+    if (showProfileQrOnTiltEnabled) void requestDeviceMotionPermission();
     navigateTo({ route: "profile" });
-  }, []);
+  }, [showProfileQrOnTiltEnabled]);
 
   return {
     cycleProfileAvatarControl,

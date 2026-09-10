@@ -131,7 +131,6 @@ export function AuthenticatedLayout({
           npub={state.currentNpub}
           onClose={actions.closeProfileShareOverlay}
           pictureUrl={state.effectiveProfilePicture}
-          qrSrc={state.myProfileQr}
           t={state.t}
         />
       ) : null}

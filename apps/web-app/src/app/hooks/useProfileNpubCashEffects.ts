@@ -6,7 +6,7 @@ import {
   isNpubCashDisabled,
   NPUB_CASH_SERVER_BASE_URL,
 } from "../../utils/npubCashServer";
-import { optimizeCaseInsensitiveQrPayload } from "../../utils/qrPayload";
+import { renderNpubQr } from "../../utils/npubQr";
 import { asRecord } from "../../utils/validation";
 
 interface UseProfileNpubCashEffectsParams {
@@ -20,7 +20,6 @@ interface UseProfileNpubCashEffectsParams {
   npubCashInfoInFlightRef: React.MutableRefObject<boolean>;
   npubCashInfoLoadedAtMsRef: React.MutableRefObject<number>;
   npubCashInfoLoadedForNpubRef: React.MutableRefObject<string | null>;
-  profileShareOverlayIsOpen: boolean;
   routeKind: string;
   setDefaultMintUrl: React.Dispatch<React.SetStateAction<string | null>>;
   setDefaultMintUrlDraft: React.Dispatch<React.SetStateAction<string>>;
@@ -39,7 +38,6 @@ export const useProfileNpubCashEffects = ({
   npubCashInfoInFlightRef,
   npubCashInfoLoadedAtMsRef,
   npubCashInfoLoadedForNpubRef,
-  profileShareOverlayIsOpen,
   routeKind,
   setDefaultMintUrl,
   setDefaultMintUrlDraft,
@@ -53,7 +51,7 @@ export const useProfileNpubCashEffects = ({
     }
   }, [routeKind, setIsProfileEditing]);
 
-  const showProfileQr = routeKind === "profile" || profileShareOverlayIsOpen;
+  const showProfileQr = routeKind === "profile";
 
   React.useEffect(() => {
     // Generate QR code for the current npub when profile QR is visible.
@@ -68,53 +66,13 @@ export const useProfileNpubCashEffects = ({
 
     let cancelled = false;
 
-    const run = async () => {
-      try {
-        const QRCode = await import("qrcode");
-        const size = 240;
-        const canvas = document.createElement("canvas");
-
-        await QRCode.toCanvas(
-          canvas,
-          optimizeCaseInsensitiveQrPayload(currentNpub),
-          {
-            errorCorrectionLevel: "H",
-            margin: 1,
-            width: size,
-            color: {
-              dark: "#0f172a",
-              light: "#ffffff",
-            },
-          },
-        );
-
-        const context = canvas.getContext("2d");
-        if (!context) {
-          throw new Error("Missing QR canvas context");
-        }
-
-        const cutoutSize = Math.round(size * 0.23);
-        const cutoutRadius = cutoutSize / 2;
-        const cutoutCenterX = size / 2;
-        const cutoutCenterY = size / 2;
-
-        context.save();
-        context.fillStyle = "#ffffff";
-        context.beginPath();
-        context.arc(cutoutCenterX, cutoutCenterY, cutoutRadius, 0, Math.PI * 2);
-        context.fill();
-        context.restore();
-
-        const url = canvas.toDataURL();
-        if (cancelled) return;
-        setMyProfileQr(url);
-      } catch {
-        if (cancelled) return;
-        setMyProfileQr(null);
-      }
-    };
-
-    void run();
+    void renderNpubQr(currentNpub, { cutout: true })
+      .then((url) => {
+        if (!cancelled) setMyProfileQr(url);
+      })
+      .catch(() => {
+        if (!cancelled) setMyProfileQr(null);
+      });
     return () => {
       cancelled = true;
     };

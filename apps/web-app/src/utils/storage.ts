@@ -241,7 +241,7 @@ export const getInitialPayWithCashuEnabled = (): boolean => {
 };
 
 export const getInitialShowProfileQrOnTiltEnabled = (): boolean =>
-  safeLocalStorageGet(SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY) !== "0";
+  safeLocalStorageGet(SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY) === "1";
 
 export const getInitialLightningInvoiceAutoPayLimit = (): number => {
   const stored = readStoredInt(LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY);

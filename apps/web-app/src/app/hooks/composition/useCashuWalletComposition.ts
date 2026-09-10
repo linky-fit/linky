@@ -222,7 +222,6 @@ interface UseCashuWalletCompositionParams {
     | "setOwnedProfileLightningAddressesLoading"
   >;
   pushToast: (message: string) => void;
-  profileShareOverlayIsOpen: boolean;
   route: ReturnType<typeof useRouting>;
   setContactPaymentIntent: React.Dispatch<
     React.SetStateAction<"pay" | "request">
@@ -246,7 +245,6 @@ export const useCashuWalletComposition = ({
   payAmount,
   profile,
   pushToast,
-  profileShareOverlayIsOpen,
   route,
   setContactPaymentIntent,
   setPayAmount,
@@ -1004,7 +1002,6 @@ export const useCashuWalletComposition = ({
     npubCashInfoInFlightRef,
     npubCashInfoLoadedAtMsRef,
     npubCashInfoLoadedForNpubRef,
-    profileShareOverlayIsOpen,
     routeKind: route.kind,
     setDefaultMintUrl,
     setDefaultMintUrlDraft,
