@@ -344,18 +344,25 @@ export const useContactsMessagingComposition = ({
   }, [currentNsec]);
 
   const [chatDraft, setChatDraft] = useState<string>("");
-  const [chatAttachment, setChatAttachmentState] = useState<File | null>(null);
-  const setChatAttachment = React.useCallback(
-    (file: File | null) => {
-      const rejectionKey = file ? getChatAttachmentRejection(file) : null;
-      if (rejectionKey) {
-        setStatus(t(rejectionKey));
-        return;
+  const [chatAttachments, setChatAttachments] = useState<File[]>([]);
+  const addChatAttachments = React.useCallback(
+    (files: readonly File[]) => {
+      const accepted: File[] = [];
+      for (const file of files) {
+        const rejectionKey = getChatAttachmentRejection(file);
+        if (rejectionKey) setStatus(t(rejectionKey));
+        else accepted.push(file);
       }
-      setChatAttachmentState(file);
+      if (accepted.length === 0) return;
+      setChatAttachments((previous) => [...previous, ...accepted]);
     },
     [setStatus, t],
   );
+  const removeChatAttachment = React.useCallback((file: File) => {
+    setChatAttachments((previous) =>
+      previous.filter((candidate) => candidate !== file),
+    );
+  }, []);
 
   const [chatSendIsBusy, setChatSendIsBusy] = useState(false);
 
@@ -2249,8 +2256,9 @@ export const useContactsMessagingComposition = ({
     blockArchivedContact,
     blockUnknownContactFromChat,
     canAddContact,
+    addChatAttachments,
     canSaveNewRelay,
-    chatAttachment,
+    chatAttachments,
     chatDidInitialScrollForContactRef,
     chatDraft,
     chatForceScrollToBottomRef,
@@ -2330,8 +2338,8 @@ export const useContactsMessagingComposition = ({
     sendChatImage,
     sendChatMessage,
     sendChatOrEditMessage,
+    removeChatAttachment,
     setActiveGroup,
-    setChatAttachment,
     setChatDraft,
     setContactNewPrefill,
     setContactsOnboardingHasBackedUpKeys,

@@ -107,6 +107,12 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
         mimeType: "image/png",
         buffer: Buffer.from(png, "base64"),
         selector: ".chat-private-image-button img",
+        // Picked together with smoke.png to cover staging several files.
+        companion: {
+          name: "companion.png",
+          mimeType: "image/png",
+          buffer: Buffer.from(png, "base64"),
+        },
       },
       {
         name: "keyboard-paste.png",
@@ -171,29 +177,38 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
             );
           }, Array.from(file.buffer));
         } else {
-          await sender.page.locator(".chat-image-input").setInputFiles({
-            name: file.name,
-            mimeType: file.mimeType,
-            buffer: file.buffer,
-          });
+          await sender.page
+            .locator(".chat-image-input")
+            .setInputFiles([
+              { name: file.name, mimeType: file.mimeType, buffer: file.buffer },
+              ...(file.companion ? [file.companion] : []),
+            ]);
         }
-        // Staging never sends; the composer's send button ships the attachment
-        // first and any typed text as a second message.
-        await expect(
-          sender.page.locator(".chat-attachment-preview"),
-        ).toBeVisible();
+        // Staging never sends; the composer's send button ships every staged
+        // attachment in order and any typed text as the final message.
+        const stagedCount = file.companion ? 2 : 1;
+        await expect(sender.page.locator(".chat-attachment-item")).toHaveCount(
+          stagedCount,
+        );
         await expect(editor).toHaveText(
           file.name === "keyboard-paste.png" ? "Keep this draft" : "",
         );
         const followUpTextCount = file.name === "keyboard-paste.png" ? 1 : 0;
         await sender.page.locator('[data-guide="chat-send"]').click();
         await expect(receiver.page.locator(".chat-message.in")).toHaveCount(
-          previousMessageCount + 1 + followUpTextCount,
+          previousMessageCount + stagedCount + followUpTextCount,
         );
         await expect(
           sender.page.locator(".chat-attachment-preview"),
         ).toHaveCount(0);
         await expect(editor).toHaveText("");
+        if (file.companion)
+          await expect(
+            receiver.page
+              .locator(".chat-message.in")
+              .nth(previousMessageCount + 1)
+              .locator(file.selector),
+          ).toBeVisible();
         if (followUpTextCount)
           await expect(
             receiver.page.locator(".chat-message.in").last(),

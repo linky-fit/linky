@@ -28,7 +28,7 @@ describe("ChatMessageEditor", () => {
     "pastes $kind with disabled=$disabled",
     async ({ kind, disabled, expectedText }) => {
       const onChange = vi.fn();
-      const onPasteImage = vi.fn();
+      const onPasteImages = vi.fn();
       const image = new File(["image bytes"], "image.png", {
         type: "image/png",
       });
@@ -40,7 +40,7 @@ describe("ChatMessageEditor", () => {
           getNpubMessageContactInfo={() => null}
           onCaretChange={() => undefined}
           onChange={onChange}
-          onPasteImage={onPasteImage}
+          onPasteImages={onPasteImages}
           onSendShortcut={() => undefined}
           placeholder="Message"
           removeContactLabel="Remove contact from message"
@@ -68,9 +68,9 @@ describe("ChatMessageEditor", () => {
       expect(paste.defaultPrevented).toBe(true);
       expect(editor.textContent).toBe(expectedText);
       if (kind === "image" && !disabled) {
-        expect(onPasteImage).toHaveBeenCalledExactlyOnceWith(image);
+        expect(onPasteImages).toHaveBeenCalledExactlyOnceWith([image]);
       } else {
-        expect(onPasteImage).not.toHaveBeenCalled();
+        expect(onPasteImages).not.toHaveBeenCalled();
       }
       if (kind === "text") {
         expect(onChange).toHaveBeenCalledWith(expectedText);
@@ -97,7 +97,7 @@ describe("ChatMessageEditor", () => {
         })}
         onCaretChange={() => undefined}
         onChange={onChange}
-        onPasteImage={() => undefined}
+        onPasteImages={() => undefined}
         onSendShortcut={() => undefined}
         placeholder="Message"
         removeContactLabel="Remove contact from message"

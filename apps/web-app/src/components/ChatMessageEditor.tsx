@@ -22,7 +22,7 @@ interface ChatMessageEditorProps {
   getNpubMessageContactInfo: (npub: string) => NpubMessageContactInfo | null;
   onCaretChange: (caret: number) => void;
   onChange: (value: string) => void;
-  onPasteImage: (file: File) => void;
+  onPasteImages: (files: File[]) => void;
   onSendShortcut: () => void;
   placeholder: string;
   removeContactLabel: string;
@@ -127,7 +127,7 @@ export const ChatMessageEditor = React.forwardRef<
     getNpubMessageContactInfo,
     onCaretChange,
     onChange,
-    onPasteImage,
+    onPasteImages,
     onSendShortcut,
     placeholder,
     removeContactLabel,
@@ -339,11 +339,11 @@ export const ChatMessageEditor = React.forwardRef<
         if (!editor) return;
         event.preventDefault();
         if (disabled) return;
-        const image = Array.from(event.clipboardData.files).find((file) =>
+        const images = Array.from(event.clipboardData.files).filter((file) =>
           file.type.startsWith("image/"),
         );
-        if (image) {
-          onPasteImage(image);
+        if (images.length > 0) {
+          onPasteImages(images);
           return;
         }
         insertMessageEditorText(

@@ -85,8 +85,9 @@ interface Contact {
 interface ChatPageProps {
   cashuBalance: number;
   cashuBalanceAfterMelt: number;
+  addChatAttachments: (files: readonly File[]) => void;
   cashuIsBusy: boolean;
-  chatAttachment: File | null;
+  chatAttachments: readonly File[];
   chatDraft: string;
   chatMessageElByIdRef: React.MutableRefObject<Map<string, HTMLDivElement>>;
   chatMessages: LocalNostrMessage[];
@@ -132,7 +133,7 @@ interface ChatPageProps {
     replyToMessage?: LocalNostrMessage,
   ) => Promise<boolean>;
   sendChatMessage: () => Promise<void>;
-  setChatAttachment: (file: File | null) => void;
+  removeChatAttachment: (file: File) => void;
   setChatDraft: (value: string) => void;
   setMintIconUrlByMint: React.Dispatch<
     React.SetStateAction<Record<string, string | null>>
@@ -571,8 +572,9 @@ interface ChatComposerProps {
   canPayThisContact: boolean;
   canRequestThisContact: boolean;
   canStartPay: boolean;
+  addChatAttachments: ChatPageProps["addChatAttachments"];
   cashuIsBusy: boolean;
-  chatAttachment: File | null;
+  chatAttachments: readonly File[];
   chatDraft: string;
   chatSendIsBusy: boolean;
   composeContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -593,7 +595,7 @@ interface ChatComposerProps {
   selectedContact: Contact;
   sendChatImage: ChatPageProps["sendChatImage"];
   sendChatMessage: ChatPageProps["sendChatMessage"];
-  setChatAttachment: ChatPageProps["setChatAttachment"];
+  removeChatAttachment: ChatPageProps["removeChatAttachment"];
   setChatDraft: ChatPageProps["setChatDraft"];
   t: Translate;
 }
@@ -602,8 +604,9 @@ const ChatComposer = memo(function ChatComposer({
   canPayThisContact,
   canRequestThisContact,
   canStartPay,
+  addChatAttachments,
   cashuIsBusy,
-  chatAttachment,
+  chatAttachments,
   chatDraft,
   chatSendIsBusy,
   composeContainerRef,
@@ -623,8 +626,8 @@ const ChatComposer = memo(function ChatComposer({
   replyPreviewText,
   selectedContact,
   sendChatImage,
+  removeChatAttachment,
   sendChatMessage,
-  setChatAttachment,
   setChatDraft,
   t,
 }: ChatComposerProps) {
@@ -653,10 +656,10 @@ const ChatComposer = memo(function ChatComposer({
   );
   const hasDraftText = Boolean(draft.trim());
   const hasRecipient = Boolean(npub || hasUnknownPubkeyHex);
-  const hasAttachmentToSend = chatAttachment !== null && !editContext;
+  const hasAttachmentsToSend = chatAttachments.length > 0 && !editContext;
   const canSendChat =
-    !chatSendIsBusy && hasRecipient && (hasDraftText || hasAttachmentToSend);
-  const canAttach = hasRecipient && !editContext && chatAttachment === null;
+    !chatSendIsBusy && hasRecipient && (hasDraftText || hasAttachmentsToSend);
+  const canAttach = hasRecipient && !editContext;
 
   useEffect(() => {
     setDraft(chatDraft);
@@ -692,10 +695,12 @@ const ChatComposer = memo(function ChatComposer({
 
   const requestSend = useCallback(async () => {
     if (!canSendChat) return;
-    if (hasAttachmentToSend) {
-      const sent = await sendChatImage(chatAttachment);
-      if (!sent) return;
-      setChatAttachment(null);
+    if (hasAttachmentsToSend) {
+      for (const file of chatAttachments) {
+        const sent = await sendChatImage(file);
+        if (!sent) return;
+        removeChatAttachment(file);
+      }
     }
     if (!hasDraftText) return;
     if (draft === chatDraft) {
@@ -707,14 +712,14 @@ const ChatComposer = memo(function ChatComposer({
     setChatDraft(draft);
   }, [
     canSendChat,
-    chatAttachment,
+    chatAttachments,
     chatDraft,
     draft,
-    hasAttachmentToSend,
+    hasAttachmentsToSend,
     hasDraftText,
+    removeChatAttachment,
     sendChatImage,
     sendChatMessage,
-    setChatAttachment,
     setChatDraft,
   ]);
 
@@ -760,10 +765,13 @@ const ChatComposer = memo(function ChatComposer({
           onCancel={onCancelEdit}
         />
       )}
-      {chatAttachment ? (
+      {chatAttachments.length > 0 ? (
         <ChatAttachmentPreview
-          file={chatAttachment}
-          onRemove={() => setChatAttachment(null)}
+          addLabel={t("chatImageAttach")}
+          disabled={chatSendIsBusy}
+          files={chatAttachments}
+          onAdd={() => imageInputRef.current?.click()}
+          onRemove={removeChatAttachment}
           removeLabel={t("chatAttachmentRemove")}
         />
       ) : null}
@@ -826,10 +834,11 @@ const ChatComposer = memo(function ChatComposer({
           className="chat-image-input"
           type="file"
           accept="image/*,application/pdf,.pdf"
+          multiple
           onChange={(event) => {
-            const file = event.target.files?.[0] ?? null;
+            const files = Array.from(event.target.files ?? []);
             event.currentTarget.value = "";
-            if (file && canAttach) setChatAttachment(file);
+            if (files.length > 0 && canAttach) addChatAttachments(files);
           }}
           tabIndex={-1}
         />
@@ -838,8 +847,8 @@ const ChatComposer = memo(function ChatComposer({
           value={draft}
           onChange={setDraft}
           onCaretChange={setComposeCaret}
-          onPasteImage={(file) => {
-            if (canAttach) setChatAttachment(file);
+          onPasteImages={(files) => {
+            if (canAttach) addChatAttachments(files);
           }}
           onSendShortcut={() => {
             if (isDesktop) void requestSend();
@@ -851,7 +860,7 @@ const ChatComposer = memo(function ChatComposer({
           getMintIconUrl={getMintIconUrl}
           getNpubMessageContactInfo={getNpubMessageContactInfo}
         />
-        {!hasDraftText && !chatAttachment ? (
+        {!hasDraftText && chatAttachments.length === 0 ? (
           <button
             type="button"
             className="chat-compose-image-button"
@@ -866,7 +875,7 @@ const ChatComposer = memo(function ChatComposer({
             </span>
           </button>
         ) : null}
-        {hasDraftText || chatAttachment ? (
+        {hasDraftText || chatAttachments.length > 0 ? (
           <button
             type="button"
             className="chat-compose-send-button"
@@ -1151,8 +1160,9 @@ const UnknownContactWarning = memo(function UnknownContactWarning({
 export const ChatPage: FC<ChatPageProps> = ({
   cashuBalance,
   cashuBalanceAfterMelt,
+  addChatAttachments,
   cashuIsBusy,
-  chatAttachment,
+  chatAttachments,
   chatDraft,
   chatMessageElByIdRef,
   chatMessages,
@@ -1187,8 +1197,8 @@ export const ChatPage: FC<ChatPageProps> = ({
   replyContext,
   selectedContact,
   sendChatImage,
+  removeChatAttachment,
   sendChatMessage,
-  setChatAttachment,
   setChatDraft,
   setMintIconUrlByMint,
 }) => {
@@ -1335,8 +1345,9 @@ export const ChatPage: FC<ChatPageProps> = ({
         canPayThisContact={canPayThisContact}
         canRequestThisContact={canRequestThisContact}
         canStartPay={canStartPay}
+        addChatAttachments={addChatAttachments}
         cashuIsBusy={cashuIsBusy}
-        chatAttachment={chatAttachment}
+        chatAttachments={chatAttachments}
         chatDraft={chatDraft}
         chatSendIsBusy={chatSendIsBusy}
         composeContainerRef={composeContainerRef}
@@ -1357,7 +1368,7 @@ export const ChatPage: FC<ChatPageProps> = ({
         selectedContact={selectedContact}
         sendChatImage={sendChatImage}
         sendChatMessage={sendChatMessage}
-        setChatAttachment={setChatAttachment}
+        removeChatAttachment={removeChatAttachment}
         setChatDraft={setChatDraft}
         t={t}
       />

@@ -9,7 +9,8 @@ interface BuildPeopleRoutePropsParams {
   cashuIsBusy: PeopleRoutesProps["chatProps"]["cashuIsBusy"];
   canWriteNfc: PeopleRoutesProps["profileProps"]["canWriteToNfc"];
   chatSelectedContact: PeopleRoutesProps["chatProps"]["selectedContact"];
-  chatAttachment: PeopleRoutesProps["chatProps"]["chatAttachment"];
+  addChatAttachments: PeopleRoutesProps["chatProps"]["addChatAttachments"];
+  chatAttachments: PeopleRoutesProps["chatProps"]["chatAttachments"];
   chatDraft: PeopleRoutesProps["chatProps"]["chatDraft"];
   chatMessageElByIdRef: PeopleRoutesProps["chatProps"]["chatMessageElByIdRef"];
   chatMessages: PeopleRoutesProps["chatProps"]["chatMessages"];
@@ -109,7 +110,7 @@ interface BuildPeopleRoutePropsParams {
   };
   sendChatImage: PeopleRoutesProps["chatProps"]["sendChatImage"];
   sendChatMessage: PeopleRoutesProps["chatProps"]["sendChatMessage"];
-  setChatAttachment: PeopleRoutesProps["chatProps"]["setChatAttachment"];
+  removeChatAttachment: PeopleRoutesProps["chatProps"]["removeChatAttachment"];
   setChatDraft: PeopleRoutesProps["chatProps"]["setChatDraft"];
   setContactPayMethod: PeopleRoutesProps["contactPayProps"]["setContactPayMethod"];
   setForm: PeopleRoutesProps["contactEditProps"]["setForm"];
@@ -129,7 +130,8 @@ export const buildPeopleRouteProps = ({
   cashuIsBusy,
   canWriteNfc,
   chatSelectedContact,
-  chatAttachment,
+  addChatAttachments,
+  chatAttachments,
   chatDraft,
   chatMessageElByIdRef,
   chatMessages,
@@ -222,7 +224,7 @@ export const buildPeopleRouteProps = ({
   selectedContactPublicProfile,
   sendChatImage,
   sendChatMessage,
-  setChatAttachment,
+  removeChatAttachment,
   setChatDraft,
   setContactPayMethod,
   setForm,
@@ -260,8 +262,9 @@ export const buildPeopleRouteProps = ({
       bankPaymentOfferMessages,
       chatMessagesRef,
       chatOwnPubkeyHex,
-      chatAttachment,
-      setChatAttachment,
+      addChatAttachments,
+      chatAttachments,
+      removeChatAttachment,
       chatDraft,
       setChatDraft,
       chatSendIsBusy,
