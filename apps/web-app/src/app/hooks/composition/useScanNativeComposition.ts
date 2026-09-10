@@ -90,6 +90,7 @@ interface UseScanNativeCompositionParams {
   addNewContactFromIdentifier: ContactsMessagingCompositionResult["addNewContactFromIdentifier"];
   cashuBalance: CashuWalletCompositionResult["cashuBalance"];
   cashuOwnerId: IdentityOwnersCompositionResult["cashuOwnerId"];
+  cashuReceiveReady: CashuWalletCompositionResult["cashuReceiveReady"];
   cashuTokensAllFiltered: CashuWalletCompositionResult["cashuTokensAllFiltered"];
   contacts: ContactsMessagingCompositionResult["contacts"];
   contactsLatestRef: ContactsMessagingCompositionResult["contactsLatestRef"];
@@ -126,6 +127,7 @@ export const useScanNativeComposition = ({
   addNewContactFromIdentifier,
   cashuBalance,
   cashuOwnerId,
+  cashuReceiveReady,
   cashuTokensAllFiltered,
   contacts,
   contactsLatestRef,
@@ -769,7 +771,9 @@ export const useScanNativeComposition = ({
       return;
     }
 
-    if (!currentNsec || !cashuOwnerId) {
+    // saveCashuFromText drops a token while the linkshu runtime is still
+    // composing, so a parked one waits for it rather than only the owner.
+    if (!currentNsec || !cashuOwnerId || !cashuReceiveReady) {
       return;
     }
 
@@ -779,6 +783,7 @@ export const useScanNativeComposition = ({
     });
   }, [
     cashuOwnerId,
+    cashuReceiveReady,
     currentNsec,
     handleScannedText,
     pendingDeepLinkText,

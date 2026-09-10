@@ -12,7 +12,7 @@ import type { useSaveNpubContact } from "./useSaveNpubContact";
 
 interface UsePendingOnboarderParams {
   currentNpub: string | null;
-  /** Contacts are loaded and relays reachable, so the greeting can go out. */
+  /** The contacts owner lane is known; the outbox holds the greeting until a relay accepts it. */
   ready: boolean;
   saveNpubContact: ReturnType<typeof useSaveNpubContact>;
   sendChatMessageTo: (args: {

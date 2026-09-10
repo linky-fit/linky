@@ -1946,7 +1946,7 @@ export const useContactsMessagingComposition = ({
 
   usePendingOnboarder({
     currentNpub,
-    ready: canRunNostrNetworkWork,
+    ready: contactsOwnerId !== null,
     saveNpubContact,
     sendChatMessageTo,
     t,

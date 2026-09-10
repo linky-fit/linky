@@ -2609,6 +2609,7 @@ export const useCashuWalletComposition = ({
     checkAndRefreshCashuToken,
     checkIssuedCashuTokensAndDeleteClaimed,
     checkSingleIssuedCashuTokenIsClaimed,
+    cashuReceiveReady: receiveCashuToken !== null,
     closeLightningInvoiceConfirmation,
     closeLnurlWithdrawConfirmation,
     closePaymentMintMeltConfirmation,
