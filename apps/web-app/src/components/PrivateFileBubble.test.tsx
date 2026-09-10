@@ -86,12 +86,13 @@ describe("PrivateFileBubble", () => {
         ?.click();
     });
 
-    expect(container.querySelector(".chat-image-viewer")).not.toBeNull();
-    expect(
-      container.querySelectorAll(".chat-pdf-viewer-pages img"),
-    ).toHaveLength(1);
-    expect(container.textContent).toContain("chatPdfSave");
-    expect(container.textContent).toContain("share");
+    const viewer = document.body.querySelector(".chat-image-viewer");
+    expect(viewer).not.toBeNull();
+    expect(viewer?.querySelectorAll(".chat-pdf-viewer-pages img")).toHaveLength(
+      1,
+    );
+    expect(viewer?.textContent).toContain("chatPdfSave");
+    expect(viewer?.textContent).toContain("share");
   });
 
   it("falls back to the file card when the preview cannot be rendered", async () => {

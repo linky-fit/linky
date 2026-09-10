@@ -1,6 +1,7 @@
 import { useLatest } from "../hooks/useLatest";
 import { Download, FileText, Share2 as ShareIcon } from "lucide-react";
 import React from "react";
+import { createPortal } from "react-dom";
 import {
   renderPdfPages,
   revokePdfPages,
@@ -234,90 +235,94 @@ export function PrivateFileBubble({
         </button>
       )}
 
-      {viewerOpen && fileBlob ? (
-        <div
-          className="chat-image-viewer"
-          role="dialog"
-          aria-modal="true"
-          aria-label={fileName}
-          onClick={closeViewer}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <div
-            className="chat-image-viewer-toolbar"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="topbar-btn chat-image-viewer-back"
+      {viewerOpen && fileBlob
+        ? // Portaled to <body> for the same reason as the image viewer.
+          createPortal(
+            <div
+              className="chat-image-viewer"
+              role="dialog"
+              aria-modal="true"
+              aria-label={fileName}
               onClick={closeViewer}
-              aria-label={t("chatImageBackToChat")}
-              title={t("chatImageBackToChat")}
+              onPointerDown={(event) => event.stopPropagation()}
             >
-              <span aria-hidden="true">&lt;</span>
-            </button>
-          </div>
-
-          <div
-            className="chat-image-viewer-stage"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {viewerPages ? (
-              <div className="chat-pdf-viewer-pages">
-                {viewerPages.map((page, index) => (
-                  <img
-                    key={page.url}
-                    src={page.url}
-                    alt={`${fileName} ${index + 1}`}
-                    width={page.width}
-                    height={page.height}
-                    decoding="async"
-                  />
-                ))}
-              </div>
-            ) : viewerErrorText ? null : (
-              <span className="btn-spinner" aria-hidden="true" />
-            )}
-          </div>
-
-          <div
-            className="chat-image-viewer-footer"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {viewerErrorText ? (
-              <div className="chat-image-viewer-error" role="status">
-                {viewerErrorText}
-              </div>
-            ) : null}
-            <div className="chat-image-viewer-actions">
-              <button
-                type="button"
-                className="chat-image-viewer-action"
-                onClick={saveFile}
+              <div
+                className="chat-image-viewer-toolbar"
+                onClick={(event) => event.stopPropagation()}
               >
-                <span className="btn-label-with-icon">
-                  <span className="btn-label-icon" aria-hidden="true">
-                    <Download size={20} />
-                  </span>
-                  <span>{t("chatPdfSave")}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="chat-image-viewer-action"
-                onClick={() => void shareFile()}
+                <button
+                  type="button"
+                  className="topbar-btn chat-image-viewer-back"
+                  onClick={closeViewer}
+                  aria-label={t("chatImageBackToChat")}
+                  title={t("chatImageBackToChat")}
+                >
+                  <span aria-hidden="true">&lt;</span>
+                </button>
+              </div>
+
+              <div
+                className="chat-image-viewer-stage"
+                onClick={(event) => event.stopPropagation()}
               >
-                <span className="btn-label-with-icon">
-                  <span className="btn-label-icon" aria-hidden="true">
-                    <ShareIcon size={20} />
-                  </span>
-                  <span>{t("share")}</span>
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                {viewerPages ? (
+                  <div className="chat-pdf-viewer-pages">
+                    {viewerPages.map((page, index) => (
+                      <img
+                        key={page.url}
+                        src={page.url}
+                        alt={`${fileName} ${index + 1}`}
+                        width={page.width}
+                        height={page.height}
+                        decoding="async"
+                      />
+                    ))}
+                  </div>
+                ) : viewerErrorText ? null : (
+                  <span className="btn-spinner" aria-hidden="true" />
+                )}
+              </div>
+
+              <div
+                className="chat-image-viewer-footer"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {viewerErrorText ? (
+                  <div className="chat-image-viewer-error" role="status">
+                    {viewerErrorText}
+                  </div>
+                ) : null}
+                <div className="chat-image-viewer-actions">
+                  <button
+                    type="button"
+                    className="chat-image-viewer-action"
+                    onClick={saveFile}
+                  >
+                    <span className="btn-label-with-icon">
+                      <span className="btn-label-icon" aria-hidden="true">
+                        <Download size={20} />
+                      </span>
+                      <span>{t("chatPdfSave")}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="chat-image-viewer-action"
+                    onClick={() => void shareFile()}
+                  >
+                    <span className="btn-label-with-icon">
+                      <span className="btn-label-icon" aria-hidden="true">
+                        <ShareIcon size={20} />
+                      </span>
+                      <span>{t("share")}</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

@@ -320,7 +320,7 @@ describe("ChatMessage image message actions", () => {
       imageButton?.click();
     });
 
-    expect(container.querySelector(".chat-image-viewer")).not.toBeNull();
+    expect(document.body.querySelector(".chat-image-viewer")).not.toBeNull();
   });
 
   it("swallows the click synthesized after a long-press", async () => {

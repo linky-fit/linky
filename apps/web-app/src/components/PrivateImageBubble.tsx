@@ -1,6 +1,8 @@
+import { useImageZoom } from "../hooks/useImageZoom";
 import { useLatest } from "../hooks/useLatest";
 import { Download, Share2 as ShareIcon } from "lucide-react";
 import React from "react";
+import { createPortal } from "react-dom";
 import {
   downloadPrivateImageBlob,
   isCancelledShareError,
@@ -39,6 +41,8 @@ export function PrivateImageBubble({
   );
 
   const onBlobChangeRef = useLatest(onBlobChange);
+  const viewerStageRef = React.useRef<HTMLDivElement | null>(null);
+  const zoom = useImageZoom(viewerStageRef, viewerOpen);
 
   React.useEffect(() => {
     if (shouldLoad || typeof IntersectionObserver === "undefined") return;
@@ -101,6 +105,7 @@ export function PrivateImageBubble({
   }, [viewerOpen]);
 
   const openViewer = () => {
+    zoom.reset();
     setViewerErrorText(null);
     setViewerOpen(true);
   };
@@ -182,87 +187,99 @@ export function PrivateImageBubble({
         />
       </button>
 
-      {viewerOpen && imageBlob ? (
-        <div
-          className="chat-image-viewer"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("chatImageMessage")}
-          onClick={closeViewer}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <div
-            className="chat-image-viewer-toolbar"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="topbar-btn chat-image-viewer-back"
+      {viewerOpen && imageBlob
+        ? // Portaled to <body>: on iOS the chat scroller is a composited layer whose
+          // stacking context would otherwise paint this fixed viewer below the
+          // topbar and the compose bar.
+          createPortal(
+            <div
+              className="chat-image-viewer"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t("chatImageMessage")}
               onClick={closeViewer}
-              aria-label={t("chatImageBackToChat")}
-              title={t("chatImageBackToChat")}
+              onPointerDown={(event) => event.stopPropagation()}
             >
-              <span aria-hidden="true">&lt;</span>
-            </button>
-          </div>
-
-          <div className="chat-image-viewer-stage">
-            <img
-              className="chat-image-viewer-image"
-              src={imageUrl}
-              alt={t("chatImageMessage")}
-              width={payload.width}
-              height={payload.height}
-              decoding="async"
-              referrerPolicy="no-referrer"
-              onClick={(event) => event.stopPropagation()}
-            />
-          </div>
-
-          <div
-            className="chat-image-viewer-footer"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {viewerErrorText ? (
-              <div className="chat-image-viewer-error" role="status">
-                {viewerErrorText}
+              <div
+                className="chat-image-viewer-toolbar"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="topbar-btn chat-image-viewer-back"
+                  onClick={closeViewer}
+                  aria-label={t("chatImageBackToChat")}
+                  title={t("chatImageBackToChat")}
+                >
+                  <span aria-hidden="true">&lt;</span>
+                </button>
               </div>
-            ) : null}
-            <div className="chat-image-viewer-actions">
-              <button
-                type="button"
-                className="chat-image-viewer-action"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  saveImage();
-                }}
+
+              <div
+                className="chat-image-viewer-stage"
+                ref={viewerStageRef}
+                {...zoom.handlers}
               >
-                <span className="btn-label-with-icon">
-                  <span className="btn-label-icon" aria-hidden="true">
-                    <Download size={20} />
-                  </span>
-                  <span>{t("chatImageSave")}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                className="chat-image-viewer-action"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void shareImage();
-                }}
+                <img
+                  className="chat-image-viewer-image"
+                  src={imageUrl}
+                  alt={t("chatImageMessage")}
+                  width={payload.width}
+                  height={payload.height}
+                  decoding="async"
+                  draggable={false}
+                  referrerPolicy="no-referrer"
+                  style={zoom.imageStyle}
+                  onClick={(event) => event.stopPropagation()}
+                />
+              </div>
+
+              <div
+                className="chat-image-viewer-footer"
+                onClick={(event) => event.stopPropagation()}
               >
-                <span className="btn-label-with-icon">
-                  <span className="btn-label-icon" aria-hidden="true">
-                    <ShareIcon size={20} />
-                  </span>
-                  <span>{t("share")}</span>
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+                {viewerErrorText ? (
+                  <div className="chat-image-viewer-error" role="status">
+                    {viewerErrorText}
+                  </div>
+                ) : null}
+                <div className="chat-image-viewer-actions">
+                  <button
+                    type="button"
+                    className="chat-image-viewer-action"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      saveImage();
+                    }}
+                  >
+                    <span className="btn-label-with-icon">
+                      <span className="btn-label-icon" aria-hidden="true">
+                        <Download size={20} />
+                      </span>
+                      <span>{t("chatImageSave")}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="chat-image-viewer-action"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void shareImage();
+                    }}
+                  >
+                    <span className="btn-label-with-icon">
+                      <span className="btn-label-icon" aria-hidden="true">
+                        <ShareIcon size={20} />
+                      </span>
+                      <span>{t("share")}</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

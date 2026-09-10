@@ -232,6 +232,39 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
         await expect(
           sender.page.locator(".chat-message.out").last(),
         ).toHaveClass(/seen/);
+        if (file.mimeType !== "application/pdf") {
+          await test.step("full-screen viewer covers the chat chrome", async () => {
+            await message.locator(".chat-private-image-button").click();
+            const viewer = receiver.page.locator(".chat-image-viewer");
+            await expect(viewer).toBeVisible();
+            // Portaled to <body>, so no chat ancestor's stacking context can
+            // paint the topbar or the compose bar over it.
+            expect(
+              await viewer.evaluate(
+                (element) => element.parentElement === document.body,
+              ),
+            ).toBe(true);
+            const covered = await receiver.page.evaluate(() => {
+              const viewer = document.querySelector(".chat-image-viewer");
+              const probes = [
+                document.querySelector(".topbar"),
+                document.querySelector(".chat-compose"),
+              ];
+              return probes.every((probe) => {
+                if (!probe) return true;
+                const rect = probe.getBoundingClientRect();
+                const hit = document.elementFromPoint(
+                  rect.left + rect.width / 2,
+                  rect.top + rect.height / 2,
+                );
+                return Boolean(hit && viewer?.contains(hit));
+              });
+            });
+            expect(covered).toBe(true);
+            await viewer.getByRole("button", { name: "Back to chat" }).click();
+            await expect(viewer).toHaveCount(0);
+          });
+        }
         await message.locator(".chat-bubble").click({ button: "right" });
         const downloadEvent = receiver.page.waitForEvent("download");
         await receiver.page

@@ -2426,6 +2426,8 @@ button.settings-sensitive-action.is-armed {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+  touch-action: none;
 }
 
 .chat-image-viewer-image {
@@ -2435,6 +2437,9 @@ button.settings-sensitive-action.is-armed {
   border-radius: 12px;
   object-fit: contain;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
+  transform-origin: center;
+  will-change: transform;
+  user-select: none;
 }
 
 .chat-image-viewer-error {
