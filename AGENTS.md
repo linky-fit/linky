@@ -58,6 +58,7 @@ Exception: August 2026 accidentally shipped as `26.9.0`, so keep releasing as `2
 - `bun run dev:prod` runs the web app on :5175 against production services (no local stack needed)
 - `bun run dev:services` runs just the docker stack attached (Ctrl-C stops it)
 - See the "Local dev environment" section in `docs/architecture.md` for how env overrides and vite modes work
+- UI book uses Expo/Metro for React Native, with an optional web preview. See `apps/ui-book/README.md` for device setup, export commands, and Bun autolinking diagnostics.
 
 ## E2E tests
 

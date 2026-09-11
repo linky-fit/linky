@@ -4,33 +4,41 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 5190 --strictPort",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 5192 --strictPort",
+    "dev": "expo start --port 5190",
+    "build": "tsc --noEmit && expo export --platform all",
+    "preview": "serve dist --listen tcp://127.0.0.1:5192",
     "typecheck": "tsc --noEmit",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "android": "expo start --android --port 5190",
+    "ios": "expo start --ios --port 5190",
+    "web": "expo start --web --port 5190",
+    "build:web": "tsc --noEmit && expo export --platform web"
   },
   "dependencies": {
     "@linky/ui": "workspace:*",
+    "expo": "~57.0.21",
+    "expo-asset": "~57.0.16",
+    "expo-font": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
-    "react-native-web": "~0.21.0",
-    "react-native-svg": "15.15.4"
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "~0.21.0"
   },
   "devDependencies": {
     "@linky/config": "workspace:*",
     "@playwright/test": "^1.58.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.1.1",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react-swc": "^4.2.2",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",
-    "typescript": "~5.9.3",
-    "vite": "^7.2.4"
+    "serve": "^14.2.4",
+    "typescript": "~6.0.3"
   },
-  "prettier": "@linky/config/prettier"
+  "prettier": "@linky/config/prettier",
+  "main": "index.ts"
 }

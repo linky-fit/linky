@@ -1,5 +1,14 @@
 import config from "@linky/config/eslint";
 export default [
   ...config,
-  { ignores: ["dist/**", "test-results/**", "playwright-report/**"] },
+  {
+    ignores: [
+      ".expo/**",
+      "ios/**",
+      "android/**",
+      "dist/**",
+      "test-results/**",
+      "playwright-report/**",
+    ],
+  },
 ];

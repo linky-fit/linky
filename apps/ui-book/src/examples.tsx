@@ -1,3 +1,4 @@
+import { portraits } from "./assets";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -75,7 +76,7 @@ export function WalletExample({ notify }: ExampleProps) {
     <Stack gap={0}>
       <ScreenHeader
         title={tab === "wallet" ? "Wallet" : "People"}
-        leading={<Avatar name="Dave" uri="/avatars/profile.png" size="small" />}
+        leading={<Avatar name="Dave" uri={portraits.profile} size="small" />}
         trailing={
           <IconButton
             label="Wallet settings"
@@ -131,7 +132,7 @@ export function WalletExample({ notify }: ExampleProps) {
               <DateGroup label="Today">
                 <ActivityRow
                   name="Anna Novak"
-                  uri="/avatars/anna.png"
+                  uri={portraits.anna}
                   description="Dinner"
                   amount="−2,400"
                   unit="sats"
@@ -143,7 +144,7 @@ export function WalletExample({ notify }: ExampleProps) {
                 />
                 <ActivityRow
                   name="Tomas Svoboda"
-                  uri="/avatars/tomas.png"
+                  uri={portraits.tomas}
                   description="Received"
                   amount="+10,000"
                   unit="sats"
@@ -154,7 +155,7 @@ export function WalletExample({ notify }: ExampleProps) {
               <DateGroup label="Yesterday">
                 <ActivityRow
                   name="Klara"
-                  uri="/avatars/klara.png"
+                  uri={portraits.klara}
                   description="Coffee"
                   amount="−650"
                   unit="sats"
@@ -210,7 +211,7 @@ export function ChatExample({ notify }: ExampleProps) {
     <Stack gap={0}>
       <ConversationHeader
         name="Anna Novak"
-        uri="/avatars/anna.png"
+        uri={portraits.anna}
         subtitle="Friends"
         backLabel="Back to conversations"
         onBack={() => notify("Back action selected")}
@@ -336,6 +337,7 @@ export function ChatExample({ notify }: ExampleProps) {
   );
 }
 export function Foundations() {
+  const [showTokens, setShowTokens] = useState(false);
   const variants: TextProps["variant"][] = [
     "display",
     "heading",
@@ -375,31 +377,43 @@ export function Foundations() {
         </Stack>
       </Surface>
       <SectionHeader title="Icon inventory" />
-      <div className="icon-grid">
+      <Row flexWrap="wrap" gap="$lg">
         {iconNames.map((name) => (
-          <Stack key={name} alignItems="center" gap="$sm">
+          <Stack key={name} width={104} alignItems="center" gap="$sm">
             <Icon name={name} />
             <Text variant="caption" muted>
               {name}
             </Text>
           </Stack>
         ))}
-      </div>
+      </Row>
       <SectionHeader title="Palette" />
-      <div className="token-grid">
+      <Row flexWrap="wrap" gap="$md">
         {Object.entries(palette).map(([name, color]) => (
-          <div key={name}>
-            <div className="token-swatch" style={{ backgroundColor: color }} />
+          <Stack key={name} width={104} gap="$xs">
+            <Stack
+              height={40}
+              borderRadius="$control"
+              borderWidth={1}
+              borderColor="$borderColor"
+              backgroundColor={color}
+            />
             <Text variant="caption">{name}</Text>
             <Text variant="caption" muted>
               {color}
             </Text>
-          </div>
+          </Stack>
         ))}
-      </div>
-      <details>
-        <summary>Exported design tokens</summary>
-        <pre>
+      </Row>
+      <Button
+        variant="ghost"
+        onPress={() => setShowTokens(!showTokens)}
+        accessibilityState={{ expanded: showTokens }}
+      >
+        {showTokens ? "Hide design tokens" : "Exported design tokens"}
+      </Button>
+      {showTokens && (
+        <Text variant="caption" selectable>
           {JSON.stringify(
             {
               typography,
@@ -414,8 +428,8 @@ export function Foundations() {
             null,
             2,
           )}
-        </pre>
-      </details>
+        </Text>
+      )}
     </Stack>
   );
 }
@@ -563,11 +577,11 @@ export function People({ notify }: ExampleProps) {
       <Row flexWrap="wrap">
         <Avatar
           name="Dave"
-          uri="/avatars/profile.png"
+          uri={portraits.profile}
           size="large"
           label="Dave's sample portrait"
         />
-        <Avatar name="Anna Novak" uri="/avatars/anna.png" />
+        <Avatar name="Anna Novak" uri={portraits.anna} />
         <Avatar name="Eva Novak" />
         <Avatar name="" size="small" />
         <UnreadBadge count={3} label="3 unread messages" />
@@ -661,7 +675,7 @@ export function Attachments({ notify }: ExampleProps) {
     {
       id: "portrait",
       name: "Anna portrait.png",
-      previewUri: "/avatars/anna.png",
+      previewUri: portraits.anna,
       removeLabel: "Remove portrait",
     },
   ]);
@@ -676,7 +690,7 @@ export function Attachments({ notify }: ExampleProps) {
       <AttachmentCard
         name="Anna portrait.png"
         description="PNG · demo portrait"
-        previewUri="/avatars/anna.png"
+        previewUri={portraits.anna}
         label="Preview portrait"
         onPress={() => notify("Sample portrait preview selected")}
       />
@@ -707,7 +721,7 @@ export function Navigation({ notify }: ExampleProps) {
       />
       <ConversationHeader
         name="Anna Novak"
-        uri="/avatars/anna.png"
+        uri={portraits.anna}
         subtitle="Friends"
         backLabel="Back"
         onBack={() => notify("Back selected")}
@@ -872,7 +886,7 @@ export function Payments() {
       />
       <ActivityRow
         name="Anna Novak"
-        uri="/avatars/anna.png"
+        uri={portraits.anna}
         description="Dinner yesterday"
         amount="−1,250"
         unit="sats"
@@ -895,6 +909,21 @@ export function Payments() {
     </Stack>
   );
 }
-export function ExampleFrame({ children }: { children: ReactNode }) {
-  return <div className="example-frame">{children}</div>;
+interface ExampleFrameProps {
+  children: ReactNode;
+}
+
+export function ExampleFrame({ children }: ExampleFrameProps) {
+  return (
+    <Stack
+      testID="example-frame"
+      gap={0}
+      borderWidth={1}
+      borderColor="$borderColor"
+      borderRadius="$card"
+      overflow="hidden"
+    >
+      {children}
+    </Stack>
+  );
 }

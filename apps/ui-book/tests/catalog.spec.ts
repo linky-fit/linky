@@ -65,7 +65,7 @@ test("search finds exports and clearing restores all groups", async ({
   await page
     .getByRole("textbox", { name: "Find a component" })
     .fill("SelectField");
-  const groups = page.getByRole("navigation", { name: "Component groups" });
+  const groups = page.getByTestId("component-groups");
   await expect(groups.getByRole("button")).toHaveCount(1);
   await groups.getByRole("button", { name: "Fields" }).click();
   await expect(
@@ -87,13 +87,12 @@ test("theme switch changes the rendered canvas and preserves draft", async ({
   await page
     .getByRole("textbox", { name: "Chat message", exact: true })
     .fill("Keep this draft");
-  await expect(page.locator(".book")).toHaveCSS(
+  await expect(page.getByTestId("book")).toHaveCSS(
     "background-color",
     "rgb(2, 6, 23)",
   );
   await page.getByRole("button", { name: "Switch to light theme" }).click();
-  await expect(page.locator(".book")).toHaveAttribute("data-theme", "light");
-  await expect(page.locator(".book")).toHaveCSS(
+  await expect(page.getByTestId("book")).toHaveCSS(
     "background-color",
     "rgb(248, 250, 252)",
   );
@@ -101,7 +100,10 @@ test("theme switch changes the rendered canvas and preserves draft", async ({
     page.getByRole("textbox", { name: "Chat message", exact: true }),
   ).toHaveValue("Keep this draft");
   await page.getByRole("button", { name: "Switch to dark theme" }).click();
-  await expect(page.locator(".book")).toHaveAttribute("data-theme", "dark");
+  await expect(page.getByTestId("book")).toHaveCSS(
+    "background-color",
+    "rgb(2, 6, 23)",
+  );
 });
 
 test("dialog traps keyboard focus, dismisses with Escape, and restores opener", async ({
@@ -135,7 +137,7 @@ test("select updates its label, skips disabled option, and restores focus", asyn
 }) => {
   await page.goto("/");
   await page
-    .getByRole("navigation", { name: "Component groups" })
+    .getByTestId("component-groups")
     .getByRole("button", { name: "Fields", exact: true })
     .click();
   await expect(
@@ -182,7 +184,7 @@ test("message actions disclose reply and reaction callbacks", async ({
 test("disabled and sending composers cannot submit", async ({ page }) => {
   await page.goto("/");
   await page
-    .getByRole("navigation", { name: "Component groups" })
+    .getByTestId("component-groups")
     .getByRole("button", { name: "Messaging", exact: true })
     .click();
   await expect(
@@ -249,7 +251,7 @@ test("mobile and 320px examples stay inside the viewport", async ({ page }) => {
     "Payments & wallet",
   ]) {
     await page
-      .getByRole("navigation", { name: "Component groups" })
+      .getByTestId("component-groups")
       .getByRole("button", { name: group, exact: true })
       .click();
     const fits = await page.evaluate(
@@ -258,7 +260,7 @@ test("mobile and 320px examples stay inside the viewport", async ({ page }) => {
     expect(fits, `${group} should not overflow horizontally`).toBe(true);
   }
   await page
-    .getByRole("navigation", { name: "Component groups" })
+    .getByTestId("component-groups")
     .getByRole("button", { name: "Fields", exact: true })
     .click();
   const amount = page.getByRole("textbox", {
@@ -286,7 +288,7 @@ test("every component group renders without runtime errors", async ({
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  const groups = page.getByRole("navigation", { name: "Component groups" });
+  const groups = page.getByTestId("component-groups");
   for (const name of [
     "In context",
     "Foundations",
@@ -303,7 +305,7 @@ test("every component group renders without runtime errors", async ({
     await expect(
       page.getByRole("heading", { name, exact: true }).first(),
     ).toBeVisible();
-    await expect(page.locator(".example-frame").first()).toBeVisible();
+    await expect(page.getByTestId("example-frame").first()).toBeVisible();
   }
   expect(errors).toEqual([]);
 });
@@ -390,7 +392,7 @@ test("fields and search use their themed borders without browser focus outlines"
 }) => {
   await page.goto("/");
   await page
-    .getByRole("navigation", { name: "Component groups" })
+    .getByTestId("component-groups")
     .getByRole("button", { name: "Fields", exact: true })
     .click();
   const field = page.getByRole("textbox", {
@@ -409,5 +411,70 @@ test("fields and search use their themed borders without browser focus outlines"
   await expect(search.locator("..")).toHaveCSS(
     "border-color",
     "rgb(45, 212, 191)",
+  );
+});
+
+test("bundled assets load and catalog controls fit phone and desktop widths", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await expect(page.getByText("84,250", { exact: true })).toBeVisible();
+  const portrait = page.locator('img[src*="anna."]').first();
+  await expect(portrait).toBeVisible();
+  await expect
+    .poll(() =>
+      portrait.evaluate(
+        (image) =>
+          image instanceof HTMLImageElement &&
+          image.complete &&
+          image.naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => document.fonts.check('16px "Manrope"')))
+    .toBe(true);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const theme = page.getByRole("button", { name: "Switch to light theme" });
+    await expect(theme).toBeInViewport();
+    const frames = page.getByTestId("example-frame");
+    const wallet = await frames.nth(0).boundingBox();
+    const chat = await frames.nth(1).boundingBox();
+    expect(wallet).not.toBeNull();
+    expect(chat).not.toBeNull();
+    if (wallet && chat && width < 1180)
+      expect(chat.y).toBeGreaterThanOrEqual(wallet.y + wallet.height);
+    await expect(page.getByText("84,250", { exact: true })).toHaveCSS(
+      "font-weight",
+      "700",
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`catalog-${width}-dark.png`),
+    });
+    await theme.click();
+    await expect(
+      page.getByRole("button", { name: "Switch to dark theme" }),
+    ).toBeInViewport();
+    await page.screenshot({
+      path: testInfo.outputPath(`catalog-${width}-light.png`),
+    });
+    await page.getByRole("button", { name: "Switch to dark theme" }).click();
+  }
+  await page
+    .getByTestId("component-groups")
+    .getByRole("button", { name: "Foundations", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Exported design tokens", exact: true })
+    .click();
+  await expect(
+    page.getByText('"typography":', { exact: false }).last(),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Hide design tokens", exact: true })
+    .click();
+  await expect(page.getByText('"typography":', { exact: false })).toHaveCount(
+    0,
   );
 });

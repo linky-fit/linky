@@ -81,11 +81,13 @@ Evolu. New occurrences reopen solved issues. See
 
 ### UI book
 
-`bun run ui:dev` opens the component catalog at `http://127.0.0.1:5190`.
+`bun run ui:dev` starts the Expo React Native component catalog. Use `bun run ui:ios`
+or `bun run ui:android` for a simulator/device, or `bun run ui:web` for the browser
+preview at `http://localhost:5190`.
 It previews `@linky/ui` components and wallet/chat compositions in dark and light themes.
 Examples use local state and need no account or Docker services. Run `bun run ui:build`
-to build the catalog.
-See [`apps/ui-book/README.md`](./apps/ui-book/README.md) for browser checks.
+to export iOS, Android, and web bundles.
+See [`apps/ui-book/README.md`](./apps/ui-book/README.md) for setup and checks.
 
 ### linkshu CLI wallet
 

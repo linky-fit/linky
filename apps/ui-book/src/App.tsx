@@ -1,12 +1,28 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  Text as NativeText,
+} from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { useFonts } from "expo-font";
+import { StatusBar } from "expo-status-bar";
 import {
   UIProvider,
   Button,
   EmptyState,
   Icon,
   IconButton,
+  Row,
   SearchField,
   SegmentedControl,
+  Stack,
   Text,
   themes,
   Toast,
@@ -26,96 +42,41 @@ import {
   People,
   WalletExample,
 } from "./examples";
+import { fonts } from "./assets";
+import { sections } from "./sections";
 
-const sections = [
-  {
-    id: "compositions",
-    title: "In context",
-    description: "The approved wallet and chat, composed from the library.",
-    exports:
-      "WalletBalance, PersonShortcut, ActivityRow, DateGroup, ScreenHeader, ConversationHeader, BottomNav, MessageBubble, PaymentMessage, MessageComposer, ChatPaymentAction",
-    code: '<UIProvider mode="dark">\n  <WalletBalance\n    label="Available balance" value="84,250" unit="sats"\n    receiveLabel="Receive" sendLabel="Send"\n    onReceive={openReceive} onSend={openSend}\n  />\n</UIProvider>',
-  },
-  {
-    id: "foundations",
-    title: "Foundations",
-    description:
-      "Manrope, semantic tokens, shared layouts, and the full icon set.",
-    exports:
-      "UIProvider, Stack, Row, Surface, Divider, Text, Icon, icons, palette, themes, space, radius, size, typography, motion, zIndex, breakpoints",
-    code: '<Stack gap="$lg">\n  <Text variant="heading">People and payments</Text>\n  <Surface><Row><Icon name="Wallet" /><Text>Wallet</Text></Row></Surface>\n  <Divider />\n</Stack>',
-  },
-  {
-    id: "controls",
-    title: "Controls",
-    description:
-      "Actions, touch targets, selected filters, disabled and busy states.",
-    exports: "Button, IconButton, Chip, SegmentedControl",
-    code: '<Button icon="Send" loading={sending} loadingLabel="Sending"\n  onPress={send}>Send</Button>\n<Chip selected={selected} onPress={toggle}>Friends</Chip>\n<SegmentedControl label="View" value={view}\n  options={options} onValueChange={setView} />',
-  },
-  {
-    id: "fields",
-    title: "Fields",
-    description:
-      "Controlled input, clearable search, validation, selection, and amounts.",
-    exports: "TextField, SearchField, AmountField, SelectField",
-    code: '<SearchField label="Search people" clearLabel="Clear search"\n  value={query} onChangeText={setQuery} />\n<SelectField label="Group" description="Choose a contact group."\n  closeLabel="Close" value={group} options={groups}\n  onValueChange={setGroup} />',
-  },
-  {
-    id: "people",
-    title: "People & lists",
-    description:
-      "Portraits, initials, unread counts, long names, and quiet list rows.",
-    exports: "Avatar, PersonShortcut, UnreadBadge, ContactRow, ListRow",
-    code: '<ContactRow name="Anna Novak" uri="/avatars/anna.png"\n  preview="Thanks for dinner!" time="12:42"\n  unreadCount={2} unreadLabel="2 unread messages"\n  onPress={openConversation} />',
-  },
-  {
-    id: "messaging",
-    title: "Messaging",
-    description: "Send a local message, reply, react, and stage an attachment.",
-    exports:
-      "MessageBubble, ReplyPreview, Reaction, MessageActions, PaymentMessage, MessageComposer, ChatPaymentAction",
-    code: '<MessageComposer label="Message" value={draft}\n  onChangeText={setDraft} sendLabel="Send message"\n  onSend={send} disabled={offline}\n  attachments={<AttachmentTray items={files} onRemove={remove} />}\n/>',
-  },
-  {
-    id: "attachments",
-    title: "Attachments",
-    description: "Documents, image previews, staged files, and removal.",
-    exports: "AttachmentCard, AttachmentTray",
-    code: '<AttachmentCard name="receipt.pdf" description="PDF · 42 KB"\n  label="Preview receipt" onPress={openPreview} />\n<AttachmentTray items={attachments} onRemove={removeAttachment} />',
-  },
-  {
-    id: "navigation",
-    title: "Navigation",
-    description:
-      "Screen titles, conversation identity, and floating navigation content.",
-    exports: "ScreenHeader, ConversationHeader, BottomNav",
-    code: '<ScreenHeader title="Wallet" trailing={settingsAction} />\n<BottomNav label="Main navigation" items={items}\n  value={page} onValueChange={setPage} />',
-  },
-  {
-    id: "feedback",
-    title: "Feedback & dialogs",
-    description:
-      "Empty, loading, offline, error, toast, and keyboard-accessible dialogs.",
-    exports: "Notice, EmptyState, LoadingState, Toast, Dialog, StatusBadge",
-    code: '<Dialog open={open} onOpenChange={setOpen}\n  title="Add a contact" description="Enter their details."\n  closeLabel="Close dialog">\n  <TextField label="Name" value={name} onChangeText={setName} />\n</Dialog>',
-  },
-  {
-    id: "payments",
-    title: "Payments & wallet",
-    description:
-      "Switch outcomes and inspect amounts, transfers, requests, and encoded QR.",
-    exports:
-      "PaymentResult, QRCodeCard, PaymentMessage, ActivityRow, Amount, WalletBalance, SectionHeader, DateGroup, StatusBadge",
-    code: '<PaymentResult state={state} title={title}\n  description={description} amount="1,250" unit="sats" />\n<QRCodeCard value={request} label="Receive request QR code" />',
-  },
-];
 export function App() {
+  const [loaded, error] = useFonts(fonts);
+  return (
+    <SafeAreaProvider>
+      {loaded ? (
+        <Catalog />
+      ) : (
+        <SafeAreaView style={styles.loading}>
+          {error ? (
+            <NativeText accessibilityRole="alert">
+              Could not load the catalog fonts. Restart the preview to try
+              again.
+            </NativeText>
+          ) : (
+            <ActivityIndicator accessibilityLabel="Loading catalog" />
+          )}
+        </SafeAreaView>
+      )}
+    </SafeAreaProvider>
+  );
+}
+
+function Catalog() {
   const [mode, setMode] = useState<ColorMode>("dark");
   const [selected, setSelected] = useState("compositions");
   const [query, setQuery] = useState("");
   const [width, setWidth] = useState("comfortable");
   const [notification, setNotification] = useState("");
+  const { width: windowWidth } = useWindowDimensions();
+  const compact = windowWidth < 700;
+  const narrow = width === "narrow";
+  const content = useRef<ScrollView>(null);
   const current =
     sections.find((section) => section.id === selected) ?? sections[0];
   const matches = sections.filter((section) =>
@@ -124,180 +85,326 @@ export function App() {
       .includes(query.toLowerCase()),
   );
   const colors = themes[mode];
-  const shellStyle = {
-    color: colors.color,
-    backgroundColor: colors.background,
-    "--book-background": colors.background,
-    "--book-surface": colors.surface,
-    "--book-border": colors.borderColor,
-    "--book-muted": colors.muted,
-    "--book-accent": colors.accent,
-    "--book-selected": colors.accentSoft,
+  const chooseSection = (id: string) => {
+    setSelected(id);
+    content.current?.scrollTo({ y: 0, animated: false });
   };
+
   return (
     <UIProvider mode={mode}>
-      <div className="book" data-theme={mode} style={shellStyle}>
-        <a className="skip-link" href="#preview">
-          Skip to preview
-        </a>
-        <aside className="book-sidebar">
-          <div className="book-brand">
-            <Icon name="Wallet" color="$accent" size={26} />
-            <Text variant="title">Linky</Text>
-            <Text variant="caption" muted>
-              UI next
-            </Text>
-          </div>
-          <SearchField
-            label="Find a component"
-            placeholder="Find a component…"
-            clearLabel="Clear component search"
-            value={query}
-            onChangeText={setQuery}
-          />
-          <nav aria-label="Component groups">
-            {matches.map((section) => (
-              <button
-                key={section.id}
-                className="nav-link"
-                aria-current={selected === section.id ? "page" : undefined}
-                onClick={() => setSelected(section.id)}
-              >
-                <span>{section.title}</span>
-                <Icon name="ChevronRight" size={14} color="$muted" />
-              </button>
-            ))}
-            {matches.length === 0 && (
-              <p className="muted small">No matching components.</p>
-            )}
-          </nav>
-          <div className="sidebar-note">
-            <Text variant="caption" muted>
-              Built with @linky/ui
-            </Text>
-            <Text variant="caption" muted>
-              Tamagui · Manrope
-            </Text>
-            <Text variant="caption" muted>
-              Fictional sample data. No services.
-            </Text>
-          </div>
-        </aside>
-        <main id="preview" className="book-main">
-          <header className="book-toolbar">
-            <Text variant="label" muted>
-              Component library
-            </Text>
-            <div className="toolbar-controls">
-              <SegmentedControl
-                label="Preview width"
-                value={width}
-                onValueChange={setWidth}
-                options={[
-                  { value: "comfortable", label: "Comfortable" },
-                  { value: "narrow", label: "Narrow · 320px" },
-                ]}
-              />
-              <IconButton
-                icon={mode === "dark" ? "Sun" : "Moon"}
-                label={
-                  mode === "dark"
-                    ? "Switch to light theme"
-                    : "Switch to dark theme"
-                }
-                onPress={() => setMode(mode === "dark" ? "light" : "dark")}
-              />
-            </div>
-          </header>
-          <div className="book-content">
-            <div className="section-heading">
-              <h1>{current.title}</h1>
-              <p>{current.description}</p>
-            </div>
-            <p className="sample-note">
-              Interactive examples · fictional people and payments
-            </p>
-            <div
-              className={`preview-area ${width === "narrow" ? "is-narrow" : ""}`}
+      <SafeAreaView
+        testID="book"
+        style={[styles.shell, { backgroundColor: colors.background }]}
+      >
+        <StatusBar style={mode === "dark" ? "light" : "dark"} />
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={[styles.flex, !compact && styles.horizontal]}>
+            <View
+              style={[
+                styles.sidebar,
+                compact ? styles.compactSidebar : styles.wideSidebar,
+                { borderColor: colors.borderColor },
+              ]}
             >
-              {query && matches.length === 0 ? (
-                <EmptyState
-                  title="No components found"
-                  description="Try searching for a component name, such as Button or Dialog."
-                  icon="Search"
-                  action={
-                    <Button onPress={() => setQuery("")}>Clear search</Button>
-                  }
-                />
-              ) : selected === "compositions" ? (
-                <div className="composition-grid">
-                  <section className="composition">
-                    <h2>Wallet</h2>
-                    <ExampleFrame>
-                      <WalletExample notify={setNotification} />
-                    </ExampleFrame>
-                  </section>
-                  <section className="composition">
-                    <h2>Conversation</h2>
-                    <ExampleFrame>
-                      <ChatExample notify={setNotification} />
-                    </ExampleFrame>
-                  </section>
-                </div>
-              ) : (
-                <section className="single-example">
-                  <ExampleFrame>
-                    <div className="component-padding">
-                      {selected === "foundations" && <Foundations />}
-                      {selected === "controls" && (
-                        <Controls notify={setNotification} />
-                      )}
-                      {selected === "fields" && <Fields />}
-                      {selected === "people" && (
-                        <People notify={setNotification} />
-                      )}
-                      {selected === "messaging" && (
-                        <Messaging notify={setNotification} />
-                      )}
-                      {selected === "attachments" && (
-                        <Attachments notify={setNotification} />
-                      )}
-                      {selected === "navigation" && (
-                        <Navigation notify={setNotification} />
-                      )}
-                      {selected === "feedback" && (
-                        <Feedback notify={setNotification} />
-                      )}
-                      {selected === "payments" && <Payments />}
-                    </div>
-                  </ExampleFrame>
-                </section>
+              <Row>
+                <Icon name="Wallet" color="$accent" size={26} />
+                <Text variant="title">Linky</Text>
+                <Text variant="caption" muted marginLeft="auto">
+                  UI next
+                </Text>
+              </Row>
+              <SearchField
+                label="Find a component"
+                placeholder="Find a component…"
+                clearLabel="Clear component search"
+                value={query}
+                onChangeText={setQuery}
+              />
+              <ScrollView
+                horizontal={compact}
+                style={!compact && styles.flex}
+                contentContainerStyle={{ gap: 5 }}
+                keyboardShouldPersistTaps="handled"
+                testID="component-groups"
+                accessibilityLabel="Component groups"
+              >
+                {matches.map((section) => (
+                  <Pressable
+                    key={section.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: selected === section.id }}
+                    onPress={() => chooseSection(section.id)}
+                    style={({ pressed }) => [
+                      styles.navLink,
+                      {
+                        backgroundColor:
+                          selected === section.id
+                            ? colors.accentSoft
+                            : pressed
+                              ? colors.surface
+                              : "transparent",
+                      },
+                    ]}
+                  >
+                    <Text
+                      variant="label"
+                      color={selected === section.id ? "$accent" : "$muted"}
+                    >
+                      {section.title}
+                    </Text>
+                    <Icon name="ChevronRight" size={14} color="$muted" />
+                  </Pressable>
+                ))}
+                {matches.length === 0 && (
+                  <Text variant="caption" muted>
+                    No matching components.
+                  </Text>
+                )}
+              </ScrollView>
+              {!compact && (
+                <Stack gap="$sm" padding="$sm">
+                  <Text variant="caption" muted>
+                    Built with @linky/ui
+                  </Text>
+                  <Text variant="caption" muted>
+                    Tamagui · Manrope
+                  </Text>
+                  <Text variant="caption" muted>
+                    Fictional sample data. No services.
+                  </Text>
+                </Stack>
               )}
-            </div>
-            <section className="usage">
-              <h2>Use these components</h2>
-              <p className="export-list">{current.exports}</p>
-              <pre>
-                <code>{`import { ${Array.from(new Set(Array.from(current.code.matchAll(/<([A-Z]\w*)/g), (match) => match[1]))).join(", ")} } from "@linky/ui";\n\n${current.code}`}</code>
-              </pre>
-              <p>
-                Examples use local React state. Apps provide translated labels,
-                formatted values, and action handlers. Open the package README
-                for the ownership and platform notes.
-              </p>
-            </section>
-          </div>
-        </main>
-        {notification && (
-          <div className="book-toast">
-            <Toast
-              message={notification}
-              dismissLabel="Dismiss notification"
-              onDismiss={() => setNotification("")}
-            />
-          </div>
-        )}
-      </div>
+            </View>
+            <ScrollView
+              ref={content}
+              style={styles.flex}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={styles.mainContent}
+            >
+              <Row
+                padding={compact ? "$md" : "$lg"}
+                flexWrap="wrap"
+                justifyContent="space-between"
+                borderBottomWidth={1}
+                borderColor="$borderColor"
+              >
+                {!compact && (
+                  <Text variant="label" muted>
+                    Component library
+                  </Text>
+                )}
+                <Row
+                  flex={compact ? 1 : undefined}
+                  justifyContent="space-between"
+                  gap="$sm"
+                >
+                  <Stack flex={1}>
+                    <SegmentedControl
+                      label="Preview width"
+                      value={width}
+                      onValueChange={setWidth}
+                      options={[
+                        { value: "comfortable", label: "Comfortable" },
+                        { value: "narrow", label: "Narrow · 320px" },
+                      ]}
+                    />
+                  </Stack>
+                  <IconButton
+                    icon={mode === "dark" ? "Sun" : "Moon"}
+                    label={
+                      mode === "dark"
+                        ? "Switch to light theme"
+                        : "Switch to dark theme"
+                    }
+                    onPress={() => setMode(mode === "dark" ? "light" : "dark")}
+                  />
+                </Row>
+              </Row>
+              <Stack
+                padding={compact ? "$md" : "$xl"}
+                gap="$xl"
+                width="100%"
+                maxWidth={1240}
+                alignSelf="center"
+              >
+                <Stack gap="$md">
+                  <Text role="heading" variant="heading">
+                    {current.title}
+                  </Text>
+                  <Text muted>{current.description}</Text>
+                </Stack>
+                <Text variant="caption" muted>
+                  Interactive examples · fictional people and payments
+                </Text>
+                {query && matches.length === 0 ? (
+                  <EmptyState
+                    title="No components found"
+                    description="Try searching for a component name, such as Button or Dialog."
+                    icon="Search"
+                    action={
+                      <Button onPress={() => setQuery("")}>Clear search</Button>
+                    }
+                  />
+                ) : selected === "compositions" ? (
+                  <View
+                    style={[
+                      styles.compositions,
+                      windowWidth >= 1180 && styles.horizontal,
+                    ]}
+                  >
+                    <Stack
+                      flex={windowWidth >= 1180 ? 1 : undefined}
+                      maxWidth={
+                        narrow ? 320 : windowWidth < 1180 ? 460 : undefined
+                      }
+                      width="100%"
+                    >
+                      <Text role="heading" variant="caption" muted>
+                        Wallet
+                      </Text>
+                      <ExampleFrame>
+                        <WalletExample notify={setNotification} />
+                      </ExampleFrame>
+                    </Stack>
+                    <Stack
+                      flex={windowWidth >= 1180 ? 1 : undefined}
+                      maxWidth={
+                        narrow ? 320 : windowWidth < 1180 ? 460 : undefined
+                      }
+                      width="100%"
+                    >
+                      <Text role="heading" variant="caption" muted>
+                        Conversation
+                      </Text>
+                      <ExampleFrame>
+                        <ChatExample notify={setNotification} />
+                      </ExampleFrame>
+                    </Stack>
+                  </View>
+                ) : (
+                  <Stack maxWidth={narrow ? 320 : 750} width="100%">
+                    <ExampleFrame>
+                      <Stack padding={narrow ? "$sm" : compact ? "$md" : "$lg"}>
+                        {selected === "foundations" && <Foundations />}
+                        {selected === "controls" && (
+                          <Controls notify={setNotification} />
+                        )}
+                        {selected === "fields" && <Fields />}
+                        {selected === "people" && (
+                          <People notify={setNotification} />
+                        )}
+                        {selected === "messaging" && (
+                          <Messaging notify={setNotification} />
+                        )}
+                        {selected === "attachments" && (
+                          <Attachments notify={setNotification} />
+                        )}
+                        {selected === "navigation" && (
+                          <Navigation notify={setNotification} />
+                        )}
+                        {selected === "feedback" && (
+                          <Feedback notify={setNotification} />
+                        )}
+                        {selected === "payments" && <Payments />}
+                      </Stack>
+                    </ExampleFrame>
+                  </Stack>
+                )}
+                <Stack
+                  paddingTop="$xl"
+                  borderTopWidth={1}
+                  borderColor="$borderColor"
+                >
+                  <Text role="heading" variant="label">
+                    Use these components
+                  </Text>
+                  <Text variant="caption" muted>
+                    {current.exports}
+                  </Text>
+                  <Stack
+                    padding="$lg"
+                    backgroundColor="$surface"
+                    borderRadius="$control"
+                  >
+                    <NativeText
+                      selectable
+                      style={{
+                        color: colors.color,
+                        fontFamily:
+                          Platform.OS === "ios" ? "Menlo" : "monospace",
+                        fontSize: 12,
+                        lineHeight: 22,
+                      }}
+                    >
+                      {`import { ${Array.from(new Set(Array.from(current.code.matchAll(/<([A-Z]\w*)/g), (match) => match[1]))).join(", ")} } from "@linky/ui";\n\n${current.code}`}
+                    </NativeText>
+                  </Stack>
+                  <Text variant="caption" muted>
+                    Examples use local React state. Apps provide translated
+                    labels, formatted values, and action handlers. Open the
+                    package README for the ownership and platform notes.
+                  </Text>
+                </Stack>
+              </Stack>
+            </ScrollView>
+          </View>
+          {notification && (
+            <View style={styles.toast}>
+              <Toast
+                message={notification}
+                dismissLabel="Dismiss notification"
+                onDismiss={() => setNotification("")}
+              />
+            </View>
+          )}
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </UIProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  flex: { flex: 1, minWidth: 0 },
+  shell: { flex: 1 },
+  loading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  horizontal: { flexDirection: "row" },
+  sidebar: { gap: 24 },
+  wideSidebar: { width: 258, padding: 20, paddingTop: 30, borderRightWidth: 1 },
+  compactSidebar: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 12,
+    borderBottomWidth: 1,
+  },
+  navLink: {
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  mainContent: { paddingBottom: 48 },
+  compositions: { gap: 30, alignItems: "flex-start" },
+  toast: {
+    position: "absolute",
+    right: 16,
+    bottom: 16,
+    left: 16,
+    maxWidth: 440,
+    marginLeft: "auto",
+    zIndex: 1000,
+  },
+});
