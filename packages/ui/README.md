@@ -37,12 +37,12 @@ Load Manrope before rendering. Web can load `@fontsource/manrope` weights 400, 6
 | Area        | Exports                                                                                                   | Demo patterns                                                                       |
 | ----------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | Foundations | UIProvider, Stack, Row, Surface, Divider, Text, Icon                                                      | Theme roles, typography, flat surfaces, Lucide icons                                |
-| Controls    | Button, IconButton, Chip, SegmentedControl                                                                | Primary, secondary, ghost, destructive, busy, disabled, filters, appearance         |
+| Controls    | Button, IconButton, Chip, Checkbox, SegmentedControl                                                      | Primary, secondary, ghost, destructive, busy, disabled, filters, appearance         |
 | Fields      | TextField, SearchField, AmountField, SelectField                                                          | Labels, hints, errors, multiline input, search clear, amount entry, group selection |
 | People      | Avatar, PersonShortcut, UnreadBadge, ContactRow, ListRow                                                  | Portraits and initials, recent people, conversations, settings rows                 |
 | Wallet      | Amount, WalletBalance, ActivityRow, SectionHeader, DateGroup, StatusBadge                                 | Balance actions, dated activity, completed/pending/failed states                    |
 | Chat        | MessageBubble, ReplyPreview, Reaction, MessageActions, PaymentMessage, MessageComposer, ChatPaymentAction | Both directions, metadata, replies, reactions, payment/request cards, composing     |
-| Attachments | AttachmentCard, AttachmentTray                                                                            | Image/document preview, controlled staged files and removal                         |
+| Attachments | AttachmentCard, AttachmentTray, ImagePreview                                                              | Image/document preview, controlled staged files and removal                         |
 | Navigation  | ScreenHeader, ConversationHeader, BottomNav                                                               | Centered titles, chat headers, floating navigation content                          |
 | Feedback    | Notice, EmptyState, LoadingState, Toast, Dialog                                                           | Offline/error feedback, empty lists, loading, dismissal, modal focus                |
 | Payments    | PaymentResult, QRCodeCard                                                                                 | Distinct outcomes, encoded receive requests, action slots                           |
@@ -76,3 +76,7 @@ bun run --filter @linky/ui test
 The preview book imports these exports directly and runs with local example state, without Linky services.
 
 `ChatPaymentAction` reproduces the composer’s Request and Pay pills. Pass `kind="request"` or `kind="pay"`, a translated label as children, and `onPress`. Place these in `MessageComposer.paymentActions`. The composer uses its outer teal border for input focus. Enter sends; Shift+Enter inserts a newline, and IME composition does not submit.
+
+`Checkbox` takes `label`, `checked`, `onCheckedChange`, and optional `disabled`. The full row toggles the controlled value and exposes checkbox semantics on web and native. The Controls catalog includes interactive, disabled checked, and disabled unchecked examples.
+
+`ImagePreview` takes `uri` and `label` and fits the entire image inside its container without cropping. Use it in a dialog for attachment inspection. The Attachments catalog includes a full-image example. `Icon` also includes `Link` and `Share2`.

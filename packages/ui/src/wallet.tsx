@@ -75,6 +75,7 @@ export function WalletBalance({
           <Button
             variant="ghost"
             onPress={onAmountPress}
+            padding={0}
             aria-label={amountLabel ?? label}
           >
             {amount}

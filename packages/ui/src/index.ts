@@ -103,3 +103,7 @@ export {
 export type { ColorMode, Tone } from "./tokens";
 export { SelectField } from "./select-field";
 export type { SelectFieldProps, SelectOption } from "./select-field";
+export { Checkbox } from "./checkbox";
+export type { CheckboxProps } from "./checkbox";
+export { ImagePreview } from "./image-preview";
+export type { ImagePreviewProps } from "./image-preview";

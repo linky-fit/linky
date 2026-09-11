@@ -11,6 +11,8 @@ import {
   BottomNav,
   Button,
   Chip,
+  Checkbox,
+  ImagePreview,
   ContactRow,
   ConversationHeader,
   DateGroup,
@@ -349,9 +351,6 @@ export function Foundations() {
     "message",
     "metadata",
   ];
-  const iconNames = Object.keys(icons).filter(
-    (name): name is IconName => name in icons,
-  );
   return (
     <Stack>
       {variants.map((variant) => (
@@ -376,17 +375,6 @@ export function Foundations() {
           <Text muted>Vertical content</Text>
         </Stack>
       </Surface>
-      <SectionHeader title="Icon inventory" />
-      <Row flexWrap="wrap" gap="$lg">
-        {iconNames.map((name) => (
-          <Stack key={name} width={104} alignItems="center" gap="$sm">
-            <Icon name={name} />
-            <Text variant="caption" muted>
-              {name}
-            </Text>
-          </Stack>
-        ))}
-      </Row>
       <SectionHeader title="Palette" />
       <Row flexWrap="wrap" gap="$md">
         {Object.entries(palette).map(([name, color]) => (
@@ -433,11 +421,54 @@ export function Foundations() {
     </Stack>
   );
 }
+interface IconsProps {
+  query: string;
+}
+
+export function Icons({ query }: IconsProps) {
+  const iconNames = Object.keys(icons).filter(
+    (name): name is IconName => name in icons,
+  );
+  const matches = iconNames.filter((name) =>
+    name.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+  const visible = matches.length ? matches : iconNames;
+  return (
+    <Row flexWrap="wrap" gap="$lg">
+      {visible.map((name) => (
+        <Stack key={name} width={104} alignItems="center" gap="$sm">
+          <Icon name={name} />
+          <Text variant="caption">{name}</Text>
+        </Stack>
+      ))}
+    </Row>
+  );
+}
+
 export function Controls({ notify }: ExampleProps) {
+  const [checked, setChecked] = useState(false);
   const [filter, setFilter] = useState("All");
   const [segment, setSegment] = useState("personal");
   return (
     <Stack>
+      <SectionHeader title="Checkbox" />
+      <Checkbox
+        label="Offline preview"
+        checked={checked}
+        onCheckedChange={setChecked}
+      />
+      <Checkbox
+        label="Disabled unchecked"
+        checked={false}
+        disabled
+        onCheckedChange={() => {}}
+      />
+      <Checkbox
+        label="Disabled checked"
+        checked
+        disabled
+        onCheckedChange={() => {}}
+      />
       <Row flexWrap="wrap">
         {["primary", "secondary", "ghost", "danger"].map((variant) => {
           if (
@@ -681,6 +712,8 @@ export function Attachments({ notify }: ExampleProps) {
   ]);
   return (
     <Stack>
+      <SectionHeader title="ImagePreview" />
+      <ImagePreview uri={portraits.anna} label="Full portrait of Anna" />
       <AttachmentCard
         name="Dinner receipt.pdf"
         description="PDF · 42 KB · sample file"

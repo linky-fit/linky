@@ -28,12 +28,12 @@ export function AttachmentCard({
       <Stack gap="$sm" flex={1}>
         {previewUri ? (
           <Image
-            source={{ uri: previewUri }}
+            src={previewUri}
             width="100%"
             height={180}
             objectFit="cover"
             borderRadius="$sm"
-            accessibilityLabel={name}
+            alt={name}
           />
         ) : null}
         <Row>
@@ -79,12 +79,12 @@ export function AttachmentTray({ items, onRemove }: AttachmentTrayProps) {
           >
             {item.previewUri ? (
               <Image
-                source={{ uri: item.previewUri }}
+                src={item.previewUri}
                 width={30}
                 height={30}
                 objectFit="cover"
                 borderRadius="$sm"
-                accessibilityLabel=""
+                alt=""
               />
             ) : (
               <Icon name="FileText" size={16} color="$muted" />

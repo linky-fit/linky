@@ -10,19 +10,25 @@ export const sections = [
   {
     id: "foundations",
     title: "Foundations",
-    description:
-      "Manrope, semantic tokens, shared layouts, and the full icon set.",
+    description: "Manrope, semantic tokens, and shared layouts.",
     exports:
       "UIProvider, Stack, Row, Surface, Divider, Text, Icon, icons, palette, themes, space, radius, size, typography, motion, zIndex, breakpoints",
     code: '<Stack gap="$lg">\n  <Text variant="heading">People and payments</Text>\n  <Surface><Row><Icon name="Wallet" /><Text>Wallet</Text></Row></Surface>\n  <Divider />\n</Stack>',
+  },
+  {
+    id: "icons",
+    title: "Icons",
+    description: "The full icon set. Search by name, such as Link or Share2.",
+    exports: "Icon, icons",
+    code: '<Icon name="Link" />\n<Icon name="Share2" />',
   },
   {
     id: "controls",
     title: "Controls",
     description:
       "Actions, touch targets, selected filters, disabled and busy states.",
-    exports: "Button, IconButton, Chip, SegmentedControl",
-    code: '<Button icon="Send" loading={sending} loadingLabel="Sending"\n  onPress={send}>Send</Button>\n<Chip selected={selected} onPress={toggle}>Friends</Chip>\n<SegmentedControl label="View" value={view}\n  options={options} onValueChange={setView} />',
+    exports: "Button, IconButton, Chip, Checkbox, SegmentedControl",
+    code: '<Button icon="Send" loading={sending} loadingLabel="Sending"\n  onPress={send}>Send</Button>\n<Chip selected={selected} onPress={toggle}>Friends</Chip>\n<Checkbox label="Offline" checked={offline} onCheckedChange={setOffline} />\n<SegmentedControl label="View" value={view}\n  options={options} onValueChange={setView} />',
   },
   {
     id: "fields",
@@ -52,8 +58,8 @@ export const sections = [
     id: "attachments",
     title: "Attachments",
     description: "Documents, image previews, staged files, and removal.",
-    exports: "AttachmentCard, AttachmentTray",
-    code: '<AttachmentCard name="receipt.pdf" description="PDF · 42 KB"\n  label="Preview receipt" onPress={openPreview} />\n<AttachmentTray items={attachments} onRemove={removeAttachment} />',
+    exports: "AttachmentCard, AttachmentTray, ImagePreview",
+    code: '<AttachmentCard name="receipt.pdf" description="PDF · 42 KB"\n  label="Preview receipt" onPress={openPreview} />\n<AttachmentTray items={attachments} onRemove={removeAttachment} />\n<ImagePreview uri={imageUri} label="Full attachment" />',
   },
   {
     id: "navigation",

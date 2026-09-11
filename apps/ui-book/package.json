@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "expo start --port 5190",
     "build": "tsc --noEmit && expo export --platform all",
-    "preview": "serve dist --listen tcp://127.0.0.1:5192",
+    "preview": "serve -s dist --listen tcp://127.0.0.1:5192",
     "typecheck": "tsc --noEmit",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
@@ -20,6 +20,8 @@
     "@linky/ui": "workspace:*",
     "expo": "~57.0.21",
     "expo-asset": "~57.0.16",
+    "expo-clipboard": "~57.0.1",
+    "expo-document-picker": "~57.0.1",
     "expo-font": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",

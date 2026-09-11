@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,7 +11,6 @@ import {
   Text as NativeText,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import {
   UIProvider,
@@ -19,6 +18,7 @@ import {
   EmptyState,
   Icon,
   IconButton,
+  icons,
   Row,
   SearchField,
   SegmentedControl,
@@ -36,21 +36,31 @@ import {
   Feedback,
   Fields,
   Foundations,
+  Icons,
   Messaging,
   Navigation,
   Payments,
   People,
   WalletExample,
 } from "./examples";
-import { fonts } from "./assets";
+import { useBookFonts } from "./useBookFonts";
 import { sections } from "./sections";
+import { Demo } from "./demo/Demo";
+import { useRoute } from "./route";
 
 export function App() {
-  const [loaded, error] = useFonts(fonts);
+  const [loaded, error] = useBookFonts();
+  const [route, navigate] = useRoute();
   return (
     <SafeAreaProvider>
       {loaded ? (
-        <Catalog />
+        route === "/demo" ||
+        route.startsWith("/demo#") ||
+        route === "/demo/" ? (
+          <Demo route={route} navigate={navigate} />
+        ) : (
+          <Catalog openDemo={() => navigate("/demo")} />
+        )
       ) : (
         <SafeAreaView style={styles.loading}>
           {error ? (
@@ -67,9 +77,13 @@ export function App() {
   );
 }
 
-function Catalog() {
+interface CatalogProps {
+  openDemo: () => void;
+}
+
+function Catalog({ openDemo }: CatalogProps) {
   const [mode, setMode] = useState<ColorMode>("dark");
-  const [selected, setSelected] = useState("compositions");
+  const [selectedGroup, setSelected] = useState("compositions");
   const [query, setQuery] = useState("");
   const [width, setWidth] = useState("comfortable");
   const [notification, setNotification] = useState("");
@@ -77,13 +91,20 @@ function Catalog() {
   const compact = windowWidth < 700;
   const narrow = width === "narrow";
   const content = useRef<ScrollView>(null);
+  const matches = sections.filter((section) =>
+    `${section.title} ${section.exports} ${section.id === "icons" ? Object.keys(icons).join(" ") : ""}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
+  );
+  const selected =
+    query.trim() && !matches.some((section) => section.id === selectedGroup)
+      ? (matches[0]?.id ?? selectedGroup)
+      : selectedGroup;
   const current =
     sections.find((section) => section.id === selected) ?? sections[0];
-  const matches = sections.filter((section) =>
-    `${section.title} ${section.exports}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
+  useEffect(() => {
+    content.current?.scrollTo({ y: 0, animated: false });
+  }, [selected, query]);
   const colors = themes[mode];
   const chooseSection = (id: string) => {
     setSelected(id);
@@ -116,6 +137,13 @@ function Catalog() {
                   UI next
                 </Text>
               </Row>
+              <Button
+                variant="secondary"
+                icon="ArrowUpRight"
+                onPress={openDemo}
+              >
+                Open demo app
+              </Button>
               <SearchField
                 label="Find a component"
                 placeholder="Find a component…"
@@ -290,6 +318,7 @@ function Catalog() {
                     <ExampleFrame>
                       <Stack padding={narrow ? "$sm" : compact ? "$md" : "$lg"}>
                         {selected === "foundations" && <Foundations />}
+                        {selected === "icons" && <Icons query={query} />}
                         {selected === "controls" && (
                           <Controls notify={setNotification} />
                         )}

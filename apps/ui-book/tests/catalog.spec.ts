@@ -72,7 +72,7 @@ test("search finds exports and clearing restores all groups", async ({
     page.getByRole("button", { name: "Contact group: Friends" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Clear component search" }).click();
-  await expect(groups.getByRole("button")).toHaveCount(10);
+  await expect(groups.getByRole("button")).toHaveCount(11);
   await page.getByRole("textbox", { name: "Search people" }).fill("Anna");
   await page.getByRole("button", { name: "Clear people search" }).click();
   await expect(
@@ -292,6 +292,7 @@ test("every component group renders without runtime errors", async ({
   for (const name of [
     "In context",
     "Foundations",
+    "Icons",
     "Controls",
     "Fields",
     "People & lists",
@@ -477,4 +478,32 @@ test("bundled assets load and catalog controls fit phone and desktop widths", as
   await expect(page.getByText('"typography":', { exact: false })).toHaveCount(
     0,
   );
+});
+
+test("search opens named component and icon previews without a second click", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const search = page.getByRole("textbox", { name: "Find a component" });
+  await search.fill("Checkbox");
+  await expect(
+    page.getByRole("heading", { name: "Checkbox", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "Offline preview", exact: true }),
+  ).toBeVisible();
+  await search.fill("ImagePreview");
+  await expect(
+    page.getByRole("heading", { name: "ImagePreview", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Full portrait of Anna" }),
+  ).toBeVisible();
+  for (const name of ["Link", "Share2"]) {
+    await search.fill(name);
+    await expect(
+      page.getByRole("heading", { name: "Icons", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+  }
 });

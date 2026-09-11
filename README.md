@@ -87,6 +87,8 @@ preview at `http://localhost:5190`.
 It previews `@linky/ui` components and wallet/chat compositions in dark and light themes.
 Examples use local state and need no account or Docker services. Run `bun run ui:build`
 to export iOS, Android, and web bundles.
+Open `/demo` in the web preview, or choose **Open demo app** in the catalog, to click through the redesign with fictional contacts, messages, and payments.
+
 See [`apps/ui-book/README.md`](./apps/ui-book/README.md) for setup and checks.
 
 ### linkshu CLI wallet
