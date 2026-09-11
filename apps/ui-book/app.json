@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Linky UI Book",
+    "slug": "linky-ui-book",
+    "version": "0.1.0",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "fit.linky.uibook"
+    },
+    "android": {
+      "package": "fit.linky.uibook"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}

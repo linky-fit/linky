@@ -1,0 +1,48 @@
+{
+  "name": "@linky/ui",
+  "version": "0.1.0",
+  "private": true,
+  "license": "0BSD",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts",
+    "./tokens": "./src/tokens.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "eslint": "eslint --fix .",
+    "prettier": "prettier --write .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "tamagui": "2.7.7",
+    "lucide-react-native": "^1.44.0",
+    "react-native-qrcode-svg": "^6.3.24"
+  },
+  "peerDependencies": {
+    "react": ">=19.2.3 <20",
+    "react-native": ">=0.86 <0.88",
+    "react-native-svg": ">=15.15.4 <16",
+    "react-dom": ">=19.2.3 <20"
+  },
+  "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@linky/config": "workspace:*",
+    "@types/react": "^19.1.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "typescript": "~5.9.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-svg": "15.15.4",
+    "vitest": "^4.0.18"
+  },
+  "prettier": "@linky/config/prettier"
+}

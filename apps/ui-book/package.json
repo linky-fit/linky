@@ -1,0 +1,46 @@
+{
+  "name": "@linky/ui-book",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "expo start --port 5190",
+    "build": "tsc --noEmit && expo export --platform all",
+    "preview": "serve -s dist --listen tcp://127.0.0.1:5192",
+    "typecheck": "tsc --noEmit",
+    "eslint": "eslint --fix .",
+    "prettier": "prettier --write .",
+    "test:e2e": "playwright test",
+    "android": "expo start --android --port 5190",
+    "ios": "expo start --ios --port 5190",
+    "web": "expo start --web --port 5190",
+    "build:web": "tsc --noEmit && expo export --platform web"
+  },
+  "dependencies": {
+    "@linky/ui": "workspace:*",
+    "expo": "~57.0.21",
+    "expo-asset": "~57.0.16",
+    "expo-clipboard": "~57.0.1",
+    "expo-document-picker": "~57.0.1",
+    "expo-font": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": {
+    "@linky/config": "workspace:*",
+    "@playwright/test": "^1.58.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.1.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "serve": "^14.2.4",
+    "typescript": "~6.0.3"
+  },
+  "prettier": "@linky/config/prettier",
+  "main": "index.ts"
+}
