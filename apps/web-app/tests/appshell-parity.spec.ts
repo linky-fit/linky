@@ -454,3 +454,79 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
   });
   errors.assertClean();
 });
+
+test("keeps the composer visible on the first keyboard opening when iOS temporarily shrinks innerHeight", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 647 });
+  await setAuthenticatedStorage(page);
+  await createContactAndOpenChat(page);
+  const editor = page.locator('[data-guide="chat-input"]');
+  const composer = page.locator(".chat-compose");
+  await editor.fill("First keyboard opening");
+
+  // Replay the iOS SE standalone measurements: innerHeight briefly equals
+  // visualViewport.height, but fixed elements still use the full layout height.
+  // Deliver the resize after the focus retries to cover a cold keyboard start.
+  await page.evaluate(async () => {
+    await new Promise((resolve) => window.setTimeout(resolve, 450));
+    const viewport = window.visualViewport;
+    if (!viewport) throw new Error("Visual viewport is unavailable");
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 319,
+    });
+    Object.defineProperty(viewport, "height", {
+      configurable: true,
+      value: 319,
+    });
+    viewport.dispatchEvent(new Event("resize"));
+    await new Promise(requestAnimationFrame);
+    Object.defineProperty(window, "innerHeight", {
+      configurable: true,
+      value: 647,
+    });
+  });
+
+  const expectAboveKeyboard = async () => {
+    for (const element of [editor, composer]) {
+      await expect
+        .poll(() =>
+          element.evaluate((node) => node.getBoundingClientRect().top),
+        )
+        .toBeGreaterThanOrEqual(0);
+      await expect
+        .poll(() =>
+          element.evaluate((node) => node.getBoundingClientRect().bottom),
+        )
+        .toBeLessThanOrEqual(319);
+    }
+  };
+  await expectAboveKeyboard();
+
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport, "height", {
+      configurable: true,
+      value: 647,
+    });
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
+    window.visualViewport?.dispatchEvent(new Event("resize"));
+  });
+  await expect(editor).toHaveText("First keyboard opening");
+  await editor.focus();
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport, "height", {
+      configurable: true,
+      value: 319,
+    });
+    window.visualViewport?.dispatchEvent(new Event("resize"));
+  });
+  await expectAboveKeyboard();
+
+  // Reload to restore native viewport properties before testing layout resize.
+  await page.reload();
+  await editor.focus();
+  await page.setViewportSize({ width: 375, height: 319 });
+  await expectAboveKeyboard();
+});

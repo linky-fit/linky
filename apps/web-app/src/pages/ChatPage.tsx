@@ -971,16 +971,16 @@ const useChatViewport = (
         window.scrollTo(0, 0);
       }
       const viewport = window.visualViewport;
-      const nextHeight = viewport?.height ?? window.innerHeight;
+      // During iOS keyboard animation innerHeight can shrink before the
+      // fixed-position layout viewport does. Measure that viewport directly.
+      const layoutHeight = root.clientHeight;
+      const nextHeight = viewport?.height ?? layoutHeight;
       const nextOffsetTop = viewport?.offsetTop ?? 0;
       const visibleHeight = Math.min(
-        window.innerHeight,
+        layoutHeight,
         Math.max(0, nextHeight + nextOffsetTop),
       );
-      const viewportKeyboardInset = Math.max(
-        0,
-        window.innerHeight - visibleHeight,
-      );
+      const viewportKeyboardInset = Math.max(0, layoutHeight - visibleHeight);
       const rootStyles = getComputedStyle(root);
       const nativeKeyboardInset = Number.parseFloat(
         rootStyles.getPropertyValue("--native-keyboard-inset"),
@@ -998,7 +998,7 @@ const useChatViewport = (
         keyboardCanBeOpen ? viewportKeyboardInset : 0,
         Number.isFinite(nativeKeyboardInset) ? nativeKeyboardInset : 0,
       );
-      const viewportHeight = Math.round(window.innerHeight - keyboardInset);
+      const viewportHeight = Math.round(layoutHeight - keyboardInset);
       const viewportHeightChanged = appliedViewportHeight !== viewportHeight;
 
       if (viewportHeightChanged) {
