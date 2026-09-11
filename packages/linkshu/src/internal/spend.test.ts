@@ -1,122 +1,215 @@
-import { Amount, getEncodedToken } from "@cashu/cashu-ts";
-import {
-  CurrencyUnit,
-  MintUrl,
-  TokenRowId,
-  TokenText,
-  UnixSeconds,
-} from "../domain/primitives";
-import { StoredTokenRow } from "../ports/TokenStore";
-import type { TokenState } from "../token/domain";
-import {
-  collectAcceptedSources,
-  dedupeSourceProofs,
-  partitionByProofState,
-} from "./spend";
+import { Effect, Exit } from "effect";
+import { CurrencyUnit, MintUrl } from "../domain/primitives";
+import { ProofStore } from "../ports/ProofStore";
+import { inMemoryProofStore } from "../ports/inMemoryProofStore";
+import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import type { ProofStateName } from "../testing/fakeWallet";
+import { recordingInspector } from "../testing/inspector";
+import { proofsIn, secretsOf, seedProofs } from "../testing/inventory";
+import { selectSpendableProofs, settleSwap } from "./spend";
+import type { SpendContext } from "./spend";
 
 const mint = MintUrl.make("https://mint.example");
-const otherMint = MintUrl.make("https://other.example");
+const otherMint = "https://other.example";
 const sat = CurrencyUnit.make("sat");
-const keysetHex = "009a1f293253e41e";
 
-const token = (mintUrl: string, entries: Array<[number, string]>): string =>
-  getEncodedToken({
-    mint: mintUrl,
-    unit: "sat",
-    proofs: entries.map(([amount, secret]) => ({
-      id: keysetHex,
-      amount: Amount.from(amount),
-      secret,
-      C: "02" + "ab".repeat(32),
-    })),
+interface HarnessArgs {
+  stateOf?: (secret: string) => ProofStateName;
+  checkStatesError?: unknown;
+}
+
+/** A spend context over fresh in-memory stores; `checked` records every NUT-07 ask. */
+const makeHarness = (args: HarnessArgs = {}) => {
+  const inspector = recordingInspector();
+  const checked: string[][] = [];
+  const wallet = fakeWallet({
+    keysetId: KEYSET_HEX,
+    checkProofsStates: (proofs) => {
+      checked.push(proofs.map((entry) => entry.secret ?? ""));
+      return args.checkStatesError !== undefined
+        ? Promise.reject(args.checkStatesError)
+        : Promise.resolve(
+            proofs.map((entry) => ({
+              Y: entry.secret ?? "",
+              state: args.stateOf?.(entry.secret ?? "") ?? "UNSPENT",
+              witness: null,
+            })),
+          );
+    },
   });
-
-let nextId = 0;
-const row = (tokenText: string, state: TokenState = "accepted") =>
-  new StoredTokenRow({
-    id: TokenRowId.make(`row-${++nextId}`),
-    originalTokenText: TokenText.make(tokenText),
-    tokenText: TokenText.make(tokenText),
-    state,
-    error: null,
-    createdAt: UnixSeconds.make(1),
-  });
-
-describe("collectAcceptedSources", () => {
-  it("keeps only accepted rows decodable at the target mint and unit", () => {
-    const good = row(token(mint, [[4, "a1"]]));
-    const foreign = row(token(otherMint, [[8, "f1"]]));
-    const pending = row(token(mint, [[2, "p1"]]), "pending");
-    const issued = row(token(mint, [[2, "i1"]]), "issued");
-
-    const sources = collectAcceptedSources(
-      [good, foreign, pending, issued],
-      mint,
-      sat,
-      [],
+  const run = <A, E>(
+    program: (ctx: SpendContext) => Effect.Effect<A, E, ProofStore>,
+  ) =>
+    Effect.runPromiseExit(
+      Effect.flatMap(ProofStore, (proofStore) =>
+        program({
+          proofStore,
+          inspector: inspector.service,
+          wallet,
+          mint,
+          unit: sat,
+          reason: "test",
+        }),
+      ).pipe(Effect.provide(inMemoryProofStore)),
     );
-    expect(sources.map((source) => source.row.id)).toEqual([good.id]);
-    expect(sources[0]?.proofs.map((proof) => proof.secret)).toEqual(["a1"]);
+  return { run, checked, events: inspector.events };
+};
+
+const loadAll = Effect.flatMap(ProofStore, (store) => store.loadAll);
+
+describe("selectSpendableProofs", () => {
+  it("offers only available proofs at the mint the mint confirms unspent", async () => {
+    const { run, checked, events } = makeHarness({
+      stateOf: (secret) =>
+        secret === "gone"
+          ? "SPENT"
+          : secret === "locked"
+            ? "PENDING"
+            : "UNSPENT",
+    });
+
+    const exit = await run((ctx) =>
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [
+          proof(4, "ok"),
+          proof(2, "gone"),
+          proof(8, "locked"),
+        ]);
+        yield* seedProofs(mint, [proof(16, "held")], "held");
+        yield* seedProofs(mint, [proof(32, "out")], "handedOut");
+        yield* seedProofs(otherMint, [proof(64, "foreign")]);
+        const selection = yield* selectSpendableProofs(ctx);
+        return { selection, proofs: yield* loadAll };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { selection, proofs } = exit.value;
+    expect(checked).toEqual([["ok", "gone", "locked"]]);
+    expect(secretsOf(selection.spendable)).toEqual(["ok"]);
+    expect(selection.available).toBe(4);
+    // Spent knowledge sticks; a pending proof stays available for later.
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["gone"]);
+    expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
+      "foreign",
+      "locked",
+      "ok",
+    ]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        _tag: "ProofsChanged",
+        mint,
+        from: "available",
+        to: "spent",
+        count: 1,
+        amount: 2,
+        operationId: null,
+        reason: "test",
+      }),
+    ]);
+  });
+
+  it("never asks the mint about an empty pool", async () => {
+    const { run, checked } = makeHarness();
+
+    const exit = await run((ctx) => selectSpendableProofs(ctx));
+
+    expect(exit).toEqual(Exit.succeed({ spendable: [], available: 0 }));
+    expect(checked).toEqual([]);
+  });
+
+  it("surfaces a failed NUT-07 check without touching the inventory", async () => {
+    const { run } = makeHarness({
+      checkStatesError: new TypeError("fetch failed"),
+    });
+
+    const exit = await run((ctx) =>
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [proof(4, "ok")]);
+        const error = yield* Effect.flip(selectSpendableProofs(ctx));
+        return { error, proofs: yield* loadAll };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.error._tag).toBe("MintUnreachable");
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual(["ok"]);
   });
 });
 
-describe("dedupeSourceProofs", () => {
-  it("returns each secret once across rows", () => {
-    const shared = token(mint, [
-      [4, "a1"],
-      [2, "a2"],
+describe("settleSwap", () => {
+  it("stores fresh change, marks consumed inputs spent, and leaves passthrough inputs alone", async () => {
+    const { run, events } = makeHarness();
+
+    const exit = await run((ctx) =>
+      Effect.gen(function* () {
+        const offered = yield* seedProofs(mint, [
+          proof(4, "a1"),
+          proof(2, "a2"),
+          proof(8, "b1"),
+        ]);
+        const outcome = yield* settleSwap(
+          ctx,
+          offered,
+          {
+            keep: [proof(4, "a1"), proof(3, "change")],
+            send: [proof(6, "s1")],
+          },
+          "settle",
+        );
+        return { outcome, proofs: yield* loadAll };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { outcome, proofs } = exit.value;
+    assert(outcome !== null);
+    expect(secretsOf(outcome.freshKeep)).toEqual(["change"]);
+    expect(secretsOf(outcome.consumed)).toEqual(["a2", "b1"]);
+    expect(outcome.keepAmount).toBe(7);
+    expect(secretsOf(proofsIn(proofs, "available"))).toEqual(["a1", "change"]);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["a2", "b1"]);
+    // The send proofs are the caller's to book; settling never stores them.
+    expect(proofs.find((p) => p.secret === "s1")).toBeUndefined();
+    expect(events.map((event) => event._tag)).toEqual([
+      "ProofsChanged",
+      "ProofsChanged",
     ]);
-    const sources = collectAcceptedSources(
-      [row(shared), row(shared)],
-      mint,
-      sat,
-      [],
-    );
-    expect(dedupeSourceProofs(sources).map((proof) => proof.secret)).toEqual([
-      "a1",
-      "a2",
-    ]);
-  });
-});
-
-describe("partitionByProofState", () => {
-  it("splits fully spent rows from live ones and sums the unspent pool", () => {
-    const partial = row(
-      token(mint, [
-        [4, "a1"],
-        [2, "a2"],
-      ]),
-    );
-    const dead = row(token(mint, [[3, "z1"]]));
-    const sources = collectAcceptedSources([partial, dead], mint, sat, []);
-
-    const partition = partitionByProofState(
-      sources,
-      new Set(["a2", "z1"]),
-      new Set(["a1"]),
-    );
-    expect(partition.fullySpentRows.map((r) => r.id)).toEqual([dead.id]);
-    expect(partition.liveRows.map((r) => r.id)).toEqual([partial.id]);
-    expect(partition.spendable.map((proof) => proof.secret)).toEqual(["a1"]);
-    expect(partition.available).toBe(4);
+    expect(events[0]).toMatchObject({
+      from: null,
+      to: "available",
+      amount: 3,
+      reason: "settle",
+    });
+    expect(events[1]).toMatchObject({
+      from: "available",
+      to: "spent",
+      amount: 10,
+      reason: "settle",
+    });
   });
 
-  it("keeps twin rows live while offering their shared proofs once", () => {
-    const shared = token(mint, [[4, "a1"]]);
-    const sources = collectAcceptedSources(
-      [row(shared), row(shared)],
-      mint,
-      sat,
-      [],
+  it("refuses malformed change before touching anything", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run((ctx) =>
+      Effect.gen(function* () {
+        const offered = yield* seedProofs(mint, [proof(4, "a1")]);
+        const outcome = yield* settleSwap(
+          ctx,
+          offered,
+          {
+            keep: [{ ...proof(1, "bad"), C: "not-hex" }],
+            send: [proof(3, "s1")],
+          },
+          "settle",
+        );
+        return { outcome, proofs: yield* loadAll };
+      }),
     );
 
-    const partition = partitionByProofState(
-      sources,
-      new Set(),
-      new Set(["a1"]),
-    );
-    expect(partition.liveRows).toHaveLength(2);
-    expect(partition.spendable).toHaveLength(1);
-    expect(partition.available).toBe(4);
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.outcome).toBeNull();
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual(["a1"]);
   });
 });

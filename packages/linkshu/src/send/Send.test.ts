@@ -1,5 +1,5 @@
 import type { Proof as CashuProof, SendResponse } from "@cashu/cashu-ts";
-import { getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
+import { MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import {
   Amount as SendAmount,
@@ -10,44 +10,34 @@ import {
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
-import { deterministicIdTokenStore } from "../testing/deterministicIdTokenStore";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
+import { inMemoryOperationStore } from "../ports/inMemoryOperationStore";
+import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
-import type { StoredTokenRow } from "../ports/TokenStore";
+import { OperationStore } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
+import type { StoredProof } from "../ports/ProofStore";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { seedRow } from "../testing/rows";
+import { proofsIn, secretsOf, seedProofs } from "../testing/inventory";
 import { decodeTokenText, parseTokenText } from "../token/codec";
-import { encodeCashuProofs } from "../token/internal/cashuProofs";
-import type { TokenState } from "../token/domain";
 import { SendDraft } from "./domain";
 import { Send } from "./Send";
 
 const mint = MintUrl.make("https://mint.example");
+const otherMint = "https://other.example";
 const counterKey = deterministicCounterKey({
   mint,
   unit: CurrencyUnit.make("sat"),
   keysetId: KeysetId.make(KEYSET_HEX),
 });
 
-// Row A (4+2) and row B (8): 14 sats available at the mint under test.
-const tokenA = getEncodedToken({
-  mint,
-  unit: "sat",
-  proofs: [proof(4, "src-a1"), proof(2, "src-a2")],
-});
-const tokenB = getEncodedToken({
-  mint,
-  unit: "sat",
-  proofs: [proof(8, "src-b1")],
-});
-const otherMintToken = getEncodedToken({
-  mint: "https://other.example",
-  unit: "sat",
-  proofs: [proof(16, "src-o1")],
-});
+// 4 + 2 + 8: 14 sats available at the mint under test.
+const sourceProofs = [
+  proof(4, "src-a1"),
+  proof(2, "src-a2"),
+  proof(8, "src-b1"),
+];
 
 const outputsAlreadySigned = () =>
   new MintOperationError(11005, "outputs have already been signed before");
@@ -113,10 +103,7 @@ const makeWallet = (args: FakeWalletArgs) => {
   return { wallet, sendCalls, restoreCalls };
 };
 
-const makeHarness = (
-  wallet: LoadedWallet,
-  tokenStore: Layer.Layer<TokenStore> = inMemoryTokenStore,
-) => {
+const makeHarness = (wallet: LoadedWallet) => {
   const inspector = recordingInspector();
   const layer = Send.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -126,7 +113,8 @@ const makeHarness = (
           WalletInstances.make({ get: () => Effect.succeed(wallet) }),
         ),
         inMemoryKeyValueStore,
-        tokenStore,
+        inMemoryProofStore,
+        inMemoryOperationStore,
         inspector.layer,
       ),
     ),
@@ -135,94 +123,47 @@ const makeHarness = (
     program: Effect.Effect<
       A,
       E,
-      Send | TokenStore | KeyValueStore | WalletInstances
+      Send | ProofStore | OperationStore | KeyValueStore | WalletInstances
     >,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
   return { run, events: inspector.events };
 };
 
-const sendAndInspect = (draft: SendDraft, seeds: ReadonlyArray<string>) =>
+interface Seed {
+  readonly mint: string;
+  readonly proofs: ReadonlyArray<CashuProof>;
+}
+
+const sendAndInspect = (
+  draft: SendDraft,
+  seeds: ReadonlyArray<Seed> = [{ mint, proofs: sourceProofs }],
+) =>
   Effect.gen(function* () {
-    yield* Effect.forEach(seeds, (tokenText) => seedRow(tokenText));
+    yield* Effect.forEach(seeds, (seed) => seedProofs(seed.mint, seed.proofs));
     const send = yield* Send;
     const kv = yield* KeyValueStore;
-    const tokenStore = yield* TokenStore;
     const receipt = yield* Effect.either(send.send(draft));
     return {
       receipt,
-      rows: yield* tokenStore.loadAll,
+      proofs: yield* (yield* ProofStore).loadAll,
+      operations: yield* (yield* OperationStore).loadAll,
       counter: yield* kv.get(counterKey),
     };
   });
 
-const rowByState = (
-  rows: ReadonlyArray<StoredTokenRow>,
-  state: TokenState,
-): StoredTokenRow | undefined => rows.find((row) => row.state === state);
+const stateOf = (
+  proofs: ReadonlyArray<StoredProof>,
+  secret: string,
+): string | undefined => proofs.find((p) => p.secret === secret)?.state;
+
+const allAvailable = (proofs: ReadonlyArray<StoredProof>): boolean =>
+  proofs.every((p) => p.state === "available");
 
 const draft = (amount: number, produceAs: "issued" | "pending" = "issued") =>
   new SendDraft({ mint, amount: SendAmount.make(amount), produceAs });
 
 describe("Send.send", () => {
-  it("preserves locked proofs after sending from the same row", async () => {
-    const mixed = getEncodedToken({
-      mint,
-      unit: "sat",
-      proofs: [proof(4, "src-a1"), proof(2, "src-a2"), proof(32, "locked")],
-    });
-    const { wallet, sendCalls } = makeWallet({
-      stateOf: (secret) => (secret === "locked" ? "PENDING" : "UNSPENT"),
-      send: () =>
-        Promise.resolve({
-          keep: [proof(8, "keep")],
-          send: [proof(4, "out1"), proof(1, "out2")],
-        }),
-    });
-    const { run, events } = makeHarness(wallet, deterministicIdTokenStore);
-    const exit = await run(sendAndInspect(draft(5), [mixed, tokenB]));
-    assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
-    expect(exit.value.receipt.right).toMatchObject({
-      amount: 5,
-      feePaid: 1,
-      changeAmount: 8,
-    });
-    expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
-    const retained = exit.value.rows.find(
-      (row) => row.originalTokenText === mixed,
-    );
-    assert(retained !== undefined);
-    expect(
-      decodeTokenText(retained.tokenText)?.proofs.map((proof) => proof.secret),
-    ).toEqual(["locked"]);
-    expect(events).toContainEqual(
-      expect.objectContaining({
-        _tag: "TokenLifecycleChanged",
-        rowId: retained.id,
-        reason: "spend-retained",
-      }),
-    );
-    expect(JSON.stringify(events)).not.toContain("locked");
-  });
-
-  it("keeps all source proofs if the swap fails after filtering pending proofs", async () => {
-    const { wallet, sendCalls } = makeWallet({
-      stateOf: (secret) => (secret === "src-a2" ? "PENDING" : "UNSPENT"),
-      send: () =>
-        Promise.reject(new MintOperationError(11002, "proofs are pending")),
-    });
-    const { run } = makeHarness(wallet);
-    const exit = await run(sendAndInspect(draft(5), [tokenA, tokenB]));
-    assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-b1"]);
-    expect(exit.value.rows.map((row) => row.tokenText)).toEqual([
-      tokenA,
-      tokenB,
-    ]);
-  });
-
-  it("swaps with disjoint counter blocks, persists change and send rows, removes sources", async () => {
+  it("swaps with disjoint counter blocks, books the transfer, change, and spent inputs", async () => {
     // keep mixes passthrough (a1) with one fresh change output (k1).
     const { wallet, sendCalls } = makeWallet({
       send: () =>
@@ -234,10 +175,13 @@ describe("Send.send", () => {
     const { run, events } = makeHarness(wallet);
 
     const exit = await run(
-      sendAndInspect(draft(5), [tokenA, tokenB, otherMintToken]),
+      sendAndInspect(draft(5), [
+        { mint, proofs: sourceProofs },
+        { mint: otherMint, proofs: [proof(16, "src-o1")] },
+      ]),
     );
     assert(Exit.isSuccess(exit));
-    const { receipt, rows, counter } = exit.value;
+    const { receipt, proofs, operations, counter } = exit.value;
 
     assert(receipt._tag === "Right");
     expect(receipt.right.mint).toBe(mint);
@@ -259,36 +203,69 @@ describe("Send.send", () => {
     // Send block (64) fully burned + 1 fresh keep output.
     expect(counter).toBe("66");
 
-    // Sources for the mint are gone; the foreign-mint row is untouched.
-    expect(rows).toHaveLength(3);
-    const untouched = rows.find((row) => row.tokenText === otherMintToken);
-    expect(untouched?.state).toBe("accepted");
-    const freshChange = rows.find(
-      (row) => row.state === "accepted" && row.tokenText !== otherMintToken,
-    );
-    expect(parseTokenText(freshChange?.tokenText ?? "")?.amount).toBe(8);
-    const sendRow = rowByState(rows, "issued");
-    expect(sendRow?.tokenText).toBe(receipt.right.tokenText);
-    expect(sendRow?.id).toBe(receipt.right.rowId);
+    // The passthrough input, the fresh change, and the foreign-mint proof
+    // are balance; the consumed inputs are spent; the sent proofs are out.
+    expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
+      "k1",
+      "src-a1",
+      "src-o1",
+    ]);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["src-a2", "src-b1"]);
+    const handedOut = proofsIn(proofs, "handedOut");
+    expect(secretsOf(handedOut)).toEqual(["s1", "s2"]);
+    expect(
+      handedOut.every((p) => p.operationId === receipt.right.operationId),
+    ).toBe(true);
+
+    expect(operations).toHaveLength(1);
+    expect(operations[0]).toMatchObject({
+      id: receipt.right.operationId,
+      kind: "send",
+      status: "issued",
+      mint,
+      amount: 5,
+      tokenText: receipt.right.tokenText,
+      error: null,
+    });
 
     expect(events.map((event) => event._tag)).toEqual([
       "CounterAdvanced",
-      "TokenLifecycleChanged",
-      "TokenLifecycleChanged",
+      "OperationChanged",
+      "ProofsChanged",
+      "ProofsChanged",
+      "ProofsChanged",
       "OperationSucceeded",
     ]);
     expect(events[0]).toMatchObject({ from: 1, to: 66, reason: "used" });
     expect(events[1]).toMatchObject({
-      from: null,
-      to: "accepted",
-      reason: "send-change",
-    });
-    expect(events[2]).toMatchObject({
+      kind: "send",
       from: null,
       to: "issued",
       reason: "send",
     });
+    expect(events[2]).toMatchObject({
+      from: null,
+      to: "handedOut",
+      count: 2,
+      amount: 5,
+      operationId: receipt.right.operationId,
+      reason: "send",
+    });
     expect(events[3]).toMatchObject({
+      from: null,
+      to: "available",
+      count: 1,
+      amount: 4,
+      reason: "send-change",
+    });
+    expect(events[4]).toMatchObject({
+      from: "available",
+      to: "spent",
+      count: 2,
+      amount: 10,
+      reason: "send-change",
+    });
+    expect(events[5]).toMatchObject({
       name: "send.send",
       params: { mint, amount: 5, produceAs: "issued" },
       result: { amount: 5, changeAmount: 8, feePaid: 1 },
@@ -300,19 +277,75 @@ describe("Send.send", () => {
     expect(serialized).not.toContain("src-a1");
   });
 
-  it("produces the send row in the drafted pending state", async () => {
+  it("leaves a NUT-07 pending proof available but does not offer it", async () => {
+    const { wallet, sendCalls } = makeWallet({
+      stateOf: (secret) => (secret === "locked" ? "PENDING" : "UNSPENT"),
+      send: () =>
+        Promise.resolve({
+          keep: [proof(8, "keep")],
+          send: [proof(4, "out1"), proof(1, "out2")],
+        }),
+    });
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(
+      sendAndInspect(draft(5), [
+        { mint, proofs: [...sourceProofs, proof(32, "locked")] },
+      ]),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    expect(exit.value.receipt.right).toMatchObject({
+      amount: 5,
+      feePaid: 1,
+      changeAmount: 8,
+    });
+    expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
+    expect(stateOf(exit.value.proofs, "locked")).toBe("available");
+    expect(JSON.stringify(events)).not.toContain("locked");
+  });
+
+  it("keeps every source proof if the swap fails after filtering pending proofs", async () => {
+    const { wallet, sendCalls } = makeWallet({
+      stateOf: (secret) => (secret === "src-a2" ? "PENDING" : "UNSPENT"),
+      send: () =>
+        Promise.reject(new MintOperationError(11002, "proofs are pending")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(sendAndInspect(draft(5)));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-b1"]);
+    expect(allAvailable(exit.value.proofs)).toBe(true);
+    expect(exit.value.operations).toEqual([]);
+  });
+
+  it("produces the send transfer in the drafted pending status", async () => {
     const { wallet } = makeWallet({
       send: () =>
         Promise.resolve({ keep: [], send: [proof(4, "s1"), proof(2, "s2")] }),
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(sendAndInspect(draft(6, "pending"), [tokenA]));
+    const exit = await run(
+      sendAndInspect(draft(6, "pending"), [
+        { mint, proofs: [proof(4, "src-a1"), proof(2, "src-a2")] },
+      ]),
+    );
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
-    // Exact spend: no change row, only the pending send row remains.
-    expect(exit.value.rows).toHaveLength(1);
-    expect(exit.value.rows[0]?.state).toBe("pending");
+    // Exact spend: no change, every input spent, the sent proofs handed out.
+    expect(exit.value.operations.map((op) => op.status)).toEqual(["pending"]);
+    expect(proofsIn(exit.value.proofs, "available")).toEqual([]);
+    expect(secretsOf(proofsIn(exit.value.proofs, "spent"))).toEqual([
+      "src-a1",
+      "src-a2",
+    ]);
+    expect(secretsOf(proofsIn(exit.value.proofs, "handedOut"))).toEqual([
+      "s1",
+      "s2",
+    ]);
   });
 
   it("carries the sent proofs with full v2 keyset ids, which the token text alone loses", async () => {
@@ -326,7 +359,7 @@ describe("Send.send", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(sendAndInspect(draft(6, "pending"), [tokenA]));
+    const exit = await run(sendAndInspect(draft(6, "pending")));
     assert(Exit.isSuccess(exit));
     const { receipt } = exit.value;
     assert(receipt._tag === "Right");
@@ -341,22 +374,24 @@ describe("Send.send", () => {
     ).toEqual(receipt.right.proofs);
   });
 
-  it("excludes NUT-07 spent proofs and marks fully spent rows as error", async () => {
-    const spentToken = getEncodedToken({
-      mint,
-      unit: "sat",
-      proofs: [proof(3, "src-z1")],
-    });
+  it("excludes NUT-07 spent proofs from the swap and marks them spent", async () => {
     const { wallet, sendCalls } = makeWallet({
       stateOf: (secret) =>
         secret === "src-a2" || secret === "src-z1" ? "SPENT" : "UNSPENT",
       send: () => Promise.resolve({ keep: [], send: [proof(3, "s1")] }),
     });
-    const { run } = makeHarness(wallet);
+    const { run, events } = makeHarness(wallet);
 
-    const exit = await run(sendAndInspect(draft(3), [tokenA, spentToken]));
+    const exit = await run(
+      sendAndInspect(draft(3), [
+        {
+          mint,
+          proofs: [proof(4, "src-a1"), proof(2, "src-a2"), proof(3, "src-z1")],
+        },
+      ]),
+    );
     assert(Exit.isSuccess(exit));
-    const { receipt, rows } = exit.value;
+    const { receipt, proofs } = exit.value;
 
     assert(receipt._tag === "Right");
     // Only the unspent a1 proof was offered; available was 4, fee 4-3-0.
@@ -364,20 +399,44 @@ describe("Send.send", () => {
     expect(receipt.right.feePaid).toBe(1);
     expect(receipt.right.changeAmount).toBe(0);
 
-    const errorRow = rowByState(rows, "error");
-    expect(errorRow?.tokenText).toBe(spentToken);
-    expect(JSON.parse(errorRow?.error ?? "")).toMatchObject({
-      _tag: "TokenAlreadySpent",
-      mint,
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual([
+      "src-a1",
+      "src-a2",
+      "src-z1",
+    ]);
+    expect(events[0]).toMatchObject({
+      _tag: "ProofsChanged",
+      from: "available",
+      to: "spent",
+      count: 2,
+      amount: 5,
+      reason: "send",
     });
-    expect(rows).toHaveLength(2); // error row + issued send row
+  });
+
+  it("keeps definitive spend knowledge even when the swap then fails", async () => {
+    const { wallet } = makeWallet({
+      stateOf: (secret) => (secret === "src-b1" ? "SPENT" : "UNSPENT"),
+      send: () => Promise.reject(new TypeError("fetch failed")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(sendAndInspect(draft(5)));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+    expect(stateOf(exit.value.proofs, "src-b1")).toBe("spent");
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual([
+      "src-a1",
+      "src-a2",
+    ]);
   });
 
   it("fails with InsufficientFunds before calling the mint", async () => {
     const { wallet, sendCalls } = makeWallet({});
     const { run } = makeHarness(wallet);
 
-    const exit = await run(sendAndInspect(draft(15), [tokenA, tokenB]));
+    const exit = await run(sendAndInspect(draft(15)));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
@@ -386,7 +445,7 @@ describe("Send.send", () => {
       available: 14,
     });
     expect(sendCalls).toEqual([]);
-    expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
+    expect(allAvailable(exit.value.proofs)).toBe(true);
   });
 
   it("maps the mint's fee-inclusive shortfall to InsufficientFunds", async () => {
@@ -396,7 +455,7 @@ describe("Send.send", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(sendAndInspect(draft(14), [tokenA, tokenB]));
+    const exit = await run(sendAndInspect(draft(14)));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
@@ -404,20 +463,21 @@ describe("Send.send", () => {
       required: 14,
       available: 14,
     });
-    expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
+    expect(allAvailable(exit.value.proofs)).toBe(true);
   });
 
-  it("surfaces transient failures without touching any row", async () => {
+  it("surfaces transient failures without touching the inventory", async () => {
     const { wallet } = makeWallet({
       send: () => Promise.reject(new TypeError("fetch failed")),
     });
     const { run, events } = makeHarness(wallet);
 
-    const exit = await run(sendAndInspect(draft(5), [tokenA, tokenB]));
+    const exit = await run(sendAndInspect(draft(5)));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
-    expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
+    expect(allAvailable(exit.value.proofs)).toBe(true);
+    expect(exit.value.operations).toEqual([]);
     expect(events.map((event) => event._tag)).toEqual(["OperationFailed"]);
   });
 
@@ -427,28 +487,28 @@ describe("Send.send", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(sendAndInspect(draft(5), [tokenA]));
+    const exit = await run(sendAndInspect(draft(5)));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
     expect(sendCalls).toEqual([]);
   });
 
-  it("surfaces a definitive rejection as MintRejected and leaves rows intact", async () => {
+  it("surfaces a definitive rejection as MintRejected and leaves proofs intact", async () => {
     const { wallet } = makeWallet({
       send: () =>
         Promise.reject(new MintOperationError(20003, "keyset inactive")),
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(sendAndInspect(draft(5), [tokenA, tokenB]));
+    const exit = await run(sendAndInspect(draft(5)));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "MintRejected",
       code: 20003,
     });
-    expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
+    expect(allAvailable(exit.value.proofs)).toBe(true);
   });
 
   it.each([
@@ -471,7 +531,7 @@ describe("Send.send", () => {
       });
       const { run, events } = makeHarness(wallet);
 
-      const exit = await run(sendAndInspect(draft(4), [tokenA, tokenB]));
+      const exit = await run(sendAndInspect(draft(4)));
       assert(Exit.isSuccess(exit));
       expect(exit.value.receipt._tag).toBe("Right");
       expect(sendCalls.map((call) => call.sendCounter)).toEqual([1, 40]);
@@ -493,14 +553,14 @@ describe("Send.send", () => {
     },
   );
 
-  it("bounds duplicate-output retries and preserves source rows on rejection", async () => {
+  it("bounds duplicate-output retries and preserves the inventory on rejection", async () => {
     const { wallet, sendCalls, restoreCalls } = makeWallet({
       send: () =>
         Promise.reject(new MintOperationError(11008, "Duplicate outputs")),
       restore: () => Promise.resolve({ proofs: [] }),
     });
     const { run } = makeHarness(wallet);
-    const exit = await run(sendAndInspect(draft(4), [tokenA, tokenB]));
+    const exit = await run(sendAndInspect(draft(4)));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
@@ -511,58 +571,7 @@ describe("Send.send", () => {
       1, 129, 257, 385, 513,
     ]);
     expect(restoreCalls).toHaveLength(5);
-    expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
-  });
-
-  it("offers proofs shared by twin rows only once and consumes both rows", async () => {
-    const { wallet, sendCalls } = makeWallet({
-      send: () =>
-        Promise.resolve({ keep: [], send: [proof(4, "s1"), proof(1, "s2")] }),
-    });
-    const { run } = makeHarness(wallet);
-
-    const exit = await run(sendAndInspect(draft(5), [tokenA, tokenA]));
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
-    expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2"]);
-    // Both twin rows consumed; only the issued send row remains.
-    expect(exit.value.rows).toHaveLength(1);
-    expect(exit.value.rows[0]?.state).toBe("issued");
-  });
-
-  it("spares the source row whose id the change insert reused (deterministic-id store)", async () => {
-    // A fully-unselected source row passes through the swap's keep side
-    // unchanged, so the change row re-encodes byte-identically to it — a
-    // store deriving ids from `originalTokenText` reuses the source row's id.
-    const passthrough = [proof(4, "src-a1"), proof(2, "src-a2")];
-    const collisionText = encodeCashuProofs({
-      mint,
-      unit: CurrencyUnit.make("sat"),
-      memo: null,
-      proofs: passthrough,
-    })?.tokenText;
-    expect(collisionText).toBeDefined();
-    if (collisionText === undefined) return;
-
-    const { wallet } = makeWallet({
-      send: () =>
-        Promise.resolve({ keep: passthrough, send: [proof(8, "s1")] }),
-    });
-    const { run } = makeHarness(wallet, deterministicIdTokenStore);
-
-    const exit = await run(sendAndInspect(draft(8), [collisionText, tokenB]));
-    assert(Exit.isSuccess(exit));
-    const { receipt, rows } = exit.value;
-
-    assert(receipt._tag === "Right");
-    expect(receipt.right.changeAmount).toBe(6);
-    expect(rows).toHaveLength(2);
-    // The change landed on the source row's own id and survived the removal.
-    const changeRow = rows.find((row) => row.tokenText === collisionText);
-    expect(changeRow?.state).toBe("accepted");
-    const sendRow = rowByState(rows, "issued");
-    expect(sendRow?.id).toBe(receipt.right.rowId);
-    expect(rows.find((row) => row.tokenText === tokenB)).toBeUndefined();
+    expect(allAvailable(exit.value.proofs)).toBe(true);
   });
 
   it("starts the swap from the persisted counter", async () => {
@@ -575,7 +584,7 @@ describe("Send.send", () => {
       Effect.gen(function* () {
         const kv = yield* KeyValueStore;
         yield* kv.set(counterKey, "7");
-        yield* seedRow(tokenA);
+        yield* seedProofs(mint, [proof(4, "src-a1")]);
         const send = yield* Send;
         yield* send.send(draft(4));
         return yield* kv.get(counterKey);

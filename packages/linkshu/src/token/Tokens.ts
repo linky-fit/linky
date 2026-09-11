@@ -1,32 +1,38 @@
 import { Effect, Schema } from "effect";
-import { parseTokenText } from "./codec";
+import { decodeTokenText, parseTokenText } from "./codec";
 import {
-  InvalidTokenTransition,
+  InvalidTransferTransition,
   MintBalance,
+  TokenTransfer,
   WalletBalances,
-  WalletToken,
 } from "./domain";
-import type { ImportRowDraft, TokenState } from "./domain";
-import {
-  findRowByTokenText,
-  insertRowInState,
-  transitionRow,
-} from "./internal/lifecycle";
-import { totalProofAmount } from "./internal/rowProofs";
-import { TokenAlreadyKnown, TokenRowNotFound } from "../domain/errors";
-import { Amount, NonNegativeAmount, TokenRowId } from "../domain/primitives";
-import type { MintUrl } from "../domain/primitives";
+import type { ImportProofDraft, LegacyTokenRow } from "./domain";
+import { OperationNotFound, TokenParseFailed } from "../domain/errors";
+import { Amount, NonNegativeAmount } from "../domain/primitives";
+import type { MintUrl, OperationId } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import {
+  insertOperation,
   inspectOperation,
   inspectOperationWith,
+  patchOperation,
   redactReceipt,
 } from "../internal/operations";
-import { checkMintRows, groupRowsByMint } from "../internal/rowStates";
+import {
+  domainToNewProofs,
+  insertProofs,
+  setProofState,
+  storedSecrets,
+  totalAmount,
+} from "../internal/proofs";
+import { sat } from "../internal/units";
+import { meltRecords } from "../melt/internal/meltRecords";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
-import type { StoredTokenRow } from "../ports/TokenStore";
+import { NewOperation, OperationStore } from "../ports/OperationStore";
+import type { OperationStatus, StoredOperation } from "../ports/OperationStore";
+import { NewProof, ProofStore } from "../ports/ProofStore";
+import type { ProofState, StoredProof } from "../ports/ProofStore";
 import { ReceiveReceipt } from "../receive/domain";
 import type { ReceiveError } from "../receive/domain";
 import {
@@ -34,74 +40,102 @@ import {
   receiveTokenText,
 } from "../receive/internal/acceptFlow";
 import type { ReceiveContext } from "../receive/internal/acceptFlow";
+import type { DecodedToken } from "./domain";
 
-export class DeletedSpentToken extends Schema.Class<DeletedSpentToken>(
-  "DeletedSpentToken",
+export class LegacyIngestReport extends Schema.Class<LegacyIngestReport>(
+  "LegacyIngestReport",
 )({
-  rowId: TokenRowId,
-  amount: Amount,
+  /** Rows whose proofs were not yet in the inventory and are now. */
+  ingestedRows: Schema.Int,
+  proofs: Schema.Int,
 }) {}
 
-const enrich = (row: StoredTokenRow): WalletToken | null => {
-  const parsed = parseTokenText(row.tokenText);
-  if (parsed === null) return null;
-  return new WalletToken({
-    id: row.id,
-    state: row.state,
-    tokenText: row.tokenText,
-    mint: parsed.mint,
-    unit: parsed.unit,
-    amount: parsed.amount,
-    error: row.error,
-    createdAt: row.createdAt,
+const isTransfer = (operation: StoredOperation): boolean =>
+  operation.kind === "send" || operation.kind === "receive";
+
+const toTransfer = (operation: StoredOperation): TokenTransfer | null => {
+  if (
+    (operation.kind !== "send" && operation.kind !== "receive") ||
+    operation.tokenText === null
+  )
+    return null;
+  return new TokenTransfer({
+    id: operation.id,
+    kind: operation.kind,
+    status: operation.status,
+    tokenText: operation.tokenText,
+    mint: operation.mint,
+    unit: operation.unit,
+    amount: operation.amount,
+    error: operation.error,
+    createdAt: operation.createdAt,
   });
 };
 
+const isTokenAlreadySpentError = (error: string | null): boolean => {
+  if (error === null) return false;
+  try {
+    const parsed: unknown = JSON.parse(error);
+    return (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      Reflect.get(parsed, "_tag") === "TokenAlreadySpent"
+    );
+  } catch {
+    return false;
+  }
+};
+
 /**
- * Read model and lifecycle transitions over the stored rows. The transition
- * functions are the only way rows change state outside the operation
- * verticals — platforms never write states themselves.
+ * Read model over the inventory plus the transfer transitions callers are
+ * allowed to make. Every state change outside the operation verticals goes
+ * through here — platforms never write states themselves.
  */
 export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
   dependencies: [WalletInstances.Default],
   effect: Effect.gen(function* () {
-    const tokenStore = yield* TokenStore;
+    const kv = yield* KeyValueStore;
+    const proofStore = yield* ProofStore;
+    const operationStore = yield* OperationStore;
     const instances = yield* WalletInstances;
     const inspector = yield* Inspector.orNoop;
-    const receiveContext: ReceiveContext = {
-      kv: yield* KeyValueStore,
-      tokenStore,
-      instances,
-      inspector,
-    };
+    const ctx = { proofStore, operationStore, inspector };
+    const receiveContext: ReceiveContext = { ...ctx, kv, instances };
+    const melts = meltRecords({ kv, operationStore, inspector });
 
-    /**
-     * All live rows enriched with metadata derived from their token text,
-     * newest first. A row whose text no longer parses holds nothing anyone
-     * can display or spend, so it is left in the store but out of the list.
-     */
-    const list: Effect.Effect<ReadonlyArray<WalletToken>> = Effect.map(
-      tokenStore.loadAll,
+    const newestFirst = <T extends { readonly createdAt: number }>(
+      rows: ReadonlyArray<T>,
+    ): ReadonlyArray<T> => [...rows].sort((a, b) => b.createdAt - a.createdAt);
+
+    /** The whole inventory, any state, newest first. */
+    const proofs: Effect.Effect<ReadonlyArray<StoredProof>> = Effect.map(
+      proofStore.loadAll,
+      newestFirst,
+    );
+
+    /** Every stored operation, newest first. */
+    const operations: Effect.Effect<ReadonlyArray<StoredOperation>> =
+      Effect.map(operationStore.loadAll, newestFirst);
+
+    /** Tokens that crossed the wallet boundary as text, newest first. */
+    const transfers: Effect.Effect<ReadonlyArray<TokenTransfer>> = Effect.map(
+      operations,
       (rows) =>
-        rows
-          .flatMap((row) => {
-            const token = enrich(row);
-            return token === null ? [] : [token];
-          })
-          .sort((a, b) => b.createdAt - a.createdAt),
+        rows.flatMap((operation) => {
+          const transfer = toTransfer(operation);
+          return transfer === null ? [] : [transfer];
+        }),
     );
 
     const balances: Effect.Effect<WalletBalances> = Effect.map(
-      tokenStore.loadAll,
+      proofStore.loadAll,
       (rows) => {
         const perMint = new Map<MintUrl, number>();
-        for (const row of rows) {
-          if (row.state !== "accepted") continue;
-          const parsed = parseTokenText(row.tokenText);
-          if (parsed === null || parsed.mint === null) continue;
+        for (const proof of rows) {
+          if (proof.state !== "available") continue;
           perMint.set(
-            parsed.mint,
-            (perMint.get(parsed.mint) ?? 0) + parsed.amount,
+            proof.mint,
+            (perMint.get(proof.mint) ?? 0) + proof.amount,
           );
         }
         const amounts = [...perMint.values()];
@@ -110,186 +144,345 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
           spendable: NonNegativeAmount.make(Math.max(0, ...amounts)),
           perMint: [...perMint].map(
             ([mint, amount]) =>
-              new MintBalance({
-                mint,
-                amount: NonNegativeAmount.make(amount),
-              }),
+              new MintBalance({ mint, amount: NonNegativeAmount.make(amount) }),
           ),
         });
       },
     );
 
-    const requireRow = (
-      rowId: TokenRowId,
-    ): Effect.Effect<StoredTokenRow, TokenRowNotFound> =>
-      Effect.flatMap(tokenStore.loadAll, (rows) => {
-        const row = rows.find((candidate) => candidate.id === rowId);
-        return row === undefined
-          ? Effect.fail(new TokenRowNotFound({ rowId }))
-          : Effect.succeed(row);
+    const requireTransfer = (
+      operationId: OperationId,
+    ): Effect.Effect<StoredOperation, OperationNotFound> =>
+      Effect.flatMap(operationStore.loadAll, (rows) => {
+        const operation = rows.find(
+          (candidate) => candidate.id === operationId && isTransfer(candidate),
+        );
+        return operation === undefined
+          ? Effect.fail(new OperationNotFound({ operationId }))
+          : Effect.succeed(operation);
       });
 
-    /** Every pure transition: one lookup, then the state machine. */
-    const transition = (
-      rowId: TokenRowId,
-      to: TokenState,
-      operation: string,
-    ): Effect.Effect<void, TokenRowNotFound | InvalidTokenTransition> =>
-      requireRow(rowId).pipe(
-        Effect.flatMap((row) =>
-          transitionRow(tokenStore, inspector, row, to, operation),
-        ),
-        inspectOperation(inspector, `tokens.${operation}`, { rowId }),
+    const proofsOf = (
+      operation: StoredOperation,
+    ): Effect.Effect<ReadonlyArray<StoredProof>> =>
+      Effect.map(proofStore.loadAll, (rows) =>
+        rows.filter((proof) => proof.operationId === operation.id),
       );
 
-    /** `accepted` → `reserved`: earmark a row for a pending handover. */
-    const reserve = (rowId: TokenRowId) =>
-      transition(rowId, "reserved", "reserve");
-
-    /** `accepted` | `reserved` → `issued`: the token left as a QR/share. */
-    const markIssued = (rowId: TokenRowId) =>
-      transition(rowId, "issued", "markIssued");
-
-    /** → `externalized`: the token was handed off outside the app. */
-    const markExternalized = (rowId: TokenRowId) =>
-      transition(rowId, "externalized", "markExternalized");
-
-    /** A reserved encoding never left the device, so the earmark just drops. */
-    const dropReservation = (
-      row: StoredTokenRow,
-    ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
-      Effect.gen(function* () {
-        const parsed = yield* parseReceivable(row.tokenText);
-        // `reserved` → `accepted` is always legal; failing here is a bug.
-        yield* Effect.orDie(
-          transitionRow(
-            tokenStore,
-            inspector,
-            row,
-            "accepted",
-            "returnToWallet",
-          ),
-        );
-        return new ReceiveReceipt({
-          rowId: row.id,
-          tokenText: parsed.tokenText,
-          mint: parsed.mint,
-          unit: parsed.unit,
-          amount: parsed.amount,
-        });
-      });
-
     /**
-     * Bring an emitted or errored row back to `accepted`. Everything that
-     * was handed out is re-received, so the encoding somebody else may hold
-     * dies at the mint; only the replaced row's own fate differs from a
-     * plain receive (see `receiveTokenText`).
+     * One transition of a `send` transfer: the status moves when legal, and
+     * its handed-out proofs follow when `proofState` is given.
      */
-    const returnToWallet = (
-      rowId: TokenRowId,
-    ): Effect.Effect<
-      ReceiveReceipt,
-      ReceiveError | TokenRowNotFound | InvalidTokenTransition
-    > =>
+    const transitionSend = (
+      operationId: OperationId,
+      from: ReadonlyArray<OperationStatus>,
+      to: OperationStatus,
+      operation: string,
+      proofState?: ProofState,
+    ): Effect.Effect<void, OperationNotFound | InvalidTransferTransition> =>
       Effect.gen(function* () {
-        const row = yield* requireRow(rowId);
-        if (row.state === "accepted") {
-          return yield* new InvalidTokenTransition({
-            rowId,
-            from: row.state,
-            to: "accepted",
+        const transfer = yield* requireTransfer(operationId);
+        if (transfer.kind !== "send" || !from.includes(transfer.status)) {
+          return yield* new InvalidTransferTransition({
+            operationId,
+            from: transfer.status,
+            to,
           });
         }
-        return yield* row.state === "reserved"
-          ? dropReservation(row)
-          : receiveTokenText(receiveContext, row.tokenText, {
-              row,
-              reason: "returnToWallet",
-            });
+        if (proofState !== undefined) {
+          const held = (yield* proofsOf(transfer)).filter(
+            (proof) => proof.state !== "spent",
+          );
+          yield* setProofState(ctx, held, proofState, operation);
+        }
+        yield* patchOperation(ctx, transfer, { status: to }, operation);
+      }).pipe(
+        inspectOperation(inspector, `tokens.${operation}`, { operationId }),
+      );
+
+    /** `pending` → `issued`: a messenger token was shown as a QR after all. */
+    const markIssued = (operationId: OperationId) =>
+      transitionSend(operationId, ["pending"], "issued", "markIssued");
+
+    /** `issued` | `pending` → `externalized`: the token left the app entirely. */
+    const markExternalized = (operationId: OperationId) =>
+      transitionSend(
+        operationId,
+        ["issued", "pending"],
+        "externalized",
+        "markExternalized",
+        "externalized",
+      );
+
+    /**
+     * Closes a transfer the caller has nothing left to do about: a `send`
+     * whose token verifiably reached its recipient, or a `receive` that
+     * failed for good. Not a refund — handed-out proofs stay handed out and
+     * are still reported spent once the recipient claims them.
+     */
+    const forget = (
+      operationId: OperationId,
+    ): Effect.Effect<void, OperationNotFound | InvalidTransferTransition> =>
+      Effect.gen(function* () {
+        const transfer = yield* requireTransfer(operationId);
+        const closable =
+          transfer.kind === "send"
+            ? ["issued", "pending", "externalized"]
+            : ["pending", "failed"];
+        if (!closable.includes(transfer.status)) {
+          return yield* new InvalidTransferTransition({
+            operationId,
+            from: transfer.status,
+            to: "done",
+          });
+        }
+        yield* patchOperation(ctx, transfer, { status: "done" }, "forget");
+      }).pipe(inspectOperation(inspector, "tokens.forget", { operationId }));
+
+    /**
+     * Bring a transfer's funds back: a handed-out `send` is re-received so
+     * the encoding somebody else may hold dies at the mint; a failed or
+     * interrupted `receive` is retried. See `receiveTokenText`.
+     */
+    const returnToWallet = (
+      operationId: OperationId,
+    ): Effect.Effect<
+      ReceiveReceipt,
+      ReceiveError | OperationNotFound | InvalidTransferTransition
+    > =>
+      Effect.gen(function* () {
+        const transfer = yield* requireTransfer(operationId);
+        const returnable =
+          transfer.kind === "send"
+            ? ["issued", "pending", "externalized"]
+            : ["pending", "failed"];
+        if (
+          !returnable.includes(transfer.status) ||
+          transfer.tokenText === null
+        ) {
+          return yield* new InvalidTransferTransition({
+            operationId,
+            from: transfer.status,
+            to: transfer.kind === "send" ? "returned" : "done",
+          });
+        }
+        return yield* receiveTokenText(receiveContext, transfer.tokenText, {
+          operation: transfer,
+          reason: "returnToWallet",
+        });
       }).pipe(
         inspectOperationWith(
           inspector,
           "tokens.returnToWallet",
-          { rowId },
+          { operationId },
           redactReceipt,
         ),
       );
 
     /**
-     * Remove every row NUT-07 has definitively marked spent: own balance
-     * (`accepted`) and failed rows (`error`), never rows whose funds are
-     * out with someone else — pruning those is `Validation.checkIssued`'s
-     * job. A mint that cannot be reached, or that leaves a proof
-     * unanswered, keeps its rows. Rows already carrying a recorded spend
-     * error are re-confirmed too: receive writes `TokenAlreadySpent` when
-     * a swap is rejected over a *partially* spent token, whose text still
-     * holds live proofs.
+     * Restores proofs from a backup exactly as it states them. Secrets the
+     * inventory already holds are skipped, so a backup imported twice adds
+     * nothing. Returns how many proofs were added.
      */
-    const deleteSpent: Effect.Effect<ReadonlyArray<DeletedSpentToken>> =
+    const importProofs = (
+      drafts: ReadonlyArray<ImportProofDraft>,
+    ): Effect.Effect<number> =>
       Effect.gen(function* () {
-        const deleted: DeletedSpentToken[] = [];
-        const candidates = (yield* tokenStore.loadAll).filter(
-          (row) => row.state === "accepted" || row.state === "error",
-        );
-
-        for (const group of groupRowsByMint(candidates)) {
-          const partition = yield* checkMintRows(
-            instances,
-            group.mint,
-            group.unit,
-            group.rows,
-          );
-          if (partition === null) continue;
-          for (const dead of partition.fullySpent) {
-            yield* tokenStore.remove(dead.row.id);
-            deleted.push(
-              new DeletedSpentToken({
-                rowId: dead.row.id,
-                amount: Amount.make(totalProofAmount(dead.proofs)),
-              }),
-            );
-          }
-        }
-        return deleted;
-      }).pipe(inspectOperation(inspector, "tokens.deleteSpent", {}));
-
-    const importRow = (
-      draft: ImportRowDraft,
-    ): Effect.Effect<TokenRowId, TokenAlreadyKnown> =>
-      Effect.gen(function* () {
-        const rows = yield* tokenStore.loadAll;
-        const known =
-          findRowByTokenText(rows, draft.originalTokenText) ??
-          findRowByTokenText(rows, draft.tokenText);
-        if (known !== null) {
-          return yield* new TokenAlreadyKnown({ rowId: known.id });
-        }
-        return yield* insertRowInState(tokenStore, inspector, {
-          originalTokenText: draft.originalTokenText,
-          tokenText: draft.tokenText,
-          state: draft.state,
-          error: draft.state === "error" ? draft.error : null,
-          reason: "import",
-        });
+        const known = storedSecrets(yield* proofStore.loadAll);
+        const fresh = drafts
+          .filter((draft) => !known.has(draft.secret))
+          .map((draft) => new NewProof({ ...draft }));
+        yield* insertProofs(ctx, fresh, "import");
+        return fresh.length;
       }).pipe(
-        inspectOperationWith(
-          inspector,
-          "tokens.importRow",
-          { state: draft.state },
-          (row) => ({ rowId: row.id, state: row.state }),
-        ),
-        Effect.map((row) => row.id),
+        inspectOperation(inspector, "tokens.importProofs", {
+          count: drafts.length,
+        }),
+      );
+
+    /** Restores an operation from a backup; an existing one is replaced. */
+    const importOperation = (draft: NewOperation): Effect.Effect<OperationId> =>
+      Effect.map(
+        insertOperation(ctx, draft, "import"),
+        (stored) => stored.id,
+      ).pipe(
+        inspectOperation(inspector, "tokens.importOperation", {
+          kind: draft.kind,
+        }),
+      );
+
+    /** Decodes stored token text, loading the mint's keysets only when needed. */
+    const decodeStored = (text: string): Effect.Effect<DecodedToken | null> =>
+      Effect.gen(function* () {
+        const decoded = decodeTokenText(text);
+        if (decoded !== null) return decoded;
+        const parsed = parseTokenText(text);
+        if (parsed === null || parsed.mint === null) return null;
+        const wallet = yield* Effect.option(
+          instances.get(parsed.mint, parsed.unit ?? sat),
+        );
+        if (wallet._tag === "None") return null;
+        return decodeTokenText(
+          text,
+          wallet.value.keyChain.getKeysets().map((keyset) => keyset.id),
+        );
+      });
+
+    /**
+     * Stores a token's proofs as `available` without re-signing them at the
+     * mint. Only for a wallet that exists to spend one token it already
+     * trusts (the site's redemption page); anything received from someone
+     * else goes through `Receive`, or the sender keeps a spendable copy.
+     * Secrets already stored are skipped. Returns the amount added.
+     */
+    const adoptToken = (
+      text: string,
+    ): Effect.Effect<NonNegativeAmount, TokenParseFailed> =>
+      Effect.gen(function* () {
+        const parsed = yield* parseReceivable(text);
+        const decoded = yield* decodeStored(parsed.tokenText);
+        if (decoded === null) {
+          return yield* new TokenParseFailed({
+            reason: "undecodable",
+            detail: "token proofs could not be decoded",
+          });
+        }
+        const known = storedSecrets(yield* proofStore.loadAll);
+        const fresh = decoded.proofs.filter(
+          (proof) => !known.has(proof.secret),
+        );
+        yield* insertProofs(
+          ctx,
+          domainToNewProofs(
+            fresh,
+            decoded.mint,
+            decoded.unit,
+            "available",
+            null,
+          ),
+          "adopt",
+        );
+        return NonNegativeAmount.make(totalAmount(fresh));
+      }).pipe(
+        // Params stay empty: the only input is token text (proof secrets).
+        inspectOperation(inspector, "tokens.adoptToken", {}),
+      );
+
+    /**
+     * Carries rows of the previous storage model into the inventory. A row
+     * is ingested when any of its proofs is not yet stored; `pending` rows
+     * are skipped, `accepted` becomes `available`, `reserved` is `held` by
+     * the pending melt whose inputs sum to the row (or by no known
+     * operation), `issued`/`externalized` become a `send` transfer with
+     * handed-out proofs, and `error` is `spent` only when the recorded error
+     * says so — everything else is `available` for the next mint check to
+     * decide. Never drops funds; safe to run on every load and on every
+     * device, because ids derive from secrets.
+     */
+    const ingestLegacyRows = (
+      rows: ReadonlyArray<LegacyTokenRow>,
+    ): Effect.Effect<LegacyIngestReport> =>
+      Effect.gen(function* () {
+        const known = storedSecrets(yield* proofStore.loadAll);
+        const pendingMelts = yield* melts.readAll;
+        const linkedMelts = new Set(
+          (yield* proofStore.loadAll)
+            .filter((proof) => proof.state === "held")
+            .map((proof) => proof.operationId),
+        );
+        let ingestedRows = 0;
+        let proofCount = 0;
+        for (const row of rows) {
+          if (row.state === "pending") continue;
+          const decoded = yield* decodeStored(row.tokenText);
+          if (decoded === null) continue;
+          const fresh = decoded.proofs.filter(
+            (proof) => !known.has(proof.secret),
+          );
+          if (fresh.length === 0) continue;
+          for (const proof of fresh) known.add(proof.secret);
+
+          let state: ProofState = "available";
+          let operationId: OperationId | null = null;
+          if (row.state === "reserved") {
+            state = "held";
+            const total = totalAmount(decoded.proofs);
+            const melt = pendingMelts.find(
+              (candidate) =>
+                candidate.mint === decoded.mint &&
+                candidate.inputsTotal === total &&
+                !linkedMelts.has(candidate.id),
+            );
+            if (melt !== undefined) {
+              operationId = melt.id;
+              linkedMelts.add(melt.id);
+            }
+          } else if (row.state === "issued" || row.state === "externalized") {
+            state = row.state === "issued" ? "handedOut" : "externalized";
+            const transfer = yield* insertOperation(
+              ctx,
+              new NewOperation({
+                kind: "send",
+                status: row.state,
+                mint: decoded.mint,
+                unit: decoded.unit,
+                keysetId: null,
+                amount: Amount.make(totalAmount(decoded.proofs)),
+                feeReserve: null,
+                inputsTotal: null,
+                quoteId: null,
+                invoice: null,
+                sourceMint: null,
+                counter: null,
+                locked: null,
+                expiresAt: null,
+                createdAt: row.createdAt,
+                tokenText: row.tokenText,
+                error: null,
+              }),
+              "legacy-ingest",
+            );
+            operationId = transfer.id;
+          } else if (
+            row.state === "error" &&
+            isTokenAlreadySpentError(row.error)
+          ) {
+            state = "spent";
+          }
+          yield* insertProofs(
+            ctx,
+            domainToNewProofs(
+              fresh,
+              decoded.mint,
+              decoded.unit,
+              state,
+              operationId,
+            ),
+            "legacy-ingest",
+          );
+          ingestedRows += 1;
+          proofCount += fresh.length;
+        }
+        return new LegacyIngestReport({ ingestedRows, proofs: proofCount });
+      }).pipe(
+        inspectOperation(inspector, "tokens.ingestLegacyRows", {
+          rows: rows.length,
+        }),
       );
 
     return {
-      list,
+      proofs,
+      operations,
+      transfers,
       balances,
-      reserve,
       markIssued,
       markExternalized,
+      forget,
       returnToWallet,
-      deleteSpent,
-      importRow,
+      importProofs,
+      importOperation,
+      adoptToken,
+      ingestLegacyRows,
     } as const;
   }),
 }) {}

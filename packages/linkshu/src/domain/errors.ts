@@ -5,13 +5,13 @@ import {
   KeysetId,
   MintUrl,
   NonNegativeAmount,
+  OperationId,
   QuoteId,
-  TokenRowId,
 } from "./primitives";
 
 /**
  * Every failure the package reports is a `Schema.TaggedError`: serializable
- * by design so callers can persist it (token rows carry their last failure),
+ * by design so callers can persist it (operations carry their last failure),
  * branch on `_tag`, and render it without string matching.
  *
  * The split between `MintUnreachable` (transient: network, timeout, 5xx —
@@ -36,11 +36,15 @@ export class TokenParseFailed extends Schema.TaggedError<TokenParseFailed>()(
   },
 ) {}
 
-/** Dedup by token text: this token already has a row (any state). */
+/**
+ * Dedup: this token is already in the wallet — a transfer with the same text
+ * exists (`operationId`), or its proofs are already stored (`operationId`
+ * null: the funds are in the inventory, no transfer names the text).
+ */
 export class TokenAlreadyKnown extends Schema.TaggedError<TokenAlreadyKnown>()(
   "TokenAlreadyKnown",
   {
-    rowId: TokenRowId,
+    operationId: Schema.NullOr(OperationId),
   },
 ) {}
 
@@ -100,7 +104,7 @@ export class PaymentFailed extends Schema.TaggedError<PaymentFailed>()(
 
 /**
  * The melt request was sent and the mint has not settled it either way: the
- * inputs stay `reserved` in `rowId` under a durable record that
+ * inputs stay `held` by the melt operation `operationId`, which
  * `Melt.resumePending` settles once the mint answers PAID or UNPAID.
  */
 export class PaymentPending extends Schema.TaggedError<PaymentPending>()(
@@ -108,7 +112,7 @@ export class PaymentPending extends Schema.TaggedError<PaymentPending>()(
   {
     mint: MintUrl,
     quoteId: QuoteId,
-    rowId: TokenRowId,
+    operationId: OperationId,
     amount: Amount,
   },
 ) {}
@@ -139,14 +143,15 @@ export class CounterLockTimeout extends Schema.TaggedError<CounterLockTimeout>()
   },
 ) {}
 
+/** Unspent proofs still name the mint; it cannot be forgotten. */
 export class MintInUse extends Schema.TaggedError<MintInUse>()("MintInUse", {
   mint: MintUrl,
-  rowCount: Schema.Int.pipe(Schema.positive()),
+  proofCount: Schema.Int.pipe(Schema.positive()),
 }) {}
 
-export class TokenRowNotFound extends Schema.TaggedError<TokenRowNotFound>()(
-  "TokenRowNotFound",
+export class OperationNotFound extends Schema.TaggedError<OperationNotFound>()(
+  "OperationNotFound",
   {
-    rowId: TokenRowId,
+    operationId: OperationId,
   },
 ) {}

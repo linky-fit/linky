@@ -24,8 +24,9 @@ import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import type { KeyValueStoreService } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
+import { OperationStore } from "../ports/OperationStore";
+import type { StoredOperation } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
 import { runOnTestClock } from "../testing/clock";
 import {
   answerProofStates,
@@ -34,14 +35,11 @@ import {
   proof,
 } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
+import { proofsIn } from "../testing/inventory";
 import { freshStorage } from "../testing/storage";
 import type { Storage } from "../testing/storage";
 import { PaidQuoteDraft, QuoteLockingKey, TopupDraft } from "./domain";
-import {
-  PENDING_TOPUP_KEY_PREFIX,
-  PendingTopup,
-  pendingTopups,
-} from "./internal/pendingTopup";
+import { topupRecords } from "./internal/topupRecords";
 import { Topup } from "./Topup";
 
 const mint = MintUrl.make("https://mint.example");
@@ -54,6 +52,8 @@ const counterKey = deterministicCounterKey({
 
 const invoice = "lnbc160n1pexampleinvoice";
 const quoteId = "quote-1";
+
+const LEGACY_PENDING_TOPUP_KEY_PREFIX = "linkshu.pendingTopup.";
 
 const mintedProofs = [proof(8, "topup-a"), proof(8, "topup-b")];
 
@@ -131,7 +131,8 @@ const makeHarness = (wallet: LoadedWallet, storage: Storage) => {
           WalletInstances.make({ get: () => Effect.succeed(wallet) }),
         ),
         Layer.succeed(KeyValueStore, storage.kv),
-        Layer.succeed(TokenStore, storage.tokens),
+        Layer.succeed(ProofStore, storage.proofs),
+        Layer.succeed(OperationStore, storage.operations),
         inspector.layer,
       ),
     ),
@@ -158,8 +159,60 @@ const websocketMintInfo = (
 
 const draft = new TopupDraft({ mint, amount: Amount.make(16) });
 
-const pendingKeys = (kv: KeyValueStoreService) =>
-  Effect.runPromise(kv.listKeys(PENDING_TOPUP_KEY_PREFIX));
+const storedProofs = (storage: Storage) =>
+  Effect.runPromise(storage.proofs.loadAll);
+
+const topupOperations = (storage: Storage) =>
+  Effect.runPromise(storage.operations.loadAll).then((operations) =>
+    operations.filter((operation) => operation.kind === "topup"),
+  );
+
+const pendingTopups = (storage: Storage) =>
+  topupOperations(storage).then((operations) =>
+    operations.filter((operation) => operation.status === "pending"),
+  );
+
+const onlyTopup = async (storage: Storage): Promise<StoredOperation> => {
+  const operations = await topupOperations(storage);
+  expect(operations).toHaveLength(1);
+  const [only] = operations;
+  assert(only !== undefined);
+  return only;
+};
+
+/** A pending `topup` operation written the way the flow writes its own. */
+const writePendingTopup = (
+  storage: Storage,
+  record: {
+    readonly counter: number | null;
+    readonly expiresAt?: number | null;
+    readonly createdAt?: number;
+    readonly locked?: boolean;
+  },
+) =>
+  Effect.runPromise(
+    topupRecords({
+      kv: storage.kv,
+      operationStore: storage.operations,
+      inspector: recordingInspector().service,
+    }).create({
+      quoteId: QuoteId.make(quoteId),
+      mint,
+      unit: sat,
+      keysetId: KeysetId.make(KEYSET_HEX),
+      amount: Amount.make(16),
+      invoice: Bolt11Invoice.make(invoice),
+      expiresAt:
+        record.expiresAt === undefined || record.expiresAt === null
+          ? null
+          : UnixSeconds.make(record.expiresAt),
+      createdAt: UnixSeconds.make(
+        record.createdAt ?? Math.floor(Date.now() / 1000),
+      ),
+      counter: record.counter,
+      locked: record.locked ?? false,
+    }),
+  );
 
 const startAndAwait = Effect.gen(function* () {
   const topup = yield* Topup;
@@ -199,8 +252,8 @@ describe("Topup", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt.amount).toBe(16);
     expect(mintCounters).toEqual([1]);
-    expect(await Effect.runPromise(storage.tokens.loadAll)).toHaveLength(1);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(proofsIn(await storedProofs(storage), "available")).toHaveLength(2);
+    expect(await pendingTopups(storage)).toEqual([]);
     expect(
       events
         .filter((event) => event._tag === "QuoteStateChanged")
@@ -208,7 +261,7 @@ describe("Topup", () => {
     ).toEqual(["UNPAID", "PAID", "UNPAID", "PAID"]);
   });
 
-  it("mints an accepted row once the quote reports paid", async () => {
+  it("mints available proofs once the quote reports paid", async () => {
     const storage = freshStorage();
     const { wallet, mintCounters } = makeWallet({
       states: [quoteResponse("PAID")],
@@ -223,17 +276,22 @@ describe("Topup", () => {
     expect(exit.value.receipt.amount).toBe(16);
     expect(exit.value.receipt.quoteId).toBe(quoteId);
 
-    const rows = await Effect.runPromise(storage.tokens.loadAll);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("accepted");
-    expect(rows[0].id).toBe(exit.value.receipt.rowId);
+    const proofs = await storedProofs(storage);
+    expect(proofs).toHaveLength(2);
+    expect(proofs.every((proof) => proof.state === "available")).toBe(true);
+    expect(proofs.every((proof) => proof.operationId === null)).toBe(true);
 
     // Counters floor at 1, and the whole reserved block is burned.
     expect(mintCounters).toEqual([1]);
     expect(await Effect.runPromise(storage.kv.get(counterKey))).toBe("65");
 
-    // The record only exists while the topup is unfinished.
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    // The operation closes with the receipt naming it.
+    const operation = await onlyTopup(storage);
+    expect(operation).toMatchObject({
+      id: exit.value.receipt.operationId,
+      status: "done",
+      counter: 1,
+    });
 
     const quoteEvents = events.filter(
       (event) => event._tag === "QuoteStateChanged",
@@ -246,12 +304,22 @@ describe("Topup", () => {
           event.name === "topup.complete",
       ),
     ).toBe(true);
-    expect(
-      events.some(
-        (event) =>
-          event._tag === "TokenLifecycleChanged" && event.reason === "topup",
-      ),
-    ).toBe(true);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: "ProofsChanged",
+        to: "available",
+        amount: 16,
+        reason: "topup",
+      }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: "OperationChanged",
+        kind: "topup",
+        from: "pending",
+        to: "done",
+      }),
+    );
   });
 
   it("resumes an interrupted topup on a fresh runtime over the same storage", async () => {
@@ -268,7 +336,7 @@ describe("Topup", () => {
     );
     assert(Exit.isSuccess(interrupted));
     expect(interrupted.value.invoice).toBe(invoice);
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(await pendingTopups(storage)).toHaveLength(1);
     expect(first.mintCounters).toEqual([]);
 
     // Second run: same storage, nothing in memory. The invoice was paid in
@@ -281,10 +349,8 @@ describe("Topup", () => {
     expect(resumed.value.count).toBe(1);
     expect(resumed.value.receipt?.amount).toBe(16);
 
-    const rows = await Effect.runPromise(storage.tokens.loadAll);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("accepted");
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(proofsIn(await storedProofs(storage), "available")).toHaveLength(2);
+    expect((await onlyTopup(storage)).status).toBe("done");
   });
 
   it("reclaims proofs a lost response already had signed, without minting twice", async () => {
@@ -304,7 +370,7 @@ describe("Topup", () => {
 
     // The reserved slot survived the crash, so the resume re-derives exactly
     // the outputs the mint signed.
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(await pendingTopups(storage)).toMatchObject([{ counter: 1 }]);
     expect(interrupting.mintCounters).toEqual([1]);
 
     const resuming = makeWallet({
@@ -322,36 +388,22 @@ describe("Topup", () => {
     expect(resuming.mintCounters).toEqual([]);
     expect(resuming.restoreCalls).toEqual([{ start: 1, count: 64 }]);
 
-    const rows = await Effect.runPromise(storage.tokens.loadAll);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("accepted");
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(proofsIn(await storedProofs(storage), "available")).toHaveLength(2);
+    expect((await onlyTopup(storage)).status).toBe("done");
   });
 
-  it("resolves to the stored row when the proofs landed before the crash", async () => {
+  it("resolves to the stored proofs when they landed before the crash", async () => {
     const storage = freshStorage();
     const first = makeWallet({ states: [quoteResponse("PAID")] });
     const done = await makeHarness(first.wallet, storage).run(startAndAwait);
     assert(Exit.isSuccess(done));
 
-    // The row was written but the record never cleared — the one window
-    // `persistMinted` leaves open. Resuming must find the stored proofs
-    // rather than import them a second time.
+    // The proofs were written but the operation never closed — the one
+    // window `persistMinted` leaves open. Resuming must find the stored
+    // proofs rather than import them a second time.
+    const operation = await onlyTopup(storage);
     await Effect.runPromise(
-      pendingTopups.write(
-        storage.kv,
-        new PendingTopup({
-          quoteId: QuoteId.make(quoteId),
-          mint,
-          unit: sat,
-          keysetId: KeysetId.make(KEYSET_HEX),
-          amount: Amount.make(16),
-          invoice: Bolt11Invoice.make(invoice),
-          expiresAt: null,
-          createdAt: UnixSeconds.make(Math.floor(Date.now() / 1000)),
-          mintCounter: 1,
-        }),
-      ),
+      storage.operations.update(operation.id, { status: "pending" }),
     );
 
     const resuming = makeWallet({
@@ -364,14 +416,15 @@ describe("Topup", () => {
     );
 
     assert(Exit.isSuccess(resumed));
-    expect(resumed.value.receipt?.rowId).toBe(done.value.receipt.rowId);
+    expect(resumed.value.receipt?.operationId).toBe(
+      done.value.receipt.operationId,
+    );
 
-    const rows = await Effect.runPromise(storage.tokens.loadAll);
-    expect(rows).toHaveLength(1);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(await storedProofs(storage)).toHaveLength(2);
+    expect((await onlyTopup(storage)).status).toBe("done");
   });
 
-  it("fails with QuoteExpired and drops the record once an unpaid quote expires", async () => {
+  it("fails with QuoteExpired and closes the operation once an unpaid quote expires", async () => {
     const storage = freshStorage();
     const expired = Math.floor(Date.now() / 1000) - 60;
     const { wallet } = makeWallet({
@@ -385,11 +438,11 @@ describe("Topup", () => {
     assert(Exit.isSuccess(exit));
     assert(exit.value._tag === "Left");
     expect(exit.value.left._tag).toBe("QuoteExpired");
-    expect(await Effect.runPromise(storage.tokens.loadAll)).toEqual([]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(await storedProofs(storage)).toEqual([]);
+    expect((await onlyTopup(storage)).status).toBe("failed");
   });
 
-  it("keeps the record when the mint is unreachable across the deadline", async () => {
+  it("keeps the operation when the mint is unreachable across the deadline", async () => {
     const storage = freshStorage();
     const { wallet } = makeWallet({
       // The TestClock starts the topup at t=1000s, so this deadline passes
@@ -412,30 +465,20 @@ describe("Topup", () => {
     // Unreachable, not expired: only the mint's own UNPAID answer may expire
     // a quote — it might have been paid while we could not check.
     expect(exit.value.left._tag).toBe("MintUnreachable");
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(await pendingTopups(storage)).toHaveLength(1);
   });
 
-  it("rescues a paid quote whose record outlived its deadline", async () => {
+  it("rescues a paid quote whose operation outlived its deadline", async () => {
     const storage = freshStorage();
     const expired = Math.floor(Date.now() / 1000) - 3600;
     // Crash window: the invoice was paid, but the process died before any
-    // mint attempt reserved counters — the record must not be pruned on time.
-    await Effect.runPromise(
-      pendingTopups.write(
-        storage.kv,
-        new PendingTopup({
-          quoteId: QuoteId.make(quoteId),
-          mint,
-          unit: sat,
-          keysetId: KeysetId.make(KEYSET_HEX),
-          amount: Amount.make(16),
-          invoice: Bolt11Invoice.make(invoice),
-          expiresAt: UnixSeconds.make(expired),
-          createdAt: UnixSeconds.make(expired - 600),
-          mintCounter: null,
-        }),
-      ),
-    );
+    // mint attempt reserved counters — the operation must not be pruned on
+    // time.
+    await writePendingTopup(storage, {
+      counter: null,
+      expiresAt: expired,
+      createdAt: expired - 600,
+    });
 
     const { wallet, mintCounters } = makeWallet({
       states: [quoteResponse("PAID")],
@@ -446,28 +489,17 @@ describe("Topup", () => {
     expect(resumed.value.count).toBe(1);
     expect(resumed.value.receipt?.amount).toBe(16);
     expect(mintCounters).toEqual([1]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect((await onlyTopup(storage)).status).toBe("done");
   });
 
-  it("drops an expired record once the mint confirms it unpaid on resume", async () => {
+  it("closes an expired operation once the mint confirms it unpaid on resume", async () => {
     const storage = freshStorage();
     const expired = Math.floor(Date.now() / 1000) - 3600;
-    await Effect.runPromise(
-      pendingTopups.write(
-        storage.kv,
-        new PendingTopup({
-          quoteId: QuoteId.make(quoteId),
-          mint,
-          unit: sat,
-          keysetId: KeysetId.make(KEYSET_HEX),
-          amount: Amount.make(16),
-          invoice: Bolt11Invoice.make(invoice),
-          expiresAt: UnixSeconds.make(expired),
-          createdAt: UnixSeconds.make(expired - 600),
-          mintCounter: null,
-        }),
-      ),
-    );
+    await writePendingTopup(storage, {
+      counter: null,
+      expiresAt: expired,
+      createdAt: expired - 600,
+    });
 
     const { wallet } = makeWallet({ states: [quoteResponse("UNPAID")] });
     const resumed = await makeHarness(wallet, storage).run(
@@ -481,7 +513,7 @@ describe("Topup", () => {
     assert(Exit.isSuccess(resumed));
     assert(resumed.value?._tag === "Left");
     expect(resumed.value.left._tag).toBe("QuoteExpired");
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect((await onlyTopup(storage)).status).toBe("failed");
   });
 
   it("moves past a counter collision and mints on the recovered slot", async () => {
@@ -509,10 +541,13 @@ describe("Topup", () => {
     // The NUT-09 probe found signatures past the reserved block, so the retry
     // starts beyond them rather than at the block's end.
     expect(mintCounters).toEqual([1, 101]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(await onlyTopup(storage)).toMatchObject({
+      status: "done",
+      counter: 101,
+    });
   });
 
-  it("surfaces a definitive mint rejection and keeps the record for a retry", async () => {
+  it("surfaces a definitive mint rejection and keeps the operation for a retry", async () => {
     const storage = freshStorage();
     const { wallet } = makeWallet({
       states: [quoteResponse("PAID")],
@@ -526,9 +561,9 @@ describe("Topup", () => {
     assert(Exit.isSuccess(exit));
     assert(exit.value._tag === "Left");
     expect(exit.value.left._tag).toBe("MintRejected");
-    // A reserved counter means the invoice was paid: the record must outlive
-    // the failure so the funds stay reclaimable.
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    // A reserved counter means the invoice was paid: the operation must
+    // outlive the failure so the funds stay reclaimable.
+    expect(await pendingTopups(storage)).toMatchObject([{ counter: 1 }]);
   });
 
   it.each(["QuoteExpired", "MintRejected", "MintUnreachable"])(
@@ -597,9 +632,9 @@ describe("Topup", () => {
       expect(result.disconnects).toBe(1);
       expect(checks).toBe(errorTag === "MintUnreachable" ? 10 : 1);
       expect(mintCounters).toEqual([]);
-      expect(await Effect.runPromise(storage.tokens.loadAll)).toEqual([]);
-      expect(await pendingKeys(storage.kv)).toHaveLength(
-        errorTag === "QuoteExpired" ? 0 : 1,
+      expect(await storedProofs(storage)).toEqual([]);
+      expect((await onlyTopup(storage)).status).toBe(
+        errorTag === "QuoteExpired" ? "failed" : "pending",
       );
     },
   );
@@ -657,7 +692,7 @@ describe("Topup", () => {
     expect(cancelled).toBe(1);
     expect(disconnects).toBe(1);
     expect(mintCounters).toEqual([]);
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(await pendingTopups(storage)).toHaveLength(1);
   });
 
   it("settles from a NUT-17 push without the poll ever seeing it paid", async () => {
@@ -699,7 +734,7 @@ describe("Topup", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt.amount).toBe(16);
     expect(mintCounters).toEqual([1]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(await pendingTopups(storage)).toEqual([]);
     // The socket is closed again once it has delivered.
     expect(cancelled).toBe(1);
 
@@ -878,7 +913,7 @@ const adoptAndAwait = (draft: PaidQuoteDraft, key?: QuoteLockingKey) =>
   });
 
 describe("Topup.adopt", () => {
-  it("mints a quote someone else paid into an accepted row", async () => {
+  it("mints a quote someone else paid into available proofs", async () => {
     const storage = freshStorage();
     const { wallet, mintCounters, mintConfigs } = makeWallet({
       states: [quoteResponse("PAID")],
@@ -894,10 +929,12 @@ describe("Topup.adopt", () => {
     expect(mintCounters).toEqual([1]);
     expect(mintConfigs).toEqual([undefined]);
 
-    const rows = await Effect.runPromise(storage.tokens.loadAll);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("accepted");
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(proofsIn(await storedProofs(storage), "available")).toHaveLength(2);
+    expect(await onlyTopup(storage)).toMatchObject({
+      id: exit.value.right.operationId,
+      status: "done",
+      locked: false,
+    });
     expect(
       events.some(
         (event) =>
@@ -918,8 +955,12 @@ describe("Topup.adopt", () => {
     assert(Exit.isSuccess(exit));
     assert(exit.value._tag === "Right");
     expect(mintConfigs).toEqual([{ privkey: lockingKey }]);
-    // The key must never leave through the inspector.
+    expect((await onlyTopup(storage)).locked).toBe(true);
+    // The key must never leave through the inspector or the store.
     expect(JSON.stringify(events)).not.toContain(lockingKey);
+    expect(JSON.stringify(await topupOperations(storage))).not.toContain(
+      lockingKey,
+    );
   });
 
   it("rejects a locked quote without its key before touching the mint", async () => {
@@ -935,7 +976,7 @@ describe("Topup.adopt", () => {
     assert(exit.value._tag === "Left");
     expect(exit.value.left._tag).toBe("MintRejected");
     expect(mintCounters).toEqual([]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(await topupOperations(storage)).toEqual([]);
   });
 
   it("leaves a quote another wallet already minted alone", async () => {
@@ -952,7 +993,7 @@ describe("Topup.adopt", () => {
     expect(exit.value.left._tag).toBe("QuoteAlreadyIssued");
     expect(mintCounters).toEqual([]);
     expect(restoreCalls).toEqual([]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(await topupOperations(storage)).toEqual([]);
     expect(await Effect.runPromise(storage.kv.get(counterKey))).toBeNull();
   });
 
@@ -969,7 +1010,7 @@ describe("Topup.adopt", () => {
     assert(exit.value._tag === "Left");
     expect(exit.value.left._tag).toBe("MintRejected");
     expect(mintCounters).toEqual([]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(await topupOperations(storage)).toEqual([]);
   });
 
   it("resumes an adopted locked quote after a crash, key in hand", async () => {
@@ -984,9 +1025,11 @@ describe("Topup.adopt", () => {
     assert(Exit.isSuccess(crashed));
     assert(crashed.value._tag === "Left");
     expect(crashed.value.left._tag).toBe("MintUnreachable");
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(await pendingTopups(storage)).toMatchObject([
+      { locked: true, counter: 1 },
+    ]);
 
-    // Without the key the resumed record fails before any mint call and
+    // Without the key the resumed operation fails before any mint call and
     // stays put; with it, the interrupted attempt finishes on its slot.
     const keyless = makeWallet({ states: [quoteResponse("PAID")] });
     const stuck = await makeHarness(keyless.wallet, storage).run(
@@ -1000,7 +1043,7 @@ describe("Topup.adopt", () => {
     assert(stuck.value?._tag === "Left");
     expect(stuck.value.left._tag).toBe("MintRejected");
     expect(keyless.mintCounters).toEqual([]);
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(await pendingTopups(storage)).toHaveLength(1);
 
     const resuming = makeWallet({ states: [quoteResponse("PAID")] });
     const resumed = await makeHarness(resuming.wallet, storage).run(
@@ -1014,15 +1057,19 @@ describe("Topup.adopt", () => {
     expect(resumed.value?.amount).toBe(16);
     expect(resuming.mintCounters).toEqual([1]);
     expect(resuming.mintConfigs).toEqual([{ privkey: lockingKey }]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect((await onlyTopup(storage)).status).toBe("done");
   });
 
-  it("decodes records written before the locked flag existed", async () => {
+  it("carries a legacy key-value record over into a topup operation", async () => {
     const storage = freshStorage();
+    const legacyKey =
+      LEGACY_PENDING_TOPUP_KEY_PREFIX +
+      [mint, quoteId].map(encodeURIComponent).join(".");
+    // Written before the `locked` flag existed, by an attempt that reserved
+    // slot 1 and lost the mint's response.
     await Effect.runPromise(
       storage.kv.set(
-        PENDING_TOPUP_KEY_PREFIX +
-          [mint, quoteId].map(encodeURIComponent).join("."),
+        legacyKey,
         JSON.stringify({
           quoteId,
           mint,
@@ -1032,17 +1079,35 @@ describe("Topup.adopt", () => {
           invoice,
           expiresAt: null,
           createdAt: Math.floor(Date.now() / 1000),
-          mintCounter: null,
+          mintCounter: 1,
         }),
       ),
     );
-    const { wallet, mintConfigs } = makeWallet({
-      states: [quoteResponse("PAID")],
+    const { wallet, mintCounters, restoreCalls } = makeWallet({
+      states: [quoteResponse("ISSUED")],
+      restore: () =>
+        Promise.resolve({ proofs: mintedProofs, lastCounterWithSignature: 2 }),
     });
     const resumed = await makeHarness(wallet, storage).run(resumeAndAwait);
 
     assert(Exit.isSuccess(resumed));
     expect(resumed.value.receipt?.amount).toBe(16);
-    expect(mintConfigs).toEqual([undefined]);
+    // The carried-over slot is reclaimed, never minted again.
+    expect(mintCounters).toEqual([]);
+    expect(restoreCalls).toEqual([{ start: 1, count: 64 }]);
+    expect(await onlyTopup(storage)).toMatchObject({
+      kind: "topup",
+      status: "done",
+      mint,
+      quoteId,
+      amount: 16,
+      counter: 1,
+      locked: false,
+    });
+    expect(
+      await Effect.runPromise(
+        storage.kv.listKeys(LEGACY_PENDING_TOPUP_KEY_PREFIX),
+      ),
+    ).toEqual([]);
   });
 });

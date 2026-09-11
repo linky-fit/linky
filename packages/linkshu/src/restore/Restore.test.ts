@@ -1,22 +1,19 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { getEncodedToken, Keyset } from "@cashu/cashu-ts";
+import { Keyset } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import { MintUnreachable } from "../domain/errors";
-import {
-  CurrencyUnit,
-  KeysetId,
-  MintUrl,
-  TokenText,
-} from "../domain/primitives";
+import { CurrencyUnit, KeysetId, MintUrl } from "../domain/primitives";
 import { deterministicCounterKey } from "../internal/counters";
 import { seenMintKey, WalletInstances } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
+import { inMemoryOperationStore } from "../ports/inMemoryOperationStore";
+import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { NewTokenRow, TokenStore } from "../ports/TokenStore";
+import { ProofStore } from "../ports/ProofStore";
+import type { ProofState } from "../ports/ProofStore";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { parseTokenText } from "../token/codec";
+import { amountIn, secretsOf, seedProofs } from "../testing/inventory";
 import { RestoreDraft } from "./domain";
 import { restoreCursorKey, seenKeysetKey } from "./internal/restoreState";
 import { Restore } from "./Restore";
@@ -103,14 +100,15 @@ const makeHarness = (args: HarnessArgs) => {
           }),
         ),
         inMemoryKeyValueStore,
-        inMemoryTokenStore,
+        inMemoryProofStore,
+        inMemoryOperationStore,
         inspector.layer,
       ),
     ),
   );
 
   const run = <A, E>(
-    program: Effect.Effect<A, E, Restore | TokenStore | KeyValueStore>,
+    program: Effect.Effect<A, E, Restore | ProofStore | KeyValueStore>,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
 
   return { run, restoreCalls, events: inspector.events };
@@ -123,14 +121,14 @@ const restoreAt = (mints: ReadonlyArray<MintUrl> = [mint]) =>
     const kv = yield* KeyValueStore;
     return {
       report,
-      rows: yield* (yield* TokenStore).loadAll,
+      proofs: yield* (yield* ProofStore).loadAll,
       counter: yield* kv.get(counterKey),
       cursor: yield* kv.get(cursorKey),
     };
   });
 
 describe("Restore.restore", () => {
-  it("recovers signed proofs into an accepted row and moves cursor and counter past them", async () => {
+  it("recovers signed proofs as available and moves cursor and counter past them", async () => {
     const { run, restoreCalls } = makeHarness({
       signed: [
         { slot: 3, proof: proof(4, "r1") },
@@ -141,16 +139,16 @@ describe("Restore.restore", () => {
     const exit = await run(restoreAt());
 
     assert(Exit.isSuccess(exit));
-    const { report, rows, counter, cursor } = exit.value;
+    const { report, proofs, counter, cursor } = exit.value;
 
     expect(report.restoredAmount).toBe(12);
-    expect(report.rows).toHaveLength(1);
+    expect(report.restoredProofs).toBe(2);
     expect(report.scannedMints).toEqual([mint]);
     expect(report.unavailableMints).toEqual([]);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.state).toBe("accepted");
-    expect(parseTokenText(rows[0]?.tokenText ?? "")?.amount).toBe(12);
+    expect(secretsOf(proofs)).toEqual(["r1", "r2"]);
+    expect(amountIn(proofs, "available")).toBe(12);
+    expect(proofs.every((entry) => entry.mint === mint)).toBe(true);
 
     // Both positions move past the last signature the mint reported.
     expect(cursor).toBe("6");
@@ -174,8 +172,8 @@ describe("Restore.restore", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.first.report.restoredAmount).toBe(4);
     expect(exit.value.second.report.restoredAmount).toBe(0);
-    expect(exit.value.second.report.rows).toEqual([]);
-    expect(exit.value.second.rows).toHaveLength(1);
+    expect(exit.value.second.report.restoredProofs).toBe(0);
+    expect(exit.value.second.proofs).toHaveLength(1);
     expect(exit.value.second.cursor).toBe("4");
   });
 
@@ -184,47 +182,55 @@ describe("Restore.restore", () => {
       signed: [
         { slot: 1, proof: proof(4, "spent") },
         { slot: 2, proof: proof(8, "live") },
+        { slot: 3, proof: proof(16, "pending") },
       ],
-      stateOf: (secret) => (secret === "spent" ? "SPENT" : "UNSPENT"),
+      stateOf: (secret) =>
+        secret === "spent"
+          ? "SPENT"
+          : secret === "pending"
+            ? "PENDING"
+            : "UNSPENT",
     });
 
     const exit = await run(restoreAt());
 
     assert(Exit.isSuccess(exit));
     expect(exit.value.report.restoredAmount).toBe(8);
-    expect(parseTokenText(exit.value.rows[0]?.tokenText ?? "")?.amount).toBe(8);
+    expect(secretsOf(exit.value.proofs)).toEqual(["live"]);
+    expect(exit.value.proofs[0]?.state).toBe("available");
   });
 
-  it("skips proofs already stored in any row", async () => {
-    const stored = getEncodedToken({
-      mint,
-      unit: "sat",
-      proofs: [proof(4, "r1")],
-    });
-    const { run } = makeHarness({
-      signed: [
-        { slot: 1, proof: proof(4, "r1") },
-        { slot: 2, proof: proof(8, "r2") },
-      ],
-    });
+  it.each([
+    "available",
+    "held",
+    "handedOut",
+    "externalized",
+    "spent",
+  ] as const satisfies ReadonlyArray<ProofState>)(
+    "skips a signed proof already stored as %s",
+    async (state) => {
+      const { run } = makeHarness({
+        signed: [
+          { slot: 1, proof: proof(4, "r1") },
+          { slot: 2, proof: proof(8, "r2") },
+        ],
+      });
 
-    const exit = await run(
-      Effect.gen(function* () {
-        yield* (yield* TokenStore).insert(
-          new NewTokenRow({
-            originalTokenText: TokenText.make(stored),
-            tokenText: TokenText.make(stored),
-            state: "issued",
-            error: null,
-          }),
-        );
-        return yield* restoreAt();
-      }),
-    );
+      const exit = await run(
+        Effect.gen(function* () {
+          yield* seedProofs(mint, [proof(4, "r1")], state);
+          return yield* restoreAt();
+        }),
+      );
 
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.report.restoredAmount).toBe(8);
-  });
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.report.restoredAmount).toBe(8);
+      expect(exit.value.report.restoredProofs).toBe(1);
+      expect(
+        exit.value.proofs.find((entry) => entry.secret === "r1")?.state,
+      ).toBe(state);
+    },
+  );
 
   it("reports an unreachable mint instead of failing", async () => {
     const { run } = makeHarness({
@@ -240,7 +246,7 @@ describe("Restore.restore", () => {
       scannedMints: [],
       unavailableMints: [mint],
     });
-    expect(exit.value.rows).toEqual([]);
+    expect(exit.value.proofs).toEqual([]);
     expect(exit.value.cursor).toBeNull();
   });
 
@@ -302,7 +308,7 @@ describe("Restore.restore", () => {
     expect(restoreCalls).toHaveLength(1);
   });
 
-  it("emits the restore operation and the counter move, without proof secrets", async () => {
+  it("emits the proof batch and the counter move, without proof secrets", async () => {
     const { run, events } = makeHarness({
       signed: [{ slot: 2, proof: proof(4, "r1") }],
     });
@@ -310,10 +316,18 @@ describe("Restore.restore", () => {
     await run(restoreAt());
 
     expect(events.map((event) => event._tag)).toEqual([
-      "TokenLifecycleChanged",
+      "ProofsChanged",
       "CounterAdvanced",
       "OperationSucceeded",
     ]);
+    expect(events[0]).toMatchObject({
+      mint,
+      count: 1,
+      amount: 4,
+      from: null,
+      to: "available",
+      reason: "restore",
+    });
     expect(events[1]).toMatchObject({ from: 1, to: 3, reason: "restore" });
     expect(events[2]).toMatchObject({ name: "restore.restore" });
     const serialized = JSON.stringify(events);
@@ -340,6 +354,7 @@ describe("Restore.wipeSeedBoundState", () => {
           cursor: yield* kv.get(cursorKey),
           seenMint: yield* kv.get(seenMintKey(mint)),
           seenKeyset: yield* kv.get(seenKeysetKey(mint, sat, keysetHex)),
+          proofs: (yield* (yield* ProofStore).loadAll).length,
         };
       }),
     );
@@ -350,6 +365,7 @@ describe("Restore.wipeSeedBoundState", () => {
         cursor: null,
         seenMint: mint,
         seenKeyset: keysetHex,
+        proofs: 1,
       }),
     );
   });

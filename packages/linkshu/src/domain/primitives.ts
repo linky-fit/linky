@@ -79,11 +79,24 @@ export const QuoteId = Schema.NonEmptyTrimmedString.pipe(
 );
 export type QuoteId = typeof QuoteId.Type;
 
-/** Id of a stored token row; assigned by the `TokenStore` implementation. */
-export const TokenRowId = Schema.NonEmptyTrimmedString.pipe(
-  Schema.brand("TokenRowId"),
+/**
+ * Id of a stored proof row. The `ProofStore` derives it from the proof's
+ * secret, so every device that stores one proof stores it under one id.
+ */
+export const ProofId = Schema.NonEmptyTrimmedString.pipe(
+  Schema.brand("ProofId"),
 );
-export type TokenRowId = typeof TokenRowId.Type;
+export type ProofId = typeof ProofId.Type;
+
+/**
+ * Id of a stored operation. The `OperationStore` derives it from the
+ * operation's key (`operationKeyOf`): the token text of a transfer, the
+ * quote of a mint or melt.
+ */
+export const OperationId = Schema.NonEmptyTrimmedString.pipe(
+  Schema.brand("OperationId"),
+);
+export type OperationId = typeof OperationId.Type;
 
 /** Deterministic-derivation counter position (NUT-13); per mint/unit/keyset. */
 export const DeterministicCounter = Schema.Int.pipe(

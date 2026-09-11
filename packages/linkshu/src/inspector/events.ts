@@ -6,10 +6,11 @@ import {
   KeysetId,
   MintUrl,
   NonNegativeAmount,
+  OperationId,
   QuoteId,
-  TokenRowId,
 } from "../domain/primitives";
-import { TokenState } from "../token/domain";
+import { OperationKind, OperationStatus } from "../ports/OperationStore";
+import { ProofState } from "../ports/ProofStore";
 
 /**
  * Diagnostic taps over everything linkshu does, emitted only when the
@@ -37,13 +38,31 @@ export class OperationFailed extends Schema.TaggedClass<OperationFailed>()(
   },
 ) {}
 
-/** A stored token row changed state; `from` is null for fresh rows. */
-export class TokenLifecycleChanged extends Schema.TaggedClass<TokenLifecycleChanged>()(
-  "TokenLifecycleChanged",
+/**
+ * A batch of stored proofs changed state; `from` is null for fresh proofs.
+ * Amounts and counts only — the proofs themselves never travel.
+ */
+export class ProofsChanged extends Schema.TaggedClass<ProofsChanged>()(
+  "ProofsChanged",
   {
-    rowId: TokenRowId,
-    from: Schema.NullOr(TokenState),
-    to: TokenState,
+    mint: MintUrl,
+    count: Schema.Int,
+    amount: NonNegativeAmount,
+    from: Schema.NullOr(ProofState),
+    to: ProofState,
+    operationId: Schema.NullOr(OperationId),
+    reason: Schema.String,
+  },
+) {}
+
+/** A stored operation changed status; `from` is null for fresh operations. */
+export class OperationChanged extends Schema.TaggedClass<OperationChanged>()(
+  "OperationChanged",
+  {
+    operationId: OperationId,
+    kind: OperationKind,
+    from: Schema.NullOr(OperationStatus),
+    to: OperationStatus,
     reason: Schema.String,
   },
 ) {}
@@ -96,7 +115,8 @@ export class LightningFeeProbed extends Schema.TaggedClass<LightningFeeProbed>()
 export const LinkshuInspectorEvent = Schema.Union(
   OperationSucceeded,
   OperationFailed,
-  TokenLifecycleChanged,
+  ProofsChanged,
+  OperationChanged,
   CounterAdvanced,
   QuoteStateChanged,
   LightningFeeProbed,

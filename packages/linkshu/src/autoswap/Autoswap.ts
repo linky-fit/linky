@@ -28,10 +28,12 @@ import {
 } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
+import { OperationStore } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
 import { AutoswapClaimResult, AutoswapReceipt } from "./domain";
 import type { AutoswapDraft, AutoswapError } from "./domain";
-import { PendingAutoswapClaim, pendingClaims } from "./internal/pendingClaim";
+import { autoswapRecords } from "./internal/autoswapRecords";
+import type { PendingAutoswapClaim } from "./internal/autoswapRecords";
 
 /**
  * Attempts at sizing the swap. Every failed one only costs an unpaid mint
@@ -55,8 +57,8 @@ const asAutoswapError = (error: MeltError): AutoswapError =>
 /**
  * Consolidating a foreign mint's balance into the main mint: quote a topup at
  * the target, melt the source balance against that invoice (stepping the
- * amount down on shortage), persist the claim before touching rows, then mint
- * at the target. Pending claims survive crashes and are drained by
+ * amount down on shortage), persist the claim before touching proofs, then
+ * mint at the target. Pending claims survive crashes and are drained by
  * `resumePendingClaims`, which mints deterministically off the persisted
  * counter slots so an interrupted claim never mints twice. When to trigger a
  * swap (thresholds, debounce, opt-in) stays caller policy.
@@ -65,22 +67,22 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
   dependencies: [WalletInstances.Default, Melt.Default],
   effect: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
-    const tokenStore = yield* TokenStore;
+    const proofStore = yield* ProofStore;
+    const operationStore = yield* OperationStore;
     const instances = yield* WalletInstances;
     const melt = yield* Melt;
     const inspector = yield* Inspector.orNoop;
+    const records = autoswapRecords({ kv, operationStore, inspector });
 
     const claimContext = (
       wallet: LoadedWallet,
     ): QuoteClaimContext<PendingAutoswapClaim> => ({
       kv,
       inspector,
-      tokenStore,
+      proofStore,
       wallet,
       reason: "autoswap",
-      withMintCounter: (record, mintCounter) =>
-        new PendingAutoswapClaim({ ...record, mintCounter }),
-      records: pendingClaims,
+      records,
     });
 
     const createTargetQuote = (
@@ -155,7 +157,8 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
           draft.targetMint,
           amount,
         );
-        const record = new PendingAutoswapClaim({
+        // The record lands before the melt can pay the invoice.
+        const record = yield* records.create({
           quoteId: quote.quoteId,
           mint: draft.targetMint,
           unit: sat,
@@ -163,11 +166,10 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
           amount: Amount.make(amount),
           invoice: quote.invoice,
           sourceMint: draft.sourceMint,
+          expiresAt: quote.expiresAt,
           createdAt: UnixSeconds.make(yield* nowSeconds),
-          mintCounter: null,
+          counter: null,
         });
-        // The record lands before the melt can pay the invoice.
-        yield* pendingClaims.write(kv, record);
         emitQuoteState(inspector, "autoswap", record, quote.state);
 
         const paid = yield* Effect.either(
@@ -179,7 +181,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
           if (paid.left._tag !== "InsufficientFunds") {
             return yield* Effect.fail(asAutoswapError(paid.left));
           }
-          yield* pendingClaims.remove(kv, record);
+          yield* records.settle(record, "failed");
           return Either.left(paid.left);
         }
 
@@ -190,7 +192,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
             targetMint: draft.targetMint,
             movedAmount: claimed.amount,
             feePaid: paid.right.feePaid,
-            rowId: claimed.rowId,
+            operationId: claimed.operationId,
           }),
         );
       });
@@ -203,7 +205,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
         const target = yield* instances.get(draft.targetMint, sat);
         const keysetId = yield* boundKeysetId(draft.targetMint, target);
         const { spendable, available } = yield* selectSpendableProofs({
-          tokenStore,
+          proofStore,
           inspector,
           wallet: source,
           mint: draft.sourceMint,
@@ -256,7 +258,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
         quoteId: pending.quoteId,
         targetMint: pending.mint,
         status,
-        rowId: claimed?.rowId ?? null,
+        operationId: pending.id,
         amount: claimed?.amount ?? null,
       });
 
@@ -264,7 +266,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       pending: PendingAutoswapClaim,
     ): Effect.Effect<AutoswapClaimResult> =>
       Effect.as(
-        pendingClaims.remove(kv, pending),
+        records.settle(pending, "failed"),
         resultOf(pending, "dropped", null),
       );
 
@@ -278,7 +280,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       pending: PendingAutoswapClaim,
     ): Effect.Effect<AutoswapClaimResult> =>
       Effect.flatMap(nowSeconds, (now) =>
-        now > pendingClaims.deadlineOf(pending)
+        now > records.deadlineOf(pending)
           ? dropClaim(pending)
           : Effect.succeed(resultOf(pending, "not-claimable-yet", null)),
       );
@@ -317,7 +319,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       ReadonlyArray<AutoswapClaimResult>
     > = Effect.gen(function* () {
       const results: AutoswapClaimResult[] = [];
-      for (const pending of yield* pendingClaims.readAll(kv)) {
+      for (const pending of yield* records.readAll) {
         results.push(yield* resumeOne(pending));
       }
       return results;

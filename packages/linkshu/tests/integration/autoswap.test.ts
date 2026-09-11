@@ -7,36 +7,30 @@ import {
   Bolt11Invoice,
   CurrencyUnit,
   KeysetId,
+  NewOperation,
   QuoteId,
-  parseTokenText,
   Receive,
   ReceiveDraft,
   runLinkshu,
   UnixSeconds,
 } from "../../src";
-import type { KeyValueStoreService } from "../../src";
 import {
-  PENDING_AUTOSWAP_CLAIM_KEY_PREFIX,
-  PendingAutoswapClaim,
-  pendingClaims,
-} from "../../src/autoswap/internal/pendingClaim";
-import {
-  acceptedTotalOf,
+  availableTotalOf,
   durableStorage,
   fundToken,
   loadMintWallet,
   mintUrl,
+  pendingOperations,
   randomSeed,
   targetMintUrl,
+  toCashuProofs,
+  tokenOf,
 } from "./helpers";
-
-const pendingKeys = (kv: KeyValueStoreService) =>
-  Effect.runPromise(kv.listKeys(PENDING_AUTOSWAP_CLAIM_KEY_PREFIX));
 
 describe("autoswap between local mints", () => {
   it("moves the source balance into spendable proofs at another mint", async () => {
     expect(targetMintUrl).not.toBe(mintUrl);
-    const { kv, tokens, layers } = durableStorage();
+    const { proofs, operations, layers } = durableStorage();
     const funded = await fundToken(256);
 
     const { receipt, funding } = await runLinkshu(
@@ -56,43 +50,53 @@ describe("autoswap between local mints", () => {
     expect(receipt.targetMint).toBe(targetMintUrl);
     expect(receipt.movedAmount).toBeGreaterThan(0);
 
-    const rows = await Effect.runPromise(tokens.loadAll);
-    const claimed = rows.find((row) => row.id === receipt.rowId);
-    expect(claimed?.state).toBe("accepted");
-    if (!claimed) throw new Error("Missing target mint row");
-    expect(parseTokenText(claimed.tokenText)).toMatchObject({
+    const stored = await Effect.runPromise(proofs.loadAll);
+    const target = stored.filter((proof) => proof.mint === targetMintUrl);
+    expect(target.length).toBeGreaterThan(0);
+    expect(target.every((proof) => proof.state === "available")).toBe(true);
+    expect(availableTotalOf(target)).toBe(receipt.movedAmount);
+
+    const source = stored.filter((proof) => proof.mint === mintUrl);
+    expect(availableTotalOf(source)).toBeLessThan(16);
+    // Nothing is held: the melt closed and its inputs are spent on record.
+    expect(
+      stored.every(
+        (proof) => proof.state === "available" || proof.state === "spent",
+      ),
+    ).toBe(true);
+
+    const available = availableTotalOf(stored);
+    expect(available).toBeGreaterThanOrEqual(receipt.movedAmount);
+    expect(funding.amount - available).toBeGreaterThanOrEqual(receipt.feePaid);
+    expect(funding.amount - available).toBeLessThanOrEqual(16);
+    expect(await pendingOperations(operations, "autoswap")).toEqual([]);
+    expect(
+      (await Effect.runPromise(operations.loadAll)).find(
+        (operation) => operation.id === receipt.operationId,
+      ),
+    ).toMatchObject({
+      kind: "autoswap",
+      status: "done",
       mint: targetMintUrl,
-      amount: receipt.movedAmount,
+      sourceMint: mintUrl,
     });
 
-    const sourceRows = rows.filter(
-      (row) => parseTokenText(row.tokenText)?.mint === mintUrl,
-    );
-    expect(acceptedTotalOf(sourceRows)).toBeLessThan(16);
-    expect(rows.every((row) => row.state === "accepted")).toBe(true);
-
-    const accepted = acceptedTotalOf(rows);
-    expect(accepted).toBeGreaterThanOrEqual(receipt.movedAmount);
-    expect(funding.amount - accepted).toBeGreaterThanOrEqual(receipt.feePaid);
-    expect(funding.amount - accepted).toBeLessThanOrEqual(16);
-    expect(await pendingKeys(kv)).toEqual([]);
-
-    const source = await loadMintWallet();
-    const sourceStates = await source.checkProofsStates(
-      getDecodedToken(funding.tokenText, [source.keysetId]).proofs,
+    const sourceWallet = await loadMintWallet();
+    const sourceStates = await sourceWallet.checkProofsStates(
+      getDecodedToken(funding.tokenText, [sourceWallet.keysetId]).proofs,
     );
     expect(sourceStates.every((proof) => proof.state === "SPENT")).toBe(true);
 
     const receiver = await loadMintWallet(targetMintUrl);
-    expect(receiver.keysetId).not.toBe(source.keysetId);
-    const targetProofs = getDecodedToken(claimed.tokenText, [
-      receiver.keysetId,
-    ]).proofs;
+    expect(receiver.keysetId).not.toBe(sourceWallet.keysetId);
+    const targetProofs = toCashuProofs(target);
     const before = await receiver.checkProofsStates(targetProofs);
     expect(before.every((proof) => proof.state === "UNSPENT")).toBe(true);
-    const received = await receiver.receive(claimed.tokenText, undefined, {
-      type: "random",
-    });
+    const received = await receiver.receive(
+      tokenOf(targetProofs, targetMintUrl),
+      undefined,
+      { type: "random" },
+    );
     const receivedAmount = received.reduce(
       (sum, proof) => sum + proof.amount.toNumber(),
       0,
@@ -106,26 +110,33 @@ describe("autoswap between local mints", () => {
 
   it("claims a pending record left behind by an interrupted run, exactly once", async () => {
     const seed = randomSeed();
-    const { kv, tokens, layers } = durableStorage();
+    const { proofs, operations, layers } = durableStorage();
 
     // The state an interrupted claim leaves: the invoice is settled at the
-    // mint (the FakeWallet backend pays its own quotes) and the record names
-    // the quote to mint against, but no run ever minted it.
+    // mint (the FakeWallet backend pays its own quotes) and the pending
+    // autoswap names the quote to mint against, but no run ever minted it.
     const wallet = await loadMintWallet(targetMintUrl);
     const quote = await wallet.createMintQuoteBolt11(64);
-    await Effect.runPromise(
-      pendingClaims.write(
-        kv,
-        new PendingAutoswapClaim({
-          quoteId: QuoteId.make(quote.quote),
+    const pending = await Effect.runPromise(
+      operations.insert(
+        new NewOperation({
+          kind: "autoswap",
+          status: "pending",
           mint: targetMintUrl,
           unit: CurrencyUnit.make("sat"),
           keysetId: KeysetId.make(wallet.keysetId),
           amount: Amount.make(64),
+          feeReserve: null,
+          inputsTotal: null,
+          quoteId: QuoteId.make(quote.quote),
           invoice: Bolt11Invoice.make(quote.request),
           sourceMint: mintUrl,
+          counter: null,
+          locked: null,
+          expiresAt: null,
           createdAt: UnixSeconds.make(Math.floor(Date.now() / 1000)),
-          mintCounter: null,
+          tokenText: null,
+          error: null,
         }),
       ),
     );
@@ -138,17 +149,19 @@ describe("autoswap between local mints", () => {
 
     const first = await resumeOnce();
     expect(first).toHaveLength(1);
-    expect(first[0].status).toBe("claimed");
-    expect(first[0].amount).toBe(64);
-    expect(first[0].targetMint).toBe(targetMintUrl);
-    expect(await pendingKeys(kv)).toEqual([]);
+    expect(first[0]).toMatchObject({
+      status: "claimed",
+      amount: 64,
+      targetMint: targetMintUrl,
+      operationId: pending.id,
+    });
+    expect(await pendingOperations(operations, "autoswap")).toEqual([]);
 
-    // The record is cleared, so a second pass has nothing left to claim and
-    // the 64 sats stay a single row.
+    // The autoswap is closed, so a second pass has nothing left to claim and
+    // the 64 sats are minted exactly once.
     expect(await resumeOnce()).toEqual([]);
-    const rows = await Effect.runPromise(tokens.loadAll);
-    expect(rows).toHaveLength(1);
-    expect(acceptedTotalOf(rows)).toBe(64);
-    expect(parseTokenText(rows[0].tokenText)?.mint).toBe(targetMintUrl);
+    const stored = await Effect.runPromise(proofs.loadAll);
+    expect(stored.every((proof) => proof.mint === targetMintUrl)).toBe(true);
+    expect(availableTotalOf(stored)).toBe(64);
   });
 });

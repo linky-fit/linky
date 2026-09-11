@@ -7,10 +7,9 @@ import {
   TokenParseFailed,
 } from "../../domain/errors";
 import type { CounterLockTimeout, MintUnreachable } from "../../domain/errors";
-import { CurrencyUnit } from "../../domain/primitives";
+import { CurrencyUnit, UnixSeconds } from "../../domain/primitives";
 import { sat } from "../../internal/units";
 import type { Amount, MintUrl, TokenText } from "../../domain/primitives";
-import { TokenLifecycleChanged } from "../../inspector/events";
 import type { InspectorService } from "../../inspector/Inspector";
 import { recoverFromCollision } from "../../internal/collisionRecovery";
 import {
@@ -19,10 +18,17 @@ import {
   withCounterLock,
 } from "../../internal/counters";
 import type { CounterScope } from "../../internal/counters";
+import { insertOperation, patchOperation } from "../../internal/operations";
 import {
   isRecoverableOutputCollision,
   isTokenAlreadySpentError,
 } from "../../internal/outputCollisions";
+import {
+  insertProofs,
+  setProofState,
+  toNewProofs,
+} from "../../internal/proofs";
+import { nowSeconds } from "../../internal/time";
 import {
   boundKeysetId,
   classifyMintError,
@@ -32,15 +38,15 @@ import type {
   WalletInstances,
 } from "../../mint/internal/WalletInstances";
 import type { KeyValueStoreService } from "../../ports/KeyValueStore";
-import type { StoredTokenRow, TokenStoreService } from "../../ports/TokenStore";
-import { extractTokenText, parseTokenText } from "../../token/codec";
-import { encodeCashuProofs } from "../../token/internal/cashuProofs";
+import { NewOperation, StoredOperation } from "../../ports/OperationStore";
+import type { OperationStoreService } from "../../ports/OperationStore";
+import type { ProofStoreService, StoredProof } from "../../ports/ProofStore";
 import {
-  findRowByTokenText,
-  insertRowInState,
-  isLegalTransition,
-  transitionRow,
-} from "../../token/internal/lifecycle";
+  decodeTokenText,
+  extractTokenText,
+  parseTokenText,
+} from "../../token/codec";
+import { encodeCashuProofs } from "../../token/internal/cashuProofs";
 import { ReceiveError, ReceiveReceipt } from "../domain";
 
 const MAX_SWAP_ATTEMPTS = 5;
@@ -56,7 +62,7 @@ type AcceptFailure =
 const isTransient = (error: AcceptFailure): boolean =>
   error._tag === "MintUnreachable" || error._tag === "CounterLockTimeout";
 
-/** Serialized onto `error` rows; every member is a tagged Schema error. */
+/** Serialized onto failed transfers; every member is a tagged Schema error. */
 const encodeStoredError = Schema.encodeSync(Schema.parseJson(ReceiveError));
 
 /** A token found in arbitrary text, decoded to what accepting it needs. */
@@ -101,19 +107,21 @@ export const parseReceivable = (
 /** Token text (draft and receipt encodings) carries proof secrets. */
 export interface ReceiveContext {
   readonly kv: KeyValueStoreService;
-  readonly tokenStore: TokenStoreService;
+  readonly proofStore: ProofStoreService;
+  readonly operationStore: OperationStoreService;
   readonly instances: WalletInstances;
   readonly inspector: InspectorService;
 }
 
 /**
- * The row whose encoding is being re-received (`Tokens.returnToWallet`): it
- * is ignored by dedup, removed once the fresh row holds the swapped proofs,
- * and carries a definitive failure instead of the fresh row.
+ * The transfer whose text is being re-received (`Tokens.returnToWallet`):
+ * ignored by dedup, and the one that carries the outcome. A failed
+ * `receive` is retried in place; a `send` is taken back, its handed-out
+ * proofs dying at the mint the moment the fresh ones are signed.
  */
-export interface ReplacedRow {
-  readonly row: StoredTokenRow;
-  /** Lifecycle-event reason for every row this re-receive touches. */
+export interface ReplacedTransfer {
+  readonly operation: StoredOperation;
+  /** Inspector reason for everything this re-receive touches. */
   readonly reason: string;
 }
 
@@ -176,14 +184,17 @@ const swapAtMint = (
     }),
   );
 
-const acceptRow = (
+/** Re-signs the token at the mint and stores the fresh proofs as balance. */
+const acceptAtMint = (
   ctx: ReceiveContext,
-  row: StoredTokenRow,
+  wallet: LoadedWallet,
   parsed: ReceivableToken,
   reason: string,
-): Effect.Effect<ReceiveReceipt, AcceptFailure> =>
+): Effect.Effect<
+  { readonly tokenText: TokenText; readonly amount: Amount },
+  AcceptFailure
+> =>
   Effect.gen(function* () {
-    const wallet = yield* ctx.instances.get(parsed.mint, parsed.unit);
     const keysetId = yield* boundKeysetId(parsed.mint, wallet);
     const scope: CounterScope = {
       mint: parsed.mint,
@@ -197,154 +208,223 @@ const acceptRow = (
       memo: parsed.memo,
       proofs,
     });
-    if (encoded === null) {
+    const fresh = toNewProofs(
+      proofs,
+      parsed.mint,
+      parsed.unit,
+      "available",
+      null,
+    );
+    if (encoded === null || fresh === null) {
       return yield* new MintRejected({
         mint: parsed.mint,
         code: null,
         detail: "mint returned malformed proofs from the swap",
       });
     }
-    // `pending` → `accepted` is always legal; failing here is a package bug.
-    yield* Effect.orDie(
-      transitionRow(ctx.tokenStore, ctx.inspector, row, "accepted", reason, {
-        tokenText: encoded.tokenText,
-      }),
-    );
-    return new ReceiveReceipt({
-      rowId: row.id,
-      tokenText: encoded.tokenText,
-      mint: parsed.mint,
-      unit: parsed.unit,
-      amount: encoded.amount,
-    });
+    yield* insertProofs(ctx, fresh, reason);
+    return { tokenText: encoded.tokenText, amount: encoded.amount };
   });
 
-/**
- * Definitive spend knowledge lands on the row the caller holds, where the
- * state machine allows it: an `externalized` row left the app and a dead
- * `error` row is already marked, so both only keep their state.
- */
-const markRowFailed = (
-  ctx: ReceiveContext,
-  row: StoredTokenRow,
-  error: AcceptFailure,
-  reason: string,
-): Effect.Effect<void> =>
-  isLegalTransition(row.state, "error")
-    ? Effect.orDie(
-        transitionRow(ctx.tokenStore, ctx.inspector, row, "error", reason, {
-          error: encodeStoredError(error),
-        }),
-      )
-    : Effect.void;
+/** Proofs a transfer handed out and still accounts for. */
+const proofsOf = (
+  proofs: ReadonlyArray<StoredProof>,
+  operation: StoredOperation,
+): ReadonlyArray<StoredProof> =>
+  proofs.filter(
+    (proof) =>
+      proof.operationId === operation.id &&
+      (proof.state === "handedOut" || proof.state === "externalized"),
+  );
+
+const isTransfer = (operation: StoredOperation): boolean =>
+  operation.kind === "send" || operation.kind === "receive";
+
+const isFailedReceive = (operation: StoredOperation): boolean =>
+  operation.kind === "receive" && operation.status === "failed";
 
 /**
- * Undoes what the insert clobbered when the store handed it the replaced
- * row's own id: a raw store write back to the pre-flow snapshot, not a
- * domain transition — the row never legally left its state (`pending` →
- * `issued` has no place in the state machine).
+ * Dedup: the text is known when a transfer carries it, or when any of its
+ * proofs is already in the inventory — a token whose proofs the wallet
+ * holds must not be swapped a second time, or the stored copies die. A
+ * failed receive holds nothing, so its text is free to be tried again.
  */
-const restoreReplacedRow = (
-  ctx: ReceiveContext,
-  replaced: ReplacedRow,
-): Effect.Effect<void> =>
-  ctx.tokenStore
-    .update(replaced.row.id, {
-      state: replaced.row.state,
-      tokenText: replaced.row.tokenText,
-      error: replaced.row.error,
-    })
-    .pipe(
-      Effect.tap(() =>
-        Effect.sync(() =>
-          ctx.inspector.emit(
-            () =>
-              new TokenLifecycleChanged(
-                {
-                  rowId: replaced.row.id,
-                  from: "pending",
-                  to: replaced.row.state,
-                  reason: replaced.reason,
-                },
-                { disableValidation: true },
-              ),
-          ),
-        ),
-      ),
-    );
-
-const settleFailedRow = (
-  ctx: ReceiveContext,
-  row: StoredTokenRow,
-  replaced: ReplacedRow | null,
-  error: AcceptFailure,
-  reason: string,
-): Effect.Effect<never, AcceptFailure> => {
-  // A transient failure leaves nothing behind, so a replaced row survives it
-  // untouched; a definitive one is recorded on the row the caller holds.
-  // When the store gave the insert the replaced row's own id, the fresh and
-  // replaced rows are one physical row holding the funds: it is never
-  // removed, only marked failed or restored to its pre-flow snapshot.
-  const settle =
-    replaced !== null && replaced.row.id === row.id
-      ? isTransient(error) || !isLegalTransition(replaced.row.state, "error")
-        ? restoreReplacedRow(ctx, replaced)
-        : markRowFailed(ctx, replaced.row, error, reason)
-      : isTransient(error)
-        ? ctx.tokenStore.remove(row.id)
-        : replaced === null
-          ? markRowFailed(ctx, row, error, reason)
-          : Effect.zipRight(
-              ctx.tokenStore.remove(row.id),
-              markRowFailed(ctx, replaced.row, error, reason),
-            );
-  return Effect.zipRight(settle, Effect.fail(error));
+const findKnown = (
+  operations: ReadonlyArray<StoredOperation>,
+  proofs: ReadonlyArray<StoredProof>,
+  tokenText: TokenText,
+  replaced: StoredOperation | null,
+  /** The mint's keyset ids, so v4 text with short v2 ids decodes too. */
+  keysetIds: readonly string[],
+): TokenAlreadyKnown | null => {
+  const transfer = operations.find(
+    (operation) =>
+      isTransfer(operation) &&
+      operation.tokenText === tokenText &&
+      operation.id !== replaced?.id &&
+      !isFailedReceive(operation),
+  );
+  if (transfer !== undefined) {
+    return new TokenAlreadyKnown({ operationId: transfer.id });
+  }
+  const decoded =
+    decodeTokenText(tokenText, keysetIds) ?? decodeTokenText(tokenText);
+  if (decoded === null) return null;
+  const secrets = new Set(decoded.proofs.map((proof) => proof.secret));
+  const stored = proofs.find(
+    (proof) =>
+      secrets.has(proof.secret) &&
+      (replaced === null || proof.operationId !== replaced.id),
+  );
+  return stored === undefined
+    ? null
+    : new TokenAlreadyKnown({ operationId: stored.operationId });
 };
 
 /**
+ * A retried receive starts over as `pending`; a send is taken back as it
+ * stands. Returns the transfer as now stored, so later patches report the
+ * transition they actually make.
+ */
+const reopen = (
+  ctx: ReceiveContext,
+  transfer: StoredOperation,
+  reason: string,
+): Effect.Effect<StoredOperation> => {
+  if (transfer.kind !== "receive") return Effect.succeed(transfer);
+  const patch = { status: "pending", error: null } as const;
+  return Effect.as(
+    patchOperation(ctx, transfer, patch, reason),
+    new StoredOperation({ ...transfer, ...patch }),
+  );
+};
+
+const pendingReceive = (
+  parsed: ReceivableToken,
+  createdAt: UnixSeconds,
+): NewOperation =>
+  new NewOperation({
+    kind: "receive",
+    status: "pending",
+    mint: parsed.mint,
+    unit: parsed.unit,
+    keysetId: null,
+    amount: parsed.amount,
+    feeReserve: null,
+    inputsTotal: null,
+    quoteId: null,
+    invoice: null,
+    sourceMint: null,
+    counter: null,
+    locked: null,
+    expiresAt: null,
+    createdAt,
+    tokenText: parsed.tokenText,
+    error: null,
+  });
+
+/**
  * Receiving a token is one call: extract and decode the text, dedup against
- * stored rows by token text, re-sign the proofs at the mint with
- * deterministic outputs (recovering counter collisions via targeted NUT-09
- * lookups), and persist the row through its lifecycle (fresh → `accepted`,
- * or `error` carrying the serialized failure on definitive rejection —
- * transient failures leave no `error` row behind).
+ * stored transfers and proofs, persist a `pending` receive, re-sign the
+ * proofs at the mint with deterministic outputs (recovering counter
+ * collisions via targeted NUT-09 lookups), store them as `available`, and
+ * close the receive as `done` — or `failed`, carrying the serialized error,
+ * so that pasting the text again retries it.
  *
- * Re-receiving (`replaced`) follows the same path, and the replaced row only
- * goes away once the fresh proofs are stored: funds are never outside the
- * store, not even for the length of a swap.
+ * Re-receiving (`replaced`) follows the same path over the replaced transfer
+ * instead of a fresh one: a failed `receive` is retried in place; a `send`'s
+ * handed-out proofs are marked `spent` and the send `returned` only once the
+ * fresh proofs are stored, so funds are never outside the store.
  */
 export const receiveTokenText = (
   ctx: ReceiveContext,
   text: string,
-  replaced: ReplacedRow | null,
+  replaced: ReplacedTransfer | null,
 ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
   Effect.gen(function* () {
     const reason = replaced?.reason ?? "receive";
     const parsed = yield* parseReceivable(text);
-    const rows = yield* ctx.tokenStore.loadAll;
-    const known = findRowByTokenText(
-      rows.filter((row) => row.id !== replaced?.row.id),
+    // The mint's keysets decide dedup (short v2 ids in v4 text), so a mint
+    // that will not load ends the receive before anything is recorded.
+    const wallet = yield* ctx.instances.get(parsed.mint, parsed.unit);
+    const operations = yield* ctx.operationStore.loadAll;
+    const proofs = yield* ctx.proofStore.loadAll;
+    const known = findKnown(
+      operations,
+      proofs,
       parsed.tokenText,
+      replaced?.operation ?? null,
+      wallet.keyChain.getKeysets().map((keyset) => keyset.id),
     );
-    if (known !== null) {
-      return yield* new TokenAlreadyKnown({ rowId: known.id });
+    if (known !== null) return yield* known;
+
+    const transfer =
+      replaced === null
+        ? yield* insertOperation(
+            ctx,
+            pendingReceive(parsed, UnixSeconds.make(yield* nowSeconds)),
+            reason,
+          )
+        : yield* reopen(ctx, replaced.operation, reason);
+
+    const accepted = yield* Effect.either(
+      acceptAtMint(ctx, wallet, parsed, reason),
+    );
+    if (Either.isLeft(accepted)) {
+      const error = accepted.left;
+      if (transfer.kind === "receive") {
+        yield* patchOperation(
+          ctx,
+          transfer,
+          { status: "failed", error: encodeStoredError(error) },
+          reason,
+        );
+      } else if (!isTransient(error)) {
+        // Definitive knowledge about a handed-out token: spent means the
+        // recipient claimed it; any other rejection is only recorded.
+        const claimed = error._tag === "TokenAlreadySpent";
+        if (claimed) {
+          yield* setProofState(
+            ctx,
+            proofsOf(proofs, transfer),
+            "spent",
+            reason,
+          );
+        }
+        yield* patchOperation(
+          ctx,
+          transfer,
+          {
+            ...(claimed ? { status: "done" } : {}),
+            error: encodeStoredError(error),
+          },
+          reason,
+        );
+      }
+      return yield* Effect.fail(error);
     }
-    const row = yield* insertRowInState(ctx.tokenStore, ctx.inspector, {
-      originalTokenText: parsed.tokenText,
-      tokenText: parsed.tokenText,
-      state: "pending",
-      reason,
+
+    if (transfer.kind === "receive") {
+      yield* patchOperation(
+        ctx,
+        transfer,
+        { status: "done", error: null },
+        reason,
+      );
+    } else {
+      yield* setProofState(ctx, proofsOf(proofs, transfer), "spent", reason);
+      yield* patchOperation(
+        ctx,
+        transfer,
+        { status: "returned", error: null },
+        reason,
+      );
+    }
+    return new ReceiveReceipt({
+      operationId: transfer.id,
+      tokenText: accepted.right.tokenText,
+      mint: parsed.mint,
+      unit: parsed.unit,
+      amount: accepted.right.amount,
     });
-    return yield* acceptRow(ctx, row, parsed, reason).pipe(
-      // A store deriving ids from `originalTokenText` hands the insert the
-      // replaced row's own id; that one physical row already superseded it.
-      Effect.tap(() =>
-        replaced === null || replaced.row.id === row.id
-          ? Effect.void
-          : ctx.tokenStore.remove(replaced.row.id),
-      ),
-      Effect.catchAll((error) =>
-        settleFailedRow(ctx, row, replaced, error, reason),
-      ),
-    );
   });

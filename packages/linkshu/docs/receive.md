@@ -1,6 +1,6 @@
 # Receive
 
-`Receive` turns pasted, scanned, or message-borne text into an `accepted` row in the wallet. Use it whenever token text arrives from outside: a QR scan, a paste, a chat message, a URL, an npub.cash payout. One call parses, dedups, re-signs the proofs at the mint, and persists the result.
+`Receive` turns pasted, scanned, or message-borne text into `available` proofs in the wallet. Use it whenever token text arrives from outside: a QR scan, a paste, a chat message, a URL, an npub.cash payout. One call parses, dedups, re-signs the proofs at the mint, and persists the result under a `receive` operation.
 
 ## Quick example
 
@@ -24,17 +24,19 @@ const receiveText = (
   );
 ```
 
-The receipt carries `amount`, `unit`, `mint`, and the `rowId` of the new `accepted` row. A failure rejects the promise with one of the tagged errors below; wrap the effect in `Effect.either` to get it as a value. In a long-lived app, run the same effect on your `ManagedRuntime` instead of `runLinkshu`.
+The receipt carries `amount`, `unit`, `mint`, and the `operationId` of the `receive` operation, now `done`. A failure rejects the promise with one of the tagged errors below; wrap the effect in `Effect.either` to get it as a value. In a long-lived app, run the same effect on your `ManagedRuntime` instead of `runLinkshu`.
 
 ## How it works
 
 1. **Extract.** `extractTokenText` finds a token inside arbitrary text: bare `cashuA…`/`cashuB…`, `cashu:`/`web+cashu:`/`lightning:`/`nostr:` schemes, URLs carrying the token in a query parameter, hash, or path, and legacy cashu.me JSON bundles. Whitespace inside a token is compacted.
-2. **Dedup.** The extracted text is compared with every live row's `originalTokenText` and `tokenText`, in any state. A match fails with `TokenAlreadyKnown` and touches nothing. A re-paste of a token that already failed definitively therefore also reports "already known".
-3. **Persist `pending`.** A row is inserted with `originalTokenText = tokenText = extracted text` and state `pending` before the mint is contacted.
+2. **Dedup.** The text is known when a `send` or `receive` transfer carries it (a `failed` receive does not count — its text is free to be tried again), or when any proof secret it encodes is already in the inventory, in any state. A match fails with `TokenAlreadyKnown` and touches nothing: swapping a token whose proofs the wallet holds would kill the stored copies.
+3. **Persist `pending`.** A `receive` operation with the text is inserted before the mint is contacted.
 4. **Swap.** Under the counter lock, the proofs are swapped for fresh deterministic outputs.
-5. **Persist `accepted`.** The row's `tokenText` is rewritten to the fresh encoding and the state moves to `accepted`. Only now does the receipt resolve.
+5. **Persist the proofs.** The fresh proofs are stored `available`, then the receive moves to `done`. Only now does the receipt resolve.
 
 The package retries counter collisions at the mint automatically, so a receive on a fresh origin may take a few round-trips. If recovery fails, the last rejection surfaces as `MintRejected`.
+
+Any failure after step 3 leaves the receive `failed` with the serialized error in `error` — transient or definitive. Pasting the same text again retries it over the same operation (`Tokens.returnToWallet` on the transfer does the same); `Tokens.forget` closes it once it is not worth retrying. `Tokens.returnToWallet` on a `send` runs this same flow over the handed-out text.
 
 ## Inputs and outputs
 
@@ -46,31 +48,29 @@ The package retries counter collisions at the mint automatically, so a receive o
 
 `ReceiveReceipt`:
 
-| Field       | Type           | Notes                                                              |
-| ----------- | -------------- | ------------------------------------------------------------------ |
-| `rowId`     | `TokenRowId`   | the `accepted` row                                                 |
-| `tokenText` | `TokenText`    | the re-signed encoding now stored on the row; never the input text |
-| `mint`      | `MintUrl`      | normalized (no trailing slash)                                     |
-| `unit`      | `CurrencyUnit` | from the token, `sat` when the encoding states none                |
-| `amount`    | `Amount`       | sum of the swapped proofs                                          |
+| Field         | Type           | Notes                                                                        |
+| ------------- | -------------- | ---------------------------------------------------------------------------- |
+| `operationId` | `OperationId`  | the `receive` (or, via `returnToWallet`, the returned `send`)                |
+| `tokenText`   | `TokenText`    | the re-signed encoding of the proofs now in the wallet; never the input text |
+| `mint`        | `MintUrl`      | normalized (no trailing slash)                                               |
+| `unit`        | `CurrencyUnit` | from the token, `sat` when the encoding states none                          |
+| `amount`      | `Amount`       | sum of the swapped proofs                                                    |
 
 ## Errors
 
-Transient failures (`MintUnreachable`, `CounterLockTimeout`) remove the `pending` row and leave nothing behind. Definitive failures leave an `error` row whose `error` column holds the serialized tagged error.
-
-| Tag                  | When                                                                                                                                           | Row left behind                       | What to do                                                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `TokenParseFailed`   | no token in the text (`reason: "empty"` / `"no-token-found"`), or it does not decode or states no mint (`"undecodable"`, `detail` may explain) | none                                  | tell the user                                                                                                    |
-| `TokenAlreadyKnown`  | a row with this text exists, in any state                                                                                                      | the existing row (`rowId`), untouched | show that row                                                                                                    |
-| `TokenAlreadySpent`  | the mint reported the proofs spent (code `11001`)                                                                                              | `error`                               | nothing to recover, unless the token was only partially spent: `Tokens.returnToWallet` re-receives the live part |
-| `MintRejected`       | definitive mint rejection (`code` when known), malformed swap response, or collision recovery exhausted                                        | `error`                               | surface `detail`                                                                                                 |
-| `MintUnreachable`    | network, timeout, 5xx while loading the mint or swapping                                                                                       | none                                  | you may retry later                                                                                              |
-| `CounterLockTimeout` | another tab/process held the counter lease                                                                                                     | none                                  | you may retry                                                                                                    |
+| Tag                  | When                                                                                                                                           | Operation left behind       | What to do                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------ |
+| `TokenParseFailed`   | no token in the text (`reason: "empty"` / `"no-token-found"`), or it does not decode or states no mint (`"undecodable"`, `detail` may explain) | none                        | tell the user                                                            |
+| `TokenAlreadyKnown`  | a transfer carries this text (`operationId`), or its proofs are already stored (`operationId` is the holding operation, or null for balance)   | the existing one, untouched | show that transfer, or the balance                                       |
+| `TokenAlreadySpent`  | the mint reported the proofs spent (code `11001`)                                                                                              | `failed`                    | nothing to recover; `Tokens.forget` closes it                            |
+| `MintRejected`       | definitive mint rejection (`code` when known), malformed swap response, or collision recovery exhausted                                        | `failed`                    | surface `detail`                                                         |
+| `MintUnreachable`    | network, timeout, 5xx while loading the mint or swapping                                                                                       | `failed`                    | you may retry later: paste again or `Tokens.returnToWallet(operationId)` |
+| `CounterLockTimeout` | another tab/process held the counter lease                                                                                                     | `failed`                    | you may retry                                                            |
 
 ## Related
 
-- [tokens.md](./tokens.md) — `returnToWallet` re-receives through the same flow; lifecycle states
+- [tokens.md](./tokens.md) — `returnToWallet` re-receives through the same flow; `forget`
 - [send.md](./send.md) — the reverse direction
 - [errors.md](./errors.md) — transient vs definitive classification
-- [inspector.md](./inspector.md) — the `receive.receive` operation and `TokenLifecycleChanged` rows
-- [../README.md](../README.md) — why dedup is by token text and why funds never leave the store
+- [inspector.md](./inspector.md) — the `receive.receive` operation and `ProofsChanged`/`OperationChanged` rows
+- [../README.md](../README.md) — why dedup is by text and by secret, and why funds never leave the store

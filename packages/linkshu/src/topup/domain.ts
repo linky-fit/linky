@@ -10,8 +10,8 @@ import {
   Amount,
   Bolt11Invoice,
   MintUrl,
+  OperationId,
   QuoteId,
-  TokenRowId,
   TokenText,
   UnixSeconds,
 } from "../domain/primitives";
@@ -31,7 +31,9 @@ export class TopupQuote extends Schema.Class<TopupQuote>("TopupQuote")({
 }) {}
 
 export class TopupReceipt extends Schema.Class<TopupReceipt>("TopupReceipt")({
-  rowId: TokenRowId,
+  /** The `topup` operation, now `done`. */
+  operationId: OperationId,
+  /** The minted proofs, encoded; they are stored as `available`. */
   tokenText: TokenText,
   mint: MintUrl,
   amount: Amount,

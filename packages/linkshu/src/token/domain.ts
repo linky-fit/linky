@@ -5,45 +5,20 @@ import {
   KeysetId,
   MintUrl,
   NonNegativeAmount,
-  TokenRowId,
+  OperationId,
   TokenText,
   UnixSeconds,
 } from "../domain/primitives";
+import { OperationStatus } from "../ports/OperationStore";
+import { ProofState } from "../ports/ProofStore";
 
-/**
- * The token lifecycle owned by the package — every platform gets identical
- * transition semantics from a dumb row store:
- *
- * - `pending`       — in flight: an incoming token being accepted, or an
- *                     outgoing one (e.g. over a messenger) not yet confirmed
- *                     sent
- * - `accepted`      — spendable and owned; the row's `tokenText` holds fresh
- *                     post-swap proofs. Only `accepted` rows count as balance.
- * - `reserved`      — earmarked for handover, not yet issued
- * - `issued`        — emitted for someone else to claim (QR, share); watched
- *                     via NUT-07 and pruned once fully spent (= claimed)
- * - `externalized`  — handed off outside the app entirely
- * - `error`         — accept/validation failed; `error` holds the serialized
- *                     failure. Definitive failures ("already spent") mark the
- *                     row spent; transient ones never do.
- */
-export const TokenState = Schema.Literal(
-  "pending",
-  "accepted",
-  "reserved",
-  "issued",
-  "externalized",
-  "error",
-);
-export type TokenState = typeof TokenState.Type;
-
-/** The requested lifecycle transition is not legal from the row's state. */
-export class InvalidTokenTransition extends Schema.TaggedError<InvalidTokenTransition>()(
-  "InvalidTokenTransition",
+/** The requested transfer transition is not legal from its status. */
+export class InvalidTransferTransition extends Schema.TaggedError<InvalidTransferTransition>()(
+  "InvalidTransferTransition",
   {
-    rowId: TokenRowId,
-    from: TokenState,
-    to: TokenState,
+    operationId: OperationId,
+    from: OperationStatus,
+    to: OperationStatus,
   },
 ) {}
 
@@ -79,18 +54,25 @@ export class ParsedToken extends Schema.Class<ParsedToken>("ParsedToken")({
   memo: Schema.NullOr(Schema.String),
 }) {}
 
-/** A stored token row enriched with metadata derived from its token text. */
-export class WalletToken extends Schema.Class<WalletToken>("WalletToken")({
-  id: TokenRowId,
-  state: TokenState,
-  tokenText: TokenText,
-  mint: Schema.NullOr(MintUrl),
-  unit: Schema.NullOr(CurrencyUnit),
-  amount: Amount,
-  /** Serialized tagged error of the last failure; null outside `error`. */
-  error: Schema.NullOr(Schema.String),
-  createdAt: UnixSeconds,
-}) {}
+/**
+ * A token that crossed the wallet boundary as text: a `send` the wallet
+ * issued, or a `receive` it accepted. Every field is safe to display; the
+ * text itself carries the proofs and must stay out of logs.
+ */
+export class TokenTransfer extends Schema.Class<TokenTransfer>("TokenTransfer")(
+  {
+    id: OperationId,
+    kind: Schema.Literal("send", "receive"),
+    status: OperationStatus,
+    tokenText: TokenText,
+    mint: MintUrl,
+    unit: CurrencyUnit,
+    amount: Amount,
+    /** Serialized tagged error of the last failure; null otherwise. */
+    error: Schema.NullOr(Schema.String),
+    createdAt: UnixSeconds,
+  },
+) {}
 
 export class MintBalance extends Schema.Class<MintBalance>("MintBalance")({
   mint: MintUrl,
@@ -100,7 +82,7 @@ export class MintBalance extends Schema.Class<MintBalance>("MintBalance")({
 export class WalletBalances extends Schema.Class<WalletBalances>(
   "WalletBalances",
 )({
-  /** Sum over all `accepted` rows across mints. */
+  /** Sum over all `available` proofs across mints. */
   total: NonNegativeAmount,
   /**
    * Largest single-mint balance — the actually spendable figure, because
@@ -110,11 +92,40 @@ export class WalletBalances extends Schema.Class<WalletBalances>(
   perMint: Schema.Array(MintBalance),
 }) {}
 
-export class ImportRowDraft extends Schema.Class<ImportRowDraft>(
-  "ImportRowDraft",
+/** A proof restored from a backup exactly as the backup states it. */
+export class ImportProofDraft extends Schema.Class<ImportProofDraft>(
+  "ImportProofDraft",
 )({
+  mint: MintUrl,
+  unit: CurrencyUnit,
+  keysetId: KeysetId,
+  amount: Amount,
+  secret: Schema.NonEmptyString,
+  C: Schema.String.pipe(Schema.pattern(/^(?:[0-9a-f]{2})+$/i)),
+  dleq: Schema.NullOr(Schema.String),
+  state: ProofState,
+  operationId: Schema.NullOr(OperationId),
+}) {}
+
+/**
+ * A token row of the pre-inventory storage model, as the web app's
+ * `cashuToken` table and old backups still hold it. `Tokens.ingestLegacyRows`
+ * turns it into proofs and operations.
+ */
+export class LegacyTokenRow extends Schema.Class<LegacyTokenRow>(
+  "LegacyTokenRow",
+)({
+  id: Schema.NonEmptyTrimmedString,
   originalTokenText: TokenText,
   tokenText: TokenText,
-  state: TokenState,
+  state: Schema.Literal(
+    "pending",
+    "accepted",
+    "reserved",
+    "issued",
+    "externalized",
+    "error",
+  ),
   error: Schema.NullOr(Schema.String),
+  createdAt: UnixSeconds,
 }) {}

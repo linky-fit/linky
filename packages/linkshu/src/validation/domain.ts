@@ -1,52 +1,52 @@
 import { Schema } from "effect";
-import {
-  Amount,
-  MintUrl,
-  NonNegativeAmount,
-  TokenRowId,
-} from "../domain/primitives";
+import { Amount, MintUrl, OperationId, ProofId } from "../domain/primitives";
 
-export class SpentTokenReport extends Schema.Class<SpentTokenReport>(
-  "SpentTokenReport",
+export class SpentProofReport extends Schema.Class<SpentProofReport>(
+  "SpentProofReport",
 )({
-  rowId: TokenRowId,
+  proofId: ProofId,
   amount: Amount,
 }) {}
 
 export class ValidationReport extends Schema.Class<ValidationReport>(
   "ValidationReport",
 )({
-  checkedRows: Schema.Int,
-  /** Rows definitively spent, marked `error` individually. */
-  markedSpent: Schema.Array(SpentTokenReport),
-  /** Sibling rows merged into a per-mint primary and removed. */
-  mergedRows: Schema.Array(TokenRowId),
-  /** Mints that could not be reached; their rows were left untouched. */
+  /** Proofs the mints actually answered about. */
+  checkedProofs: Schema.Int,
+  /** Proofs definitively spent, marked so individually. */
+  markedSpent: Schema.Array(SpentProofReport),
+  /** Held-by-unknown proofs the mint reported unspent, now `available`. */
+  released: Schema.Int,
+  /** Mints that could not be reached; their proofs were left untouched. */
   unavailableMints: Schema.Array(MintUrl),
 }) {}
 
-export class RowCheckResult extends Schema.Class<RowCheckResult>(
-  "RowCheckResult",
+export class TransferCheckResult extends Schema.Class<TransferCheckResult>(
+  "TransferCheckResult",
 )({
-  rowId: TokenRowId,
-  /** `unavailable` = mint unreachable; never treated as spent. */
+  operationId: OperationId,
+  /** `unavailable` = mint unreachable or unanswered; never treated as spent. */
   status: Schema.Literal("live", "spent", "unavailable"),
+}) {}
+
+export class ClaimedTransferReport extends Schema.Class<ClaimedTransferReport>(
+  "ClaimedTransferReport",
+)({
+  operationId: OperationId,
+  amount: Amount,
 }) {}
 
 export class IssuedClaimReport extends Schema.Class<IssuedClaimReport>(
   "IssuedClaimReport",
 )({
-  /** Issued rows found fully spent — i.e. claimed by the recipient — and removed. */
-  claimed: Schema.Array(SpentTokenReport),
+  /** Handed-out transfers found fully spent — claimed by the recipient — now `done`. */
+  claimed: Schema.Array(ClaimedTransferReport),
 }) {}
 
-/** Read-only NUT-07 amounts; no proofs or secrets leave the operation. */
-export class TokenProofStateAmounts extends Schema.Class<TokenProofStateAmounts>(
-  "TokenProofStateAmounts",
+/** One proof's current NUT-07 answer; no secret leaves the operation. */
+export class ProofStateSnapshot extends Schema.Class<ProofStateSnapshot>(
+  "ProofStateSnapshot",
 )({
-  rowId: TokenRowId,
-  unspent: NonNegativeAmount,
-  pending: NonNegativeAmount,
-  spent: NonNegativeAmount,
-  unknown: NonNegativeAmount,
+  proofId: ProofId,
+  state: Schema.Literal("unspent", "pending", "spent", "unknown"),
 }) {}

@@ -11,8 +11,8 @@ import {
   Amount,
   MintUrl,
   NonNegativeAmount,
+  OperationId,
   QuoteId,
-  TokenRowId,
 } from "../domain/primitives";
 
 export class AutoswapDraft extends Schema.Class<AutoswapDraft>("AutoswapDraft")(
@@ -27,10 +27,11 @@ export class AutoswapReceipt extends Schema.Class<AutoswapReceipt>(
 )({
   sourceMint: MintUrl,
   targetMint: MintUrl,
-  /** Amount that arrived at the target mint, persisted as `accepted`. */
+  /** Amount that arrived at the target mint, stored as `available`. */
   movedAmount: Amount,
   feePaid: NonNegativeAmount,
-  rowId: TokenRowId,
+  /** The `autoswap` operation, now `done`. */
+  operationId: OperationId,
 }) {}
 
 export class AutoswapClaimResult extends Schema.Class<AutoswapClaimResult>(
@@ -41,10 +42,10 @@ export class AutoswapClaimResult extends Schema.Class<AutoswapClaimResult>(
   /**
    * `claimed` — proofs minted and persisted; `not-claimable-yet` — quote
    * unpaid, kept for the next pass; `dropped` — deterministic recovery
-   * exhausted, claim removed to avoid retrying forever.
+   * exhausted, claim closed to avoid retrying forever.
    */
   status: Schema.Literal("claimed", "not-claimable-yet", "dropped"),
-  rowId: Schema.NullOr(TokenRowId),
+  operationId: OperationId,
   amount: Schema.NullOr(Amount),
 }) {}
 

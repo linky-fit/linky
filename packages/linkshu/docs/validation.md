@@ -1,6 +1,6 @@
 # Validation
 
-`Validation` asks mints about stored proofs (NUT-07). Its checks update rows accordingly; `inspectProofStates` returns amounts without changing rows. Use it to verify the balance, to check one token, and to notice when an issued token has been claimed. It performs no swap and costs no signatures.
+`Validation` asks mints about stored proofs (NUT-07). Its checks update proof states accordingly; `inspectProofStates` reports without changing anything. Use it to verify the balance, to check one transfer, and to notice when a handed-out token has been claimed. It performs no swap and costs no signatures.
 
 ## Quick example
 
@@ -15,7 +15,7 @@ const checkWallet = Effect.gen(function* () {
   const report = yield* validation.checkAll;
   return {
     spent: report.markedSpent.length,
-    merged: report.mergedRows.length,
+    released: report.released,
     offline: report.unavailableMints,
   };
 });
@@ -23,66 +23,66 @@ const checkWallet = Effect.gen(function* () {
 
 ## How it works
 
-One batched checkstate call per mint+unit group. Per row:
+One batched checkstate call per mint+unit group. Per proof:
 
-| Mint's answer for the row                                   | What happens                                                                   |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| every proof `SPENT`                                         | row → `error` with a serialized `TokenAlreadySpent`; reported in `markedSpent` |
-| some proofs `UNSPENT`, all others `SPENT`                   | row keeps only the unspent proofs                                              |
-| any proof `PENDING` / unanswered / unrecognized / truncated | nothing changes — a missing answer is never a guess                            |
-| mint unreachable or rejects the query                       | whole group untouched; mint listed in `unavailableMints`                       |
-
-**Merge.** Surviving proofs of a mint group are collapsed into the first live row (its `tokenText` rewritten locally) and the sibling rows removed; their ids come back in `mergedRows`. The primary carries the merged proofs before any sibling is removed.
+| Mint's answer for the proof                          | What happens                                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `SPENT`                                              | proof → `spent` (its `operationId` link is kept as history); reported in `markedSpent`   |
+| `UNSPENT`, and the proof is `held` with no operation | proof → `available` — a migrated `reserved` row whose melt is unknown is back in balance |
+| `UNSPENT` otherwise                                  | nothing changes                                                                          |
+| `PENDING` / unanswered / unrecognized / truncated    | nothing changes — a missing answer is never a guess                                      |
+| mint unreachable or rejects the query                | whole group untouched; mint listed in `unavailableMints`                                 |
 
 ### The calls
 
-| Call                 | Rows considered               | Returns                                                                                         |
-| -------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
-| `checkAll`           | `accepted` only (the balance) | `ValidationReport`                                                                              |
-| `checkRow(rowId)`    | the supplied row, any state   | `RowCheckResult`; `"unavailable"` when the mint gave no usable answer or the row states no mint |
-| `checkIssued`        | `issued` only                 | `IssuedClaimReport`; fully spent rows are **removed** (the recipient claimed them)              |
-| `inspectProofStates` | all stored rows               | `readonly TokenProofStateAmounts[]`; no row mutations                                           |
+| Call                         | Proofs considered                                                   | Returns                                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `checkAll`                   | `available`, plus `held` with `operationId === null`                | `ValidationReport`                                                                                            |
+| `checkTransfer(operationId)` | a `send`'s `handedOut`/`externalized` proofs, or a `receive`'s text | `TransferCheckResult`; `"unavailable"` when the mint gave no usable answer for every proof                    |
+| `checkIssued`                | `handedOut` and `externalized`                                      | `IssuedClaimReport`; a send whose every handed-out proof is spent is closed `done` (the recipient claimed it) |
+| `inspectProofStates`         | every proof that is not `spent`                                     | `readonly ProofStateSnapshot[]`; no writes                                                                    |
 
-`inspectProofStates` batches requests by mint and unit and returns `{ rowId, unspent, pending, spent, unknown }` for each row. Amounts use the token's unit. A mixed token contributes to several amounts. Missing or unrecognized answers count as `unknown`; an unreachable mint leaves its rows' full amounts unknown. These are current mint answers, separate from the stored row's lifecycle state. The result contains no proof secrets or token text.
+`checkTransfer` on a `send` asks the mint about the proofs it handed out, marks the spent ones, and reports `spent` when all are (closing the send `done`), `live` when every proof was answered and some are unspent, `unavailable` otherwise. A send with no handed-out proofs left reports `spent` when it is `done` or `returned`, `unavailable` otherwise. On a `receive` it decodes the stored text and asks the mint about those proofs without writing anything — they are not the wallet's until accepted — and reports `spent` only when every one is. `checkTransfer` on a quote operation fails with `OperationNotFound`.
 
-`checkAll` and `checkIssued` skip `pending` and `reserved` rows; `checkRow` checks whatever row you give it. Validation never resolves the `reserved` inputs of an interrupted melt — `checkRow` on one only reports what the mint says — [`Melt.resumePending`](./melt.md#resumepending--run-it-at-startup) settles them from the quote's state. `externalized` and dead `error` rows are only reported, never re-marked.
+`inspectProofStates` batches by mint and unit and returns `{ proofId, state }` per proof, `state` being `unspent`, `pending`, `spent`, or `unknown`. Missing or unrecognized answers are `unknown`; an unreachable mint leaves its proofs `unknown`. These are current mint answers, separate from the stored `state`. The result contains no secrets.
 
-Validation never resurrects a row: an `error` row with live proofs comes back only through `Tokens.returnToWallet`.
+Proofs `held` by a known melt belong to [`Melt.resumePending`](./melt.md#resumepending--run-it-at-startup), which settles them from the quote's state; validation never touches them. Validation never deletes a proof and never reopens a closed operation.
 
 ### When to run it
 
 - `checkAll`: on the user's "check all" action. Not on every render — each run is one request per mint.
-- `checkRow`: when opening a token's detail page.
+- `checkTransfer`: when opening a transfer's detail page.
 - `checkIssued`: after handing out an `issued` token, while the token is on screen, and periodically in the background. Avoid overlapping runs: share one in-flight call instead of starting another.
-- `Tokens.deleteSpent` (see [tokens.md](./tokens.md)) when the user wants spent rows gone.
-- `inspectProofStates`: when opening or refreshing a token list that shows available and pending amounts. Keep the snapshot in UI memory and discard it when rows change; do not persist mint answers as row states.
+- `inspectProofStates`: when opening or refreshing a list that shows available and pending amounts. Keep the snapshot in UI memory and discard it when the inventory changes; do not persist mint answers as states.
 
 ## Inputs and outputs
 
 `ValidationReport` (`validation/domain.ts`):
 
-| Field              | Type                             | Notes                                                          |
-| ------------------ | -------------------------------- | -------------------------------------------------------------- |
-| `checkedRows`      | `Schema.Int`                     | rows the mints actually answered about                         |
-| `markedSpent`      | `Schema.Array(SpentTokenReport)` | `{ rowId: TokenRowId, amount: Amount }` per row marked `error` |
-| `mergedRows`       | `Schema.Array(TokenRowId)`       | siblings removed after merging                                 |
-| `unavailableMints` | `Schema.Array(MintUrl)`          | rows left untouched                                            |
+| Field              | Type                             | Notes                                                             |
+| ------------------ | -------------------------------- | ----------------------------------------------------------------- |
+| `checkedProofs`    | `Schema.Int`                     | proofs the mints actually answered about                          |
+| `markedSpent`      | `Schema.Array(SpentProofReport)` | `{ proofId: ProofId, amount: Amount }` per proof marked `spent`   |
+| `released`         | `Schema.Int`                     | held-by-unknown proofs the mint reported unspent, now `available` |
+| `unavailableMints` | `Schema.Array(MintUrl)`          | proofs left untouched                                             |
 
-`RowCheckResult`: `rowId: TokenRowId`, `status: "live" | "spent" | "unavailable"`.
+`TransferCheckResult`: `operationId: OperationId`, `status: "live" | "spent" | "unavailable"`.
 
-`IssuedClaimReport`: `claimed: Schema.Array(SpentTokenReport)`.
+`IssuedClaimReport`: `claimed: Schema.Array(ClaimedTransferReport)` with `ClaimedTransferReport { operationId: OperationId, amount: Amount }` — the amount handed out by each send closed as claimed.
+
+`ProofStateSnapshot`: `proofId: ProofId`, `state: "unspent" | "pending" | "spent" | "unknown"`.
 
 ## Errors
 
-| Tag                | Raised by  | When                | What to do         |
-| ------------------ | ---------- | ------------------- | ------------------ |
-| `TokenRowNotFound` | `checkRow` | no row with that id | drop the reference |
+| Tag                 | Raised by       | When                                                     | What to do         |
+| ------------------- | --------------- | -------------------------------------------------------- | ------------------ |
+| `OperationNotFound` | `checkTransfer` | no transfer with that id (quote operations do not count) | drop the reference |
 
-`checkAll` and `checkIssued` never fail. `checkAll` reports unreachable mints in `unavailableMints`. `checkIssued` leaves rows untouched when it cannot verify them and does not say so: an empty `claimed` array does not prove every mint answered.
+`checkAll`, `checkIssued`, and `inspectProofStates` never fail. `checkAll` reports unreachable mints in `unavailableMints`. `checkIssued` leaves proofs untouched when it cannot verify them and does not say so: an empty `claimed` array does not prove every mint answered.
 
 ## Related
 
-- [tokens.md](./tokens.md) — `deleteSpent`, `returnToWallet`, lifecycle
-- [send.md](./send.md) — `issued` rows come from here
-- [melt.md](./melt.md) — where `reserved` rows come from and who settles them
+- [tokens.md](./tokens.md) — `returnToWallet`, `forget`, transfers
+- [send.md](./send.md) — handed-out proofs come from here
+- [melt.md](./melt.md) — where `held` proofs come from and who settles them
 - [../README.md](../README.md) — "A missing NUT-07 answer is never a guess"

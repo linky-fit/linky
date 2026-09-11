@@ -5,7 +5,7 @@ import type {
   Proof as CashuProof,
   SendResponse,
 } from "@cashu/cashu-ts";
-import { Amount, getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
+import { Amount, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
 import {
   Bolt11Invoice,
@@ -18,19 +18,22 @@ import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import type { KeyValueStoreService } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
-import type { StoredTokenRow } from "../ports/TokenStore";
+import { OperationStore } from "../ports/OperationStore";
+import type { StoredOperation } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
+import type { StoredProof } from "../ports/ProofStore";
 import { runOnTestClock } from "../testing/clock";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { amountOf, seedRow } from "../testing/rows";
+import {
+  amountIn,
+  proofsIn,
+  secretsOf,
+  seedProofs,
+} from "../testing/inventory";
 import { freshStorage } from "../testing/storage";
 import type { Storage } from "../testing/storage";
-import { decodeTokenText } from "../token/codec";
-import type { TokenState } from "../token/domain";
 import { MeltDraft } from "./domain";
-import { PENDING_MELT_KEY_PREFIX, pendingMelts } from "./internal/pendingMelt";
 import { Melt } from "./Melt";
 
 const mint = MintUrl.make("https://mint.example");
@@ -42,17 +45,11 @@ const counterKey = deterministicCounterKey({
 const invoice = Bolt11Invoice.make("lnbc1fakeinvoice");
 const draft = new MeltDraft({ mint, invoice });
 
-// Row A (4+2) and row B (8): 14 sats available at the mint under test.
-const tokenA = getEncodedToken({
-  mint,
-  unit: "sat",
-  proofs: [proof(4, "src-a1"), proof(2, "src-a2")],
-});
-const tokenB = getEncodedToken({
-  mint,
-  unit: "sat",
-  proofs: [proof(8, "src-b1")],
-});
+// Batch A (4+2) and batch B (8): 14 sats available at the mint under test.
+const proofsA = [proof(4, "src-a1"), proof(2, "src-a2")];
+const proofsB = [proof(8, "src-b1")];
+
+const LEGACY_PENDING_MELT_KEY_PREFIX = "linkshu.pendingMelt.";
 
 const futureExpiry = () => Math.floor(Date.now() / 1000) + 600;
 
@@ -197,7 +194,8 @@ const makeHarness = (
           WalletInstances.make({ get: () => Effect.succeed(wallet) }),
         ),
         Layer.succeed(KeyValueStore, storage.kv),
-        Layer.succeed(TokenStore, storage.tokens),
+        Layer.succeed(ProofStore, storage.proofs),
+        Layer.succeed(OperationStore, storage.operations),
         inspector.layer,
       ),
     ),
@@ -206,46 +204,67 @@ const makeHarness = (
     program: Effect.Effect<
       A,
       E,
-      Melt | TokenStore | KeyValueStore | WalletInstances
+      Melt | ProofStore | OperationStore | KeyValueStore | WalletInstances
     >,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
   return { run, events: inspector.events };
 };
 
-const meltAndInspect = (seeds: ReadonlyArray<string>) =>
+const meltAndInspect = (seeds: ReadonlyArray<ReadonlyArray<CashuProof>>) =>
   Effect.gen(function* () {
-    yield* Effect.forEach(seeds, (tokenText) => seedRow(tokenText));
+    yield* Effect.forEach(seeds, (proofs) => seedProofs(mint, proofs));
     const melt = yield* Melt;
     const kv = yield* KeyValueStore;
-    const tokenStore = yield* TokenStore;
     const receipt = yield* Effect.either(melt.melt(draft));
     return {
       receipt,
-      rows: yield* tokenStore.loadAll,
+      proofs: yield* (yield* ProofStore).loadAll,
+      operations: yield* (yield* OperationStore).loadAll,
       counter: yield* kv.get(counterKey),
     };
   });
 
-const rowsByState = (
-  rows: ReadonlyArray<StoredTokenRow>,
-  state: TokenState,
-): ReadonlyArray<StoredTokenRow> => rows.filter((row) => row.state === state);
+const storedProofs = (storage: Storage) =>
+  Effect.runPromise(storage.proofs.loadAll);
 
-const pendingKeys = (kv: KeyValueStoreService) =>
-  Effect.runPromise(kv.listKeys(PENDING_MELT_KEY_PREFIX));
+const meltOperations = (storage: Storage) =>
+  Effect.runPromise(storage.operations.loadAll).then((operations) =>
+    operations.filter((operation) => operation.kind === "melt"),
+  );
 
-const pendingRecord = (kv: KeyValueStoreService) =>
-  Effect.runPromise(pendingMelts.read(kv, mint, QuoteId.make("quote-1")));
+const pendingMelts = (storage: Storage) =>
+  meltOperations(storage).then((operations) =>
+    operations.filter((operation) => operation.status === "pending"),
+  );
+
+const onlyMelt = (
+  operations: ReadonlyArray<StoredOperation>,
+): StoredOperation => {
+  const melts = operations.filter((operation) => operation.kind === "melt");
+  expect(melts).toHaveLength(1);
+  const [only] = melts;
+  assert(only !== undefined);
+  return only;
+};
+
+const availableAmounts = (proofs: ReadonlyArray<StoredProof>) =>
+  proofsIn(proofs, "available")
+    .map((proof) => proof.amount)
+    .sort((a, b) => a - b);
 
 const resumeAndInspect = Effect.gen(function* () {
   const results = yield* (yield* Melt).resumePending;
-  return { results, rows: yield* (yield* TokenStore).loadAll };
+  return {
+    results,
+    proofs: yield* (yield* ProofStore).loadAll,
+    operations: yield* (yield* OperationStore).loadAll,
+  };
 });
 
 /**
  * A melt whose request left but whose outcome the process never learned:
  * the response and the follow-up quote check both fail, so the runtime ends
- * with `PaymentPending`, a `reserved` row, and a record naming both.
+ * with `PaymentPending`, the inputs `held`, and a pending `melt` operation.
  */
 const interruptMelt = async (storage: Storage) => {
   const { wallet, meltCalls } = makeWallet({
@@ -254,7 +273,7 @@ const interruptMelt = async (storage: Storage) => {
     checkQuote: () => Promise.reject(new TypeError("fetch failed")),
   });
   const exit = await makeHarness(wallet, storage).run(
-    meltAndInspect([tokenA, tokenB]),
+    meltAndInspect([proofsA, proofsB]),
   );
   assert(Exit.isSuccess(exit));
   assert(exit.value.receipt._tag === "Left");
@@ -264,16 +283,16 @@ const interruptMelt = async (storage: Storage) => {
 };
 
 describe("Melt.quote", () => {
-  it("prices the payment without touching stored tokens", async () => {
+  it("prices the payment without touching stored proofs", async () => {
     const { wallet, sendCalls } = makeWallet({});
     const { run, events } = makeHarness(wallet);
 
     const exit = await run(
       Effect.gen(function* () {
-        yield* seedRow(tokenA);
+        yield* seedProofs(mint, proofsA);
         const melt = yield* Melt;
         const quoted = yield* melt.quote(draft);
-        return { quoted, rows: yield* (yield* TokenStore).loadAll };
+        return { quoted, proofs: yield* (yield* ProofStore).loadAll };
       }),
     );
     assert(Exit.isSuccess(exit));
@@ -283,7 +302,7 @@ describe("Melt.quote", () => {
       amount: 10,
       feeReserve: 2,
     });
-    expect(exit.value.rows).toHaveLength(1);
+    expect(proofsIn(exit.value.proofs, "available")).toHaveLength(2);
     expect(sendCalls).toEqual([]);
     // No invoice text in any event.
     expect(JSON.stringify(events)).not.toContain("lnbc");
@@ -309,23 +328,32 @@ describe("Melt.melt", () => {
     const { wallet, sendCalls, meltCalls } = makeWallet({
       send: () => Promise.resolve(swappedThirteen()),
       melt: async () => {
-        // The record is durable before the request reaches the mint.
-        expect(await pendingRecord(storage.kv)).toMatchObject({
+        // The operation and its held inputs are durable before the request
+        // reaches the mint.
+        const pending = onlyMelt(await meltOperations(storage));
+        expect(pending).toMatchObject({
+          status: "pending",
           quoteId: "quote-1",
           amount: 10,
           feeReserve: 2,
           inputsTotal: 13,
-          blankCounter: 66,
+          counter: 66,
         });
+        const held = proofsIn(await storedProofs(storage), "held");
+        expect(secretsOf(held)).toEqual(["m1", "m2", "m3"]);
+        expect(held.every((proof) => proof.operationId === pending.id)).toBe(
+          true,
+        );
         return meltResponse("PAID", [proof(1, "chg")]);
       },
     });
     const { run, events } = makeHarness(wallet, storage);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
-    const { receipt, rows, counter } = exit.value;
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    const { receipt, proofs, operations, counter } = exit.value;
+    const operation = onlyMelt(operations);
+    expect(operation.status).toBe("paid");
 
     assert(receipt._tag === "Right");
     expect(receipt.right).toMatchObject({
@@ -355,31 +383,64 @@ describe("Melt.melt", () => {
     ]);
     expect(counter).toBe("68");
 
-    // Sources are gone; the swap remainder and the melt change remain.
-    const accepted = rowsByState(rows, "accepted");
-    expect(accepted).toHaveLength(2);
-    expect(accepted.map(amountOf).sort()).toEqual([1, 1]);
-    expect(rowsByState(rows, "reserved")).toHaveLength(0);
-    expect(rows).toHaveLength(2);
+    // Sources and melt inputs are spent; the swap remainder and the melt
+    // change are balance.
+    expect(secretsOf(proofsIn(proofs, "available"))).toEqual(["chg", "k1"]);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual([
+      "m1",
+      "m2",
+      "m3",
+      "src-a1",
+      "src-a2",
+      "src-b1",
+    ]);
+    expect(proofsIn(proofs, "held")).toHaveLength(0);
 
     expect(events.map((event) => event._tag)).toEqual([
       "QuoteStateChanged",
       "CounterAdvanced",
-      "TokenLifecycleChanged",
-      "TokenLifecycleChanged",
+      "OperationChanged",
+      "ProofsChanged",
+      "ProofsChanged",
+      "ProofsChanged",
       "CounterAdvanced",
       "QuoteStateChanged",
-      "TokenLifecycleChanged",
+      "ProofsChanged",
+      "ProofsChanged",
+      "OperationChanged",
       "OperationSucceeded",
     ]);
     expect(events[0]).toMatchObject({ flow: "melt", state: "UNPAID" });
     expect(events[1]).toMatchObject({ from: 1, to: 66, reason: "used" });
-    expect(events[2]).toMatchObject({ to: "accepted", reason: "melt-keep" });
-    expect(events[3]).toMatchObject({ to: "reserved", reason: "melt" });
-    expect(events[4]).toMatchObject({ from: 66, to: 68, reason: "used" });
-    expect(events[5]).toMatchObject({ flow: "melt", state: "PAID" });
-    expect(events[6]).toMatchObject({ to: "accepted", reason: "melt-change" });
-    expect(events[7]).toMatchObject({
+    expect(events[2]).toMatchObject({
+      kind: "melt",
+      from: null,
+      to: "pending",
+      operationId: operation.id,
+    });
+    expect(events[3]).toMatchObject({
+      to: "held",
+      amount: 13,
+      operationId: operation.id,
+      reason: "melt",
+    });
+    expect(events[4]).toMatchObject({ to: "available", reason: "melt-keep" });
+    expect(events[5]).toMatchObject({
+      from: "available",
+      to: "spent",
+      amount: 14,
+      reason: "melt-keep",
+    });
+    expect(events[6]).toMatchObject({ from: 66, to: 68, reason: "used" });
+    expect(events[7]).toMatchObject({ flow: "melt", state: "PAID" });
+    expect(events[8]).toMatchObject({ to: "available", reason: "melt-change" });
+    expect(events[9]).toMatchObject({
+      from: "held",
+      to: "spent",
+      reason: "melt-paid",
+    });
+    expect(events[10]).toMatchObject({ from: "pending", to: "paid" });
+    expect(events[11]).toMatchObject({
       name: "melt.melt",
       params: { mint },
       result: { paidAmount: 10, feePaid: 2, changeAmount: 1 },
@@ -391,40 +452,31 @@ describe("Melt.melt", () => {
     expect(serialized).not.toContain("lnbc");
   });
 
-  it("pays with unspent proofs from a mixed row and preserves pending inputs", async () => {
-    const mixed = getEncodedToken({
-      mint,
-      unit: "sat",
-      proofs: [proof(4, "src-a1"), proof(2, "src-a2"), proof(32, "locked")],
-    });
+  it("pays with unspent proofs and leaves pending ones stored", async () => {
+    const mixed = [...proofsA, proof(32, "locked")];
     const { wallet, sendCalls } = makeWallet({
       stateOf: (secret) => (secret === "locked" ? "PENDING" : "UNSPENT"),
       send: () => Promise.resolve(swappedThirteen()),
       melt: () => Promise.resolve(meltResponse("PAID", [proof(1, "change")])),
     });
     const { run, events } = makeHarness(wallet);
-    const exit = await run(meltAndInspect([mixed, tokenB]));
-    expect(exit).toMatchObject({ _tag: "Success" });
+    const exit = await run(meltAndInspect([mixed, proofsB]));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Right");
     expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
-    expect(exit.value.rows.map(amountOf).sort()).toEqual([1, 1, 32]);
-    const retained = exit.value.rows.find(
-      (row) => row.originalTokenText === mixed,
+    expect(availableAmounts(exit.value.proofs)).toEqual([1, 1, 32]);
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toContain(
+      "locked",
     );
-    assert(retained !== undefined);
-    expect(
-      decodeTokenText(retained.tokenText)?.proofs.map((proof) => proof.secret),
-    ).toEqual(["locked"]);
     expect(JSON.stringify(events)).not.toContain("locked");
   });
 
-  it("does not swap or drop a mixed row when only pending funds cover the payment", async () => {
+  it("does not swap or touch anything when only pending funds cover the payment", async () => {
     const { wallet, sendCalls, meltCalls } = makeWallet({
       stateOf: (secret) => (secret === "src-a1" ? "PENDING" : "UNSPENT"),
     });
     const { run } = makeHarness(wallet);
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
@@ -433,17 +485,19 @@ describe("Melt.melt", () => {
     });
     expect(sendCalls).toEqual([]);
     expect(meltCalls).toEqual([]);
-    expect(exit.value.rows.map((row) => row.tokenText)).toEqual([
-      tokenA,
-      tokenB,
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual([
+      "src-a1",
+      "src-a2",
+      "src-b1",
     ]);
+    expect(exit.value.operations).toEqual([]);
   });
 
   it("fails with InsufficientFunds against amount + feeReserve before swapping", async () => {
     const { wallet, sendCalls } = makeWallet({});
     const { run } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenB]));
+    const exit = await run(meltAndInspect([proofsB]));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
@@ -452,16 +506,19 @@ describe("Melt.melt", () => {
       available: 8,
     });
     expect(sendCalls).toEqual([]);
-    expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
+    expect(
+      exit.value.proofs.every((proof) => proof.state === "available"),
+    ).toBe(true);
+    expect(exit.value.operations).toEqual([]);
   });
 
-  it("fails with QuoteExpired without touching any row", async () => {
+  it("fails with QuoteExpired without touching any proof", async () => {
     const { wallet, sendCalls, meltCalls } = makeWallet({
       quote: () => Promise.resolve(quoteResponse({ expiry: 1000 })),
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
@@ -471,7 +528,10 @@ describe("Melt.melt", () => {
     });
     expect(sendCalls).toEqual([]);
     expect(meltCalls).toEqual([]);
-    expect(exit.value.rows.every((row) => row.state === "accepted")).toBe(true);
+    expect(
+      exit.value.proofs.every((proof) => proof.state === "available"),
+    ).toBe(true);
+    expect(exit.value.operations).toEqual([]);
   });
 
   it("recovers a blank-output counter collision via NUT-09 and retries", async () => {
@@ -486,15 +546,20 @@ describe("Melt.melt", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(meltCalls.map((call) => call.counter)).toEqual([66, 100]);
     expect(restoreCalls).toEqual([{ start: 66, count: 100 }]);
     expect(exit.value.counter).toBe("102"); // 100 + 2 blank slots
+    // The operation remembers the slot of the attempt that went through.
+    expect(onlyMelt(exit.value.operations)).toMatchObject({
+      status: "paid",
+      counter: 100,
+    });
   });
 
-  it("returns the reserved inputs to balance on a definitive rejection", async () => {
+  it("returns the held inputs to balance on a definitive rejection", async () => {
     const { wallet } = makeWallet({
       send: () => Promise.resolve(swappedThirteen()),
       melt: () =>
@@ -502,16 +567,23 @@ describe("Melt.melt", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
-    const { receipt, rows } = exit.value;
+    const { receipt, proofs, operations } = exit.value;
     assert(receipt._tag === "Left");
     expect(receipt.left).toMatchObject({ _tag: "MintRejected", code: 20003 });
 
     // Nothing lost: the swap remainder and the released inputs are balance.
-    const accepted = rowsByState(rows, "accepted");
-    expect(accepted.map(amountOf).sort()).toEqual([1, 13]);
-    expect(rowsByState(rows, "reserved")).toHaveLength(0);
+    const available = proofsIn(proofs, "available");
+    expect(secretsOf(available)).toEqual(["k1", "m1", "m2", "m3"]);
+    expect(available.every((proof) => proof.operationId === null)).toBe(true);
+    expect(proofsIn(proofs, "held")).toHaveLength(0);
+    const operation = onlyMelt(operations);
+    expect(operation.status).toBe("failed");
+    expect(JSON.parse(operation.error ?? "")).toMatchObject({
+      _tag: "MintRejected",
+      code: 20003,
+    });
   });
 
   it("treats an UNPAID melt response as a failed payment and releases the inputs", async () => {
@@ -521,17 +593,16 @@ describe("Melt.melt", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "PaymentFailed",
       quoteId: "quote-1",
     });
-    expect(rowsByState(exit.value.rows, "accepted").map(amountOf)).toContain(
-      13,
-    );
-    expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(0);
+    expect(amountIn(exit.value.proofs, "available")).toBe(14);
+    expect(proofsIn(exit.value.proofs, "held")).toHaveLength(0);
+    expect(onlyMelt(exit.value.operations).status).toBe("unpaid");
   });
 
   it("finishes a PENDING payment once the quote turns PAID, reclaiming change", async () => {
@@ -543,17 +614,18 @@ describe("Melt.melt", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
-    const { receipt, rows } = exit.value;
+    const { receipt, proofs, operations } = exit.value;
     assert(receipt._tag === "Right");
     expect(receipt.right).toMatchObject({ feePaid: 2, changeAmount: 1 });
     // The change came from re-deriving the melt's own blank range.
     expect(restoreCalls).toEqual([{ start: 66, count: 2 }]);
-    expect(rowsByState(rows, "reserved")).toHaveLength(0);
+    expect(proofsIn(proofs, "held")).toHaveLength(0);
+    expect(onlyMelt(operations).status).toBe("paid");
   });
 
-  it("hands a payment that stays pending to resume, inputs reserved under the record", async () => {
+  it("hands a payment that stays pending to resume, inputs held under the operation", async () => {
     const storage = freshStorage();
     const { wallet } = makeWallet({
       send: () => Promise.resolve(swappedThirteen()),
@@ -564,30 +636,31 @@ describe("Melt.melt", () => {
 
     const exit = await run(
       Effect.gen(function* () {
-        // Row timestamps are positive unix seconds; the TestClock starts at 0.
+        // Timestamps are positive unix seconds; the TestClock starts at 0.
         yield* TestClock.adjust("1000 seconds");
         return yield* runOnTestClock(
-          meltAndInspect([tokenA, tokenB]),
+          meltAndInspect([proofsA, proofsB]),
           "500 millis",
         );
       }).pipe(Effect.provide(TestContext.TestContext)),
     );
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
-    // Neither balance nor destroyed: the record lets `resumePending` settle it.
-    const reserved = rowsByState(exit.value.rows, "reserved");
-    expect(reserved).toHaveLength(1);
-    expect(amountOf(reserved[0])).toBe(13);
+    // Neither balance nor destroyed: the operation lets `resumePending`
+    // settle it.
+    const operation = onlyMelt(exit.value.operations);
+    expect(operation).toMatchObject({ status: "pending", counter: 66 });
+    const held = proofsIn(exit.value.proofs, "held");
+    expect(amountIn(exit.value.proofs, "held")).toBe(13);
+    expect(held.every((proof) => proof.operationId === operation.id)).toBe(
+      true,
+    );
     expect(exit.value.receipt.left).toMatchObject({
       _tag: "PaymentPending",
       mint,
       quoteId: "quote-1",
-      rowId: reserved[0]?.id,
+      operationId: operation.id,
       amount: 10,
-    });
-    expect(await pendingRecord(storage.kv)).toMatchObject({
-      rowId: reserved[0]?.id,
-      blankCounter: 66,
     });
   });
 
@@ -600,20 +673,21 @@ describe("Melt.melt", () => {
     });
     const { run } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB]));
+    const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
-    const { receipt, rows } = exit.value;
+    const { receipt, proofs, operations } = exit.value;
     assert(receipt._tag === "Right");
     expect(receipt.right).toMatchObject({ paidAmount: 10, changeAmount: 1 });
     expect(restoreCalls).toEqual([{ start: 66, count: 2 }]);
-    expect(rowsByState(rows, "reserved")).toHaveLength(0);
+    expect(proofsIn(proofs, "held")).toHaveLength(0);
+    expect(onlyMelt(operations).status).toBe("paid");
   });
 
-  it("keeps the inputs reserved under the record when a lost response cannot be resolved", async () => {
+  it("keeps the inputs held under the operation when a lost response cannot be resolved", async () => {
     const storage = freshStorage();
-    const { rows } = await interruptMelt(storage);
-    expect(rowsByState(rows, "reserved")).toHaveLength(1);
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    const { proofs } = await interruptMelt(storage);
+    expect(proofsIn(proofs, "held")).toHaveLength(3);
+    expect(await pendingMelts(storage)).toHaveLength(1);
   });
 
   it("releases the inputs when the quote check after a lost response says UNPAID", async () => {
@@ -624,41 +698,42 @@ describe("Melt.melt", () => {
       checkQuote: () => Promise.resolve(quoteResponse({ state: "UNPAID" })),
     });
     const exit = await makeHarness(wallet, storage).run(
-      meltAndInspect([tokenA, tokenB]),
+      meltAndInspect([proofsA, proofsB]),
     );
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("PaymentFailed");
-    expect(rowsByState(exit.value.rows, "accepted").map(amountOf)).toContain(
-      13,
-    );
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(amountIn(exit.value.proofs, "available")).toBe(14);
+    expect(await pendingMelts(storage)).toEqual([]);
+    expect(onlyMelt(exit.value.operations).status).toBe("unpaid");
   });
 
-  it("excludes NUT-07 spent rows and marks them before melting", async () => {
-    const spentToken = getEncodedToken({
-      mint,
-      unit: "sat",
-      proofs: [proof(3, "src-z1")],
-    });
+  it("excludes NUT-07 spent proofs and marks them before melting", async () => {
     const { wallet, sendCalls } = makeWallet({
       stateOf: (secret) => (secret === "src-z1" ? "SPENT" : "UNSPENT"),
       send: () => Promise.resolve(swappedThirteen()),
       melt: () => Promise.resolve(meltResponse("PAID", [proof(1, "chg")])),
     });
-    const { run } = makeHarness(wallet);
+    const { run, events } = makeHarness(wallet);
 
-    const exit = await run(meltAndInspect([tokenA, tokenB, spentToken]));
+    const exit = await run(
+      meltAndInspect([proofsA, proofsB, [proof(3, "src-z1")]]),
+    );
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
 
-    const errorRow = rowsByState(exit.value.rows, "error")[0];
-    expect(errorRow?.tokenText).toBe(spentToken);
-    expect(JSON.parse(errorRow?.error ?? "")).toMatchObject({
-      _tag: "TokenAlreadySpent",
-      mint,
-    });
+    const marked = exit.value.proofs.find((proof) => proof.secret === "src-z1");
+    expect(marked).toMatchObject({ state: "spent", operationId: null });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: "ProofsChanged",
+        from: "available",
+        to: "spent",
+        amount: 3,
+        reason: "melt",
+      }),
+    );
   });
 });
 
@@ -675,11 +750,13 @@ describe("Melt.resumePending", () => {
     const exit = await run(resumeAndInspect);
     assert(Exit.isSuccess(exit));
 
-    const { results, rows } = exit.value;
+    const { results, proofs, operations } = exit.value;
+    const operation = onlyMelt(operations);
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       quoteId: "quote-1",
       mint,
+      operationId: operation.id,
       amount: 10,
       status: "paid",
       receipt: { paidAmount: 10, feePaid: 2, changeAmount: 1 },
@@ -687,21 +764,24 @@ describe("Melt.resumePending", () => {
     expect(resuming.restoreCalls).toEqual([{ start: 66, count: 2 }]);
     expect(resuming.meltCalls).toEqual([]);
     // The swap remainder and the change are balance; the inputs are gone.
-    expect(rowsByState(rows, "accepted").map(amountOf).sort()).toEqual([1, 1]);
-    expect(rowsByState(rows, "reserved")).toHaveLength(0);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(secretsOf(proofsIn(proofs, "available"))).toEqual(["chg", "k1"]);
+    expect(proofsIn(proofs, "held")).toHaveLength(0);
+    expect(operation.status).toBe("paid");
 
     expect(events.map((event) => event._tag)).toEqual([
       "QuoteStateChanged",
-      "TokenLifecycleChanged",
+      "ProofsChanged",
+      "ProofsChanged",
+      "OperationChanged",
       "OperationSucceeded",
       "OperationSucceeded",
     ]);
-    expect(events[2]).toMatchObject({
+    expect(events[3]).toMatchObject({ from: "pending", to: "paid" });
+    expect(events[4]).toMatchObject({
       name: "melt.resume",
-      params: { mint, quoteId: "quote-1", rowId: results[0]?.rowId },
+      params: { mint, quoteId: "quote-1", operationId: operation.id },
     });
-    expect(events[3]).toMatchObject({ name: "melt.resumePending" });
+    expect(events[5]).toMatchObject({ name: "melt.resumePending" });
     const serialized = JSON.stringify(events);
     expect(serialized).not.toContain("cashu");
     expect(serialized).not.toContain("lnbc");
@@ -723,14 +803,17 @@ describe("Melt.resumePending", () => {
       receipt: null,
     });
     expect(resuming.restoreCalls).toEqual([]);
-    expect(
-      rowsByState(exit.value.rows, "accepted").map(amountOf).sort(),
-    ).toEqual([1, 13]);
-    expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(0);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual([
+      "k1",
+      "m1",
+      "m2",
+      "m3",
+    ]);
+    expect(proofsIn(exit.value.proofs, "held")).toHaveLength(0);
+    expect(onlyMelt(exit.value.operations).status).toBe("unpaid");
   });
 
-  it("leaves a PENDING payment and its row untouched", async () => {
+  it("leaves a PENDING payment and its held inputs untouched", async () => {
     const storage = freshStorage();
     await interruptMelt(storage);
 
@@ -742,11 +825,11 @@ describe("Melt.resumePending", () => {
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.results[0]).toMatchObject({ status: "pending" });
-    expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(1);
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(proofsIn(exit.value.proofs, "held")).toHaveLength(3);
+    expect(onlyMelt(exit.value.operations).status).toBe("pending");
   });
 
-  it("keeps the record when the mint gives no answer, even past the quote expiry", async () => {
+  it("keeps the operation when the mint gives no answer, even past the quote expiry", async () => {
     const storage = freshStorage();
     await interruptMelt(storage);
 
@@ -762,8 +845,8 @@ describe("Melt.resumePending", () => {
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.results[0]).toMatchObject({ status: "unresolved" });
-    expect(rowsByState(exit.value.rows, "reserved")).toHaveLength(1);
-    expect(await pendingKeys(storage.kv)).toHaveLength(1);
+    expect(proofsIn(exit.value.proofs, "held")).toHaveLength(3);
+    expect(onlyMelt(exit.value.operations).status).toBe("pending");
     expect(events).toContainEqual(
       expect.objectContaining({
         _tag: "OperationFailed",
@@ -773,17 +856,12 @@ describe("Melt.resumePending", () => {
     );
   });
 
-  it("does not import change twice when the change row landed before the record was cleared", async () => {
+  it("does not import change twice when the change landed before the operation closed", async () => {
     const storage = freshStorage();
     await interruptMelt(storage);
-    const changeRow = getEncodedToken({
-      mint,
-      unit: "sat",
-      proofs: [proof(1, "chg")],
-    });
     await Effect.runPromise(
-      seedRow(changeRow).pipe(
-        Effect.provide(Layer.succeed(TokenStore, storage.tokens)),
+      seedProofs(mint, [proof(1, "chg")]).pipe(
+        Effect.provide(Layer.succeed(ProofStore, storage.proofs)),
       ),
     );
 
@@ -795,14 +873,75 @@ describe("Melt.resumePending", () => {
       resumeAndInspect,
     );
     assert(Exit.isSuccess(exit));
-    expect(exit.value.results[0]).toMatchObject({ status: "paid" });
-    expect(
-      rowsByState(exit.value.rows, "accepted").map(amountOf).sort(),
-    ).toEqual([1, 1]);
-    expect(await pendingKeys(storage.kv)).toEqual([]);
+    expect(exit.value.results[0]).toMatchObject({
+      status: "paid",
+      receipt: { changeAmount: 0 },
+    });
+    expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual([
+      "chg",
+      "k1",
+    ]);
+    expect(onlyMelt(exit.value.operations).status).toBe("paid");
   });
 
-  it("does nothing without records", async () => {
+  it("carries a legacy key-value record over into a melt operation", async () => {
+    const storage = freshStorage();
+    const legacyKey =
+      LEGACY_PENDING_MELT_KEY_PREFIX +
+      [mint, "quote-1"].map(encodeURIComponent).join(".");
+    await Effect.runPromise(
+      storage.kv.set(
+        legacyKey,
+        JSON.stringify({
+          quoteId: "quote-1",
+          mint,
+          unit: "sat",
+          keysetId: KEYSET_HEX,
+          invoice,
+          amount: 10,
+          feeReserve: 2,
+          inputsTotal: 13,
+          expiresAt: null,
+          createdAt: Math.floor(Date.now() / 1000) - 60,
+          blankCounter: 66,
+        }),
+      ),
+    );
+
+    const resuming = makeWallet({
+      checkQuote: () => Promise.resolve(quoteResponse({ state: "PAID" })),
+      restore: () => Promise.resolve({ proofs: [proof(1, "chg")] }),
+    });
+    const exit = await makeHarness(resuming.wallet, storage).run(
+      resumeAndInspect,
+    );
+    assert(Exit.isSuccess(exit));
+    const operation = onlyMelt(exit.value.operations);
+    expect(operation).toMatchObject({
+      kind: "melt",
+      status: "paid",
+      mint,
+      quoteId: "quote-1",
+      amount: 10,
+      feeReserve: 2,
+      inputsTotal: 13,
+      counter: 66,
+    });
+    expect(exit.value.results[0]).toMatchObject({
+      status: "paid",
+      operationId: operation.id,
+      receipt: { changeAmount: 1 },
+    });
+    // The carried-over blank slot is what the reclaim scans.
+    expect(resuming.restoreCalls).toEqual([{ start: 66, count: 2 }]);
+    expect(
+      await Effect.runPromise(
+        storage.kv.listKeys(LEGACY_PENDING_MELT_KEY_PREFIX),
+      ),
+    ).toEqual([]);
+  });
+
+  it("does nothing without operations", async () => {
     const { wallet, checkQuoteCalls } = makeWallet({});
     const exit = await makeHarness(wallet).run(resumeAndInspect);
     assert(Exit.isSuccess(exit));

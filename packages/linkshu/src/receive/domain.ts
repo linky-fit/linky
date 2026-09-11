@@ -11,7 +11,7 @@ import {
   Amount,
   CurrencyUnit,
   MintUrl,
-  TokenRowId,
+  OperationId,
   TokenText,
 } from "../domain/primitives";
 
@@ -26,8 +26,9 @@ export class ReceiveDraft extends Schema.Class<ReceiveDraft>("ReceiveDraft")({
 export class ReceiveReceipt extends Schema.Class<ReceiveReceipt>(
   "ReceiveReceipt",
 )({
-  rowId: TokenRowId,
-  /** The re-signed (swapped) encoding now stored on the row. */
+  /** The transfer this receive settled: the `receive`, or a returned `send`. */
+  operationId: OperationId,
+  /** The re-signed (swapped) encoding of the proofs now in the wallet. */
   tokenText: TokenText,
   mint: MintUrl,
   unit: CurrencyUnit,

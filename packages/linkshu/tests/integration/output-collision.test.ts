@@ -1,24 +1,14 @@
-import {
-  getDecodedToken,
-  Mint,
-  MintOperationError,
-  Wallet,
-} from "@cashu/cashu-ts";
+import { Mint, MintOperationError, Wallet } from "@cashu/cashu-ts";
 import { Effect } from "effect";
+import { Amount, ProofStore, runLinkshu, Send, SendDraft } from "../../src";
+import { amountIn, proofsIn } from "../../src/testing/inventory";
 import {
-  Amount,
-  NewTokenRow,
-  runLinkshu,
-  Send,
-  SendDraft,
-  TokenStore,
-  TokenText,
-} from "../../src";
-import {
+  availableRowsOf,
   claimExternally,
   fundProofs,
   mintUrl,
   randomSeed,
+  toCashuProofs,
   tokenOf,
 } from "./helpers";
 
@@ -49,7 +39,6 @@ describe("deterministic output collisions against the local mint", () => {
     await previous.completeSwap(used);
 
     const sourceProofs = await fundProofs(32);
-    const sourceToken = TokenText.make(tokenOf(sourceProofs));
     const originalSwap = Mint.prototype.swap;
     let collisions = 0;
     let successfulSwaps = 0;
@@ -85,15 +74,8 @@ describe("deterministic output collisions against the local mint", () => {
     const result = await runLinkshu(
       { bip39Seed: seed },
       Effect.gen(function* () {
-        const tokens = yield* TokenStore;
-        yield* tokens.insert(
-          new NewTokenRow({
-            originalTokenText: sourceToken,
-            tokenText: sourceToken,
-            state: "accepted",
-            error: null,
-          }),
-        );
+        const proofStore = yield* ProofStore;
+        yield* proofStore.insert(availableRowsOf(sourceProofs));
         const receipt = yield* (yield* Send).send(
           new SendDraft({
             mint: mintUrl,
@@ -101,7 +83,7 @@ describe("deterministic output collisions against the local mint", () => {
             produceAs: "issued",
           }),
         );
-        return { receipt, rows: yield* tokens.loadAll };
+        return { receipt, proofs: yield* proofStore.loadAll };
       }),
     ).finally(() => swap.mockRestore());
 
@@ -110,20 +92,23 @@ describe("deterministic output collisions against the local mint", () => {
     expect(result.receipt.amount).toBe(2);
     expect(result.receipt.changeAmount).toBe(29);
     expect(result.receipt.feePaid).toBe(1);
-    expect(result.rows).toHaveLength(2);
+    // The 32 source sats are spent on record; 2 handed out, 29 kept.
+    expect(amountIn(result.proofs, "spent")).toBe(32);
+    expect(amountIn(result.proofs, "handedOut")).toBe(2);
+    expect(amountIn(result.proofs, "available")).toBe(29);
     const sourceStates = await previous.checkProofsStates(sourceProofs);
     expect(sourceStates.every((state) => state.state === "SPENT")).toBe(true);
-    for (const row of result.rows) {
-      const proofs = getDecodedToken(row.tokenText, [previous.keysetId]).proofs;
+    for (const state of ["handedOut", "available"] as const) {
+      const proofs = toCashuProofs(proofsIn(result.proofs, state));
       expect(
         (await previous.checkProofsStates(proofs)).every(
-          (state) => state.state === "UNSPENT",
+          (entry) => entry.state === "UNSPENT",
         ),
       ).toBe(true);
-      await claimExternally(row.tokenText);
+      await claimExternally(tokenOf(proofs));
       expect(
         (await previous.checkProofsStates(proofs)).every(
-          (state) => state.state === "SPENT",
+          (entry) => entry.state === "SPENT",
         ),
       ).toBe(true);
     }

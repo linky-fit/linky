@@ -4,7 +4,7 @@ Wire `@linky/linkshu` and make a first wallet call. Read this before touching ca
 
 ## What it is
 
-`@linky/linkshu` is Linky's cashu wallet as an Effect library. Every wallet operation (receive, send, pay an invoice, top up, validate, restore, …) is a typed service that takes a draft and returns a receipt. You bring the seed and two storage ports; the package owns everything else, including the token lifecycle and the deterministic counters.
+`@linky/linkshu` is Linky's cashu wallet as an Effect library. Every wallet operation (receive, send, pay an invoice, top up, validate, restore, …) is a typed service that takes a draft and returns a receipt. You bring the seed and three storage ports; the package owns everything else, including the proof inventory and the deterministic counters.
 
 ## Core concepts
 
@@ -12,8 +12,8 @@ Wire `@linky/linkshu` and make a first wallet call. Read this before touching ca
 
 - **Services.** Each operation is an Effect service (`Receive`, `Send`, `Melt`, `Topup`, …). `yield* Receive` gives you the instance; call a method on it.
 - **Drafts in, receipts out.** Methods take a draft (`ReceiveDraft`, `SendDraft`, …) and return a receipt (`ReceiveReceipt`, `SendReceipt`, …). Both are typed over branded primitives (`MintUrl`, `Amount`, `TokenText`), so a plain string or number does not type-check until you decode it.
-- **Token rows.** Every token is a row in your `TokenStore` with a state; only `accepted` counts as balance. The package decides every state change; your store only persists it.
-- **Ports.** You supply storage (`KeyValueStore`, `TokenStore`) and the seed. In-memory defaults exist for tests. The package talks to mints itself.
+- **Proofs and operations.** The wallet is an inventory of proofs in your `ProofStore`, each in a state; only `available` counts as balance. Every flow that moves proofs (a melt, a topup, a send, …) is an operation in your `OperationStore`, and proofs point at the operation holding them. The package decides every state; your stores only persist it.
+- **Ports.** You supply storage (`KeyValueStore`, `ProofStore`, `OperationStore`) and the seed. In-memory defaults exist for tests. The package talks to mints itself.
 - **Errors are values.** Every failure is a tagged error (`MintRejected`, `MintUnreachable`, `InsufficientFunds`, …) you match on `_tag`.
 
 ## Install and import
@@ -85,19 +85,20 @@ balance 0 sat across 0 mints
 no token in input (no-token-found)
 ```
 
-What happened: `Tokens.balances` read an empty store, and `Receive.receive` failed with `TokenParseFailed`. `Effect.either` turned that typed failure into a value; without it the promise rejects with the error. Nothing was stored, because a parse failure never creates a row.
+What happened: `Tokens.balances` read an empty inventory, and `Receive.receive` failed with `TokenParseFailed`. `Effect.either` turned that typed failure into a value; without it the promise rejects with the error. Nothing was stored, because a parse failure never creates an operation.
 
 To put real funds in, paste a token: [receive.md](./receive.md). Or mint some against the local Docker mint: [topup.md](./topup.md).
 
-## The three inputs you bring
+## The four inputs you bring
 
-| Input           | Type                         | What it is                                                                                                   |
-| --------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `bip39Seed`     | `Bip39Seed`                  | The raw 64-byte BIP-39 seed. All deterministic derivation hangs off it; the package never sees the mnemonic. |
-| `keyValueStore` | `Layer.Layer<KeyValueStore>` | Durable string storage with lease locks. Optional: in-memory default.                                        |
-| `tokenStore`    | `Layer.Layer<TokenStore>`    | The token row store. Optional: in-memory default.                                                            |
+| Input            | Type                          | What it is                                                                                                   |
+| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `bip39Seed`      | `Bip39Seed`                   | The raw 64-byte BIP-39 seed. All deterministic derivation hangs off it; the package never sees the mnemonic. |
+| `keyValueStore`  | `Layer.Layer<KeyValueStore>`  | Durable string storage with lease locks; device-local state only. Optional: in-memory default.               |
+| `proofStore`     | `Layer.Layer<ProofStore>`     | The proof inventory. Optional: in-memory default.                                                            |
+| `operationStore` | `Layer.Layer<OperationStore>` | The operation records. Optional: in-memory default.                                                          |
 
-The in-memory defaults lose everything when the runtime ends. A real consumer implements the ports ([ports.md](./ports.md)); the CLI's file-based ones are the shortest working pair.
+The in-memory defaults lose everything when the runtime ends. A real consumer implements the ports ([ports.md](./ports.md)); the CLI's file-based ones are the shortest working set.
 
 Build the seed from a mnemonic on your side with `mnemonicToSeedSync` from `@scure/bip39`, then `Bip39Seed.make(bytes)`. `Bip39Seed.make` throws unless the array is exactly 64 bytes. The web app does this in `apps/web-app/src/platform/linkshu/resolveLinkshuSeed.ts`.
 
@@ -159,18 +160,18 @@ export const sendFromForm = (mint: string, amount: number) =>
 
 ## The services
 
-| Service      | Methods                                                                                          | Guide                            |
-| ------------ | ------------------------------------------------------------------------------------------------ | -------------------------------- |
-| `Receive`    | `receive`                                                                                        | [receive.md](./receive.md)       |
-| `Send`       | `send`                                                                                           | [send.md](./send.md)             |
-| `Melt`       | `quote`, `melt`, `status`                                                                        | [melt.md](./melt.md)             |
-| `Topup`      | `start`, `adopt`, `resumePending`                                                                | [topup.md](./topup.md)           |
-| `Autoswap`   | `claim`, `resumePendingClaims`                                                                   | [autoswap.md](./autoswap.md)     |
-| `Validation` | `checkAll`, `checkRow`, `checkIssued`                                                            | [validation.md](./validation.md) |
-| `Restore`    | `restore`, `wipeSeedBoundState`                                                                  | [restore.md](./restore.md)       |
-| `Tokens`     | `list`, `balances`, `reserve`, `markIssued`, `markExternalized`, `returnToWallet`, `deleteSpent` | [tokens.md](./tokens.md)         |
-| `Mints`      | `info`, `knownMints`                                                                             | [mints.md](./mints.md)           |
-| `FeeProbe`   | `probeLightningFee`                                                                              | [fee-probe.md](./fee-probe.md)   |
+| Service      | Methods                                                                                                                                                              | Guide                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `Receive`    | `receive`                                                                                                                                                            | [receive.md](./receive.md)       |
+| `Send`       | `send`                                                                                                                                                               | [send.md](./send.md)             |
+| `Melt`       | `quote`, `melt`, `status`, `resumePending`                                                                                                                           | [melt.md](./melt.md)             |
+| `Topup`      | `start`, `adopt`, `resumePending`                                                                                                                                    | [topup.md](./topup.md)           |
+| `Autoswap`   | `claim`, `resumePendingClaims`                                                                                                                                       | [autoswap.md](./autoswap.md)     |
+| `Validation` | `checkAll`, `checkTransfer`, `checkIssued`, `inspectProofStates`                                                                                                     | [validation.md](./validation.md) |
+| `Restore`    | `restore`, `wipeSeedBoundState`                                                                                                                                      | [restore.md](./restore.md)       |
+| `Tokens`     | `proofs`, `operations`, `transfers`, `balances`, `markIssued`, `markExternalized`, `forget`, `returnToWallet`, `importProofs`, `importOperation`, `ingestLegacyRows` | [tokens.md](./tokens.md)         |
+| `Mints`      | `info`, `knownMints`, `addKnownMint`, `removeKnownMint`                                                                                                              | [mints.md](./mints.md)           |
+| `FeeProbe`   | `probeLightningFee`                                                                                                                                                  | [fee-probe.md](./fee-probe.md)   |
 
 Helpers that need no runtime (token codec, invoice preview, LNURL) are in [tokens.md](./tokens.md) and [lightning-utilities.md](./lightning-utilities.md).
 
@@ -188,8 +189,8 @@ bun run linkshu --data-dir /tmp/wallet --verbose balance
 
 ## Related
 
-- [concepts.md](./concepts.md) — drafts, receipts, primitives, token states, counters, Effect primer
-- [ports.md](./ports.md) — implementing `KeyValueStore`, `TokenStore`, `CashuSeed`
+- [concepts.md](./concepts.md) — drafts, receipts, primitives, proof states, operation statuses, counters, Effect primer
+- [ports.md](./ports.md) — implementing `KeyValueStore`, `ProofStore`, `OperationStore`, `CashuSeed`
 - [errors.md](./errors.md) — every tagged error and how to handle it
 - [inspector.md](./inspector.md) — diagnostics events
 - [testing.md](./testing.md) — unit and integration testing

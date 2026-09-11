@@ -6,25 +6,27 @@ import {
   runLinkshu,
   Send,
   SendDraft,
-  TokenStore,
+  Tokens,
   Validation,
 } from "../../src";
+import { amountIn } from "../../src/testing/inventory";
 import { claimExternally, fundToken, mintUrl, randomSeed } from "./helpers";
 
 describe("validation vertical against the local mint", () => {
-  it("detects an externally spent row on refresh and marks it error", async () => {
+  it("detects externally spent proofs on refresh and marks them spent", async () => {
     const funded = await fundToken(12);
 
-    const { funding, report, rows } = await runLinkshu(
+    const { funding, report, proofs, balances } = await runLinkshu(
       { bip39Seed: randomSeed() },
       Effect.gen(function* () {
         const receive = yield* Receive;
+        const tokens = yield* Tokens;
         const validation = yield* Validation;
         const funding = yield* receive.receive(
           new ReceiveDraft({ text: funded }),
         );
 
-        // Nothing has happened to the proofs yet: the row stays as it is.
+        // Nothing has happened to the proofs yet: the inventory stays as it is.
         const healthy = yield* validation.checkAll;
         expect(healthy.markedSpent).toEqual([]);
         expect(healthy.unavailableMints).toEqual([]);
@@ -32,31 +34,36 @@ describe("validation vertical against the local mint", () => {
         yield* Effect.promise(() => claimExternally(funding.tokenText));
 
         const report = yield* validation.checkAll;
-        return { funding, report, rows: yield* (yield* TokenStore).loadAll };
+        return {
+          funding,
+          report,
+          proofs: yield* tokens.proofs,
+          balances: yield* tokens.balances,
+        };
       }),
     );
 
-    expect(report.checkedRows).toBe(1);
-    expect(report.markedSpent).toHaveLength(1);
-    expect(report.markedSpent[0]?.amount).toBe(funding.amount);
+    expect(proofs.length).toBeGreaterThan(0);
+    expect(report.checkedProofs).toBe(proofs.length);
+    expect(report.markedSpent).toHaveLength(proofs.length);
+    expect(
+      report.markedSpent.reduce((sum, entry) => sum + entry.amount, 0),
+    ).toBe(funding.amount);
     expect(report.unavailableMints).toEqual([]);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("error");
-    expect(JSON.parse(rows[0].error ?? "")).toMatchObject({
-      _tag: "TokenAlreadySpent",
-      mint: mintUrl,
-    });
+    expect(proofs.every((proof) => proof.state === "spent")).toBe(true);
+    expect(balances.total).toBe(0);
   });
 
-  it("prunes an issued token once the recipient claims it", async () => {
+  it("closes an issued send once the recipient claims it", async () => {
     const funded = await fundToken(20);
 
-    const { receipt, report, rows } = await runLinkshu(
+    const { receipt, report, transfers, proofs } = await runLinkshu(
       { bip39Seed: randomSeed() },
       Effect.gen(function* () {
         const receive = yield* Receive;
         const send = yield* Send;
+        const tokens = yield* Tokens;
         const validation = yield* Validation;
         yield* receive.receive(new ReceiveDraft({ text: funded }));
         const receipt = yield* send.send(
@@ -67,48 +74,68 @@ describe("validation vertical against the local mint", () => {
           }),
         );
 
-        // Unclaimed: the issued row must survive the check untouched.
+        // Unclaimed: the send must survive the check untouched.
         const unclaimed = yield* validation.checkIssued;
         expect(unclaimed.claimed).toEqual([]);
 
         yield* Effect.promise(() => claimExternally(receipt.tokenText));
 
         const report = yield* validation.checkIssued;
-        return { receipt, report, rows: yield* (yield* TokenStore).loadAll };
-      }),
-    );
-
-    expect(report.claimed).toHaveLength(1);
-    expect(report.claimed[0]?.rowId).toBe(receipt.rowId);
-    expect(report.claimed[0]?.amount).toBe(receipt.amount);
-    expect(rows.some((row) => row.id === receipt.rowId)).toBe(false);
-    // The change row is untouched by an issued-token check.
-    expect(rows.every((row) => row.state === "accepted")).toBe(true);
-  });
-
-  it("consolidates several accepted rows into one without a swap", async () => {
-    const first = await fundToken(6);
-    const second = await fundToken(9);
-
-    const { report, rows } = await runLinkshu(
-      { bip39Seed: randomSeed() },
-      Effect.gen(function* () {
-        const receive = yield* Receive;
-        const one = yield* receive.receive(new ReceiveDraft({ text: first }));
-        const two = yield* receive.receive(new ReceiveDraft({ text: second }));
-        const report = yield* (yield* Validation).checkAll;
         return {
-          total: one.amount + two.amount,
+          receipt,
           report,
-          rows: yield* (yield* TokenStore).loadAll,
+          transfers: yield* tokens.transfers,
+          proofs: yield* tokens.proofs,
         };
       }),
     );
 
-    expect(report.checkedRows).toBe(2);
-    expect(report.markedSpent).toEqual([]);
-    expect(report.mergedRows).toHaveLength(1);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("accepted");
+    expect(report.claimed).toEqual([
+      expect.objectContaining({
+        operationId: receipt.operationId,
+        amount: receipt.amount,
+      }),
+    ]);
+    expect(
+      transfers.find((transfer) => transfer.id === receipt.operationId),
+    ).toMatchObject({ kind: "send", status: "done" });
+
+    const handedOut = proofs.filter(
+      (proof) => proof.operationId === receipt.operationId,
+    );
+    expect(handedOut.length).toBeGreaterThan(0);
+    expect(handedOut.every((proof) => proof.state === "spent")).toBe(true);
+    // The change is untouched by an issued-token check.
+    expect(amountIn(proofs, "available")).toBe(receipt.changeAmount);
+  });
+
+  it("follows a handed-out send from live to spent through checkTransfer", async () => {
+    const funded = await fundToken(20);
+
+    const { live, spent, transfers } = await runLinkshu(
+      { bip39Seed: randomSeed() },
+      Effect.gen(function* () {
+        const validation = yield* Validation;
+        yield* (yield* Receive).receive(new ReceiveDraft({ text: funded }));
+        const receipt = yield* (yield* Send).send(
+          new SendDraft({
+            mint: mintUrl,
+            amount: Amount.make(5),
+            produceAs: "pending",
+          }),
+        );
+        const live = yield* validation.checkTransfer(receipt.operationId);
+        yield* Effect.promise(() => claimExternally(receipt.tokenText));
+        const spent = yield* validation.checkTransfer(receipt.operationId);
+        return { live, spent, transfers: yield* (yield* Tokens).transfers };
+      }),
+    );
+
+    expect(live.status).toBe("live");
+    expect(spent.status).toBe("spent");
+    expect(transfers.map((transfer) => transfer.status)).toEqual([
+      "done",
+      "done",
+    ]);
   });
 });

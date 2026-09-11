@@ -1,8 +1,18 @@
 import { Effect, Struct } from "effect";
 import type { TokenText } from "../domain/primitives";
 import type { Proof } from "../token/domain";
+import {
+  OperationChanged,
+  OperationFailed,
+  OperationSucceeded,
+} from "../inspector/events";
 import type { InspectorService } from "../inspector/Inspector";
-import { OperationFailed, OperationSucceeded } from "../inspector/events";
+import type {
+  NewOperation,
+  OperationPatch,
+  OperationStoreService,
+  StoredOperation,
+} from "../ports/OperationStore";
 
 /**
  * Taps a wallet operation into the inspector: success as
@@ -69,3 +79,60 @@ export const redactReceipt = <
 >(
   receipt: R,
 ) => Struct.omit(receipt, "tokenText", "proofs");
+
+export interface OperationContext {
+  readonly operationStore: OperationStoreService;
+  readonly inspector: InspectorService;
+}
+
+/** Persists an operation and reports it; the store assigns the id. */
+export const insertOperation = (
+  ctx: OperationContext,
+  operation: NewOperation,
+  reason: string,
+): Effect.Effect<StoredOperation> =>
+  Effect.tap(ctx.operationStore.insert(operation), (stored) =>
+    Effect.sync(() =>
+      ctx.inspector.emit(
+        () =>
+          new OperationChanged(
+            {
+              operationId: stored.id,
+              kind: stored.kind,
+              from: null,
+              to: stored.status,
+              reason,
+            },
+            { disableValidation: true },
+          ),
+      ),
+    ),
+  );
+
+/** Patches an operation; a status change is reported. */
+export const patchOperation = (
+  ctx: OperationContext,
+  operation: StoredOperation,
+  patch: OperationPatch,
+  reason: string,
+): Effect.Effect<void> =>
+  Effect.tap(ctx.operationStore.update(operation.id, patch), () =>
+    Effect.sync(() => {
+      if (patch.status === undefined || patch.status === operation.status)
+        return;
+      const to = patch.status;
+      ctx.inspector.emit(
+        () =>
+          new OperationChanged(
+            {
+              operationId: operation.id,
+              kind: operation.kind,
+              from: operation.status,
+              to,
+              reason,
+            },
+            { disableValidation: true },
+          ),
+      );
+    }),
+  );

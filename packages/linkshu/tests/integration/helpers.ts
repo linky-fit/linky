@@ -1,20 +1,34 @@
-import { Mint, Wallet, getEncodedToken } from "@cashu/cashu-ts";
+import {
+  Amount as CashuAmount,
+  getEncodedToken,
+  Mint,
+  Wallet,
+} from "@cashu/cashu-ts";
 import type { Proof } from "@cashu/cashu-ts";
 import { Effect, Layer } from "effect";
 import {
   Bip39Seed,
   Bolt11Invoice,
+  CurrencyUnit,
   KeyValueStore,
   makeInMemoryKeyValueStore,
-  makeInMemoryTokenStore,
+  makeInMemoryOperationStore,
+  makeInMemoryProofStore,
   MintUrl,
-  parseTokenText,
+  OperationStore,
+  ProofStore,
   Receive,
   ReceiveDraft,
   runLinkshu,
-  TokenStore,
 } from "../../src";
-import type { StoredTokenRow } from "../../src";
+import type {
+  NewProof,
+  OperationKind,
+  OperationStoreService,
+  StoredOperation,
+  StoredProof,
+} from "../../src";
+import { toNewProofs } from "../../src/internal/proofs";
 
 /**
  * The dev-stack Nutshell FakeWallet mint (docker-compose.dev.yml
@@ -58,8 +72,8 @@ export const fundProofs = async (amountSat: number): Promise<Proof[]> => {
   });
 };
 
-export const tokenOf = (proofs: Proof[]): string =>
-  getEncodedToken({ mint: mintUrl, unit: "sat", proofs });
+export const tokenOf = (proofs: Proof[], mint: MintUrl = mintUrl): string =>
+  getEncodedToken({ mint, unit: "sat", proofs });
 
 export const fundToken = async (amountSat: number): Promise<string> =>
   tokenOf(await fundProofs(amountSat));
@@ -77,13 +91,50 @@ export const claimExternally = async (tokenText: string): Promise<void> => {
   await wallet.receive(tokenText, undefined, { type: "random" });
 };
 
-export const acceptedTotalOf = (rows: ReadonlyArray<StoredTokenRow>): number =>
-  rows
-    .filter((row) => row.state === "accepted")
-    .reduce(
-      (sum, row) => sum + (parseTokenText(row.tokenText)?.amount ?? 0),
-      0,
-    );
+/** The spendable balance the inventory holds. */
+export const availableTotalOf = (proofs: ReadonlyArray<StoredProof>): number =>
+  proofs
+    .filter((proof) => proof.state === "available")
+    .reduce((sum, proof) => sum + proof.amount, 0);
+
+/** Stored proofs as cashu-ts proofs, for talking to a mint outside linkshu. */
+export const toCashuProofs = (proofs: ReadonlyArray<StoredProof>): Proof[] =>
+  proofs.map((proof) => ({
+    id: proof.keysetId,
+    amount: CashuAmount.from(proof.amount),
+    secret: proof.secret,
+    C: proof.C,
+  }));
+
+/**
+ * Inventory rows for proofs minted outside linkshu, as a balance synced from
+ * another device would land: `available`, owned by no operation.
+ */
+export const availableRowsOf = (proofs: Proof[]): ReadonlyArray<NewProof> => {
+  const rows = toNewProofs(
+    proofs,
+    mintUrl,
+    CurrencyUnit.make("sat"),
+    "available",
+    null,
+  );
+  if (rows === null) throw new Error("malformed mint proofs");
+  return rows;
+};
+
+/** Operations of `kind` a resumer would still pick up. */
+export const pendingOperations = (
+  store: OperationStoreService,
+  kind: OperationKind,
+): Promise<ReadonlyArray<StoredOperation>> =>
+  Effect.runPromise(
+    Effect.map(store.loadAll, (operations) =>
+      operations.filter(
+        (operation) =>
+          operation.kind === kind && operation.status === "pending",
+      ),
+    ),
+  );
 
 /**
  * Storage that outlives the runtime using it. Two `runLinkshu` calls over one
@@ -92,25 +143,28 @@ export const acceptedTotalOf = (rows: ReadonlyArray<StoredTokenRow>): number =>
  */
 export const durableStorage = () => {
   const kv = makeInMemoryKeyValueStore();
-  const tokens = makeInMemoryTokenStore();
+  const proofs = makeInMemoryProofStore();
+  const operations = makeInMemoryOperationStore();
   return {
     kv,
-    tokens,
+    proofs,
+    operations,
     layers: {
       keyValueStore: Layer.succeed(KeyValueStore, kv),
-      tokenStore: Layer.succeed(TokenStore, tokens),
+      proofStore: Layer.succeed(ProofStore, proofs),
+      operationStore: Layer.succeed(OperationStore, operations),
     },
   };
 };
 
-/** One runtime with in-memory ports: receive `text`, report the receipt and rows. */
+/** One runtime with in-memory ports: receive `text`, report the receipt and inventory. */
 export const receiveOnce = (seed: Bip39Seed, text: string) =>
   runLinkshu(
     { bip39Seed: seed },
     Effect.gen(function* () {
       const receive = yield* Receive;
       const receipt = yield* receive.receive(new ReceiveDraft({ text }));
-      const rows = yield* (yield* TokenStore).loadAll;
-      return { receipt, rows };
+      const proofs = yield* (yield* ProofStore).loadAll;
+      return { receipt, proofs };
     }),
   );

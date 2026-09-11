@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import {
   Amount,
+  ProofStore,
   Receive,
   ReceiveDraft,
   Restore,
@@ -8,10 +9,9 @@ import {
   runLinkshu,
   Send,
   SendDraft,
-  TokenStore,
 } from "../../src";
 import type { Bip39Seed } from "../../src";
-import { fundToken, mintUrl, randomSeed } from "./helpers";
+import { availableTotalOf, fundToken, mintUrl, randomSeed } from "./helpers";
 
 /** Everything the seed owns at the mint, with no storage to start from. */
 const restoreFromSeedAlone = (seed: Bip39Seed) =>
@@ -26,7 +26,7 @@ const restoreFromSeedAlone = (seed: Bip39Seed) =>
       const second = yield* restore.restore(
         new RestoreDraft({ mints: [mintUrl] }),
       );
-      return { first, second, rows: yield* (yield* TokenStore).loadAll };
+      return { first, second, proofs: yield* (yield* ProofStore).loadAll };
     }),
   );
 
@@ -44,21 +44,22 @@ describe("restore vertical against the local mint", () => {
       }),
     );
 
-    const { first, second, rows } = await restoreFromSeedAlone(seed);
+    const { first, second, proofs } = await restoreFromSeedAlone(seed);
 
     expect(first.restoredAmount).toBe(amount);
-    expect(first.rows).toHaveLength(1);
+    expect(first.restoredProofs).toBe(proofs.length);
     expect(first.scannedMints).toEqual([mintUrl]);
     expect(first.unavailableMints).toEqual([]);
 
     // Idempotent: the mint still reports the same signatures, but every one
     // of them is already stored.
     expect(second.restoredAmount).toBe(0);
-    expect(second.rows).toEqual([]);
+    expect(second.restoredProofs).toBe(0);
     expect(second.scannedMints).toEqual([mintUrl]);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("accepted");
+    expect(proofs.length).toBeGreaterThan(0);
+    expect(proofs.every((proof) => proof.state === "available")).toBe(true);
+    expect(availableTotalOf(proofs)).toBe(amount);
   });
 
   it("leaves the counter past the recovered slots, so the wallet can spend", async () => {

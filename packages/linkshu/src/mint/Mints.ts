@@ -5,10 +5,11 @@ import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { inspectOperation } from "../internal/operations";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
+import { OperationStore } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
 import { findMintInfoIconValue, isTestMintUrl } from "./icons";
 import { MintInfo } from "./domain";
-import { collectKnownMints, tokenTextMint } from "./internal/knownMints";
+import { collectKnownMints } from "./internal/knownMints";
 import { boundKeysetInputFeePpk } from "./internal/keysetFees";
 import { seenMintKey, WalletInstances } from "./internal/WalletInstances";
 import type { LoadedWallet } from "./internal/WalletInstances";
@@ -54,7 +55,8 @@ export class Mints extends Effect.Service<Mints>()("linkshu/Mints", {
   dependencies: [WalletInstances.Default],
   effect: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
-    const tokenStore = yield* TokenStore;
+    const proofStore = yield* ProofStore;
+    const operationStore = yield* OperationStore;
     const instances = yield* WalletInstances;
     const inspector = yield* Inspector.orNoop;
 
@@ -67,10 +69,11 @@ export class Mints extends Effect.Service<Mints>()("linkshu/Mints", {
         inspectOperation(inspector, "mints.info", { mint }),
       );
 
-    /** Every mint the wallet has state for: stored rows plus seen mints. */
+    /** Every mint the wallet has state for: stored proofs plus seen mints. */
     const knownMints: Effect.Effect<ReadonlyArray<MintUrl>> = collectKnownMints(
       kv,
-      tokenStore,
+      proofStore,
+      operationStore,
     );
 
     const addKnownMint = (mint: MintUrl): Effect.Effect<void> =>
@@ -78,17 +81,20 @@ export class Mints extends Effect.Service<Mints>()("linkshu/Mints", {
         .set(seenMintKey(mint), mint)
         .pipe(inspectOperation(inspector, "mints.addKnownMint", { mint }));
 
-    const countRowsAt = (mint: MintUrl): Effect.Effect<number> =>
+    /** Unspent proofs at the mint, whatever the wallet considers them. */
+    const countProofsAt = (mint: MintUrl): Effect.Effect<number> =>
       Effect.map(
-        tokenStore.loadAll,
-        (rows) =>
-          rows.filter((row) => tokenTextMint(row.tokenText) === mint).length,
+        proofStore.loadAll,
+        (proofs) =>
+          proofs.filter(
+            (proof) => proof.mint === mint && proof.state !== "spent",
+          ).length,
       );
 
     const removeKnownMint = (mint: MintUrl): Effect.Effect<void, MintInUse> =>
-      Effect.flatMap(countRowsAt(mint), (rowCount) =>
-        rowCount > 0
-          ? Effect.fail(new MintInUse({ mint, rowCount }))
+      Effect.flatMap(countProofsAt(mint), (proofCount) =>
+        proofCount > 0
+          ? Effect.fail(new MintInUse({ mint, proofCount }))
           : kv.remove(seenMintKey(mint)),
       ).pipe(inspectOperation(inspector, "mints.removeKnownMint", { mint }));
 

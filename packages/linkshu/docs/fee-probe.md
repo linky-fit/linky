@@ -33,7 +33,7 @@ Pick `probeMint` as a _different_, Lightning-backed mint; a mint quoting a melt 
 ### What it never does
 
 - Never pays the invoice, mints, or melts. Both quotes are left unpaid and expire on their own.
-- Never touches token rows or deterministic counters.
+- Never touches stored proofs, operations, or deterministic counters.
 - Never retries on its own; a failure is not cached either (the app keeps a short client-side backoff for failed probes).
 
 ## Inputs and outputs

@@ -6,9 +6,11 @@ import { Melt } from "./melt/Melt";
 import { Mints } from "./mint/Mints";
 import { CashuSeed } from "./ports/CashuSeed";
 import { inMemoryKeyValueStore } from "./ports/inMemoryKeyValueStore";
-import { inMemoryTokenStore } from "./ports/inMemoryTokenStore";
+import { inMemoryOperationStore } from "./ports/inMemoryOperationStore";
+import { inMemoryProofStore } from "./ports/inMemoryProofStore";
 import type { KeyValueStore } from "./ports/KeyValueStore";
-import type { TokenStore } from "./ports/TokenStore";
+import type { OperationStore } from "./ports/OperationStore";
+import type { ProofStore } from "./ports/ProofStore";
 import { Receive } from "./receive/Receive";
 import { Restore } from "./restore/Restore";
 import { Send } from "./send/Send";
@@ -20,8 +22,10 @@ export interface LinkshuServicesConfig {
   readonly bip39Seed: Bip39Seed;
   /** Durable locked key-value storage; defaults to non-durable in-memory. */
   readonly keyValueStore?: Layer.Layer<KeyValueStore> | undefined;
-  /** Durable token row storage; defaults to non-durable in-memory. */
-  readonly tokenStore?: Layer.Layer<TokenStore> | undefined;
+  /** Durable proof inventory; defaults to non-durable in-memory. */
+  readonly proofStore?: Layer.Layer<ProofStore> | undefined;
+  /** Durable operation records; defaults to non-durable in-memory. */
+  readonly operationStore?: Layer.Layer<OperationStore> | undefined;
 }
 
 /**
@@ -47,7 +51,8 @@ export const linkshuServices = (config: LinkshuServicesConfig) =>
       Layer.mergeAll(
         CashuSeed.fromBytes(config.bip39Seed),
         config.keyValueStore ?? inMemoryKeyValueStore,
-        config.tokenStore ?? inMemoryTokenStore,
+        config.proofStore ?? inMemoryProofStore,
+        config.operationStore ?? inMemoryOperationStore,
       ),
     ),
   );

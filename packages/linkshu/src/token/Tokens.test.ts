@@ -1,87 +1,69 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
 import { getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Either, Exit, Layer, Schema } from "effect";
+import { MintRejected, TokenAlreadySpent } from "../domain/errors";
 import {
-  MintRejected,
-  TokenAlreadyKnown,
-  TokenAlreadySpent,
-} from "../domain/errors";
-import {
+  Amount,
+  Bolt11Invoice,
+  CurrencyUnit,
+  KeysetId,
   MintUrl,
-  TokenRowId,
+  NonNegativeAmount,
+  OperationId,
+  QuoteId,
   TokenText,
   UnixSeconds,
 } from "../domain/primitives";
 import { WalletInstances } from "../mint/internal/WalletInstances";
-import { deterministicIdTokenStore } from "../testing/deterministicIdTokenStore";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import {
-  inMemoryTokenStore,
-  makeInMemoryTokenStore,
-} from "../ports/inMemoryTokenStore";
-import { NewTokenRow, StoredTokenRow, TokenStore } from "../ports/TokenStore";
+import { inMemoryOperationStore } from "../ports/inMemoryOperationStore";
+import { inMemoryProofStore } from "../ports/inMemoryProofStore";
+import { NewOperation, OperationStore } from "../ports/OperationStore";
+import type { OperationStatus, StoredOperation } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
+import type { ProofState, StoredProof } from "../ports/ProofStore";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
-import { amountOf, seedRow as seedTokenRow } from "../testing/rows";
-import { ImportRowDraft } from "./domain";
-import type { TokenState } from "./domain";
+import {
+  amountIn,
+  proofsIn,
+  secretsOf,
+  seedProofs,
+  seedTransfer,
+} from "../testing/inventory";
+import { ImportProofDraft, LegacyTokenRow } from "./domain";
 import { Tokens } from "./Tokens";
 
 const mint = MintUrl.make("https://mint.example");
+const sat = CurrencyUnit.make("sat");
 
 const tokenOf = (...proofs: ReadonlyArray<CashuProof>): TokenText =>
   TokenText.make(getEncodedToken({ mint, unit: "sat", proofs: [...proofs] }));
 
-const tokenA = tokenOf(proof(4, "sec-a1"), proof(2, "sec-a2"));
+const proofsA = [proof(4, "sec-a1"), proof(2, "sec-a2")];
+const tokenA = tokenOf(...proofsA);
 const tokenB = tokenOf(proof(8, "sec-b1"));
-const tokenC = tokenOf(proof(16, "sec-c1"));
 /** What the mint hands back when a token is re-received (its input fee taken). */
 const swappedProofs = [proof(4, "fresh-1"), proof(1, "fresh-2")];
 
 const encodeSpent = Schema.encodeSync(Schema.parseJson(TokenAlreadySpent));
 const encodeRejected = Schema.encodeSync(Schema.parseJson(MintRejected));
-
-const ALL_STATES: ReadonlyArray<TokenState> = [
-  "pending",
-  "accepted",
-  "reserved",
-  "issued",
-  "externalized",
-  "error",
-];
-
-type StateName = "UNSPENT" | "PENDING" | "SPENT";
+const rejected = encodeRejected(
+  new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
+);
 
 interface HarnessArgs {
   receive?: () => Promise<CashuProof[]>;
-  stateOf?: (secret: string) => StateName;
-  checkStatesError?: unknown;
-  /** Answer fewer states than asked, to emulate a truncated response. */
-  truncateTo?: number;
-  tokenStore?: Layer.Layer<TokenStore>;
 }
 
 const makeHarness = (args: HarnessArgs = {}) => {
   const inspector = recordingInspector();
-  const checkedSecrets: string[][] = [];
   let receiveCalls = 0;
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
     receive: () => {
       receiveCalls += 1;
       return args.receive?.() ?? Promise.reject(new Error("not under test"));
-    },
-    checkProofsStates: (proofs) => {
-      checkedSecrets.push(proofs.map((entry) => entry.secret ?? ""));
-      return args.checkStatesError !== undefined
-        ? Promise.reject(args.checkStatesError)
-        : Promise.resolve(
-            proofs.slice(0, args.truncateTo ?? proofs.length).map((entry) => ({
-              Y: entry.secret ?? "",
-              state: args.stateOf?.(entry.secret ?? "") ?? "UNSPENT",
-              witness: null,
-            })),
-          );
     },
   });
 
@@ -93,891 +75,916 @@ const makeHarness = (args: HarnessArgs = {}) => {
           WalletInstances.make({ get: () => Effect.succeed(wallet) }),
         ),
         inMemoryKeyValueStore,
-        args.tokenStore ?? inMemoryTokenStore,
+        inMemoryProofStore,
+        inMemoryOperationStore,
         inspector.layer,
       ),
     ),
   );
 
-  const run = <A, E>(program: Effect.Effect<A, E, Tokens | TokenStore>) =>
-    Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
+  const run = <A, E>(
+    program: Effect.Effect<A, E, Tokens | ProofStore | OperationStore>,
+  ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
 
-  return {
-    run,
-    events: inspector.events,
-    checkedSecrets,
-    receiveCalls: () => receiveCalls,
-  };
+  return { run, events: inspector.events, receiveCalls: () => receiveCalls };
 };
 
-interface Seed {
-  readonly tokenText: TokenText;
-  readonly state: TokenState;
-  readonly error?: string;
-}
+const inventory = Effect.gen(function* () {
+  return {
+    proofs: yield* (yield* ProofStore).loadAll,
+    operations: yield* (yield* OperationStore).loadAll,
+  };
+});
 
-const seedRow = (seed: Seed) =>
-  seedTokenRow(seed.tokenText, seed.state, seed.error ?? null);
+const stateOf = (
+  proofs: ReadonlyArray<StoredProof>,
+  secret: string,
+): ProofState | undefined => proofs.find((p) => p.secret === secret)?.state;
 
-/** Seeds rows, runs one Tokens call, and reports the resulting store. */
-const withRows = <A, E>(
-  seeds: ReadonlyArray<Seed>,
-  operation: (tokens: Tokens) => Effect.Effect<A, E>,
-) =>
-  Effect.gen(function* () {
-    const rowIds = yield* Effect.forEach(seeds, (seed) =>
-      Effect.map(seedRow(seed), (row) => row.id),
-    );
-    const result = yield* Effect.either(operation(yield* Tokens));
-    return { rowIds, result, rows: yield* (yield* TokenStore).loadAll };
+const operationById = (
+  operations: ReadonlyArray<StoredOperation>,
+  id: OperationId,
+): StoredOperation | undefined => operations.find((op) => op.id === id);
+
+/** A quote-kind operation; transfers come from `seedTransfer`. */
+const quoteOperation = (
+  overrides: Partial<ConstructorParameters<typeof NewOperation>[0]>,
+): NewOperation =>
+  new NewOperation({
+    kind: "melt",
+    status: "pending",
+    mint,
+    unit: sat,
+    keysetId: KeysetId.make(KEYSET_HEX),
+    amount: Amount.make(5),
+    feeReserve: NonNegativeAmount.make(1),
+    inputsTotal: Amount.make(6),
+    quoteId: QuoteId.make("quote-1"),
+    invoice: Bolt11Invoice.make("lnbc50n1test"),
+    sourceMint: null,
+    counter: null,
+    locked: null,
+    expiresAt: null,
+    createdAt: UnixSeconds.make(1_700_000_000),
+    tokenText: null,
+    error: null,
+    ...overrides,
   });
 
-describe("Tokens.list", () => {
-  const storedRow = (
-    id: string,
-    tokenText: string,
-    createdAt: number,
-    state: TokenState = "accepted",
-  ): StoredTokenRow =>
-    new StoredTokenRow({
-      id: TokenRowId.make(id),
-      originalTokenText: TokenText.make(tokenText),
-      tokenText: TokenText.make(tokenText),
-      state,
-      error: null,
-      createdAt: UnixSeconds.make(createdAt),
-    });
+const seedOperation = (operation: NewOperation) =>
+  Effect.flatMap(OperationStore, (store) => store.insert(operation));
 
-  const listOf = (rows: ReadonlyArray<StoredTokenRow>) =>
-    Effect.runPromise(
-      Effect.flatMap(Tokens, (tokens) => tokens.list).pipe(
-        Effect.provide(
-          Tokens.DefaultWithoutDependencies.pipe(
-            Layer.provideMerge(
-              Layer.mergeAll(
-                Layer.succeed(
-                  WalletInstances,
-                  WalletInstances.make({
-                    get: () => Effect.die("not under test"),
-                  }),
-                ),
-                inMemoryKeyValueStore,
-                Layer.succeed(TokenStore, {
-                  ...makeInMemoryTokenStore(),
-                  loadAll: Effect.succeed(rows),
-                }),
-              ),
-            ),
-          ),
-        ),
-      ),
+describe("Tokens read models", () => {
+  it("lists every proof whatever its state", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [proof(4, "a")], "available");
+        yield* seedProofs(mint, [proof(2, "b")], "spent");
+        yield* seedProofs(mint, [proof(1, "c")], "handedOut");
+        return yield* (yield* Tokens).proofs;
+      }),
     );
 
-  it("enriches every row from its token text", async () => {
-    const tokens = await listOf([
-      storedRow("row-a", tokenA, 10),
-      storedRow("row-b", tokenB, 20, "issued"),
-    ]);
+    assert(Exit.isSuccess(exit));
+    expect(secretsOf(exit.value)).toEqual(["a", "b", "c"]);
+  });
 
-    expect(tokens.map((token) => token.id)).toEqual(["row-b", "row-a"]);
-    expect(tokens[1]).toMatchObject({
-      id: "row-a",
-      state: "accepted",
-      tokenText: tokenA,
+  it("lists operations newest first and transfers without quote operations", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedOperation(
+          quoteOperation({ createdAt: UnixSeconds.make(300) }),
+        );
+        const receive = yield* seedOperation(
+          new NewOperation({
+            ...quoteOperation({ createdAt: UnixSeconds.make(100) }),
+            kind: "receive",
+            status: "done",
+            keysetId: null,
+            feeReserve: null,
+            inputsTotal: null,
+            quoteId: null,
+            invoice: null,
+            amount: Amount.make(6),
+            tokenText: tokenA,
+          }),
+        );
+        const send = yield* seedOperation(
+          new NewOperation({
+            ...quoteOperation({ createdAt: UnixSeconds.make(200) }),
+            kind: "send",
+            status: "issued",
+            keysetId: null,
+            feeReserve: null,
+            inputsTotal: null,
+            quoteId: null,
+            invoice: null,
+            amount: Amount.make(8),
+            tokenText: tokenB,
+            error: rejected,
+          }),
+        );
+        const tokens = yield* Tokens;
+        return {
+          receive,
+          send,
+          operations: yield* tokens.operations,
+          transfers: yield* tokens.transfers,
+        };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { receive, send, operations, transfers } = exit.value;
+    expect(operations.map((op) => op.createdAt)).toEqual([300, 200, 100]);
+    expect(transfers.map((transfer) => transfer.id)).toEqual([
+      send.id,
+      receive.id,
+    ]);
+    expect(transfers[0]).toMatchObject({
+      kind: "send",
+      status: "issued",
+      tokenText: tokenB,
       mint,
       unit: "sat",
+      amount: 8,
+      error: rejected,
+      createdAt: 200,
+    });
+    expect(transfers[1]).toMatchObject({
+      kind: "receive",
+      status: "done",
       amount: 6,
       error: null,
-      createdAt: 10,
     });
-    expect(tokens[0]).toMatchObject({ state: "issued", amount: 8 });
-  });
-
-  it("orders newest first regardless of store order", async () => {
-    const tokens = await listOf([
-      storedRow("old", tokenA, 100),
-      storedRow("newest", tokenB, 300),
-      storedRow("middle", tokenC, 200),
-    ]);
-
-    expect(tokens.map((token) => token.id)).toEqual([
-      "newest",
-      "middle",
-      "old",
-    ]);
-  });
-
-  it("drops rows whose token text no longer parses", async () => {
-    const tokens = await listOf([
-      storedRow("broken", "cashuBnotatoken", 10),
-      storedRow("good", tokenA, 20),
-    ]);
-
-    expect(tokens.map((token) => token.id)).toEqual(["good"]);
   });
 });
 
-const balancesOf = (rows: ReadonlyArray<Seed>) =>
-  Effect.runPromise(
+const balancesOf = (
+  seeds: ReadonlyArray<{
+    readonly mint: string;
+    readonly proof: CashuProof;
+    readonly state?: ProofState;
+  }>,
+) =>
+  makeHarness().run(
     Effect.gen(function* () {
-      yield* Effect.forEach(rows, seedRow);
+      yield* Effect.forEach(seeds, (seed) =>
+        seedProofs(seed.mint, [seed.proof], seed.state),
+      );
       return yield* (yield* Tokens).balances;
-    }).pipe(
-      Effect.provide(
-        Tokens.DefaultWithoutDependencies.pipe(
-          Layer.provideMerge(
-            Layer.mergeAll(
-              Layer.succeed(
-                WalletInstances,
-                WalletInstances.make({
-                  get: () => Effect.die("not under test"),
-                }),
-              ),
-              inMemoryKeyValueStore,
-              inMemoryTokenStore,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-
-const mintToken = (mintUrl: string, amount: number, secret: string): Seed => ({
-  tokenText: TokenText.make(
-    getEncodedToken({
-      mint: mintUrl,
-      unit: "sat",
-      proofs: [proof(amount, secret)],
     }),
-  ),
-  state: "accepted",
-});
+  );
 
 describe("Tokens.balances", () => {
   it("is empty for an empty wallet", async () => {
-    const balances = await balancesOf([]);
-    expect(balances.total).toBe(0);
-    expect(balances.spendable).toBe(0);
-    expect(balances.perMint).toEqual([]);
+    const exit = await balancesOf([]);
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.total).toBe(0);
+    expect(exit.value.spendable).toBe(0);
+    expect(exit.value.perMint).toEqual([]);
   });
 
-  it("sums accepted rows per mint; spendable is the largest single mint", async () => {
-    const balances = await balancesOf([
-      mintToken("https://mint.one", 4, "a"),
-      mintToken("https://mint.one", 2, "b"),
-      mintToken("https://mint.two", 5, "c"),
+  it("sums available proofs per mint; spendable is the largest single mint", async () => {
+    const exit = await balancesOf([
+      { mint: "https://mint.one", proof: proof(4, "a") },
+      { mint: "https://mint.one", proof: proof(2, "b") },
+      { mint: "https://mint.two", proof: proof(5, "c") },
     ]);
 
-    expect(balances.total).toBe(11);
-    expect(balances.spendable).toBe(6);
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.total).toBe(11);
+    expect(exit.value.spendable).toBe(6);
     expect(
-      balances.perMint.map(({ mint: url, amount }) => [String(url), amount]),
+      exit.value.perMint.map(({ mint: url, amount }) => [String(url), amount]),
     ).toEqual([
       ["https://mint.one", 6],
       ["https://mint.two", 5],
     ]);
   });
 
-  it("counts only accepted rows", async () => {
-    const balances = await balancesOf([
-      mintToken("https://mint.one", 4, "a"),
-      { ...mintToken("https://mint.one", 8, "b"), state: "pending" },
-      { ...mintToken("https://mint.one", 16, "c"), state: "reserved" },
-      { ...mintToken("https://mint.one", 32, "d"), state: "issued" },
-      { ...mintToken("https://mint.one", 64, "e"), state: "externalized" },
-      { ...mintToken("https://mint.one", 128, "f"), state: "error" },
+  it("counts only available proofs", async () => {
+    const exit = await balancesOf([
+      { mint, proof: proof(4, "a"), state: "available" },
+      { mint, proof: proof(8, "b"), state: "held" },
+      { mint, proof: proof(16, "c"), state: "handedOut" },
+      { mint, proof: proof(32, "d"), state: "externalized" },
+      { mint, proof: proof(64, "e"), state: "spent" },
     ]);
 
-    expect(balances.total).toBe(4);
-    expect(balances.spendable).toBe(4);
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.total).toBe(4);
+    expect(exit.value.spendable).toBe(4);
   });
 });
 
+const SEND_STATUSES: ReadonlyArray<OperationStatus> = [
+  "issued",
+  "pending",
+  "externalized",
+  "done",
+  "returned",
+];
+
+const handedOutStateFor = (status: OperationStatus): ProofState =>
+  status === "externalized"
+    ? "externalized"
+    : status === "done" || status === "returned"
+      ? "spent"
+      : "handedOut";
+
 /**
- * Each transition attempted from every state: the outcome is the state the
- * row ended in, or the tag of the failure that kept it where it was.
+ * One transition attempted from every send status, each over its own
+ * transfer with one handed-out proof: the outcome is the status the
+ * transfer ended in (with its proof's state), or the failure tag.
  */
-const outcomesFromEveryState = (
+const outcomesFromEverySendStatus = (
   operation: (
     tokens: Tokens,
-    rowId: TokenRowId,
+    operationId: OperationId,
   ) => Effect.Effect<void, { readonly _tag: string }>,
 ) =>
-  Effect.forEach(ALL_STATES, (from) =>
+  Effect.forEach(SEND_STATUSES, (from) =>
     Effect.gen(function* () {
-      const store = yield* TokenStore;
-      const row = yield* store.insert(
-        new NewTokenRow({
-          originalTokenText: tokenA,
-          tokenText: tokenA,
-          state: from,
-          error:
-            from === "error"
-              ? encodeSpent(new TokenAlreadySpent({ mint }))
-              : null,
-        }),
+      const secret = `sec-${from}`;
+      const transfer = yield* seedTransfer(
+        "send",
+        from,
+        mint,
+        tokenOf(proof(2, secret)),
+        2,
       );
-      const result = yield* Effect.either(operation(yield* Tokens, row.id));
-      const stored = (yield* store.loadAll).find(
-        (candidate) => candidate.id === row.id,
+      yield* seedProofs(
+        mint,
+        [proof(2, secret)],
+        handedOutStateFor(from),
+        transfer.id,
       );
+      const result = yield* Effect.either(
+        operation(yield* Tokens, transfer.id),
+      );
+      const { proofs, operations } = yield* inventory;
       return [
         from,
-        Either.isRight(result) ? stored?.state : result.left._tag,
-        stored?.error,
+        Either.isRight(result)
+          ? operationById(operations, transfer.id)?.status
+          : result.left._tag,
+        stateOf(proofs, secret),
       ] as const;
     }),
   );
 
-describe("Tokens lifecycle transitions", () => {
-  it("reserves only accepted rows", async () => {
+describe("Tokens send transitions", () => {
+  it("issues only pending sends", async () => {
     const { run } = makeHarness();
 
     const exit = await run(
-      outcomesFromEveryState((tokens, rowId) => tokens.reserve(rowId)),
+      outcomesFromEverySendStatus((tokens, id) => tokens.markIssued(id)),
     );
 
     assert(Exit.isSuccess(exit));
-    expect(exit.value.map(([from, outcome]) => [from, outcome])).toEqual([
-      ["pending", "InvalidTokenTransition"],
-      ["accepted", "reserved"],
-      ["reserved", "InvalidTokenTransition"],
-      ["issued", "InvalidTokenTransition"],
-      ["externalized", "InvalidTokenTransition"],
-      ["error", "InvalidTokenTransition"],
+    expect(exit.value).toEqual([
+      ["issued", "InvalidTransferTransition", "handedOut"],
+      ["pending", "issued", "handedOut"],
+      ["externalized", "InvalidTransferTransition", "externalized"],
+      ["done", "InvalidTransferTransition", "spent"],
+      ["returned", "InvalidTransferTransition", "spent"],
     ]);
   });
 
-  it("issues accepted and reserved rows", async () => {
+  it("externalizes issued and pending sends along with their proofs", async () => {
     const { run } = makeHarness();
 
     const exit = await run(
-      outcomesFromEveryState((tokens, rowId) => tokens.markIssued(rowId)),
+      outcomesFromEverySendStatus((tokens, id) => tokens.markExternalized(id)),
     );
 
     assert(Exit.isSuccess(exit));
-    expect(exit.value.map(([from, outcome]) => [from, outcome])).toEqual([
-      ["pending", "InvalidTokenTransition"],
-      ["accepted", "issued"],
-      ["reserved", "issued"],
-      ["issued", "InvalidTokenTransition"],
-      ["externalized", "InvalidTokenTransition"],
-      ["error", "InvalidTokenTransition"],
+    expect(exit.value).toEqual([
+      ["issued", "externalized", "externalized"],
+      ["pending", "externalized", "externalized"],
+      ["externalized", "InvalidTransferTransition", "externalized"],
+      ["done", "InvalidTransferTransition", "spent"],
+      ["returned", "InvalidTransferTransition", "spent"],
     ]);
   });
 
-  it("externalizes accepted, reserved, and issued rows", async () => {
+  it("forgets open sends without touching their handed-out proofs", async () => {
     const { run } = makeHarness();
 
     const exit = await run(
-      outcomesFromEveryState((tokens, rowId) => tokens.markExternalized(rowId)),
+      outcomesFromEverySendStatus((tokens, id) => tokens.forget(id)),
     );
 
     assert(Exit.isSuccess(exit));
-    expect(exit.value.map(([from, outcome]) => [from, outcome])).toEqual([
-      ["pending", "InvalidTokenTransition"],
-      ["accepted", "externalized"],
-      ["reserved", "externalized"],
-      ["issued", "externalized"],
-      ["externalized", "InvalidTokenTransition"],
-      ["error", "InvalidTokenTransition"],
+    expect(exit.value).toEqual([
+      ["issued", "done", "handedOut"],
+      ["pending", "done", "handedOut"],
+      ["externalized", "done", "externalized"],
+      ["done", "InvalidTransferTransition", "spent"],
+      ["returned", "InvalidTransferTransition", "spent"],
     ]);
   });
 
-  it("clears the error a row carried and reports the move", async () => {
+  it("reports the transition and the proofs that followed it", async () => {
     const { run, events } = makeHarness();
 
     const exit = await run(
       Effect.gen(function* () {
-        const store = yield* TokenStore;
-        const row = yield* store.insert(
-          new NewTokenRow({
-            originalTokenText: tokenA,
-            tokenText: tokenA,
-            state: "accepted",
-            error: encodeRejected(
-              new MintRejected({ mint, code: 20003, detail: "stale" }),
-            ),
-          }),
-        );
-        yield* (yield* Tokens).reserve(row.id);
-        return (yield* store.loadAll)[0];
+        const transfer = yield* seedTransfer("send", "issued", mint, tokenA, 6);
+        yield* seedProofs(mint, proofsA, "handedOut", transfer.id);
+        yield* (yield* Tokens).markExternalized(transfer.id);
+        return transfer.id;
       }),
     );
 
     assert(Exit.isSuccess(exit));
-    expect(exit.value?.state).toBe("reserved");
-    expect(exit.value?.error).toBeNull();
-    expect(events.map((event) => event._tag)).toEqual([
-      "TokenLifecycleChanged",
-      "OperationSucceeded",
+    expect(events).toEqual([
+      expect.objectContaining({
+        _tag: "ProofsChanged",
+        from: "handedOut",
+        to: "externalized",
+        count: 2,
+        amount: 6,
+        operationId: exit.value,
+        reason: "markExternalized",
+      }),
+      expect.objectContaining({
+        _tag: "OperationChanged",
+        operationId: exit.value,
+        kind: "send",
+        from: "issued",
+        to: "externalized",
+        reason: "markExternalized",
+      }),
+      expect.objectContaining({
+        _tag: "OperationSucceeded",
+        name: "tokens.markExternalized",
+        params: { operationId: exit.value },
+      }),
     ]);
-    expect(events[1]).toMatchObject({
-      name: "tokens.reserve",
-      params: { rowId: exit.value?.id },
-    });
+    expect(JSON.stringify(events)).not.toContain("cashu");
+    expect(JSON.stringify(events)).not.toContain("sec-a1");
   });
 
-  it("fails with TokenRowNotFound for an unknown row", async () => {
+  it("refuses send transitions on a receive", async () => {
     const { run } = makeHarness();
 
     const exit = await run(
-      Effect.flatMap(Tokens, (tokens) =>
-        Effect.flip(tokens.markIssued(TokenRowId.make("missing"))),
-      ),
+      Effect.gen(function* () {
+        const transfer = yield* seedTransfer(
+          "receive",
+          "done",
+          mint,
+          tokenA,
+          6,
+        );
+        const tokens = yield* Tokens;
+        return {
+          issued: yield* Effect.flip(tokens.markIssued(transfer.id)),
+          externalized: yield* Effect.flip(
+            tokens.markExternalized(transfer.id),
+          ),
+        };
+      }),
     );
 
     assert(Exit.isSuccess(exit));
-    expect(exit.value).toMatchObject({ _tag: "TokenRowNotFound" });
+    expect(exit.value.issued).toMatchObject({
+      _tag: "InvalidTransferTransition",
+      from: "done",
+      to: "issued",
+    });
+    expect(exit.value.externalized).toMatchObject({
+      _tag: "InvalidTransferTransition",
+      from: "done",
+      to: "externalized",
+    });
+  });
+
+  it("fails with OperationNotFound for an unknown or non-transfer operation", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const melt = yield* seedOperation(quoteOperation({}));
+        const tokens = yield* Tokens;
+        return {
+          missing: yield* Effect.flip(
+            tokens.markIssued(OperationId.make("missing")),
+          ),
+          melt: yield* Effect.flip(tokens.forget(melt.id)),
+          returned: yield* Effect.flip(
+            tokens.returnToWallet(OperationId.make("missing")),
+          ),
+        };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.missing).toMatchObject({
+      _tag: "OperationNotFound",
+      operationId: "missing",
+    });
+    expect(exit.value.melt._tag).toBe("OperationNotFound");
+    expect(exit.value.returned._tag).toBe("OperationNotFound");
   });
 });
 
-/** Seeds one row, runs a Tokens call against it, and reports the store. */
-const onSeededRow = <A, E>(
-  seed: Seed,
-  operation: (tokens: Tokens, rowId: TokenRowId) => Effect.Effect<A, E>,
-) =>
-  Effect.gen(function* () {
-    const row = yield* seedRow(seed);
-    const result = yield* Effect.either(operation(yield* Tokens, row.id));
-    return { row, result, rows: yield* (yield* TokenStore).loadAll };
+describe("Tokens.forget on a receive", () => {
+  it.each([
+    ["pending", "done"],
+    ["failed", "done"],
+    ["done", "InvalidTransferTransition"],
+  ] as const)("from %s ends %s", async (from, outcome) => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const transfer = yield* seedTransfer("receive", from, mint, tokenA, 6);
+        const result = yield* Effect.either(
+          (yield* Tokens).forget(transfer.id),
+        );
+        const { operations } = yield* inventory;
+        return Either.isRight(result)
+          ? operationById(operations, transfer.id)?.status
+          : result.left._tag;
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value).toBe(outcome);
   });
+});
 
-const returnRow = (seed: Seed) =>
-  onSeededRow(seed, (tokens, rowId) => tokens.returnToWallet(rowId));
-
-interface StoreCase {
-  readonly name: string;
-  readonly tokenStore: Layer.Layer<TokenStore>;
-  /** The Evolu adapter derives ids from `originalTokenText`, so a re-receive lands on the replaced row's own id. */
-  readonly reusesRowId: boolean;
+interface Seed {
+  readonly kind: "send" | "receive";
+  readonly status: OperationStatus;
+  readonly error?: string;
 }
 
-const storeCases: ReadonlyArray<StoreCase> = [
-  {
-    name: "a unique-id store",
-    tokenStore: inMemoryTokenStore,
-    reusesRowId: false,
-  },
-  {
-    name: "a deterministic-id store",
-    tokenStore: deterministicIdTokenStore,
-    reusesRowId: true,
-  },
-];
-
-describe.each(storeCases)(
-  "Tokens.returnToWallet with $name",
-  ({ tokenStore, reusesRowId }) => {
-    const harness = (args: HarnessArgs = {}) =>
-      makeHarness({ ...args, tokenStore });
-
-    it("drops a reservation locally, without contacting the mint", async () => {
-      const { run, receiveCalls } = harness();
-
-      const exit = await run(
-        returnRow({ tokenText: tokenA, state: "reserved" }),
-      );
-
-      assert(Exit.isSuccess(exit));
-      const { row, result, rows } = exit.value;
-      expect(receiveCalls()).toBe(0);
-      assert(result._tag === "Right");
-      expect(result.right).toMatchObject({
-        rowId: row.id,
-        tokenText: tokenA,
+/** Seeds one transfer over tokenA (its proofs out for a send) and returns it. */
+const returnSeeded = (seed: Seed) =>
+  Effect.gen(function* () {
+    const transfer = yield* seedTransfer(
+      seed.kind,
+      seed.status,
+      mint,
+      tokenA,
+      6,
+      seed.error ?? null,
+    );
+    if (seed.kind === "send") {
+      yield* seedProofs(
         mint,
-        unit: "sat",
-        amount: 6,
-      });
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ id: row.id, state: "accepted" });
-    });
-
-    it("keeps a reservation whose token text no longer parses", async () => {
-      const { run, receiveCalls } = harness();
-
-      const exit = await run(
-        returnRow({
-          tokenText: TokenText.make("cashuBnotatoken"),
-          state: "reserved",
-        }),
+        proofsA,
+        seed.status === "externalized" ? "externalized" : "handedOut",
+        transfer.id,
       );
+    }
+    const result = yield* Effect.either(
+      (yield* Tokens).returnToWallet(transfer.id),
+    );
+    const { proofs, operations } = yield* inventory;
+    return {
+      transfer,
+      result,
+      proofs,
+      stored: operationById(operations, transfer.id),
+    };
+  });
 
-      assert(Exit.isSuccess(exit));
-      const { row, result, rows } = exit.value;
-      expect(receiveCalls()).toBe(0);
-      assert(result._tag === "Left");
-      expect(result.left._tag).toBe("TokenParseFailed");
-      // The parse runs before the flip: the row must still be reserved.
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ id: row.id, state: "reserved" });
-    });
-
-    it("re-receives an issued row and drops the handed-out encoding", async () => {
-      const { run, events } = harness({
+describe("Tokens.returnToWallet", () => {
+  it.each(["issued", "pending", "externalized"] as const)(
+    "re-receives a %s send: fresh proofs in, handed-out proofs dead, send returned",
+    async (status) => {
+      const { run, events } = makeHarness({
         receive: () => Promise.resolve(swappedProofs),
       });
 
-      const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
+      const exit = await run(returnSeeded({ kind: "send", status }));
 
       assert(Exit.isSuccess(exit));
-      const { row, result, rows } = exit.value;
+      const { transfer, result, proofs, stored } = exit.value;
       assert(result._tag === "Right");
-      expect(result.right.amount).toBe(5);
-      expect(result.right.rowId === row.id).toBe(reusesRowId);
-
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        id: result.right.rowId,
-        state: "accepted",
-        tokenText: result.right.tokenText,
-        error: null,
+      expect(result.right).toMatchObject({
+        operationId: transfer.id,
+        mint,
+        unit: "sat",
+        amount: 5,
       });
-      expect(rows[0]?.tokenText).not.toBe(tokenA);
-      // The replaced row only goes away once the fresh proofs are stored.
+      expect(result.right.tokenText).not.toBe(tokenA);
+
+      expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
+        "fresh-1",
+        "fresh-2",
+      ]);
+      expect(
+        proofsIn(proofs, "available").every((p) => p.operationId === null),
+      ).toBe(true);
+      expect(secretsOf(proofsIn(proofs, "spent"))).toEqual([
+        "sec-a1",
+        "sec-a2",
+      ]);
+      expect(stored).toMatchObject({ status: "returned", error: null });
+
+      // The handed-out proofs die only once the fresh ones are stored.
       expect(
         events
-          .filter((event) => event._tag === "TokenLifecycleChanged")
-          .map((event) => [event.from, event.to]),
+          .filter((event) => event._tag === "ProofsChanged")
+          .map((event) => [event.from, event.to, event.reason]),
       ).toEqual([
-        [null, "pending"],
-        ["pending", "accepted"],
+        [null, "available", "returnToWallet"],
+        [
+          status === "externalized" ? "externalized" : "handedOut",
+          "spent",
+          "returnToWallet",
+        ],
       ]);
-
+      expect(events.at(-1)).toMatchObject({
+        name: "tokens.returnToWallet",
+        params: { operationId: transfer.id },
+        result: { operationId: transfer.id, amount: 5 },
+      });
       const serialized = JSON.stringify(events);
       expect(serialized).not.toContain("cashu");
       expect(serialized).not.toContain("fresh-1");
+    },
+  );
+
+  it("retries a failed receive in place", async () => {
+    const { run, events } = makeHarness({
+      receive: () => Promise.resolve(swappedProofs),
     });
 
-    it("re-receives an errored row", async () => {
-      const { run } = harness({
-        receive: () => Promise.resolve(swappedProofs),
-      });
+    const exit = await run(
+      returnSeeded({ kind: "receive", status: "failed", error: rejected }),
+    );
 
-      const exit = await run(
-        returnRow({
-          tokenText: tokenA,
-          state: "error",
-          error: encodeRejected(
-            new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
-          ),
-        }),
-      );
+    assert(Exit.isSuccess(exit));
+    const { transfer, result, proofs, stored } = exit.value;
+    assert(result._tag === "Right");
+    expect(result.right.operationId).toBe(transfer.id);
+    expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
+      "fresh-1",
+      "fresh-2",
+    ]);
+    expect(stored).toMatchObject({ status: "done", error: null });
+    expect(
+      events
+        .filter((event) => event._tag === "OperationChanged")
+        .map((event) => [event.from, event.to]),
+    ).toEqual([
+      ["failed", "pending"],
+      ["pending", "done"],
+    ]);
+  });
 
-      assert(Exit.isSuccess(exit));
-      expect(exit.value.result._tag).toBe("Right");
-      expect(exit.value.rows).toHaveLength(1);
-      expect(exit.value.rows[0]).toMatchObject({
-        state: "accepted",
-        error: null,
-      });
-    });
+  it.each([
+    ["send", "done", "returned"],
+    ["send", "returned", "returned"],
+    ["receive", "done", "done"],
+  ] as const)(
+    "rejects a %s in status %s: there is nothing to bring back",
+    async (kind, status, to) => {
+      const { run, receiveCalls } = makeHarness();
 
-    it("rejects an accepted row: there is nothing to bring back", async () => {
-      const { run, receiveCalls } = harness();
-
-      const exit = await run(
-        returnRow({ tokenText: tokenA, state: "accepted" }),
-      );
+      const exit = await run(returnSeeded({ kind, status }));
 
       assert(Exit.isSuccess(exit));
       assert(exit.value.result._tag === "Left");
       expect(exit.value.result.left).toMatchObject({
-        _tag: "InvalidTokenTransition",
-        from: "accepted",
-        to: "accepted",
+        _tag: "InvalidTransferTransition",
+        from: status,
+        to,
       });
       expect(receiveCalls()).toBe(0);
-      expect(exit.value.rows[0]?.state).toBe("accepted");
+      expect(exit.value.stored?.status).toBe(status);
+    },
+  );
+
+  it("closes an issued send as claimed when the mint says its proofs are gone", async () => {
+    const { run } = makeHarness({
+      receive: () =>
+        Promise.reject(new MintOperationError(11001, "Token already spent.")),
     });
 
-    it("marks the returned row spent when the mint says it is gone", async () => {
-      const { run } = harness({
-        receive: () =>
-          Promise.reject(new MintOperationError(11001, "Token already spent.")),
-      });
+    const exit = await run(returnSeeded({ kind: "send", status: "issued" }));
 
-      const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
+    assert(Exit.isSuccess(exit));
+    const { result, proofs, stored } = exit.value;
+    assert(result._tag === "Left");
+    expect(result.left).toMatchObject({ _tag: "TokenAlreadySpent", mint });
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["sec-a1", "sec-a2"]);
+    expect(proofsIn(proofs, "available")).toEqual([]);
+    expect(stored?.status).toBe("done");
+    expect(JSON.parse(stored?.error ?? "")).toMatchObject({
+      _tag: "TokenAlreadySpent",
+    });
+  });
 
-      assert(Exit.isSuccess(exit));
-      const { row, result, rows } = exit.value;
-      assert(result._tag === "Left");
-      expect(result.left).toMatchObject({ _tag: "TokenAlreadySpent", mint });
-
-      // Only the row the caller knows about survives, carrying the failure.
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        id: row.id,
-        state: "error",
-        tokenText: tokenA,
-      });
-      expect(JSON.parse(rows[0]?.error ?? "")).toMatchObject({
-        _tag: "TokenAlreadySpent",
-      });
+  it("leaves an issued send untouched when the mint is unreachable", async () => {
+    const { run } = makeHarness({
+      receive: () => Promise.reject(new TypeError("fetch failed")),
     });
 
-    it("leaves the issued row untouched when the mint is unreachable", async () => {
-      const { run } = harness({
-        receive: () => Promise.reject(new TypeError("fetch failed")),
-      });
+    const exit = await run(returnSeeded({ kind: "send", status: "issued" }));
 
-      const exit = await run(returnRow({ tokenText: tokenA, state: "issued" }));
+    assert(Exit.isSuccess(exit));
+    const { result, proofs, stored } = exit.value;
+    assert(result._tag === "Left");
+    expect(result.left._tag).toBe("MintUnreachable");
+    expect(secretsOf(proofsIn(proofs, "handedOut"))).toEqual([
+      "sec-a1",
+      "sec-a2",
+    ]);
+    expect(stored).toMatchObject({ status: "issued", error: null });
+  });
 
-      assert(Exit.isSuccess(exit));
-      const { row, result, rows } = exit.value;
-      assert(result._tag === "Left");
-      expect(result.left._tag).toBe("MintUnreachable");
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        id: row.id,
-        state: "issued",
-        tokenText: tokenA,
-        error: null,
-      });
+  it("keeps an externalized send in its status on a definitive rejection, recording it", async () => {
+    const { run } = makeHarness({
+      receive: () =>
+        Promise.reject(new MintOperationError(20003, "keyset inactive")),
     });
 
-    it("restores an errored row's recorded error on a transient failure", async () => {
-      const recorded = encodeRejected(
-        new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
-      );
-      const { run } = harness({
-        receive: () => Promise.reject(new TypeError("fetch failed")),
-      });
+    const exit = await run(
+      returnSeeded({ kind: "send", status: "externalized" }),
+    );
 
-      const exit = await run(
-        returnRow({ tokenText: tokenA, state: "error", error: recorded }),
-      );
-
-      assert(Exit.isSuccess(exit));
-      const { row, result, rows } = exit.value;
-      assert(result._tag === "Left");
-      expect(result.left._tag).toBe("MintUnreachable");
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        id: row.id,
-        state: "error",
-        tokenText: tokenA,
-        error: recorded,
-      });
+    assert(Exit.isSuccess(exit));
+    const { result, proofs, stored } = exit.value;
+    assert(result._tag === "Left");
+    expect(result.left._tag).toBe("MintRejected");
+    expect(secretsOf(proofsIn(proofs, "externalized"))).toEqual([
+      "sec-a1",
+      "sec-a2",
+    ]);
+    expect(stored?.status).toBe("externalized");
+    expect(JSON.parse(stored?.error ?? "")).toMatchObject({
+      _tag: "MintRejected",
+      code: 20003,
     });
+  });
 
-    it("keeps an externalized row in its state on a definitive failure", async () => {
-      const { run } = harness({
-        receive: () =>
-          Promise.reject(new MintOperationError(11001, "Token already spent.")),
-      });
-
-      const exit = await run(
-        returnRow({ tokenText: tokenA, state: "externalized" }),
-      );
-
-      assert(Exit.isSuccess(exit));
-      const { row, result, rows } = exit.value;
-      expect(result._tag).toBe("Left");
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        id: row.id,
-        state: "externalized",
-        tokenText: tokenA,
-        error: null,
-      });
-    });
-
-    it("fails with TokenRowNotFound for an unknown row", async () => {
-      const { run } = harness();
-
-      const exit = await run(
-        Effect.flatMap(Tokens, (tokens) =>
-          Effect.flip(tokens.returnToWallet(TokenRowId.make("missing"))),
-        ),
-      );
-
-      assert(Exit.isSuccess(exit));
-      expect(exit.value).toMatchObject({ _tag: "TokenRowNotFound" });
-    });
-  },
-);
-
-const deleteSpentOn = (seeds: ReadonlyArray<Seed>) =>
-  withRows(seeds, (tokens) => tokens.deleteSpent);
-
-describe("Tokens.deleteSpent", () => {
-  it("deletes rows the mint reports fully spent and keeps the rest", async () => {
+  it("fails a retried receive again with the new error", async () => {
     const { run, events } = makeHarness({
-      stateOf: (secret) => (secret.startsWith("sec-a") ? "SPENT" : "UNSPENT"),
+      receive: () => Promise.reject(new TypeError("fetch failed")),
     });
 
     const exit = await run(
-      deleteSpentOn([
-        { tokenText: tokenA, state: "accepted" },
-        { tokenText: tokenB, state: "accepted" },
-      ]),
+      returnSeeded({ kind: "receive", status: "failed", error: rejected }),
     );
 
     assert(Exit.isSuccess(exit));
-    const { rowIds, result, rows } = exit.value;
-    assert(result._tag === "Right");
-    expect(result.right).toHaveLength(1);
-    expect(result.right[0]).toMatchObject({ rowId: rowIds[0], amount: 6 });
-    expect(rows.map((row) => row.tokenText)).toEqual([tokenB]);
-    expect(events.at(-1)).toMatchObject({ name: "tokens.deleteSpent" });
-  });
-
-  it("keeps a partially spent row", async () => {
-    const { run } = makeHarness({
-      stateOf: (secret) => (secret === "sec-a1" ? "SPENT" : "UNSPENT"),
+    const { result, proofs, stored } = exit.value;
+    assert(result._tag === "Left");
+    expect(result.left._tag).toBe("MintUnreachable");
+    expect(proofs).toEqual([]);
+    expect(stored?.status).toBe("failed");
+    expect(JSON.parse(stored?.error ?? "")).toMatchObject({
+      _tag: "MintUnreachable",
     });
-
-    const exit = await run(
-      deleteSpentOn([{ tokenText: tokenA, state: "accepted" }]),
-    );
-
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.result).toMatchObject({ right: [] });
-    expect(amountOf(exit.value.rows[0])).toBe(6);
-  });
-
-  it("re-confirms a row already marked spent instead of trusting the marker", async () => {
-    // Receive records TokenAlreadySpent when a swap is rejected over a
-    // partially spent token — the mint must vouch again before deletion.
-    const { run } = makeHarness({
-      stateOf: (secret) => (secret === "sec-a1" ? "SPENT" : "UNSPENT"),
-    });
-    const markedSpent = encodeSpent(new TokenAlreadySpent({ mint }));
-
-    const exit = await run(
-      deleteSpentOn([
-        { tokenText: tokenA, state: "error", error: markedSpent },
-      ]),
-    );
-
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.result).toMatchObject({ right: [] });
-    expect(exit.value.rows).toHaveLength(1);
-  });
-
-  it("deletes a marked-spent row once the mint confirms every proof", async () => {
-    const { run } = makeHarness({ stateOf: () => "SPENT" });
-
-    const exit = await run(
-      deleteSpentOn([
-        {
-          tokenText: tokenA,
-          state: "error",
-          error: encodeSpent(new TokenAlreadySpent({ mint })),
-        },
-      ]),
-    );
-
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.result).toMatchObject({
-      right: [{ rowId: exit.value.rowIds[0], amount: 6 }],
-    });
-    expect(exit.value.rows).toEqual([]);
-  });
-
-  it("keeps a marked-spent row while the mint is unreachable", async () => {
-    const { run } = makeHarness({
-      checkStatesError: new TypeError("fetch failed"),
-    });
-
-    const exit = await run(
-      deleteSpentOn([
-        {
-          tokenText: tokenA,
-          state: "error",
-          error: encodeSpent(new TokenAlreadySpent({ mint })),
-        },
-      ]),
-    );
-
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.result).toMatchObject({ right: [] });
-    expect(exit.value.rows).toHaveLength(1);
-  });
-
-  it("re-checks error rows whose failure was not a spend", async () => {
-    const { run } = makeHarness({
-      stateOf: (secret) => (secret === "sec-b1" ? "SPENT" : "UNSPENT"),
-    });
-    const rejected = encodeRejected(
-      new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
-    );
-
-    const exit = await run(
-      deleteSpentOn([
-        { tokenText: tokenA, state: "error", error: rejected },
-        { tokenText: tokenB, state: "error", error: rejected },
-      ]),
-    );
-
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.result).toMatchObject({
-      right: [{ rowId: exit.value.rowIds[1], amount: 8 }],
-    });
-    expect(exit.value.rows.map((row) => row.tokenText)).toEqual([tokenA]);
-  });
-
-  it("keeps every row when the mint cannot be asked", async () => {
-    const { run } = makeHarness({
-      checkStatesError: new TypeError("fetch failed"),
-    });
-
-    const exit = await run(
-      deleteSpentOn([{ tokenText: tokenA, state: "accepted" }]),
-    );
-
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.result).toMatchObject({ right: [] });
-    expect(exit.value.rows).toHaveLength(1);
-  });
-
-  it("keeps rows the mint answered only partially", async () => {
-    const { run } = makeHarness({ stateOf: () => "SPENT", truncateTo: 1 });
-
-    const exit = await run(
-      deleteSpentOn([
-        { tokenText: tokenA, state: "accepted" },
-        { tokenText: tokenB, state: "accepted" },
-      ]),
-    );
-
-    assert(Exit.isSuccess(exit));
-    // Only the first of the three proofs was answered: no row is covered.
-    expect(exit.value.result).toMatchObject({ right: [] });
-    expect(exit.value.rows).toHaveLength(2);
-  });
-
-  it("never touches rows whose funds are out with someone else", async () => {
-    const { run, checkedSecrets } = makeHarness({ stateOf: () => "SPENT" });
-
-    const exit = await run(
-      deleteSpentOn([
-        { tokenText: tokenA, state: "issued" },
-        { tokenText: tokenB, state: "externalized" },
-        { tokenText: tokenC, state: "pending" },
-        { tokenText: tokenOf(proof(32, "sec-d1")), state: "reserved" },
-      ]),
-    );
-
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.result).toMatchObject({ right: [] });
-    expect(exit.value.rows).toHaveLength(4);
-    expect(checkedSecrets).toEqual([]);
+    expect(
+      events
+        .filter((event) => event._tag === "OperationChanged")
+        .map((event) => [event.from, event.to]),
+    ).toEqual([
+      ["failed", "pending"],
+      ["pending", "failed"],
+    ]);
   });
 });
 
-describe("Tokens.importRow", () => {
-  it("persists the row as the backup states it, without touching the mint", async () => {
-    const harness = makeHarness();
-
-    const exit = await harness.run(
-      withRows([], (tokens) =>
-        tokens.importRow(
-          new ImportRowDraft({
-            originalTokenText: tokenA,
-            tokenText: tokenB,
-            state: "issued",
-            error: null,
-          }),
-        ),
-      ),
-    );
-
-    assert(Exit.isSuccess(exit));
-    const { result, rows } = exit.value;
-    assert(Either.isRight(result));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: result.right,
-      originalTokenText: tokenA,
-      tokenText: tokenB,
-      state: "issued",
-      error: null,
+describe("Tokens.importProofs", () => {
+  const draft = (cashuProof: CashuProof, state: ProofState = "available") =>
+    new ImportProofDraft({
+      mint,
+      unit: sat,
+      keysetId: KeysetId.make(cashuProof.id),
+      amount: Amount.make(cashuProof.amount.toNumber()),
+      secret: cashuProof.secret,
+      C: cashuProof.C,
+      dleq: null,
+      state,
+      operationId: null,
     });
-    expect(harness.receiveCalls()).toBe(0);
-    expect(harness.checkedSecrets).toEqual([]);
-    expect(harness.events).toEqual([
-      expect.objectContaining({
-        _tag: "TokenLifecycleChanged",
-        rowId: result.right,
-        from: null,
-        to: "issued",
-        reason: "import",
-      }),
-      expect.objectContaining({
-        _tag: "OperationSucceeded",
-        name: "tokens.importRow",
-        params: { state: "issued" },
-        result: { rowId: result.right, state: "issued" },
-      }),
-    ]);
-    expect(JSON.stringify(harness.events)).not.toContain("cashu");
-  });
 
-  it("keeps error text only on error rows", async () => {
-    const harness = makeHarness();
-    const spent = encodeSpent(new TokenAlreadySpent({ mint }));
+  it("stores the proofs as the backup states them, skipping known secrets", async () => {
+    const { run, events, receiveCalls } = makeHarness();
 
-    const exit = await harness.run(
-      withRows([], (tokens) =>
-        Effect.all([
-          tokens.importRow(
-            new ImportRowDraft({
-              originalTokenText: tokenA,
-              tokenText: tokenA,
-              state: "accepted",
-              error: "stale failure",
-            }),
-          ),
-          tokens.importRow(
-            new ImportRowDraft({
-              originalTokenText: tokenB,
-              tokenText: tokenB,
-              state: "error",
-              error: spent,
-            }),
-          ),
-        ]),
-      ),
+    const exit = await run(
+      Effect.gen(function* () {
+        const tokens = yield* Tokens;
+        const first = yield* tokens.importProofs([
+          draft(proof(4, "sec-a1")),
+          draft(proof(8, "sec-b1"), "handedOut"),
+        ]);
+        const second = yield* tokens.importProofs([
+          draft(proof(4, "sec-a1")),
+          draft(proof(16, "sec-c1")),
+        ]);
+        return { first, second, ...(yield* inventory) };
+      }),
     );
 
     assert(Exit.isSuccess(exit));
-    expect(exit.value.rows.map((row) => [row.state, row.error])).toEqual([
-      ["accepted", null],
-      ["error", spent],
+    expect(exit.value.first).toBe(2);
+    expect(exit.value.second).toBe(1);
+    expect(
+      exit.value.proofs.map((p) => [p.secret, p.state, p.amount]).sort(),
+    ).toEqual([
+      ["sec-a1", "available", 4],
+      ["sec-b1", "handedOut", 8],
+      ["sec-c1", "available", 16],
     ]);
+    expect(receiveCalls()).toBe(0);
+    expect(events[0]).toMatchObject({
+      _tag: "ProofsChanged",
+      from: null,
+      count: 2,
+      amount: 12,
+      reason: "import",
+    });
+    expect(events[1]).toMatchObject({
+      _tag: "OperationSucceeded",
+      name: "tokens.importProofs",
+      params: { count: 2 },
+      result: 2,
+    });
+    expect(JSON.stringify(events)).not.toContain("sec-a1");
   });
+});
 
-  it("refuses a token either text of an existing row already names", async () => {
-    const harness = makeHarness();
+describe("Tokens.importOperation", () => {
+  it("stores the operation and replaces one with the same key", async () => {
+    const { run } = makeHarness();
 
-    const exit = await harness.run(
-      withRows([{ tokenText: tokenA, state: "accepted" }], (tokens) =>
-        tokens.importRow(
-          new ImportRowDraft({
-            originalTokenText: tokenB,
-            tokenText: tokenA,
-            state: "accepted",
-            error: null,
-          }),
-        ),
-      ),
+    const exit = await run(
+      Effect.gen(function* () {
+        const tokens = yield* Tokens;
+        const first = yield* tokens.importOperation(quoteOperation({}));
+        const second = yield* tokens.importOperation(
+          quoteOperation({ status: "paid" }),
+        );
+        return { first, second, ...(yield* inventory) };
+      }),
     );
 
     assert(Exit.isSuccess(exit));
-    const { rowIds, result, rows } = exit.value;
-    expect(result).toEqual(
-      Either.left(new TokenAlreadyKnown({ rowId: rowIds[0] })),
-    );
-    expect(rows).toHaveLength(1);
-    expect(harness.events).toEqual([
-      expect.objectContaining({
-        _tag: "OperationFailed",
-        name: "tokens.importRow",
-        error: new TokenAlreadyKnown({ rowId: rowIds[0] }),
+    expect(exit.value.second).toBe(exit.value.first);
+    expect(exit.value.operations).toHaveLength(1);
+    expect(exit.value.operations[0]).toMatchObject({
+      id: exit.value.first,
+      kind: "melt",
+      status: "paid",
+    });
+  });
+});
+
+describe("Tokens.ingestLegacyRows", () => {
+  const legacyRow = (
+    id: string,
+    tokenText: TokenText,
+    state: LegacyTokenRow["state"],
+    error: string | null = null,
+  ): LegacyTokenRow =>
+    new LegacyTokenRow({
+      id,
+      originalTokenText: tokenText,
+      tokenText,
+      state,
+      error,
+      createdAt: UnixSeconds.make(1_600_000_000),
+    });
+
+  const tokenC = tokenOf(proof(16, "sec-c1"));
+  const tokenD = tokenOf(proof(32, "sec-d1"));
+  const tokenE = tokenOf(proof(64, "sec-e1"));
+  const tokenF = tokenOf(proof(128, "sec-f1"));
+  const tokenG = tokenOf(proof(256, "sec-g1"));
+
+  it("maps every legacy state onto proofs and operations", async () => {
+    const { run, receiveCalls } = makeHarness();
+    const rows = [
+      legacyRow("pending", tokenA, "pending"),
+      legacyRow("accepted", tokenB, "accepted"),
+      legacyRow("issued", tokenC, "issued"),
+      legacyRow("externalized", tokenD, "externalized"),
+      legacyRow(
+        "spent",
+        tokenE,
+        "error",
+        encodeSpent(new TokenAlreadySpent({ mint })),
+      ),
+      legacyRow("rejected", tokenF, "error", rejected),
+      legacyRow("broken", TokenText.make("cashuBnotatoken"), "accepted"),
+    ];
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const report = yield* (yield* Tokens).ingestLegacyRows(rows);
+        return { report, ...(yield* inventory) };
       }),
-    ]);
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { report, proofs, operations } = exit.value;
+    expect(report).toMatchObject({ ingestedRows: 5, proofs: 5 });
+    expect(receiveCalls()).toBe(0);
+
+    expect(stateOf(proofs, "sec-a1")).toBeUndefined();
+    expect(stateOf(proofs, "sec-b1")).toBe("available");
+    expect(stateOf(proofs, "sec-e1")).toBe("spent");
+    expect(stateOf(proofs, "sec-f1")).toBe("available");
+
+    const issued = operations.find((op) => op.tokenText === tokenC);
+    expect(issued).toMatchObject({
+      kind: "send",
+      status: "issued",
+      mint,
+      amount: 16,
+      createdAt: 1_600_000_000,
+    });
+    expect(proofs.find((p) => p.secret === "sec-c1")).toMatchObject({
+      state: "handedOut",
+      operationId: issued?.id,
+    });
+    const externalized = operations.find((op) => op.tokenText === tokenD);
+    expect(externalized).toMatchObject({
+      kind: "send",
+      status: "externalized",
+    });
+    expect(proofs.find((p) => p.secret === "sec-d1")).toMatchObject({
+      state: "externalized",
+      operationId: externalized?.id,
+    });
+    expect(operations).toHaveLength(2);
+  });
+
+  it("holds reserved rows under the pending melt whose inputs sum to them", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const melt = yield* seedOperation(
+          quoteOperation({ inputsTotal: Amount.make(6) }),
+        );
+        const report = yield* (yield* Tokens).ingestLegacyRows([
+          legacyRow("linked", tokenA, "reserved"),
+          legacyRow("orphan", tokenB, "reserved"),
+        ]);
+        return { melt, report, ...(yield* inventory) };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { melt, report, proofs } = exit.value;
+    expect(report).toMatchObject({ ingestedRows: 2, proofs: 3 });
+    expect(proofs.every((p) => p.state === "held")).toBe(true);
+    expect(proofs.find((p) => p.secret === "sec-a1")?.operationId).toBe(
+      melt.id,
+    );
+    expect(proofs.find((p) => p.secret === "sec-a2")?.operationId).toBe(
+      melt.id,
+    );
+    expect(proofs.find((p) => p.secret === "sec-b1")?.operationId).toBeNull();
+  });
+
+  it("skips proofs the inventory already holds and is idempotent", async () => {
+    const { run, events } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [proof(8, "sec-b1")], "spent");
+        const tokens = yield* Tokens;
+        const rows = [
+          legacyRow("known", tokenB, "accepted"),
+          legacyRow("fresh", tokenG, "issued"),
+        ];
+        const first = yield* tokens.ingestLegacyRows(rows);
+        const before = yield* inventory;
+        const second = yield* tokens.ingestLegacyRows(rows);
+        const after = yield* inventory;
+        return { first, second, before, after };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.first).toMatchObject({ ingestedRows: 1, proofs: 1 });
+    expect(exit.value.second).toMatchObject({ ingestedRows: 0, proofs: 0 });
+    expect(stateOf(exit.value.before.proofs, "sec-b1")).toBe("spent");
+    expect(amountIn(exit.value.before.proofs, "handedOut")).toBe(256);
+    expect(exit.value.after).toEqual(exit.value.before);
+    expect(events.filter((e) => e._tag === "OperationChanged")).toHaveLength(1);
+    expect(events.at(-1)).toMatchObject({
+      name: "tokens.ingestLegacyRows",
+      params: { rows: 2 },
+      result: { ingestedRows: 0, proofs: 0 },
+    });
+    expect(JSON.stringify(events)).not.toContain("cashu");
   });
 });

@@ -7,11 +7,11 @@ import { Duration, Effect, Either, Schema } from "effect";
 import {
   InsufficientFunds,
   MintRejected,
+  MintUnreachable,
   PaymentFailed,
   PaymentPending,
   QuoteExpired,
 } from "../domain/errors";
-import type { MintUnreachable } from "../domain/errors";
 import { Amount, NonNegativeAmount, UnixSeconds } from "../domain/primitives";
 import type { MintUrl, QuoteId } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
@@ -25,12 +25,21 @@ import {
 import type { CounterScope } from "../internal/counters";
 import { inspectOperationWith } from "../internal/operations";
 import { isRecoverableOutputCollision } from "../internal/outputCollisions";
+import {
+  domainToNewProofs,
+  insertProofs,
+  setProofState,
+  storedSecrets,
+  toDomainProof,
+  toNewProofs,
+  totalAmount,
+} from "../internal/proofs";
 import { checkProofStates, unspentProofs } from "../internal/proofStates";
 import { pollUntil } from "../internal/poll";
 import { decodeQuoteId, emitQuoteState } from "../internal/quotes";
 import {
-  removeConsumedRows,
   selectSpendableProofs,
+  settleSwap,
   swapProofsForAmount,
 } from "../internal/spend";
 import { nowSeconds } from "../internal/time";
@@ -42,19 +51,16 @@ import {
 } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
+import { OperationStore } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
+import type { StoredProof } from "../ports/ProofStore";
 import type { Proof } from "../token/domain";
-import {
-  encodeCashuProofs,
-  encodeProofs,
-  toDomainProofs,
-} from "../token/internal/cashuProofs";
-import { insertRowInState, transitionRow } from "../token/internal/lifecycle";
-import { collectRowProofs } from "../token/internal/rowProofs";
+import { toDomainProofs } from "../token/internal/cashuProofs";
 import { MeltQuote, MeltReceipt, MeltResumeResult } from "./domain";
 import type { MeltDraft, MeltError } from "./domain";
 import { blankOutputCount } from "./internal/blankOutputs";
-import { PendingMelt, pendingMelts } from "./internal/pendingMelt";
+import { meltRecords } from "./internal/meltRecords";
+import type { PendingMelt } from "./internal/meltRecords";
 
 const MAX_MELT_ATTEMPTS = 5;
 /**
@@ -75,6 +81,11 @@ const decodeQuoteState = Schema.decodeUnknownOption(
 );
 
 type QuoteState = "UNPAID" | "PENDING" | "PAID" | null;
+
+/** Serialized onto a melt record the mint rejected. */
+const encodeMeltError = Schema.encodeSync(
+  Schema.parseJson(Schema.Union(MintRejected, MintUnreachable)),
+);
 
 const toMeltQuote = (
   mint: MintUrl,
@@ -126,7 +137,7 @@ const paymentPendingOf = (pending: PendingMelt): PaymentPending =>
   new PaymentPending({
     mint: pending.mint,
     quoteId: pending.quoteId,
-    rowId: pending.rowId,
+    operationId: pending.id,
     amount: pending.amount,
   });
 
@@ -144,17 +155,20 @@ interface MeltExecution {
  * the deterministic counter past the full blank range — not just the change
  * actually returned — so orphaned blind signatures at the mint can never
  * collide with later derivations. Change and any post-swap remainder are
- * persisted as `accepted` rows before the receipt resolves; a failure after
- * the swap loses no funds. A melt the mint has not settled leaves a durable
- * record next to its `reserved` inputs, and `resumePending` finishes it.
+ * persisted as `available` proofs before the receipt resolves; a failure
+ * after the swap loses no funds. A melt the mint has not settled leaves a
+ * `melt` operation `held` over its inputs, and `resumePending` finishes it.
  */
 export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
   dependencies: [WalletInstances.Default],
   effect: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
-    const tokenStore = yield* TokenStore;
+    const proofStore = yield* ProofStore;
+    const operationStore = yield* OperationStore;
     const instances = yield* WalletInstances;
     const inspector = yield* Inspector.orNoop;
+    const ctx = { proofStore, inspector };
+    const records = meltRecords({ kv, operationStore, inspector });
 
     const createQuoteAt = (
       wallet: LoadedWallet,
@@ -182,34 +196,42 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         catch: (error) => classifyMintError(quote.mint, error),
       });
 
+    const heldInputs = (
+      pending: PendingMelt,
+    ): Effect.Effect<ReadonlyArray<StoredProof>> =>
+      Effect.map(proofStore.loadAll, (proofs) =>
+        proofs.filter(
+          (proof) => proof.operationId === pending.id && proof.state === "held",
+        ),
+      );
+
     /**
      * The mint never executed (or reversed) the melt: the inputs return to
-     * balance and the record is done. A row someone already moved on (a
-     * manual return to wallet) is left alone.
+     * balance and the record is closed.
      */
     const releaseInputs = (
       pending: PendingMelt,
+      status: "unpaid" | "failed",
       reason: string,
+      error?: string,
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
-        const row = (yield* tokenStore.loadAll).find(
-          (candidate) => candidate.id === pending.rowId,
+        yield* setProofState(
+          ctx,
+          yield* heldInputs(pending),
+          "available",
+          reason,
+          null,
         );
-        if (row !== undefined && row.state === "reserved") {
-          // `reserved` → `accepted` is always legal; failing here is a package bug.
-          yield* Effect.orDie(
-            transitionRow(tokenStore, inspector, row, "accepted", reason),
-          );
-        }
-        yield* pendingMelts.remove(kv, pending);
+        yield* records.settle(pending, status, error);
       });
 
     /**
      * Re-derives the melt's blank range via NUT-09 when the change proofs did
      * not arrive with the response (deferred change, lost response, resume).
-     * Only proofs the mint explicitly reports unspent and that no row already
-     * holds count, so a crash between persisting change and clearing the
-     * record cannot import it twice.
+     * Only proofs the mint explicitly reports unspent and that the inventory
+     * does not hold count, so a crash between persisting change and closing
+     * the record cannot import it twice.
      */
     const reclaimBlankChange = (
       wallet: LoadedWallet,
@@ -217,7 +239,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
     ): Effect.Effect<ReadonlyArray<Proof>, MintUnreachable | MintRejected> =>
       Effect.gen(function* () {
         const blanks = blankOutputCount(pending.inputsTotal - pending.amount);
-        const blankStart = pending.blankCounter;
+        const blankStart = pending.counter;
         if (blankStart === null || blanks === 0) return [];
         const restored = yield* Effect.tryPromise({
           try: () =>
@@ -232,26 +254,15 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
             detail: "mint returned malformed proofs from the change reclaim",
           });
         }
-        const storedSecrets = new Set(
-          collectRowProofs(
-            yield* tokenStore.loadAll,
-            pending.mint,
-            pending.unit,
-            wallet.keyChain.getKeysets().map((keyset) => keyset.id),
-          ).flatMap(({ proofs: stored }) =>
-            stored.map((proof) => proof.secret),
-          ),
-        );
-        const unstored = proofs.filter(
-          (proof) => !storedSecrets.has(proof.secret),
-        );
+        const known = storedSecrets(yield* proofStore.loadAll);
+        const unstored = proofs.filter((proof) => !known.has(proof.secret));
         const states = yield* checkProofStates(wallet, pending.mint, unstored);
         return unspentProofs(unstored, states);
       });
 
     /**
-     * The payment settled: NUT-08 change becomes an `accepted` row before the
-     * consumed inputs row and the record are dropped, so the funds are never
+     * The payment settled: NUT-08 change becomes `available` before the held
+     * inputs are marked `spent` and the record closes, so the funds are never
      * outside the store; the actual fee is what the inputs lost beyond
      * invoice + change.
      */
@@ -260,23 +271,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
       change: ReadonlyArray<Proof>,
     ): Effect.Effect<MeltReceipt, MintRejected> =>
       Effect.gen(function* () {
-        const encodedChange =
-          change.length > 0
-            ? encodeProofs({
-                mint: pending.mint,
-                unit: pending.unit,
-                memo: null,
-                proofs: change,
-              })
-            : null;
-        if (change.length > 0 && encodedChange === null) {
-          return yield* new MintRejected({
-            mint: pending.mint,
-            code: null,
-            detail: "mint returned malformed change proofs from the melt",
-          });
-        }
-        const changeAmount = encodedChange?.amount ?? 0;
+        const changeAmount = totalAmount(change);
         const feePaid = pending.inputsTotal - pending.amount - changeAmount;
         if (feePaid < 0) {
           return yield* new MintRejected({
@@ -285,16 +280,24 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
             detail: "mint returned more change than the melt inputs held",
           });
         }
-        if (encodedChange !== null) {
-          yield* insertRowInState(tokenStore, inspector, {
-            originalTokenText: encodedChange.tokenText,
-            tokenText: encodedChange.tokenText,
-            state: "accepted",
-            reason: "melt-change",
-          });
-        }
-        yield* tokenStore.remove(pending.rowId);
-        yield* pendingMelts.remove(kv, pending);
+        yield* insertProofs(
+          ctx,
+          domainToNewProofs(
+            change,
+            pending.mint,
+            pending.unit,
+            "available",
+            null,
+          ),
+          "melt-change",
+        );
+        yield* setProofState(
+          ctx,
+          yield* heldInputs(pending),
+          "spent",
+          "melt-paid",
+        );
+        yield* records.settle(pending, "paid");
         return new MeltReceipt({
           mint: pending.mint,
           quoteId: pending.quoteId,
@@ -308,7 +311,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
     /**
      * The one decision every post-request path shares: PAID finishes the
      * melt (change via NUT-09), UNPAID hands the inputs back, and anything
-     * else leaves the inputs `reserved` under the record for `resumePending`.
+     * else leaves the inputs `held` under the record for `resumePending`.
      */
     const settleQuoteState = (
       wallet: LoadedWallet,
@@ -321,7 +324,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           return yield* finishPaid(pending, change);
         }
         if (state === "UNPAID") {
-          yield* releaseInputs(pending, "melt-unpaid");
+          yield* releaseInputs(pending, "unpaid", "melt-unpaid");
           return yield* new PaymentFailed({
             mint: pending.mint,
             quoteId: pending.quoteId,
@@ -390,7 +393,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
     /**
      * The melt response was lost in transit; the payment may have happened.
      * The quote is asked once: a settled answer decides, no answer leaves
-     * the inputs `reserved` under the record.
+     * the inputs `held` under the record.
      */
     const resolveLostMeltResponse = (
       exec: MeltExecution,
@@ -432,12 +435,8 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
             const counter = yield* readCounter(kv, scope);
             exec = {
               ...exec,
-              pending: new PendingMelt({
-                ...exec.pending,
-                blankCounter: counter,
-              }),
+              pending: yield* records.withCounter(exec.pending, counter),
             };
-            yield* pendingMelts.write(kv, exec.pending);
             yield* advanceCounterTo(
               kv,
               inspector,
@@ -481,18 +480,27 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
               return yield* resolveLostMeltResponse(exec);
             }
             // A definitive rejection means the mint never executed the melt.
-            yield* releaseInputs(exec.pending, "melt-rejected");
+            yield* releaseInputs(
+              exec.pending,
+              "failed",
+              "melt-rejected",
+              encodeMeltError(failure),
+            );
             return yield* Effect.fail(failure);
           }
-          yield* releaseInputs(exec.pending, "melt-rejected");
-          return yield* Effect.fail(
-            classifyMintError(scope.mint, lastCollision),
+          const failure = classifyMintError(scope.mint, lastCollision);
+          yield* releaseInputs(
+            exec.pending,
+            "failed",
+            "melt-rejected",
+            encodeMeltError(failure),
           );
+          return yield* Effect.fail(failure);
         }),
       );
     };
 
-    /** Price the payment without touching any stored token. */
+    /** Price the payment without touching any stored proof. */
     const quote = (draft: MeltDraft): Effect.Effect<MeltQuote, MeltError> =>
       Effect.gen(function* () {
         const wallet = yield* instances.get(draft.mint, sat);
@@ -545,15 +553,16 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           });
         }
 
-        const selection = yield* selectSpendableProofs({
-          tokenStore,
+        const spendContext = {
+          proofStore,
           inspector,
           wallet,
           mint: draft.mint,
           unit: sat,
           reason: "melt",
-        });
-        const { spendable, available } = selection;
+        };
+        const { spendable, available } =
+          yield* selectSpendableProofs(spendContext);
         const needed = quote.amount + quote.feeReserve;
         if (available < needed) {
           return yield* new InsufficientFunds({
@@ -567,32 +576,15 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           { kv, inspector, wallet, scope },
           {
             amount: Amount.make(needed),
-            proofs: spendable,
+            proofs: spendable.map(toDomainProof),
             available,
             // The melt inputs must also cover their own cashu input fee, or
             // the mint rejects `amount + feeReserve` as short.
             includeFees: true,
           },
         );
-        const inputsEncoded = encodeCashuProofs({
-          mint: draft.mint,
-          unit: sat,
-          memo: null,
-          proofs: swapped.send,
-        });
-        const keepEncoded =
-          swapped.keep.length > 0
-            ? encodeCashuProofs({
-                mint: draft.mint,
-                unit: sat,
-                memo: null,
-                proofs: swapped.keep,
-              })
-            : null;
-        if (
-          inputsEncoded === null ||
-          (swapped.keep.length > 0 && keepEncoded === null)
-        ) {
+        const inputs = toDomainProofs(swapped.send);
+        if (inputs === null || inputs.length === 0) {
           return yield* new MintRejected({
             mint: draft.mint,
             code: null,
@@ -600,27 +592,10 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           });
         }
 
-        // Both post-swap rows and the melt record land before the consumed
-        // sources go away, so the funds are never outside the store and a
-        // crash from here on is resumable: the remainder as balance, the
-        // melt inputs as a `reserved` row for as long as the mint may hold
-        // them.
-        const keepRow =
-          keepEncoded === null
-            ? null
-            : yield* insertRowInState(tokenStore, inspector, {
-                originalTokenText: keepEncoded.tokenText,
-                tokenText: keepEncoded.tokenText,
-                state: "accepted",
-                reason: "melt-keep",
-              });
-        const inputsRow = yield* insertRowInState(tokenStore, inspector, {
-          originalTokenText: inputsEncoded.tokenText,
-          tokenText: inputsEncoded.tokenText,
-          state: "reserved",
-          reason: "melt",
-        });
-        const pending = new PendingMelt({
+        // The record, its held inputs, and the remainder all land before
+        // the consumed sources are marked spent, so the funds are never
+        // outside the store and a crash from here on is resumable.
+        const pending = yield* records.create({
           quoteId: quote.quoteId,
           mint: draft.mint,
           unit: sat,
@@ -628,18 +603,39 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           invoice: draft.invoice,
           amount: quote.amount,
           feeReserve: quote.feeReserve,
-          inputsTotal: inputsEncoded.amount,
-          rowId: inputsRow.id,
+          inputsTotal: Amount.make(totalAmount(inputs)),
           expiresAt: quote.expiresAt,
           createdAt: UnixSeconds.make(yield* nowSeconds),
-          blankCounter: null,
+          counter: null,
         });
-        yield* pendingMelts.write(kv, pending);
-        yield* removeConsumedRows(
-          { tokenStore, inspector, mint: draft.mint, unit: sat },
-          selection,
-          keepRow === null ? [inputsRow] : [keepRow, inputsRow],
+        const held = toNewProofs(
+          swapped.send,
+          draft.mint,
+          sat,
+          "held",
+          pending.id,
         );
+        if (held === null) {
+          return yield* new MintRejected({
+            mint: draft.mint,
+            code: null,
+            detail: "mint returned malformed proofs from the swap",
+          });
+        }
+        yield* insertProofs(ctx, held, "melt");
+        const outcome = yield* settleSwap(
+          spendContext,
+          spendable,
+          swapped,
+          "melt-keep",
+        );
+        if (outcome === null) {
+          return yield* new MintRejected({
+            mint: draft.mint,
+            code: null,
+            detail: "mint returned malformed proofs from the swap",
+          });
+        }
 
         return yield* executeMelt({
           wallet,
@@ -674,7 +670,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
       new MeltResumeResult({
         quoteId: pending.quoteId,
         mint: pending.mint,
-        rowId: pending.rowId,
+        operationId: pending.id,
         amount: pending.amount,
         status,
         receipt,
@@ -712,7 +708,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           {
             mint: pending.mint,
             quoteId: pending.quoteId,
-            rowId: pending.rowId,
+            operationId: pending.id,
           },
           (result) => result,
         ),
@@ -724,7 +720,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
     const resumePending: Effect.Effect<ReadonlyArray<MeltResumeResult>> =
       Effect.gen(function* () {
         const results: MeltResumeResult[] = [];
-        for (const pending of yield* pendingMelts.readAll(kv)) {
+        for (const pending of yield* records.readAll) {
           results.push(yield* resumeOne(pending));
         }
         return results;

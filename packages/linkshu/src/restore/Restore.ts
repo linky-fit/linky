@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { MintRejected } from "../domain/errors";
 import { KeysetId, NonNegativeAmount } from "../domain/primitives";
-import type { MintUrl, TokenRowId } from "../domain/primitives";
+import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import {
   advanceCounterTo,
@@ -12,6 +12,12 @@ import {
 } from "../internal/counters";
 import type { CounterScope } from "../internal/counters";
 import { inspectOperation } from "../internal/operations";
+import {
+  domainToNewProofs,
+  insertProofs,
+  storedSecrets,
+  totalAmount,
+} from "../internal/proofs";
 import { checkProofStates } from "../internal/proofStates";
 import { collectKnownMints } from "../mint/internal/knownMints";
 import {
@@ -20,11 +26,9 @@ import {
 } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
-import { decodeTokenText } from "../token/codec";
-import type { Proof } from "../token/domain";
-import { encodeProofs, toDomainProofs } from "../token/internal/cashuProofs";
-import { insertRowInState } from "../token/internal/lifecycle";
+import { OperationStore } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
+import { toDomainProofs } from "../token/internal/cashuProofs";
 import { RestoreReport } from "./domain";
 import type { RestoreDraft } from "./domain";
 import {
@@ -43,9 +47,6 @@ import { sat } from "../internal/units";
 
 const isKeysetId = Schema.is(KeysetId);
 
-/** Proofs per restored row; one huge token would be unwieldy to spend. */
-const ROW_PROOF_CHUNK = 200;
-
 /** Every key describing a position only the current seed can reproduce. */
 const SEED_BOUND_KEY_PREFIXES = [
   DETERMINISTIC_COUNTER_KEY_PREFIX,
@@ -53,32 +54,18 @@ const SEED_BOUND_KEY_PREFIXES = [
   RESTORE_CURSOR_KEY_PREFIX,
 ];
 
-const chunk = <T>(
-  items: ReadonlyArray<T>,
-  size: number,
-): ReadonlyArray<T[]> => {
-  const chunks: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size));
-  }
-  return chunks;
-};
-
 const finitePosition = (value: number | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
-interface RestoredRows {
-  readonly rows: ReadonlyArray<TokenRowId>;
+interface Restored {
+  readonly proofs: number;
   readonly amount: number;
 }
 
-const NOTHING_RESTORED: RestoredRows = { rows: [], amount: 0 };
+const NOTHING_RESTORED: Restored = { proofs: 0, amount: 0 };
 
-const mergeRestored = (
-  left: RestoredRows,
-  right: RestoredRows,
-): RestoredRows => ({
-  rows: [...left.rows, ...right.rows],
+const mergeRestored = (left: Restored, right: Restored): Restored => ({
+  proofs: left.proofs + right.proofs,
   amount: left.amount + right.amount,
 });
 
@@ -87,17 +74,19 @@ const mergeRestored = (
  * keyset: scan a bounded window behind the persisted cursor/counter high
  * water (falling back to a full scan from zero when the window finds
  * nothing), keep only unspent proofs whose secrets are not already stored,
- * persist them as `accepted` rows, and advance both the restore cursor and
- * the deterministic counter past the last signature found. Unreachable
- * mints are reported, not failed on.
+ * persist them as `available`, and advance both the restore cursor and the
+ * deterministic counter past the last signature found. Unreachable mints
+ * are reported, not failed on.
  */
 export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
   dependencies: [WalletInstances.Default],
   effect: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
-    const tokenStore = yield* TokenStore;
+    const proofStore = yield* ProofStore;
+    const operationStore = yield* OperationStore;
     const instances = yield* WalletInstances;
     const inspector = yield* Inspector.orNoop;
+    const ctx = { proofStore, inspector };
 
     const batchRestoreAt = (
       wallet: LoadedWallet,
@@ -147,49 +136,6 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
         return [...new Set([...live, ...seen])];
       });
 
-    /** Secrets already stored, in any state: they must not be restored twice. */
-    const storedSecrets = (
-      keysetIds: ReadonlyArray<KeysetId>,
-    ): Effect.Effect<Set<string>> =>
-      Effect.map(tokenStore.loadAll, (rows) => {
-        const secrets = new Set<string>();
-        for (const row of rows) {
-          const decoded = decodeTokenText(row.tokenText, keysetIds);
-          if (decoded === null) continue;
-          for (const proof of decoded.proofs) secrets.add(proof.secret);
-        }
-        return secrets;
-      });
-
-    const persistRestored = (
-      mint: MintUrl,
-      proofs: ReadonlyArray<Proof>,
-    ): Effect.Effect<RestoredRows> =>
-      Effect.reduce(
-        chunk(proofs, ROW_PROOF_CHUNK),
-        NOTHING_RESTORED,
-        (restored, proofChunk) =>
-          Effect.gen(function* () {
-            const encoded = encodeProofs({
-              mint,
-              unit: sat,
-              memo: null,
-              proofs: proofChunk,
-            });
-            if (encoded === null) return restored;
-            const row = yield* insertRowInState(tokenStore, inspector, {
-              originalTokenText: encoded.tokenText,
-              tokenText: encoded.tokenText,
-              state: "accepted",
-              reason: "restore",
-            });
-            return mergeRestored(restored, {
-              rows: [row.id],
-              amount: encoded.amount,
-            });
-          }),
-      );
-
     /**
      * One keyset's tree, under the counter lock: nothing else may derive from
      * it while restore decides where the tree ends. `null` reports that the
@@ -200,8 +146,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
       wallet: LoadedWallet,
       mint: MintUrl,
       keysetId: KeysetId,
-      keysetIds: ReadonlyArray<KeysetId>,
-    ): Effect.Effect<RestoredRows | null> => {
+    ): Effect.Effect<Restored | null> => {
       const scope: CounterScope = { mint, unit: sat, keysetId };
       return withCounterLock(
         kv,
@@ -213,16 +158,22 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
               batchRestoreAt(wallet, mint, keysetId, start),
             proofStates: (proofs) => checkProofStates(wallet, mint, proofs),
             // Read inside the lock: a restore that just released it may have
-            // persisted rows this one must not import again.
-            knownSecrets: yield* storedSecrets(keysetIds),
+            // stored proofs this one must not import again. Any state
+            // counts — a spent proof restored again would be balance the
+            // mint will not honor.
+            knownSecrets: storedSecrets(yield* proofStore.loadAll),
             cursor: yield* readRestoreCursor(kv, scope),
             counter: yield* readCounter(kv, scope),
           });
           if (scan.status === "unavailable") return null;
 
-          // Proofs become rows before the cursor moves past them, so a crash
+          // Proofs are stored before the cursor moves past them, so a crash
           // here costs a rescan, never the funds.
-          const restored = yield* persistRestored(mint, scan.proofs);
+          yield* insertProofs(
+            ctx,
+            domainToNewProofs(scan.proofs, mint, sat, "available", null),
+            "restore",
+          );
           if (scan.nextCursor !== null) {
             yield* advanceRestoreCursor(kv, scope, scan.nextCursor);
             yield* advanceCounterTo(
@@ -233,7 +184,10 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
               "restore",
             );
           }
-          return restored;
+          return {
+            proofs: scan.proofs.length,
+            amount: totalAmount(scan.proofs),
+          };
         }),
       ).pipe(Effect.catchAll(() => Effect.succeed(null)));
     };
@@ -241,19 +195,14 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
     /** `null` when the mint could not be scanned at all. */
     const restoreMint = (
       mint: MintUrl,
-    ): Effect.Effect<{ restored: RestoredRows; complete: boolean } | null> =>
+    ): Effect.Effect<{ restored: Restored; complete: boolean } | null> =>
       Effect.gen(function* () {
         const wallet = yield* instances.get(mint, sat);
         const keysetIds = yield* keysetsToScan(wallet, mint);
         let restored = NOTHING_RESTORED;
         let complete = true;
         for (const keysetId of keysetIds) {
-          const scanned = yield* restoreKeyset(
-            wallet,
-            mint,
-            keysetId,
-            keysetIds,
-          );
+          const scanned = yield* restoreKeyset(wallet, mint, keysetId);
           if (scanned === null) complete = false;
           else restored = mergeRestored(restored, scanned);
         }
@@ -262,7 +211,9 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
 
     const restore = (draft: RestoreDraft): Effect.Effect<RestoreReport> =>
       Effect.gen(function* () {
-        const mints = draft.mints ?? (yield* collectKnownMints(kv, tokenStore));
+        const mints =
+          draft.mints ??
+          (yield* collectKnownMints(kv, proofStore, operationStore));
         const scannedMints: MintUrl[] = [];
         const unavailableMints: MintUrl[] = [];
         let restored = NOTHING_RESTORED;
@@ -282,7 +233,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
 
         return new RestoreReport({
           restoredAmount: NonNegativeAmount.make(restored.amount),
-          rows: restored.rows,
+          restoredProofs: restored.proofs,
           scannedMints,
           unavailableMints,
         });

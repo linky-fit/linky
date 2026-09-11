@@ -13,8 +13,8 @@ import {
   Bolt11Invoice,
   MintUrl,
   NonNegativeAmount,
+  OperationId,
   QuoteId,
-  TokenRowId,
   UnixSeconds,
 } from "../domain/primitives";
 
@@ -40,7 +40,7 @@ export class MeltReceipt extends Schema.Class<MeltReceipt>("MeltReceipt")({
   feeReserve: NonNegativeAmount,
   /** Actual Lightning fee charged; may be 0 even when `feeReserve` > 0. */
   feePaid: NonNegativeAmount,
-  /** NUT-08 change returned to the wallet as a fresh `accepted` row. */
+  /** NUT-08 change returned to the wallet as fresh `available` proofs. */
   changeAmount: NonNegativeAmount,
 }) {}
 
@@ -50,12 +50,12 @@ export class MeltResumeResult extends Schema.Class<MeltResumeResult>(
 )({
   quoteId: QuoteId,
   mint: MintUrl,
-  /** The `reserved` inputs row the record pointed at. */
-  rowId: TokenRowId,
+  /** The `melt` operation holding the inputs. */
+  operationId: OperationId,
   amount: Amount,
   /**
-   * `paid` — settled, change persisted, record dropped; `unpaid` — inputs
-   * back in balance, record dropped; `pending` — the mint still reports the
+   * `paid` — settled, change persisted, record closed; `unpaid` — inputs
+   * back in balance, record closed; `pending` — the mint still reports the
    * payment in flight, record kept; `unresolved` — no usable mint answer,
    * record kept for the next pass.
    */

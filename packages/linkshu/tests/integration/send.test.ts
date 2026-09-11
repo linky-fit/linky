@@ -1,24 +1,26 @@
-import { Mint } from "@cashu/cashu-ts";
 import { Effect } from "effect";
 import {
   Amount,
-  decodeTokenText,
-  NewTokenRow,
   parseTokenText,
+  ProofStore,
   Receive,
   ReceiveDraft,
   runLinkshu,
   Send,
   SendDraft,
-  TokenStore,
-  TokenText,
+  Tokens,
 } from "../../src";
+import { amountIn, secretsOf } from "../../src/testing/inventory";
 import {
+  availableRowsOf,
+  availableTotalOf,
+  fundProofs,
   fundToken,
   inputFee,
   mintUrl,
   randomSeed,
   receiveOnce,
+  tokenOf,
 } from "./helpers";
 
 describe("send vertical against the local mint", () => {
@@ -31,6 +33,7 @@ describe("send vertical against the local mint", () => {
       Effect.gen(function* () {
         const receive = yield* Receive;
         const send = yield* Send;
+        const tokens = yield* Tokens;
         const funding = yield* receive.receive(
           new ReceiveDraft({ text: funded }),
         );
@@ -41,7 +44,12 @@ describe("send vertical against the local mint", () => {
             produceAs: "issued",
           }),
         );
-        return { funding, receipt, rows: yield* (yield* TokenStore).loadAll };
+        return {
+          funding,
+          receipt,
+          transfers: yield* tokens.transfers,
+          proofs: yield* tokens.proofs,
+        };
       }),
     );
 
@@ -54,33 +62,31 @@ describe("send vertical against the local mint", () => {
     );
     expect(parseTokenText(a.receipt.tokenText)?.amount).toBe(5);
 
-    // The funding row is gone; change is an accepted row, the send is issued.
-    const issued = a.rows.find((row) => row.state === "issued");
-    expect(issued?.id).toBe(a.receipt.rowId);
-    expect(issued?.tokenText).toBe(a.receipt.tokenText);
-    const accepted = a.rows.filter((row) => row.state === "accepted");
-    if (a.receipt.changeAmount > 0) {
-      expect(accepted).toHaveLength(1);
-      expect(parseTokenText(accepted[0].tokenText)?.amount).toBe(
-        a.receipt.changeAmount,
-      );
-    } else {
-      expect(accepted).toHaveLength(0);
-    }
-    expect(a.rows.some((row) => row.originalTokenText === funded)).toBe(false);
-
-    // Wallet B (separate seed and storage) receives the produced token. The
-    // mint uses v2 keyset ids, so decoding the v4 token needs the keyset list.
-    const keysetIds = (await new Mint(mintUrl).getKeySets()).keysets.map(
-      (keyset) => keyset.id,
+    // The send is a transfer in the drafted status carrying the token; its
+    // proofs are handed out under it, the change is available, and the
+    // consumed inputs stay on record as spent.
+    expect(
+      a.transfers.find((transfer) => transfer.id === a.receipt.operationId),
+    ).toMatchObject({
+      kind: "send",
+      status: "issued",
+      tokenText: a.receipt.tokenText,
+      amount: 5,
+    });
+    const handedOut = a.proofs.filter(
+      (proof) => proof.operationId === a.receipt.operationId,
     );
-    const sendProofCount = decodeTokenText(a.receipt.tokenText, keysetIds)
-      ?.proofs.length;
-    expect(sendProofCount).toBeGreaterThan(0);
+    expect(handedOut.every((proof) => proof.state === "handedOut")).toBe(true);
+    expect(secretsOf(handedOut)).toEqual(secretsOf(a.receipt.proofs));
+    expect(amountIn(a.proofs, "handedOut")).toBe(5);
+    expect(amountIn(a.proofs, "available")).toBe(a.receipt.changeAmount);
+    expect(amountIn(a.proofs, "held")).toBe(0);
+
+    // Wallet B (separate seed and storage) receives the produced token.
     const b = await receiveOnce(randomSeed(), a.receipt.tokenText);
-    expect(b.receipt.amount).toBe(5 - inputFee(sendProofCount ?? 0));
-    expect(b.rows).toHaveLength(1);
-    expect(b.rows[0].state).toBe("accepted");
+    expect(b.receipt.amount).toBe(5 - inputFee(a.receipt.proofs.length));
+    expect(b.proofs.every((proof) => proof.state === "available")).toBe(true);
+    expect(availableTotalOf(b.proofs)).toBe(b.receipt.amount);
   });
 
   it("fails with typed InsufficientFunds both before and at the mint", async () => {
@@ -126,31 +132,24 @@ describe("send vertical against the local mint", () => {
     });
   });
 
-  it("excludes NUT-07 spent rows before sending and marks them error", async () => {
-    // A token another wallet already claimed: its proofs are spent at the mint.
-    const spentToken = await fundToken(4);
-    await receiveOnce(randomSeed(), spentToken);
+  it("excludes NUT-07 spent proofs before sending and marks them spent", async () => {
+    // Proofs another wallet already claimed: spent at the mint.
+    const stale = await fundProofs(4);
+    await receiveOnce(randomSeed(), tokenOf(stale));
 
     const funded = await fundToken(10);
-    const { funding, receipt, rows } = await runLinkshu(
+    const { funding, receipt, transfers, proofs } = await runLinkshu(
       { bip39Seed: randomSeed() },
       Effect.gen(function* () {
         const receive = yield* Receive;
         const send = yield* Send;
-        const tokenStore = yield* TokenStore;
+        const tokens = yield* Tokens;
         const funding = yield* receive.receive(
           new ReceiveDraft({ text: funded }),
         );
-        // A stale accepted row pointing at the spent proofs (e.g. state
+        // Stale available proofs pointing at the spent secrets (e.g. state
         // synced from a device that missed the spend).
-        yield* tokenStore.insert(
-          new NewTokenRow({
-            originalTokenText: TokenText.make(spentToken),
-            tokenText: TokenText.make(spentToken),
-            state: "accepted",
-            error: null,
-          }),
-        );
+        yield* (yield* ProofStore).insert(availableRowsOf(stale));
         const receipt = yield* send.send(
           new SendDraft({
             mint: mintUrl,
@@ -158,20 +157,25 @@ describe("send vertical against the local mint", () => {
             produceAs: "pending",
           }),
         );
-        return { funding, receipt, rows: yield* tokenStore.loadAll };
+        return {
+          funding,
+          receipt,
+          transfers: yield* tokens.transfers,
+          proofs: yield* tokens.proofs,
+        };
       }),
     );
 
-    // The send succeeded from the live row alone.
+    // The send succeeded from the live proofs alone.
     expect(receipt.amount).toBe(3);
     expect(funding.amount).toBe(3 + receipt.changeAmount + receipt.feePaid);
 
-    const staleRow = rows.find((row) => row.tokenText === spentToken);
-    expect(staleRow?.state).toBe("error");
-    expect(JSON.parse(staleRow?.error ?? "")).toMatchObject({
-      _tag: "TokenAlreadySpent",
-      mint: mintUrl,
-    });
-    expect(rows.find((row) => row.id === receipt.rowId)?.state).toBe("pending");
+    const staleSecrets = new Set(stale.map((proof) => proof.secret));
+    const staleRows = proofs.filter((proof) => staleSecrets.has(proof.secret));
+    expect(staleRows).toHaveLength(stale.length);
+    expect(staleRows.every((proof) => proof.state === "spent")).toBe(true);
+    expect(
+      transfers.find((transfer) => transfer.id === receipt.operationId)?.status,
+    ).toBe("pending");
   });
 });

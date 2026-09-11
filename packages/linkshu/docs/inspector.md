@@ -109,24 +109,27 @@ Call `shutdown` at application exit. Disposing the runtime also closes the queue
 
 All in `src/inspector/events.ts`; `LinkshuInspectorEvent` is their union.
 
-| Tag                     | Fields                                                                               | Emitted when                                                                                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OperationSucceeded`    | `name`, `params`, `result`                                                           | A public operation finished.                                                                                                                                   |
-| `OperationFailed`       | `name`, `params`, `error`                                                            | An operation or subscription attempt failed with a typed error (the tagged error object is `error`).                                                           |
-| `TokenLifecycleChanged` | `rowId`, `from`, `to`, `reason`                                                      | A row was inserted (`from: null`), transitioned, or had its text rewritten (`from === to`).                                                                    |
-| `CounterAdvanced`       | `mint`, `unit`, `keysetId`, `from`, `to`, `reason`                                   | A deterministic counter moved; `reason` is `used`, `collision-recovery`, or `restore`.                                                                         |
-| `QuoteStateChanged`     | `flow`, `quoteId`, `mint`, `state`, `via`                                            | A mint/melt quote was observed in a new state while `topup`, `autoswap`, or `melt` watched it; `via` names the watcher (`poll`, or the NUT-17 `subscription`). |
-| `LightningFeeProbed`    | `mint`, `probeMint`, `meltQuoteId`, `mintQuoteId`, `amount`, `feeReserve`, `percent` | A fee probe measured a mint's Lightning fee.                                                                                                                   |
+| Tag                  | Fields                                                                               | Emitted when                                                                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OperationSucceeded` | `name`, `params`, `result`                                                           | A public operation finished.                                                                                                                                   |
+| `OperationFailed`    | `name`, `params`, `error`                                                            | An operation or subscription attempt failed with a typed error (the tagged error object is `error`).                                                           |
+| `ProofsChanged`      | `mint`, `count`, `amount`, `from`, `to`, `operationId`, `reason`                     | A batch of proofs was stored (`from: null`) or moved between states; one row per batch and source state. Counts and amounts only.                              |
+| `OperationChanged`   | `operationId`, `kind`, `from`, `to`, `reason`                                        | An operation was inserted (`from: null`) or changed status.                                                                                                    |
+| `CounterAdvanced`    | `mint`, `unit`, `keysetId`, `from`, `to`, `reason`                                   | A deterministic counter moved; `reason` is `used`, `collision-recovery`, or `restore`.                                                                         |
+| `QuoteStateChanged`  | `flow`, `quoteId`, `mint`, `state`, `via`                                            | A mint/melt quote was observed in a new state while `topup`, `autoswap`, or `melt` watched it; `via` names the watcher (`poll`, or the NUT-17 `subscription`). |
+| `LightningFeeProbed` | `mint`, `probeMint`, `meltQuoteId`, `mintQuoteId`, `amount`, `feeReserve`, `percent` | A fee probe measured a mint's Lightning fee.                                                                                                                   |
 
-Operation `name` is `<vertical>.<method>` in camelCase, matching the service and method you called: `receive.receive`, `topup.resumePending`. One operation usually produces several rows — a `send.send` is bracketed by the `CounterAdvanced` and `TokenLifecycleChanged` rows it caused. `melt.resumePending` emits one `melt.resume` row per persisted record (params `mint`, `quoteId`, `rowId`; `OperationFailed` when the mint gave no usable answer) before its own summary row.
+Operation `name` is `<vertical>.<method>` in camelCase, matching the service and method you called: `receive.receive`, `topup.resumePending`. One operation usually produces several rows — a `send.send` is bracketed by the `CounterAdvanced`, `OperationChanged`, and `ProofsChanged` rows it caused. `melt.resumePending` emits one `melt.resume` row per pending melt (params `mint`, `quoteId`, `operationId`; `OperationFailed` when the mint gave no usable answer) before its own summary row.
+
+`reason` on `ProofsChanged`/`OperationChanged` names the step that caused the change: the operation (`receive`, `send`, `melt`, `topup`, `autoswap`, `restore`, `returnToWallet`, `import`, `legacy-ingest`), a sub-step (`send-change`, `melt-keep`, `melt-change`, `melt-paid`, `melt-unpaid`, `melt-rejected`), a `Tokens` transition (`markIssued`, `markExternalized`, `forget`), or a validation outcome (`validation`, `claimed`, `check`). Quote operations report their record steps as `<kind>-record` (inserted), `attempt` (counter slot written), and `<kind>-<status>` (settled).
 
 `topup.subscribe` is an internal subscription attempt: an `OperationFailed` row records a setup failure or socket close before retrying. Its params contain only `mint` and `quoteId`; normal cancellation emits no failure, and settlement appears as `QuoteStateChanged` with `via: "subscription"`.
 
-Correlate rows by the ids inside `params`/`result`: `rowId` links a lifecycle event to the operation that caused it, `quoteId` links quote-state changes to a topup or melt.
+Correlate rows by `operationId`: it links every `ProofsChanged` and `OperationChanged` row of one flow to the `OperationSucceeded`/`OperationFailed` row whose `result` or `params` carries the same id (receipts, resume results, and the `Tokens` transitions all name it). `quoteId` links quote-state changes to a topup, autoswap, or melt. `ProofsChanged` with `operationId: null` is balance moving (change, restored proofs, spent-marking by a pre-check or validation); its `reason` says which flow.
 
 ## What events never contain
 
-No event carries seed material or proof secrets. Token text _is_ proof secrets, so receipts arrive without their `tokenText`, `receive.receive` has empty `params`, melt and fee-probe params carry the mint but not the invoice, and a `QuoteLockingKey` never appears. Everything else — mint urls, amounts, quote ids, row ids, tagged errors — is in the clear; treat a persisted event log as sensitive metadata, not as secrets.
+No event carries seed material or proof secrets. Token text _is_ proof secrets, so receipts arrive without their `tokenText` and `proofs`, `receive.receive` has empty `params`, melt and fee-probe params carry the mint but not the invoice, and a `QuoteLockingKey` never appears. Everything else — mint urls, amounts, quote ids, operation ids, tagged errors — is in the clear; treat a persisted event log as sensitive metadata, not as secrets.
 
 ## Consumers in the repo
 
@@ -137,12 +140,12 @@ For tests, `recordingInspector()` from `src/testing/inspector.ts` collects event
 
 ## Emitting from a new vertical (contributors)
 
-Wrap the public operation in `inspectOperationWith(inspector, name, params, redactResult)` from `src/internal/operations.ts`; it emits `OperationSucceeded`/`OperationFailed` without altering the outcome. `redactResult` must strip anything a holder could spend — pass `redactReceipt` for anything carrying `tokenText`. `inspectOperation` is the shorthand when the result is already safe. Lifecycle and counter events come for free from `transitionRow`/`insertRowInState` and `advanceCounterTo`.
+Wrap the public operation in `inspectOperationWith(inspector, name, params, redactResult)` from `src/internal/operations.ts`; it emits `OperationSucceeded`/`OperationFailed` without altering the outcome. `redactResult` must strip anything a holder could spend — pass `redactReceipt` for anything carrying `tokenText` or `proofs`. `inspectOperation` is the shorthand when the result is already safe. Proof, operation, and counter events come for free from `insertProofs`/`setProofState` (`src/internal/proofs.ts`), `insertOperation`/`patchOperation` (`src/internal/operations.ts`), and `advanceCounterTo`; pass a `reason` that names your step.
 
 Events are constructed with `disableValidation: true` so a bad field surfaces in the consumer, not as a failed wallet operation. Assert on `recordingInspector().events` in the vertical's unit test.
 
 ## Related
 
 - [errors.md](./errors.md) — the tagged errors `OperationFailed` carries
-- [concepts.md](./concepts.md) — row states and counter reasons the events describe
+- [concepts.md](./concepts.md) — proof states, operation statuses, and counter reasons the events describe
 - [testing.md](./testing.md) — asserting on emitted events

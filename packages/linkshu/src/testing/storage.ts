@@ -1,15 +1,19 @@
 import { makeInMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { makeInMemoryTokenStore } from "../ports/inMemoryTokenStore";
+import { makeInMemoryOperationStore } from "../ports/inMemoryOperationStore";
+import { makeInMemoryProofStore } from "../ports/inMemoryProofStore";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
-import type { TokenStoreService } from "../ports/TokenStore";
+import type { OperationStoreService } from "../ports/OperationStore";
+import type { ProofStoreService } from "../ports/ProofStore";
 
 /** Ports that outlive one runtime; a second runtime over them models a restart. */
 export interface Storage {
   readonly kv: KeyValueStoreService;
-  readonly tokens: TokenStoreService;
+  readonly proofs: ProofStoreService;
+  readonly operations: OperationStoreService;
 }
 
 export const freshStorage = (): Storage => ({
   kv: makeInMemoryKeyValueStore(),
-  tokens: makeInMemoryTokenStore(),
+  proofs: makeInMemoryProofStore(),
+  operations: makeInMemoryOperationStore(),
 });

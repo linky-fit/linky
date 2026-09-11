@@ -17,12 +17,18 @@ import {
   runLinkshu,
 } from "../../src";
 import { supportsMintQuoteSubscription } from "../../src/internal/quoteSubscription";
-import { PENDING_TOPUP_KEY_PREFIX } from "../../src/topup/internal/pendingTopup";
-import { durableStorage, loadMintWallet, mintUrl, randomSeed } from "./helpers";
+import {
+  availableTotalOf,
+  durableStorage,
+  loadMintWallet,
+  mintUrl,
+  pendingOperations,
+  randomSeed,
+} from "./helpers";
 
 describe("topup vertical against the local mint", () => {
-  it("drives quote, poll, and mint into one accepted row", async () => {
-    const { kv, tokens, layers } = durableStorage();
+  it("drives quote, poll, and mint into available proofs", async () => {
+    const { proofs, operations, layers } = durableStorage();
 
     const { quote, receipt } = await runLinkshu(
       { bip39Seed: randomSeed(), ...layers },
@@ -44,20 +50,26 @@ describe("topup vertical against the local mint", () => {
     expect(receipt.amount).toBe(32);
     expect(receipt.tokenText.startsWith("cashu")).toBe(true);
 
-    const rows = await Effect.runPromise(tokens.loadAll);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("accepted");
-    expect(rows[0].id).toBe(receipt.rowId);
+    const stored = await Effect.runPromise(proofs.loadAll);
+    expect(stored.length).toBeGreaterThan(0);
+    expect(stored.every((proof) => proof.state === "available")).toBe(true);
+    expect(availableTotalOf(stored)).toBe(32);
 
-    // A finished topup leaves no pending work behind.
-    expect(
-      await Effect.runPromise(kv.listKeys(PENDING_TOPUP_KEY_PREFIX)),
-    ).toEqual([]);
+    // The topup is closed; a finished topup leaves no pending work behind.
+    const topups = await Effect.runPromise(operations.loadAll);
+    expect(topups).toHaveLength(1);
+    expect(topups[0]).toMatchObject({
+      id: receipt.operationId,
+      kind: "topup",
+      status: "done",
+      quoteId: quote.quoteId,
+    });
+    expect(await pendingOperations(operations, "topup")).toEqual([]);
   });
 
   it("resumes a topup interrupted after quote creation and spends the result", async () => {
     const seed = randomSeed();
-    const { kv, tokens, layers } = durableStorage();
+    const { proofs, operations, layers } = durableStorage();
 
     // Run one: the quote is created and persisted, then the runtime dies —
     // closing the scope interrupts the poll before it can mint anything.
@@ -76,10 +88,10 @@ describe("topup vertical against the local mint", () => {
     );
 
     expect(quote.invoice.toLowerCase().startsWith("ln")).toBe(true);
-    expect(await Effect.runPromise(tokens.loadAll)).toEqual([]);
-    expect(
-      await Effect.runPromise(kv.listKeys(PENDING_TOPUP_KEY_PREFIX)),
-    ).toHaveLength(1);
+    expect(await Effect.runPromise(proofs.loadAll)).toEqual([]);
+    const pending = await pendingOperations(operations, "topup");
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.quoteId).toBe(quote.quoteId);
 
     // Run two: nothing in memory, the same storage. The invoice settled while
     // nobody was watching, and the topup finishes itself.
@@ -109,19 +121,16 @@ describe("topup vertical against the local mint", () => {
     expect(receipt.amount).toBe(64);
     expect(sent.amount).toBe(8);
 
-    // The record is gone and the funds are rows, not a dangling quote.
-    expect(
-      await Effect.runPromise(kv.listKeys(PENDING_TOPUP_KEY_PREFIX)),
-    ).toEqual([]);
-    const accepted = (await Effect.runPromise(tokens.loadAll)).filter(
-      (row) => row.state === "accepted",
+    // The topup is closed and the funds are proofs, not a dangling quote.
+    expect(await pendingOperations(operations, "topup")).toEqual([]);
+    expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(
+      64 - 8 - sent.feePaid,
     );
-    expect(accepted.length).toBeGreaterThan(0);
   });
 
   it("resumes the same quote rather than minting it twice", async () => {
     const seed = randomSeed();
-    const { kv, tokens, layers } = durableStorage();
+    const { proofs, operations, layers } = durableStorage();
 
     const quote = await runLinkshu(
       { bip39Seed: seed, ...layers },
@@ -153,13 +162,11 @@ describe("topup vertical against the local mint", () => {
     expect(first?.quoteId).toBe(quote.quoteId);
     expect(first?.amount).toBe(16);
 
-    // The record is cleared, so a second resume has nothing left to claim and
-    // the 16 sats stay a single row.
+    // The topup is closed, so a second resume has nothing left to claim and
+    // the 16 sats are minted exactly once.
     expect(await resumeOnce()).toBeNull();
-    expect(
-      await Effect.runPromise(kv.listKeys(PENDING_TOPUP_KEY_PREFIX)),
-    ).toEqual([]);
-    expect(await Effect.runPromise(tokens.loadAll)).toHaveLength(1);
+    expect(await pendingOperations(operations, "topup")).toEqual([]);
+    expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(16);
   });
 });
 
@@ -199,7 +206,7 @@ describe("adopting externally paid quotes against the local mint", () => {
 
   it("mints an unlocked quote once and reports it issued the second time", async () => {
     const seed = randomSeed();
-    const { kv, tokens, layers } = durableStorage();
+    const { proofs, operations, layers } = durableStorage();
     const wallet = await loadWallet();
     const quote = await wallet.createMintQuoteBolt11(24);
     const draft = draftOf(quote, 24, false);
@@ -219,15 +226,13 @@ describe("adopting externally paid quotes against the local mint", () => {
     assert(second._tag === "Left");
     expect(second.left._tag).toBe("QuoteAlreadyIssued");
 
-    expect(await Effect.runPromise(tokens.loadAll)).toHaveLength(1);
-    expect(
-      await Effect.runPromise(kv.listKeys(PENDING_TOPUP_KEY_PREFIX)),
-    ).toEqual([]);
+    expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(24);
+    expect(await pendingOperations(operations, "topup")).toEqual([]);
   });
 
   it("mints a NUT-20 locked quote with its key and rejects it without", async () => {
     const seed = randomSeed();
-    const { tokens, layers } = durableStorage();
+    const { proofs, layers } = durableStorage();
     const { privkey, pubkey } = secp256k1Keypair();
     const wallet = await loadWallet();
     const quote = await wallet.createLockedMintQuote(40, pubkey);
@@ -249,9 +254,9 @@ describe("adopting externally paid quotes against the local mint", () => {
     assert(withKey._tag === "Right");
     expect(withKey.right.amount).toBe(40);
 
-    const rows = await Effect.runPromise(tokens.loadAll);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].state).toBe("accepted");
+    const stored = await Effect.runPromise(proofs.loadAll);
+    expect(stored.every((proof) => proof.state === "available")).toBe(true);
+    expect(availableTotalOf(stored)).toBe(40);
   });
 });
 

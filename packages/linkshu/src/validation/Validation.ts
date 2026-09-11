@@ -1,225 +1,377 @@
-import { Effect, Schema } from "effect";
-import { inspectStoredProofStates } from "./inspectProofStates";
-import { TokenAlreadySpent, TokenRowNotFound } from "../domain/errors";
-import { Amount } from "../domain/primitives";
-import type { CurrencyUnit, MintUrl, TokenRowId } from "../domain/primitives";
+import { Effect } from "effect";
+import { OperationNotFound } from "../domain/errors";
+import type { CurrencyUnit, MintUrl, OperationId } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
-import { inspectOperation } from "../internal/operations";
-import { dedupeProofs } from "../internal/proofStates";
-import type { LiveGroup } from "../internal/proofStates";
-import { checkMintRows, groupRowsByMint } from "../internal/rowStates";
+import { inspectOperation, patchOperation } from "../internal/operations";
+import { amountOf, setProofState, toDomainProof } from "../internal/proofs";
+import {
+  checkProofStates,
+  spentSecrets,
+  unspentProofs,
+} from "../internal/proofStates";
+import type { ProofStateEntry } from "../internal/proofStates";
 import { WalletInstances } from "../mint/internal/WalletInstances";
-import { TokenStore } from "../ports/TokenStore";
-import type { StoredTokenRow } from "../ports/TokenStore";
-import { encodeProofs } from "../token/internal/cashuProofs";
+import { OperationStore } from "../ports/OperationStore";
+import type { StoredOperation } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
+import type { StoredProof } from "../ports/ProofStore";
+import { decodeTokenText } from "../token/codec";
 import {
-  isLegalTransition,
-  rewriteRowTokenText,
-  transitionRow,
-} from "../token/internal/lifecycle";
-import { totalProofAmount } from "../token/internal/rowProofs";
-import type { RowProofs } from "../token/internal/rowProofs";
-import {
+  ClaimedTransferReport,
   IssuedClaimReport,
-  RowCheckResult,
-  SpentTokenReport,
+  ProofStateSnapshot,
+  SpentProofReport,
+  TransferCheckResult,
   ValidationReport,
 } from "./domain";
 
-/** Serialized onto rows NUT-07 reports fully spent. */
-const encodeSpentRowError = Schema.encodeSync(
-  Schema.parseJson(TokenAlreadySpent),
-);
+/** Proofs that share a mint and unit, and therefore one checkstate call. */
+interface MintGroup {
+  readonly mint: MintUrl;
+  readonly unit: CurrencyUnit;
+  readonly proofs: ReadonlyArray<StoredProof>;
+}
 
-const spentReport = (entry: RowProofs): SpentTokenReport =>
-  new SpentTokenReport({
-    rowId: entry.row.id,
-    amount: Amount.make(totalProofAmount(entry.proofs)),
-  });
+const groupByMint = (
+  proofs: ReadonlyArray<StoredProof>,
+): ReadonlyArray<MintGroup> => {
+  const groups = new Map<string, MintGroup & { proofs: StoredProof[] }>();
+  for (const proof of proofs) {
+    const key = `${proof.mint}|${proof.unit}`;
+    const group = groups.get(key);
+    if (group === undefined) {
+      groups.set(key, { mint: proof.mint, unit: proof.unit, proofs: [proof] });
+    } else {
+      group.proofs.push(proof);
+    }
+  }
+  return [...groups.values()];
+};
+
+type Answer = "unspent" | "pending" | "spent" | "unknown";
+
+/** v4 text with short keyset ids needs the mint's list; try both ways. */
+const decodeWithKeysets = (text: string, keysetIds: readonly string[]) =>
+  decodeTokenText(text, keysetIds) ?? decodeTokenText(text);
+
+const answerAt = (
+  states: ReadonlyArray<ProofStateEntry>,
+  index: number,
+): Answer => {
+  const raw = states[index]?.state.trim().toUpperCase();
+  if (raw === "UNSPENT") return "unspent";
+  if (raw === "PENDING") return "pending";
+  if (raw === "SPENT") return "spent";
+  return "unknown";
+};
 
 /**
- * NUT-07 proof-state validation of stored rows. One batched checkstate call
- * per mint+unit group; per row, any unspent proof keeps it live (with only
- * the unspent proofs), all-spent marks it `error` individually, and an
- * unknown or truncated response never marks anything. Surviving proofs of a
- * group are merged locally into one re-encoded `accepted` row — validation
- * performs no swap, so it costs no mint signatures. Mint unavailability is
- * data in the reports, never a failure of the operation.
+ * NUT-07 proof-state validation of the inventory. One batched checkstate
+ * call per mint+unit group; per proof, `SPENT` is persisted as the terminal
+ * state, `UNSPENT` releases a proof held by an unknown operation, and a
+ * `PENDING`, unanswered, or unrecognized answer changes nothing — a missing
+ * answer is never a guess. Mint unavailability is data in the reports,
+ * never a failure of the operation.
  */
 export class Validation extends Effect.Service<Validation>()(
   "linkshu/Validation",
   {
     dependencies: [WalletInstances.Default],
     effect: Effect.gen(function* () {
-      const tokenStore = yield* TokenStore;
+      const proofStore = yield* ProofStore;
+      const operationStore = yield* OperationStore;
       const instances = yield* WalletInstances;
       const inspector = yield* Inspector.orNoop;
+      const ctx = { proofStore, operationStore, inspector };
 
       /**
-       * Definitive spend knowledge, persisted where the state machine allows
-       * it: `externalized` rows left the app and dead `error` rows are
-       * already marked, so both keep their state and are only reported.
+       * One mint, one checkstate call. `null` means the mint gave no usable
+       * answer (unreachable, or it rejected the query) — that is information
+       * we do not have, never information that proofs are spent.
        */
-      const markRowSpent = (
-        row: StoredTokenRow,
-        mint: MintUrl,
-      ): Effect.Effect<void> =>
-        isLegalTransition(row.state, "error")
-          ? Effect.orDie(
-              transitionRow(tokenStore, inspector, row, "error", "validation", {
-                error: encodeSpentRowError(new TokenAlreadySpent({ mint })),
-              }),
-            )
-          : Effect.void;
-
-      /**
-       * Collapses a mint's surviving proofs into the first live row and drops
-       * the rest. Purely local re-encoding: the primary carries the merged
-       * proofs before any sibling is removed, so nothing is ever outside the
-       * store. Returns the removed row ids.
-       */
-      const mergeLiveRows = (
-        live: ReadonlyArray<LiveGroup<RowProofs>>,
-        mint: MintUrl,
-        unit: CurrencyUnit,
-      ): Effect.Effect<ReadonlyArray<TokenRowId>> =>
+      const askMint = (
+        group: MintGroup,
+      ): Effect.Effect<ReadonlyArray<ProofStateEntry> | null> =>
         Effect.gen(function* () {
-          const primary = live[0];
-          if (primary === undefined) return [];
-          const encoded = encodeProofs({
-            mint,
-            unit,
-            memo: null,
-            proofs: dedupeProofs(live.flatMap((entry) => entry.unspent)),
-          });
-          if (encoded === null) return [];
-          if (encoded.tokenText !== primary.group.row.tokenText) {
-            yield* rewriteRowTokenText(
-              tokenStore,
-              inspector,
-              primary.group.row,
-              encoded.tokenText,
-              "validation",
-            );
-          }
-          const siblings = live.slice(1);
-          yield* Effect.forEach(
-            siblings,
-            (entry) => tokenStore.remove(entry.group.row.id),
-            { discard: true },
+          const wallet = yield* instances.get(group.mint, group.unit);
+          return yield* checkProofStates(
+            wallet,
+            group.mint,
+            group.proofs.map(toDomainProof),
           );
-          return siblings.map((entry) => entry.group.row.id);
+        }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+
+      /** Persists what one mint answer settles; returns the spent proofs. */
+      const applyAnswer = (
+        group: MintGroup,
+        states: ReadonlyArray<ProofStateEntry>,
+        reason: string,
+      ): Effect.Effect<{
+        readonly spent: ReadonlyArray<StoredProof>;
+        readonly released: ReadonlyArray<StoredProof>;
+      }> =>
+        Effect.gen(function* () {
+          const domain = group.proofs.map(toDomainProof);
+          const spentSet = spentSecrets(domain, states);
+          const unspentSet = new Set(
+            unspentProofs(domain, states).map((proof) => proof.secret),
+          );
+          const spent = group.proofs.filter((proof) =>
+            spentSet.has(proof.secret),
+          );
+          const released = group.proofs.filter(
+            (proof) =>
+              proof.state === "held" &&
+              proof.operationId === null &&
+              unspentSet.has(proof.secret),
+          );
+          // Spent proofs keep their operation link: which send handed them
+          // out is history the transfer still reads.
+          yield* setProofState(ctx, spent, "spent", reason);
+          yield* setProofState(ctx, released, "available", reason, null);
+          return { spent, released };
         });
 
       /**
-       * Checks every `accepted` row — the wallet's balance. Emitted rows
-       * (`issued`, `externalized`) belong to `checkIssued` and to their
-       * holder; `pending` rows are still in flight.
+       * Checks the balance: every `available` proof, plus proofs `held` by
+       * an unknown operation, which return to balance once the mint says
+       * they are unspent. Proofs held by a known operation belong to its
+       * resumer; handed-out proofs to `checkIssued`.
        */
       const checkAll: Effect.Effect<ValidationReport> = Effect.gen(
         function* () {
-          const rows = yield* tokenStore.loadAll;
-          const markedSpent: SpentTokenReport[] = [];
-          const mergedRows: TokenRowId[] = [];
+          const proofs = (yield* proofStore.loadAll).filter(
+            (proof) =>
+              proof.state === "available" ||
+              (proof.state === "held" && proof.operationId === null),
+          );
+          const markedSpent: SpentProofReport[] = [];
           const unavailableMints: MintUrl[] = [];
-          let checkedRows = 0;
-
-          for (const group of groupRowsByMint(
-            rows.filter((row) => row.state === "accepted"),
-          )) {
-            const partition = yield* checkMintRows(
-              instances,
-              group.mint,
-              group.unit,
-              group.rows,
-            );
-            if (partition === null) {
+          let checkedProofs = 0;
+          let released = 0;
+          for (const group of groupByMint(proofs)) {
+            const states = yield* askMint(group);
+            if (states === null) {
               unavailableMints.push(group.mint);
               continue;
             }
-            checkedRows +=
-              partition.live.length +
-              partition.fullySpent.length +
-              partition.unknown.length;
-            for (const dead of partition.fullySpent) {
-              yield* markRowSpent(dead.row, group.mint);
-              markedSpent.push(spentReport(dead));
-            }
-            mergedRows.push(
-              ...(yield* mergeLiveRows(partition.live, group.mint, group.unit)),
+            checkedProofs += Math.min(states.length, group.proofs.length);
+            const applied = yield* applyAnswer(group, states, "validation");
+            released += applied.released.length;
+            markedSpent.push(
+              ...applied.spent.map(
+                (proof) =>
+                  new SpentProofReport({
+                    proofId: proof.id,
+                    amount: proof.amount,
+                  }),
+              ),
             );
           }
-
           return new ValidationReport({
-            checkedRows,
+            checkedProofs,
             markedSpent,
-            mergedRows,
+            released,
             unavailableMints,
           });
         },
       ).pipe(inspectOperation(inspector, "validation.checkAll", {}));
 
-      const checkRow = (
-        rowId: TokenRowId,
-      ): Effect.Effect<RowCheckResult, TokenRowNotFound> =>
+      const handedOutOf = (
+        proofs: ReadonlyArray<StoredProof>,
+        operation: StoredOperation,
+      ): ReadonlyArray<StoredProof> =>
+        proofs.filter(
+          (proof) =>
+            proof.operationId === operation.id &&
+            (proof.state === "handedOut" || proof.state === "externalized"),
+        );
+
+      /** Transfers whose handed-out proofs are all spent are claimed. */
+      const closeClaimed = (
+        operations: ReadonlyArray<StoredOperation>,
+        proofsBefore: ReadonlyArray<StoredProof>,
+        spent: ReadonlyArray<StoredProof>,
+      ): Effect.Effect<ReadonlyArray<ClaimedTransferReport>> =>
         Effect.gen(function* () {
-          const rows = yield* tokenStore.loadAll;
-          const row = rows.find((candidate) => candidate.id === rowId);
-          if (row === undefined) return yield* new TokenRowNotFound({ rowId });
+          const spentIds = new Set(spent.map((proof) => proof.id));
+          const claimed: ClaimedTransferReport[] = [];
+          for (const operation of operations) {
+            if (
+              operation.kind !== "send" ||
+              (operation.status !== "issued" &&
+                operation.status !== "pending" &&
+                operation.status !== "externalized")
+            )
+              continue;
+            const handedOut = handedOutOf(proofsBefore, operation);
+            if (
+              handedOut.length === 0 ||
+              !handedOut.every((proof) => spentIds.has(proof.id))
+            )
+              continue;
+            yield* patchOperation(
+              ctx,
+              operation,
+              { status: "done" },
+              "claimed",
+            );
+            claimed.push(
+              new ClaimedTransferReport({
+                operationId: operation.id,
+                amount: amountOf(handedOut),
+              }),
+            );
+          }
+          return claimed;
+        });
 
-          const [group] = groupRowsByMint([row]);
-          // An undecodable row states no mint: nobody can be asked about it.
-          if (group === undefined) {
-            return new RowCheckResult({ rowId, status: "unavailable" });
-          }
-          const partition = yield* checkMintRows(
-            instances,
-            group.mint,
-            group.unit,
-            group.rows,
-          );
-          if (partition === null || partition.unknown.length > 0) {
-            return new RowCheckResult({ rowId, status: "unavailable" });
-          }
-          const dead = partition.fullySpent[0];
-          if (dead !== undefined) {
-            yield* markRowSpent(dead.row, group.mint);
-            return new RowCheckResult({ rowId, status: "spent" });
-          }
-          // A partially spent row keeps only what survived.
-          yield* mergeLiveRows(partition.live, group.mint, group.unit);
-          return new RowCheckResult({ rowId, status: "live" });
-        }).pipe(inspectOperation(inspector, "validation.checkRow", { rowId }));
-
-      /** Detect issued tokens the recipient has claimed, and prune them. */
+      /** Detect handed-out tokens the recipient has claimed. */
       const checkIssued: Effect.Effect<IssuedClaimReport> = Effect.gen(
         function* () {
-          const rows = yield* tokenStore.loadAll;
-          const claimed: SpentTokenReport[] = [];
-          for (const group of groupRowsByMint(
-            rows.filter((row) => row.state === "issued"),
-          )) {
-            const partition = yield* checkMintRows(
-              instances,
-              group.mint,
-              group.unit,
-              group.rows,
-            );
-            if (partition === null) continue;
-            for (const dead of partition.fullySpent) {
-              yield* tokenStore.remove(dead.row.id);
-              claimed.push(spentReport(dead));
-            }
+          const proofs = yield* proofStore.loadAll;
+          const operations = yield* operationStore.loadAll;
+          const handedOut = proofs.filter(
+            (proof) =>
+              proof.state === "handedOut" || proof.state === "externalized",
+          );
+          const spent: StoredProof[] = [];
+          for (const group of groupByMint(handedOut)) {
+            const states = yield* askMint(group);
+            if (states === null) continue;
+            spent.push(...(yield* applyAnswer(group, states, "claimed")).spent);
           }
-          return new IssuedClaimReport({ claimed });
+          return new IssuedClaimReport({
+            claimed: yield* closeClaimed(operations, proofs, spent),
+          });
         },
       ).pipe(inspectOperation(inspector, "validation.checkIssued", {}));
 
-      const inspectProofStates = Effect.flatMap(tokenStore.loadAll, (rows) =>
-        inspectStoredProofStates(instances, rows),
-      ).pipe(inspectOperation(inspector, "validation.inspectProofStates", {}));
+      /**
+       * One transfer: the proofs it handed out (a `send`), or the proofs its
+       * text carries (a `receive`, whose proofs are not the wallet's until
+       * accepted). `spent` closes a handed-out send as claimed.
+       */
+      const checkTransfer = (
+        operationId: OperationId,
+      ): Effect.Effect<TransferCheckResult, OperationNotFound> =>
+        Effect.gen(function* () {
+          const operations = yield* operationStore.loadAll;
+          const operation = operations.find(
+            (candidate) => candidate.id === operationId,
+          );
+          if (operation === undefined || operation.tokenText === null) {
+            return yield* new OperationNotFound({ operationId });
+          }
+          const unavailable = new TransferCheckResult({
+            operationId,
+            status: "unavailable",
+          });
+          const proofs = yield* proofStore.loadAll;
+          const handedOut = handedOutOf(proofs, operation);
+          if (operation.kind === "send") {
+            if (handedOut.length === 0) {
+              return new TransferCheckResult({
+                operationId,
+                status:
+                  operation.status === "done" || operation.status === "returned"
+                    ? "spent"
+                    : "unavailable",
+              });
+            }
+            const [group] = groupByMint(handedOut);
+            if (group === undefined) return unavailable;
+            const states = yield* askMint(group);
+            if (states === null) return unavailable;
+            const { spent } = yield* applyAnswer(group, states, "check");
+            if (spent.length === handedOut.length) {
+              yield* closeClaimed(operations, proofs, spent);
+              return new TransferCheckResult({ operationId, status: "spent" });
+            }
+            return group.proofs.every(
+              (_, index) => answerAt(states, index) !== "unknown",
+            )
+              ? new TransferCheckResult({ operationId, status: "live" })
+              : unavailable;
+          }
+          const decoded = yield* Effect.map(
+            Effect.option(instances.get(operation.mint, operation.unit)),
+            (wallet) =>
+              wallet._tag === "None"
+                ? null
+                : decodeWithKeysets(
+                    operation.tokenText ?? "",
+                    wallet.value.keyChain
+                      .getKeysets()
+                      .map((keyset) => keyset.id),
+                  ),
+          );
+          if (decoded === null) return unavailable;
+          const wallet = yield* Effect.option(
+            instances.get(operation.mint, operation.unit),
+          );
+          if (wallet._tag === "None") return unavailable;
+          const states = yield* Effect.option(
+            checkProofStates(wallet.value, operation.mint, decoded.proofs),
+          );
+          if (states._tag === "None") return unavailable;
+          const answers = decoded.proofs.map((_, index) =>
+            answerAt(states.value, index),
+          );
+          if (answers.some((answer) => answer === "unknown"))
+            return unavailable;
+          return new TransferCheckResult({
+            operationId,
+            status: answers.every((answer) => answer === "spent")
+              ? "spent"
+              : "live",
+          });
+        }).pipe(
+          inspectOperation(inspector, "validation.checkTransfer", {
+            operationId,
+          }),
+        );
 
-      return { checkAll, checkRow, checkIssued, inspectProofStates } as const;
+      /** Read-only NUT-07 snapshot of every proof that is not yet spent. */
+      const inspectProofStates: Effect.Effect<
+        ReadonlyArray<ProofStateSnapshot>
+      > = Effect.gen(function* () {
+        const proofs = (yield* proofStore.loadAll).filter(
+          (proof) => proof.state !== "spent",
+        );
+        const snapshots = new Map<string, ProofStateSnapshot>(
+          proofs.map((proof) => [
+            proof.id,
+            new ProofStateSnapshot({ proofId: proof.id, state: "unknown" }),
+          ]),
+        );
+        yield* Effect.forEach(
+          groupByMint(proofs),
+          (group) =>
+            Effect.gen(function* () {
+              const states = yield* askMint(group);
+              if (states === null) return;
+              group.proofs.forEach((proof, index) => {
+                snapshots.set(
+                  proof.id,
+                  new ProofStateSnapshot({
+                    proofId: proof.id,
+                    state: answerAt(states, index),
+                  }),
+                );
+              });
+            }),
+          { concurrency: 4, discard: true },
+        );
+        return [...snapshots.values()];
+      }).pipe(inspectOperation(inspector, "validation.inspectProofStates", {}));
+
+      return {
+        checkAll,
+        checkTransfer,
+        checkIssued,
+        inspectProofStates,
+      } as const;
     }),
   },
 ) {}

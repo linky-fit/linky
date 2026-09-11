@@ -5,13 +5,15 @@ import type { LinkshuServices } from "./composition";
 import type { Bip39Seed } from "./domain/primitives";
 import { Inspector } from "./inspector/Inspector";
 import type { KeyValueStore } from "./ports/KeyValueStore";
-import type { TokenStore } from "./ports/TokenStore";
+import type { OperationStore } from "./ports/OperationStore";
+import type { ProofStore } from "./ports/ProofStore";
 
 export interface LinkshuHeadlessConfig {
   readonly bip39Seed: Bip39Seed;
   /** Omitting the stores runs on non-durable in-memory defaults. */
   readonly keyValueStore?: Layer.Layer<KeyValueStore> | undefined;
-  readonly tokenStore?: Layer.Layer<TokenStore> | undefined;
+  readonly proofStore?: Layer.Layer<ProofStore> | undefined;
+  readonly operationStore?: Layer.Layer<OperationStore> | undefined;
   /** Omitting it disables diagnostics; see `Inspector`. */
   readonly inspector?: Layer.Layer<Inspector> | undefined;
 }

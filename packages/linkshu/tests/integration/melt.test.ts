@@ -10,10 +10,10 @@ import {
   runLinkshu,
   Send,
   SendDraft,
-  TokenStore,
+  Tokens,
 } from "../../src";
 import {
-  acceptedTotalOf,
+  availableTotalOf,
   fundToken,
   invoiceFor,
   mintUrl,
@@ -32,6 +32,7 @@ describe("melt vertical against the local mint", () => {
       Effect.gen(function* () {
         const receive = yield* Receive;
         const melt = yield* Melt;
+        const tokens = yield* Tokens;
         const funding = yield* receive.receive(
           new ReceiveDraft({ text: funded }),
         );
@@ -41,7 +42,8 @@ describe("melt vertical against the local mint", () => {
           funding,
           quoted,
           receipt,
-          rows: yield* (yield* TokenStore).loadAll,
+          proofs: yield* tokens.proofs,
+          operations: yield* tokens.operations,
         };
       }),
     );
@@ -51,16 +53,24 @@ describe("melt vertical against the local mint", () => {
     expect(paid.receipt.paidAmount).toBe(21);
     expect(paid.receipt.feeReserve).toBe(paid.quoted.feeReserve);
 
-    // Consumed rows transitioned correctly: nothing reserved or errored
-    // remains, only accepted change/remainder rows.
-    expect(paid.rows.every((row) => row.state === "accepted")).toBe(true);
+    // The inputs transitioned: nothing is held any more, the melt is closed
+    // as paid, and only available change/remainder plus spent inputs remain.
+    expect(paid.proofs.some((proof) => proof.state === "held")).toBe(false);
+    expect(
+      paid.proofs.every(
+        (proof) => proof.state === "available" || proof.state === "spent",
+      ),
+    ).toBe(true);
+    expect(
+      paid.operations.find((operation) => operation.kind === "melt"),
+    ).toMatchObject({ status: "paid", quoteId: paid.receipt.quoteId });
 
     // Funds conservation: everything the wallet lost is the invoice, the
     // melt fee, and a small swap fee (input_fee_ppk = 100 on this mint).
-    const acceptedTotal = acceptedTotalOf(paid.rows);
+    const availableTotal = availableTotalOf(paid.proofs);
     const swapFee =
       paid.funding.amount -
-      acceptedTotal -
+      availableTotal -
       paid.receipt.paidAmount -
       paid.receipt.feePaid;
     expect(swapFee).toBeGreaterThanOrEqual(0);
@@ -90,7 +100,7 @@ describe("melt vertical against the local mint", () => {
         return { report, sent };
       }),
     );
-    expect(restored.report.restoredAmount).toBe(acceptedTotal);
+    expect(restored.report.restoredAmount).toBe(availableTotal);
     expect(restored.sent.amount).toBe(2);
   });
 
@@ -98,16 +108,23 @@ describe("melt vertical against the local mint", () => {
     const funded = await fundToken(5);
     const invoice = await invoiceFor(50);
 
-    const { quoted, failure, rows } = await runLinkshu(
+    const { funding, quoted, failure, proofs } = await runLinkshu(
       { bip39Seed: randomSeed() },
       Effect.gen(function* () {
         const receive = yield* Receive;
         const melt = yield* Melt;
-        yield* receive.receive(new ReceiveDraft({ text: funded }));
+        const funding = yield* receive.receive(
+          new ReceiveDraft({ text: funded }),
+        );
         const draft = new MeltDraft({ mint: mintUrl, invoice });
         const quoted = yield* melt.quote(draft);
         const failure = yield* Effect.flip(melt.melt(draft));
-        return { quoted, failure, rows: yield* (yield* TokenStore).loadAll };
+        return {
+          funding,
+          quoted,
+          failure,
+          proofs: yield* (yield* Tokens).proofs,
+        };
       }),
     );
 
@@ -118,6 +135,7 @@ describe("melt vertical against the local mint", () => {
       required: 50 + quoted.feeReserve,
     });
     // The balance is untouched.
-    expect(rows.every((row) => row.state === "accepted")).toBe(true);
+    expect(proofs.every((proof) => proof.state === "available")).toBe(true);
+    expect(availableTotalOf(proofs)).toBe(funding.amount);
   });
 });

@@ -1,16 +1,24 @@
 import type { Proof } from "@cashu/cashu-ts";
 import { getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
-import { CurrencyUnit, KeysetId, MintUrl } from "../domain/primitives";
+import {
+  CurrencyUnit,
+  KeysetId,
+  MintUrl,
+  TokenText,
+} from "../domain/primitives";
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { inMemoryTokenStore } from "../ports/inMemoryTokenStore";
+import { inMemoryOperationStore } from "../ports/inMemoryOperationStore";
+import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
-import { TokenStore } from "../ports/TokenStore";
+import { OperationStore } from "../ports/OperationStore";
+import { ProofStore } from "../ports/ProofStore";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
+import { secretsOf, seedProofs, seedTransfer } from "../testing/inventory";
 import { parseTokenText } from "../token/codec";
 import { ReceiveDraft } from "./domain";
 import { Receive } from "./Receive";
@@ -23,11 +31,10 @@ const counterKey = deterministicCounterKey({
 });
 
 // 6 sats in; the "mint" hands back 5 (its input fee).
-const sourceToken = getEncodedToken({
-  mint,
-  unit: "sat",
-  proofs: [proof(4, "src-a"), proof(2, "src-b")],
-});
+const sourceProofs = [proof(4, "src-a"), proof(2, "src-b")];
+const sourceToken = TokenText.make(
+  getEncodedToken({ mint, unit: "sat", proofs: sourceProofs }),
+);
 const receivedProofs = [proof(4, "rcv-a"), proof(1, "rcv-b")];
 
 const outputsAlreadySigned = () =>
@@ -73,7 +80,8 @@ const makeHarness = (wallet: LoadedWallet) => {
           WalletInstances.make({ get: () => Effect.succeed(wallet) }),
         ),
         inMemoryKeyValueStore,
-        inMemoryTokenStore,
+        inMemoryProofStore,
+        inMemoryOperationStore,
         inspector.layer,
       ),
     ),
@@ -82,29 +90,37 @@ const makeHarness = (wallet: LoadedWallet) => {
     program: Effect.Effect<
       A,
       E,
-      Receive | TokenStore | KeyValueStore | WalletInstances
+      Receive | ProofStore | OperationStore | KeyValueStore | WalletInstances
     >,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
   return { run, events: inspector.events };
 };
 
+const inventory = Effect.gen(function* () {
+  return {
+    proofs: yield* (yield* ProofStore).loadAll,
+    operations: yield* (yield* OperationStore).loadAll,
+  };
+});
+
+const receiveText = (text: string) =>
+  Effect.flatMap(Receive, (receive) =>
+    receive.receive(new ReceiveDraft({ text })),
+  );
+
 const receiveAndInspect = (text: string) =>
   Effect.gen(function* () {
-    const receive = yield* Receive;
     const kv = yield* KeyValueStore;
-    const tokenStore = yield* TokenStore;
-    const receipt = yield* Effect.either(
-      receive.receive(new ReceiveDraft({ text })),
-    );
+    const receipt = yield* Effect.either(receiveText(text));
     return {
       receipt,
-      rows: yield* tokenStore.loadAll,
+      ...(yield* inventory),
       counter: yield* kv.get(counterKey),
     };
   });
 
 describe("Receive.receive", () => {
-  it("swaps deterministically, stores an accepted row, and advances the counter", async () => {
+  it("swaps deterministically, stores the proofs as balance, and closes the receive", async () => {
     const { wallet, receiveCounters } = makeWallet({
       receive: () => Promise.resolve(receivedProofs),
     });
@@ -112,39 +128,68 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    const { receipt, rows, counter } = exit.value;
+    const { receipt, proofs, operations, counter } = exit.value;
 
     assert(receipt._tag === "Right");
     expect(receipt.right.mint).toBe(mint);
     expect(receipt.right.unit).toBe("sat");
     expect(receipt.right.amount).toBe(5);
+    expect(receipt.right.tokenText).not.toBe(sourceToken);
+    expect(parseTokenText(receipt.right.tokenText)?.amount).toBe(5);
 
-    expect(rows).toHaveLength(1);
-    const row = rows[0];
-    expect(row.state).toBe("accepted");
-    expect(row.error).toBeNull();
-    expect(row.originalTokenText).toBe(sourceToken);
-    expect(row.tokenText).toBe(receipt.right.tokenText);
-    expect(row.tokenText).not.toBe(sourceToken);
-    expect(parseTokenText(row.tokenText)?.amount).toBe(5);
-    expect(receipt.right.rowId).toBe(row.id);
+    expect(operations).toHaveLength(1);
+    const transfer = operations[0];
+    expect(transfer).toMatchObject({
+      kind: "receive",
+      status: "done",
+      mint,
+      unit: "sat",
+      amount: 6,
+      tokenText: sourceToken,
+      error: null,
+    });
+    expect(receipt.right.operationId).toBe(transfer?.id);
+
+    // The fresh proofs are balance owned by nobody: the receive is closed.
+    expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
+    expect(proofs.every((p) => p.state === "available")).toBe(true);
+    expect(proofs.every((p) => p.operationId === null)).toBe(true);
 
     expect(receiveCounters).toEqual([1]);
     expect(counter).toBe("3");
 
     expect(events.map((event) => event._tag)).toEqual([
-      "TokenLifecycleChanged",
+      "OperationChanged",
       "CounterAdvanced",
-      "TokenLifecycleChanged",
+      "ProofsChanged",
+      "OperationChanged",
       "OperationSucceeded",
     ]);
-    expect(events[0]).toMatchObject({ from: null, to: "pending" });
+    expect(events[0]).toMatchObject({
+      kind: "receive",
+      from: null,
+      to: "pending",
+      reason: "receive",
+    });
     expect(events[1]).toMatchObject({ from: 1, to: 3, reason: "used" });
-    expect(events[2]).toMatchObject({ from: "pending", to: "accepted" });
+    expect(events[2]).toMatchObject({
+      mint,
+      from: null,
+      to: "available",
+      count: 2,
+      amount: 5,
+      operationId: null,
+      reason: "receive",
+    });
     expect(events[3]).toMatchObject({
+      from: "pending",
+      to: "done",
+      reason: "receive",
+    });
+    expect(events[4]).toMatchObject({
       name: "receive.receive",
       params: {},
-      result: { rowId: row.id, mint, unit: "sat", amount: 5 },
+      result: { operationId: transfer?.id, mint, unit: "sat", amount: 5 },
     });
     // No key material: neither token text nor proof secrets in any event.
     const serialized = JSON.stringify(events);
@@ -164,7 +209,7 @@ describe("Receive.receive", () => {
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
-    expect(exit.value.rows[0]?.originalTokenText).toBe(sourceToken);
+    expect(exit.value.operations[0]?.tokenText).toBe(sourceToken);
   });
 
   it("fails with TokenParseFailed and stores nothing for token-less text", async () => {
@@ -175,15 +220,9 @@ describe("Receive.receive", () => {
 
     const exit = await run(
       Effect.gen(function* () {
-        const receive = yield* Receive;
-        const tokenStore = yield* TokenStore;
-        const empty = yield* Effect.flip(
-          receive.receive(new ReceiveDraft({ text: "   " })),
-        );
-        const noToken = yield* Effect.flip(
-          receive.receive(new ReceiveDraft({ text: "hello world" })),
-        );
-        return { empty, noToken, rows: yield* tokenStore.loadAll };
+        const empty = yield* Effect.flip(receiveText("   "));
+        const noToken = yield* Effect.flip(receiveText("hello world"));
+        return { empty, noToken, ...(yield* inventory) };
       }),
     );
     assert(Exit.isSuccess(exit));
@@ -195,7 +234,8 @@ describe("Receive.receive", () => {
       _tag: "TokenParseFailed",
       reason: "no-token-found",
     });
-    expect(exit.value.rows).toEqual([]);
+    expect(exit.value.proofs).toEqual([]);
+    expect(exit.value.operations).toEqual([]);
     expect(receiveCounters).toEqual([]);
   });
 
@@ -207,52 +247,71 @@ describe("Receive.receive", () => {
 
     const exit = await run(
       Effect.gen(function* () {
-        const receive = yield* Receive;
-        const tokenStore = yield* TokenStore;
-        const first = yield* receive.receive(
-          new ReceiveDraft({ text: sourceToken }),
-        );
-        const second = yield* Effect.flip(
-          receive.receive(new ReceiveDraft({ text: sourceToken })),
-        );
-        return { first, second, rows: yield* tokenStore.loadAll };
+        const first = yield* receiveText(sourceToken);
+        const second = yield* Effect.flip(receiveText(sourceToken));
+        return { first, second, ...(yield* inventory) };
       }),
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.second).toMatchObject({
       _tag: "TokenAlreadyKnown",
-      rowId: exit.value.first.rowId,
+      operationId: exit.value.first.operationId,
     });
-    expect(exit.value.rows).toHaveLength(1);
+    expect(exit.value.operations).toHaveLength(1);
+    expect(exit.value.proofs).toHaveLength(2);
     expect(receiveCounters).toEqual([1]);
   });
 
-  it("dedupes against a row's re-signed encoding", async () => {
-    const { wallet } = makeWallet({
+  it("dedupes the re-signed encoding by its stored proofs, which no transfer names", async () => {
+    const { wallet, receiveCounters } = makeWallet({
       receive: () => Promise.resolve(receivedProofs),
     });
     const { run } = makeHarness(wallet);
 
     const exit = await run(
       Effect.gen(function* () {
-        const receive = yield* Receive;
-        const first = yield* receive.receive(
-          new ReceiveDraft({ text: sourceToken }),
-        );
-        const second = yield* Effect.flip(
-          receive.receive(new ReceiveDraft({ text: first.tokenText })),
-        );
-        return { first, second };
+        const first = yield* receiveText(sourceToken);
+        const second = yield* Effect.flip(receiveText(first.tokenText));
+        return { second, ...(yield* inventory) };
       }),
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.second).toMatchObject({
       _tag: "TokenAlreadyKnown",
-      rowId: exit.value.first.rowId,
+      operationId: null,
     });
+    expect(exit.value.operations).toHaveLength(1);
+    expect(receiveCounters).toEqual([1]);
   });
 
-  it("keeps no row behind on transient mint failure", async () => {
+  it("dedupes a token whose proofs a send handed out, naming that send", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    const { run } = makeHarness(wallet);
+    const otherText = TokenText.make(
+      getEncodedToken({ mint, unit: "sat", proofs: [proof(6, "elsewhere")] }),
+    );
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const send = yield* seedTransfer("send", "issued", mint, otherText, 6);
+        yield* seedProofs(mint, [sourceProofs[0]], "handedOut", send.id);
+        const result = yield* Effect.flip(receiveText(sourceToken));
+        return { send, result, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.result).toMatchObject({
+      _tag: "TokenAlreadyKnown",
+      operationId: exit.value.send.id,
+    });
+    expect(exit.value.operations).toHaveLength(1);
+    expect(exit.value.proofs).toHaveLength(1);
+    expect(receiveCounters).toEqual([]);
+  });
+
+  it("fails the receive with the serialized error on transient mint failure", async () => {
     const { wallet } = makeWallet({
       receive: () => Promise.reject(new TypeError("fetch failed")),
     });
@@ -262,14 +321,25 @@ describe("Receive.receive", () => {
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
-    expect(exit.value.rows).toEqual([]);
+    expect(exit.value.proofs).toEqual([]);
+    expect(exit.value.operations).toHaveLength(1);
+    expect(exit.value.operations[0]).toMatchObject({
+      status: "failed",
+      tokenText: sourceToken,
+    });
+    expect(JSON.parse(exit.value.operations[0]?.error ?? "")).toMatchObject({
+      _tag: "MintUnreachable",
+      mint,
+    });
     expect(events.map((event) => event._tag)).toEqual([
-      "TokenLifecycleChanged",
+      "OperationChanged",
+      "OperationChanged",
       "OperationFailed",
     ]);
+    expect(events[1]).toMatchObject({ from: "pending", to: "failed" });
   });
 
-  it("persists a serialized error row on definitive rejection", async () => {
+  it("fails the receive with the serialized error on definitive rejection", async () => {
     const { wallet } = makeWallet({
       receive: () =>
         Promise.reject(new MintOperationError(20003, "keyset inactive")),
@@ -283,18 +353,15 @@ describe("Receive.receive", () => {
       _tag: "MintRejected",
       code: 20003,
     });
-    expect(exit.value.rows).toHaveLength(1);
-    const row = exit.value.rows[0];
-    expect(row.state).toBe("error");
-    expect(row.tokenText).toBe(sourceToken);
-    expect(row.error).not.toBeNull();
-    expect(JSON.parse(row.error ?? "")).toMatchObject({
+    expect(exit.value.proofs).toEqual([]);
+    expect(exit.value.operations[0]?.status).toBe("failed");
+    expect(JSON.parse(exit.value.operations[0]?.error ?? "")).toMatchObject({
       _tag: "MintRejected",
       code: 20003,
     });
   });
 
-  it("classifies spent inputs as TokenAlreadySpent and persists the error", async () => {
+  it("classifies spent inputs as TokenAlreadySpent and records it", async () => {
     const { wallet } = makeWallet({
       receive: () =>
         Promise.reject(new MintOperationError(11001, "Token already spent.")),
@@ -308,10 +375,53 @@ describe("Receive.receive", () => {
       _tag: "TokenAlreadySpent",
       mint,
     });
-    expect(exit.value.rows[0]?.state).toBe("error");
-    expect(JSON.parse(exit.value.rows[0]?.error ?? "")).toMatchObject({
+    expect(exit.value.operations[0]?.status).toBe("failed");
+    expect(JSON.parse(exit.value.operations[0]?.error ?? "")).toMatchObject({
       _tag: "TokenAlreadySpent",
     });
+  });
+
+  it("retries a failed receive when the same text is pasted again", async () => {
+    let attempts = 0;
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => {
+        attempts += 1;
+        return attempts === 1
+          ? Promise.reject(new TypeError("fetch failed"))
+          : Promise.resolve(receivedProofs);
+      },
+    });
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const first = yield* Effect.flip(receiveText(sourceToken));
+        const second = yield* receiveText(sourceToken);
+        return { first, second, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.first._tag).toBe("MintUnreachable");
+    expect(exit.value.second.amount).toBe(5);
+    // One transfer for the text: the retry lands on the same operation.
+    expect(exit.value.operations).toHaveLength(1);
+    expect(exit.value.operations[0]).toMatchObject({
+      id: exit.value.second.operationId,
+      status: "done",
+      error: null,
+    });
+    expect(secretsOf(exit.value.proofs)).toEqual(["rcv-a", "rcv-b"]);
+    expect(receiveCounters).toEqual([1, 1]);
+    expect(
+      events
+        .filter((event) => event._tag === "OperationChanged")
+        .map((event) => [event.from, event.to]),
+    ).toEqual([
+      [null, "pending"],
+      ["pending", "failed"],
+      [null, "pending"],
+      ["pending", "done"],
+    ]);
   });
 
   it("recovers a stale counter via NUT-09 restore", async () => {
@@ -389,8 +499,7 @@ describe("Receive.receive", () => {
       Effect.gen(function* () {
         const kv = yield* KeyValueStore;
         yield* kv.set(counterKey, "7");
-        const receive = yield* Receive;
-        yield* receive.receive(new ReceiveDraft({ text: sourceToken }));
+        yield* receiveText(sourceToken);
         return yield* kv.get(counterKey);
       }),
     );
@@ -410,6 +519,6 @@ describe("Receive.receive", () => {
     assert(exit.value.receipt._tag === "Left");
     expect(exit.value.receipt.left._tag).toBe("MintRejected");
     expect(receiveCounters).toHaveLength(5);
-    expect(exit.value.rows[0]?.state).toBe("error");
+    expect(exit.value.operations[0]?.status).toBe("failed");
   });
 });

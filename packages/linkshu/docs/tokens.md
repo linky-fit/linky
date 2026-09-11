@@ -1,6 +1,6 @@
 # Tokens
 
-`Tokens` is the read model over stored rows plus the lifecycle transitions callers are allowed to make. Use `list` and `balances` to render the wallet, the transition calls when a token changes hands, `returnToWallet` to take one back, `deleteSpent` to clean up, and `importRow` to restore a row from a backup. The token codec exports in `token/codec.ts` are the pure functions behind all of it.
+`Tokens` is the read model over the inventory plus the transfer transitions callers are allowed to make. Use `proofs`, `operations`, `transfers`, and `balances` to render the wallet, the transition calls when a handed-out token changes hands, `returnToWallet` to take one back or retry a failed receive, `forget` to close a transfer, `importProofs`/`importOperation` to restore a backup, and `ingestLegacyRows` to carry the previous storage model over. The token codec exports in `token/codec.ts` are the pure functions behind all of it.
 
 ## Quick example
 
@@ -13,86 +13,96 @@ import { Tokens } from "@linky/linkshu";
 const walletView = Effect.gen(function* () {
   const tokens = yield* Tokens;
   const balances = yield* tokens.balances;
-  const rows = yield* tokens.list;
+  const transfers = yield* tokens.transfers;
   return {
     total: balances.total,
     spendable: balances.spendable,
     perMint: balances.perMint.map(
       (entry) => [entry.mint, entry.amount] as const,
     ),
-    issued: rows.filter((row) => row.state === "issued"),
+    issued: transfers.filter(
+      (transfer) => transfer.kind === "send" && transfer.status === "issued",
+    ),
   };
 });
 ```
 
-Reads are pull-based: re-run them when the store changes (Linky re-runs on every Evolu query change).
+Reads are pull-based: re-run them when the stores change (Linky re-runs on every Evolu query change).
 
 ## How it works
 
 ### Read model
 
-- `list` — every row whose text still parses, enriched into `WalletToken`, newest first. Rows that no longer parse stay in the store but are omitted.
-- `balances` — `WalletBalances` over `accepted` rows only. `spendable` is the largest single-mint balance, because cashu cannot spend across mints in one operation.
+- `proofs` — every `StoredProof`, any state, newest first.
+- `operations` — every `StoredOperation`, any status, newest first.
+- `transfers` — the `send` and `receive` operations as `TokenTransfer`, newest first. Quote operations (`melt`, `topup`, `autoswap`) are not transfers; read them from `operations`.
+- `balances` — `WalletBalances` over `available` proofs only. `spendable` is the largest single-mint balance, because cashu cannot spend across mints in one operation.
 
-### Lifecycle
+### Send transitions
 
-States, their meanings, and the legal transitions are in [concepts.md](./concepts.md#token-rows-and-the-lifecycle). Only `accepted` counts as balance. Callers get three pure transitions, each `(rowId) => Effect<void, TokenRowNotFound | InvalidTokenTransition>`:
+States and statuses are in [concepts.md](./concepts.md#proofs-operations-and-who-moves-them). Callers get these transitions on a `send` transfer, each `(operationId) => Effect<void, OperationNotFound | InvalidTransferTransition>`:
 
-| Call               | Meaning                                                              |
-| ------------------ | -------------------------------------------------------------------- |
-| `reserve`          | earmark an `accepted` row for a handover that has not happened yet   |
-| `markIssued`       | the token left as a QR/share; watch it with `Validation.checkIssued` |
-| `markExternalized` | the token was handed off outside the app entirely                    |
+| Call               | From                                | To             | Proofs                                                    |
+| ------------------ | ----------------------------------- | -------------- | --------------------------------------------------------- |
+| `markIssued`       | `pending`                           | `issued`       | untouched — a messenger token was shown as a QR after all |
+| `markExternalized` | `issued`, `pending`                 | `externalized` | its non-spent proofs → `externalized`                     |
+| `forget`           | `issued`, `pending`, `externalized` | `done`         | untouched — see below                                     |
 
-Everything else (`pending` → `accepted`, `error` marking, removal of consumed sources) is done by the operation verticals. Platforms never write states themselves.
+`forget` closes a transfer the caller has nothing left to do about: a send whose token verifiably reached its recipient (a published message), or a `receive` in `pending`/`failed` that will never be retried. It is not a refund — the handed-out proofs stay `handedOut` and are still reported `spent` once the recipient claims them. Everything else (`pending` → `done` on a receive, `spent` marking, closing claimed sends) is done by the operation verticals. Platforms never write states themselves.
 
 ### `returnToWallet`
 
-`returnToWallet(rowId)` brings a row back to `accepted` and returns a `ReceiveReceipt`. Its behavior depends on the state:
+`returnToWallet(operationId)` brings a transfer's funds into the balance and returns a `ReceiveReceipt` (`operationId` is the transfer it settled). It goes through the accept flow of [receive.md](./receive.md), with the transfer itself excluded from dedup:
 
-| Row state                                    | What happens                                                                                                                                                                                                                                                                                  |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accepted`                                   | `InvalidTokenTransition` — nothing to return                                                                                                                                                                                                                                                  |
-| `reserved`                                   | released locally, without a mint check. Inputs of an interrupted melt belong to [`Melt.resumePending`](./melt.md#resumepending--run-it-at-startup), which asks the mint first; returning them by hand while the mint still holds them makes the balance count funds that may already be spent |
-| `issued`, `externalized`, `pending`, `error` | the row's text is **re-received** through the accept flow: a fresh `accepted` row gets swapped proofs, then the old row is removed. The copy someone else may hold is now spent at the mint                                                                                                   |
+| Transfer                                         | What happens                                                                                                                                                                                                  |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `send` in `issued`, `pending`, or `externalized` | the token text is **re-received**: fresh proofs are stored `available`, then the handed-out proofs are marked `spent` and the send becomes `returned`. The copy someone else may hold is now dead at the mint |
+| `receive` in `pending` or `failed`               | retried in place: it reopens as `pending` (error cleared) and ends `done` with the proofs stored, or `failed` again with the new error                                                                        |
+| anything else (`done`, `returned`, a quote kind) | `InvalidTransferTransition` (`OperationNotFound` for a non-transfer id)                                                                                                                                       |
 
-On a re-receive, dedup ignores the replaced row. A transient failure leaves it exactly as it was; a definitive failure (`TokenAlreadySpent`, `MintRejected`) lands on the replaced row as `error` where the state machine allows (an `externalized` row keeps its state). This is the recovery path for a `pending` message send that never confirmed, an unclaimed `issued` token, and an `error` row that still holds live proofs after a partial spend.
+On a send, a transient failure (`MintUnreachable`, `CounterLockTimeout`) leaves it exactly as it was. `TokenAlreadySpent` means the recipient claimed it: the handed-out proofs are marked `spent`, the send closes `done`, and the error is still returned — treat it as "already claimed", not as a loss. Any other definitive rejection is recorded in `error` without changing the status. This is the recovery path for a `pending` message send that never confirmed and for an unclaimed `issued` token; a melt's `held` inputs are not a transfer and belong to [`Melt.resumePending`](./melt.md#resumepending--run-it-at-startup).
 
-### `deleteSpent`
+### Backup import
 
-Removes rows the mints confirm fully spent and returns `DeletedSpentToken[]` (`rowId`, `amount`). It sweeps `accepted` and `error` rows only. It runs its own NUT-07 check: rows already carrying a recorded `TokenAlreadySpent` are re-confirmed, because a receive rejected over a _partially_ spent token records that error while the text still holds live proofs. An unreachable mint or an unanswered proof keeps every row.
-
-Rows in other states are never swept: `issued` rows are pruned by `Validation.checkIssued` once claimed; `externalized` rows come back only through `returnToWallet`; `reserved` and `pending` rows belong to an operation in flight (a melt's `reserved` inputs are settled by `Melt.resumePending`).
-
-### `importRow`
-
-`importRow(draft: ImportRowDraft)` restores one row from a backup exactly as the backup states it and returns its `TokenRowId`. The draft is `{ originalTokenText, tokenText, state, error }`; there is no receive, swap, or mint check, so a row comes back in whatever state it left with, and later checks reconcile it with the mint according to its state. `Validation.checkAll` checks accepted and error rows; it does not settle reserved or pending operations. `error` is kept only when `state` is `error`. If either draft token text matches an existing row's current or original encoding, the import fails with `TokenAlreadyKnown`, which also covers a backup imported twice. This is the only way platform code writes a wallet row it did not obtain through an operation; it keeps the store's row identity, sparse payloads, and active-lane targeting in one place.
+`importProofs(drafts)` restores proofs from a backup exactly as it states them (`ImportProofDraft` has the fields of `NewProof`: `mint`, `unit`, `keysetId`, `amount`, `secret`, `C`, `dleq`, `state`, `operationId`) and returns how many were added. Secrets the inventory already holds are skipped, so a backup imported twice adds nothing; there is no mint check, so a proof comes back in the state it left with and the next validation reconciles it. `importOperation(draft: NewOperation)` restores one operation and returns its `OperationId`; an existing operation with the same key is replaced. Import operations before proofs when the backup has both, so the proofs' `operationId` links resolve. These are the only way platform code writes inventory rows it did not obtain through an operation.
 
 ```ts
 import { Effect, Schema } from "effect";
-import { ImportRowDraft, Tokens } from "@linky/linkshu";
+import { ImportProofDraft, NewOperation, Tokens } from "@linky/linkshu";
 
-const decodeImportRowDraft = Schema.decodeUnknownOption(ImportRowDraft);
+const decodeProofs = Schema.decodeUnknownOption(Schema.Array(ImportProofDraft));
+const decodeOperations = Schema.decodeUnknownOption(Schema.Array(NewOperation));
 
-const restoreBackupRow = (backup: {
-  token: string;
-  rawToken: string | null;
-  state: string | null;
-  error: string | null;
-}) => {
-  const draft = decodeImportRowDraft({
-    originalTokenText: backup.rawToken ?? backup.token,
-    tokenText: backup.token,
-    state: backup.state ?? "accepted",
-    error: backup.error,
+const restoreBackup = (backup: { proofs: unknown; operations: unknown }) =>
+  Effect.gen(function* () {
+    const proofs = decodeProofs(backup.proofs);
+    const operations = decodeOperations(backup.operations);
+    if (proofs._tag === "None" || operations._tag === "None") return null;
+    const tokens = yield* Tokens;
+    for (const operation of operations.value) {
+      yield* tokens.importOperation(operation);
+    }
+    return yield* tokens.importProofs(proofs.value);
   });
-  if (draft._tag === "None") return Effect.succeed("skipped");
-  return Effect.flatMap(Tokens, (tokens) => tokens.importRow(draft.value)).pipe(
-    Effect.as("restored"),
-    Effect.catchTag("TokenAlreadyKnown", () => Effect.succeed("duplicate")),
-  );
-};
 ```
+
+### `adoptToken`
+
+`adoptToken(text)` stores a token's proofs as `available` without re-signing them at the mint and returns the amount added (`NonNegativeAmount`; secrets already stored are skipped). It fails with `TokenParseFailed` when the text carries no decodable token. It exists for a wallet that only ever spends one token it already trusts — the site's `/cashu/` redemption page — and must not be used for anything received from someone else, because the sender keeps a spendable copy; that is what `Receive` is for.
+
+### `ingestLegacyRows`
+
+`ingestLegacyRows(rows)` carries rows of the pre-inventory storage model (`LegacyTokenRow`: `id`, `originalTokenText`, `tokenText`, `state`, `error`, `createdAt` — the web app's `cashuToken` table and old backups) into proofs and operations, and returns a `LegacyIngestReport` (`ingestedRows`, `proofs`). A row is ingested when any of its proofs is not yet stored; ids derive from secrets, so it is idempotent and safe to run on every load and on every device. No mint is contacted. Per legacy state:
+
+| Legacy row state         | Becomes                                                                                                                                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pending`                | skipped                                                                                                                                                                                            |
+| `accepted`               | `available` proofs                                                                                                                                                                                 |
+| `reserved`               | `held` proofs, linked to the pending `melt` at that mint whose `inputsTotal` equals the row's total (each melt linked once); no such melt → `operationId: null`, released by `Validation.checkAll` |
+| `issued`, `externalized` | a `send` operation in that status (`createdAt` from the row) with the proofs `handedOut` / `externalized` under it                                                                                 |
+| `error`                  | `spent` proofs when `error` is a serialized `TokenAlreadySpent`; otherwise `available`, for the next mint check to decide                                                                          |
+
+Rows whose text no longer decodes are skipped. Linky runs it from `useLinkshuComposition.ts` over the legacy table on every load.
 
 ## Token codec
 
@@ -110,34 +120,36 @@ Supported formats: v3 (`cashuA`, base64url JSON), v4 (`cashuB`, base64url CBOR),
 
 ## Inputs and outputs
 
-`WalletToken` (`token/domain.ts`):
+`TokenTransfer` (`token/domain.ts`):
 
-| Field       | Type                           | Notes                                         |
-| ----------- | ------------------------------ | --------------------------------------------- |
-| `id`        | `TokenRowId`                   |                                               |
-| `state`     | `TokenState`                   |                                               |
-| `tokenText` | `TokenText`                    | current encoding                              |
-| `mint`      | `Schema.NullOr(MintUrl)`       |                                               |
-| `unit`      | `Schema.NullOr(CurrencyUnit)`  |                                               |
-| `amount`    | `Amount`                       |                                               |
-| `error`     | `Schema.NullOr(Schema.String)` | serialized tagged error; null outside `error` |
-| `createdAt` | `UnixSeconds`                  |                                               |
+| Field       | Type                           | Notes                                            |
+| ----------- | ------------------------------ | ------------------------------------------------ |
+| `id`        | `OperationId`                  |                                                  |
+| `kind`      | `"send" \| "receive"`          |                                                  |
+| `status`    | `OperationStatus`              |                                                  |
+| `tokenText` | `TokenText`                    | the handed-out or accepted text; carries secrets |
+| `mint`      | `MintUrl`                      |                                                  |
+| `unit`      | `CurrencyUnit`                 |                                                  |
+| `amount`    | `Amount`                       |                                                  |
+| `error`     | `Schema.NullOr(Schema.String)` | serialized tagged error of the last failure      |
+| `createdAt` | `UnixSeconds`                  |                                                  |
 
 `WalletBalances`: `total: NonNegativeAmount`, `spendable: NonNegativeAmount`, `perMint: Schema.Array(MintBalance)` with `MintBalance { mint: MintUrl, amount: NonNegativeAmount }`.
 
+`StoredProof` and `StoredOperation` are described in [ports.md](./ports.md).
+
 ## Errors
 
-| Tag                      | Raised by                        | When                                                     | What to do                             |
-| ------------------------ | -------------------------------- | -------------------------------------------------------- | -------------------------------------- |
-| `TokenRowNotFound`       | transitions, `returnToWallet`    | no row with that id                                      | drop the reference                     |
-| `InvalidTokenTransition` | transitions, `returnToWallet`    | the state machine forbids it (`from`, `to` in the error) | refresh the row and re-check the state |
-| `ReceiveError` members   | `returnToWallet` on a re-receive | see [receive.md](./receive.md#errors)                    | same handling as a receive             |
-| `TokenAlreadyKnown`      | `importRow`                      | a row already has either token text                      | count it as already present            |
+| Tag                         | Raised by                               | When                                                     | What to do                                                                     |
+| --------------------------- | --------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `OperationNotFound`         | transitions, `forget`, `returnToWallet` | no transfer with that id (quote operations do not count) | drop the reference                                                             |
+| `InvalidTransferTransition` | transitions, `forget`, `returnToWallet` | the status forbids it (`from`, `to` in the error)        | refresh the transfer and re-check its status                                   |
+| `ReceiveError` members      | `returnToWallet`                        | see [receive.md](./receive.md#errors)                    | same handling as a receive; `TokenAlreadySpent` on a send means it was claimed |
 
-`list`, `balances`, and `deleteSpent` never fail.
+`proofs`, `operations`, `transfers`, `balances`, `importProofs`, `importOperation`, and `ingestLegacyRows` never fail; `adoptToken` fails only with `TokenParseFailed`.
 
 ## Related
 
 - [receive.md](./receive.md), [send.md](./send.md), [validation.md](./validation.md)
-- [concepts.md](./concepts.md#token-rows-and-the-lifecycle) — states and transitions
-- [ports.md](./ports.md) — `TokenStore`, `StoredTokenRow`, why ids may derive from `originalTokenText`
+- [concepts.md](./concepts.md#proofs-operations-and-who-moves-them) — states and statuses
+- [ports.md](./ports.md) — `ProofStore`, `OperationStore`, why ids derive from secrets and operation keys

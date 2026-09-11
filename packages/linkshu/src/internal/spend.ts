@@ -1,6 +1,6 @@
 import type { SendResponse } from "@cashu/cashu-ts";
-import { Effect, Either, Schema } from "effect";
-import { InsufficientFunds, TokenAlreadySpent } from "../domain/errors";
+import { Effect, Either } from "effect";
+import { InsufficientFunds } from "../domain/errors";
 import type { MintRejected, MintUnreachable } from "../domain/errors";
 import { NonNegativeAmount } from "../domain/primitives";
 import type { Amount, CurrencyUnit, MintUrl } from "../domain/primitives";
@@ -8,15 +8,8 @@ import type { InspectorService } from "../inspector/Inspector";
 import { classifyMintError } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
-import type { StoredTokenRow, TokenStoreService } from "../ports/TokenStore";
+import type { ProofStoreService, StoredProof } from "../ports/ProofStore";
 import type { Proof } from "../token/domain";
-import { encodeProofs } from "../token/internal/cashuProofs";
-import {
-  rewriteRowTokenText,
-  transitionRow,
-} from "../token/internal/lifecycle";
-import { collectRowProofs } from "../token/internal/rowProofs";
-import type { RowProofs } from "../token/internal/rowProofs";
 import { recoverFromCollision } from "./collisionRecovery";
 import { advanceCounterTo, readCounter, withCounterLock } from "./counters";
 import type { CounterScope } from "./counters";
@@ -26,16 +19,20 @@ import {
   isRecoverableOutputCollision,
 } from "./outputCollisions";
 import {
-  checkProofStates,
-  dedupeProofs,
-  spentSecrets,
-  unspentProofs,
-} from "./proofStates";
+  insertProofs,
+  proofsAt,
+  setProofState,
+  toDomainProof,
+  toNewProofs,
+  totalAmount,
+} from "./proofs";
+import { checkProofStates, spentSecrets, unspentProofs } from "./proofStates";
 
 /**
- * Shared machinery for operations that spend `accepted` rows (send, melt):
- * source selection, the NUT-07 pre-filter with spent-row marking, and the
- * deterministic swap that turns the pool into exact-amount proofs.
+ * Shared machinery for operations that spend `available` proofs (send,
+ * melt, autoswap): source selection with the NUT-07 pre-filter, the
+ * deterministic swap that turns the pool into exact-amount proofs, and the
+ * bookkeeping that settles the swap's inputs and change in the inventory.
  */
 
 const MAX_SWAP_ATTEMPTS = 5;
@@ -48,183 +45,53 @@ const SWAP_OUTPUT_BLOCK = 64;
 /** A failed attempt may have burned both blocks. */
 const COLLISION_FALLBACK_BUMP = SWAP_OUTPUT_BLOCK * 2;
 
-/** An `accepted` row spendable at the target mint, with its decoded proofs. */
-export type AcceptedSource = RowProofs;
-
-export const collectAcceptedSources = (
-  rows: ReadonlyArray<StoredTokenRow>,
-  mint: MintUrl,
-  unit: CurrencyUnit,
-  /** The mint's full keyset ids; expands short v2 ids in stored v4 tokens. */
-  keysetIds: readonly string[],
-): ReadonlyArray<AcceptedSource> =>
-  collectRowProofs(
-    rows.filter((row) => row.state === "accepted"),
-    mint,
-    unit,
-    keysetIds,
-  );
-
-/** One state-check candidate per distinct secret (rows may share proofs). */
-export const dedupeSourceProofs = (
-  sources: ReadonlyArray<AcceptedSource>,
-): ReadonlyArray<Proof> =>
-  dedupeProofs(sources.flatMap((source) => source.proofs));
-
-export interface SpendablePartition extends SpendSelection {
-  /** Rows whose every proof the mint reports spent; dead, to be marked. */
-  readonly fullySpentRows: ReadonlyArray<StoredTokenRow>;
-}
-
-export const partitionByProofState = (
-  sources: ReadonlyArray<AcceptedSource>,
-  spentSecrets: ReadonlySet<string>,
-  unspentSecrets: ReadonlySet<string>,
-): SpendablePartition => {
-  const fullySpentRows: StoredTokenRow[] = [];
-  const liveRows: StoredTokenRow[] = [];
-  const retainedRows: RowProofs[] = [];
-  const seen = new Set<string>();
-  const spendable: Proof[] = [];
-  let available = 0;
-  for (const source of sources) {
-    if (source.proofs.every((proof) => spentSecrets.has(proof.secret))) {
-      fullySpentRows.push(source.row);
-      continue;
-    }
-    const retained = source.proofs.filter(
-      (proof) =>
-        !spentSecrets.has(proof.secret) && !unspentSecrets.has(proof.secret),
-    );
-    if (retained.length > 0)
-      retainedRows.push({ row: source.row, proofs: retained });
-    liveRows.push(source.row);
-    for (const proof of source.proofs) {
-      if (!unspentSecrets.has(proof.secret) || seen.has(proof.secret)) continue;
-      seen.add(proof.secret);
-      spendable.push(proof);
-      available += proof.amount;
-    }
-  }
-  return { fullySpentRows, liveRows, retainedRows, spendable, available };
-};
-
-/** Serialized onto rows NUT-07 reports fully spent. */
-const encodeSpentRowError = Schema.encodeSync(
-  Schema.parseJson(TokenAlreadySpent),
-);
-
 export interface SpendContext {
-  readonly tokenStore: TokenStoreService;
+  readonly proofStore: ProofStoreService;
   readonly inspector: InspectorService;
   readonly wallet: LoadedWallet;
   readonly mint: MintUrl;
   readonly unit: CurrencyUnit;
-  /** Lifecycle-event reason for rows the pre-filter marks spent. */
+  /** Inspector reason for proofs the pre-filter marks spent. */
   readonly reason: string;
 }
 
 export interface SpendSelection {
-  /** Source rows to remove or rewrite after the swap is persisted. */
-  readonly liveRows: ReadonlyArray<StoredTokenRow>;
-  /** Unspent proofs offered to the swap, deduped by secret. */
-  readonly spendable: ReadonlyArray<Proof>;
-  /** Proofs withheld from the swap, retained in their original rows. */
-  readonly retainedRows: ReadonlyArray<RowProofs>;
+  /** Confirmed-unspent `available` proofs, offered to the swap. */
+  readonly spendable: ReadonlyArray<StoredProof>;
   /** Sum of `spendable`. */
   readonly available: number;
 }
 
 /**
- * The spendable pool at one mint: `accepted` rows decoded, NUT-07 checked,
- * and rows the mint reports fully spent marked `error` — definitive spend
- * knowledge sticks even when the operation itself fails afterwards.
+ * The spendable pool at one mint: `available` proofs, NUT-07 checked. Proofs
+ * the mint reports spent are marked so — definitive spend knowledge sticks
+ * even when the operation itself fails afterwards. `PENDING`, unanswered,
+ * and unrecognized proofs stay `available` and are simply not offered.
  */
 export const selectSpendableProofs = (
   ctx: SpendContext,
 ): Effect.Effect<SpendSelection, MintUnreachable | MintRejected> =>
   Effect.gen(function* () {
-    const sources = collectAcceptedSources(
-      yield* ctx.tokenStore.loadAll,
+    const candidates = proofsAt(
+      yield* ctx.proofStore.loadAll,
       ctx.mint,
       ctx.unit,
-      ctx.wallet.keyChain.getKeysets().map((keyset) => keyset.id),
+    ).filter((proof) => proof.state === "available");
+    const domain = candidates.map(toDomainProof);
+    const states = yield* checkProofStates(ctx.wallet, ctx.mint, domain);
+    const spent = spentSecrets(domain, states);
+    const unspent = new Set(
+      unspentProofs(domain, states).map((proof) => proof.secret),
     );
-    const candidates = dedupeSourceProofs(sources);
-    const states = yield* checkProofStates(ctx.wallet, ctx.mint, candidates);
-    const partition = partitionByProofState(
-      sources,
-      spentSecrets(candidates, states),
-      new Set(unspentProofs(candidates, states).map((proof) => proof.secret)),
+    yield* setProofState(
+      ctx,
+      candidates.filter((proof) => spent.has(proof.secret)),
+      "spent",
+      ctx.reason,
+      null,
     );
-    yield* Effect.forEach(
-      partition.fullySpentRows,
-      (row) =>
-        // `accepted` → `error` is always legal; failing here is a package bug.
-        Effect.orDie(
-          transitionRow(
-            ctx.tokenStore,
-            ctx.inspector,
-            row,
-            "error",
-            ctx.reason,
-            {
-              error: encodeSpentRowError(
-                new TokenAlreadySpent({ mint: ctx.mint }),
-              ),
-            },
-          ),
-        ),
-      { discard: true },
-    );
-    return {
-      liveRows: partition.liveRows,
-      retainedRows: partition.retainedRows,
-      spendable: partition.spendable,
-      available: partition.available,
-    };
-  });
-
-/**
- * Retains unresolved proofs in their source rows and removes consumed rows.
- * Spares rows reused by fresh inserts: cashu-ts passes unselected proofs
- * through to the keep side unchanged, so a fully-unselected source row can re-encode
- * byte-identically — a store deriving ids from `originalTokenText` then
- * hands the change insert that source row's own id, and removing it would
- * destroy the just-persisted funds.
- */
-export const removeConsumedRows = (
-  ctx: Pick<SpendContext, "tokenStore" | "inspector" | "mint" | "unit">,
-  selection: SpendSelection,
-  inserted: ReadonlyArray<StoredTokenRow>,
-): Effect.Effect<void> =>
-  Effect.gen(function* () {
-    const preservedIds = new Set(inserted.map((row) => row.id));
-    for (const { row, proofs } of selection.retainedRows) {
-      preservedIds.add(row.id);
-      const encoded = encodeProofs({
-        mint: ctx.mint,
-        unit: ctx.unit,
-        memo: null,
-        proofs,
-      });
-      if (encoded === null)
-        return yield* Effect.die(new Error("Cannot encode retained proofs"));
-      if (encoded.tokenText !== row.tokenText) {
-        yield* rewriteRowTokenText(
-          ctx.tokenStore,
-          ctx.inspector,
-          row,
-          encoded.tokenText,
-          "spend-retained",
-        );
-      }
-    }
-    yield* Effect.forEach(
-      selection.liveRows.filter((row) => !preservedIds.has(row.id)),
-      (row) => ctx.tokenStore.remove(row.id),
-      { discard: true },
-    );
+    const spendable = candidates.filter((proof) => unspent.has(proof.secret));
+    return { spendable, available: totalAmount(spendable) };
   });
 
 export interface SwapContext {
@@ -332,3 +199,48 @@ export const swapProofsForAmount = (
       );
     }),
   );
+
+export interface SwapOutcome {
+  /** Fresh change the swap minted, now `available`. */
+  readonly freshKeep: ReadonlyArray<StoredProof>;
+  /** Offered proofs the swap consumed. */
+  readonly consumed: ReadonlyArray<StoredProof>;
+  /** Sum of every keep proof — fresh change plus passthrough inputs. */
+  readonly keepAmount: number;
+}
+
+/**
+ * Books a swap: fresh change is stored `available` before the consumed
+ * inputs are marked `spent`, so the funds are never outside the store.
+ * Passthrough inputs (offered but not consumed) are untouched. `null` when
+ * the mint handed back malformed change.
+ */
+export const settleSwap = (
+  ctx: SpendContext,
+  offered: ReadonlyArray<StoredProof>,
+  swapped: SendResponse,
+  reason: string,
+): Effect.Effect<SwapOutcome | null> =>
+  Effect.gen(function* () {
+    const offeredSecrets = new Set(offered.map((proof) => proof.secret));
+    const keepSecrets = new Set(swapped.keep.map((proof) => proof.secret));
+    const fresh = toNewProofs(
+      swapped.keep.filter((proof) => !offeredSecrets.has(proof.secret)),
+      ctx.mint,
+      ctx.unit,
+      "available",
+      null,
+    );
+    if (fresh === null) return null;
+    const freshKeep = yield* insertProofs(ctx, fresh, reason);
+    const consumed = offered.filter((proof) => !keepSecrets.has(proof.secret));
+    yield* setProofState(ctx, consumed, "spent", reason, null);
+    return {
+      freshKeep,
+      consumed,
+      keepAmount: swapped.keep.reduce(
+        (sum, proof) => sum + proof.amount.toNumber(),
+        0,
+      ),
+    };
+  });
