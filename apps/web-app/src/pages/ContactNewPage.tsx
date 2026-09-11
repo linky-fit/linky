@@ -252,10 +252,33 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         })
       : [];
   const [step, setStep] = React.useState<"search" | "details">("search");
+  const searchQuery = form.npub.trim();
   const nearbyUsers = useNearbyProfiles(
     nearbyIdentities.map((peer) => peer.npub),
-    step === "search",
+    step === "search" && !searchQuery,
   );
+  const suggestionNpubs = new Set<string>();
+  const suggestions = [
+    ...nearbyUsers.map((peer) => {
+      const recent = contactSuggestions.find(
+        (suggestion) => normalizeNpubIdentifier(suggestion.npub) === peer.npub,
+      );
+      return {
+        npub: peer.npub,
+        name: peer.name || recent?.name || "",
+        lnAddress: peer.lnAddress || recent?.lnAddress || "",
+        pictureUrl: peer.pictureUrl ?? recent?.pictureUrl ?? null,
+        query: peer.npub,
+        displayLnAddress: peer.lnAddress || recent?.displayLnAddress || "",
+      };
+    }),
+    ...contactSuggestions,
+  ].filter((suggestion) => {
+    const npub = normalizeNpubIdentifier(suggestion.npub) ?? suggestion.npub;
+    if (suggestionNpubs.has(npub)) return false;
+    suggestionNpubs.add(npub);
+    return true;
+  });
   const [searchError, setSearchError] = React.useState<string | null>(null);
   const [searchIsBusy, setSearchIsBusy] = React.useState(false);
   const [searchResults, setSearchResults] =
@@ -268,9 +291,8 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   const searchQueryRef = React.useRef("");
   const searchRequestSeqRef = React.useRef(0);
 
-  const searchQuery = form.npub.trim();
   const showSuggestions =
-    step === "search" && !searchQuery && contactSuggestions.length > 0;
+    step === "search" && !searchQuery && suggestions.length > 0;
 
   React.useEffect(() => {
     searchQueryRef.current = searchQuery;
@@ -562,11 +584,12 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                     {t("contactSuggestionsTitle")}
                   </div>
                   <div className="contact-new-suggestion-list">
-                    {contactSuggestions.map((suggestion) => {
+                    {suggestions.map((suggestion) => {
                       const displayName = (
                         suggestion.name ||
-                        suggestion.query ||
-                        ""
+                        (suggestion.query === suggestion.npub
+                          ? formatShortNpub(suggestion.npub)
+                          : suggestion.query)
                       ).trim();
                       const avatarUrl = suggestion.pictureUrl ?? null;
 
@@ -586,10 +609,16 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                             </span>
                             <span className="contact-new-suggestion-body">
                               <strong>{displayName || t("contact")}</strong>
-                              <span title={suggestion.displayLnAddress}>
-                                {formatShortLightningAddress(
-                                  suggestion.displayLnAddress,
-                                )}
+                              <span
+                                title={
+                                  suggestion.displayLnAddress || suggestion.npub
+                                }
+                              >
+                                {suggestion.displayLnAddress
+                                  ? formatShortLightningAddress(
+                                      suggestion.displayLnAddress,
+                                    )
+                                  : formatShortNpub(suggestion.npub)}
                               </span>
                             </span>
                           </div>
@@ -617,59 +646,6 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                         </div>
                       );
                     })}
-                  </div>
-                </div>
-              ) : null}
-              {nearbyUsers.length > 0 ? (
-                <div className="contact-new-suggestions bluetooth-nearby-users">
-                  <div className="contact-new-suggestions-title">
-                    {t("bluetoothNearbyUsers")}
-                  </div>
-                  <div className="contact-new-suggestion-list">
-                    {nearbyUsers.map((peer) => (
-                      <div className="contact-new-suggestion" key={peer.npub}>
-                        <div className="contact-new-suggestion-main">
-                          <span className="contact-avatar" aria-hidden="true">
-                            <Avatar
-                              pictureUrl={peer.pictureUrl}
-                              fallback={getInitials(peer.name)}
-                              fallbackClassName="contact-avatar-fallback"
-                            />
-                          </span>
-                          <span className="contact-new-suggestion-body">
-                            <strong>
-                              {peer.name || formatShortNpub(peer.npub)}
-                            </strong>
-                            <span title={peer.npub}>
-                              {formatShortNpub(peer.npub)}
-                            </span>
-                            {peer.lnAddress ? (
-                              <span title={peer.lnAddress}>
-                                {formatShortLightningAddress(peer.lnAddress)}
-                              </span>
-                            ) : null}
-                          </span>
-                        </div>
-                        <div className="contact-new-suggestion-action">
-                          <button
-                            type="button"
-                            disabled={isSavingContact}
-                            onClick={() =>
-                              void addNewContactFromSearchResult({
-                                npub: peer.npub,
-                                name: peer.name,
-                                lnAddress: peer.lnAddress,
-                                pictureUrl: peer.pictureUrl,
-                                query: peer.npub,
-                                isExactMatch: true,
-                              })
-                            }
-                          >
-                            {isSavingContact ? t("saving") : t("saveContact")}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               ) : null}

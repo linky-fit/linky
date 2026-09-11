@@ -5,8 +5,6 @@ import { formatChatMessagePreviewText } from "../app/lib/chatMessageDisplay";
 import { hasMessageEntityPreview } from "../app/lib/messageEntityPreview";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
 import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
-import { useBluetooth } from "../bluetooth/BluetoothContext";
-import { isNearbyContact } from "../bluetooth/contactPresence";
 import { formatDisplayGeneralStatus } from "../nostrStatus";
 import {
   formatContactMessageTimestamp,
@@ -52,16 +50,6 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
     isUnknownContact = false,
   }) => {
     const { formatDisplayedAmountText, t } = useAppShellCore();
-    const bluetooth = useBluetooth();
-    const isNearby =
-      bluetooth.available &&
-      bluetooth.enabled &&
-      bluetooth.state.active &&
-      !isUnknownContact &&
-      isNearbyContact(
-        contact,
-        new Set(bluetooth.nearby.map((peer) => peer.npub)),
-      );
     const initials = getInitials(contact.name ?? "");
     const contactStatus = formatDisplayGeneralStatus({
       status: statusText,
@@ -137,11 +125,6 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
 
           <div className="card-main">
             <div className="card-title-row">
-              {isNearby ? (
-                <span className="bluetooth-nearby-badge">
-                  {t("bluetoothNearby")}
-                </span>
-              ) : null}
               {contact.name ? (
                 <h4 className="contact-title">
                   <span className="contact-title-text" title={contact.name}>

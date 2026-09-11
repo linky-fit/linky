@@ -7315,37 +7315,6 @@ button.cashu-token-pill {
 .bluetooth-settings-description p {
   margin: 6px 0;
 }
-.bluetooth-nearby-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--app-primary-button-bg) 15%, transparent);
-  color: inherit;
-  font-size: 0.7rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.bluetooth-room-entry {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  width: 100%;
-  margin-top: 20px;
-  padding: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 14px;
-  color: inherit;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-.bluetooth-room-entry > span {
-  display: grid;
-  gap: 4px;
-}
 .bluetooth-room {
   display: flex;
   flex-direction: column;

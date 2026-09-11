@@ -5,7 +5,6 @@ import type { ContactRowLike } from "../app/types/appTypes";
 import { useBluetooth } from "../bluetooth/BluetoothContext";
 import { partitionNearbyContacts } from "../bluetooth/contactPresence";
 import { BottomTabBar } from "../components/BottomTabBar";
-import { navigateTo } from "../hooks/useRouting";
 
 import type { Translate } from "../i18n";
 
@@ -177,21 +176,6 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
                 )}
               </>
             )}
-            {showBluetooth ? (
-              <button
-                type="button"
-                className="bluetooth-room-entry"
-                onClick={() => navigateTo({ route: "bluetoothChat" })}
-              >
-                <strong>{t("bluetoothRoom")}</strong>
-                <span>
-                  {t("bluetoothNearbyCount").replace(
-                    "{count}",
-                    String(bluetooth.state.active ? bluetooth.nearbyCount : 0),
-                  )}
-                </span>
-              </button>
-            ) : null}
           </div>
         </section>
 

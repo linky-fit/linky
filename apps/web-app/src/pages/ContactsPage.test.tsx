@@ -131,14 +131,19 @@ describe("ContactsPage", () => {
       );
     expect(order()).toEqual(["alice", "bob", "pinned", "unknown"]);
     expect(
-      rendered.container.querySelector(".bluetooth-room-entry")?.textContent,
-    ).toContain("Nearby peers: 3");
+      rendered.container.querySelector(".contact-list-section-title")
+        ?.textContent,
+    ).toBe("bluetoothNearby");
+    expect(
+      rendered.container.querySelector(".bluetooth-room-entry"),
+    ).toBeNull();
 
     await rendered.rerender(page(false));
     expect(order()).toEqual(["pinned", "alice", "unknown", "bob"]);
+    expect(rendered.container.textContent).not.toContain("bluetoothNearby");
     expect(
-      rendered.container.querySelector(".bluetooth-room-entry")?.textContent,
-    ).toContain("Nearby peers: 0");
+      rendered.container.querySelector(".bluetooth-room-entry"),
+    ).toBeNull();
 
     await rendered.rerender(page(true, false));
     expect(order()).toEqual(["pinned", "alice", "unknown", "bob"]);
