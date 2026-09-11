@@ -4,7 +4,7 @@ import type { WrapInboxEvent } from "@linky/linkstr";
 import { fetchWrapEventAtom, useAtomSet } from "@linky/linkstr-react";
 import { Exit, Schema } from "effect";
 import React from "react";
-import type { CashuTokenId, useEvolu } from "../../../evolu";
+import type { CashuOperationId, useEvolu } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import {
   cancelNativeNfcWrite,
@@ -37,7 +37,6 @@ import type { DispatchInboxEvent } from "../messages/useLinkstrInboxSync";
 import type { LnurlAuthResult } from "../useLnurlAuth";
 import { useGuideScannerDomain } from "../useGuideScannerDomain";
 import { useScannedTextHandler } from "../useScannedTextHandler";
-import { isCashuTokenAcceptedState } from "../../lib/cashuTokenState";
 import {
   consumeNotificationOpenDetailFromHash,
   readNotificationOpenRoute,
@@ -94,7 +93,7 @@ interface UseScanNativeCompositionParams {
   addNewContactFromIdentifier: ContactsMessagingCompositionResult["addNewContactFromIdentifier"];
   cashuBalance: CashuWalletCompositionResult["cashuBalance"];
   cashuOwnerId: IdentityOwnersCompositionResult["cashuOwnerId"];
-  cashuTokensAllFiltered: CashuWalletCompositionResult["cashuTokensAllFiltered"];
+  cashuTransfers: CashuWalletCompositionResult["cashuTransfers"];
   contacts: ContactsMessagingCompositionResult["contacts"];
   contactsLatestRef: ContactsMessagingCompositionResult["contactsLatestRef"];
   contactsOnboardingDismissedSynced: boolean;
@@ -131,7 +130,7 @@ export const useScanNativeComposition = ({
   addNewContactFromIdentifier,
   cashuBalance,
   cashuOwnerId,
-  cashuTokensAllFiltered,
+  cashuTransfers,
   contacts,
   contactsLatestRef,
   contactsOnboardingDismissedSynced,
@@ -451,7 +450,7 @@ export const useScanNativeComposition = ({
   );
 
   const writeCashuTokenToNfc = React.useCallback(
-    async (id: CashuTokenId, tokenText: string) => {
+    async (id: CashuOperationId, tokenText: string) => {
       const trimmed = tokenText.trim();
       const deepLink = buildCashuDeepLink(trimmed);
       if (!deepLink) {
@@ -473,17 +472,17 @@ export const useScanNativeComposition = ({
   );
 
   const shareCashuTokenText = React.useCallback(
-    async (id: CashuTokenId, text: string) => {
+    async (id: CashuOperationId, text: string) => {
       const trimmed = text.trim();
       if (!trimmed) {
         pushToast(t("cashuInvalid"));
         return;
       }
 
-      const row = cashuTokensAllFiltered.find(
-        (candidate) => candidate.id === id && !candidate.isDeleted,
+      const transfer = cashuTransfers.find(
+        (candidate) => String(candidate.id) === id,
       );
-      if (!row) {
+      if (!transfer) {
         pushToast(t("cashuInvalid"));
         return;
       }
@@ -494,11 +493,12 @@ export const useScanNativeComposition = ({
         setShareOptionsText(trimmed);
       }
 
-      if (isCashuTokenAcceptedState(row.state)) {
+      // A messenger send shared by hand is now out there like a QR token.
+      if (transfer.kind === "send" && transfer.status === "pending") {
         await markCashuTokenIssued(id);
       }
     },
-    [cashuTokensAllFiltered, markCashuTokenIssued, pushToast, shareText, t],
+    [cashuTransfers, markCashuTokenIssued, pushToast, shareText, t],
   );
 
   const writeCurrentNpubToNfc = React.useCallback(async () => {

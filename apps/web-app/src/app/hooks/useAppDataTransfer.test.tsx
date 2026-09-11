@@ -13,9 +13,13 @@ const mount = async (cashuTokens: readonly CashuTokenRow[] = []) => {
   const Harness = () => {
     const api = useAppDataTransfer({
       appOwnerId: null,
+      cashuOperations: [],
+      cashuProofs: [],
       cashuTokens,
       contacts: [],
-      importCashuTokenRow: null,
+      importCashuLegacyRows: null,
+      importCashuOperation: null,
+      importCashuProofs: null,
       importDataFileInputRef: createRef<HTMLInputElement>(),
       insert: () => {
         insert();

@@ -339,6 +339,11 @@ export function TransactionsPage(): React.ReactElement {
     () => evolu.createQuery((db) => db.selectFrom("cashuToken").selectAll()),
     [],
   );
+  const cashuOperationsQuery = React.useMemo(
+    () =>
+      evolu.createQuery((db) => db.selectFrom("cashuOperation").selectAll()),
+    [],
+  );
 
   const nostrMessagesQuery = React.useMemo(
     () =>
@@ -353,6 +358,7 @@ export function TransactionsPage(): React.ReactElement {
 
   const contactRows = useQuery(contactsQuery);
   const cashuTokenRows = useQuery(cashuTokensQuery);
+  const cashuOperationRows = useQuery(cashuOperationsQuery);
   const nostrMessageRows = useQuery(nostrMessagesQuery);
   const transactionRows = useQuery(transactionsQuery);
 
@@ -365,8 +371,12 @@ export function TransactionsPage(): React.ReactElement {
         tokens.set(createCashuTokenId(token), token);
       }
     }
+    for (const row of cashuOperationRows) {
+      const token = asNonEmptyString(row.tokenText);
+      if (token) tokens.set(createCashuTokenId(token), token);
+    }
     return tokens;
-  }, [cashuTokenRows]);
+  }, [cashuOperationRows, cashuTokenRows]);
 
   const contactsById = React.useMemo(() => {
     const byId = new Map<string, ContactSummary>();

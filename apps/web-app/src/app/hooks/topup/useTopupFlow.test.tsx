@@ -4,7 +4,7 @@ import {
   MintUnreachable,
   MintUrl,
   QuoteId,
-  TokenRowId,
+  OperationId,
   TokenText,
   TopupQuote,
   TopupReceipt,
@@ -46,7 +46,7 @@ const topupQuote = (quoteId = "quote-1"): TopupQuote =>
 
 const topupReceipt = (quote: TopupQuote): TopupReceipt =>
   new TopupReceipt({
-    rowId: TokenRowId.make("row-1"),
+    operationId: OperationId.make("op-1"),
     tokenText: TokenText.make("cashuBfaketoken"),
     mint: quote.mint,
     amount: quote.amount,

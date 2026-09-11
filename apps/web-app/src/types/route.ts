@@ -1,8 +1,8 @@
 import * as Evolu from "@evolu/common";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../utils/constants";
 
-const CashuTokenId = Evolu.id("CashuToken");
-type CashuTokenId = typeof CashuTokenId.Type;
+const CashuOperationId = Evolu.id("CashuOperation");
+type CashuOperationId = typeof CashuOperationId.Type;
 const ContactId = Evolu.id("Contact");
 type ContactId = typeof ContactId.Type;
 
@@ -19,8 +19,8 @@ export const BANK_PAYMENT_EDIT_SUFFIX = "/edit";
 const decodeHashSegment = (hash: string, prefix: string): string | null =>
   hash.startsWith(prefix) ? decodeSegment(hash.slice(prefix.length)) : null;
 
-const parseCashuTokenId = (value: string): CashuTokenId | null => {
-  const result = CashuTokenId.fromUnknown(value);
+const parseCashuTokenId = (value: string): CashuOperationId | null => {
+  const result = CashuOperationId.fromUnknown(value);
   return result.ok ? result.value : null;
 };
 
@@ -55,7 +55,7 @@ export type Route =
   | { kind: "cashuTokens" }
   | { kind: "cashuTokenNew" }
   | { kind: "cashuTokenEmit" }
-  | { kind: "cashuToken"; id: CashuTokenId }
+  | { kind: "cashuToken"; id: CashuOperationId }
   | { kind: "nostrRelays" }
   | { kind: "nostrRelay"; id: string }
   | { kind: "nostrRelayNew" }

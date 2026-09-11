@@ -7,7 +7,7 @@ import {
   NonNegativeAmount,
   PaymentPending,
   QuoteId,
-  TokenRowId,
+  OperationId,
 } from "@linky/linkshu";
 import { Either } from "effect";
 import React, { act } from "react";
@@ -49,7 +49,7 @@ const paymentPending = (amount: number) =>
     new PaymentPending({
       mint: MintUrl.make(MINT_URL),
       quoteId: QuoteId.make("quote-1"),
-      rowId: TokenRowId.make("row-1"),
+      operationId: OperationId.make("op-1"),
       amount: Amount.make(amount),
     }),
   );

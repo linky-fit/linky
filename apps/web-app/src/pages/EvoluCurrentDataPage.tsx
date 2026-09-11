@@ -26,6 +26,8 @@ function isTrackedTable(tableName: string): boolean {
   return (
     tableName === "contact" ||
     tableName === "cashuToken" ||
+    tableName === "cashuProof" ||
+    tableName === "cashuOperation" ||
     tableName === "nostrMessage" ||
     tableName === "nostrReaction" ||
     tableName === "transaction"
@@ -131,7 +133,11 @@ export function EvoluCurrentDataPage(): React.ReactElement {
               ),
             ];
           }
-          if (tableName === "cashuToken") {
+          if (
+            tableName === "cashuToken" ||
+            tableName === "cashuProof" ||
+            tableName === "cashuOperation"
+          ) {
             if (visibleCashuOwnerIds.size === 0) return [tableName, []];
             return [
               tableName,
@@ -171,6 +177,21 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   ]);
 
   const trackedTableConfigs = React.useMemo(() => {
+    // The three cashu tables share one lane; the inventory carries the
+    // rotate button, the other two only report the shared owner index.
+    const cashuConfig = (
+      label: string,
+      withRotate: boolean,
+    ): EvoluDataSectionConfig => ({
+      label,
+      ownerIndex: evoluCashuOwnerIndex,
+      editsUntilRotation: evoluCashuOwnerEditsUntilRotation,
+      rotationLimit: CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+      onRotate: withRotate ? requestManualRotateCashuOwner : null,
+      rotateLabel: withRotate ? t("evoluCashuOwnerRotate") : null,
+      rotateIsBusy: rotateCashuOwnerIsBusy,
+      rotatingLabel: withRotate ? t("evoluCashuOwnerRotating") : null,
+    });
     const messageConfig = (label: string): EvoluDataSectionConfig => ({
       label,
       ownerIndex: evoluMessagesOwnerIndex,
@@ -196,19 +217,9 @@ export function EvoluCurrentDataPage(): React.ReactElement {
           rotatingLabel: t("evoluContactsCashuOwnerRotating"),
         },
       ],
-      [
-        "cashuToken",
-        {
-          label: t("tokens"),
-          ownerIndex: evoluCashuOwnerIndex,
-          editsUntilRotation: evoluCashuOwnerEditsUntilRotation,
-          rotationLimit: CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-          onRotate: requestManualRotateCashuOwner,
-          rotateLabel: t("evoluCashuOwnerRotate"),
-          rotateIsBusy: rotateCashuOwnerIsBusy,
-          rotatingLabel: t("evoluCashuOwnerRotating"),
-        },
-      ],
+      ["cashuToken", cashuConfig(t("tokens"), false)],
+      ["cashuProof", cashuConfig(t("cashuProofsTable"), true)],
+      ["cashuOperation", cashuConfig(t("cashuOperationsTable"), false)],
       ["nostrMessage", messageConfig(t("messagesTitle"))],
       ["nostrReaction", messageConfig(t("reactionsTitle"))],
       [

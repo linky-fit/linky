@@ -72,11 +72,9 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
       await expect.poll(() => readBalanceSat(device.page)).toBe(512);
     }
     await second.page.goto("/#wallet/tokens");
-    await second.page
-      .getByRole("button", { name: /^Available: 512 sat ·/ })
-      .click();
-    const originalTokenRoute = new URL(second.page.url()).hash;
-    await expect(second.page).toHaveURL(/#wallet\/token\/[A-Za-z0-9_-]+$/);
+    await expect(
+      second.page.getByLabel("Available", { exact: true }),
+    ).toContainText("Available · 512 sat");
     await second.page.goto("/#wallet");
     await second.context.setOffline(true);
     await second.page.route("**/v1/checkstate", (route) =>
@@ -124,13 +122,13 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
       }
     });
 
-    await test.step("the stale device receives the original token's deletion through Evolu", async () => {
-      await second.page.goto(`/${originalTokenRoute}`);
-      await expect(
-        second.page.getByText("Token is invalid or already spent.", {
-          exact: true,
-        }),
-      ).toBeVisible();
+    await test.step("the stale device receives the spent proofs through Evolu", async () => {
+      await second.page.goto("/#wallet/tokens");
+      const available = second.page.getByLabel("Available", { exact: true });
+      await expect(available).toContainText("Available · 488 sat");
+      await expect(available).toContainText(
+        /Spent proofs kept for bookkeeping: \d+/,
+      );
       expect(secondMintResponses).toEqual([]);
       for (const device of devices) {
         await expectNoBootErrorPanel(device.page, device.label);

@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import * as Evolu from "@evolu/common";
 import React from "react";
-import type { CashuTokenRow } from "../../../evolu";
+import type { StoredProof } from "@linky/linkshu";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
 import { LOCAL_MINT_INFO_STORAGE_KEY_PREFIX } from "../../../utils/constants";
 import {
@@ -51,7 +51,7 @@ const isStoredMintInfoRow = (
 interface UseMintInfoStoreParams {
   appOwnerId: Evolu.OwnerId | null;
   appOwnerIdRef: React.MutableRefObject<Evolu.OwnerId | null>;
-  cashuTokensAll: readonly CashuTokenRow[];
+  walletProofs: readonly StoredProof[];
   defaultMintUrl: string | null;
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
 }
@@ -71,7 +71,7 @@ interface UseMintInfoStoreResult {
 export const useMintInfoStore = ({
   appOwnerId,
   appOwnerIdRef,
-  cashuTokensAll,
+  walletProofs,
   defaultMintUrl,
   rememberSeenMint,
 }: UseMintInfoStoreParams): UseMintInfoStoreResult => {
@@ -193,8 +193,8 @@ export const useMintInfoStore = ({
   );
 
   const encounteredMintUrls = React.useMemo(
-    () => getEncounteredMintUrls(cashuTokensAll),
-    [cashuTokensAll],
+    () => getEncounteredMintUrls(walletProofs),
+    [walletProofs],
   );
 
   const [mintRuntimeByUrl, setMintRuntimeByUrl] = React.useState<

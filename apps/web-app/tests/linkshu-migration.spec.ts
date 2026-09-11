@@ -19,11 +19,12 @@
  *
  * Needs the docker stack up — see "E2E tests" in CLAUDE.md.
  *
- * Honest limits: pre-existing Evolu token rows cannot be seeded before
- * launch — the legacy writers that produced them are deleted, and Evolu's
- * SQLite lives in OPFS behind owner-derived encryption — so "migrated
- * balance intact" is asserted as balance created through the migrated
- * counter accounting surviving a relaunch, not as pre-seeded rows.
+ * Pre-existing Evolu `cashuToken` rows cannot be seeded before launch —
+ * the legacy writers that produced them are deleted, and Evolu's SQLite
+ * lives in OPFS behind owner-derived encryption — so the legacy-row
+ * ingest into the proof inventory is exercised through the one remaining
+ * writer of that row shape: a version-1 backup import, whose token rows go
+ * through the same `Tokens.ingestLegacyRows` path as the legacy table.
  */
 import {
   expect,
@@ -38,6 +39,7 @@ import {
   waitForNetworkReady,
 } from "./helpers/appState";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
+import { fundToken } from "../../../packages/linkshu/tests/integration/helpers";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { topUp } from "./helpers/wallet";
@@ -55,6 +57,8 @@ const PENDING_TOPUP_SAT = 53;
 const PENDING_AUTOSWAP_SAT = 21;
 /** input_fee_ppk: 100 on the dev mint plus the melt fee reserve. */
 const MAX_PAYMENT_FEE_SAT = 3;
+/** An `accepted` token row of the pre-inventory backup format. */
+const LEGACY_ROW_SAT = 16;
 
 const LEGACY_COUNTER_VALUE = "7";
 const LEGACY_CURSOR_VALUE = "5";
@@ -413,6 +417,47 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
         .toBeGreaterThanOrEqual(
           balanceBeforeReload - INVOICE_SAT - MAX_PAYMENT_FEE_SAT,
         );
+    });
+
+    await test.step("a pre-inventory backup's token rows land in the inventory without a swap", async () => {
+      const token = await fundToken(LEGACY_ROW_SAT);
+      const before = await readBalanceSat(page);
+      const swaps: string[] = [];
+      const onRequest = (request: { url: () => string }) => {
+        if (new URL(request.url()).pathname === "/v1/swap")
+          swaps.push(request.url());
+      };
+      page.on("request", onRequest);
+
+      await page.goto("/#advanced");
+      await page.locator('input[type="file"][accept*="json"]').setInputFiles({
+        name: "linky-export.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from(
+          JSON.stringify({
+            app: "linky",
+            version: 1,
+            contacts: [],
+            cashuTokens: [
+              { token, rawToken: null, state: "accepted", error: null },
+            ],
+          }),
+        ),
+      });
+
+      // The row is trusted as-is: its proofs become available balance
+      // without contacting the mint, exactly like the legacy table on load.
+      await page.goto("/#wallet");
+      await expect
+        .poll(() => readBalanceSat(page), { timeout: 60_000 })
+        .toBe(before + LEGACY_ROW_SAT);
+      page.off("request", onRequest);
+      expect(swaps).toEqual([]);
+
+      await page.goto("/#wallet/tokens");
+      await expect(page.getByLabel("Available", { exact: true })).toContainText(
+        `Available · ${before + LEGACY_ROW_SAT} sat`,
+      );
     });
 
     await expectNoBootErrorPanel(page, "M");

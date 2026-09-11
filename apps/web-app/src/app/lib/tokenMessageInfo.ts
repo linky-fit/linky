@@ -28,8 +28,10 @@ export const getMintDisplay = (
 
 const isKnownCashuToken = (
   cashuTokensAll: readonly Pick<CashuTokenRow, "id" | "rawToken" | "token">[],
+  knownTokenTexts: ReadonlySet<string>,
   tokenRaw: string,
 ): boolean => {
+  if (knownTokenTexts.has(tokenRaw)) return true;
   const tokenId = createCashuTokenId(tokenRaw);
   return cashuTokensAll.some((row) => {
     const storedRaw = (row.rawToken ?? "").trim();
@@ -45,6 +47,8 @@ const isKnownCashuToken = (
 export const getCashuTokenMessageInfo = (
   text: string,
   cashuTokensAll: readonly Pick<CashuTokenRow, "id" | "rawToken" | "token">[],
+  /** Token texts the wallet's transfers carry (sent or received). */
+  knownTokenTexts: ReadonlySet<string> = new Set(),
 ): CashuTokenMessageInfo | null => {
   if (getLinkyBankPaymentOfferInfo(text)) return null;
   if (parsePrivateImageMessage(text)) return null;
@@ -62,6 +66,6 @@ export const getCashuTokenMessageInfo = (
     amount: parsed.amount,
     unit: parsed.unit,
     // Best-effort: "valid" means not yet imported into wallet.
-    isValid: !isKnownCashuToken(cashuTokensAll, tokenRaw),
+    isValid: !isKnownCashuToken(cashuTokensAll, knownTokenTexts, tokenRaw),
   };
 };

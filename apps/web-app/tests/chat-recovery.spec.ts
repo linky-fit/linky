@@ -103,15 +103,13 @@ test("chat reaches a peer, edit and reaction survive reload, pending topup resum
       await a.page.getByRole("button", { name: "0", exact: true }).click();
       await a.page.locator('[data-guide="topup-show-invoice"]').click();
       await expect(a.page.locator("img.qr")).toBeVisible();
-      await expect
-        .poll(() =>
-          a.page.evaluate(() =>
-            Object.keys(localStorage).some((key) =>
-              key.includes("pendingTopup"),
-            ),
-          ),
-        )
-        .toBe(true);
+      // The pending topup is an operation row; wait for it to land in Evolu
+      // before reloading, so the claim after reload resumes from storage.
+      await a.page.goto("/#evolu-current-data");
+      const operationTable = a.page.locator("table").filter({
+        has: a.page.getByRole("columnheader", { name: "quoteId", exact: true }),
+      });
+      await expect(operationTable.locator("tbody tr")).toHaveCount(1);
       await a.page.reload();
       await a.page.unroute("**/v1/mint/bolt11");
       await a.page.goto("/#wallet");

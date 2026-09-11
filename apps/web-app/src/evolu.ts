@@ -370,6 +370,12 @@ const probeWebSocketConnection = (
 const CashuTokenId = Evolu.id("CashuToken");
 export type CashuTokenId = typeof CashuTokenId.Type;
 
+const CashuProofId = Evolu.id("CashuProof");
+export type CashuProofId = typeof CashuProofId.Type;
+
+const CashuOperationId = Evolu.id("CashuOperation");
+export type CashuOperationId = typeof CashuOperationId.Type;
+
 const NostrIdentityId = Evolu.id("NostrIdentity");
 type NostrIdentityId = typeof NostrIdentityId.Type;
 
@@ -480,6 +486,53 @@ export const Schema = {
     error: Evolu.nullOr(Evolu.NonEmptyString1000),
   },
 
+  // The wallet inventory: one row per cashu proof, id derived from the
+  // secret so every device converges on one row. Written only by linkshu
+  // through the ProofStore adapter; `cashuToken` above is read-only legacy
+  // input that gets ingested into this table.
+  cashuProof: {
+    id: CashuProofId,
+    mint: Evolu.NonEmptyString1000,
+    unit: Evolu.NonEmptyString100,
+    keysetId: Evolu.NonEmptyString100,
+    amount: Evolu.PositiveInt,
+    secret: Evolu.NonEmptyString1000,
+    // The NUT-00 signature point `C`.
+    c: Evolu.NonEmptyString1000,
+    // JSON of the NUT-12 DLEQ proof when the mint supplied one.
+    dleq: Evolu.nullOr(Evolu.NonEmptyString1000),
+    // "available" | "held" | "handedOut" | "externalized" | "spent"
+    state: Evolu.NonEmptyString100,
+    operationId: Evolu.nullOr(CashuOperationId),
+  },
+
+  // Durable links between inputs and outputs: melts, topups, autoswaps,
+  // sends, receives. Quote kinds are what a resumer finishes after a crash
+  // on any device; transfer kinds keep the token text for dedup and returns.
+  cashuOperation: {
+    id: CashuOperationId,
+    // "melt" | "topup" | "autoswap" | "send" | "receive"
+    kind: Evolu.NonEmptyString100,
+    status: Evolu.NonEmptyString100,
+    mint: Evolu.NonEmptyString1000,
+    unit: Evolu.NonEmptyString100,
+    keysetId: Evolu.nullOr(Evolu.NonEmptyString100),
+    amount: Evolu.PositiveInt,
+    feeReserve: Evolu.nullOr(Evolu.NonNegativeInt),
+    inputsTotal: Evolu.nullOr(Evolu.PositiveInt),
+    quoteId: Evolu.nullOr(Evolu.NonEmptyString1000),
+    invoice: Evolu.nullOr(Evolu.NonEmptyString),
+    sourceMint: Evolu.nullOr(Evolu.NonEmptyString1000),
+    // First deterministic output slot of the latest attempt.
+    counter: Evolu.nullOr(Evolu.NonNegativeInt),
+    locked: Evolu.nullOr(Evolu.SqliteBoolean),
+    expiresAtSec: Evolu.nullOr(Evolu.PositiveInt),
+    // Event time, separate from Evolu's updatedAt like `transaction`.
+    createdAtSec: Evolu.PositiveInt,
+    tokenText: Evolu.nullOr(Evolu.NonEmptyString),
+    error: Evolu.nullOr(Evolu.NonEmptyString1000),
+  },
+
   transaction: {
     id: TransactionId,
     // Event time is intentionally stored separately from Evolu's updatedAt:
@@ -562,6 +615,11 @@ export const createCashuTokensAllQuery = () =>
     db.selectFrom("cashuToken").selectAll().orderBy("createdAt", "desc"),
   );
 
+export const createCashuProofsAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("cashuProof").selectAll());
+export const createCashuOperationsAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("cashuOperation").selectAll());
+
 export const createContactsAllQuery = () =>
   evolu.createQuery((db) => db.selectFrom("contact").selectAll());
 export const createNostrMessagesAllQuery = () =>
@@ -585,6 +643,12 @@ export type TransactionRow = Evolu.InferRow<
 
 export type CashuTokenRow = Evolu.InferRow<
   ReturnType<typeof createCashuTokensAllQuery>
+>;
+export type CashuProofRow = Evolu.InferRow<
+  ReturnType<typeof createCashuProofsAllQuery>
+>;
+export type CashuOperationRow = Evolu.InferRow<
+  ReturnType<typeof createCashuOperationsAllQuery>
 >;
 
 export const useEvoluSyncOwner = (enabled: boolean): Evolu.SyncOwner | null => {
@@ -664,6 +728,8 @@ const getEvoluDatabaseInfo = async (
   const tables = [
     "contact",
     "cashuToken",
+    "cashuProof",
+    "cashuOperation",
     "nostrIdentity",
     "nostrMessage",
     "nostrReaction",
@@ -908,6 +974,8 @@ export const loadEvoluCurrentData = async (): Promise<
   const tables = [
     "contact",
     "cashuToken",
+    "cashuProof",
+    "cashuOperation",
     "nostrIdentity",
     "nostrMessage",
     "nostrReaction",

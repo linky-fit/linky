@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CashuTokenId, ContactId } from "../evolu";
+import type { CashuOperationId, ContactId } from "../evolu";
 import {
   BANK_PAYMENT_EDIT_SUFFIX,
   parseRouteFromHash,
@@ -85,7 +85,7 @@ type NavigationAction =
   | { route: "advancedInspectorTimeline" }
   | { route: "advancedPushDebug" }
   | { route: "cashuTokenEmit" }
-  | { route: "cashuToken"; id: CashuTokenId }
+  | { route: "cashuToken"; id: CashuOperationId }
   | { route: "cashuTokenNew" }
   | { route: "cashuTokens" }
   | { route: "chat"; id: string }

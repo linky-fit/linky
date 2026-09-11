@@ -1,30 +1,42 @@
 import { writeContact } from "../lib/writeContact";
 import { toContactTextFields } from "../lib/contactFields";
-import { Either, Option, Schema } from "effect";
+import { Option, Schema, Struct } from "effect";
 import type * as Evolu from "@evolu/common";
-import { ImportRowDraft } from "@linky/linkshu";
+import { ImportProofDraft, LegacyTokenRow, NewOperation } from "@linky/linkshu";
+import type { StoredOperation, StoredProof } from "@linky/linkshu";
 import React from "react";
 import type { CashuTokenRow } from "../../evolu";
 import { JsonValue } from "../../types/json";
+import { nowSeconds } from "../../utils/time";
 import { asRecord } from "../../utils/validation";
-import type { ContactRowLike } from "../types/appTypes";
+import { createCashuTokenId } from "../lib/cashuTokenIdentity";
 import {
   CASHU_TOKEN_STATE_ACCEPTED,
   normalizeCashuTokenState,
 } from "../lib/cashuTokenState";
-import type { CashuTokenLifecycle } from "./composition/useLinkshuComposition";
+import type { ContactRowLike } from "../types/appTypes";
+import type { CashuTransferLifecycle } from "./composition/useLinkshuComposition";
 import type { Translate } from "../../i18n";
 
 type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
 
-const decodeImportRowDraft = Schema.decodeUnknownOption(ImportRowDraft);
+const decodeImportProofDrafts = Schema.decodeUnknownOption(
+  Schema.Array(ImportProofDraft),
+);
+const decodeNewOperation = Schema.decodeUnknownOption(NewOperation);
+const decodeLegacyTokenRow = Schema.decodeUnknownOption(LegacyTokenRow);
 
 interface UseAppDataTransferParams<TContact extends ContactRowLike> {
   appOwnerId: Evolu.OwnerId | null;
+  cashuOperations: readonly StoredOperation[];
+  cashuProofs: readonly StoredProof[];
+  /** Legacy rows, exported so a backup imports into older releases too. */
   cashuTokens: readonly CashuTokenRow[];
   contacts: readonly TContact[];
-  /** Null until the wallet runtime is ready to restore token rows. */
-  importCashuTokenRow: CashuTokenLifecycle["importRow"] | null;
+  /** Null until the wallet runtime is ready to restore wallet rows. */
+  importCashuLegacyRows: CashuTransferLifecycle["importLegacyRows"] | null;
+  importCashuOperation: CashuTransferLifecycle["importOperation"] | null;
+  importCashuProofs: CashuTransferLifecycle["importProofs"] | null;
   importDataFileInputRef: React.RefObject<HTMLInputElement | null>;
   insert: EvoluMutations["insert"];
   pushToast: (message: string) => void;
@@ -34,9 +46,13 @@ interface UseAppDataTransferParams<TContact extends ContactRowLike> {
 
 export const useAppDataTransfer = <TContact extends ContactRowLike>({
   appOwnerId,
+  cashuOperations,
+  cashuProofs,
   cashuTokens,
   contacts,
-  importCashuTokenRow,
+  importCashuLegacyRows,
+  importCashuOperation,
+  importCashuProofs,
   importDataFileInputRef,
   insert,
   pushToast,
@@ -50,7 +66,7 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
 
       const payload = {
         app: "linky",
-        version: 1,
+        version: 2,
         exportedAt: now.toISOString(),
         contacts: contacts.map((contact) => ({
           name: (contact.name ?? "").trim() || null,
@@ -71,6 +87,20 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
             error: (token.error ?? "").trim() || null,
           };
         }),
+        cashuProofs: cashuProofs.map((proof) => ({
+          mint: proof.mint,
+          unit: proof.unit,
+          keysetId: proof.keysetId,
+          amount: proof.amount,
+          secret: proof.secret,
+          C: proof.C,
+          dleq: proof.dleq,
+          state: proof.state,
+          operationId: proof.operationId,
+        })),
+        cashuOperations: cashuOperations.map((operation) =>
+          Struct.omit(operation, "id"),
+        ),
       };
 
       const text = JSON.stringify(payload, null, 2);
@@ -94,7 +124,7 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
     } catch {
       pushToast(t("exportFailed"));
     }
-  }, [cashuTokens, contacts, pushToast, t]);
+  }, [cashuOperations, cashuProofs, cashuTokens, contacts, pushToast, t]);
 
   const requestImportAppData = React.useCallback(() => {
     const element = importDataFileInputRef.current;
@@ -131,11 +161,28 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
       const importedContacts = Array.isArray(root.contacts)
         ? root.contacts
         : [];
+      const importedProofs = Array.isArray(root.cashuProofs)
+        ? root.cashuProofs
+        : [];
+      const importedOperations = Array.isArray(root.cashuOperations)
+        ? root.cashuOperations
+        : [];
+      // Version 1 backups carry token rows of the previous storage model;
+      // they are ingested like the legacy table is on load.
       const importedTokens = Array.isArray(root.cashuTokens)
         ? root.cashuTokens
         : [];
+      const hasWalletRows =
+        importedProofs.length > 0 ||
+        importedOperations.length > 0 ||
+        importedTokens.length > 0;
 
-      if (importedTokens.length > 0 && importCashuTokenRow === null) {
+      if (
+        hasWalletRows &&
+        (importCashuProofs === null ||
+          importCashuOperation === null ||
+          importCashuLegacyRows === null)
+      ) {
         pushToast(t("importWalletNotReady"));
         return;
       }
@@ -215,24 +262,39 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
         }
       }
 
-      if (importCashuTokenRow !== null) {
-        for (const item of importedTokens) {
+      if (
+        importCashuProofs !== null &&
+        importCashuOperation !== null &&
+        importCashuLegacyRows !== null
+      ) {
+        // Operations first, so imported proofs can point at them.
+        for (const item of importedOperations) {
+          const draft = decodeNewOperation(item);
+          if (Option.isNone(draft)) continue;
+          await importCashuOperation(draft.value);
+        }
+        const drafts = decodeImportProofDrafts(importedProofs);
+        if (Option.isSome(drafts) && drafts.value.length > 0) {
+          addedTokens += await importCashuProofs(drafts.value);
+        }
+        const legacyRows = importedTokens.flatMap((item) => {
           const rec = asRecord(item);
-          if (!rec) continue;
-          const token = String(rec.token ?? "").trim();
-          if (!token) continue;
-
-          const draft = decodeImportRowDraft({
+          const token = String(rec?.token ?? "").trim();
+          if (!rec || !token) return [];
+          const row = decodeLegacyTokenRow({
+            id: createCashuTokenId(token),
             originalTokenText: sanitizeText(rec.rawToken, 100000) ?? token,
             tokenText: token,
             state:
               normalizeCashuTokenState(rec.state) ?? CASHU_TOKEN_STATE_ACCEPTED,
             error: sanitizeText(rec.error, 1000),
+            createdAt: nowSeconds(),
           });
-          if (Option.isNone(draft)) continue;
-
-          const result = await importCashuTokenRow(draft.value);
-          if (Either.isRight(result)) addedTokens += 1;
+          return Option.isSome(row) ? [row.value] : [];
+        });
+        if (legacyRows.length > 0) {
+          const report = await importCashuLegacyRows(legacyRows);
+          addedTokens += report.proofs;
         }
       }
 
@@ -245,7 +307,17 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
         `${t("importDone")} (${addedContacts}/${updatedContacts}/${addedTokens})`,
       );
     },
-    [appOwnerId, contacts, importCashuTokenRow, insert, pushToast, t, update],
+    [
+      appOwnerId,
+      contacts,
+      importCashuLegacyRows,
+      importCashuOperation,
+      importCashuProofs,
+      insert,
+      pushToast,
+      t,
+      update,
+    ],
   );
 
   const handleImportAppDataFilePicked = React.useCallback(

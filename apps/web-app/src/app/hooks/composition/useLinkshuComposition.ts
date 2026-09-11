@@ -8,6 +8,7 @@ import {
   Melt,
   MeltDraft,
   NonNegativeAmount,
+  OperationId,
   PaidQuoteDraft,
   QuoteLockingKey,
   Receive,
@@ -17,8 +18,6 @@ import {
   SendDraft,
   Send,
   Tokens,
-  TokenRowId,
-  TokenStore,
   Topup,
   TopupDraft,
   Validation,
@@ -31,50 +30,64 @@ import type {
   AutoswapError,
   AutoswapReceipt,
   Bip39Seed,
-  DeletedSpentToken,
   FeeProbeError,
-  ImportRowDraft,
-  InvalidTokenTransition,
+  ImportProofDraft,
+  InvalidTransferTransition,
   IssuedClaimReport,
+  LegacyIngestReport,
+  LegacyTokenRow,
   LightningFeeProbeResult,
   MeltError,
   MeltReceipt,
   MeltResumeResult,
   MintRejected,
   MintUnreachable,
+  NewOperation,
+  OperationNotFound,
+  ProofStateSnapshot,
   ReceiveError,
   ReceiveReceipt,
   RestoreReport,
-  RowCheckResult,
   SendError,
   SendReceipt,
-  TokenAlreadyKnown,
-  TokenRowNotFound,
-  TokenProofStateAmounts,
+  StoredOperation,
+  StoredProof,
+  TokenTransfer,
   TopupAdoptError,
   TopupError,
   TopupHandle,
   TopupQuote,
   TopupReceipt,
+  TransferCheckResult,
   ValidationReport,
-  WalletToken,
 } from "@linky/linkshu";
 import { Effect, Exit, Layer, ManagedRuntime, Schema, Scope } from "effect";
 import type { Either } from "effect";
 import React from "react";
 import { linkshuAppInspector } from "../../../devtools/inspector/linkshuInspector";
 import { migrateLegacyCashuLocalState } from "../../migrations/linkshuStorageMigration";
-import type { CashuTokenRow, useEvolu } from "../../../evolu";
+import type {
+  CashuOperationRow,
+  CashuProofRow,
+  CashuTokenRow,
+  useEvolu,
+} from "../../../evolu";
 import { useLatest } from "../../../hooks/useLatest";
-import { evoluTokenStore } from "../../../platform/linkshu/evoluTokenStore";
+import { evoluOperationStore } from "../../../platform/linkshu/evoluOperationStore";
+import { evoluProofStore } from "../../../platform/linkshu/evoluProofStore";
 import { localStorageKeyValueStore } from "../../../platform/linkshu/localStorageKeyValueStore";
 import { resolveLinkshuSeed } from "../../../platform/linkshu/resolveLinkshuSeed";
+import { toLegacyTokenRow } from "../../lib/legacyTokenRow";
 
 type EvoluMutations = ReturnType<typeof useEvolu>;
 
 interface UseLinkshuCompositionParams {
-  /** Wallet-visible rows across cashu owner lanes, already deduped. */
-  cashuTokenRows: readonly CashuTokenRow[];
+  /** Inventory rows across cashu owner lanes, deduped by id. */
+  cashuProofRows: readonly CashuProofRow[];
+  /** Operation rows across cashu owner lanes, deduped by id. */
+  cashuOperationRows: readonly CashuOperationRow[];
+  /** Read-only legacy `cashuToken` rows, ingested into the inventory on load. */
+  legacyTokenRows: readonly CashuTokenRow[];
   /** Seed resolution re-runs when the active identity changes. */
   currentNsec: string | null;
   update: EvoluMutations["update"];
@@ -91,12 +104,16 @@ const emptyBalances = new WalletBalances({
 
 interface LinkshuReadModel {
   readonly balances: WalletBalances;
-  readonly tokens: ReadonlyArray<WalletToken>;
+  readonly proofs: ReadonlyArray<StoredProof>;
+  readonly operations: ReadonlyArray<StoredOperation>;
+  readonly transfers: ReadonlyArray<TokenTransfer>;
 }
 
 const emptyReadModel: LinkshuReadModel = {
   balances: emptyBalances,
-  tokens: [],
+  proofs: [],
+  operations: [],
+  transfers: [],
 };
 
 const sameSeed = (a: Bip39Seed, b: Bip39Seed): boolean =>
@@ -203,58 +220,62 @@ type ResumePendingCashuAutoswapClaims = () => Promise<
   ReadonlyArray<AutoswapClaimResult>
 >;
 
-/** Read-only mint status for the Tokens page. */
-export type InspectCashuTokenProofStates = () => Promise<
-  ReadonlyArray<TokenProofStateAmounts>
+/** Read-only mint status of every unspent proof, for the Tokens page. */
+export type InspectCashuProofStates = () => Promise<
+  ReadonlyArray<ProofStateSnapshot>
 >;
 
-/** linkshu `Validation.checkAll` over stored rows; only defects reject. */
+/** linkshu `Validation.checkAll` over the inventory; only defects reject. */
 export type CheckAllCashuTokens = () => Promise<ValidationReport>;
 
-/** NUT-07 check of a single stored row (linkshu `Validation.checkRow`). */
-export type CheckCashuTokenRow = (
-  rowId: string,
-) => Promise<Either.Either<RowCheckResult, TokenRowNotFound>>;
+/** NUT-07 check of one transfer (linkshu `Validation.checkTransfer`). */
+export type CheckCashuTransfer = (
+  operationId: string,
+) => Promise<Either.Either<TransferCheckResult, OperationNotFound>>;
 
 /** linkshu `Restore` over the given mints; invalid mint input rejects. */
 export type RestoreCashuTokens = (
   mints: ReadonlyArray<string>,
 ) => Promise<RestoreReport>;
 
-type TokenTransitionError = TokenRowNotFound | InvalidTokenTransition;
+type TransferTransitionError = OperationNotFound | InvalidTransferTransition;
 
 /**
- * Lifecycle operations over stored token rows, keyed by the row id linkshu
- * reports (`String(CashuTokenId)`). Only typed failures come back as Left;
- * defects reject.
+ * Lifecycle operations over stored transfers, keyed by the operation id
+ * linkshu reports (`String(CashuOperationId)`). Only typed failures come
+ * back as Left; defects reject.
  */
-export interface CashuTokenLifecycle {
+export interface CashuTransferLifecycle {
   readonly checkIssuedClaims: () => Promise<IssuedClaimReport>;
-  readonly deleteSpent: () => Promise<ReadonlyArray<DeletedSpentToken>>;
   /**
-   * Drops a row whose funds verifiably left the wallet (e.g. a `pending`
-   * messenger send once the message is confirmed published). Not a state
-   * transition — the handed-over encoding stays valid for its recipient.
+   * Closes a transfer the caller has nothing left to do about (a `pending`
+   * messenger send once the message is confirmed published). Not a refund:
+   * the handed-over encoding stays valid for its recipient.
    */
-  readonly forget: (rowId: string) => Promise<void>;
-  /** Restores a backup row as-is: no receive, swap, or mint check. */
-  readonly importRow: (
-    draft: ImportRowDraft,
-  ) => Promise<Either.Either<TokenRowId, TokenAlreadyKnown>>;
+  readonly forget: (
+    operationId: string,
+  ) => Promise<Either.Either<void, TransferTransitionError>>;
+  /** Restores backup proofs as-is; returns how many were new. */
+  readonly importProofs: (
+    drafts: ReadonlyArray<ImportProofDraft>,
+  ) => Promise<number>;
+  /** Restores a backup operation as-is. */
+  readonly importOperation: (draft: NewOperation) => Promise<OperationId>;
+  /** Ingests token rows of a pre-inventory backup, like the legacy table. */
+  readonly importLegacyRows: (
+    rows: ReadonlyArray<LegacyTokenRow>,
+  ) => Promise<LegacyIngestReport>;
   readonly markExternalized: (
-    rowId: string,
-  ) => Promise<Either.Either<void, TokenTransitionError>>;
+    operationId: string,
+  ) => Promise<Either.Either<void, TransferTransitionError>>;
   readonly markIssued: (
-    rowId: string,
-  ) => Promise<Either.Either<void, TokenTransitionError>>;
-  readonly reserve: (
-    rowId: string,
-  ) => Promise<Either.Either<void, TokenTransitionError>>;
-  /** Re-receives the row so any handed-out encoding dies at the mint. */
+    operationId: string,
+  ) => Promise<Either.Either<void, TransferTransitionError>>;
+  /** Re-receives a handed-out token, or retries a failed receive. */
   readonly returnToWallet: (
-    rowId: string,
+    operationId: string,
   ) => Promise<
-    Either.Either<ReceiveReceipt, ReceiveError | TokenTransitionError>
+    Either.Either<ReceiveReceipt, ReceiveError | TransferTransitionError>
   >;
 }
 
@@ -280,19 +301,24 @@ const quoteLockingKeyOf = (nsec: string | null): QuoteLockingKey | null => {
 
 /**
  * The app's linkshu composition root: resolves the seed, layers
- * `linkshuServices` over the Evolu `TokenStore` and localStorage
- * `KeyValueStore` adapters with the app inspector bridged in, and keeps a
- * `ManagedRuntime` alive for the wallet UI. The read model (token list +
- * balances) re-runs through `Tokens` whenever the underlying rows change.
+ * `linkshuServices` over the Evolu `ProofStore`/`OperationStore` and
+ * localStorage `KeyValueStore` adapters with the app inspector bridged in,
+ * and keeps a `ManagedRuntime` alive for the wallet UI. The read model
+ * (proofs, transfers, balances) re-runs through `Tokens` whenever the
+ * underlying rows change, and legacy `cashuToken` rows are ingested into
+ * the inventory whenever they change.
  */
 export const useLinkshuComposition = ({
-  cashuTokenRows,
+  cashuProofRows,
+  cashuOperationRows,
+  legacyTokenRows,
   currentNsec,
   update,
   upsert,
   writeOwnerId,
 }: UseLinkshuCompositionParams) => {
-  const rowsRef = useLatest(cashuTokenRows);
+  const proofRowsRef = useLatest(cashuProofRows);
+  const operationRowsRef = useLatest(cashuOperationRows);
   const writeOwnerIdRef = useLatest(writeOwnerId);
   const updateRef = useLatest(update);
   const upsertRef = useLatest(upsert);
@@ -322,27 +348,43 @@ export const useLinkshuComposition = ({
 
   const linkshuRuntime = React.useMemo(() => {
     if (bip39Seed === null) return null;
+    const getWriteOwnerId = () => {
+      const ownerId = writeOwnerIdRef.current;
+      if (ownerId === null) {
+        throw new Error("linkshu write before cashu owner is ready");
+      }
+      return ownerId;
+    };
     return ManagedRuntime.make(
       linkshuServices({
         bip39Seed,
         keyValueStore: localStorageKeyValueStore,
-        tokenStore: evoluTokenStore({
-          loadTokenRows: () => Promise.resolve(rowsRef.current),
+        proofStore: evoluProofStore({
+          loadProofRows: () => proofRowsRef.current,
           update: (table, payload, options) =>
             updateRef.current(table, payload, options),
           upsert: (table, payload, options) =>
             upsertRef.current(table, payload, options),
-          getWriteOwnerId: () => {
-            const ownerId = writeOwnerIdRef.current;
-            if (ownerId === null) {
-              throw new Error("linkshu write before cashu owner is ready");
-            }
-            return ownerId;
-          },
+          getWriteOwnerId,
+        }),
+        operationStore: evoluOperationStore({
+          loadOperationRows: () => operationRowsRef.current,
+          update: (table, payload, options) =>
+            updateRef.current(table, payload, options),
+          upsert: (table, payload, options) =>
+            upsertRef.current(table, payload, options),
+          getWriteOwnerId,
         }),
       }).pipe(Layer.provideMerge(linkshuAppInspector)),
     );
-  }, [bip39Seed, rowsRef, updateRef, upsertRef, writeOwnerIdRef]);
+  }, [
+    bip39Seed,
+    operationRowsRef,
+    proofRowsRef,
+    updateRef,
+    upsertRef,
+    writeOwnerIdRef,
+  ]);
 
   /**
    * Topup polling fibers outlive the effect that started them but must die
@@ -374,7 +416,9 @@ export const useLinkshuComposition = ({
           const tokens = yield* Tokens;
           return {
             balances: yield* tokens.balances,
-            tokens: yield* tokens.list,
+            proofs: yield* tokens.proofs,
+            operations: yield* tokens.operations,
+            transfers: yield* tokens.transfers,
           };
         }),
       )
@@ -387,10 +431,40 @@ export const useLinkshuComposition = ({
     return () => {
       cancelled = true;
     };
-  }, [cashuTokenRows, linkshuRuntime]);
+  }, [cashuProofRows, cashuOperationRows, linkshuRuntime]);
 
+  // The legacy `cashuToken` table is a permanent read-only feed: any row
+  // whose proofs are not yet in the inventory is ingested, on every device,
+  // whenever the rows change. Ids derive from secrets, so devices converge.
+  const ingestInFlightRef = React.useRef(false);
+  React.useEffect(() => {
+    if (linkshuRuntime === null || writeOwnerId === null) return;
+    if (ingestInFlightRef.current) return;
+    const rows = legacyTokenRows.flatMap((row) => {
+      const legacy = toLegacyTokenRow(row);
+      return legacy === null ? [] : [legacy];
+    });
+    if (rows.length === 0) return;
+    ingestInFlightRef.current = true;
+    void linkshuRuntime
+      .runPromise(
+        Effect.flatMap(Tokens, (tokens) => tokens.ingestLegacyRows(rows)),
+      )
+      .catch((error: unknown) => {
+        console.warn("[linky] legacy cashu row ingest failed", error);
+      })
+      .finally(() => {
+        ingestInFlightRef.current = false;
+      });
+  }, [legacyTokenRows, linkshuRuntime, writeOwnerId]);
+
+  // Every operation may write to the active cashu lane (the launch resumers
+  // carry legacy records over into operations), so none is offered before
+  // the lane is known. Later rotations do not rebuild the operations.
+  const ownerReady = writeOwnerId !== null;
   const operations = React.useMemo(() => {
-    if (linkshuRuntime === null || topupScope === null) return null;
+    if (linkshuRuntime === null || topupScope === null || !ownerReady)
+      return null;
     const runtime = linkshuRuntime;
     type Env = ManagedRuntime.ManagedRuntime.Context<typeof runtime>;
 
@@ -402,7 +476,7 @@ export const useLinkshuComposition = ({
     const runEither = <A, E>(
       effect: Effect.Effect<A, E, Env>,
     ): Promise<Either.Either<A, E>> => run(Effect.either(effect));
-    const rowId = (id: string) => TokenRowId.make(id);
+    const operationId = (id: string) => OperationId.make(id);
 
     const toHandle = (handle: TopupHandle): CashuTopupHandle => {
       const completion = runEither(handle.result);
@@ -503,7 +577,7 @@ export const useLinkshuComposition = ({
         }),
       );
 
-    const inspectCashuTokenProofStates: InspectCashuTokenProofStates = () =>
+    const inspectCashuProofStates: InspectCashuProofStates = () =>
       run(
         Effect.flatMap(
           Validation,
@@ -514,10 +588,10 @@ export const useLinkshuComposition = ({
     const checkAllCashuTokens: CheckAllCashuTokens = () =>
       run(Effect.flatMap(Validation, (validation) => validation.checkAll));
 
-    const checkCashuTokenRow: CheckCashuTokenRow = (id) =>
+    const checkCashuTransfer: CheckCashuTransfer = (id) =>
       runEither(
         Effect.flatMap(Validation, (validation) =>
-          validation.checkRow(rowId(id)),
+          validation.checkTransfer(operationId(id)),
         ),
       );
 
@@ -529,42 +603,46 @@ export const useLinkshuComposition = ({
         }),
       );
 
-    const cashuTokenLifecycle: CashuTokenLifecycle = {
+    const cashuTransferLifecycle: CashuTransferLifecycle = {
       checkIssuedClaims: () =>
         run(Effect.flatMap(Validation, (validation) => validation.checkIssued)),
-      deleteSpent: () =>
-        run(Effect.flatMap(Tokens, (tokens) => tokens.deleteSpent)),
       forget: (id) =>
-        run(Effect.flatMap(TokenStore, (store) => store.remove(rowId(id)))),
-      importRow: (draft) =>
-        runEither(Effect.flatMap(Tokens, (tokens) => tokens.importRow(draft))),
+        runEither(
+          Effect.flatMap(Tokens, (tokens) => tokens.forget(operationId(id))),
+        ),
+      importProofs: (drafts) =>
+        run(Effect.flatMap(Tokens, (tokens) => tokens.importProofs(drafts))),
+      importOperation: (draft) =>
+        run(Effect.flatMap(Tokens, (tokens) => tokens.importOperation(draft))),
+      importLegacyRows: (rows) =>
+        run(Effect.flatMap(Tokens, (tokens) => tokens.ingestLegacyRows(rows))),
       markExternalized: (id) =>
         runEither(
           Effect.flatMap(Tokens, (tokens) =>
-            tokens.markExternalized(rowId(id)),
+            tokens.markExternalized(operationId(id)),
           ),
         ),
       markIssued: (id) =>
         runEither(
-          Effect.flatMap(Tokens, (tokens) => tokens.markIssued(rowId(id))),
-        ),
-      reserve: (id) =>
-        runEither(
-          Effect.flatMap(Tokens, (tokens) => tokens.reserve(rowId(id))),
+          Effect.flatMap(Tokens, (tokens) =>
+            tokens.markIssued(operationId(id)),
+          ),
         ),
       returnToWallet: (id) =>
         runEither(
-          Effect.flatMap(Tokens, (tokens) => tokens.returnToWallet(rowId(id))),
+          Effect.flatMap(Tokens, (tokens) =>
+            tokens.returnToWallet(operationId(id)),
+          ),
         ),
     };
 
     return {
       adoptPaidCashuQuote,
       autoswapCashu,
-      cashuTokenLifecycle,
+      cashuTransferLifecycle,
       checkAllCashuTokens,
-      inspectCashuTokenProofStates,
-      checkCashuTokenRow,
+      inspectCashuProofStates,
+      checkCashuTransfer,
       meltCashuInvoice,
       probeLightningFee,
       receiveCashuToken,
@@ -575,16 +653,15 @@ export const useLinkshuComposition = ({
       sendCashuToken,
       startCashuTopup,
     };
-  }, [currentNsec, linkshuRuntime, topupScope]);
+  }, [currentNsec, linkshuRuntime, ownerReady, topupScope]);
 
   return {
     adoptPaidCashuQuote: operations?.adoptPaidCashuQuote ?? null,
     autoswapCashu: operations?.autoswapCashu ?? null,
-    cashuTokenLifecycle: operations?.cashuTokenLifecycle ?? null,
+    cashuTransferLifecycle: operations?.cashuTransferLifecycle ?? null,
     checkAllCashuTokens: operations?.checkAllCashuTokens ?? null,
-    inspectCashuTokenProofStates:
-      operations?.inspectCashuTokenProofStates ?? null,
-    checkCashuTokenRow: operations?.checkCashuTokenRow ?? null,
+    inspectCashuProofStates: operations?.inspectCashuProofStates ?? null,
+    checkCashuTransfer: operations?.checkCashuTransfer ?? null,
     meltCashuInvoice: operations?.meltCashuInvoice ?? null,
     probeLightningFee: operations?.probeLightningFee ?? null,
     receiveCashuToken: operations?.receiveCashuToken ?? null,
@@ -596,6 +673,8 @@ export const useLinkshuComposition = ({
     sendCashuToken: operations?.sendCashuToken ?? null,
     startCashuTopup: operations?.startCashuTopup ?? null,
     walletBalances: readModel.balances,
-    walletTokens: readModel.tokens,
+    walletOperations: readModel.operations,
+    walletProofs: readModel.proofs,
+    walletTransfers: readModel.transfers,
   };
 };

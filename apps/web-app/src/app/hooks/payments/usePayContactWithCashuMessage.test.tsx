@@ -6,7 +6,7 @@ import {
   MintUrl,
   NonNegativeAmount,
   SendReceipt,
-  TokenRowId,
+  OperationId,
   TokenText,
 } from "@linky/linkshu";
 import {
@@ -29,7 +29,7 @@ import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { buildCashuToken } from "../../../testUtils/cashuToken";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type {
-  CashuTokenLifecycle,
+  CashuTransferLifecycle,
   SendCashuToken,
 } from "../composition/useLinkshuComposition";
 import type {
@@ -72,7 +72,7 @@ const sendTokenText = buildCashuToken({
 });
 
 const sendReceipt = new SendReceipt({
-  rowId: TokenRowId.make("send-row"),
+  operationId: OperationId.make("send-op"),
   tokenText: TokenText.make(sendTokenText),
   proofs: [],
   mint: MintUrl.make(MINT_URL),
@@ -120,7 +120,7 @@ type PayParams = Parameters<
 interface SetupOptions {
   appendLocalNostrMessage?: PayParams["appendLocalNostrMessage"];
   enqueuePendingPayment?: PayParams["enqueuePendingPayment"];
-  forget?: CashuTokenLifecycle["forget"];
+  forget?: CashuTransferLifecycle["forget"];
   logPaymentEvent?: PayParams["logPaymentEvent"];
   nostrMessagesLocal?: LocalNostrMessage[];
   pushToast?: PayParams["pushToast"];
@@ -136,7 +136,10 @@ const setup = async (options: SetupOptions = {}) => {
     options.enqueuePendingPayment ??
     vi.fn<PayParams["enqueuePendingPayment"]>();
   const forget =
-    options.forget ?? vi.fn<CashuTokenLifecycle["forget"]>(async () => {});
+    options.forget ??
+    vi.fn<CashuTransferLifecycle["forget"]>(async () =>
+      Either.right(undefined),
+    );
   const logPaymentEvent =
     options.logPaymentEvent ?? vi.fn<PayParams["logPaymentEvent"]>();
   const pushToast = options.pushToast ?? vi.fn<PayParams["pushToast"]>();
@@ -149,15 +152,15 @@ const setup = async (options: SetupOptions = {}) => {
   const sendCashuToken =
     options.sendCashuToken ?? vi.fn(async () => Either.right(sendReceipt));
 
-  const cashuTokenLifecycle: CashuTokenLifecycle = {
-    checkIssuedClaims: vi.fn<CashuTokenLifecycle["checkIssuedClaims"]>(),
-    deleteSpent: vi.fn<CashuTokenLifecycle["deleteSpent"]>(),
+  const cashuTransferLifecycle: CashuTransferLifecycle = {
+    checkIssuedClaims: vi.fn<CashuTransferLifecycle["checkIssuedClaims"]>(),
     forget,
-    importRow: vi.fn<CashuTokenLifecycle["importRow"]>(),
-    markExternalized: vi.fn<CashuTokenLifecycle["markExternalized"]>(),
-    markIssued: vi.fn<CashuTokenLifecycle["markIssued"]>(),
-    reserve: vi.fn<CashuTokenLifecycle["reserve"]>(),
-    returnToWallet: vi.fn<CashuTokenLifecycle["returnToWallet"]>(),
+    importLegacyRows: vi.fn<CashuTransferLifecycle["importLegacyRows"]>(),
+    importOperation: vi.fn<CashuTransferLifecycle["importOperation"]>(),
+    importProofs: vi.fn<CashuTransferLifecycle["importProofs"]>(),
+    markExternalized: vi.fn<CashuTransferLifecycle["markExternalized"]>(),
+    markIssued: vi.fn<CashuTransferLifecycle["markIssued"]>(),
+    returnToWallet: vi.fn<CashuTransferLifecycle["returnToWallet"]>(),
   };
 
   const Harness = () => {
@@ -165,7 +168,7 @@ const setup = async (options: SetupOptions = {}) => {
       appendLocalNostrMessage:
         options.appendLocalNostrMessage ?? (() => "local-message"),
       cashuBalance: 1_000,
-      cashuTokenLifecycle,
+      cashuTransferLifecycle,
       currentNpub,
       currentNsec: "nsec-test",
       defaultMintUrl: MINT_URL,
@@ -251,8 +254,9 @@ describe("usePayContactWithCashuMessage", () => {
     sendPaymentNoticeMock.mockImplementation(async (draft) =>
       Exit.succeed(noticeReceipt(draft.clientId ?? fallbackClientId)),
     );
-    const forget = vi.fn(async (rowId: string) => {
-      operations.push(`forget:${rowId}`);
+    const forget = vi.fn(async (operationId: string) => {
+      operations.push(`forget:${operationId}`);
+      return Either.right(undefined);
     });
     const logPaymentEvent = vi.fn(() => {
       operations.push("transaction");
@@ -265,7 +269,7 @@ describe("usePayContactWithCashuMessage", () => {
     expect(operations).toEqual([
       `send:${MINT_URL}:600:pending`,
       "enqueue",
-      "forget:send-row",
+      "forget:send-op",
       "transaction",
     ]);
     expect(logPaymentEvent).toHaveBeenCalledWith(

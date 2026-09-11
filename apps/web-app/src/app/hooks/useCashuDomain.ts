@@ -1,5 +1,6 @@
 import { useLatest } from "../../hooks/useLatest";
 import type { OwnerId } from "@evolu/common";
+import type { TokenTransfer } from "@linky/linkshu";
 import React from "react";
 import type { CashuTokenRow } from "../../evolu";
 import { isCashuTokenErrorState } from "../lib/cashuTokenState";
@@ -7,14 +8,19 @@ import { createCashuTokenId } from "../lib/cashuTokenIdentity";
 
 interface UseCashuDomainParams {
   appOwnerId: OwnerId | null;
+  /** Legacy `cashuToken` rows; still consulted for texts received before the inventory. */
   cashuTokensAll: readonly CashuTokenRow[];
+  /** Tokens the wallet sent or received as text. */
+  cashuTransfers: readonly TokenTransfer[];
 }
 
 export const useCashuDomain = ({
   appOwnerId,
   cashuTokensAll,
+  cashuTransfers,
 }: UseCashuDomainParams) => {
   const cashuTokensAllRef = useLatest(cashuTokensAll);
+  const cashuTransfersRef = useLatest(cashuTransfers);
 
   const optimisticallyKnownCashuTokensRef = React.useRef<Set<string>>(
     new Set(),
@@ -79,7 +85,7 @@ export const useCashuDomain = ({
       return;
     }
 
-    if (cashuTokensAll.length > 0) {
+    if (cashuTokensAll.length > 0 || cashuTransfers.length > 0) {
       cashuTokensHydratedRef.current = true;
       if (cashuTokensHydrationTimeoutRef.current !== null) {
         window.clearTimeout(cashuTokensHydrationTimeoutRef.current);
@@ -103,13 +109,25 @@ export const useCashuDomain = ({
         cashuTokensHydrationTimeoutRef.current = null;
       }
     };
-  }, [appOwnerId, cashuTokensAll]);
+  }, [appOwnerId, cashuTokensAll, cashuTransfers]);
+
+  // A failed receive does not count as stored: pasting the text again retries.
+  const isTransferStored = React.useCallback(
+    (raw: string): boolean =>
+      cashuTransfersRef.current.some(
+        (transfer) =>
+          transfer.tokenText === raw &&
+          !(transfer.kind === "receive" && transfer.status === "failed"),
+      ),
+    [cashuTransfersRef],
+  );
 
   const isCashuTokenStored = React.useCallback(
     (tokenRaw: string): boolean => {
       const raw = normalizeCashuTokenText(tokenRaw);
       if (!raw) return false;
       if (isOptimisticallyKnownCashuToken(raw)) return true;
+      if (isTransferStored(raw)) return true;
 
       const current = cashuTokensAllRef.current;
       const deterministicId = createCashuTokenId(raw);
@@ -123,6 +141,7 @@ export const useCashuDomain = ({
     [
       cashuTokensAllRef,
       isOptimisticallyKnownCashuToken,
+      isTransferStored,
       normalizeCashuTokenText,
       rowMatchesToken,
     ],
@@ -133,6 +152,10 @@ export const useCashuDomain = ({
       const raw = normalizeCashuTokenText(tokenRaw);
       if (!raw) return false;
       if (isOptimisticallyKnownCashuToken(raw)) return true;
+      if (
+        cashuTransfersRef.current.some((transfer) => transfer.tokenText === raw)
+      )
+        return true;
 
       const current = cashuTokensAllRef.current;
       return current.some((row) => {
@@ -141,6 +164,7 @@ export const useCashuDomain = ({
     },
     [
       cashuTokensAllRef,
+      cashuTransfersRef,
       isOptimisticallyKnownCashuToken,
       normalizeCashuTokenText,
       rowMatchesToken,

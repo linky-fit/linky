@@ -20,11 +20,11 @@ IMPORTANT: When you make or change an architectural decision, document it in `do
 
 - TypeScript strict mode with `exactOptionalPropertyTypes`
 - **NEVER use `as` or `any` to cast types** - validate with a runtime type guard instead of casting
-- Branded ID types from Evolu (`ContactId`, `CashuTokenId`, `MintId`, etc.) - don't use plain strings
+- Branded ID types from Evolu (`ContactId`, `CashuProofId`, `CashuOperationId`, `MintId`, etc.) - don't use plain strings
 - Components use `interface` for props, not `type`
 - New browser storage names use the `linky.` prefix (e.g., `linky.nostr_nsec`, `linky.lang`). Existing exceptions are listed in `docs/architecture.md` under "Compatibility and audit decisions"; preserve those names for upgrades.
 - Use types from libraries (e.g., Evolu, Cashu, Nostr) instead of redefining them - look up the library's exported types first
-- Prefer sparse Evolu mutation payloads: omit optional fields when empty instead of writing explicit `null` (especially `cashuToken` optional columns like `rawToken`, `mint`, `unit`, `amount`, `error`)
+- Prefer sparse Evolu mutation payloads: omit optional fields when empty instead of writing explicit `null` (the `cashuProof`/`cashuOperation` adapters and the legacy `cashuToken` columns follow this)
 - Plain CSS in `App.css` - no CSS-in-JS or utility framework
 - `localStorage` goes through `utils/storage.ts` (`safeLocalStorageGet/Set/Remove`, `safeLocalStorageGetJson` with a Schema); raw access is reserved for the one-time linkshu migration and the linkshu `KeyValueStore` port
 - Validate stored and wire JSON with effect `Schema` (shared pieces in `utils/schema.ts`), not hand-rolled `typeof` guards
@@ -103,6 +103,7 @@ Shared helpers live in `tests/helpers/`. Use `setSeedLoginStorage` when a test n
 - In this workspace/Bun setup, `bunx --cwd apps/web-app playwright test tests` can resolve incorrectly; run `cd apps/web-app && bunx playwright test tests` instead
 - Playwright cannot intercept requests made by a service worker, and `src/sw.ts` has a Workbox `CacheFirst` route for image destinations that matches cross-origin URLs — any test stubbing remote images must use `serviceWorkers: "block"`
 - Payment integration tests use source mint :3338 and target mint :3339, with separate keys and databases. `cashu-mint-target` starts with the `integration` or `e2e` profile. Use the target mint for payable invoices; the source mint auto-pays its own quotes, and nutshell's FakeWallet reports a quote as paid on the first status poll regardless of `FAKEWALLET_DELAY_INCOMING_PAYMENT`, so a top-up's QR can disappear within tens of milliseconds
+- The Evolu `cashuToken` table is read-only legacy input: linkshu ingests it into `cashuProof`/`cashuOperation` on load and nothing writes it any more; never write a `cashuToken` row from app code
 - Evolu quota recovery tests use the isolated :4002 relay from the `e2e` or `quota` profile, capped at 16 KiB per owner. The normal :4001 relay defaults to unlimited; `EVOLU_OWNER_QUOTA_BYTES=0` means unlimited, and a positive value limits encrypted history bytes per owner.
 - The local Nginx server accepts the password-save form POST only at `/password-save.html` and serves the empty static document. Keep this exception scoped so other unsupported POST requests still fail
 - The local Nginx server must serve `.mjs` as JavaScript; PDF previews load a module worker and fail when it is served as `application/octet-stream`

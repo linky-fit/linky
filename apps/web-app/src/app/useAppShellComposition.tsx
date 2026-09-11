@@ -5,6 +5,8 @@ import React, { useMemo, useState } from "react";
 import type { MessageContactsGroupAssignment } from "../components/ChatMessage";
 import { ContactCard } from "../components/ContactCard";
 import {
+  createCashuOperationsAllQuery,
+  createCashuProofsAllQuery,
   createCashuTokensAllQuery,
   evolu,
   useEvolu,
@@ -505,6 +507,10 @@ export const useAppShellComposition = ({
 
   const cashuTokensAllQuery = useMemo(createCashuTokensAllQuery, []);
   const cashuTokensAll = useQuery(cashuTokensAllQuery);
+  const cashuProofsAllQuery = useMemo(createCashuProofsAllQuery, []);
+  const cashuProofsAll = useQuery(cashuProofsAllQuery);
+  const cashuOperationsAllQuery = useMemo(createCashuOperationsAllQuery, []);
+  const cashuOperationsAll = useQuery(cashuOperationsAllQuery);
 
   const copyText = React.useCallback(
     async (value: string) => {
@@ -643,7 +649,7 @@ export const useAppShellComposition = ({
     appOwnerId,
     appOwnerIdRef,
     cashuOwnerId,
-    cashuTokensAll,
+    cashuTokensAll: cashuProofsAll,
     contactPayBackToChatRef,
     contactsOwnerId,
     contactsOwnerNewContactsCount,
@@ -794,17 +800,17 @@ export const useAppShellComposition = ({
     cashuEmitAmount,
     cashuHasMultipleAcceptedMints,
     cashuIsBusy,
-    cashuIssuedTokens,
     cashuMeltToMainMintButtonLabel,
-    cashuOwnSpentTokens,
-    cashuOwnTokens,
-    cashuTokensAllFiltered,
+    cashuOpenTransfers,
+    cashuOperations,
+    cashuProofs,
     cashuTokensFiltered,
     cashuTokensHydratedRef,
     cashuTotalBalance,
-    cashuTokenLifecycle,
+    cashuTransferLifecycle,
+    cashuTransfers,
     checkAllCashuTokensAndDeleteInvalid,
-    inspectCashuTokenProofStates,
+    inspectCashuProofStates,
     checkAndRefreshCashuToken,
     checkIssuedCashuTokensAndDeleteClaimed,
     checkSingleIssuedCashuTokenIsClaimed,
@@ -818,8 +824,6 @@ export const useAppShellComposition = ({
     defaultMintDisplay,
     defaultMintUrl,
     defaultMintUrlDraft,
-    deleteSpentCashuTokens,
-    deleteSpentCashuTokensIsBusy,
     dismissWalletWarning,
     emitCashuToken,
     getCashuTokenMessageInfo,
@@ -859,7 +863,6 @@ export const useAppShellComposition = ({
     refreshMintInfo,
     requestDeleteCashuToken,
     requestSelectedContact,
-    reserveCashuToken,
     restoreMissingTokens,
     returnCashuTokenToWallet,
     saveCashuFromText,
@@ -895,6 +898,8 @@ export const useAppShellComposition = ({
     walletWarningDismissed,
   } = useCashuWalletComposition({
     cashuTokensAll,
+    cashuProofsAll,
+    cashuOperationsAll,
     contactPayBackToChatRef,
     contactsMessaging: {
       saveNpubContact,
@@ -1056,7 +1061,7 @@ export const useAppShellComposition = ({
     addNewContactFromIdentifier,
     cashuBalance,
     cashuOwnerId,
-    cashuTokensAllFiltered,
+    cashuTransfers,
     contacts,
     contactsLatestRef,
     contactsOnboardingDismissedSynced,
@@ -1170,9 +1175,13 @@ export const useAppShellComposition = ({
   const { exportAppData, handleImportAppDataFilePicked, requestImportAppData } =
     useAppDataTransfer<(typeof contacts)[number]>({
       appOwnerId: contactsOwnerId,
+      cashuOperations,
+      cashuProofs,
       cashuTokens: cashuTokensFiltered,
       contacts,
-      importCashuTokenRow: cashuTokenLifecycle?.importRow ?? null,
+      importCashuLegacyRows: cashuTransferLifecycle?.importLegacyRows ?? null,
+      importCashuOperation: cashuTransferLifecycle?.importOperation ?? null,
+      importCashuProofs: cashuTransferLifecycle?.importProofs ?? null,
       importDataFileInputRef,
       insert,
       pushToast,
@@ -1375,18 +1384,15 @@ export const useAppShellComposition = ({
       cashuEmitAmount,
       cashuHasMultipleAcceptedMints,
       cashuIsBusy,
-      cashuIssuedTokens,
       cashuMeltToMainMintButtonLabel,
-      cashuTokensAll: cashuTokensAllFiltered,
-      cashuOwnTokens,
-      cashuOwnSpentTokensCount: cashuOwnSpentTokens.length,
+      cashuOpenTransfers,
+      cashuProofs,
+      cashuTransfers,
       bankPaymentOfferContacts,
       bankPaymentOfferRecipientCount,
       bankPaymentOfferStaggerDelaySec,
-      deleteSpentCashuTokens,
-      deleteSpentCashuTokensIsBusy,
       checkAllCashuTokensAndDeleteInvalid,
-      inspectCashuTokenProofStates,
+      inspectCashuProofStates,
       checkAndRefreshCashuToken,
       checkIssuedCashuTokensAndDeleteClaimed,
       checkSingleIssuedCashuTokenIsClaimed,
@@ -1407,7 +1413,6 @@ export const useAppShellComposition = ({
       payLightningAddressWithCashu,
       pendingCashuDeleteId,
       restoreMissingTokens,
-      reserveCashuToken,
       requestDeleteCashuToken,
       returnCashuTokenToWallet,
       startSendCashuTokenToContact,

@@ -1,10 +1,10 @@
 import {
+  OperationChanged,
   OperationFailed,
+  OperationId,
   OperationSucceeded,
   QuoteId,
   QuoteStateChanged,
-  TokenLifecycleChanged,
-  TokenRowId,
   parseMintUrl,
 } from "@linky/linkshu";
 import { describe, expect, it } from "vitest";
@@ -23,36 +23,37 @@ describe("linkshuEventToRow", () => {
       new OperationSucceeded({
         name: "receive.receive",
         params: { tokenText: "cashuB…" },
-        result: { rowId: "row-1", quoteId: "quote-1" },
+        result: { operationId: "op-1", quoteId: "quote-1" },
       }),
       1_000,
     );
 
     expect(row.channel).toBe("cashu");
     expect(row.tag).toBe("receive.receive");
-    expect(row.links).toEqual({ row: ["row-1"], quote: ["quote-1"] });
+    expect(row.links).toEqual({ operation: ["op-1"], quote: ["quote-1"] });
   });
 
   it("names the failure in the summary", () => {
     const row = linkshuEventToRow(
       new OperationFailed({
         name: "melt.pay",
-        params: { rowId: "row-2" },
+        params: { operationId: "op-2" },
         error: { _tag: "MintUnreachable" },
       }),
       1_000,
     );
 
     expect(row.summary).toBe("melt.pay — failed: MintUnreachable");
-    expect(row.links).toEqual({ row: ["row-2"] });
+    expect(row.links).toEqual({ operation: ["op-2"] });
   });
 
   it("produces rows the inspector pipeline accepts unchanged", () => {
     const rows = [
       linkshuEventToRow(
-        new TokenLifecycleChanged({
-          rowId: TokenRowId.make("row-3"),
-          from: "accepted",
+        new OperationChanged({
+          operationId: OperationId.make("op-3"),
+          kind: "send",
+          from: "pending",
           to: "issued",
           reason: "markIssued",
         }),

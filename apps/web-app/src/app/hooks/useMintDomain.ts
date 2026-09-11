@@ -1,6 +1,6 @@
 import type { OwnerId } from "@evolu/common";
 import React from "react";
-import type { CashuTokenRow } from "../../evolu";
+import type { StoredProof } from "@linky/linkshu";
 import type { MintIcon } from "../../utils/mint";
 import {
   GENERIC_MINT_ICON_DATA_URL,
@@ -15,7 +15,7 @@ import { useMintInfoStore } from "./mint/useMintInfoStore";
 interface UseMintDomainParams {
   appOwnerId: OwnerId | null;
   appOwnerIdRef: React.MutableRefObject<OwnerId | null>;
-  cashuTokensAll: readonly CashuTokenRow[];
+  walletProofs: readonly StoredProof[];
   defaultMintUrl: string | null;
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
 }
@@ -39,7 +39,7 @@ interface UseMintDomainResult {
 export const useMintDomain = ({
   appOwnerId,
   appOwnerIdRef,
-  cashuTokensAll,
+  walletProofs,
   defaultMintUrl,
   rememberSeenMint,
 }: UseMintDomainParams): UseMintDomainResult => {
@@ -58,7 +58,7 @@ export const useMintDomain = ({
   } = useMintInfoStore({
     appOwnerId,
     appOwnerIdRef,
-    cashuTokensAll,
+    walletProofs,
     defaultMintUrl,
     rememberSeenMint,
   });

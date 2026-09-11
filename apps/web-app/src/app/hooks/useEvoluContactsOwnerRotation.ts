@@ -375,7 +375,7 @@ const OWNER_LANES: Record<RotatingOwnerRole, OwnerLaneConfig> = {
     rotatedAtKey: EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
     threshold: CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
     rotatedLabel: "evoluCashuOwnerRotated",
-    tables: ["cashuToken"],
+    tables: ["cashuToken", "cashuProof", "cashuOperation"],
   },
   messages: {
     indexKey: EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
@@ -749,6 +749,17 @@ export const useEvoluContactsOwnerRotation = (
     [],
   );
   const allCashuTokensRows = useQuery(allCashuTokensQuery);
+  const allCashuProofsQuery = React.useMemo(
+    () => evolu.createQuery((db) => db.selectFrom("cashuProof").selectAll()),
+    [],
+  );
+  const allCashuProofsRows = useQuery(allCashuProofsQuery);
+  const allCashuOperationsQuery = React.useMemo(
+    () =>
+      evolu.createQuery((db) => db.selectFrom("cashuOperation").selectAll()),
+    [],
+  );
+  const allCashuOperationsRows = useQuery(allCashuOperationsQuery);
   const allNostrMessagesQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -820,12 +831,20 @@ export const useEvoluContactsOwnerRotation = (
     () => [...allNostrMessagesRows, ...allNostrReactionsRows],
     [allNostrMessagesRows, allNostrReactionsRows],
   );
+  const cashuRows = React.useMemo(
+    () => [
+      ...allCashuTokensRows,
+      ...allCashuProofsRows,
+      ...allCashuOperationsRows,
+    ],
+    [allCashuOperationsRows, allCashuProofsRows, allCashuTokensRows],
+  );
   const shared = { ...params, metaOwner, allowMissingOwnerMetaBootstrap };
   const cashu = useOwnerLane({
     ...shared,
     scope: "cashu",
     snapshot: snapshots.cashu,
-    rows: allCashuTokensRows,
+    rows: cashuRows,
     historyCount: historyMutationCounts.cashu,
   });
   const contacts = useOwnerLane({

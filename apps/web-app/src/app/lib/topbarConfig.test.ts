@@ -17,7 +17,7 @@ const assignMock = vi.fn();
 vi.stubGlobal("location", { assign: assignMock, hash: "" });
 
 const contactId = Evolu.createIdFromString<"Contact">("contact-1");
-const tokenId = Evolu.createIdFromString<"CashuToken">("token-1");
+const tokenId = Evolu.createIdFromString<"CashuOperation">("token-1");
 
 const closeContactDetail = vi.fn();
 const navigateToMainReturn = vi.fn();

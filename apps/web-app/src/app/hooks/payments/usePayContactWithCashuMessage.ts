@@ -16,7 +16,7 @@ import { normalizeMintUrl } from "../../../utils/mint";
 import { safeLocalStorageSet } from "../../../utils/storage";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
 import { makeLocalId } from "../../../utils/validation";
-import { reportCashuSendRowForgotten } from "../../lib/cashuSendInspector";
+import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { selectSendMintForAmount } from "../../lib/paymentMintSelection";
 import type { SendMintBalance } from "../../lib/paymentMintSelection";
@@ -29,7 +29,7 @@ import type {
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
 import type {
-  CashuTokenLifecycle,
+  CashuTransferLifecycle,
   SendCashuToken,
 } from "../composition/useLinkshuComposition";
 import type { ReplyContext } from "../messages/useSendChatMessage";
@@ -46,7 +46,7 @@ interface UsePayContactWithCashuMessageParams {
   appendLocalNostrMessage: AppendLocalNostrMessage;
   cashuBalance: number;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
-  cashuTokenLifecycle: CashuTokenLifecycle | null;
+  cashuTransferLifecycle: CashuTransferLifecycle | null;
   currentNpub: string | null;
   currentNsec: string | null;
   defaultMintUrl: string | null;
@@ -86,7 +86,7 @@ const describeSendError = (error: SendError): string =>
 export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
   appendLocalNostrMessage,
   cashuBalance,
-  cashuTokenLifecycle,
+  cashuTransferLifecycle,
   currentNpub,
   currentNsec,
   defaultMintUrl,
@@ -217,7 +217,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         return { ok: true, queued: true };
       }
 
-      if (sendCashuToken === null || cashuTokenLifecycle === null) {
+      if (sendCashuToken === null || cashuTransferLifecycle === null) {
         if (notify)
           setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
         return { error: "cashu storage not ready", ok: false, queued: false };
@@ -334,11 +334,11 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       if (!publishing.hasPendingMessages) {
         // The message carrying the token is published; the funds are the
         // contact's now, so the pending row has nothing left to guard.
-        await cashuTokenLifecycle.forget(receipt.rowId);
-        reportCashuSendRowForgotten({
+        await cashuTransferLifecycle.forget(receipt.operationId);
+        reportCashuSendForgotten({
           mint: receipt.mint,
           reason: "message-published",
-          rowId: receipt.rowId,
+          operationId: receipt.operationId,
         });
       }
 
@@ -386,7 +386,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
     [
       appendLocalNostrMessage,
       cashuBalance,
-      cashuTokenLifecycle,
+      cashuTransferLifecycle,
       currentNpub,
       currentNsec,
       defaultMintUrl,

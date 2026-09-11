@@ -1,7 +1,8 @@
-import { TokenProofStateAmounts, WalletToken } from "@linky/linkshu";
+import { ProofStateSnapshot, TokenTransfer } from "@linky/linkshu";
 import { Schema } from "effect";
 import { act, type ComponentProps } from "react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
+import { createStoredProofFixture } from "../testUtils/cashuInventory";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { navigateTo } from "../hooks/useRouting";
 import { CashuTokensPage } from "./CashuTokensPage";
@@ -14,40 +15,50 @@ vi.mock("../app/context/AppShellContexts", () => ({
 }));
 vi.mock("../hooks/useRouting", () => ({ navigateTo: vi.fn() }));
 
-const token = Schema.decodeUnknownSync(WalletToken)({
+const available = createStoredProofFixture({
   id: "AAAAAAAAAAAAAAAAAAAAAA",
-  state: "accepted",
-  tokenText: "cashu-test-token",
+  amount: 68,
+});
+const held = createStoredProofFixture({
+  id: "AgICAgICAgICAgICAgICAg",
+  amount: 32,
+  state: "held",
+  operationId: "AwMDAwMDAwMDAwMDAwMDAw",
+});
+const spent = createStoredProofFixture({
+  id: "BAQEBAQEBAQEBAQEBAQEBA",
+  amount: 5,
+  state: "spent",
+});
+const issued = Schema.decodeUnknownSync(TokenTransfer)({
+  id: "AQEBAQEBAQEBAQEBAQEBAQ",
+  kind: "send",
+  status: "issued",
+  tokenText: "cashuBissued",
   mint: "https://mint.example",
   unit: "sat",
-  amount: 100,
+  amount: 21,
   error: null,
   createdAt: 1,
 });
-const report = (unspent: number, pending: number, unknown = 0) =>
-  Schema.decodeUnknownSync(TokenProofStateAmounts)({
-    rowId: token.id,
-    unspent,
-    pending,
-    unknown,
-    spent: 0,
-  });
+const snapshot = (
+  proofId: string,
+  state: ProofStateSnapshot["state"],
+): ProofStateSnapshot =>
+  Schema.decodeUnknownSync(ProofStateSnapshot)({ proofId, state });
+
 const props = (
-  inspect: () => Promise<readonly TokenProofStateAmounts[]>,
+  inspect: () => Promise<readonly ProofStateSnapshot[]>,
 ): ComponentProps<typeof CashuTokensPage> => ({
-  inspectCashuTokenProofStates: inspect,
+  inspectCashuProofStates: inspect,
   canRestoreTokens: false,
-  cashuTotalBalance: 100,
   cashuBulkCheckIsBusy: false,
   cashuIsBusy: false,
   cashuMeltToMainMintButtonLabel: null,
-  cashuOwnTokens: [token],
-  cashuOwnSpentTokensCount: 0,
-  cashuIssuedTokens: [],
+  cashuProofs: [available, held, spent],
+  cashuOpenTransfers: [issued],
   checkAllCashuTokensAndDeleteInvalid: async () => {},
   checkIssuedCashuTokensAndDeleteClaimed: async () => ({ claimed: [] }),
-  deleteSpentCashuTokens: async () => {},
-  deleteSpentCashuTokensIsBusy: false,
   getMintIconUrl: () => ({
     url: null,
     host: "mint.example",
@@ -68,83 +79,102 @@ const clickButton = async (container: HTMLElement, text: string) => {
   await act(async () => button.click());
 };
 
+const sectionText = (container: HTMLElement, label: string) =>
+  container.querySelector(`div[aria-label="${label}"]`)?.textContent ?? "";
+
 afterEach(() => {
   document.body.innerHTML = "";
   vi.clearAllMocks();
 });
 
-describe("CashuTokensPage mint status", () => {
-  it("shows only the pending portion of a mixed token and opens its original row", async () => {
+describe("CashuTokensPage inventory", () => {
+  it("lists proofs by stored state with the mint's answer per row", async () => {
     const { container, unmount } = await renderIntoDocument(
-      <CashuTokensPage {...props(async () => [report(68, 32)])} />,
+      <CashuTokensPage
+        {...props(async () => [
+          snapshot(available.id, "unspent"),
+          snapshot(held.id, "pending"),
+        ])}
+      />,
     );
-    expect(container.textContent).toContain("cashuAvailableProofs · 68 sat");
-    const pending = container.querySelector(
-      '[aria-label="cashuPendingAtMint"]',
+    const availableSection = sectionText(container, "cashuProofStateAvailable");
+    expect(availableSection).toContain("cashuProofStateAvailable · 68 sat");
+    expect(availableSection).toContain("cashuMintStateUnspent");
+    const heldSection = sectionText(container, "cashuProofStateHeld");
+    expect(heldSection).toContain("cashuProofStateHeld · 32 sat");
+    expect(heldSection).toContain("cashuMintStatePending");
+    expect(heldSection).toContain("cashuHeldProofsHint");
+    expect(container.textContent).toContain("1");
+    expect(container.textContent).toContain("cashuSpentProofsKept");
+    await unmount();
+  });
+
+  it("opens an open transfer from its pill", async () => {
+    const { container, unmount } = await renderIntoDocument(
+      <CashuTokensPage {...props(async () => [])} />,
     );
-    expect(pending?.textContent).toContain("cashuPendingAtMint · 32 sat");
-    const tokenButton = pending?.querySelector(
-      'button[aria-label^="cashuPendingAtMint:"]',
+    const pill = container.querySelector(
+      'button[aria-label^="cashuTransfers:"]',
     );
-    assert(tokenButton instanceof HTMLButtonElement);
-    expect(tokenButton.textContent).toContain("32 sat");
-    await act(async () => tokenButton.click());
+    assert(pill instanceof HTMLButtonElement);
+    expect(pill.textContent).toContain("21 sat");
+    await act(async () => pill.click());
     expect(navigateTo).toHaveBeenCalledWith({
       route: "cashuToken",
-      id: token.id,
+      id: issued.id,
     });
     await unmount();
   });
 
-  it("moves released funds back to available after refresh", async () => {
-    const inspect = vi.fn(async () => [report(68, 32)]);
+  it("re-asks the mint on refresh", async () => {
+    const inspect = vi.fn(async () => [snapshot(available.id, "pending")]);
     const { container, unmount } = await renderIntoDocument(
       <CashuTokensPage {...props(inspect)} />,
     );
-    inspect.mockResolvedValue([report(100, 0)]);
-    await clickButton(container, "cashuRefreshProofs");
-    expect(container.textContent).toContain("cashuAvailableProofs · 100 sat");
-    expect(container.textContent).toContain("cashuPendingAtMint · 0 sat");
-    expect(container.textContent).toContain("cashuNoPendingProofs");
-    await unmount();
-  });
-
-  it("shows unavailable funds as unknown instead of pending", async () => {
-    const { container, unmount } = await renderIntoDocument(
-      <CashuTokensPage {...props(async () => [report(0, 0, 100)])} />,
+    expect(sectionText(container, "cashuProofStateAvailable")).toContain(
+      "cashuMintStatePending",
     );
-    expect(container.textContent).toContain("cashuUnknownProofs · 100 sat");
-    expect(container.textContent).toContain("cashuPendingAtMint · 0 sat");
+    inspect.mockResolvedValue([snapshot(available.id, "unspent")]);
+    await clickButton(container, "cashuRefreshProofs");
+    expect(sectionText(container, "cashuProofStateAvailable")).toContain(
+      "cashuMintStateUnspent",
+    );
     await unmount();
   });
 
-  it("does not apply an old mint response after the token changes", async () => {
-    let finish: (reports: readonly TokenProofStateAmounts[]) => void = () => {};
-    const old = new Promise<readonly TokenProofStateAmounts[]>((resolve) => {
+  it("shows an unanswered proof as unknown", async () => {
+    const { container, unmount } = await renderIntoDocument(
+      <CashuTokensPage {...props(async () => [])} />,
+    );
+    expect(sectionText(container, "cashuProofStateAvailable")).toContain(
+      "cashuMintStateUnknown",
+    );
+    await unmount();
+  });
+
+  it("does not apply an old mint response after the inventory changes", async () => {
+    let finish: (reports: readonly ProofStateSnapshot[]) => void = () => {};
+    const old = new Promise<readonly ProofStateSnapshot[]>((resolve) => {
       finish = resolve;
     });
     const inspect = vi
-      .fn<() => Promise<readonly TokenProofStateAmounts[]>>()
+      .fn<() => Promise<readonly ProofStateSnapshot[]>>()
       .mockReturnValueOnce(old)
-      .mockResolvedValue([report(100, 0)]);
+      .mockResolvedValue([snapshot(available.id, "unspent")]);
     const initialProps = props(inspect);
     const { container, rerender, unmount } = await renderIntoDocument(
       <CashuTokensPage {...initialProps} />,
     );
     await rerender(
-      <CashuTokensPage
-        {...initialProps}
-        cashuOwnTokens={[
-          new WalletToken({ ...token, tokenText: token.tokenText }),
-        ]}
-      />,
+      <CashuTokensPage {...initialProps} cashuProofs={[available, held]} />,
     );
     await act(async () => {
-      finish([report(0, 100)]);
+      finish([snapshot(available.id, "pending")]);
       await old;
     });
-    expect(container.textContent).toContain("cashuAvailableProofs · 100 sat");
-    expect(container.textContent).toContain("cashuPendingAtMint · 0 sat");
+    expect(sectionText(container, "cashuProofStateAvailable")).toContain(
+      "cashuMintStateUnspent",
+    );
     await unmount();
   });
 });

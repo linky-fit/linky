@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { buildCashuToken } from "../../../testUtils/cashuToken";
-import { createCashuTokenRowFixture } from "../../../testUtils/cashuTokenRow";
 import { getEncounteredMintUrls, getMintInfoIconUrl } from "./mintInfoHelpers";
 
 describe("getMintInfoIconUrl", () => {
@@ -37,24 +35,13 @@ describe("getMintInfoIconUrl", () => {
 });
 
 describe("getEncounteredMintUrls", () => {
-  it("uses accepted token metadata and ignores unavailable rows", () => {
+  it("uses available proofs and ignores held, handed-out, and spent ones", () => {
     expect(
       getEncounteredMintUrls([
-        createCashuTokenRowFixture({
-          mint: "https://stale.example",
-          state: "accepted",
-          token: buildCashuToken({ mint: "https://parsed.example" }),
-        }),
-        createCashuTokenRowFixture({
-          id: "error-token",
-          mint: "https://error.example",
-          state: "error",
-        }),
-        createCashuTokenRowFixture({
-          id: "reserved-token",
-          mint: "https://reserved.example",
-          state: "reserved",
-        }),
+        { mint: "https://parsed.example/", state: "available" },
+        { mint: "https://held.example", state: "held" },
+        { mint: "https://out.example", state: "handedOut" },
+        { mint: "https://spent.example", state: "spent" },
       ]),
     ).toEqual(["https://parsed.example"]);
   });

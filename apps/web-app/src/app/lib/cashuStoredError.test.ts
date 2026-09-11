@@ -50,12 +50,12 @@ describe("describeTaggedCashuError", () => {
     expect(
       describeTaggedCashuError({ _tag: "TokenAlreadyKnown", rowId: "r" }),
     ).toBe("Token is already in the wallet");
-    expect(describeTaggedCashuError({ _tag: "TokenRowNotFound" })).toBe(
+    expect(describeTaggedCashuError({ _tag: "OperationNotFound" })).toBe(
       "Token not found",
     );
     expect(
       describeTaggedCashuError({
-        _tag: "InvalidTokenTransition",
+        _tag: "InvalidTransferTransition",
         from: "pending",
         to: "issued",
       }),

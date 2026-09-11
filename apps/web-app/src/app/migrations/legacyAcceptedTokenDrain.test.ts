@@ -5,7 +5,6 @@ import {
   parseMintUrl,
   ReceiveReceipt,
   TokenAlreadyKnown,
-  TokenRowId,
 } from "@linky/linkshu";
 import { Either, Schema } from "effect";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -19,7 +18,7 @@ if (mint === null) throw new Error("test mint url must parse");
 const receipt = Schema.decodeUnknownSync(ReceiveReceipt)({
   amount: 21,
   mint: "https://mint.example",
-  rowId: "row-1",
+  operationId: "op-1",
   tokenText: "cashuBdrained",
   unit: "sat",
 });
@@ -61,7 +60,7 @@ describe("drainLegacyAcceptedCashuToken", () => {
 
     await drainLegacyAcceptedCashuToken(() =>
       Promise.resolve(
-        Either.left(new TokenAlreadyKnown({ rowId: TokenRowId.make("row-1") })),
+        Either.left(new TokenAlreadyKnown({ operationId: null })),
       ),
     );
 

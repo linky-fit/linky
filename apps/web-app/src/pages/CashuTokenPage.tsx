@@ -1,61 +1,84 @@
 import { useLatest } from "../hooks/useLatest";
-import { parseTokenText } from "@linky/linkshu";
+import type { StoredProof, TokenTransfer } from "@linky/linkshu";
 import { Radio as NfcIcon } from "lucide-react";
 import type { FC } from "react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { formatStoredCashuError } from "../app/lib/cashuStoredError";
-import {
-  isCashuTokenAcceptedState,
-  isCashuTokenErrorState,
-  isCashuTokenExternalizedState,
-  isCashuTokenIssuedState,
-  isCashuTokenReservedState,
-  isCashuTokenUnavailableState,
-} from "../app/lib/cashuTokenState";
-import { extractCashuTokenMeta } from "../app/lib/tokenText";
+import { canReturnTransfer } from "../app/lib/cashuTransfers";
 
 import { getMintDisplay } from "../app/lib/tokenMessageInfo";
 import { WalletBalance } from "../components/WalletBalance";
 import { CashuTokenProofStatus } from "../components/CashuTokenProofStatus";
-import type { InspectCashuTokenProofStates } from "../app/hooks/composition/useLinkshuComposition";
-import type { CashuTokenId, CashuTokenRow } from "../evolu";
+import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
+import type { CashuOperationId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
+import type { I18nKey } from "../i18n";
 import { buildCashuShareUrl } from "../utils/deepLinks";
 
 interface CashuTokenPageProps {
-  inspectCashuTokenProofStates: InspectCashuTokenProofStates | null;
+  inspectCashuProofStates: InspectCashuProofStates | null;
   canSendToContact: boolean;
   canWriteToNfc: boolean;
   cashuIsBusy: boolean;
-  cashuTokensAll: readonly CashuTokenRow[];
+  cashuProofs: readonly StoredProof[];
+  cashuTransfers: readonly TokenTransfer[];
   checkAndRefreshCashuToken: (
-    id: CashuTokenId,
+    id: CashuOperationId,
   ) => Promise<"ok" | "invalid" | "transient" | "skipped">;
-  checkSingleIssuedCashuTokenIsClaimed: (id: CashuTokenId) => Promise<boolean>;
+  checkSingleIssuedCashuTokenIsClaimed: (
+    id: CashuOperationId,
+  ) => Promise<boolean>;
   copyText: (text: string) => Promise<void>;
-  pendingCashuDeleteId: CashuTokenId | null;
-  reserveCashuToken: (id: CashuTokenId) => Promise<void>;
-  requestDeleteCashuToken: (id: CashuTokenId) => void;
-  returnCashuTokenToWallet: (id: CashuTokenId) => Promise<void>;
-  routeId: CashuTokenId;
-  shareTokenText: (id: CashuTokenId, text: string) => Promise<void>;
+  pendingCashuDeleteId: CashuOperationId | null;
+  requestDeleteCashuToken: (id: CashuOperationId) => void;
+  returnCashuTokenToWallet: (id: CashuOperationId) => Promise<void>;
+  routeId: CashuOperationId;
+  shareTokenText: (id: CashuOperationId, text: string) => Promise<void>;
   showPaidOverlay: (title?: string) => void;
-  startSendCashuTokenToContact: (id: CashuTokenId) => Promise<void>;
-  writeToNfc: (id: CashuTokenId, tokenText: string) => Promise<void>;
+  startSendCashuTokenToContact: (id: CashuOperationId) => Promise<void>;
+  writeToNfc: (id: CashuOperationId, tokenText: string) => Promise<void>;
 }
 
+/** What the status line says for a transfer that is not in an error. */
+const statusKeyOf = (transfer: TokenTransfer): I18nKey | null => {
+  if (transfer.kind === "send") {
+    switch (transfer.status) {
+      case "issued":
+        return "cashuTransferIssued";
+      case "pending":
+        return "cashuPendingHint";
+      case "externalized":
+        return "cashuOnNfc";
+      case "returned":
+        return "cashuTransferReturned";
+      case "done":
+        return "cashuTransferClaimed";
+      default:
+        return null;
+    }
+  }
+  switch (transfer.status) {
+    case "pending":
+      return "cashuReceivePending";
+    case "done":
+      return "cashuTransferReceived";
+    default:
+      return null;
+  }
+};
+
 export const CashuTokenPage: FC<CashuTokenPageProps> = ({
-  inspectCashuTokenProofStates,
+  inspectCashuProofStates,
   canSendToContact,
   canWriteToNfc,
   cashuIsBusy,
-  cashuTokensAll,
+  cashuProofs,
+  cashuTransfers,
   checkAndRefreshCashuToken,
   checkSingleIssuedCashuTokenIsClaimed,
   copyText,
   pendingCashuDeleteId,
-  reserveCashuToken,
   requestDeleteCashuToken,
   returnCashuTokenToWallet,
   routeId,
@@ -67,45 +90,38 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   const { formatDisplayedAmountText, t } = useAppShellCore();
 
   const [tokenQr, setTokenQr] = React.useState<string | null>(null);
-  const row = cashuTokensAll.find(
-    (tkn) => tkn.id === routeId && !tkn.isDeleted,
+  const transfer = cashuTransfers.find(
+    (candidate) => String(candidate.id) === routeId,
+  );
+  const tokenText = transfer?.tokenText ?? "";
+  const tokenAmount = transfer?.amount ?? 0;
+  const mintDisplay = getMintDisplay(transfer?.mint);
+  const transferProofs = React.useMemo(
+    () =>
+      cashuProofs.filter(
+        (proof) =>
+          proof.operationId !== null && String(proof.operationId) === routeId,
+      ),
+    [cashuProofs, routeId],
   );
 
-  const tokenMeta = row ? extractCashuTokenMeta(row) : null;
-  const tokenText = tokenMeta?.tokenText ?? "";
-
-  const { mintText, tokenAmount } = React.useMemo(() => {
-    const parsed = tokenText ? parseTokenText(tokenText) : null;
-    const storedAmount = tokenMeta?.amount ?? 0;
-    const amount =
-      Number.isFinite(storedAmount) && storedAmount > 0
-        ? storedAmount
-        : (parsed?.amount ?? 0);
-    const mint = (tokenMeta?.mint ?? "").trim() || (parsed?.mint ?? "");
-    return { mintText: mint, tokenAmount: amount };
-  }, [tokenMeta?.amount, tokenMeta?.mint, tokenText]);
-  const mintDisplay = getMintDisplay(mintText);
-  const isExternalized = isCashuTokenExternalizedState(row?.state);
-  const isIssued = isCashuTokenIssuedState(row?.state);
-  const isReserved = isCashuTokenReservedState(row?.state);
-  const isPending = (row?.state ?? "") === "pending";
-  const isOwnToken = isCashuTokenAcceptedState(row?.state);
-  // Error rows can hold live proofs (e.g. a partially spent receive); linkshu
-  // `returnToWallet` re-receives them, which is the recovery path since
-  // validation itself never resurrects an error row.
+  const isSend = transfer?.kind === "send";
+  const isIssued = isSend && transfer.status === "issued";
+  const isOpenSend =
+    transfer !== undefined && isSend && canReturnTransfer(transfer);
+  const isFailedReceive =
+    transfer?.kind === "receive" && transfer.status === "failed";
   const canReturnToWallet =
-    isCashuTokenUnavailableState(row?.state) ||
-    isCashuTokenErrorState(row?.state);
+    transfer !== undefined && canReturnTransfer(transfer);
+  const statusKey = transfer === undefined ? null : statusKeyOf(transfer);
   const shareUrl = buildCashuShareUrl(tokenText);
   const shareMessage = (() => {
     if (!shareUrl) return "";
-
-    if (tokenMeta?.amount && tokenMeta.amount > 0) {
+    if (tokenAmount > 0) {
       return t("cashuShareMessageWithAmount")
-        .replace("{amount}", formatDisplayedAmountText(tokenMeta.amount))
+        .replace("{amount}", formatDisplayedAmountText(tokenAmount))
         .replace("{url}", shareUrl);
     }
-
     return t("cashuShareMessage").replace("{url}", shareUrl);
   })();
 
@@ -153,16 +169,13 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   }, [tokenText]);
 
   // Poll the source mint while the user is staring at the QR of an issued
-  // token (issue #86): wallet.checkProofsStates is the passive NUT-07
-  // query, so it doesn't consume the proofs. Once all proofs flip to
-  // SPENT the helper soft-deletes the row and we navigate back to the
-  // tokens list — staying on the now-orphan detail page would just
-  // render the generic error panel.
+  // token (issue #86): checkProofsStates is the passive NUT-07 query, so it
+  // doesn't consume the proofs. Once all proofs flip to SPENT the transfer
+  // closes as claimed and we navigate back to the tokens list.
   //
-  // The helper's identity changes whenever cashuTokensAll updates, so
-  // we stash the latest reference in a ref to keep the 10s interval
-  // from being torn down + restarted on every churn. Without this the
-  // tick was effectively firing every couple of seconds under load.
+  // The helper's identity changes whenever the read model updates, so the
+  // latest reference is stashed in a ref to keep the 10s interval from being
+  // torn down + restarted on every churn.
   const checkSingleIssuedRef = useLatest(checkSingleIssuedCashuTokenIsClaimed);
 
   React.useEffect(() => {
@@ -193,34 +206,30 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
     };
   }, [isIssued, routeId, showPaidOverlay, t, checkSingleIssuedRef]);
 
-  // If the row vanished after we had loaded it once (claim detector,
-  // manual delete, etc.), bounce back to the tokens list instead of
-  // rendering the generic error panel. Critical: do NOT navigate when
-  // the row is undefined on the FIRST render — cashuTokensAll is
-  // hydrated asynchronously from Evolu and is briefly empty on initial
-  // mount, which would otherwise kick the user out before the QR has
-  // a chance to render.
-  const rowMissing = !row || !tokenMeta;
-  const loadedRouteIdRef = React.useRef<CashuTokenId | null>(null);
+  // The transfer list hydrates asynchronously from Evolu and is briefly empty
+  // on first mount, so a missing transfer only shows the recovery panel after
+  // a delay, and a transfer that vanished after loading once bounces back.
+  const transferMissing = transfer === undefined;
+  const loadedRouteIdRef = React.useRef<CashuOperationId | null>(null);
   const [showMissingRecovery, setShowMissingRecovery] = React.useState(false);
-  if (!rowMissing) loadedRouteIdRef.current = routeId;
+  if (!transferMissing) loadedRouteIdRef.current = routeId;
   React.useEffect(() => {
     setShowMissingRecovery(false);
-    if (!rowMissing || loadedRouteIdRef.current === routeId) return;
+    if (!transferMissing || loadedRouteIdRef.current === routeId) return;
 
     const timeoutId = window.setTimeout(() => {
       setShowMissingRecovery(true);
     }, 750);
     return () => window.clearTimeout(timeoutId);
-  }, [routeId, rowMissing]);
+  }, [routeId, transferMissing]);
 
   React.useEffect(() => {
-    if (!rowMissing) return;
+    if (!transferMissing) return;
     if (loadedRouteIdRef.current !== routeId) return;
     navigateTo({ route: "cashuTokens" });
-  }, [routeId, rowMissing]);
+  }, [routeId, transferMissing]);
 
-  if (rowMissing) {
+  if (transfer === undefined) {
     if (!showMissingRecovery) return null;
 
     return (
@@ -228,23 +237,11 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         <p className="cashu-token-status cashu-token-status-error">
           {t("cashuInvalid")}
         </p>
-        <div className="settings-row">
-          <button
-            className={
-              pendingCashuDeleteId === routeId
-                ? "btn-wide secondary danger-armed"
-                : "btn-wide secondary"
-            }
-            onClick={() => requestDeleteCashuToken(routeId)}
-          >
-            {t("delete")}
-          </button>
-        </div>
       </section>
     );
   }
 
-  const safeRow = row;
+  const isClosed = transfer.status === "done" || transfer.status === "returned";
 
   return (
     <section className="panel topup-invoice-panel cashu-token-panel">
@@ -263,26 +260,26 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         ) : null}
       </div>
 
-      {(safeRow.state ?? "") === "error" && (
+      {isFailedReceive ? (
         <p className="cashu-token-status cashu-token-status-error">
-          {formatStoredCashuError(safeRow.error) ?? t("cashuInvalid")}
+          {formatStoredCashuError(transfer.error) ?? t("cashuReceiveFailed")}
         </p>
-      )}
+      ) : statusKey !== null ? (
+        <p className="cashu-token-status">{t(statusKey)}</p>
+      ) : null}
+      {!isFailedReceive && transfer.error !== null ? (
+        <p className="cashu-token-status cashu-token-status-error">
+          {formatStoredCashuError(transfer.error)}
+        </p>
+      ) : null}
 
-      {isExternalized && (
-        <p className="cashu-token-status">{t("cashuOnNfc")}</p>
-      )}
-
-      {isPending && (
-        <p className="cashu-token-status">{t("cashuPendingHint")}</p>
-      )}
-
-      <CashuTokenProofStatus
-        row={safeRow}
-        amount={tokenAmount}
-        inspect={inspectCashuTokenProofStates}
-        busy={cashuIsBusy}
-      />
+      {isSend && transferProofs.length > 0 ? (
+        <CashuTokenProofStatus
+          proofs={transferProofs}
+          inspect={inspectCashuProofStates}
+          busy={cashuIsBusy}
+        />
+      ) : null}
 
       {tokenQr ? (
         <div className="topup-invoice-qr-shell cashu-token-qr-shell">
@@ -302,7 +299,7 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         </div>
       ) : null}
 
-      {!isIssued && !isPending && !isReserved ? (
+      {isOpenSend || isFailedReceive ? (
         <div className="settings-row">
           <button
             className="btn-wide"
@@ -336,29 +333,19 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         </button>
       </div>
 
-      <div className="settings-row">
-        <button
-          className="btn-wide secondary"
-          onClick={() => void shareTokenText(routeId, shareMessage)}
-          disabled={!shareMessage}
-        >
-          {t("share")}
-        </button>
-      </div>
-
-      {isOwnToken ? (
+      {isOpenSend ? (
         <div className="settings-row">
           <button
             className="btn-wide secondary"
-            onClick={() => void reserveCashuToken(routeId)}
-            disabled={cashuIsBusy}
+            onClick={() => void shareTokenText(routeId, shareMessage)}
+            disabled={!shareMessage}
           >
-            {t("cashuMarkReserved")}
+            {t("share")}
           </button>
         </div>
       ) : null}
 
-      {canWriteToNfc ? (
+      {isOpenSend && canWriteToNfc ? (
         <div className="settings-row">
           <button
             className="btn-wide secondary"
@@ -387,18 +374,20 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         </div>
       ) : null}
 
-      <div className="settings-row">
-        <button
-          className={
-            pendingCashuDeleteId === routeId
-              ? "btn-wide secondary danger-armed"
-              : "btn-wide secondary"
-          }
-          onClick={() => requestDeleteCashuToken(routeId)}
-        >
-          {t("delete")}
-        </button>
-      </div>
+      {!isClosed ? (
+        <div className="settings-row">
+          <button
+            className={
+              pendingCashuDeleteId === routeId
+                ? "btn-wide secondary danger-armed"
+                : "btn-wide secondary"
+            }
+            onClick={() => requestDeleteCashuToken(routeId)}
+          >
+            {t("delete")}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 };

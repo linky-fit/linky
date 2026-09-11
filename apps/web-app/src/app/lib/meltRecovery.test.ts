@@ -5,7 +5,7 @@ import {
   MintUrl,
   NonNegativeAmount,
   QuoteId,
-  TokenRowId,
+  OperationId,
 } from "@linky/linkshu";
 import { describe, expect, it } from "vitest";
 import {
@@ -20,7 +20,7 @@ const result = (
   new MeltResumeResult({
     quoteId: QuoteId.make("quote-1"),
     mint: MintUrl.make("https://mint.example"),
-    rowId: TokenRowId.make("row-1"),
+    operationId: OperationId.make("op-1"),
     amount: Amount.make(40),
     status,
     receipt:

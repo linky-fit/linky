@@ -4,25 +4,20 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useRestoreMissingTokens } from "./useRestoreMissingTokens";
 import type { RestoreCashuTokens } from "../composition/useLinkshuComposition";
-import type { CashuTokenRow } from "../../../evolu";
-import { createCashuTokenRowFixture } from "../../../testUtils/cashuTokenRow";
 import { MAIN_MINT_URL } from "../../../utils/mint";
 
 type RestoreMissingTokens = () => Promise<void>;
 
 interface HookOverrides {
-  cashuTokensAll?: readonly CashuTokenRow[];
+  walletMints?: readonly string[];
   isMintDeleted?: (mintUrl: string) => boolean;
   restoreCashuTokens?: RestoreCashuTokens | null;
   pushToast?: (message: string) => void;
 }
 
-const rowWithMint = (mint: string, isDeleted = false): CashuTokenRow =>
-  createCashuTokenRowFixture({ mint, isDeleted });
-
 const emptyReport = new RestoreReport({
   restoredAmount: NonNegativeAmount.make(0),
-  rows: [],
+  restoredProofs: 0,
   scannedMints: [],
   unavailableMints: [],
 });
@@ -34,7 +29,7 @@ const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
   const Harness: React.FC = () => {
     const restore = useRestoreMissingTokens({
       cashuIsBusy: false,
-      cashuTokensAll: overrides.cashuTokensAll ?? [],
+      walletMints: overrides.walletMints ?? [],
       defaultMintUrl: null,
       enqueueCashuOp: (op) => op(),
       isMintDeleted: overrides.isMintDeleted ?? (() => false),
@@ -72,16 +67,13 @@ afterEach(() => {
 });
 
 describe("useRestoreMissingTokens", () => {
-  it("scans stored-row mints (including soft-deleted rows) plus the main mint", async () => {
+  it("scans every wallet mint plus the main mint", async () => {
     const restoreCashuTokens = vi.fn<RestoreCashuTokens>(() =>
       Promise.resolve(emptyReport),
     );
 
     const restore = renderRestore({
-      cashuTokensAll: [
-        rowWithMint("https://mint-a.example"),
-        rowWithMint("https://mint-b.example/", true),
-      ],
+      walletMints: ["https://mint-a.example", "https://mint-b.example/"],
       restoreCashuTokens,
     });
     await act(() => restore());
@@ -100,7 +92,7 @@ describe("useRestoreMissingTokens", () => {
     );
 
     const restore = renderRestore({
-      cashuTokensAll: [rowWithMint("https://mint-a.example")],
+      walletMints: ["https://mint-a.example"],
       isMintDeleted: () => true,
       restoreCashuTokens,
     });

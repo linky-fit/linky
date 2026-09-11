@@ -1,7 +1,6 @@
-import { parseMintUrl, parseTokenText } from "@linky/linkshu";
+import { parseMintUrl } from "@linky/linkshu";
 import type { MintUrl } from "@linky/linkshu";
 import React from "react";
-import type { CashuTokenRow } from "../../../evolu";
 import { MAIN_MINT_URL } from "../../../utils/mint";
 import type { LoggedPaymentEventParams } from "../../types/appTypes";
 import type { RestoreCashuTokens } from "../composition/useLinkshuComposition";
@@ -9,7 +8,12 @@ import type { Translate } from "../../../i18n";
 
 interface UseRestoreMissingTokensParams {
   cashuIsBusy: boolean;
-  cashuTokensAll: readonly CashuTokenRow[];
+  /**
+   * Every mint the wallet ever held funds at, including mints of legacy
+   * rows the user soft-deleted: deleting a mint's last token locally must
+   * not exclude that mint from a seed recovery.
+   */
+  walletMints: readonly string[];
   defaultMintUrl: string | null;
   enqueueCashuOp: (op: () => Promise<void>) => Promise<void>;
   isMintDeleted: (mintUrl: string) => boolean;
@@ -36,7 +40,7 @@ interface UseRestoreMissingTokensParams {
  */
 export const useRestoreMissingTokens = ({
   cashuIsBusy,
-  cashuTokensAll,
+  walletMints,
   defaultMintUrl,
   enqueueCashuOp,
   isMintDeleted,
@@ -65,18 +69,10 @@ export const useRestoreMissingTokens = ({
           return;
         }
 
-        // Soft-deleted rows count: the user deleting a mint's last token
-        // locally must not exclude that mint from a seed recovery.
         const candidates = new Set<MintUrl>();
-        for (const row of cashuTokensAll) {
-          const fromColumn = parseMintUrl(row.mint ?? "");
-          if (fromColumn !== null) {
-            candidates.add(fromColumn);
-            continue;
-          }
-          const tokenText = (row.token ?? row.rawToken ?? "").trim();
-          const mint = tokenText ? parseTokenText(tokenText)?.mint : null;
-          if (mint != null) candidates.add(mint);
+        for (const candidate of walletMints) {
+          const mint = parseMintUrl(candidate);
+          if (mint !== null) candidates.add(mint);
         }
         for (const info of mintInfoDeduped) {
           const mint = parseMintUrl(info.canonicalUrl ?? "");
@@ -106,7 +102,7 @@ export const useRestoreMissingTokens = ({
 
         const report = await restoreCashuTokens(mints);
 
-        if (report.rows.length === 0) {
+        if (report.restoredProofs === 0) {
           pushToast(t("restoreNothing"));
           return;
         }
@@ -128,7 +124,7 @@ export const useRestoreMissingTokens = ({
         pushToast(
           t("restoreDone")
             .replace("{amount}", String(report.restoredAmount))
-            .replace("{tokens}", String(report.rows.length)),
+            .replace("{tokens}", String(report.restoredProofs)),
         );
       } catch (e) {
         pushToast(`${t("restoreFailed")}: ${String(e ?? "unknown")}`);
@@ -139,7 +135,7 @@ export const useRestoreMissingTokens = ({
     });
   }, [
     cashuIsBusy,
-    cashuTokensAll,
+    walletMints,
     defaultMintUrl,
     enqueueCashuOp,
     isMintDeleted,

@@ -1,31 +1,47 @@
+import type { ProofStateSnapshot, StoredProof } from "@linky/linkshu";
 import { useMemo } from "react";
-import type { InspectCashuTokenProofStates } from "../app/hooks/composition/useLinkshuComposition";
+import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import type { CashuTokenRow } from "../evolu";
 import { useTokenProofStates } from "../hooks/useTokenProofStates";
 import { normalizeLocale } from "../utils/formatting";
 
 interface CashuTokenProofStatusProps {
-  row: CashuTokenRow;
-  amount: number;
-  inspect: InspectCashuTokenProofStates | null;
+  /** The proofs a transfer handed out, as the inventory holds them. */
+  proofs: readonly StoredProof[];
+  inspect: InspectCashuProofStates | null;
   busy: boolean;
 }
 
+/** Amounts of `proofs` per mint answer; an unanswered proof is `unknown`. */
+const sumProofsByMintState = (
+  proofs: readonly StoredProof[],
+  reports: readonly ProofStateSnapshot[],
+) => {
+  const byId = new Map(reports.map((report) => [report.proofId, report]));
+  const sums = { unspent: 0, pending: 0, spent: 0, unknown: 0 };
+  for (const proof of proofs) {
+    const state =
+      proof.state === "spent"
+        ? "spent"
+        : (byId.get(proof.id)?.state ?? "unknown");
+    sums[state] += proof.amount;
+  }
+  return sums;
+};
+
+/** The mint's answer about a transfer's proofs; read-only, refreshable. */
 export const CashuTokenProofStatus = ({
-  row,
-  amount,
+  proofs,
   inspect,
   busy,
 }: CashuTokenProofStatusProps) => {
   const { t, lang, formatDisplayedAmountText } = useAppShellCore();
-  const tokens = useMemo(() => [row], [row]);
+  const tokens = useMemo(() => proofs, [proofs]);
   const { reports, loading, refresh, checkedAt } = useTokenProofStates(
     tokens,
     inspect,
   );
-  const report = reports.find((entry) => entry.rowId === String(row.id));
-  const unknown = report?.unknown ?? amount;
+  const sums = sumProofsByMintState(proofs, reports);
 
   return (
     <section
@@ -51,37 +67,26 @@ export const CashuTokenProofStatus = ({
         <>
           <dl className="cashu-token-proof-amounts">
             <dt>{t("cashuUnspentProofs")}</dt>
-            <dd>{formatDisplayedAmountText(report?.unspent ?? 0)}</dd>
+            <dd>{formatDisplayedAmountText(sums.unspent)}</dd>
             <dt>{t("cashuPendingAtMint")}</dt>
-            <dd>{formatDisplayedAmountText(report?.pending ?? 0)}</dd>
-            {(report?.spent ?? 0) > 0 ? (
+            <dd>{formatDisplayedAmountText(sums.pending)}</dd>
+            {sums.spent > 0 ? (
               <>
                 <dt>{t("cashuSpentProofs")}</dt>
-                <dd>{formatDisplayedAmountText(report?.spent ?? 0)}</dd>
+                <dd>{formatDisplayedAmountText(sums.spent)}</dd>
               </>
             ) : null}
-            {unknown > 0 ? (
+            {sums.unknown > 0 ? (
               <>
                 <dt>{t("cashuUnknownProofs")}</dt>
-                <dd>{formatDisplayedAmountText(unknown)}</dd>
+                <dd>{formatDisplayedAmountText(sums.unknown)}</dd>
               </>
             ) : null}
           </dl>
-          {(report?.pending ?? 0) > 0 ? (
-            <div className="cashu-token-pending-detail">
-              <p>{t("cashuPendingOutcome")}</p>
-              <dl>
-                <dt>{t("cashuPendingRelease")}</dt>
-                <dd>{t("cashuPendingReleaseUnknown")}</dd>
-                <dt>{t("cashuPendingSince")}</dt>
-                <dd>{t("cashuPendingNotRecorded")}</dd>
-                <dt>{t("cashuPendingOperation")}</dt>
-                <dd>{t("cashuPendingOperationUnknown")}</dd>
-              </dl>
-              <p className="muted">{t("cashuPendingQuoteExpiryHint")}</p>
-            </div>
+          {sums.pending > 0 ? (
+            <p className="muted">{t("cashuPendingQuoteExpiryHint")}</p>
           ) : null}
-          {unknown > 0 ? (
+          {sums.unknown > 0 ? (
             <p className="muted">{t("cashuUnknownProofsHint")}</p>
           ) : null}
           {checkedAt !== null ? (

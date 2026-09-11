@@ -2,13 +2,12 @@ import { Option, Schema } from "effect";
 import { JsonValue } from "../../../types/json";
 import { findMintInfoIconValue } from "@linky/linkshu";
 import * as Evolu from "@evolu/common";
-import type { CashuTokenRow } from "../../../evolu";
+import type { StoredProof } from "@linky/linkshu";
 import {
   extractPpk,
   MAIN_MINT_URL,
   normalizeMintUrl,
 } from "../../../utils/mint";
-import { extractCashuTokenMeta } from "../../lib/tokenText";
 import type { LocalMintInfoRow } from "../../types/appTypes";
 import { isRecord } from "../../../utils/unknown";
 
@@ -119,17 +118,18 @@ export const getMintInfoByUrlMap = (
   return map;
 };
 
+/** Mints the wallet currently holds available funds at. */
 export const getEncounteredMintUrls = (
-  cashuTokensAll: readonly CashuTokenRow[],
+  walletProofs: readonly {
+    readonly mint: string;
+    readonly state: StoredProof["state"];
+  }[],
 ): string[] => {
   const set = new Set<string>();
 
-  for (const row of cashuTokensAll) {
-    const state = row.state ?? "";
-    if (state !== "accepted") continue;
-
-    const mint = extractCashuTokenMeta(row).mint;
-    const normalized = normalizeMintUrl(mint);
+  for (const proof of walletProofs) {
+    if (proof.state !== "available") continue;
+    const normalized = normalizeMintUrl(proof.mint);
     if (normalized) set.add(normalized);
   }
 

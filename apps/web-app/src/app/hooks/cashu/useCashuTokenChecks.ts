@@ -1,10 +1,12 @@
 import { Either } from "effect";
 import React from "react";
-import type { CashuTokenId } from "../../../evolu";
+import type { CashuOperationId } from "../../../evolu";
 import { navigateTo } from "../../../hooks/useRouting";
+import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import type {
+  CashuTransferLifecycle,
   CheckAllCashuTokens,
-  CheckCashuTokenRow,
+  CheckCashuTransfer,
 } from "../composition/useLinkshuComposition";
 import type { Translate } from "../../../i18n";
 
@@ -13,33 +15,33 @@ interface UseCashuTokenChecksParams {
   cashuIsBusy: boolean;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   checkAllCashuTokens: CheckAllCashuTokens | null;
-  checkCashuTokenRow: CheckCashuTokenRow | null;
+  checkCashuTransfer: CheckCashuTransfer | null;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
-  forgetCashuToken: ((rowId: string) => Promise<void>) | null;
-  pendingCashuDeleteId: CashuTokenId | null;
+  forgetCashuTransfer: CashuTransferLifecycle["forget"] | null;
+  pendingCashuDeleteId: CashuOperationId | null;
   pushToast: (message: string) => void;
   setCashuBulkCheckIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setPendingCashuDeleteId: React.Dispatch<
-    React.SetStateAction<CashuTokenId | null>
+    React.SetStateAction<CashuOperationId | null>
   >;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
 }
 
 /**
- * NUT-07 token validation over linkshu `Validation`: the mint's checkstate
- * answer is the sole truth, fully spent rows become `error` rows, and a
- * partially spent row keeps only its surviving proofs — the package owns the
- * pruning and re-encoding. This hook wraps the calls with busy flags,
- * statuses, and toasts, and hosts the (unrelated) row-delete confirmation.
+ * NUT-07 validation over linkshu `Validation`: the mint's checkstate answer
+ * is the sole truth, spent proofs are marked so, and a handed-out transfer
+ * whose proofs are all spent closes as claimed. This hook wraps the calls
+ * with busy flags, statuses, and toasts, and hosts the (unrelated)
+ * transfer-close confirmation.
  */
 export const useCashuTokenChecks = ({
   cashuBulkCheckIsBusy,
   cashuIsBusy,
   checkAllCashuTokens,
-  checkCashuTokenRow,
-  forgetCashuToken,
+  checkCashuTransfer,
+  forgetCashuTransfer,
   pendingCashuDeleteId,
   pushToast,
   setCashuBulkCheckIsBusy,
@@ -49,13 +51,19 @@ export const useCashuTokenChecks = ({
   t,
 }: UseCashuTokenChecksParams) => {
   const handleDeleteCashuToken = React.useCallback(
-    async (id: CashuTokenId) => {
-      if (forgetCashuToken === null) {
+    async (id: CashuOperationId) => {
+      if (forgetCashuTransfer === null) {
         pushToast(t("errorPrefix"));
         return;
       }
       try {
-        await forgetCashuToken(id);
+        const outcome = await forgetCashuTransfer(id);
+        if (Either.isLeft(outcome)) {
+          setStatus(
+            `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.left) ?? outcome.left._tag}`,
+          );
+          return;
+        }
       } catch (error) {
         setStatus(`${t("errorPrefix")}: ${String(error)}`);
         return;
@@ -64,14 +72,14 @@ export const useCashuTokenChecks = ({
       setPendingCashuDeleteId(null);
       navigateTo({ route: "wallet" });
     },
-    [forgetCashuToken, pushToast, setPendingCashuDeleteId, setStatus, t],
+    [forgetCashuTransfer, pushToast, setPendingCashuDeleteId, setStatus, t],
   );
 
   const checkAndRefreshCashuToken = React.useCallback(
     async (
-      id: CashuTokenId,
+      id: CashuOperationId,
     ): Promise<"ok" | "invalid" | "transient" | "skipped"> => {
-      if (checkCashuTokenRow === null) {
+      if (checkCashuTransfer === null) {
         pushToast(t("errorPrefix"));
         return "skipped";
       }
@@ -79,7 +87,7 @@ export const useCashuTokenChecks = ({
       setCashuIsBusy(true);
       setStatus(t("cashuChecking"));
       try {
-        const outcome = await checkCashuTokenRow(id);
+        const outcome = await checkCashuTransfer(id);
         if (Either.isLeft(outcome)) {
           pushToast(t("errorPrefix"));
           return "skipped";
@@ -102,7 +110,7 @@ export const useCashuTokenChecks = ({
         setCashuIsBusy(false);
       }
     },
-    [cashuIsBusy, checkCashuTokenRow, pushToast, setCashuIsBusy, setStatus, t],
+    [cashuIsBusy, checkCashuTransfer, pushToast, setCashuIsBusy, setStatus, t],
   );
 
   const checkAllCashuTokensAndDeleteInvalid = React.useCallback(async () => {
@@ -138,7 +146,7 @@ export const useCashuTokenChecks = ({
   ]);
 
   const requestDeleteCashuToken = React.useCallback(
-    (id: CashuTokenId) => {
+    (id: CashuOperationId) => {
       if (pendingCashuDeleteId === id) {
         void handleDeleteCashuToken(id);
         return;

@@ -16,11 +16,12 @@ const errorTag = (error: unknown): string | null =>
 const MAX_ID_SCAN_DEPTH = 3;
 
 // Operation params/results are linkshu's shapes; a shallow key scan lifts the
-// correlating ids wherever they sit (rowId, receipt.rowId, quoteId, …).
+// correlating ids wherever they sit (operationId, receipt.operationId,
+// quoteId, …).
 const scanForLinkIds = (
   value: unknown,
   depth: number,
-  out: { row: Set<string>; quote: Set<string> },
+  out: { operation: Set<string>; quote: Set<string> },
 ): void => {
   if (depth > MAX_ID_SCAN_DEPTH) return;
   if (Array.isArray(value)) {
@@ -30,7 +31,7 @@ const scanForLinkIds = (
   if (!isRecord(value)) return;
   for (const [key, entry] of Object.entries(value)) {
     if (typeof entry === "string" && entry.length > 0) {
-      if (key === "rowId") out.row.add(entry);
+      if (key === "operationId") out.operation.add(entry);
       else if (
         key === "quoteId" ||
         key === "meltQuoteId" ||
@@ -45,11 +46,11 @@ const scanForLinkIds = (
 };
 
 const operationLinks = (params: unknown, result: unknown) => {
-  const found = { row: new Set<string>(), quote: new Set<string>() };
+  const found = { operation: new Set<string>(), quote: new Set<string>() };
   scanForLinkIds(params, 0, found);
   scanForLinkIds(result, 0, found);
   return {
-    ...(found.row.size > 0 ? { row: [...found.row] } : {}),
+    ...(found.operation.size > 0 ? { operation: [...found.operation] } : {}),
     ...(found.quote.size > 0 ? { quote: [...found.quote] } : {}),
   };
 };
@@ -79,13 +80,24 @@ export const linkshuEventToRow = (
         payload: event,
       };
     }
-    case "TokenLifecycleChanged":
+    case "ProofsChanged":
       return {
         at,
         channel: "cashu",
         tag: event._tag,
-        summary: `token ${short(event.rowId)} ${event.from ?? "(new)"} → ${event.to} (${event.reason})`,
-        links: { row: event.rowId },
+        summary: `${event.count} proofs · ${event.amount} sat ${event.from ?? "(new)"} → ${event.to} (${event.reason})`,
+        links:
+          event.operationId === null ? {} : { operation: event.operationId },
+        context: { mint: event.mint },
+        payload: event,
+      };
+    case "OperationChanged":
+      return {
+        at,
+        channel: "cashu",
+        tag: event._tag,
+        summary: `${event.kind} ${short(event.operationId)} ${event.from ?? "(new)"} → ${event.to} (${event.reason})`,
+        links: { operation: event.operationId },
         payload: event,
       };
     case "CounterAdvanced":

@@ -77,13 +77,23 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "mints.addKnownMint":
     "linkshu recorded a mint in its known-mint set without contacting it. The payload names the mint; repeating the operation leaves one entry.",
   "mints.removeKnownMint":
-    "linkshu tried to forget a known mint. MintInUse means stored token rows still name it; rowCount reports how many. Success removes the seen entry without contacting the mint.",
+    "linkshu tried to forget a known mint. MintInUse means unspent proofs still name it; proofCount reports how many. Success removes the seen entry without contacting the mint.",
   "validation.inspectProofStates":
-    "Read-only mint status check for the token list or detail. Reports unspent, pending, spent and unknown amounts per token row; follows row links without exposing proofs or secrets.",
-  "tokens.importRow":
-    "A backup row was restored in its recorded state without receiving, swapping, or checking proofs at the mint. TokenAlreadyKnown means a live row already has either encoding. Follow the row link to its lifecycle event.",
-  TokenLifecycleChanged:
-    "A stored cashu token row moved to a new lifecycle state inside linkshu (e.g. accepted → issued); the reason names the operation that caused it. A spend-retained rewrite keeps unresolved proofs in the source row after spending its unspent proofs. Follow the row link to the operation rows around it.",
+    "Read-only mint status check for the token list or detail. Reports the mint's answer (unspent, pending, spent, unknown) per stored proof without exposing secrets.",
+  "validation.checkTransfer":
+    "NUT-07 check of one transfer: a send's handed-out proofs, or the proofs a received token text carries. A send whose proofs are all spent closes as claimed.",
+  "tokens.importProofs":
+    "Backup proofs were restored in their recorded state without contacting the mint; secrets already in the inventory were skipped. The result counts what was added.",
+  "tokens.importOperation":
+    "A backup operation was restored as-is; an existing operation with the same key was replaced.",
+  "tokens.ingestLegacyRows":
+    "Rows of the legacy cashuToken table were carried into the proof inventory: accepted → available, reserved → held, issued/externalized → a send transfer with handed-out proofs, error → spent only when the recorded error says so. Rows whose proofs are already stored are skipped.",
+  "tokens.forget":
+    "A transfer was closed by the app because nothing is left to do about it (a delivered messenger send, a dismissed failed receive). Handed-out proofs stay handed out until the mint reports them spent.",
+  ProofsChanged:
+    "A batch of stored proofs moved to a new state inside linkshu (e.g. available → spent, (new) → handedOut); the reason names the operation that caused it, the operation link points at the melt or send holding them. Amounts and counts only — the proofs themselves never travel.",
+  OperationChanged:
+    "A stored operation (melt, topup, autoswap, send, receive) changed status; the reason names what caused it. Follow the operation link to the proofs it holds and the operation rows around it.",
   CounterAdvanced:
     "linkshu moved a deterministic derivation counter (NUT-13) for one mint/unit/keyset — the audit trail for output derivation and collision recovery.",
   QuoteStateChanged:

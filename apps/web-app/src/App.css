@@ -7279,3 +7279,31 @@ button.cashu-token-pill {
 .evolu-usage-progress::-moz-progress-bar {
   background: var(--progress-color);
 }
+
+.list-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cashu-proof-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.cashu-proof-table th,
+.cashu-proof-table td {
+  padding: 6px 4px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+}
+
+.cashu-proof-table th {
+  font-weight: 500;
+  color: var(--muted, #888);
+}
+
+.cashu-proof-table td:first-child {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,40 +1,36 @@
-import type { TokenRowId, WalletToken } from "@linky/linkshu";
+import type { OperationId, TokenTransfer } from "@linky/linkshu";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import { isCashuTokenUnavailableState } from "../app/lib/cashuTokenState";
 import type { MintIcon } from "../utils/mint";
 import { getNextMintIconUrl } from "../utils/mint";
 
-interface WalletTokenPillProps {
-  amount?: number;
+interface TransferPillProps {
   ariaLabel: string;
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
-  isError?: boolean;
   onMintIconError: (origin: string, nextUrl: string | null) => void;
   onMintIconLoad: (origin: string, url: string | null) => void;
-  onOpenToken: (id: TokenRowId) => void;
-  token: WalletToken;
+  onOpenTransfer: (id: OperationId) => void;
+  transfer: TokenTransfer;
 }
 
-export const WalletTokenPill = React.memo(function WalletTokenPill({
+/** A token that left or entered the wallet as text; opens its detail page. */
+export const TransferPill = React.memo(function TransferPill({
   ariaLabel,
-  amount,
   getMintIconUrl,
-  isError = false,
   onMintIconError,
   onMintIconLoad,
-  onOpenToken,
-  token,
-}: WalletTokenPillProps) {
+  onOpenTransfer,
+  transfer,
+}: TransferPillProps) {
   const { formatDisplayedAmountText } = useAppShellCore();
   return (
     <CashuTokenPill
-      icon={getMintIconUrl(token.mint)}
-      amountText={formatDisplayedAmountText(amount ?? token.amount)}
+      icon={getMintIconUrl(transfer.mint)}
+      amountText={formatDisplayedAmountText(transfer.amount)}
       ariaLabel={ariaLabel}
-      isError={isError}
-      isMuted={isCashuTokenUnavailableState(token.state)}
-      onClick={() => onOpenToken(token.id)}
+      isError={transfer.kind === "receive" && transfer.status === "failed"}
+      isMuted={transfer.status !== "issued"}
+      onClick={() => onOpenTransfer(transfer.id)}
       onMintIconLoad={onMintIconLoad}
       onMintIconError={onMintIconError}
     />

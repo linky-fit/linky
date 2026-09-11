@@ -54,6 +54,8 @@ export function EvoluDataDetailPage(): React.ReactElement {
   const userTables = [
     "contact",
     "cashuToken",
+    "cashuProof",
+    "cashuOperation",
     "nostrIdentity",
     "nostrMessage",
     "nostrReaction",

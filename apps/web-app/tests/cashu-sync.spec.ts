@@ -112,29 +112,26 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
             .poll(() => readBalanceSat(device.page))
             .toBe(expectedBalance);
         }
+        // One topup operation per rotated lane (the restore into lane zero
+        // records none): the operation table is the one whose row count
+        // tracks rotations, proofs vary per topup amount.
         await source.page.goto("/#evolu-current-data");
-        const tokenTable = source.page.locator("table").filter({
+        const operationTable = source.page.locator("table").filter({
           has: source.page.getByRole("columnheader", {
-            name: "originalTokenText",
+            name: "quoteId",
             exact: true,
           }),
         });
-        if (rotation.index === 2) {
-          await tokenTable
-            .locator("..")
-            .getByRole("button", { name: /Show all remaining rows/ })
-            .click();
-        }
-        await expect(tokenTable.locator("tbody tr")).toHaveCount(
-          rotation.index + 1,
+        await expect(operationTable.locator("tbody tr")).toHaveCount(
+          rotation.index,
         );
-        const headers = await tokenTable.locator("th").allTextContents();
+        const headers = await operationTable.locator("th").allTextContents();
         const ownerColumn = headers.indexOf("ownerId");
         expect(ownerColumn).toBeGreaterThanOrEqual(0);
-        const owners = await tokenTable
+        const owners = await operationTable
           .locator(`tbody td:nth-child(${ownerColumn + 1})`)
           .allTextContents();
-        expect(new Set(owners).size).toBe(rotation.index + 1);
+        expect(new Set(owners).size).toBe(rotation.index);
         await source.page.goto("/#wallet");
       }
     });
@@ -213,7 +210,7 @@ test("token consumption rotates lane zero from its mutation history while few li
       await expect.poll(() => readBalanceSat(device.page)).toBe(512);
     }
 
-    await test.step("consume and replace token rows without reaching 170 live rows", async () => {
+    await test.step("issue tokens until the mutation history rotates the lane", async () => {
       for (let index = 0; index < 60; index += 1) {
         await source.page.goto("/#wallet/token/emit");
         await source.page
@@ -235,28 +232,39 @@ test("token consumption rotates lane zero from its mutation history while few li
           rotations.push({ issuedTokens: index + 1, ...lane });
         }
       }
+      // Every issue leaves one send operation behind; the proofs it spent
+      // stay on record as `spent`, so nothing is deleted any more.
       await source.page.goto("/#evolu-data");
-      const tokenRowCount = source.page.locator(".settings-row").filter({
-        has: source.page.getByText("cashuToken", { exact: true }),
+      const operationRowCount = source.page.locator(".settings-row").filter({
+        has: source.page.getByText("cashuOperation", { exact: true }),
       });
-      await expect(tokenRowCount).toContainText(/\d+ rows/);
+      await expect(operationRowCount).toContainText(/\d+ rows/);
       const rows = Number(
-        (await tokenRowCount.innerText()).match(/(\d+) rows/)?.[1],
+        (await operationRowCount.innerText()).match(/(\d+) rows/)?.[1],
       );
-      expect(rows).toBeGreaterThan(60);
-      expect(rows).toBeLessThan(170);
+      expect(rows).toBeGreaterThanOrEqual(60);
     });
 
     await test.step("both devices adopt the automatic rotation", async () => {
+      // Each issue writes several proof and operation mutations, so the
+      // history threshold can trip more than once within the cooldown.
       for (const device of devices) {
         await expect
           .poll(() =>
             device.page.evaluate(() =>
-              localStorage.getItem("linky.evolu.cashu_owner_index.v1"),
+              Number(localStorage.getItem("linky.evolu.cashu_owner_index.v1")),
             ),
           )
-          .toBe("1");
+          .toBeGreaterThanOrEqual(1);
       }
+      const [sourceIndex, secondIndex] = await Promise.all(
+        devices.map((device) =>
+          device.page.evaluate(() =>
+            localStorage.getItem("linky.evolu.cashu_owner_index.v1"),
+          ),
+        ),
+      );
+      expect(secondIndex).toBe(sourceIndex);
     });
 
     await source.page.goto("/#wallet");
