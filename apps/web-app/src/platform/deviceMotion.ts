@@ -1,6 +1,8 @@
-// Safari on iOS 13+ only delivers motion events after a permission prompt that
-// must be triggered from a user gesture. Chrome exposes the same method but
-// resolves "granted" without prompting; browsers without it need nothing.
+export const requiresDeviceMotionPermission = (): boolean =>
+  typeof DeviceMotionEvent !== "undefined" &&
+  typeof Reflect.get(DeviceMotionEvent, "requestPermission") === "function";
+
+// Call from a user gesture so Safari can show its permission prompt.
 export const requestDeviceMotionPermission = async (): Promise<boolean> => {
   if (typeof DeviceMotionEvent === "undefined") return true;
   const request = Reflect.get(DeviceMotionEvent, "requestPermission");

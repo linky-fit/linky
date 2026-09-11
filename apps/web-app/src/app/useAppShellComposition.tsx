@@ -18,7 +18,10 @@ import { useRouting } from "../hooks/useRouting";
 import { useToasts } from "../hooks/useToasts";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import { writeClipboardText } from "../platform/clipboard";
-import { requestDeviceMotionPermission } from "../platform/deviceMotion";
+import {
+  requestDeviceMotionPermission,
+  requiresDeviceMotionPermission,
+} from "../platform/deviceMotion";
 import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
 import {
   triggerPasswordManagerSeedSave,
@@ -229,7 +232,12 @@ export const useAppShellComposition = ({
     number | null
   >(getInitialSeenReceiptsEnabledAtSec);
   const [showProfileQrOnTiltEnabled, setShowProfileQrOnTiltEnabled] =
-    useState<boolean>(getInitialShowProfileQrOnTiltEnabled);
+    useState<boolean>(
+      () =>
+        !requiresDeviceMotionPermission() &&
+        getInitialShowProfileQrOnTiltEnabled(),
+    );
+  const motionPermissionPendingRef = React.useRef(false);
   const [profileShareOverlayIsOpen, setProfileShareOverlayIsOpen] =
     useState(false);
 
@@ -273,10 +281,24 @@ export const useAppShellComposition = ({
     setDecimalAmountInputEnabled((current) => !current);
   }, []);
 
-  const toggleShowProfileQrOnTilt = React.useCallback(() => {
-    setShowProfileQrOnTiltEnabled((current) => !current);
-    // Safari on iOS only prompts for motion access from a user gesture.
-    if (!showProfileQrOnTiltEnabled) void requestDeviceMotionPermission();
+  const toggleShowProfileQrOnTilt = React.useCallback(async () => {
+    if (motionPermissionPendingRef.current) return;
+    motionPermissionPendingRef.current = true;
+    const enabled = showProfileQrOnTiltEnabled
+      ? false
+      : await requestDeviceMotionPermission();
+    setShowProfileQrOnTiltEnabled(enabled);
+    motionPermissionPendingRef.current = false;
+    reportAppLog({
+      tag: "profileShare.tiltSettingChanged",
+      summary: enabled
+        ? "Tilt to show profile enabled"
+        : "Tilt to show profile disabled",
+      payload: {
+        enabled,
+        permissionGranted: showProfileQrOnTiltEnabled ? null : enabled,
+      },
+    });
   }, [showProfileQrOnTiltEnabled]);
 
   const closeProfileShareOverlay = React.useCallback(() => {
@@ -751,7 +773,6 @@ export const useAppShellComposition = ({
     nostrStatusByNpub,
     route,
     setStatus,
-    showProfileQrOnTiltEnabled,
     t,
   });
 

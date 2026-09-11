@@ -1,6 +1,5 @@
 import React from "react";
 import { useLatest } from "../../hooks/useLatest";
-import { requestDeviceMotionPermission } from "../../platform/deviceMotion";
 
 const STANDARD_GRAVITY = 9.81;
 // Hysteresis in degrees of the screen-top elevation: negative means the top
@@ -70,9 +69,6 @@ export const useTopDownTilt = ({
       }
     };
 
-    // Listeners are harmless without permission; events start flowing once a
-    // gesture-driven request (settings toggle, profile page) is granted.
-    void requestDeviceMotionPermission();
     window.addEventListener("devicemotion", onDeviceMotion, { passive: true });
     window.addEventListener("deviceorientation", onDeviceOrientation, {
       passive: true,

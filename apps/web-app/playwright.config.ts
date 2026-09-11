@@ -13,6 +13,7 @@ const LOCAL_STACK_SPECS = [
   "**/proxy-payment.spec.ts",
   "**/linkshu-migration.spec.ts",
   "**/password-manager-save.spec.ts",
+  "**/profile-tilt-permission.spec.ts",
 ];
 
 export default defineConfig({

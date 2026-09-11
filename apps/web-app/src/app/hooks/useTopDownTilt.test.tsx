@@ -69,7 +69,7 @@ describe("top-down tilt detection", () => {
     await rendered.unmount();
   });
 
-  it("requests motion permission on enable and listens regardless of the answer", async () => {
+  it("listens without requesting motion permission", async () => {
     const requestPermission = vi
       .fn<() => Promise<PermissionState>>()
       .mockRejectedValue(new Error("needs a user gesture"));
@@ -82,7 +82,7 @@ describe("top-down tilt detection", () => {
     act(() => {
       dispatchMotion(-9);
     });
-    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(requestPermission).not.toHaveBeenCalled();
     expect(onChange.mock.calls).toEqual([[true]]);
 
     vi.unstubAllGlobals();
