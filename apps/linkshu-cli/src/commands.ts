@@ -10,7 +10,6 @@ import {
   Send,
   SendDraft,
   Tokens,
-  TokenStore,
   Topup,
   TopupDraft,
 } from "@linky/linkshu";
@@ -71,9 +70,17 @@ const summarize: Effect.Effect<void, never, LinkshuServices> = Effect.gen(
     for (const { mint, amount } of balances.perMint)
       print(`  ${mint}  ${amount} sat`);
 
-    const rows = yield* (yield* TokenStore).loadAll;
-    for (const row of rows)
-      if (row.state !== "accepted") print(`  ${row.state}  row ${row.id}`);
+    const tokens = yield* Tokens;
+    for (const proof of yield* tokens.proofs)
+      if (proof.state !== "available" && proof.state !== "spent")
+        print(
+          `  ${proof.state.padEnd(12)} ${proof.amount} sat  proof ${proof.id}`,
+        );
+    for (const operation of yield* tokens.operations)
+      if (operation.status === "pending" || operation.status === "issued")
+        print(
+          `  ${operation.kind.padEnd(8)} ${operation.status.padEnd(8)} ${operation.amount} sat  ${operation.id}`,
+        );
   },
 );
 
@@ -95,7 +102,7 @@ const startTopup = (mint: MintUrl, amount: Amount): Command =>
       print(`invoice  ${handle.quote.invoice}`);
       print("waiting for the invoice to be paid…");
       const receipt = yield* handle.result;
-      print(`minted   ${receipt.amount} sat into row ${receipt.rowId}`);
+      print(`minted   ${receipt.amount} sat`);
     }),
   );
 
@@ -109,7 +116,7 @@ const resumeTopups: Command = Effect.scoped(
     for (const handle of handles) {
       print(`resuming ${handle.quote.quoteId} (${handle.quote.amount} sat)`);
       const receipt = yield* handle.result;
-      print(`minted   ${receipt.amount} sat into row ${receipt.rowId}`);
+      print(`minted   ${receipt.amount} sat`);
     }
   }),
 );
@@ -120,7 +127,6 @@ const receive = (operands: ReadonlyArray<string>): Command =>
       new ReceiveDraft({ text: requireOperand(operands, "token") }),
     );
     print(`received ${receipt.amount} ${receipt.unit} from ${receipt.mint}`);
-    print(`row      ${receipt.rowId}`);
   });
 
 const send = (mint: MintUrl, amount: Amount): Command =>
@@ -174,7 +180,7 @@ const restore = (mint: MintUrl): Command =>
       new RestoreDraft({ mints: [mint] }),
     );
     print(
-      `restored ${report.restoredAmount} sat into ${report.rows.length} rows`,
+      `restored ${report.restoredAmount} sat as ${report.restoredProofs} proofs`,
     );
     print(`scanned  ${report.scannedMints.join(", ") || "nothing"}`);
     if (report.unavailableMints.length > 0)

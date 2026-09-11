@@ -24,7 +24,7 @@ docker compose -f docker-compose.dev.yml up -d --wait cashu-mint
 
 | command           | what it does                                              |
 | ----------------- | --------------------------------------------------------- |
-| `balance`         | accepted balance held in the data directory               |
+| `balance`         | available balance held in the data directory              |
 | `topup <amount>`  | mint quote for `<amount>` sat, then wait for it to settle |
 | `topup`           | finish topups an earlier run left pending                 |
 | `receive <token>` | accept a cashu token                                      |
@@ -39,11 +39,16 @@ command's result — `send` ends with the bare token, ready to pipe.
 
 ## Data directory
 
-`--data-dir`, else `$LINKSHU_DATA_DIR`, else `~/.linkshu`. Three files:
+`--data-dir`, else `$LINKSHU_DATA_DIR`, else `~/.linkshu`. Four files:
 
 - `seed.hex` — the 64-byte BIP-39 seed, generated on first use, mode `0600`
-- `tokens.json` — the `TokenStore` rows, verbatim
+- `proofs.json` — the `ProofStore` rows (the wallet inventory), verbatim
+- `operations.json` — the `OperationStore` rows (melts, topups, sends, …), verbatim
 - `kv.json` — the `KeyValueStore` values and leases
+
+A data directory written by a release before the proof inventory holds
+`tokens.json` instead; it is not read. Recover such a wallet with `restore`
+from its seed.
 
 `$LINKSHU_SEED` (128 hex characters) overrides `seed.hex`, which is how you
 restore a wiped wallet:
@@ -72,9 +77,10 @@ silently starting over would look exactly like losing every token.
 lease and writing under it touch the same lock. The port's lease primitives
 are deliberately dumb — retries and timeouts are linkshu's own semantics.
 
-**`fileTokenStore.ts`** writes a JSON array of the port's own `StoredTokenRow`
-schema. There is no adapter mapping to drift, and the wallet stays readable in
-any text editor.
+**`fileProofStore.ts`** and **`fileOperationStore.ts`** write JSON arrays of
+the ports' own `StoredProof` / `StoredOperation` schemas, with ids derived by
+`deriveStoreId` from the proof secret and the operation key. There is no
+adapter mapping to drift, and the wallet stays readable in any text editor.
 
 ## Tests
 

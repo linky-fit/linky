@@ -9,7 +9,8 @@ import { UsageError, parseArgs } from "./args";
 import { buildCommand } from "./commands";
 import type { TaggedFailure } from "./commands";
 import { fileKeyValueStore } from "./fileKeyValueStore";
-import { fileTokenStore } from "./fileTokenStore";
+import { fileOperationStore } from "./fileOperationStore";
+import { fileProofStore } from "./fileProofStore";
 import { loadSeed } from "./seed";
 import { stderrInspector } from "./stderrInspector";
 
@@ -20,7 +21,7 @@ const USAGE = `linkshu — a cashu wallet on @linky/linkshu
 usage: linkshu [options] <command> [arguments]
 
 commands:
-  balance             accepted balance held in the data directory
+  balance             available balance held in the data directory
   topup <amount>      mint quote for <amount> sat, then wait for it to settle
   topup               finish topups an earlier run left pending
   receive <token>     accept a cashu token
@@ -82,7 +83,8 @@ const main = async (): Promise<void> => {
     {
       bip39Seed: seed,
       keyValueStore: fileKeyValueStore(path.join(dataDir, "kv.json")),
-      tokenStore: fileTokenStore(path.join(dataDir, "tokens.json")),
+      proofStore: fileProofStore(path.join(dataDir, "proofs.json")),
+      operationStore: fileOperationStore(path.join(dataDir, "operations.json")),
       ...(verbose ? { inspector: stderrInspector } : {}),
     },
     Effect.either(buildCommand(args.command, args.operands, mint)),
