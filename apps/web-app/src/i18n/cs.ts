@@ -1,4 +1,30 @@
 export const cs = {
+  bluetoothChat: "Bluetooth chat",
+  bluetoothRoom: "Veřejný Bluetooth chat",
+  bluetoothNearby: "Poblíž",
+  bluetoothNearbyUsers: "Uživatelé Linky poblíž",
+  bluetoothNearbyCount: "Zařízení poblíž: {count}",
+  bluetoothDisclosure:
+    "Zpřístupní vaše veřejné jméno a klíč lidem poblíž. Veřejný chat je kompatibilní s BitChatem. Funguje, když je Linky otevřené.",
+  bluetoothUnsupported:
+    "Bluetooth chat je dostupný pouze v podporované nativní aplikaci.",
+  bluetoothPermissionDenied:
+    "Povolte Linky přístup k Bluetooth v nastavení telefonu.",
+  bluetoothOff: "Bluetooth chat je vypnutý.",
+  bluetoothRadioOff: "Zapněte Bluetooth v telefonu.",
+  bluetoothPaused:
+    "Bluetooth chat je pozastavený. Otevřete Linky pro připojení.",
+  bluetoothActive: "Bluetooth chat je aktivní.",
+  bluetoothPublicNotice:
+    "Veřejná místnost sdílená s BitChatem. Zprávy jsou čitelné pro ostatní a mohou se šířit přes další telefony. Soukromé chaty zůstávají šifrované přes Nostr.",
+  bluetoothNoMessages:
+    "Zatím žádné zprávy. Otevřete BitChat nebo Linky na telefonu poblíž.",
+  bluetoothMessageLimit:
+    "Pro kompatibilitu s BitChatem nejvýše {count} bajtů na zprávu.",
+  bluetoothMessagePlaceholder: "Zpráva do veřejné místnosti",
+  bluetoothSendFailed:
+    "Zprávu se nepodařilo odeslat. Zkontrolujte Bluetooth a zkuste to znovu.",
+
   appTitle: "Linky",
   appCrashed: "Aplikace se zhroutila",
 

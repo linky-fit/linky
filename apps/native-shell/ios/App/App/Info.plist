@@ -43,6 +43,8 @@
 	<true/>
 	<key>NFCReaderUsageDescription</key>
 	<string>Linky uses NFC to write contact and Cashu token links to NDEF tags.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Linky uses Bluetooth to chat in the public nearby room and discover nearby contacts while enabled.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Linky uses the camera to scan QR codes for contacts, Lightning, and Cashu flows.</string>
 	<key>UILaunchStoryboardName</key>

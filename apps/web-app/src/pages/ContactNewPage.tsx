@@ -8,11 +8,13 @@ import {
 import type { FC } from "react";
 import React from "react";
 import { getContactQueryPrefill } from "../app/lib/contactQueryPrefill";
+import { useBluetooth } from "../bluetooth/BluetoothContext";
 import { Avatar } from "../components/Avatar";
 
 import type { Translate } from "../i18n";
 import { readClipboardText } from "../platform/clipboard";
 import { normalizeContactGroups } from "../utils/contactGroups";
+import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import {
   formatShortLightningAddress,
   formatShortNpub,
@@ -195,7 +197,7 @@ interface ContactSuggestionCandidate extends Omit<
   displayLnAddress: string;
 }
 
-type ContactSearchResult =
+export type ContactSearchResult =
   | { kind: "empty" }
   | { kind: "error"; identifier: string }
   | { kind: "found"; contacts: ContactSearchCandidate[] }
@@ -215,6 +217,7 @@ interface ContactNewPageProps {
   groupNames: string[];
   handleSaveContact: () => void;
   isSavingContact: boolean;
+  knownNpubs?: readonly string[];
   searchNewContact: (
     query?: string,
     onProgress?: (result: ContactSearchResult) => void,
@@ -230,10 +233,23 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   groupNames,
   handleSaveContact,
   isSavingContact,
+  knownNpubs = [],
   searchNewContact,
   setForm,
   t,
 }) => {
+  const bluetooth = useBluetooth();
+  const excludedNpubs = new Set(
+    knownNpubs.map((npub) => normalizeNpubIdentifier(npub)),
+  );
+  const nearbyUsers =
+    bluetooth.available && bluetooth.enabled && bluetooth.state.active
+      ? bluetooth.nearby.filter((peer) => {
+          if (excludedNpubs.has(peer.npub)) return false;
+          excludedNpubs.add(peer.npub);
+          return true;
+        })
+      : [];
   const [step, setStep] = React.useState<"search" | "details">("search");
   const [searchError, setSearchError] = React.useState<string | null>(null);
   const [searchIsBusy, setSearchIsBusy] = React.useState(false);
@@ -596,6 +612,54 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              ) : null}
+              {nearbyUsers.length > 0 ? (
+                <div className="contact-new-suggestions bluetooth-nearby-users">
+                  <div className="contact-new-suggestions-title">
+                    {t("bluetoothNearbyUsers")}
+                  </div>
+                  <div className="contact-new-suggestion-list">
+                    {nearbyUsers.map((peer) => (
+                      <div className="contact-new-suggestion" key={peer.npub}>
+                        <div className="contact-new-suggestion-main">
+                          <span className="contact-avatar" aria-hidden="true">
+                            <Avatar
+                              pictureUrl={null}
+                              fallback={getInitials(peer.name)}
+                              fallbackClassName="contact-avatar-fallback"
+                            />
+                          </span>
+                          <span className="contact-new-suggestion-body">
+                            <strong>
+                              {peer.name || formatShortNpub(peer.npub)}
+                            </strong>
+                            <span title={peer.npub}>
+                              {formatShortNpub(peer.npub)}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="contact-new-suggestion-action">
+                          <button
+                            type="button"
+                            disabled={isSavingContact}
+                            onClick={() =>
+                              void addNewContactFromSearchResult({
+                                npub: peer.npub,
+                                name: peer.name,
+                                lnAddress: "",
+                                pictureUrl: null,
+                                query: peer.npub,
+                                isExactMatch: true,
+                              })
+                            }
+                          >
+                            {isSavingContact ? t("saving") : t("saveContact")}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : null}

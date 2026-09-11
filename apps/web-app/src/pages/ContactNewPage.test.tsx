@@ -1,7 +1,11 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { encodeNpub } from "@linky/linkstr";
+import { makeIdentity } from "@linky/linkstr/testing";
+import { BluetoothContext } from "../bluetooth/BluetoothContext";
+import { emptyBluetoothSnapshot } from "../bluetooth/controller";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { ContactNewPage } from "./ContactNewPage";
+import { ContactNewPage, type ContactSearchResult } from "./ContactNewPage";
 
 describe("ContactNewPage", () => {
   afterEach(() => {
@@ -83,5 +87,75 @@ describe("ContactNewPage", () => {
     expect(rows[1]?.textContent).toContain("Alice Cooper");
 
     await act(async () => root.unmount());
+  });
+
+  it("adds a nearby identity offline while excluding self and known contacts", async () => {
+    const identities = [makeIdentity(), makeIdentity(), makeIdentity()];
+    const peers = identities.map((identity, index) => ({
+      pubkey: identity.pubkey,
+      npub: encodeNpub(identity.pubkey),
+      name: `Nearby ${index}`,
+      meshId: String(index),
+    }));
+    const newcomer = peers[2];
+    if (!newcomer) throw new Error("Missing nearby fixture");
+    const add = vi.fn(async () => {});
+    const search = vi.fn(
+      async (): Promise<ContactSearchResult> => ({ kind: "empty" }),
+    );
+    const page = (active: boolean) => (
+      <BluetoothContext.Provider
+        value={{
+          ...emptyBluetoothSnapshot,
+          available: true,
+          enabled: true,
+          state: {
+            supported: true,
+            powered: true,
+            permission: "granted",
+            active,
+          },
+          nearby: [...peers, newcomer],
+          nearbyCount: 3,
+          setEnabled: async () => {},
+          sendMessage: async () => {},
+        }}
+      >
+        <ContactNewPage
+          addNewContactFromSearchResult={add}
+          contactSuggestions={[]}
+          form={{ groups: [], lnAddress: "", name: "", npub: "" }}
+          groupNames={[]}
+          handleSaveContact={() => {}}
+          isSavingContact={false}
+          knownNpubs={peers.slice(0, 2).map((peer) => peer.npub)}
+          searchNewContact={search}
+          setForm={() => {}}
+          t={(key) => key}
+        />
+      </BluetoothContext.Provider>
+    );
+    const rendered = await renderIntoDocument(page(true));
+    const rows = rendered.container.querySelectorAll(
+      ".bluetooth-nearby-users .contact-new-suggestion",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain(newcomer.name);
+    await act(async () => rows[0]?.querySelector("button")?.click());
+    expect(add).toHaveBeenCalledWith({
+      npub: newcomer.npub,
+      name: newcomer.name,
+      lnAddress: "",
+      pictureUrl: null,
+      query: newcomer.npub,
+      isExactMatch: true,
+    });
+    expect(search).not.toHaveBeenCalled();
+
+    await rendered.rerender(page(false));
+    expect(
+      rendered.container.querySelector(".bluetooth-nearby-users"),
+    ).toBeNull();
+    await rendered.unmount();
   });
 });

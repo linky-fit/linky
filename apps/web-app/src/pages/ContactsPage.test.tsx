@@ -1,5 +1,9 @@
 import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
+import { encodeNpub } from "@linky/linkstr";
+import { makeIdentity } from "@linky/linkstr/testing";
+import { BluetoothContext } from "../bluetooth/BluetoothContext";
+import { emptyBluetoothSnapshot } from "../bluetooth/controller";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ContactsPage } from "./ContactsPage";
 
@@ -49,5 +53,99 @@ describe("ContactsPage", () => {
     ).toHaveLength(1);
 
     await act(async () => root.unmount());
+  });
+
+  it("moves nearby saved friends across sections once and restores order when inactive", async () => {
+    const alice = makeIdentity();
+    const bob = makeIdentity();
+    const aliceNpub = encodeNpub(alice.pubkey);
+    const bobNpub = encodeNpub(bob.pubkey);
+    const page = (active: boolean, available = true) => (
+      <BluetoothContext.Provider
+        value={{
+          ...emptyBluetoothSnapshot,
+          available,
+          enabled: true,
+          state: {
+            supported: true,
+            powered: true,
+            permission: "granted",
+            active,
+          },
+          nearby: [
+            {
+              pubkey: alice.pubkey,
+              npub: aliceNpub,
+              name: "Alice",
+              meshId: "alice",
+            },
+            { pubkey: bob.pubkey, npub: bobNpub, name: "Bob", meshId: "bob" },
+          ],
+          nearbyCount: 3,
+          setEnabled: async () => {},
+          sendMessage: async () => {},
+        }}
+      >
+        <ContactsPage
+          activeGroup={null}
+          bottomTabActive="contacts"
+          contactsSearch=""
+          contactsSearchInputRef={{ current: null }}
+          conversationsLabel="Conversations"
+          filterOptions={[]}
+          openNewContactPage={() => {}}
+          otherContactsLabel="Other contacts"
+          renderContactCard={(contact) => (
+            <div key={contact.id ?? ""} data-contact-id={contact.id ?? ""}>
+              {contact.name}
+            </div>
+          )}
+          setActiveGroup={() => {}}
+          setContactsSearch={() => {}}
+          showBottomTabBar={false}
+          showFab={false}
+          showGroupFilter={false}
+          t={(key) =>
+            key === "bluetoothNearbyCount" ? "Nearby peers: {count}" : key
+          }
+          visibleContacts={{
+            pinned: [{ id: "pinned", name: "Pinned" }],
+            proxyPayments: [{ id: "alice", name: "Alice", npub: aliceNpub }],
+            conversations: [
+              {
+                id: "unknown",
+                name: "Unknown",
+                npub: bobNpub,
+                isUnknownContact: true,
+              },
+              { id: "alice", name: "Alice", npub: aliceNpub },
+            ],
+            others: [{ id: "bob", name: "Bob", npub: bobNpub }],
+          }}
+        />
+      </BluetoothContext.Provider>
+    );
+    const rendered = await renderIntoDocument(page(true));
+    const order = () =>
+      [...rendered.container.querySelectorAll("[data-contact-id]")].map(
+        (element) => element.getAttribute("data-contact-id"),
+      );
+    expect(order()).toEqual(["alice", "bob", "pinned", "unknown"]);
+    expect(
+      rendered.container.querySelector(".bluetooth-room-entry")?.textContent,
+    ).toContain("Nearby peers: 3");
+
+    await rendered.rerender(page(false));
+    expect(order()).toEqual(["pinned", "alice", "unknown", "bob"]);
+    expect(
+      rendered.container.querySelector(".bluetooth-room-entry")?.textContent,
+    ).toContain("Nearby peers: 0");
+
+    await rendered.rerender(page(true, false));
+    expect(order()).toEqual(["pinned", "alice", "unknown", "bob"]);
+    expect(
+      rendered.container.querySelector(".bluetooth-room-entry"),
+    ).toBeNull();
+    await rendered.unmount();
   });
 });

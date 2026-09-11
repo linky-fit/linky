@@ -1,4 +1,5 @@
 import React from "react";
+import { BluetoothProvider } from "../bluetooth/BluetoothContext";
 import "../App.css";
 import { AuthenticatedLayout } from "../components/AuthenticatedLayout";
 import { CashuContactSendBanner } from "../components/CashuContactSendBanner";
@@ -94,9 +95,14 @@ const AuthenticatedAppShell = ({
         relaySettings={relaySettingsContext}
         routes={routeContextValue}
       >
-        <AuthenticatedLayout>
-          <AppRouteContent />
-        </AuthenticatedLayout>
+        <BluetoothProvider
+          currentNsec={currentNsec}
+          nickname={appState.effectiveProfileName ?? "Linky"}
+        >
+          <AuthenticatedLayout>
+            <AppRouteContent />
+          </AuthenticatedLayout>
+        </BluetoothProvider>
       </AppShellContextsProvider>
     </div>
   );

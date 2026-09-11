@@ -34,6 +34,7 @@ import {
 } from "../app/hooks/useRelayHealth";
 
 import { SettingsLinkRow, SettingsToggleRow } from "../components/SettingsRows";
+import { BluetoothSettings } from "../bluetooth/BluetoothSettings";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import { getNativeNotificationPermissionState } from "../platform/nativeBridge";
@@ -280,6 +281,8 @@ export function AdvancedPage(): React.ReactElement {
           icon={<FeedbackIcon size={18} />}
           label={t("feedback")}
         />
+
+        <BluetoothSettings t={t} />
 
         <SettingsToggleRow
           icon={<Bell size={18} />}

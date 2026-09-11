@@ -1,5 +1,9 @@
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "../mnemonic";
 import {
+  BLUETOOTH_ENABLED_KEY,
+  BLUETOOTH_IDENTITY_KEY,
+} from "../bluetooth/storageKeys";
+import {
   CASHU_BIP85_MNEMONIC_STORAGE_KEY,
   NOSTR_IDENTITY_SOURCE_STORAGE_KEY,
   NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY,
@@ -143,6 +147,7 @@ export const persistSyncedActiveNostrIdentity = async ({
 };
 
 export const clearIdentitySecrets = async (): Promise<void> => {
+  safeLocalStorageRemove(BLUETOOTH_ENABLED_KEY);
   // The seed-bound wallet state belongs to the seed that's being cleared. If
   // the user logs in again with a different seed they'd otherwise inherit
   // stale offsets that break NUT-09 restore. When the mnemonic is already
@@ -156,6 +161,7 @@ export const clearIdentitySecrets = async (): Promise<void> => {
   }
 
   await Promise.all([
+    removeStoredSecret(BLUETOOTH_IDENTITY_KEY),
     removeStoredSecret(NOSTR_NSEC_STORAGE_KEY),
     removeStoredSecret(NOSTR_SLIP39_SEED_STORAGE_KEY),
     removeStoredSecret(CASHU_BIP85_MNEMONIC_STORAGE_KEY),

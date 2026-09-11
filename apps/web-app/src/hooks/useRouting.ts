@@ -94,6 +94,7 @@ type NavigationAction =
   | { route: "contactNew" }
   | { route: "contactPay"; id: ContactId }
   | { route: "contacts" }
+  | { route: "bluetoothChat" }
   | { route: "evoluCurrentData" }
   | { route: "evoluData" }
   | { route: "evoluHistoryData" }
@@ -123,6 +124,9 @@ type NavigationAction =
 
 export const navigateTo = (action: NavigationAction): void => {
   switch (action.route) {
+    case "bluetoothChat":
+      window.location.assign("#bluetooth");
+      break;
     case "contacts":
       window.location.assign("#contacts");
       break;
