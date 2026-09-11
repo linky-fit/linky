@@ -38,6 +38,7 @@ Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `d
 
 - Each Evolu owner lane rotates on its own historical mutation threshold: contacts `220`, cashu `170`, messages `160`, transactions `220` (`*_OWNER_ROTATION_TRIGGER_WRITE_COUNT`), with a per-scope `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown.
 - Existing quota failures need relay capacity before rejected history can sync. Keep the device's local data, increase the relay's quota or add a relay with capacity, then reload normally.
+- An upgrade silently adds and enables `wss://evolu.linky.fit` and adds `wss://nostr.linky.fit` to the user's Nostr relay lists once, preserving custom endpoints. Later user edits are respected; explicit development relay overrides skip the migration.
 - Rotation is pointer-only for every scope: the active lane index moves forward in `ownerMeta`, nothing is copied, and older lanes stay readable instead of being pruned.
 - Contacts are additionally capped at `MAX_CONTACTS_PER_OWNER = 100` per active lane; a full lane triggers rotation to the next one.
 

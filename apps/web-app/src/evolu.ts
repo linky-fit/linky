@@ -20,6 +20,7 @@ import {
 import { isRecord } from "./utils/unknown";
 import { getInspectorEmissionEnabled } from "./devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
+import { reportAppLog } from "./devtools/inspector/appLog";
 
 const isEvoluLoggingEnabled = (): boolean => {
   if (!import.meta.env.DEV) return false;
@@ -309,6 +310,34 @@ const setEvoluServerUrls = (urls: ReadonlyArray<string>): void => {
   const extras = unique.filter((u) => !defaultsLower.has(u.toLowerCase()));
   safeLocalStorageSetJson(EVOLU_SERVERS_STORAGE_KEY, extras);
 };
+
+const migrateLinkyEvoluServer = (): void => {
+  const migrationKey = "linky.evoluServers.linkyRelayAdded.v1";
+  if (envEvoluServerUrls.length > 0) return;
+  if (safeLocalStorageGet(migrationKey) === "true") return;
+
+  const relay = "wss://evolu.linky.fit";
+  const configured = getEvoluConfiguredServerUrls();
+  if (!configured.includes(relay)) {
+    const stored = safeLocalStorageGetJson(
+      EVOLU_SERVERS_STORAGE_KEY,
+      EffectSchema.Array(EffectSchema.String),
+      [],
+    );
+    safeLocalStorageSetJson(EVOLU_SERVERS_STORAGE_KEY, [...stored, relay]);
+  }
+  setEvoluServerDisabled(relay, false);
+
+  if (!getEvoluActiveServerUrls().includes(relay)) return;
+  safeLocalStorageSetJson(migrationKey, true);
+  reportAppLog({
+    tag: "evolu.linkyRelayMigrated",
+    summary: "Enabled the Linky Evolu relay for this installation",
+    payload: { relay },
+  });
+};
+
+migrateLinkyEvoluServer();
 
 const EVOLU_SERVER_URLS: ReadonlyArray<string> = getEvoluActiveServerUrls();
 

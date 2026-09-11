@@ -68,6 +68,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
   "relayList.syncFailed":
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
+  "evolu.linkyRelayMigrated":
+    "The one-time upgrade enabled the Linky Evolu relay before database startup, preserving the other configured servers and their disabled states.",
+  "relayList.linkyRelayMigrated":
+    "The one-time upgrade published both Nostr relay lists with the Linky relay added. Event links identify the signed list publications; failed attempts remain pending for retry.",
   "pay.step":
     "One step of paying a contact with a cashu token sent as a chat message (start, mint-selected, swap-ok, plan-send-token, publish-pending, publish-ok, publish-failed, payment-notice-publish, message-ack, queued-offline). The client and message links tie the steps to the gift wraps they produced.",
   "contacts.addToGroup":

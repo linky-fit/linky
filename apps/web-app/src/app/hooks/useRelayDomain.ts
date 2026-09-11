@@ -15,6 +15,10 @@ import { navigateTo } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
 import {
   loadCachedRelayLists,
+  loadInitialRelayUrls,
+  needsLinkyNostrRelayMigration,
+  completeLinkyNostrRelayMigration,
+  withLinkyNostrRelay,
   NOSTR_RELAYS,
   saveCachedRelayLists,
 } from "../../utils/nostrRelays";
@@ -87,16 +91,12 @@ export const useRelayDomain = ({
     return identityFromNsec(nsec)?.pubkey ?? null;
   }, [currentNsec]);
 
-  const [relayUrls, setRelayUrls] = React.useState<string[]>(() => {
-    const cached =
-      cachePubkey === null ? null : loadCachedRelayLists(cachePubkey);
-    return cached === null ? [...NOSTR_RELAYS] : [...cached.relayUrls];
-  });
+  const [relayUrls, setRelayUrls] = React.useState<string[]>(() =>
+    loadInitialRelayUrls(cachePubkey),
+  );
 
   React.useEffect(() => {
-    const cached =
-      cachePubkey === null ? null : loadCachedRelayLists(cachePubkey);
-    const next = cached === null ? NOSTR_RELAYS : cached.relayUrls;
+    const next = loadInitialRelayUrls(cachePubkey);
     setRelayUrls((current) =>
       haveSameRelayUrls(current, next) ? current : [...next],
     );
@@ -168,6 +168,7 @@ export const useRelayDomain = ({
       if (Exit.isFailure(exit)) {
         throw new Error("relay list publish failed");
       }
+      return exit.value;
     },
     [currentNsec, publishRelayLists],
   );
@@ -177,6 +178,7 @@ export const useRelayDomain = ({
   });
 
   const relayProfileSyncForNpubRef = React.useRef<string | null>(null);
+  const [syncAttempt, retrySync] = React.useReducer((n: number) => n + 1, 0);
 
   React.useEffect(() => {
     if (!networkEnabled) return;
@@ -186,6 +188,7 @@ export const useRelayDomain = ({
     if (relayProfileSyncForNpubRef.current === relaySyncKey) return;
 
     let cancelled = false;
+    let retryTimeout: number | undefined;
 
     const run = async () => {
       try {
@@ -205,6 +208,50 @@ export const useRelayDomain = ({
 
         const cached =
           cachePubkey === null ? null : loadCachedRelayLists(cachePubkey);
+
+        if (
+          cachePubkey !== null &&
+          needsLinkyNostrRelayMigration(cachePubkey)
+        ) {
+          const source =
+            cached !== null && newestUpdatedAt(cached) > newestUpdatedAt(lists)
+              ? cached.relayUrls
+              : urls.length > 0
+                ? Array.from(new Set([...relayListUrls, ...inboxRelayUrls]))
+                : (cached?.relayUrls ?? NOSTR_RELAYS);
+          const migrated = withLinkyNostrRelay(source);
+          // Publish before changing state: changing relays rebuilds the runtime
+          // and interrupts any in-flight publish on the previous runtime.
+          const receipt = await publishNostrRelayLists(migrated);
+          if (cancelled) return;
+          saveCachedRelayLists(cachePubkey, {
+            relayUrls: migrated,
+            relaysUpdatedAt: receipt.relayList.sentAt,
+            dmRelaysUpdatedAt: receipt.dmRelayList.sentAt,
+          });
+          if (
+            haveSameRelayUrls(
+              loadCachedRelayLists(cachePubkey)?.relayUrls ?? [],
+              migrated,
+            )
+          ) {
+            completeLinkyNostrRelayMigration(cachePubkey);
+          }
+          relayProfileSyncForNpubRef.current = relayProfileSyncKey(
+            currentNpub,
+            migrated,
+          );
+          setRelayUrls(migrated);
+          reportAppLog({
+            tag: "relayList.linkyRelayMigrated",
+            summary: "Added the Linky relay to the Nostr relay lists",
+            links: {
+              wrap: [receipt.relayList.eventId, receipt.dmRelayList.eventId],
+            },
+            payload: { relayCount: migrated.length },
+          });
+          return;
+        }
 
         if (urls.length > 0) {
           if (
@@ -257,7 +304,14 @@ export const useRelayDomain = ({
           await publishNostrRelayLists([...fallback]);
         }
       } catch (e) {
+        if (cancelled) return;
         relayProfileSyncForNpubRef.current = null;
+        if (
+          cachePubkey !== null &&
+          needsLinkyNostrRelayMigration(cachePubkey)
+        ) {
+          retryTimeout = window.setTimeout(retrySync, 30_000);
+        }
         reportAppLog({
           tag: "relayList.syncFailed",
           summary: "Relay list sync from relays failed",
@@ -269,6 +323,7 @@ export const useRelayDomain = ({
     void run();
     return () => {
       cancelled = true;
+      window.clearTimeout(retryTimeout);
     };
   }, [
     cachePubkey,
@@ -278,6 +333,7 @@ export const useRelayDomain = ({
     networkEnabled,
     publishNostrRelayLists,
     relayUrls,
+    syncAttempt,
   ]);
 
   const saveNewRelay = React.useCallback(() => {
