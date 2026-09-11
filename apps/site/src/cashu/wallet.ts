@@ -6,7 +6,6 @@ import {
   Bolt11Invoice,
   buildPaymentAmountAttempts,
   buildPaymentFailureAmountAttempts,
-  decodeTokenText,
   encodeToken,
   fetchLnurlInvoiceForTarget,
   GENERIC_MINT_ICON_DATA_URL,
@@ -16,18 +15,16 @@ import {
   MeltDraft,
   MeltQuote,
   Mints,
-  NewTokenRow,
   parseTokenText,
   normalizeTokenText,
   isTestMintUrl,
   Restore,
   RestoreDraft,
   runLinkshu,
-  TokenStore,
   Tokens,
   Validation,
 } from "@linky/linkshu";
-import type { LinkshuServices, TokenText } from "@linky/linkshu";
+import type { LinkshuServices, StoredProof, TokenText } from "@linky/linkshu";
 import { Effect, Schema } from "effect";
 import { walletStorage } from "./walletStorage";
 
@@ -75,9 +72,7 @@ const CompletedPayment = Schema.parseJson(
 const withWallet = async <A>(
   token: string,
   use: (
-    run: <V, E>(
-      effect: Effect.Effect<V, E, LinkshuServices | TokenStore>,
-    ) => Promise<V>,
+    run: <V, E>(effect: Effect.Effect<V, E, LinkshuServices>) => Promise<V>,
     key: string,
     text: TokenText,
   ) => Promise<A>,
@@ -91,30 +86,22 @@ const withWallet = async <A>(
   return navigator.locks.request(key, async () => {
     const config = walletStorage(key);
     const run = async <V, E>(
-      effect: Effect.Effect<V, E, LinkshuServices | TokenStore>,
+      effect: Effect.Effect<V, E, LinkshuServices>,
     ): Promise<V> => {
-      const result = await runLinkshu(
-        config,
-        Effect.either(Effect.provide(effect, config.tokenStore)),
-      );
+      const result = await runLinkshu(config, Effect.either(effect));
       if (result._tag === "Left") throw result.left;
       return result.right;
     };
+    // The pasted token's proofs are trusted as-is: the site never re-signs
+    // them, it only spends them.
     await run(
       Effect.gen(function* () {
-        const store = yield* TokenStore;
+        const tokens = yield* Tokens;
         if (
-          (yield* store.loadAll).length === 0 &&
+          (yield* tokens.proofs).length === 0 &&
           localStorage.getItem(`${key}.initialized`) === null
         ) {
-          yield* store.insert(
-            new NewTokenRow({
-              originalTokenText: text,
-              tokenText: text,
-              state: "accepted",
-              error: null,
-            }),
-          );
+          yield* tokens.adoptToken(text);
           localStorage.setItem(`${key}.initialized`, "1");
         }
       }),
@@ -123,15 +110,25 @@ const withWallet = async <A>(
   });
 };
 
-const remainingToken = (texts: readonly TokenText[]): string | null => {
-  const decoded = texts.flatMap((text) => {
-    const token = decodeTokenText(text);
-    return token ? [token] : [];
-  });
-  const first = decoded[0];
+const availableProofs = (proofs: readonly StoredProof[]) =>
+  proofs.filter((proof) => proof.state === "available");
+
+/** The wallet's remaining balance as one token the user can keep. */
+const remainingToken = (proofs: readonly StoredProof[]): string | null => {
+  const [first, ...rest] = proofs;
   if (!first) return null;
-  const [proof, ...rest] = decoded.flatMap((token) => token.proofs);
-  return proof ? encodeToken({ ...first, proofs: [proof, ...rest] }) : null;
+  const toProof = (proof: StoredProof) => ({
+    id: proof.keysetId,
+    amount: proof.amount,
+    secret: proof.secret,
+    C: proof.C,
+  });
+  return encodeToken({
+    mint: first.mint,
+    unit: first.unit,
+    memo: null,
+    proofs: [toProof(first), ...rest.map(toProof)],
+  });
 };
 
 export const inspectToken = (token: string): Promise<TokenSnapshot> =>
@@ -192,15 +189,16 @@ export const redeemToken = (
       feePaid: number | null,
       address: string,
     ) => {
-      const rows = await run(Effect.flatMap(Tokens, (tokens) => tokens.list));
-      const accepted = rows.filter((row) => row.state === "accepted");
+      const proofs = availableProofs(
+        await run(Effect.flatMap(Tokens, (tokens) => tokens.proofs)),
+      );
       const result = {
         amountSent,
         feePaid,
         mint,
         lightningAddress: address,
-        changeAmount: accepted.reduce((sum, row) => sum + row.amount, 0),
-        changeToken: remainingToken(accepted.map((row) => row.tokenText)),
+        changeAmount: proofs.reduce((sum, proof) => sum + proof.amount, 0),
+        changeToken: remainingToken(proofs),
       };
       localStorage.setItem(
         `${key}.completed`,
@@ -209,15 +207,10 @@ export const redeemToken = (
       localStorage.removeItem(`${key}.payment`);
       return result;
     };
-    const returnReservedRows = () =>
-      run(
-        Effect.gen(function* () {
-          const tokens = yield* Tokens;
-          for (const row of yield* tokens.list) {
-            if (row.state === "reserved") yield* tokens.returnToWallet(row.id);
-          }
-        }),
-      );
+    // Settles held melt inputs from the mint's own answer: PAID reclaims
+    // change, UNPAID returns the inputs, PENDING keeps both.
+    const settlePendingMelts = () =>
+      run(Effect.flatMap(Melt, (melt) => melt.resumePending));
     // A rejected melt frees its inputs only once the mint itself reports the quote unpaid.
     const releaseUnpaidAttempt = async () => {
       const pendingText = localStorage.getItem(`${key}.payment`);
@@ -230,7 +223,7 @@ export const redeemToken = (
         ),
       );
       if (state !== "UNPAID") return;
-      await returnReservedRows();
+      await settlePendingMelts();
       localStorage.removeItem(`${key}.payment`);
     };
     const pendingText = localStorage.getItem(`${key}.payment`);
@@ -244,7 +237,7 @@ export const redeemToken = (
           "Payment is pending. Check again before sending another payment.",
           "melt",
         );
-      await returnReservedRows();
+      await settlePendingMelts();
       const restored = await run(
         Effect.flatMap(Restore, (restore) =>
           restore.restore(new RestoreDraft({ mints: [mint] })),

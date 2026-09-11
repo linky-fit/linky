@@ -1,10 +1,17 @@
 import {
+  applyOperationPatch,
+  applyProofPatch,
   Bip39Seed,
+  deriveStoreId,
   KeyValueStore,
   LeaseId,
-  StoredTokenRow,
-  TokenRowId,
-  TokenStore,
+  OperationId,
+  operationKeyOf,
+  OperationStore,
+  ProofId,
+  ProofStore,
+  StoredOperation,
+  StoredProof,
   UnixSeconds,
 } from "@linky/linkshu";
 import { Effect, Layer, Schema } from "effect";
@@ -14,10 +21,13 @@ const SeedJson = Schema.parseJson(
     Schema.itemsCount(64),
   ),
 );
-const RowsJson = Schema.parseJson(Schema.Array(StoredTokenRow));
+const ProofsJson = Schema.parseJson(Schema.Array(StoredProof));
+const OperationsJson = Schema.parseJson(Schema.Array(StoredOperation));
 const LeaseJson = Schema.parseJson(
   Schema.Struct({ lease: LeaseId, expiresAtMs: Schema.Number }),
 );
+
+const nowSeconds = () => UnixSeconds.make(Math.floor(Date.now() / 1000));
 
 export const walletStorage = (prefix: string) => {
   const seedKey = `${prefix}.seed`;
@@ -28,39 +38,76 @@ export const walletStorage = (prefix: string) => {
       : Schema.decodeUnknownSync(SeedJson)(storedSeed);
   if (storedSeed === null)
     localStorage.setItem(seedKey, Schema.encodeSync(SeedJson)(seed));
-  const rowsKey = `${prefix}.tokens`;
-  const loadRows = () =>
-    Schema.decodeUnknownSync(RowsJson)(localStorage.getItem(rowsKey) ?? "[]");
-  const saveRows = (rows: readonly StoredTokenRow[]) =>
-    localStorage.setItem(rowsKey, Schema.encodeSync(RowsJson)(rows));
+  const proofsKey = `${prefix}.proofs`;
+  const loadProofs = () =>
+    Schema.decodeUnknownSync(ProofsJson)(
+      localStorage.getItem(proofsKey) ?? "[]",
+    );
+  const saveProofs = (rows: readonly StoredProof[]) =>
+    localStorage.setItem(proofsKey, Schema.encodeSync(ProofsJson)(rows));
+  const operationsKey = `${prefix}.operations`;
+  const loadOperations = () =>
+    Schema.decodeUnknownSync(OperationsJson)(
+      localStorage.getItem(operationsKey) ?? "[]",
+    );
+  const saveOperations = (rows: readonly StoredOperation[]) =>
+    localStorage.setItem(
+      operationsKey,
+      Schema.encodeSync(OperationsJson)(rows),
+    );
   const readLease = (key: string) => {
     const raw = localStorage.getItem(`${prefix}.lease.${key}`);
     return raw === null ? null : Schema.decodeUnknownSync(LeaseJson)(raw);
   };
   return {
     bip39Seed: Bip39Seed.make(Uint8Array.from(seed)),
-    tokenStore: Layer.succeed(TokenStore, {
-      loadAll: Effect.sync(loadRows),
-      insert: (row) =>
+    proofStore: Layer.succeed(ProofStore, {
+      loadAll: Effect.sync(loadProofs),
+      insert: (proofs) =>
         Effect.sync(() => {
-          const stored = new StoredTokenRow({
-            ...row,
-            id: TokenRowId.make(crypto.randomUUID()),
-            createdAt: UnixSeconds.make(Math.floor(Date.now() / 1000)),
+          const byId = new Map(loadProofs().map((row) => [row.id, row]));
+          const stored = proofs.map((proof) => {
+            const id = ProofId.make(deriveStoreId(proof.secret));
+            const row = new StoredProof({
+              ...proof,
+              id,
+              createdAt: byId.get(id)?.createdAt ?? nowSeconds(),
+            });
+            byId.set(id, row);
+            return row;
           });
-          saveRows([...loadRows(), stored]);
+          saveProofs([...byId.values()]);
           return stored;
         }),
       update: (id, patch) =>
         Effect.sync(() =>
-          saveRows(
-            loadRows().map((row) =>
-              row.id === id ? new StoredTokenRow({ ...row, ...patch }) : row,
+          saveProofs(
+            loadProofs().map((row) =>
+              row.id === id ? applyProofPatch(row, patch) : row,
             ),
           ),
         ),
-      remove: (id) =>
-        Effect.sync(() => saveRows(loadRows().filter((row) => row.id !== id))),
+    }),
+    operationStore: Layer.succeed(OperationStore, {
+      loadAll: Effect.sync(loadOperations),
+      insert: (operation) =>
+        Effect.sync(() => {
+          const id = OperationId.make(deriveStoreId(operationKeyOf(operation)));
+          const stored = new StoredOperation({ ...operation, id });
+          saveOperations([
+            ...loadOperations().filter((row) => row.id !== id),
+            stored,
+          ]);
+          return stored;
+        }),
+      update: (id, patch) =>
+        Effect.sync(() =>
+          saveOperations(
+            loadOperations().map((row) =>
+              row.id === id ? applyOperationPatch(row, patch) : row,
+            ),
+          ),
+        ),
     }),
     keyValueStore: Layer.succeed(KeyValueStore, {
       get: (key) =>
