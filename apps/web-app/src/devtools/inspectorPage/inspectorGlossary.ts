@@ -26,6 +26,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A direct BLE connection became available or disconnected. The link joins its traffic and identity verification.",
   "bluetooth.identityVerified":
     "A nearby peer answered a fresh challenge signed by its Nostr identity. The pubkey links it to contact activity; this is not a distance guarantee.",
+  "bluetooth.identityRequested":
+    "A fresh Linky identity challenge was queued on a direct BLE connection. Follow this link to its reply or a transport failure.",
+  "bluetooth.identityIgnored":
+    "An identity reply was not used for nearby presence because its challenge expired or was already consumed, its proof was invalid, or it belongs to the current account.",
   "bluetooth.publicMessage":
     "A signed public BitChat room message was received or accepted for sending to connected peers. It does not confirm delivery to every participant.",
   "bluetooth.wireSent":

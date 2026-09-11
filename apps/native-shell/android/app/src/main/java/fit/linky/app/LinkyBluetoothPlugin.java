@@ -52,6 +52,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -562,13 +563,14 @@ public class LinkyBluetoothPlugin extends Plugin {
             @Override
             public void onServicesDiscovered(BluetoothGatt gatt, int status) {
                 dispatch(() -> {
-                    BluetoothGattService service = gatt.getService(SERVICE);
+                    BluetoothGattService service = selectChatService(gatt.getServices());
                     if (status != BluetoothGatt.GATT_SUCCESS || service == null) {
                         disconnect(peer);
                         return;
                     }
                     peer.mesh = service.getCharacteristic(MESH);
-                    peer.identity = service.getCharacteristic(IDENTITY);
+                    BluetoothGattCharacteristic identity = service.getCharacteristic(IDENTITY);
+                    peer.identity = supportsChat(identity) ? identity : null;
                     if (peer.mesh == null || !subscribe(peer, peer.mesh)) disconnect(peer);
                 });
             }
@@ -629,6 +631,24 @@ public class LinkyBluetoothPlugin extends Plugin {
         peer.operationStartedAt = SystemClock.elapsedRealtime();
         descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
         return peer.gatt.writeDescriptor(descriptor);
+    }
+
+    static BluetoothGattService selectChatService(List<BluetoothGattService> services) {
+        BluetoothGattService meshOnly = null;
+        for (BluetoothGattService service : services) {
+            if (!SERVICE.equals(service.getUuid()) || !supportsChat(service.getCharacteristic(MESH))) continue;
+            if (supportsChat(service.getCharacteristic(IDENTITY))) return service;
+            if (meshOnly == null) meshOnly = service;
+        }
+        return meshOnly;
+    }
+
+    private static boolean supportsChat(BluetoothGattCharacteristic characteristic) {
+        if (characteristic == null) return false;
+        int properties = characteristic.getProperties();
+        return (properties & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0
+            && (properties & (BluetoothGattCharacteristic.PROPERTY_WRITE
+                | BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)) != 0;
     }
 
     private BluetoothGattServerCallback serverCallback(long session) {

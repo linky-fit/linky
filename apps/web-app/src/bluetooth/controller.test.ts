@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { encodeNsec } from "@linky/linkstr";
 import { makeIdentity } from "@linky/linkstr/testing";
+import { base64 } from "@scure/base";
+import { getInspectorEmissionEnabled } from "../devtools/inspector/inspectorEnabled";
+import { reportInspectorRows } from "../devtools/inspector/reportInspectorRows";
 import { BluetoothController } from "./controller";
+import { IdentityAssembler } from "./identity";
 import type { BluetoothState, BluetoothTransport } from "./transport";
 
 vi.mock("../platform/secretStorage", () => ({
@@ -9,7 +13,10 @@ vi.mock("../platform/secretStorage", () => ({
   writeStoredSecret: async () => {},
 }));
 vi.mock("../devtools/inspector/inspectorEnabled", () => ({
-  getInspectorEmissionEnabled: () => false,
+  getInspectorEmissionEnabled: vi.fn(() => false),
+}));
+vi.mock("../devtools/inspector/reportInspectorRows", () => ({
+  reportInspectorRows: vi.fn(),
 }));
 
 class FakeBluetooth implements BluetoothTransport {
@@ -70,11 +77,15 @@ class FakeBluetooth implements BluetoothTransport {
 }
 
 const controllers: BluetoothController[] = [];
-const createController = (transport: FakeBluetooth, available = true) => {
+const createController = (
+  transport: FakeBluetooth,
+  available = true,
+  nsec = encodeNsec(makeIdentity().secretKey),
+) => {
   const controller = new BluetoothController(
     transport,
     available,
-    encodeNsec(makeIdentity().secretKey),
+    nsec,
     "Alice",
   );
   controllers.push(controller);
@@ -85,9 +96,45 @@ afterEach(async () => {
   controllers.splice(0).forEach((controller) => controller.dispose());
   await new Promise((resolve) => setTimeout(resolve, 0));
   localStorage.clear();
+  vi.mocked(getInspectorEmissionEnabled).mockReturnValue(false);
+  vi.mocked(reportInspectorRows).mockClear();
 });
 
 describe("Bluetooth controller", () => {
+  it("reports completed identity requests and explains why the current account is excluded", async () => {
+    vi.mocked(getInspectorEmissionEnabled).mockReturnValue(true);
+    const nsec = encodeNsec(makeIdentity().secretKey);
+    const a = new FakeBluetooth();
+    const b = new FakeBluetooth();
+    const alice = createController(a, true, nsec);
+    const otherDevice = createController(b, true, nsec);
+    await alice.setEnabled(true);
+    await otherDevice.setEnabled(true);
+    a.connect(b);
+    await vi.waitFor(() => {
+      const rows = vi
+        .mocked(reportInspectorRows)
+        .mock.calls.flatMap(([rows]) => rows);
+      expect(
+        rows.filter((row) => row.tag === "bluetooth.identityRequested"),
+      ).toHaveLength(2);
+      expect(
+        rows.filter((row) => row.tag === "bluetooth.identityIgnored"),
+      ).toEqual([
+        expect.objectContaining({
+          payload: { reason: "own-account" },
+          links: expect.objectContaining({ bluetoothLink: "direct" }),
+        }),
+        expect.objectContaining({
+          payload: { reason: "own-account" },
+          links: expect.objectContaining({ bluetoothLink: "direct" }),
+        }),
+      ]);
+    });
+    expect(alice.getSnapshot().nearby).toEqual([]);
+    expect(otherDevice.getSnapshot().nearby).toEqual([]);
+  });
+
   it("never starts from permission alone or in a PWA", async () => {
     const native = new FakeBluetooth();
     const controller = createController(native);
@@ -121,6 +168,7 @@ describe("Bluetooth controller", () => {
   it("verifies direct Linky identities, exchanges a public message, and clears presence on disable", async () => {
     const a = new FakeBluetooth();
     const b = new FakeBluetooth();
+    const sent = vi.spyOn(a, "send");
     const alice = createController(a);
     const bob = createController(b);
     await alice.setEnabled(true);
@@ -133,6 +181,14 @@ describe("Bluetooth controller", () => {
       },
       { timeout: 3000 },
     );
+    const assembler = new IdentityAssembler();
+    const proofs = sent.mock.calls.flatMap(([packet]) => {
+      if (packet.lane !== "identity") return [];
+      const decoded = assembler.receive(base64.decode(packet.data));
+      return decoded?.type === "proof" ? [decoded] : [];
+    });
+    expect(proofs).toHaveLength(1);
+    expect(proofs[0]?.name).toBe("");
     await alice.sendMessage("Hello from Linky");
     await vi.waitFor(() =>
       expect(

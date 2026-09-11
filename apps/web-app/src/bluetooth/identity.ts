@@ -32,7 +32,6 @@ export type IdentityProof = typeof Proof.Type;
 export interface NearbyIdentity {
   pubkey: Pubkey;
   npub: string;
-  name: string;
   meshId: string;
 }
 
@@ -95,7 +94,6 @@ export const verifyIdentityProof = (
     return {
       pubkey,
       npub: encodeNpub(pubkey),
-      name: proof.name,
       meshId: proof.meshId,
     };
   } catch {

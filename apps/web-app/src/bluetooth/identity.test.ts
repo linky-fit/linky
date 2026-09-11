@@ -20,6 +20,7 @@ describe("Bluetooth identity proof", () => {
       "Alice",
     );
     expect(verifyIdentityProof(proof, challenge)?.pubkey).toBe(identity.pubkey);
+    expect(verifyIdentityProof(proof, challenge)).not.toHaveProperty("name");
     expect(
       verifyIdentityProof({ ...proof, name: "Someone else" }, challenge),
     ).toBeNull();

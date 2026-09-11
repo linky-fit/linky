@@ -493,6 +493,12 @@ export class BluetoothController {
     peer.challenge = newIdentityChallenge(this.mesh.ownPeerId);
     peer.challengedAt = Date.now();
     await this.sendIdentity(id, peer, peer.challenge);
+    logBluetooth(
+      "bluetooth.identityRequested",
+      "Requested nearby Linky identity",
+      {},
+      { bluetoothLink: id },
+    );
   }
 
   private async receiveIdentity(
@@ -505,25 +511,38 @@ export class BluetoothController {
       await this.sendIdentity(
         id,
         peer,
-        createIdentityProof(
-          packet,
-          this.identity,
-          this.mesh.ownPeerId,
-          this.nickname,
-        ),
+        createIdentityProof(packet, this.identity, this.mesh.ownPeerId, ""),
       );
       return;
     }
-    if (!peer.challenge || Date.now() - peer.challengedAt > 15_000) return;
-    const identity = verifyIdentityProof(packet, peer.challenge);
-    if (!identity || identity.pubkey === this.identity.pubkey) return;
+    const challengeIsFresh =
+      peer.challenge !== null && Date.now() - peer.challengedAt <= 15_000;
+    const identity =
+      challengeIsFresh && peer.challenge
+        ? verifyIdentityProof(packet, peer.challenge)
+        : null;
+    if (!identity || identity.pubkey === this.identity.pubkey) {
+      logBluetooth(
+        "bluetooth.identityIgnored",
+        "Nearby Linky identity proof ignored",
+        {
+          reason: !challengeIsFresh
+            ? "no-fresh-challenge"
+            : !identity
+              ? "invalid-proof"
+              : "own-account",
+        },
+        { bluetoothLink: id, bluetoothPeer: packet.meshId },
+      );
+      return;
+    }
     peer.challenge = null;
     peer.identity = identity;
     peer.verifiedAt = Date.now();
     logBluetooth(
       "bluetooth.identityVerified",
       "Nearby Linky identity verified",
-      { name: identity.name },
+      {},
       {
         bluetoothLink: id,
         bluetoothPeer: identity.meshId,

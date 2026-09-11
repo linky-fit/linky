@@ -206,6 +206,17 @@ export const useOutboxSync = ({
 
 The web app's version is `applyOutboxResult` in `apps/web-app/src/app/hooks/messages/outboxResults.ts`; [outbox.md](./outbox.md) explains results and acks.
 
+## Independent profile lookups
+
+A function atom holds one current operation and result. Calling the same atom again interrupts its previous operation; separate callers sharing that atom do not have independent promises. For profile lookups owned by a separate component, create one atom per mounted consumer:
+
+```tsx
+const [profileLookup] = React.useState(createFetchProfilesAtom);
+const fetchProfiles = useAtomSet(profileLookup, { mode: "promiseExit" });
+```
+
+Import `createFetchProfilesAtom` from `@linky/linkstr-react`. Serialize batches within that consumer so two calls to its atom do not overlap. The existing `fetchProfilesAtom` remains a shared single-operation atom.
+
 ## Profile watch
 
 `watchedProfilesAtom` (the pubkey set), `profileWatchHandlerAtom`, and `profileWatchAtom` follow the inbox pattern; changing the set resubscribes without rebuilding the runtime. See [profiles.md](./profiles.md) and `apps/web-app/src/app/hooks/useLinkstrProfileSync.ts`.

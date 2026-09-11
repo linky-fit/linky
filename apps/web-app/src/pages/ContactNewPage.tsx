@@ -9,6 +9,7 @@ import type { FC } from "react";
 import React from "react";
 import { getContactQueryPrefill } from "../app/lib/contactQueryPrefill";
 import { useBluetooth } from "../bluetooth/BluetoothContext";
+import { useNearbyProfiles } from "../bluetooth/useNearbyProfiles";
 import { Avatar } from "../components/Avatar";
 
 import type { Translate } from "../i18n";
@@ -242,7 +243,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   const excludedNpubs = new Set(
     knownNpubs.map((npub) => normalizeNpubIdentifier(npub)),
   );
-  const nearbyUsers =
+  const nearbyIdentities =
     bluetooth.available && bluetooth.enabled && bluetooth.state.active
       ? bluetooth.nearby.filter((peer) => {
           if (excludedNpubs.has(peer.npub)) return false;
@@ -251,6 +252,10 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         })
       : [];
   const [step, setStep] = React.useState<"search" | "details">("search");
+  const nearbyUsers = useNearbyProfiles(
+    nearbyIdentities.map((peer) => peer.npub),
+    step === "search",
+  );
   const [searchError, setSearchError] = React.useState<string | null>(null);
   const [searchIsBusy, setSearchIsBusy] = React.useState(false);
   const [searchResults, setSearchResults] =
@@ -626,7 +631,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                         <div className="contact-new-suggestion-main">
                           <span className="contact-avatar" aria-hidden="true">
                             <Avatar
-                              pictureUrl={null}
+                              pictureUrl={peer.pictureUrl}
                               fallback={getInitials(peer.name)}
                               fallbackClassName="contact-avatar-fallback"
                             />
@@ -638,6 +643,11 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                             <span title={peer.npub}>
                               {formatShortNpub(peer.npub)}
                             </span>
+                            {peer.lnAddress ? (
+                              <span title={peer.lnAddress}>
+                                {formatShortLightningAddress(peer.lnAddress)}
+                              </span>
+                            ) : null}
                           </span>
                         </div>
                         <div className="contact-new-suggestion-action">
@@ -648,8 +658,8 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                               void addNewContactFromSearchResult({
                                 npub: peer.npub,
                                 name: peer.name,
-                                lnAddress: "",
-                                pictureUrl: null,
+                                lnAddress: peer.lnAddress,
+                                pictureUrl: peer.pictureUrl,
                                 query: peer.npub,
                                 isExactMatch: true,
                               })

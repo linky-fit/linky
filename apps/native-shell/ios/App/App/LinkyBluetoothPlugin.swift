@@ -26,6 +26,8 @@ final class LinkyBluetoothPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerD
         let peripheral: CBPeripheral
         var mesh: CBCharacteristic?
         var identity: CBCharacteristic?
+        var pendingServices = Set<ObjectIdentifier>()
+        var discoveredServices: [CBService] = []
         var announced = false
         var identitySubscriptionPending = false
         var incoming: [(characteristic: CBUUID, data: Data)] = []
@@ -381,24 +383,30 @@ final class LinkyBluetoothPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerD
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard let client = clients[peripheral.identifier] else { return }
-        guard error == nil, let service = peripheral.services?.first(where: { $0.uuid == Self.serviceUUID }) else {
+        let services = (peripheral.services ?? []).filter { $0.uuid == Self.serviceUUID }
+        guard error == nil, !services.isEmpty else {
             remove(client)
             return
         }
-        peripheral.discoverCharacteristics([Self.meshUUID, Self.identityUUID], for: service)
+        client.discoveredServices.removeAll()
+        client.pendingServices = Set(services.map(ObjectIdentifier.init))
+        for service in services {
+            peripheral.discoverCharacteristics([Self.meshUUID, Self.identityUUID], for: service)
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard let client = clients[peripheral.identifier] else { return }
-        guard error == nil, let characteristics = service.characteristics else { remove(client); return }
-        for characteristic in characteristics where characteristic.properties.contains(.notify)
-            && (characteristic.properties.contains(.write) || characteristic.properties.contains(.writeWithoutResponse)) {
-            if characteristic.uuid == Self.meshUUID { client.mesh = characteristic }
-            if characteristic.uuid == Self.identityUUID { client.identity = characteristic }
-        }
-        guard let mesh = client.mesh else { remove(client); return }
+        guard let client = clients[peripheral.identifier],
+              client.pendingServices.remove(ObjectIdentifier(service)) != nil else { return }
+        if error == nil { client.discoveredServices.append(service) }
+        guard client.pendingServices.isEmpty else { return }
+        guard let selected = LinkyBluetoothService.select(from: client.discoveredServices,
+            meshUUID: Self.meshUUID, identityUUID: Self.identityUUID) else { remove(client); return }
+        client.mesh = selected.mesh
+        client.identity = selected.identity
+        client.discoveredServices.removeAll()
         client.identitySubscriptionPending = client.identity != nil
-        peripheral.setNotifyValue(true, for: mesh)
+        peripheral.setNotifyValue(true, for: selected.mesh)
         if let identity = client.identity { peripheral.setNotifyValue(true, for: identity) }
     }
 

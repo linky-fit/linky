@@ -76,10 +76,9 @@ describe("ContactsPage", () => {
             {
               pubkey: alice.pubkey,
               npub: aliceNpub,
-              name: "Alice",
               meshId: "alice",
             },
-            { pubkey: bob.pubkey, npub: bobNpub, name: "Bob", meshId: "bob" },
+            { pubkey: bob.pubkey, npub: bobNpub, meshId: "bob" },
           ],
           nearbyCount: 3,
           setEnabled: async () => {},

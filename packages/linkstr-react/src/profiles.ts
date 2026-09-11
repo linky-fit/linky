@@ -48,10 +48,12 @@ export const fetchProfileAtom = linkstrRuntimeAtom.fn<Pubkey>()((pubkey) =>
   Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(pubkey)),
 );
 
-export const fetchProfilesAtom = linkstrRuntimeAtom.fn<ReadonlyArray<Pubkey>>()(
-  (pubkeys) =>
+export const createFetchProfilesAtom = () =>
+  linkstrRuntimeAtom.fn<ReadonlyArray<Pubkey>>()((pubkeys) =>
     Effect.flatMap(Profiles, (profiles) => profiles.fetchProfiles(pubkeys)),
-);
+  );
+
+export const fetchProfilesAtom = createFetchProfilesAtom();
 
 export const discoverActiveProfilesAtom = linkstrRuntimeAtom.fn<
   DiscoverActiveProfilesOptions | undefined
