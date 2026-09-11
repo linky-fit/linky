@@ -55,12 +55,14 @@ describe("ContactsPage", () => {
     await act(async () => root.unmount());
   });
 
-  it("moves nearby saved friends across sections once and restores order when inactive", async () => {
+  it("keeps priority contacts above nearby friends without duplicates and restores normal order when inactive", async () => {
     const alice = makeIdentity();
     const bob = makeIdentity();
+    const pinned = makeIdentity();
     const aliceNpub = encodeNpub(alice.pubkey);
     const bobNpub = encodeNpub(bob.pubkey);
-    const page = (active: boolean, available = true) => (
+    const pinnedNpub = encodeNpub(pinned.pubkey);
+    const page = (active: boolean, available = true, hasPriority = true) => (
       <BluetoothContext.Provider
         value={{
           ...emptyBluetoothSnapshot,
@@ -79,6 +81,7 @@ describe("ContactsPage", () => {
               meshId: "alice",
             },
             { pubkey: bob.pubkey, npub: bobNpub, meshId: "bob" },
+            { pubkey: pinned.pubkey, npub: pinnedNpub, meshId: "pinned" },
           ],
           nearbyCount: 3,
           setEnabled: async () => {},
@@ -108,8 +111,12 @@ describe("ContactsPage", () => {
             key === "bluetoothNearbyCount" ? "Nearby peers: {count}" : key
           }
           visibleContacts={{
-            pinned: [{ id: "pinned", name: "Pinned" }],
-            proxyPayments: [{ id: "alice", name: "Alice", npub: aliceNpub }],
+            pinned: hasPriority
+              ? [{ id: "pinned", name: "Pinned", npub: pinnedNpub }]
+              : [],
+            proxyPayments: hasPriority
+              ? [{ id: "alice", name: "Alice", npub: aliceNpub }]
+              : [],
             conversations: [
               {
                 id: "unknown",
@@ -119,7 +126,10 @@ describe("ContactsPage", () => {
               },
               { id: "alice", name: "Alice", npub: aliceNpub },
             ],
-            others: [{ id: "bob", name: "Bob", npub: bobNpub }],
+            others: [
+              { id: "bob", name: "Bob", npub: bobNpub },
+              { id: "pinned", name: "Pinned", npub: pinnedNpub },
+            ],
           }}
         />
       </BluetoothContext.Provider>
@@ -129,6 +139,13 @@ describe("ContactsPage", () => {
       [...rendered.container.querySelectorAll("[data-contact-id]")].map(
         (element) => element.getAttribute("data-contact-id"),
       );
+    expect(order()).toEqual(["pinned", "alice", "bob", "unknown"]);
+    expect(
+      [
+        ...rendered.container.querySelectorAll(".contact-list-section-title"),
+      ].map((element) => element.textContent),
+    ).toEqual(["proxyPayments", "bluetoothNearby", "Conversations"]);
+    await rendered.rerender(page(true, true, false));
     expect(order()).toEqual(["alice", "bob", "pinned", "unknown"]);
     expect(
       rendered.container.querySelector(".contact-list-section-title")

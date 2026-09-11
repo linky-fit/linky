@@ -137,15 +137,6 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
               <p className="muted">{t("noContactsYet")}</p>
             ) : (
               <>
-                {groups.nearby.length > 0 && (
-                  <React.Fragment key="nearby">
-                    <div className="settings-section-title contact-list-section-title">
-                      {t("bluetoothNearby")}
-                    </div>
-                    {groups.nearby.map(renderContactCard)}
-                  </React.Fragment>
-                )}
-
                 {groups.pinned.map(renderContactCard)}
 
                 {groups.proxyPayments.length > 0 && (
@@ -154,6 +145,15 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
                       {t("proxyPayments")}
                     </div>
                     {groups.proxyPayments.map(renderContactCard)}
+                  </React.Fragment>
+                )}
+
+                {groups.nearby.length > 0 && (
+                  <React.Fragment key="nearby">
+                    <div className="settings-section-title contact-list-section-title">
+                      {t("bluetoothNearby")}
+                    </div>
+                    {groups.nearby.map(renderContactCard)}
                   </React.Fragment>
                 )}
 

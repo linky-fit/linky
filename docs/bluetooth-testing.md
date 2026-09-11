@@ -15,7 +15,7 @@ This needs **Linky running on both phones**. BitChat alone does not implement Li
 
 1. Use different Linky accounts. Open Settings and enable Bluetooth chat on both phones. Grant permission when prompted. On Android 6–11, discovery also needs Location permission and the system Location switch.
 2. Keep both apps open and wait up to 30 seconds. Repeat with BitChat still running in the background on each phone; Linky must select its identity-capable service even when BitChat exposes a public-chat service too.
-3. Saved nearby friends appear in a **Nearby** section at the top of Contacts. Their cards have no Nearby badge. There is no public Bluetooth chat button.
+3. Saved nearby friends appear in a **Nearby** section below any recently added contacts and active proxy-payment contacts. Priority contacts stay in their original position even when nearby, and appear only once. Their cards have no Nearby badge. There is no public Bluetooth chat button.
 4. Verify that existing contact names and group/search filters still behave normally.
 5. Disable Bluetooth or background the other Linky app. The Nearby section disappears and normal ordering returns. Allow up to 60 seconds for stale presence to expire after abrupt radio loss.
 6. Toggle system Bluetooth off/on, background/resume Linky, and revoke/regrant permission in system settings. Linky should report the inactive reason, clear stale presence, and reconnect when enabled and available.

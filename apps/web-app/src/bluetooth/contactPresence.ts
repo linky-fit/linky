@@ -21,20 +21,20 @@ export const partitionNearbyContacts = (
 ) => {
   const seen = new Set<string>();
   const nearby: ContactRowLike[] = [];
-  const remaining = (contacts: readonly ContactRowLike[]) =>
+  const remaining = (contacts: readonly ContactRowLike[], moveNearby = true) =>
     contacts.filter((contact) => {
       if (contact.id) {
         if (seen.has(contact.id)) return false;
         seen.add(contact.id);
       }
-      if (!isNearbyContact(contact, nearbyNpubs)) return true;
+      if (!moveNearby || !isNearbyContact(contact, nearbyNpubs)) return true;
       nearby.push(contact);
       return false;
     });
 
   return {
-    pinned: remaining(groups.pinned),
-    proxyPayments: remaining(groups.proxyPayments),
+    pinned: remaining(groups.pinned, false),
+    proxyPayments: remaining(groups.proxyPayments, false),
     conversations: remaining(groups.conversations),
     others: remaining(groups.others),
     nearby,
