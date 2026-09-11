@@ -124,6 +124,8 @@ Wire notes: `displayName` is written as `display_name`; empty strings are omitte
 
 `profile` and `status` are the same `ProfileUpdated` / `StatusUpdated` facts the watch emits — newest event per kind, expired statuses excluded. React atoms: `fetchProfileAtom`, `fetchProfilesAtom`, `discoverActiveProfilesAtom`, `searchProfilesAtom` (takes `{ query, options? }`).
 
+`createFetchProfilesAtom()` creates an independent batch-fetch atom with the same input and output as `fetchProfilesAtom`. Keep one instance per consumer and serialize calls to it; this prevents separate profile lookup flows from interrupting each other. See [React](./react.md#independent-profile-lookups).
+
 Search streams ranked matches through `onHits` each time a relay answers, until the deadline; `preferredDomains` ranks profiles whose `nip05` or `lud16` ends in one of those domains first. Matching is accent- and case-insensitive on every query word.
 
 ## Receiving

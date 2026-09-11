@@ -8,11 +8,14 @@ import {
 import type { FC } from "react";
 import React from "react";
 import { getContactQueryPrefill } from "../app/lib/contactQueryPrefill";
+import { useBluetooth } from "../bluetooth/BluetoothContext";
+import { useNearbyProfiles } from "../bluetooth/useNearbyProfiles";
 import { Avatar } from "../components/Avatar";
 
 import type { Translate } from "../i18n";
 import { readClipboardText } from "../platform/clipboard";
 import { normalizeContactGroups } from "../utils/contactGroups";
+import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import {
   formatShortLightningAddress,
   formatShortNpub,
@@ -195,7 +198,7 @@ interface ContactSuggestionCandidate extends Omit<
   displayLnAddress: string;
 }
 
-type ContactSearchResult =
+export type ContactSearchResult =
   | { kind: "empty" }
   | { kind: "error"; identifier: string }
   | { kind: "found"; contacts: ContactSearchCandidate[] }
@@ -215,6 +218,7 @@ interface ContactNewPageProps {
   groupNames: string[];
   handleSaveContact: () => void;
   isSavingContact: boolean;
+  knownNpubs?: readonly string[];
   searchNewContact: (
     query?: string,
     onProgress?: (result: ContactSearchResult) => void,
@@ -230,11 +234,51 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   groupNames,
   handleSaveContact,
   isSavingContact,
+  knownNpubs = [],
   searchNewContact,
   setForm,
   t,
 }) => {
+  const bluetooth = useBluetooth();
+  const excludedNpubs = new Set(
+    knownNpubs.map((npub) => normalizeNpubIdentifier(npub)),
+  );
+  const nearbyIdentities =
+    bluetooth.available && bluetooth.enabled && bluetooth.state.active
+      ? bluetooth.nearby.filter((peer) => {
+          if (excludedNpubs.has(peer.npub)) return false;
+          excludedNpubs.add(peer.npub);
+          return true;
+        })
+      : [];
   const [step, setStep] = React.useState<"search" | "details">("search");
+  const searchQuery = form.npub.trim();
+  const nearbyUsers = useNearbyProfiles(
+    nearbyIdentities.map((peer) => peer.npub),
+    step === "search" && !searchQuery,
+  );
+  const suggestionNpubs = new Set<string>();
+  const suggestions = [
+    ...nearbyUsers.map((peer) => {
+      const recent = contactSuggestions.find(
+        (suggestion) => normalizeNpubIdentifier(suggestion.npub) === peer.npub,
+      );
+      return {
+        npub: peer.npub,
+        name: peer.name || recent?.name || "",
+        lnAddress: peer.lnAddress || recent?.lnAddress || "",
+        pictureUrl: peer.pictureUrl ?? recent?.pictureUrl ?? null,
+        query: peer.npub,
+        displayLnAddress: peer.lnAddress || recent?.displayLnAddress || "",
+      };
+    }),
+    ...contactSuggestions,
+  ].filter((suggestion) => {
+    const npub = normalizeNpubIdentifier(suggestion.npub) ?? suggestion.npub;
+    if (suggestionNpubs.has(npub)) return false;
+    suggestionNpubs.add(npub);
+    return true;
+  });
   const [searchError, setSearchError] = React.useState<string | null>(null);
   const [searchIsBusy, setSearchIsBusy] = React.useState(false);
   const [searchResults, setSearchResults] =
@@ -247,9 +291,8 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   const searchQueryRef = React.useRef("");
   const searchRequestSeqRef = React.useRef(0);
 
-  const searchQuery = form.npub.trim();
   const showSuggestions =
-    step === "search" && !searchQuery && contactSuggestions.length > 0;
+    step === "search" && !searchQuery && suggestions.length > 0;
 
   React.useEffect(() => {
     searchQueryRef.current = searchQuery;
@@ -541,11 +584,12 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                     {t("contactSuggestionsTitle")}
                   </div>
                   <div className="contact-new-suggestion-list">
-                    {contactSuggestions.map((suggestion) => {
+                    {suggestions.map((suggestion) => {
                       const displayName = (
                         suggestion.name ||
-                        suggestion.query ||
-                        ""
+                        (suggestion.query === suggestion.npub
+                          ? formatShortNpub(suggestion.npub)
+                          : suggestion.query)
                       ).trim();
                       const avatarUrl = suggestion.pictureUrl ?? null;
 
@@ -565,10 +609,16 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                             </span>
                             <span className="contact-new-suggestion-body">
                               <strong>{displayName || t("contact")}</strong>
-                              <span title={suggestion.displayLnAddress}>
-                                {formatShortLightningAddress(
-                                  suggestion.displayLnAddress,
-                                )}
+                              <span
+                                title={
+                                  suggestion.displayLnAddress || suggestion.npub
+                                }
+                              >
+                                {suggestion.displayLnAddress
+                                  ? formatShortLightningAddress(
+                                      suggestion.displayLnAddress,
+                                    )
+                                  : formatShortNpub(suggestion.npub)}
                               </span>
                             </span>
                           </div>

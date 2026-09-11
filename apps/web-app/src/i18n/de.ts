@@ -1,6 +1,32 @@
 import type { cs } from "./cs";
 
 export const de = {
+  bluetoothChat: "Bluetooth-Chat",
+  bluetoothRoom: "Öffentlicher Bluetooth-Chat",
+  bluetoothNearby: "In der Nähe",
+  bluetoothNearbyUsers: "Linky-Nutzer in der Nähe",
+  bluetoothNearbyCount: "Geräte in der Nähe: {count}",
+  bluetoothDisclosure:
+    "Teilt Ihren öffentlichen Namen und Schlüssel mit Personen in der Nähe. Der öffentliche Chat funktioniert mit BitChat. Linky muss geöffnet bleiben.",
+  bluetoothUnsupported:
+    "Bluetooth-Chat ist nur in einer unterstützten nativen App verfügbar.",
+  bluetoothPermissionDenied:
+    "Erlauben Sie Linky den Bluetooth-Zugriff in den Telefoneinstellungen.",
+  bluetoothOff: "Bluetooth-Chat ist ausgeschaltet.",
+  bluetoothRadioOff: "Schalten Sie Bluetooth am Telefon ein.",
+  bluetoothPaused:
+    "Bluetooth-Chat ist pausiert. Öffnen Sie Linky, um sich zu verbinden.",
+  bluetoothActive: "Bluetooth-Chat ist aktiv.",
+  bluetoothPublicNotice:
+    "Ein öffentlicher Raum mit BitChat. Andere können diese Nachrichten lesen und über weitere Telefone weiterleiten. Private Chats bleiben über Nostr verschlüsselt.",
+  bluetoothNoMessages:
+    "Noch keine Nachrichten. Öffnen Sie BitChat oder Linky auf einem Telefon in der Nähe.",
+  bluetoothMessageLimit:
+    "Bis zu {count} Bytes pro Nachricht für BitChat-Kompatibilität.",
+  bluetoothMessagePlaceholder: "Nachricht an den öffentlichen Raum",
+  bluetoothSendFailed:
+    "Senden fehlgeschlagen. Prüfen Sie Bluetooth und versuchen Sie es erneut.",
+
   appTitle: "Linky",
   appCrashed: "Die App ist abgestürzt",
   settings: "Einstellungen",

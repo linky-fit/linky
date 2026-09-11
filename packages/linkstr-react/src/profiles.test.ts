@@ -6,6 +6,7 @@ import { finalizeEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
 import { linkstrConfigAtom } from "./config";
 import {
+  createFetchProfilesAtom,
   discoverActiveProfilesAtom,
   fetchProfileAtom,
   profileWatchAtom,
@@ -118,6 +119,43 @@ describe("fetchProfileAtom", () => {
         status: null,
       }),
     );
+  });
+});
+
+describe("createFetchProfilesAtom", () => {
+  it("keeps concurrent consumers' profile results independent", async () => {
+    const registry = Registry.make();
+    const first = createFetchProfilesAtom();
+    const second = createFetchProfilesAtom();
+    registry.set(
+      linkstrConfigAtom,
+      configWith(
+        alice,
+        fakeTransportLayer(
+          [],
+          [],
+          [
+            profileEvent(bob, JSON.stringify({ name: "Bob" }), base),
+            profileEvent(carol, JSON.stringify({ name: "Carol" }), base),
+          ],
+        ),
+      ),
+    );
+    registry.set(first, [bob.pubkey]);
+    registry.set(second, [carol.pubkey]);
+    const [bobResult, carolResult] = await Promise.all([
+      settle(registry, first),
+      settle(registry, second),
+    ]);
+    assert(Exit.isSuccess(bobResult));
+    assert(Exit.isSuccess(carolResult));
+    expect(bobResult.value.map((entry) => entry.pubkey)).toEqual([bob.pubkey]);
+    expect(carolResult.value.map((entry) => entry.pubkey)).toEqual([
+      carol.pubkey,
+    ]);
+    expect(bobResult.value[0]?.profile?.metadata.name).toBe("Bob");
+    expect(carolResult.value[0]?.profile?.metadata.name).toBe("Carol");
+    registry.dispose();
   });
 });
 

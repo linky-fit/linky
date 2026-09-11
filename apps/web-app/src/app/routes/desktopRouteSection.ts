@@ -40,6 +40,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "cashuToken":
       return "settings";
 
+    case "bluetoothChat":
     case "contacts":
     case "contactNew":
     case "contact":

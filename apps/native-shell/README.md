@@ -115,6 +115,8 @@ If neither variable is set, the native shells use the bundled web assets.
 
 ## Native integrations
 
+Android and iOS provide `LinkyBluetooth`, a foreground-only BLE central/peripheral plugin. The shared web-app Bluetooth domain handles BitChat public packets and signed Linky identity discovery. The setting is hidden in the PWA. See [Bluetooth device testing](../../docs/bluetooth-testing.md) for build commands, permissions, and compatibility limits.
+
 Android:
 
 - Push: Capacitor Push Notifications + FCM with data-only messages rendered by `LinkyFirebaseMessagingService`, so closed-app notifications still show through the native shell. Requires `android/app/google-services.json`; without it the app skips push registration and notifications stay disabled.

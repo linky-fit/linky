@@ -18,6 +18,26 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
 };
 
 const TAG_DESCRIPTIONS: Record<string, string> = {
+  "bluetooth.settingChanged":
+    "The device-local Bluetooth chat opt-in changed. Disabling stops discovery and clears nearby presence.",
+  "bluetooth.stateChanged":
+    "Native Bluetooth permission, radio, or foreground availability changed.",
+  "bluetooth.peerChanged":
+    "A direct BLE connection became available or disconnected. The link joins its traffic and identity verification.",
+  "bluetooth.identityVerified":
+    "A nearby peer answered a fresh challenge signed by its Nostr identity. The pubkey links it to contact activity; this is not a distance guarantee.",
+  "bluetooth.identityRequested":
+    "A fresh Linky identity challenge was queued on a direct BLE connection. Follow this link to its reply or a transport failure.",
+  "bluetooth.identityIgnored":
+    "An identity reply was not used for nearby presence because its challenge expired or was already consumed, its proof was invalid, or it belongs to the current account.",
+  "bluetooth.publicMessage":
+    "A signed public BitChat room message was received or accepted for sending to connected peers. It does not confirm delivery to every participant.",
+  "bluetooth.wireSent":
+    "A BLE frame was accepted by the native send queue. Later radio failures are reported separately.",
+  "bluetooth.wireReceived":
+    "A frame arrived over a direct Bluetooth link on the mesh or Linky identity characteristic.",
+  "bluetooth.failed":
+    "A Bluetooth operation or incoming frame failed. No private key material is included.",
   "contacts.npubSaved":
     "A Nostr contact was saved after duplicate and active owner limit checks. The contact link identifies the new row.",
   "evolu.ownerRotated":

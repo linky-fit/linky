@@ -104,6 +104,7 @@ export const resolveBackAction = (
 
     case "lnAddressPay":
     case "chat":
+    case "bluetoothChat":
       return () => navigateTo({ route: "contacts" });
 
     case "nostrRelay":
@@ -196,6 +197,7 @@ const SHOWS_MENU_BUTTON: Record<
   contactEdit: false,
   contactPay: true,
   contacts: true,
+  bluetoothChat: false,
   evoluCurrentData: false,
   evoluData: false,
   evoluHistoryData: false,
@@ -325,6 +327,7 @@ const TOPBAR_TITLE_KEY: Record<
   contactNew: "newContact",
   contactPay: "contactPayTitle",
   contacts: "contactsTitle",
+  bluetoothChat: "bluetoothRoom",
   evoluCurrentData: "evoluData",
   evoluData: "evoluData",
   evoluHistoryData: "evoluHistory",

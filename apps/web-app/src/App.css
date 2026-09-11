@@ -7307,3 +7307,97 @@ button.cashu-token-pill {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+/* Bluetooth proximity and the public room */
+.bluetooth-settings-description {
+  padding: 0 16px 12px 48px;
+  font-size: 0.85rem;
+}
+.bluetooth-settings-description p {
+  margin: 6px 0;
+}
+.bluetooth-room {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--topbar-height) - 88px);
+  gap: 16px;
+}
+.bluetooth-room-info {
+  font-size: 0.85rem;
+  padding: 0 4px;
+}
+.bluetooth-room-info p {
+  margin: 6px 0;
+}
+.bluetooth-messages {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+}
+.bluetooth-message {
+  align-self: flex-start;
+  max-width: 90%;
+  min-width: 140px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  overflow-wrap: anywhere;
+}
+.bluetooth-message.is-own {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--app-primary-button-bg) 12%, transparent);
+}
+.bluetooth-message-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-size: 0.75rem;
+}
+.bluetooth-message-meta time {
+  margin-left: auto;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+.bluetooth-message p {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+.bluetooth-composer {
+  position: sticky;
+  bottom: 0;
+  background: var(--app-flat-bg);
+  padding: 10px 0;
+}
+.bluetooth-composer > label {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+.bluetooth-composer-row {
+  display: flex;
+  gap: 8px;
+}
+.bluetooth-composer-row textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 60px;
+  height: 60px;
+  max-height: 140px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  background: var(--app-secondary-button-bg);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+.bluetooth-composer-row button {
+  flex-shrink: 0;
+  align-self: flex-end;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 12px;
+}

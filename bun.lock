@@ -92,7 +92,7 @@
     },
     "apps/web-app": {
       "name": "@linky/web-app",
-      "version": "26.9.10",
+      "version": "26.9.11",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
         "@capacitor/core": "^7.4.3",
@@ -105,6 +105,7 @@
         "@linky/linkshu": "workspace:*",
         "@linky/linkstr": "workspace:*",
         "@linky/linkstr-react": "workspace:*",
+        "@noble/curves": "^1.9.7",
         "@noble/hashes": "^1.5.0",
         "@scure/base": "^2.0.0",
         "@scure/bip32": "^2.0.1",

@@ -1,7 +1,20 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { encodeNpub, ProfileMetadata } from "@linky/linkstr";
+import {
+  Registry,
+  RegistryContext,
+  linkstrConfigAtom,
+} from "@linky/linkstr-react";
+import { configWith, fakeTransportLayer } from "@linky/linkstr-react/testing";
+import { makeIdentity } from "@linky/linkstr/testing";
+import { finalizeEvent, type Filter } from "nostr-tools";
+import { BluetoothContext } from "../bluetooth/BluetoothContext";
+import { emptyBluetoothSnapshot } from "../bluetooth/controller";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { ContactNewPage } from "./ContactNewPage";
+import { loadCachedProfile, saveCachedProfile } from "../profileCache";
+import { formatShortNpub } from "../utils/formatting";
+import { ContactNewPage, type ContactSearchResult } from "./ContactNewPage";
 
 describe("ContactNewPage", () => {
   afterEach(() => {
@@ -84,4 +97,277 @@ describe("ContactNewPage", () => {
 
     await act(async () => root.unmount());
   });
+
+  it.each(["missing", "cached", "fetched", "reconnected"])(
+    "adds nearby users with %s Nostr profiles, excluding self and known contacts",
+    async (profileSource) => {
+      const identities = [makeIdentity(), makeIdentity(), makeIdentity()];
+      const peers = identities.map((identity, index) => ({
+        pubkey: identity.pubkey,
+        npub: encodeNpub(identity.pubkey),
+        meshId: String(index),
+      }));
+      const newcomer = peers[2];
+      if (!newcomer) throw new Error("Missing nearby fixture");
+      const newcomerIdentity = identities[2];
+      if (!newcomerIdentity) throw new Error("Missing nearby identity");
+      const name = profileSource === "missing" ? "" : "Nostr Alice";
+      const lnAddress = profileSource === "missing" ? "" : "alice@example.com";
+      const pictureUrl =
+        profileSource === "missing" ? null : "https://example.com/alice.png";
+      const registry = Registry.make();
+      const releaseConfig = registry.mount(linkstrConfigAtom);
+      const fetchedFilters: Filter[] = [];
+      const fetchedProfile = finalizeEvent(
+        {
+          kind: 0,
+          tags: [],
+          created_at: 2,
+          content: JSON.stringify({
+            display_name: name,
+            lud16: lnAddress,
+            picture: pictureUrl,
+          }),
+        },
+        newcomerIdentity.secretKey,
+      );
+      const storedEvents = profileSource === "fetched" ? [fetchedProfile] : [];
+      if (profileSource !== "missing") {
+        saveCachedProfile(
+          newcomer.npub,
+          new ProfileMetadata({
+            displayName:
+              profileSource === "fetched" || profileSource === "reconnected"
+                ? "Old profile"
+                : name,
+            lud16: lnAddress,
+            ...(pictureUrl ? { picture: pictureUrl } : {}),
+          }),
+          1,
+        );
+      }
+      if (profileSource === "fetched" || profileSource === "reconnected") {
+        registry.set(
+          linkstrConfigAtom,
+          configWith(
+            makeIdentity(),
+            fakeTransportLayer([], [], storedEvents, fetchedFilters),
+          ),
+        );
+      }
+      const add = vi.fn(async () => {});
+      const search = vi.fn(
+        async (): Promise<ContactSearchResult> => ({ kind: "empty" }),
+      );
+      const page = (active: boolean) => (
+        <RegistryContext.Provider value={registry}>
+          <BluetoothContext.Provider
+            value={{
+              ...emptyBluetoothSnapshot,
+              available: true,
+              enabled: true,
+              state: {
+                supported: true,
+                powered: true,
+                permission: "granted",
+                active,
+              },
+              nearby: [...peers, newcomer],
+              nearbyCount: 3,
+              setEnabled: async () => {},
+              sendMessage: async () => {},
+            }}
+          >
+            <ContactNewPage
+              addNewContactFromSearchResult={add}
+              contactSuggestions={[]}
+              form={{ groups: [], lnAddress: "", name: "", npub: "" }}
+              groupNames={[]}
+              handleSaveContact={() => {}}
+              isSavingContact={false}
+              knownNpubs={peers.slice(0, 2).map((peer) => peer.npub)}
+              searchNewContact={search}
+              setForm={() => {}}
+              t={(key) => key}
+            />
+          </BluetoothContext.Provider>
+        </RegistryContext.Provider>
+      );
+      const rendered = await renderIntoDocument(page(true));
+      if (profileSource === "reconnected") {
+        expect(
+          rendered.container.querySelector(".contact-new-suggestions")
+            ?.textContent,
+        ).toContain("Old profile");
+        expect(fetchedFilters).toHaveLength(1);
+        await rendered.rerender(page(true));
+        expect(fetchedFilters).toHaveLength(1);
+        storedEvents.push(fetchedProfile);
+        await act(async () => {
+          window.dispatchEvent(new Event("online"));
+        });
+      }
+      if (profileSource === "fetched" || profileSource === "reconnected") {
+        await act(async () => {
+          await expect
+            .poll(() => loadCachedProfile(newcomer.npub)?.metadata.displayName)
+            .toBe(name);
+        });
+        expect(fetchedFilters).toHaveLength(
+          profileSource === "reconnected" ? 2 : 1,
+        );
+        expect(fetchedFilters[0]?.authors).toEqual([newcomer.pubkey]);
+      }
+      const rows = rendered.container.querySelectorAll(
+        ".contact-new-suggestion",
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.textContent).toContain(
+        name || formatShortNpub(newcomer.npub),
+      );
+      expect(rows[0]?.querySelector("img")?.getAttribute("src") ?? null).toBe(
+        pictureUrl,
+      );
+      await act(async () => rows[0]?.querySelector("button")?.click());
+      expect(add).toHaveBeenCalledWith({
+        npub: newcomer.npub,
+        name,
+        lnAddress,
+        displayLnAddress: lnAddress,
+        pictureUrl,
+        query: newcomer.npub,
+        isExactMatch: false,
+      });
+      expect(search).not.toHaveBeenCalled();
+
+      await rendered.rerender(page(true));
+      const expectedFetches =
+        profileSource === "reconnected"
+          ? 2
+          : profileSource === "fetched"
+            ? 1
+            : 0;
+      expect(fetchedFilters).toHaveLength(expectedFetches);
+
+      await rendered.rerender(page(false));
+      expect(
+        rendered.container.querySelector(".contact-new-suggestions"),
+      ).toBeNull();
+      await act(async () => {
+        window.dispatchEvent(new Event("online"));
+      });
+      expect(fetchedFilters).toHaveLength(expectedFetches);
+      await rendered.unmount();
+      releaseConfig();
+      registry.dispose();
+    },
+  );
+
+  it.each([true, false])(
+    "merges nearby suggestions with cached profile %s, preserving metadata and hiding while typing",
+    async (hasCachedProfile) => {
+      const alice = makeIdentity();
+      const bob = makeIdentity();
+      const carol = makeIdentity();
+      const aliceNpub = encodeNpub(alice.pubkey);
+      if (hasCachedProfile)
+        saveCachedProfile(
+          aliceNpub,
+          new ProfileMetadata({ name: "Nearby Alice" }),
+          1,
+        );
+      const nearbyName = hasCachedProfile ? "Nearby Alice" : "Relay Alice";
+      const add = vi.fn(async () => {});
+      const suggestion = (name: string, npub: string) => ({
+        name,
+        npub,
+        lnAddress: "",
+        displayLnAddress: "",
+        pictureUrl: null,
+        query: npub,
+      });
+      const recentSuggestions = [
+        suggestion("Recent Bob", encodeNpub(bob.pubkey)),
+        {
+          ...suggestion("Relay Alice", aliceNpub.toUpperCase()),
+          pictureUrl: "https://example.com/alice.png",
+          lnAddress: "alice@example.com",
+          displayLnAddress: "alice@example.com",
+        },
+        suggestion("Recent Carol", encodeNpub(carol.pubkey)),
+      ];
+      const page = (query: string, active = true) => (
+        <BluetoothContext.Provider
+          value={{
+            ...emptyBluetoothSnapshot,
+            available: true,
+            enabled: true,
+            state: {
+              supported: true,
+              permission: "granted",
+              powered: true,
+              active,
+            },
+            nearby: [
+              { npub: aliceNpub, pubkey: alice.pubkey, meshId: "alice" },
+            ],
+            setEnabled: async () => {},
+            sendMessage: async () => {},
+          }}
+        >
+          <ContactNewPage
+            addNewContactFromSearchResult={add}
+            contactSuggestions={recentSuggestions}
+            form={{ groups: [], lnAddress: "", name: "", npub: query }}
+            groupNames={[]}
+            handleSaveContact={() => {}}
+            isSavingContact={false}
+            searchNewContact={async () => ({ kind: "empty" })}
+            setForm={() => {}}
+            t={(key) => key}
+          />
+        </BluetoothContext.Provider>
+      );
+      const rendered = await renderIntoDocument(page(""));
+      const names = () =>
+        [
+          ...rendered.container.querySelectorAll(
+            ".contact-new-suggestion strong",
+          ),
+        ].map((element) => element.textContent);
+      expect(names()).toEqual([nearbyName, "Recent Bob", "Recent Carol"]);
+      const first = rendered.container.querySelector(".contact-new-suggestion");
+      expect(first?.querySelector("img")?.getAttribute("src")).toBe(
+        "https://example.com/alice.png",
+      );
+      expect(first?.textContent).toContain("alice@example.com");
+      await act(async () => first?.querySelector("button")?.click());
+      expect(add).toHaveBeenCalledWith({
+        npub: aliceNpub,
+        name: nearbyName,
+        pictureUrl: "https://example.com/alice.png",
+        lnAddress: "alice@example.com",
+        displayLnAddress: "alice@example.com",
+        query: aliceNpub,
+        isExactMatch: false,
+      });
+      expect(
+        rendered.container.querySelectorAll(".contact-new-suggestions"),
+      ).toHaveLength(1);
+      expect(
+        rendered.container.querySelector(".contact-new-suggestions-title")
+          ?.textContent,
+      ).toBe("contactSuggestionsTitle");
+
+      await rendered.rerender(page("ali"));
+      expect(
+        rendered.container.querySelector(".contact-new-suggestions"),
+      ).toBeNull();
+      await rendered.rerender(page(""));
+      expect(names()).toEqual([nearbyName, "Recent Bob", "Recent Carol"]);
+      await rendered.rerender(page("", false));
+      expect(names()).toEqual(["Recent Bob", "Relay Alice", "Recent Carol"]);
+      await rendered.unmount();
+    },
+  );
 });

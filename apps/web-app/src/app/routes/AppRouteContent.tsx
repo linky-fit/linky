@@ -1,4 +1,5 @@
 import React from "react";
+import { BluetoothChatPage } from "../../pages/BluetoothChatPage";
 import { DesktopNavigation } from "../../components/DesktopNavigation";
 import { ScanModal } from "../../components/ScanModal";
 import { Topbar } from "../../components/Topbar";
@@ -97,6 +98,8 @@ const RoutePage = (): React.ReactElement => {
   const moneyRoutes = useMoneyRoutes();
 
   switch (route.kind) {
+    case "bluetoothChat":
+      return <BluetoothChatPage />;
     case "contacts":
     case "wallet":
       return <MainSwipeContent />;

@@ -31,6 +31,7 @@ const parseContactId = (value: string): ContactId | null => {
 
 export type Route =
   | { kind: "contacts" }
+  | { kind: "bluetoothChat" }
   | { kind: "settings" }
   | { kind: "settingsLanguage" }
   | { kind: "settingsUnits" }
@@ -79,6 +80,7 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "" && hasExplicitEmptyHash) return { kind: "contacts" };
   if (hash === "") return { kind: "wallet" };
   if (hash === "#") return { kind: "contacts" };
+  if (hash === "#bluetooth") return { kind: "bluetoothChat" };
   if (hash === "#contacts") return { kind: "contacts" };
   if (hash === "#settings") return { kind: "settings" };
   if (hash === "#settings/language") return { kind: "settingsLanguage" };

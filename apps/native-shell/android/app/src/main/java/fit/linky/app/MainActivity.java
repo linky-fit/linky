@@ -139,6 +139,7 @@ public class MainActivity extends BridgeActivity {
 		// super.onCreate() re-delivers the launch intent through onNewIntent(), which
 		// writes to bridgePreferences — so it must be initialized first.
 		bridgePreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+		registerPlugin(LinkyBluetoothPlugin.class);
 		super.onCreate(savedInstanceState);
 		activeInstanceRef = new WeakReference<>(this);
 		getOnBackPressedDispatcher().addCallback(this, appNavigationBackCallback);

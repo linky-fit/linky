@@ -320,6 +320,10 @@ export const buildPeopleRouteProps = ({
       t,
     },
     contactNewProps: {
+      knownNpubs: [
+        ...contacts.flatMap((contact) => (contact.npub ? [contact.npub] : [])),
+        ...(currentNpub ? [currentNpub] : []),
+      ],
       addNewContactFromSearchResult,
       contactSuggestions,
       form,

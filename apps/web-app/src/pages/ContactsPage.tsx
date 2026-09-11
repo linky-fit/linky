@@ -2,6 +2,8 @@ import { UserPlus as ContactAddIcon } from "lucide-react";
 import type { FC } from "react";
 import React from "react";
 import type { ContactRowLike } from "../app/types/appTypes";
+import { useBluetooth } from "../bluetooth/BluetoothContext";
+import { partitionNearbyContacts } from "../bluetooth/contactPresence";
 import { BottomTabBar } from "../components/BottomTabBar";
 
 import type { Translate } from "../i18n";
@@ -53,11 +55,22 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
     t,
     visibleContacts,
   }) => {
+    const bluetooth = useBluetooth();
+    const showBluetooth = bluetooth.available && bluetooth.enabled;
+    const groups = partitionNearbyContacts(
+      visibleContacts,
+      new Set(
+        showBluetooth && bluetooth.state.active
+          ? bluetooth.nearby.map((peer) => peer.npub)
+          : [],
+      ),
+    );
     const totalVisible =
-      visibleContacts.pinned.length +
-      visibleContacts.proxyPayments.length +
-      visibleContacts.conversations.length +
-      visibleContacts.others.length;
+      groups.nearby.length +
+      groups.pinned.length +
+      groups.proxyPayments.length +
+      groups.conversations.length +
+      groups.others.length;
     const hasAnyContacts = totalVisible > 0;
 
     return (
@@ -124,32 +137,41 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
               <p className="muted">{t("noContactsYet")}</p>
             ) : (
               <>
-                {visibleContacts.pinned.map(renderContactCard)}
+                {groups.pinned.map(renderContactCard)}
 
-                {visibleContacts.proxyPayments.length > 0 && (
+                {groups.proxyPayments.length > 0 && (
                   <React.Fragment key="proxy-payments">
                     <div className="settings-section-title contact-list-section-title">
                       {t("proxyPayments")}
                     </div>
-                    {visibleContacts.proxyPayments.map(renderContactCard)}
+                    {groups.proxyPayments.map(renderContactCard)}
                   </React.Fragment>
                 )}
 
-                {visibleContacts.conversations.length > 0 && (
+                {groups.nearby.length > 0 && (
+                  <React.Fragment key="nearby">
+                    <div className="settings-section-title contact-list-section-title">
+                      {t("bluetoothNearby")}
+                    </div>
+                    {groups.nearby.map(renderContactCard)}
+                  </React.Fragment>
+                )}
+
+                {groups.conversations.length > 0 && (
                   <React.Fragment key="conversations">
                     <div className="settings-section-title contact-list-section-title">
                       {conversationsLabel}
                     </div>
-                    {visibleContacts.conversations.map(renderContactCard)}
+                    {groups.conversations.map(renderContactCard)}
                   </React.Fragment>
                 )}
 
-                {visibleContacts.others.length > 0 && (
+                {groups.others.length > 0 && (
                   <React.Fragment key="others">
                     <div className="settings-section-title contact-list-section-title">
                       {otherContactsLabel}
                     </div>
-                    {visibleContacts.others.map(renderContactCard)}
+                    {groups.others.map(renderContactCard)}
                   </React.Fragment>
                 )}
               </>

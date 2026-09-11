@@ -27,6 +27,7 @@
     "@linky/linkshu": "workspace:*",
     "@linky/linkstr": "workspace:*",
     "@linky/linkstr-react": "workspace:*",
+    "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.5.0",
     "@scure/base": "^2.0.0",
     "@scure/bip32": "^2.0.1",
