@@ -318,8 +318,11 @@ export const de = {
   scanAnimatedQrDetected: "Animierter QR-Code — Kamera ruhig halten…",
   scanAnimatedQrProgress:
     "Animierter QR-Code — {received} von {expected} Teilen ({percent} %)",
+  cashuTokenAnimateQr: "QR-Code animieren",
+  cashuTokenStaticQrUnavailable:
+    "Dieses Token passt nicht in einen einzelnen QR-Code. Aktiviere die Animation oder nutze Kopieren oder Teilen.",
   cashuTokenAnimatedQrHint:
-    "Das Token passt nicht in einen QR-Code und wird in {frames} Teilen gesendet. Halte die Kamera darauf, bis es vollständig ist.",
+    "Das Token wird zum leichteren Scannen in {frames} Teilen gesendet. Halte die Kamera darauf, bis es vollständig ist.",
   chatIdentityChangedNotice: "Meine Identität hat sich geändert.",
   chatPlaceholder: "Nachricht",
   chatMissingContactNpub: "npub des Kontakts fehlt.",

@@ -7,8 +7,10 @@ import {
 export interface TokenQr {
   /** Data URL of the frame to show, or null while there is nothing to show. */
   src: string | null;
-  /** Frames in one pass, or null when the token fits a single static QR. */
+  /** Frames in one pass, or null while showing a static QR. */
   frameCount: number | null;
+  canToggleAnimation: boolean;
+  isTooLargeForStatic: boolean;
 }
 
 /**
@@ -45,17 +47,24 @@ const renderQr = async (payload: string): Promise<string> => {
  * a camera can read it — it can be photographed, shared as an image, and read
  * by anything — so the animation (NUT-16) takes over only past the version a
  * phone screen still scans, where the page used to show a code too dense to
- * read or nothing at all.
+ * read or nothing at all. Disabling animation uses the full static capacity.
  */
-export const useTokenQr = (tokenText: string): TokenQr => {
+export const useTokenQr = (
+  tokenText: string,
+  animationEnabled = true,
+): TokenQr => {
   const [src, setSrc] = React.useState<string | null>(null);
   const [frameCount, setFrameCount] = React.useState<number | null>(null);
+  const [canToggleAnimation, setCanToggleAnimation] = React.useState(false);
+  const [isTooLargeForStatic, setIsTooLargeForStatic] = React.useState(false);
 
   React.useEffect(() => {
+    setSrc(null);
+    setFrameCount(null);
     const payload = tokenText.trim();
     if (!payload) {
-      setSrc(null);
-      setFrameCount(null);
+      setCanToggleAnimation(false);
+      setIsTooLargeForStatic(false);
       return;
     }
 
@@ -83,21 +92,19 @@ export const useTokenQr = (tokenText: string): TokenQr => {
       }, ANIMATED_QR_FRAME_MS);
     };
 
-    const renderStatic = async (): Promise<string | null> => {
-      const version = await staticQrVersion(payload);
-      if (version === null || version > STATIC_QR_MAX_VERSION) return null;
-      return renderQr(payload);
-    };
-
     const generate = async () => {
-      const stat = await renderStatic();
+      const version = await staticQrVersion(payload);
       if (cancelled) return;
-      if (stat !== null) {
-        setFrameCount(null);
-        setSrc(stat);
-        return;
+      const needsAnimation =
+        version === null || version > STATIC_QR_MAX_VERSION;
+      setCanToggleAnimation(needsAnimation);
+      setIsTooLargeForStatic(version === null);
+      if (needsAnimation && animationEnabled) {
+        await animate();
+      } else if (version !== null) {
+        const rendered = await renderQr(payload);
+        if (!cancelled) setSrc(rendered);
       }
-      await animate();
     };
 
     void generate().catch(() => {
@@ -111,7 +118,7 @@ export const useTokenQr = (tokenText: string): TokenQr => {
       cancelled = true;
       if (timer !== null) window.clearInterval(timer);
     };
-  }, [tokenText]);
+  }, [tokenText, animationEnabled]);
 
-  return { src, frameCount };
+  return { src, frameCount, canToggleAnimation, isTooLargeForStatic };
 };

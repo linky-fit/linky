@@ -310,8 +310,11 @@ export const en = {
   scanAnimatedQrDetected: "Animated QR code — hold the camera steady…",
   scanAnimatedQrProgress:
     "Animated QR code — {received} of {expected} parts ({percent} %)",
+  cashuTokenAnimateQr: "Animate QR code",
+  cashuTokenStaticQrUnavailable:
+    "This token cannot fit in a single QR code. Enable animation or use Copy or Share.",
   cashuTokenAnimatedQrHint:
-    "The token is too large for one QR code, so it is sent in {frames} parts. Hold the camera on it until it completes.",
+    "The token is sent in {frames} parts to make it easier to scan. Hold the camera on it until it completes.",
   chatIdentityChangedNotice: "My identity changed.",
   chatPlaceholder: "Message",
   chatMissingContactNpub: "Missing contact npub.",

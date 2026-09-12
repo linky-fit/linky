@@ -313,8 +313,11 @@ export const cs = {
   scanAnimatedQrDetected: "Animovaný QR kód — drž kameru na místě…",
   scanAnimatedQrProgress:
     "Animovaný QR kód — {received} z {expected} dílů ({percent} %)",
+  cashuTokenAnimateQr: "Animovat QR kód",
+  cashuTokenStaticQrUnavailable:
+    "Tento token se nevejde do jednoho QR kódu. Zapněte animaci nebo použijte Kopírovat či Sdílet.",
   cashuTokenAnimatedQrHint:
-    "Token je na jeden QR kód moc velký, posílá se po částech ({frames}). Podrž na něm kameru, dokud se nenačte celý.",
+    "Token se pro snazší skenování posílá po částech ({frames}). Podrž na něm kameru, dokud se nenačte celý.",
   chatIdentityChangedNotice: "Došlo ke změně mojí identity.",
   chatPlaceholder: "Zpráva",
   chatMissingContactNpub: "Chybí npub u kontaktu.",

@@ -94,7 +94,13 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
     (candidate) => String(candidate.id) === routeId,
   );
   const tokenText = transfer?.tokenText ?? "";
-  const { frameCount: tokenQrFrameCount, src: tokenQr } = useTokenQr(tokenText);
+  const [animationEnabled, setAnimationEnabled] = React.useState(true);
+  const {
+    frameCount: tokenQrFrameCount,
+    src: tokenQr,
+    canToggleAnimation,
+    isTooLargeForStatic,
+  } = useTokenQr(tokenText, animationEnabled);
   const tokenAmount = transfer?.amount ?? 0;
   const mintDisplay = getMintDisplay(transfer?.mint);
   const transferProofs = React.useMemo(
@@ -263,6 +269,32 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
             </p>
           )}
         </div>
+      ) : null}
+
+      {canToggleAnimation ? (
+        <>
+          <div className="settings-row">
+            <div className="settings-left">
+              <span className="settings-label">{t("cashuTokenAnimateQr")}</span>
+            </div>
+            <div className="settings-right">
+              <label className="switch">
+                <input
+                  className="switch-input"
+                  type="checkbox"
+                  checked={animationEnabled}
+                  aria-label={t("cashuTokenAnimateQr")}
+                  onChange={(event) =>
+                    setAnimationEnabled(event.target.checked)
+                  }
+                />
+              </label>
+            </div>
+          </div>
+          {!animationEnabled && isTooLargeForStatic ? (
+            <p className="muted">{t("cashuTokenStaticQrUnavailable")}</p>
+          ) : null}
+        </>
       ) : null}
 
       {isOpenSend || isFailedReceive ? (
