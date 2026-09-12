@@ -34,6 +34,7 @@ interface NativeBridgeRequestOptions<Result> {
 }
 
 export interface NativeScanStreamHandle {
+  updateViewport: () => void;
   stop: () => void;
 }
 
@@ -476,6 +477,19 @@ export const startNativeQrScanStream = (
 
   window.addEventListener(eventName, onResultEvent);
 
+  const applyViewport = (viewport: NativeScanViewport | null) => {
+    if (viewport && bridge.setScanViewport) {
+      bridge.setScanViewport(
+        viewport.left,
+        viewport.top,
+        viewport.width,
+        viewport.height,
+        viewport.viewportWidth,
+        viewport.viewportHeight,
+      );
+    }
+  };
+
   const startWhenViewportIsReady = (framesRemaining: number) => {
     animationFrameId = window.requestAnimationFrame(() => {
       animationFrameId = null;
@@ -494,16 +508,7 @@ export const startNativeQrScanStream = (
 
         // Viewport still unavailable after the frame budget: start anyway so a
         // slow layout degrades to a full-screen preview instead of no scanner.
-        if (viewport && bridge.setScanViewport) {
-          bridge.setScanViewport(
-            viewport.left,
-            viewport.top,
-            viewport.width,
-            viewport.height,
-            viewport.viewportWidth,
-            viewport.viewportHeight,
-          );
-        }
+        applyViewport(viewport);
         bridge.startScan?.();
         started = true;
       } catch (error) {
@@ -520,6 +525,9 @@ export const startNativeQrScanStream = (
   startWhenViewportIsReady(NATIVE_SCAN_VIEWPORT_MAX_FRAMES);
 
   return {
+    updateViewport: () => {
+      if (started) applyViewport(getViewport?.() ?? null);
+    },
     stop: () => {
       cleanup();
       if (started) {
@@ -528,6 +536,7 @@ export const startNativeQrScanStream = (
         } catch {
           // ignore native scanner shutdown failures
         }
+        started = false;
       }
     },
   };

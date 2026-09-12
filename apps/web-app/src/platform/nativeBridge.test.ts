@@ -79,6 +79,32 @@ describe("startNativeQrScanStream", () => {
     expect(stopScan).toHaveBeenCalledOnce();
   });
 
+  it("resizes the running preview when progress takes space and ignores updates after stopping", () => {
+    let height = 462;
+    const getViewport = () => ({
+      height,
+      left: 0,
+      top: 84,
+      viewportHeight: 640,
+      viewportWidth: 360,
+      width: 360,
+    });
+    const handle = startNativeQrScanStream(vi.fn(), getViewport);
+    handle?.updateViewport();
+    expect(setScanViewport).not.toHaveBeenCalled();
+    callbacks.shift()?.(0);
+
+    height = 420;
+    handle?.updateViewport();
+    expect(setScanViewport).toHaveBeenLastCalledWith(0, 84, 360, 420, 360, 640);
+    expect(startScan).toHaveBeenCalledOnce();
+
+    handle?.stop();
+    setScanViewport.mockClear();
+    handle?.updateViewport();
+    expect(setScanViewport).not.toHaveBeenCalled();
+  });
+
   it("starts a full-screen preview when the viewport never becomes available", () => {
     const onResult = vi.fn();
     const getViewport = vi.fn(() => null);

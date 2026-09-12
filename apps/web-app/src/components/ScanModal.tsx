@@ -90,6 +90,16 @@ export function ScanModal(): React.ReactElement {
               <span>{t("scanSwitchCamera")}</span>
             </button>
           ) : null}
+        </div>
+        <input
+          ref={scanImageInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={onScanImageSelected}
+        />
+
+        <div className="scan-footer">
           {scanDiagnostics.animation === null && !showScanDiagnostics ? null : (
             <div className="scan-status" role="status">
               {scanDiagnostics.animation === null ? null : (
@@ -132,16 +142,6 @@ export function ScanModal(): React.ReactElement {
               </div>
             </div>
           )}
-        </div>
-        <input
-          ref={scanImageInputRef}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={onScanImageSelected}
-        />
-
-        <div className="scan-footer">
           {isSendScan ? (
             <button
               type="button"

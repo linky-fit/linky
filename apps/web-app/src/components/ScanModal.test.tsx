@@ -16,6 +16,10 @@ vi.mock("../hooks/useRouting", () => ({
 
 import { ScanModal } from "./ScanModal";
 
+vi.mock("../devtools/inspector/inspectorEnabled", () => ({
+  useInspectorEmissionEnabled: () => false,
+}));
+
 vi.mock("../app/context/AppShellContexts", () => ({
   useAppShellCore: mockScanCore,
   useAppShellActions: mockScanActions,
@@ -63,6 +67,8 @@ const translate = (key: string): string => {
       return "Close";
     case "paste":
       return "Paste";
+    case "scanAnimatedQrProgress":
+      return "Reading QR: {received}/{expected} ({percent}%)";
     case "scan":
       return "Scan";
     case "scanTypeManually":
@@ -104,6 +110,36 @@ describe("ScanModal", () => {
     showWalletActions: false,
     t: translate,
   } satisfies ScanModalProps;
+
+  it("shows animated QR progress in the footer outside the native camera viewport", async () => {
+    const { container, root, unmount } = await renderIntoDocument(
+      <TestScanModal {...baseProps} scanEntryPoint="receive" />,
+    );
+    expect(container.querySelector(".scan-status")).toBeNull();
+
+    await act(async () => {
+      root.render(
+        <TestScanModal
+          {...baseProps}
+          scanEntryPoint="receive"
+          scanDiagnostics={{
+            ...baseProps.scanDiagnostics,
+            animation: { expected: 10, received: 4 },
+            reads: 4,
+          }}
+        />,
+      );
+    });
+
+    expect(
+      container.querySelector(".scan-footer .scan-status")?.textContent,
+    ).toContain("Reading QR: 4/10 (40%)");
+    const bar = container.querySelector(".scan-status-bar");
+    expect(bar instanceof HTMLElement && bar.style.width).toBe("40%");
+    expect(container.querySelector(".scan-video-wrap .scan-status")).toBeNull();
+    expect(container.querySelector(".scan-status-detail")).toBeNull();
+    await unmount();
+  });
 
   it("shows the manual action only when allowed", async () => {
     const { container, root } = await renderIntoDocument(

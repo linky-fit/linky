@@ -562,6 +562,23 @@ export const useGuideScannerDomain = ({
     [handleNativeScanResult, logScanDebug, pushToast, stopScanStream, t],
   );
 
+  React.useEffect(() => {
+    const nativeScanHandle = nativeScanHandleRef.current;
+    if (!scanIsOpen || !nativeScanHandle) return;
+
+    const controls = document.querySelectorAll(".scan-header, .scan-footer");
+    if (controls.length === 0) return;
+
+    const updateViewport = () => nativeScanHandle.updateViewport();
+    const observer = new ResizeObserver(updateViewport);
+    controls.forEach((element) => observer.observe(element));
+    window.addEventListener("resize", updateViewport);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateViewport);
+    };
+  }, [scanIsOpen]);
+
   const openScan = React.useCallback(() => {
     preferredCameraDeviceIdRef.current = null;
     openScanForEntryPoint("contacts");

@@ -311,10 +311,9 @@
 }
 
 .scan-status {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 12px;
+  position: relative;
+  width: 100%;
+  max-width: 420px;
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.68);
   color: #fff;
