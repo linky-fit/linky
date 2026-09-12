@@ -7,7 +7,10 @@ import {
   KeysetId,
   MintUrl,
 } from "../domain/primitives";
-import { deterministicCounterKey } from "../internal/counters";
+import {
+  DERIVATION_GAP_LIMIT,
+  deterministicCounterKey,
+} from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
@@ -47,7 +50,8 @@ interface FakeWalletArgs {
   /** NUT-07 state per proof secret; defaults to UNSPENT. */
   stateOf?: (secret: string) => "UNSPENT" | "PENDING" | "SPENT";
   checkStatesError?: unknown;
-  restore?: () => Promise<{
+  /** NUT-09 walk collision recovery runs from the colliding counter. */
+  probe?: () => Promise<{
     proofs: CashuProof[];
     lastCounterWithSignature?: number;
   }>;
@@ -62,7 +66,7 @@ interface SendCall {
 
 const makeWallet = (args: FakeWalletArgs) => {
   const sendCalls: SendCall[] = [];
-  const restoreCalls: Array<{ start: number; count: number }> = [];
+  const probeCalls: Array<{ start: number; gapLimit: number }> = [];
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
     checkProofsStates: (proofs) =>
@@ -93,14 +97,14 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.send(call)
         : Promise.reject(new Error("send not stubbed"));
     },
-    restore: (start, count) => {
-      restoreCalls.push({ start, count });
-      return args.restore
-        ? args.restore()
+    batchRestore: (gapLimit = 0, _batchSize, start = 0) => {
+      probeCalls.push({ start, gapLimit });
+      return args.probe
+        ? args.probe()
         : Promise.reject(new Error("restore unavailable"));
     },
   });
-  return { wallet, sendCalls, restoreCalls };
+  return { wallet, sendCalls, probeCalls };
 };
 
 const makeHarness = (wallet: LoadedWallet) => {
@@ -518,7 +522,7 @@ describe("Send.send", () => {
   ])(
     "recovers a stale counter via NUT-09 restore and retries: %s",
     async (collision) => {
-      const { wallet, sendCalls, restoreCalls } = makeWallet({
+      const { wallet, sendCalls, probeCalls } = makeWallet({
         send: (call) =>
           call.sendCounter < 40
             ? Promise.reject(collision)
@@ -526,7 +530,7 @@ describe("Send.send", () => {
                 keep: [proof(9, "k1")],
                 send: [proof(4, "s1")],
               }),
-        restore: () =>
+        probe: () =>
           Promise.resolve({ proofs: [], lastCounterWithSignature: 39 }),
       });
       const { run, events } = makeHarness(wallet);
@@ -536,7 +540,9 @@ describe("Send.send", () => {
       expect(exit.value.receipt._tag).toBe("Right");
       expect(sendCalls.map((call) => call.sendCounter)).toEqual([1, 40]);
       expect(sendCalls[1]?.keepCounter).toBe(104);
-      expect(restoreCalls).toEqual([{ start: 1, count: 100 }]);
+      expect(probeCalls).toEqual([
+        { start: 1, gapLimit: DERIVATION_GAP_LIMIT },
+      ]);
       expect(exit.value.counter).toBe("105"); // 40 + 64 + 1 fresh keep output
 
       const counterEvents = events.filter(
@@ -554,10 +560,10 @@ describe("Send.send", () => {
   );
 
   it("bounds duplicate-output retries and preserves the inventory on rejection", async () => {
-    const { wallet, sendCalls, restoreCalls } = makeWallet({
+    const { wallet, sendCalls, probeCalls } = makeWallet({
       send: () =>
         Promise.reject(new MintOperationError(11008, "Duplicate outputs")),
-      restore: () => Promise.resolve({ proofs: [] }),
+      probe: () => Promise.resolve({ proofs: [] }),
     });
     const { run } = makeHarness(wallet);
     const exit = await run(sendAndInspect(draft(4)));
@@ -570,7 +576,7 @@ describe("Send.send", () => {
     expect(sendCalls.map((call) => call.sendCounter)).toEqual([
       1, 129, 257, 385, 513,
     ]);
-    expect(restoreCalls).toHaveLength(5);
+    expect(probeCalls).toHaveLength(5);
     expect(allAvailable(exit.value.proofs)).toBe(true);
   });
 

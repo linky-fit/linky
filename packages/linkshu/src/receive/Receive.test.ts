@@ -7,7 +7,10 @@ import {
   MintUrl,
   TokenText,
 } from "../domain/primitives";
-import { deterministicCounterKey } from "../internal/counters";
+import {
+  DERIVATION_GAP_LIMIT,
+  deterministicCounterKey,
+} from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
@@ -43,7 +46,8 @@ const outputsAlreadySigned = () =>
 interface FakeWalletArgs {
   keysetId?: string;
   receive: (counter: number) => Promise<Proof[]>;
-  restore?: () => Promise<{
+  /** NUT-09 walk collision recovery runs from the colliding counter. */
+  probe?: () => Promise<{
     proofs: Proof[];
     lastCounterWithSignature?: number;
   }>;
@@ -51,7 +55,7 @@ interface FakeWalletArgs {
 
 const makeWallet = (args: FakeWalletArgs) => {
   const receiveCounters: number[] = [];
-  const restoreCalls: Array<{ start: number; count: number }> = [];
+  const probeCalls: Array<{ start: number; gapLimit: number }> = [];
   const wallet = fakeWallet({
     keysetId: args.keysetId ?? KEYSET_HEX,
     receive: (_token, _config, outputType) => {
@@ -60,14 +64,14 @@ const makeWallet = (args: FakeWalletArgs) => {
       receiveCounters.push(counter);
       return args.receive(counter);
     },
-    restore: (start, count) => {
-      restoreCalls.push({ start, count });
-      return args.restore
-        ? args.restore()
+    batchRestore: (gapLimit = 0, _batchSize, start = 0) => {
+      probeCalls.push({ start, gapLimit });
+      return args.probe
+        ? args.probe()
         : Promise.reject(new Error("restore unavailable"));
     },
   });
-  return { wallet, receiveCounters, restoreCalls };
+  return { wallet, receiveCounters, probeCalls };
 };
 
 const makeHarness = (wallet: LoadedWallet) => {
@@ -425,12 +429,12 @@ describe("Receive.receive", () => {
   });
 
   it("recovers a stale counter via NUT-09 restore", async () => {
-    const { wallet, receiveCounters, restoreCalls } = makeWallet({
+    const { wallet, receiveCounters, probeCalls } = makeWallet({
       receive: (counter) =>
         counter < 40
           ? Promise.reject(outputsAlreadySigned())
           : Promise.resolve(receivedProofs),
-      restore: () =>
+      probe: () =>
         Promise.resolve({ proofs: [], lastCounterWithSignature: 39 }),
     });
     const { run, events } = makeHarness(wallet);
@@ -439,7 +443,7 @@ describe("Receive.receive", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(receiveCounters).toEqual([1, 40]);
-    expect(restoreCalls).toEqual([{ start: 1, count: 100 }]);
+    expect(probeCalls).toEqual([{ start: 1, gapLimit: DERIVATION_GAP_LIMIT }]);
     expect(exit.value.counter).toBe("42");
 
     const counterEvents = events.filter(
@@ -456,12 +460,12 @@ describe("Receive.receive", () => {
   });
 
   it("falls back to a fixed bump when restore cannot locate the collision", async () => {
-    const { wallet, receiveCounters, restoreCalls } = makeWallet({
+    const { wallet, receiveCounters, probeCalls } = makeWallet({
       receive: (counter) =>
         counter < 64
           ? Promise.reject(outputsAlreadySigned())
           : Promise.resolve(receivedProofs),
-      restore: () => Promise.reject(new Error("restore failed")),
+      probe: () => Promise.reject(new Error("restore failed")),
     });
     const { run } = makeHarness(wallet);
 
@@ -469,12 +473,12 @@ describe("Receive.receive", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(receiveCounters).toEqual([1, 65]);
-    expect(restoreCalls).toHaveLength(1);
+    expect(probeCalls).toHaveLength(1);
     expect(exit.value.counter).toBe("67");
   });
 
   it("bumps without probing restore for outputs-pending collisions", async () => {
-    const { wallet, receiveCounters, restoreCalls } = makeWallet({
+    const { wallet, receiveCounters, probeCalls } = makeWallet({
       receive: (counter) =>
         counter === 1
           ? Promise.reject(new MintOperationError(11004, "outputs are pending"))
@@ -486,7 +490,7 @@ describe("Receive.receive", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(receiveCounters).toEqual([1, 65]);
-    expect(restoreCalls).toEqual([]);
+    expect(probeCalls).toEqual([]);
   });
 
   it("starts the swap from the persisted counter", async () => {
@@ -510,7 +514,7 @@ describe("Receive.receive", () => {
   it("gives up after repeated collisions with a definitive rejection", async () => {
     const { wallet, receiveCounters } = makeWallet({
       receive: () => Promise.reject(outputsAlreadySigned()),
-      restore: () => Promise.resolve({ proofs: [] }),
+      probe: () => Promise.resolve({ proofs: [] }),
     });
     const { run } = makeHarness(wallet);
 

@@ -1,5 +1,6 @@
 import { Effect, Either } from "effect";
 import type { MintRejected, MintUnreachable } from "../../domain/errors";
+import { DERIVATION_GAP_LIMIT } from "../../internal/counters";
 import { unspentProofs } from "../../internal/proofStates";
 import type { ProofStateEntry } from "../../internal/proofStates";
 import type { Proof } from "../../token/domain";
@@ -12,7 +13,7 @@ import type { Proof } from "../../token/domain";
 /** Counter positions scanned behind the cursor/counter high water. */
 const RESTORE_RESCAN_WINDOW = 4000;
 /** Consecutive empty positions tolerated before a scan gives up. */
-export const RESTORE_GAP_LIMIT = 300;
+export const RESTORE_GAP_LIMIT = DERIVATION_GAP_LIMIT;
 /** Positions per restore request; cashu-ts issues one request per batch. */
 export const RESTORE_BATCH_SIZE = 100;
 

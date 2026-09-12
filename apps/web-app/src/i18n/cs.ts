@@ -710,6 +710,7 @@ export const cs = {
   installPwaDismiss: "Zavřít",
   cashuCheckFailed: "Kontrola selhala",
   cashuInvalid: "Token je neplatný nebo už byl použit.",
+  cashuClaimedByRecipient: "Příjemce si token už vyzvedl.",
   cashuDeleted: "Token byl smazán.",
   cashuEmpty: "Zatím žádné Cashu tokeny.",
   cashuToken: "Token",

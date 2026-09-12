@@ -32,7 +32,7 @@ Omit `mints` to scan every mint the package knows (`Mints.knownMints`). Linky pa
 Per mint: load the wallet (failure → `unavailableMints`). Every `sat` keyset the mint lists now, plus every keyset it has shown this wallet before, is scanned under the counter lock:
 
 1. The secrets of every stored proof (any state, `spent` included) are read, so nothing is imported twice — a spent proof restored again would be balance the mint will not honor.
-2. The positions just behind the counter are scanned first. If that finds nothing and the wallet has scanned this keyset before, the whole derivation tree is rescanned from zero.
+2. The positions just behind the counter are scanned first. If that finds nothing and the wallet has scanned this keyset before, the whole derivation tree is rescanned from zero. A scan ends after 1000 unsigned positions in a row (`DERIVATION_GAP_LIMIT`): operations reserve 64-slot output blocks and a failed attempt leaves its block unsigned, so a shorter gap limit would stop inside a tree that still has live signatures ahead and leave the counter on slots the mint has signed.
 3. Only proofs that are not stored and that the mint explicitly reports `UNSPENT` are kept. A failed state check imports nothing.
 4. The proofs are stored `available` (`restore`), **then** the restore cursor and the deterministic counter advance past the last signature. A crash between the two costs a rescan, never the funds.
 

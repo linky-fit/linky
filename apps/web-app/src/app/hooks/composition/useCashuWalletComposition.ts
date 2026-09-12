@@ -687,6 +687,14 @@ export const useCashuWalletComposition = ({
     [walletTransfers],
   );
 
+  const isHandedOutTransfer = React.useCallback(
+    (id: CashuOperationId) =>
+      walletTransfers.some(
+        (transfer) => String(transfer.id) === id && transfer.kind === "send",
+      ),
+    [walletTransfers],
+  );
+
   // Legacy migration; removal gate in docs/architecture.md
   React.useEffect(() => {
     seedLinkshuSeenMintsFromTokenRows(cashuTokensAll);
@@ -1666,6 +1674,7 @@ export const useCashuWalletComposition = ({
     checkAllCashuTokens,
     checkCashuTransfer,
     forgetCashuTransfer: cashuTransferLifecycle?.forget ?? null,
+    isHandedOutTransfer,
     pendingCashuDeleteId,
     pushToast,
     setCashuBulkCheckIsBusy,
@@ -1784,6 +1793,13 @@ export const useCashuWalletComposition = ({
       }
       const outcome = await cashuTransferLifecycle.returnToWallet(id);
       if (Either.isLeft(outcome)) {
+        if (
+          outcome.left._tag === "TokenAlreadySpent" &&
+          isHandedOutTransfer(id)
+        ) {
+          setStatus(t("cashuClaimedByRecipient"));
+          return;
+        }
         const message =
           describeTaggedCashuError(outcome.left) ?? outcome.left._tag;
         setStatus(`${t("errorPrefix")}: ${message}`);
@@ -1792,7 +1808,7 @@ export const useCashuWalletComposition = ({
 
       setStatus(t("cashuReturnedToWallet"));
     },
-    [cashuTransferLifecycle, setStatus, t],
+    [cashuTransferLifecycle, isHandedOutTransfer, setStatus, t],
   );
 
   const pendingCashuContactSend = React.useMemo(() => {

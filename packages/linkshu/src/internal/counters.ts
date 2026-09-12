@@ -18,6 +18,15 @@ export interface CounterScope {
 export const DETERMINISTIC_COUNTER_KEY_PREFIX = "linkshu.detCounter.";
 export const COUNTER_LOCK_KEY_PREFIX = "linkshu.detCounterLock.";
 
+/**
+ * Unsigned positions a NUT-09 scan tolerates before it takes the tree as
+ * ended. Operations reserve 64-slot output blocks and a failed attempt leaves
+ * its block unsigned, so a few failed attempts in a row put several hundred
+ * empty slots in front of live signatures; a scan that gave up there would
+ * park the counter on slots the mint has already signed.
+ */
+export const DERIVATION_GAP_LIMIT = 1000;
+
 /** Key suffix identifying one derivation tree; shared with restore cursors. */
 export const scopeSuffix = (scope: CounterScope): string =>
   [scope.mint, scope.unit, scope.keysetId].map(encodeURIComponent).join(".");

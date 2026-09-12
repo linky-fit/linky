@@ -34,7 +34,7 @@ The receipt carries `amount`, `unit`, `mint`, and the `operationId` of the `rece
 4. **Swap.** Under the counter lock, the proofs are swapped for fresh deterministic outputs.
 5. **Persist the proofs.** The fresh proofs are stored `available`, then the receive moves to `done`. Only now does the receipt resolve.
 
-The package retries counter collisions at the mint automatically, so a receive on a fresh origin may take a few round-trips. If recovery fails, the last rejection surfaces as `MintRejected`.
+The package retries counter collisions at the mint automatically: on `outputs already signed` it walks the derivation tree with NUT-09 to the last signed slot (tolerating up to `DERIVATION_GAP_LIMIT` = 1000 unsigned positions, the room a few failed attempts' reserved blocks can leave) and retries just past it, so a counter that lags the tree by thousands of slots — another context or device used the seed — catches up in one retry. A receive on a fresh origin may therefore take a few extra restore requests. If recovery fails, the last rejection surfaces as `MintRejected`.
 
 Any failure after step 3 leaves the receive `failed` with the serialized error in `error` — transient or definitive. Pasting the same text again retries it over the same operation (`Tokens.returnToWallet` on the transfer does the same); `Tokens.forget` closes it once it is not worth retrying. `Tokens.returnToWallet` on a `send` runs this same flow over the handed-out text.
 

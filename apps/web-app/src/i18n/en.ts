@@ -703,6 +703,7 @@ export const en = {
   installPwaDismiss: "Cancel",
   cashuCheckFailed: "Check failed",
   cashuInvalid: "Token is invalid or already spent.",
+  cashuClaimedByRecipient: "The recipient has already claimed this token.",
   cashuDeleted: "Token deleted.",
   cashuEmpty: "No Cashu tokens yet.",
   cashuToken: "Token",

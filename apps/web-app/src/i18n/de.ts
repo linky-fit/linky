@@ -710,6 +710,7 @@ export const de = {
   installPwaDismiss: "Abbrechen",
   cashuCheckFailed: "Prüfung fehlgeschlagen",
   cashuInvalid: "Token ist ungültig oder bereits ausgegeben.",
+  cashuClaimedByRecipient: "Der Empfänger hat dieses Token bereits eingelöst.",
   cashuDeleted: "Token gelöscht.",
   cashuEmpty: "Noch keine Cashu-Token.",
   cashuToken: "Token",

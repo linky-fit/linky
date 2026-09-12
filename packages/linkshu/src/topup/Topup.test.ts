@@ -81,12 +81,18 @@ interface FakeWalletArgs {
     proofs: Proof[];
     lastCounterWithSignature?: number;
   }>;
+  /** NUT-09 walk collision recovery runs from the colliding counter. */
+  readonly probe?: () => Promise<{
+    proofs: Proof[];
+    lastCounterWithSignature?: number;
+  }>;
 }
 
 const makeWallet = (args: FakeWalletArgs) => {
   const mintCounters: number[] = [];
   const mintConfigs: Array<MintProofsConfig | undefined> = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
+  const probeCalls: Array<{ start: number; gapLimit: number }> = [];
   let checks = 0;
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
@@ -116,8 +122,14 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.restore()
         : Promise.reject(new Error("restore unavailable"));
     },
+    batchRestore: (gapLimit = 0, _batchSize, start = 0) => {
+      probeCalls.push({ start, gapLimit });
+      return args.probe
+        ? args.probe()
+        : Promise.reject(new Error("restore unavailable"));
+    },
   });
-  return { wallet, mintCounters, mintConfigs, restoreCalls };
+  return { wallet, mintCounters, mintConfigs, restoreCalls, probeCalls };
 };
 
 /** One runtime over the given storage — a second one models a restart. */
@@ -529,7 +541,7 @@ describe("Topup", () => {
               ),
             )
           : Promise.resolve(mintedProofs),
-      restore: () =>
+      probe: () =>
         Promise.resolve({ proofs: [], lastCounterWithSignature: 100 }),
     });
     const { run } = makeHarness(wallet, storage);

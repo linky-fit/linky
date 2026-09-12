@@ -18,6 +18,8 @@ interface UseCashuTokenChecksParams {
   checkCashuTransfer: CheckCashuTransfer | null;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   forgetCashuTransfer: CashuTransferLifecycle["forget"] | null;
+  /** A `send` transfer: its proofs spent means the recipient claimed them. */
+  isHandedOutTransfer: (id: CashuOperationId) => boolean;
   pendingCashuDeleteId: CashuOperationId | null;
   pushToast: (message: string) => void;
   setCashuBulkCheckIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
@@ -42,6 +44,7 @@ export const useCashuTokenChecks = ({
   checkAllCashuTokens,
   checkCashuTransfer,
   forgetCashuTransfer,
+  isHandedOutTransfer,
   pendingCashuDeleteId,
   pushToast,
   setCashuBulkCheckIsBusy,
@@ -97,10 +100,16 @@ export const useCashuTokenChecks = ({
             setStatus(null);
             pushToast(t("cashuCheckOk"));
             return "ok";
-          case "spent":
-            setStatus(t("cashuInvalid"));
-            pushToast(t("cashuInvalid"));
+          case "spent": {
+            const message = t(
+              isHandedOutTransfer(id)
+                ? "cashuClaimedByRecipient"
+                : "cashuInvalid",
+            );
+            setStatus(message);
+            pushToast(message);
             return "invalid";
+          }
           case "unavailable":
             setStatus(t("cashuCheckFailed"));
             pushToast(t("cashuCheckFailed"));
@@ -110,7 +119,15 @@ export const useCashuTokenChecks = ({
         setCashuIsBusy(false);
       }
     },
-    [cashuIsBusy, checkCashuTransfer, pushToast, setCashuIsBusy, setStatus, t],
+    [
+      cashuIsBusy,
+      checkCashuTransfer,
+      isHandedOutTransfer,
+      pushToast,
+      setCashuIsBusy,
+      setStatus,
+      t,
+    ],
   );
 
   const checkAllCashuTokensAndDeleteInvalid = React.useCallback(async () => {

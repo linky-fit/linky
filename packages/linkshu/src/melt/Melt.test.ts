@@ -14,7 +14,10 @@ import {
   QuoteId,
   MintUrl,
 } from "../domain/primitives";
-import { deterministicCounterKey } from "../internal/counters";
+import {
+  DERIVATION_GAP_LIMIT,
+  deterministicCounterKey,
+} from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
@@ -115,6 +118,11 @@ interface FakeWalletArgs {
     start: number,
     count: number,
   ) => Promise<{ proofs: CashuProof[]; lastCounterWithSignature?: number }>;
+  /** NUT-09 walk collision recovery runs from the colliding counter. */
+  probe?: () => Promise<{
+    proofs: CashuProof[];
+    lastCounterWithSignature?: number;
+  }>;
 }
 
 const makeWallet = (args: FakeWalletArgs) => {
@@ -122,6 +130,7 @@ const makeWallet = (args: FakeWalletArgs) => {
   const meltCalls: MeltCall[] = [];
   const checkQuoteCalls: string[] = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
+  const probeCalls: Array<{ start: number; gapLimit: number }> = [];
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
     checkProofsStates: (proofs) =>
@@ -157,6 +166,12 @@ const makeWallet = (args: FakeWalletArgs) => {
         ? args.restore(start, count)
         : Promise.reject(new Error("restore unavailable"));
     },
+    batchRestore: (gapLimit = 0, _batchSize, start = 0) => {
+      probeCalls.push({ start, gapLimit });
+      return args.probe
+        ? args.probe()
+        : Promise.reject(new Error("restore unavailable"));
+    },
     createMeltQuoteBolt11: () =>
       args.quote ? args.quote() : Promise.resolve(quoteResponse()),
     checkMeltQuoteBolt11: (quote) => {
@@ -177,7 +192,14 @@ const makeWallet = (args: FakeWalletArgs) => {
         : Promise.reject(new Error("melt not stubbed"));
     },
   });
-  return { wallet, sendCalls, meltCalls, checkQuoteCalls, restoreCalls };
+  return {
+    wallet,
+    sendCalls,
+    meltCalls,
+    checkQuoteCalls,
+    restoreCalls,
+    probeCalls,
+  };
 };
 
 /** One runtime over the given storage — a second one models a restart. */
@@ -535,13 +557,13 @@ describe("Melt.melt", () => {
   });
 
   it("recovers a blank-output counter collision via NUT-09 and retries", async () => {
-    const { wallet, meltCalls, restoreCalls } = makeWallet({
+    const { wallet, meltCalls, probeCalls } = makeWallet({
       send: () => Promise.resolve(swappedThirteen()),
       melt: (call) =>
         call.counter < 100
           ? Promise.reject(outputsAlreadySigned())
           : Promise.resolve(meltResponse("PAID", [proof(1, "chg")])),
-      restore: () =>
+      probe: () =>
         Promise.resolve({ proofs: [], lastCounterWithSignature: 99 }),
     });
     const { run } = makeHarness(wallet);
@@ -550,7 +572,7 @@ describe("Melt.melt", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.receipt._tag).toBe("Right");
     expect(meltCalls.map((call) => call.counter)).toEqual([66, 100]);
-    expect(restoreCalls).toEqual([{ start: 66, count: 100 }]);
+    expect(probeCalls).toEqual([{ start: 66, gapLimit: DERIVATION_GAP_LIMIT }]);
     expect(exit.value.counter).toBe("102"); // 100 + 2 blank slots
     // The operation remembers the slot of the attempt that went through.
     expect(onlyMelt(exit.value.operations)).toMatchObject({
