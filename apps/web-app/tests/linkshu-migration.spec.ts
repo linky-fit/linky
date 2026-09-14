@@ -454,7 +454,7 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
       page.off("request", onRequest);
       expect(swaps).toEqual([]);
 
-      await page.goto("/#wallet/tokens");
+      await page.goto("/#wallet/tokens/proofs");
       await expect(page.getByLabel("Available", { exact: true })).toContainText(
         `Available · ${before + LEGACY_ROW_SAT} sat`,
       );

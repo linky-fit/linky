@@ -71,7 +71,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     for (const device of devices) {
       await expect.poll(() => readBalanceSat(device.page)).toBe(512);
     }
-    await second.page.goto("/#wallet/tokens");
+    await second.page.goto("/#wallet/tokens/proofs");
     await expect(
       second.page.getByLabel("Available", { exact: true }),
     ).toContainText("Available · 512 sat");
@@ -123,7 +123,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     });
 
     await test.step("the stale device receives the spent proofs through Evolu", async () => {
-      await second.page.goto("/#wallet/tokens");
+      await second.page.goto("/#wallet/tokens/proofs");
       const available = second.page.getByLabel("Available", { exact: true });
       await expect(available).toContainText("Available · 488 sat");
       await expect(available).toContainText(
