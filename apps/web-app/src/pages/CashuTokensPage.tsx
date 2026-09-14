@@ -13,7 +13,9 @@ import { useAppShellCore } from "../app/context/AppShellContexts";
 import { TransferPill } from "../components/CashuTokenPill";
 import type { MintIcon } from "../utils/mint";
 
+import type { ReturnUnclaimedTokensReport } from "../app/hooks/cashu/useReturnUnclaimedTokens";
 import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
+import { isIssuedTransfer } from "../app/lib/cashuTransfers";
 import { getMintDisplay } from "../app/lib/tokenMessageInfo";
 import { useTokenProofStates } from "../hooks/useTokenProofStates";
 import { navigateTo } from "../hooks/useRouting";
@@ -38,8 +40,13 @@ interface CashuTokensPageProps {
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   meltLargestForeignMintToMainMint: () => Promise<void>;
   restoreMissingTokens: () => Promise<void>;
+  /** Re-receives every issued send nobody claimed; see useReturnUnclaimedTokens. */
+  returnUnclaimedTokens: (options: {
+    reason: "manual";
+  }) => Promise<ReturnUnclaimedTokensReport>;
   setMintIconUrlByMint: Dispatch<SetStateAction<Record<string, string | null>>>;
   tokensRestoreIsBusy: boolean;
+  tokensReturnIsBusy: boolean;
 }
 
 const MINT_STATE_KEY: Record<ProofStateSnapshot["state"], I18nKey> = {
@@ -70,8 +77,10 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
   getMintIconUrl,
   meltLargestForeignMintToMainMint,
   restoreMissingTokens,
+  returnUnclaimedTokens,
   setMintIconUrlByMint,
   tokensRestoreIsBusy,
+  tokensReturnIsBusy,
 }) => {
   const { formatDisplayedAmountText, t } = useAppShellCore();
 
@@ -107,6 +116,7 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
   // delivered messenger send) until the mint reports them spent, so the
   // claim check is offered whenever any are left, not only for issued ones.
   const hasHandedOut = handedOut.length > 0;
+  const hasIssuedTransfers = cashuOpenTransfers.some(isIssuedTransfer);
   const autoCheckedRef = useRef(false);
   useEffect(() => {
     if (!hasHandedOut) return;
@@ -279,16 +289,32 @@ export const CashuTokensPage: FC<CashuTokensPageProps> = ({
         >
           <div className="list-header">
             <span>{t("cashuTransfers")}</span>
-            <button
-              type="button"
-              className="btn-small secondary"
-              onClick={() =>
-                void checkIssuedCashuTokensAndDeleteClaimed().then(refresh)
-              }
-              disabled={!hasHandedOut}
-            >
-              {t("cashuCheckIssuedTokens")}
-            </button>
+            <div className="list-header-actions">
+              <button
+                type="button"
+                className="btn-small secondary"
+                onClick={() =>
+                  void checkIssuedCashuTokensAndDeleteClaimed().then(refresh)
+                }
+                disabled={!hasHandedOut}
+              >
+                {t("cashuCheckIssuedTokens")}
+              </button>
+              <button
+                type="button"
+                className="btn-small secondary"
+                onClick={() =>
+                  void returnUnclaimedTokens({ reason: "manual" }).then(refresh)
+                }
+                disabled={
+                  !hasIssuedTransfers || tokensReturnIsBusy || cashuIsBusy
+                }
+              >
+                {tokensReturnIsBusy
+                  ? t("cashuReturningUnclaimed")
+                  : t("cashuReturnUnclaimed")}
+              </button>
+            </div>
           </div>
           {cashuOpenTransfers.length === 0 ? (
             <p className="muted">{t("cashuTransfersEmpty")}</p>

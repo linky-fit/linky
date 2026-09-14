@@ -9,6 +9,7 @@ import {
   PAY_WITH_CASHU_STORAGE_KEY,
   SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY,
   SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY,
+  UNCLAIMED_TOKEN_AUTO_RETURN_HOURS_STORAGE_KEY,
   UNIT_TOGGLE_STORAGE_KEY,
 } from "../../utils/constants";
 import type { DisplayCurrency } from "../../utils/displayAmounts";
@@ -24,6 +25,7 @@ interface UseAppPreferencesParams {
   payWithCashuEnabled: boolean;
   seenReceiptsEnabledAtSec: number | null;
   showProfileQrOnTiltEnabled: boolean;
+  unclaimedTokenAutoReturnHours: number;
 }
 
 export const useAppPreferences = ({
@@ -36,6 +38,7 @@ export const useAppPreferences = ({
   payWithCashuEnabled,
   seenReceiptsEnabledAtSec,
   showProfileQrOnTiltEnabled,
+  unclaimedTokenAutoReturnHours,
 }: UseAppPreferencesParams): void => {
   React.useEffect(() => {
     safeLocalStorageSet(
@@ -69,6 +72,13 @@ export const useAppPreferences = ({
       String(lightningInvoiceAutoPayLimit),
     );
   }, [lightningInvoiceAutoPayLimit]);
+
+  React.useEffect(() => {
+    safeLocalStorageSet(
+      UNCLAIMED_TOKEN_AUTO_RETURN_HOURS_STORAGE_KEY,
+      String(unclaimedTokenAutoReturnHours),
+    );
+  }, [unclaimedTokenAutoReturnHours]);
 
   React.useEffect(() => {
     safeLocalStorageSet(

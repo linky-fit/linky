@@ -62,6 +62,7 @@ interface BuildMoneyRoutePropsParams {
   returnCashuTokenToWallet: ReturnType<
     MoneyRoutesProps["cashuTokenProps"]
   >["returnCashuTokenToWallet"];
+  returnUnclaimedTokens: MoneyRoutesProps["cashuTokensProps"]["returnUnclaimedTokens"];
   startSendCashuTokenToContact: ReturnType<
     MoneyRoutesProps["cashuTokenProps"]
   >["startSendCashuTokenToContact"];
@@ -87,6 +88,10 @@ interface BuildMoneyRoutePropsParams {
   topupInvoiceQr: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceQr"];
   topupInvoiceQrPayload: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceQrPayload"];
   tokensRestoreIsBusy: MoneyRoutesProps["cashuTokensProps"]["tokensRestoreIsBusy"];
+  tokensReturnIsBusy: MoneyRoutesProps["cashuTokensProps"]["tokensReturnIsBusy"];
+  unclaimedTokenAutoReturnHours: ReturnType<
+    MoneyRoutesProps["cashuTokenProps"]
+  >["unclaimedTokenAutoReturnHours"];
   writeCashuTokenToNfc: MoneyRoutesProps["cashuTokenProps"] extends () => infer Props
     ? Props extends { writeToNfc: infer Fn }
       ? Fn
@@ -136,6 +141,7 @@ export const buildMoneyRouteProps = ({
   payLightningAddressWithCashu,
   pendingCashuDeleteId,
   restoreMissingTokens,
+  returnUnclaimedTokens,
   requestDeleteCashuToken,
   returnCashuTokenToWallet,
   startSendCashuTokenToContact,
@@ -157,6 +163,8 @@ export const buildMoneyRouteProps = ({
   topupInvoiceQr,
   topupInvoiceQrPayload,
   tokensRestoreIsBusy,
+  tokensReturnIsBusy,
+  unclaimedTokenAutoReturnHours,
   writeCashuTokenToNfc,
 }: BuildMoneyRoutePropsParams): MoneyRouteProps => {
   return {
@@ -193,8 +201,10 @@ export const buildMoneyRouteProps = ({
       getMintIconUrl,
       meltLargestForeignMintToMainMint,
       restoreMissingTokens,
+      returnUnclaimedTokens,
       setMintIconUrlByMint,
       tokensRestoreIsBusy,
+      tokensReturnIsBusy,
     },
     cashuTokenProps: () => {
       if (route.kind !== "cashuToken") {
@@ -217,6 +227,7 @@ export const buildMoneyRouteProps = ({
         returnCashuTokenToWallet,
         startSendCashuTokenToContact,
         shareTokenText: shareCashuTokenText,
+        unclaimedTokenAutoReturnHours,
         writeToNfc: writeCashuTokenToNfc,
       };
     },

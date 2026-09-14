@@ -7,6 +7,7 @@ import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useTokenQr } from "../app/hooks/cashu/useTokenQr";
 import { formatStoredCashuError } from "../app/lib/cashuStoredError";
 import { canReturnTransfer } from "../app/lib/cashuTransfers";
+import { unclaimedTokenAutoReturnAt } from "../app/lib/unclaimedTokenAutoReturn";
 
 import { getMintDisplay } from "../app/lib/tokenMessageInfo";
 import { WalletBalance } from "../components/WalletBalance";
@@ -16,6 +17,7 @@ import type { CashuOperationId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import { buildCashuShareUrl } from "../utils/deepLinks";
+import { formatRelativeTime } from "../utils/formatting";
 
 interface CashuTokenPageProps {
   inspectCashuProofStates: InspectCashuProofStates | null;
@@ -35,6 +37,8 @@ interface CashuTokenPageProps {
   requestDeleteCashuToken: (id: CashuOperationId) => void;
   returnCashuTokenToWallet: (id: CashuOperationId) => Promise<void>;
   routeId: CashuOperationId;
+  /** Hours before an issued token nobody claimed returns by itself; 0 = off. */
+  unclaimedTokenAutoReturnHours: number;
   shareTokenText: (id: CashuOperationId, text: string) => Promise<void>;
   showPaidOverlay: (title?: string) => void;
   startSendCashuTokenToContact: (id: CashuOperationId) => Promise<void>;
@@ -86,9 +90,10 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   shareTokenText,
   showPaidOverlay,
   startSendCashuTokenToContact,
+  unclaimedTokenAutoReturnHours,
   writeToNfc,
 }) => {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { formatDisplayedAmountText, lang, t } = useAppShellCore();
 
   const transfer = cashuTransfers.find(
     (candidate) => String(candidate.id) === routeId,
@@ -121,6 +126,13 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   const canReturnToWallet =
     transfer !== undefined && canReturnTransfer(transfer);
   const statusKey = transfer === undefined ? null : statusKeyOf(transfer);
+  const autoReturnAt =
+    transfer !== undefined && isIssued
+      ? unclaimedTokenAutoReturnAt(
+          transfer.createdAt,
+          unclaimedTokenAutoReturnHours,
+        )
+      : null;
   const shareUrl = buildCashuShareUrl(tokenText);
   const shareMessage = (() => {
     if (!shareUrl) return "";
@@ -229,7 +241,18 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
           {formatStoredCashuError(transfer.error) ?? t("cashuReceiveFailed")}
         </p>
       ) : statusKey !== null ? (
-        <p className="cashu-token-status">{t(statusKey)}</p>
+        <p className="cashu-token-status">
+          {t(statusKey)}
+          {autoReturnAt !== null ? (
+            <>
+              {" "}
+              {t("cashuTokenAutoReturnAt").replace(
+                "{when}",
+                formatRelativeTime(autoReturnAt, lang),
+              )}
+            </>
+          ) : null}
+        </p>
       ) : null}
       {!isFailedReceive && transfer.error !== null ? (
         <p className="cashu-token-status cashu-token-status-error">

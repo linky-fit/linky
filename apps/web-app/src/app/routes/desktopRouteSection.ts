@@ -20,6 +20,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "settingsMasterKeys":
     case "advanced":
     case "advancedAutoPayLimit":
+    case "advancedTokenAutoReturn":
     case "advancedInspector":
     case "advancedInspectorTimeline":
     case "advancedPushDebug":
@@ -74,6 +75,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "settingsUnits":
     case "settingsMasterKeys":
     case "advancedAutoPayLimit":
+    case "advancedTokenAutoReturn":
     case "advancedInspector":
     case "mints":
     case "nostrRelays":

@@ -67,6 +67,9 @@ export const SHOW_PROFILE_QR_ON_TILT_STORAGE_KEY =
   "linky.show_profile_qr_on_tilt.v2";
 export const LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY =
   "linky.lightning_invoice_auto_pay_limit";
+// Hours before an issued token nobody claimed returns to the wallet; 0 = off.
+export const UNCLAIMED_TOKEN_AUTO_RETURN_HOURS_STORAGE_KEY =
+  "linky.unclaimed_token_auto_return_hours.v1";
 export const BANK_PAYMENT_OFFER_RECIPIENT_COUNT_STORAGE_KEY =
   "linky.bank_payment_offer_recipient_count.v1";
 export const BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY =

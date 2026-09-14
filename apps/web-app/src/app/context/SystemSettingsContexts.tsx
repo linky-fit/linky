@@ -32,6 +32,9 @@ export interface AdvancedSettingsContextValue {
   seedMnemonic: string | null;
   setLightningInvoiceAutoPayLimit: (value: number) => void;
   setPayWithCashuEnabled: (value: boolean) => void;
+  setUnclaimedTokenAutoReturnHours: (value: number) => void;
+  /** Hours before an issued token nobody claimed returns by itself; 0 = off. */
+  unclaimedTokenAutoReturnHours: number;
 }
 
 export interface EvoluSettingsContextValue {

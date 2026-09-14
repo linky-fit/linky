@@ -81,6 +81,7 @@ export const useRouting = () => {
 type NavigationAction =
   | { route: "advanced" }
   | { route: "advancedAutoPayLimit" }
+  | { route: "advancedTokenAutoReturn" }
   | { route: "advancedInspector" }
   | { route: "advancedInspectorTimeline" }
   | { route: "advancedPushDebug" }
@@ -143,6 +144,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "advancedAutoPayLimit":
       window.location.assign("#advanced/auto-pay-limit");
+      break;
+    case "advancedTokenAutoReturn":
+      window.location.assign("#advanced/token-auto-return");
       break;
     case "advancedInspector":
       window.location.assign("#advanced/inspector");

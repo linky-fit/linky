@@ -63,6 +63,7 @@ import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { parseNpubCashProfileInfo } from "../../../utils/npubCashInfo";
 import {
   getInitialLightningInvoiceAutoPayLimit,
+  getInitialUnclaimedTokenAutoReturnHours,
   getInitialPayWithCashuEnabled,
   safeLocalStorageGet,
   safeLocalStorageRemove,
@@ -95,6 +96,7 @@ import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { readCashuTokenAliases as readCashuRowAliases } from "../../lib/cashuTokenIdentity";
 import { isIssuedTransfer, isOpenTransfer } from "../../lib/cashuTransfers";
+import { useReturnUnclaimedTokens } from "../cashu/useReturnUnclaimedTokens";
 import {
   canOfferPaymentMintMelt,
   getPaymentMintMeltPlan,
@@ -325,6 +327,8 @@ export const useCashuWalletComposition = ({
   );
   const [lightningInvoiceAutoPayLimit, setLightningInvoiceAutoPayLimit] =
     useState<number>(() => getInitialLightningInvoiceAutoPayLimit());
+  const [unclaimedTokenAutoReturnHours, setUnclaimedTokenAutoReturnHours] =
+    useState<number>(() => getInitialUnclaimedTokenAutoReturnHours());
 
   useAnonymousPaymentTelemetry({
     appOwnerId,
@@ -376,6 +380,7 @@ export const useCashuWalletComposition = ({
   const [cashuIsBusy, setCashuIsBusy] = useState(false);
   const [cashuBulkCheckIsBusy, setCashuBulkCheckIsBusy] = useState(false);
   const [tokensRestoreIsBusy, setTokensRestoreIsBusy] = useState(false);
+  const [tokensReturnIsBusy, setTokensReturnIsBusy] = useState(false);
 
   const cashuOpQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   const enqueueCashuOp = React.useCallback(
@@ -2112,6 +2117,58 @@ export const useCashuWalletComposition = ({
     tokensRestoreIsBusy,
   });
 
+  const returnUnclaimedTokens = useReturnUnclaimedTokens({
+    cashuIsBusy,
+    cashuOpenTransfers,
+    checkIssuedClaims:
+      cashuTransferLifecycle === null
+        ? null
+        : checkIssuedCashuTokensAndDeleteClaimed,
+    enqueueCashuOp,
+    formatDisplayedAmountText,
+    pushToast,
+    returnToWallet:
+      cashuTransferLifecycle === null
+        ? null
+        : cashuTransferLifecycle.returnToWallet,
+    setCashuIsBusy,
+    setTokensReturnIsBusy,
+    t,
+    tokensReturnIsBusy,
+  });
+
+  // Automatic return of issued tokens nobody claimed, once they are older
+  // than the configured wait. Same cadence as the claim check above; the
+  // hook itself does nothing (no mint call) while no send is old enough.
+  const returnUnclaimedTokensRef = useLatest(returnUnclaimedTokens);
+  const hasIssuedTokensForAutoReturn =
+    unclaimedTokenAutoReturnHours > 0 &&
+    cashuOpenTransfers.some(isIssuedTransfer);
+  React.useEffect(() => {
+    if (!hasIssuedTokensForAutoReturn) return;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      void returnUnclaimedTokensRef.current({
+        reason: "auto",
+        olderThanSec: unclaimedTokenAutoReturnHours * 3600,
+      });
+    };
+    // Let the claim check on mount answer first so a redeemed token closes
+    // as claimed instead of being re-received.
+    const startId = window.setTimeout(tick, 5_000);
+    const intervalId = window.setInterval(tick, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startId);
+      window.clearInterval(intervalId);
+    };
+  }, [
+    hasIssuedTokensForAutoReturn,
+    returnUnclaimedTokensRef,
+    unclaimedTokenAutoReturnHours,
+  ]);
+
   const mainMintForTokenList = React.useMemo(
     () => normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL),
     [defaultMintUrl],
@@ -2560,6 +2617,8 @@ export const useCashuWalletComposition = ({
     knownLnAddressPayContact,
     knownLnAddressPayContactPictureUrl,
     lightningInvoiceAutoPayLimit,
+    unclaimedTokenAutoReturnHours,
+    setUnclaimedTokenAutoReturnHours,
     lnAddressPayAmount,
     lnurlWithdrawIsBusy,
     makeNip98AuthHeader,
@@ -2589,6 +2648,7 @@ export const useCashuWalletComposition = ({
     requestSelectedContact,
     restoreMissingTokens,
     returnCashuTokenToWallet,
+    returnUnclaimedTokens,
     saveCashuFromText,
     sendCashuTokenToContact,
     setCashuDraft,
@@ -2610,6 +2670,7 @@ export const useCashuWalletComposition = ({
     showPaidOverlay,
     startSendCashuTokenToContact,
     tokensRestoreIsBusy,
+    tokensReturnIsBusy,
     topupAmount,
     topupInvoice,
     topupInvoiceCashuRequest,

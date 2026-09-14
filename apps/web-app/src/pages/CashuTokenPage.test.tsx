@@ -56,6 +56,7 @@ const props = (tokenText: string): ComponentProps<typeof CashuTokenPage> => ({
   shareTokenText: async () => {},
   showPaidOverlay: vi.fn(),
   startSendCashuTokenToContact: async () => {},
+  unclaimedTokenAutoReturnHours: 0,
   writeToNfc: async () => {},
 });
 

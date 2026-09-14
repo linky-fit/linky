@@ -44,6 +44,8 @@ const createAdvancedSettings = (
   seedMnemonic: null,
   setLightningInvoiceAutoPayLimit: noop,
   setPayWithCashuEnabled: noop,
+  setUnclaimedTokenAutoReturnHours: noop,
+  unclaimedTokenAutoReturnHours: 0,
 });
 
 type EvoluSettingsInput = Omit<

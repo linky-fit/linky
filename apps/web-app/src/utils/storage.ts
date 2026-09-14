@@ -11,6 +11,7 @@ import {
   DISPLAY_CURRENCY_STORAGE_KEY,
   LIGHTNING_INVOICE_AUTO_PAY_LIMIT_SAT,
   LIGHTNING_INVOICE_AUTO_PAY_LIMIT_STORAGE_KEY,
+  UNCLAIMED_TOKEN_AUTO_RETURN_HOURS_STORAGE_KEY,
   NOSTR_IDENTITY_SOURCE_STORAGE_KEY,
   NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY,
   NOSTR_NSEC_STORAGE_KEY,
@@ -248,6 +249,11 @@ export const getInitialLightningInvoiceAutoPayLimit = (): number => {
   return stored !== null && stored >= 0
     ? stored
     : LIGHTNING_INVOICE_AUTO_PAY_LIMIT_SAT;
+};
+
+export const getInitialUnclaimedTokenAutoReturnHours = (): number => {
+  const stored = readStoredInt(UNCLAIMED_TOKEN_AUTO_RETURN_HOURS_STORAGE_KEY);
+  return stored !== null && stored >= 0 ? stored : 0;
 };
 
 export const getInitialBankPaymentOfferRecipientCount = (

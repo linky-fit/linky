@@ -41,6 +41,13 @@ const issued = Schema.decodeUnknownSync(TokenTransfer)({
   error: null,
   createdAt: 1,
 });
+const emptyReturnReport = {
+  returned: 0,
+  returnedAmount: 0,
+  claimed: 0,
+  failed: 0,
+  mintUnreachable: false,
+};
 const snapshot = (
   proofId: string,
   state: ProofStateSnapshot["state"],
@@ -67,8 +74,10 @@ const props = (
   }),
   meltLargestForeignMintToMainMint: async () => {},
   restoreMissingTokens: async () => {},
+  returnUnclaimedTokens: async () => emptyReturnReport,
   setMintIconUrlByMint: () => {},
   tokensRestoreIsBusy: false,
+  tokensReturnIsBusy: false,
 });
 
 const clickButton = async (container: HTMLElement, text: string) => {
@@ -106,6 +115,31 @@ describe("CashuTokensPage inventory", () => {
     expect(heldSection).toContain("cashuHeldProofsHint");
     expect(container.textContent).toContain("1");
     expect(container.textContent).toContain("cashuSpentProofsKept");
+    await unmount();
+  });
+
+  it("returns every unclaimed issued send from the transfers header", async () => {
+    const returnUnclaimedTokens = vi.fn(async () => emptyReturnReport);
+    const { container, unmount } = await renderIntoDocument(
+      <CashuTokensPage
+        {...props(async () => [])}
+        returnUnclaimedTokens={returnUnclaimedTokens}
+      />,
+    );
+    await clickButton(container, "cashuReturnUnclaimed");
+    expect(returnUnclaimedTokens).toHaveBeenCalledWith({ reason: "manual" });
+    await unmount();
+  });
+
+  it("offers no bulk return without an issued send", async () => {
+    const { container, unmount } = await renderIntoDocument(
+      <CashuTokensPage {...props(async () => [])} cashuOpenTransfers={[]} />,
+    );
+    const button = [...container.querySelectorAll("button")].find(
+      (candidate) => candidate.textContent === "cashuReturnUnclaimed",
+    );
+    assert(button instanceof HTMLButtonElement);
+    expect(button.disabled).toBe(true);
     await unmount();
   });
 

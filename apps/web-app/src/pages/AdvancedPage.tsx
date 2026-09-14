@@ -11,6 +11,7 @@ import {
   Download,
   MessageCircle as FeedbackIcon,
   Smartphone,
+  Undo2,
   Landmark,
   Languages,
   LogOut,
@@ -37,6 +38,7 @@ import { SettingsLinkRow, SettingsToggleRow } from "../components/SettingsRows";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import { getNativeNotificationPermissionState } from "../platform/nativeBridge";
+import { unclaimedTokenAutoReturnLabelKey } from "../app/lib/unclaimedTokenAutoReturn";
 import { isNativePlatform } from "../platform/runtime";
 
 export function AdvancedPage(): React.ReactElement {
@@ -61,6 +63,7 @@ export function AdvancedPage(): React.ReactElement {
     requestPasteNostrKeys,
     seedMnemonic,
     setPayWithCashuEnabled,
+    unclaimedTokenAutoReturnHours,
   } = useAdvancedSettingsContext();
   const relayHealth = useRelayHealth();
   const connectedRelayCount = countConnectedRelays(relayUrls, relayHealth);
@@ -321,6 +324,19 @@ export function AdvancedPage(): React.ReactElement {
           tail={
             <span className="settings-tail-content settings-value">
               {getAutoPayLimitLabel(lightningInvoiceAutoPayLimit)}
+            </span>
+          }
+        />
+
+        <SettingsLinkRow
+          onClick={() => navigateTo({ route: "advancedTokenAutoReturn" })}
+          icon={<Undo2 size={18} />}
+          label={t("unclaimedTokenAutoReturn")}
+          tail={
+            <span className="settings-tail-content settings-value">
+              {t(
+                unclaimedTokenAutoReturnLabelKey(unclaimedTokenAutoReturnHours),
+              )}
             </span>
           }
         />
