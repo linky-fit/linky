@@ -18,10 +18,9 @@ export const pendingTokenTransfers = (
   return transfers
     .filter(
       (transfer) =>
-        isOpenTransfer(transfer) ||
-        (transfer.kind === "send" &&
-          transfer.status === "done" &&
-          outstanding.has(transfer.id)),
+        transfer.kind === "send" &&
+        (isOpenTransfer(transfer) ||
+          (transfer.status === "done" && outstanding.has(transfer.id))),
     )
     .sort((a, b) => b.createdAt - a.createdAt);
 };

@@ -143,6 +143,8 @@ describe("pending tokens", () => {
         (node) => node.textContent,
       ),
     ).toEqual(["140 sat", "28 sat"]);
+    expect(container.querySelectorAll(".cashu-transfer-row")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Received token");
     await unmount();
   });
 
@@ -208,7 +210,7 @@ describe("pending tokens", () => {
     await unmount();
   });
 
-  it("distinguishes NFC, unknown handoffs and failed incoming tokens", async () => {
+  it("distinguishes NFC and unknown handoffs, and excludes incoming tokens", async () => {
     const pageProps = props();
     const { container, rerender, unmount } = await renderIntoDocument(
       <CashuTokensPage
@@ -227,16 +229,19 @@ describe("pending tokens", () => {
     );
     expect(container.textContent).toContain("Handoff unknown");
     expect(container.textContent).not.toContain("Sent in chat");
-    await rerender(
-      <CashuTokensPage
-        {...pageProps}
-        cashuTransfers={[
-          new TokenTransfer({ ...transfer, kind: "receive", status: "failed" }),
-        ]}
-      />,
-    );
-    expect(container.textContent).toContain("Receiving failed.");
-    expect(container.textContent).toContain("Received token");
+    for (const status of TokenTransfer.fields.status.literals) {
+      await rerender(
+        <CashuTokensPage
+          {...pageProps}
+          cashuTransfers={[
+            new TokenTransfer({ ...transfer, kind: "receive", status }),
+          ]}
+        />,
+      );
+      expect(container.textContent).toContain("No open transfers.");
+      expect(container.querySelector("li")).toBeNull();
+      expect(container.textContent).not.toContain("Received token");
+    }
     await unmount();
   });
 

@@ -171,9 +171,7 @@ export const CashuTokensPage = ({
           >
             {transfers.map((transfer) => {
               const chats = (chatsByToken.get(transfer.tokenText) ?? []).filter(
-                (message) =>
-                  message.direction ===
-                  (transfer.kind === "send" ? "out" : "in"),
+                (message) => message.direction === "out",
               );
               const minutes = Math.max(
                 0,
@@ -184,27 +182,17 @@ export const CashuTokensPage = ({
                 0,
                 Math.floor((now - transfer.createdAt) / 86_400),
               );
-              const partiallyClaimed =
-                transfer.kind === "send" &&
-                cashuProofs.some(
-                  (proof) =>
-                    proof.operationId === transfer.id &&
-                    proof.state === "spent",
-                );
-              const state =
-                transfer.kind === "receive"
-                  ? t(
-                      transfer.status === "failed"
-                        ? "cashuReceiveFailed"
-                        : "cashuReceivePending",
-                    )
-                  : t(
-                      partiallyClaimed
-                        ? "cashuPartiallyClaimed"
-                        : transfer.status === "pending"
-                          ? "cashuAwaitingDelivery"
-                          : "cashuAwaitingClaim",
-                    );
+              const partiallyClaimed = cashuProofs.some(
+                (proof) =>
+                  proof.operationId === transfer.id && proof.state === "spent",
+              );
+              const state = t(
+                partiallyClaimed
+                  ? "cashuPartiallyClaimed"
+                  : transfer.status === "pending"
+                    ? "cashuAwaitingDelivery"
+                    : "cashuAwaitingClaim",
+              );
               return (
                 <li key={transfer.id} className="cashu-transfer-row">
                   <button
