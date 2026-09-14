@@ -258,6 +258,13 @@ export const CashuTokensPage = ({
             {tokensRestoreIsBusy ? t("restoring") : t("restoreTokens")}
           </button>
         </div>
+        {tokensRestoreIsBusy && (
+          <div
+            className="cashu-restore-progress"
+            role="progressbar"
+            aria-label={t("restoring")}
+          />
+        )}
         <p className="muted">{t("cashuMissingRestoreHint")}</p>
       </section>
       <button

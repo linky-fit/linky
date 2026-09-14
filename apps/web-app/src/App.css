@@ -7349,6 +7349,39 @@ button.cashu-token-pill {
   padding-bottom: 100px;
 }
 
+.cashu-restore-progress {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-border);
+}
+
+.cashu-restore-progress::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--app-primary-button-bg);
+  animation: cashu-restore-progress 1.4s ease-in-out infinite;
+}
+
+@keyframes cashu-restore-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cashu-restore-progress::after {
+    animation: none;
+    width: 100%;
+  }
+}
+
 .cashu-transfers-toolbar {
   display: flex;
   justify-content: space-between;

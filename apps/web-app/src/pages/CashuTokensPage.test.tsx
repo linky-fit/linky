@@ -153,6 +153,7 @@ describe("pending tokens", () => {
     const { container, rerender, unmount } = await renderIntoDocument(
       <CashuTokensPage {...pageProps} />,
     );
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
     await click(container, "Look for missing tokens");
     expect(pageProps.restoreMissingTokens).toHaveBeenCalledOnce();
     await rerender(<CashuTokensPage {...pageProps} canRestoreTokens={false} />);
@@ -162,6 +163,13 @@ describe("pending tokens", () => {
       <CashuTokensPage {...pageProps} tokensRestoreIsBusy={true} />,
     );
     expect(container.textContent).toContain("Looking for missing tokens");
+    const progress = container.querySelector('[role="progressbar"]');
+    expect(progress?.getAttribute("aria-label")).toBe(
+      "Looking for missing tokens…",
+    );
+    expect(progress?.hasAttribute("aria-valuenow")).toBe(false);
+    await rerender(<CashuTokensPage {...pageProps} />);
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
     await unmount();
   });
 
