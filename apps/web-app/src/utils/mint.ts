@@ -15,8 +15,7 @@ const envMainMintUrl = (import.meta.env.VITE_MAIN_MINT_URL ?? "").trim();
 
 export const MAIN_MINT_URL = envMainMintUrl || "https://cashu.cz";
 
-// With a local dev mint configured, keep only test mints in the presets so
-// dev mode never fetches metadata from (or offers) production mints.
+// An explicit development mint keeps preset discovery and recovery local.
 export const PRODUCTION_MINTS = [
   "https://cashu.cz",
   "https://mint.minibits.cash/Bitcoin",
@@ -25,7 +24,7 @@ export const PRODUCTION_MINTS = [
 ];
 
 export const PRESET_MINTS = envMainMintUrl
-  ? [envMainMintUrl, "https://testnut.cashu.space"]
+  ? [envMainMintUrl]
   : [
       PRODUCTION_MINTS[0],
       "https://testnut.cashu.space",
