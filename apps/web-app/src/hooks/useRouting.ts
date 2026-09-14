@@ -88,6 +88,7 @@ type NavigationAction =
   | { route: "cashuToken"; id: CashuOperationId }
   | { route: "cashuTokenNew" }
   | { route: "cashuTokens" }
+  | { route: "cashuProofs" }
   | { route: "chat"; id: string }
   | { route: "contact"; id: ContactId }
   | { route: "contactEdit"; id: ContactId }
@@ -190,6 +191,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "topupInvoice":
       window.location.assign("#wallet/topup/invoice");
+      break;
+    case "cashuProofs":
+      window.location.assign("#wallet/tokens/proofs");
       break;
     case "cashuTokens":
       window.location.assign("#wallet/tokens");

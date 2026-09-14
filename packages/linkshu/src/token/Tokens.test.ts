@@ -22,7 +22,12 @@ import { NewOperation, OperationStore } from "../ports/OperationStore";
 import type { OperationStatus, StoredOperation } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { ProofState, StoredProof } from "../ports/ProofStore";
-import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import {
+  answerProofStates,
+  fakeWallet,
+  KEYSET_HEX,
+  proof,
+} from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import {
   amountIn,
@@ -53,7 +58,8 @@ const rejected = encodeRejected(
 );
 
 interface HarnessArgs {
-  receive?: () => Promise<CashuProof[]>;
+  receive?: (text: string) => Promise<CashuProof[]>;
+  checkProofsStates?: import("../mint/internal/WalletInstances").LoadedWallet["checkProofsStates"];
 }
 
 const makeHarness = (args: HarnessArgs = {}) => {
@@ -61,9 +67,12 @@ const makeHarness = (args: HarnessArgs = {}) => {
   let receiveCalls = 0;
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
-    receive: () => {
+    checkProofsStates: args.checkProofsStates ?? answerProofStates(),
+    receive: (text) => {
       receiveCalls += 1;
-      return args.receive?.() ?? Promise.reject(new Error("not under test"));
+      return (
+        args.receive?.(text) ?? Promise.reject(new Error("not under test"))
+      );
     },
   });
 
@@ -986,5 +995,167 @@ describe("Tokens.ingestLegacyRows", () => {
       result: { ingestedRows: 0, proofs: 0 },
     });
     expect(JSON.stringify(events)).not.toContain("cashu");
+  });
+});
+
+describe("Tokens.reclaim", () => {
+  it("reclaims closed sends, NFC and orphan proofs while preserving pending, unknown and held proofs", async () => {
+    const { run, events, receiveCalls } = makeHarness({
+      receive: async () => [
+        proof(16, "reclaimed-fresh"),
+        proof(4, "reclaimed-change"),
+      ],
+      checkProofsStates: async (proofs) =>
+        (
+          await answerProofStates((secret) =>
+            secret === "claimed"
+              ? "SPENT"
+              : secret === "pending"
+                ? "PENDING"
+                : "UNSPENT",
+          )(proofs)
+        ).filter((state) => state.Y !== "unknown"),
+    });
+    const exit = await run(
+      Effect.gen(function* () {
+        const tokens = yield* Tokens;
+        const closed = yield* seedTransfer("send", "done", mint, tokenA, 8);
+        yield* seedProofs(mint, [proof(8, "closed")], "handedOut", closed.id);
+        const nfc = yield* seedTransfer(
+          "send",
+          "externalized",
+          mint,
+          tokenB,
+          10,
+        );
+        yield* seedProofs(
+          mint,
+          [proof(8, "nfc"), proof(2, "claimed")],
+          "externalized",
+          nfc.id,
+        );
+        yield* seedProofs(
+          mint,
+          [proof(8, "orphan"), proof(2, "pending"), proof(2, "unknown")],
+          "handedOut",
+        );
+        yield* seedProofs(mint, [proof(8, "held")], "held");
+        yield* seedProofs(mint, [proof(16, "keep")], "available");
+        const ids = (yield* tokens.proofs)
+          .filter((p) => p.state !== "available")
+          .map((p) => p.id);
+        const report = yield* tokens.reclaim(ids);
+        return { report, closed, nfc, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    const { report, proofs, operations, closed, nfc } = exit.value;
+    expect(report.reclaimedAmount).toBe(20);
+    expect(report.reclaimedProofs).toHaveLength(3);
+    expect(report.spentProofs).toHaveLength(1);
+    expect(report.unresolvedProofs).toHaveLength(3);
+    expect(stateOf(proofs, "closed")).toBe("spent");
+    expect(stateOf(proofs, "nfc")).toBe("spent");
+    expect(stateOf(proofs, "claimed")).toBe("spent");
+    expect(stateOf(proofs, "pending")).toBe("handedOut");
+    expect(stateOf(proofs, "unknown")).toBe("handedOut");
+    expect(stateOf(proofs, "held")).toBe("held");
+    expect(stateOf(proofs, "keep")).toBe("available");
+    expect(amountIn(proofs, "available")).toBe(36);
+    expect(operationById(operations, closed.id)?.status).toBe("returned");
+    expect(operationById(operations, nfc.id)?.status).toBe("returned");
+    expect(receiveCalls()).toBe(1);
+    expect(JSON.stringify(events)).not.toContain("reclaimed-fresh");
+    expect(
+      events.some(
+        (event) => "name" in event && event.name === "tokens.reclaim",
+      ),
+    ).toBe(true);
+  });
+
+  it("returns one delivered chat send without touching another send at the same mint", async () => {
+    const { run } = makeHarness({
+      receive: async () => [proof(4, "fresh-return")],
+    });
+    const exit = await run(
+      Effect.gen(function* () {
+        const selected = yield* seedTransfer("send", "done", mint, tokenA, 4);
+        const other = yield* seedTransfer("send", "done", mint, tokenB, 8);
+        yield* seedProofs(
+          mint,
+          [proof(4, "selected")],
+          "handedOut",
+          selected.id,
+        );
+        yield* seedProofs(mint, [proof(8, "other")], "handedOut", other.id);
+        const tokens = yield* Tokens;
+        const ids = (yield* tokens.proofs)
+          .filter((proof) => proof.operationId === selected.id)
+          .map((proof) => proof.id);
+        const report = yield* tokens.reclaim(ids);
+        return { selected, other, report, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.report.reclaimedAmount).toBe(4);
+    expect(stateOf(exit.value.proofs, "selected")).toBe("spent");
+    expect(stateOf(exit.value.proofs, "other")).toBe("handedOut");
+    expect(
+      operationById(exit.value.operations, exit.value.selected.id)?.status,
+    ).toBe("returned");
+    expect(
+      operationById(exit.value.operations, exit.value.other.id)?.status,
+    ).toBe("done");
+    expect(amountIn(exit.value.proofs, "available")).toBe(4);
+  });
+
+  it("does not mark the whole batch spent when a recipient races the swap", async () => {
+    const { run } = makeHarness({
+      receive: () =>
+        Promise.reject(new MintOperationError(11001, "Token already spent")),
+    });
+    const exit = await run(
+      Effect.gen(function* () {
+        const tokens = yield* Tokens;
+        yield* seedProofs(mint, proofsA, "handedOut");
+        const report = yield* tokens.reclaim(
+          (yield* tokens.proofs).map((p) => p.id),
+        );
+        return { report, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.report.unresolvedProofs).toHaveLength(2);
+    expect(exit.value.report.reclaimedAmount).toBe(0);
+    expect(exit.value.proofs.every((p) => p.state === "handedOut")).toBe(true);
+  });
+
+  it("continues after an unreachable mint and skips already reclaimed ids on retry", async () => {
+    const otherMint = MintUrl.make("https://other-mint.example");
+    const { run, receiveCalls } = makeHarness({
+      receive: async () => swappedProofs,
+      checkProofsStates: (proofs) =>
+        proofs.some((p) => p.secret === "offline")
+          ? Promise.reject(new TypeError("fetch failed"))
+          : answerProofStates()(proofs),
+    });
+    const exit = await run(
+      Effect.gen(function* () {
+        const tokens = yield* Tokens;
+        yield* seedProofs(mint, [proof(8, "offline")], "externalized");
+        yield* seedProofs(otherMint, proofsA, "handedOut");
+        const ids = (yield* tokens.proofs).map((p) => p.id);
+        const first = yield* tokens.reclaim(ids);
+        const second = yield* tokens.reclaim(ids);
+        return { first, second, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.first.reclaimedAmount).toBe(5);
+    expect(exit.value.first.unresolvedProofs).toHaveLength(1);
+    expect(exit.value.second.reclaimedAmount).toBe(0);
+    expect(exit.value.second.unresolvedProofs).toHaveLength(1);
+    expect(receiveCalls()).toBe(1);
+    expect(stateOf(exit.value.proofs, "offline")).toBe("externalized");
   });
 });

@@ -11,6 +11,7 @@ import {
   CashuTokenNewPage,
   CashuTokenPage,
   CashuTokensPage,
+  CashuProofsPage,
   ChatPage,
   ContactEditPage,
   ContactNewPage,
@@ -75,6 +76,7 @@ export interface MoneyRoutesProps {
   cashuTokenEmitProps: React.ComponentProps<typeof CashuTokenEmitPage>;
   cashuTokenNewProps: React.ComponentProps<typeof CashuTokenNewPage>;
   cashuTokenProps: () => React.ComponentProps<typeof CashuTokenPage>;
+  cashuProofsProps: React.ComponentProps<typeof CashuProofsPage>;
   cashuTokensProps: React.ComponentProps<typeof CashuTokensPage>;
   lnAddressPayProps: React.ComponentProps<typeof LnAddressPayPage>;
   manualPayProps: React.ComponentProps<typeof ManualPayPage>;
@@ -151,6 +153,8 @@ const RoutePage = (): React.ReactElement => {
       return <TopupNoAmountPage />;
     case "topupInvoice":
       return <TopupInvoicePage {...moneyRoutes.topupInvoiceProps} />;
+    case "cashuProofs":
+      return <CashuProofsPage {...moneyRoutes.cashuProofsProps} />;
     case "cashuTokens":
       return <CashuTokensPage {...moneyRoutes.cashuTokensProps} />;
     case "cashuTokenNew":

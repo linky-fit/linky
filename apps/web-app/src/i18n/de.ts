@@ -124,6 +124,33 @@ export const de = {
   seed: "Schlüssel",
   seedCopied: "Schlüssel in die Zwischenablage kopiert.",
   seedMissing: "Schlüssel fehlen. Melde dich erneut mit deinen Schlüsseln an.",
+  cashuMissingRestoreHint:
+    "Sucht unbekannte Proofs und tauscht gefundene gegen neue aus. Mint-Gebühren können anfallen.",
+  cashuMissingRestoreDone: "{amount} sat als neue Proofs wiederhergestellt.",
+  cashuMissingRestoreIncomplete:
+    "{amount} sat erneuert. Einige Mints konnten nicht durchsucht oder gefundene Proofs nicht getauscht werden. Nicht getauschte Proofs bleiben in der Wallet; zur Wiederherstellung Proofs prüfen öffnen.",
+  cashuJustCreated: "Gerade erstellt",
+  cashuPendingMinutes: "Seit {minutes} Min. ausstehend",
+  cashuPendingHours: "Seit {hours} Std. ausstehend",
+  cashuTotalBalance: "Gesamt",
+  cashuPendingBalance: "In ausstehenden Tokens",
+  cashuInspectProofs: "Proofs prüfen",
+  cashuPendingTransfers: "Ausstehende Transfers",
+  cashuAwaitingDelivery: "Wartet auf Zustellung",
+  cashuAwaitingClaim: "Wartet auf Einlösung",
+  cashuPartiallyClaimed: "Teilweise eingelöst",
+  cashuHandoffIssued: "Ausgegebener Token",
+  cashuHandoffNfc: "Auf NFC geschrieben",
+  cashuHandoffReceived: "Empfangener Token",
+  cashuHandoffReclaimed: "Zurückgeholter Token",
+  cashuHandoffUnknown: "Übergabe unbekannt",
+  cashuSentInChat: "Im Chat gesendet",
+  cashuQueuedInChat: "Im Chat zum Senden vorgemerkt",
+  cashuReceivedInChat: "Im Chat empfangen",
+  cashuChatContact: "Chat öffnen",
+  cashuCreated: "Erstellt",
+  cashuPendingOneDay: "Seit 1 Tag ausstehend",
+  cashuPendingDays: "Seit {days} Tagen ausstehend",
   tokens: "Tokens",
   preferCashu: "Cashu bevorzugen",
   payWithCashuDisabled:
@@ -143,8 +170,19 @@ export const de = {
   claimOwnLightningAddressCheckFailed:
     "Verfügbarkeit konnte nicht geprüft werden.",
   claimOwnLightningAddressUnpaid: "Die Zahlung ist noch nicht eingegangen.",
-  restoreTokens: "Token wiederherstellen",
-  restoring: "Wird wiederhergestellt…",
+  restoreTokens: "Nach fehlenden Tokens suchen",
+  restoreIncomplete:
+    "{amount} sat wiederhergestellt. Einige Mints konnten nicht durchsucht werden; später erneut versuchen.",
+  cashuReclaimHandedOut: "Alle weitergegebenen Tokens zurückholen",
+  cashuRestoreAndReclaimAll: "Alle Tokens wiederherstellen und zurückholen",
+  cashuReclaimHint:
+    "Holt ungenutzte geteilte oder auf NFC geschriebene Tokens zurück. Ihre alten Kopien werden ungültig. Mint-Gebühren können anfallen.",
+  cashuRestoreAndReclaimHint:
+    "Sucht fehlende Tokens und holt alle verfügbaren, weitergegebenen und NFC-Tokens zurück. Alte Kopien werden ungültig. Mint-Gebühren können anfallen.",
+  cashuReclaimDone: "{amount} sat aus {proofs} Proofs zurückgeholt.",
+  cashuReclaimIncomplete:
+    "{amount} sat aus {proofs} Proofs zurückgeholt. Einige Tokens oder Mints konnten nicht wiederhergestellt werden; später erneut versuchen.",
+  restoring: "Suche nach fehlenden Tokens…",
   restoreNothing: "Keine fehlenden Token gefunden.",
   restoreDone: "{amount} sat als {tokens} Proofs wiederhergestellt.",
   restoreFailed: "Wiederherstellung fehlgeschlagen",
@@ -318,6 +356,7 @@ export const de = {
   scanAnimatedQrDetected: "Animierter QR-Code — Kamera ruhig halten…",
   scanAnimatedQrProgress:
     "Animierter QR-Code — {received} von {expected} Teilen ({percent} %)",
+  cashuShowTokenQr: "Token-QR-Code anzeigen",
   cashuTokenAnimateQr: "QR-Code animieren",
   cashuTokenStaticQrUnavailable:
     "Dieses Token passt nicht in einen einzelnen QR-Code. Aktiviere die Animation oder nutze Kopieren oder Teilen.",
@@ -720,7 +759,7 @@ export const de = {
     "Wähle einen Kontakt, an den du diesen Token senden möchtest.",
   cashuContactSendPendingBanner:
     "{amount} bereit. Tippe zum Senden auf einen Kontakt.",
-  cashuReturnToWallet: "Zur Wallet zurückgeben",
+  cashuReturnToWallet: "Zurückfordern und zur Wallet zurückgeben",
   cashuReturnedToWallet: "Token wurde an die Wallet zurückgegeben.",
   cashuAddToken: "Token hinzufügen",
   cashuEmit: "Ausstellen",

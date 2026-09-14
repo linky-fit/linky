@@ -3,7 +3,10 @@ import type { MintUrl } from "@linky/linkshu";
 import React from "react";
 import { MAIN_MINT_URL } from "../../../utils/mint";
 import type { LoggedPaymentEventParams } from "../../types/appTypes";
-import type { RestoreCashuTokens } from "../composition/useLinkshuComposition";
+import type {
+  ReclaimCashuTokens,
+  RestoreCashuTokens,
+} from "../composition/useLinkshuComposition";
 import type { Translate } from "../../../i18n";
 
 interface UseRestoreMissingTokensParams {
@@ -24,6 +27,7 @@ interface UseRestoreMissingTokensParams {
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   restoreCashuTokens: RestoreCashuTokens | null;
+  reclaimCashuTokens: ReclaimCashuTokens | null;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setTokensRestoreIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   t: Translate;
@@ -50,104 +54,138 @@ export const useRestoreMissingTokens = ({
   readSeenMintsFromStorage,
   rememberSeenMint,
   restoreCashuTokens,
+  reclaimCashuTokens,
   setCashuIsBusy,
   setTokensRestoreIsBusy,
   t,
   tokensRestoreIsBusy,
 }: UseRestoreMissingTokensParams) => {
-  return React.useCallback(async () => {
-    if (tokensRestoreIsBusy) return;
-    if (cashuIsBusy) return;
+  const running = React.useRef(false);
+  return React.useCallback(
+    async (mode: "missing" | "reclaim" | "all" = "missing") => {
+      if (running.current) return;
+      if (tokensRestoreIsBusy) return;
+      if (cashuIsBusy) return;
 
-    await enqueueCashuOp(async () => {
-      setTokensRestoreIsBusy(true);
-      setCashuIsBusy(true);
-
+      running.current = true;
       try {
-        if (restoreCashuTokens === null) {
-          pushToast(t("seedMissing"));
-          return;
-        }
+        await enqueueCashuOp(async () => {
+          setTokensRestoreIsBusy(mode === "missing");
+          setCashuIsBusy(true);
 
-        const candidates = new Set<MintUrl>();
-        for (const candidate of walletMints) {
-          const mint = parseMintUrl(candidate);
-          if (mint !== null) candidates.add(mint);
-        }
-        for (const info of mintInfoDeduped) {
-          const mint = parseMintUrl(info.canonicalUrl ?? "");
-          if (mint !== null) candidates.add(mint);
-        }
-        for (const seen of readSeenMintsFromStorage()) {
-          const mint = parseMintUrl(seen);
-          if (mint !== null) candidates.add(mint);
-        }
-        rememberSeenMint(MAIN_MINT_URL);
+          try {
+            if (
+              restoreCashuTokens === null ||
+              (mode !== "missing" && reclaimCashuTokens === null)
+            ) {
+              pushToast(t("seedMissing"));
+              return;
+            }
 
-        const alwaysInclude = new Set(
-          [MAIN_MINT_URL, defaultMintUrl ?? ""].flatMap((url) => {
-            const mint = parseMintUrl(url);
-            return mint === null ? [] : [mint];
-          }),
-        );
-        for (const mint of alwaysInclude) candidates.add(mint);
+            const candidates = new Set<MintUrl>();
+            for (const candidate of walletMints) {
+              const mint = parseMintUrl(candidate);
+              if (mint !== null) candidates.add(mint);
+            }
+            for (const info of mintInfoDeduped) {
+              const mint = parseMintUrl(info.canonicalUrl ?? "");
+              if (mint !== null) candidates.add(mint);
+            }
+            for (const seen of readSeenMintsFromStorage()) {
+              const mint = parseMintUrl(seen);
+              if (mint !== null) candidates.add(mint);
+            }
+            rememberSeenMint(MAIN_MINT_URL);
 
-        const mints = [...candidates].filter(
-          (mint) => alwaysInclude.has(mint) || !isMintDeleted(mint),
-        );
-        if (mints.length === 0) {
-          pushToast(t("restoreNothing"));
-          return;
-        }
+            const alwaysInclude = new Set(
+              [MAIN_MINT_URL, defaultMintUrl ?? ""].flatMap((url) => {
+                const mint = parseMintUrl(url);
+                return mint === null ? [] : [mint];
+              }),
+            );
+            for (const mint of alwaysInclude) candidates.add(mint);
 
-        const report = await restoreCashuTokens(mints);
+            const mints = [...candidates].filter(
+              (mint) => alwaysInclude.has(mint) || !isMintDeleted(mint),
+            );
+            if (mints.length === 0) {
+              pushToast(t("restoreNothing"));
+              return;
+            }
 
-        if (report.restoredProofs === 0) {
-          pushToast(t("restoreNothing"));
-          return;
-        }
+            if (mode !== "missing" && reclaimCashuTokens !== null) {
+              const result = await reclaimCashuTokens(
+                mode === "all" ? mints : undefined,
+              );
+              const report = result.reclaim;
+              const incomplete =
+                report.unresolvedProofs.length > 0 ||
+                (result.restore?.unavailableMints.length ?? 0) > 0;
+              pushToast(
+                t(incomplete ? "cashuReclaimIncomplete" : "cashuReclaimDone")
+                  .replace("{amount}", String(report.reclaimedAmount))
+                  .replace("{proofs}", String(report.reclaimedProofs.length)),
+              );
+              return;
+            }
 
-        logPaymentEvent({
-          direction: "in",
-          status: "ok",
-          amount: report.restoredAmount,
-          fee: null,
-          mint: null,
-          unit: "sat",
-          error: null,
-          contactId: null,
-          method: "cashu_restore",
-          phase: "restore",
-          details: { scannedMints: [...report.scannedMints] },
+            const { restore, reclaim } = await restoreCashuTokens(mints);
+            const incomplete =
+              restore.unavailableMints.length > 0 ||
+              reclaim.unresolvedProofs.length > 0;
+
+            if (reclaim.reclaimedAmount > 0) {
+              logPaymentEvent({
+                direction: "in",
+                status: "ok",
+                amount: reclaim.reclaimedAmount,
+                fee: null,
+                mint: null,
+                unit: "sat",
+                error: null,
+                contactId: null,
+                method: "cashu_restore",
+                phase: "restore",
+                details: { scannedMints: [...restore.scannedMints] },
+              });
+            }
+            pushToast(
+              t(
+                incomplete
+                  ? "cashuMissingRestoreIncomplete"
+                  : restore.restoredProofs === 0
+                    ? "restoreNothing"
+                    : "cashuMissingRestoreDone",
+              ).replace("{amount}", String(reclaim.reclaimedAmount)),
+            );
+          } catch (e) {
+            pushToast(`${t("restoreFailed")}: ${String(e ?? "unknown")}`);
+          } finally {
+            setCashuIsBusy(false);
+            setTokensRestoreIsBusy(false);
+          }
         });
-
-        pushToast(
-          t("restoreDone")
-            .replace("{amount}", String(report.restoredAmount))
-            .replace("{tokens}", String(report.restoredProofs)),
-        );
-      } catch (e) {
-        pushToast(`${t("restoreFailed")}: ${String(e ?? "unknown")}`);
       } finally {
-        setCashuIsBusy(false);
-        setTokensRestoreIsBusy(false);
+        running.current = false;
       }
-    });
-  }, [
-    cashuIsBusy,
-    walletMints,
-    defaultMintUrl,
-    enqueueCashuOp,
-    isMintDeleted,
-    logPaymentEvent,
-    mintInfoDeduped,
-    pushToast,
-    readSeenMintsFromStorage,
-    rememberSeenMint,
-    restoreCashuTokens,
-    setCashuIsBusy,
-    setTokensRestoreIsBusy,
-    t,
-    tokensRestoreIsBusy,
-  ]);
+    },
+    [
+      cashuIsBusy,
+      walletMints,
+      defaultMintUrl,
+      enqueueCashuOp,
+      isMintDeleted,
+      logPaymentEvent,
+      mintInfoDeduped,
+      pushToast,
+      readSeenMintsFromStorage,
+      rememberSeenMint,
+      restoreCashuTokens,
+      reclaimCashuTokens,
+      setCashuIsBusy,
+      setTokensRestoreIsBusy,
+      t,
+      tokensRestoreIsBusy,
+    ],
+  );
 };

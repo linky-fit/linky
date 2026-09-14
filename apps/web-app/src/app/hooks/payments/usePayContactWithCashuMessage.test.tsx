@@ -153,6 +153,7 @@ const setup = async (options: SetupOptions = {}) => {
     options.sendCashuToken ?? vi.fn(async () => Either.right(sendReceipt));
 
   const cashuTransferLifecycle: CashuTransferLifecycle = {
+    reclaim: vi.fn<CashuTransferLifecycle["reclaim"]>(),
     checkIssuedClaims: vi.fn<CashuTransferLifecycle["checkIssuedClaims"]>(),
     forget,
     importLegacyRows: vi.fn<CashuTransferLifecycle["importLegacyRows"]>(),

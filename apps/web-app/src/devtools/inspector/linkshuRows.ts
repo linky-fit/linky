@@ -21,7 +21,7 @@ const MAX_ID_SCAN_DEPTH = 3;
 const scanForLinkIds = (
   value: unknown,
   depth: number,
-  out: { operation: Set<string>; quote: Set<string> },
+  out: { operation: Set<string>; quote: Set<string>; proof: Set<string> },
 ): void => {
   if (depth > MAX_ID_SCAN_DEPTH) return;
   if (Array.isArray(value)) {
@@ -30,6 +30,10 @@ const scanForLinkIds = (
   }
   if (!isRecord(value)) return;
   for (const [key, entry] of Object.entries(value)) {
+    if (key === "proofIds" && Array.isArray(entry)) {
+      for (const id of entry) if (typeof id === "string") out.proof.add(id);
+      continue;
+    }
     if (typeof entry === "string" && entry.length > 0) {
       if (key === "operationId") out.operation.add(entry);
       else if (
@@ -46,12 +50,17 @@ const scanForLinkIds = (
 };
 
 const operationLinks = (params: unknown, result: unknown) => {
-  const found = { operation: new Set<string>(), quote: new Set<string>() };
+  const found = {
+    operation: new Set<string>(),
+    quote: new Set<string>(),
+    proof: new Set<string>(),
+  };
   scanForLinkIds(params, 0, found);
   scanForLinkIds(result, 0, found);
   return {
     ...(found.operation.size > 0 ? { operation: [...found.operation] } : {}),
     ...(found.quote.size > 0 ? { quote: [...found.quote] } : {}),
+    ...(found.proof.size > 0 ? { proof: [...found.proof] } : {}),
   };
 };
 

@@ -121,7 +121,7 @@ All in `src/inspector/events.ts`; `LinkshuInspectorEvent` is their union.
 
 Operation `name` is `<vertical>.<method>` in camelCase, matching the service and method you called: `receive.receive`, `topup.resumePending`. One operation usually produces several rows — a `send.send` is bracketed by the `CounterAdvanced`, `OperationChanged`, and `ProofsChanged` rows it caused. `melt.resumePending` emits one `melt.resume` row per pending melt (params `mint`, `quoteId`, `operationId`; `OperationFailed` when the mint gave no usable answer) before its own summary row.
 
-`reason` on `ProofsChanged`/`OperationChanged` names the step that caused the change: the operation (`receive`, `send`, `melt`, `topup`, `autoswap`, `restore`, `returnToWallet`, `import`, `legacy-ingest`), a sub-step (`send-change`, `melt-keep`, `melt-change`, `melt-paid`, `melt-unpaid`, `melt-rejected`), a `Tokens` transition (`markIssued`, `markExternalized`, `forget`), or a validation outcome (`validation`, `claimed`, `check`). Quote operations report their record steps as `<kind>-record` (inserted), `attempt` (counter slot written), and `<kind>-<status>` (settled).
+`reason` on `ProofsChanged`/`OperationChanged` names the step that caused the change: the operation (`receive`, `send`, `melt`, `topup`, `autoswap`, `restore`, `returnToWallet`, `reclaim`, `import`, `legacy-ingest`), a sub-step (`send-change`, `melt-keep`, `melt-change`, `melt-paid`, `melt-unpaid`, `melt-rejected`), a `Tokens` transition (`markIssued`, `markExternalized`, `forget`), or a validation outcome (`validation`, `claimed`, `check`). Quote operations report their record steps as `<kind>-record` (inserted), `attempt` (counter slot written), and `<kind>-<status>` (settled).
 
 `topup.subscribe` is an internal subscription attempt: an `OperationFailed` row records a setup failure or socket close before retrying. Its params contain only `mint` and `quoteId`; normal cancellation emits no failure, and settlement appears as `QuoteStateChanged` with `via: "subscription"`.
 
@@ -149,3 +149,5 @@ Events are constructed with `disableValidation: true` so a bad field surfaces in
 - [errors.md](./errors.md) — the tagged errors `OperationFailed` carries
 - [concepts.md](./concepts.md) — proof states, operation statuses, and counter reasons the events describe
 - [testing.md](./testing.md) — asserting on emitted events
+
+`tokens.reclaim` reports selected proof ids and its recovery totals. `tokens.reclaimMint` reports each mint attempt with proof ids and linked operation ids, so partial failures can be followed independently. Neither event carries token text or proof secrets.

@@ -40,6 +40,14 @@ A mint is either fully scanned (`scannedMints`) or reported as not scanned (`una
 
 Restore knows nothing about operations: proofs it finds land as balance with no `operationId`, even if a pending melt or send once held them. Run the resumers and `Validation.checkIssued` afterwards when that matters.
 
+### Recover into fresh proofs
+
+`restoreAndReclaim(draft)` scans with the same rules, then swaps only the proofs inserted by that scan through the reclaim flow. It returns `{ restore: RestoreReport, reclaim: ReclaimReport }`. Use `reclaim.reclaimedAmount` for the amount refreshed after fees, and check both `restore.unavailableMints` and `reclaim.unresolvedProofs` for incomplete recovery.
+
+Known proofs in any state are excluded from both the scan and the swap. The scan tracks the exact inserted ids, so unrelated proofs arriving during recovery cannot become swap inputs. The swap runs after the scan releases its counter locks, stores fresh proofs before marking originals spent, and emits the existing `restore.restore` and `tokens.reclaim` inspector rows.
+
+If the swap fails or recovery is interrupted after discovery, the discovered proofs remain stored. A later missing-proof scan skips them because they are now known; use `Tokens.reclaim` with their ids, or Linky's full recovery action, to retry their swap. Linky's “Look for missing tokens” uses this method; the CLI's ordinary restore still restores proofs as-is.
+
 ### What a fresh-device scan costs
 
 A seed-only recovery has no cursor, so it walks the full derivation tree of every keyset. Expect it to take noticeably longer than later restores, and to happen once; afterwards the cursor keeps later scans short.

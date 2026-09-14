@@ -4,6 +4,7 @@ export { BankPaymentOfferDetailPage } from "./BankPaymentOfferDetailPage";
 export { CashuTokenEmitPage } from "./CashuTokenEmitPage";
 export { CashuTokenNewPage } from "./CashuTokenNewPage";
 export { CashuTokenPage } from "./CashuTokenPage";
+export { CashuProofsPage } from "./CashuProofsPage";
 export { CashuTokensPage } from "./CashuTokensPage";
 export { ChatPage } from "./ChatPage";
 export { ContactEditPage } from "./ContactEditPage";

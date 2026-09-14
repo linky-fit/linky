@@ -1,325 +1,277 @@
 import * as Evolu from "@evolu/common";
-import type {
-  OperationId,
-  ProofState,
-  ProofStateSnapshot,
-  StoredProof,
-  TokenTransfer,
-} from "@linky/linkshu";
-import { CirclePlus as TokenAddIcon } from "lucide-react";
-import type { Dispatch, FC, SetStateAction } from "react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { StoredProof, TokenTransfer } from "@linky/linkshu";
+import { ChevronRight, CirclePlus as TokenAddIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import { TransferPill } from "../components/CashuTokenPill";
-import type { MintIcon } from "../utils/mint";
-
-import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
+import {
+  pendingTokenTransfers,
+  tokenChatMessages,
+} from "../app/lib/pendingTokenTransfers";
 import { getMintDisplay } from "../app/lib/tokenMessageInfo";
-import { useTokenProofStates } from "../hooks/useTokenProofStates";
+import type { LocalNostrMessage } from "../app/types/appTypes";
+import {
+  CashuTokenHandoff,
+  type CashuTokenHandoffProps,
+} from "../components/CashuTokenHandoff";
 import { navigateTo } from "../hooks/useRouting";
-import type { I18nKey } from "../i18n";
+import { nowSeconds } from "../utils/time";
 
 const CashuOperationIdType = Evolu.id("CashuOperation");
 
 interface CashuTokensPageProps {
-  inspectCashuProofStates: InspectCashuProofStates | null;
-  canRestoreTokens: boolean;
-  cashuBulkCheckIsBusy: boolean;
   cashuIsBusy: boolean;
-  cashuMeltToMainMintButtonLabel: string | null;
-  /** The whole inventory, every state. */
+  canRestoreTokens: boolean;
+  tokensRestoreIsBusy: boolean;
+  restoreMissingTokens: () => Promise<void>;
+  cashuBulkCheckIsBusy: boolean;
   cashuProofs: readonly StoredProof[];
-  /** Transfers still open: issued, pending, externalized sends; pending or failed receives. */
-  cashuOpenTransfers: readonly TokenTransfer[];
-  checkAllCashuTokensAndDeleteInvalid: () => Promise<void>;
+  cashuTransfers: readonly TokenTransfer[];
+  contacts: CashuTokenHandoffProps["contacts"];
+  messages: readonly LocalNostrMessage[];
   checkIssuedCashuTokensAndDeleteClaimed: () => Promise<{
     claimed: ReadonlyArray<{ amount: number; id: string }>;
   }>;
-  getMintIconUrl: (mint: string | null | undefined) => MintIcon;
-  meltLargestForeignMintToMainMint: () => Promise<void>;
-  restoreMissingTokens: () => Promise<void>;
-  setMintIconUrlByMint: Dispatch<SetStateAction<Record<string, string | null>>>;
-  tokensRestoreIsBusy: boolean;
 }
 
-const MINT_STATE_KEY: Record<ProofStateSnapshot["state"], I18nKey> = {
-  unspent: "cashuMintStateUnspent",
-  pending: "cashuMintStatePending",
-  spent: "cashuMintStateSpent",
-  unknown: "cashuMintStateUnknown",
-};
-
-const sum = (proofs: readonly StoredProof[]) =>
-  proofs.reduce((total, proof) => total + proof.amount, 0);
-
-/**
- * First-draft inventory view: one table per proof state with the mint's
- * live answer per proof, plus the open transfers as pills. The mint answer
- * is a snapshot kept in memory; the stored state is what the wallet acts on.
- */
-export const CashuTokensPage: FC<CashuTokensPageProps> = ({
-  canRestoreTokens,
-  inspectCashuProofStates,
-  cashuBulkCheckIsBusy,
+export const CashuTokensPage = ({
   cashuIsBusy,
-  cashuMeltToMainMintButtonLabel,
-  cashuOpenTransfers,
-  cashuProofs,
-  checkAllCashuTokensAndDeleteInvalid,
-  checkIssuedCashuTokensAndDeleteClaimed,
-  getMintIconUrl,
-  meltLargestForeignMintToMainMint,
-  restoreMissingTokens,
-  setMintIconUrlByMint,
+  canRestoreTokens,
   tokensRestoreIsBusy,
-}) => {
+  restoreMissingTokens,
+  cashuBulkCheckIsBusy,
+  cashuProofs,
+  cashuTransfers,
+  contacts,
+  messages,
+  checkIssuedCashuTokensAndDeleteClaimed,
+}: CashuTokensPageProps) => {
   const { formatDisplayedAmountText, t } = useAppShellCore();
-
-  const unspentProofs = useMemo(
-    () => cashuProofs.filter((proof) => proof.state !== "spent"),
-    [cashuProofs],
+  const [now, setNow] = useState(nowSeconds);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(nowSeconds()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const transfers = useMemo(
+    () => pendingTokenTransfers(cashuTransfers, cashuProofs),
+    [cashuTransfers, cashuProofs],
   );
-  const {
-    reports,
-    loading: checkingProofs,
-    refresh,
-  } = useTokenProofStates(unspentProofs, inspectCashuProofStates);
-  const mintStateById = useMemo(
-    () => new Map(reports.map((report) => [report.proofId, report.state])),
-    [reports],
+  const chatsByToken = useMemo(() => tokenChatMessages(messages), [messages]);
+  const hasHandedOut = cashuProofs.some(
+    (proof) => proof.state === "handedOut" || proof.state === "externalized",
   );
-
-  const byState = (state: ProofState) =>
-    unspentProofs
-      .filter((proof) => proof.state === state)
-      .sort((a, b) => b.amount - a.amount);
-  const available = byState("available");
-  const held = byState("held");
-  const handedOut = [...byState("handedOut"), ...byState("externalized")];
-  const spentCount = cashuProofs.length - unspentProofs.length;
-
-  const checkAll = async () => {
-    await checkAllCashuTokensAndDeleteInvalid();
-    refresh();
-  };
-
-  // Handed-out proofs stay on record after their transfer closes (a
-  // delivered messenger send) until the mint reports them spent, so the
-  // claim check is offered whenever any are left, not only for issued ones.
-  const hasHandedOut = handedOut.length > 0;
+  const balancesByMint = useMemo(() => {
+    const balances = new Map<
+      StoredProof["mint"],
+      { available: number; pending: number }
+    >();
+    for (const proof of cashuProofs) {
+      if (
+        proof.state !== "available" &&
+        proof.state !== "handedOut" &&
+        proof.state !== "externalized"
+      )
+        continue;
+      const balance = balances.get(proof.mint) ?? { available: 0, pending: 0 };
+      if (proof.state === "available") balance.available += proof.amount;
+      else balance.pending += proof.amount;
+      balances.set(proof.mint, balance);
+    }
+    return [...balances].sort(([a], [b]) => a.localeCompare(b));
+  }, [cashuProofs]);
+  const availableBalance = balancesByMint.reduce(
+    (total, [, balance]) => total + balance.available,
+    0,
+  );
+  const pendingBalance = balancesByMint.reduce(
+    (total, [, balance]) => total + balance.pending,
+    0,
+  );
   const autoCheckedRef = useRef(false);
   useEffect(() => {
-    if (!hasHandedOut) return;
-    if (autoCheckedRef.current) return;
+    if (!hasHandedOut || autoCheckedRef.current) return;
     autoCheckedRef.current = true;
-    void checkIssuedCashuTokensAndDeleteClaimed().then(refresh);
-  }, [checkIssuedCashuTokensAndDeleteClaimed, hasHandedOut, refresh]);
-
-  const handleMintIconLoad = useCallback(
-    (origin: string, url: string | null) => {
-      setMintIconUrlByMint((prev) => ({
-        ...prev,
-        [origin]: url,
-      }));
-    },
-    [setMintIconUrlByMint],
-  );
-
-  const handleOpenTransfer = useCallback((id: OperationId) => {
-    const decoded = CashuOperationIdType.fromUnknown(id);
-    if (!decoded.ok) return;
-    navigateTo({ route: "cashuToken", id: decoded.value });
-  }, []);
-
-  const renderProofTable = (proofs: readonly StoredProof[]) => {
-    if (proofs.length === 0) {
-      return <p className="muted">{t("cashuNoProofs")}</p>;
-    }
-    return (
-      <table className="cashu-proof-table">
-        <thead>
-          <tr>
-            <th scope="col">{t("cashuProofsColumnAmount")}</th>
-            <th scope="col">{t("cashuProofsColumnMint")}</th>
-            <th scope="col">{t("cashuProofsColumnMintState")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {proofs.map((proof) => {
-            const mintState = checkingProofs
-              ? null
-              : (mintStateById.get(proof.id) ?? "unknown");
-            return (
-              <tr key={proof.id}>
-                <td>{formatDisplayedAmountText(proof.amount)}</td>
-                <td>{getMintDisplay(proof.mint)}</td>
-                <td className={mintState === null ? "muted" : ""}>
-                  {mintState === null ? "…" : t(MINT_STATE_KEY[mintState])}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    );
-  };
-
-  const sectionTotal = (proofs: readonly StoredProof[]) =>
-    formatDisplayedAmountText(sum(proofs));
+    void checkIssuedCashuTokensAndDeleteClaimed();
+  }, [hasHandedOut, checkIssuedCashuTokensAndDeleteClaimed]);
 
   return (
     <>
-      <section className="panel">
-        <p className="muted wallet-proof-status" role="status">
-          {checkingProofs ? t("cashuCheckingProofs") : t("cashuInventoryHint")}
-        </p>
-
-        <div
-          className="ln-list wallet-token-list"
-          aria-label={t("cashuProofStateAvailable")}
-        >
-          <div className="list-header">
-            <span>
-              {t("cashuProofStateAvailable")} · {sectionTotal(available)}
-            </span>
-            <div className="list-header-actions">
-              <button
-                type="button"
-                className="btn-small secondary"
-                onClick={refresh}
-                disabled={
-                  checkingProofs ||
-                  cashuIsBusy ||
-                  inspectCashuProofStates === null
-                }
-              >
-                {t("cashuRefreshProofs")}
-              </button>
-              <button
-                type="button"
-                className="btn-small secondary"
-                onClick={() => void checkAll()}
-                disabled={
-                  cashuIsBusy ||
-                  cashuBulkCheckIsBusy ||
-                  checkingProofs ||
-                  unspentProofs.length === 0
-                }
-              >
-                {t("cashuCheckAllTokens")}
-              </button>
+      <section className="panel cashu-transfers-page">
+        {balancesByMint.length <= 1 ? (
+          <dl className="cashu-token-balance-summary">
+            <div>
+              <dt>{t("cashuBalance")}</dt>
+              <dd>{formatDisplayedAmountText(availableBalance)}</dd>
             </div>
-          </div>
-          {renderProofTable(available)}
-          {spentCount > 0 ? (
-            <p className="muted">
-              {t("cashuSpentProofsKept").replace("{count}", String(spentCount))}
-            </p>
-          ) : null}
-          {cashuMeltToMainMintButtonLabel ? (
-            <div className="settings-row section-actions">
-              <button
-                type="button"
-                className="btn-wide secondary"
-                onClick={() => void meltLargestForeignMintToMainMint()}
-                disabled={cashuIsBusy || cashuBulkCheckIsBusy}
-              >
-                {cashuMeltToMainMintButtonLabel}
-              </button>
+            <div>
+              <dt>{t("cashuPendingBalance")}</dt>
+              <dd>{formatDisplayedAmountText(pendingBalance)}</dd>
             </div>
-          ) : null}
-          <div className="settings-row section-actions">
-            <button
-              type="button"
-              className="btn-wide secondary"
-              onClick={() => void restoreMissingTokens()}
-              disabled={!canRestoreTokens || tokensRestoreIsBusy || cashuIsBusy}
-            >
-              {tokensRestoreIsBusy ? t("restoring") : t("restoreTokens")}
-            </button>
-          </div>
-        </div>
-
-        {held.length > 0 ? (
-          <div
-            className="ln-list wallet-token-list"
-            aria-label={t("cashuProofStateHeld")}
-          >
-            <div className="list-header">
-              <span>
-                {t("cashuProofStateHeld")} · {sectionTotal(held)}
-              </span>
-            </div>
-            <p className="muted">
-              {held.some((proof) => proof.operationId === null)
-                ? t("cashuHeldUnknownHint")
-                : t("cashuHeldProofsHint")}
-            </p>
-            {renderProofTable(held)}
-          </div>
-        ) : null}
-
-        {handedOut.length > 0 ? (
-          <div
-            className="ln-list wallet-token-list"
-            aria-label={t("cashuProofStateHandedOut")}
-          >
-            <div className="list-header">
-              <span>
-                {t("cashuProofStateHandedOut")} · {sectionTotal(handedOut)}
-              </span>
-            </div>
-            {renderProofTable(handedOut)}
-          </div>
-        ) : null}
-
-        <div
-          className="ln-list wallet-token-list"
-          aria-label={t("cashuTransfers")}
-        >
-          <div className="list-header">
-            <span>{t("cashuTransfers")}</span>
-            <button
-              type="button"
-              className="btn-small secondary"
-              onClick={() =>
-                void checkIssuedCashuTokensAndDeleteClaimed().then(refresh)
-              }
-              disabled={!hasHandedOut}
-            >
-              {t("cashuCheckIssuedTokens")}
-            </button>
-          </div>
-          {cashuOpenTransfers.length === 0 ? (
-            <p className="muted">{t("cashuTransfersEmpty")}</p>
-          ) : (
-            <div className="ln-tags">
-              {cashuOpenTransfers.map((transfer) => (
-                <TransferPill
-                  key={transfer.id}
-                  transfer={transfer}
-                  getMintIconUrl={getMintIconUrl}
-                  onMintIconLoad={handleMintIconLoad}
-                  onMintIconError={handleMintIconLoad}
-                  onOpenTransfer={handleOpenTransfer}
-                  ariaLabel={`${t("cashuTransfers")}: ${formatDisplayedAmountText(transfer.amount)} · ${transfer.mint}`}
-                />
+          </dl>
+        ) : (
+          <table className="cashu-token-balances">
+            <thead>
+              <tr>
+                <th scope="col">{t("cashuProofsColumnMint")}</th>
+                <th scope="col">{t("cashuBalance")}</th>
+                <th scope="col">{t("cashuPendingBalance")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {balancesByMint.map(([mint, balance]) => (
+                <tr key={mint}>
+                  <th scope="row">{getMintDisplay(mint)}</th>
+                  <td>{formatDisplayedAmountText(balance.available)}</td>
+                  <td>{formatDisplayedAmountText(balance.pending)}</td>
+                </tr>
               ))}
-            </div>
-          )}
-          <div className="settings-row section-actions">
-            <button
-              type="button"
-              className="btn-wide"
-              onClick={() => navigateTo({ route: "cashuTokenEmit" })}
-              disabled={cashuIsBusy}
-            >
-              {t("cashuEmit")}
-            </button>
-          </div>
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row">{t("cashuTotalBalance")}</th>
+                <td>{formatDisplayedAmountText(availableBalance)}</td>
+                <td>{formatDisplayedAmountText(pendingBalance)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        )}
+        <div className="cashu-transfers-toolbar">
+          <button
+            className="secondary"
+            onClick={() => navigateTo({ route: "cashuProofs" })}
+          >
+            {t("cashuInspectProofs")}
+          </button>
+          <button
+            disabled={cashuIsBusy}
+            onClick={() => navigateTo({ route: "cashuTokenEmit" })}
+          >
+            {t("cashuEmit")}
+          </button>
         </div>
+        <div className="list-header">
+          <span>
+            {t("cashuPendingTransfers")} · {transfers.length}
+          </span>
+          <button
+            className="btn-small secondary"
+            onClick={() => void checkIssuedCashuTokensAndDeleteClaimed()}
+            disabled={!hasHandedOut || cashuIsBusy || cashuBulkCheckIsBusy}
+          >
+            {t("cashuCheckIssuedTokens")}
+          </button>
+        </div>
+        {transfers.length === 0 ? (
+          <p className="muted cashu-transfers-empty">
+            {t("cashuTransfersEmpty")}
+          </p>
+        ) : (
+          <ul
+            className="cashu-transfer-list"
+            aria-label={t("cashuPendingTransfers")}
+          >
+            {transfers.map((transfer) => {
+              const chats = (chatsByToken.get(transfer.tokenText) ?? []).filter(
+                (message) =>
+                  message.direction ===
+                  (transfer.kind === "send" ? "out" : "in"),
+              );
+              const minutes = Math.max(
+                0,
+                Math.floor((now - transfer.createdAt) / 60),
+              );
+              const hours = Math.floor(minutes / 60);
+              const days = Math.max(
+                0,
+                Math.floor((now - transfer.createdAt) / 86_400),
+              );
+              const partiallyClaimed =
+                transfer.kind === "send" &&
+                cashuProofs.some(
+                  (proof) =>
+                    proof.operationId === transfer.id &&
+                    proof.state === "spent",
+                );
+              const state =
+                transfer.kind === "receive"
+                  ? t(
+                      transfer.status === "failed"
+                        ? "cashuReceiveFailed"
+                        : "cashuReceivePending",
+                    )
+                  : t(
+                      partiallyClaimed
+                        ? "cashuPartiallyClaimed"
+                        : transfer.status === "pending"
+                          ? "cashuAwaitingDelivery"
+                          : "cashuAwaitingClaim",
+                    );
+              return (
+                <li key={transfer.id} className="cashu-transfer-row">
+                  <button
+                    className="cashu-transfer-open"
+                    aria-label={`${t("cashuToken")}: ${formatDisplayedAmountText(transfer.amount)}`}
+                    onClick={() => {
+                      const id = CashuOperationIdType.fromUnknown(transfer.id);
+                      if (id.ok)
+                        navigateTo({ route: "cashuToken", id: id.value });
+                    }}
+                  >
+                    <span className="cashu-transfer-amount">
+                      {formatDisplayedAmountText(transfer.amount)}
+                    </span>
+                    <span className="cashu-transfer-state">{state}</span>
+                    <ChevronRight size={18} aria-hidden="true" />
+                  </button>
+                  <CashuTokenHandoff
+                    transfer={transfer}
+                    chats={chats}
+                    contacts={contacts}
+                  />
+                  <div className="cashu-transfer-meta">
+                    <span>{getMintDisplay(transfer.mint)}</span>
+                    <span>
+                      {minutes < 1
+                        ? t("cashuJustCreated")
+                        : hours < 1
+                          ? t("cashuPendingMinutes").replace(
+                              "{minutes}",
+                              String(minutes),
+                            )
+                          : days < 1
+                            ? t("cashuPendingHours").replace(
+                                "{hours}",
+                                String(hours),
+                              )
+                            : days === 1
+                              ? t("cashuPendingOneDay")
+                              : t("cashuPendingDays").replace(
+                                  "{days}",
+                                  String(days),
+                                )}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="settings-row section-actions">
+          <button
+            type="button"
+            className="btn-wide secondary"
+            onClick={() => void restoreMissingTokens()}
+            disabled={
+              !canRestoreTokens ||
+              tokensRestoreIsBusy ||
+              cashuIsBusy ||
+              cashuBulkCheckIsBusy
+            }
+          >
+            {tokensRestoreIsBusy ? t("restoring") : t("restoreTokens")}
+          </button>
+        </div>
+        <p className="muted">{t("cashuMissingRestoreHint")}</p>
       </section>
-
       <button
         type="button"
         className="contacts-fab"

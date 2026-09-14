@@ -76,3 +76,22 @@ describe("linkshuEventToRow", () => {
     }
   });
 });
+
+it("correlates bulk reclaim inputs with mint attempts and their send operations", () => {
+  const row = linkshuEventToRow(
+    new OperationSucceeded({
+      name: "tokens.reclaimMint",
+      params: {
+        proofIds: ["proof-1", "proof-2"],
+        operations: [{ operationId: "send-1" }],
+      },
+      result: 12,
+    }),
+    1000,
+  );
+  expect(row.links).toEqual({
+    proof: ["proof-1", "proof-2"],
+    operation: ["send-1"],
+  });
+  expect(parseInspectorRow(JSON.parse(JSON.stringify(row)))).toEqual(row);
+});

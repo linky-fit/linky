@@ -95,6 +95,7 @@ export const resolveBackAction = (
       };
     }
 
+    case "cashuProofs":
     case "cashuTokenNew":
     case "cashuToken":
       return () => navigateTo({ route: "cashuTokens" });
@@ -193,6 +194,7 @@ const SHOWS_MENU_BUTTON: Record<
   cashuTokenEmit: false,
   cashuTokenNew: false,
   cashuTokens: false,
+  cashuProofs: false,
   contactEdit: false,
   contactPay: true,
   contacts: true,
@@ -319,6 +321,7 @@ const TOPBAR_TITLE_KEY: Record<
   cashuTokenEmit: "cashuEmit",
   cashuTokenNew: "cashuAddToken",
   cashuTokens: "tokens",
+  cashuProofs: "cashuInspectProofs",
   chat: "messagesTitle",
   contact: "contact",
   contactEdit: "contactEditTitle",

@@ -62,15 +62,19 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
         expect(receipt.amount).toBe(31);
         expect(await readBalanceSat(source.page)).toBe(0);
         expect(await readBalanceSat(second.page)).toBe(0);
-        return receipt.amount;
+        return receipt.amount - 1;
       });
 
     await test.step("restore on one device and receive the same funds over Evolu on the other", async () => {
       await source.page.goto("/#wallet/tokens");
       await source.page
-        .getByRole("button", { name: "Restore tokens", exact: true })
+        .getByRole("button", { name: "Look for missing tokens", exact: true })
         .click();
-      await expect(source.page.getByText(/Restored 31 sat/)).toBeVisible({
+      await expect(
+        source.page.getByText("Recovered 30 sat into fresh proofs.", {
+          exact: true,
+        }),
+      ).toBeVisible({
         timeout: 90_000,
       });
       await source.page.goto("/#wallet");
@@ -295,4 +299,70 @@ test("token consumption rotates lane zero from its mutation history while few li
     });
     for (const device of devices) await device.context.close();
   }
+});
+
+test("token recovery buttons find missing funds and reclaim handed-out proofs", async ({
+  page,
+}) => {
+  const identity = await createSeedIdentity();
+  const funded = await fundToken(64);
+  await runLinkshu(
+    { bip39Seed: Bip39Seed.make(mnemonicToSeedSync(identity.cashuMnemonic)) },
+    Effect.gen(function* () {
+      yield* (yield* Receive).receive(new ReceiveDraft({ text: funded }));
+    }),
+  );
+  await setBaseStorage(page);
+  await setSeedLoginStorage(page, identity);
+  await stubFiatRates(page);
+  await page.setViewportSize(MOBILE_VIEWPORT);
+  await page.goto("/#wallet/tokens");
+  await page
+    .getByRole("button", { name: "Look for missing tokens", exact: true })
+    .click();
+  await expect(page.locator(".cashu-token-balance-summary dd")).toHaveText([
+    "62 sat",
+    "0 sat",
+  ]);
+  const available = page.locator('[aria-label="Available"]');
+  await page.getByRole("button", { name: "Issue", exact: true }).click();
+  await page.getByRole("button", { name: "1", exact: true }).click();
+  await page.getByRole("button", { name: "6", exact: true }).click();
+  await page.getByRole("button", { name: "Issue", exact: true }).click();
+  await expect(page.getByText("Issued, waiting to be claimed.")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Delete", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Reclaim and return to wallet",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.goto("/#wallet/tokens");
+  await page
+    .getByRole("button", { name: "Inspect proofs", exact: true })
+    .click();
+  await expect(page.locator('[aria-label="Handed out"]')).toBeVisible();
+  await page
+    .getByRole("button", { name: "Reclaim all handed-out tokens", exact: true })
+    .click();
+  await expect(page.locator('[aria-label="Handed out"]')).toHaveCount(0);
+  await expect(available.locator(".list-header > span")).toHaveText(
+    "Available · 60 sat",
+  );
+  await page
+    .getByRole("button", {
+      name: "Restore and reclaim all tokens",
+      exact: true,
+    })
+    .click();
+  await expect(available.locator(".list-header > span")).toHaveText(
+    "Available · 59 sat",
+  );
+  await page.reload();
+  await expect(available.locator(".list-header > span")).toHaveText(
+    "Available · 59 sat",
+  );
+  await expect(page.locator('[aria-label="Handed out"]')).toHaveCount(0);
 });

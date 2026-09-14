@@ -1,10 +1,16 @@
+import {
+  CashuTokenHandoff,
+  type CashuTokenHandoffProps,
+} from "../components/CashuTokenHandoff";
+import { tokenChatMessages } from "../app/lib/pendingTokenTransfers";
+import type { LocalNostrMessage } from "../app/types/appTypes";
 import { useLatest } from "../hooks/useLatest";
 import type { StoredProof, TokenTransfer } from "@linky/linkshu";
 import { Radio as NfcIcon } from "lucide-react";
 import type { FC } from "react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useTokenQr } from "../app/hooks/cashu/useTokenQr";
+import { CashuTokenQr } from "../components/CashuTokenQr";
 import { formatStoredCashuError } from "../app/lib/cashuStoredError";
 import { canReturnTransfer } from "../app/lib/cashuTransfers";
 
@@ -18,6 +24,9 @@ import type { I18nKey } from "../i18n";
 import { buildCashuShareUrl } from "../utils/deepLinks";
 
 interface CashuTokenPageProps {
+  contacts: CashuTokenHandoffProps["contacts"];
+  messages: readonly LocalNostrMessage[];
+  reclaimCashuTransfer: (id: CashuOperationId) => Promise<void>;
   inspectCashuProofStates: InspectCashuProofStates | null;
   canSendToContact: boolean;
   canWriteToNfc: boolean;
@@ -70,6 +79,9 @@ const statusKeyOf = (transfer: TokenTransfer): I18nKey | null => {
 };
 
 export const CashuTokenPage: FC<CashuTokenPageProps> = ({
+  contacts,
+  messages,
+  reclaimCashuTransfer,
   inspectCashuProofStates,
   canSendToContact,
   canWriteToNfc,
@@ -88,19 +100,20 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
   startSendCashuTokenToContact,
   writeToNfc,
 }) => {
-  const { formatDisplayedAmountText, t } = useAppShellCore();
+  const { formatDisplayedAmountText, lang, t } = useAppShellCore();
 
   const transfer = cashuTransfers.find(
     (candidate) => String(candidate.id) === routeId,
   );
   const tokenText = transfer?.tokenText ?? "";
-  const [animationEnabled, setAnimationEnabled] = React.useState(true);
-  const {
-    frameCount: tokenQrFrameCount,
-    src: tokenQr,
-    canToggleAnimation,
-    isTooLargeForStatic,
-  } = useTokenQr(tokenText, animationEnabled);
+  const chatsByToken = React.useMemo(
+    () => tokenChatMessages(messages),
+    [messages],
+  );
+  const chats = (chatsByToken.get(tokenText) ?? []).filter(
+    (message) =>
+      message.direction === (transfer?.kind === "send" ? "out" : "in"),
+  );
   const tokenAmount = transfer?.amount ?? 0;
   const mintDisplay = getMintDisplay(transfer?.mint);
   const transferProofs = React.useMemo(
@@ -118,9 +131,29 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
     transfer !== undefined && isSend && canReturnTransfer(transfer);
   const isFailedReceive =
     transfer?.kind === "receive" && transfer.status === "failed";
+  const allProofsSpent =
+    transferProofs.length > 0 &&
+    transferProofs.reduce((amount, proof) => amount + proof.amount, 0) ===
+      tokenAmount &&
+    transferProofs.every((proof) => proof.state === "spent");
+  const hasOutstandingProofs = transferProofs.some(
+    (proof) => proof.state === "handedOut" || proof.state === "externalized",
+  );
+  const reclaimFromInventory =
+    isSend &&
+    transfer.status !== "returned" &&
+    hasOutstandingProofs &&
+    (chats.length > 0 || transfer.status === "done");
   const canReturnToWallet =
-    transfer !== undefined && canReturnTransfer(transfer);
-  const statusKey = transfer === undefined ? null : statusKeyOf(transfer);
+    transfer !== undefined &&
+    !allProofsSpent &&
+    (canReturnTransfer(transfer) || reclaimFromInventory);
+  const statusKey =
+    isSend && transfer?.status === "done" && hasOutstandingProofs
+      ? "cashuAwaitingClaim"
+      : transfer === undefined
+        ? null
+        : statusKeyOf(transfer);
   const shareUrl = buildCashuShareUrl(tokenText);
   const shareMessage = (() => {
     if (!shareUrl) return "";
@@ -224,6 +257,19 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         ) : null}
       </div>
 
+      <CashuTokenHandoff
+        transfer={transfer}
+        chats={chats}
+        contacts={contacts}
+      />
+
+      <p className="muted">
+        {t("cashuCreated")}{" "}
+        <time dateTime={new Date(transfer.createdAt * 1000).toISOString()}>
+          {new Date(transfer.createdAt * 1000).toLocaleString(lang)}
+        </time>
+      </p>
+
       {isFailedReceive ? (
         <p className="cashu-token-status cashu-token-status-error">
           {formatStoredCashuError(transfer.error) ?? t("cashuReceiveFailed")}
@@ -245,57 +291,7 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         />
       ) : null}
 
-      {tokenQr ? (
-        <div className="topup-invoice-qr-shell cashu-token-qr-shell">
-          <button
-            type="button"
-            className="topup-invoice-qr-button cashu-token-qr-button"
-            onClick={() => void copyText(tokenText)}
-            title={t("copy")}
-            aria-label={t("copy")}
-          >
-            <img
-              className="qr topup-invoice-qr cashu-token-qr"
-              src={tokenQr}
-              alt={t("cashuToken")}
-            />
-          </button>
-          {tokenQrFrameCount === null ? null : (
-            <p className="muted cashu-token-qr-hint">
-              {t("cashuTokenAnimatedQrHint").replace(
-                "{frames}",
-                String(tokenQrFrameCount),
-              )}
-            </p>
-          )}
-        </div>
-      ) : null}
-
-      {canToggleAnimation ? (
-        <>
-          <div className="settings-row">
-            <div className="settings-left">
-              <span className="settings-label">{t("cashuTokenAnimateQr")}</span>
-            </div>
-            <div className="settings-right">
-              <label className="switch">
-                <input
-                  className="switch-input"
-                  type="checkbox"
-                  checked={animationEnabled}
-                  aria-label={t("cashuTokenAnimateQr")}
-                  onChange={(event) =>
-                    setAnimationEnabled(event.target.checked)
-                  }
-                />
-              </label>
-            </div>
-          </div>
-          {!animationEnabled && isTooLargeForStatic ? (
-            <p className="muted">{t("cashuTokenStaticQrUnavailable")}</p>
-          ) : null}
-        </>
-      ) : null}
+      <CashuTokenQr key={routeId} tokenText={tokenText} copyText={copyText} />
 
       {isOpenSend || isFailedReceive ? (
         <div className="settings-row">
@@ -364,7 +360,11 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         <div className="settings-row">
           <button
             className="btn-wide secondary"
-            onClick={() => void returnCashuTokenToWallet(routeId)}
+            onClick={() =>
+              void (reclaimFromInventory
+                ? reclaimCashuTransfer(routeId)
+                : returnCashuTokenToWallet(routeId))
+            }
             disabled={cashuIsBusy}
           >
             {t("cashuReturnToWallet")}
@@ -372,7 +372,7 @@ export const CashuTokenPage: FC<CashuTokenPageProps> = ({
         </div>
       ) : null}
 
-      {!isClosed ? (
+      {!isClosed && allProofsSpent ? (
         <div className="settings-row">
           <button
             className={

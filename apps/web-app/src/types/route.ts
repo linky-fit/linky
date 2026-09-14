@@ -53,6 +53,7 @@ export type Route =
   | { kind: "bankPayment"; spdPayload: string; editing?: true }
   | { kind: "lnAddressPay"; lnAddress: string }
   | { kind: "cashuTokens" }
+  | { kind: "cashuProofs" }
   | { kind: "cashuTokenNew" }
   | { kind: "cashuTokenEmit" }
   | { kind: "cashuToken"; id: CashuOperationId }
@@ -130,6 +131,7 @@ export const parseRouteFromHash = (): Route => {
     }
   }
 
+  if (hash === "#wallet/tokens/proofs") return { kind: "cashuProofs" };
   if (hash === "#wallet/tokens") return { kind: "cashuTokens" };
 
   const payLnPrefix = "#payln/";

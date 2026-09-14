@@ -34,6 +34,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "evoluData":
     case "evoluCurrentData":
     case "evoluHistoryData":
+    case "cashuProofs":
     case "cashuTokens":
     case "cashuTokenNew":
     case "cashuTokenEmit":

@@ -47,6 +47,7 @@ import type {
   ProofStateSnapshot,
   ReceiveError,
   ReceiveReceipt,
+  ReclaimReport,
   RestoreReport,
   SendError,
   SendReceipt,
@@ -233,10 +234,15 @@ export type CheckCashuTransfer = (
   operationId: string,
 ) => Promise<Either.Either<TransferCheckResult, OperationNotFound>>;
 
-/** linkshu `Restore` over the given mints; invalid mint input rejects. */
+/** Scan the given mints and swap only newly discovered proofs. */
 export type RestoreCashuTokens = (
   mints: ReadonlyArray<string>,
-) => Promise<RestoreReport>;
+) => Promise<{ restore: RestoreReport; reclaim: ReclaimReport }>;
+
+export type ReclaimCashuTokens = (mints?: ReadonlyArray<string>) => Promise<{
+  restore: RestoreReport | null;
+  reclaim: ReclaimReport;
+}>;
 
 type TransferTransitionError = OperationNotFound | InvalidTransferTransition;
 
@@ -246,6 +252,8 @@ type TransferTransitionError = OperationNotFound | InvalidTransferTransition;
  * back as Left; defects reject.
  */
 export interface CashuTransferLifecycle {
+  /** Reclaims only this transfer's remaining handed-out proofs, including delivered sends. */
+  readonly reclaim: (operationId: string) => Promise<ReclaimReport>;
   readonly checkIssuedClaims: () => Promise<IssuedClaimReport>;
   /**
    * Closes a transfer the caller has nothing left to do about (a `pending`
@@ -599,11 +607,51 @@ export const useLinkshuComposition = ({
       run(
         Effect.suspend(() => {
           const draft = decodeRestoreDraft({ mints });
-          return Effect.flatMap(Restore, (restore) => restore.restore(draft));
+          return Effect.flatMap(Restore, (restore) =>
+            restore.restoreAndReclaim(draft),
+          );
+        }),
+      );
+
+    const reclaimCashuTokens: ReclaimCashuTokens = (mints) =>
+      run(
+        Effect.gen(function* () {
+          const tokens = yield* Tokens;
+          const restore =
+            mints === undefined
+              ? null
+              : yield* Effect.flatMap(Restore, (service) =>
+                  service.restore(decodeRestoreDraft({ mints })),
+                );
+          const ids = (yield* tokens.proofs)
+            .filter(
+              (proof) =>
+                proof.state === "handedOut" ||
+                proof.state === "externalized" ||
+                (mints !== undefined && proof.state === "available"),
+            )
+            .map((proof) => proof.id);
+          return { restore, reclaim: yield* tokens.reclaim(ids) };
         }),
       );
 
     const cashuTransferLifecycle: CashuTransferLifecycle = {
+      reclaim: (id) =>
+        run(
+          Effect.gen(function* () {
+            const tokens = yield* Tokens;
+            const transferId = operationId(id);
+            const ids = (yield* tokens.proofs)
+              .filter(
+                (proof) =>
+                  proof.operationId === transferId &&
+                  (proof.state === "handedOut" ||
+                    proof.state === "externalized"),
+              )
+              .map((proof) => proof.id);
+            return yield* tokens.reclaim(ids);
+          }),
+        ),
       checkIssuedClaims: () =>
         run(Effect.flatMap(Validation, (validation) => validation.checkIssued)),
       forget: (id) =>
@@ -647,6 +695,7 @@ export const useLinkshuComposition = ({
       probeLightningFee,
       receiveCashuToken,
       restoreCashuTokens,
+      reclaimCashuTokens,
       resumePendingCashuAutoswapClaims,
       resumePendingCashuMelts,
       resumePendingCashuTopups,
@@ -666,6 +715,7 @@ export const useLinkshuComposition = ({
     probeLightningFee: operations?.probeLightningFee ?? null,
     receiveCashuToken: operations?.receiveCashuToken ?? null,
     restoreCashuTokens: operations?.restoreCashuTokens ?? null,
+    reclaimCashuTokens: operations?.reclaimCashuTokens ?? null,
     resumePendingCashuAutoswapClaims:
       operations?.resumePendingCashuAutoswapClaims ?? null,
     resumePendingCashuMelts: operations?.resumePendingCashuMelts ?? null,

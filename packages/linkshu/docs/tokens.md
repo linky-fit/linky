@@ -62,6 +62,16 @@ States and statuses are in [concepts.md](./concepts.md#proofs-operations-and-who
 
 On a send, a transient failure (`MintUnreachable`, `CounterLockTimeout`) leaves it exactly as it was. `TokenAlreadySpent` means the recipient claimed it: the handed-out proofs are marked `spent`, the send closes `done`, and the error is still returned — treat it as "already claimed", not as a loss. Any other definitive rejection is recorded in `error` without changing the status. This is the recovery path for a `pending` message send that never confirmed and for an unclaimed `issued` token; a melt's `held` inputs are not a transfer and belong to [`Melt.resumePending`](./melt.md#resumepending--run-it-at-startup).
 
+### Bulk reclaim
+
+`reclaim(proofIds)` checks selected stored proofs at their mints and re-signs the confirmed unspent ones into fresh `available` proofs. It accepts `available`, `handedOut`, and `externalized` proofs, including proofs linked to closed sends or with no operation record. `held` proofs are never spent by this action. Unselected proofs are untouched.
+
+Requests are grouped by mint and unit. Spent inputs are marked individually. Pending or unanswered inputs remain unchanged; a failed mint or swap does not stop other mints. A spent-input rejection during a racing claim does not mark the entire group spent. Fresh proofs are persisted before reclaimed inputs become `spent`. A send closes `returned` when all its linked proofs are spent and this call reclaimed some of them; a fully claimed send closes `done`.
+
+The `ReclaimReport` contains `reclaimedAmount` after mint fees and the input ids in `reclaimedProofs`, `spentProofs`, and `unresolvedProofs`. Retry unresolved proofs later. Missing ids and proofs already stored as spent are ignored. Repeating the same successfully reclaimed ids does not swap again. A lost swap response may require `Restore` to recover the deterministic replacement proofs.
+
+Linky's handed-out action selects `handedOut` and `externalized` proofs. Its full recovery action first runs `Restore`, then selects all available and handed-out/externalized proofs. Re-signing available proofs also invalidates old copies recovered by an earlier interrupted run. Neither action releases inputs held by pending payments.
+
 ### Backup import
 
 `importProofs(drafts)` restores proofs from a backup exactly as it states them (`ImportProofDraft` has the fields of `NewProof`: `mint`, `unit`, `keysetId`, `amount`, `secret`, `C`, `dleq`, `state`, `operationId`) and returns how many were added. Secrets the inventory already holds are skipped, so a backup imported twice adds nothing; there is no mint check, so a proof comes back in the state it left with and the next validation reconciles it. `importOperation(draft: NewOperation)` restores one operation and returns its `OperationId`; an existing operation with the same key is replaced. Import operations before proofs when the backup has both, so the proofs' `operationId` links resolve. These are the only way platform code writes inventory rows it did not obtain through an operation.

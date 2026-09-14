@@ -3,6 +3,8 @@ import {
   Amount,
   Receive,
   ReceiveDraft,
+  Restore,
+  RestoreDraft,
   runLinkshu,
   Send,
   SendDraft,
@@ -13,6 +15,108 @@ import { amountIn } from "../../src/testing/inventory";
 import { claimExternally, fundToken, mintUrl, randomSeed } from "./helpers";
 
 describe("tokens vertical against the local mint", () => {
+  it("bulk reclaims NFC tokens and closed sends, invalidating every old copy", async () => {
+    const funded = await fundToken(128);
+    const result = await runLinkshu(
+      { bip39Seed: randomSeed() },
+      Effect.gen(function* () {
+        const tokens = yield* Tokens;
+        const send = yield* Send;
+        yield* (yield* Receive).receive(new ReceiveDraft({ text: funded }));
+        const closed = yield* send.send(
+          new SendDraft({
+            mint: mintUrl,
+            amount: Amount.make(16),
+            produceAs: "pending",
+          }),
+        );
+        yield* tokens.forget(closed.operationId);
+        const nfc = yield* send.send(
+          new SendDraft({
+            mint: mintUrl,
+            amount: Amount.make(16),
+            produceAs: "issued",
+          }),
+        );
+        yield* tokens.markExternalized(nfc.operationId);
+        const before = yield* tokens.balances;
+        const selected = (yield* tokens.proofs)
+          .filter(
+            (proof) =>
+              proof.state === "handedOut" || proof.state === "externalized",
+          )
+          .map((proof) => proof.id);
+        const report = yield* tokens.reclaim(selected);
+        const again = yield* tokens.reclaim(selected);
+        return {
+          closed,
+          nfc,
+          before,
+          report,
+          again,
+          proofs: yield* tokens.proofs,
+          transfers: yield* tokens.transfers,
+          after: yield* tokens.balances,
+        };
+      }),
+    );
+    expect(result.report.unresolvedProofs).toEqual([]);
+    expect(result.report.reclaimedAmount).toBeGreaterThan(0);
+    expect(result.report.reclaimedAmount).toBeLessThan(32);
+    expect(result.after.total).toBe(
+      result.before.total + result.report.reclaimedAmount,
+    );
+    expect(result.again.reclaimedAmount).toBe(0);
+    expect(
+      result.transfers.every(
+        (transfer) =>
+          transfer.kind !== "send" || transfer.status === "returned",
+      ),
+    ).toBe(true);
+    expect(
+      amountIn(result.proofs, "handedOut") +
+        amountIn(result.proofs, "externalized"),
+    ).toBe(0);
+    await expect(claimExternally(result.closed.tokenText)).rejects.toThrow();
+    await expect(claimExternally(result.nfc.tokenText)).rejects.toThrow();
+  });
+
+  it("re-signs seed-restored available proofs so lost outgoing copies cannot be claimed", async () => {
+    const seed = randomSeed();
+    const funded = await fundToken(64);
+    const sent = await runLinkshu(
+      { bip39Seed: seed },
+      Effect.gen(function* () {
+        yield* (yield* Receive).receive(new ReceiveDraft({ text: funded }));
+        return yield* (yield* Send).send(
+          new SendDraft({
+            mint: mintUrl,
+            amount: Amount.make(16),
+            produceAs: "issued",
+          }),
+        );
+      }),
+    );
+    const result = await runLinkshu(
+      { bip39Seed: seed },
+      Effect.gen(function* () {
+        const tokens = yield* Tokens;
+        const restored = yield* (yield* Restore).restore(
+          new RestoreDraft({ mints: [mintUrl] }),
+        );
+        const report = yield* tokens.reclaim(
+          (yield* tokens.proofs).map((proof) => proof.id),
+        );
+        return { restored, report, balance: yield* tokens.balances };
+      }),
+    );
+    expect(result.restored.restoredAmount).toBeGreaterThan(16);
+    expect(result.report.unresolvedProofs).toEqual([]);
+    expect(result.report.reclaimedAmount).toBeGreaterThan(0);
+    expect(result.balance.total).toBe(result.report.reclaimedAmount);
+    await expect(claimExternally(sent.tokenText)).rejects.toThrow();
+  });
+
   it("returns an issued token to the wallet, killing the issued encoding", async () => {
     const funded = await fundToken(64);
 

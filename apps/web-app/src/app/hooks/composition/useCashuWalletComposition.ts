@@ -1,3 +1,4 @@
+import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { useLatest } from "../../../hooks/useLatest";
 import * as Evolu from "@evolu/common";
 import { useQuery } from "@evolu/react";
@@ -663,6 +664,7 @@ export const useCashuWalletComposition = ({
     probeLightningFee,
     receiveCashuToken,
     restoreCashuTokens,
+    reclaimCashuTokens,
     resumePendingCashuAutoswapClaims,
     resumePendingCashuMelts,
     resumePendingCashuTopups,
@@ -1776,6 +1778,15 @@ export const useCashuWalletComposition = ({
     hasAnyIssuedTokensForBackgroundCheck,
   ]);
 
+  const reclaimCashuTransfer = useReclaimCashuTransfer({
+    busy: cashuIsBusy || cashuBulkCheckIsBusy || tokensRestoreIsBusy,
+    enqueueCashuOp,
+    reclaim: cashuTransferLifecycle?.reclaim ?? null,
+    setCashuIsBusy,
+    pushToast,
+    t,
+  });
+
   const returnCashuTokenToWallet = React.useCallback(
     async (id: CashuOperationId) => {
       if (cashuTransferLifecycle === null) {
@@ -2094,7 +2105,7 @@ export const useCashuWalletComposition = ({
     return [...mints];
   }, [cashuTokensAll, walletOperations, walletProofs]);
 
-  const restoreMissingTokens = useRestoreMissingTokens({
+  const recoverTokens = useRestoreMissingTokens({
     cashuIsBusy,
     walletMints,
     defaultMintUrl,
@@ -2106,11 +2117,25 @@ export const useCashuWalletComposition = ({
     readSeenMintsFromStorage,
     rememberSeenMint,
     restoreCashuTokens,
+    reclaimCashuTokens,
     setCashuIsBusy,
     setTokensRestoreIsBusy,
     t,
     tokensRestoreIsBusy,
   });
+
+  const restoreMissingTokens = React.useCallback(
+    () => recoverTokens("missing"),
+    [recoverTokens],
+  );
+  const reclaimHandedOutTokens = React.useCallback(
+    () => recoverTokens("reclaim"),
+    [recoverTokens],
+  );
+  const restoreAndReclaimAllTokens = React.useCallback(
+    () => recoverTokens("all"),
+    [recoverTokens],
+  );
 
   const mainMintForTokenList = React.useMemo(
     () => normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL),
@@ -2513,6 +2538,7 @@ export const useCashuWalletComposition = ({
   }, [knownLnAddressPayContact, nostrPictureByNpub]);
 
   return {
+    reclaimCashuTransfer,
     cashuTransferLifecycle,
     applyDefaultMintSelection,
     canPayWithCashu,
@@ -2588,6 +2614,8 @@ export const useCashuWalletComposition = ({
     requestDeleteCashuToken,
     requestSelectedContact,
     restoreMissingTokens,
+    reclaimHandedOutTokens,
+    restoreAndReclaimAllTokens,
     returnCashuTokenToWallet,
     saveCashuFromText,
     sendCashuTokenToContact,

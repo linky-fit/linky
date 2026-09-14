@@ -74,6 +74,7 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "topupInvoice" })).toBe("#wallet/topup");
     expect(backHashFor({ kind: "cashuTokens" })).toBe("#wallet");
     expect(backHashFor({ kind: "cashuTokenEmit" })).toBe("#wallet");
+    expect(backHashFor({ kind: "cashuProofs" })).toBe("#wallet/tokens");
     expect(backHashFor({ kind: "cashuTokenNew" })).toBe("#wallet/tokens");
     expect(backHashFor({ kind: "cashuToken", id: tokenId })).toBe(
       "#wallet/tokens",

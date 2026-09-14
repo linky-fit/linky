@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { MintRejected } from "../domain/errors";
 import { KeysetId, NonNegativeAmount } from "../domain/primitives";
-import type { MintUrl } from "../domain/primitives";
+import type { MintUrl, ProofId } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import {
   advanceCounterTo,
@@ -11,7 +11,7 @@ import {
   withCounterLock,
 } from "../internal/counters";
 import type { CounterScope } from "../internal/counters";
-import { inspectOperation } from "../internal/operations";
+import { inspectOperation, inspectOperationWith } from "../internal/operations";
 import {
   domainToNewProofs,
   insertProofs,
@@ -44,6 +44,7 @@ import {
   scanKeyset,
 } from "./internal/scan";
 import { sat } from "../internal/units";
+import { reclaimProofs } from "../token/internal/reclaim";
 
 const isKeysetId = Schema.is(KeysetId);
 
@@ -58,14 +59,14 @@ const finitePosition = (value: number | undefined): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
 
 interface Restored {
-  readonly proofs: number;
+  readonly proofIds: ReadonlyArray<ProofId>;
   readonly amount: number;
 }
 
-const NOTHING_RESTORED: Restored = { proofs: 0, amount: 0 };
+const NOTHING_RESTORED: Restored = { proofIds: [], amount: 0 };
 
 const mergeRestored = (left: Restored, right: Restored): Restored => ({
-  proofs: left.proofs + right.proofs,
+  proofIds: [...left.proofIds, ...right.proofIds],
   amount: left.amount + right.amount,
 });
 
@@ -169,7 +170,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
 
           // Proofs are stored before the cursor moves past them, so a crash
           // here costs a rescan, never the funds.
-          yield* insertProofs(
+          const inserted = yield* insertProofs(
             ctx,
             domainToNewProofs(scan.proofs, mint, sat, "available", null),
             "restore",
@@ -185,7 +186,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
             );
           }
           return {
-            proofs: scan.proofs.length,
+            proofIds: inserted.map((proof) => proof.id),
             amount: totalAmount(scan.proofs),
           };
         }),
@@ -209,7 +210,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
         return { restored, complete };
       }).pipe(Effect.catchAll(() => Effect.succeed(null)));
 
-    const restore = (draft: RestoreDraft): Effect.Effect<RestoreReport> =>
+    const restoreWithProofIds = (draft: RestoreDraft) =>
       Effect.gen(function* () {
         const mints =
           draft.mints ??
@@ -231,17 +232,38 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
           else unavailableMints.push(mint);
         }
 
-        return new RestoreReport({
-          restoredAmount: NonNegativeAmount.make(restored.amount),
-          restoredProofs: restored.proofs,
-          scannedMints,
-          unavailableMints,
-        });
+        return {
+          proofIds: restored.proofIds,
+          report: new RestoreReport({
+            restoredAmount: NonNegativeAmount.make(restored.amount),
+            restoredProofs: restored.proofIds.length,
+            scannedMints,
+            unavailableMints,
+          }),
+        };
       }).pipe(
-        inspectOperation(inspector, "restore.restore", {
-          mints: draft.mints ?? null,
-        }),
+        inspectOperationWith(
+          inspector,
+          "restore.restore",
+          {
+            mints: draft.mints ?? null,
+          },
+          (result) => result.report,
+        ),
       );
+
+    const restore = (draft: RestoreDraft): Effect.Effect<RestoreReport> =>
+      Effect.map(restoreWithProofIds(draft), (result) => result.report);
+
+    const restoreAndReclaim = (draft: RestoreDraft) =>
+      Effect.gen(function* () {
+        const { report, proofIds } = yield* restoreWithProofIds(draft);
+        const reclaim = yield* reclaimProofs(
+          { kv, proofStore, operationStore, instances, inspector },
+          proofIds,
+        );
+        return { restore: report, reclaim };
+      });
 
     /**
      * Remove every counter, cursor, and lease keyed to the current seed's
@@ -257,6 +279,6 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
       { discard: true },
     ).pipe(inspectOperation(inspector, "restore.wipeSeedBoundState", {}));
 
-    return { restore, wipeSeedBoundState } as const;
+    return { restore, restoreAndReclaim, wipeSeedBoundState } as const;
   }),
 }) {}

@@ -1,18 +1,30 @@
-import { MintUrl, NonNegativeAmount, RestoreReport } from "@linky/linkshu";
+import {
+  MintUrl,
+  NonNegativeAmount,
+  ReclaimReport,
+  RestoreReport,
+  ProofId,
+} from "@linky/linkshu";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useRestoreMissingTokens } from "./useRestoreMissingTokens";
-import type { RestoreCashuTokens } from "../composition/useLinkshuComposition";
+import type {
+  ReclaimCashuTokens,
+  RestoreCashuTokens,
+} from "../composition/useLinkshuComposition";
 import { MAIN_MINT_URL } from "../../../utils/mint";
 
-type RestoreMissingTokens = () => Promise<void>;
+type RestoreMissingTokens = (
+  mode?: "missing" | "reclaim" | "all",
+) => Promise<void>;
 
 interface HookOverrides {
   walletMints?: readonly string[];
   isMintDeleted?: (mintUrl: string) => boolean;
   restoreCashuTokens?: RestoreCashuTokens | null;
   pushToast?: (message: string) => void;
+  reclaimCashuTokens?: ReclaimCashuTokens;
 }
 
 const emptyReport = new RestoreReport({
@@ -21,6 +33,14 @@ const emptyReport = new RestoreReport({
   scannedMints: [],
   unavailableMints: [],
 });
+
+const emptyReclaim = new ReclaimReport({
+  reclaimedAmount: NonNegativeAmount.make(0),
+  reclaimedProofs: [],
+  spentProofs: [],
+  unresolvedProofs: [],
+});
+const emptyResult = { restore: emptyReport, reclaim: emptyReclaim };
 
 const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
   const restoreRef: { current: RestoreMissingTokens } = {
@@ -38,6 +58,7 @@ const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
       pushToast: overrides.pushToast ?? (() => {}),
       readSeenMintsFromStorage: () => [],
       rememberSeenMint: () => {},
+      reclaimCashuTokens: overrides.reclaimCashuTokens ?? null,
       restoreCashuTokens:
         overrides.restoreCashuTokens === undefined
           ? null
@@ -59,7 +80,7 @@ const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
   act(() => {
     root.render(<Harness />);
   });
-  return () => restoreRef.current();
+  return (mode) => restoreRef.current(mode);
 };
 
 afterEach(() => {
@@ -69,7 +90,7 @@ afterEach(() => {
 describe("useRestoreMissingTokens", () => {
   it("scans every wallet mint plus the main mint", async () => {
     const restoreCashuTokens = vi.fn<RestoreCashuTokens>(() =>
-      Promise.resolve(emptyReport),
+      Promise.resolve(emptyResult),
     );
 
     const restore = renderRestore({
@@ -88,7 +109,7 @@ describe("useRestoreMissingTokens", () => {
 
   it("skips deleted mints but never the always-included main mint", async () => {
     const restoreCashuTokens = vi.fn<RestoreCashuTokens>(() =>
-      Promise.resolve(emptyReport),
+      Promise.resolve(emptyResult),
     );
 
     const restore = renderRestore({
@@ -110,5 +131,85 @@ describe("useRestoreMissingTokens", () => {
     await act(() => restore());
 
     expect(pushToast).toHaveBeenCalledWith("seedMissing");
+  });
+});
+
+describe("bulk recovery actions", () => {
+  const reclaimed = new ReclaimReport({
+    reclaimedAmount: NonNegativeAmount.make(12),
+    reclaimedProofs: [ProofId.make("p1")],
+    spentProofs: [],
+    unresolvedProofs: [],
+  });
+
+  it("reclaims without scanning, and gives the full action the restore mint candidates", async () => {
+    const reclaimCashuTokens = vi.fn<ReclaimCashuTokens>(async () => ({
+      restore: null,
+      reclaim: reclaimed,
+    }));
+    const restoreCashuTokens = vi.fn<RestoreCashuTokens>(
+      async () => emptyResult,
+    );
+    const recover = renderRestore({
+      reclaimCashuTokens,
+      restoreCashuTokens,
+      walletMints: ["https://mint-a.example"],
+    });
+    await act(() => recover("reclaim"));
+    expect(reclaimCashuTokens).toHaveBeenLastCalledWith(undefined);
+    await act(() => recover("all"));
+    expect(reclaimCashuTokens).toHaveBeenLastCalledWith([
+      "https://mint-a.example",
+      MAIN_MINT_URL,
+    ]);
+    expect(restoreCashuTokens).not.toHaveBeenCalled();
+  });
+
+  it("reports incomplete recovery and blocks duplicate clicks until completion", async () => {
+    let finish: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const reclaimCashuTokens = vi.fn<ReclaimCashuTokens>(async () => {
+      await gate;
+      return {
+        restore: null,
+        reclaim: new ReclaimReport({
+          ...reclaimed,
+          unresolvedProofs: [ProofId.make("p2")],
+        }),
+      };
+    });
+    const pushToast = vi.fn();
+    const recover = renderRestore({
+      reclaimCashuTokens,
+      restoreCashuTokens: async () => emptyResult,
+      pushToast,
+    });
+    const first = recover("all");
+    await recover("reclaim");
+    expect(reclaimCashuTokens).toHaveBeenCalledTimes(1);
+    finish?.();
+    await act(() => first);
+    expect(pushToast).toHaveBeenCalledWith("cashuReclaimIncomplete");
+    await act(() => recover("reclaim"));
+    expect(reclaimCashuTokens).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not report nothing found when a mint could not be scanned", async () => {
+    const pushToast = vi.fn();
+    const recover = renderRestore({
+      pushToast,
+      restoreCashuTokens: async () => ({
+        restore: new RestoreReport({
+          ...emptyReport,
+          unavailableMints: [MintUrl.make(MAIN_MINT_URL)],
+        }),
+        reclaim: emptyReclaim,
+      }),
+    });
+    await act(() => recover());
+    expect(pushToast).toHaveBeenCalledWith("cashuMissingRestoreIncomplete");
+    expect(pushToast).not.toHaveBeenCalledWith("restoreNothing");
   });
 });

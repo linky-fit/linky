@@ -1,5 +1,5 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { Keyset } from "@cashu/cashu-ts";
+import { getDecodedToken, Keyset } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import { MintUnreachable } from "../domain/errors";
 import { CurrencyUnit, KeysetId, MintUrl } from "../domain/primitives";
@@ -44,6 +44,7 @@ interface HarnessArgs {
   stateOf?: (secret: string) => "UNSPENT" | "PENDING" | "SPENT";
   restoreError?: unknown;
   walletUnreachable?: boolean;
+  receive?: (text: string) => Promise<CashuProof[]>;
 }
 
 const makeHarness = (args: HarnessArgs) => {
@@ -52,6 +53,7 @@ const makeHarness = (args: HarnessArgs) => {
   const signed = args.signed ?? [];
 
   const wallet = fakeWallet({
+    ...(args.receive === undefined ? {} : { receive: args.receive }),
     keysetId: keysetHex,
     keyChain: {
       getKeysets: () => [
@@ -333,6 +335,99 @@ describe("Restore.restore", () => {
     const serialized = JSON.stringify(events);
     expect(serialized).not.toContain("r1");
     expect(serialized).not.toContain("cashu");
+  });
+});
+
+describe("Restore.restoreAndReclaim", () => {
+  it("swaps only newly discovered proofs, preserves every known state, and does not swap them twice", async () => {
+    const received: string[] = [];
+    const knownStates: ReadonlyArray<ProofState> = [
+      "available",
+      "held",
+      "handedOut",
+      "externalized",
+      "spent",
+    ];
+    const { run, events } = makeHarness({
+      signed: [
+        ...knownStates.map((state, slot) => ({
+          slot,
+          proof: proof(8, `known-${state}`),
+        })),
+        { slot: 5, proof: proof(4, "newly-found") },
+      ],
+      receive: async (text) => {
+        received.push(text);
+        return [proof(2, "fresh-two"), proof(1, "fresh-one")];
+      },
+    });
+    const exit = await run(
+      Effect.gen(function* () {
+        for (const state of knownStates)
+          yield* seedProofs(mint, [proof(8, `known-${state}`)], state);
+        const restore = yield* Restore;
+        const first = yield* restore.restoreAndReclaim(
+          new RestoreDraft({ mints: [mint] }),
+        );
+        const second = yield* restore.restoreAndReclaim(
+          new RestoreDraft({ mints: [mint] }),
+        );
+        return { first, second, proofs: yield* (yield* ProofStore).loadAll };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(received).toHaveLength(1);
+    expect(
+      getDecodedToken(received[0], [keysetHex]).proofs.map(
+        (proof) => proof.secret,
+      ),
+    ).toEqual(["newly-found"]);
+    expect(exit.value.first.restore.restoredAmount).toBe(4);
+    expect(exit.value.first.reclaim.reclaimedAmount).toBe(3);
+    expect(exit.value.second.restore.restoredProofs).toBe(0);
+    for (const state of knownStates) {
+      expect(
+        exit.value.proofs.find((proof) => proof.secret === `known-${state}`)
+          ?.state,
+      ).toBe(state);
+    }
+    expect(
+      exit.value.proofs.find((proof) => proof.secret === "newly-found")?.state,
+    ).toBe("spent");
+    expect(
+      exit.value.proofs.find((proof) => proof.secret === "fresh-two")?.state,
+    ).toBe("available");
+    expect(
+      events.some(
+        (event) =>
+          event._tag === "OperationSucceeded" &&
+          event.name === "tokens.reclaim",
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(events)).not.toContain("newly-found");
+  });
+
+  it("keeps discovered proofs and reports an incomplete swap when the mint fails", async () => {
+    const { run } = makeHarness({
+      signed: [{ slot: 1, proof: proof(4, "found") }],
+      receive: async () => {
+        throw new Error("mint unavailable");
+      },
+    });
+    const exit = await run(
+      Effect.gen(function* () {
+        const result = yield* (yield* Restore).restoreAndReclaim(
+          new RestoreDraft({ mints: [mint] }),
+        );
+        return { result, proofs: yield* (yield* ProofStore).loadAll };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.result.reclaim.reclaimedAmount).toBe(0);
+    expect(exit.value.result.reclaim.unresolvedProofs).toEqual(
+      exit.value.proofs.map((proof) => proof.id),
+    );
+    expect(exit.value.proofs[0]?.state).toBe("available");
   });
 });
 

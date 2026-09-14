@@ -20,14 +20,14 @@ interface BuildMoneyRoutePropsParams {
   cashuEmitAmount: MoneyRoutesProps["cashuTokenEmitProps"]["cashuEmitAmount"];
   cashuHasMultipleAcceptedMints: MoneyRoutesProps["cashuTokenEmitProps"]["cashuHasMultipleAcceptedMints"];
   cashuIsBusy: MoneyRoutesProps["cashuTokensProps"]["cashuIsBusy"];
-  cashuMeltToMainMintButtonLabel: MoneyRoutesProps["cashuTokensProps"]["cashuMeltToMainMintButtonLabel"];
-  cashuOpenTransfers: MoneyRoutesProps["cashuTokensProps"]["cashuOpenTransfers"];
+  cashuMeltToMainMintButtonLabel: MoneyRoutesProps["cashuProofsProps"]["cashuMeltToMainMintButtonLabel"];
+  tokenMessages: MoneyRoutesProps["cashuTokensProps"]["messages"];
   cashuProofs: MoneyRoutesProps["cashuTokensProps"]["cashuProofs"];
   cashuTransfers: ReturnType<
     MoneyRoutesProps["cashuTokenProps"]
   >["cashuTransfers"];
-  inspectCashuProofStates: MoneyRoutesProps["cashuTokensProps"]["inspectCashuProofStates"];
-  checkAllCashuTokensAndDeleteInvalid: MoneyRoutesProps["cashuTokensProps"]["checkAllCashuTokensAndDeleteInvalid"];
+  inspectCashuProofStates: MoneyRoutesProps["cashuProofsProps"]["inspectCashuProofStates"];
+  checkAllCashuTokensAndDeleteInvalid: MoneyRoutesProps["cashuProofsProps"]["checkAllCashuTokensAndDeleteInvalid"];
   checkAndRefreshCashuToken: ReturnType<
     MoneyRoutesProps["cashuTokenProps"]
   >["checkAndRefreshCashuToken"];
@@ -42,7 +42,6 @@ interface BuildMoneyRoutePropsParams {
   currentNpub: MoneyRoutesProps["topupProps"]["currentNpub"];
   displayUnit: MoneyRoutesProps["lnAddressPayProps"]["displayUnit"];
   emitCashuToken: MoneyRoutesProps["cashuTokenEmitProps"]["emitCashuToken"];
-  getMintIconUrl: MoneyRoutesProps["cashuTokensProps"]["getMintIconUrl"];
   knownLnAddressPayContact: MoneyRoutesProps["lnAddressPayProps"]["knownContact"];
   knownLnAddressPayContactPictureUrl: MoneyRoutesProps["lnAddressPayProps"]["knownContactPictureUrl"];
   lnAddressPayAmount: MoneyRoutesProps["lnAddressPayProps"]["lnAddressPayAmount"];
@@ -50,12 +49,17 @@ interface BuildMoneyRoutePropsParams {
   manualPayNostrPictureByNpub: MoneyRoutesProps["manualPayProps"]["nostrPictureByNpub"];
   onRequestBankPaymentOffer: MoneyRoutesProps["spdPaymentProps"]["onRequestReimbursement"];
   onSubmitManualPayText: MoneyRoutesProps["manualPayProps"]["onSubmitText"];
-  meltLargestForeignMintToMainMint: MoneyRoutesProps["cashuTokensProps"]["meltLargestForeignMintToMainMint"];
+  meltLargestForeignMintToMainMint: MoneyRoutesProps["cashuProofsProps"]["meltLargestForeignMintToMainMint"];
   payLightningAddressWithCashu: MoneyRoutesProps["lnAddressPayProps"]["payLightningAddressWithCashu"];
   pendingCashuDeleteId: ReturnType<
     MoneyRoutesProps["cashuTokenProps"]
   >["pendingCashuDeleteId"];
-  restoreMissingTokens: MoneyRoutesProps["cashuTokensProps"]["restoreMissingTokens"];
+  reclaimCashuTransfer: ReturnType<
+    MoneyRoutesProps["cashuTokenProps"]
+  >["reclaimCashuTransfer"];
+  restoreMissingTokens: MoneyRoutesProps["cashuProofsProps"]["restoreMissingTokens"];
+  reclaimHandedOutTokens: MoneyRoutesProps["cashuProofsProps"]["reclaimHandedOutTokens"];
+  restoreAndReclaimAllTokens: MoneyRoutesProps["cashuProofsProps"]["restoreAndReclaimAllTokens"];
   requestDeleteCashuToken: ReturnType<
     MoneyRoutesProps["cashuTokenProps"]
   >["requestDeleteCashuToken"];
@@ -70,7 +74,6 @@ interface BuildMoneyRoutePropsParams {
   setCashuEmitAmount: MoneyRoutesProps["cashuTokenEmitProps"]["setCashuEmitAmount"];
   setCashuDraft: MoneyRoutesProps["cashuTokenNewProps"]["setCashuDraft"];
   setLnAddressPayAmount: MoneyRoutesProps["lnAddressPayProps"]["setLnAddressPayAmount"];
-  setMintIconUrlByMint: MoneyRoutesProps["cashuTokensProps"]["setMintIconUrlByMint"];
   shareCashuTokenText: MoneyRoutesProps["cashuTokenProps"] extends () => infer Props
     ? Props extends { shareTokenText: infer Fn }
       ? Fn
@@ -86,7 +89,7 @@ interface BuildMoneyRoutePropsParams {
   topupMintUrl: MoneyRoutesProps["topupInvoiceProps"]["topupMintUrl"];
   topupInvoiceQr: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceQr"];
   topupInvoiceQrPayload: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceQrPayload"];
-  tokensRestoreIsBusy: MoneyRoutesProps["cashuTokensProps"]["tokensRestoreIsBusy"];
+  tokensRestoreIsBusy: MoneyRoutesProps["cashuProofsProps"]["tokensRestoreIsBusy"];
   writeCashuTokenToNfc: MoneyRoutesProps["cashuTokenProps"] extends () => infer Props
     ? Props extends { writeToNfc: infer Fn }
       ? Fn
@@ -111,7 +114,7 @@ export const buildMoneyRouteProps = ({
   cashuHasMultipleAcceptedMints,
   cashuIsBusy,
   cashuMeltToMainMintButtonLabel,
-  cashuOpenTransfers,
+  tokenMessages,
   cashuProofs,
   cashuTransfers,
   inspectCashuProofStates,
@@ -124,7 +127,6 @@ export const buildMoneyRouteProps = ({
   currentNpub,
   displayUnit,
   emitCashuToken,
-  getMintIconUrl,
   knownLnAddressPayContact,
   knownLnAddressPayContactPictureUrl,
   lnAddressPayAmount,
@@ -135,7 +137,10 @@ export const buildMoneyRouteProps = ({
   meltLargestForeignMintToMainMint,
   payLightningAddressWithCashu,
   pendingCashuDeleteId,
+  reclaimCashuTransfer,
   restoreMissingTokens,
+  reclaimHandedOutTokens,
+  restoreAndReclaimAllTokens,
   requestDeleteCashuToken,
   returnCashuTokenToWallet,
   startSendCashuTokenToContact,
@@ -144,7 +149,6 @@ export const buildMoneyRouteProps = ({
   setCashuEmitAmount,
   setCashuDraft,
   setLnAddressPayAmount,
-  setMintIconUrlByMint,
   shareCashuTokenText,
   setTopupAmount,
   t,
@@ -182,18 +186,29 @@ export const buildMoneyRouteProps = ({
     },
     cashuTokensProps: {
       canRestoreTokens,
+      tokensRestoreIsBusy,
+      restoreMissingTokens,
+      cashuIsBusy,
+      cashuBulkCheckIsBusy,
+      cashuProofs,
+      cashuTransfers,
+      contacts: manualPayContacts,
+      messages: tokenMessages,
+      checkIssuedCashuTokensAndDeleteClaimed,
+    },
+    cashuProofsProps: {
+      canRestoreTokens,
       cashuBulkCheckIsBusy,
       cashuIsBusy,
       cashuMeltToMainMintButtonLabel,
-      cashuOpenTransfers,
       cashuProofs,
       checkAllCashuTokensAndDeleteInvalid,
       inspectCashuProofStates,
       checkIssuedCashuTokensAndDeleteClaimed,
-      getMintIconUrl,
       meltLargestForeignMintToMainMint,
       restoreMissingTokens,
-      setMintIconUrlByMint,
+      reclaimHandedOutTokens,
+      restoreAndReclaimAllTokens,
       tokensRestoreIsBusy,
     },
     cashuTokenProps: () => {
@@ -201,13 +216,16 @@ export const buildMoneyRouteProps = ({
         throw new Error("invalid route for cashu token");
       }
       return {
+        contacts: manualPayContacts,
+        messages: tokenMessages,
+        reclaimCashuTransfer,
         canSendToContact: canSendCashuTokenToContact,
         canWriteToNfc: canWriteNfc,
         cashuProofs,
         cashuTransfers,
         routeId: route.id,
         inspectCashuProofStates,
-        cashuIsBusy,
+        cashuIsBusy: cashuIsBusy || cashuBulkCheckIsBusy || tokensRestoreIsBusy,
         pendingCashuDeleteId,
         checkAndRefreshCashuToken,
         checkSingleIssuedCashuTokenIsClaimed,

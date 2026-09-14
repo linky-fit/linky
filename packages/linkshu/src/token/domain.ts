@@ -6,6 +6,7 @@ import {
   MintUrl,
   NonNegativeAmount,
   OperationId,
+  ProofId,
   TokenText,
   UnixSeconds,
 } from "../domain/primitives";
@@ -106,6 +107,15 @@ export class ImportProofDraft extends Schema.Class<ImportProofDraft>(
   state: ProofState,
   operationId: Schema.NullOr(OperationId),
 }) {}
+
+export class ReclaimReport extends Schema.Class<ReclaimReport>("ReclaimReport")(
+  {
+    reclaimedAmount: NonNegativeAmount,
+    reclaimedProofs: Schema.Array(ProofId),
+    spentProofs: Schema.Array(ProofId),
+    unresolvedProofs: Schema.Array(ProofId),
+  },
+) {}
 
 /**
  * A token row of the pre-inventory storage model, as the web app's

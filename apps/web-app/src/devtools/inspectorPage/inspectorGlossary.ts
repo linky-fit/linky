@@ -94,6 +94,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Rows of the legacy cashuToken table were carried into the proof inventory: accepted → available, reserved → held, issued/externalized → a send transfer with handed-out proofs, error → spent only when the recorded error says so. Rows whose proofs are already stored are skipped.",
   "tokens.forget":
     "A transfer was closed by the app because nothing is left to do about it (a delivered messenger send, a dismissed failed receive). Handed-out proofs stay handed out until the mint reports them spent.",
+  "restore.restore":
+    "Seed scan for proofs not already in the inventory. Missing-token recovery follows this with tokens.reclaim for only the newly discovered proofs; ordinary restore keeps them as-is.",
+  "tokens.reclaim":
+    "Selected stored proofs were checked and re-signed at their mints. Reports reclaimed, already spent, and unresolved proof ids; pending and held proofs remain untouched. Fresh proofs are stored before old copies are marked spent.",
+  "tokens.reclaimMint":
+    "One mint's part of a bulk reclaim. Proof ids identify the selected inputs; a successful result is the net amount returned after mint fees. A failed attempt leaves unconfirmed inputs for retry.",
   ProofsChanged:
     "A batch of stored proofs moved to a new state inside linkshu (e.g. available → spent, (new) → handedOut); the reason names the operation that caused it, the operation link points at the melt or send holding them. Amounts and counts only — the proofs themselves never travel.",
   OperationChanged:

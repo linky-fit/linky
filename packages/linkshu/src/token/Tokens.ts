@@ -41,6 +41,8 @@ import {
 } from "../receive/internal/acceptFlow";
 import type { ReceiveContext } from "../receive/internal/acceptFlow";
 import type { DecodedToken } from "./domain";
+import type { ProofId } from "../domain/primitives";
+import { reclaimProofs } from "./internal/reclaim";
 
 export class LegacyIngestReport extends Schema.Class<LegacyIngestReport>(
   "LegacyIngestReport",
@@ -102,6 +104,8 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
     const ctx = { proofStore, operationStore, inspector };
     const receiveContext: ReceiveContext = { ...ctx, kv, instances };
     const melts = meltRecords({ kv, operationStore, inspector });
+    const reclaim = (ids: ReadonlyArray<ProofId>) =>
+      reclaimProofs(receiveContext, ids);
 
     const newestFirst = <T extends { readonly createdAt: number }>(
       rows: ReadonlyArray<T>,
@@ -479,6 +483,7 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
       markExternalized,
       forget,
       returnToWallet,
+      reclaim,
       importProofs,
       importOperation,
       adoptToken,

@@ -185,7 +185,7 @@ const swapAtMint = (
   );
 
 /** Re-signs the token at the mint and stores the fresh proofs as balance. */
-const acceptAtMint = (
+export const acceptAtMint = (
   ctx: ReceiveContext,
   wallet: LoadedWallet,
   parsed: ReceivableToken,
