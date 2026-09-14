@@ -79,7 +79,7 @@ The default reporter prints every `[linky]` console line prefixed with the accou
 
 The run is ~20s, so `--headed` mostly shows a blur; `--ui` and the trace viewer are the useful tools. Do not reintroduce a slow-motion knob: a per-action delay pushes the top-up quote and the offer's phase timers past their deadlines, so the test fails for reasons unrelated to the code under test.
 
-`.github/workflows/e2e.yml` runs the `local-stack` project and site redemption/recovery tests on pull requests and every push to main, and is reused (`workflow_call`) as a required job by both Android release workflows. The Vercel production deploy is gated on the same `e2e` check via Deployment Checks in the Vercel dashboard.
+`.github/workflows/e2e.yml` runs the `local-stack` project and site redemption/recovery tests on pull requests and every push to main, and is reused (`workflow_call`) as a required job by the Android release workflow. The Vercel production deploy is gated on the same `e2e` check via Deployment Checks in the Vercel dashboard.
 
 Shared helpers live in `tests/helpers/`. Use `setSeedLoginStorage` when a test needs a real seed login (deterministic Evolu owner lanes); `setRandomIdentityStorage` is the cheaper "just be logged in" variant and leaves `isSeedLogin` false.
 

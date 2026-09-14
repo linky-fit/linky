@@ -4,7 +4,7 @@ Capacitor-based native shell for shipping the existing web app as:
 
 - Android debug APK (side-by-side `fit.linky.app.debug`, "Linky Dev")
 - Android release APK, published as `linky.apk` on GitHub Releases
-- Android AAB, uploaded to the Google Play internal track by `.github/workflows/android-play-internal.yml`
+- Android AAB, uploaded to Google Play internal and open testing with each versioned release by `.github/workflows/android-apk-release.yml`, see [Play setup](../../docs/android-play-console.md)
 - iOS project (no App Store release pipeline yet)
 
 The shell consumes the bundled output from `apps/web-app/dist` and keeps the product UI in the web app package.

@@ -165,6 +165,9 @@ Android APK/AAB builds, signing, Firebase push setup, and the iOS project are do
 to that workspace. Native push delivery additionally needs `apps/push` configured with
 `PUSH_FIREBASE_SERVICE_ACCOUNT_JSON`.
 
+Versioned Android releases publish the APK to GitHub and Zapstore, and the AAB to Google Play
+internal and open testing. See [Play Console setup](docs/android-play-console.md).
+
 Start the push service once:
 
 ```bash
@@ -218,8 +221,8 @@ printed prefixed with its account label (`[A]`, `[B]`, `[C]`). The run takes ~20
 trace viewer are far more useful than watching it live.
 
 In CI, `local-stack` gates every release: it runs on each push to main (Vercel Deployment Checks
-holds the production promotion until it passes) and as a required job in both Android release
-workflows.
+holds the production promotion until it passes) and as a required job in the Android release
+workflow.
 
 ### Code quality
 

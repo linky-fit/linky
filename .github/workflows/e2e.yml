@@ -2,7 +2,7 @@ name: E2E
 
 # Runs on pull requests and every push to main (Vercel Deployment Checks reads the
 # `e2e` check to gate production promotion) and as a reusable job for the
-# Android release workflows.
+# Android release workflow.
 on:
   pull_request:
   push:

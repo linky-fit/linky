@@ -63,4 +63,4 @@ runs:
 
     - name: Compute CI Android version code
       shell: bash
-      run: echo "LINKY_ANDROID_VERSION_CODE=$((100000000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      run: echo "LINKY_ANDROID_VERSION_CODE=$((200000000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"

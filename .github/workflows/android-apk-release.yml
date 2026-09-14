@@ -22,7 +22,7 @@ on:
 
 concurrency:
   group: android-apk-release-${{ github.event.inputs.tag_name || github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   resolve:
@@ -116,6 +116,17 @@ jobs:
       - name: Build Android release APK
         run: bun run native:apk:release
 
+      - name: Build Android App Bundle
+        working-directory: apps/native-shell/android
+        run: bash ../scripts/with-java17.sh ./gradlew bundleRelease
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-release-aab
+          path: apps/native-shell/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
       - name: Prepare APK asset
         run: cp "$APK_PATH" "$APK_UPLOAD_PATH"
 
@@ -140,6 +151,47 @@ jobs:
               --notes-file "$RELEASE_NOTES_PATH" \
               --target "$GITHUB_SHA"
           fi
+
+  google-play:
+    name: Publish to Google Play open testing
+    needs: [resolve, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: android-google-play-publish
+      cancel-in-progress: false
+    env:
+      RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+
+    steps:
+      - name: Checkout release notes
+        uses: actions/checkout@v5
+
+      - name: Download signed AAB
+        uses: actions/download-artifact@v8
+        with:
+          name: android-release-aab
+          path: google-play
+
+      - name: Prepare localized release notes
+        run: |
+          whats_new_dir="$RUNNER_TEMP/google-play-whats-new"
+          apps/native-shell/scripts/extract-release-notes.sh \
+            "$RELEASE_TAG" "$whats_new_dir/whatsnew-cs-CZ" cs-CZ
+          apps/native-shell/scripts/extract-release-notes.sh \
+            "$RELEASE_TAG" "$whats_new_dir/whatsnew-en-US" en-US
+
+      - name: Upload to Google Play internal and open testing
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: fit.linky.app
+          releaseFiles: google-play/app-release.aab
+          tracks: internal,beta
+          status: completed
+          changesNotSentForReview: false
+          whatsNewDirectory: ${{ runner.temp }}/google-play-whats-new
 
   zapstore:
     name: Publish to Zapstore
