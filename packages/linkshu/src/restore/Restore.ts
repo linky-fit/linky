@@ -30,7 +30,7 @@ import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import { toDomainProofs } from "../token/internal/cashuProofs";
 import { RestoreReport } from "./domain";
-import type { RestoreDraft } from "./domain";
+import type { RestoreDraft, RestoreProgress } from "./domain";
 import {
   advanceRestoreCursor,
   readRestoreCursor,
@@ -193,47 +193,74 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
       ).pipe(Effect.catchAll(() => Effect.succeed(null)));
     };
 
-    /** `null` when the mint could not be scanned at all. */
-    const restoreMint = (
-      mint: MintUrl,
-    ): Effect.Effect<{ restored: Restored; complete: boolean } | null> =>
+    const prepareMint = (mint: MintUrl) =>
       Effect.gen(function* () {
         const wallet = yield* instances.get(mint, sat);
         const keysetIds = yield* keysetsToScan(wallet, mint);
-        let restored = NOTHING_RESTORED;
-        let complete = true;
-        for (const keysetId of keysetIds) {
-          const scanned = yield* restoreKeyset(wallet, mint, keysetId);
-          if (scanned === null) complete = false;
-          else restored = mergeRestored(restored, scanned);
-        }
-        return { restored, complete };
+        return { mint, wallet, keysetIds };
       }).pipe(Effect.catchAll(() => Effect.succeed(null)));
 
-    const restoreWithProofIds = (draft: RestoreDraft) =>
+    const restoreWithProofIds = (
+      draft: RestoreDraft,
+      onProgress?: (progress: RestoreProgress) => void,
+    ) =>
       Effect.gen(function* () {
-        const mints =
-          draft.mints ??
-          (yield* collectKnownMints(kv, proofStore, operationStore));
+        const mints = [
+          ...new Set(
+            draft.mints ??
+              (yield* collectKnownMints(kv, proofStore, operationStore)),
+          ),
+        ];
         const scannedMints: MintUrl[] = [];
         const unavailableMints: MintUrl[] = [];
         let restored = NOTHING_RESTORED;
+        let progress: RestoreProgress = {
+          phase: "preparing",
+          completedKeysets: 0,
+          totalKeysets: 0,
+          totalMints: mints.length,
+        };
+        onProgress?.(progress);
+        const plans = yield* Effect.forEach(mints, (mint) =>
+          Effect.map(prepareMint(mint), (plan) => {
+            if (plan === null) unavailableMints.push(mint);
+            return plan;
+          }),
+        );
+        progress = {
+          ...progress,
+          phase: "scanning",
+          totalKeysets: plans.reduce(
+            (total, plan) => total + (plan?.keysetIds.length ?? 0),
+            0,
+          ),
+        };
+        onProgress?.(progress);
 
-        for (const mint of mints) {
-          const outcome = yield* restoreMint(mint);
-          if (outcome === null) {
-            unavailableMints.push(mint);
-            continue;
+        for (const plan of plans) {
+          if (plan === null) continue;
+          let complete = true;
+          for (const keysetId of plan.keysetIds) {
+            const scanned = yield* restoreKeyset(
+              plan.wallet,
+              plan.mint,
+              keysetId,
+            );
+            if (scanned === null) complete = false;
+            else restored = mergeRestored(restored, scanned);
+            progress = {
+              ...progress,
+              completedKeysets: progress.completedKeysets + 1,
+            };
+            onProgress?.(progress);
           }
-          restored = mergeRestored(restored, outcome.restored);
-          // A mint is either fully scanned or reported as not scanned; a
-          // keyset the scan could not reach leaves funds unaccounted for.
-          if (outcome.complete) scannedMints.push(mint);
-          else unavailableMints.push(mint);
+          if (complete) scannedMints.push(plan.mint);
+          else unavailableMints.push(plan.mint);
         }
 
         return {
           proofIds: restored.proofIds,
+          progress,
           report: new RestoreReport({
             restoredAmount: NonNegativeAmount.make(restored.amount),
             restoredProofs: restored.proofIds.length,
@@ -252,12 +279,25 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
         ),
       );
 
-    const restore = (draft: RestoreDraft): Effect.Effect<RestoreReport> =>
-      Effect.map(restoreWithProofIds(draft), (result) => result.report);
+    const restore = (
+      draft: RestoreDraft,
+      onProgress?: (progress: RestoreProgress) => void,
+    ): Effect.Effect<RestoreReport> =>
+      Effect.map(
+        restoreWithProofIds(draft, onProgress),
+        (result) => result.report,
+      );
 
-    const restoreAndReclaim = (draft: RestoreDraft) =>
+    const restoreAndReclaim = (
+      draft: RestoreDraft,
+      onProgress?: (progress: RestoreProgress) => void,
+    ) =>
       Effect.gen(function* () {
-        const { report, proofIds } = yield* restoreWithProofIds(draft);
+        const { report, proofIds, progress } = yield* restoreWithProofIds(
+          draft,
+          onProgress,
+        );
+        onProgress?.({ ...progress, phase: "refreshing" });
         const reclaim = yield* reclaimProofs(
           { kv, proofStore, operationStore, instances, inspector },
           proofIds,

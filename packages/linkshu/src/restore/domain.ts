@@ -15,3 +15,10 @@ export class RestoreReport extends Schema.Class<RestoreReport>("RestoreReport")(
     unavailableMints: Schema.Array(MintUrl),
   },
 ) {}
+
+export interface RestoreProgress {
+  readonly phase: "preparing" | "scanning" | "refreshing";
+  readonly completedKeysets: number;
+  readonly totalKeysets: number;
+  readonly totalMints: number;
+}

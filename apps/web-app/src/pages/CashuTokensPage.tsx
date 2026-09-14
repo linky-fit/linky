@@ -1,5 +1,9 @@
 import * as Evolu from "@evolu/common";
-import type { StoredProof, TokenTransfer } from "@linky/linkshu";
+import type {
+  StoredProof,
+  TokenTransfer,
+  RestoreProgress,
+} from "@linky/linkshu";
 import { ChevronRight, CirclePlus as TokenAddIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
@@ -22,6 +26,7 @@ interface CashuTokensPageProps {
   cashuIsBusy: boolean;
   canRestoreTokens: boolean;
   tokensRestoreIsBusy: boolean;
+  tokensRestoreProgress: RestoreProgress | null;
   restoreMissingTokens: () => Promise<void>;
   cashuBulkCheckIsBusy: boolean;
   cashuProofs: readonly StoredProof[];
@@ -37,6 +42,7 @@ export const CashuTokensPage = ({
   cashuIsBusy,
   canRestoreTokens,
   tokensRestoreIsBusy,
+  tokensRestoreProgress,
   restoreMissingTokens,
   cashuBulkCheckIsBusy,
   cashuProofs,
@@ -46,6 +52,12 @@ export const CashuTokensPage = ({
   checkIssuedCashuTokensAndDeleteClaimed,
 }: CashuTokensPageProps) => {
   const { formatDisplayedAmountText, t } = useAppShellCore();
+  const scanProgress =
+    tokensRestoreProgress?.phase === "scanning" &&
+    tokensRestoreProgress.totalKeysets > 0
+      ? tokensRestoreProgress
+      : null;
+
   const [now, setNow] = useState(nowSeconds);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(nowSeconds()), 60_000);
@@ -259,11 +271,43 @@ export const CashuTokensPage = ({
           </button>
         </div>
         {tokensRestoreIsBusy && (
-          <div
-            className="cashu-restore-progress"
-            role="progressbar"
-            aria-label={t("restoring")}
-          />
+          <div>
+            <div
+              className={`cashu-restore-progress${scanProgress ? " is-determinate" : ""}`}
+              role="progressbar"
+              aria-label={t("restoring")}
+              aria-valuemin={scanProgress ? 0 : undefined}
+              aria-valuemax={scanProgress?.totalKeysets}
+              aria-valuenow={scanProgress?.completedKeysets}
+            >
+              {scanProgress && (
+                <span
+                  style={{
+                    width: `${(scanProgress.completedKeysets / scanProgress.totalKeysets) * 100}%`,
+                  }}
+                />
+              )}
+            </div>
+            <p className="muted" role="status">
+              {tokensRestoreProgress?.phase === "refreshing"
+                ? t("cashuRestoreRefreshing")
+                : tokensRestoreProgress?.phase === "scanning"
+                  ? t("cashuRestoreScanProgress")
+                      .replace(
+                        "{completed}",
+                        String(tokensRestoreProgress.completedKeysets),
+                      )
+                      .replace(
+                        "{total}",
+                        String(tokensRestoreProgress.totalKeysets),
+                      )
+                      .replace(
+                        "{mints}",
+                        String(tokensRestoreProgress.totalMints),
+                      )
+                  : t("cashuRestorePreparing")}
+            </p>
+          </div>
         )}
         <p className="muted">{t("cashuMissingRestoreHint")}</p>
       </section>

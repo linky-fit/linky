@@ -1,5 +1,5 @@
 import { parseMintUrl } from "@linky/linkshu";
-import type { MintUrl } from "@linky/linkshu";
+import type { MintUrl, RestoreProgress } from "@linky/linkshu";
 import React from "react";
 import { MAIN_MINT_URL } from "../../../utils/mint";
 import type { LoggedPaymentEventParams } from "../../types/appTypes";
@@ -30,6 +30,7 @@ interface UseRestoreMissingTokensParams {
   reclaimCashuTokens: ReclaimCashuTokens | null;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setTokensRestoreIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  setTokensRestoreProgress: (progress: RestoreProgress | null) => void;
   t: Translate;
   tokensRestoreIsBusy: boolean;
 }
@@ -57,6 +58,7 @@ export const useRestoreMissingTokens = ({
   reclaimCashuTokens,
   setCashuIsBusy,
   setTokensRestoreIsBusy,
+  setTokensRestoreProgress,
   t,
   tokensRestoreIsBusy,
 }: UseRestoreMissingTokensParams) => {
@@ -129,7 +131,10 @@ export const useRestoreMissingTokens = ({
               return;
             }
 
-            const { restore, reclaim } = await restoreCashuTokens(mints);
+            const { restore, reclaim } = await restoreCashuTokens(
+              mints,
+              setTokensRestoreProgress,
+            );
             const incomplete =
               restore.unavailableMints.length > 0 ||
               reclaim.unresolvedProofs.length > 0;
@@ -163,6 +168,7 @@ export const useRestoreMissingTokens = ({
           } finally {
             setCashuIsBusy(false);
             setTokensRestoreIsBusy(false);
+            setTokensRestoreProgress(null);
           }
         });
       } finally {
@@ -184,6 +190,7 @@ export const useRestoreMissingTokens = ({
       reclaimCashuTokens,
       setCashuIsBusy,
       setTokensRestoreIsBusy,
+      setTokensRestoreProgress,
       t,
       tokensRestoreIsBusy,
     ],

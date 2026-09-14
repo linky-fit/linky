@@ -49,6 +49,7 @@ import type {
   ReceiveReceipt,
   ReclaimReport,
   RestoreReport,
+  RestoreProgress,
   SendError,
   SendReceipt,
   StoredOperation,
@@ -237,6 +238,7 @@ export type CheckCashuTransfer = (
 /** Scan the given mints and swap only newly discovered proofs. */
 export type RestoreCashuTokens = (
   mints: ReadonlyArray<string>,
+  onProgress?: (progress: RestoreProgress) => void,
 ) => Promise<{ restore: RestoreReport; reclaim: ReclaimReport }>;
 
 export type ReclaimCashuTokens = (mints?: ReadonlyArray<string>) => Promise<{
@@ -603,12 +605,12 @@ export const useLinkshuComposition = ({
         ),
       );
 
-    const restoreCashuTokens: RestoreCashuTokens = (mints) =>
+    const restoreCashuTokens: RestoreCashuTokens = (mints, onProgress) =>
       run(
         Effect.suspend(() => {
           const draft = decodeRestoreDraft({ mints });
           return Effect.flatMap(Restore, (restore) =>
-            restore.restoreAndReclaim(draft),
+            restore.restoreAndReclaim(draft, onProgress),
           );
         }),
       );

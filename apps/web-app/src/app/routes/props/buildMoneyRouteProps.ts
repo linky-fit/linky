@@ -89,6 +89,7 @@ interface BuildMoneyRoutePropsParams {
   topupMintUrl: MoneyRoutesProps["topupInvoiceProps"]["topupMintUrl"];
   topupInvoiceQr: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceQr"];
   topupInvoiceQrPayload: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceQrPayload"];
+  tokensRestoreProgress: MoneyRoutesProps["cashuTokensProps"]["tokensRestoreProgress"];
   tokensRestoreIsBusy: MoneyRoutesProps["cashuProofsProps"]["tokensRestoreIsBusy"];
   writeCashuTokenToNfc: MoneyRoutesProps["cashuTokenProps"] extends () => infer Props
     ? Props extends { writeToNfc: infer Fn }
@@ -161,6 +162,7 @@ export const buildMoneyRouteProps = ({
   topupInvoiceQr,
   topupInvoiceQrPayload,
   tokensRestoreIsBusy,
+  tokensRestoreProgress,
   writeCashuTokenToNfc,
 }: BuildMoneyRoutePropsParams): MoneyRouteProps => {
   return {
@@ -185,6 +187,7 @@ export const buildMoneyRouteProps = ({
       t,
     },
     cashuTokensProps: {
+      tokensRestoreProgress,
       canRestoreTokens,
       tokensRestoreIsBusy,
       restoreMissingTokens,

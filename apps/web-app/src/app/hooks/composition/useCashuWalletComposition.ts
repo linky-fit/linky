@@ -1,3 +1,4 @@
+import type { RestoreProgress } from "@linky/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { useLatest } from "../../../hooks/useLatest";
 import * as Evolu from "@evolu/common";
@@ -377,6 +378,8 @@ export const useCashuWalletComposition = ({
   const [cashuIsBusy, setCashuIsBusy] = useState(false);
   const [cashuBulkCheckIsBusy, setCashuBulkCheckIsBusy] = useState(false);
   const [tokensRestoreIsBusy, setTokensRestoreIsBusy] = useState(false);
+  const [tokensRestoreProgress, setTokensRestoreProgress] =
+    useState<RestoreProgress | null>(null);
 
   const cashuOpQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   const enqueueCashuOp = React.useCallback(
@@ -2120,6 +2123,7 @@ export const useCashuWalletComposition = ({
     reclaimCashuTokens,
     setCashuIsBusy,
     setTokensRestoreIsBusy,
+    setTokensRestoreProgress,
     t,
     tokensRestoreIsBusy,
   });
@@ -2638,6 +2642,7 @@ export const useCashuWalletComposition = ({
     showPaidOverlay,
     startSendCashuTokenToContact,
     tokensRestoreIsBusy,
+    tokensRestoreProgress,
     topupAmount,
     topupInvoice,
     topupInvoiceCashuRequest,

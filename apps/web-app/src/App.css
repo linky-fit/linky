@@ -7356,7 +7356,8 @@ button.cashu-token-pill {
   background: var(--color-border);
 }
 
-.cashu-restore-progress::after {
+.cashu-restore-progress::after,
+.cashu-restore-progress > span {
   content: "";
   display: block;
   width: 40%;
@@ -7364,6 +7365,15 @@ button.cashu-token-pill {
   border-radius: inherit;
   background: var(--app-primary-button-bg);
   animation: cashu-restore-progress 1.4s ease-in-out infinite;
+}
+
+.cashu-restore-progress.is-determinate::after {
+  display: none;
+}
+
+.cashu-restore-progress > span {
+  animation: none;
+  transition: width 0.2s ease;
 }
 
 @keyframes cashu-restore-progress {
@@ -7376,6 +7386,9 @@ button.cashu-token-pill {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cashu-restore-progress > span {
+    transition: none;
+  }
   .cashu-restore-progress::after {
     animation: none;
     width: 100%;

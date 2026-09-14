@@ -10,8 +10,16 @@ import {
   Send,
   SendDraft,
 } from "../../src";
-import type { Bip39Seed } from "../../src";
-import { availableTotalOf, fundToken, mintUrl, randomSeed } from "./helpers";
+import type { Bip39Seed, RestoreProgress } from "../../src";
+import {
+  availableTotalOf,
+  fundToken,
+  mintUrl,
+  randomSeed,
+  targetMintUrl,
+  loadMintWallet,
+  tokenOf,
+} from "./helpers";
 
 /** Everything the seed owns at the mint, with no storage to start from. */
 const restoreFromSeedAlone = (seed: Bip39Seed) =>
@@ -31,6 +39,68 @@ const restoreFromSeedAlone = (seed: Bip39Seed) =>
   );
 
 describe("restore vertical against the local mint", () => {
+  it("tracks a fixed keyset total and refreshes recovered balances across both mints", async () => {
+    const seed = randomSeed();
+    const sourceToken = await fundToken(16);
+    const targetWallet = await loadMintWallet(targetMintUrl);
+    const quote = await targetWallet.createMintQuoteBolt11(16);
+    const targetToken = tokenOf(
+      await targetWallet.mintProofsBolt11(16, quote, undefined, {
+        type: "random",
+      }),
+      targetMintUrl,
+    );
+    await runLinkshu(
+      { bip39Seed: seed },
+      Effect.gen(function* () {
+        const receive = yield* Receive;
+        yield* receive.receive(new ReceiveDraft({ text: sourceToken }));
+        yield* receive.receive(new ReceiveDraft({ text: targetToken }));
+      }),
+    );
+
+    const progress: RestoreProgress[] = [];
+    const { result, proofs } = await runLinkshu(
+      { bip39Seed: seed },
+      Effect.gen(function* () {
+        const result = yield* (yield* Restore).restoreAndReclaim(
+          new RestoreDraft({ mints: [mintUrl, targetMintUrl] }),
+          (update) => progress.push(update),
+        );
+        return { result, proofs: yield* (yield* ProofStore).loadAll };
+      }),
+    );
+    const scanning = progress.filter((update) => update.phase === "scanning");
+    const total = scanning[0]?.totalKeysets;
+    expect(total).toBeGreaterThanOrEqual(2);
+    expect(
+      scanning.every(
+        (update) => update.totalKeysets === total && update.totalMints === 2,
+      ),
+    ).toBe(true);
+    expect(scanning.map((update) => update.completedKeysets)).toEqual(
+      scanning.map((_, index) => index),
+    );
+    expect(progress.at(-1)).toEqual({
+      phase: "refreshing",
+      totalMints: 2,
+      totalKeysets: total,
+      completedKeysets: total,
+    });
+    expect(result.restore.scannedMints).toEqual([mintUrl, targetMintUrl]);
+    expect(result.restore.unavailableMints).toEqual([]);
+    expect(result.reclaim.unresolvedProofs).toEqual([]);
+    expect(result.reclaim.reclaimedAmount).toBeGreaterThan(0);
+    expect(availableTotalOf(proofs)).toBe(result.reclaim.reclaimedAmount);
+    expect(
+      new Set(
+        proofs
+          .filter((proof) => proof.state === "available")
+          .map((proof) => proof.mint),
+      ),
+    ).toEqual(new Set([mintUrl, targetMintUrl]));
+  });
+
   it("recovers the wallet balance on fresh storage, given only the seed", async () => {
     const seed = randomSeed();
     const funded = await fundToken(16);

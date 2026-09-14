@@ -29,7 +29,7 @@ Omit `mints` to scan every mint the package knows (`Mints.knownMints`). Linky pa
 
 ## How it works
 
-Per mint: load the wallet (failure → `unavailableMints`). Every `sat` keyset the mint lists now, plus every keyset it has shown this wallet before, is scanned under the counter lock:
+First load the wallets and keyset lists for all candidate mints (failure → `unavailableMints`) to establish a fixed scan total. Then every `sat` keyset the mint lists now, plus every keyset it has shown this wallet before, is scanned under the counter lock:
 
 1. The secrets of every stored proof (any state, `spent` included) are read, so nothing is imported twice — a spent proof restored again would be balance the mint will not honor.
 2. The positions just behind the counter are scanned first. If that finds nothing and the wallet has scanned this keyset before, the whole derivation tree is rescanned from zero.
@@ -54,7 +54,11 @@ A seed-only recovery has no cursor, so it walks the full derivation tree of ever
 
 ### How progress is reported
 
-`restore` returns one `RestoreReport` at the end. Live progress exists only as inspector rows: `ProofsChanged` with `reason: "restore"` per keyset that stored proofs, and `CounterAdvanced` with `reason: "restore"` per keyset. Wire the [inspector](./inspector.md) if you want a progress UI.
+Both `restore(draft, onProgress?)` and `restoreAndReclaim(draft, onProgress?)` accept an optional synchronous callback with `RestoreProgress`: `phase` (`preparing`, `scanning`, or `refreshing`), `completedKeysets`, `totalKeysets`, and `totalMints`. Callbacks must not throw. Progress is scoped to that invocation and works with the inspector disabled.
+
+`preparing` loads every candidate mint's keyset list. `scanning` starts with a fixed total and zero completed keysets, then reports after each keyset attempt, including failed attempts. Mints whose keysets cannot be loaded remain in `unavailableMints` and contribute no keysets to the denominator. `totalMints` counts all distinct candidate mints. Each keyset counts equally, so the fraction measures completed scan attempts, not elapsed or remaining time. There is no determinate fraction when `totalKeysets` is zero.
+
+`restoreAndReclaim` reports `refreshing` before swapping the newly discovered proofs. The callback does not report a swap percentage. The returned reports remain the authority on success and failures; callers clear progress when the operation settles. Existing `ProofsChanged`, `CounterAdvanced`, `restore.restore`, and `tokens.reclaim` inspector rows continue to describe the underlying work.
 
 ### The seed-bound wipe
 

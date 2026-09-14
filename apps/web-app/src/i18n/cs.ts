@@ -178,6 +178,10 @@ export const cs = {
   cashuReclaimDone: "Vráceno {amount} sat z {proofs} důkazů.",
   cashuReclaimIncomplete:
     "Vráceno {amount} sat z {proofs} důkazů. Některé tokeny nebo minty se nepodařilo obnovit; zkuste to později.",
+  cashuRestorePreparing: "Načítání sad klíčů mincoven…",
+  cashuRestoreScanProgress:
+    "Prohledáno {completed} z {total} sad klíčů v {mints} mincovnách.",
+  cashuRestoreRefreshing: "Obnovování nalezených tokenů…",
   restoring: "Hledám chybějící tokeny…",
   restoreNothing: "Žádné chybějící tokeny nenalezeny.",
   restoreDone: "Obnoveno {amount} sat jako {tokens} důkazů.",

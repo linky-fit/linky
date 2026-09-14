@@ -177,6 +177,10 @@ export const en = {
   cashuReclaimDone: "Reclaimed {amount} sat from {proofs} proofs.",
   cashuReclaimIncomplete:
     "Reclaimed {amount} sat from {proofs} proofs. Some tokens or mints could not be recovered; try again later.",
+  cashuRestorePreparing: "Loading mint keysets…",
+  cashuRestoreScanProgress:
+    "Scanned {completed} of {total} keysets across {mints} mints.",
+  cashuRestoreRefreshing: "Refreshing recovered tokens…",
   restoring: "Looking for missing tokens…",
   restoreNothing: "No missing tokens found.",
   restoreDone: "Restored {amount} sat as {tokens} proofs.",

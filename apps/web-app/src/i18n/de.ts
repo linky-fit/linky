@@ -182,6 +182,10 @@ export const de = {
   cashuReclaimDone: "{amount} sat aus {proofs} Proofs zurückgeholt.",
   cashuReclaimIncomplete:
     "{amount} sat aus {proofs} Proofs zurückgeholt. Einige Tokens oder Mints konnten nicht wiederhergestellt werden; später erneut versuchen.",
+  cashuRestorePreparing: "Schlüsselsätze der Mints werden geladen…",
+  cashuRestoreScanProgress:
+    "{completed} von {total} Schlüsselsätzen in {mints} Mints geprüft.",
+  cashuRestoreRefreshing: "Wiederhergestellte Token werden erneuert…",
   restoring: "Suche nach fehlenden Tokens…",
   restoreNothing: "Keine fehlenden Token gefunden.",
   restoreDone: "{amount} sat als {tokens} Proofs wiederhergestellt.",

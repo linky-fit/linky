@@ -1,3 +1,4 @@
+import type { RestoreProgress } from "@linky/linkshu";
 import {
   MintUrl,
   NonNegativeAmount,
@@ -20,6 +21,7 @@ type RestoreMissingTokens = (
 ) => Promise<void>;
 
 interface HookOverrides {
+  setTokensRestoreProgress?: (progress: RestoreProgress | null) => void;
   walletMints?: readonly string[];
   isMintDeleted?: (mintUrl: string) => boolean;
   restoreCashuTokens?: RestoreCashuTokens | null;
@@ -65,6 +67,8 @@ const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
           : overrides.restoreCashuTokens,
       setCashuIsBusy: () => {},
       setTokensRestoreIsBusy: () => {},
+      setTokensRestoreProgress:
+        overrides.setTokensRestoreProgress ?? (() => {}),
       t: (key) => key,
       tokensRestoreIsBusy: false,
     });
@@ -88,6 +92,31 @@ afterEach(() => {
 });
 
 describe("useRestoreMissingTokens", () => {
+  it.each([false, true])(
+    "forwards scan progress and clears it after recovery settles, failure: %s",
+    async (fail) => {
+      const setTokensRestoreProgress = vi.fn();
+      const update: RestoreProgress = {
+        phase: "scanning",
+        completedKeysets: 2,
+        totalKeysets: 5,
+        totalMints: 2,
+      };
+      const restore = renderRestore({
+        setTokensRestoreProgress,
+        restoreCashuTokens: async (_mints, onProgress) => {
+          onProgress?.(update);
+          expect(setTokensRestoreProgress).toHaveBeenLastCalledWith(update);
+          if (fail) throw new Error("recovery interrupted");
+          onProgress?.({ ...update, phase: "refreshing", completedKeysets: 5 });
+          return emptyResult;
+        },
+      });
+      await act(() => restore());
+      expect(setTokensRestoreProgress).toHaveBeenLastCalledWith(null);
+    },
+  );
+
   it("scans every wallet mint plus the main mint", async () => {
     const restoreCashuTokens = vi.fn<RestoreCashuTokens>(() =>
       Promise.resolve(emptyResult),

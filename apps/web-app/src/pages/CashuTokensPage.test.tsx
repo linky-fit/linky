@@ -41,6 +41,7 @@ const props = (): ComponentProps<typeof CashuTokensPage> => ({
   cashuIsBusy: false,
   canRestoreTokens: true,
   tokensRestoreIsBusy: false,
+  tokensRestoreProgress: null,
   restoreMissingTokens: vi.fn(async () => {}),
   cashuBulkCheckIsBusy: false,
   cashuProofs: [proof],
@@ -168,6 +169,55 @@ describe("pending tokens", () => {
       "Looking for missing tokens…",
     );
     expect(progress?.hasAttribute("aria-valuenow")).toBe(false);
+    expect(container.textContent).toContain("Loading mint keysets…");
+    await rerender(
+      <CashuTokensPage
+        {...pageProps}
+        tokensRestoreIsBusy={true}
+        tokensRestoreProgress={{
+          phase: "scanning",
+          completedKeysets: 3,
+          totalKeysets: 6,
+          totalMints: 2,
+        }}
+      />,
+    );
+    expect(container.textContent).toContain(
+      "Scanned 3 of 6 keysets across 2 mints.",
+    );
+    expect(
+      container
+        .querySelector('[role="progressbar"]')
+        ?.getAttribute("aria-valuenow"),
+    ).toBe("3");
+    expect(
+      container
+        .querySelector('[role="progressbar"]')
+        ?.getAttribute("aria-valuemax"),
+    ).toBe("6");
+    expect(
+      container
+        .querySelector('[role="progressbar"] > span')
+        ?.getAttribute("style"),
+    ).toBe("width: 50%;");
+    await rerender(
+      <CashuTokensPage
+        {...pageProps}
+        tokensRestoreIsBusy={true}
+        tokensRestoreProgress={{
+          phase: "refreshing",
+          completedKeysets: 6,
+          totalKeysets: 6,
+          totalMints: 2,
+        }}
+      />,
+    );
+    expect(container.textContent).toContain("Refreshing recovered tokens…");
+    expect(
+      container
+        .querySelector('[role="progressbar"]')
+        ?.hasAttribute("aria-valuenow"),
+    ).toBe(false);
     await rerender(<CashuTokensPage {...pageProps} />);
     expect(container.querySelector('[role="progressbar"]')).toBeNull();
     await unmount();

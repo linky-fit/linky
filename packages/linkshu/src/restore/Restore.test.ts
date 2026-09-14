@@ -14,6 +14,7 @@ import type { ProofState } from "../ports/ProofStore";
 import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { amountIn, secretsOf, seedProofs } from "../testing/inventory";
+import type { RestoreProgress } from "./domain";
 import { RestoreDraft } from "./domain";
 import { restoreCursorKey, seenKeysetKey } from "./internal/restoreState";
 import { Restore } from "./Restore";
@@ -41,6 +42,8 @@ interface RestoreCall {
 interface HarnessArgs {
   signed?: ReadonlyArray<SignedSlot>;
   keysets?: ReadonlyArray<Keyset>;
+  keysetsForMint?: (mint: MintUrl) => ReadonlyArray<Keyset>;
+  unreachableMints?: ReadonlyArray<MintUrl>;
   stateOf?: (secret: string) => "UNSPENT" | "PENDING" | "SPENT";
   restoreError?: unknown;
   walletUnreachable?: boolean;
@@ -52,40 +55,42 @@ const makeHarness = (args: HarnessArgs) => {
   const inspector = recordingInspector();
   const signed = args.signed ?? [];
 
-  const wallet = fakeWallet({
-    ...(args.receive === undefined ? {} : { receive: args.receive }),
-    keysetId: keysetHex,
-    keyChain: {
-      getKeysets: () => [
-        ...(args.keysets ?? [new Keyset(keysetHex, "sat", true, 0)]),
-      ],
-    },
-    checkProofsStates: (proofs) =>
-      Promise.resolve(
-        proofs.map((entry) => ({
-          Y: entry.secret ?? "",
-          state: args.stateOf?.(entry.secret ?? "") ?? "UNSPENT",
-          witness: null,
-        })),
-      ),
-    batchRestore: (_gapLimit, _batchSize, counter = 0, keysetId = "") => {
-      restoreCalls.push({ start: counter, keysetId });
-      if (args.restoreError !== undefined) {
-        return Promise.reject(args.restoreError);
-      }
-      const found = signed.filter((entry) => entry.slot >= counter);
-      return Promise.resolve({
-        proofs: found.map((entry) => entry.proof),
-        ...(found.length > 0
-          ? {
-              lastCounterWithSignature: Math.max(
-                ...found.map((entry) => entry.slot),
-              ),
-            }
-          : {}),
-      });
-    },
-  });
+  const wallet = (requested: MintUrl) =>
+    fakeWallet({
+      ...(args.receive === undefined ? {} : { receive: args.receive }),
+      keysetId: keysetHex,
+      keyChain: {
+        getKeysets: () => [
+          ...(args.keysetsForMint?.(requested) ??
+            args.keysets ?? [new Keyset(keysetHex, "sat", true, 0)]),
+        ],
+      },
+      checkProofsStates: (proofs) =>
+        Promise.resolve(
+          proofs.map((entry) => ({
+            Y: entry.secret ?? "",
+            state: args.stateOf?.(entry.secret ?? "") ?? "UNSPENT",
+            witness: null,
+          })),
+        ),
+      batchRestore: (_gapLimit, _batchSize, counter = 0, keysetId = "") => {
+        restoreCalls.push({ start: counter, keysetId });
+        if (args.restoreError !== undefined) {
+          return Promise.reject(args.restoreError);
+        }
+        const found = signed.filter((entry) => entry.slot >= counter);
+        return Promise.resolve({
+          proofs: found.map((entry) => entry.proof),
+          ...(found.length > 0
+            ? {
+                lastCounterWithSignature: Math.max(
+                  ...found.map((entry) => entry.slot),
+                ),
+              }
+            : {}),
+        });
+      },
+    });
 
   const layer = Restore.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -94,11 +99,12 @@ const makeHarness = (args: HarnessArgs) => {
           WalletInstances,
           WalletInstances.make({
             get: (requested) =>
-              args.walletUnreachable === true
+              args.walletUnreachable === true ||
+              args.unreachableMints?.includes(requested)
                 ? Effect.fail(
                     new MintUnreachable({ mint: requested, detail: null }),
                   )
-                : Effect.succeed(wallet),
+                : Effect.succeed(wallet(requested)),
           }),
         ),
         inMemoryKeyValueStore,
@@ -130,6 +136,111 @@ const restoreAt = (mints: ReadonlyArray<MintUrl> = [mint]) =>
   });
 
 describe("Restore.restore", () => {
+  it.each([false, true])(
+    "reports a fixed total and completes every keyset attempt, including failures: %s",
+    async (fail) => {
+      const progress: RestoreProgress[] = [];
+      const { run, restoreCalls } = makeHarness({
+        keysetsForMint: (requested) =>
+          requested === mint
+            ? [
+                new Keyset(keysetHex, "sat", true, 0),
+                new Keyset(otherKeysetHex, "sat", false, 0),
+              ]
+            : [new Keyset(keysetHex, "sat", true, 0)],
+        ...(fail ? { restoreError: new Error("mint rejected keyset") } : {}),
+      });
+      const mints = [mint, MintUrl.make("https://second.example")];
+      const exit = await run(
+        Effect.gen(function* () {
+          return yield* (yield* Restore).restore(
+            new RestoreDraft({ mints }),
+            (update) => {
+              if (update.phase === "scanning" && update.completedKeysets === 0)
+                expect(restoreCalls).toHaveLength(0);
+              progress.push(update);
+            },
+          );
+        }),
+      );
+      assert(Exit.isSuccess(exit));
+      expect(progress).toEqual([
+        {
+          phase: "preparing",
+          completedKeysets: 0,
+          totalKeysets: 0,
+          totalMints: 2,
+        },
+        ...[0, 1, 2, 3].map((completedKeysets) => ({
+          phase: "scanning",
+          completedKeysets,
+          totalKeysets: 3,
+          totalMints: 2,
+        })),
+      ]);
+      expect(exit.value.unavailableMints).toEqual(fail ? mints : []);
+      expect(exit.value.scannedMints).toEqual(fail ? [] : mints);
+    },
+  );
+
+  it("continues across mints when one cannot load and counts only discovered keysets", async () => {
+    const offlineMint = MintUrl.make("https://offline.example");
+    const progress: RestoreProgress[] = [];
+    const { run } = makeHarness({ unreachableMints: [offlineMint] });
+    const exit = await run(
+      Effect.gen(function* () {
+        return yield* (yield* Restore).restore(
+          new RestoreDraft({ mints: [offlineMint, mint, mint] }),
+          (update) => progress.push(update),
+        );
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.unavailableMints).toEqual([offlineMint]);
+    expect(exit.value.scannedMints).toEqual([mint]);
+    expect(progress).toEqual([
+      {
+        phase: "preparing",
+        completedKeysets: 0,
+        totalKeysets: 0,
+        totalMints: 2,
+      },
+      {
+        phase: "scanning",
+        completedKeysets: 0,
+        totalKeysets: 1,
+        totalMints: 2,
+      },
+      {
+        phase: "scanning",
+        completedKeysets: 1,
+        totalKeysets: 1,
+        totalMints: 2,
+      },
+    ]);
+  });
+
+  it("reports no scan total when mint discovery fails", async () => {
+    const progress: RestoreProgress[] = [];
+    const { run } = makeHarness({ walletUnreachable: true });
+    const exit = await run(
+      Effect.gen(function* () {
+        return yield* (yield* Restore).restore(
+          new RestoreDraft({ mints: [mint] }),
+          (update) => progress.push(update),
+        );
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.unavailableMints).toEqual([mint]);
+    expect(progress.at(-1)).toEqual({
+      phase: "scanning",
+      completedKeysets: 0,
+      totalKeysets: 0,
+      totalMints: 1,
+    });
+  });
+
   it("recovers signed proofs as available and moves cursor and counter past them", async () => {
     const { run, restoreCalls } = makeHarness({
       signed: [
@@ -341,6 +452,7 @@ describe("Restore.restore", () => {
 describe("Restore.restoreAndReclaim", () => {
   it("swaps only newly discovered proofs, preserves every known state, and does not swap them twice", async () => {
     const received: string[] = [];
+    const progress: RestoreProgress[] = [];
     const knownStates: ReadonlyArray<ProofState> = [
       "available",
       "held",
@@ -357,6 +469,12 @@ describe("Restore.restoreAndReclaim", () => {
         { slot: 5, proof: proof(4, "newly-found") },
       ],
       receive: async (text) => {
+        expect(progress.at(-1)).toEqual({
+          phase: "refreshing",
+          completedKeysets: 1,
+          totalKeysets: 1,
+          totalMints: 1,
+        });
         received.push(text);
         return [proof(2, "fresh-two"), proof(1, "fresh-one")];
       },
@@ -368,6 +486,7 @@ describe("Restore.restoreAndReclaim", () => {
         const restore = yield* Restore;
         const first = yield* restore.restoreAndReclaim(
           new RestoreDraft({ mints: [mint] }),
+          (update) => progress.push(update),
         );
         const second = yield* restore.restoreAndReclaim(
           new RestoreDraft({ mints: [mint] }),
