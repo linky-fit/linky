@@ -21,6 +21,7 @@ COPY apps/web-app/package.json apps/web-app/
 COPY packages/config/package.json packages/config/
 COPY packages/identity/package.json packages/identity/
 COPY packages/linkshu/package.json packages/linkshu/
+COPY packages/linksync/package.json packages/linksync/
 COPY packages/linkstr/package.json packages/linkstr/
 COPY packages/linkstr-react/package.json packages/linkstr-react/
 COPY tools/nostr-error-tracker/package.json tools/nostr-error-tracker/

@@ -1,0 +1,32 @@
+{
+  "name": "@linky/linksync",
+  "private": true,
+  "version": "0.1.0",
+  "license": "0BSD",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./evolu": "./src/evolu/index.ts"
+  },
+  "scripts": {
+    "eslint": "eslint --fix .",
+    "prettier": "prettier --write .",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@evolu/common": "^7.4.1",
+    "@linky/linkshu": "workspace:*",
+    "effect": "^3.19.19"
+  },
+  "devDependencies": {
+    "@linky/config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

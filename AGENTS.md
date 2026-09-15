@@ -40,7 +40,7 @@ IMPORTANT: When you make or change an architectural decision, document it in `do
 
 ## Package docs
 
-`packages/linkshu/docs/` and `packages/linkstr/docs/` hold usage guides for the two libraries (linkstr-react is documented in `packages/linkstr/docs/react.md`). Read the relevant guide before using or changing a package, and follow the package's `AGENTS.md`: a change to an exported surface or documented behavior updates the matching guide in the same commit.
+`packages/linkshu/docs/`, `packages/linkstr/docs/`, and `packages/linksync/docs/` hold usage guides for the three libraries (linkstr-react is documented in `packages/linkstr/docs/react.md`; linksync's scope table in `packages/linksync/docs/concepts.md` is the source of truth for owner types, rotation rules, and forget policies). Read the relevant guide before using or changing a package, and follow the package's `AGENTS.md`: a change to an exported surface or documented behavior updates the matching guide in the same commit.
 
 ## Inspector events
 

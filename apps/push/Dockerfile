@@ -11,6 +11,7 @@ COPY apps/site/package.json apps/site/package.json
 COPY apps/web-app/package.json apps/web-app/package.json
 COPY packages/identity/package.json packages/identity/package.json
 COPY packages/linkshu/package.json packages/linkshu/package.json
+COPY packages/linksync/package.json packages/linksync/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/linkstr/package.json packages/linkstr/package.json
 COPY packages/linkstr-react/package.json packages/linkstr-react/package.json

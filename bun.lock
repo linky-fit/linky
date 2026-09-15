@@ -246,6 +246,23 @@
         "react": "^19.2.3",
       },
     },
+    "packages/linksync": {
+      "name": "@linky/linksync",
+      "version": "0.1.0",
+      "dependencies": {
+        "@evolu/common": "^7.4.1",
+        "@linky/linkshu": "workspace:*",
+        "effect": "^3.19.19",
+      },
+      "devDependencies": {
+        "@linky/config": "workspace:*",
+        "@types/node": "^24.10.1",
+        "eslint": "^9.39.1",
+        "prettier": "^3.4.2",
+        "typescript": "~5.9.3",
+        "vitest": "^4.0.18",
+      },
+    },
     "tools/nostr-error-tracker": {
       "name": "@linky/nostr-error-tracker",
       "version": "0.1.0",
@@ -696,6 +713,8 @@
     "@linky/linkstr": ["@linky/linkstr@workspace:packages/linkstr"],
 
     "@linky/linkstr-react": ["@linky/linkstr-react@workspace:packages/linkstr-react"],
+
+    "@linky/linksync": ["@linky/linksync@workspace:packages/linksync"],
 
     "@linky/native-shell": ["@linky/native-shell@workspace:apps/native-shell"],
 
