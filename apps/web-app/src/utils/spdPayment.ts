@@ -424,11 +424,8 @@ const openSpdPaymentOnAndroid = async (spdPayload: string): Promise<void> => {
 
   const params = new URLSearchParams({
     data: spdPayload,
-    disposition: "inline",
-    filename: SPAYD_FILENAME,
-    type: SPAYD_MIME_TYPE,
   });
-  const url = new URL("platba.spayd", window.location.href);
+  const url = new URL("/platba.spayd", window.location.href);
   url.search = params.toString();
 
   window.location.assign(url.toString());

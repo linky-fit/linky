@@ -14,6 +14,7 @@ const LOCAL_STACK_SPECS = [
   "**/linkshu-migration.spec.ts",
   "**/password-manager-save.spec.ts",
   "**/profile-tilt-permission.spec.ts",
+  "**/spayd-response.spec.ts",
 ];
 
 export default defineConfig({

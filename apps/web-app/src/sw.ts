@@ -205,28 +205,17 @@ function buildNotificationTitle(
     : (envelope.title ?? "Linky");
 }
 
-function sanitizeSpaydFilename(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
 function createSpaydResponse(url: URL): Response {
   const payload = url.searchParams.get("data") || "";
-  const type =
-    url.searchParams.get("type") || "application/x-shortpaymentdescriptor";
-  const filename = sanitizeSpaydFilename(
-    url.searchParams.get("filename") || "platba.spayd",
-  );
-  const disposition =
-    url.searchParams.get("disposition") === "attachment"
-      ? "attachment"
-      : "inline";
 
   return new Response(payload, {
     status: 200,
     headers: {
       "Cache-Control": "no-store",
-      "Content-Disposition": `${disposition}; filename="${filename}"`,
-      "Content-Type": `${type}; charset=utf-8`,
+      "Content-Disposition": 'inline; filename="platba.spayd"',
+      "Content-Type": "application/x-shortpaymentdescriptor; charset=utf-8",
+      "Content-Security-Policy": "default-src 'none'; sandbox allow-downloads",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
@@ -431,7 +420,8 @@ registerRoute(
 );
 
 registerRoute(
-  ({ url }) => url.pathname.endsWith("/platba.spayd"),
+  ({ url }) =>
+    url.origin === self.location.origin && url.pathname === "/platba.spayd",
   async ({ url }) => createSpaydResponse(url),
 );
 
