@@ -150,10 +150,7 @@ interface UseProfileAuthDomainResult {
   pickPendingOnboardingPhoto: () => Promise<void>;
   requestPasteNostrKeys: () => Promise<void>;
   requestLogout: () => void;
-  savePendingOnboardingBackupToPasswordManager: (
-    username: string,
-    password: string,
-  ) => Promise<void>;
+  savePendingOnboardingBackupToPasswordManager: () => Promise<void>;
   seedMnemonic: string | null;
   cyclePendingOnboardingAvatarControl: (
     controlId: AvatarEditorControlId,
@@ -849,8 +846,8 @@ export const useProfileAuthDomain = ({
     updatePendingOnboardingProfile,
   ]);
 
-  const savePendingOnboardingBackupToPasswordManager = React.useCallback(
-    async (username: string, password: string) => {
+  const savePendingOnboardingBackupToPasswordManager =
+    React.useCallback(async () => {
       if (onboardingIsBusy) return;
       if (!onboardingStep || onboardingStep.kind !== "profile") return;
 
@@ -858,15 +855,12 @@ export const useProfileAuthDomain = ({
       try {
         await triggerPasswordManagerSeedSave({
           displayName: onboardingStep.name,
-          password,
-          username,
+          password: onboardingStep.slip39Seed,
         });
       } finally {
         setOnboardingIsBusy(false);
       }
-    },
-    [onboardingIsBusy, onboardingStep],
-  );
+    }, [onboardingIsBusy, onboardingStep]);
 
   const openReturningOnboarding = React.useCallback(() => {
     if (onboardingIsBusy) return;

@@ -1,3 +1,4 @@
+import { deriveNostrKeysFromSlip39 } from "../utils/slip39Nostr";
 import { isNativePlatform } from "./runtime";
 
 interface PasswordCredentialDataLike {
@@ -18,7 +19,6 @@ interface PasswordCredentialConstructorLike {
 interface TriggerPasswordManagerSeedSaveParams {
   displayName: string;
   password: string;
-  username: string;
 }
 
 export type PasswordManagerSaveResult = "failed" | "saved" | "unsupported";
@@ -38,7 +38,6 @@ const getPasswordCredentialConstructor =
 export const triggerPasswordManagerSeedSave = async ({
   displayName,
   password,
-  username,
 }: TriggerPasswordManagerSeedSaveParams): Promise<PasswordManagerSaveResult> => {
   if (isNativePlatform()) return "unsupported";
   if (typeof window === "undefined") return "unsupported";
@@ -50,13 +49,15 @@ export const triggerPasswordManagerSeedSave = async ({
   if (!navigator.credentials?.store) return "unsupported";
 
   const normalizedPassword = password.trim();
-  const normalizedUsername = username.trim();
   const normalizedDisplayName = displayName.trim();
-  if (!normalizedPassword || !normalizedUsername) return "failed";
+  if (!normalizedPassword) return "failed";
 
   try {
+    const identity = await deriveNostrKeysFromSlip39(normalizedPassword);
+    if (!identity) return "failed";
+
     const credential = new PasswordCredentialCtor({
-      id: normalizedUsername,
+      id: `linky.seed:${identity.npub}`,
       ...(normalizedDisplayName ? { name: normalizedDisplayName } : {}),
       password: normalizedPassword,
     });

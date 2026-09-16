@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { NOSTR_SLIP39_SEED_STORAGE_KEY } from "../src/utils/constants";
+import { deriveNostrKeysFromSlip39 } from "../src/utils/slip39Nostr";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { addContactByNpub } from "./helpers/contacts";
 import { watchAppErrors } from "./helpers/diagnostics";
@@ -42,6 +43,10 @@ for (const serviceWorkers of ["allow", "block"] as const) {
                     ) + 1,
                   ),
                 );
+                sessionStorage.setItem(
+                  "e2e.saved-credential-id",
+                  credential.id,
+                );
                 if (result === "failed")
                   throw new Error("Password manager rejected save");
                 sessionStorage.setItem(
@@ -72,6 +77,19 @@ for (const serviceWorkers of ["allow", "block"] as const) {
           NOSTR_SLIP39_SEED_STORAGE_KEY,
         );
         if (!seed) throw new Error("Signup did not persist its recovery seed");
+        const identity = await deriveNostrKeysFromSlip39(seed);
+        if (!identity)
+          throw new Error("Signup seed did not derive an identity");
+        const assertCredentialId = async () => {
+          expect(
+            await page.evaluate(() =>
+              sessionStorage.getItem("e2e.saved-credential-id"),
+            ),
+          ).toBe(
+            saveResult === "unsupported" ? null : `linky.seed:${identity.npub}`,
+          );
+        };
+        await assertCredentialId();
         const assertNoSeedRequests = () => {
           expect(
             requests.filter(
@@ -120,6 +138,7 @@ for (const serviceWorkers of ["allow", "block"] as const) {
           ).toBe(true);
         }
         assertNoSeedRequests();
+        await assertCredentialId();
 
         if (serviceWorkers === "allow" && saveResult === "saved") {
           const contact = await createSeedIdentity();

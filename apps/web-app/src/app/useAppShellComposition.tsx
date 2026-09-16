@@ -1220,13 +1220,11 @@ export const useAppShellComposition = ({
   const saveSeedToPasswordManager =
     async (): Promise<PasswordManagerSaveResult> => {
       const password = (slip39Seed ?? "").trim();
-      const username = (effectiveProfileName ?? currentNpub ?? "").trim();
-      if (!password || !username) return "failed";
+      if (!password) return "failed";
 
       return triggerPasswordManagerSeedSave({
-        displayName: username,
+        displayName: effectiveProfileName ?? currentNpub ?? "",
         password,
-        username,
       });
     };
 

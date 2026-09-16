@@ -39,10 +39,7 @@ type UnauthenticatedLayoutProps = {
   onPendingOnboardingPhotoSelected: (dataUrl: string) => void;
   pasteReturningSlip39FromClipboard: () => Promise<void>;
   pickPendingOnboardingPhoto: () => Promise<void>;
-  savePendingOnboardingBackupToPasswordManager: (
-    username: string,
-    password: string,
-  ) => Promise<void>;
+  savePendingOnboardingBackupToPasswordManager: () => Promise<void>;
   selectPendingOnboardingGeneratedAvatar: () => void;
   selectReturningSlip39Suggestion: (value: string) => void;
   setReturningSlip39Input: (value: string) => void;
@@ -428,12 +425,7 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
     const submitProfile = async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
-      const username = profile.name.trim();
-      const password = profile.slip39Seed;
-
-      if (username && password) {
-        await savePendingOnboardingBackupToPasswordManager(username, password);
-      }
+      await savePendingOnboardingBackupToPasswordManager();
 
       await confirmPendingOnboardingProfile();
     };
