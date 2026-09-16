@@ -260,6 +260,7 @@ Architectural decisions and behavioral constraints for Linky. Keep this file up 
 ## Native shells (`apps/native-shell/`)
 
 - Native packaging uses a separate Capacitor shell in `apps/native-shell/` so Android/iOS project files stay isolated from the web app source tree
+- Android builds set `android:allowBackup="false"` in the shared application manifest to opt out of Android app backups in both debug and release builds.
 - Native shells now load bundled `apps/web-app/dist` assets by default; Capacitor live reload must be enabled explicitly via `LINKY_CAP_SERVER_URL` / `CAP_SERVER_URL` before `cap sync` / `cap open`, preventing packaged APKs from pointing at `127.0.0.1`
 - Android debug builds install side-by-side as package `fit.linky.app.debug` with launcher label `Linky Dev`, so they can coexist with the production app already installed on a phone; the Google Services plugin is applied to debug-only builds only when `google-services.json` has a `fit.linky.app.debug` client, otherwise native FCM push stays disabled there
 - Android release AAB builds derive `versionName` from the workspace `package.json` version and derive `versionCode` from semantic version components (`major * 10000 + minor * 100 + patch`), with optional `LINKY_ANDROID_VERSION_NAME` / `LINKY_ANDROID_VERSION_CODE` overrides for special releases
