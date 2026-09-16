@@ -69,7 +69,7 @@ Always go through `parseMintUrl` (or `MintUrl.make` on already-normalized input)
 
 `Validation` checks stored proofs rather than the seen set. Explicit `RestoreDraft.mints` also bypasses the seen set; Linky's PWA supplies its own restore candidates. `Restore.wipeSeedBoundState` leaves the seen set alone. Restore defaults to `knownMints` when you pass no `mints`.
 
-Successful wallet loads are cached for the runtime's lifetime; a failed load is evicted so the next call retries.
+Successful wallet loads are cached for the runtime's lifetime; a failed load is evicted so the next call retries. Wallet loading propagates keyset verification and ID-mapping errors as `MintRejected`; there is no fallback that accepts the rejected keys. cashu-ts 4.5.1 discards invalid keys during initial loading and rejects them when an operation requests that keyset. A mint with only inactive keysets can still load for restore. Inactive keysets load verified keys on demand when old proofs or restore need them. Mints must serve keys matching their advertised IDs before affected operations can proceed.
 
 ### Icons (`mint/icons.ts`)
 

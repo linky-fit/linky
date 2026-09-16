@@ -1,250 +1,118 @@
-import type {
-  GetInfoResponse,
-  GetKeysResponse,
-  GetKeysetsResponse,
-  KeyChainCache,
-} from "@cashu/cashu-ts";
-import type { CashuWalletOptions } from "./loadWallet";
-import {
-  isKeysetVerificationError,
-  loadWallet,
-  pickPreferredMintKeyset,
-} from "./loadWallet";
+import { deriveKeysetId, Mint, Wallet } from "@cashu/cashu-ts";
+import type { GetInfoResponse, MintKeys, MintKeyset } from "@cashu/cashu-ts";
+import { loadWallet } from "./loadWallet";
 
-describe("isKeysetVerificationError", () => {
-  it("matches short keyset id mapping failures", () => {
-    expect(
-      isKeysetVerificationError(
-        new Error(
-          "A short keyset ID v2 was encountered, but got no keysets to map it to.",
-        ),
-      ),
-    ).toBe(true);
-    expect(
-      isKeysetVerificationError(
-        "Couldn't map short keyset ID 00ff to any known keysets of the current Mint",
-      ),
-    ).toBe(true);
-  });
+const mintUrl = "https://mint.example";
+const keys = {
+  "1": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+};
+const otherKeys = {
+  "1": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+};
+const info: GetInfoResponse = {
+  name: "Test mint",
+  pubkey: keys["1"],
+  version: "test",
+  contact: [],
+  nuts: {
+    "4": { methods: [], disabled: false },
+    "5": { methods: [], disabled: false },
+  },
+};
 
-  it("keeps matching legacy keyset verification failures", () => {
-    expect(
-      isKeysetVerificationError(
-        new Error("Couldn't verify keyset id for mint keys"),
-      ),
-    ).toBe(true);
-    expect(
-      isKeysetVerificationError(
-        new Error("Couldn't verify keyset ID 01884a74bb2fc5ee"),
-      ),
-    ).toBe(true);
-  });
-
-  it("ignores unrelated cashu failures", () => {
-    expect(
-      isKeysetVerificationError(
-        new Error("Mint keys for keyset are unavailable"),
-      ),
-    ).toBe(false);
-    expect(isKeysetVerificationError(new Error("Mint quote timeout"))).toBe(
-      false,
-    );
-  });
+const keyset = (versionByte: number): MintKeyset => ({
+  id: deriveKeysetId(keys, { versionByte }),
+  active: true,
+  unit: "sat",
+  input_fee_ppk: 0,
 });
 
-describe("pickPreferredMintKeyset", () => {
-  it("prefers the lowest-fee active hex keyset for the requested unit", () => {
-    const keyset = pickPreferredMintKeyset(
-      [
-        {
-          active: true,
-          id: "base64-keyset",
-          input_fee_ppk: 1,
-          unit: "sat",
-        },
-        {
-          active: true,
-          id: "01bbbb",
-          input_fee_ppk: 200,
-          unit: "sat",
-        },
-        {
-          active: true,
-          id: "01aaaa",
-          input_fee_ppk: 100,
-          unit: "sat",
-        },
-        {
-          active: true,
-          id: "01cccc",
-          input_fee_ppk: 50,
-          unit: "msat",
-        },
-        {
-          active: false,
-          id: "01dddd",
-          input_fee_ppk: 0,
-          unit: "sat",
-        },
-      ],
-      "sat",
-    );
-
-    expect(keyset?.id).toBe("01aaaa");
+const serveMint = (metadata: MintKeyset[], servedKeys: MintKeys[]) => {
+  vi.spyOn(Mint.prototype, "getInfo").mockResolvedValue(info);
+  vi.spyOn(Mint.prototype, "getKeySets").mockResolvedValue({
+    keysets: metadata,
   });
-
-  it("returns null when no compatible keyset exists", () => {
-    expect(
-      pickPreferredMintKeyset(
-        [
-          {
-            active: false,
-            id: "01aaaa",
-            input_fee_ppk: 100,
-            unit: "sat",
-          },
-        ],
-        "sat",
-      ),
-    ).toBeNull();
+  return vi.spyOn(Mint.prototype, "getKeys").mockResolvedValue({
+    keysets: servedKeys,
   });
-});
+};
+
+const load = () => loadWallet({ Mint, Wallet, mintUrl, unit: " sat " });
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("loadWallet", () => {
-  it("loads fallback keys for all compatible keysets", async () => {
-    const mintInfo: GetInfoResponse = {
-      name: "Test mint",
-      pubkey: "02" + "ab".repeat(32),
-      version: "Nutshell/0.16.0",
-      contact: [],
-      nuts: {
-        "4": { methods: [], disabled: false },
-        "5": { methods: [], disabled: false },
-      },
-    };
-    const activeKeys = { "1": "02aa", "2": "02bb" };
-    const legacyKeys = { "128": "03cc" };
+  it.each([0, 1])("loads verified version %i mint keys", async (version) => {
+    const metadata = keyset(version);
+    serveMint([metadata], [{ ...metadata, keys }]);
 
-    const getKeysCalls: Array<string | undefined> = [];
-    class FakeMint {
-      readonly mintUrl: string;
+    const wallet = await load();
 
-      constructor(mintUrl: string) {
-        this.mintUrl = mintUrl;
-      }
+    expect(wallet.keysetId).toBe(metadata.id);
+    expect(wallet.unit).toBe("sat");
+    expect(wallet.getKeyset().keys).toEqual(keys);
+    expect(wallet.getMintInfo().name).toBe(info.name);
+  });
 
-      getInfo(): Promise<GetInfoResponse> {
-        return Promise.resolve(mintInfo);
-      }
+  it.each([0, 1])("cannot use substituted version %i keys", async (version) => {
+    const metadata = keyset(version);
+    serveMint([metadata], [{ ...metadata, keys: otherKeys }]);
+    const primeFromCache = vi.spyOn(Wallet.prototype, "loadMintFromCache");
 
-      getKeySets(): Promise<GetKeysetsResponse> {
-        return Promise.resolve({
-          keysets: [
-            {
-              active: true,
-              id: "01884a74bb2fc5ee",
-              input_fee_ppk: 10,
-              unit: "sat",
-            },
-            {
-              active: false,
-              id: "009a1f293253e41e",
-              input_fee_ppk: 10,
-              unit: "sat",
-            },
-          ],
-        });
-      }
+    const wallet = await load();
+    expect(() => wallet.getKeyset()).toThrow();
+    await expect(wallet.keyChain.ensureKeysetKeys(metadata.id)).rejects.toThrow(
+      "Keyset verification failed",
+    );
+    expect(wallet.keyChain.getKeyset(metadata.id).hasKeys).toBe(false);
+    expect(primeFromCache).not.toHaveBeenCalled();
+  });
 
-      getKeys(keysetId?: string): Promise<GetKeysResponse> {
-        getKeysCalls.push(keysetId);
-        if (keysetId === "01884a74bb2fc5ee") {
-          return Promise.resolve({
-            keysets: [
-              {
-                active: true,
-                id: "01884a74bb2fc5ee",
-                keys: activeKeys,
-                unit: "sat",
-              },
-            ],
-          });
-        }
-        if (keysetId === "009a1f293253e41e") {
-          return Promise.resolve({
-            keysets: [
-              {
-                active: false,
-                id: "009a1f293253e41e",
-                keys: legacyKeys,
-                unit: "sat",
-              },
-            ],
-          });
-        }
-        return Promise.resolve({ keysets: [] });
-      }
-    }
+  it.each([
+    "Couldn't verify keyset ID 01884a74bb2fc5ee",
+    "A short keyset ID v2 was encountered, but got no keysets to map it to.",
+    "Couldn't map short keyset ID 00ff to any known keysets of the current Mint",
+    "Keyset verification failed for ID 00ff",
+    "fetch failed",
+  ])("propagates %s without a cache fallback", async (message) => {
+    const error = new Error(message);
+    vi.spyOn(Wallet.prototype, "loadMint").mockRejectedValue(error);
+    const primeFromCache = vi.spyOn(Wallet.prototype, "loadMintFromCache");
+    const mintInfo = vi
+      .spyOn(Mint.prototype, "getInfo")
+      .mockRejectedValue(new Error("must not fetch fallback data"));
 
-    const cacheCalls: Array<{
-      mintInfo: GetInfoResponse;
-      cache: KeyChainCache;
-    }> = [];
-    const bindCalls: Array<string> = [];
-    class FakeWallet {
-      readonly mint: FakeMint;
-      readonly options: CashuWalletOptions;
+    await expect(load()).rejects.toBe(error);
+    expect(primeFromCache).not.toHaveBeenCalled();
+    expect(mintInfo).not.toHaveBeenCalled();
+  });
 
-      constructor(mint: FakeMint, options: CashuWalletOptions) {
-        this.mint = mint;
-        this.options = options;
-      }
+  it("preserves restore access when the mint has only inactive keysets", async () => {
+    const inactive = { ...keyset(0), active: false };
+    const getKeys = serveMint([inactive], []);
+    const wallet = await load();
+    getKeys.mockResolvedValue({ keysets: [{ ...inactive, keys }] });
 
-      loadMint(): Promise<void> {
-        return Promise.reject(
-          new Error("Couldn't verify keyset ID 01884a74bb2fc5ee"),
-        );
-      }
+    const restored = await wallet.keyChain.ensureKeysetKeys(inactive.id);
+    expect(restored.verify()).toBe(true);
+    expect(restored.keys).toEqual(keys);
+  });
 
-      loadMintFromCache(info: GetInfoResponse, cache: KeyChainCache): void {
-        cacheCalls.push({ mintInfo: info, cache });
-      }
+  it("verifies inactive keysets when loading their keys for old proofs", async () => {
+    const active = keyset(1);
+    const inactive = { ...keyset(0), active: false };
+    const getKeys = serveMint([active, inactive], [{ ...active, keys }]);
+    const wallet = await load();
+    getKeys.mockResolvedValue({ keysets: [{ ...inactive, keys: otherKeys }] });
 
-      bindKeyset(id: string): void {
-        bindCalls.push(id);
-      }
-    }
+    await expect(wallet.keyChain.ensureKeysetKeys(inactive.id)).rejects.toThrow(
+      "Keyset verification failed",
+    );
+    expect(wallet.keyChain.getKeyset(inactive.id).hasKeys).toBe(false);
 
-    await loadWallet({
-      Mint: FakeMint,
-      Wallet: FakeWallet,
-      mintUrl: "https://mint.example",
-      unit: "sat",
-    });
-
-    expect(getKeysCalls).toContain("01884a74bb2fc5ee");
-    expect(getKeysCalls).toContain("009a1f293253e41e");
-    expect(cacheCalls).toHaveLength(1);
-    expect(cacheCalls[0]?.mintInfo).toBe(mintInfo);
-    expect(cacheCalls[0]?.cache).toEqual({
-      mintUrl: "https://mint.example",
-      keysets: [
-        {
-          active: true,
-          id: "01884a74bb2fc5ee",
-          input_fee_ppk: 10,
-          keys: activeKeys,
-          unit: "sat",
-        },
-        {
-          active: false,
-          id: "009a1f293253e41e",
-          input_fee_ppk: 10,
-          keys: legacyKeys,
-          unit: "sat",
-        },
-      ],
-    });
-    expect(bindCalls).toEqual(["01884a74bb2fc5ee"]);
+    getKeys.mockResolvedValue({ keysets: [{ ...inactive, keys }] });
+    const restored = await wallet.keyChain.ensureKeysetKeys(inactive.id);
+    expect(restored.keys).toEqual(keys);
+    expect(restored.verify()).toBe(true);
   });
 });
