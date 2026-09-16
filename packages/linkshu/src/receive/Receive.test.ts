@@ -1,5 +1,5 @@
 import type { Proof } from "@cashu/cashu-ts";
-import { getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
+import { getEncodedToken, Keyset, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import {
   CurrencyUnit,
@@ -42,6 +42,8 @@ const outputsAlreadySigned = () =>
 
 interface FakeWalletArgs {
   keysetId?: string;
+  /** The mint's keysets as the wallet knows them; none (fee-free) by default. */
+  keysets?: Keyset[];
   receive: (counter: number) => Promise<Proof[]>;
   restore?: () => Promise<{
     proofs: Proof[];
@@ -54,6 +56,7 @@ const makeWallet = (args: FakeWalletArgs) => {
   const restoreCalls: Array<{ start: number; count: number }> = [];
   const wallet = fakeWallet({
     keysetId: args.keysetId ?? KEYSET_HEX,
+    keyChain: { getKeysets: () => args.keysets ?? [] },
     receive: (_token, _config, outputType) => {
       const counter =
         outputType?.type === "deterministic" ? outputType.counter : -1;
@@ -237,6 +240,53 @@ describe("Receive.receive", () => {
     expect(exit.value.proofs).toEqual([]);
     expect(exit.value.operations).toEqual([]);
     expect(receiveCounters).toEqual([]);
+  });
+
+  it("refuses a token the mint's input fee would consume, before calling the mint", async () => {
+    // 100 ppk: swapping one proof costs 1 sat, so a 1-sat token nets nothing.
+    const { wallet, receiveCounters } = makeWallet({
+      keysets: [new Keyset(KEYSET_HEX, "sat", true, 100)],
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet);
+    const dust = getEncodedToken({
+      mint,
+      unit: "sat",
+      proofs: [proof(1, "dust")],
+    });
+
+    const exit = await run(receiveAndInspect(dust));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "AmountConsumedByFee",
+      mint,
+      amount: 1,
+      fee: 1,
+    });
+    expect(exit.value.proofs).toEqual([]);
+    expect(exit.value.operations).toEqual([]);
+    expect(receiveCounters).toEqual([]);
+  });
+
+  it("charges the fee per proof and lets a token through that nets something", async () => {
+    // Two proofs at 100 ppk cost 1 sat together; the token is worth 2.
+    const { wallet, receiveCounters } = makeWallet({
+      keysets: [new Keyset(KEYSET_HEX, "sat", true, 100)],
+      receive: () => Promise.resolve([proof(1, "rcv")]),
+    });
+    const { run } = makeHarness(wallet);
+    const token = getEncodedToken({
+      mint,
+      unit: "sat",
+      proofs: [proof(1, "a"), proof(1, "b")],
+    });
+
+    const exit = await run(receiveAndInspect(token));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    expect(exit.value.receipt.right.amount).toBe(1);
+    expect(receiveCounters).toHaveLength(1);
   });
 
   it("dedupes a second receive of the same token text", async () => {

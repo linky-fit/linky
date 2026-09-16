@@ -30,6 +30,15 @@ const describeInsufficientFunds = (error: object): string => {
     : "Insufficient funds";
 };
 
+/** `fee` is the floor the amount has to exceed for the mint to sign anything. */
+const describeAmountConsumedByFee = (error: object): string => {
+  const amount = readAmountField(error, "amount");
+  const fee = readAmountField(error, "fee");
+  return amount !== null && fee !== null
+    ? `Amount too small to cover the mint fee (amount ${amount}, fee ${fee})`
+    : "Amount too small to cover the mint fee";
+};
+
 /** Human text for a live or parsed tagged cashu error; null for unknown shapes. */
 export const describeTaggedCashuError = (error: unknown): string | null => {
   if (typeof error !== "object" || error === null) return null;
@@ -49,6 +58,8 @@ export const describeTaggedCashuError = (error: unknown): string | null => {
       return "Wallet is busy in another window, try again";
     case "InsufficientFunds":
       return describeInsufficientFunds(error);
+    case "AmountConsumedByFee":
+      return describeAmountConsumedByFee(error);
     case "PaymentFailed":
       return withDetail("Lightning payment failed", detail);
     case "PaymentPending":

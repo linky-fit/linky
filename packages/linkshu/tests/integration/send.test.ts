@@ -132,6 +132,43 @@ describe("send vertical against the local mint", () => {
     });
   });
 
+  it("refuses an amount the recipient's input fee would consume, keeping the balance", async () => {
+    const funded = await fundToken(8);
+    const { funding, refused, proofs } = await runLinkshu(
+      { bip39Seed: randomSeed() },
+      Effect.gen(function* () {
+        const receive = yield* Receive;
+        const send = yield* Send;
+        const funding = yield* receive.receive(
+          new ReceiveDraft({ text: funded }),
+        );
+        // 100 ppk: a 1-sat token would cost its recipient 1 sat to redeem.
+        const refused = yield* Effect.flip(
+          send.send(
+            new SendDraft({
+              mint: mintUrl,
+              amount: Amount.make(1),
+              produceAs: "issued",
+            }),
+          ),
+        );
+        return {
+          funding,
+          refused,
+          proofs: yield* (yield* ProofStore).loadAll,
+        };
+      }),
+    );
+
+    expect(refused).toMatchObject({
+      _tag: "AmountConsumedByFee",
+      mint: mintUrl,
+      amount: 1,
+      fee: inputFee(1),
+    });
+    expect(availableTotalOf(proofs)).toBe(funding.amount);
+  });
+
   it("excludes NUT-07 spent proofs before sending and marks them spent", async () => {
     // Proofs another wallet already claimed: spent at the mint.
     const stale = await fundProofs(4);

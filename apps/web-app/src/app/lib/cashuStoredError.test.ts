@@ -48,6 +48,17 @@ describe("describeTaggedCashuError", () => {
       "Insufficient funds",
     );
     expect(
+      describeTaggedCashuError({
+        _tag: "AmountConsumedByFee",
+        mint: "m",
+        amount: 1,
+        fee: 1,
+      }),
+    ).toBe("Amount too small to cover the mint fee (amount 1, fee 1)");
+    expect(describeTaggedCashuError({ _tag: "AmountConsumedByFee" })).toBe(
+      "Amount too small to cover the mint fee",
+    );
+    expect(
       describeTaggedCashuError({ _tag: "TokenAlreadyKnown", rowId: "r" }),
     ).toBe("Token is already in the wallet");
     expect(describeTaggedCashuError({ _tag: "OperationNotFound" })).toBe(

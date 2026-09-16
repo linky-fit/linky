@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import {
+  AmountConsumedByFee,
   CounterLockTimeout,
   MintRejected,
   MintUnreachable,
@@ -38,6 +39,7 @@ export class ReceiveReceipt extends Schema.Class<ReceiveReceipt>(
 export const ReceiveError = Schema.Union(
   TokenParseFailed,
   TokenAlreadyKnown,
+  AmountConsumedByFee,
   TokenAlreadySpent,
   MintUnreachable,
   MintRejected,

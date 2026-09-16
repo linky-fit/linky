@@ -1,15 +1,16 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
 import { Effect, Either, Schema } from "effect";
 import {
+  AmountConsumedByFee,
   MintRejected,
   TokenAlreadyKnown,
   TokenAlreadySpent,
   TokenParseFailed,
 } from "../../domain/errors";
 import type { CounterLockTimeout, MintUnreachable } from "../../domain/errors";
-import { CurrencyUnit, UnixSeconds } from "../../domain/primitives";
+import { Amount, CurrencyUnit, UnixSeconds } from "../../domain/primitives";
 import { sat } from "../../internal/units";
-import type { Amount, MintUrl, TokenText } from "../../domain/primitives";
+import type { MintUrl, TokenText } from "../../domain/primitives";
 import type { InspectorService } from "../../inspector/Inspector";
 import { recoverFromCollision } from "../../internal/collisionRecovery";
 import {
@@ -29,6 +30,7 @@ import {
   toNewProofs,
 } from "../../internal/proofs";
 import { nowSeconds } from "../../internal/time";
+import { inputFeeForProofs } from "../../mint/internal/keysetFees";
 import {
   boundKeysetId,
   classifyMintError,
@@ -46,6 +48,7 @@ import {
   extractTokenText,
   parseTokenText,
 } from "../../token/codec";
+import type { DecodedToken } from "../../token/domain";
 import { encodeCashuProofs } from "../../token/internal/cashuProofs";
 import { ReceiveError, ReceiveReceipt } from "../domain";
 
@@ -254,8 +257,8 @@ const findKnown = (
   proofs: ReadonlyArray<StoredProof>,
   tokenText: TokenText,
   replaced: StoredOperation | null,
-  /** The mint's keyset ids, so v4 text with short v2 ids decodes too. */
-  keysetIds: readonly string[],
+  /** The token's proofs, when the text decodes. */
+  decoded: DecodedToken | null,
 ): TokenAlreadyKnown | null => {
   const transfer = operations.find(
     (operation) =>
@@ -267,8 +270,6 @@ const findKnown = (
   if (transfer !== undefined) {
     return new TokenAlreadyKnown({ operationId: transfer.id });
   }
-  const decoded =
-    decodeTokenText(tokenText, keysetIds) ?? decodeTokenText(tokenText);
   if (decoded === null) return null;
   const secrets = new Set(decoded.proofs.map((proof) => proof.secret));
   const stored = proofs.find(
@@ -344,19 +345,34 @@ export const receiveTokenText = (
   Effect.gen(function* () {
     const reason = replaced?.reason ?? "receive";
     const parsed = yield* parseReceivable(text);
-    // The mint's keysets decide dedup (short v2 ids in v4 text), so a mint
-    // that will not load ends the receive before anything is recorded.
+    // The mint's keysets decide dedup (short v2 ids in v4 text) and the fee,
+    // so a mint that will not load ends the receive before anything is recorded.
     const wallet = yield* ctx.instances.get(parsed.mint, parsed.unit);
     const operations = yield* ctx.operationStore.loadAll;
     const proofs = yield* ctx.proofStore.loadAll;
+    const keysetIds = wallet.keyChain.getKeysets().map((keyset) => keyset.id);
+    const decoded =
+      decodeTokenText(parsed.tokenText, keysetIds) ??
+      decodeTokenText(parsed.tokenText);
     const known = findKnown(
       operations,
       proofs,
       parsed.tokenText,
       replaced?.operation ?? null,
-      wallet.keyChain.getKeysets().map((keyset) => keyset.id),
+      decoded,
     );
     if (known !== null) return yield* known;
+    // A swap signs what is left after the mint's input fee. A token worth no
+    // more than that fee has nothing to sign, and no wallet can redeem it on
+    // its own, so it is refused before anything is recorded.
+    const fee = inputFeeForProofs(wallet, decoded?.proofs ?? []);
+    if (parsed.amount <= fee) {
+      return yield* new AmountConsumedByFee({
+        mint: parsed.mint,
+        amount: parsed.amount,
+        fee: Amount.make(fee),
+      });
+    }
 
     const transfer =
       replaced === null

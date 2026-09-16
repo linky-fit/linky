@@ -1,6 +1,10 @@
 import { Effect } from "effect";
-import { InsufficientFunds, MintRejected } from "../domain/errors";
-import { NonNegativeAmount, UnixSeconds } from "../domain/primitives";
+import {
+  AmountConsumedByFee,
+  InsufficientFunds,
+  MintRejected,
+} from "../domain/errors";
+import { Amount, NonNegativeAmount, UnixSeconds } from "../domain/primitives";
 import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { CounterScope } from "../internal/counters";
@@ -17,6 +21,7 @@ import {
 } from "../internal/spend";
 import { nowSeconds } from "../internal/time";
 import { sat } from "../internal/units";
+import { inputFeeForAmount } from "../mint/internal/keysetFees";
 import {
   boundKeysetId,
   WalletInstances,
@@ -57,6 +62,16 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
         const wallet = yield* instances.get(draft.mint, sat);
         const keysetId = yield* boundKeysetId(draft.mint, wallet);
         const scope: CounterScope = { mint: draft.mint, unit: sat, keysetId };
+        // Whoever redeems the token pays the mint's input fee on its proofs;
+        // an amount that fee consumes would issue a token nobody can redeem.
+        const recipientFee = inputFeeForAmount(wallet, draft.amount);
+        if (draft.amount <= recipientFee) {
+          return yield* new AmountConsumedByFee({
+            mint: draft.mint,
+            amount: draft.amount,
+            fee: Amount.make(recipientFee),
+          });
+        }
         const spendContext = {
           proofStore,
           inspector,

@@ -1,5 +1,5 @@
 import type { Proof as CashuProof, SendResponse } from "@cashu/cashu-ts";
-import { MintOperationError } from "@cashu/cashu-ts";
+import { Keyset, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import {
   Amount as SendAmount,
@@ -42,7 +42,23 @@ const sourceProofs = [
 const outputsAlreadySigned = () =>
   new MintOperationError(11005, "outputs have already been signed before");
 
+const POWERS_OF_TWO = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
+
+/** The bound keyset at `inputFeePpk`, publishing keys for `denominations`. */
+const feeKeyset = (
+  inputFeePpk: number,
+  denominations: ReadonlyArray<number> = POWERS_OF_TWO,
+): Keyset => {
+  const keyset = new Keyset(KEYSET_HEX, "sat", true, inputFeePpk);
+  const keys: Record<number, string> = {};
+  for (const amount of denominations) keys[amount] = "02" + "ab".repeat(32);
+  keyset.keys = keys;
+  return keyset;
+};
+
 interface FakeWalletArgs {
+  /** The mint's keysets as the wallet knows them; none (fee-free) by default. */
+  keysets?: Keyset[];
   send?: (call: SendCall) => Promise<SendResponse>;
   /** NUT-07 state per proof secret; defaults to UNSPENT. */
   stateOf?: (secret: string) => "UNSPENT" | "PENDING" | "SPENT";
@@ -65,6 +81,7 @@ const makeWallet = (args: FakeWalletArgs) => {
   const restoreCalls: Array<{ start: number; count: number }> = [];
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
+    keyChain: { getKeysets: () => args.keysets ?? [] },
     checkProofsStates: (proofs) =>
       args.checkStatesError !== undefined
         ? Promise.reject(args.checkStatesError)
@@ -446,6 +463,60 @@ describe("Send.send", () => {
     });
     expect(sendCalls).toEqual([]);
     expect(allAvailable(exit.value.proofs)).toBe(true);
+  });
+
+  it("refuses an amount the recipient's input fee would consume, before any mint call", async () => {
+    // 100 ppk: a 1-sat token costs its recipient 1 sat to redeem.
+    const { wallet, sendCalls } = makeWallet({
+      keysets: [feeKeyset(100)],
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(sendAndInspect(draft(1)));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "AmountConsumedByFee",
+      mint,
+      amount: 1,
+      fee: 1,
+    });
+    expect(sendCalls).toEqual([]);
+    expect(exit.value.operations).toEqual([]);
+    expect(allAvailable(exit.value.proofs)).toBe(true);
+  });
+
+  it("sizes the recipient's fee by the split the bound keyset produces", async () => {
+    // 3 sats swap into 2 + 1: two proofs at 1000 ppk cost 2, leaving 1.
+    const { wallet, sendCalls } = makeWallet({
+      keysets: [feeKeyset(1000)],
+      send: () => Promise.reject(new Error("mint down")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(sendAndInspect(draft(3)));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("MintRejected");
+    expect(sendCalls.map((call) => call.amount)).toEqual([3]);
+  });
+
+  it("counts the proofs the keyset's own denominations force", async () => {
+    // Only a 1-sat key: 3 sats swap into 1 + 1 + 1, which cost 3 at 1000 ppk.
+    const { wallet, sendCalls } = makeWallet({
+      keysets: [feeKeyset(1000, [1])],
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(sendAndInspect(draft(3)));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "AmountConsumedByFee",
+      amount: 3,
+      fee: 3,
+    });
+    expect(sendCalls).toEqual([]);
   });
 
   it("maps the mint's fee-inclusive shortfall to InsufficientFunds", async () => {

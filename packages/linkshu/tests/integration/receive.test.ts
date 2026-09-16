@@ -11,6 +11,7 @@ import {
   fundProofs,
   fundToken,
   inputFee,
+  loadMintWallet,
   mintUrl,
   randomSeed,
   receiveOnce,
@@ -99,6 +100,38 @@ describe("receive vertical against the local mint", () => {
       error: null,
     });
     expect(availableTotalOf(proofs)).toBe(first.amount);
+  });
+
+  it("refuses a token the mint's input fee would consume, without touching it", async () => {
+    // 100 ppk: the single 1-sat proof costs exactly 1 sat to swap.
+    const funded = await fundProofs(1);
+    const { error, transfers, proofs } = await runLinkshu(
+      { bip39Seed: randomSeed() },
+      Effect.gen(function* () {
+        const receive = yield* Receive;
+        const tokens = yield* Tokens;
+        const failure = yield* Effect.flip(
+          receive.receive(new ReceiveDraft({ text: tokenOf(funded) })),
+        );
+        return {
+          error: failure,
+          transfers: yield* tokens.transfers,
+          proofs: yield* tokens.proofs,
+        };
+      }),
+    );
+
+    expect(error).toMatchObject({
+      _tag: "AmountConsumedByFee",
+      mint: mintUrl,
+      amount: 1,
+      fee: inputFee(1),
+    });
+    expect(transfers).toEqual([]);
+    expect(proofs).toEqual([]);
+    // Nothing was swapped: the proof is still unspent at the mint.
+    const states = await (await loadMintWallet()).checkProofsStates(funded);
+    expect(states.map((state) => state.state)).toEqual(["UNSPENT"]);
   });
 
   it("persists a spent token as a failed receive transfer", async () => {

@@ -30,13 +30,14 @@ The receipt carries `amount`, `unit`, `mint`, and the `operationId` of the `rece
 
 1. **Extract.** `extractTokenText` finds a token inside arbitrary text: bare `cashuA…`/`cashuB…`, `cashu:`/`web+cashu:`/`lightning:`/`nostr:` schemes, URLs carrying the token in a query parameter, hash, or path, and legacy cashu.me JSON bundles. Whitespace inside a token is compacted.
 2. **Dedup.** The text is known when a `send` or `receive` transfer carries it (a `failed` receive does not count — its text is free to be tried again), or when any proof secret it encodes is already in the inventory, in any state. A match fails with `TokenAlreadyKnown` and touches nothing: swapping a token whose proofs the wallet holds would kill the stored copies.
-3. **Persist `pending`.** A `receive` operation with the text is inserted before the mint is contacted.
-4. **Swap.** Under the counter lock, the proofs are swapped for fresh deterministic outputs.
-5. **Persist the proofs.** The fresh proofs are stored `available`, then the receive moves to `done`. Only now does the receipt resolve.
+3. **Check the fee.** The input fee the mint charges to swap the token's proofs (NUT-02, from each proof's keyset) must leave something to sign. A token worth no more than that fee fails with `AmountConsumedByFee` before anything is stored: no wallet can redeem it on its own.
+4. **Persist `pending`.** A `receive` operation with the text is inserted before the mint is contacted.
+5. **Swap.** Under the counter lock, the proofs are swapped for fresh deterministic outputs.
+6. **Persist the proofs.** The fresh proofs are stored `available`, then the receive moves to `done`. Only now does the receipt resolve.
 
 The package retries counter collisions at the mint automatically, so a receive on a fresh origin may take a few round-trips. If recovery fails, the last rejection surfaces as `MintRejected`.
 
-Any failure after step 3 leaves the receive `failed` with the serialized error in `error` — transient or definitive. Pasting the same text again retries it over the same operation (`Tokens.returnToWallet` on the transfer does the same); `Tokens.forget` closes it once it is not worth retrying. `Tokens.returnToWallet` on a `send` runs this same flow over the handed-out text.
+Any failure after step 4 leaves the receive `failed` with the serialized error in `error` — transient or definitive. Pasting the same text again retries it over the same operation (`Tokens.returnToWallet` on the transfer does the same); `Tokens.forget` closes it once it is not worth retrying. `Tokens.returnToWallet` on a `send` runs this same flow over the handed-out text.
 
 ## Inputs and outputs
 
@@ -58,14 +59,15 @@ Any failure after step 3 leaves the receive `failed` with the serialized error i
 
 ## Errors
 
-| Tag                  | When                                                                                                                                           | Operation left behind       | What to do                                                               |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------ |
-| `TokenParseFailed`   | no token in the text (`reason: "empty"` / `"no-token-found"`), or it does not decode or states no mint (`"undecodable"`, `detail` may explain) | none                        | tell the user                                                            |
-| `TokenAlreadyKnown`  | a transfer carries this text (`operationId`), or its proofs are already stored (`operationId` is the holding operation, or null for balance)   | the existing one, untouched | show that transfer, or the balance                                       |
-| `TokenAlreadySpent`  | the mint reported the proofs spent (code `11001`)                                                                                              | `failed`                    | nothing to recover; `Tokens.forget` closes it                            |
-| `MintRejected`       | definitive mint rejection (`code` when known), malformed swap response, or collision recovery exhausted                                        | `failed`                    | surface `detail`                                                         |
-| `MintUnreachable`    | network, timeout, 5xx while loading the mint or swapping                                                                                       | `failed`                    | you may retry later: paste again or `Tokens.returnToWallet(operationId)` |
-| `CounterLockTimeout` | another tab/process held the counter lease                                                                                                     | `failed`                    | you may retry                                                            |
+| Tag                   | When                                                                                                                                           | Operation left behind       | What to do                                                               |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------ |
+| `TokenParseFailed`    | no token in the text (`reason: "empty"` / `"no-token-found"`), or it does not decode or states no mint (`"undecodable"`, `detail` may explain) | none                        | tell the user                                                            |
+| `TokenAlreadyKnown`   | a transfer carries this text (`operationId`), or its proofs are already stored (`operationId` is the holding operation, or null for balance)   | the existing one, untouched | show that transfer, or the balance                                       |
+| `AmountConsumedByFee` | the token is worth no more than the mint's input fee for its proofs (`fee`)                                                                    | none                        | tell the user; a token has to be worth more than `fee` to be redeemable  |
+| `TokenAlreadySpent`   | the mint reported the proofs spent (code `11001`)                                                                                              | `failed`                    | nothing to recover; `Tokens.forget` closes it                            |
+| `MintRejected`        | definitive mint rejection (`code` when known), malformed swap response, or collision recovery exhausted                                        | `failed`                    | surface `detail`                                                         |
+| `MintUnreachable`     | network, timeout, 5xx while loading the mint or swapping                                                                                       | `failed`                    | you may retry later: paste again or `Tokens.returnToWallet(operationId)` |
+| `CounterLockTimeout`  | another tab/process held the counter lease                                                                                                     | `failed`                    | you may retry                                                            |
 
 ## Related
 

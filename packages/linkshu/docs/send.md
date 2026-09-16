@@ -25,11 +25,12 @@ Run it with `runLinkshu` or on your `ManagedRuntime`.
 
 ## How it works
 
-1. **Select sources.** Every `available` proof at `mint` (unit `sat`) goes into one batched NUT-07 check. Proofs the mint reports `SPENT` are marked `spent` right away — that knowledge sticks even if the send fails afterwards. Only proofs explicitly reported `UNSPENT` are offered; `PENDING`, missing, and unrecognized states stay `available` but are not offered and do not count.
-2. **Check funds.** Offered total below `amount` fails with `InsufficientFunds` before any mint write.
-3. **Swap.** Under the counter lock, `amount` is swapped out into fresh send proofs plus change. Counter collisions are retried by the package, as in [receive.md](./receive.md).
-4. **Persist the send.** A `send` operation in the `produceAs` status is inserted with the token text, then the send proofs are stored `handedOut` under it.
-5. **Persist change, then retire inputs.** Fresh change is stored `available` (`send-change`); only then are the consumed inputs marked `spent`. Offered proofs the swap passed through untouched stay `available`. Funds are never outside the store, even if the process dies mid-flow.
+1. **Check the amount.** Whoever redeems the token pays the mint's input fee on its proofs (NUT-02). `amount` has to exceed the fee of the split the swap produces from the bound keyset's published denominations; otherwise `AmountConsumedByFee`, before any mint call.
+2. **Select sources.** Every `available` proof at `mint` (unit `sat`) goes into one batched NUT-07 check. Proofs the mint reports `SPENT` are marked `spent` right away — that knowledge sticks even if the send fails afterwards. Only proofs explicitly reported `UNSPENT` are offered; `PENDING`, missing, and unrecognized states stay `available` but are not offered and do not count.
+3. **Check funds.** Offered total below `amount` fails with `InsufficientFunds` before any mint write.
+4. **Swap.** Under the counter lock, `amount` is swapped out into fresh send proofs plus change. Counter collisions are retried by the package, as in [receive.md](./receive.md).
+5. **Persist the send.** A `send` operation in the `produceAs` status is inserted with the token text, then the send proofs are stored `handedOut` under it.
+6. **Persist change, then retire inputs.** Fresh change is stored `available` (`send-change`); only then are the consumed inputs marked `spent`. Offered proofs the swap passed through untouched stay `available`. Funds are never outside the store, even if the process dies mid-flow.
 
 ### Choosing `produceAs`
 
@@ -46,7 +47,7 @@ If delivery fails, check the result of `Tokens.returnToWallet`: recovery is atte
 
 ### Fees
 
-Sends are exact-amount: the recipient receives `amount`. The mint's cashu input fee comes out of the change, so `receipt.feePaid = offered - amount - changeAmount`. If the offered proofs cannot cover `amount` plus fees, the mint's own rejection is reported as `InsufficientFunds` (`required: amount`, `available`). There is no amount-degrade ladder in the package; the app decides whether to retry lower.
+Sends are exact-amount: the recipient receives `amount`. The mint's cashu input fee comes out of the change, so `receipt.feePaid = offered - amount - changeAmount`. If the offered proofs cannot cover `amount` plus fees, the mint's own rejection is reported as `InsufficientFunds` (`required: amount`, `available`). There is no amount-degrade ladder in the package; the app decides whether to retry lower. An amount the recipient's fee would consume is refused up front (`AmountConsumedByFee`): at 100 ppk that is a 1-sat send, whose token would cost 1 sat to redeem.
 
 ### When the recipient never claims
 
@@ -80,12 +81,13 @@ The `issued` send keeps the funds visible under `Tokens.transfers` but not in `b
 
 On every failure, unspent sources remain `available`; proofs the NUT-07 pre-check found spent have already been marked `spent`, whatever happens next.
 
-| Tag                  | When                                                                                                | What to do                                                      |
-| -------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `InsufficientFunds`  | confirmed-unspent balance at `mint` is below `amount`, or the swap could not cover amount plus fees | pick another mint (`Tokens.balances.perMint`) or a lower amount |
-| `MintUnreachable`    | network/timeout/5xx while loading the mint, checking states, or swapping                            | you may retry later                                             |
-| `MintRejected`       | definitive rejection, malformed swap proofs, or collision retries exhausted                         | surface `detail`                                                |
-| `CounterLockTimeout` | the counter lease was held elsewhere                                                                | you may retry                                                   |
+| Tag                   | When                                                                                                | What to do                                                      |
+| --------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `InsufficientFunds`   | confirmed-unspent balance at `mint` is below `amount`, or the swap could not cover amount plus fees | pick another mint (`Tokens.balances.perMint`) or a lower amount |
+| `AmountConsumedByFee` | `amount` does not exceed the input fee the recipient pays to redeem the token (`fee`)               | ask for more than `fee`; nothing was sent to the mint           |
+| `MintUnreachable`     | network/timeout/5xx while loading the mint, checking states, or swapping                            | you may retry later                                             |
+| `MintRejected`        | definitive rejection, malformed swap proofs, or collision retries exhausted                         | surface `detail`                                                |
+| `CounterLockTimeout`  | the counter lease was held elsewhere                                                                | you may retry                                                   |
 
 ## Related
 

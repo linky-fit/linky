@@ -12,6 +12,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+### en-US
+
+- Receiving or sending a Cashu token worth no more than the mint's fee is now refused up front with a clear message, instead of failing at the mint.
+
+### cs-CZ
+
+- Přijetí nebo odeslání Cashu tokenu, jehož hodnota nepřevyšuje poplatek mintu, se nyní předem odmítne se srozumitelnou hláškou místo selhání u mintu.
+
 ## [26.9.17] - 2026-09-16
 
 ### en-US

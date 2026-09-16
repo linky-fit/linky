@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import {
+  AmountConsumedByFee,
   CounterLockTimeout,
   InsufficientFunds,
   MintRejected,
@@ -47,6 +48,7 @@ export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({
 
 export const SendError = Schema.Union(
   InsufficientFunds,
+  AmountConsumedByFee,
   MintUnreachable,
   MintRejected,
   CounterLockTimeout,

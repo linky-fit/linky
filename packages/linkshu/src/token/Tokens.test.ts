@@ -1,5 +1,5 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { getEncodedToken, MintOperationError } from "@cashu/cashu-ts";
+import { getEncodedToken, Keyset, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Either, Exit, Layer, Schema } from "effect";
 import { MintRejected, TokenAlreadySpent } from "../domain/errors";
 import {
@@ -58,6 +58,8 @@ const rejected = encodeRejected(
 );
 
 interface HarnessArgs {
+  /** The mint's keysets as the wallet knows them; none (fee-free) by default. */
+  keysets?: Keyset[];
   receive?: (text: string) => Promise<CashuProof[]>;
   checkProofsStates?: import("../mint/internal/WalletInstances").LoadedWallet["checkProofsStates"];
 }
@@ -67,6 +69,7 @@ const makeHarness = (args: HarnessArgs = {}) => {
   let receiveCalls = 0;
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
+    keyChain: { getKeysets: () => args.keysets ?? [] },
     checkProofsStates: args.checkProofsStates ?? answerProofStates(),
     receive: (text) => {
       receiveCalls += 1;
@@ -624,6 +627,50 @@ describe("Tokens.returnToWallet", () => {
       expect(serialized).not.toContain("fresh-1");
     },
   );
+
+  it("refuses to return a send the mint's input fee would consume, leaving it as it stands", async () => {
+    // 100 ppk: the handed-out 1-sat proof costs 1 sat to swap back.
+    const { run, receiveCalls } = makeHarness({
+      keysets: [new Keyset(KEYSET_HEX, "sat", true, 100)],
+    });
+    const dust = proof(1, "dust");
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const transfer = yield* seedTransfer(
+          "send",
+          "issued",
+          mint,
+          tokenOf(dust),
+          1,
+          null,
+        );
+        yield* seedProofs(mint, [dust], "handedOut", transfer.id);
+        const result = yield* Effect.either(
+          (yield* Tokens).returnToWallet(transfer.id),
+        );
+        const { proofs, operations } = yield* inventory;
+        return {
+          result,
+          proofs,
+          stored: operationById(operations, transfer.id),
+        };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { result, proofs, stored } = exit.value;
+    assert(result._tag === "Left");
+    expect(result.left).toMatchObject({
+      _tag: "AmountConsumedByFee",
+      mint,
+      amount: 1,
+      fee: 1,
+    });
+    expect(secretsOf(proofsIn(proofs, "handedOut"))).toEqual(["dust"]);
+    expect(stored).toMatchObject({ status: "issued", error: null });
+    expect(receiveCalls()).toBe(0);
+  });
 
   it("retries a failed receive in place", async () => {
     const { run, events } = makeHarness({
