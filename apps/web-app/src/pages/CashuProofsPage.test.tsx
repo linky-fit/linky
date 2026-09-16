@@ -80,6 +80,10 @@ describe("CashuProofsPage inventory", () => {
         ])}
       />,
     );
+    for (const proof of [available, held, spent]) {
+      expect(container.outerHTML).not.toContain(proof.secret);
+      expect(container.outerHTML).not.toContain(proof.C);
+    }
     const availableSection = sectionText(container, "cashuProofStateAvailable");
     expect(availableSection).toContain("cashuProofStateAvailable · 68 sat");
     expect(availableSection).toContain("cashuMintStateUnspent");

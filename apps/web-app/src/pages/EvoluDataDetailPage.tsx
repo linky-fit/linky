@@ -12,6 +12,7 @@ import {
   CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
   MAX_CONTACTS_PER_OWNER,
 } from "../utils/constants";
+import { formatEvoluDebugValue } from "../utils/evoluDebugValue";
 import { formatBytes } from "../utils/formatting";
 
 const ONE_MB = 1024 * 1024;
@@ -440,11 +441,13 @@ export function EvoluDataDetailPage(): React.ReactElement {
                         <tbody>
                           {rows.map((row, idx) => (
                             <tr key={idx}>
-                              {Object.values(row).map((val, vidx) => (
+                              {Object.entries(row).map(([key, val], vidx) => (
                                 <td key={vidx} className="evolu-data-cell">
-                                  {typeof val === "object" && val !== null
-                                    ? JSON.stringify(val).slice(0, 50)
-                                    : String(val ?? "").slice(0, 50)}
+                                  {formatEvoluDebugValue(
+                                    tableName,
+                                    key,
+                                    val,
+                                  ).slice(0, 50)}
                                 </td>
                               ))}
                             </tr>

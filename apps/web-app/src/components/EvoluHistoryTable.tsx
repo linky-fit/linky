@@ -1,4 +1,5 @@
 import type { EvoluHistoryRow } from "../evolu";
+import { formatEvoluDebugValue } from "../utils/evoluDebugValue";
 import type { Translate } from "../i18n";
 
 interface EvoluHistoryTableProps {
@@ -28,11 +29,12 @@ export function EvoluHistoryTable({ rows, t }: EvoluHistoryTableProps) {
             </td>
             <td
               className="evolu-data-value-cell"
-              title={String(row.value ?? "")}
+              title={formatEvoluDebugValue(row.table, row.column, row.value)}
             >
-              {typeof row.value === "object" && row.value !== null
-                ? JSON.stringify(row.value).slice(0, 40)
-                : String(row.value ?? "").slice(0, 40)}
+              {formatEvoluDebugValue(row.table, row.column, row.value).slice(
+                0,
+                40,
+              )}
             </td>
             <td className="evolu-data-timestamp-cell">{row.timestamp}</td>
           </tr>

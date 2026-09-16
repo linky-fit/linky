@@ -3,6 +3,7 @@ import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
 import { readRowOwnerId } from "../app/lib/rowOwnerId";
 import { loadEvoluCurrentData } from "../evolu";
+import { formatEvoluDebugValue } from "../utils/evoluDebugValue";
 import { writeClipboardText } from "../platform/clipboard";
 import {
   CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
@@ -32,14 +33,6 @@ function isTrackedTable(tableName: string): boolean {
     tableName === "nostrReaction" ||
     tableName === "transaction"
   );
-}
-
-function stringifyCellValue(value: unknown): string {
-  if (typeof value === "object" && value !== null) {
-    return JSON.stringify(value);
-  }
-
-  return String(value ?? "");
 }
 
 export function EvoluCurrentDataPage(): React.ReactElement {
@@ -426,7 +419,11 @@ export function EvoluCurrentDataPage(): React.ReactElement {
                               {Object.entries(row)
                                 .filter(([key]) => key !== "createdAt")
                                 .map(([key, val], valueIdx) => {
-                                  const fullValue = stringifyCellValue(val);
+                                  const fullValue = formatEvoluDebugValue(
+                                    tableName,
+                                    key,
+                                    val,
+                                  );
                                   const previewValue = fullValue.slice(0, 50);
                                   const cellKey = `${tableName}:${idx}:${key}`;
                                   const isCopied = copiedCellKey === cellKey;
