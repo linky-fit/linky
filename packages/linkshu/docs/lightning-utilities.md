@@ -42,6 +42,10 @@ const invoiceFor = async (target: string, amountSat: number) => {
 
 These are permissive by design: they decode fields for display and never verify the signature or authorize a payment.
 
+## Fixed-amount invoice decoding
+
+`getPayableLightningInvoice(raw)` returns `PayableLightningInvoice | null`. It uses `light-bolt11-decoder` for checksum-checked decoding, rejects missing or non-positive amounts, requires a payment hash and a correctly sized signature field, and bounds input to 5,000 characters. `amountSat` is rounded up from whole millisatoshis; `expiresAtSec` includes the default one-hour expiry. Both fields are non-null. The caller must compare expiry with the current time and check balance immediately before payment. This decodes invoice fields; the mint still validates the signature and payment feasibility.
+
 ## Amount fallback (`invoice/paymentAmountFallback.ts`)
 
 For LNURL targets, the app can re-fetch the invoice at a lower amount when the requested amount plus fees does not fit the balance. The package supplies the ladder; the retry loop stays app-side (`useLightningPaymentsDomain.ts`).

@@ -1,3 +1,4 @@
+import { nowSeconds } from "../utils/time";
 import { Copy, Radio, RefreshCcw, Save } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
@@ -222,11 +223,24 @@ export function ProfilePage({
   const purchaseInlineLightningAddress = React.useCallback(async () => {
     if (!inlineClaimPreview) return;
     if (cashuIsBusy || inlineClaimIsConfirming) return;
+    if (
+      inlineClaimPreview.username !== unregisteredOwnLightningAddress?.username
+    )
+      return;
+    if (inlineClaimInsufficientBalance) {
+      setInlineClaimError(t("payInsufficient"));
+      return;
+    }
+    if (inlineClaimPreview.invoice.expiresAtSec <= nowSeconds()) {
+      setInlineClaimError(t("claimOwnLightningAddressInvoiceInvalid"));
+      return;
+    }
 
     setInlineClaimError(null);
     setInlineClaimIsConfirming(true);
     try {
       const result = await purchaseOwnLightningAddressClaim({
+        availableBalanceSat: Math.max(cashuBalance, cashuBalanceAfterMelt),
         makeNip98AuthHeader,
         payLightningInvoiceWithCashu,
         preview: inlineClaimPreview,
@@ -246,6 +260,10 @@ export function ProfilePage({
     }
   }, [
     cashuIsBusy,
+    cashuBalance,
+    cashuBalanceAfterMelt,
+    inlineClaimInsufficientBalance,
+    unregisteredOwnLightningAddress?.username,
     inlineClaimIsConfirming,
     inlineClaimPreview,
     makeNip98AuthHeader,
@@ -318,7 +336,9 @@ export function ProfilePage({
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                {inlineClaimPreview ? (
+                {inlineClaimPreview?.username ===
+                  unregisteredOwnLightningAddress?.username &&
+                inlineClaimPreview ? (
                   <button
                     type="button"
                     className="profile-lightning-purchase-button"

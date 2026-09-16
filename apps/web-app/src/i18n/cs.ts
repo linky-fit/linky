@@ -158,6 +158,8 @@ export const cs = {
   bankPaymentOfferStaggerDelayIncrease: "Prodloužit prodlevu",
   custom: "Vlastní",
   restore: "Obnovit",
+  claimOwnLightningAddressInvoiceInvalid:
+    "Neplatná nebo vypršená platební faktura",
   claimOwnLightningAddressPurchase: "Koupit",
   claimOwnLightningAddressPurchaseFor: "Koupit za {amount}",
   claimOwnLightningAddressPurchasing: "Kupuji...",

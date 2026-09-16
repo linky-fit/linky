@@ -1,9 +1,9 @@
 import type { JsonValue } from "../types/json";
-import type { LightningInvoicePreview } from "@linky/linkshu";
-import { getLightningInvoicePreview } from "@linky/linkshu";
+import type { PayableLightningInvoice } from "@linky/linkshu";
+import { getPayableLightningInvoice } from "@linky/linkshu";
 import { getUnknownErrorMessage } from "./unknown";
 import { asNonEmptyString, asRecord } from "./validation";
-import { sleep } from "./time";
+import { nowSeconds, sleep } from "./time";
 
 const OWN_LIGHTNING_ADDRESS_DOMAIN = "linky.fit";
 const OWN_LIGHTNING_USERNAME_MIN_LENGTH = 3;
@@ -21,7 +21,7 @@ type OwnLightningUsernameValidationIssue =
   | "too_short";
 
 export interface OwnLightningClaimAvailableResult {
-  invoice: LightningInvoicePreview;
+  invoice: PayableLightningInvoice;
   kind: "available";
   lightningAddress: string;
   paymentToken: string;
@@ -54,15 +54,6 @@ export interface Nip98AuthHeaderFactory {
     payload?: Record<string, string>,
   ): Promise<string>;
 }
-
-const buildFallbackInvoicePreview = (
-  invoice: string,
-): LightningInvoicePreview => ({
-  amountSat: null,
-  description: null,
-  expiresAtSec: null,
-  invoice,
-});
 
 const parseResponseJson = async (response: Response): Promise<JsonValue> => {
   try {
@@ -170,10 +161,13 @@ export const requestOwnLightningAddressClaimPreview = async (args: {
         return { kind: "error", message };
       }
 
+      const invoice = getPayableLightningInvoice(paymentRequest);
+      if (!invoice || invoice.expiresAtSec <= nowSeconds()) {
+        return { kind: "error", message: "Invalid or expired payment invoice" };
+      }
+
       return {
-        invoice:
-          getLightningInvoicePreview(paymentRequest) ??
-          buildFallbackInvoicePreview(paymentRequest),
+        invoice,
         kind: "available",
         lightningAddress: getOwnLightningAddressFromUsername(username),
         paymentToken,
@@ -257,6 +251,7 @@ const CLAIM_CONFIRM_RETRY_DELAY_MS = 1_000;
 const CLAIM_CONFIRM_RETRY_LIMIT = 5;
 
 export const purchaseOwnLightningAddressClaim = async (args: {
+  availableBalanceSat: number;
   makeNip98AuthHeader: Nip98AuthHeaderFactory;
   payLightningInvoiceWithCashu: (invoice: string) => Promise<boolean>;
   preview: OwnLightningClaimAvailableResult;
@@ -265,23 +260,34 @@ export const purchaseOwnLightningAddressClaim = async (args: {
 }): Promise<
   { kind: "cancelled" | "success" } | { kind: "error"; message: string }
 > => {
-  const paid = await args.payLightningInvoiceWithCashu(
-    args.preview.invoice.invoice,
-  );
+  const { paymentToken, username, lightningAddress } = args.preview;
+  const invoice = getPayableLightningInvoice(args.preview.invoice.invoice);
+  if (
+    !invoice ||
+    invoice.expiresAtSec <= nowSeconds() ||
+    invoice.amountSat !== args.preview.invoice.amountSat
+  ) {
+    return { kind: "error", message: "Invalid or expired payment invoice" };
+  }
+  if (
+    !Number.isFinite(args.availableBalanceSat) ||
+    invoice.amountSat > args.availableBalanceSat
+  ) {
+    return { kind: "error", message: "Insufficient balance" };
+  }
+  const paid = await args.payLightningInvoiceWithCashu(invoice.invoice);
   if (!paid) return { kind: "cancelled" };
 
   for (let attempt = 0; attempt < CLAIM_CONFIRM_RETRY_LIMIT; attempt += 1) {
     const result = await finalizeOwnLightningAddressClaim({
       makeNip98AuthHeader: args.makeNip98AuthHeader,
-      paymentToken: args.preview.paymentToken,
+      paymentToken,
       serverBaseUrl: args.serverBaseUrl,
-      username: args.preview.username,
+      username,
     });
 
     if (result.kind === "success" || result.kind === "already_set") {
-      const saved = await args.saveClaimedLightningAddress(
-        args.preview.lightningAddress,
-      );
+      const saved = await args.saveClaimedLightningAddress(lightningAddress);
       return saved ? { kind: "success" } : { kind: "cancelled" };
     }
 

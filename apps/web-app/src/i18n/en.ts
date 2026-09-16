@@ -157,6 +157,7 @@ export const en = {
   bankPaymentOfferStaggerDelayIncrease: "Increase delay",
   custom: "Custom",
   restore: "Restore",
+  claimOwnLightningAddressInvoiceInvalid: "Invalid or expired payment invoice",
   claimOwnLightningAddressPurchase: "Purchase",
   claimOwnLightningAddressPurchaseFor: "Purchase for {amount}",
   claimOwnLightningAddressPurchasing: "Purchasing...",

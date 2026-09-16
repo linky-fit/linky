@@ -9,6 +9,7 @@ export * from "./headless";
 export * from "./inspector/events";
 export * from "./inspector/Inspector";
 export * from "./invoice/preview";
+export * from "./invoice/payable";
 export * from "./melt/domain";
 export * from "./melt/Melt";
 export * from "./mint/domain";
