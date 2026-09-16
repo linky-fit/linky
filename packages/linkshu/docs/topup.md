@@ -44,7 +44,7 @@ Expiry is decided only by the mint: a quote the mint still reports `UNPAID` afte
 
 ### `resumePending` — run it at startup
 
-Pending topups outlive the process. Nothing polls them until you call `resumePending()`, which returns a handle for every `pending` topup, even those past their deadline. Call it once when your runtime comes up and again whenever connectivity returns; duplicate handles for the same quote are safe.
+Pending topups outlive the process. Nothing polls them until you call `resumePending()`, which returns a handle for every `pending` topup, even those past their deadline. Call it once when your runtime comes up and again whenever connectivity returns; duplicate handles for the same quote are safe, and cost nothing. A quote is watched by exactly one fiber per runtime, so a second `resumePending` hands back a handle onto the watcher that is already running rather than starting a second poll loop against the mint. The watcher belongs to the scope of the call that forked it: a later call's scope owns nothing, and closing the forking scope ends the poll for every handle onto it, so run all resumes in one scope that outlives them.
 
 ```ts
 import { Effect, Either } from "effect";
@@ -74,7 +74,7 @@ const resumeTopups = Effect.scoped(
 );
 ```
 
-This waits for every handle inside one scope, which suits a CLI (`apps/linkshu-cli/src/commands.ts`, `topup` with no amount). In a long-lived app, extend the handles into a scope that outlives the call (`Scope.extend`) so polling survives UI unmounts, and close that scope before disposing the runtime; Linky does this in `useLinkshuComposition.ts`. Pass `{ lockingKey }` when the wallet adopts locked quotes (below).
+This waits for every handle inside one scope, which suits a CLI (`apps/linkshu-cli/src/commands.ts`, `topup` with no amount). In a long-lived app, extend the handles into a scope that outlives the call (`Scope.extend`) so polling survives UI unmounts, use that same scope for every resume, and close it before disposing the runtime; Linky does this in `useLinkshuComposition.ts`. Pass `{ lockingKey }` when the wallet adopts locked quotes (below).
 
 Topup records written by releases before the inventory (`linkshu.pendingTopup.*` keys in the `KeyValueStore`) are carried over into `pending` topup operations the first time `resumePending` (or `adopt`) reads them, and the keys are removed.
 

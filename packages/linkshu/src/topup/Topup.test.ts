@@ -9,8 +9,15 @@ import {
   MintInfo as CashuMintInfo,
   MintOperationError,
 } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
-import type { Scope } from "effect";
+import {
+  Effect,
+  Either,
+  Exit,
+  Layer,
+  Scope,
+  TestClock,
+  TestContext,
+} from "effect";
 import {
   Amount,
   Bolt11Invoice,
@@ -514,6 +521,119 @@ describe("Topup", () => {
     assert(resumed.value?._tag === "Left");
     expect(resumed.value.left._tag).toBe("QuoteExpired");
     expect((await onlyTopup(storage)).status).toBe("failed");
+  });
+
+  it("watches a resumed quote once however often the resume runs", async () => {
+    const pollsAfterResumes = async (resumes: number): Promise<number> => {
+      const storage = freshStorage();
+      await writePendingTopup(storage, { counter: null });
+      let checks = 0;
+      const { wallet } = makeWallet({
+        states: [],
+        check: () => {
+          checks += 1;
+          return Promise.resolve(quoteResponse("UNPAID"));
+        },
+      });
+
+      const exit = await makeHarness(wallet, storage).run(
+        Effect.gen(function* () {
+          yield* TestClock.adjust("1000 seconds");
+          const topup = yield* Topup;
+          for (let attempt = 0; attempt < resumes; attempt += 1) {
+            expect(yield* topup.resumePending()).toHaveLength(1);
+          }
+          for (let tick = 0; tick < 4; tick += 1) {
+            yield* Effect.promise(
+              () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+            );
+            yield* TestClock.adjust("5 seconds");
+          }
+        }).pipe(Effect.provide(TestContext.TestContext)),
+      );
+
+      assert(Exit.isSuccess(exit));
+      return checks;
+    };
+
+    const single = await pollsAfterResumes(1);
+    expect(single).toBeGreaterThan(1);
+    expect(await pollsAfterResumes(3)).toBe(single);
+  });
+
+  it("watches a quote afresh once its earlier watcher has failed", async () => {
+    const storage = freshStorage();
+    await writePendingTopup(storage, { counter: null });
+    let checks = 0;
+    const { wallet } = makeWallet({
+      states: [],
+      check: () => {
+        checks += 1;
+        return Promise.reject(new MintOperationError(10000, "quote not found"));
+      },
+    });
+
+    const exit = await makeHarness(wallet, storage).run(
+      Effect.gen(function* () {
+        const topup = yield* Topup;
+        const tags: string[] = [];
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const [handle] = yield* topup.resumePending();
+          assert(handle !== undefined);
+          const outcome = yield* Effect.either(handle.result);
+          assert(Either.isLeft(outcome));
+          tags.push(outcome.left._tag);
+        }
+        return tags;
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value).toEqual(["MintRejected", "MintRejected"]);
+    expect(checks).toBe(2);
+  });
+
+  it("ends every handle when the scope that forked the watcher closes", async () => {
+    const storage = freshStorage();
+    await writePendingTopup(storage, { counter: null });
+    let checks = 0;
+    const { wallet } = makeWallet({
+      states: [],
+      check: () => {
+        checks += 1;
+        return Promise.resolve(quoteResponse("UNPAID"));
+      },
+    });
+
+    const exit = await makeHarness(wallet, storage).run(
+      Effect.gen(function* () {
+        yield* TestClock.adjust("1000 seconds");
+        const topup = yield* Topup;
+        const owner = yield* Scope.make();
+        const [first] = yield* Scope.extend(topup.resumePending(), owner);
+        const [second] = yield* topup.resumePending();
+        assert(first !== undefined && second !== undefined);
+        yield* Effect.scoped(
+          Effect.map(topup.resumePending(), (handles) => {
+            expect(handles).toHaveLength(1);
+          }),
+        );
+        yield* Effect.promise(
+          () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+        );
+        yield* TestClock.adjust("5 seconds");
+        const pollsBeforeClose = checks;
+        yield* Scope.close(owner, Exit.void);
+        const outcome = yield* Effect.exit(second.result);
+        yield* TestClock.adjust("60 seconds");
+        return { pollsBeforeClose, interrupted: Exit.isInterrupted(outcome) };
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.pollsBeforeClose).toBe(2);
+    expect(exit.value.interrupted).toBe(true);
+    expect(checks).toBe(2);
   });
 
   it("moves past a counter collision and mints on the recovered slot", async () => {
