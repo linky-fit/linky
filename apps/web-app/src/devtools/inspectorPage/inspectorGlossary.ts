@@ -46,6 +46,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "System share of a chat PDF failed for a reason other than the user cancelling; the app fell back to a file download when triggered from the message menu.",
   "bankOffer.staggerExtended":
     "A staggered proxy payment offer reached its next queued recipient: the configured delay elapsed without a winner, so the offer was extended while keeping the original expiry.",
+  "bankOffer.snapshotNotAuthorized":
+    "A bank-offer snapshot was rejected or held for an authenticated offerer snapshot. It cannot update the offer or authorize settlement yet.",
   "bankOffer.staggerDropped":
     "The queued recipients of a staggered proxy payment offer were discarded because the offer stopped being open — someone accepted it, it ended, or it expired.",
   "profiles.searchProfiles":

@@ -195,6 +195,22 @@ export const decodeBankOfferRumor = (
       if (offerer === null || !isPubkey(offerer)) {
         return Either.left<DropReason>("invalid-bank-offer");
       }
+      const participants = tagValues(rumor.tags, "p");
+      const isOffererStatus =
+        status === "offered" ||
+        status === "accepted_by_other" ||
+        status === "bank_details_sent" ||
+        status === "canceled" ||
+        status === "settled";
+      if (
+        !participants.includes(offerer) ||
+        (isOffererStatus
+          ? rumor.pubkey !== offerer
+          : rumor.pubkey === offerer) ||
+        (rumor.pubkey !== me && rumor.pubkey !== offerer && offerer !== me)
+      ) {
+        return Either.left<DropReason>("invalid-bank-offer");
+      }
       const snapshot = {
         snapshotId,
         offerId,

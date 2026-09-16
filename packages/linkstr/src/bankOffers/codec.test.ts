@@ -9,7 +9,7 @@ import {
   encodeBankOfferRumor,
 } from "./codec";
 import { makeIdentity } from "../testing";
-import { BankOfferDraft, BankOfferId } from "./domain";
+import { BankOfferDraft, BankOfferId, type BankOfferStatus } from "./domain";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -184,14 +184,19 @@ describe("bank offer rumor encoding", () => {
 
 describe("bank offer rumor decoding", () => {
   it("round-trips the encoded snapshot", () => {
-    const rumor = encodeBankOfferRumor(draft, alice.pubkey, sentAt, clientId);
+    const rumor = encodeBankOfferRumor(
+      new BankOfferDraft({ ...draft, to: alice.pubkey }),
+      bob.pubkey,
+      sentAt,
+      clientId,
+    );
 
-    expect(decodeBankOfferRumor(rumor, bob.pubkey)).toEqual(
+    expect(decodeBankOfferRumor(rumor, alice.pubkey)).toEqual(
       Either.right(
         expect.objectContaining({
           _tag: "BankOfferSnapshotReceived",
           snapshotId: rumor.id,
-          from: alice.pubkey,
+          from: bob.pubkey,
           offerId,
           offerer: alice.pubkey,
           status: "bank_paid",
@@ -212,7 +217,12 @@ describe("bank offer rumor decoding", () => {
   });
 
   it("decodes the offerer's own self copy as a confirmation addressed to the recipient", () => {
-    const rumor = encodeBankOfferRumor(draft, alice.pubkey, sentAt, clientId);
+    const rumor = encodeBankOfferRumor(
+      new BankOfferDraft({ ...draft, status: "offered" }),
+      alice.pubkey,
+      sentAt,
+      clientId,
+    );
 
     expect(decodeBankOfferRumor(rumor, alice.pubkey)).toEqual(
       Either.right(
@@ -248,7 +258,7 @@ describe("bank offer rumor decoding", () => {
       content: JSON.stringify({
         amountText: " 1 000 Kč ",
         offerId: " offer-1 ",
-        status: "accepted",
+        status: "offered",
         text: "   ",
         type: "linky.bank_payment_offer",
         amountSat: 50_000.9,
@@ -346,6 +356,43 @@ describe("bank offer rumor decoding", () => {
       }),
     },
   ])("drops a snapshot with $name", ({ rumor }) => {
+    expect(decodeBankOfferRumor(rumor, bob.pubkey)).toEqual(
+      Either.left("invalid-bank-offer"),
+    );
+  });
+});
+
+describe("bank offer author roles", () => {
+  const offererStatuses: BankOfferStatus[] = [
+    "offered",
+    "bank_details_sent",
+    "accepted_by_other",
+    "canceled",
+    "settled",
+  ];
+  it.each(offererStatuses)(
+    "rejects a recipient claiming the offerer's %s status",
+    (status) => {
+      const rumor = encodeBankOfferRumor(
+        new BankOfferDraft({ ...draft, to: alice.pubkey, status }),
+        bob.pubkey,
+        sentAt,
+        clientId,
+      );
+      expect(decodeBankOfferRumor(rumor, alice.pubkey)).toEqual(
+        Either.left("invalid-bank-offer"),
+      );
+    },
+  );
+
+  it("rejects an outsider claiming to pay someone else's offer", () => {
+    const outsider = makeIdentity();
+    const rumor = encodeBankOfferRumor(
+      new BankOfferDraft({ ...draft, offerer: outsider.pubkey }),
+      alice.pubkey,
+      sentAt,
+      clientId,
+    );
     expect(decodeBankOfferRumor(rumor, bob.pubkey)).toEqual(
       Either.left("invalid-bank-offer"),
     );

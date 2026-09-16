@@ -910,6 +910,7 @@ export const useAppShellComposition = ({
       chatMessages,
       contacts,
       enqueuePendingPayment,
+      bankPaymentOfferMessages,
       isBankPaymentOfferCanceled,
       nostrBootstrapReady,
       nostrMessagesLocal,

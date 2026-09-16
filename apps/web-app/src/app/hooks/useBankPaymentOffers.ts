@@ -1,3 +1,4 @@
+import { getAuthorizedBankOffer } from "../lib/bankOfferSettlement";
 import {
   BankOfferDraft,
   BankOfferId,
@@ -539,7 +540,13 @@ export const useBankPaymentOffers = ({
         withPush?: boolean;
       },
     ): Promise<boolean> => {
-      const offerInfo = getLinkyBankPaymentOfferInfo(message.content);
+      const authorizedMessage = getAuthorizedBankOffer(
+        message,
+        bankPaymentOfferMessages,
+      );
+      const offerInfo = authorizedMessage
+        ? getLinkyBankPaymentOfferInfo(authorizedMessage.content)
+        : null;
       if (!offerInfo) {
         setStatus(t("spdPaymentOfferFailed"));
         return false;
@@ -558,7 +565,16 @@ export const useBankPaymentOffers = ({
           (offerInfo.offererPublicKey ?? "").trim() ||
           (messageDirection === "out" ? myPubHex : message.pubkey.trim());
 
-        if (!isPubkey(offererPublicKey)) {
+        const offererStatus =
+          nextStatus === "offered" ||
+          nextStatus === "bank_details_sent" ||
+          nextStatus === "accepted_by_other" ||
+          nextStatus === "canceled" ||
+          nextStatus === "settled";
+        if (
+          !isPubkey(offererPublicKey) ||
+          offererStatus !== (offererPublicKey === myPubHex)
+        ) {
           setStatus(t("spdPaymentOfferFailed"));
           return false;
         }
@@ -669,6 +685,7 @@ export const useBankPaymentOffers = ({
     [
       currentNsec,
       contacts,
+      bankPaymentOfferMessages,
       sendBankOffer,
       setStatus,
       t,

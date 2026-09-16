@@ -1,6 +1,6 @@
 # Bank offers
 
-`BankOffers` carries the proxy-payment flow: you scanned a bank QR, and you offer contacts to pay it for you in exchange for sats. Every step is a **snapshot** of the offer — a kind 24135 rumor tagged `["linky", "bank_payment_offer"]`, gift-wrapped (kind 1059) to the counterparty and to yourself. Linkstr delivers snapshots and decodes them; which transitions are legal, who may send which status, and timers are app state (`useBankPaymentOffers`).
+`BankOffers` carries the proxy-payment flow: you scanned a bank QR, and you offer contacts to pay it for you in exchange for sats. Every step is a **snapshot** of the offer — a kind 24135 rumor tagged `["linky", "bank_payment_offer"]`, gift-wrapped (kind 1059) to the counterparty and to yourself. Linkstr decodes snapshots and binds each status to the authenticated author: only the offerer may send `offered`, `bank_details_sent`, `accepted_by_other`, `canceled`, or `settled`; only the counterparty may send `accepted`, `bank_paid`, or `declined`. The app authorizes transitions and terms against its existing offer state.
 
 ## Quick example
 
@@ -155,7 +155,7 @@ import type {
   WrapInboxEvent,
 } from "@linky/linkstr";
 
-/** Placeholder: merge by (peer, offerId); the newest statusUpdatedAtSec wins. */
+/** Placeholder: authorize roles, terms and payer selection before merging. */
 type ApplySnapshot = (peer: Pubkey, snapshot: BankOfferInboxEvent) => void;
 
 export const bankOfferHandler =
@@ -168,9 +168,11 @@ export const bankOfferHandler =
   };
 ```
 
-`event.offerer === myPubkey` tells you whether the offer is outgoing. Backfill replays old snapshots, so the merge must be idempotent.
+`event.offerer === myPubkey` tells you whether the offer is outgoing only after stateful authorization. The codec cannot establish that a counterparty's claimed outgoing offer exists. Before applying a payer snapshot, require an authenticated offerer snapshot for that peer and offer ID, preserve its amount and initiation time, and require offerer-authorized `bank_details_sent` before accepting `bank_paid`. The app queues up to 256 early payer snapshots for out-of-order backfill and rechecks them when the offerer's snapshot arrives. It pins expiry, extension, and bank details to the offerer's state and uses the rumor timestamp for updates.
 
-Drop reason: `invalid-bank-offer` — wrong `linky` tag, not p-tagged to you, unparsable content, unknown `status`, or no valid offerer pubkey.
+Backfill replays old snapshots, so the merge must be idempotent. The app's actionable offer collection starts empty on reload and is rebuilt from authenticated inbox events; persisted ordinary chat content cannot authorize responses or settlement. Settlement also requires the current authorized row and current account, rejecting stale or modified UI messages.
+
+Drop reason: `invalid-bank-offer` — wrong `linky` tag, not p-tagged to you, unparsable content, unknown `status`, no valid offerer pubkey, offerer absent from the participants, or a status authored by the wrong role.
 
 ## Errors
 

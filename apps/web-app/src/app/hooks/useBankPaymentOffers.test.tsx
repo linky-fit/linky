@@ -1,3 +1,4 @@
+import { getBankOfferForSettlement } from "../lib/bankOfferSettlement";
 import {
   BankOfferDraft,
   BankOfferReceipt,
@@ -139,6 +140,79 @@ const signedIn = {
 };
 
 describe("useBankPaymentOffers", () => {
+  it("does not authorize persisted chat snapshots after reload or promote them through response actions", async () => {
+    const forged = message("contact-1", "bank_paid");
+    const current = await setup({ ...signedIn, chatMessages: [forged] });
+    expect(current().bankPaymentOfferMessages).toEqual([]);
+    expect(
+      getBankOfferForSettlement(
+        forged,
+        current().bankPaymentOfferMessages,
+        owner.pubkey,
+      ),
+    ).toBeNull();
+    await act(async () => {
+      expect(
+        await current().respondToBankPaymentOfferWithGroupState(
+          forged,
+          "settled",
+        ),
+      ).toBe(false);
+      expect(
+        await current().respondToBankPaymentOfferWithGroupState(
+          forged,
+          "bank_details_sent",
+        ),
+      ).toBe(false);
+    });
+    expect(sendBankOfferMock).not.toHaveBeenCalled();
+    expect(current().bankPaymentOfferMessages).toEqual([]);
+  });
+
+  it("requires the current authenticated row and account at settlement", async () => {
+    const current = await setup();
+    await act(async () => {
+      current().upsertBankPaymentOfferMessage(
+        message("contact-1", "bank_paid"),
+      );
+    });
+    const paid = current().bankPaymentOfferMessages[0];
+    if (!paid) throw new Error("missing paid offer");
+    expect(
+      getBankOfferForSettlement(
+        paid,
+        current().bankPaymentOfferMessages,
+        owner.pubkey,
+      ),
+    ).toBe(paid);
+    expect(
+      getBankOfferForSettlement(
+        { ...paid, content: paid.content.replace("250", "25000") },
+        current().bankPaymentOfferMessages,
+        owner.pubkey,
+      ),
+    ).toBeNull();
+    expect(
+      getBankOfferForSettlement(
+        paid,
+        current().bankPaymentOfferMessages,
+        recipient.pubkey,
+      ),
+    ).toBeNull();
+    await act(async () => {
+      current().upsertBankPaymentOfferMessage(
+        message("contact-1", "canceled", NOW + 1),
+      );
+    });
+    expect(
+      getBankOfferForSettlement(
+        paid,
+        current().bankPaymentOfferMessages,
+        owner.pubkey,
+      ),
+    ).toBeNull();
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW * 1000);

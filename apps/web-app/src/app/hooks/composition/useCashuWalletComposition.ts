@@ -1,3 +1,4 @@
+import { getBankOfferForSettlement } from "../../lib/bankOfferSettlement";
 import type { RestoreProgress } from "@linky/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { useLatest } from "../../../hooks/useLatest";
@@ -168,6 +169,7 @@ interface UseCashuWalletCompositionParams {
     | "chatMessages"
     | "contacts"
     | "enqueuePendingPayment"
+    | "bankPaymentOfferMessages"
     | "isBankPaymentOfferCanceled"
     | "nostrBootstrapReady"
     | "nostrMessagesLocal"
@@ -282,6 +284,7 @@ export const useCashuWalletComposition = ({
     chatMessages,
     contacts,
     enqueuePendingPayment,
+    bankPaymentOfferMessages,
     isBankPaymentOfferCanceled,
     nostrBootstrapReady,
     nostrMessagesLocal,
@@ -1014,8 +1017,15 @@ export const useCashuWalletComposition = ({
     async (message: LocalNostrMessage) => {
       if (cashuIsBusy) return;
 
-      const offerInfo = getLinkyBankPaymentOfferInfo(message.content);
-      if (!offerInfo || offerInfo.status !== "bank_paid") {
+      const authorizedMessage = getBankOfferForSettlement(
+        message,
+        bankPaymentOfferMessages,
+        currentNsec ? (identityFromNsec(currentNsec)?.pubkey ?? null) : null,
+      );
+      const offerInfo = authorizedMessage
+        ? getLinkyBankPaymentOfferInfo(authorizedMessage.content)
+        : null;
+      if (!authorizedMessage || !offerInfo) {
         setStatus(t("spdPaymentOfferFailed"));
         return;
       }
@@ -1047,7 +1057,10 @@ export const useCashuWalletComposition = ({
         });
         if (!result.ok) return;
 
-        await respondToBankPaymentOfferWithGroupState(message, "settled");
+        await respondToBankPaymentOfferWithGroupState(
+          authorizedMessage,
+          "settled",
+        );
       } finally {
         setCashuIsBusy(false);
       }
@@ -1055,6 +1068,8 @@ export const useCashuWalletComposition = ({
     [
       cashuIsBusy,
       contacts,
+      currentNsec,
+      bankPaymentOfferMessages,
       isBankPaymentOfferCanceled,
       payContactWithCashuMessage,
       respondToBankPaymentOfferWithGroupState,
