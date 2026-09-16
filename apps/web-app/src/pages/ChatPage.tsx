@@ -441,6 +441,7 @@ const ChatMessageList = memo(function ChatMessageList({
         canActOnPaymentRequest:
           Boolean(parsed.paymentRequestInfo) &&
           message.direction === "in" &&
+          !message.isEdited &&
           paymentRequestStatus === "requested",
         canEdit:
           message.direction === "out" &&

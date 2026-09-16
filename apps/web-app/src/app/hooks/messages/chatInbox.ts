@@ -1,3 +1,5 @@
+import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
+import { reportAppLog } from "../../../devtools/inspector/appLog";
 import type {
   ChatMessageReceived,
   MessageBody,
@@ -94,6 +96,21 @@ export const applyChatMessageReceived = (
         trimString(message.rumorId) === editOf ||
         trimString(message.editedFromId) === editOf,
     );
+    if (
+      parseCashuPaymentRequestMessage(content) ||
+      (target &&
+        parseCashuPaymentRequestMessage(
+          target.originalContent || target.content,
+        ))
+    ) {
+      reportAppLog({
+        tag: "paymentRequest.editRejected",
+        summary: "Ignored an edit to an immutable payment request",
+        links: { rumor: event.messageId, message: editOf },
+        payload: null,
+      });
+      return null;
+    }
     if (target) {
       // A replayed backfill must not roll an already-applied newer edit back.
       if (target.isEdited && (target.editedAtSec ?? 0) >= event.sentAt) {
@@ -119,6 +136,20 @@ export const applyChatMessageReceived = (
     const editedVersion = scoped.find(
       (message) => trimString(message.editedFromId) === event.messageId,
     );
+    if (editedVersion && parseCashuPaymentRequestMessage(content)) {
+      ctx.updateLocalNostrMessage(editedVersion.id, {
+        content,
+        originalContent: null,
+        isEdited: false,
+        editedAtSec: null,
+        editedFromId: null,
+        createdAtSec: event.sentAt,
+        rumorId: event.messageId,
+        wrapId: event.messageId,
+        pubkey: event.from,
+      });
+      return null;
+    }
     if (editedVersion) {
       const editedVersionId = trimString(editedVersion.id);
       if (!trimString(editedVersion.originalContent) && editedVersionId) {

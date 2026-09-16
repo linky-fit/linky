@@ -1,3 +1,5 @@
+import type { Pubkey } from "@linky/linkstr";
+import { readPendingPayments } from "../lib/pendingPayments";
 import { Schema } from "effect";
 import type { OwnerId } from "@evolu/common";
 import * as Evolu from "@evolu/common";
@@ -1208,32 +1210,9 @@ export const useMessagesDomain = ({
       return;
     }
 
-    const normalized = safeLocalStorageGetJson(
+    const normalized = readPendingPayments(
       `${LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX}.${ownerId}`,
-      Schema.Array(UnknownRecord),
-      [],
-    )
-      .map((pendingPayment) => ({
-        id: trimString(pendingPayment.id),
-        contactId: trimString(pendingPayment.contactId),
-        amountSat: Math.max(
-          0,
-          Math.trunc(Number(pendingPayment.amountSat ?? 0) || 0),
-        ),
-        createdAtSec: Math.max(
-          0,
-          Math.trunc(Number(pendingPayment.createdAtSec ?? 0) || 0),
-        ),
-        ...(pendingPayment.messageId
-          ? { messageId: toText(pendingPayment.messageId) }
-          : {}),
-      }))
-      .filter(
-        (pendingPayment) =>
-          pendingPayment.id &&
-          pendingPayment.contactId &&
-          pendingPayment.amountSat > 0,
-      );
+    );
 
     setPendingPayments(normalized);
   }, [appOwnerId, appOwnerIdRef]);
@@ -1241,6 +1220,7 @@ export const useMessagesDomain = ({
   const enqueuePendingPayment = React.useCallback(
     (payload: {
       amountSat: number;
+      recipientPubkey: Pubkey;
       contactId: ContactId;
       messageId?: string;
     }) => {
@@ -1257,6 +1237,7 @@ export const useMessagesDomain = ({
         id: makeLocalId(),
         contactId: toText(payload.contactId),
         amountSat,
+        recipientPubkey: payload.recipientPubkey,
         createdAtSec: nowSeconds(),
         ...(payload.messageId ? { messageId: payload.messageId } : {}),
       };

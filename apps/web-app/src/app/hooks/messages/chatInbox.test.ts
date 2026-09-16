@@ -1,3 +1,5 @@
+import { encodeNprofile } from "@linky/linkstr";
+import { buildCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import {
   ChatMessageReceived,
   ClientId,
@@ -395,5 +397,79 @@ describe("applyOwnChatMessageConfirmed", () => {
 
     expect(harness.updateLocalNostrMessage).not.toHaveBeenCalled();
     expect(harness.logPayStep).not.toHaveBeenCalled();
+  });
+});
+
+describe("immutable chat payment requests", () => {
+  const requestText = (amount: number) =>
+    buildCashuPaymentRequestMessage({
+      amount,
+      mintUrls: [],
+      recipientNprofile: encodeNprofile(Pubkey.make(peerPubkey), []),
+      requestId: "request-1",
+    });
+  it("keeps the original amount when its sender edits a rendered request", () => {
+    const harness = createHarness();
+    applyChatMessageReceived(
+      received({ body: new TextBody({ text: requestText(10) }) }),
+      harness.ctx,
+    );
+    const before = harness.messages[0]?.content;
+    applyChatMessageReceived(
+      received({
+        messageId: RumorId.make(EDIT_RUMOR_ID),
+        editOf: RumorId.make(MESSAGE_RUMOR_ID),
+        body: new TextBody({ text: requestText(10_000) }),
+        sentAt: UnixSeconds.make(SENT_AT + 1),
+      }),
+      harness.ctx,
+    );
+    expect(harness.messages[0]?.content).toBe(before);
+    expect(harness.updateLocalNostrMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects payment request edits before the original arrives", () => {
+    const harness = createHarness();
+    applyChatMessageReceived(
+      received({
+        messageId: RumorId.make(EDIT_RUMOR_ID),
+        editOf: RumorId.make(MESSAGE_RUMOR_ID),
+        body: new TextBody({ text: requestText(10_000) }),
+        sentAt: UnixSeconds.make(SENT_AT + 1),
+      }),
+      harness.ctx,
+    );
+    expect(harness.messages).toEqual([]);
+    applyChatMessageReceived(
+      received({ body: new TextBody({ text: requestText(10) }) }),
+      harness.ctx,
+    );
+    expect(harness.messages[0]?.content).toBe(requestText(10));
+  });
+
+  it("restores the original request when a text edit arrived before it", () => {
+    const harness = createHarness();
+    applyChatMessageReceived(
+      received({
+        messageId: RumorId.make(EDIT_RUMOR_ID),
+        editOf: RumorId.make(MESSAGE_RUMOR_ID),
+        body: new TextBody({ text: "edited text" }),
+        sentAt: UnixSeconds.make(SENT_AT + 1),
+      }),
+      harness.ctx,
+    );
+    applyChatMessageReceived(
+      received({ body: new TextBody({ text: requestText(10) }) }),
+      harness.ctx,
+    );
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]).toMatchObject({
+      content: requestText(10),
+      isEdited: false,
+      editedAtSec: null,
+      rumorId: MESSAGE_RUMOR_ID,
+      wrapId: MESSAGE_RUMOR_ID,
+      pubkey: peerPubkey,
+    });
   });
 });

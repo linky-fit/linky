@@ -1,3 +1,9 @@
+import { encodeNprofile, Pubkey } from "@linky/linkstr";
+import {
+  buildCashuPaymentRequestMessage,
+  parseCashuPaymentRequestMessage,
+} from "../../lib/paymentRequestMessage";
+import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
 import * as Evolu from "@evolu/common";
 import {
   Amount,
@@ -6,6 +12,7 @@ import {
   MintUrl,
   NonNegativeAmount,
   SendReceipt,
+  ReceiveReceipt,
   OperationId,
   TokenText,
 } from "@linky/linkshu";
@@ -121,6 +128,7 @@ interface SetupOptions {
   appendLocalNostrMessage?: PayParams["appendLocalNostrMessage"];
   enqueuePendingPayment?: PayParams["enqueuePendingPayment"];
   forget?: CashuTransferLifecycle["forget"];
+  returnToWallet?: CashuTransferLifecycle["returnToWallet"];
   logPaymentEvent?: PayParams["logPaymentEvent"];
   nostrMessagesLocal?: LocalNostrMessage[];
   pushToast?: PayParams["pushToast"];
@@ -152,6 +160,19 @@ const setup = async (options: SetupOptions = {}) => {
   const sendCashuToken =
     options.sendCashuToken ?? vi.fn(async () => Either.right(sendReceipt));
 
+  const returnToWallet =
+    options.returnToWallet ??
+    vi.fn<CashuTransferLifecycle["returnToWallet"]>(async () =>
+      Either.right(
+        new ReceiveReceipt({
+          operationId: sendReceipt.operationId,
+          tokenText: sendReceipt.tokenText,
+          mint: sendReceipt.mint,
+          unit: sendReceipt.unit,
+          amount: sendReceipt.amount,
+        }),
+      ),
+    );
   const cashuTransferLifecycle: CashuTransferLifecycle = {
     reclaim: vi.fn<CashuTransferLifecycle["reclaim"]>(),
     checkIssuedClaims: vi.fn<CashuTransferLifecycle["checkIssuedClaims"]>(),
@@ -161,7 +182,7 @@ const setup = async (options: SetupOptions = {}) => {
     importProofs: vi.fn<CashuTransferLifecycle["importProofs"]>(),
     markExternalized: vi.fn<CashuTransferLifecycle["markExternalized"]>(),
     markIssued: vi.fn<CashuTransferLifecycle["markIssued"]>(),
-    returnToWallet: vi.fn<CashuTransferLifecycle["returnToWallet"]>(),
+    returnToWallet,
   };
 
   const Harness = () => {
@@ -205,6 +226,7 @@ const setup = async (options: SetupOptions = {}) => {
     enqueuePendingPayment,
     forget,
     getPay: () => payContact,
+    returnToWallet,
     logPaymentEvent,
     pushToast,
     root,
@@ -215,12 +237,16 @@ const setup = async (options: SetupOptions = {}) => {
   };
 };
 
-const payAlice = async (harness: Awaited<ReturnType<typeof setup>>) => {
+const payAlice = async (
+  harness: Awaited<ReturnType<typeof setup>>,
+  isPaymentAuthorized?: () => boolean,
+) => {
   let result: Awaited<ReturnType<PayContact>> | null = null;
   await act(async () => {
     result =
       (await harness.getPay()?.({
         amountSat: 600,
+        ...(isPaymentAuthorized ? { isPaymentAuthorized } : {}),
         contact: {
           id: CONTACT_ID,
           name: "Alice",
@@ -238,6 +264,176 @@ describe("usePayContactWithCashuMessage", () => {
     sendPaymentNoticeMock.mockReset();
     vi.restoreAllMocks();
     localStorage.clear();
+  });
+
+  const reviewRequest = () => {
+    const pubkey = Pubkey.make(getPublicKey(createSecretKey(2)));
+    const content = buildCashuPaymentRequestMessage({
+      amount: 600,
+      mintUrls: [],
+      recipientNprofile: encodeNprofile(pubkey, []),
+      requestId: "request-1",
+    });
+    const reviewed: LocalNostrMessage = {
+      id: "request",
+      content,
+      pubkey,
+      contactId: CONTACT_ID,
+      direction: "in",
+      createdAtSec: sentAt,
+      rumorId: "a".repeat(64),
+      wrapId: "b".repeat(64),
+    };
+    const request = parseCashuPaymentRequestMessage(content);
+    if (!request) throw new Error("invalid fixture request");
+    const messages = [{ ...reviewed }];
+    const recipient = { id: CONTACT_ID, npub: contactNpub };
+    return {
+      messages,
+      reviewed,
+      request,
+      recipient,
+      isCurrent: () =>
+        isCurrentChatPaymentRequest(
+          reviewed,
+          request,
+          recipient,
+          messages,
+          recipient,
+        ),
+    };
+  };
+
+  it("rejects an old Pay callback after the request was edited", async () => {
+    const review = reviewRequest();
+    review.messages[0] = {
+      ...review.reviewed,
+      isEdited: true,
+      content: "changed",
+    };
+    const harness = await setup();
+    expect(await payAlice(harness, review.isCurrent)).toMatchObject({
+      ok: false,
+      queued: false,
+    });
+    expect(harness.sendCashuToken).not.toHaveBeenCalled();
+    expect(enqueueOutboxMock).not.toHaveBeenCalled();
+    await act(async () => harness.root.unmount());
+  });
+
+  it("rejects changed recipients and amount arguments even with the original request encoding", () => {
+    const review = reviewRequest();
+    expect(review.isCurrent()).toBe(true);
+    expect(
+      isCurrentChatPaymentRequest(
+        review.reviewed,
+        { ...review.request, amount: 60_000 },
+        review.recipient,
+        review.messages,
+        review.recipient,
+      ),
+    ).toBe(false);
+    expect(
+      isCurrentChatPaymentRequest(
+        review.reviewed,
+        review.request,
+        review.recipient,
+        review.messages,
+        { ...review.recipient, npub: currentNpub },
+      ),
+    ).toBe(false);
+  });
+
+  it("returns minted proofs without publishing when a request changes during token creation", async () => {
+    const review = reviewRequest();
+    const harness = await setup({
+      sendCashuToken: vi.fn(async () => {
+        review.messages[0] = {
+          ...review.reviewed,
+          isEdited: true,
+          content: "changed while mint was responding",
+        };
+        return Either.right(sendReceipt);
+      }),
+    });
+    expect(await payAlice(harness, review.isCurrent)).toMatchObject({
+      ok: false,
+      queued: false,
+    });
+    expect(harness.returnToWallet).toHaveBeenCalledWith(
+      sendReceipt.operationId,
+    );
+    expect(harness.forget).not.toHaveBeenCalled();
+    expect(enqueueOutboxMock).not.toHaveBeenCalled();
+    expect(harness.showPaidOverlay).not.toHaveBeenCalled();
+    expect(harness.logPaymentEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: "ok" }),
+    );
+    await act(async () => harness.root.unmount());
+  });
+
+  it("returns funds when the approved recipient changes during minting", async () => {
+    const approvedPubkey = getPublicKey(createSecretKey(2));
+    let currentPubkey = approvedPubkey;
+    const harness = await setup({
+      sendCashuToken: vi.fn(async () => {
+        currentPubkey = getPublicKey(createSecretKey(3));
+        return Either.right(sendReceipt);
+      }),
+    });
+    expect(
+      await payAlice(harness, () => currentPubkey === approvedPubkey),
+    ).toMatchObject({ ok: false, queued: false });
+    expect(harness.returnToWallet).toHaveBeenCalledWith(
+      sendReceipt.operationId,
+    );
+    expect(harness.forget).not.toHaveBeenCalled();
+    expect(enqueueOutboxMock).not.toHaveBeenCalled();
+    expect(harness.showPaidOverlay).not.toHaveBeenCalled();
+    await act(async () => harness.root.unmount());
+  });
+
+  it("retains the pending transfer if reclamation fails after authorization is lost", async () => {
+    let current = true;
+    const harness = await setup({
+      sendCashuToken: vi.fn(async () => {
+        current = false;
+        return Either.right(sendReceipt);
+      }),
+      returnToWallet: vi.fn(async () => {
+        throw new Error("mint unavailable");
+      }),
+    });
+    expect(await payAlice(harness, () => current)).toMatchObject({ ok: false });
+    expect(harness.returnToWallet).toHaveBeenCalledWith(
+      sendReceipt.operationId,
+    );
+    expect(harness.forget).not.toHaveBeenCalled();
+    expect(enqueueOutboxMock).not.toHaveBeenCalled();
+    expect(harness.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "error", error: "mint unavailable" }),
+    );
+    await act(async () => harness.root.unmount());
+  });
+
+  it("queues the reviewed amount and recipient offline without re-reading later edits", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const review = reviewRequest();
+    const harness = await setup();
+    expect(await payAlice(harness, review.isCurrent)).toMatchObject({
+      ok: true,
+      queued: true,
+    });
+    review.messages[0] = {
+      ...review.reviewed,
+      isEdited: true,
+      content: "changed after queueing",
+    };
+    expect(harness.enqueuePendingPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ amountSat: 600, contactId: CONTACT_ID }),
+    );
+    expect(harness.sendCashuToken).not.toHaveBeenCalled();
+    await act(async () => harness.root.unmount());
   });
 
   it("sends via linkshu, publishes, forgets the delivered row, finalizes transaction", async () => {
@@ -264,7 +460,7 @@ describe("usePayContactWithCashuMessage", () => {
     });
     const harness = await setup({ forget, logPaymentEvent, sendCashuToken });
 
-    const result = await payAlice(harness);
+    const result = await payAlice(harness, reviewRequest().isCurrent);
 
     expect(result).toEqual({ ok: true, queued: false });
     expect(operations).toEqual([
@@ -300,6 +496,7 @@ describe("usePayContactWithCashuMessage", () => {
     expect(harness.enqueuePendingPayment).toHaveBeenCalledWith({
       amountSat: 600,
       contactId: CONTACT_ID,
+      recipientPubkey: Pubkey.make(getPublicKey(createSecretKey(2))),
       messageId: "offline-message",
     });
     expect(appendLocalNostrMessage).toHaveBeenCalledOnce();

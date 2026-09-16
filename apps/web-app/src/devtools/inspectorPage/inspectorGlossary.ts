@@ -46,6 +46,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "System share of a chat PDF failed for a reason other than the user cancelling; the app fell back to a file download when triggered from the message menu.",
   "bankOffer.staggerExtended":
     "A staggered proxy payment offer reached its next queued recipient: the configured delay elapsed without a winner, so the offer was extended while keeping the original expiry.",
+  "payment.queuedApprovalRejected":
+    "An offline payment had no pinned recipient identity or that identity changed. Its unfunded approval was canceled and its chat placeholder asks for a new approval.",
+  "paymentRequest.authorizationLost":
+    "The reviewed request or approved recipient changed during token creation. Delivery was stopped and the app attempted to return the pending transfer to the wallet; a failed return leaves it recoverable.",
+  "paymentRequest.editRejected":
+    "An incoming edit tried to create or change a payment request. Payment requests are immutable; the sender must send a new request.",
   "bankOffer.snapshotNotAuthorized":
     "A bank-offer snapshot was rejected or held for an authenticated offerer snapshot. It cannot update the offer or authorize settlement yet.",
   "bankOffer.staggerDropped":

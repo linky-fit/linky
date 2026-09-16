@@ -1,6 +1,7 @@
 import type { ContactId, ContactRow } from "../../evolu";
 import type { I18nKey } from "../../i18n";
 import type {
+  Pubkey,
   PaymentTelemetryAppRuntime,
   PaymentTelemetryDevicePlatform,
 } from "@linky/linkstr";
@@ -107,6 +108,7 @@ export type LocalNostrReaction = {
 };
 
 export type LocalPendingPayment = {
+  recipientPubkey?: Pubkey;
   amountSat: number;
   contactId: string;
   createdAtSec: number;

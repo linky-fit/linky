@@ -1,3 +1,4 @@
+import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
 import { getBankOfferForSettlement } from "../../lib/bankOfferSettlement";
 import type { RestoreProgress } from "@linky/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
@@ -172,6 +173,7 @@ interface UseCashuWalletCompositionParams {
     | "bankPaymentOfferMessages"
     | "isBankPaymentOfferCanceled"
     | "nostrBootstrapReady"
+    | "nostrMessagesLatestRef"
     | "nostrMessagesLocal"
     | "nostrMessagesRecent"
     | "nostrPictureByNpub"
@@ -287,6 +289,7 @@ export const useCashuWalletComposition = ({
     bankPaymentOfferMessages,
     isBankPaymentOfferCanceled,
     nostrBootstrapReady,
+    nostrMessagesLatestRef,
     nostrMessagesLocal,
     nostrMessagesRecent,
     nostrPictureByNpub,
@@ -1086,6 +1089,7 @@ export const useCashuWalletComposition = ({
     currentNsec,
     payContactWithCashuMessage,
     pendingPayments,
+    updateLocalNostrMessage,
     pushToast,
     removePendingPayment,
     setCashuIsBusy,
@@ -2483,6 +2487,7 @@ export const useCashuWalletComposition = ({
     t,
   ]);
 
+  const paymentRequestContactsRef = useLatest(contacts);
   const onPayChatPaymentRequest = React.useCallback(
     async (
       message: LocalNostrMessage,
@@ -2492,20 +2497,37 @@ export const useCashuWalletComposition = ({
       if (!selectedChatContact || selectedChatContact.isUnknownContact) return;
       if (!selectedContact) return;
 
-      const requestRumorId = (message.rumorId ?? "").trim();
-      if (!requestRumorId) return;
+      const reviewedMessage = { ...message };
+      const reviewedRequest = { ...requestInfo };
+      const reviewedRecipient = { ...selectedContact };
+      const isPaymentAuthorized = () =>
+        isCurrentChatPaymentRequest(
+          reviewedMessage,
+          reviewedRequest,
+          reviewedRecipient,
+          nostrMessagesLatestRef.current,
+          paymentRequestContactsRef.current.find(
+            (contact) => contact.id === reviewedRecipient.id,
+          ) ?? null,
+        );
+      if (!isPaymentAuthorized()) {
+        setStatus(t("paymentRequestChanged"));
+        return;
+      }
+      const requestRumorId = (reviewedMessage.rumorId ?? "").trim();
 
       setCashuIsBusy(true);
       try {
         await payContactWithCashuMessage({
-          contact: selectedContact,
-          amountSat: requestInfo.amount,
-          paymentRequestId: requestInfo.requestId,
+          contact: reviewedRecipient,
+          amountSat: reviewedRequest.amount,
+          paymentRequestId: reviewedRequest.requestId,
+          isPaymentAuthorized,
           replyContext: {
             replyToId: requestRumorId,
             rootMessageId:
-              (message.rootMessageId ?? "").trim() || requestRumorId,
-            replyToContent: message.content.trim() || null,
+              (reviewedMessage.rootMessageId ?? "").trim() || requestRumorId,
+            replyToContent: reviewedMessage.content.trim() || null,
           },
         });
       } finally {
@@ -2518,6 +2540,10 @@ export const useCashuWalletComposition = ({
       selectedChatContact,
       selectedContact,
       setCashuIsBusy,
+      nostrMessagesLatestRef,
+      paymentRequestContactsRef,
+      setStatus,
+      t,
     ],
   );
 

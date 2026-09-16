@@ -857,6 +857,9 @@ function ChatMessageComponent({
                   <div className="chat-payment-request-amount">
                     {formatDisplayedAmountText(paymentRequestInfo.amount)}
                   </div>
+                  {message.isEdited && !isOut ? (
+                    <p className="muted">{t("paymentRequestChanged")}</p>
+                  ) : null}
                   {canActOnPaymentRequest ? (
                     <div className="chat-payment-request-actions">
                       <button

@@ -1,5 +1,10 @@
+import { reportAppLog } from "../../../devtools/inspector/appLog";
 import * as Evolu from "@evolu/common";
-import type { PaymentNoticeContext } from "@linky/linkstr";
+import {
+  decodeNpub,
+  type Pubkey,
+  type PaymentNoticeContext,
+} from "@linky/linkstr";
 import type { SendError, SendReceipt } from "@linky/linkshu";
 import {
   enqueueOutboxAtom,
@@ -53,6 +58,7 @@ interface UsePayContactWithCashuMessageParams {
   enqueuePendingPayment: (payload: {
     amountSat: number;
     contactId: ContactId;
+    recipientPubkey: Pubkey;
     messageId?: string;
   }) => void;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
@@ -121,6 +127,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       paymentNoticeContext?: PaymentNoticeContext;
       paymentNoticeOfferId?: string;
       paymentRequestId?: string | null;
+      isPaymentAuthorized?: () => boolean;
       pendingMessageId?: string;
       replyContext?: ReplyContext | null;
     }): Promise<CashuMessagePaymentHookResult> => {
@@ -132,10 +139,19 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         paymentNoticeContext,
         paymentNoticeOfferId,
         paymentRequestId,
+        isPaymentAuthorized,
         pendingMessageId,
         replyContext,
       } = args;
       const notify = !fromQueue;
+      if (isPaymentAuthorized && !isPaymentAuthorized()) {
+        setStatus(t("payApprovalChanged"));
+        return {
+          error: "payment authorization changed",
+          ok: false,
+          queued: false,
+        };
+      }
       const normalizedPendingMessageId =
         typeof pendingMessageId === "string" && pendingMessageId.trim()
           ? pendingMessageId.trim()
@@ -147,7 +163,8 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       }
 
       const contactNpub = (contact.npub ?? "").trim();
-      if (!contactNpub) {
+      const recipientPubkey = decodeNpub(contactNpub);
+      if (!recipientPubkey) {
         if (notify) setStatus(t("chatMissingContactNpub"));
         return { error: "missing contact npub", ok: false, queued: false };
       }
@@ -199,7 +216,12 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
           contactId: contactId,
           messageId,
         });
-        enqueuePendingPayment({ amountSat, contactId, messageId });
+        enqueuePendingPayment({
+          amountSat,
+          contactId,
+          recipientPubkey,
+          messageId,
+        });
         if (notify) {
           showPaidOverlay(
             t("paidQueuedTo")
@@ -283,6 +305,34 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       }
 
       const receipt = sendOutcome.right;
+      if (isPaymentAuthorized && !isPaymentAuthorized()) {
+        reportAppLog({
+          tag: "paymentRequest.authorizationLost",
+          summary:
+            "Payment authorization changed before token delivery; returning funds",
+          links: { operation: receipt.operationId },
+          payload: null,
+        });
+        try {
+          const restored = await cashuTransferLifecycle.returnToWallet(
+            receipt.operationId,
+          );
+          if (Either.isLeft(restored))
+            logFailure(restored.left._tag, receipt.mint, "swap");
+        } catch (error) {
+          logFailure(
+            getUnknownErrorMessage(error, "return-to-wallet failed"),
+            receipt.mint,
+            "swap",
+          );
+        }
+        setStatus(t("payApprovalChanged"));
+        return {
+          error: "payment authorization changed",
+          ok: false,
+          queued: false,
+        };
+      }
       logPayStep("swap-ok", {
         changeAmount: receipt.changeAmount,
         feePaid: receipt.feePaid,

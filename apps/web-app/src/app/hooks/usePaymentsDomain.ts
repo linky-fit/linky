@@ -1,7 +1,11 @@
+import { reportAppLog } from "../../devtools/inspector/appLog";
+import { decodeNpub, encodeNpub } from "@linky/linkstr";
+import { useLatest } from "../../hooks/useLatest";
 import React from "react";
 import type {
   ContactIdentityRowLike,
   LocalPendingPayment,
+  UpdateLocalNostrMessage,
 } from "../types/appTypes";
 import type { Translate } from "../../i18n";
 
@@ -20,9 +24,11 @@ interface UsePaymentsDomainParams<TContact extends ContactIdentityRowLike> {
     amountSat: number;
     contact: TContact;
     fromQueue?: boolean;
+    isPaymentAuthorized?: () => boolean;
     pendingMessageId?: string;
   }) => Promise<PayResult>;
   pendingPayments: LocalPendingPayment[];
+  updateLocalNostrMessage: UpdateLocalNostrMessage;
   pushToast: (message: string) => void;
   removePendingPayment: (id: string) => void;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
@@ -36,11 +42,13 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
   currentNsec,
   payContactWithCashuMessage,
   pendingPayments,
+  updateLocalNostrMessage,
   pushToast,
   removePendingPayment,
   setCashuIsBusy,
   t,
 }: UsePaymentsDomainParams<TContact>) => {
+  const contactsLatestRef = useLatest(contacts);
   const pendingPaymentsFlushRef = React.useRef<Promise<void> | null>(null);
 
   const flushPendingPayments = React.useCallback(async () => {
@@ -50,15 +58,43 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
     if (cashuIsBusy) return;
     if (pendingPayments.length === 0) return;
 
-    const run = (async () => {
+    const run = Promise.resolve().then(async () => {
       try {
         for (const pending of pendingPayments) {
-          const contact = contacts.find(
+          const contact = contactsLatestRef.current.find(
             (candidate) => (candidate.id ?? "") === pending.contactId,
           );
 
-          if (!contact) {
+          const approvedPubkey = pending.recipientPubkey;
+          const isPaymentAuthorized = () =>
+            Boolean(approvedPubkey) &&
+            decodeNpub(
+              contactsLatestRef.current.find(
+                (candidate) => candidate.id === pending.contactId,
+              )?.npub ?? "",
+            ) === approvedPubkey;
+          if (!contact || !approvedPubkey || !isPaymentAuthorized()) {
+            reportAppLog({
+              tag: "payment.queuedApprovalRejected",
+              summary: "Queued payment requires new recipient approval",
+              links: {
+                payment: pending.id,
+                ...(pending.messageId ? { message: pending.messageId } : {}),
+              },
+              payload: {
+                reason: approvedPubkey
+                  ? "recipient-changed"
+                  : "legacy-unbound-recipient",
+              },
+            });
             removePendingPayment(pending.id);
+            if (pending.messageId)
+              updateLocalNostrMessage(pending.messageId, {
+                content: t("payApprovalChanged"),
+                status: "sent",
+                localOnly: true,
+              });
+            pushToast(t("payApprovalChanged"));
             continue;
           }
 
@@ -73,8 +109,9 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
           setCashuIsBusy(true);
           try {
             const result = await payContactWithCashuMessage({
-              contact,
+              contact: { ...contact, npub: encodeNpub(approvedPubkey) },
               amountSat,
+              isPaymentAuthorized,
               fromQueue: true,
               ...(pending.messageId
                 ? { pendingMessageId: pending.messageId }
@@ -95,13 +132,14 @@ export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
       } finally {
         pendingPaymentsFlushRef.current = null;
       }
-    })();
+    });
 
     pendingPaymentsFlushRef.current = run;
     await run;
   }, [
     cashuIsBusy,
-    contacts,
+    contactsLatestRef,
+    updateLocalNostrMessage,
     currentNpub,
     currentNsec,
     payContactWithCashuMessage,

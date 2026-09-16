@@ -2298,6 +2298,7 @@ export const useContactsMessagingComposition = ({
     mentionContacts,
     newRelayUrl,
     nostrBootstrapReady,
+    nostrMessagesLatestRef,
     nostrMessagesLocal,
     nostrMessagesRecent,
     nostrMetadataByNpub,
