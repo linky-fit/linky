@@ -203,15 +203,14 @@ Every delivered Web Push message contains:
     "outerEventId": "<outer-event-id>",
     "recipientPubkey": "<hex-pubkey>",
     "recipientNpub": "<npub>",
-    "createdAt": 1760000000,
-    "relayHints": ["wss://relay.example"]
+    "createdAt": 1760000000
   }
 }
 ```
 
 The title carries a shortened recipient npub so a device subscribed for several identities can tell them apart; the body is a fixed generic text because the service never sees message content.
 
-Android FCM deliveries carry `title`, `body`, and the same data fields in the FCM data payload, with `createdAt` as a string and `relayHints` encoded as a JSON string array.
+Android FCM deliveries carry `title`, `body`, and the same data fields in the FCM data payload, with `createdAt` as a string. Sender-provided relay hints are omitted; clients fetch wraps only from their configured relays.
 
 ## Environment
 

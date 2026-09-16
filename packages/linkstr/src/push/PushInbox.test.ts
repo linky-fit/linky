@@ -160,7 +160,6 @@ describe("PushInbox", () => {
           wrapId: live.id,
           recipient,
           createdAt: live.created_at,
-          relayHints: ["wss://hint.test"],
         },
       });
     }).pipe(Effect.scoped, Effect.provide(layer), Effect.runPromise);

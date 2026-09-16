@@ -64,7 +64,6 @@ public class MainActivity extends BridgeActivity {
 	private static final String EXTRA_NOTIFICATION_ROUTE = "linky_notification_route";
 	private static final String EXTRA_NOTIFICATION_OUTER_EVENT_ID = "outerEventId";
 	private static final String EXTRA_NOTIFICATION_RECIPIENT_PUBKEY = "recipientPubkey";
-	private static final String EXTRA_NOTIFICATION_RELAY_HINTS = "relayHints";
 	private static final long NFC_READ_SUPPRESS_AFTER_WRITE_MS = 4000L;
 	private static final String PREFS_NAME = "linky.native.bridge";
 	private static final String PREF_PENDING_DEEP_LINK_URL = "pending_deep_link_url";
@@ -588,11 +587,6 @@ public class MainActivity extends BridgeActivity {
 			String recipientPubkey = normalizeIntentStringExtra(intent, EXTRA_NOTIFICATION_RECIPIENT_PUBKEY);
 			if (recipientPubkey != null) {
 				detail.put("recipientPubkey", recipientPubkey);
-			}
-
-			String relayHints = normalizeIntentStringExtra(intent, EXTRA_NOTIFICATION_RELAY_HINTS);
-			if (relayHints != null) {
-				detail.put("relayHints", relayHints);
 			}
 		} catch (Exception ignored) {
 			return null;

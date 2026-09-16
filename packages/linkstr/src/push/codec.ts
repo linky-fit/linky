@@ -18,7 +18,6 @@ export interface PushWrap {
   readonly wrapId: WrapId;
   readonly recipient: Pubkey;
   readonly createdAt: number;
-  readonly relayHints: ReadonlyArray<string>;
 }
 
 const PushWrapEvent = Schema.Struct({
@@ -82,15 +81,5 @@ export const decodePushWrap = (
       wrapId: wrap.id,
       recipient,
       createdAt: wrap.created_at,
-      relayHints: unique(
-        wrap.tags.flatMap((tag) =>
-          tag[0] === "p" &&
-          tag[1] === recipient &&
-          typeof tag[2] === "string" &&
-          tag[2].length > 0
-            ? [tag[2]]
-            : [],
-        ),
-      ),
     };
   });

@@ -54,7 +54,6 @@ type PushNotificationData = {
   outerEventId?: string;
   recipientNpub?: string;
   recipientPubkey?: string;
-  relayHints?: string[];
   senderPubkey?: string;
   type?: string;
 };
@@ -90,14 +89,6 @@ function readPushNotificationData(value: unknown): PushNotificationData {
     ...(typeof value.recipientPubkey === "string" &&
     value.recipientPubkey.trim()
       ? { recipientPubkey: value.recipientPubkey }
-      : {}),
-    ...(Array.isArray(value.relayHints)
-      ? {
-          relayHints: value.relayHints.filter(
-            (entry): entry is string =>
-              typeof entry === "string" && entry.trim().length > 0,
-          ),
-        }
       : {}),
     ...(typeof value.senderPubkey === "string" && value.senderPubkey.trim()
       ? { senderPubkey: value.senderPubkey }
@@ -236,9 +227,7 @@ async function fetchWrapInboxEvent(
   }
 
   const readRelays = NOSTR_RELAYS.filter(isRelayUrl);
-  const extraRelays = (envelope.data?.relayHints ?? []).filter(isRelayUrl);
-  const relays = Array.from(new Set([...readRelays, ...extraRelays]));
-  if (relays.length === 0) {
+  if (readRelays.length === 0) {
     logSw("sw decrypt fetch skipped because no relays were available", {
       data: envelope.data ?? {},
     });
@@ -247,8 +236,8 @@ async function fetchWrapInboxEvent(
 
   logSw("sw decrypt fetching outer wrap", {
     data: envelope.data ?? {},
-    relayCount: relays.length,
-    relays,
+    relayCount: readRelays.length,
+    relays: readRelays,
   });
 
   try {
@@ -260,7 +249,6 @@ async function fetchWrapInboxEvent(
       },
       Effect.flatMap(WrapInbox, (inbox) =>
         inbox.fetchWrapEvent(outerEventId, {
-          extraRelays,
           timeout: WRAP_FETCH_TIMEOUT_MS,
         }),
       ),

@@ -113,7 +113,6 @@ function deliveredWrap(
       wrapId: WrapId.make(id.toString(16).padStart(64, "0")),
       recipient,
       createdAt: 1_754_000_000,
-      relayHints: ["wss://hint.test"],
     },
   };
 }
@@ -136,11 +135,18 @@ describe("RelayWatcher", () => {
     await withHarness(
       async ({ storage, storagePath, pushDelivery, watcher }) => {
         registerWebSubscription(storage);
-        const event = deliveredWrap(1);
+        const original = deliveredWrap(1);
+        const event = {
+          ...original,
+          wrap: { ...original.wrap, relayHints: ["wss://attacker.example"] },
+        };
 
         await watcher.handleDelivered(event);
 
         expect(pushDelivery.webDeliveries).toHaveLength(1);
+        expect(pushDelivery.webDeliveries[0]?.payloadData).not.toHaveProperty(
+          "relayHints",
+        );
         expect(pushDelivery.nativeDeliveries).toHaveLength(0);
         expect(hasSeenEvent(storagePath, event.wrap.wrapId)).toBe(true);
       },

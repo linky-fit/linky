@@ -224,7 +224,6 @@ export class PushDeliveryService {
         outerEventId: payloadData.outerEventId,
         recipientNpub: payloadData.recipientNpub,
         recipientPubkey: payloadData.recipientPubkey,
-        relayHints: JSON.stringify(payloadData.relayHints),
         title: buildNotificationTitle(payloadData),
         type: payloadData.type,
       },

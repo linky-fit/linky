@@ -50,7 +50,6 @@ export interface PushNotificationData {
   recipientPubkey: string;
   recipientNpub: string;
   createdAt: number;
-  relayHints: string[];
 }
 
 export interface PushNotificationEnvelope {

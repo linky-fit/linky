@@ -1,6 +1,6 @@
 # Push inbox
 
-`PushInbox` watches kind-1059 traffic for a server that has no keys: it verifies outer wraps, extracts the recipient and relay hints, and tells you whether each arrival is backfill or live. You need it only when building push infrastructure like `apps/push`; app code uses [`WrapInbox`](./inbox.md). Gift wrap, EOSE, and backfill are defined in [concepts.md](./concepts.md#vocabulary).
+`PushInbox` watches kind-1059 traffic for a server that has no keys: it verifies outer wraps, extracts the recipient, and tells you whether each arrival is backfill or live. You need it only when building push infrastructure like `apps/push`; app code uses [`WrapInbox`](./inbox.md). Gift wrap, EOSE, and backfill are defined in [concepts.md](./concepts.md#vocabulary).
 
 ## The `["linky", "push"]` marker
 
@@ -14,11 +14,7 @@ The Promise-facing entry for long-lived services. No identity is needed. Keep th
 import { RelayUrl, watchPushInbox } from "@linky/linkstr";
 
 /** App callback placeholder: look up subscriptions for `recipient` and send the push. */
-declare const notify: (
-  recipient: string,
-  wrapId: string,
-  relayHints: ReadonlyArray<string>,
-) => void;
+declare const notify: (recipient: string, wrapId: string) => void;
 
 const subscription = watchPushInbox(
   {
@@ -38,7 +34,7 @@ const subscription = watchPushInbox(
   },
   ({ delivery, wrap }) => {
     if (delivery === "backfill") return;
-    notify(wrap.recipient, wrap.wrapId, wrap.relayHints);
+    notify(wrap.recipient, wrap.wrapId);
   },
 );
 
@@ -59,7 +55,7 @@ process.on("SIGTERM", () => {
 | `onRelayStatus`          | `{ type: "eose", relay }` or `{ type: "attempt-ended", relay, reason }`    |
 | `onFatal`                | the whole watcher died with a non-interrupt cause                          |
 
-Each `DeliveredPushWrap` is `{ delivery, wrap }` with `wrap: PushWrap = { wrapId, recipient, createdAt, relayHints }`.
+Each `DeliveredPushWrap` is `{ delivery, wrap }` with `wrap: PushWrap = { wrapId, recipient, createdAt }`.
 
 Per-relay reconnects are automatic and never reach `onFatal`. `onFatal` means the watcher fiber itself died and nothing restarts it: either call `watchPushInbox` again from the callback or exit and let the process supervisor restart the service, as above. `apps/push` only logs it, so a fatal there stays down until the process is restarted.
 
@@ -81,7 +77,7 @@ Per-relay reconnects are automatic and never reach `onFatal`. `onFatal` means th
 | `invalid-signature`          | outer signature fails                                       |
 | `unexpected-recipient-count` | not exactly one distinct `p` pubkey                         |
 
-The outer signature authenticates the id, tags, and ciphertext for routing and dedupe. The server never decrypts anything.
+The outer signature authenticates the id, tags, and ciphertext for routing and dedupe. The server never decrypts anything. Sender-controlled relay hints in `p` tags are ignored. Notification recipients fetch only from their configured relays.
 
 ## In `apps/push`
 
@@ -94,9 +90,8 @@ The outer signature authenticates the id, tags, and ciphertext for routing and d
 | `recipientPubkey` | `wrap.recipient`             |
 | `recipientNpub`   | `encodeNpub(wrap.recipient)` |
 | `createdAt`       | `wrap.createdAt`             |
-| `relayHints`      | `wrap.relayHints`            |
 
-The client calls `WrapInbox.fetchWrapEvent(outerEventId, { extraRelays: relayHints })` ([inbox.md](./inbox.md#fetchwrapevent-for-notification-opens)).
+The client calls `WrapInbox.fetchWrapEvent(outerEventId)` ([inbox.md](./inbox.md#fetchwrapevent-for-notification-opens)).
 
 ## Proving ownership of a subscription
 

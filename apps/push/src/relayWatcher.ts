@@ -124,7 +124,6 @@ export class RelayWatcher {
       recipientPubkey: recipient,
       recipientNpub: encodeNpub(recipient),
       createdAt: wrap.createdAt,
-      relayHints: [...wrap.relayHints],
     };
     const deliveries: Array<Promise<void>> = [];
 

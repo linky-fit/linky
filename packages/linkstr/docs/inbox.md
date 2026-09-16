@@ -117,7 +117,7 @@ const cursorStoreFor = (pubkey: Pubkey) =>
 
 ## `fetchWrapEvent` for notification opens
 
-A push payload names a wrap by id and lists relay hints ([push-inbox.md](./push-inbox.md)). Validate the id first; it came over the network.
+A push payload names a wrap by id ([push-inbox.md](./push-inbox.md)). Validate the id first; it came over the network. Fetch from configured read relays only; ignore sender-provided relay hints, including those in older push payloads.
 
 ```ts
 import { Effect, Schema } from "effect";
@@ -136,14 +136,12 @@ const decodePushed = (
   secretKey: NostrSecretKey,
   readRelays: ReadonlyArray<RelayUrl>,
   outerEventId: string,
-  relayHints: ReadonlyArray<RelayUrl>,
 ): Promise<WrapInboxEvent | null> => {
   if (!isWrapId(outerEventId)) return Promise.resolve(null);
   return runLinkstr(
     { secretKey, readRelays },
     Effect.flatMap(WrapInbox, (inbox) =>
       inbox.fetchWrapEvent(outerEventId, {
-        extraRelays: relayHints,
         timeout: "8 seconds",
       }),
     ).pipe(

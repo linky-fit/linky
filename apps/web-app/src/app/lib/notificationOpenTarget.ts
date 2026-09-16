@@ -1,15 +1,11 @@
 import { asNonEmptyString } from "../../utils/validation";
 import { normalizePubkeyHex } from "../hooks/messages/contactIdentity";
-import {
-  readNotificationOpenData,
-  unwrapNotificationOpenValue,
-} from "./notificationOpen";
+import { unwrapNotificationOpenValue } from "./notificationOpen";
 import { readField } from "../../utils/unknown";
 
 interface NotificationOpenTarget {
   outerEventId: string;
   recipientPubkey: string;
-  relayHints: string[];
   senderPubkey: string | null;
 }
 
@@ -34,27 +30,6 @@ export const readNotificationOpenRoute = (value: unknown): string | null => {
   return normalized || null;
 };
 
-const readNotificationRelayHints = (value: unknown): string[] => {
-  const source = readNotificationOpenData(value);
-  if (!Array.isArray(source)) return [];
-
-  const seen = new Set<string>();
-  const relayHints: string[] = [];
-  for (const entry of source) {
-    const relay = String(entry ?? "").trim();
-    if (
-      !relay ||
-      !(relay.startsWith("wss://") || relay.startsWith("ws://")) ||
-      seen.has(relay)
-    ) {
-      continue;
-    }
-    seen.add(relay);
-    relayHints.push(relay);
-  }
-  return relayHints;
-};
-
 export const readNotificationOpenTarget = (
   value: unknown,
 ): NotificationOpenTarget | null => {
@@ -65,16 +40,13 @@ export const readNotificationOpenTarget = (
   const recipientPubkey = normalizePubkeyHex(
     asNonEmptyString(readField(source, "recipientPubkey")),
   );
-  const relayHints = readNotificationRelayHints(
-    readField(source, "relayHints"),
-  );
   const senderPubkey = normalizePubkeyHex(
     asNonEmptyString(readField(source, "senderPubkey")),
   );
 
   if (!outerEventId || !recipientPubkey) return null;
 
-  return { outerEventId, recipientPubkey, relayHints, senderPubkey };
+  return { outerEventId, recipientPubkey, senderPubkey };
 };
 
 export const consumeNotificationOpenDetailFromHash = (): string | null => {

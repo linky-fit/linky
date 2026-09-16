@@ -34,14 +34,13 @@ const expectFailure = (input: unknown, failure: PushWrapFailure): void => {
 };
 
 describe("decodePushWrap", () => {
-  it("decodes a valid push-marked gift wrap", () => {
+  it("decodes a valid push-marked gift wrap without exposing sender relay hints", () => {
     const wrap = pushWrap();
 
     expect(Either.getOrThrow(decodePushWrap(wrap))).toEqual({
       wrapId: wrap.id,
       recipient,
       createdAt,
-      relayHints: ["wss://relay-a.test", "wss://relay-b.test"],
     });
   });
 

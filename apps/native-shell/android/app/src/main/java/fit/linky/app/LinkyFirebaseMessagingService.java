@@ -50,8 +50,11 @@ public final class LinkyFirebaseMessagingService extends MessagingService {
 
         Intent launchIntent = new Intent(this, MainActivity.class)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        for (Map.Entry<String, String> entry : data.entrySet()) {
-            launchIntent.putExtra(entry.getKey(), entry.getValue());
+        for (String key : new String[] { "outerEventId", "recipientPubkey" }) {
+            String value = data.get(key);
+            if (value != null) {
+                launchIntent.putExtra(key, value);
+            }
         }
         launchIntent.putExtra(EXTRA_NOTIFICATION_ROUTE, NOTIFICATION_ROUTE_CONTACTS);
         launchIntent.putExtra(

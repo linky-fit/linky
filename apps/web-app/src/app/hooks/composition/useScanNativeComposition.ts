@@ -1,5 +1,5 @@
 import { Share } from "@capacitor/share";
-import { decodeNpub, identityFromNsec, RelayUrl, WrapId } from "@linky/linkstr";
+import { decodeNpub, identityFromNsec, WrapId } from "@linky/linkstr";
 import type { WrapInboxEvent } from "@linky/linkstr";
 import { fetchWrapEventAtom, useAtomSet } from "@linky/linkstr-react";
 import { Exit, Schema } from "effect";
@@ -63,7 +63,6 @@ type IdentityOwnersCompositionResult = ReturnType<
   typeof useIdentityOwnersComposition
 >;
 
-const isRelayUrl = Schema.is(RelayUrl);
 const isWrapId = Schema.is(WrapId);
 
 const inboxPeerPubkey = (event: WrapInboxEvent): string | null => {
@@ -562,10 +561,8 @@ export const useScanNativeComposition = ({
         if (!isWrapId(target.outerEventId)) {
           return openedFromNotificationData;
         }
-        const extraRelays = target.relayHints.filter(isRelayUrl);
         const fetched = await fetchWrapEvent({
           wrapId: target.outerEventId,
-          ...(extraRelays.length === 0 ? {} : { extraRelays }),
         });
         if (
           Exit.isFailure(fetched) ||
