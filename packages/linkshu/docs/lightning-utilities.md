@@ -70,6 +70,8 @@ These work on error _messages_. `Melt` itself fails with a typed `InsufficientFu
 
 `fallback: LnurlFallback = (url) => Promise<Response>` is tried when the direct fetch fails — Linky routes through its `/api/lnurlp` proxy for CORS-blocked servers (`apps/web-app/src/lnurlPay.ts`). Fixed-amount LNURLs that re-quote in fiat are followed within 2 % drift.
 
+All LNURL targets and pay/withdraw/auth callbacks require HTTPS, including bech32-encoded URLs. `lnurlp://`, `lnurlw://`, and `keyauth://` resolve to HTTPS. HTTP loopback URLs are rejected too; local LNURL providers need HTTPS. Redirects are followed manually, up to three hops, with HTTPS checked before each request. Browsers hide redirect destinations, so those requests use the optional fallback. Fallback adapters must enforce HTTPS on every upstream redirect as well. Invalid schemes fail before the fallback is called, and an insecure auth preview fails before signing.
+
 ### LNURL-withdraw
 
 The withdrawing service pays an invoice you give it, so the invoice comes from a [topup](./topup.md): preview the offer, open a topup for an amount inside its range, hand the topup's invoice to the callback, and let the topup handle complete on its own.

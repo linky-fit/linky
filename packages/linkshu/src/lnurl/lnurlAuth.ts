@@ -1,14 +1,15 @@
 import {
   decodeLnurlBech32Url,
   fetchLnurlJson,
+  requireLnurlHttpsUrl,
   isLnurlErrorStatus,
   isLnurlStatusResponse,
-  normalizeLnurlHttpUrl,
-  toHttpLnurlUrl,
+  normalizeLnurlHttpsUrl,
+  toHttpsLnurlUrl,
   type LnurlFallback,
 } from "./common";
 import { stripLightningPrefix } from "./lightningAddress";
-import { asNonEmptyString, isHttpUrl } from "./text";
+import { asNonEmptyString, isHttpsUrl } from "./text";
 
 // LUD-04 (LNURL-auth). Unlike pay and withdraw, the whole request is already in
 // the scanned URL — `tag=login` plus the challenge — so a login can be told
@@ -54,7 +55,7 @@ const normalizeLnurlAuthSchemeUrl = (value: string): string | null => {
   if (!/^keyauth:\/\//i.test(normalized)) return null;
 
   const httpUrl = `https://${normalized.replace(/^keyauth:\/\//i, "").trim()}`;
-  return isHttpUrl(httpUrl) ? normalizeLnurlHttpUrl(httpUrl) : null;
+  return isHttpsUrl(httpUrl) ? normalizeLnurlHttpsUrl(httpUrl) : null;
 };
 
 export const parseLnurlAuthTarget = (
@@ -63,7 +64,7 @@ export const parseLnurlAuthTarget = (
   const requestUrl =
     decodeLnurlBech32Url(value) ??
     normalizeLnurlAuthSchemeUrl(value) ??
-    toHttpLnurlUrl(value);
+    toHttpsLnurlUrl(value);
   if (!requestUrl) return null;
 
   let url: URL;
@@ -100,6 +101,7 @@ export const submitLnurlAuth = async (
   },
   fallback?: LnurlFallback,
 ): Promise<void> => {
+  requireLnurlHttpsUrl(args.preview.requestUrl);
   const { publicKeyHex, signatureHex } = await args.sign({
     challengeHex: args.preview.k1,
     domain: args.preview.domain,

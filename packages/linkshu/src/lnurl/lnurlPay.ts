@@ -14,12 +14,13 @@ import { Schema } from "effect";
 import {
   decodeLnurlBech32Url,
   fetchLnurlJson,
+  requireLnurlHttpsUrl,
   isLnurlErrorStatus,
   isLnurlStatusResponse,
-  toHttpLnurlUrl,
+  toHttpsLnurlUrl,
   type LnurlFallback,
 } from "./common";
-import { isRecord, asNonEmptyString, isHttpUrl } from "./text";
+import { isRecord, asNonEmptyString, isHttpsUrl } from "./text";
 export type { LnurlFallback } from "./common";
 
 // How far a fixed-amount LNURL's fresh quote may drift from the confirmed
@@ -134,7 +135,7 @@ const normalizeLnurlSchemeUrl = (value: string): string | null => {
   }
 
   const httpUrl = `https://${rawTarget}`;
-  return isHttpUrl(httpUrl) ? httpUrl : null;
+  return isHttpsUrl(httpUrl) ? httpUrl : null;
 };
 
 const normalizeLnurlWithdrawSchemeUrl = (value: string): string | null => {
@@ -143,7 +144,7 @@ const normalizeLnurlWithdrawSchemeUrl = (value: string): string | null => {
 
   const rawTarget = normalized.replace(/^lnurlw:\/\//i, "").trim();
   const httpUrl = `https://${rawTarget}`;
-  return isHttpUrl(httpUrl) ? httpUrl : null;
+  return isHttpsUrl(httpUrl) ? httpUrl : null;
 };
 
 const resolveLnurlTargetUrlOrNull = (value: string): string | null => {
@@ -156,7 +157,7 @@ const resolveLnurlTargetUrlOrNull = (value: string): string | null => {
   return (
     decodeLnurlBech32Url(normalized) ??
     normalizeLnurlSchemeUrl(normalized) ??
-    toHttpLnurlUrl(normalized)
+    toHttpsLnurlUrl(normalized)
   );
 };
 
@@ -171,7 +172,7 @@ const resolveAnyLnurlTargetUrlOrNull = (value: string): string | null => {
     decodeLnurlBech32Url(normalized) ??
     normalizeLnurlSchemeUrl(normalized) ??
     normalizeLnurlWithdrawSchemeUrl(normalized) ??
-    toHttpLnurlUrl(normalized)
+    toHttpsLnurlUrl(normalized)
   );
 };
 
@@ -345,6 +346,7 @@ export const fetchLnurlPayPreview = async (
 
   const callback = asNonEmptyString(payReq.callback);
   if (!callback) throw new Error("LNURL callback missing");
+  requireLnurlHttpsUrl(callback);
 
   const minSendableMsat = Number(payReq.minSendable ?? NaN);
   const maxSendableMsat = Number(payReq.maxSendable ?? NaN);
@@ -541,6 +543,7 @@ export const fetchLnurlWithdrawPreview = async (
 
   const callback = asNonEmptyString(withdrawJson.callback);
   if (!callback) throw new Error("LNURL withdraw callback missing");
+  requireLnurlHttpsUrl(callback);
 
   const k1 = asNonEmptyString(withdrawJson.k1);
   if (!k1) throw new Error("LNURL withdraw k1 missing");
