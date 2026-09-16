@@ -287,3 +287,20 @@ describe("Linky Nostr relay upgrade", () => {
     expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(false);
   });
 });
+
+it("rejects insecure and malformed relay entries before saving or publishing", async () => {
+  await mount(fakeTransport(published, []), false);
+  const initial = state?.relayUrls;
+  for (const input of [
+    "not-a-url",
+    "ws://attacker.example",
+    "https://relay.example",
+  ]) {
+    await act(async () => state?.setNewRelayUrl(input));
+    expect(state?.canSaveNewRelay).toBe(false);
+    await act(async () => state?.saveNewRelay());
+    expect(state?.relayUrls).toEqual(initial);
+  }
+  expect(published).toEqual([]);
+  expect(setStatus).toHaveBeenCalledWith("errorPrefix: invalidRelayUrl");
+});

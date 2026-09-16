@@ -1,7 +1,7 @@
 import { Cause, Duration, Effect, Exit, Fiber, Layer, Stream } from "effect";
 import type { RelayUrl } from "../domain/primitives";
 import type { NostrTransport } from "../services/NostrTransport";
-import { NostrTransportSimplePool } from "../services/NostrTransport";
+import { makeNostrTransportSimplePool } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import type {
   DeliveredPushWrap,
@@ -11,6 +11,7 @@ import type {
 import { PushInbox } from "./PushInbox";
 
 export interface PushInboxConfig {
+  readonly allowInsecureLocalhost?: boolean | undefined;
   readonly readRelays: ReadonlyArray<RelayUrl>;
   readonly lookbackSeconds: number;
   readonly transport?: Layer.Layer<NostrTransport> | undefined;
@@ -60,7 +61,10 @@ export const watchPushInbox = (
               readRelays: config.readRelays,
               writeRelays: [],
             }),
-            config.transport ?? NostrTransportSimplePool,
+            config.transport ??
+              makeNostrTransportSimplePool({
+                allowInsecureLocalhost: config.allowInsecureLocalhost,
+              }),
           ),
         ),
       ),

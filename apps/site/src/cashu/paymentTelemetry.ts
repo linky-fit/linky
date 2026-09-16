@@ -44,6 +44,8 @@ const config = () => {
     .map((url: string) => RelayUrl.make(url.trim()));
   return {
     secretKey,
+    allowInsecureLocalhost:
+      import.meta.env.VITE_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
     readRelays: relays,
     writeRelays: relays,
     outboxStore: OutboxStore.fromStringStorage(
@@ -193,12 +195,12 @@ export const forwardCashuTokenPrivately = async (args: {
 }): Promise<void> => {
   const to = decodeNpub(args.recipientNpub);
   if (!to) throw new Error("Invalid npub");
-  const { readRelays, writeRelays } = config();
+  const { readRelays, writeRelays, allowInsecureLocalhost } = config();
   const secretKey = NostrSecretKey.make(
     crypto.getRandomValues(new Uint8Array(32)),
   );
   await runLinkstr(
-    { secretKey, readRelays, writeRelays },
+    { secretKey, readRelays, writeRelays, allowInsecureLocalhost },
     Effect.flatMap(Chat, (chat) =>
       chat.sendToken(
         new TokenMessageDraft({ to, token: CashuTokenText.make(args.token) }),

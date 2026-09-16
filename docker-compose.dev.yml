@@ -115,6 +115,7 @@ services:
       context: .
       dockerfile: docker/web-app/Dockerfile
       args:
+        VITE_ALLOW_INSECURE_LOCALHOST_RELAYS: "1"
         VITE_NOSTR_RELAYS: ws://localhost:7777
         VITE_EVOLU_SERVER_URLS: ws://localhost:4001
         VITE_MAIN_MINT_URL: http://localhost:3338

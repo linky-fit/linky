@@ -3,7 +3,7 @@ import {
   Inspector,
   inspectTransport,
   linkstrServices,
-  NostrTransportSimplePool,
+  makeNostrTransportSimplePool,
   observeTransport,
   RelayHealth,
 } from "@linky/linkstr";
@@ -32,7 +32,12 @@ export const linkstrRuntimeAtom = Atom.runtime((get) => {
           // Both decorators are transparent taps over the same raw transport:
           // health folds connection state, the inspector streams diagnostics.
           transport: inspectTransport(
-            observeTransport(config.transport ?? NostrTransportSimplePool),
+            observeTransport(
+              config.transport ??
+                makeNostrTransportSimplePool({
+                  allowInsecureLocalhost: config.allowInsecureLocalhost,
+                }),
+            ),
           ),
           outboxStore: config.outboxStore,
           inboxCursorStore: config.inboxCursorStore,

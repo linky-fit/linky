@@ -105,6 +105,7 @@ const DEFAULT_FETCH_EOSE_TIMEOUT = Duration.seconds(5);
 export const makeRelayPoolTransport = (
   pool: RelayPool,
   options?: {
+    allowInsecureLocalhost?: boolean | undefined;
     publishTimeout?: Duration.Duration;
     fetchEoseTimeout?: Duration.Duration;
   },
@@ -113,15 +114,28 @@ export const makeRelayPoolTransport = (
   const fetchEoseTimeout =
     options?.fetchEoseTimeout ?? DEFAULT_FETCH_EOSE_TIMEOUT;
 
+  const ensureRelay = (relay: RelayUrl): Promise<RelayConnection> => {
+    if (
+      !Schema.is(RelayUrl)(relay) ||
+      (new URL(relay).protocol !== "wss:" &&
+        options?.allowInsecureLocalhost !== true)
+    ) {
+      return Promise.reject(
+        new Error("Relay requires WSS; loopback WS needs explicit opt-in"),
+      );
+    }
+    return pool.ensureRelay(relay, {
+      connectionTimeout: CONNECTION_TIMEOUT_MS,
+    });
+  };
+
   const publishToRelay = (
     relay: RelayUrl,
     event: SignedWrapEvent | SignedPlainEvent,
   ): Effect.Effect<RelayPublishResult> =>
     Effect.tryPromise({
       try: async () => {
-        const connection = await pool.ensureRelay(relay, {
-          connectionTimeout: CONNECTION_TIMEOUT_MS,
-        });
+        const connection = await ensureRelay(relay);
         return await connection.publish(event);
       },
       catch: (reason) => String(reason),
@@ -153,21 +167,19 @@ export const makeRelayPoolTransport = (
       let interrupted = false;
       const alreadyHaveEvent = options?.alreadyHaveEvent;
       const onEose = options?.onEose;
-      pool
-        .ensureRelay(relay, { connectionTimeout: CONNECTION_TIMEOUT_MS })
-        .then(
-          (connection) => {
-            if (interrupted) return;
-            handle = connection.subscribe([filter], {
-              onevent: onEvent,
-              ...(alreadyHaveEvent === undefined ? {} : { alreadyHaveEvent }),
-              ...(onEose === undefined ? {} : { oneose: onEose }),
-              onclose: (reason) => resume(Effect.succeed(reason)),
-            });
-          },
-          (reason) =>
-            resume(new RelayUnreachable({ relay, detail: String(reason) })),
-        );
+      ensureRelay(relay).then(
+        (connection) => {
+          if (interrupted) return;
+          handle = connection.subscribe([filter], {
+            onevent: onEvent,
+            ...(alreadyHaveEvent === undefined ? {} : { alreadyHaveEvent }),
+            ...(onEose === undefined ? {} : { oneose: onEose }),
+            onclose: (reason) => resume(Effect.succeed(reason)),
+          });
+        },
+        (reason) =>
+          resume(new RelayUnreachable({ relay, detail: String(reason) })),
+      );
       return Effect.sync(() => {
         interrupted = true;
         handle?.close();
@@ -192,26 +204,24 @@ export const makeRelayPoolTransport = (
         handle?.close();
         resume(Effect.succeed(events));
       };
-      pool
-        .ensureRelay(relay, { connectionTimeout: CONNECTION_TIMEOUT_MS })
-        .then(
-          (connection) => {
-            if (done) return;
-            timer = setTimeout(settle, Duration.toMillis(fetchEoseTimeout));
-            handle = connection.subscribe([filter], {
-              onevent: (event) => {
-                events.push(event);
-              },
-              oneose: settle,
-              onclose: settle,
-            });
-          },
-          (reason) => {
-            if (done) return;
-            done = true;
-            resume(new RelayUnreachable({ relay, detail: String(reason) }));
-          },
-        );
+      ensureRelay(relay).then(
+        (connection) => {
+          if (done) return;
+          timer = setTimeout(settle, Duration.toMillis(fetchEoseTimeout));
+          handle = connection.subscribe([filter], {
+            onevent: (event) => {
+              events.push(event);
+            },
+            oneose: settle,
+            onclose: settle,
+          });
+        },
+        (reason) => {
+          if (done) return;
+          done = true;
+          resume(new RelayUnreachable({ relay, detail: String(reason) }));
+        },
+      );
       return Effect.sync(() => {
         done = true;
         if (timer !== null) clearTimeout(timer);
@@ -229,7 +239,9 @@ export const makeRelayPoolTransport = (
   };
 };
 
-export const NostrTransportSimplePool: Layer.Layer<NostrTransport> =
+export const makeNostrTransportSimplePool = (options?: {
+  allowInsecureLocalhost?: boolean | undefined;
+}): Layer.Layer<NostrTransport> =>
   Layer.scoped(
     NostrTransport,
     Effect.map(
@@ -246,6 +258,8 @@ export const NostrTransportSimplePool: Layer.Layer<NostrTransport> =
         ),
         (pool) => Effect.sync(() => pool.destroy()),
       ),
-      makeRelayPoolTransport,
+      (pool) => makeRelayPoolTransport(pool, options),
     ),
   );
+
+export const NostrTransportSimplePool = makeNostrTransportSimplePool();

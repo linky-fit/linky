@@ -259,3 +259,43 @@ describe("makeRelayPoolTransport fetch", () => {
     );
   });
 });
+
+describe("loopback relay opt-in", () => {
+  const local = RelayUrl.make("ws://localhost:7777");
+  it("blocks publish, subscribe and fetch before opening a socket by default", async () => {
+    let connected = false;
+    const pool: RelayPool = {
+      ensureRelay: async () => {
+        connected = true;
+        throw new Error("must not connect");
+      },
+    };
+    const localTransport = makeRelayPoolTransport(pool);
+    expect(
+      (await Effect.runPromise(localTransport.publish([local], event)))[0]
+        ?.accepted,
+    ).toBe(false);
+    expect(
+      Exit.isFailure(
+        await Effect.runPromiseExit(localTransport.fetch(local, {})),
+      ),
+    ).toBe(true);
+    expect(
+      Exit.isFailure(
+        await Effect.runPromiseExit(
+          localTransport.subscribe(local, {}, () => {}),
+        ),
+      ),
+    ).toBe(true);
+    expect(connected).toBe(false);
+  });
+  it("permits loopback with explicit development opt-in", async () => {
+    const localTransport = makeRelayPoolTransport(fakePool, {
+      allowInsecureLocalhost: true,
+    });
+    expect(
+      (await Effect.runPromise(localTransport.publish([local], event)))[0]
+        ?.accepted,
+    ).toBe(true);
+  });
+});

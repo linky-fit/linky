@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Effect, Either, Schema } from "effect";
 import {
   finalizeEvent,
   generateSecretKey,
@@ -9,8 +9,11 @@ import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
 import { createSeal, wrapEvent } from "nostr-tools/nip59";
 import type { NostrSecretKey, Pubkey } from "../domain/primitives";
 import { Rumor, SignedSealEvent, SignedWrapEvent } from "./nostrEvent";
+import { nowSeconds } from "./time";
 
 export type UnwrapFailure =
+  | "invalid-wrap"
+  | "invalid-rumor-timestamp"
   | "unwrap-failed"
   | "invalid-seal"
   | "sender-forged"
@@ -22,6 +25,7 @@ const decodeSealEither = Schema.decodeUnknownEither(SignedSealEvent);
 const decodeRumorEither = Schema.decodeUnknownEither(Rumor);
 
 const TWO_DAYS_SECONDS = 2 * 24 * 60 * 60;
+const MAX_FUTURE_RUMOR_SKEW_SECONDS = 5 * 60;
 
 export const LINKY_PUSH_MARKER_TAG = "linky";
 export const LINKY_PUSH_MARKER_VALUE = "push";
@@ -88,7 +92,8 @@ const decryptJson = (
 /**
  * Authenticated unwrap. nostr-tools' `unwrapEvent` verifies nothing, so this
  * decrypts by hand and enforces what NIP-59 leaves to the reader:
- * - the seal signature is valid (the only authentication a wrap has),
+ * - the outer signature is valid before decrypting,
+ * - the seal signature authenticates the sender,
  * - the rumor author is the seal author and not the ephemeral wrap key,
  *   otherwise the sender identity is forgeable,
  * - the rumor id is the hash of the rumor, otherwise dedupe, receipts and
@@ -99,6 +104,9 @@ export const unwrapToRumor = (
   recipientSecretKey: NostrSecretKey,
 ): Either.Either<Rumor, UnwrapFailure> =>
   Either.gen(function* () {
+    if (!verifyEvent(wrap)) {
+      return yield* Either.left<UnwrapFailure>("invalid-wrap");
+    }
     const sealJson = yield* decryptJson(
       wrap.content,
       recipientSecretKey,
@@ -119,6 +127,12 @@ export const unwrapToRumor = (
     const rumor = yield* decodeRumorEither(rumorJson).pipe(
       Either.mapLeft((): UnwrapFailure => "malformed-rumor"),
     );
+    if (
+      rumor.created_at >
+      Effect.runSync(nowSeconds) + MAX_FUTURE_RUMOR_SKEW_SECONDS
+    ) {
+      return yield* Either.left<UnwrapFailure>("invalid-rumor-timestamp");
+    }
     if (rumor.pubkey !== seal.pubkey || rumor.pubkey === wrap.pubkey) {
       return yield* Either.left<UnwrapFailure>("sender-forged");
     }

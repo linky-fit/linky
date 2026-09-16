@@ -2,18 +2,18 @@ import {
   identityFromNsec,
   RelayListEntry,
   RelayListsDraft,
-  RelayUrl,
 } from "@linky/linkstr";
 import {
   fetchOwnRelayListsAtom,
   publishRelayListsAtom,
   useAtomSet,
 } from "@linky/linkstr-react";
-import { Exit, Schema } from "effect";
+import { Exit } from "effect";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
 import {
+  isRelayUrl,
   loadCachedRelayLists,
   loadInitialRelayUrls,
   needsLinkyNostrRelayMigration,
@@ -46,8 +46,6 @@ interface UseRelayDomainResult {
   selectedRelayUrl: string | null;
   setNewRelayUrl: React.Dispatch<React.SetStateAction<string>>;
 }
-
-const isRelayUrl = Schema.is(RelayUrl);
 
 function haveSameRelayUrls(
   left: readonly string[],
@@ -343,6 +341,11 @@ export const useRelayDomain = ({
       return;
     }
 
+    if (!isRelayUrl(url)) {
+      setStatus(`${t("errorPrefix")}: ${t("invalidRelayUrl")}`);
+      return;
+    }
+
     const already = relayUrls.some((u) => u === url);
     if (already) {
       navigateTo({ route: "nostrRelays" });
@@ -422,7 +425,7 @@ export const useRelayDomain = ({
     t,
   ]);
 
-  const canSaveNewRelay = Boolean(newRelayUrl.trim());
+  const canSaveNewRelay = isRelayUrl(newRelayUrl.trim());
 
   return {
     canSaveNewRelay,

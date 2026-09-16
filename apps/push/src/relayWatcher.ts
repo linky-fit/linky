@@ -49,6 +49,8 @@ export class RelayWatcher {
     this.subscription = watchPushInbox(
       {
         readRelays: this.relayUrls,
+        allowInsecureLocalhost:
+          process.env.PUSH_ALLOW_INSECURE_LOCALHOST_RELAYS === "1",
         lookbackSeconds: CATCH_UP_LOOKBACK_SECONDS,
         onInvalidWrap: (failure) =>
           console.warn(`[push] invalid push wrap failure=${failure}`),

@@ -2,21 +2,22 @@ import {
   identityFromNsec,
   InboxCursorStore,
   OutboxStore,
-  RelayUrl,
 } from "@linky/linkstr";
 import {
   linkstrConfigAtom,
   useAtomSet,
   type LinkstrConfig,
 } from "@linky/linkstr-react";
-import { Schema } from "effect";
 import React from "react";
 import {
   getInspectorEmissionEnabled,
   useInspectorEmissionEnabled,
 } from "../../devtools/inspector/inspectorEnabled";
 
-const isRelayUrl = Schema.is(RelayUrl);
+import {
+  ALLOW_INSECURE_LOCALHOST_RELAYS,
+  isRelayUrl,
+} from "../../utils/nostrRelays";
 
 const OUTBOX_STORAGE_KEY = "linky.outbox";
 const INBOX_CURSOR_STORAGE_KEY_PREFIX = "linky.inbox_cursor";
@@ -32,6 +33,7 @@ export const buildLinkstrConfig = (
   const relays = fetchRelays.filter(isRelayUrl);
   return {
     secretKey: identity.secretKey,
+    allowInsecureLocalhost: ALLOW_INSECURE_LOCALHOST_RELAYS,
     readRelays: relays,
     writeRelays: relays,
     outboxStore: OutboxStore.fromStringStorage(

@@ -3,7 +3,12 @@ import { RelayUrl } from "@linky/linkstr";
 import { Schema } from "effect";
 import { safeLocalStorageGetJson, safeLocalStorageSetJson } from "./storage";
 
-const isRelayUrl = Schema.is(RelayUrl);
+export const ALLOW_INSECURE_LOCALHOST_RELAYS =
+  import.meta.env.VITE_ALLOW_INSECURE_LOCALHOST_RELAYS === "1";
+
+export const isRelayUrl = (value: string): value is RelayUrl =>
+  Schema.is(RelayUrl)(value) &&
+  (new URL(value).protocol === "wss:" || ALLOW_INSECURE_LOCALHOST_RELAYS);
 
 const envRelays = Array.from(
   new Set(
@@ -100,5 +105,8 @@ export const saveCachedRelayLists = (
   pubkey: string,
   lists: CachedRelayLists,
 ): void => {
-  safeLocalStorageSetJson(`${RELAY_CACHE_KEY_PREFIX}.${pubkey}`, lists);
+  safeLocalStorageSetJson(`${RELAY_CACHE_KEY_PREFIX}.${pubkey}`, {
+    ...lists,
+    relayUrls: lists.relayUrls.filter(isRelayUrl),
+  });
 };

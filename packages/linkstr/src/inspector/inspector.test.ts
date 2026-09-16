@@ -430,7 +430,7 @@ describe("Inspector", () => {
             rumorKind: null,
             event: expect.objectContaining({
               _tag: "WrapDropped",
-              reason: "unwrap-failed",
+              reason: "invalid-wrap",
             }),
           }),
         );

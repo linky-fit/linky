@@ -63,8 +63,13 @@ const isRelayUrl = (value: string): boolean => {
   try {
     const url = new URL(value);
     return (
-      (url.protocol === "ws:" || url.protocol === "wss:") &&
-      url.hostname.length > 0
+      (url.protocol === "wss:" ||
+        (url.protocol === "ws:" &&
+          ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) &&
+      url.hostname.length > 0 &&
+      url.username === "" &&
+      url.password === "" &&
+      url.hash === ""
     );
   } catch {
     return false;
@@ -73,7 +78,8 @@ const isRelayUrl = (value: string): boolean => {
 
 export const RelayUrl = Schema.NonEmptyTrimmedString.pipe(
   Schema.filter(isRelayUrl, {
-    description: "a ws:// or wss:// url with a host",
+    description:
+      "a wss:// URL, or a loopback ws:// URL for explicitly enabled local development",
   }),
   Schema.brand("RelayUrl"),
 );

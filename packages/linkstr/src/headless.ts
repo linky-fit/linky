@@ -5,13 +5,14 @@ import type { LinkstrServices } from "./composition";
 import type { InboxCursorStore } from "./inbox/InboxCursorStore";
 import type { OutboxStore } from "./outbox/OutboxStore";
 import type { NostrSecretKey, RelayUrl } from "./domain/primitives";
-import { NostrTransportSimplePool } from "./services/NostrTransport";
+import { makeNostrTransportSimplePool } from "./services/NostrTransport";
 import type { NostrTransport } from "./services/NostrTransport";
 
 export interface LinkstrHeadlessConfig {
   readonly outboxStore?: Layer.Layer<OutboxStore> | undefined;
   readonly inboxCursorStore?: Layer.Layer<InboxCursorStore> | undefined;
   readonly secretKey: NostrSecretKey;
+  readonly allowInsecureLocalhost?: boolean | undefined;
   readonly readRelays: ReadonlyArray<RelayUrl>;
   /** Read-only consumers (the service worker) omit this. */
   readonly writeRelays?: ReadonlyArray<RelayUrl> | undefined;
@@ -37,7 +38,11 @@ export const runLinkstr = <A, E>(
         inboxCursorStore: config.inboxCursorStore,
         readRelays: config.readRelays,
         writeRelays: config.writeRelays ?? [],
-        transport: config.transport ?? NostrTransportSimplePool,
+        transport:
+          config.transport ??
+          makeNostrTransportSimplePool({
+            allowInsecureLocalhost: config.allowInsecureLocalhost,
+          }),
       }),
     ),
   );

@@ -9,6 +9,7 @@ import type {
 import type { Layer } from "effect";
 
 export interface LinkstrConfig {
+  readonly allowInsecureLocalhost?: boolean;
   readonly secretKey: NostrSecretKey;
   readonly readRelays: ReadonlyArray<RelayUrl>;
   readonly writeRelays: ReadonlyArray<RelayUrl>;

@@ -88,7 +88,7 @@ The app does this in `useRelayDomain`: it prefers the kind 10002 list, falls bac
 
 Both events are signed with the configured identity and published to every write relay concurrently. Both publishes always run to completion; if either was accepted by no relay the operation fails with that event's `NoRelayAcceptedEvent`, the other may still have landed. Direct only — relay lists are not outbox operations.
 
-`RelayUrl` is a branded `ws://` / `wss://` url with a host. Validate user input with `Schema.is(RelayUrl)` or `Schema.decodeUnknownEither(RelayUrl)`. `DEFAULT_NOSTR_RELAYS` (`defaultRelays.ts`) is a plain string array; filter it through the brand as above before handing it to the config.
+`RelayUrl` accepts `wss://` URLs without credentials or fragments. It also represents `ws://localhost`, `ws://127.0.0.1` and `ws://[::1]` for local development. The default transport refuses these insecure loopback URLs unless configured with `allowInsecureLocalhost: true`. Other `ws://` hosts are always rejected. Validate user input with `Schema.is(RelayUrl)` or `Schema.decodeUnknownEither(RelayUrl)`. `DEFAULT_NOSTR_RELAYS` (`defaultRelays.ts`) is a plain string array; filter it through the brand as above before handing it to the config.
 
 ## Fetching
 

@@ -44,6 +44,8 @@ export const useLinkstrConfigSync = (
 };
 ```
 
+`LinkstrConfig.allowInsecureLocalhost` defaults to false. Enable it only for local development or tests that use `ws://localhost`, `ws://127.0.0.1` or `ws://[::1]`; production relay connections require WSS.
+
 ## Call an operation
 
 Every operation is a `linkstrRuntimeAtom.fn` atom. `useAtomSet(atom, { mode: "promiseExit" })` returns a function that resolves with an `Exit`; call it from a handler. The web app sends reactions through the outbox, so that is the first button:

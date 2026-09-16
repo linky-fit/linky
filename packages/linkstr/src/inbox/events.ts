@@ -12,6 +12,8 @@ export type InboxDelivery = typeof InboxDelivery.Type;
 
 export const DropReason = Schema.Literal(
   "malformed-wrap",
+  "invalid-wrap",
+  "invalid-rumor-timestamp",
   "not-addressed-to-me",
   "unwrap-failed",
   "invalid-seal",

@@ -70,7 +70,12 @@ if (secretKey === null) throw new Error("NSEC is not a valid nsec");
 if (peer === null) throw new Error("PEER is not an npub or a hex pubkey");
 if (!Schema.is(RelayUrl)(relay)) throw new Error("RELAY is not a ws(s):// url");
 
-const config = { secretKey, readRelays: [relay], writeRelays: [relay] };
+const config = {
+  secretKey,
+  readRelays: [relay],
+  writeRelays: [relay],
+  allowInsecureLocalhost: true,
+};
 
 const sendHello = () =>
   runLinkstr(
@@ -154,6 +159,8 @@ What happened:
 Point `RELAY` at a closed port and the lines become `no relay accepted anything; is RELAY up?` and `nothing arrived in 20 s`. A bad `NSEC` stops before any network call: `error: NSEC is not a valid nsec`.
 
 Delete `firstRun.ts` when you are done; it is not part of the package.
+
+The example opts into loopback WS for the local relay. Leave `allowInsecureLocalhost` unset in production. `makeNostrTransportSimplePool({ allowInsecureLocalhost: true })` provides the equivalent layer for direct composition; `NostrTransportSimplePool` requires WSS. Custom transports are responsible for their own connection policy.
 
 ## Two ways to run
 

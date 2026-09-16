@@ -356,7 +356,7 @@ describe("WrapInbox.fetchWrapEvent", () => {
       expect.objectContaining({
         _tag: "WrapDropped",
         wrapId: wrap.id,
-        reason: "unwrap-failed",
+        reason: "invalid-wrap",
       }),
     );
   });
@@ -487,7 +487,7 @@ describe("WrapInbox", () => {
           expect.objectContaining({
             _tag: "WrapDropped",
             wrapId: authentic.id,
-            reason: "unwrap-failed",
+            reason: "invalid-wrap",
           }),
           expect.objectContaining({
             _tag: "WrapDropped",
@@ -526,7 +526,7 @@ describe("WrapInbox", () => {
             expect.objectContaining({
               _tag: "WrapDropped",
               wrapId: wrap.id,
-              reason: "unwrap-failed",
+              reason: "invalid-wrap",
             }),
             expect.objectContaining({ _tag: "ReactionAdded", emoji: "👍" }),
           ]);

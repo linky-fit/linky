@@ -31,7 +31,10 @@ import {
   getChatAttachmentCopyForLanguage,
   getReceivedMoneyCopyForLanguage,
 } from "./app/lib/cashuNotificationCopy";
-import { NOSTR_RELAYS } from "./utils/nostrRelays";
+import {
+  NOSTR_RELAYS,
+  ALLOW_INSECURE_LOCALHOST_RELAYS,
+} from "./utils/nostrRelays";
 import { getStoredPushContactName } from "./utils/pushContactNamesStorage";
 import { appendPushDebugLog, flushPushDebugLog } from "./utils/pushDebugLog";
 import { getStoredPushNsec } from "./utils/pushNsecStorage";
@@ -250,7 +253,11 @@ async function fetchWrapInboxEvent(
 
   try {
     const event = await runLinkstr(
-      { secretKey, readRelays },
+      {
+        secretKey,
+        readRelays,
+        allowInsecureLocalhost: ALLOW_INSECURE_LOCALHOST_RELAYS,
+      },
       Effect.flatMap(WrapInbox, (inbox) =>
         inbox.fetchWrapEvent(outerEventId, {
           extraRelays,

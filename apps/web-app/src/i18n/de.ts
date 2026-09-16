@@ -212,6 +212,7 @@ export const de = {
   nostrRelay: "Nostr-Relay",
   evoluServer: "Evolu-Server",
   addRelay: "Relay hinzufügen",
+  invalidRelayUrl: "Gib eine sichere WebSocket-Relay-URL ein (wss://).",
   relayUrl: "Relay-URL",
   relayStatusLabel: "Status",
   relayStateConnected: "Verbunden",

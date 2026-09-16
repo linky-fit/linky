@@ -47,16 +47,17 @@ process.on("SIGTERM", () => {
 });
 ```
 
-| Config             | Meaning                                                                    |
-| ------------------ | -------------------------------------------------------------------------- |
-| `readRelays`       | relays to subscribe on; one reconnecting subscription each                 |
-| `lookbackSeconds`  | `since = now - lookback` on every (re)subscription                         |
-| `refreshInterval`  | force a fresh REQ this often (default 10 min) to detect deaf subscriptions |
-| `resubscribeDelay` | base backoff after an attempt ends (default 5s)                            |
-| `transport`        | test seam; defaults to `NostrTransportSimplePool`                          |
-| `onInvalidWrap`    | called for every failure except `missing-push-marker`                      |
-| `onRelayStatus`    | `{ type: "eose", relay }` or `{ type: "attempt-ended", relay, reason }`    |
-| `onFatal`          | the whole watcher died with a non-interrupt cause                          |
+| Config                   | Meaning                                                                    |
+| ------------------------ | -------------------------------------------------------------------------- |
+| `allowInsecureLocalhost` | opt into loopback WS for development; default false                        |
+| `readRelays`             | relays to subscribe on; one reconnecting subscription each                 |
+| `lookbackSeconds`        | `since = now - lookback` on every (re)subscription                         |
+| `refreshInterval`        | force a fresh REQ this often (default 10 min) to detect deaf subscriptions |
+| `resubscribeDelay`       | base backoff after an attempt ends (default 5s)                            |
+| `transport`              | test seam; defaults to `NostrTransportSimplePool`                          |
+| `onInvalidWrap`          | called for every failure except `missing-push-marker`                      |
+| `onRelayStatus`          | `{ type: "eose", relay }` or `{ type: "attempt-ended", relay, reason }`    |
+| `onFatal`                | the whole watcher died with a non-interrupt cause                          |
 
 Each `DeliveredPushWrap` is `{ delivery, wrap }` with `wrap: PushWrap = { wrapId, recipient, createdAt, relayHints }`.
 

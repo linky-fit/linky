@@ -128,12 +128,12 @@ describe("dropped wraps", () => {
     );
   });
 
-  it("drops a wrap it cannot decrypt", () => {
+  it("rejects a readdressed wrap before decryption", () => {
     const wrap = wrapRumorFor(rumor, alice.secretKey, bob.pubkey);
     const mallory = makeIdentity();
     const readdressed = overWire({ ...wrap, tags: [["p", mallory.pubkey]] });
     expect(decodeWrap(readdressed, mallory)).toEqual(
-      expect.objectContaining({ reason: "unwrap-failed" }),
+      expect.objectContaining({ reason: "invalid-wrap" }),
     );
   });
 });

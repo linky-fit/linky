@@ -10,7 +10,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      "VITE_NOSTR_RELAYS=ws://localhost:7777 VITE_ALLOW_TEST_MINT=1 bun run build && bun run preview --host localhost --port 5180",
+      "VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=1 VITE_NOSTR_RELAYS=ws://localhost:7777 VITE_ALLOW_TEST_MINT=1 bun run build && bun run preview --host localhost --port 5180",
     url: "http://localhost:5180/cashu/",
     reuseExistingServer: false,
   },
