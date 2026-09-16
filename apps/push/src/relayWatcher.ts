@@ -133,7 +133,7 @@ export class RelayWatcher {
           .catch((error) => {
             console.warn(
               `[push] failed to deliver ${wrap.wrapId} to ${recipient}`,
-              error,
+              error instanceof Error ? error.message : "Unknown delivery error",
             );
           }),
       );

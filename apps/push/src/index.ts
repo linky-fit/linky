@@ -3,6 +3,7 @@ import { createHttpHandler, errorResponse } from "./http";
 import { OwnershipVerifier } from "./ownership";
 import { PushDeliveryService } from "./push";
 import { InMemoryRateLimiter } from "./rateLimit";
+import { MAX_REQUEST_BODY_BYTES } from "./requestSecurity";
 import { RelayWatcher } from "./relayWatcher";
 import { PushStorage } from "./storage";
 
@@ -36,6 +37,7 @@ const cleanupTimer = setInterval(() => {
 
 const server = Bun.serve({
   port: config.port,
+  maxRequestBodySize: MAX_REQUEST_BODY_BYTES,
   fetch: createHttpHandler({
     config,
     storage,

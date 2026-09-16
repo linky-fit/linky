@@ -224,6 +224,10 @@ Copy `.env.example` and set the required values:
 
 Optional values cover the port, storage path, relay list, challenge TTL, proof age window, rate limits, and subscription caps.
 
+Request bodies are limited to 64 KiB, including chunked bodies. Web Push endpoints must use HTTPS on port 443 with a public DNS hostname and no credentials or fragment. Delivery resolves and checks every address, pins the connection to those addresses, keeps TLS hostname verification, refuses redirects, caps provider responses at 16 KiB, and has a 12-second deadline. Chrome/FCM, Firefox, Safari, and other providers meeting these rules work without a provider allowlist. Existing subscriptions are checked again at delivery. Provider response bodies are not logged.
+
+Rate limits use the socket peer unless its exact IP appears in `PUSH_TRUSTED_PROXY_IPS`, a comma-separated list that defaults to empty. For trusted proxies, the server walks `X-Forwarded-For` from right to left and stops at the first untrusted address. Configure only proxies you control, and ensure they append the actual connecting address or replace the header. Never configure arbitrary clients as trusted. For a host proxy forwarding into Docker, configure the peer address actually seen inside the container, which may be its bridge gateway rather than `127.0.0.1`. Without this setting, clients behind a proxy share its rate-limit bucket. HTTP logs omit client IPs; challenge logs omit pubkeys too.
+
 `PUSH_CORS_ORIGIN` accepts either `*` or a comma-separated list of allowed web app origins, for example:
 
 ```bash

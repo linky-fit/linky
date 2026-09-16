@@ -1,3 +1,4 @@
+import { parsePushEndpoint } from "./endpoint";
 import type {
   NativePushSubscriptionData,
   NativeSubscribeRequestBody,
@@ -170,6 +171,20 @@ export function readPubkey(value: unknown, fieldName = "pubkey"): string {
   return pubkey;
 }
 
+function readPushEndpoint(value: unknown): string {
+  const endpoint = readString(value, "subscription.endpoint");
+  try {
+    parsePushEndpoint(endpoint);
+  } catch {
+    throw new RequestError(
+      400,
+      "invalid_endpoint",
+      "Push endpoint must be a public HTTPS URL on port 443",
+    );
+  }
+  return endpoint;
+}
+
 function readWebPushSubscription(value: unknown): WebPushSubscriptionData {
   if (!isRecord(value)) {
     throw new RequestError(
@@ -189,7 +204,7 @@ function readWebPushSubscription(value: unknown): WebPushSubscriptionData {
   }
 
   return {
-    endpoint: readString(value.endpoint, "subscription.endpoint"),
+    endpoint: readPushEndpoint(value.endpoint),
     expirationTime: readNullableNumber(
       value.expirationTime,
       "subscription.expirationTime",

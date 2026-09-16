@@ -9,6 +9,7 @@ import {
   readUnsubscribeRequest,
   RequestError,
 } from "./guards";
+import { clientIp, readBoundedBody } from "./requestSecurity";
 import { hashSecret } from "./hashSecret";
 import { OwnershipVerifier } from "./ownership";
 import { InMemoryRateLimiter, RateLimitError } from "./rateLimit";
@@ -83,28 +84,14 @@ function jsonResponse(
   });
 }
 
-function ipFromRequest(
-  request: Request,
-  server: Bun.Server<undefined>,
-): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const [first] = forwarded.split(",");
-    if (first && first.trim().length > 0) {
-      return first.trim();
-    }
-  }
-
-  return server.requestIP(request)?.address ?? "unknown";
-}
-
 async function readJsonBody(
   request: Request,
 ): Promise<Record<string | number | symbol, unknown>> {
   let json: unknown;
   try {
-    json = await request.json();
-  } catch {
+    json = JSON.parse(await readBoundedBody(request));
+  } catch (error) {
+    if (error instanceof RequestError) throw error;
     throw new RequestError(
       400,
       "invalid_json",
@@ -211,7 +198,11 @@ export function createHttpHandler({
         });
       }
 
-      const ip = ipFromRequest(request, server);
+      const ip = clientIp(
+        server.requestIP(request)?.address,
+        request.headers.get("x-forwarded-for"),
+        config.trustedProxyIps,
+      );
 
       if (request.method === "POST" && url.pathname === "/auth/challenge") {
         rateLimiter.check(
@@ -230,9 +221,7 @@ export function createHttpHandler({
           expiresAt,
           nowMs,
         );
-        console.info(
-          `[push] challenge issued action=${action} pubkey=${pubkey} ip=${ip}`,
-        );
+        console.info(`[push] challenge issued action=${action}`);
 
         return jsonResponse(config, request, 200, {
           pubkey,
@@ -270,7 +259,7 @@ export function createHttpHandler({
           nowMs,
         });
         console.info(
-          `[push] subscribe ok endpoint=${hashSecret(body.subscription.endpoint)} installation=${body.installationId ?? "none"} cleanupLegacy=${body.cleanupLegacySubscriptions} pubkeys=${body.recipientPubkeys.length} ip=${ip}`,
+          `[push] subscribe ok endpoint=${hashSecret(body.subscription.endpoint)} installation=${body.installationId ?? "none"} cleanupLegacy=${body.cleanupLegacySubscriptions} pubkeys=${body.recipientPubkeys.length}`,
         );
 
         return jsonResponse(config, request, 200, {
@@ -315,7 +304,7 @@ export function createHttpHandler({
           nowMs,
         });
         console.info(
-          `[push] native subscribe ok token=${hashSecret(body.device.token)} installation=${body.installationId ?? "none"} platform=${body.device.platform} cleanupLegacy=${body.cleanupLegacySubscriptions} pubkeys=${body.recipientPubkeys.length} ip=${ip}`,
+          `[push] native subscribe ok token=${hashSecret(body.device.token)} installation=${body.installationId ?? "none"} platform=${body.device.platform} cleanupLegacy=${body.cleanupLegacySubscriptions} pubkeys=${body.recipientPubkeys.length}`,
         );
 
         return jsonResponse(config, request, 200, {
@@ -350,7 +339,7 @@ export function createHttpHandler({
           nowMs,
         });
         console.info(
-          `[push] unsubscribe pubkeys endpoint=${hashSecret(body.endpoint)} removedPubkeys=${result.removedPubkeys} removedSubscription=${result.removedSubscription} ip=${ip}`,
+          `[push] unsubscribe pubkeys endpoint=${hashSecret(body.endpoint)} removedPubkeys=${result.removedPubkeys} removedSubscription=${result.removedSubscription}`,
         );
 
         return jsonResponse(config, request, 200, {
@@ -385,7 +374,7 @@ export function createHttpHandler({
           nowMs,
         });
         console.info(
-          `[push] native unsubscribe pubkeys token=${hashSecret(body.token)} removedPubkeys=${result.removedPubkeys} removedSubscription=${result.removedSubscription} ip=${ip}`,
+          `[push] native unsubscribe pubkeys token=${hashSecret(body.token)} removedPubkeys=${result.removedPubkeys} removedSubscription=${result.removedSubscription}`,
         );
 
         return jsonResponse(config, request, 200, {

@@ -1,5 +1,6 @@
 import { DEFAULT_NOSTR_RELAYS } from "@linky/linkstr";
 import { resolve } from "node:path";
+import { normalizeIp } from "./requestSecurity";
 
 export const CATCH_UP_LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
 export const SEEN_EVENT_RETENTION_MARGIN_MS = 6 * 60 * 60 * 1000;
@@ -14,6 +15,7 @@ export interface PushServiceConfig {
   firebaseServiceAccountJson: string | null;
   defaultRelays: string[];
   corsOrigins: string[];
+  trustedProxyIps: string[];
   challengeTtlMs: number;
   proofMaxAgeSeconds: number;
   maxPubkeysPerSubscription: number;
@@ -173,6 +175,11 @@ export function loadConfig(
     ),
     defaultRelays: readRelayList(env),
     corsOrigins: readCorsOrigins(env),
+    trustedProxyIps: (env.PUSH_TRUSTED_PROXY_IPS ?? "")
+      .split(",")
+      .map((ip) => ip.trim())
+      .filter(Boolean)
+      .map(normalizeIp),
     challengeTtlMs: readEnvInteger(env, "PUSH_CHALLENGE_TTL_MS", 5 * 60 * 1000),
     proofMaxAgeSeconds: readEnvInteger(env, "PUSH_PROOF_MAX_AGE_SECONDS", 300),
     maxPubkeysPerSubscription: readEnvInteger(
