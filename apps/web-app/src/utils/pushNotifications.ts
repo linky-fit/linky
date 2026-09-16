@@ -25,7 +25,8 @@ import {
   requestNativeNotificationPermission,
 } from "../platform/nativeBridge";
 import { isNativePlatform } from "../platform/runtime";
-import { appendPushDebugLog } from "./pushDebugLog";
+import { appendPushDebugLog, fingerprintPubkey } from "./pushDebugLog";
+import { isRecord } from "./unknown";
 import { base64 } from "@scure/base";
 import { nowSeconds } from "./time";
 
@@ -200,6 +201,21 @@ function hashStoredIdentifier(value: string | null): string | null {
     return null;
   }
   return value.slice(-24);
+}
+
+function describeNativeNotification(
+  notification: PushNotificationSchema,
+): Record<string, unknown> {
+  const payload: unknown = notification.data;
+  const { body, title, ...data }: Record<string, unknown> = isRecord(payload)
+    ? payload
+    : {};
+  return {
+    data,
+    hasBody: typeof body === "string",
+    hasTitle: typeof title === "string",
+    id: notification.id,
+  };
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -385,7 +401,7 @@ async function ensureNativePushListeners(): Promise<void> {
         appendPushDebugLog(
           "client",
           "native push notification received",
-          notification,
+          describeNativeNotification(notification),
         );
         window.dispatchEvent(
           new CustomEvent("linky-native-push-received", {
@@ -398,11 +414,10 @@ async function ensureNativePushListeners(): Promise<void> {
     await PushNotifications.addListener(
       "pushNotificationActionPerformed",
       (notification: PushNotificationActionPerformed) => {
-        appendPushDebugLog(
-          "client",
-          "native push notification action",
-          notification,
-        );
+        appendPushDebugLog("client", "native push notification action", {
+          actionId: notification.actionId,
+          notification: describeNativeNotification(notification.notification),
+        });
         window.dispatchEvent(
           new CustomEvent(NATIVE_PUSH_ACTION_EVENT, {
             detail: notification,
@@ -495,7 +510,7 @@ async function registerNativePushNotifications(
       appendPushDebugLog("client", "native push register server error", {
         errorMessage,
         installationId,
-        pubkey,
+        pubkeyFingerprint: fingerprintPubkey(pubkey),
         status: response.status,
         tokenHash: hashStoredIdentifier(token),
       });
@@ -514,7 +529,7 @@ async function registerNativePushNotifications(
         details: {
           installationId,
           previousTokenHash: hashStoredIdentifier(previousToken),
-          pubkey,
+          pubkeyFingerprint: fingerprintPubkey(pubkey),
           tokenHash: hashStoredIdentifier(token),
         },
         logPrefix: "native push stale token cleanup",
@@ -530,7 +545,7 @@ async function registerNativePushNotifications(
     appendPushDebugLog("client", "native push register success", {
       installationId,
       previousTokenHash: hashStoredIdentifier(previousToken),
-      pubkey,
+      pubkeyFingerprint: fingerprintPubkey(pubkey),
       tokenHash: hashStoredIdentifier(token),
     });
     return { success: true };
@@ -617,10 +632,10 @@ export async function registerPushNotifications(
     appendPushDebugLog("client", "push registration ready", {
       hasActiveWorker: Boolean(registration.active),
       installationId,
-      pubkey,
+      pubkeyFingerprint: fingerprintPubkey(pubkey),
       storedEndpointHash:
         storedEndpoint === null ? null : storedEndpoint.slice(-24),
-      storedPubkey,
+      storedPubkeyFingerprint: fingerprintPubkey(storedPubkey),
       subscription: describeSubscription(subscription),
       storedVapidKey: storedKey,
       subscriptionApplicationServerKey,
@@ -676,8 +691,8 @@ export async function registerPushNotifications(
     const challenge = await requestChallenge(pubkey, "subscribe");
     appendPushDebugLog("client", "push challenge received", {
       action: challenge.action,
+      challengePubkeyMatches: challenge.pubkey === pubkey,
       expiresAt: challenge.expiresAt,
-      pubkey: challenge.pubkey,
     });
     const proof = await createOwnershipProof({
       action: "subscribe",
@@ -703,7 +718,7 @@ export async function registerPushNotifications(
       const errorMessage = await readErrorMessage(response);
       appendPushDebugLog("client", "push register server error", {
         errorMessage,
-        pubkey,
+        pubkeyFingerprint: fingerprintPubkey(pubkey),
         status: response.status,
         subscription: describeSubscription(subscription),
       });
@@ -726,10 +741,10 @@ export async function registerPushNotifications(
           currentEndpointHash: currentEndpoint.slice(-24),
           installationId,
           previousEndpointHash: previousEndpoint.slice(-24),
-          pubkey,
+          pubkeyFingerprint: fingerprintPubkey(pubkey),
           replacedEndpointHash:
             replacedEndpoint === null ? null : replacedEndpoint.slice(-24),
-          storedPubkey,
+          storedPubkeyFingerprint: fingerprintPubkey(storedPubkey),
         },
         logPrefix: "push stale endpoint cleanup",
         unregister: () =>
@@ -746,7 +761,7 @@ export async function registerPushNotifications(
       installationId,
       previousEndpointHash:
         previousEndpoint === null ? null : previousEndpoint.slice(-24),
-      pubkey,
+      pubkeyFingerprint: fingerprintPubkey(pubkey),
       subscription: describeSubscription(subscription),
     });
     return { success: true };

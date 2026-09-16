@@ -1,12 +1,17 @@
 import { Option, Schema } from "effect";
 import { isRecord } from "./unknown";
 import type { JsonRecord, JsonValue } from "../types/json";
+import { redactDiagnosticText } from "./bootDiagnosticRedaction";
 import { sleep } from "./time";
 
 const PUSH_DEBUG_CACHE_NAME = "linky-push-debug-v1";
 const PUSH_DEBUG_LOG_URL = "/__debug__/push-log.json";
 const PUSH_DEBUG_LOG_LIMIT = 100;
 const PUSH_DEBUG_LOG_BATCH_DELAY_MS = 50;
+const REDACTED = "[redacted]";
+const IDENTITY_KEY_PATTERN = /(pub|pubkey|npub|nsec)s?$/i;
+const BARE_HEX_64_PATTERN = /^[0-9a-f]{64}$/i;
+const PUBKEY_FINGERPRINT_LENGTH = 8;
 const pendingPushDebugEntries: PushDebugLogEntry[] = [];
 let pushDebugLogFlushPromise: Promise<void> | null = null;
 
@@ -27,21 +32,52 @@ const decodeStoredPushDebugLogEntry = Schema.decodeUnknownOption(
   StoredPushDebugLogEntry,
 );
 
+export function fingerprintPubkey(value: string | null): string | null {
+  return value === null ? null : value.slice(0, PUBKEY_FINGERPRINT_LENGTH);
+}
+
+function redactText(value: string): string {
+  return BARE_HEX_64_PATTERN.test(value) ? value : redactDiagnosticText(value);
+}
+
+function redactIdentityValue(value: unknown): JsonValue {
+  if (typeof value === "string") {
+    return REDACTED;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactIdentityValue(entry));
+  }
+
+  if (isRecord(value)) {
+    const out: JsonRecord = {};
+    for (const [key, entry] of Object.entries(value)) {
+      out[key] = redactIdentityValue(entry);
+    }
+    return out;
+  }
+
+  return normalizeJsonValue(value);
+}
+
 function normalizeJsonValue(value: unknown): JsonValue {
   if (
     value === null ||
     typeof value === "boolean" ||
-    typeof value === "number" ||
-    typeof value === "string"
+    typeof value === "number"
   ) {
     return value;
   }
 
+  if (typeof value === "string") {
+    return redactText(value);
+  }
+
   if (value instanceof Error) {
     return {
-      message: value.message,
+      message: redactText(value.message),
       name: value.name,
-      stack: value.stack ?? null,
+      stack: value.stack === undefined ? null : redactText(value.stack),
     };
   }
 
@@ -52,7 +88,9 @@ function normalizeJsonValue(value: unknown): JsonValue {
   if (isRecord(value)) {
     const out: JsonRecord = {};
     for (const [key, entry] of Object.entries(value)) {
-      out[key] = normalizeJsonValue(entry);
+      out[key] = IDENTITY_KEY_PATTERN.test(key)
+        ? redactIdentityValue(entry)
+        : normalizeJsonValue(entry);
     }
     return out;
   }

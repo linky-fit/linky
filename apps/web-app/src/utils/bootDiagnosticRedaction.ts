@@ -28,6 +28,10 @@ export const redactDiagnosticText = (value: string): string =>
       "[redacted secret key]",
     )
     .replace(/\bcashu[ab][a-z0-9_-]{20,}\b/gi, "[redacted cashu token]")
+    .replace(
+      /\bnpub1[023456789acdefghjklmnpqrstuvwxyz]{6,}\b/gi,
+      "[redacted npub]",
+    )
     .replace(/\b[0-9a-f]{64}\b/gi, "[redacted 32-byte value]");
 
 export const stringifyDiagnosticValue = (value: unknown): string =>

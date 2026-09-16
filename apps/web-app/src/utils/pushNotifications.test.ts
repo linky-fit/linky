@@ -26,7 +26,8 @@ vi.mock("@capacitor/push-notifications", () => ({
   PushNotifications: nativePushMocks,
 }));
 
-vi.mock("./pushDebugLog", () => ({
+vi.mock("./pushDebugLog", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./pushDebugLog")>()),
   appendPushDebugLog: vi.fn(),
 }));
 
