@@ -51,14 +51,12 @@ const lnurlProxy = (): Plugin => ({
         const url = new URL(req.url ?? "", "http://localhost");
         if (url.pathname !== "/api/lnurlp") return next();
 
-        if (req.method !== "GET") {
-          res.statusCode = 405;
-          res.end("Method not allowed");
-          return;
-        }
-
         await lnurlpHandler(
-          { query: Object.fromEntries(url.searchParams) },
+          {
+            method: req.method ?? "",
+            headers: req.headers,
+            query: Object.fromEntries(url.searchParams),
+          },
           {
             setHeader: (name, value) => {
               res.setHeader(name, value);

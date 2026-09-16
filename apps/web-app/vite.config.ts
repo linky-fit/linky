@@ -4,13 +4,12 @@ import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import type { ServerResponse } from "node:http";
-import http from "node:http";
-import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Connect, Plugin, ViteDevServer } from "vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
+import lnurlpHandler from "./api/lnurlp.js";
 import { inspectorCollector } from "./server/inspectorCollector";
 import { fetchLinkPreview } from "./server/linkPreview";
 
@@ -109,74 +108,31 @@ const lnurlProxy = (): Plugin => ({
         res: ServerResponse,
         next: Connect.NextFunction,
       ) => {
-        const url = req.url ?? "";
-        if (!url.startsWith("/api/lnurlp")) return next();
-
-        if (req.method !== "GET") {
-          res.statusCode = 405;
-          res.end("Method not allowed");
-          return;
-        }
-
-        const parsed = new URL(url, "http://localhost");
-        const target = String(parsed.searchParams.get("url") ?? "").trim();
-        if (!/^https?:\/\//i.test(target)) {
-          res.statusCode = 400;
-          res.end("Invalid url");
-          return;
-        }
-
-        try {
-          const targetUrl = new URL(target);
-          const isHttps = targetUrl.protocol === "https:";
-          const client = isHttps ? https : http;
-
-          const proxyReq = client.request(
-            {
-              method: "GET",
-              hostname: targetUrl.hostname,
-              port: targetUrl.port
-                ? Number(targetUrl.port)
-                : isHttps
-                  ? 443
-                  : 80,
-              path: `${targetUrl.pathname}${targetUrl.search}`,
-              headers: {
-                Accept: "application/json",
-              },
-              timeout: 12_000,
+        const url = new URL(req.url ?? "", "http://localhost");
+        if (url.pathname !== "/api/lnurlp") return next();
+        await lnurlpHandler(
+          {
+            method: req.method ?? "",
+            headers: req.headers,
+            query: Object.fromEntries(url.searchParams),
+          },
+          {
+            setHeader: (name, value) => {
+              res.setHeader(name, value);
             },
-            (proxyRes) => {
-              res.statusCode = proxyRes.statusCode ?? 502;
-              const contentType = proxyRes.headers["content-type"];
-              if (contentType) {
-                res.setHeader("Content-Type", contentType);
-              } else {
-                res.setHeader("Content-Type", "application/json");
-              }
-              res.setHeader("Cache-Control", "no-store");
-              proxyRes.pipe(res);
+            status: (code) => {
+              res.statusCode = code;
+              return {
+                json: (body) => {
+                  res.end(JSON.stringify(body));
+                },
+                send: (body) => {
+                  res.end(body);
+                },
+              };
             },
-          );
-
-          proxyReq.on("timeout", () => {
-            proxyReq.destroy(new Error("Proxy timeout"));
-          });
-
-          proxyReq.on("error", (error) => {
-            if (res.headersSent) return;
-            res.statusCode = 502;
-            res.end(`Proxy error: ${String(error ?? "")}`);
-          });
-
-          proxyReq.end();
-        } catch (error) {
-          server.config.logger.error(
-            `LNURL proxy error: ${String(error ?? "unknown")}`,
-          );
-          res.statusCode = 502;
-          res.end(`Proxy error: ${String(error ?? "")}`);
-        }
+          },
+        );
       },
     );
   },

@@ -7,6 +7,7 @@ import {
 import {
   getFirstQueryValue,
   parseJsonObject,
+  requireProxyGet,
   sendProxyFailure,
   sendProxyResult,
   type ApiRequest,
@@ -42,6 +43,8 @@ const readCallbackUrl = (payRequestText: string): URL | null => {
 // only URLs ever fetched are the address's well-known endpoint, the callback
 // that endpoint returned, and redirects of those that pass the same checks.
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (!requireProxyGet(req, res)) return;
+
   const address = getFirstQueryValue(req.query?.address)?.toLowerCase();
   const endpoint = address ? getLnurlpEndpoint(address) : null;
   if (!endpoint) {

@@ -1,44 +1,35 @@
-import { isAllowedTarget, safeFetch } from "./_safeFetch.js";
+import {
+  getFirstQueryValue,
+  requireProxyGet,
+  sendProxyFailure,
+  sendProxyResult,
+  type ApiRequest,
+  type ApiResponse,
+} from "../../site/api/_npubcash.js";
+import { isAllowedTarget, safeFetch } from "../../site/api/_safeFetch.js";
 
-const parseTarget = (raw: string | string[] | undefined): URL | null => {
-  const value = (Array.isArray(raw) ? raw[0] : raw)?.trim();
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return isAllowedTarget(url) ? url : null;
-  } catch {
-    return null;
+export default async function handler(req: ApiRequest, res: ApiResponse) {
+  const origin = getFirstQueryValue(req.headers?.origin);
+  res.setHeader("Vary", "Origin");
+  if (origin === "https://localhost" || origin === "capacitor://localhost") {
+    res.setHeader("Access-Control-Allow-Origin", origin);
   }
-};
+  if (!requireProxyGet(req, res)) return;
 
-export default async function handler(
-  req: { query?: Record<string, string | string[] | undefined> },
-  res: {
-    status: (code: number) => {
-      json: (body: Record<string, unknown>) => void;
-      send: (body: string) => void;
-    };
-    setHeader: (name: string, value: string) => void;
-  },
-) {
-  const target = parseTarget(req.query?.url);
-  if (!target) {
+  const raw = getFirstQueryValue(req.query?.url);
+  let target: URL;
+  try {
+    if (!raw || raw.length > 2000) throw new Error("Invalid url");
+    target = new URL(raw);
+    if (!isAllowedTarget(target)) throw new Error("Invalid url");
+  } catch {
     res.status(400).json({ error: "Invalid url" });
     return;
   }
 
   try {
-    // Fetch through the hardened guard (https-only, no ports/creds, public-IP
-    // check, pinned connect, redirect re-validation). The response is always
-    // served as JSON with nosniff and no open CORS: reflecting the upstream
-    // content type turned this into reflected XSS on the app origin, and the
-    // lack of an egress guard made it an open SSRF proxy.
-    const result = await safeFetch(target);
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.status(result.status).send(result.text);
+    sendProxyResult(res, await safeFetch(target));
   } catch {
-    res.status(502).json({ error: "Proxy fetch failed" });
+    sendProxyFailure(res);
   }
 }

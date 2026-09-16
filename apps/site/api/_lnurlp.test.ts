@@ -12,7 +12,7 @@ const { lookup, undiciFetch } = vi.hoisted(() => ({
 
 vi.mock("node:dns", () => ({ promises: { lookup } }));
 
-vi.mock("undici", () => ({
+vi.mock("undici/index.js", () => ({
   Agent: class {
     close = async (): Promise<void> => {};
   },
@@ -28,7 +28,7 @@ interface Sent {
 const run = async (query: Record<string, string>): Promise<Sent> => {
   const sent: Sent = { status: 0, body: "", headers: {} };
   await handler(
-    { query },
+    { method: "GET", query },
     {
       setHeader: (name, value) => {
         sent.headers[name] = value;
