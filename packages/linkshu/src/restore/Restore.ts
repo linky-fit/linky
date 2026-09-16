@@ -5,9 +5,12 @@ import type { MintUrl, ProofId } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import {
   advanceCounterTo,
+  advanceRestoreCursor,
   COUNTER_LOCK_KEY_PREFIX,
   DETERMINISTIC_COUNTER_KEY_PREFIX,
   readCounter,
+  readRestoreCursor,
+  RESTORE_CURSOR_KEY_PREFIX,
   withCounterLock,
 } from "../internal/counters";
 import type { CounterScope } from "../internal/counters";
@@ -31,13 +34,7 @@ import { ProofStore } from "../ports/ProofStore";
 import { toDomainProofs } from "../token/internal/cashuProofs";
 import { RestoreReport } from "./domain";
 import type { RestoreDraft, RestoreProgress } from "./domain";
-import {
-  advanceRestoreCursor,
-  readRestoreCursor,
-  readSeenKeysets,
-  rememberKeysets,
-  RESTORE_CURSOR_KEY_PREFIX,
-} from "./internal/restoreState";
+import { readSeenKeysets, rememberKeysets } from "./internal/restoreState";
 import {
   RESTORE_BATCH_SIZE,
   RESTORE_GAP_LIMIT,

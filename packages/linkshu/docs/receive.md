@@ -34,7 +34,7 @@ The receipt carries `amount`, `unit`, `mint`, and the `operationId` of the `rece
 4. **Swap.** Under the counter lock, the proofs are swapped for fresh deterministic outputs.
 5. **Persist the proofs.** The fresh proofs are stored `available`, then the receive moves to `done`. Only now does the receipt resolve.
 
-The package retries counter collisions at the mint automatically, so a receive on a fresh origin may take a few round-trips. If recovery fails, the last rejection surfaces as `MintRejected`.
+The package retries counter collisions at the mint automatically, so a receive on a fresh origin may take a few round-trips. Recovery prefers the stored NUT-09 restore cursor when it is already past the counter in effect, because it marks where the last restore saw the tree end and so clears everything that restore walked in one step; otherwise it probes a NUT-09 window for the last signed slot, and falls back to a blind bump. If recovery fails, the last rejection surfaces as `MintRejected`.
 
 Any failure after step 3 leaves the receive `failed` with the serialized error in `error` — transient or definitive. Pasting the same text again retries it over the same operation (`Tokens.returnToWallet` on the transfer does the same); `Tokens.forget` closes it once it is not worth retrying. `Tokens.returnToWallet` on a `send` runs this same flow over the handed-out text.
 

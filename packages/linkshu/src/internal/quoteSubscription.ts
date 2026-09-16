@@ -112,7 +112,6 @@ const subscribeOnce = (
       let cancel: (() => void) | null = null;
       let removeCloseListener: (() => void) | null = null;
       let settled = false;
-      retainSocket(wallet);
 
       const stop = (): void => {
         if (settled) return;
@@ -121,7 +120,6 @@ const subscribeOnce = (
         removeCloseListener = null;
         cancel?.();
         cancel = null;
-        releaseSocket(wallet);
       };
 
       const fail = (error: unknown): void => {
@@ -165,7 +163,10 @@ const subscribeOnce = (
 
 /**
  * Resolves with the quote the mint reports as settled, re-subscribing for as
- * long as it takes. Interrupting cancels whatever subscription is open.
+ * long as it takes. The socket stays retained across the backoff between
+ * attempts, so a sibling settling meanwhile does not close the connection
+ * this subscriber is about to reuse. Interrupting cancels whatever
+ * subscription is open.
  */
 export const awaitMintQuoteSettled = (
   wallet: LoadedWallet,
@@ -173,11 +174,16 @@ export const awaitMintQuoteSettled = (
 ): Effect.Effect<MintQuoteBolt11Response, MintUnreachable | MintRejected> =>
   Effect.gen(function* () {
     const inspector = yield* Inspector.orNoop;
-    return yield* subscribeOnce(wallet, quote).pipe(
-      inspectFailureWith(inspector, "topup.subscribe", {
-        mint: quote.mint,
-        quoteId: quote.quoteId,
-      }),
-      Effect.retry(RESUBSCRIBE_SCHEDULE),
+    return yield* Effect.acquireUseRelease(
+      Effect.sync(() => retainSocket(wallet)),
+      () =>
+        subscribeOnce(wallet, quote).pipe(
+          inspectFailureWith(inspector, "topup.subscribe", {
+            mint: quote.mint,
+            quoteId: quote.quoteId,
+          }),
+          Effect.retry(RESUBSCRIBE_SCHEDULE),
+        ),
+      () => Effect.sync(() => releaseSocket(wallet)),
     );
   });

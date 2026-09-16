@@ -3,7 +3,7 @@ import type { KeysetId } from "../domain/primitives";
 import type { InspectorService } from "../inspector/Inspector";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
-import { advanceCounterTo } from "./counters";
+import { advanceCounterTo, readCounter, readRestoreCursor } from "./counters";
 import type { CounterScope } from "./counters";
 import {
   isDuplicateOutputsError,
@@ -44,9 +44,12 @@ const probeLastSignedCounter = (
   );
 
 /**
- * Moves the counter past a recoverable output collision: for `outputs
- * already signed` and CDK `duplicate outputs` failures a NUT-09 probe locates the last signed
- * slot; otherwise (or when the probe fails) the counter jumps `fallbackBump`
+ * Moves the counter past a recoverable output collision. A restore cursor
+ * ahead of the counter in effect (the colliding one, or a block the caller
+ * already reserved) wins without a round-trip: it marks where the last
+ * restore saw the tree end. Otherwise, for `outputs already signed` and CDK
+ * `duplicate outputs` failures a NUT-09 probe locates the last signed slot,
+ * and when that does not apply or fails the counter jumps `fallbackBump`
  * ahead. Caller must hold the counter lock. Returns the counter now in
  * effect.
  */
@@ -56,6 +59,17 @@ export const recoverFromCollision = (
   raw: unknown,
 ): Effect.Effect<number> =>
   Effect.gen(function* () {
+    const inEffect = Math.max(counter, yield* readCounter(ctx.kv, ctx.scope));
+    const cursor = yield* readRestoreCursor(ctx.kv, ctx.scope);
+    if (cursor > inEffect) {
+      return yield* advanceCounterTo(
+        ctx.kv,
+        ctx.inspector,
+        ctx.scope,
+        cursor,
+        "collision-recovery",
+      );
+    }
     const lastSigned =
       isOutputsAlreadySignedError(raw) || isDuplicateOutputsError(raw)
         ? yield* probeLastSignedCounter(ctx.wallet, counter, ctx.scope.keysetId)

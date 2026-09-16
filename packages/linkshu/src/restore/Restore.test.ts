@@ -3,7 +3,10 @@ import { getDecodedToken, Keyset } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import { MintUnreachable } from "../domain/errors";
 import { CurrencyUnit, KeysetId, MintUrl } from "../domain/primitives";
-import { deterministicCounterKey } from "../internal/counters";
+import {
+  deterministicCounterKey,
+  restoreCursorKey,
+} from "../internal/counters";
 import { seenMintKey, WalletInstances } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import { inMemoryOperationStore } from "../ports/inMemoryOperationStore";
@@ -16,7 +19,7 @@ import { recordingInspector } from "../testing/inspector";
 import { amountIn, secretsOf, seedProofs } from "../testing/inventory";
 import type { RestoreProgress } from "./domain";
 import { RestoreDraft } from "./domain";
-import { restoreCursorKey, seenKeysetKey } from "./internal/restoreState";
+import { seenKeysetKey } from "./internal/restoreState";
 import { Restore } from "./Restore";
 
 const mint = MintUrl.make("https://mint.example");

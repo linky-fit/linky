@@ -1,44 +1,17 @@
 import { Effect, Schema } from "effect";
 import { KeysetId } from "../../domain/primitives";
 import type { CurrencyUnit, MintUrl } from "../../domain/primitives";
-import { readStoredInteger, scopeSuffix } from "../../internal/counters";
-import type { CounterScope } from "../../internal/counters";
 import type { KeyValueStoreService } from "../../ports/KeyValueStore";
 
 /**
- * Restore's own durable bookkeeping, next to the deterministic counters and
- * keyed the same way. Two facts survive between runs:
- *
- * - the cursor, so a second restore resumes near where the last one stopped
- *   instead of rescanning the whole derivation tree, and
- * - the keysets a mint has shown us, so proofs signed by a keyset the mint
- *   later stops listing are still recoverable.
+ * Restore's own durable bookkeeping: the keysets a mint has shown us, so
+ * proofs signed by a keyset the mint later stops listing are still
+ * recoverable. The restore cursor lives with the deterministic counters in
+ * `internal/counters.ts`, keyed the same way, because collision recovery
+ * reads it too.
  */
 
-export const RESTORE_CURSOR_KEY_PREFIX = "linkshu.restoreCursor.";
 const SEEN_KEYSETS_KEY_PREFIX = "linkshu.seenKeysets.";
-
-export const restoreCursorKey = (scope: CounterScope): string =>
-  RESTORE_CURSOR_KEY_PREFIX + scopeSuffix(scope);
-
-/** Absent or malformed cursors read as 0 — scan the tree from its start. */
-export const readRestoreCursor = (
-  kv: KeyValueStoreService,
-  scope: CounterScope,
-): Effect.Effect<number> => readStoredInteger(kv, restoreCursorKey(scope), 0);
-
-/** Cursors never move backwards; a lower one would only redo covered ground. */
-export const advanceRestoreCursor = (
-  kv: KeyValueStoreService,
-  scope: CounterScope,
-  target: number,
-): Effect.Effect<number> =>
-  Effect.gen(function* () {
-    const current = yield* readRestoreCursor(kv, scope);
-    const next = Math.max(current, Math.floor(target));
-    if (next > current) yield* kv.set(restoreCursorKey(scope), String(next));
-    return next;
-  });
 
 const seenKeysetPrefix = (mint: MintUrl, unit: CurrencyUnit): string =>
   SEEN_KEYSETS_KEY_PREFIX +

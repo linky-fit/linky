@@ -17,13 +17,17 @@ export interface CounterScope {
 
 export const DETERMINISTIC_COUNTER_KEY_PREFIX = "linkshu.detCounter.";
 export const COUNTER_LOCK_KEY_PREFIX = "linkshu.detCounterLock.";
+export const RESTORE_CURSOR_KEY_PREFIX = "linkshu.restoreCursor.";
 
-/** Key suffix identifying one derivation tree; shared with restore cursors. */
+/** Key suffix identifying one derivation tree; counters and restore cursors share it. */
 export const scopeSuffix = (scope: CounterScope): string =>
   [scope.mint, scope.unit, scope.keysetId].map(encodeURIComponent).join(".");
 
 export const deterministicCounterKey = (scope: CounterScope): string =>
   DETERMINISTIC_COUNTER_KEY_PREFIX + scopeSuffix(scope);
+
+export const restoreCursorKey = (scope: CounterScope): string =>
+  RESTORE_CURSOR_KEY_PREFIX + scopeSuffix(scope);
 
 /**
  * Cross-context mutual exclusion over one counter scope. Every read and
@@ -73,6 +77,25 @@ export const readCounter = (
   scope: CounterScope,
 ): Effect.Effect<number> =>
   readStoredInteger(kv, deterministicCounterKey(scope), 1);
+
+/** Absent or malformed cursors read as 0 — scan the tree from its start. */
+export const readRestoreCursor = (
+  kv: KeyValueStoreService,
+  scope: CounterScope,
+): Effect.Effect<number> => readStoredInteger(kv, restoreCursorKey(scope), 0);
+
+/** Cursors never move backwards; a lower one would only redo covered ground. */
+export const advanceRestoreCursor = (
+  kv: KeyValueStoreService,
+  scope: CounterScope,
+  target: number,
+): Effect.Effect<number> =>
+  Effect.gen(function* () {
+    const current = yield* readRestoreCursor(kv, scope);
+    const next = Math.max(current, Math.floor(target));
+    if (next > current) yield* kv.set(restoreCursorKey(scope), String(next));
+    return next;
+  });
 
 /**
  * Advances the stored counter to `target`, never backwards (a gap costs a
