@@ -1,3 +1,5 @@
+import { Schema } from "effect";
+import { createContactNameFormatter, getContactName } from "./contactName";
 import { asNonEmptyString } from "./validation";
 const PUSH_CONTACT_NAMES_DB_NAME = "linky-push-contact-names-v1";
 const PUSH_CONTACT_NAMES_DB_VERSION = 1;
@@ -5,16 +7,20 @@ const PUSH_CONTACT_NAMES_STORE_NAME = "contacts";
 
 interface PushContactNameRecordInput {
   name: string;
+  nameSetByUser?: boolean;
   npub: string;
   pubkey: string;
 }
 
-interface StoredPushContactNameRecord {
-  name: string;
-  npub: string;
-  pubkey: string;
-  updatedAt: number;
-}
+const StoredPushContactNameRecord = Schema.Struct({
+  name: Schema.String,
+  nameSetByUser: Schema.optional(Schema.Boolean),
+  npub: Schema.String,
+  pubkey: Schema.String,
+  updatedAt: Schema.Number,
+});
+type StoredPushContactNameRecord = typeof StoredPushContactNameRecord.Type;
+const isStoredPushContactNameRecord = Schema.is(StoredPushContactNameRecord);
 
 function canUseIndexedDb(): boolean {
   try {
@@ -22,16 +28,6 @@ function canUseIndexedDb(): boolean {
   } catch {
     return false;
   }
-}
-
-function isStoredPushContactNameRecord(
-  value: unknown,
-): value is StoredPushContactNameRecord {
-  if (typeof value !== "object" || value === null) return false;
-  if (!("name" in value) || typeof value.name !== "string") return false;
-  if (!("npub" in value) || typeof value.npub !== "string") return false;
-  if (!("pubkey" in value) || typeof value.pubkey !== "string") return false;
-  return "updatedAt" in value && typeof value.updatedAt === "number";
 }
 
 function openPushContactNamesDb(): Promise<IDBDatabase> {
@@ -106,12 +102,18 @@ export async function setStoredPushContactNames(
   for (const contact of contacts) {
     const pubkey = asNonEmptyString(contact.pubkey);
     const npub = asNonEmptyString(contact.npub);
-    const name = asNonEmptyString(contact.name);
+    const name = getContactName(contact);
     if (!pubkey || !npub || !name) continue;
     if (seenPubkeys.has(pubkey)) continue;
 
     seenPubkeys.add(pubkey);
-    records.push({ name, npub, pubkey, updatedAt });
+    records.push({
+      name,
+      npub,
+      pubkey,
+      updatedAt,
+      nameSetByUser: contact.nameSetByUser === true,
+    });
   }
 
   const db = await openPushContactNamesDb();
@@ -146,15 +148,18 @@ export async function getStoredPushContactName(
       "readonly",
     );
     const value: unknown = await awaitRequest(
-      transaction
-        .objectStore(PUSH_CONTACT_NAMES_STORE_NAME)
-        .get(normalizedPubkey),
+      transaction.objectStore(PUSH_CONTACT_NAMES_STORE_NAME).getAll(),
     );
     await awaitTransaction(transaction);
-    if (!isStoredPushContactNameRecord(value)) {
-      return null;
-    }
-    return asNonEmptyString(value.name);
+    const records = Schema.is(Schema.Array(Schema.Unknown))(value)
+      ? value.filter(isStoredPushContactNameRecord)
+      : [];
+    const contact = records.find(
+      (record) => record.pubkey === normalizedPubkey,
+    );
+    return contact
+      ? createContactNameFormatter(records)(contact) || null
+      : null;
   } finally {
     db.close();
   }

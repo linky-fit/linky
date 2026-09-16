@@ -6,12 +6,11 @@ const SW_BUILD_TAG = "linky-sw-2026-08-14T00:00-linkstr-wrap-fetch";
 const NOTIFICATION_OPEN_URL = "/#contacts";
 const NOTIFICATION_OPEN_HASH_PARAM = "notificationOpen";
 
+import { buildPushNotificationTitle } from "./utils/pushNotificationTitle";
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import {
-  encodeNpub,
   identityFromNsec,
   NostrSecretKey,
-  parsePubkey,
   RelayUrl,
   runLinkstr,
   WrapId,
@@ -38,7 +37,6 @@ import {
 import { getStoredPushContactName } from "./utils/pushContactNamesStorage";
 import { appendPushDebugLog, flushPushDebugLog } from "./utils/pushDebugLog";
 import { getStoredPushNsec } from "./utils/pushNsecStorage";
-import { formatShortNpub } from "./utils/formatting";
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -168,35 +166,6 @@ function truncateNotificationBody(value: string): string {
     return normalized;
   }
   return `${normalized.slice(0, 140)}…`;
-}
-
-function formatNotificationPeerLabel(pubkeyHex: string): string {
-  const normalized = pubkeyHex.trim();
-  if (!normalized) return "";
-
-  const pubkey = parsePubkey(normalized);
-  return formatShortNpub(pubkey ? encodeNpub(pubkey) : normalized);
-}
-
-function buildNotificationTitle(
-  envelope: PushNotificationEnvelope,
-  decryptedMessage: DecryptedPushMessage | null,
-  senderContactName: string | null,
-): string {
-  const contactName = (senderContactName ?? "").trim();
-  if (contactName) return `Linky - ${contactName}`;
-
-  const senderLabel = decryptedMessage
-    ? formatNotificationPeerLabel(decryptedMessage.senderPub)
-    : "";
-  if (senderLabel) return `Linky - ${senderLabel}`;
-
-  const recipientLabel = formatShortNpub(
-    envelope.data?.recipientNpub ?? envelope.data?.recipientPubkey ?? "",
-  );
-  return recipientLabel
-    ? `Linky - ${recipientLabel}`
-    : (envelope.title ?? "Linky");
 }
 
 function createSpaydResponse(url: URL): Response {
@@ -550,11 +519,13 @@ self.addEventListener("push", (event) => {
             () => null,
           )
         : null;
-      const notificationTitle = buildNotificationTitle(
-        envelope,
-        decryptedMessage,
-        senderContactName,
-      );
+      const notificationTitle = buildPushNotificationTitle({
+        contactName: senderContactName,
+        senderPubkey: decryptedMessage?.senderPub,
+        recipientIdentifier:
+          envelope.data?.recipientNpub ?? envelope.data?.recipientPubkey,
+        title: envelope.title,
+      });
       const options: NotificationOptions = {
         badge: "/pwa-192x192.png",
         body: notificationBody,

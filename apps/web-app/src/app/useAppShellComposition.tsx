@@ -1,3 +1,4 @@
+import { createContactNameFormatter } from "../utils/contactName";
 import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
 import * as Evolu from "@evolu/common";
 import { useQuery } from "@evolu/react";
@@ -1117,6 +1118,11 @@ export const useAppShellComposition = ({
     ],
   );
 
+  const formatContactName = React.useMemo(
+    () => createContactNameFormatter(Array.from(displayContactById.values())),
+    [displayContactById],
+  );
+
   const renderContactCard = React.useCallback(
     (contact: DisplayContact) => {
       const npub = normalizeNpubIdentifier(contact.npub ?? "");
@@ -1135,6 +1141,7 @@ export const useAppShellComposition = ({
         <ContactCard
           key={contact.id ?? ""}
           contact={contact}
+          nameLabel={formatContactName(contact)}
           avatarUrl={avatarUrl}
           lastMessage={last ?? null}
           hasAttention={hasAttention}
@@ -1151,6 +1158,7 @@ export const useAppShellComposition = ({
       );
     },
     [
+      formatContactName,
       getCashuTokenMessageInfo,
       getMintIconUrl,
       getNpubMessageContactInfo,

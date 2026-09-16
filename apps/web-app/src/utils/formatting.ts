@@ -1,3 +1,4 @@
+import { normalizeProfileName } from "./profileName";
 import type { Translate } from "../i18n";
 export const getInitials = (name: string): string => {
   const normalized = name.trim();
@@ -64,9 +65,9 @@ export const getBestNostrName = (metadata: {
   displayName?: string | undefined;
   name?: string | undefined;
 }): string | null => {
-  const display = (metadata.displayName ?? "").trim();
+  const display = normalizeProfileName(metadata.displayName ?? "");
   if (display) return display;
-  const name = (metadata.name ?? "").trim();
+  const name = normalizeProfileName(metadata.name ?? "");
   if (name) return name;
   return null;
 };

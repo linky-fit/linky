@@ -1,3 +1,4 @@
+import { createContactNameFormatter } from "../../../utils/contactName";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { BankOfferAuthorization } from "./bankOfferAuthorization";
 import { Schema } from "effect";
@@ -81,12 +82,14 @@ const deriveMyPubkey = (currentNsec: string | null): string | null => {
 
 type InboxContactRowLike = ContactNameRowLike & {
   npub?: string | null | undefined;
+  nameSetByUser?: number | null | undefined;
 };
 
 const buildContactIndex = (
   contacts: readonly InboxContactRowLike[],
 ): Map<string, InboxContact> => {
   const contactByPubkey = new Map<string, InboxContact>();
+  const formatName = createContactNameFormatter(contacts);
   // Archived contacts stay in the index: their incoming messages land on the
   // contact itself, which then restores it from the archive.
   for (const contact of contacts) {
@@ -97,7 +100,7 @@ const buildContactIndex = (
     if (!pubkey || !id) continue;
     contactByPubkey.set(pubkey, {
       id,
-      name: trimString(contact.name) || null,
+      name: formatName(contact) || null,
       npub,
     });
   }

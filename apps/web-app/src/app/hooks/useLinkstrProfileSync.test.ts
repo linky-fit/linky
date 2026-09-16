@@ -55,6 +55,26 @@ describe("applyProfileWatchEvent contact-row policy", () => {
     localStorage.clear();
   });
 
+  it("normalizes an incoming profile name before syncing it", () => {
+    const { contactPatches, ctx } = makeCtx([{ id: "c1", npub: NPUB }]);
+    applyProfileWatchEvent(
+      profileUpdated({ name: "  Ali\u202ece\u200b\n Admin  " }, 100),
+      ctx,
+    );
+    expect(contactPatches()).toEqual([{ id: "c1", name: "Alice Admin" }]);
+  });
+
+  it("does not let a hostile profile rename a saved custom contact", () => {
+    const { contactPatches, ctx } = makeCtx([
+      { id: "c1", npub: NPUB, name: "My friend", nameSetByUser: 1 },
+    ]);
+    applyProfileWatchEvent(
+      profileUpdated({ name: "Bank\u202e support" }, 100),
+      ctx,
+    );
+    expect(contactPatches()).toEqual([]);
+  });
+
   it("fills non-overridden fields from the profile", () => {
     const { contactPatches, ctx } = makeCtx([{ id: "c1", npub: NPUB }]);
     applyProfileWatchEvent(

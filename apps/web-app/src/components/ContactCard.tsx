@@ -18,6 +18,7 @@ import { MessageEntityPreview } from "./MessageEntityPreview";
 interface ContactCardProps {
   avatarUrl: string | null;
   contact: ContactRowLike;
+  nameLabel: string;
   getMintIconUrl: (
     url: string | null | undefined,
   ) => Pick<MintIcon, "url"> & Partial<Omit<MintIcon, "url">>;
@@ -37,6 +38,7 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
   ({
     avatarUrl,
     contact,
+    nameLabel,
     getMintIconUrl,
     getNpubMessageContactInfo,
     hasAttention,
@@ -50,7 +52,7 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
     isUnknownContact = false,
   }) => {
     const { formatDisplayedAmountText, t } = useAppShellCore();
-    const initials = getInitials(contact.name ?? "");
+    const initials = getInitials(nameLabel);
     const contactStatus = formatDisplayGeneralStatus({
       status: statusText,
       providesLabel: t("contactStatusProvides"),
@@ -125,10 +127,10 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
 
           <div className="card-main">
             <div className="card-title-row">
-              {contact.name ? (
+              {nameLabel ? (
                 <h4 className="contact-title">
-                  <span className="contact-title-text" title={contact.name}>
-                    {contact.name}
+                  <span className="contact-title-text" title={nameLabel}>
+                    {nameLabel}
                   </span>
                   {contactStatus ? (
                     <span className="contact-status-text" title={contactStatus}>

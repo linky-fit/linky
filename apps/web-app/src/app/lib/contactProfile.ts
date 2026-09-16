@@ -1,3 +1,4 @@
+import { getContactName } from "../../utils/contactName";
 import * as Evolu from "@evolu/common";
 import type { ProfileMetadata } from "@linky/linkstr";
 import { getBestNostrName } from "../../utils/formatting";
@@ -49,7 +50,7 @@ export const resolveContactProfile = (
   metadata: ProfileMetadata | null | undefined,
 ): ResolvedContactProfile => {
   const normalizedNpub = normalizeNpubIdentifier(contact.npub ?? "");
-  const storedName = trimString(contact.name);
+  const storedName = getContactName(contact);
   const storedLnAddress = trimString(contact.lnAddress);
 
   if (!normalizedNpub) {

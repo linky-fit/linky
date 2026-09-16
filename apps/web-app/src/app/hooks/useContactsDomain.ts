@@ -1,3 +1,4 @@
+import { getContactName } from "../../utils/contactName";
 import { writeContact } from "../lib/writeContact";
 import { toContactTextFields } from "../lib/contactFields";
 import * as Evolu from "@evolu/common";
@@ -136,7 +137,12 @@ export const useContactsDomain = ({
     }
 
     return Array.from(latestById.values())
-      .map(({ row }) => row)
+      .map(({ row }) => {
+        const name = getContactName(row);
+        if (name === (row.name ?? "")) return row;
+        const parsed = Evolu.NonEmptyString1000.fromUnknown(name);
+        return { ...row, name: parsed.ok ? parsed.value : null };
+      })
       .filter((row) => row.isDeleted !== Evolu.sqliteTrue)
       .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   }, [allContacts, visibleOwnerRankById]);
