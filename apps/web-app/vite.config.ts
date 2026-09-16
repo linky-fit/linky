@@ -10,6 +10,7 @@ import type { Connect, Plugin, ViteDevServer } from "vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import lnurlpHandler from "./api/lnurlp.js";
+import { bootDiagnosticRedaction } from "./server/bootDiagnosticRedaction";
 import { inspectorCollector } from "./server/inspectorCollector";
 import { fetchLinkPreview } from "./server/linkPreview";
 
@@ -230,6 +231,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    bootDiagnosticRedaction(),
     serveSqliteWasm(),
     inspectorCollector(),
     linkPreviewApi(),

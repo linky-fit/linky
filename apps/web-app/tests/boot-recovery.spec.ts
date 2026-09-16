@@ -6,6 +6,7 @@ import { generateSecretKey, nip19 } from "nostr-tools";
 import { setBaseStorage, MOBILE_VIEWPORT } from "./helpers/appState";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { addContactByNpub } from "./helpers/contacts";
+import { BOOT_DIAGNOSTIC_TEST_PHRASES } from "../src/utils/bootDiagnosticSecrets.fixture";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 
@@ -171,5 +172,81 @@ for (const channelState of ["missing", "blocked"]) {
     await page.goto("/#contacts");
     await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
     errors.assertClean();
+  });
+}
+
+for (const attempt of ["current", "previous"]) {
+  test(`redacts ${attempt} stored diagnostics before shell recovery and export`, async ({
+    page,
+  }) => {
+    const nsec = `nsec1${"q".repeat(58)}`;
+    const cashu = `cashuA${"a".repeat(40)}`;
+    await page.addInitScript(
+      ({ attempt, phrases, nsec, cashu }) => {
+        sessionStorage.clear();
+        sessionStorage.setItem(
+          "linky.boot.shell_recovery_at.v1",
+          String(Date.now()),
+        );
+        sessionStorage.setItem(
+          `linky.boot.diagnostics.${attempt}.v1`,
+          JSON.stringify({
+            currentStage: "import-app",
+            events: phrases.map((phrase) => ({
+              error: {
+                message: phrase.toUpperCase().replaceAll(" ", "\n\t"),
+                name: phrase,
+                source: `https://app.linky.fit/${encodeURIComponent(phrase)}`,
+                stack: `${nsec} ${cashu}`,
+                words: phrase.split(" "),
+                quotedWords: JSON.stringify(phrase.split(" ")),
+              },
+            })),
+          }),
+        );
+        Reflect.set(window, "__linkyBootWatchdogMs", 50);
+      },
+      { attempt, phrases: BOOT_DIAGNOSTIC_TEST_PHRASES, nsec, cashu },
+    );
+    await page.route(MAIN_BUNDLE, (route) => route.abort());
+    await page.goto("/");
+    await expect(
+      page.getByRole("button", { name: "Download diagnostics" }),
+    ).toBeVisible();
+
+    const stored = await page.evaluate(() => JSON.stringify(sessionStorage));
+    expect(stored).toContain("[redacted recovery phrase]");
+    expect(stored.toLowerCase()).not.toContain("lilac");
+    expect(stored.toLowerCase()).not.toContain("abandon");
+    expect(stored).not.toContain(nsec);
+    expect(stored).not.toContain(cashu);
+
+    await page.evaluate((phrases) => {
+      sessionStorage.setItem(
+        "linky.boot.diagnostics.current.v1",
+        JSON.stringify({
+          currentStage: "render-failed",
+          message: phrases[0],
+          words: phrases[1]?.split(" "),
+        }),
+      );
+      history.replaceState(
+        null,
+        "",
+        `/${encodeURIComponent(phrases[0] ?? "")}`,
+      );
+    }, BOOT_DIAGNOSTIC_TEST_PHRASES);
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download diagnostics" }).click();
+    const downloadPath = await (await downloadPromise).path();
+    if (!downloadPath) throw new Error("Missing diagnostic download");
+    const report = await readFile(downloadPath, "utf8");
+    expect(report).toContain("import-app");
+    expect(report).toContain("render-failed");
+    expect(report).toContain("[redacted recovery phrase]");
+    expect(report.toLowerCase()).not.toContain("lilac");
+    expect(report.toLowerCase()).not.toContain("abandon");
+    expect(report).not.toContain(nsec);
+    expect(report).not.toContain(cashu);
   });
 }

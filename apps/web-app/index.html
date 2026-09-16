@@ -67,6 +67,8 @@
             ? configuredWatchdogMs
             : defaultWatchdogMs;
         let appMounted = false;
+        const { redactDiagnosticText, stringifyDiagnosticValue } =
+          linkyBootDiagnostics;
 
         const readLastRecoveryAt = () => {
           try {
@@ -91,24 +93,37 @@
         // survives a reload whose bundle never loads.
         const retainPreviousDiagnosticAttempt = () => {
           try {
-            const current = sessionStorage.getItem(currentDiagnosticsKey);
+            readDiagnosticAttempt(previousDiagnosticsKey);
+            const current = readDiagnosticAttempt(currentDiagnosticsKey);
             if (current === null) return;
-            sessionStorage.setItem(previousDiagnosticsKey, current);
+            sessionStorage.setItem(
+              previousDiagnosticsKey,
+              stringifyDiagnosticValue(current),
+            );
             sessionStorage.removeItem(currentDiagnosticsKey);
           } catch {
             // ignore storage failures
           }
         };
-        retainPreviousDiagnosticAttempt();
 
         const readDiagnosticAttempt = (key) => {
           try {
             const stored = sessionStorage.getItem(key);
-            return stored === null ? null : JSON.parse(stored);
+            if (stored === null) return null;
+            const sanitized = stringifyDiagnosticValue(JSON.parse(stored));
+            sessionStorage.setItem(key, sanitized);
+            return JSON.parse(sanitized);
           } catch {
+            try {
+              sessionStorage.removeItem(key);
+            } catch {
+              // Storage may be unavailable.
+            }
             return null;
           }
         };
+
+        retainPreviousDiagnosticAttempt();
 
         const downloadBootDiagnostics = () => {
           const report = {
@@ -128,12 +143,12 @@
                 serviceWorker: "serviceWorker" in navigator,
                 worker: typeof Worker !== "undefined",
               },
-              language: navigator.language,
+              language: redactDiagnosticText(navigator.language),
               online:
                 typeof navigator.onLine === "boolean" ? navigator.onLine : null,
               page: {
                 origin: location.origin,
-                pathname: location.pathname,
+                pathname: redactDiagnosticText(location.pathname),
               },
               screen: {
                 devicePixelRatio,
@@ -144,7 +159,7 @@
               },
               secureContext:
                 typeof isSecureContext === "boolean" ? isSecureContext : null,
-              userAgent: navigator.userAgent,
+              userAgent: redactDiagnosticText(navigator.userAgent),
             },
             previousAttempt: readDiagnosticAttempt(previousDiagnosticsKey),
             shell: {
@@ -152,7 +167,7 @@
               watchdogMs,
             },
           };
-          const blob = new Blob([JSON.stringify(report, null, 2)], {
+          const blob = new Blob([stringifyDiagnosticValue(report)], {
             type: "application/json;charset=utf-8",
           });
           const url = URL.createObjectURL(blob);
