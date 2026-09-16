@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap");
+@import "./assets/manrope/manrope.css";
 
 :root {
   --app-flat-bg: #020617;

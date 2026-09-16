@@ -247,6 +247,7 @@ export default defineConfig({
       srcDir: "src",
       strategies: "injectManifest",
       injectManifest: {
+        globPatterns: ["**/*.{js,wasm,css,html,woff2}"],
         rollupFormat: "es",
         // pdf.js is loaded on demand for PDF previews; don't precache it.
         globIgnores: ["**/pdf.worker*", "**/pdfjs-*"],
