@@ -1,31 +1,32 @@
-// Local-dev Evolu relay. We run our own instead of the official
-// evoluhq/relay image because that image hardcodes a 1MB-per-owner quota;
-// pinned deps must stay protocol-compatible with the web app's
-// @evolu/common version (see apps/web-app/package.json).
 import { createConsole } from "@evolu/common";
 import { createNodeJsRelay } from "@evolu/nodejs";
 import { mkdirSync } from "node:fs";
+import { logRelayError, readOwnerQuotaBytes } from "./config.js";
 
-const ownerQuotaBytes = Number(process.env.EVOLU_OWNER_QUOTA_BYTES ?? 0);
-if (!Number.isSafeInteger(ownerQuotaBytes) || ownerQuotaBytes < 0) {
-  throw new Error("EVOLU_OWNER_QUOTA_BYTES must be a non-negative integer");
-}
+const ownerQuotaBytes = readOwnerQuotaBytes();
 
 mkdirSync("data", { recursive: true });
 process.chdir("data");
 
-const relay = await createNodeJsRelay({ console: createConsole() })({
+const relayConsole = createConsole();
+relayConsole.error = logRelayError;
+const relay = await createNodeJsRelay({ console: relayConsole })({
   port: 4000,
-  enableLogging: true,
+  enableLogging: false,
   isOwnerWithinQuota: (_ownerId, requiredBytes) =>
     ownerQuotaBytes === 0 || requiredBytes <= ownerQuotaBytes,
 });
 
 if (!relay.ok) {
-  console.error(relay.error);
+  console.error("[evolu-relay] storage initialization failed");
   process.exit(1);
 }
+console.info(
+  `[evolu-relay] ready port=4000 ownerQuotaBytes=${ownerQuotaBytes === 0 ? "unlimited" : ownerQuotaBytes}`,
+);
+
 const shutdown = () => {
+  console.info("[evolu-relay] shutting down");
   relay.value[Symbol.dispose]();
   process.exit(0);
 };

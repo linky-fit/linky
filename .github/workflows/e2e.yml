@@ -90,6 +90,9 @@ jobs:
           [ "$(cat /tmp/prepare-images.status)" -eq 0 ]
           docker compose -f docker-compose.dev.yml --profile e2e up -d --wait --no-build
 
+      - name: Verify Evolu relay quota and log privacy
+        run: docker run --rm -v "$PWD/docker/evolu-relay/relay.test.js:/app/relay.test.js:ro" linky-evolu-relay npm test
+
       - name: Run e2e tests
         working-directory: apps/web-app
         run: bunx playwright test --project=local-stack

@@ -5,5 +5,8 @@
   "dependencies": {
     "@evolu/common": "7.4.1",
     "@evolu/nodejs": "2.4.0"
+  },
+  "scripts": {
+    "test": "node --test relay.test.js"
   }
 }
