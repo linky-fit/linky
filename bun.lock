@@ -276,6 +276,7 @@
   },
   "patchedDependencies": {
     "nostr-tools@2.23.3": "patches/nostr-tools@2.23.3.patch",
+    "bysquare@4.0.0": "patches/bysquare@4.0.0.patch",
   },
   "packages": {
     "@acemir/cssom": ["@acemir/cssom@0.9.31", "", {}, "sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA=="],

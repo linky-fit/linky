@@ -1,0 +1,138 @@
+diff --git a/lib/pay/decode.js b/lib/pay/decode.js
+index 401525fb3453732d1fd558a89548cef8465a293b..e6917379c5e1615ee8f8bbf66b730d8c26f770e8 100644
+--- a/lib/pay/decode.js
++++ b/lib/pay/decode.js
+@@ -64,6 +64,9 @@ function decodeString(value) {
+  * @see Table 15
+  */
+ export function deserialize(tabString) {
++    if (tabString.length > 65531) {
++        throw new DecodeError("PAY payload exceeds 16-bit length");
++    }
+     const data = tabString.split("\t");
+     let i = 0;
+     function next() {
+@@ -72,6 +75,11 @@ export function deserialize(tabString) {
+     // Base fields
+     const invoiceId = decodeString(next());
+     const paymentsCount = Number(next());
++    // Each payment needs ten base fields and two extension flags.
++    if (!Number.isSafeInteger(paymentsCount) || paymentsCount < 1
++        || paymentsCount > Math.floor((data.length - i) / 12)) {
++        throw new DecodeError("Invalid payment count");
++    }
+     const payments = new Array();
+     for (let p = 0; p < paymentsCount; p++) {
+         // Payment fields
+@@ -86,6 +94,10 @@ export function deserialize(tabString) {
+         const paymentNote = decodeString(next());
+         // Bank accounts
+         const bankAccountsCount = Number(next());
++        if (!Number.isSafeInteger(bankAccountsCount) || bankAccountsCount < 1
++            || bankAccountsCount > Math.floor((data.length - i - 2) / 2)) {
++            throw new DecodeError("Invalid bank account count");
++        }
+         const bankAccounts = [];
+         for (let j = 0; j < bankAccountsCount; j++) {
+             const iban = next();
+@@ -201,6 +213,9 @@ export function deserialize(tabString) {
+  * @param qr base32hex encoded bysquare binary data
+  */
+ export function decode(qr) {
++    if (qr.length > 4096) {
++        throw new DecodeError("PAY QR input exceeds size limit");
++    }
+     const bytes = base32hex.decode(qr);
+     const headerBytes = bytes.slice(0, 2);
+     const headerData = decodeHeader(headerBytes);
+@@ -228,6 +243,10 @@ export function decode(qr) {
+     // Parse the payload length from bytes 2-3 and properly expand to 8-byte uncompressed size
+     const payloadLengthBytes = bytes.slice(2, 4);
+     const payloadLength = payloadLengthBytes[0] | (payloadLengthBytes[1] << 8);
++    // lzma1 treats zero as unknown length, disabling its output bound.
++    if (payloadLength < 4) {
++        throw new DecodeError("Invalid PAY payload length");
++    }
+     const uncompressedSize = new Uint8Array(8);
+     // Set the full 32-bit value in little-endian format
+     uncompressedSize[0] = payloadLength & 0xFF;
+@@ -257,6 +276,10 @@ export function decode(qr) {
+             error: "Decompression returned undefined",
+         });
+     }
++    if (decompressed.byteLength !== payloadLength) {
++        throw new DecodeError("PAY payload length mismatch");
++    }
++
+     // Extract checksum and body
+     const checksumBytes = decompressed.slice(0, 4);
+     const decompressedBody = decompressed.slice(4);
+diff --git a/src/pay/decode.ts b/src/pay/decode.ts
+index 46a52d195743b4e3670fab91e6345ca79c9ccb78..9f460086b2beeb9abab6ef6364eb2115eb23b6ac 100644
+--- a/src/pay/decode.ts
++++ b/src/pay/decode.ts
+@@ -81,6 +81,9 @@ function decodeString(value: string | undefined): string | undefined {
+  * @see Table 15
+  */
+ export function deserialize(tabString: string): DataModel {
++	if (tabString.length > 65531) {
++		throw new DecodeError("PAY payload exceeds 16-bit length");
++	}
+ 	const data = tabString.split("\t");
+ 	let i = 0;
+ 
+@@ -91,6 +94,11 @@ export function deserialize(tabString: string): DataModel {
+ 	// Base fields
+ 	const invoiceId = decodeString(next());
+ 	const paymentsCount = Number(next());
++	// Each payment needs ten base fields and two extension flags.
++	if (!Number.isSafeInteger(paymentsCount) || paymentsCount < 1
++		|| paymentsCount > Math.floor((data.length - i) / 12)) {
++		throw new DecodeError("Invalid payment count");
++	}
+ 
+ 	const payments = new Array<Payment>();
+ 
+@@ -108,6 +116,10 @@ export function deserialize(tabString: string): DataModel {
+ 
+ 		// Bank accounts
+ 		const bankAccountsCount = Number(next());
++		if (!Number.isSafeInteger(bankAccountsCount) || bankAccountsCount < 1
++			|| bankAccountsCount > Math.floor((data.length - i - 2) / 2)) {
++			throw new DecodeError("Invalid bank account count");
++		}
+ 		const bankAccounts: BankAccount[] = [];
+ 
+ 		for (let j = 0; j < bankAccountsCount; j++) {
+@@ -235,6 +247,9 @@ export function deserialize(tabString: string): DataModel {
+  * @param qr base32hex encoded bysquare binary data
+  */
+ export function decode(qr: string): DataModel {
++	if (qr.length > 4096) {
++		throw new DecodeError("PAY QR input exceeds size limit");
++	}
+ 	const bytes = base32hex.decode(qr);
+ 	const headerBytes = bytes.slice(0, 2);
+ 	const headerData = decodeHeader(headerBytes);
+@@ -265,6 +280,10 @@ export function decode(qr: string): DataModel {
+ 	// Parse the payload length from bytes 2-3 and properly expand to 8-byte uncompressed size
+ 	const payloadLengthBytes = bytes.slice(2, 4);
+ 	const payloadLength = payloadLengthBytes[0] | (payloadLengthBytes[1] << 8);
++	// lzma1 treats zero as unknown length, disabling its output bound.
++	if (payloadLength < 4) {
++		throw new DecodeError("Invalid PAY payload length");
++	}
+ 
+ 	const uncompressedSize = new Uint8Array(8);
+ 	// Set the full 32-bit value in little-endian format
+@@ -299,6 +318,10 @@ export function decode(qr: string): DataModel {
+ 		});
+ 	}
+ 
++	if (decompressed.byteLength !== payloadLength) {
++		throw new DecodeError("PAY payload length mismatch");
++	}
++
+ 	// Extract checksum and body
+ 	const checksumBytes = decompressed.slice(0, 4);
+ 	const decompressedBody = decompressed.slice(4);
