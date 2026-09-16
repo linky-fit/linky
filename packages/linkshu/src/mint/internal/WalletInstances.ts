@@ -4,6 +4,7 @@ import {
   MintInfo as CashuMintInfo,
   MintOperationError,
   NetworkError,
+  RateLimitError,
   Wallet,
   type AmountLike,
   type KeyChain,
@@ -145,6 +146,9 @@ export const classifyMintError = (
   const detail = errorMessage(error, "unknown mint error");
   if (error instanceof MintOperationError) {
     return new MintRejected({ mint, code: error.code, detail });
+  }
+  if (error instanceof RateLimitError) {
+    return new MintUnreachable({ mint, detail });
   }
   if (error instanceof HttpResponseError) {
     return error.status >= 500

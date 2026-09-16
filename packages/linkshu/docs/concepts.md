@@ -105,8 +105,8 @@ One rule everywhere: a proof is marked `spent` only on the mint's **definitive**
 | Raw failure                                                | Classified as        | Kind       |
 | ---------------------------------------------------------- | -------------------- | ---------- |
 | Mint protocol error (`MintOperationError`, NUT error code) | `MintRejected`       | definitive |
-| HTTP 4xx                                                   | `MintRejected`       | definitive |
-| HTTP 5xx, fetch/network error, abort, timeout              | `MintUnreachable`    | transient  |
+| HTTP 4xx other than 429                                    | `MintRejected`       | definitive |
+| HTTP 429, 5xx, fetch/network error, abort, timeout         | `MintUnreachable`    | transient  |
 | Lease not acquired                                         | `CounterLockTimeout` | transient  |
 
 The raw cashu-ts error never crosses the boundary. [errors.md](./errors.md) lists every error and what to do with it.

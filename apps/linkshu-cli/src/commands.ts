@@ -185,6 +185,10 @@ const restore = (mint: MintUrl): Command =>
     print(`scanned  ${report.scannedMints.join(", ") || "nothing"}`);
     if (report.unavailableMints.length > 0)
       print(`offline  ${report.unavailableMints.join(", ")}`);
+    for (const skipped of report.skippedKeysets)
+      print(
+        `skipped  ${skipped.keysetId} on ${skipped.mint}: ${skipped.detail}`,
+      );
     yield* summarize;
   });
 

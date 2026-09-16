@@ -38,6 +38,8 @@ First load the wallets and keyset lists for all candidate mints (failure → `un
 
 A mint is either fully scanned (`scannedMints`) or reported as not scanned (`unavailableMints`) — one unreachable keyset puts the mint in the second list even if other keysets restored proofs. A report can therefore carry both `restoredProofs` and `unavailableMints`; the proofs are kept, scan the listed mints again later.
 
+`skippedKeysets` lists keysets whose rejection is definitive: the mint answered with a NUT error code, or it serves keys this client cannot verify against the advertised id (NUT-02). A skipped keyset leaves the mint in `scannedMints`, because rescanning cannot change that outcome. Every other failure — no answer, a rate limit, a rejection without an error code, a counter lock another context holds — keeps the mint in `unavailableMints`: scan it again later.
+
 Restore knows nothing about operations: proofs it finds land as balance with no `operationId`, even if a pending melt or send once held them. Run the resumers and `Validation.checkIssued` afterwards when that matters.
 
 ### Recover into fresh proofs
@@ -104,16 +106,17 @@ The wipe removes the deterministic counters, their leases, and the restore curso
 
 `RestoreReport`:
 
-| Field              | Type                    | Notes                      |
-| ------------------ | ----------------------- | -------------------------- |
-| `restoredAmount`   | `NonNegativeAmount`     | sum over the new proofs    |
-| `restoredProofs`   | `Schema.Int`            | `available` proofs created |
-| `scannedMints`     | `Schema.Array(MintUrl)` | every keyset scanned       |
-| `unavailableMints` | `Schema.Array(MintUrl)` | scan again later           |
+| Field              | Type                          | Notes                                               |
+| ------------------ | ----------------------------- | --------------------------------------------------- |
+| `restoredAmount`   | `NonNegativeAmount`           | sum over the new proofs                             |
+| `restoredProofs`   | `Schema.Int`                  | `available` proofs created                          |
+| `scannedMints`     | `Schema.Array(MintUrl)`       | every keyset scanned                                |
+| `unavailableMints` | `Schema.Array(MintUrl)`       | scan again later                                    |
+| `skippedKeysets`   | `Schema.Array(SkippedKeyset)` | definitively rejected, `{ mint, keysetId, detail }` |
 
 ## Errors
 
-`restore` and `wipeSeedBoundState` never fail. Unreachable mints, lock timeouts, and rejected scans all land in `unavailableMints`.
+`restore` and `wipeSeedBoundState` never fail. Unreachable mints, rate limits, lock timeouts, and rejections without a NUT error code land in `unavailableMints`. A definitive rejection — a NUT error code, or keys this client cannot verify — lands in `skippedKeysets` instead, because retrying it cannot succeed.
 
 ## Related
 

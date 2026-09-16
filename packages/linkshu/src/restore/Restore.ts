@@ -29,7 +29,7 @@ import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import { toDomainProofs } from "../token/internal/cashuProofs";
-import { RestoreReport } from "./domain";
+import { RestoreReport, SkippedKeyset } from "./domain";
 import type { RestoreDraft, RestoreProgress } from "./domain";
 import {
   advanceRestoreCursor,
@@ -43,6 +43,7 @@ import {
   RESTORE_GAP_LIMIT,
   scanKeyset,
 } from "./internal/scan";
+import type { KeysetScan } from "./internal/scan";
 import { sat } from "../internal/units";
 import { reclaimProofs } from "../token/internal/reclaim";
 
@@ -69,6 +70,10 @@ const mergeRestored = (left: Restored, right: Restored): Restored => ({
   proofIds: [...left.proofIds, ...right.proofIds],
   amount: left.amount + right.amount,
 });
+
+type KeysetOutcome =
+  | { readonly status: "restored"; readonly restored: Restored }
+  | Exclude<KeysetScan, { status: "ok" }>;
 
 /**
  * NUT-09 recovery of deterministic proofs from the seed. Per mint, unit, and
@@ -139,15 +144,17 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
 
     /**
      * One keyset's tree, under the counter lock: nothing else may derive from
-     * it while restore decides where the tree ends. `null` reports that the
-     * scan made no progress — an unreachable mint, or a lock another context
-     * holds.
+     * it while restore decides where the tree ends. `unavailable` reports that
+     * the scan made no progress — an unreachable mint, or a lock another
+     * context holds. `skipped` reports a definitive rejection — a NUT error
+     * code, or keys this client cannot verify — which no later scan can
+     * recover.
      */
     const restoreKeyset = (
       wallet: LoadedWallet,
       mint: MintUrl,
       keysetId: KeysetId,
-    ): Effect.Effect<Restored | null> => {
+    ): Effect.Effect<KeysetOutcome> => {
       const scope: CounterScope = { mint, unit: sat, keysetId };
       return withCounterLock(
         kv,
@@ -166,7 +173,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
             cursor: yield* readRestoreCursor(kv, scope),
             counter: yield* readCounter(kv, scope),
           });
-          if (scan.status === "unavailable") return null;
+          if (scan.status !== "ok") return scan;
 
           // Proofs are stored before the cursor moves past them, so a crash
           // here costs a rescan, never the funds.
@@ -186,11 +193,18 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
             );
           }
           return {
-            proofIds: inserted.map((proof) => proof.id),
-            amount: totalAmount(scan.proofs),
-          };
+            status: "restored",
+            restored: {
+              proofIds: inserted.map((proof) => proof.id),
+              amount: totalAmount(scan.proofs),
+            },
+          } satisfies KeysetOutcome;
         }),
-      ).pipe(Effect.catchAll(() => Effect.succeed(null)));
+      ).pipe(
+        Effect.catchAll(() =>
+          Effect.succeed<KeysetOutcome>({ status: "unavailable" }),
+        ),
+      );
     };
 
     const prepareMint = (mint: MintUrl) =>
@@ -213,6 +227,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
         ];
         const scannedMints: MintUrl[] = [];
         const unavailableMints: MintUrl[] = [];
+        const skippedKeysets: SkippedKeyset[] = [];
         let restored = NOTHING_RESTORED;
         let progress: RestoreProgress = {
           phase: "preparing",
@@ -241,13 +256,21 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
           if (plan === null) continue;
           let complete = true;
           for (const keysetId of plan.keysetIds) {
-            const scanned = yield* restoreKeyset(
+            const outcome = yield* restoreKeyset(
               plan.wallet,
               plan.mint,
               keysetId,
             );
-            if (scanned === null) complete = false;
-            else restored = mergeRestored(restored, scanned);
+            if (outcome.status === "unavailable") complete = false;
+            else if (outcome.status === "skipped")
+              skippedKeysets.push(
+                new SkippedKeyset({
+                  mint: plan.mint,
+                  keysetId,
+                  detail: outcome.detail,
+                }),
+              );
+            else restored = mergeRestored(restored, outcome.restored);
             progress = {
               ...progress,
               completedKeysets: progress.completedKeysets + 1,
@@ -266,6 +289,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
             restoredProofs: restored.proofIds.length,
             scannedMints,
             unavailableMints,
+            skippedKeysets,
           }),
         };
       }).pipe(

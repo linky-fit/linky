@@ -1,5 +1,5 @@
 import { Effect, Exit } from "effect";
-import { MintUnreachable } from "../../domain/errors";
+import { MintRejected, MintUnreachable } from "../../domain/errors";
 import { Amount, KeysetId, MintUrl } from "../../domain/primitives";
 import type { ProofStateEntry } from "../../internal/proofStates";
 import { Proof } from "../../token/domain";
@@ -35,10 +35,15 @@ interface Harness {
 }
 
 const harness = (args: {
-  restore: (start: number) => Effect.Effect<RestoreBatch, MintUnreachable>;
+  restore: (
+    start: number,
+  ) => Effect.Effect<RestoreBatch, MintUnreachable | MintRejected>;
   proofStates?: (
     proofs: ReadonlyArray<Proof>,
-  ) => Effect.Effect<ReadonlyArray<ProofStateEntry>, MintUnreachable>;
+  ) => Effect.Effect<
+    ReadonlyArray<ProofStateEntry>,
+    MintUnreachable | MintRejected
+  >;
   knownSecrets?: ReadonlyArray<string>;
   cursor: number;
   counter: number;
@@ -144,6 +149,65 @@ describe("scanKeyset", () => {
 
     expect(scan).toEqual({ status: "unavailable" });
     expect(checked).toEqual([]);
+  });
+
+  it("skips the keyset when the mint rejects it with a NUT error code", async () => {
+    const { input, checked } = harness({
+      cursor: 0,
+      counter: 1,
+      restore: () =>
+        new MintRejected({ mint, code: 12001, detail: "keyset not known" }),
+    });
+
+    const scan = await Effect.runPromise(scanKeyset(input));
+
+    expect(scan).toEqual({ status: "skipped", detail: "keyset not known" });
+    expect(checked).toEqual([]);
+  });
+
+  it("skips the keyset when its keys cannot be verified", async () => {
+    const detail = "Error: Keyset verification failed for ID 009a1f293253e41e";
+    const { input } = harness({
+      cursor: 0,
+      counter: 1,
+      restore: () => new MintRejected({ mint, code: null, detail }),
+    });
+
+    const scan = await Effect.runPromise(scanKeyset(input));
+
+    expect(scan).toEqual({ status: "skipped", detail });
+  });
+
+  it.each([
+    "Couldn't verify keyset ID 01884a74bb2fc5ee",
+    "A short keyset ID v2 was encountered, but got no keysets to map it to.",
+    "Couldn't map short keyset ID 00ff to any known keysets of the current Mint",
+  ])(
+    "skips the keyset on the legacy verification failure %s",
+    async (detail) => {
+      const { input } = harness({
+        cursor: 0,
+        counter: 1,
+        restore: () => new MintRejected({ mint, code: null, detail }),
+      });
+
+      const scan = await Effect.runPromise(scanKeyset(input));
+
+      expect(scan).toEqual({ status: "skipped", detail });
+    },
+  );
+
+  it("leaves the keyset untouched on a rejection without a NUT error code", async () => {
+    const { input } = harness({
+      cursor: 0,
+      counter: 1,
+      restore: () =>
+        new MintRejected({ mint, code: null, detail: "HTTP request failed" }),
+    });
+
+    const scan = await Effect.runPromise(scanKeyset(input));
+
+    expect(scan).toEqual({ status: "unavailable" });
   });
 
   it("keeps the windowed result when the deep pass fails", async () => {

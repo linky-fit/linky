@@ -44,7 +44,28 @@ export type KeysetScan =
       readonly nextCursor: number | null;
       readonly proofs: ReadonlyArray<Proof>;
     }
-  | { readonly status: "unavailable" };
+  | { readonly status: "unavailable" }
+  | { readonly status: "skipped"; readonly detail: string };
+
+/**
+ * cashu-ts refuses keys that do not derive the advertised keyset id (NUT-02).
+ * Wallet loading propagates that as a `MintRejected` without a NUT error code,
+ * so the detail text is the only signal; a rescan cannot change the outcome.
+ */
+const isKeysetVerificationDetail = (detail: string): boolean => {
+  const message = detail.toLowerCase();
+  return (
+    message.includes("keyset verification failed") ||
+    message.includes("couldn't verify keyset id") ||
+    message.includes("short keyset id v2") ||
+    message.includes("got no keysets to map it to") ||
+    message.includes("couldn't map short keyset id")
+  );
+};
+
+const isDefinitiveRejection = (failure: MintFailure): failure is MintRejected =>
+  failure._tag === "MintRejected" &&
+  (failure.code !== null || isKeysetVerificationDetail(failure.detail));
 
 const nextCursorFrom = (
   ...positions: ReadonlyArray<number | null>
@@ -105,4 +126,13 @@ export const scanKeyset = (input: KeysetScanInput): Effect.Effect<KeysetScan> =>
 
     const scan: KeysetScan = { status: "ok", nextCursor, proofs };
     return scan;
-  }).pipe(Effect.orElseSucceed((): KeysetScan => ({ status: "unavailable" })));
+  }).pipe(
+    Effect.catchAll(
+      (failure): Effect.Effect<KeysetScan> =>
+        Effect.succeed(
+          isDefinitiveRejection(failure)
+            ? { status: "skipped", detail: failure.detail }
+            : { status: "unavailable" },
+        ),
+    ),
+  );

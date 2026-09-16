@@ -1,5 +1,10 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { getDecodedToken, Keyset } from "@cashu/cashu-ts";
+import {
+  getDecodedToken,
+  Keyset,
+  MintOperationError,
+  RateLimitError,
+} from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import { MintUnreachable } from "../domain/errors";
 import { CurrencyUnit, KeysetId, MintUrl } from "../domain/primitives";
@@ -15,7 +20,7 @@ import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { amountIn, secretsOf, seedProofs } from "../testing/inventory";
 import type { RestoreProgress } from "./domain";
-import { RestoreDraft } from "./domain";
+import { RestoreDraft, SkippedKeyset } from "./domain";
 import { restoreCursorKey, seenKeysetKey } from "./internal/restoreState";
 import { Restore } from "./Restore";
 
@@ -45,7 +50,7 @@ interface HarnessArgs {
   keysetsForMint?: (mint: MintUrl) => ReadonlyArray<Keyset>;
   unreachableMints?: ReadonlyArray<MintUrl>;
   stateOf?: (secret: string) => "UNSPENT" | "PENDING" | "SPENT";
-  restoreError?: unknown;
+  restoreErrorFor?: (keysetId: string) => unknown;
   walletUnreachable?: boolean;
   receive?: (text: string) => Promise<CashuProof[]>;
 }
@@ -75,8 +80,9 @@ const makeHarness = (args: HarnessArgs) => {
         ),
       batchRestore: (_gapLimit, _batchSize, counter = 0, keysetId = "") => {
         restoreCalls.push({ start: counter, keysetId });
-        if (args.restoreError !== undefined) {
-          return Promise.reject(args.restoreError);
+        const failure = args.restoreErrorFor?.(keysetId);
+        if (failure !== undefined) {
+          return Promise.reject(failure);
         }
         const found = signed.filter((entry) => entry.slot >= counter);
         return Promise.resolve({
@@ -148,7 +154,9 @@ describe("Restore.restore", () => {
                 new Keyset(otherKeysetHex, "sat", false, 0),
               ]
             : [new Keyset(keysetHex, "sat", true, 0)],
-        ...(fail ? { restoreError: new Error("mint rejected keyset") } : {}),
+        ...(fail
+          ? { restoreErrorFor: () => new Error("mint rejected keyset") }
+          : {}),
       });
       const mints = [mint, MintUrl.make("https://second.example")];
       const exit = await run(
@@ -180,8 +188,107 @@ describe("Restore.restore", () => {
       ]);
       expect(exit.value.unavailableMints).toEqual(fail ? mints : []);
       expect(exit.value.scannedMints).toEqual(fail ? [] : mints);
+      expect(exit.value.skippedKeysets).toEqual([]);
     },
   );
+
+  it("keeps a mint scanned when it refuses one keyset, and names the keyset", async () => {
+    const { run } = makeHarness({
+      keysets: [
+        new Keyset(keysetHex, "sat", true, 0),
+        new Keyset(otherKeysetHex, "sat", false, 0),
+      ],
+      signed: [{ slot: 3, proof: proof(4, "r1") }],
+      restoreErrorFor: (keysetId) =>
+        keysetId === otherKeysetHex
+          ? new Error(`Keyset verification failed for ID ${otherKeysetHex}`)
+          : undefined,
+    });
+
+    const exit = await run(restoreAt());
+
+    assert(Exit.isSuccess(exit));
+    const { report } = exit.value;
+    expect(report.scannedMints).toEqual([mint]);
+    expect(report.unavailableMints).toEqual([]);
+    expect(report.restoredAmount).toBe(4);
+    expect(report.skippedKeysets).toHaveLength(1);
+    expect(report.skippedKeysets[0]).toMatchObject({
+      mint,
+      keysetId: otherKeysetHex,
+    });
+    expect(report.skippedKeysets[0]?.detail).toContain(
+      "Keyset verification failed",
+    );
+  });
+
+  it("keeps a mint scanned when it rejects one keyset with a NUT error code", async () => {
+    const { run } = makeHarness({
+      keysets: [
+        new Keyset(keysetHex, "sat", true, 0),
+        new Keyset(otherKeysetHex, "sat", false, 0),
+      ],
+      signed: [{ slot: 3, proof: proof(4, "r1") }],
+      restoreErrorFor: (keysetId) =>
+        keysetId === otherKeysetHex
+          ? new MintOperationError(12001, "keyset not known")
+          : undefined,
+    });
+
+    const exit = await run(restoreAt());
+
+    assert(Exit.isSuccess(exit));
+    const { report } = exit.value;
+    expect(report.scannedMints).toEqual([mint]);
+    expect(report.restoredAmount).toBe(4);
+    expect(report.skippedKeysets).toEqual([
+      new SkippedKeyset({
+        mint,
+        keysetId: otherKeysetHex,
+        detail: "MintOperationError: keyset not known",
+      }),
+    ]);
+  });
+
+  it("still reports the mint unavailable when it rate-limits a keyset scan", async () => {
+    const { run } = makeHarness({
+      keysets: [
+        new Keyset(keysetHex, "sat", true, 0),
+        new Keyset(otherKeysetHex, "sat", false, 0),
+      ],
+      signed: [{ slot: 3, proof: proof(4, "r1") }],
+      restoreErrorFor: (keysetId) =>
+        keysetId === otherKeysetHex
+          ? new RateLimitError("429 Too Many Requests", 1000)
+          : undefined,
+    });
+
+    const exit = await run(restoreAt());
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.report.unavailableMints).toEqual([mint]);
+    expect(exit.value.report.scannedMints).toEqual([]);
+    expect(exit.value.report.skippedKeysets).toEqual([]);
+  });
+
+  it("still reports the mint unavailable when a keyset scan cannot reach it", async () => {
+    const { run } = makeHarness({
+      keysets: [
+        new Keyset(keysetHex, "sat", true, 0),
+        new Keyset(otherKeysetHex, "sat", false, 0),
+      ],
+      signed: [{ slot: 3, proof: proof(4, "r1") }],
+      restoreErrorFor: (keysetId) =>
+        keysetId === otherKeysetHex ? new TypeError("fetch failed") : undefined,
+    });
+
+    const exit = await run(restoreAt());
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.report.unavailableMints).toEqual([mint]);
+    expect(exit.value.report.scannedMints).toEqual([]);
+    expect(exit.value.report.skippedKeysets).toEqual([]);
+  });
 
   it("continues across mints when one cannot load and counts only discovered keysets", async () => {
     const offlineMint = MintUrl.make("https://offline.example");
@@ -348,7 +455,7 @@ describe("Restore.restore", () => {
   it("reports an unreachable mint instead of failing", async () => {
     const { run } = makeHarness({
       signed: [{ slot: 1, proof: proof(4, "r1") }],
-      restoreError: new TypeError("fetch failed"),
+      restoreErrorFor: () => new TypeError("fetch failed"),
     });
 
     const exit = await run(restoreAt());

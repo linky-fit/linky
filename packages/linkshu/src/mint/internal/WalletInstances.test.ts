@@ -3,6 +3,7 @@ import {
   HttpResponseError,
   MintInfo as CashuMintInfo,
   MintOperationError,
+  RateLimitError,
 } from "@cashu/cashu-ts";
 import { Effect, Exit } from "effect";
 import { CurrencyUnit, MintUrl } from "../../domain/primitives";
@@ -139,6 +140,13 @@ describe("classifyMintError", () => {
     expect(
       classifyMintError(mint, new HttpResponseError("Not found", 404))._tag,
     ).toBe("MintRejected");
+  });
+
+  it("maps a rate limit to MintUnreachable", () => {
+    expect(
+      classifyMintError(mint, new RateLimitError("429 Too Many Requests", 1000))
+        ._tag,
+    ).toBe("MintUnreachable");
   });
 
   it("maps network-shaped failures to MintUnreachable and the rest to MintRejected", () => {
