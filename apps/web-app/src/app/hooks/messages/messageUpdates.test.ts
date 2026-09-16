@@ -34,6 +34,14 @@ const reaction: LocalNostrReaction = {
 };
 
 describe("message updates", () => {
+  it("records a failed status on a pending message", () => {
+    expect(
+      buildMessageUpdate(message.id, { status: "failed" }, message, {}),
+    ).toEqual({ id: message.id, status: "failed" });
+    expect(
+      buildReactionUpdate(reaction.id, { status: "failed" }, reaction, {}),
+    ).toEqual({ id: reaction.id, status: "failed" });
+  });
   it("deduplicates acknowledgments against the shadow before the read model catches up", () => {
     const shadow = {};
     expect(

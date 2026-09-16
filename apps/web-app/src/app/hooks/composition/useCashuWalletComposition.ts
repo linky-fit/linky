@@ -742,7 +742,7 @@ export const useCashuWalletComposition = ({
         const isOut = m.direction === "out";
         const matches = m.content.trim() === transfer.tokenText;
         const status = m.status ?? "sent";
-        return isOut && matches && status !== "pending";
+        return isOut && matches && status === "sent";
       });
       if (!hasMessage) continue;
       void cashuTransferLifecycle.forget(transfer.id);

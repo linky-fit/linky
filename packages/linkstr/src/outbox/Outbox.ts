@@ -50,6 +50,8 @@ import { OutboxStore } from "./OutboxStore";
 const INITIAL_BACKOFF = Duration.seconds(1);
 const MAX_BACKOFF = Duration.seconds(60);
 
+export const OUTBOX_JOB_RETENTION_SECONDS = 7 * 24 * 60 * 60;
+
 const freshJobId = Effect.sync(() => OutboxJobId.make(crypto.randomUUID()));
 
 const fifo = (jobs: ReadonlyArray<StoredOutboxJob>): Array<StoredOutboxJob> =>
@@ -237,14 +239,21 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
         );
       });
 
+    const expired = (job: StoredOutboxJob): Effect.Effect<boolean> =>
+      Effect.map(
+        nowSeconds,
+        (now) => now - job.enqueuedAt >= OUTBOX_JOB_RETENTION_SECONDS,
+      );
+
     const runToTerminal = (
       job: StoredOutboxJob,
+      operation: OutboxOperation,
       wake: Queue.Queue<void>,
     ): Effect.Effect<void> =>
       Effect.gen(function* () {
         let backoff = INITIAL_BACKOFF;
         while (true) {
-          const attempt = yield* Effect.exit(dispatch(job.operation));
+          const attempt = yield* Effect.exit(dispatch(operation));
           if (Exit.isSuccess(attempt)) {
             return yield* settle(
               job,
@@ -266,6 +275,17 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
                 ref: job.ref,
                 reason: "unexpected-error",
                 detail: Cause.pretty(attempt.cause),
+              }),
+            );
+          }
+          if (yield* expired(job)) {
+            return yield* settle(
+              job,
+              new OutboxJobFailed({
+                jobId: job.jobId,
+                ref: job.ref,
+                reason: "expired",
+                detail: `enqueued at ${job.enqueuedAt}, still undeliverable after ${OUTBOX_JOB_RETENTION_SECONDS}s`,
               }),
             );
           }
@@ -293,19 +313,22 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
     });
 
     const nextQueued = (lane: OutboxLane) =>
-      Effect.map(store.loadAll, (jobs) =>
-        fifo(jobs).find(
-          (job) =>
-            job.state._tag === "queued" && laneOf(job.operation) === lane,
-        ),
-      );
+      Effect.map(store.loadAll, (jobs) => {
+        for (const job of fifo(jobs)) {
+          const { state } = job;
+          if (state._tag === "queued" && laneOf(state.operation) === lane) {
+            return { job, operation: state.operation };
+          }
+        }
+        return undefined;
+      });
 
     const deliverLane = (lane: OutboxLane): Effect.Effect<never> =>
       Effect.gen(function* () {
         while (true) {
-          const job = yield* nextQueued(lane);
-          if (job === undefined) yield* Queue.take(wakes[lane]);
-          else yield* runToTerminal(job, wakes[lane]);
+          const next = yield* nextQueued(lane);
+          if (next === undefined) yield* Queue.take(wakes[lane]);
+          else yield* runToTerminal(next.job, next.operation, wakes[lane]);
         }
       });
 
@@ -324,10 +347,9 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
         const job = new StoredOutboxJob({
           jobId: yield* freshJobId,
           ref,
-          operation,
           pubkey: identity.pubkey,
           enqueuedAt: yield* nowSeconds,
-          state: { _tag: "queued" },
+          state: { _tag: "queued", operation },
         });
         yield* store.insert(job);
         yield* Queue.offer(wakes[laneOf(operation)], undefined);

@@ -54,22 +54,23 @@ const delivery = (suffix: string): WrapDelivery =>
     rejectedBy: [],
   });
 
+const textOperation: OutboxOperation = {
+  _tag: "chat.text",
+  draft: new TextMessageDraft({
+    to: pubkey,
+    content: MessageText.make("hi"),
+    clientId,
+    sentAt,
+  }),
+};
+
 const makeJob = (id: string, state?: OutboxJobState): StoredOutboxJob =>
   new StoredOutboxJob({
     jobId: OutboxJobId.make(id),
     ref: OutboxRef.make(`ref-${id}`),
-    operation: {
-      _tag: "chat.text",
-      draft: new TextMessageDraft({
-        to: pubkey,
-        content: MessageText.make("hi"),
-        clientId,
-        sentAt,
-      }),
-    },
     pubkey,
     enqueuedAt: sentAt,
-    state: state ?? { _tag: "queued" },
+    state: state ?? { _tag: "queued", operation: textOperation },
   });
 
 const telemetryDraft = new PaymentTelemetryDraft({
@@ -225,6 +226,7 @@ const wirePeerCopies = {
   selfCopy: wireDelivery("cd"),
   recipientCopy: wireDelivery("ef"),
 };
+const wireLegacyReceipt = () => ({ rumorId, ...wirePeerCopies });
 
 interface ReceiptCase {
   readonly name: string;
@@ -369,7 +371,7 @@ const storeSucceededJobJson = (
 
 const loadSingleSucceededJob = (
   storage: ReturnType<typeof stubStorage>,
-): { operation: OutboxOperation; receipt: OutboxReceipt } => {
+): { job: StoredOutboxJob; receipt: OutboxReceipt } => {
   const [job] = run(
     buildStore(OutboxStore.fromStringStorage(storage, storageKey)).loadAll,
   );
@@ -379,8 +381,45 @@ const loadSingleSucceededJob = (
   ) {
     throw new Error("expected one awaiting-ack success");
   }
-  return { operation: job.operation, receipt: job.state.result.receipt };
+  return { job, receipt: job.state.result.receipt };
 };
+
+describe("OutboxStore.fromStringStorage legacy job layout", () => {
+  it("moves a legacy top-level operation into the queued state", () => {
+    const storage = stubStorage();
+    storage.map.set(
+      storageKey,
+      JSON.stringify([
+        {
+          jobId: "job",
+          ref: "ref-job",
+          operation: encodeOperation(textOperation),
+          pubkey,
+          enqueuedAt: sentAt,
+          state: { _tag: "queued" },
+        },
+      ]),
+    );
+
+    const [job] = run(
+      buildStore(OutboxStore.fromStringStorage(storage, storageKey)).loadAll,
+    );
+    expect(job?.state).toEqual({ _tag: "queued", operation: textOperation });
+    expect(job).not.toHaveProperty("operation");
+  });
+
+  it("drops a legacy top-level operation from an awaiting-ack row", () => {
+    const storage = stubStorage();
+    storeSucceededJobJson(storage, textOperation, {
+      _tag: "ChatMessageReceipt",
+      ...wireLegacyReceipt(),
+    });
+
+    const { job } = loadSingleSucceededJob(storage);
+    expect(job).not.toHaveProperty("operation");
+    expect(JSON.stringify(job)).not.toContain('"hi"');
+  });
+});
 
 describe.each(receiptCases)(
   "OutboxStore.fromStringStorage $name receipt",
@@ -389,15 +428,11 @@ describe.each(receiptCases)(
       const storage = stubStorage();
       run(
         buildStore(OutboxStore.fromStringStorage(storage, storageKey)).insert(
-          new StoredOutboxJob({
-            ...makeJob("job", succeededWith("job", receipt)),
-            operation,
-          }),
+          makeJob("job", succeededWith("job", receipt)),
         ),
       );
 
       const loaded = loadSingleSucceededJob(storage);
-      expect(loaded.operation).toEqual(operation);
       expect(loaded.receipt).toBeInstanceOf(receiptClass);
       expect(loaded.receipt).toEqual(receipt);
     });

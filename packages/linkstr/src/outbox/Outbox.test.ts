@@ -1,4 +1,4 @@
-import { Chunk, Effect, Either, Layer, Option, Stream } from "effect";
+import { Chunk, Clock, Effect, Either, Layer, Option, Stream } from "effect";
 import { Chat } from "../chat/Chat";
 import {
   ChatMessageReceipt,
@@ -23,11 +23,12 @@ import {
   eventually,
   makeIdentity,
   recipientOf,
+  stubStorage,
   stubWrapTransport,
 } from "../testing";
-import { OutboxRef } from "./domain";
-import type { OutboxResult, RumorFixedOperation } from "./domain";
-import { Outbox } from "./Outbox";
+import { OutboxRef, StoredOutboxJob } from "./domain";
+import type { OutboxJobId, OutboxResult, RumorFixedOperation } from "./domain";
+import { Outbox, OUTBOX_JOB_RETENTION_SECONDS } from "./Outbox";
 import { OutboxStore } from "./OutboxStore";
 import type { OutboxStoreService } from "./OutboxStore";
 
@@ -35,8 +36,42 @@ const alice = makeIdentity();
 const bob = makeIdentity();
 const relay = RelayUrl.make("wss://relay.test");
 
+const storageKey = "test.outbox";
+
 const makeStore = (): OutboxStoreService =>
   Effect.runSync(OutboxStore.pipe(Effect.provide(OutboxStore.inMemory)));
+
+const offsetClock = (clock: { offsetSeconds: number }): Clock.Clock => {
+  const base = Clock.make();
+  const nowMillis = () =>
+    base.unsafeCurrentTimeMillis() + clock.offsetSeconds * 1000;
+  const nowNanos = () => BigInt(nowMillis()) * 1_000_000n;
+  return {
+    [Clock.ClockTypeId]: Clock.ClockTypeId,
+    unsafeCurrentTimeMillis: nowMillis,
+    currentTimeMillis: Effect.sync(nowMillis),
+    unsafeCurrentTimeNanos: nowNanos,
+    currentTimeNanos: Effect.sync(nowNanos),
+    sleep: (duration) => base.sleep(duration),
+  };
+};
+
+const ageBeyondRetention = (
+  store: OutboxStoreService,
+  jobId: OutboxJobId,
+): Effect.Effect<void> =>
+  Effect.flatMap(store.loadAll, (jobs) => {
+    const job = jobs.find((stored) => stored.jobId === jobId);
+    if (job === undefined) return Effect.void;
+    return store.update(
+      new StoredOutboxJob({
+        ...job,
+        enqueuedAt: UnixSeconds.make(
+          job.enqueuedAt - OUTBOX_JOB_RETENTION_SECONDS - 1,
+        ),
+      }),
+    );
+  });
 
 /** `behavior.accept` is read per publish, so a test can flip it mid-run. */
 const stubTransport = (
@@ -277,6 +312,251 @@ describe("Outbox", () => {
         jobId: receipt.jobId,
         ref: "row-1",
         reason: "identity-changed",
+      }),
+    );
+  });
+
+  it("keeps no draft once a job is settled", async () => {
+    const storage = stubStorage();
+    const store = Effect.runSync(
+      OutboxStore.pipe(
+        Effect.provide(OutboxStore.fromStringStorage(storage, storageKey)),
+      ),
+    );
+
+    await runOutbox(
+      outboxLayer(alice, store, stubTransport([], { accept: true })),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        yield* outbox.enqueue(textOp("secret-draft"), OutboxRef.make("row-1"));
+        return yield* Stream.runHead(outbox.results);
+      }),
+    );
+
+    const raw = storage.map.get(storageKey) ?? "";
+    expect(raw).toContain('"awaiting-ack"');
+    expect(raw).not.toContain("secret-draft");
+  });
+
+  it("expires a queued job past retention once delivery keeps failing", async () => {
+    const store = makeStore();
+    const rejecting = stubTransport([], { accept: false });
+
+    const receipt = await runOutbox(
+      outboxLayer(alice, store, rejecting),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        return yield* outbox.enqueue(
+          textOp("stranded"),
+          OutboxRef.make("row-1"),
+        );
+      }),
+    );
+    await Effect.runPromise(ageBeyondRetention(store, receipt.jobId));
+
+    const result = await runOutbox(
+      outboxLayer(alice, store, rejecting),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        return yield* Stream.runHead(outbox.results);
+      }),
+    );
+
+    expect(Option.getOrThrow(result)).toEqual(
+      expect.objectContaining({
+        _tag: "OutboxJobFailed",
+        jobId: receipt.jobId,
+        ref: "row-1",
+        reason: "expired",
+      }),
+    );
+    const stored = await Effect.runPromise(store.loadAll);
+    expect(stored.map((job) => job.state._tag)).toEqual(["awaiting-ack"]);
+  });
+
+  it("re-emits an unacked expiry on rebuild and forgets it after ack", async () => {
+    const store = makeStore();
+    const rejecting = stubTransport([], { accept: false });
+
+    const receipt = await runOutbox(
+      outboxLayer(alice, store, rejecting),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        return yield* outbox.enqueue(
+          textOp("stranded"),
+          OutboxRef.make("row-1"),
+        );
+      }),
+    );
+    await Effect.runPromise(ageBeyondRetention(store, receipt.jobId));
+    await runOutbox(
+      outboxLayer(alice, store, rejecting),
+      Effect.flatMap(Outbox, (outbox) => Stream.runHead(outbox.results)),
+    );
+
+    const replayed = await runOutbox(
+      outboxLayer(alice, store, rejecting),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        const replayed = yield* Stream.runHead(outbox.results);
+        yield* outbox.ack(receipt.jobId);
+        return replayed;
+      }),
+    );
+
+    expect(Option.getOrThrow(replayed)).toEqual(
+      expect.objectContaining({ jobId: receipt.jobId, reason: "expired" }),
+    );
+    expect(await Effect.runPromise(store.loadAll)).toEqual([]);
+  });
+
+  it("delivers a job past retention when a relay accepts it", async () => {
+    const published: Array<SignedWrapEvent> = [];
+    const store = makeStore();
+
+    const receipt = await runOutbox(
+      outboxLayer(alice, store, stubTransport([], { accept: false })),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        return yield* outbox.enqueue(textOp("late"), OutboxRef.make("row-1"));
+      }),
+    );
+    await Effect.runPromise(ageBeyondRetention(store, receipt.jobId));
+
+    const result = await runOutbox(
+      outboxLayer(alice, store, stubTransport(published, { accept: true })),
+      Effect.flatMap(Outbox, (outbox) => Stream.runHead(outbox.results)),
+    );
+
+    expect(Option.getOrThrow(result)).toEqual(
+      expect.objectContaining({
+        _tag: "OutboxJobSucceeded",
+        jobId: receipt.jobId,
+      }),
+    );
+    expect(rumorsForBob(published).map((rumor) => rumor.content)).toEqual([
+      "late",
+    ]);
+  });
+
+  it("re-emits an unacked success however old it is", async () => {
+    const store = makeStore();
+    const accepting = stubTransport([], { accept: true });
+
+    const receipt = await runOutbox(
+      outboxLayer(alice, store, accepting),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        const receipt = yield* outbox.enqueue(
+          textOp("delivered"),
+          OutboxRef.make("row-1"),
+        );
+        yield* Stream.runHead(outbox.results);
+        return receipt;
+      }),
+    );
+    await Effect.runPromise(ageBeyondRetention(store, receipt.jobId));
+
+    const replayed = await runOutbox(
+      outboxLayer(alice, store, accepting),
+      Effect.flatMap(Outbox, (outbox) => Stream.runHead(outbox.results)),
+    );
+
+    expect(Option.getOrThrow(replayed)).toEqual(
+      expect.objectContaining({
+        _tag: "OutboxJobSucceeded",
+        jobId: receipt.jobId,
+      }),
+    );
+  });
+
+  it("keeps a job that is still within retention", async () => {
+    const store = makeStore();
+    const rejecting = stubTransport([], { accept: false });
+
+    const receipt = await runOutbox(
+      outboxLayer(alice, store, rejecting),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        return yield* outbox.enqueue(textOp("recent"), OutboxRef.make("row-1"));
+      }),
+    );
+
+    const result = await runOutbox(
+      outboxLayer(alice, store, rejecting),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        return yield* Stream.runHead(outbox.results).pipe(
+          Effect.timeout(100),
+          Effect.option,
+        );
+      }),
+    );
+
+    expect(Option.isNone(result)).toBe(true);
+    const stored = await Effect.runPromise(store.loadAll);
+    expect(stored.map((job) => [job.jobId, job.state._tag])).toEqual([
+      [receipt.jobId, "queued"],
+    ]);
+  });
+
+  it("fails an aged job enqueued under another identity as identity-changed", async () => {
+    const store = makeStore();
+    const rejecting = stubTransport([], { accept: false });
+
+    const receipt = await runOutbox(
+      outboxLayer(alice, store, rejecting),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        return yield* outbox.enqueue(textOp("old"), OutboxRef.make("row-1"));
+      }),
+    );
+    await Effect.runPromise(ageBeyondRetention(store, receipt.jobId));
+
+    const result = await runOutbox(
+      outboxLayer(bob, store, rejecting),
+      Effect.flatMap(Outbox, (outbox) => Stream.runHead(outbox.results)),
+    );
+
+    expect(Option.getOrThrow(result)).toEqual(
+      expect.objectContaining({
+        jobId: receipt.jobId,
+        reason: "identity-changed",
+      }),
+    );
+  });
+
+  it("expires a job that ages out while the runtime keeps running", async () => {
+    const published: Array<SignedWrapEvent> = [];
+    const clock = { offsetSeconds: 0 };
+    const store = makeStore();
+    const layer = outboxLayer(
+      alice,
+      store,
+      stubTransport(published, { accept: false }),
+    ).pipe(Layer.provide(Layer.setClock(offsetClock(clock))));
+
+    const { receipt, result } = await runOutbox(
+      layer,
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        const receipt = yield* outbox.enqueue(
+          textOp("stale"),
+          OutboxRef.make("row-1"),
+        );
+        yield* eventually(() => published.length >= 2);
+        clock.offsetSeconds = OUTBOX_JOB_RETENTION_SECONDS + 1;
+        yield* outbox.enqueue(textOp("fresh"), OutboxRef.make("row-2"));
+        const result = yield* Stream.runHead(outbox.results);
+        return { receipt, result };
+      }),
+    );
+
+    expect(Option.getOrThrow(result)).toEqual(
+      expect.objectContaining({
+        jobId: receipt.jobId,
+        ref: "row-1",
+        reason: "expired",
       }),
     );
   });

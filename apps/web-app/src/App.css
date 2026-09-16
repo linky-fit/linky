@@ -2540,6 +2540,15 @@ button.settings-sensitive-action.is-armed {
   color: #fbbf24;
 }
 
+.chat-message.failed .chat-bubble.out {
+  border: 1px dashed rgba(239, 68, 68, 0.6);
+  opacity: 0.85;
+}
+
+.chat-message.failed .chat-time {
+  color: #f87171;
+}
+
 .chat-bubble-wrap {
   position: relative;
 }
@@ -6899,6 +6908,7 @@ dd {
   .chat-bubble.in,
   .chat-bubble.out,
   .chat-message.pending .chat-bubble.out,
+  .chat-message.failed .chat-bubble.out,
   .chat-compose,
   .reply-preview,
   .badge,

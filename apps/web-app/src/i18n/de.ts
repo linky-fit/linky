@@ -379,6 +379,7 @@ export const de = {
     "Dieser Kontakt kann noch nicht hinzugefügt werden.",
   chatQueued: "Zum Senden vorgemerkt.",
   chatPendingShort: "ausstehend",
+  chatFailedShort: "nicht zugestellt",
   chatSeenShort: "gelesen",
   chatImageAttach: "Bild oder PDF hinzufügen",
   chatPdfDecrypting: "PDF wird entschlüsselt…",

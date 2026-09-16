@@ -6,7 +6,7 @@
 
 Two things decide whether the queue is actually durable:
 
-- **The store.** The job list lives behind the `OutboxStore` port. The default, `OutboxStore.inMemory`, is lost on reload; pass `OutboxStore.fromStringStorage(storage, key)` (one JSON array under `key`; the web app uses `localStorage` and `"linky.outbox"`) through `linkstrServices({ outboxStore })`, `runLinkstr`, or `LinkstrConfig.outboxStore`. An unreadable stored value decodes as an empty list; two older receipt generations still decode, so upgrading never drops queued jobs.
+- **The store.** The job list lives behind the `OutboxStore` port. The default, `OutboxStore.inMemory`, is lost on reload; pass `OutboxStore.fromStringStorage(storage, key)` (one JSON array under `key`; the web app uses `localStorage` and `"linky.outbox"`) through `linkstrServices({ outboxStore })`, `runLinkstr`, or `LinkstrConfig.outboxStore`. An unreadable stored value decodes as an empty list; older persisted layouts (a job-level `operation`, two receipt generations) still decode, so upgrading never drops queued jobs.
 - **The runtime.** The delivery worker is scoped to the `Outbox` service. When the runtime that built it closes, the worker stops; queued jobs stay in the store and resume when the next runtime builds the service. A `runLinkstr` call that enqueues and returns therefore delivers nothing by itself.
 
 ## One runtime: enqueue, deliver, observe
@@ -102,7 +102,7 @@ In React the runtime is `linkstrRuntimeAtom`, the consumer is `useOutboxResults`
 | -------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
 | Chat text, image, token, edit    | `Outbox.enqueue`           | must not be lost while offline; the optimistic row waits for the result                                  |
 | Reaction (add)                   | `Outbox.enqueue`           | same                                                                                                     |
-| Payment telemetry                | `Outbox.enqueueTelemetry`  | fire-and-forget but must eventually land                                                                 |
+| Payment telemetry                | `Outbox.enqueueTelemetry`  | fire-and-forget; retried for up to 7 days                                                                |
 | Reaction retraction              | `Reactions.retract` direct | UX tolerates a failed undo                                                                               |
 | Seen receipts                    | `SeenReceipts.send` direct | every receipt supersedes the previous one; a retried stale cursor would move the peer's marker backwards |
 | Payment notices, bank offers     | direct                     | single-copy or ordered sends the app manages itself                                                      |
@@ -113,10 +113,11 @@ A direct send fails at once with the error its guide lists (for example [chat.md
 ## Retry and ordering rules
 
 - Delivery runs in two lanes, each **strictly FIFO**: one job at a time, in enqueue order. Chat and reaction jobs share the foreground lane; `paymentTelemetry` jobs have a background lane of their own, so a report the collector's relays keep refusing never holds back a chat send. Within a lane a job that keeps failing blocks the ones behind it.
-- Delivery errors (`RecipientNotReached`, `NoRelayReachable`, `WrapNotDelivered`) are retried automatically: sleep 1s, doubling to a 60s cap, forever. You never retry a queued job yourself.
+- Delivery errors (`RecipientNotReached`, `NoRelayReachable`, `WrapNotDelivered`) are retried automatically: sleep 1s, doubling to a 60s cap, until a relay accepts the job or it has been queued for `OUTBOX_JOB_RETENTION_SECONDS` (7 days). You never retry a queued job yourself.
 - A new enqueue cuts the current sleep of its own lane short; the browser `online` event wakes both lanes.
-- Only two things end a job without success: an unexpected defect (`OutboxJobFailed` with `reason: "unexpected-error"`) and a job enqueued under another pubkey found at startup (`reason: "identity-changed"`). Jobs are never sent under a different key than they were enqueued with.
+- Three things end a job without success: an unexpected defect (`OutboxJobFailed` with `reason: "unexpected-error"`), a job enqueued under another pubkey found at startup (`reason: "identity-changed"`), and a job still undeliverable past the retention bound (`reason: "expired"`). Jobs are never sent under a different key than they were enqueued with.
 - A completed job stays stored as `awaiting-ack` until you `ack(jobId)`. Rebuilding the service re-emits every unacked result (at-least-once), so result handlers must be idempotent.
+- **Retention.** A queued job holds its operation draft in the clear — message text, a spendable `CashuTokenText`, private-image keys. Settling drops the draft: an `awaiting-ack` row keeps only the result, so a delivered or failed job never stores one, however long it waits for its ack. A job that keeps failing is given up after `OUTBOX_JOB_RETENTION_SECONDS` (7 days) with `reason: "expired"`, settled and reported like every other terminal (at-least-once), so the app can mark its row failed. The age check runs in the delivery lane after a failed attempt, so an old job a relay accepts is delivered rather than expired, a runtime that never restarts still enforces the bound, and the check never races the job's own delivery. The bound is per runtime: two tabs sharing one store can still both deliver a job, and one may expire a job the other is delivering.
 
 ## Results
 
@@ -127,7 +128,7 @@ A direct send fails at once with the error its guide lists (for example [chat.md
 | `OutboxJobSucceeded` | `jobId`, `ref`, `receipt` (`ChatMessageReceipt` \| `MessageEditReceipt` \| `ReactionReceipt` \| `PaymentTelemetryReceipt`) |
 | `OutboxJobFailed`    | `jobId`, `ref`, `reason`, `detail`                                                                                         |
 
-Persist the outcome, then ack, as in the example above. `OutboxJobSucceeded` means a relay accepted the recipient copy ([concepts.md](./concepts.md#honest-delivery)); the peer's own inbox still has to receive it. The web app's handler, `applyOutboxResult` in `apps/web-app/src/app/hooks/messages/outboxResults.ts`, parses the `ref` prefix and marks the row `sent` with `receipt.rumorId` (or `receipt.editOf` for edits) and `receipt.selfCopy.wrapId`; a failure is only logged.
+Persist the outcome, then ack, as in the example above. `OutboxJobSucceeded` means a relay accepted the recipient copy ([concepts.md](./concepts.md#honest-delivery)); the peer's own inbox still has to receive it. The web app's handler, `applyOutboxResult` in `apps/web-app/src/app/hooks/messages/outboxResults.ts`, parses the `ref` prefix and marks the row `sent` with `receipt.rumorId` (or `receipt.editOf` for edits) and `receipt.selfCopy.wrapId`; a failure marks the row `failed` and logs `reason` and `detail`. Returning an expired token to the wallet is manual: the token text stays in the failed message.
 
 ## Related
 

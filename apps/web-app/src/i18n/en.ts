@@ -370,6 +370,7 @@ export const en = {
   chatUnknownContactAddFailed: "Cannot add this contact yet.",
   chatQueued: "Queued for delivery.",
   chatPendingShort: "pending",
+  chatFailedShort: "not delivered",
   chatSeenShort: "seen",
   chatImageAttach: "Add image or PDF",
   chatPdfDecrypting: "Decrypting PDF…",

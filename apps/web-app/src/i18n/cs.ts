@@ -373,6 +373,7 @@ export const cs = {
   chatUnknownContactAddFailed: "Tento kontakt se zatím nepodařilo přidat.",
   chatQueued: "Zpráva zařazena do fronty.",
   chatPendingShort: "čeká",
+  chatFailedShort: "nedoručeno",
   chatSeenShort: "přečteno",
   chatImageAttach: "Přidat obrázek nebo PDF",
   chatPdfDecrypting: "Dešifruji PDF…",

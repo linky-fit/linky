@@ -93,7 +93,31 @@ describe("applyOutboxResult", () => {
     expect(targets.updateLocalNostrReaction).not.toHaveBeenCalled();
   });
 
-  it("ignores telemetry receipts, failed jobs, and foreign refs", () => {
+  const failed = (ref: string): OutboxResult =>
+    new OutboxJobFailed({
+      jobId: OutboxJobId.make("job"),
+      ref: OutboxRef.make(ref),
+      reason: "expired",
+      detail: "still undeliverable",
+    });
+
+  it("marks the message row failed when its job fails", () => {
+    const targets = apply(failed("message:row-5"));
+    expect(targets.updateLocalNostrMessage).toHaveBeenCalledWith("row-5", {
+      status: "failed",
+    });
+    expect(targets.updateLocalNostrReaction).not.toHaveBeenCalled();
+  });
+
+  it("marks the reaction row failed when its job fails", () => {
+    const targets = apply(failed("reaction:row-6"));
+    expect(targets.updateLocalNostrReaction).toHaveBeenCalledWith("row-6", {
+      status: "failed",
+    });
+    expect(targets.updateLocalNostrMessage).not.toHaveBeenCalled();
+  });
+
+  it("ignores telemetry receipts and foreign refs", () => {
     const { rumorId: id, clientId, sentAt, recipientCopy } = copies;
     const telemetry = new PaymentTelemetryReceipt({
       rumorId: id,
@@ -101,15 +125,9 @@ describe("applyOutboxResult", () => {
       sentAt,
       recipientCopy,
     });
-    const failed = new OutboxJobFailed({
-      jobId: OutboxJobId.make("job"),
-      ref: OutboxRef.make("reaction:row-4"),
-      reason: "unexpected-error",
-      detail: "boom",
-    });
     for (const result of [
       succeeded("message:row-4", telemetry),
-      failed,
+      failed("telemetry:row-4"),
       succeeded("telemetry:row-4", new ReactionReceipt(copies)),
     ]) {
       const targets = apply(result);

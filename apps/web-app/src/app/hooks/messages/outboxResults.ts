@@ -38,6 +38,11 @@ export const applyOutboxResult = (
       reason: result.reason,
       ref: result.ref,
     });
+    if (parsedRef.kind === "message") {
+      updateLocalNostrMessage(parsedRef.id, { status: "failed" });
+    } else {
+      updateLocalNostrReaction(parsedRef.id, { status: "failed" });
+    }
     return;
   }
 

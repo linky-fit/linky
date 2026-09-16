@@ -102,6 +102,7 @@ export type OutboxReceipt = typeof OutboxReceipt.Type;
 export const OutboxFailureReason = Schema.Literal(
   "identity-changed",
   "unexpected-error",
+  "expired",
 );
 export type OutboxFailureReason = typeof OutboxFailureReason.Type;
 
@@ -128,7 +129,10 @@ export const OutboxResult = Schema.Union(OutboxJobSucceeded, OutboxJobFailed);
 export type OutboxResult = typeof OutboxResult.Type;
 
 export const OutboxJobState = Schema.Union(
-  Schema.TaggedStruct("queued", {}),
+  Schema.TaggedStruct("queued", {
+    /** Normalized at enqueue: `clientId` and `sentAt` are filled in. */
+    operation: OutboxOperation,
+  }),
   Schema.TaggedStruct("awaiting-ack", { result: OutboxResult }),
 );
 export type OutboxJobState = typeof OutboxJobState.Type;
@@ -138,8 +142,6 @@ export class StoredOutboxJob extends Schema.Class<StoredOutboxJob>(
 )({
   jobId: OutboxJobId,
   ref: OutboxRef,
-  /** Normalized at enqueue: `clientId` and `sentAt` are filled in. */
-  operation: OutboxOperation,
   /** Identity the job was enqueued under; never sent under another key. */
   pubkey: Pubkey,
   enqueuedAt: UnixSeconds,
@@ -183,23 +185,29 @@ const withRumorIdKey = (
  * instead of `rumorId`.
  */
 const upgradeLegacyReceipt = (
+  state: Record<string, unknown>,
+  operationTag: unknown,
+): Record<string, unknown> => {
+  const { result } = state;
+  if (!Predicate.isRecord(result)) return state;
+  const { receipt } = result;
+  if (!Predicate.isRecord(receipt) || "_tag" in receipt) return state;
+  const _tag = receiptTagOf(operationTag);
+  if (_tag === undefined) return state;
+  return {
+    ...state,
+    result: { ...result, receipt: { _tag, ...withRumorIdKey(receipt) } },
+  };
+};
+
+const upgradeLegacyJob = (
   job: Record<string, unknown>,
 ): Record<string, unknown> => {
-  const { operation, state } = job;
+  const { operation, state, ...rest } = job;
   if (!Predicate.isRecord(operation) || !Predicate.isRecord(state)) return job;
-  const { result } = state;
-  if (!Predicate.isRecord(result)) return job;
-  const { receipt } = result;
-  if (!Predicate.isRecord(receipt) || "_tag" in receipt) return job;
-  const _tag = receiptTagOf(operation._tag);
-  if (_tag === undefined) return job;
-  return {
-    ...job,
-    state: {
-      ...state,
-      result: { ...result, receipt: { _tag, ...withRumorIdKey(receipt) } },
-    },
-  };
+  if (state._tag === "queued")
+    return { ...rest, state: { ...state, operation } };
+  return { ...rest, state: upgradeLegacyReceipt(state, operation._tag) };
 };
 
 const UnknownRecord = Schema.Record({
@@ -211,7 +219,7 @@ const UnknownRecord = Schema.Record({
 export const PersistedOutboxJob = Schema.compose(
   Schema.transform(UnknownRecord, UnknownRecord, {
     strict: true,
-    decode: upgradeLegacyReceipt,
+    decode: upgradeLegacyJob,
     encode: identity,
   }),
   StoredOutboxJob,

@@ -326,6 +326,7 @@ const ChatMessageList = memo(function ChatMessageList({
     }),
     [t],
   );
+  const chatFailedLabel = t("chatFailedShort");
   const chatPendingLabel = t("chatPendingShort");
   const chatSeenLabel = t("chatSeenShort");
   const locale = normalizeLocale(lang);
@@ -557,6 +558,7 @@ const ChatMessageList = memo(function ChatMessageList({
             onOpenNpubContact={onOpenNpubContact}
             onReact={onReact}
             onReply={onReply}
+            chatFailedLabel={chatFailedLabel}
             chatPendingLabel={chatPendingLabel}
             chatSeenLabel={chatSeenLabel}
             isSeen={viewModel.isSeen}

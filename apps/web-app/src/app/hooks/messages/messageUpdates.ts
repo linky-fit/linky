@@ -25,7 +25,7 @@ export interface NostrMessageUpdatePayload {
   replyToId?: string | null;
   rootMessageId?: string | null;
   rumorId?: string | null;
-  status?: "pending" | "sent";
+  status?: "pending" | "sent" | "failed";
   wrapId?: string;
 }
 
@@ -36,7 +36,7 @@ export interface NostrReactionUpdatePayload {
   isDeleted?: typeof Evolu.sqliteTrue;
   messageId?: string;
   reactorPubkey?: string;
-  status?: "pending" | "sent";
+  status?: "pending" | "sent" | "failed";
   wrapId?: string;
 }
 
@@ -54,7 +54,7 @@ export interface NostrMessageShadowState {
   replyToId?: string | null;
   rootMessageId?: string | null;
   rumorId?: string | null;
-  status?: "pending" | "sent";
+  status?: "pending" | "sent" | "failed";
   wrapId?: string;
 }
 
@@ -63,7 +63,7 @@ export interface NostrReactionShadowState {
   emoji?: string | null;
   messageId?: string | null;
   reactorPubkey?: string | null;
-  status?: "pending" | "sent";
+  status?: "pending" | "sent" | "failed";
   wrapId?: string;
 }
 
@@ -82,8 +82,8 @@ const positiveInt = (value: unknown, fallback: number): number => {
     ? Math.trunc(numeric)
     : fallback;
 };
-const status = (value: unknown): "pending" | "sent" =>
-  value === "pending" ? "pending" : "sent";
+const status = (value: unknown): "pending" | "sent" | "failed" =>
+  value === "pending" || value === "failed" ? value : "sent";
 
 const MESSAGE_TEXT_FIELDS = [
   "pubkey",

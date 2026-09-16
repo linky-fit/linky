@@ -161,12 +161,12 @@ Wraps that fail chat decoding surface as `WrapDropped` with one of: `invalid-mes
 
 ## Errors
 
-| Tag                    | When                                                      | What to do                                                           |
-| ---------------------- | --------------------------------------------------------- | -------------------------------------------------------------------- |
-| `RecipientNotReached`  | your self copy landed, no relay accepted the peer's copy  | the peer will not see it; retry — the outbox does this for you       |
-| `NoRelayReachable`     | no relay accepted either wrap                             | offline or all write relays down; retry later                        |
-| `OutboxJobFailed`      | outbox terminal: `identity-changed` or `unexpected-error` | mark the local row failed; a delivery error never reaches this state |
-| `LinkstrNotConfigured` | React only: `linkstrConfigAtom` is null                   | user is logged out; do not send                                      |
+| Tag                    | When                                                                 | What to do                                                                                                |
+| ---------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `RecipientNotReached`  | your self copy landed, no relay accepted the peer's copy             | the peer will not see it; retry — the outbox does this for you                                            |
+| `NoRelayReachable`     | no relay accepted either wrap                                        | offline or all write relays down; retry later                                                             |
+| `OutboxJobFailed`      | outbox terminal: `identity-changed`, `unexpected-error` or `expired` | mark the local row failed; a delivery error reaches this state only as `expired`, after 7 days of retries |
+| `LinkstrNotConfigured` | React only: `linkstrConfigAtom` is null                              | user is logged out; do not send                                                                           |
 
 Both delivery errors carry `rumorId`, `clientId`, `sentAt`, `selfCopy`, and `recipientCopy`.
 

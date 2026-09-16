@@ -71,15 +71,16 @@ const RETENTION_PRUNE_THROTTLE_MS = 900;
 const toText = (value: unknown): string =>
   typeof value === "string" ? value : "";
 
-const toMessageStatus = (value: unknown): "pending" | "sent" => {
+const toSendStatus = (value: unknown): "pending" | "sent" | "failed" => {
   const normalized = trimString(value);
-  return normalized === "pending" ? "pending" : "sent";
+  return normalized === "pending" || normalized === "failed"
+    ? normalized
+    : "sent";
 };
 
-const toReactionStatus = (value: unknown): "pending" | "sent" => {
-  const normalized = trimString(value);
-  return normalized === "pending" ? "pending" : "sent";
-};
+const toMessageStatus = toSendStatus;
+
+const toReactionStatus = toSendStatus;
 
 const toPositiveInt = (value: unknown, fallback: number): number => {
   const asNumber = Number(value ?? 0);
@@ -206,7 +207,7 @@ type NostrMessageInsertPayload = {
   content: string;
   createdAtSec: number;
   direction: "in" | "out";
-  status: "pending" | "sent";
+  status: "pending" | "sent" | "failed";
   wrapId: string;
   clientId?: string;
   editedAtSec?: number;
@@ -318,7 +319,7 @@ const buildReactionInsertPayload = (
   emoji: string;
   messageId: string;
   reactorPubkey: string;
-  status: "pending" | "sent";
+  status: "pending" | "sent" | "failed";
   wrapId: string;
   clientId?: string;
 } | null => {
@@ -334,7 +335,7 @@ const buildReactionInsertPayload = (
     emoji: string;
     messageId: string;
     reactorPubkey: string;
-    status: "pending" | "sent";
+    status: "pending" | "sent" | "failed";
     wrapId: string;
     clientId?: string;
   } = {

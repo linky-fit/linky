@@ -131,7 +131,7 @@ Linkstr guarantees the transport side: ephemeral author, no self copy, no push m
 - Report buckets, not amounts or fees. Bucketing lives in the app (`app/lib/paymentTelemetry.ts`).
 - `errorDetail` must not contain invoices, token text, npubs, or contact names. The app truncates to 500 characters after classification.
 - Do not add fields. The wire is `v: 1`; a new field is a schema change and a review of what it leaks.
-- Through the outbox the draft is persisted in the `OutboxStore` until acked. It is stored under your pubkey for the `identity-changed` check, but that pubkey never leaves the device.
+- Through the outbox the draft is persisted in the `OutboxStore` until the job settles (delivered, or given up after 7 days); only the result stays until acked. It is stored under your pubkey for the `identity-changed` check, but that pubkey never leaves the device.
 
 ## Receiving
 
@@ -139,11 +139,11 @@ Nothing. `WrapInbox` has no decoder for kind 24134 and drops it as `WrapDropped(
 
 ## Errors
 
-| Tag                    | When                                     | What to do                                             |
-| ---------------------- | ---------------------------------------- | ------------------------------------------------------ |
-| `WrapNotDelivered`     | direct send: no relay accepted the wrap  | keep the event in your local queue and retry later     |
-| `OutboxJobFailed`      | `identity-changed` or `unexpected-error` | drop the item; a delivery error never terminates a job |
-| `LinkstrNotConfigured` | React only, logged out                   | keep buffering locally                                 |
+| Tag                    | When                                                | What to do                                                                                  |
+| ---------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `WrapNotDelivered`     | direct send: no relay accepted the wrap             | keep the event in your local queue and retry later                                          |
+| `OutboxJobFailed`      | `identity-changed`, `unexpected-error` or `expired` | drop the item; a delivery error terminates a job only as `expired`, after 7 days of retries |
+| `LinkstrNotConfigured` | React only, logged out                              | keep buffering locally                                                                      |
 
 ## Related
 

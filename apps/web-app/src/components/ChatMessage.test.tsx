@@ -40,6 +40,7 @@ vi.mock("../app/context/AppShellContexts", () => ({
 const makeMessage = (
   content: string,
   direction: "in" | "out" = "in",
+  status?: LocalNostrMessage["status"],
 ): LocalNostrMessage => ({
   contactId: "contact-1",
   content,
@@ -49,6 +50,7 @@ const makeMessage = (
   pubkey: "sender-pubkey",
   rumorId: "rumor-1",
   wrapId: "wrap-1",
+  ...(status === undefined ? {} : { status }),
 });
 
 const contactInfo = (
@@ -66,6 +68,7 @@ interface RenderChatMessageOptions {
   canReplyOrReact?: boolean;
   canSettleBankPaymentOffer?: boolean;
   direction?: "in" | "out";
+  status?: LocalNostrMessage["status"];
   getNpubMessageContactInfo?: (npub: string) => NpubMessageContactInfo | null;
   onAddNpubContacts?: (npubs: readonly string[], messageId: string) => void;
   contactsGroupAssignment?: MessageContactsGroupAssignment | null;
@@ -95,6 +98,7 @@ const renderChatMessage = async (
       canActOnPaymentRequest={false}
       canEdit={false}
       canReplyOrReact={options.canReplyOrReact ?? false}
+      chatFailedLabel="not delivered"
       chatPendingLabel="pending"
       chatSeenLabel="seen"
       declineInfo={null}
@@ -111,7 +115,7 @@ const renderChatMessage = async (
       }
       isSeen={false}
       locale="en"
-      message={makeMessage(content, options.direction)}
+      message={makeMessage(content, options.direction, options.status)}
       nextMessage={null}
       onAddNpubContacts={options.onAddNpubContacts ?? (() => undefined)}
       onCopy={() => undefined}
@@ -140,6 +144,31 @@ const renderChatMessage = async (
 
   return container;
 };
+
+describe("ChatMessage send status", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("labels an outgoing message the outbox gave up on", async () => {
+    const container = await renderChatMessage("hello", {
+      direction: "out",
+      status: "failed",
+    });
+    const bubble = container.querySelector(".chat-message.failed");
+    expect(bubble).not.toBeNull();
+    expect(bubble?.textContent).toContain("not delivered");
+  });
+
+  it("does not label a delivered message", async () => {
+    const container = await renderChatMessage("hello", {
+      direction: "out",
+      status: "sent",
+    });
+    expect(container.querySelector(".chat-message.failed")).toBeNull();
+    expect(container.textContent).not.toContain("not delivered");
+  });
+});
 
 describe("ChatMessage contact actions", () => {
   afterEach(() => {

@@ -172,12 +172,12 @@ Drop reasons: `invalid-reaction` (no `e` tag, a `k` tag other than `14`/`15`, or
 
 ## Errors
 
-| Tag                    | When                                                 | What to do                                     |
-| ---------------------- | ---------------------------------------------------- | ---------------------------------------------- |
-| `RecipientNotReached`  | self copy accepted, peer's copy accepted by no relay | retry; through the outbox this happens for you |
-| `NoRelayReachable`     | no relay accepted anything                           | offline; retry later                           |
-| `OutboxJobFailed`      | `identity-changed` or `unexpected-error` terminal    | mark the local row failed                      |
-| `LinkstrNotConfigured` | React only, logged out                               | do not send                                    |
+| Tag                    | When                                                         | What to do                                     |
+| ---------------------- | ------------------------------------------------------------ | ---------------------------------------------- |
+| `RecipientNotReached`  | self copy accepted, peer's copy accepted by no relay         | retry; through the outbox this happens for you |
+| `NoRelayReachable`     | no relay accepted anything                                   | offline; retry later                           |
+| `OutboxJobFailed`      | `identity-changed`, `unexpected-error` or `expired` terminal | mark the local row failed                      |
+| `LinkstrNotConfigured` | React only, logged out                                       | do not send                                    |
 
 ## Related
 
