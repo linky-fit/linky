@@ -26,8 +26,7 @@ interface ContactCardProps {
   hasAttention: boolean;
   isActive?: boolean;
   lastMessage?: LocalNostrMessage | null;
-  onMintIconError: (origin: string, nextUrl: string | null) => void;
-  onMintIconLoad: (origin: string, url: string | null) => void;
+  onMintIconError: (url: string) => void;
   onSelect: (contact: ContactRowLike) => void;
   statusText?: string | null;
   tokenInfo: CashuTokenMessageInfo | null;
@@ -45,7 +44,6 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
     isActive = false,
     lastMessage,
     onMintIconError,
-    onMintIconLoad,
     onSelect,
     statusText,
     tokenInfo,
@@ -165,7 +163,6 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
                 directionSymbol={directionSymbol}
                 formatDisplayedAmountText={formatDisplayedAmountText}
                 getMintIconUrl={getMintIconUrl}
-                onIconLoad={onMintIconLoad}
                 onIconError={onMintIconError}
               />
             ) : previewText ? (
@@ -184,8 +181,7 @@ interface TokenPreviewProps {
   getMintIconUrl: (
     url: string | null | undefined,
   ) => Pick<MintIcon, "url"> & Partial<Omit<MintIcon, "url">>;
-  onIconError: (origin: string, nextUrl: string | null) => void;
-  onIconLoad: (origin: string, url: string | null) => void;
+  onIconError: (url: string) => void;
   tokenInfo: CashuTokenMessageInfo;
 }
 
@@ -194,7 +190,6 @@ const TokenPreview: React.FC<TokenPreviewProps> = ({
   formatDisplayedAmountText,
   getMintIconUrl,
   onIconError,
-  onIconLoad,
   tokenInfo,
 }) => {
   const amountText = formatDisplayedAmountText(tokenInfo.amount ?? 0);
@@ -208,7 +203,6 @@ const TokenPreview: React.FC<TokenPreviewProps> = ({
         ariaLabel={amountText}
         className="chat-token-pill"
         isMuted={!tokenInfo.isValid}
-        onMintIconLoad={onIconLoad}
         onMintIconError={onIconError}
       />
     </div>

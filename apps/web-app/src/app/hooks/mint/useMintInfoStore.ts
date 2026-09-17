@@ -19,6 +19,7 @@ import {
   getMintInfoDedupedRows,
   isMintDeletedRow,
   parseMintInfoPayload,
+  repairStoredMintInfoRow,
 } from "./mintInfoHelpers";
 import {
   safeLocalStorageGetJson,
@@ -87,12 +88,13 @@ export const useMintInfoStore = ({
       return;
     }
 
+    const storedRows = safeLocalStorageGetJson(
+      `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${ownerId}`,
+      Schema.Array(Schema.Unknown),
+      [],
+    );
     setMintInfoAll(
-      safeLocalStorageGetJson(
-        `${LOCAL_MINT_INFO_STORAGE_KEY_PREFIX}.${ownerId}`,
-        Schema.Array(Schema.Unknown),
-        [],
-      ).filter(isStoredMintInfoRow),
+      storedRows.filter(isStoredMintInfoRow).map(repairStoredMintInfoRow),
     );
   }, [appOwnerId, appOwnerIdRef]);
 

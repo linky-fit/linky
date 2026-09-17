@@ -135,9 +135,7 @@ interface ChatPageProps {
   sendChatMessage: () => Promise<void>;
   removeChatAttachment: (file: File) => void;
   setChatDraft: (value: string) => void;
-  setMintIconUrlByMint: React.Dispatch<
-    React.SetStateAction<Record<string, string | null>>
-  >;
+  markMintIconFailed: (url: string) => void;
 }
 
 interface IndexedBankPaymentOffer {
@@ -274,12 +272,12 @@ interface ChatMessageListProps {
   onReact: ChatPageProps["onReact"];
   onReply: ChatPageProps["onReply"];
   onSettleBankPaymentOffer: ChatPageProps["onSettleBankPaymentOffer"];
+  markMintIconFailed: ChatPageProps["markMintIconFailed"];
   /** Peer's reported seen window; 0 bounds mean no receipt yet. */
   peerSeenSinceSec: number;
   peerSeenUpToSec: number;
   reactionsByMessageId: Map<string, LocalNostrReaction[]>;
   selectedContactId: string;
-  setMintIconUrlByMint: ChatPageProps["setMintIconUrlByMint"];
   t: Translate;
 }
 
@@ -307,11 +305,11 @@ const ChatMessageList = memo(function ChatMessageList({
   onReact,
   onReply,
   onSettleBankPaymentOffer,
+  markMintIconFailed,
   peerSeenSinceSec,
   peerSeenUpToSec,
   reactionsByMessageId,
   selectedContactId,
-  setMintIconUrlByMint,
   t,
 }: ChatMessageListProps) {
   const actionLabels = useMemo(
@@ -333,13 +331,6 @@ const ChatMessageList = memo(function ChatMessageList({
     (timestamp: number) => formatChatDayLabel(timestamp, lang, t),
     [lang, t],
   );
-  const onMintIconLoad = useCallback(
-    (origin: string, url: string | null) => {
-      setMintIconUrlByMint((previous) => ({ ...previous, [origin]: url }));
-    },
-    [setMintIconUrlByMint],
-  );
-
   const messageElRef = useCallback(
     (element: HTMLDivElement | null, messageId: string) => {
       const elements = chatMessageElByIdRef.current;
@@ -527,8 +518,7 @@ const ChatMessageList = memo(function ChatMessageList({
             getCashuTokenMessageInfo={getCashuTokenMessageInfo}
             getMintIconUrl={getMintIconUrl}
             getNpubMessageContactInfo={getNpubMessageContactInfo}
-            onMintIconLoad={onMintIconLoad}
-            onMintIconError={onMintIconLoad}
+            onMintIconError={markMintIconFailed}
             actionLabels={actionLabels}
             canEdit={viewModel.canEdit}
             canReplyOrReact={viewModel.canReplyOrReact}
@@ -1201,7 +1191,7 @@ export const ChatPage: FC<ChatPageProps> = ({
   removeChatAttachment,
   sendChatMessage,
   setChatDraft,
-  setMintIconUrlByMint,
+  markMintIconFailed,
 }) => {
   const { formatDisplayedAmountText, t } = useAppShellCore();
   const composeInputRef = useRef<HTMLDivElement | null>(null);
@@ -1338,7 +1328,7 @@ export const ChatPage: FC<ChatPageProps> = ({
         peerSeenUpToSec={selectedContact.chatPeerSeenAtSec ?? 0}
         reactionsByMessageId={reactionsByMessageId}
         selectedContactId={selectedContact.id}
-        setMintIconUrlByMint={setMintIconUrlByMint}
+        markMintIconFailed={markMintIconFailed}
         t={t}
       />
 

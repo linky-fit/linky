@@ -5,9 +5,13 @@ import * as Evolu from "@evolu/common";
 import type { StoredProof } from "@linky/linkshu";
 import {
   extractPpk,
+  GENERIC_MINT_ICON_DATA_URL,
+  getMintIconOverride,
+  getMintOriginAndHost,
   MAIN_MINT_URL,
   normalizeMintUrl,
 } from "../../../utils/mint";
+import type { MintIcon } from "../../../utils/mint";
 import type { LocalMintInfoRow } from "../../types/appTypes";
 import { isRecord } from "../../../utils/unknown";
 
@@ -149,10 +153,33 @@ const toJson = (value: unknown): string | null => {
       return null;
     }
 
-    return trimmed.slice(0, 1000);
+    return trimmed;
   } catch {
     return null;
   }
+};
+
+const parseJsonText = Schema.decodeUnknownOption(Schema.parseJson(JsonValue));
+
+const isBrokenJsonText = (value: string | null | undefined): boolean =>
+  hasJsonText(value) && Option.isNone(parseJsonText(value));
+
+// Rows saved while infoJson/feesJson were cut at 1000 characters hold JSON
+// that no longer parses; drop such blobs and the check time so the refresh
+// gate fetches the complete mint info again.
+export const repairStoredMintInfoRow = (
+  row: LocalMintInfoRow,
+): LocalMintInfoRow => {
+  const infoBroken = isBrokenJsonText(row.infoJson);
+  const feesBroken = isBrokenJsonText(row.feesJson);
+  if (!infoBroken && !feesBroken) return row;
+
+  return {
+    ...row,
+    feesJson: feesBroken ? null : row.feesJson,
+    infoJson: infoBroken ? null : row.infoJson,
+    lastCheckedAtSec: null,
+  };
 };
 
 export const getMintInfoIconUrl = (
@@ -180,6 +207,37 @@ export const getMintInfoIconUrl = (
   } catch {
     return null;
   }
+};
+
+// Candidates in order of preference; the first one not known to have failed
+// wins, so an icon arriving with refreshed mint info is tried as soon as it
+// appears, while a URL that already failed is never loaded again.
+export const resolveMintIcon = (
+  mint: string | null | undefined,
+  infoJson: string | null | undefined,
+  failedIconUrls: ReadonlySet<string>,
+): MintIcon => {
+  const { origin, host } = getMintOriginAndHost(mint);
+  if (!origin) {
+    return {
+      origin: null,
+      url: GENERIC_MINT_ICON_DATA_URL,
+      host,
+      failed: false,
+    };
+  }
+
+  const candidates = [
+    getMintInfoIconUrl(mint, infoJson),
+    getMintIconOverride(host),
+    `${origin}/favicon.ico`,
+    GENERIC_MINT_ICON_DATA_URL,
+  ];
+  const isUsable = (candidate: string | null): candidate is string =>
+    candidate !== null && !failedIconUrls.has(candidate);
+  const url = candidates.find(isUsable) ?? null;
+
+  return { origin, url, host, failed: url === null };
 };
 
 // Fees are not part of NUT-06 info; the only published fee is the active

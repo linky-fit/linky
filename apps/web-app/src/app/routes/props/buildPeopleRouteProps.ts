@@ -114,7 +114,7 @@ interface BuildPeopleRoutePropsParams {
   setChatDraft: PeopleRoutesProps["chatProps"]["setChatDraft"];
   setContactPayMethod: PeopleRoutesProps["contactPayProps"]["setContactPayMethod"];
   setForm: PeopleRoutesProps["contactEditProps"]["setForm"];
-  setMintIconUrlByMint: PeopleRoutesProps["chatProps"]["setMintIconUrlByMint"];
+  markMintIconFailed: PeopleRoutesProps["chatProps"]["markMintIconFailed"];
   setPayAmount: PeopleRoutesProps["contactPayProps"]["setPayAmount"];
   setProfileEditLnAddress: PeopleRoutesProps["profileProps"]["setProfileEditLnAddress"];
   setProfileEditName: PeopleRoutesProps["profileProps"]["setProfileEditName"];
@@ -228,7 +228,7 @@ export const buildPeopleRouteProps = ({
   setChatDraft,
   setContactPayMethod,
   setForm,
-  setMintIconUrlByMint,
+  markMintIconFailed,
   setPayAmount,
   setProfileEditLnAddress,
   setProfileEditName,
@@ -278,7 +278,7 @@ export const buildPeopleRouteProps = ({
       lang,
       mentionContacts,
       reactionsByMessageId,
-      setMintIconUrlByMint,
+      markMintIconFailed,
       chatMessageElByIdRef,
       getCashuTokenMessageInfo,
       getMintIconUrl,

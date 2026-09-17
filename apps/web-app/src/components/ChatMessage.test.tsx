@@ -118,7 +118,6 @@ const renderChatMessage = async (
       onDeclinePaymentRequest={() => undefined}
       onEdit={() => undefined}
       onMintIconError={() => undefined}
-      onMintIconLoad={() => undefined}
       onOpenBankPaymentOfferDetails={() => undefined}
       onOpenNpubContact={() => undefined}
       onPayPaymentRequest={() => undefined}

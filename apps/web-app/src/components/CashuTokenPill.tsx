@@ -2,13 +2,11 @@ import type { OperationId, TokenTransfer } from "@linky/linkshu";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import type { MintIcon } from "../utils/mint";
-import { getNextMintIconUrl } from "../utils/mint";
 
 interface TransferPillProps {
   ariaLabel: string;
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
-  onMintIconError: (origin: string, nextUrl: string | null) => void;
-  onMintIconLoad: (origin: string, url: string | null) => void;
+  onMintIconError: (url: string) => void;
   onOpenTransfer: (id: OperationId) => void;
   transfer: TokenTransfer;
 }
@@ -18,7 +16,6 @@ export const TransferPill = React.memo(function TransferPill({
   ariaLabel,
   getMintIconUrl,
   onMintIconError,
-  onMintIconLoad,
   onOpenTransfer,
   transfer,
 }: TransferPillProps) {
@@ -31,7 +28,6 @@ export const TransferPill = React.memo(function TransferPill({
       isError={transfer.kind === "receive" && transfer.status === "failed"}
       isMuted={transfer.status !== "issued"}
       onClick={() => onOpenTransfer(transfer.id)}
-      onMintIconLoad={onMintIconLoad}
       onMintIconError={onMintIconError}
     />
   );
@@ -46,8 +42,7 @@ interface CashuTokenPillProps {
   isError?: boolean;
   isMuted?: boolean;
   onClick?: () => void;
-  onMintIconLoad?: (origin: string, url: string | null) => void;
-  onMintIconError?: (origin: string, url: string | null) => void;
+  onMintIconError?: (url: string) => void;
 }
 
 export function CashuTokenPill({
@@ -59,7 +54,6 @@ export function CashuTokenPill({
   isError = false,
   isMuted = false,
   onClick,
-  onMintIconLoad,
   onMintIconError,
 }: CashuTokenPillProps) {
   const pillClassName = `pill cashu-token-pill${isError ? " pill-error" : isMuted ? " pill-muted" : ""}${compact ? " cashu-token-pill-compact" : ""}${className ? ` ${className}` : ""}`;
@@ -73,15 +67,8 @@ export function CashuTokenPill({
           height={14}
           loading="lazy"
           referrerPolicy="no-referrer"
-          onLoad={() => {
-            if (icon.origin) onMintIconLoad?.(icon.origin, icon.url);
-          }}
           onError={() => {
-            if (icon.origin)
-              onMintIconError?.(
-                icon.origin,
-                getNextMintIconUrl(icon.url, icon.origin),
-              );
+            if (icon.url) onMintIconError?.(icon.url);
           }}
         />
       ) : null}

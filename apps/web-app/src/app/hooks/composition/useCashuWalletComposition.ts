@@ -724,10 +724,10 @@ export const useCashuWalletComposition = ({
     getMintIconUrl,
     getMintRuntime,
     isMintDeleted,
+    markMintIconFailed,
     mintInfoByUrl,
     mintInfoDeduped,
     refreshMintInfo,
-    setMintIconUrlByMint,
     setMintInfoAll,
     touchMintInfo,
   } = useMintDomain({
@@ -2085,26 +2085,6 @@ export const useCashuWalletComposition = ({
     ],
   );
 
-  const handleMintIconLoad = React.useCallback(
-    (origin: string, url: string | null) => {
-      setMintIconUrlByMint((prev) => ({
-        ...prev,
-        [origin]: url,
-      }));
-    },
-    [setMintIconUrlByMint],
-  );
-
-  const handleMintIconError = React.useCallback(
-    (origin: string, url: string | null) => {
-      setMintIconUrlByMint((prev) => ({
-        ...prev,
-        [origin]: url,
-      }));
-    },
-    [setMintIconUrlByMint],
-  );
-
   // Every mint the wallet ever touched, soft-deleted legacy rows included:
   // deleting a mint's last token locally must not hide it from a recovery.
   const walletMints = React.useMemo(() => {
@@ -2624,8 +2604,6 @@ export const useCashuWalletComposition = ({
     getCashuTokenMessageInfo,
     getMintIconUrl,
     getMintRuntime,
-    handleMintIconError,
-    handleMintIconLoad,
     isCashuTokenKnownAny,
     isCashuTokenStored,
     knownLnAddressPayContact,
@@ -2636,6 +2614,7 @@ export const useCashuWalletComposition = ({
     makeNip98AuthHeader,
     markCashuTokenExternalized,
     markCashuTokenIssued,
+    markMintIconFailed,
     meltLargestForeignMintToMainMint,
     mintInfoByUrl,
     onPayChatPaymentRequest,
@@ -2670,7 +2649,6 @@ export const useCashuWalletComposition = ({
     setDefaultMintUrlDraft,
     setLightningInvoiceAutoPayLimit,
     setLnAddressPayAmount,
-    setMintIconUrlByMint,
     setMintInfoAll,
     setPayWithCashuEnabled,
     setPendingCashuDeleteId,
