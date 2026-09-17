@@ -4,6 +4,7 @@ import type { SignedPlainEvent } from "@linky/linkstr";
 import { stubPlainTransport } from "@linky/linkstr/testing";
 import { Effect, Exit } from "effect";
 import { finalizeEvent } from "nostr-tools";
+import { decrypt, getConversationKey } from "nostr-tools/nip44";
 import { linkstrConfigAtom } from "./config";
 import { publishMuteListAtom } from "./muteList";
 import { fetchOwnRelayListsAtom, publishRelayListsAtom } from "./relayLists";
@@ -91,6 +92,11 @@ describe("publishMuteListAtom", () => {
     expect(exit.value.kind).toBe(10000);
     const event = published[0];
     expect(event?.pubkey).toBe(alice.pubkey);
-    expect(event?.tags).toEqual([["p", bob.pubkey]]);
+    expect(event?.tags).toEqual([]);
+    assert(event !== undefined);
+    const selfKey = getConversationKey(alice.secretKey, alice.pubkey);
+    expect(JSON.parse(decrypt(event.content, selfKey))).toEqual([
+      ["p", bob.pubkey],
+    ]);
   });
 });

@@ -1,5 +1,6 @@
 import { Effect, Exit, Layer } from "effect";
 import { verifyEvent } from "nostr-tools";
+import { decrypt, getConversationKey } from "nostr-tools/nip44";
 import { RelayUrl } from "../domain/primitives";
 import { tagValues } from "../internal/nostrEvent";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
@@ -39,7 +40,7 @@ const runWith = <A, E>(
   );
 
 describe("MuteList.publishMuteList", () => {
-  it("publishes a signed kind 10000 with p tags and empty content", async () => {
+  it("publishes a signed kind 10000 with the muted keys in encrypted content and no public tags", async () => {
     const published: Array<SignedPlainEvent> = [];
     const exit = await runWith(
       stubPlainTransport(published),
@@ -52,9 +53,17 @@ describe("MuteList.publishMuteList", () => {
     const event = published[0];
     assert(event !== undefined);
     expect(event.kind).toBe(10000);
-    expect(event.content).toBe("");
     expect(verifyEvent(event)).toBe(true);
-    expect(tagValues(event.tags, "p")).toEqual([bob.pubkey, carol.pubkey]);
+    expect(tagValues(event.tags, "p")).toEqual([]);
+    expect(event.tags).toEqual([]);
+    expect(event.content).not.toBe("");
+
+    const selfKey = getConversationKey(alice.secretKey, alice.pubkey);
+    expect(JSON.parse(decrypt(event.content, selfKey))).toEqual([
+      ["p", bob.pubkey],
+      ["p", carol.pubkey],
+    ]);
+
     expect(exit.value.eventId).toBe(event.id);
     expect(exit.value.results).toEqual([
       expect.objectContaining({ relay: relayA, accepted: true }),
