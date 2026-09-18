@@ -426,16 +426,21 @@ export const createShardStore = <
     table: T,
     id: string,
   ): Effect.Effect<void, ShardDbError | RowNotFound> =>
-    Effect.flatMap(locateLive(scope, table, id), (current) =>
-      db.mutate([
+    Effect.gen(function* () {
+      const { copies } = yield* shardCopies(scope, table);
+      const current = copies.find((row) => row.id === id);
+      if (current === undefined)
+        return yield* Effect.fail(new RowNotFound({ scope, table, id }));
+      if (!isLive(current)) return;
+      yield* db.mutate([
         {
           kind: "update",
           table,
           ownerId: current.ownerId,
           row: { id, isDeleted: true },
         },
-      ]),
-    );
+      ]);
+    });
 
   const ingest = <T extends keyof S & string>(
     scope: string,

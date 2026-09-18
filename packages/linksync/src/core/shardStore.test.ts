@@ -90,6 +90,25 @@ describe("shard store", () => {
       expect(run(store.rows("notes", "note"))).toEqual([]);
     });
 
+    it("removes an already tombstoned row without another mutation", () => {
+      const { db, store } = toyStore();
+      run(store.insert("notes", "note", note("a")));
+      run(store.rotate("notes"));
+      run(store.update("notes", "note", "a", { title: "copied" }));
+      run(store.remove("notes", "note", "a"));
+      const before = run(db.readTable("note"));
+      const usage = run(db.ownerUsage(store.shardOwner("notes", 1).id));
+      run(store.remove("notes", "note", "a"));
+      expect(run(db.readTable("note"))).toEqual(before);
+      expect(run(db.ownerUsage(store.shardOwner("notes", 1).id))).toEqual(
+        usage,
+      );
+      expect(run(store.rows("notes", "note"))).toEqual([]);
+      expect(
+        run(Effect.exit(store.remove("notes", "note", "unknown")))._tag,
+      ).toBe("Failure");
+    });
+
     it("writes app-scope rows into the app owner", () => {
       const { db, store, appOwner } = toyStore();
       run(store.insert("meta", "setting", { id: "lang", value: "cs" }));

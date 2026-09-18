@@ -43,7 +43,7 @@ const store = createShardStore<Schema, typeof scopes>({ db, appOwner, scopes });
 | `copies(scope, table)`            | Every copy in the visible shards, tombstones and duplicate ids included, highest shard first; for a domain rule that beats the merge.             |
 | `insert(scope, table, row)`       | Writes into the active shard. `row` needs every non-nullable column; nullable ones may be omitted.                                                |
 | `update(scope, table, id, patch)` | Copy-on-write; fails with `RowNotFound` for an id no visible shard holds.                                                                         |
-| `remove(scope, table, id)`        | Tombstones the row where it lives.                                                                                                                |
+| `remove(scope, table, id)`        | Tombstones the row where it lives; already deleted rows are a no-op, unknown ids fail with `RowNotFound`.                                         |
 | `ingest(scope, table, rows)`      | Copies foreign rows into the active shard, idempotently; returns how many it wrote.                                                               |
 | `foreignRows(table, ownerId)`     | The rows of one owner, for feeding `ingest`.                                                                                                      |
 | `activeIndex(scope)`              | The pointer's index, or a locally written rotation the read model has not shown yet.                                                              |
