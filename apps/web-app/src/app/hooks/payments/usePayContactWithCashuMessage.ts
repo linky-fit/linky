@@ -28,6 +28,10 @@ import {
   type PaidOverlayDetails,
 } from "../../lib/paidOverlay";
 import { selectSendMintForAmount } from "../../lib/paymentMintSelection";
+import {
+  recurringRunDetails,
+  type RecurringRunRef,
+} from "../../lib/recurringPaymentOrder";
 import type { SendMintBalance } from "../../lib/paymentMintSelection";
 import type {
   AppendLocalNostrMessage,
@@ -135,6 +139,8 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       paymentRequestId?: string | null;
       isPaymentAuthorized?: () => boolean;
       pendingMessageId?: string;
+      /** Set when a standing order pays; recorded on the transaction. */
+      recurringRun?: RecurringRunRef | null;
       replyContext?: ReplyContext | null;
     }): Promise<CashuMessagePaymentHookResult> => {
       const {
@@ -148,6 +154,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         paymentRequestId,
         isPaymentAuthorized,
         pendingMessageId,
+        recurringRun,
         replyContext,
       } = args;
       const notify = !fromQueue;
@@ -310,6 +317,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
           logPaymentEvent({
             amount: amountSat,
             contactId,
+            details: recurringRun ? recurringRunDetails(recurringRun) : null,
             direction: "out",
             error,
             fee: null,
@@ -445,6 +453,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
             details: {
               issuedToken: receipt.tokenText,
               ...(paymentRequestId ? { requestId: paymentRequestId } : {}),
+              ...recurringRunDetails(recurringRun),
             },
             direction: "out",
             error: null,
