@@ -128,6 +128,14 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "One pass over every persisted unsettled melt, run when the wallet runtime comes up and when the browser comes back online; the payload lists each record's outcome.",
   "melt.historyResolved":
     "The app updated a pending Lightning payment in the transaction history after melt.resume settled it — to paid (amount and fee) or failed. The quote link connects it to the melt rows.",
+  "recurring.run":
+    "A standing order (recurring payment) was executed on this device: paid or failed, with the amount, the due time it settles, and how many due times were skipped because Linky was closed. The recurringPayment link ties it to the order's other rows; a contact link joins the chat payment steps.",
+  "recurring.skipped":
+    "A due standing order was skipped without paying — funds stayed insufficient or attempts kept failing until the grace window closed, or the contact no longer exists. The schedule moved on to the next due time.",
+  "recurring.waitingForFunds":
+    "A standing order is due but the spendable balance is below its amount; the scheduler retries every minute until the grace window closes. Reported once per due time.",
+  "recurring.interrupted":
+    "A standing order was found marked running for longer than a run can take, so an earlier launch died mid-run. The mark was cleared; check the transaction history for whether the payment went out.",
   "send.rowForgotten":
     "The app dropped a pending send row because its token verifiably reached the recipient (chat message published, or payment request POSTed). Follow the row link back to the send.send operation that produced it.",
 };

@@ -901,7 +901,9 @@ export const useAppShellComposition = ({
     topupMintUrl,
     walletWarningApplies,
     walletWarningDismissed,
+    recurringPaymentsActions,
   } = useCashuWalletComposition({
+    insert,
     cashuTokensAll,
     cashuProofsAll,
     cashuOperationsAll,
@@ -2080,6 +2082,7 @@ export const useAppShellComposition = ({
     advancedSettingsContext,
     evoluSettingsContext,
     mintSettingsContext,
+    recurringPaymentsContext: recurringPaymentsActions,
     relaySettingsContext,
     t,
     toasts,

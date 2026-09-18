@@ -77,11 +77,16 @@ export const resolveBackAction = (
         : () => navigateTo({ route: "wallet" });
 
     case "transactions":
+    case "recurringPayments":
     case "manualPay":
     case "cashuTokens":
     case "cashuTokenEmit":
     case "topup":
       return () => navigateTo({ route: "wallet" });
+
+    case "recurringPaymentNew":
+    case "recurringPayment":
+      return () => navigateTo({ route: "recurringPayments" });
 
     case "topupNoAmount":
     case "topupInvoice":
@@ -218,6 +223,9 @@ const SHOWS_MENU_BUTTON: Record<
   topupInvoice: false,
   topupNoAmount: false,
   transactions: false,
+  recurringPayments: false,
+  recurringPaymentNew: false,
+  recurringPayment: false,
   wallet: true,
 };
 
@@ -351,6 +359,9 @@ const TOPBAR_TITLE_KEY: Record<
   topupInvoice: "topupInvoiceTitle",
   topupNoAmount: "topupNoAmountTitle",
   transactions: "transactionsTitle",
+  recurringPayments: "recurringPaymentsTitle",
+  recurringPaymentNew: "recurringPaymentNewTitle",
+  recurringPayment: "recurringPaymentTitle",
   wallet: "wallet",
 };
 

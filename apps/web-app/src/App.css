@@ -7512,3 +7512,187 @@ button.cashu-token-pill {
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+
+/* Standing orders */
+.wallet-subtle-links {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+}
+
+.wallet-subtle-links .wallet-subtle-link {
+  margin-top: 12px;
+}
+
+.recurring-order-card {
+  width: 100%;
+  padding: 0;
+  border: none;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: none;
+  transform: none;
+}
+
+.recurring-order-card:hover {
+  background: rgba(148, 163, 184, 0.1);
+  box-shadow: none;
+  transform: none;
+}
+
+.recurring-empty {
+  padding: 32px 0 8px;
+  text-align: center;
+}
+
+.recurring-hint {
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.recurring-form label:first-child {
+  margin-top: 0;
+}
+
+.recurring-recipient-header {
+  margin: 0 0 4px;
+}
+
+.recurring-inline-link {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.recurring-pills {
+  margin-bottom: 10px;
+}
+
+.recurring-select {
+  width: 100%;
+  padding: 12px 40px 12px 12px;
+  border-radius: 12px;
+  border: none;
+  background: var(--app-flat-bg);
+  color: #e2e8f0;
+  font: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px 14px;
+}
+
+.recurring-select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.22);
+}
+
+.recurring-amount-field {
+  position: relative;
+}
+
+.recurring-amount-field input {
+  padding-right: 52px;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.recurring-amount-unit {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.recurring-interval-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.recurring-interval-row .recurring-interval-count {
+  width: 88px;
+  flex: 0 0 88px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.recurring-interval-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.recurring-detail .contact-header {
+  margin-top: 0;
+}
+
+.recurring-detail .contact-header-text {
+  flex: 1;
+}
+
+.recurring-truncate {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recurring-order-recipient {
+  flex-wrap: nowrap;
+}
+
+.recurring-order-recipient > span:last-child {
+  flex: 0 0 auto;
+}
+
+.recurring-detail .contact-header .pill {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.recurring-detail-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0 8px;
+}
+
+.recurring-detail-amount-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.recurring-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.recurring-repeat-link {
+  display: block;
+  margin: 12px auto 0;
+}
+
+.transaction-recurring-pill {
+  cursor: pointer;
+  box-shadow: none;
+  transform: none;
+}
+
+.error-text {
+  color: #fecaca;
+  font-size: 13px;
+}

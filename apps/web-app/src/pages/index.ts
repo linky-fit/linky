@@ -35,5 +35,8 @@ export { SpdPaymentPage } from "./SpdPaymentPage";
 export { TopupInvoicePage } from "./TopupInvoicePage";
 export { TopupNoAmountPage } from "./TopupNoAmountPage";
 export { TopupPage } from "./TopupPage";
+export { RecurringPaymentNewPage } from "./RecurringPaymentNewPage";
+export { RecurringPaymentPage } from "./RecurringPaymentPage";
+export { RecurringPaymentsPage } from "./RecurringPaymentsPage";
 export { TransactionsPage } from "./TransactionsPage";
 export { WalletPage } from "./WalletPage";

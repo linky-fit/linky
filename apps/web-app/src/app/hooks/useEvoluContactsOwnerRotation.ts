@@ -391,7 +391,7 @@ const OWNER_LANES: Record<RotatingOwnerRole, OwnerLaneConfig> = {
     rotatedAtKey: EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
     threshold: TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
     rotatedLabel: "evoluTransactionsOwnerRotated",
-    tables: ["transaction"],
+    tables: ["transaction", "recurringPayment"],
   },
 };
 

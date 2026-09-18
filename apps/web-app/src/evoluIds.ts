@@ -5,3 +5,6 @@ export type ContactId = typeof ContactId.Type;
 
 export const TransactionId = Evolu.id("Transaction");
 export type TransactionId = typeof TransactionId.Type;
+
+export const RecurringPaymentId = Evolu.id("RecurringPayment");
+export type RecurringPaymentId = typeof RecurringPaymentId.Type;

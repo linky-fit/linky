@@ -21,6 +21,10 @@ import { safeLocalStorageSet } from "../../utils/storage";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { describeTaggedCashuError } from "../lib/cashuStoredError";
 import { selectSendMintForAmount } from "../lib/paymentMintSelection";
+import {
+  recurringRunDetails,
+  type RecurringRunRef,
+} from "../lib/recurringPaymentOrder";
 import type { SendMintBalance } from "../lib/paymentMintSelection";
 import type {
   ContactPayRowLike,
@@ -38,6 +42,11 @@ interface MeltFailure {
   readonly message: string;
   /** The melt was sent and the mint has not settled it; not a failure yet. */
   readonly pending: PaymentPending | null;
+}
+
+export interface PayLightningAddressOptions {
+  /** Set when a standing order pays: recorded on the transaction, no UI. */
+  recurringRun?: RecurringRunRef | null;
 }
 
 interface UseLightningPaymentsDomainParams {
@@ -257,7 +266,12 @@ export const useLightningPaymentsDomain = ({
   );
 
   const payLightningAddressWithCashu = React.useCallback(
-    async (lnAddress: string, amountSat: number) => {
+    async (
+      lnAddress: string,
+      amountSat: number,
+      options?: PayLightningAddressOptions,
+    ) => {
+      const recurringRun = options?.recurringRun ?? null;
       const paymentTarget = lnAddress.trim();
       if (!paymentTarget) return false;
       if (!Number.isFinite(amountSat) || amountSat <= 0) {
@@ -370,6 +384,7 @@ export const useLightningPaymentsDomain = ({
                   ...(attemptInvoicePreview?.description
                     ? { lightningMemo: attemptInvoicePreview.description }
                     : {}),
+                  ...recurringRunDetails(recurringRun),
                 },
                 knownContact?.id ?? null,
               );
@@ -414,6 +429,7 @@ export const useLightningPaymentsDomain = ({
               ...(successActionUrlDescription
                 ? { lnurlSuccessUrlDescription: successActionUrlDescription }
                 : {}),
+              ...recurringRunDetails(recurringRun),
             },
             fee: receipt.feePaid,
             mint: receipt.mint,
@@ -423,6 +439,11 @@ export const useLightningPaymentsDomain = ({
             method: "lightning_address",
             phase: "complete",
           });
+
+          rememberFirstPayment();
+          // A standing order pays in the background: no overlay, no
+          // success-action status, no save-contact prompt.
+          if (recurringRun) return true;
 
           const displayAmount = formatDisplayedAmountParts(receipt.paidAmount);
           showPaidOverlay(
@@ -453,8 +474,6 @@ export const useLightningPaymentsDomain = ({
             );
           }
 
-          rememberFirstPayment();
-
           if (paidLightningAddress && !knownContact?.id) {
             setPostPaySaveContact({
               lnAddress: paidLightningAddress,
@@ -477,6 +496,7 @@ export const useLightningPaymentsDomain = ({
             ...(lastAttemptInvoicePreview?.description
               ? { lightningMemo: lastAttemptInvoicePreview.description }
               : {}),
+            ...recurringRunDetails(recurringRun),
           },
           fee: null,
           mint: finalErrorMint,

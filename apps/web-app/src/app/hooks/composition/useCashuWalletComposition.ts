@@ -124,6 +124,8 @@ import { drainLegacyAcceptedCashuToken } from "../../migrations/legacyAcceptedTo
 import { seedLinkshuSeenMintsFromTokenRows } from "../../migrations/linkshuStorageMigration";
 import { useLinkshuComposition } from "./useLinkshuComposition";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
+import { useRecurringPaymentsActions } from "../payments/useRecurringPaymentsActions";
+import { useRecurringPaymentsScheduler } from "../payments/useRecurringPaymentsScheduler";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
 import type { Translate } from "../../../i18n";
@@ -236,6 +238,7 @@ interface UseCashuWalletCompositionParams {
   setPayAmount: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
+  insert: EvoluMutations["insert"];
   update: EvoluMutations["update"];
   upsert: EvoluMutations["upsert"];
 }
@@ -259,6 +262,7 @@ export const useCashuWalletComposition = ({
   setPayAmount,
   setStatus,
   t,
+  insert,
   update,
   upsert,
 }: UseCashuWalletCompositionParams) => {
@@ -2412,6 +2416,32 @@ export const useCashuWalletComposition = ({
     update,
   });
 
+  const recurringScheduler = useRecurringPaymentsScheduler({
+    appendLocalNostrMessage,
+    cashuBalance,
+    cashuIsBusy,
+    contacts,
+    currentNsec,
+    enabled: sendCashuToken !== null && meltCashuInvoice !== null,
+    enqueueOutbox,
+    payContactWithCashuMessage,
+    payLightningAddressWithCashu: payLightningAddressWithCashuBase,
+    setCashuIsBusy,
+    t,
+    update,
+    updateLocalNostrMessage,
+  });
+  const recurringPaymentsActions = useRecurringPaymentsActions({
+    formatDisplayedAmountParts,
+    insert,
+    pushToast,
+    runOrderNow: recurringScheduler.runOrderNow,
+    showPaidOverlay,
+    t,
+    transactionsOwnerId,
+    update,
+  });
+
   const requestSelectedContact = React.useCallback(async () => {
     if (route.kind !== "contactPay") return;
     if (!selectedContact) return;
@@ -2645,6 +2675,7 @@ export const useCashuWalletComposition = ({
     payLightningAddressWithCashu,
     payLightningInvoiceWithCashu,
     paySelectedContact,
+    recurringPaymentsActions,
     payWithCashuEnabled,
     pendingCashuContactSend,
     pendingCashuDeleteId,

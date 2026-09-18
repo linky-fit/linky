@@ -19,8 +19,10 @@ import { Avatar } from "../components/Avatar";
 
 import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
 import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
+import { readRecurringPaymentIdFromDetails } from "../app/lib/recurringPaymentDisplay";
 import { deriveDefaultProfile } from "../derivedProfile";
 import { evolu } from "../evolu";
+import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { getLightningInvoicePreview } from "@linky/linkshu";
 import {
@@ -195,6 +197,7 @@ const TransactionCardView = ({
     item.status === "declined" ||
     item.status === "error";
   const lnurlMessage = readLnurlSuccessMessage(item);
+  const recurringPaymentId = readRecurringPaymentIdFromDetails(item.details);
 
   return (
     <div
@@ -233,6 +236,21 @@ const TransactionCardView = ({
           ) : null}
           <div className="transaction-meta">
             <span>{formatDateText(item.createdAtSec)}</span>
+            {recurringPaymentId ? (
+              <button
+                type="button"
+                className="pill pill-muted transaction-status-pill transaction-recurring-pill"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  navigateTo({
+                    route: "recurringPayment",
+                    id: recurringPaymentId,
+                  });
+                }}
+              >
+                {t("recurringPaymentTitle")}
+              </button>
+            ) : null}
             {problemStatusPill ? (
               <span className={problemStatusPill.className}>
                 {problemStatusPill.label}

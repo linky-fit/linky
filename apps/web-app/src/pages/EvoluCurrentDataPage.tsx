@@ -31,7 +31,8 @@ function isTrackedTable(tableName: string): boolean {
     tableName === "cashuOperation" ||
     tableName === "nostrMessage" ||
     tableName === "nostrReaction" ||
-    tableName === "transaction"
+    tableName === "transaction" ||
+    tableName === "recurringPayment"
   );
 }
 
@@ -139,7 +140,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
               ),
             ];
           }
-          if (tableName === "transaction") {
+          if (tableName === "transaction" || tableName === "recurringPayment") {
             if (visibleTransactionOwnerIds.size === 0) return [tableName, []];
             return [
               tableName,
@@ -185,6 +186,19 @@ export function EvoluCurrentDataPage(): React.ReactElement {
       rotateIsBusy: rotateCashuOwnerIsBusy,
       rotatingLabel: withRotate ? t("evoluCashuOwnerRotating") : null,
     });
+    const transactionsConfig = (
+      label: string,
+      withRotate: boolean,
+    ): EvoluDataSectionConfig => ({
+      label,
+      ownerIndex: evoluTransactionsOwnerIndex,
+      editsUntilRotation: evoluTransactionsOwnerEditsUntilRotation,
+      rotationLimit: TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+      onRotate: withRotate ? requestManualRotateTransactionsOwner : null,
+      rotateLabel: withRotate ? t("evoluTransactionsOwnerRotate") : null,
+      rotateIsBusy: rotateTransactionsOwnerIsBusy,
+      rotatingLabel: withRotate ? t("evoluTransactionsOwnerRotating") : null,
+    });
     const messageConfig = (label: string): EvoluDataSectionConfig => ({
       label,
       ownerIndex: evoluMessagesOwnerIndex,
@@ -215,18 +229,10 @@ export function EvoluCurrentDataPage(): React.ReactElement {
       ["cashuOperation", cashuConfig(t("cashuOperationsTable"), false)],
       ["nostrMessage", messageConfig(t("messagesTitle"))],
       ["nostrReaction", messageConfig(t("reactionsTitle"))],
+      ["transaction", transactionsConfig(t("transactionsTitle"), true)],
       [
-        "transaction",
-        {
-          label: t("transactionsTitle"),
-          ownerIndex: evoluTransactionsOwnerIndex,
-          editsUntilRotation: evoluTransactionsOwnerEditsUntilRotation,
-          rotationLimit: TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-          onRotate: requestManualRotateTransactionsOwner,
-          rotateLabel: t("evoluTransactionsOwnerRotate"),
-          rotateIsBusy: rotateTransactionsOwnerIsBusy,
-          rotatingLabel: t("evoluTransactionsOwnerRotating"),
-        },
+        "recurringPayment",
+        transactionsConfig(t("recurringPaymentsTitle"), false),
       ],
     ]);
   }, [

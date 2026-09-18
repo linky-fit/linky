@@ -11,6 +11,7 @@ const LOCAL_STACK_SPECS = [
   "**/evolu-quota-recovery.spec.ts",
   "**/cashu-sync.spec.ts",
   "**/proxy-payment.spec.ts",
+  "**/recurring-payments.spec.ts",
   "**/linkshu-migration.spec.ts",
   "**/password-manager-save.spec.ts",
   "**/profile-tilt-permission.spec.ts",
