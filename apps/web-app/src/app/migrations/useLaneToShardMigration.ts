@@ -1,6 +1,7 @@
 import { linkshuServices, Tokens, type LegacyTokenRow } from "@linky/linkshu";
 import {
   makeWalletRepository,
+  NonEmptyString100,
   type AppOwner,
   type LinkyStore,
 } from "@linky/linksync";
@@ -26,6 +27,7 @@ import { readStoredSlip39Seed } from "../../platform/identitySecrets";
 import { localStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
 import { resolveLinkshuSeed } from "../../platform/linkshu/resolveLinkshuSeed";
 import { getUnknownErrorMessage } from "../../utils/unknown";
+import { legacyProofsToMarkSpent } from "./legacySpentProofs";
 import {
   deriveLegacyLaneOwners,
   isLaneGracePeriodActive,
@@ -45,6 +47,7 @@ const emit = (
   summary: string,
   owners: ReadonlyArray<string>,
   payload: unknown,
+  proofIds: ReadonlyArray<string> = [],
 ): void => {
   if (!getInspectorEmissionEnabled()) return;
   reportInspectorRows([
@@ -53,7 +56,10 @@ const emit = (
       channel: INSPECTOR_CHANNEL,
       tag,
       summary,
-      links: { owner: [...owners] },
+      links: {
+        owner: [...owners],
+        ...(proofIds.length ? { proof: [...proofIds] } : {}),
+      },
       payload,
     },
   ]);
@@ -152,7 +158,7 @@ const bootLaneMigration = async (): Promise<void> => {
     return;
   }
 
-  // Read-only for the grace period: an older app version may still write here.
+  // Legacy rows remain inputs; only terminal proof states are mirrored back.
   for (const owner of laneOwners) evolu.useOwner(owner);
 
   emit(
@@ -177,6 +183,56 @@ const bootLaneMigration = async (): Promise<void> => {
     nowMs: startedAtMs,
   });
   markLaneMigrationDoneLocally();
+
+  const proofQuery = createCashuProofsAllQuery();
+  let mirroring = false;
+  let dirty = false;
+  const mirrorSpentProofs = async (): Promise<void> => {
+    dirty = true;
+    if (mirroring) return;
+    mirroring = true;
+    try {
+      while (dirty && isLaneGracePeriodActive(report.cutoffMs, Date.now())) {
+        dirty = false;
+        const [legacy, shardCopies] = await Promise.all([
+          evolu.loadQuery(proofQuery),
+          Effect.runPromise(store.copies("cashu", "cashuProof")),
+        ]);
+        const changed = legacyProofsToMarkSpent(
+          legacy,
+          shardCopies,
+          new Set(legacyOwnerIds),
+        );
+        for (const proof of changed) {
+          const result = evolu.update(
+            "cashuProof",
+            { id: proof.id, state: NonEmptyString100.orThrow("spent") },
+            { ownerId: proof.ownerId },
+          );
+          if (!result.ok) throw new Error("Legacy spent proof write failed");
+        }
+        if (changed.length > 0)
+          emit(
+            "LaneSpentProofsMirrored",
+            `Marked ${changed.length} legacy proofs spent`,
+            [...new Set(changed.map((proof) => proof.ownerId))],
+            { proofIds: changed.map((proof) => proof.id) },
+            changed.map((proof) => proof.id),
+          );
+      }
+    } catch (error: unknown) {
+      console.warn("[linky] legacy spent proof sync failed", error);
+      reportAppLog({
+        tag: "evolu.legacySpentProofSyncFailed",
+        summary: "Could not mark legacy wallet proofs spent",
+        payload: { error: getUnknownErrorMessage(error, "unknown") },
+      });
+    } finally {
+      mirroring = false;
+    }
+  };
+  evolu.subscribeQuery(proofQuery)(() => void mirrorSpentProofs());
+  await mirrorSpentProofs();
 
   const shardOwnerIds = (await Effect.runPromise(store.syncOwners())).map(
     (owner) => owner.id,

@@ -6,6 +6,7 @@ import {
   directConversationIdFor,
   linkyScopes,
   mergeShardRows,
+  OwnerId,
   type LinkyScope,
   type LinkyTable,
 } from "@linky/linksync";
@@ -42,6 +43,10 @@ export interface LinkyE2eHooks {
   readonly shardRows: (
     scope: string,
     table: string,
+  ) => Promise<ReadonlyArray<Readonly<Record<string, unknown>>>>;
+  /** Proof rows under one owner, including legacy copies and tombstones. */
+  readonly ownerProofRows: (
+    ownerId: string,
   ) => Promise<ReadonlyArray<Readonly<Record<string, unknown>>>>;
   /** The owner id of one shard of a scope, whether or not it is visible. */
   readonly shardOwnerId: (scope: string, index: number) => Promise<string>;
@@ -108,6 +113,14 @@ export const installLinkyE2eHooks = (): void => {
         return owner.id;
       }),
     upsert,
+    ownerProofRows: async (ownerId) => {
+      const owner = OwnerId.fromUnknown(ownerId);
+      if (!owner.ok) throw new Error("invalid owner id");
+      const rows = await Effect.runPromise(db.readTable("cashuProof"));
+      return rows
+        .filter((row) => row.ownerId === owner.value)
+        .map((row) => Object.fromEntries(Object.entries(row)));
+    },
     shardRows: async (scope, table) => {
       if (!isScope(scope)) throw new Error(`unknown scope ${scope}`);
       if (!isShardTable(scope, table))

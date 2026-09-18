@@ -40,6 +40,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A later launch inside the grace period: the old lanes are read again so rows written by an older app version reach the shards.",
   LaneGracePeriodReingested:
     "The grace-period re-ingest finished; counts show which lane rows were newer than their shard copies.",
+  LaneSpentProofsMirrored:
+    "During the migration grace period, spent shard proofs mark their existing legacy copies spent so older devices stop counting them. Owner and proof links identify the copies; no proof secrets are logged.",
+  "evolu.legacySpentProofSyncFailed":
+    "A terminal proof state could not be mirrored to legacy storage. An older device may show stale funds until its mint check corrects them; the next proof change retries.",
   "evolu.laneMigrationFailed":
     "The lane migration threw before it could finish; the done flag stays unset and the next launch retries. The app keeps running on the lanes meanwhile.",
   EvoluSyncRetry:

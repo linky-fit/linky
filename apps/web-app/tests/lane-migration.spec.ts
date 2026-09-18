@@ -519,3 +519,75 @@ test("an nsec-only login migrates the app owner's rows", async ({
     await device.context.close();
   }
 });
+
+test("spent shard proofs mark existing legacy copies spent during the grace period", async ({
+  browser,
+}, testInfo) => {
+  const device = await openDevice(
+    browser,
+    testInfo.project.use.baseURL,
+    "spent compatibility",
+    async (page) => {
+      await setRandomIdentityStorage(page);
+      await page.addInitScript(() =>
+        localStorage.setItem("linky.inspector_enabled", "true"),
+      );
+    },
+  );
+  try {
+    const owner = await hooks.appOwnerId(device.page);
+    const id = await hooks.createId(device.page);
+    const proof = {
+      id,
+      mint: "http://localhost:3338",
+      unit: "sat",
+      keysetId: "00legacy",
+      amount: 8,
+      secret: "legacy-compatibility-proof",
+      c: `02${PUBKEY_HEX}`,
+      state: "held",
+    };
+    await hooks.upsert(device.page, "cashuProof", proof, owner);
+    await device.page.reload();
+    await expect(device.page.getByLabel("Available balance")).toBeVisible();
+    const shard = await device.page.evaluate(async () => {
+      if (!window.__linkyE2E) throw new Error("test hooks missing");
+      return window.__linkyE2E.shardOwnerId("cashu", 0);
+    });
+    await hooks.upsert(
+      device.page,
+      "cashuProof",
+      { ...proof, state: "spent" },
+      shard,
+    );
+    await expect
+      .poll(() =>
+        device.page.evaluate(
+          async ({ owner, id }) => {
+            if (!window.__linkyE2E) throw new Error("test hooks missing");
+            const rows = await window.__linkyE2E.ownerProofRows(owner);
+            return rows.find((row) => row.id === id)?.state;
+          },
+          { owner, id },
+        ),
+      )
+      .toBe("spent");
+    await device.page.goto("/#advanced/inspector");
+    await expect(
+      device.page.getByText(/Marked 1 legacy proofs spent/).first(),
+    ).toBeVisible();
+    await device.page.reload();
+    await device.page.goto("/#wallet");
+    await expect(device.page.getByLabel("Available balance")).toBeVisible();
+    await expect
+      .poll(() =>
+        hooks
+          .shardRows(device.page, "cashu", "cashuProof")
+          .then((rows) => rows.find((row) => row.id === id)?.state),
+      )
+      .toBe("spent");
+    device.errors.assertClean();
+  } finally {
+    await device.context.close();
+  }
+});
