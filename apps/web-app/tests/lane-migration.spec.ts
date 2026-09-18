@@ -572,7 +572,7 @@ test("spent shard proofs mark existing legacy copies spent during the grace peri
         ),
       )
       .toBe("spent");
-    await device.page.goto("/#advanced/inspector");
+    await device.page.goto("/#advanced/inspector/timeline");
     await expect(
       device.page.getByText(/Marked 1 legacy proofs spent/).first(),
     ).toBeVisible();
