@@ -10,22 +10,23 @@ const mount = async () => {
   let transfer: ReturnType<typeof useAppDataTransfer> | undefined;
   const Harness = () => {
     const api = useAppDataTransfer({
-      appOwnerId: null,
       cashuOperations: [],
       cashuProofs: [],
       contacts: [],
+      contactsRepository: {
+        insert: () => {
+          insert();
+          throw new Error("Unexpected contact insert");
+        },
+        update: () => {
+          update();
+          throw new Error("Unexpected contact update");
+        },
+      },
       importCashuLegacyRows: null,
       importCashuOperation: null,
       importCashuProofs: null,
       importDataFileInputRef: createRef<HTMLInputElement>(),
-      insert: () => {
-        insert();
-        throw new Error("Unexpected contact insert");
-      },
-      update: () => {
-        update();
-        throw new Error("Unexpected contact update");
-      },
       pushToast,
       t: (key) => key,
     });

@@ -21,7 +21,6 @@ import type {
 export interface MainSwipeRouteProps {
   activeGroup: string | null;
   bottomTabActive: "contacts" | "wallet" | null;
-  canAddContact: boolean;
   cashuTotalBalance: number;
   bankPaymentOfferMessages: readonly LocalNostrMessage[];
   contactsOnboardingCelebrating: boolean;
@@ -149,13 +148,11 @@ const MainSwipeBottomTabBar = ({
 };
 
 interface MainSwipeFabProps {
-  canAddContact: boolean;
   label: string;
   onClick: () => void;
 }
 
 const MainSwipeFab = ({
-  canAddContact,
   label,
   onClick,
 }: MainSwipeFabProps): React.ReactElement => {
@@ -163,9 +160,8 @@ const MainSwipeFab = ({
   return (
     <button
       type="button"
-      className={`contacts-fab main-swipe-fab${canAddContact ? "" : " is-disabled"}`}
+      className="contacts-fab main-swipe-fab"
       onClick={onClick}
-      aria-disabled={!canAddContact}
       aria-label={label}
       title={label}
       data-guide="contact-add-button"
@@ -185,7 +181,6 @@ export const MainSwipeContent = (): React.ReactElement => {
   const {
     activeGroup,
     bottomTabActive,
-    canAddContact,
     cashuTotalBalance,
     bankPaymentOfferMessages,
     contactsOnboardingCelebrating,
@@ -260,7 +255,6 @@ export const MainSwipeContent = (): React.ReactElement => {
             otherContactsLabel={otherContactsLabel}
             renderContactCard={renderContactCard}
             bottomTabActive={bottomTabActive}
-            canAddContact={canAddContact}
             openNewContactPage={openNewContactPage}
             showBottomTabBar={false}
             showFab={false}
@@ -291,11 +285,7 @@ export const MainSwipeContent = (): React.ReactElement => {
         t={t}
         walletLabel={t("wallet")}
       />
-      <MainSwipeFab
-        canAddContact={canAddContact}
-        label={t("addContact")}
-        onClick={openNewContactPage}
-      />
+      <MainSwipeFab label={t("addContact")} onClick={openNewContactPage} />
     </>
   );
 };
@@ -305,7 +295,6 @@ export const DesktopContactsPane = (): React.ReactElement => {
   const {
     activeGroup,
     bankPaymentOfferMessages,
-    canAddContact,
     contactsOnboardingCelebrating,
     contactsOnboardingTasks,
     contactsSearch,
@@ -360,7 +349,6 @@ export const DesktopContactsPane = (): React.ReactElement => {
         otherContactsLabel={otherContactsLabel}
         renderContactCard={renderContactCard}
         bottomTabActive="contacts"
-        canAddContact={canAddContact}
         openNewContactPage={openNewContactPage}
         showBottomTabBar={false}
         showFab={false}
@@ -368,9 +356,8 @@ export const DesktopContactsPane = (): React.ReactElement => {
       />
       <button
         type="button"
-        className={`contacts-fab desktop-contacts-fab${canAddContact ? "" : " is-disabled"}`}
+        className="contacts-fab desktop-contacts-fab"
         onClick={openNewContactPage}
-        aria-disabled={!canAddContact}
         aria-label={t("addContact")}
         title={t("addContact")}
       >

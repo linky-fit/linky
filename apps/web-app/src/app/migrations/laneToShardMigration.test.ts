@@ -14,7 +14,7 @@ import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CashuTokenRow,
-  ContactRow,
+  LegacyContactRow,
   NostrIdentityRow,
   NostrMessageRow,
   NostrReactionRow,
@@ -57,8 +57,8 @@ const positive = (value: number) => Evolu.PositiveInt.orThrow(value);
 
 const contact = (
   owner: Evolu.AppOwner,
-  overrides: Partial<ContactRow> = {},
-): ContactRow => ({
+  overrides: Partial<LegacyContactRow> = {},
+): LegacyContactRow => ({
   id: createId<"Contact">(),
   name: null,
   nameSetByUser: null,
@@ -77,7 +77,7 @@ const contact = (
 
 const message = (
   owner: Evolu.AppOwner,
-  contactId: ContactRow["id"],
+  contactId: LegacyContactRow["id"],
   overrides: Partial<NostrMessageRow> = {},
 ): NostrMessageRow => ({
   id: createId<"NostrMessage">(),

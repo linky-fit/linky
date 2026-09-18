@@ -4,6 +4,9 @@ import {
   ProfileUpdated,
   UnixSeconds,
 } from "@linky/linkstr";
+import { createIdFromString } from "@evolu/common";
+import type { ContactsRepository } from "@linky/linksync";
+import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveCachedProfile } from "../../profileCache";
 import { applyProfileWatchEvent } from "./useLinkstrProfileSync";
@@ -28,25 +31,20 @@ const profileUpdated = (
 
 type SyncContext = Parameters<typeof applyProfileWatchEvent>[1];
 
+const c1 = createIdFromString<"Contact">("c1");
+
 const makeCtx = (contacts: SyncContext["contacts"], routeKind = "contacts") => {
-  const update = vi.fn<SyncContext["update"]>(() => ({
-    ok: true,
-    value: undefined,
-  }));
+  const update = vi.fn<ContactsRepository["update"]>(() => Effect.void);
   const ctx: SyncContext = {
     contacts,
-    contactsOwnerId: null,
-    contactsVisibleOwnerIds: [],
+    contactsRepository: { update },
     routeKind,
     setNostrMetadataByNpub: vi.fn(),
     setNostrPictureByNpub: vi.fn(),
     setNostrStatusByNpub: vi.fn(),
-    update,
   };
   const contactPatches = () =>
-    update.mock.calls
-      .filter(([table]) => table === "contact")
-      .map(([, payload]) => payload);
+    update.mock.calls.map(([id, patch]) => ({ id, ...patch }));
   return { contactPatches, ctx };
 };
 
@@ -56,17 +54,17 @@ describe("applyProfileWatchEvent contact-row policy", () => {
   });
 
   it("normalizes an incoming profile name before syncing it", () => {
-    const { contactPatches, ctx } = makeCtx([{ id: "c1", npub: NPUB }]);
+    const { contactPatches, ctx } = makeCtx([{ id: c1, npub: NPUB }]);
     applyProfileWatchEvent(
       profileUpdated({ name: "  Ali\u202ece\u200b\n Admin  " }, 100),
       ctx,
     );
-    expect(contactPatches()).toEqual([{ id: "c1", name: "Alice Admin" }]);
+    expect(contactPatches()).toEqual([{ id: c1, name: "Alice Admin" }]);
   });
 
   it("does not let a hostile profile rename a saved custom contact", () => {
     const { contactPatches, ctx } = makeCtx([
-      { id: "c1", npub: NPUB, name: "My friend", nameSetByUser: 1 },
+      { id: c1, npub: NPUB, name: "My friend", nameSetByUser: 1 },
     ]);
     applyProfileWatchEvent(
       profileUpdated({ name: "Bank\u202e support" }, 100),
@@ -76,20 +74,20 @@ describe("applyProfileWatchEvent contact-row policy", () => {
   });
 
   it("fills non-overridden fields from the profile", () => {
-    const { contactPatches, ctx } = makeCtx([{ id: "c1", npub: NPUB }]);
+    const { contactPatches, ctx } = makeCtx([{ id: c1, npub: NPUB }]);
     applyProfileWatchEvent(
       profileUpdated({ lud16: "vitor@ln.example", name: "Vitor" }, 100),
       ctx,
     );
     expect(contactPatches()).toEqual([
-      { id: "c1", lnAddress: "vitor@ln.example", name: "Vitor" },
+      { id: c1, lnAddress: "vitor@ln.example", name: "Vitor" },
     ]);
   });
 
   it("leaves user-overridden fields alone", () => {
     const { contactPatches, ctx } = makeCtx([
       {
-        id: "c1",
+        id: c1,
         lnAddress: "custom@ln.example",
         lnAddressSetByUser: 1,
         name: "Moje jméno",
@@ -106,7 +104,7 @@ describe("applyProfileWatchEvent contact-row policy", () => {
 
   it("never clears a value the profile did not previously provide", () => {
     const { contactPatches, ctx } = makeCtx([
-      { id: "c1", lnAddress: "manual@ln.example", name: "Vitor", npub: NPUB },
+      { id: c1, lnAddress: "manual@ln.example", name: "Vitor", npub: NPUB },
     ]);
     // Previous profile had a name but no lightning address.
     saveCachedProfile(NPUB, metadata({ name: "Vitor" }), 50);
@@ -116,7 +114,7 @@ describe("applyProfileWatchEvent contact-row policy", () => {
 
   it("clears a field the profile itself dropped", () => {
     const { contactPatches, ctx } = makeCtx([
-      { id: "c1", lnAddress: "vitor@ln.example", name: "Vitor", npub: NPUB },
+      { id: c1, lnAddress: "vitor@ln.example", name: "Vitor", npub: NPUB },
     ]);
     saveCachedProfile(
       NPUB,
@@ -124,12 +122,12 @@ describe("applyProfileWatchEvent contact-row policy", () => {
       50,
     );
     applyProfileWatchEvent(profileUpdated({ name: "Vitor" }, 100), ctx);
-    expect(contactPatches()).toEqual([{ id: "c1", lnAddress: null }]);
+    expect(contactPatches()).toEqual([{ id: c1, lnAddress: null }]);
   });
 
   it("does not touch rows while a contact form route is open", () => {
     const { contactPatches, ctx } = makeCtx(
-      [{ id: "c1", npub: NPUB }],
+      [{ id: c1, npub: NPUB }],
       "contactEdit",
     );
     applyProfileWatchEvent(

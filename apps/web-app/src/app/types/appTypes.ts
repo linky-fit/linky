@@ -1,4 +1,5 @@
-import type { ContactId, ContactRow } from "../../evolu";
+import type { ContactId } from "../../evolu";
+import type { ContactWithChatState } from "../lib/contactChatState";
 import type { I18nKey } from "../../i18n";
 import type {
   Pubkey,
@@ -134,12 +135,13 @@ type ContactDisplayValue<T> = T extends string
     : T;
 // Display rows also include unsaved Nostr contacts and selected contact fields.
 export type ContactRowLike = {
-  [K in keyof ContactRow]?: ContactDisplayValue<ContactRow[K]> | null;
+  [K in keyof ContactWithChatState]?: ContactDisplayValue<
+    ContactWithChatState[K]
+  > | null;
 } & { isUnknownContact?: boolean };
-export type ContactIdentityRowLike = Pick<
-  ContactRowLike,
-  "id" | "npub" | "ownerId"
-> & { unknownPubkeyHex?: string | null };
+export type ContactIdentityRowLike = Pick<ContactRowLike, "id" | "npub"> & {
+  unknownPubkeyHex?: string | null;
+};
 export type ContactNameRowLike = Pick<
   ContactRowLike,
   "archivedAtSec" | "createdAt" | "id" | "isUnknownContact" | "name"

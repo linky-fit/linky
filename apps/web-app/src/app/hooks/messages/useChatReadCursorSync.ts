@@ -1,20 +1,16 @@
-import { writeContact } from "../../lib/writeContact";
-import type { OwnerId } from "@evolu/common";
+import { PositiveInt, type ConversationsRepository } from "@linky/linksync";
+import { Effect } from "effect";
 import React from "react";
 import type { ContactId } from "../../../evolu";
 import {
   resolveChatLastSeenAdvance,
   summarizeConversationReadTimes,
 } from "../../lib/chatUnread";
-import { resolveContactRowOwnerLane } from "../../lib/contactOwnerLane";
+import { runWrite } from "../../lib/storeWrite";
 import type {
   LocalNostrMessage,
   RouteWithOptionalId,
 } from "../../types/appTypes";
-
-type EvoluUpdate = ReturnType<
-  typeof import("../../../evolu").useEvolu
->["update"];
 
 interface ChatReadCursorContact {
   chatLastSeenAtSec?: number | null;
@@ -23,26 +19,21 @@ interface ChatReadCursorContact {
 
 interface UseChatReadCursorSyncParams {
   chatMessages: readonly LocalNostrMessage[];
-  contactsOwnerId: OwnerId | null;
-  contactsVisibleOwnerIds: readonly OwnerId[];
+  conversations: Pick<ConversationsRepository, "ensureDirect" | "markSeen">;
   documentVisible: boolean;
   route: RouteWithOptionalId;
   selectedContact: ChatReadCursorContact | null;
-  update: EvoluUpdate;
 }
 
-// Advances the persistent per-conversation read cursor while a chat is open.
-// Writes are bounded: nothing is written unless the conversation is unread and
-// the newest displayed message is newer than the stored cursor, because
-// contact owner lanes rotate on write count.
+// Advances the conversation's read cursor while its chat is open. Nothing is
+// written unless the conversation is unread and the newest displayed message
+// is newer than the stored cursor; `markSeen` itself never moves backwards.
 export const useChatReadCursorSync = ({
   chatMessages,
-  contactsOwnerId,
-  contactsVisibleOwnerIds,
+  conversations,
   documentVisible,
   route,
   selectedContact,
-  update,
 }: UseChatReadCursorSyncParams): void => {
   const lastWrittenAtSecByContactIdRef = React.useRef(
     new Map<string, number>(),
@@ -65,23 +56,18 @@ export const useChatReadCursorSync = ({
       summarizeConversationReadTimes(chatMessages),
       lastSeenAtSec > 0 ? lastSeenAtSec : null,
     );
-    if (target === null) return;
+    const atSec = target === null ? null : PositiveInt.from(target);
+    if (!atSec?.ok) return;
 
-    const ownerId =
-      resolveContactRowOwnerLane(selectedContact, contactsVisibleOwnerIds) ??
-      contactsOwnerId;
-    const payload = { id: selectedContact.id, chatLastSeenAtSec: target };
-    const result = writeContact(update, payload, ownerId);
-    if (result.ok) {
-      lastWrittenAtSecByContactIdRef.current.set(contactId, target);
-    }
-  }, [
-    chatMessages,
-    contactsOwnerId,
-    contactsVisibleOwnerIds,
-    documentVisible,
-    route,
-    selectedContact,
-    update,
-  ]);
+    lastWrittenAtSecByContactIdRef.current.set(contactId, atSec.value);
+    void runWrite(
+      Effect.flatMap(conversations.ensureDirect(selectedContact.id), (chat) =>
+        conversations.markSeen(chat.id, atSec.value),
+      ),
+    ).then((outcome) => {
+      if (outcome.ok) return;
+      lastWrittenAtSecByContactIdRef.current.delete(contactId);
+      console.warn("[linky][conversations] read cursor write failed", outcome);
+    });
+  }, [chatMessages, conversations, documentVisible, route, selectedContact]);
 };

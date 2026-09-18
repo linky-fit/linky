@@ -5186,11 +5186,6 @@ button.bank-payment-amount-button:hover {
   box-shadow: none;
 }
 
-.contacts-fab.is-disabled {
-  background: linear-gradient(135deg, #9ca3af, #6b7280);
-  box-shadow: none;
-}
-
 .bottom-tabs-bar {
   display: flex;
   justify-content: center;

@@ -8,10 +8,6 @@ import {
   loadEvoluHistoryData,
   type EvoluHistoryRow,
 } from "../evolu";
-import {
-  CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-  MAX_CONTACTS_PER_OWNER,
-} from "../utils/constants";
 import { formatEvoluDebugValue } from "../utils/evoluDebugValue";
 import { formatBytes } from "../utils/formatting";
 
@@ -20,11 +16,8 @@ const ONE_MB = 1024 * 1024;
 export function EvoluDataDetailPage(): React.ReactElement {
   const {
     clearDatabaseArmed,
-    evoluContactsOwnerEditCount,
-    evoluContactsOwnerId,
     evoluContactsOwnerIndex,
-    evoluContactsOwnerNewContactsCount,
-    evoluContactsOwnerPointer,
+    evoluContactsVisibleOwnerIds,
     evoluDatabaseBytes,
     evoluErrorType,
     evoluHistoryCount,
@@ -114,7 +107,9 @@ export function EvoluDataDetailPage(): React.ReactElement {
   };
 
   const currentDataEntries = React.useMemo(() => {
-    const activeContactsOwnerId = (evoluContactsOwnerId ?? "").trim();
+    const visibleContactsOwnerIds = new Set<string>(
+      evoluContactsVisibleOwnerIds,
+    );
     const visibleTransactionsOwnerIds = new Set<string>(
       evoluTransactionsVisibleOwnerIds,
     );
@@ -128,10 +123,14 @@ export function EvoluDataDetailPage(): React.ReactElement {
       })
       .map(([tableName, rows]) => {
         if (tableName === "contact") {
-          if (!activeContactsOwnerId) return [tableName, rows] as const;
+          if (visibleContactsOwnerIds.size === 0) {
+            return [tableName, rows] as const;
+          }
           return [
             tableName,
-            rows.filter((row) => readRowOwnerId(row) === activeContactsOwnerId),
+            rows.filter((row) =>
+              visibleContactsOwnerIds.has(readRowOwnerId(row)),
+            ),
           ] as const;
         }
 
@@ -151,13 +150,15 @@ export function EvoluDataDetailPage(): React.ReactElement {
       });
   }, [
     currentData,
-    evoluContactsOwnerId,
+    evoluContactsVisibleOwnerIds,
     evoluTransactionsVisibleOwnerIds,
     ownerView,
   ]);
 
   const visibleHistoryRows = React.useMemo(() => {
-    const activeContactsOwnerId = (evoluContactsOwnerId ?? "").trim();
+    const visibleContactsOwnerIds = new Set<string>(
+      evoluContactsVisibleOwnerIds,
+    );
     const visibleTransactionsOwnerIds = new Set<string>(
       evoluTransactionsVisibleOwnerIds,
     );
@@ -170,7 +171,7 @@ export function EvoluDataDetailPage(): React.ReactElement {
       return historyData.filter(
         (row) =>
           row.table === "contact" &&
-          readRowOwnerId(row) === activeContactsOwnerId,
+          visibleContactsOwnerIds.has(readRowOwnerId(row)),
       );
     }
 
@@ -184,7 +185,7 @@ export function EvoluDataDetailPage(): React.ReactElement {
 
     return historyData;
   }, [
-    evoluContactsOwnerId,
+    evoluContactsVisibleOwnerIds,
     evoluTransactionsVisibleOwnerIds,
     historyData,
     ownerView,
@@ -274,48 +275,12 @@ export function EvoluDataDetailPage(): React.ReactElement {
 
           <div className="settings-row">
             <div className="settings-left">
-              <span className="settings-label">{t("evoluContactsOwner")}</span>
-            </div>
-            <div className="settings-right">
-              <span className="muted">{evoluContactsOwnerPointer}</span>
-            </div>
-          </div>
-
-          <div className="settings-row">
-            <div className="settings-left">
               <span className="settings-label">
                 {t("evoluContactsOwnerIndex")}
               </span>
             </div>
             <div className="settings-right">
               <span className="muted">{evoluContactsOwnerIndex}</span>
-            </div>
-          </div>
-
-          <div className="settings-row">
-            <div className="settings-left">
-              <span className="settings-label">
-                {t("evoluContactsOwnerNewContacts")}
-              </span>
-            </div>
-            <div className="settings-right">
-              <span className="muted">
-                {evoluContactsOwnerNewContactsCount} / {MAX_CONTACTS_PER_OWNER}
-              </span>
-            </div>
-          </div>
-
-          <div className="settings-row">
-            <div className="settings-left">
-              <span className="settings-label">
-                {t("evoluContactsOwnerEdits")}
-              </span>
-            </div>
-            <div className="settings-right">
-              <span className="muted">
-                {evoluContactsOwnerEditCount} /{" "}
-                {CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT}
-              </span>
             </div>
           </div>
 

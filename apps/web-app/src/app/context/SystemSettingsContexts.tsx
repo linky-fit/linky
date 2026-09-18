@@ -37,12 +37,8 @@ export interface EvoluSettingsContextValue {
   clearDatabaseArmed: boolean;
   evoluCashuOwnerIndex: number;
   evoluCashuVisibleOwnerIds: readonly OwnerId[];
-  evoluContactsOwnerEditCount: number;
-  evoluContactsOwnerEditsUntilRotation: number;
-  evoluContactsOwnerId: OwnerId | null;
   evoluContactsOwnerIndex: number;
-  evoluContactsOwnerNewContactsCount: number;
-  evoluContactsOwnerPointer: string;
+  evoluContactsVisibleOwnerIds: readonly OwnerId[];
   evoluDatabaseBytes: number | null;
   evoluHasError: boolean;
   evoluErrorType: EvoluError["type"] | null;

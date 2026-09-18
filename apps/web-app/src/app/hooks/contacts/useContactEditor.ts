@@ -1,6 +1,4 @@
-import { contactsLimitMessage } from "./useSaveNpubContact";
-import { writeContact } from "../../lib/writeContact";
-import { toEvoluText, toContactTextFields } from "../../lib/contactFields";
+import { toContactTextFields } from "../../lib/contactFields";
 import * as Evolu from "@evolu/common";
 import {
   decodeNpub,
@@ -13,7 +11,11 @@ import {
   searchProfilesAtom,
   useAtomSet,
 } from "@linky/linkstr-react";
-import type { TransactionsRepository } from "@linky/linksync";
+import {
+  createId,
+  type ContactsRepository,
+  type TransactionsRepository,
+} from "@linky/linksync";
 import { Effect, Exit } from "effect";
 import React from "react";
 import { ContactId } from "../../../evoluIds";
@@ -24,7 +26,6 @@ import {
   saveCachedProfile,
 } from "../../../profileCache";
 import type { Route } from "../../../types/route";
-import { MAX_CONTACTS_PER_OWNER } from "../../../utils/constants";
 import {
   getContactGroups,
   serializeContactGroups,
@@ -42,13 +43,12 @@ import {
   resolveContactProfile,
 } from "../../lib/contactProfile";
 import { getContactQueryPrefill } from "../../lib/contactQueryPrefill";
+import { runWrite } from "../../lib/storeWrite";
 import type { ContactFormState, ContactRowLike } from "../../types/appTypes";
 import { fetchAndCacheProfile } from "../useLinkstrProfileSync";
 import { useContactSuggestions } from "./useContactSuggestions";
 import { asNonEmptyString } from "../../../utils/validation";
 import type { Translate } from "../../../i18n";
-
-type EvoluMutations = ReturnType<typeof import("../../../evolu").useEvolu>;
 
 interface ContactNewPrefill {
   lnAddress: string;
@@ -104,12 +104,10 @@ type ContactFieldsPatch = {
 >;
 
 interface UseContactEditorParams {
-  activeOwnerContactsCount: number;
-  appOwnerId: Evolu.OwnerId | null;
   contactNewPrefill: ContactNewPrefill | null;
   contacts: readonly ContactRow[];
+  contactsRepository: Pick<ContactsRepository, "insert" | "update">;
   currentNpub: string | null;
-  insert: EvoluMutations["insert"];
   route: Route;
   selectedContactMetadata: ProfileMetadata | null | undefined;
   selectedContact: SelectedContactRow | null;
@@ -123,8 +121,6 @@ interface UseContactEditorParams {
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
-  update: EvoluMutations["update"];
-  upsert: EvoluMutations["upsert"];
 }
 
 const readLightningAddressFromDetailsJson = (value: unknown): string | null => {
@@ -166,12 +162,10 @@ const makeEmptyContactForm = (): ContactFormState => ({
 });
 
 export const useContactEditor = ({
-  activeOwnerContactsCount,
-  appOwnerId,
   contactNewPrefill,
   contacts,
+  contactsRepository,
   currentNpub,
-  insert,
   route,
   selectedContactMetadata,
   selectedContact,
@@ -181,8 +175,6 @@ export const useContactEditor = ({
   setStatus,
   t,
   transactions,
-  update,
-  upsert,
 }: UseContactEditorParams) => {
   const [form, setForm] = React.useState<ContactFormState>(
     makeEmptyContactForm(),
@@ -230,70 +222,10 @@ export const useContactEditor = ({
     contactSuggestionKnownNpubsKey,
   );
 
-  const buildFullContactOverridePayload = React.useCallback(
-    (payload: ContactFieldsPatch) => {
-      const currentOwnerId = asNonEmptyString(appOwnerId);
-      if (!currentOwnerId) return null;
-
-      const source =
-        contacts.find((contact) => contact.id === payload.id) ?? null;
-      const sourceOwnerId = asNonEmptyString(source?.ownerId);
-      if (!source || !sourceOwnerId || sourceOwnerId === currentOwnerId) {
-        return null;
-      }
-
-      const sourceNameSetByUser = Evolu.SqliteBoolean.fromUnknown(
-        source.nameSetByUser,
-      );
-      const sourceLnAddressSetByUser = Evolu.SqliteBoolean.fromUnknown(
-        source.lnAddressSetByUser,
-      );
-
-      return {
-        lnAddressSetByUser:
-          payload.lnAddressSetByUser !== undefined
-            ? payload.lnAddressSetByUser
-            : sourceLnAddressSetByUser.ok
-              ? sourceLnAddressSetByUser.value
-              : null,
-        nameSetByUser:
-          payload.nameSetByUser !== undefined
-            ? payload.nameSetByUser
-            : sourceNameSetByUser.ok
-              ? sourceNameSetByUser.value
-              : null,
-        id: payload.id,
-        name:
-          payload.name !== undefined ? payload.name : toEvoluText(source.name),
-        npub:
-          payload.npub !== undefined ? payload.npub : toEvoluText(source.npub),
-        lnAddress:
-          payload.lnAddress !== undefined
-            ? payload.lnAddress
-            : toEvoluText(source.lnAddress),
-        groupName:
-          payload.groupName !== undefined
-            ? payload.groupName
-            : toEvoluText(source.groupName),
-        groupNamesJson:
-          payload.groupNamesJson !== undefined
-            ? payload.groupNamesJson
-            : toEvoluText(source.groupNamesJson),
-      };
-    },
-    [appOwnerId, contacts],
-  );
-
   const updateContactFields = React.useCallback(
-    (payload: ContactFieldsPatch) => {
-      const fullOverridePayload = buildFullContactOverridePayload(payload);
-      if (fullOverridePayload && appOwnerId) {
-        return upsert("contact", fullOverridePayload, { ownerId: appOwnerId });
-      }
-
-      return writeContact(update, payload, appOwnerId);
-    },
-    [appOwnerId, buildFullContactOverridePayload, update, upsert],
+    ({ id, ...patch }: ContactFieldsPatch) =>
+      runWrite(contactsRepository.update(id, patch)),
+    [contactsRepository],
   );
 
   const backfillLightningAddressTransactions = React.useCallback(
@@ -420,11 +352,6 @@ export const useContactEditor = ({
 
     if (!name && !rawNpub && !lnAddressInput) {
       setStatus(t("fillAtLeastOne"));
-      return;
-    }
-
-    if (!editingId && activeOwnerContactsCount >= MAX_CONTACTS_PER_OWNER) {
-      setStatus(contactsLimitMessage(t));
       return;
     }
 
@@ -614,11 +541,11 @@ export const useContactEditor = ({
 
       // Only update if there are actual changes (besides just the id).
       if (Object.keys(changedFields).length > 1) {
-        const result = updateContactFields(changedFields);
+        const result = await updateContactFields(changedFields);
         if (result.ok) {
           setStatus(t("contactUpdated"));
         } else {
-          setStatus(`${t("errorPrefix")}: ${String(result.error)}`);
+          setStatus(`${t("errorPrefix")}: ${result.error}`);
           setIsSavingContact(false);
           return;
         }
@@ -626,13 +553,16 @@ export const useContactEditor = ({
         setStatus(t("contactUpdated"));
       }
     } else {
-      const result = writeContact(insert, createPayload, appOwnerId);
+      const id = createId<"Contact">();
+      const result = await runWrite(
+        contactsRepository.insert({ id, ...createPayload }),
+      );
       if (result.ok) {
-        savedContactId = result.value.id;
-        setRecentlyAddedContactId(result.value.id);
+        savedContactId = id;
+        setRecentlyAddedContactId(id);
         setStatus(t("contactSaved"));
       } else {
-        setStatus(`${t("errorPrefix")}: ${String(result.error)}`);
+        setStatus(`${t("errorPrefix")}: ${result.error}`);
         setIsSavingContact(false);
         return;
       }
@@ -653,19 +583,17 @@ export const useContactEditor = ({
     navigateTo({ route: "contacts" });
     setIsSavingContact(false);
   }, [
-    activeOwnerContactsCount,
-    appOwnerId,
     backfillLightningAddressTransactions,
     clearContactForm,
     contactEditInitial,
     contacts,
+    contactsRepository,
     currentNpub,
     editingId,
     form.groups,
     form.lnAddress,
     form.name,
     form.npub,
-    insert,
     isSavingContact,
     route.kind,
     selectedContact,
@@ -864,11 +792,6 @@ export const useContactEditor = ({
     async (candidate: ContactSearchCandidate) => {
       if (isSavingContact) return;
 
-      if (activeOwnerContactsCount >= MAX_CONTACTS_PER_OWNER) {
-        setStatus(contactsLimitMessage(t));
-        return;
-      }
-
       const npub = normalizeNpubIdentifier(candidate.npub);
       if (!npub) {
         setStatus(t("contactIdentifierInvalid"));
@@ -911,18 +834,21 @@ export const useContactEditor = ({
       if (parsedLnAddress.ok) createPayload.lnAddress = parsedLnAddress.value;
 
       setIsSavingContact(true);
-      const result = writeContact(insert, createPayload, appOwnerId);
+      const id = createId<"Contact">();
+      const result = await runWrite(
+        contactsRepository.insert({ id, ...createPayload }),
+      );
 
       if (!result.ok) {
-        setStatus(`${t("errorPrefix")}: ${String(result.error)}`);
+        setStatus(`${t("errorPrefix")}: ${result.error}`);
         setIsSavingContact(false);
         return;
       }
 
-      setRecentlyAddedContactId(result.value.id);
+      setRecentlyAddedContactId(id);
       setStatus(t("contactSaved"));
       if (lnAddress) {
-        await backfillLightningAddressTransactions(result.value.id, lnAddress);
+        await backfillLightningAddressTransactions(id, lnAddress);
       }
       clearContactForm();
       setPendingDeleteId(null);
@@ -930,13 +856,11 @@ export const useContactEditor = ({
       setIsSavingContact(false);
     },
     [
-      activeOwnerContactsCount,
-      appOwnerId,
       backfillLightningAddressTransactions,
       clearContactForm,
       contacts,
+      contactsRepository,
       currentNpub,
-      insert,
       isSavingContact,
       setPendingDeleteId,
       setRecentlyAddedContactId,
@@ -999,7 +923,7 @@ export const useContactEditor = ({
         const parsedName = bestName
           ? Evolu.NonEmptyString1000.fromUnknown(bestName)
           : null;
-        updateContactFields({
+        void updateContactFields({
           id: editingId,
           name: parsedName?.ok ? parsedName.value : null,
           nameSetByUser: null,
@@ -1007,7 +931,7 @@ export const useContactEditor = ({
       } else {
         const ln = getContactPublicProfile(npub, metadata).lnAddress;
         const parsedLn = ln ? Evolu.NonEmptyString1000.fromUnknown(ln) : null;
-        updateContactFields({
+        void updateContactFields({
           id: editingId,
           lnAddress: parsedLn?.ok ? parsedLn.value : null,
           lnAddressSetByUser: null,

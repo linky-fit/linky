@@ -1,34 +1,33 @@
-import { writeContact } from "../lib/writeContact";
-import * as Evolu from "@evolu/common";
+import {
+  createId,
+  NonEmptyString1000,
+  type ContactId,
+  type ContactsRepository,
+} from "@linky/linksync";
 import React from "react";
-import type { OwnerId } from "@evolu/common";
 import { navigateTo } from "../../hooks/useRouting";
 import { FEEDBACK_CONTACT_NPUB } from "../../utils/constants";
+import { runWrite } from "../lib/storeWrite";
 import type { ContactNameRowLike } from "../types/appTypes";
 import type { Translate } from "../../i18n";
 
-type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
+type FeedbackContactRow = ContactNameRowLike & {
+  id: ContactId;
+  npub?: string | null | undefined;
+};
 
-interface UseFeedbackContactParams<
-  TContact extends ContactNameRowLike & { npub?: string | null | undefined },
-> {
-  appOwnerId: OwnerId | null;
+interface UseFeedbackContactParams<TContact extends FeedbackContactRow> {
   contacts: readonly TContact[];
-  insert: EvoluMutations["insert"];
+  contactsRepository: Pick<ContactsRepository, "insert" | "update">;
   pushToast: (message: string) => void;
   t: Translate;
-  update: EvoluMutations["update"];
 }
 
-export const useFeedbackContact = <
-  TContact extends ContactNameRowLike & { npub?: string | null | undefined },
->({
-  appOwnerId,
+export const useFeedbackContact = <TContact extends FeedbackContactRow>({
   contacts,
-  insert,
+  contactsRepository,
   pushToast,
   t,
-  update,
 }: UseFeedbackContactParams<TContact>) => {
   const openFeedbackContactPendingRef = React.useRef(false);
 
@@ -38,9 +37,9 @@ export const useFeedbackContact = <
       (contact) => (contact.npub ?? "").trim() === targetNpub,
     );
 
-    if (existing?.id) {
+    if (existing) {
       if ((existing.name ?? "") === "Feedback") {
-        update("contact", { id: existing.id, name: null });
+        void runWrite(contactsRepository.update(existing.id, { name: null }));
       }
       openFeedbackContactPendingRef.current = false;
       navigateTo({ route: "chat", id: existing.id });
@@ -48,21 +47,17 @@ export const useFeedbackContact = <
     }
 
     openFeedbackContactPendingRef.current = true;
-
-    const payload = {
-      name: null,
-      npub: Evolu.NonEmptyString1000.orThrow(targetNpub),
-      lnAddress: null,
-      groupName: null,
-    };
-
-    const result = writeContact(insert, payload, appOwnerId);
-
-    if (result.ok) return;
-
-    openFeedbackContactPendingRef.current = false;
-    pushToast(`${t("errorPrefix")}: ${String(result.error)}`);
-  }, [appOwnerId, contacts, insert, pushToast, t, update]);
+    void runWrite(
+      contactsRepository.insert({
+        id: createId<"Contact">(),
+        npub: NonEmptyString1000.orThrow(targetNpub),
+      }),
+    ).then((outcome) => {
+      if (outcome.ok) return;
+      openFeedbackContactPendingRef.current = false;
+      pushToast(`${t("errorPrefix")}: ${outcome.error}`);
+    });
+  }, [contacts, contactsRepository, pushToast, t]);
 
   React.useEffect(() => {
     if (!openFeedbackContactPendingRef.current) return;
@@ -71,7 +66,7 @@ export const useFeedbackContact = <
     const existing = contacts.find(
       (contact) => (contact.npub ?? "").trim() === targetNpub,
     );
-    if (!existing?.id) return;
+    if (!existing) return;
 
     openFeedbackContactPendingRef.current = false;
     navigateTo({ route: "chat", id: existing.id });

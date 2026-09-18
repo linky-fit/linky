@@ -45,7 +45,7 @@ import type {
   CashuOperationRow,
   CashuProofRow,
   CashuTokenRow,
-  ContactRow,
+  LegacyContactRow,
   NostrIdentityRow,
   NostrMessageRow,
   NostrReactionRow,
@@ -169,7 +169,7 @@ export const deriveLegacyLaneOwners = async (
 };
 
 export interface LegacyLaneSnapshot {
-  readonly contacts: ReadonlyArray<ContactRow>;
+  readonly contacts: ReadonlyArray<LegacyContactRow>;
   readonly messages: ReadonlyArray<NostrMessageRow>;
   readonly reactions: ReadonlyArray<NostrReactionRow>;
   readonly tokens: ReadonlyArray<CashuTokenRow>;
@@ -281,7 +281,7 @@ function coalesceById(
 
 const DIRECT = NonEmptyString100.orThrow("direct");
 
-const hasChatState = (contact: ContactRow): boolean =>
+const hasChatState = (contact: LegacyContactRow): boolean =>
   contact.archivedAtSec !== null ||
   contact.chatLastSeenAtSec !== null ||
   contact.chatPeerSeenSinceSec !== null ||
@@ -291,7 +291,7 @@ const hasChatState = (contact: ContactRow): boolean =>
 const conversationOf = (
   contactId: ContactId,
   source: ShardRowInput,
-  contact: ContactRow | null,
+  contact: LegacyContactRow | null,
 ): Row<LinkyDbSchema["conversation"]> | null =>
   toShardRow("conversation", {
     ...source,

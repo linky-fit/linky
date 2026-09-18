@@ -1,7 +1,6 @@
-import { writeContact } from "../lib/writeContact";
-import type { OwnerId } from "@evolu/common";
 import * as Evolu from "@evolu/common";
 import { decodeNpub } from "@linky/linkstr";
+import { createId, type ContactsRepository } from "@linky/linksync";
 import React from "react";
 import { ContactId } from "../../evoluIds";
 import { navigateTo } from "../../hooks/useRouting";
@@ -25,18 +24,16 @@ import {
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,
 } from "../lib/paymentRequestMessage";
+import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
 import type { Translate } from "../../i18n";
 
-type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
-
 interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
-  appOwnerId: OwnerId | null;
   closeScan: () => void;
   contacts: readonly TContact[];
   currentNpub: string | null;
   extractCashuTokenFromText: (text: string) => string | null;
-  insert: EvoluMutations["insert"];
+  contactsRepository: Pick<ContactsRepository, "insert">;
   lightningInvoiceAutoPayLimit: number;
   onContactIdentifierScanned: ((identifier: string) => Promise<void>) | null;
   openScannedContactPendingNpubRef: React.MutableRefObject<string | null>;
@@ -64,12 +61,11 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
 }
 
 export const useScannedTextHandler = <TContact extends ContactRowLike>({
-  appOwnerId,
   closeScan,
   contacts,
   currentNpub,
   extractCashuTokenFromText,
-  insert,
+  contactsRepository,
   lightningInvoiceAutoPayLimit,
   onContactIdentifierScanned,
   openScannedContactPendingNpubRef,
@@ -208,16 +204,17 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
             return;
           }
 
-          const result = writeContact(
-            insert,
-            { npub: Evolu.NonEmptyString1000.orThrow(normalized) },
-            appOwnerId,
+          const result = await runWrite(
+            contactsRepository.insert({
+              id: createId<"Contact">(),
+              npub: Evolu.NonEmptyString1000.orThrow(normalized),
+            }),
           );
 
           if (result.ok) {
             setStatus(t("contactSaved"));
             openScannedContactPendingNpubRef.current = normalized;
-          } else setStatus(`${t("errorPrefix")}: ${String(result.error)}`);
+          } else setStatus(`${t("errorPrefix")}: ${result.error}`);
 
           closeScan();
           return;
@@ -345,12 +342,11 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       closeScan();
     },
     [
-      appOwnerId,
       closeScan,
       contacts,
       currentNpub,
       extractCashuTokenFromText,
-      insert,
+      contactsRepository,
       lightningInvoiceAutoPayLimit,
       onContactIdentifierScanned,
       payLightningInvoiceWithCashu,

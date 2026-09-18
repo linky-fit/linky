@@ -4,10 +4,7 @@ import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
 import { readRowOwnerId } from "../app/lib/rowOwnerId";
 import { loadEvoluCurrentData } from "../evolu";
 import { formatEvoluDebugValue } from "../utils/evoluDebugValue";
-import {
-  CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-  MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-} from "../utils/constants";
+import { MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT } from "../utils/constants";
 
 interface EvoluDataSectionConfig {
   editsUntilRotation: number | null;
@@ -35,9 +32,8 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   const {
     evoluCashuOwnerIndex,
     evoluCashuVisibleOwnerIds,
-    evoluContactsOwnerEditsUntilRotation,
-    evoluContactsOwnerId,
     evoluContactsOwnerIndex,
+    evoluContactsVisibleOwnerIds,
     evoluMessagesOwnerEditsUntilRotation,
     evoluMessagesOwnerId,
     evoluMessagesOwnerIndex,
@@ -71,7 +67,9 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   }, []);
 
   const filteredCurrentData = React.useMemo(() => {
-    const activeContactsOwnerId = (evoluContactsOwnerId ?? "").trim();
+    const visibleContactOwnerIds = new Set<string>(
+      evoluContactsVisibleOwnerIds,
+    );
     const visibleCashuOwnerIds = new Set<string>(evoluCashuVisibleOwnerIds);
     const visibleMessageOwnerIds = new Set(
       [evoluMessagesOwnerId, ...evoluMessagesVisibleOwnerIds]
@@ -89,11 +87,11 @@ export function EvoluCurrentDataPage(): React.ReactElement {
             return [tableName, rows];
           }
           if (tableName === "contact") {
-            if (!activeContactsOwnerId) return [tableName, []];
+            if (visibleContactOwnerIds.size === 0) return [tableName, []];
             return [
               tableName,
-              rows.filter(
-                (row) => readRowOwnerId(row) === activeContactsOwnerId,
+              rows.filter((row) =>
+                visibleContactOwnerIds.has(readRowOwnerId(row)),
               ),
             ];
           }
@@ -128,7 +126,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   }, [
     currentData,
     evoluCashuVisibleOwnerIds,
-    evoluContactsOwnerId,
+    evoluContactsVisibleOwnerIds,
     evoluMessagesOwnerId,
     evoluMessagesVisibleOwnerIds,
     evoluTransactionsVisibleOwnerIds,
@@ -163,13 +161,15 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     });
 
     return new Map<string, EvoluDataSectionConfig>([
+      // Contacts live on shards like transactions; the button also rotates
+      // the cashu shard because the two were one owner once.
       [
         "contact",
         {
           label: t("contactsTitle"),
           ownerIndex: evoluContactsOwnerIndex,
-          editsUntilRotation: evoluContactsOwnerEditsUntilRotation,
-          rotationLimit: CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+          editsUntilRotation: null,
+          rotationLimit: null,
           onRotate: requestManualRotateContactsOwner,
           rotateLabel: t("evoluContactsCashuOwnerRotate"),
           rotateIsBusy: rotateContactsOwnerIsBusy,
@@ -198,7 +198,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     ]);
   }, [
     evoluCashuOwnerIndex,
-    evoluContactsOwnerEditsUntilRotation,
     evoluContactsOwnerIndex,
     evoluMessagesOwnerEditsUntilRotation,
     evoluMessagesOwnerIndex,

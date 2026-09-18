@@ -3,7 +3,7 @@ import { act, useLayoutEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { safeLocalStorageSet } from "../../utils/storage";
-import { EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY } from "../../utils/constants";
+import { EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY } from "../../utils/constants";
 import { useOwnerLane } from "./useEvoluContactsOwnerRotation";
 
 vi.mock("../../evolu", () => ({ evolu: {} }));
@@ -25,7 +25,7 @@ const metaOwner = Evolu.createAppOwner(
   Evolu.OwnerSecret.orThrow(new Uint8Array(32).fill(99)),
 );
 const makeParams = (): Params => ({
-  scope: "contacts",
+  scope: "messages",
   appOwnerId: null,
   isSeedLogin: true,
   slip39Seed: "seed",
@@ -95,13 +95,13 @@ describe("owner lanes", () => {
     await view.unmount();
   });
   it("uses mutation history even when live rows are empty and blocks concurrent rotations", async () => {
-    const params = { ...makeParams(), historyCount: 220 };
+    const params = { ...makeParams(), historyCount: 160 };
     const view = await mountLane(params);
     expect(view.lane().index).toBe(1);
     expect(params.upsert).toHaveBeenCalledTimes(1);
-    expect(view.lane().editCount).toBe(220);
+    expect(view.lane().editCount).toBe(160);
     safeLocalStorageSet(
-      EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
+      EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
       "0",
     );
     await act(async () => {

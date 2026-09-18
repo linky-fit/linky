@@ -1,11 +1,13 @@
 import { getContactName } from "../../utils/contactName";
-import { writeContact } from "../lib/writeContact";
 import { toContactTextFields } from "../lib/contactFields";
-import * as Evolu from "@evolu/common";
-import { useQuery } from "@evolu/react";
+import {
+  NonEmptyString1000,
+  type ContactId,
+  type ContactsRepository,
+  type ConversationsRepository,
+} from "@linky/linksync";
+import { useRepositoryRows } from "@linky/linksync/react";
 import React from "react";
-import type { ContactId } from "../../evolu";
-import { evolu } from "../../evolu";
 import { isStatusFilterValue } from "../../nostrStatus";
 import type { Route } from "../../types/route";
 import { ARCHIVED_CONTACTS_FILTER } from "../../utils/constants";
@@ -14,18 +16,27 @@ import {
   normalizeContactGroups,
   serializeContactGroups,
 } from "../../utils/contactGroups";
-import { resolveContactRowOwnerLane } from "../lib/contactOwnerLane";
-import { safeLocalStorageGet, safeLocalStorageSet } from "../../utils/storage";
-import { readRowOwnerId } from "../lib/rowOwnerId";
+import {
+  joinContactChatState,
+  type ContactWithChatState,
+} from "../lib/contactChatState";
+import { runWrite } from "../lib/storeWrite";
 import type { Translate } from "../../i18n";
 
 import { reportAppLog } from "../../devtools/inspector/appLog";
-type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
+
+const withNormalizedName = (
+  row: ContactWithChatState,
+): ContactWithChatState => {
+  const name = getContactName(row);
+  if (name === (row.name ?? "")) return row;
+  const parsed = NonEmptyString1000.fromUnknown(name);
+  return { ...row, name: parsed.ok ? parsed.value : null };
+};
 
 interface UseContactsDomainParams {
-  appOwnerId: Evolu.OwnerId | null;
-  currentNsec: string | null;
-  isSeedLogin: boolean;
+  contacts: ContactsRepository;
+  conversations: ConversationsRepository;
   noGroupFilterValue: string;
   pushToast: (message: string) => void;
   reassignContactMessages: (
@@ -34,36 +45,16 @@ interface UseContactsDomainParams {
   ) => number;
   route: Route;
   t: Translate;
-  update: EvoluMutations["update"];
-  upsert: EvoluMutations["upsert"];
-  visibleOwnerIds: readonly Evolu.OwnerId[];
 }
 
-const shouldReplaceContactVersion = (
-  candidateOwnerRank: number,
-  candidateCreatedAt: number,
-  existingOwnerRank: number,
-  existingCreatedAt: number,
-): boolean => {
-  if (candidateOwnerRank !== existingOwnerRank) {
-    return candidateOwnerRank > existingOwnerRank;
-  }
-
-  return candidateCreatedAt >= existingCreatedAt;
-};
-
 export const useContactsDomain = ({
-  appOwnerId,
-  currentNsec,
-  isSeedLogin,
+  contacts: contactsRepository,
+  conversations,
   noGroupFilterValue,
   pushToast,
   reassignContactMessages,
   route,
   t,
-  update,
-  upsert,
-  visibleOwnerIds,
 }: UseContactsDomainParams) => {
   const [dedupeContactsIsBusy, setDedupeContactsIsBusy] = React.useState(false);
   const [activeGroup, setActiveGroup] = React.useState<string | null>(null);
@@ -71,81 +62,16 @@ export const useContactsDomain = ({
 
   const contactsSearchInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const contactsQuery = React.useMemo(
+  const contactRows = useRepositoryRows(contactsRepository);
+  const conversationRows = useRepositoryRows(conversations);
+
+  const contacts = React.useMemo(
     () =>
-      evolu.createQuery((db) =>
-        db.selectFrom("contact").selectAll().orderBy("createdAt", "desc"),
-      ),
-    [],
+      joinContactChatState(contactRows, conversationRows)
+        .map(withNormalizedName)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [contactRows, conversationRows],
   );
-
-  const allContacts = useQuery(contactsQuery);
-
-  const visibleOwnerIdTexts = React.useMemo(
-    () => visibleOwnerIds.map((ownerId) => ownerId.trim()).filter(Boolean),
-    [visibleOwnerIds],
-  );
-
-  const visibleOwnerRankById = React.useMemo(() => {
-    const rankById = new Map<string, number>();
-    for (const [index, ownerId] of visibleOwnerIdTexts.entries()) {
-      rankById.set(ownerId, index);
-    }
-    return rankById;
-  }, [visibleOwnerIdTexts]);
-
-  const contacts = React.useMemo(() => {
-    if (visibleOwnerRankById.size === 0) return [];
-
-    type ContactQueryRow = (typeof allContacts)[number];
-
-    const latestById = new Map<
-      string,
-      {
-        createdAt: number;
-        ownerRank: number;
-        row: ContactQueryRow;
-      }
-    >();
-
-    for (const contact of allContacts) {
-      const ownerId = readRowOwnerId(contact);
-      const ownerRank = visibleOwnerRankById.get(ownerId);
-      if (ownerRank === undefined) continue;
-
-      const contactId = contact.id;
-      if (!contactId) continue;
-
-      const createdAt = contact.createdAt ? Date.parse(contact.createdAt) : 0;
-
-      const existing = latestById.get(contactId);
-      if (
-        !existing ||
-        shouldReplaceContactVersion(
-          ownerRank,
-          createdAt,
-          existing.ownerRank,
-          existing.createdAt,
-        )
-      ) {
-        latestById.set(contactId, {
-          createdAt,
-          ownerRank,
-          row: contact,
-        });
-      }
-    }
-
-    return Array.from(latestById.values())
-      .map(({ row }) => {
-        const name = getContactName(row);
-        if (name === (row.name ?? "")) return row;
-        const parsed = Evolu.NonEmptyString1000.fromUnknown(name);
-        return { ...row, name: parsed.ok ? parsed.value : null };
-      })
-      .filter((row) => row.isDeleted !== Evolu.sqliteTrue)
-      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-  }, [allContacts, visibleOwnerRankById]);
 
   const dedupeContacts = React.useCallback(async () => {
     if (dedupeContactsIsBusy) return;
@@ -167,29 +93,6 @@ export const useContactsDomain = ({
 
     const fieldScore = (value: string | null | undefined): number =>
       normalize(value) ? 1 : 0;
-
-    const writeContactProfileUpdate = (
-      payload: {
-        id: ContactId;
-      } & Partial<
-        Record<
-          "groupName" | "groupNamesJson" | "lnAddress" | "name" | "npub",
-          typeof Evolu.NonEmptyString1000.Type | null
-        >
-      >,
-      row: unknown,
-    ) => {
-      const ownerId =
-        resolveContactRowOwnerLane(row, visibleOwnerIds) ?? appOwnerId;
-      return writeContact(update, payload, ownerId);
-    };
-
-    const writeContactDelete = (id: ContactId, row: unknown) => {
-      const payload = { id, isDeleted: Evolu.sqliteTrue };
-      const ownerId =
-        resolveContactRowOwnerLane(row, visibleOwnerIds) ?? appOwnerId;
-      return writeContact(update, payload, ownerId);
-    };
 
     try {
       const n = contacts.length;
@@ -307,33 +210,30 @@ export const useContactsDomain = ({
           (keep.groupNamesJson ?? "") !== (mergedGroupsJson ?? "");
 
         if (keepNeedsUpdate) {
-          const result = writeContactProfileUpdate(
-            {
-              id: keepId,
-              ...toContactTextFields({
+          const result = await runWrite(
+            contactsRepository.update(
+              keepId,
+              toContactTextFields({
                 name: mergedName,
                 npub: mergedNpub,
                 lnAddress: mergedLn,
                 groupName: mergedGroup,
                 groupNamesJson: mergedGroupsJson,
               }),
-            },
-            keep,
+            ),
           );
-
-          if (!result.ok) {
-            throw new Error(String(result.error ?? "contact update failed"));
-          }
+          if (!result.ok) throw new Error(result.error);
         }
 
         for (const contact of group) {
-          const duplicateId = contact.id;
+          const duplicateId: ContactId = contact.id;
           if (duplicateId === keepId) continue;
 
           movedMessages += reassignContactMessages(duplicateId, keepId);
-          const del = writeContactDelete(duplicateId, contact);
-
-          if (del.ok) removedContacts += 1;
+          const removed = await runWrite(
+            contactsRepository.remove(duplicateId),
+          );
+          if (removed.ok) removedContacts += 1;
         }
       }
 
@@ -355,56 +255,13 @@ export const useContactsDomain = ({
       setDedupeContactsIsBusy(false);
     }
   }, [
-    appOwnerId,
     contacts,
+    contactsRepository,
     dedupeContactsIsBusy,
     pushToast,
     reassignContactMessages,
     t,
-    update,
-    visibleOwnerIds,
   ]);
-
-  React.useEffect(() => {
-    if (isSeedLogin) return;
-    if (!currentNsec) return;
-    if (!appOwnerId) return;
-    if (contacts.length === 0) return;
-
-    const ownerKey = appOwnerId;
-    const migrationKey = `linky.contacts_owner_migrated_v1:${ownerKey}`;
-
-    if (safeLocalStorageGet(migrationKey) === "1") return;
-
-    let okCount = 0;
-    let failCount = 0;
-
-    for (const contact of contacts) {
-      const payload = {
-        id: contact.id,
-        ...toContactTextFields(contact),
-        archivedAtSec: (() => {
-          const parsed = Evolu.PositiveInt.fromUnknown(
-            Number(contact.archivedAtSec),
-          );
-          return parsed.ok ? parsed.value : null;
-        })(),
-      };
-
-      const result = upsert("contact", payload, { ownerId: appOwnerId });
-      if (result.ok) okCount += 1;
-      else failCount += 1;
-    }
-
-    safeLocalStorageSet(migrationKey, "1");
-
-    reportAppLog({
-      tag: "contacts.ownerMigrated",
-      summary: `Contacts migrated to the app owner lane: ${okCount} ok, ${failCount} failed`,
-      links: { owner: ownerKey },
-      payload: { failed: failCount, ok: okCount, ownerId: ownerKey },
-    });
-  }, [appOwnerId, contacts, currentNsec, isSeedLogin, upsert]);
 
   const { groupCounts, groupNames, ungroupedCount } = React.useMemo(() => {
     const counts = new Map<string, number>();

@@ -19,7 +19,7 @@ declare global {
 
 test.use({ actionTimeout: 20_000 });
 
-/** The old owner lanes mirror their active index in localStorage. */
+/** The messages owner lane still mirrors its active index in localStorage. */
 const laneIndex = (page: Page, scope: string) =>
   page.evaluate(
     (name) =>
@@ -27,14 +27,14 @@ const laneIndex = (page: Page, scope: string) =>
     scope,
   );
 
-/** Transactions live on shards; their pointer is a synced row in the app owner. */
-const transactionsShardIndex = (page: Page) =>
-  page.evaluate(async () => {
+/** Contacts and transactions live on shards; their pointer is a synced row in the app owner. */
+const shardIndex = (page: Page, scope: string) =>
+  page.evaluate(async (name) => {
     if (!window.__linkyE2E) throw new Error("test hooks missing");
     const pointers = await window.__linkyE2E.shardRows("meta", "shardPointer");
-    const pointer = pointers.find((row) => row.scope === "transactions");
+    const pointer = pointers.find((row) => row.scope === name);
     return typeof pointer?.index === "number" ? pointer.index : 0;
-  });
+  }, scope);
 
 test("contact, message and transaction rotations preserve old rows and sync new writes", async ({
   browser,
@@ -83,7 +83,7 @@ test("contact, message and transaction rotations preserve old rows and sync new 
         { scope: "contacts", button: "Rotate contacts and tokens owner" },
         { scope: "messages", button: "Rotate messages owner" },
         { scope: "transactions", button: "Rotate transactions owner" },
-      ]) {
+      ] as const) {
         await source.page.goto("/#evolu-current-data");
         await source.page
           .getByRole("button", { name: lane.button, exact: true })
@@ -92,9 +92,9 @@ test("contact, message and transaction rotations preserve old rows and sync new 
         for (const device of devices) {
           await expect
             .poll(() =>
-              lane.scope === "transactions"
-                ? transactionsShardIndex(device.page)
-                : laneIndex(device.page, lane.scope),
+              lane.scope === "messages"
+                ? laneIndex(device.page, lane.scope)
+                : shardIndex(device.page, lane.scope),
             )
             .toBe(1);
         }

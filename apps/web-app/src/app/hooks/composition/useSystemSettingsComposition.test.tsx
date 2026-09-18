@@ -55,12 +55,8 @@ const createEvoluSettings = (
 ): EvoluSettingsInput => ({
   evoluCashuOwnerIndex: 0,
   evoluCashuVisibleOwnerIds: [],
-  evoluContactsOwnerEditCount: 0,
-  evoluContactsOwnerEditsUntilRotation: 0,
-  evoluContactsOwnerId: null,
   evoluContactsOwnerIndex: 0,
-  evoluContactsOwnerNewContactsCount: 0,
-  evoluContactsOwnerPointer: "",
+  evoluContactsVisibleOwnerIds: [],
   evoluDatabaseBytes: null,
   evoluHasError: false,
   evoluErrorType: null,

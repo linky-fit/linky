@@ -1,4 +1,3 @@
-import { writeContact } from "../lib/writeContact";
 import * as Evolu from "@evolu/common";
 import type {
   ProfileFetchEntry,
@@ -9,6 +8,7 @@ import type {
   StatusUpdated,
 } from "@linky/linkstr";
 import { decodeNpub, encodeNpub, Pubkey } from "@linky/linkstr";
+import type { ContactId, ContactsRepository } from "@linky/linksync";
 import {
   profileWatchAtom,
   profileWatchHandlerAtom,
@@ -30,8 +30,8 @@ import {
 } from "../../profileCache";
 import { getBestNostrName } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
-import { resolveContactRowOwnerLane } from "../lib/contactOwnerLane";
 import { getContactPublicProfile } from "../lib/contactProfile";
+import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
 
 const decodeNpubToPubkey = (npub: string): Pubkey | null => {
@@ -108,25 +108,13 @@ type SetByNpub<T> = React.Dispatch<
   React.SetStateAction<Record<string, T | null>>
 >;
 
-type ContactRowUpdate = (
-  table: "contact",
-  props: {
-    id: string;
-    lnAddress?: typeof Evolu.NonEmptyString1000.Type | null;
-    name?: typeof Evolu.NonEmptyString1000.Type | null;
-  },
-  options?: { readonly ownerId?: Evolu.OwnerId },
-) => Evolu.Result<unknown, unknown>;
-
 interface ProfileSyncContext {
-  contacts: readonly (ContactRowLike & { id: string })[];
-  contactsOwnerId: Evolu.OwnerId | null;
-  contactsVisibleOwnerIds: readonly Evolu.OwnerId[];
+  contacts: readonly (ContactRowLike & { id: ContactId })[];
+  contactsRepository: Pick<ContactsRepository, "update">;
   routeKind: string;
   setNostrMetadataByNpub: SetByNpub<ProfileMetadata>;
   setNostrPictureByNpub: SetByNpub<string>;
   setNostrStatusByNpub: SetByNpub<string>;
-  update: ContactRowUpdate;
 }
 
 const syncContactsFromProfile = (
@@ -189,11 +177,12 @@ const syncContactsFromProfile = (
     }
 
     if (Object.keys(patch).length === 0) continue;
-    const ownerId =
-      resolveContactRowOwnerLane(contact, ctx.contactsVisibleOwnerIds) ??
-      ctx.contactsOwnerId;
-    const payload = { id: contact.id, ...patch };
-    writeContact(ctx.update, payload, ownerId);
+    void runWrite(ctx.contactsRepository.update(contact.id, patch)).then(
+      (outcome) => {
+        if (!outcome.ok)
+          console.warn("[linky][contacts] profile sync write failed", outcome);
+      },
+    );
   }
 };
 

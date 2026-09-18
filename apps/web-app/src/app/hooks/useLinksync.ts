@@ -1,8 +1,16 @@
 import {
+  makeContactsRepository,
+  makeConversationsRepository,
+  makeSettingsRepository,
   makeTransactionsRepository,
   makeWalletRepository,
+  type ContactRow,
+  type ContactsRepository,
+  type ConversationRow,
+  type ConversationsRepository,
   type LinkyScope,
   type LinkyStore,
+  type SettingsRepository,
   type TransactionRecord,
   type TransactionsRepository,
   type WalletRepository,
@@ -21,6 +29,37 @@ import { getUnknownErrorMessage } from "../../utils/unknown";
 
 /** The shard store; resolved before the authenticated shell mounts, so this reads synchronously there. */
 export const useLinkyStore = (): LinkyStore => React.use(getLinkyStore());
+
+export const useContactsRepository = (): ContactsRepository => {
+  const store = useLinkyStore();
+  return React.useMemo(() => makeContactsRepository(store), [store]);
+};
+
+export const useContactRows = (): ReadonlyArray<ContactRow> =>
+  useRepositoryRows(useContactsRepository());
+
+export const useConversationsRepository = (): ConversationsRepository => {
+  const store = useLinkyStore();
+  return React.useMemo(() => makeConversationsRepository(store), [store]);
+};
+
+export const useConversationRows = (): ReadonlyArray<ConversationRow> =>
+  useRepositoryRows(useConversationsRepository());
+
+export const useSettingsRepository = (): SettingsRepository => {
+  const store = useLinkyStore();
+  return React.useMemo(() => makeSettingsRepository(store), [store]);
+};
+
+/** One synced setting value, kept current; `null` until read or when absent. */
+export const useSetting = (key: string): string | null => {
+  const settings = useSettingsRepository();
+  const source = React.useMemo(
+    () => ({ all: settings.get(key), subscribe: settings.subscribe }),
+    [key, settings],
+  );
+  return useLiveValue<string | null>(source, null);
+};
 
 export const useTransactionsRepository = (): TransactionsRepository => {
   const store = useLinkyStore();

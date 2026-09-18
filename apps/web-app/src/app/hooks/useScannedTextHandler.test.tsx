@@ -1,4 +1,5 @@
 import { bech32 } from "@scure/base";
+import { Effect } from "effect";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
@@ -32,12 +33,11 @@ const setup = async (): Promise<Scan> => {
 
   const Probe = (): null => {
     const handle = useScannedTextHandler({
-      appOwnerId: null,
       closeScan: () => undefined,
       contacts: [],
+      contactsRepository: { insert: () => Effect.void },
       currentNpub: null,
       extractCashuTokenFromText: () => null,
-      insert: vi.fn(),
       lightningInvoiceAutoPayLimit: 0,
       onContactIdentifierScanned: null,
       openScannedContactPendingNpubRef: { current: null },

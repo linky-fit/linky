@@ -7,14 +7,9 @@ import {
   subscribeEvoluHistoryMutationVersion,
 } from "../../evolu";
 import {
-  CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-  EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-  MAX_CONTACTS_PER_OWNER,
   MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
   OWNER_ROTATION_COOLDOWN_MS,
 } from "../../utils/constants";
@@ -45,7 +40,6 @@ type UpsertOwnerMeta = (
 type CounterMap = Record<string, number>;
 
 interface RotationSnapshotsByScope {
-  contacts: RotationSnapshot | null;
   messages: RotationSnapshot | null;
 }
 
@@ -66,14 +60,6 @@ interface UseEvoluContactsOwnerRotationParams {
 }
 
 interface UseEvoluContactsOwnerRotationResult {
-  contactsOwnerEditCount: number;
-  contactsOwnerEditsUntilRotation: number;
-  contactsOwnerId: Evolu.OwnerId | null;
-  contactsSyncOwner: Evolu.SyncOwner | null;
-  contactsOwnerIndex: number;
-  contactsOwnerNewContactsCount: number;
-  contactsOwnerPointer: string;
-  contactsVisibleOwnerIds: Evolu.OwnerId[];
   identityOwnerId: Evolu.OwnerId | null;
   identitySyncOwner: Evolu.SyncOwner | null;
   historicalBootstrapSyncOwners: Evolu.SyncOwner[];
@@ -86,9 +72,7 @@ interface UseEvoluContactsOwnerRotationResult {
   messagesOwnerEditsUntilRotation: number;
   messagesSyncOwner: Evolu.SyncOwner | null;
   messagesVisibleOwnerIds: Evolu.OwnerId[];
-  requestManualRotateContactsOwner: () => Promise<void>;
   requestManualRotateMessagesOwner: () => Promise<void>;
-  rotateContactsOwnerIsBusy: boolean;
   rotateMessagesOwnerIsBusy: boolean;
 }
 
@@ -112,10 +96,7 @@ const readRotationSnapshotsByScope = (
   ownerMetaRows: readonly Record<string, unknown>[],
   metaOwnerId: string,
 ): RotationSnapshotsByScope => {
-  const snapshots: RotationSnapshotsByScope = {
-    contacts: null,
-    messages: null,
-  };
+  const snapshots: RotationSnapshotsByScope = { messages: null };
 
   if (!metaOwnerId) return snapshots;
 
@@ -127,7 +108,7 @@ const readRotationSnapshotsByScope = (
         : null;
     const scopeText = typeof scope === "string" ? scope.trim() : "";
 
-    if (scopeText !== "contacts" && scopeText !== "messages") continue;
+    if (scopeText !== "messages") continue;
 
     const decoded = decodeRotationSnapshot(readRowPointerValue(row), scopeText);
     if (!decoded) continue;
@@ -285,7 +266,7 @@ const deriveFixedOwnerSyncDataFromSeed = async (
   };
 };
 
-type RotatingOwnerRole = "contacts" | "messages";
+type RotatingOwnerRole = "messages";
 
 const deriveVisibleOwnerSyncDataFromSeed = async (
   slip39Seed: string,
@@ -318,14 +299,6 @@ interface OwnerLaneConfig {
 }
 
 const OWNER_LANES: Record<RotatingOwnerRole, OwnerLaneConfig> = {
-  contacts: {
-    indexKey: EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
-    baselineKey: EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-    rotatedAtKey: EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-    threshold: CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-    rotatedLabel: "evoluContactsOwnerRotated",
-    tables: ["contact"],
-  },
   messages: {
     indexKey: EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
     baselineKey: EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
@@ -504,7 +477,7 @@ export const useOwnerLane = ({
       setCounterValue(
         config.baselineKey,
         nextIndex,
-        scope === "contacts" ? 0 : countOwnerRows(rows, nextOwner.id),
+        countOwnerRows(rows, nextOwner.id),
       );
       writeStoredNonNegativeInt(config.rotatedAtKey, nowMs);
       setOwner(nextOwner);
@@ -520,9 +493,7 @@ export const useOwnerLane = ({
         links: { owner: ownerId ? [ownerId, nextOwner.id] : nextOwner.id },
         payload: { scope, previousIndex: resolvedIndex, index: nextIndex },
       });
-      pushToast(
-        `${t(config.rotatedLabel)}${scope === "contacts" ? "" : " (0)"}`,
-      );
+      pushToast(`${t(config.rotatedLabel)} (0)`);
     } finally {
       rotationInFlight.current = false;
       setIsBusy(false);
@@ -565,21 +536,9 @@ export const useOwnerLane = ({
 
   React.useEffect(() => {
     if (!isSeedLogin || isBusy) return;
-    if (
-      editCount < config.threshold &&
-      !(scope === "contacts" && writeCount >= MAX_CONTACTS_PER_OWNER)
-    )
-      return;
+    if (editCount < config.threshold) return;
     void rotate();
-  }, [
-    config.threshold,
-    editCount,
-    isBusy,
-    isSeedLogin,
-    rotate,
-    scope,
-    writeCount,
-  ]);
+  }, [config.threshold, editCount, isBusy, isSeedLogin, rotate]);
 
   const visibleOwnerIds = React.useMemo(
     () =>
@@ -632,17 +591,6 @@ export const useEvoluContactsOwnerRotation = (
     [],
   );
   const ownerMetaRows = useQuery(ownerMetaQuery);
-  const allContactsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("contact")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-  const allContactsRows = useQuery(allContactsQuery);
   const allNostrMessagesQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -703,16 +651,10 @@ export const useEvoluContactsOwnerRotation = (
     () => [...allNostrMessagesRows, ...allNostrReactionsRows],
     [allNostrMessagesRows, allNostrReactionsRows],
   );
-  const shared = { ...params, metaOwner, allowMissingOwnerMetaBootstrap };
-  const contacts = useOwnerLane({
-    ...shared,
-    scope: "contacts",
-    snapshot: snapshots.contacts,
-    rows: allContactsRows,
-    historyCount: historyMutationCounts.contacts,
-  });
   const messages = useOwnerLane({
-    ...shared,
+    ...params,
+    metaOwner,
+    allowMissingOwnerMetaBootstrap,
     scope: "messages",
     snapshot: snapshots.messages,
     rows: messageRows,
@@ -720,12 +662,6 @@ export const useEvoluContactsOwnerRotation = (
   });
   React.useEffect(() => {
     const requests = [
-      {
-        key: "contacts",
-        ownerId: contacts.ownerId,
-        rotatedAtMs: contacts.rotatedAtMs,
-        tables: OWNER_LANES.contacts.tables,
-      },
       {
         key: "messages",
         ownerId: messages.ownerId,
@@ -754,29 +690,15 @@ export const useEvoluContactsOwnerRotation = (
       window.clearTimeout(timer);
     };
   }, [
-    contacts.ownerId,
-    contacts.rotatedAtMs,
     messages.ownerId,
     messages.rotatedAtMs,
     historyMutationVersion,
     isSeedLogin,
   ]);
-  const historicalBootstrapSyncOwners = React.useMemo(() => {
-    if (!isSeedLogin) return EMPTY_SYNC_OWNERS;
-    const owners = [...contacts.historicalOwners, ...messages.historicalOwners];
-    return owners.filter(
-      (owner, index) =>
-        owners.findIndex((candidate) => candidate.id === owner.id) === index,
-    );
-  }, [contacts.historicalOwners, messages.historicalOwners, isSeedLogin]);
+  const historicalBootstrapSyncOwners = isSeedLogin
+    ? messages.historicalOwners
+    : EMPTY_SYNC_OWNERS;
   return {
-    contactsOwnerId: contacts.ownerId,
-    contactsOwnerEditsUntilRotation: contacts.editsUntilRotation,
-    contactsOwnerIndex: contacts.index,
-    contactsSyncOwner: contacts.syncOwner,
-    contactsVisibleOwnerIds: contacts.visibleOwnerIds,
-    requestManualRotateContactsOwner: contacts.requestManualRotate,
-    rotateContactsOwnerIsBusy: contacts.isBusy,
     messagesOwnerId: messages.ownerId,
     messagesOwnerEditsUntilRotation: messages.editsUntilRotation,
     messagesOwnerIndex: messages.index,
@@ -784,9 +706,6 @@ export const useEvoluContactsOwnerRotation = (
     messagesVisibleOwnerIds: messages.visibleOwnerIds,
     requestManualRotateMessagesOwner: messages.requestManualRotate,
     rotateMessagesOwnerIsBusy: messages.isBusy,
-    contactsOwnerEditCount: contacts.editCount,
-    contactsOwnerNewContactsCount: contacts.writeCount,
-    contactsOwnerPointer: `contacts-${contacts.index}`,
     identityOwnerId: isSeedLogin
       ? (fixedOwnerSyncData?.identityOwner.id ?? null)
       : appOwnerId,

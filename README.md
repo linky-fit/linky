@@ -26,11 +26,7 @@ The repo also contains a separate public website in `apps/site/` intended for `l
   - one 20-word **SLIP-39** share
 - With SLIP-39 login:
   - Nostr keypair is derived at `m/44'/1237'/0'/0/0`
-  - deterministic Evolu owner lanes are derived for:
-    - contacts (`contacts-n`)
-    - cashu (`cashu-n`)
-    - messages (`messages-n`)
-    - owner metadata (`ownerMeta`)
+  - the meta owner (`ownerMeta`) is the Evolu app owner and every other scope (contacts, conversations and messages, cashu, transactions, identity) is a `@linky/linksync` shard derived from it; the old `messages-n` owner lane is still derived for messages until linky-fit/linky#387
 - Seed backup uses the browser credential API where supported. Otherwise, use Show/Copy in Master keys and save the seed manually. Linky does not submit the seed to a server to trigger password saving.
 - If user pastes custom `nsec` during a SLIP-39 session, app switches to pasted key locally without immediate Evolu restore/write; choosing Derive switches back to seed-derived key.
 
@@ -38,13 +34,11 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 
 Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `docs/architecture.md` ("Evolu persistence and owner lanes").
 
-- Contacts and messages still rotate as Evolu owner lanes on their own historical mutation thresholds (contacts `220`, messages `160`, `*_OWNER_ROTATION_TRIGGER_WRITE_COUNT`) with a per-scope `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown. Transactions and the cashu wallet (proofs and operations) live on `@linky/linksync` shards, which rotate at 256 KiB of history or the scope's mutation count (transactions `220`, cashu `170`) inside the package; a cashu update moves the proof to the active shard (copy-on-write), so old shards never grow.
-- Transactions already live on `@linky/linksync` shards: the package rotates the `transactions` scope after a write once the active shard holds 256 KiB of history values or 220 mutations (60 s cooldown), keeps the newest 4 shards, and copies a row forward on update so a retired shard never grows.
+- Messages still rotate as an Evolu owner lane on a historical mutation threshold (`MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT = 160`) with an `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown. Contacts, conversations (chat read cursor, peer seen window, archive state; stored in the messages scope), transactions and the cashu wallet (proofs and operations) live on `@linky/linksync` shards, which rotate at 256 KiB of history or the scope's mutation count (contacts `220`, transactions `220`, cashu `170`, 60 s cooldown) inside the package; an update moves the row to the active shard (copy-on-write), so old shards never grow. Transactions keep the newest 4 shards; contacts are never forgotten.
 - Existing quota failures need relay capacity before rejected history can sync. Keep the device's local data, increase the relay's quota or add a relay with capacity, then reload normally.
 - An upgrade silently adds and enables `wss://evolu.linky.fit` and adds `wss://nostr.linky.fit` to the user's Nostr relay lists once, preserving custom endpoints. Later user edits are respected; explicit development relay overrides skip the migration.
-- Rotation is pointer-only for every scope: the active lane index moves forward in `ownerMeta`, nothing is copied, and older lanes stay readable instead of being pruned.
-- Contacts are additionally capped at `MAX_CONTACTS_PER_OWNER = 100` per active lane; a full lane triggers rotation to the next one.
-- The lanes are being replaced by `@linky/linksync` shards (linky-fit/linky#380). The first launch after the update shows a short "Migrating data" screen while the lanes are copied into the shards; the remaining lanes (contacts, cashu, messages) still take every write until their scope cuts over, and for 180 days after the migration every launch re-copies rows an older app version wrote to any lane, transactions included.
+- The messages lane rotation is pointer-only: the active lane index moves forward in `ownerMeta`, nothing is copied, and older lanes stay readable instead of being pruned. There is no cap on the number of contacts any more; the byte-aware shard rule covers it.
+- The lanes are being replaced by `@linky/linksync` shards (linky-fit/linky#380). The first launch after the update shows a short "Migrating data" screen while the lanes are copied into the shards; the remaining messages lane still takes every message write until #387 cuts it over, and for 180 days after the migration every launch re-copies rows an older app version wrote to any lane.
 
 ## Features
 

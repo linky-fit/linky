@@ -1,9 +1,12 @@
-import { writeContact } from "../lib/writeContact";
 import { toContactTextFields } from "../lib/contactFields";
 import { Option, Schema, Struct } from "effect";
-import type * as Evolu from "@evolu/common";
 import { ImportProofDraft, LegacyTokenRow, NewOperation } from "@linky/linkshu";
 import type { StoredOperation, StoredProof } from "@linky/linkshu";
+import {
+  createId,
+  type ContactId,
+  type ContactsRepository,
+} from "@linky/linksync";
 import React from "react";
 import { JsonValue } from "../../types/json";
 import { nowSeconds } from "../../utils/time";
@@ -13,11 +16,12 @@ import {
   CASHU_TOKEN_STATE_ACCEPTED,
   normalizeCashuTokenState,
 } from "../lib/cashuTokenState";
+import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
 import type { CashuTransferLifecycle } from "./composition/useLinkshuComposition";
 import type { Translate } from "../../i18n";
 
-type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
+type ImportableContact = ContactRowLike & { id: ContactId };
 
 const decodeImportProofDrafts = Schema.decodeUnknownOption(
   Schema.Array(ImportProofDraft),
@@ -25,35 +29,31 @@ const decodeImportProofDrafts = Schema.decodeUnknownOption(
 const decodeNewOperation = Schema.decodeUnknownOption(NewOperation);
 const decodeLegacyTokenRow = Schema.decodeUnknownOption(LegacyTokenRow);
 
-interface UseAppDataTransferParams<TContact extends ContactRowLike> {
-  appOwnerId: Evolu.OwnerId | null;
+interface UseAppDataTransferParams<TContact extends ImportableContact> {
   cashuOperations: readonly StoredOperation[];
   cashuProofs: readonly StoredProof[];
   contacts: readonly TContact[];
+  contactsRepository: Pick<ContactsRepository, "insert" | "update">;
   /** Null until the wallet runtime is ready to restore wallet rows. */
   importCashuLegacyRows: CashuTransferLifecycle["importLegacyRows"] | null;
   importCashuOperation: CashuTransferLifecycle["importOperation"] | null;
   importCashuProofs: CashuTransferLifecycle["importProofs"] | null;
   importDataFileInputRef: React.RefObject<HTMLInputElement | null>;
-  insert: EvoluMutations["insert"];
   pushToast: (message: string) => void;
   t: Translate;
-  update: EvoluMutations["update"];
 }
 
-export const useAppDataTransfer = <TContact extends ContactRowLike>({
-  appOwnerId,
+export const useAppDataTransfer = <TContact extends ImportableContact>({
   cashuOperations,
   cashuProofs,
   contacts,
+  contactsRepository,
   importCashuLegacyRows,
   importCashuOperation,
   importCashuProofs,
   importDataFileInputRef,
-  insert,
   pushToast,
   t,
-  update,
 }: UseAppDataTransferParams<TContact>) => {
   const exportAppData = React.useCallback(() => {
     try {
@@ -220,11 +220,9 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
           groupNamesJson,
         });
 
-        if (existing && existing.id) {
-          const id = existing.id;
+        if (existing) {
           const previous = toContactTextFields(existing);
           const merged = {
-            id,
             name: payload.name ?? previous.name,
             npub: payload.npub ?? previous.npub,
             lnAddress: payload.lnAddress ?? previous.lnAddress,
@@ -232,10 +230,17 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
             groupNamesJson: payload.groupNamesJson ?? previous.groupNamesJson,
           };
 
-          const result = writeContact(update, merged, appOwnerId);
+          const result = await runWrite(
+            contactsRepository.update(existing.id, merged),
+          );
           if (result.ok) updatedContacts += 1;
         } else {
-          const result = writeContact(insert, payload, appOwnerId);
+          const result = await runWrite(
+            contactsRepository.insert({
+              id: createId<"Contact">(),
+              ...payload,
+            }),
+          );
           if (result.ok) {
             addedContacts += 1;
             if (npub) insertedNpubs.add(npub);
@@ -292,15 +297,13 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
       );
     },
     [
-      appOwnerId,
       contacts,
+      contactsRepository,
       importCashuLegacyRows,
       importCashuOperation,
       importCashuProofs,
-      insert,
       pushToast,
       t,
-      update,
     ],
   );
 

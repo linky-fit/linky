@@ -627,7 +627,8 @@ export const createNostrReactionsAllQuery = () =>
   evolu.createQuery((db) => db.selectFrom("nostrReaction").selectAll());
 export const createTransactionsAllQuery = () =>
   evolu.createQuery((db) => db.selectFrom("transaction").selectAll());
-export type ContactRow = Evolu.InferRow<
+/** A `contact` row with its legacy chat columns; read only by the lane migration. */
+export type LegacyContactRow = Evolu.InferRow<
   ReturnType<typeof createContactsAllQuery>
 >;
 export type NostrMessageRow = Evolu.InferRow<

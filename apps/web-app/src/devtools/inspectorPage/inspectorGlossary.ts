@@ -19,7 +19,11 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
 
 const TAG_DESCRIPTIONS: Record<string, string> = {
   "contacts.npubSaved":
-    "A Nostr contact was saved after duplicate and active owner limit checks. The contact link identifies the new row.",
+    "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
+  "conversations.archived":
+    "User archived a contact's chat: the conversation row (messages scope) records the archive time and its read cursor moves there; the contact row is untouched. The contact and conversation links identify both rows.",
+  "conversations.unarchived":
+    "A conversation left the archive, either by the user restoring the contact or because an incoming message newer than the archive time arrived.",
   "evolu.ownerRotated":
     "The active write owner moved to the next lane. Previous lanes remain visible for reads; owner links join the rotation to sync diagnostics.",
   ShardRotated:

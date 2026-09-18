@@ -1,7 +1,6 @@
 import { createContactNameFormatter } from "../utils/contactName";
 import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
 import * as Evolu from "@evolu/common";
-import { useQuery } from "@evolu/react";
 import React, { useMemo, useState } from "react";
 import type { MessageContactsGroupAssignment } from "../components/ChatMessage";
 import { ContactCard } from "../components/ContactCard";
@@ -81,6 +80,10 @@ import { useArmedDeleteTimeouts } from "./hooks/useArmedDeleteTimeouts";
 import { useFiatRates } from "./hooks/useFiatRates";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
 import {
+  useContactsRepository,
+  useConversationsRepository,
+  useSetting,
+  useSettingsRepository,
   useShardIds,
   useShardRotation,
   useTransactionRecords,
@@ -95,10 +98,10 @@ import {
   buildIdentityChangeMessageWrapId,
 } from "./lib/identityChangeMessage";
 import {
-  buildDismissedOnboardingTutorialOwnerMetaPayload,
-  hasDismissedOnboardingTutorialOwnerMetaRow,
-  ONBOARDING_TUTORIAL_OWNER_META_SCOPE,
-} from "./lib/onboardingTutorialSync";
+  ONBOARDING_TUTORIAL_DISMISSED,
+  ONBOARDING_TUTORIAL_SETTING_KEY,
+} from "./lib/onboardingTutorial";
+import { runWrite } from "./lib/storeWrite";
 import { parsePrivateImageMessage } from "./lib/privateImageMessage";
 import { showPwaNotification } from "./lib/pwaNotifications";
 import {
@@ -127,7 +130,7 @@ export const useAppShellComposition = ({
   currentNsec,
   setCurrentNsec,
 }: UseAppShellCompositionParams) => {
-  const { insert, update, upsert } = useEvolu();
+  const { upsert } = useEvolu();
 
   const route = useRouting();
   const { dismissToast, toasts, pushToast } = useToasts();
@@ -137,13 +140,6 @@ export const useAppShellComposition = ({
     appOwnerId,
     appOwnerIdRef,
     appendIdentityChangeNoticesRef,
-    contactsOwnerEditCount,
-    contactsOwnerEditsUntilRotation,
-    contactsOwnerId,
-    contactsOwnerIndex,
-    contactsOwnerNewContactsCount,
-    contactsOwnerPointer,
-    contactsVisibleOwnerIds,
     currentNpub,
     historicalOwnerSetsReady,
     identityOwnerId,
@@ -160,10 +156,8 @@ export const useAppShellComposition = ({
     myProfileMetadataRef,
     nostrIdentityRows,
     requestLogout,
-    requestManualRotateContactsOwner,
     requestManualRotateMessagesOwner,
     requestPasteNostrKeys,
-    rotateContactsOwnerIsBusy,
     rotateMessagesOwnerIsBusy,
     seedMnemonic,
     slip39Seed,
@@ -181,18 +175,22 @@ export const useAppShellComposition = ({
     upsert,
   });
 
+  const contactsRepository = useContactsRepository();
+  const conversationsRepository = useConversationsRepository();
+  const settingsRepository = useSettingsRepository();
   const transactions = useTransactionsRepository();
   const transactionRecords = useTransactionRecords();
+  const contactShards = useShardIds("contacts");
+  const contactsShardRotation = useShardRotation("contacts");
   const transactionShards = useShardIds("transactions");
   const transactionsShardRotation = useShardRotation("transactions");
   const cashuShards = useShardIds("cashu");
   const cashuShardRotation = useShardRotation("cashu");
-  // The contacts lane and the cashu shard were one owner once; the debug
-  // button keeps rotating both until contacts cut over (#386).
+  // Contacts and tokens were one owner once; the debug button still rotates both.
   const rotateContactsAndCashuOwners = React.useCallback(async () => {
-    await requestManualRotateContactsOwner();
+    await contactsShardRotation.rotate();
     await cashuShardRotation.rotate();
-  }, [cashuShardRotation, requestManualRotateContactsOwner]);
+  }, [cashuShardRotation, contactsShardRotation]);
   const walletProofs = useWalletProofs();
 
   const {
@@ -435,36 +433,18 @@ export const useAppShellComposition = ({
     "pay" | "request"
   >("pay");
   const [payAmount, setPayAmount] = useState<string>("");
-  const onboardingTutorialOwnerId = isSeedLogin ? metaOwnerId : appOwnerId;
-  const onboardingTutorialOwnerMetaQuery = useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("ownerMeta")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue)
-          .where("scope", "=", ONBOARDING_TUTORIAL_OWNER_META_SCOPE),
-      ),
-    [],
-  );
-  const onboardingTutorialOwnerMetaRows = useQuery(
-    onboardingTutorialOwnerMetaQuery,
-  );
-  const contactsOnboardingDismissedSynced = React.useMemo(
-    () =>
-      hasDismissedOnboardingTutorialOwnerMetaRow(
-        onboardingTutorialOwnerMetaRows,
-        onboardingTutorialOwnerId,
-      ),
-    [onboardingTutorialOwnerId, onboardingTutorialOwnerMetaRows],
-  );
+  const contactsOnboardingDismissedSynced =
+    useSetting(ONBOARDING_TUTORIAL_SETTING_KEY) ===
+    ONBOARDING_TUTORIAL_DISMISSED;
   const persistContactsOnboardingDismissed = React.useCallback(() => {
-    if (!onboardingTutorialOwnerId) return;
     if (contactsOnboardingDismissedSynced) return;
-    upsert("ownerMeta", buildDismissedOnboardingTutorialOwnerMetaPayload(), {
-      ownerId: onboardingTutorialOwnerId,
-    });
-  }, [contactsOnboardingDismissedSynced, onboardingTutorialOwnerId, upsert]);
+    void runWrite(
+      settingsRepository.set(
+        ONBOARDING_TUTORIAL_SETTING_KEY,
+        ONBOARDING_TUTORIAL_DISMISSED,
+      ),
+    );
+  }, [contactsOnboardingDismissedSynced, settingsRepository]);
 
   const evoluHistoryAllowedOwnerIds = React.useMemo(() => {
     const ids = [
@@ -473,13 +453,13 @@ export const useAppShellComposition = ({
       ...messagesVisibleOwnerIds.map((ownerId) => ownerId.trim()),
       ...transactionShards.ownerIds,
       (metaOwnerId ?? "").trim(),
-      ...contactsVisibleOwnerIds.map((ownerId) => ownerId.trim()),
+      ...contactShards.ownerIds,
     ].filter(Boolean);
     return Array.from(new Set(ids));
   }, [
     appOwnerId,
     cashuShards.ownerIds,
-    contactsVisibleOwnerIds,
+    contactShards.ownerIds,
     messagesVisibleOwnerIds,
     metaOwnerId,
     transactionShards.ownerIds,
@@ -541,7 +521,6 @@ export const useAppShellComposition = ({
     bankPaymentOfferStaggerDelaySec,
     blockArchivedContact,
     blockUnknownContactFromChat,
-    canAddContact,
     addChatAttachments,
     canSaveNewRelay,
     chatAttachments,
@@ -646,16 +625,14 @@ export const useAppShellComposition = ({
     appOwnerIdRef,
     cashuProofs: walletProofs,
     contactPayBackToChatRef,
-    contactsOwnerId,
-    contactsOwnerNewContactsCount,
-    contactsVisibleOwnerIds,
+    contactsRepository,
+    conversationsRepository,
     copyText,
     currentNpub,
     currentNsec,
     formatDisplayedAmountText,
     historicalOwnerSetsReady,
     identityOwnerId,
-    insert,
     isSeedLogin,
     lang,
     legacyIdentitiesOwnerId,
@@ -678,8 +655,6 @@ export const useAppShellComposition = ({
     t,
     transactions,
     transactionsBootstrapSnapshot: transactionRecords,
-    update,
-    upsert,
   });
 
   React.useEffect(() => {
@@ -1059,12 +1034,11 @@ export const useAppShellComposition = ({
     contactsOnboardingHasBackedUpKeys,
     contactsOnboardingHasPaid,
     contactsOnboardingHasSentMessage,
-    contactsOwnerId,
+    contactsRepository,
     copyText,
     currentNpub,
     currentNsec,
     dispatchInboxEvent,
-    insert,
     lightningInvoiceAutoPayLimit,
     markCashuTokenExternalized,
     markCashuTokenIssued,
@@ -1172,18 +1146,16 @@ export const useAppShellComposition = ({
 
   const { exportAppData, handleImportAppDataFilePicked, requestImportAppData } =
     useAppDataTransfer<(typeof contacts)[number]>({
-      appOwnerId: contactsOwnerId,
       cashuOperations,
       cashuProofs,
       contacts,
+      contactsRepository,
       importCashuLegacyRows: cashuTransferLifecycle?.importLegacyRows ?? null,
       importCashuOperation: cashuTransferLifecycle?.importOperation ?? null,
       importCashuProofs: cashuTransferLifecycle?.importProofs ?? null,
       importDataFileInputRef,
-      insert,
       pushToast,
       t,
-      update,
     });
 
   const copyNostrKeys = async () => {
@@ -1492,7 +1464,8 @@ export const useAppShellComposition = ({
         pendingContactsGroupAssignment
           ? {
               messageId: pendingContactsGroupAssignment.messageId,
-              contactCount: pendingContactsGroupAssignment.savedContacts.length,
+              contactCount:
+                pendingContactsGroupAssignment.savedContactIds.length,
               groupNames,
               onAssign: assignPendingContactsToGroup,
               onDismiss: closeContactsGroupAssignment,
@@ -1644,7 +1617,6 @@ export const useAppShellComposition = ({
         dismissWalletWarning,
         handleMainSwipeTabChange: commitMainSwipe,
         mainSwipeRef,
-        canAddContact,
         openNewContactPage,
         openWalletScan,
         otherContactsLabel,
@@ -1697,12 +1669,8 @@ export const useAppShellComposition = ({
     evoluSettingsInput: {
       evoluCashuOwnerIndex: cashuShards.index,
       evoluCashuVisibleOwnerIds: cashuShards.ownerIds,
-      evoluContactsOwnerEditCount: contactsOwnerEditCount,
-      evoluContactsOwnerEditsUntilRotation: contactsOwnerEditsUntilRotation,
-      evoluContactsOwnerId: contactsOwnerId,
-      evoluContactsOwnerIndex: contactsOwnerIndex,
-      evoluContactsOwnerNewContactsCount: contactsOwnerNewContactsCount,
-      evoluContactsOwnerPointer: contactsOwnerPointer,
+      evoluContactsOwnerIndex: contactShards.index,
+      evoluContactsVisibleOwnerIds: contactShards.ownerIds,
       evoluDatabaseBytes: evoluDbInfo.info.bytes,
       evoluHasError,
       evoluErrorType: evoluLastError?.type ?? null,
@@ -1728,7 +1696,7 @@ export const useAppShellComposition = ({
       requestManualRotateTransactionsOwner: transactionsShardRotation.rotate,
       rotateCashuOwnerIsBusy: cashuShardRotation.isBusy,
       rotateContactsOwnerIsBusy:
-        rotateContactsOwnerIsBusy || cashuShardRotation.isBusy,
+        contactsShardRotation.isBusy || cashuShardRotation.isBusy,
       rotateMessagesOwnerIsBusy,
       rotateTransactionsOwnerIsBusy: transactionsShardRotation.isBusy,
       saveEvoluServerUrls,

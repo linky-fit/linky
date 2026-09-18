@@ -4,7 +4,8 @@ import type { WrapInboxEvent } from "@linky/linkstr";
 import { fetchWrapEventAtom, useAtomSet } from "@linky/linkstr-react";
 import { Exit, Schema } from "effect";
 import React from "react";
-import type { CashuOperationId, useEvolu } from "../../../evolu";
+import type { ContactsRepository } from "@linky/linksync";
+import type { CashuOperationId } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import {
   cancelNativeNfcWrite,
@@ -49,7 +50,6 @@ import {
 } from "../../lib/tokenText";
 import type { useCashuWalletComposition } from "./useCashuWalletComposition";
 import type { useContactsMessagingComposition } from "./useContactsMessagingComposition";
-import type { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 import type { Translate } from "../../../i18n";
 
 type CashuWalletCompositionResult = ReturnType<
@@ -57,10 +57,6 @@ type CashuWalletCompositionResult = ReturnType<
 >;
 type ContactsMessagingCompositionResult = ReturnType<
   typeof useContactsMessagingComposition
->;
-type EvoluMutations = ReturnType<typeof useEvolu>;
-type IdentityOwnersCompositionResult = ReturnType<
-  typeof useIdentityOwnersComposition
 >;
 
 const isWrapId = Schema.is(WrapId);
@@ -99,12 +95,11 @@ interface UseScanNativeCompositionParams {
   contactsOnboardingHasBackedUpKeys: ContactsMessagingCompositionResult["contactsOnboardingHasBackedUpKeys"];
   contactsOnboardingHasPaid: ContactsMessagingCompositionResult["contactsOnboardingHasPaid"];
   contactsOnboardingHasSentMessage: ContactsMessagingCompositionResult["contactsOnboardingHasSentMessage"];
-  contactsOwnerId: IdentityOwnersCompositionResult["contactsOwnerId"];
+  contactsRepository: Pick<ContactsRepository, "insert">;
   copyText: (value: string) => Promise<void>;
   currentNpub: string | null;
   currentNsec: string | null;
   dispatchInboxEvent: DispatchInboxEvent;
-  insert: EvoluMutations["insert"];
   lightningInvoiceAutoPayLimit: CashuWalletCompositionResult["lightningInvoiceAutoPayLimit"];
   markCashuTokenExternalized: CashuWalletCompositionResult["markCashuTokenExternalized"];
   markCashuTokenIssued: CashuWalletCompositionResult["markCashuTokenIssued"];
@@ -135,12 +130,11 @@ export const useScanNativeComposition = ({
   contactsOnboardingHasBackedUpKeys,
   contactsOnboardingHasPaid,
   contactsOnboardingHasSentMessage,
-  contactsOwnerId,
+  contactsRepository,
   copyText,
   currentNpub,
   currentNsec,
   dispatchInboxEvent,
-  insert,
   lightningInvoiceAutoPayLimit,
   markCashuTokenExternalized,
   markCashuTokenIssued,
@@ -615,12 +609,11 @@ export const useScanNativeComposition = ({
   );
 
   const handleScannedText = useScannedTextHandler<(typeof contacts)[number]>({
-    appOwnerId: contactsOwnerId,
     closeScan,
     contacts,
+    contactsRepository,
     currentNpub,
     extractCashuTokenFromText,
-    insert,
     lightningInvoiceAutoPayLimit,
     onContactIdentifierScanned:
       route.kind === "contactNew" ? handleContactIdentifierScanned : null,

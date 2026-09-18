@@ -82,16 +82,13 @@ export const useIdentityOwnersComposition = ({
     upsert,
   });
 
-  useOwner(ownerRotation.contactsSyncOwner);
   useOwner(ownerRotation.messagesSyncOwner);
   useOwner(ownerRotation.metaSyncOwner);
   useOwner(ownerRotation.identitySyncOwner);
 
   const historicalOwnerSetsReady = profileAuth.isSeedLogin
-    ? ownerRotation.contactsVisibleOwnerIds.length ===
-        ownerRotation.contactsOwnerIndex + 1 &&
-      ownerRotation.messagesVisibleOwnerIds.length ===
-        ownerRotation.messagesOwnerIndex + 1
+    ? ownerRotation.messagesVisibleOwnerIds.length ===
+      ownerRotation.messagesOwnerIndex + 1
     : true;
   React.useEffect(() => {
     if (!profileAuth.isSeedLogin || !historicalOwnerSetsReady) return;

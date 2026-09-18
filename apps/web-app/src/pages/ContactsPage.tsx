@@ -9,7 +9,6 @@ import type { Translate } from "../i18n";
 interface ContactsPageProps {
   activeGroup: string | null;
   bottomTabActive: "contacts" | "wallet" | null;
-  canAddContact?: boolean;
   contactsSearch: string;
   contactsSearchInputRef: React.RefObject<HTMLInputElement | null>;
   conversationsLabel: string;
@@ -36,7 +35,6 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
   ({
     activeGroup,
     bottomTabActive,
-    canAddContact = true,
     contactsSearch,
     contactsSearchInputRef,
     conversationsLabel,
@@ -169,9 +167,8 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
         {showFab ? (
           <button
             type="button"
-            className={`contacts-fab${canAddContact ? "" : " is-disabled"}`}
+            className="contacts-fab"
             onClick={openNewContactPage}
-            aria-disabled={!canAddContact}
             aria-label={t("addContact")}
             title={t("addContact")}
             data-guide="contact-add-button"
