@@ -26,6 +26,10 @@ import {
   RECURRING_RUN_RETRY_DELAY_SEC,
   type RecurringTickAction,
 } from "../../lib/recurringPaymentTick";
+import {
+  nextRecurringOccurrenceAfter,
+  resolveTimeZone,
+} from "../../lib/recurringSchedule";
 import type {
   ContactRowLike,
   NewLocalNostrMessage,
@@ -53,6 +57,19 @@ type UpdateRecurringPayment = (
 interface PayContactResult {
   ok: boolean;
   error?: string;
+}
+
+export interface RecurringPaymentsScheduler {
+  /** One scheduler pass over every order. */
+  runNow: () => Promise<void>;
+  /**
+   * Pay one order right away, consuming its pending period. Resolves to what
+   * happened so the caller can tell the user; `busy` means the wallet was
+   * occupied and nothing was attempted.
+   */
+  runOrderNow: (
+    orderId: string,
+  ) => Promise<"paid" | "failed" | "busy" | "missing">;
 }
 
 interface UseRecurringPaymentsSchedulerParams {
@@ -127,7 +144,7 @@ export const useRecurringPaymentsScheduler = ({
   t,
   update,
   updateLocalNostrMessage,
-}: UseRecurringPaymentsSchedulerParams): { runNow: () => Promise<void> } => {
+}: UseRecurringPaymentsSchedulerParams): RecurringPaymentsScheduler => {
   const latest = useLatest({
     appendLocalNostrMessage,
     cashuBalance,
@@ -265,7 +282,7 @@ export const useRecurringPaymentsScheduler = ({
     async (
       row: RecurringPaymentRowLike,
       action: Extract<RecurringTickAction, { kind: "run" }>,
-    ): Promise<void> => {
+    ): Promise<"paid" | "failed"> => {
       const { order, advance, dueAtSec } = action;
       const startedAtSec = nowSec();
       const recurringRun: RecurringRunRef = {
@@ -291,7 +308,7 @@ export const useRecurringPaymentsScheduler = ({
             links: orderLinks(order),
             payload: { dueAtSec, reason: "invalidRecipient" },
           });
-          return;
+          return "failed";
         }
         patchOrder(row, {
           lastRunAtSec: startedAtSec,
@@ -327,7 +344,7 @@ export const useRecurringPaymentsScheduler = ({
           latest.current.setCashuIsBusy(false);
         }
         settleRun(row, action, outcome, startedAtSec);
-        return;
+        return outcome.ok ? "paid" : "failed";
       }
 
       patchOrder(row, {
@@ -353,8 +370,58 @@ export const useRecurringPaymentsScheduler = ({
         paid ? { ok: true } : { ok: false, error },
         startedAtSec,
       );
+      return paid ? "paid" : "failed";
     },
     [latest, nowSec, patchOrder, sendChatNote, settleRun],
+  );
+
+  const loadOrders = React.useCallback(async () => {
+    const rows = await evolu.loadQuery(ordersQuery);
+    const rowsById = new Map<string, RecurringPaymentRowLike>();
+    const orders: RecurringPaymentOrder[] = [];
+    for (const row of rows) {
+      const order = readRecurringPaymentOrder(row);
+      if (order === null) continue;
+      rowsById.set(order.id, row);
+      orders.push(order);
+    }
+    return { orders, rowsById };
+  }, [ordersQuery]);
+
+  const runOrderNow = React.useCallback(
+    async (orderId: string) => {
+      if (tickInFlightRef.current) await tickInFlightRef.current;
+      if (latest.current.cashuIsBusy) return "busy";
+      const { orders, rowsById } = await loadOrders();
+      const order = orders.find((candidate) => candidate.id === orderId);
+      const row = rowsById.get(orderId);
+      if (!order || !row) return "missing";
+      const now = nowSec();
+      // Paying early consumes the pending period: the next due time is the
+      // first one after whichever is later, now or the pending due time.
+      const { schedule } = order;
+      const next = nextRecurringOccurrenceAfter(
+        schedule.anchorAtSec,
+        schedule.interval,
+        Math.max(now, schedule.nextDueAtSec),
+        resolveTimeZone(schedule.timeZone),
+      );
+      const pass = executeRun(row, {
+        kind: "run",
+        order,
+        dueAtSec: now,
+        missedCount: 0,
+        advance: {
+          nextDueAtSec: next.dueAtSec,
+          runCount: schedule.runCount + 1,
+        },
+      }).finally(() => {
+        tickInFlightRef.current = null;
+      });
+      tickInFlightRef.current = pass.then(() => undefined);
+      return pass;
+    },
+    [executeRun, latest, loadOrders, nowSec],
   );
 
   const tick = React.useCallback(async (): Promise<void> => {
@@ -363,15 +430,7 @@ export const useRecurringPaymentsScheduler = ({
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
 
     const pass = (async () => {
-      const rows = await evolu.loadQuery(ordersQuery);
-      const rowsById = new Map<string, RecurringPaymentRowLike>();
-      const orders: RecurringPaymentOrder[] = [];
-      for (const row of rows) {
-        const order = readRecurringPaymentOrder(row);
-        if (order === null) continue;
-        rowsById.set(order.id, row);
-        orders.push(order);
-      }
+      const { orders, rowsById } = await loadOrders();
       if (orders.length === 0) return;
 
       const now = nowSec();
@@ -443,7 +502,7 @@ export const useRecurringPaymentsScheduler = ({
       });
     tickInFlightRef.current = pass;
     return pass;
-  }, [deviceId, executeRun, latest, nowSec, ordersQuery, patchOrder]);
+  }, [deviceId, executeRun, latest, loadOrders, nowSec, patchOrder]);
 
   React.useEffect(() => {
     if (!enabled) return;
@@ -462,5 +521,5 @@ export const useRecurringPaymentsScheduler = ({
     };
   }, [enabled, tick, tickIntervalMs]);
 
-  return { runNow: tick };
+  return { runNow: tick, runOrderNow };
 };

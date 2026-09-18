@@ -181,7 +181,9 @@ const RoutePage = (): React.ReactElement => {
     case "recurringPayments":
       return <RecurringPaymentsPage />;
     case "recurringPaymentNew":
-      return <RecurringPaymentNewPage />;
+      // The prefill lives in the hash query, which is not part of `route`;
+      // keying on it gives each "Repeat regularly…" entry a fresh form.
+      return <RecurringPaymentNewPage key={globalThis.location?.hash ?? ""} />;
     case "recurringPayment":
       return <RecurringPaymentPage id={route.id} />;
     case "topupNoAmount":

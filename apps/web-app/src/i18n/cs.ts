@@ -36,7 +36,7 @@ export const cs = {
   recurringTitleLabel: "Název",
   recurringRecipientLabel: "Příjemce",
   recurringSelectContact: "Vyberte kontakt…",
-  recurringAmountLabel: "Částka (sat)",
+  recurringAmountLabel: "Částka",
   recurringIntervalLabel: "Opakovat",
   recurringEveryPrefix: "každých",
   recurringUnitHours: "hodin",
@@ -76,6 +76,17 @@ export const cs = {
   recurringBindToThisDevice: "Platit z tohoto zařízení",
   recurringRepeatPayment: "Opakovat pravidelně…",
   recurringNotFound: "Trvalý příkaz nenalezen.",
+  recurringEmptyHint:
+    "Založte příkaz z platby kontaktu nebo Lightning adresy volbou „Opakovat pravidelně…“, nebo tlačítkem plus.",
+  recurringChangeRecipient: "Změnit příjemce",
+  recurringTitlePlaceholder: "např. Nájem",
+  recurringMaxRunsPlaceholder: "bez omezení",
+  recurringStatusActive: "aktivní",
+  recurringOtherDeviceHint:
+    "Tento příkaz platí jiné zařízení. Převzít ho sem znamená, že platby budou odcházet z této peněženky.",
+  recurringWalletBusy:
+    "Peněženka je zrovna zaneprázdněná, zkuste to za chvíli.",
+  recurringRunFailedToast: "Platba trvalého příkazu se nezdařila.",
   showTransactions: "Ukázat transakce",
   feedback: "Zpětná vazba",
   donate: "Přispět",

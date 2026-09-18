@@ -1,5 +1,5 @@
 import * as Evolu from "@evolu/common";
-import { act } from "react";
+import React, { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type { ContactRowLike } from "../../types/appTypes";
@@ -228,6 +228,72 @@ describe("useRecurringPaymentsScheduler", () => {
         lastRunAtSec: NOW,
         lastRunStatus: "skipped",
         nextDueAtSec: DUE + 6 * HOUR,
+        runCount: 1,
+      },
+      { ownerId: owner.id },
+    );
+    await view.unmount();
+  });
+
+  it("pays an order on demand and consumes its pending period", async () => {
+    const future = DUE + 5 * HOUR; // not due yet
+    loadQueryMock.mockResolvedValue([orderRow({ nextDueAtSec: future })]);
+    const params: Params = {
+      appendLocalNostrMessage: vi.fn(() => "local-1"),
+      cashuBalance: 1_000,
+      cashuIsBusy: false,
+      contacts: [contact],
+      currentNsec: null,
+      enabled: true,
+      enqueueOutbox: null,
+      payContactWithCashuMessage: vi.fn(async () => ({ ok: true })),
+      payLightningAddressWithCashu: vi.fn(async () => true),
+      setCashuIsBusy: vi.fn(),
+      t: (key) => key,
+      update: vi.fn<Params["update"]>(),
+      updateLocalNostrMessage: vi.fn(),
+      dependencies: { deviceId: "device-a", nowSec: () => NOW },
+    };
+    let scheduler: ReturnType<typeof useRecurringPaymentsScheduler> | null =
+      null;
+    const Probe = ({
+      onReady,
+    }: {
+      onReady: (
+        value: ReturnType<typeof useRecurringPaymentsScheduler>,
+      ) => void;
+    }) => {
+      const value = useRecurringPaymentsScheduler(params);
+      React.useEffect(() => onReady(value), [onReady, value]);
+      return null;
+    };
+    const view = await renderIntoDocument(
+      <Probe
+        onReady={(value) => {
+          scheduler = value;
+        }}
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(params.payContactWithCashuMessage).not.toHaveBeenCalled();
+
+    let outcome: string | null = null;
+    await act(async () => {
+      outcome = (await scheduler?.runOrderNow("rp-1")) ?? null;
+    });
+    expect(outcome).toBe("paid");
+    expect(params.payContactWithCashuMessage).toHaveBeenCalledTimes(1);
+    expect(params.update).toHaveBeenNthCalledWith(
+      1,
+      "recurringPayment",
+      {
+        id: "rp-1",
+        lastRunAtSec: NOW,
+        lastRunStatus: "running",
+        // The pending 5 h slot is consumed: next is the one after it.
+        nextDueAtSec: future + HOUR,
         runCount: 1,
       },
       { ownerId: owner.id },

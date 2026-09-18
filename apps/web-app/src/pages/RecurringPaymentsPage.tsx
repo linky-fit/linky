@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import {
@@ -52,7 +53,7 @@ export function RecurringPaymentsPage(): React.ReactElement {
       <button
         type="button"
         key={order.id}
-        className="transaction-card recurring-order-card"
+        className={`transaction-card recurring-order-card${state === "active" ? "" : " is-unsuccessful"}`}
         onClick={() => navigateTo({ route: "recurringPayment", id: order.id })}
       >
         <article className="transaction-row">
@@ -72,9 +73,13 @@ export function RecurringPaymentsPage(): React.ReactElement {
           </div>
           <div className="transaction-main">
             <div className="transaction-title">{order.title}</div>
-            <div className="transaction-subtitle">
-              {recurringRecipientLabel(order, contacts)} ·{" "}
-              {describeRecurringInterval(order.schedule.interval, t)}
+            <div className="transaction-meta recurring-order-recipient">
+              <span className="recurring-truncate">
+                {recurringRecipientLabel(order, contacts)}
+              </span>
+              <span>
+                · {describeRecurringInterval(order.schedule.interval, t)}
+              </span>
             </div>
             <div className="transaction-meta">
               {state === "active" ? (
@@ -101,22 +106,27 @@ export function RecurringPaymentsPage(): React.ReactElement {
   };
 
   return (
-    <section className="panel panel-plain recurring-payments-page">
-      <p className="muted">{t("recurringOnlyWhileOpen")}</p>
-      {orders.length === 0 ? (
-        <p className="muted">{t("recurringEmpty")}</p>
-      ) : (
-        <div className="transactions-list">{orders.map(renderOrder)}</div>
-      )}
-      <div className="actions">
-        <button
-          type="button"
-          className="btn-wide"
-          onClick={() => navigateTo({ route: "recurringPaymentNew" })}
-        >
-          {t("recurringPaymentNewTitle")}
-        </button>
-      </div>
-    </section>
+    <>
+      <section className="panel panel-plain recurring-payments-page">
+        {orders.length === 0 ? (
+          <div className="recurring-empty">
+            <p className="muted">{t("recurringEmpty")}</p>
+            <p className="muted recurring-hint">{t("recurringEmptyHint")}</p>
+          </div>
+        ) : (
+          <div className="transactions-list">{orders.map(renderOrder)}</div>
+        )}
+        <p className="muted recurring-hint">{t("recurringOnlyWhileOpen")}</p>
+      </section>
+      <button
+        type="button"
+        className="contacts-fab"
+        onClick={() => navigateTo({ route: "recurringPaymentNew" })}
+        aria-label={t("recurringPaymentNewTitle")}
+        title={t("recurringPaymentNewTitle")}
+      >
+        <Plus className="contacts-fab-svgIcon" aria-hidden="true" />
+      </button>
+    </>
   );
 }

@@ -3,7 +3,10 @@ import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { ContactId, RecurringPaymentId } from "../../../evoluIds";
 import { nowSeconds } from "../../../utils/time";
+import type { Translate } from "../../../i18n";
+import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { getDeviceId } from "../../lib/deviceId";
+import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
 import type {
   RecurringPaymentOrder,
   RecurringPaymentRecipient,
@@ -42,8 +45,12 @@ export interface RecurringPaymentsActions {
 }
 
 interface UseRecurringPaymentsActionsParams {
+  formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   insert: EvoluMutations["insert"];
-  runSchedulerNow: () => Promise<void>;
+  pushToast: (message: string) => void;
+  runOrderNow: RecurringPaymentsScheduler["runOrderNow"];
+  showPaidOverlay: (title: string) => void;
+  t: Translate;
   transactionsOwnerId: Evolu.OwnerId | null;
   update: EvoluMutations["update"];
 }
@@ -71,8 +78,12 @@ const orderKeys = (
  * lane-routed table. Deleting is a two-tap armed action.
  */
 export const useRecurringPaymentsActions = ({
+  formatDisplayedAmountParts,
   insert,
-  runSchedulerNow,
+  pushToast,
+  runOrderNow,
+  showPaidOverlay,
+  t,
   transactionsOwnerId,
   update,
 }: UseRecurringPaymentsActionsParams): RecurringPaymentsActions => {
@@ -223,20 +234,36 @@ export const useRecurringPaymentsActions = ({
     async (order: RecurringPaymentOrder): Promise<void> => {
       const keys = orderKeys(order);
       if (!keys) return;
-      // Making the order due now keeps the anchor grid: the scheduler pays
-      // once and moves on to the next regular due time.
-      update(
-        "recurringPayment",
-        {
-          id: keys.id,
-          nextDueAtSec: nowSeconds(),
-          executorDeviceId: deviceId,
-        },
-        keys.options,
-      );
-      await runSchedulerNow();
+      if (order.executorDeviceId !== deviceId) {
+        update(
+          "recurringPayment",
+          { id: keys.id, executorDeviceId: deviceId },
+          keys.options,
+        );
+      }
+      const outcome = await runOrderNow(order.id);
+      if (outcome === "paid") {
+        const amount = formatDisplayedAmountParts(order.amountSat);
+        showPaidOverlay(
+          t("paidSent")
+            .replace("{amount}", `${amount.approxPrefix}${amount.amountText}`)
+            .replace("{unit}", amount.unitLabel),
+        );
+      } else if (outcome === "busy") {
+        pushToast(t("recurringWalletBusy"));
+      } else if (outcome === "failed") {
+        pushToast(t("recurringRunFailedToast"));
+      }
     },
-    [deviceId, runSchedulerNow, update],
+    [
+      deviceId,
+      formatDisplayedAmountParts,
+      pushToast,
+      runOrderNow,
+      showPaidOverlay,
+      t,
+      update,
+    ],
   );
 
   return {

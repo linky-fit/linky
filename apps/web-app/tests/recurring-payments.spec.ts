@@ -110,7 +110,7 @@ test("a due standing order pays the contact once and shows up in history", async
       String(ORDER_SAT),
     );
     await a.page.locator("#recurringTitle").fill("Coffee");
-    await a.page.locator("#recurringIntervalUnit").selectOption("hour");
+    await a.page.getByRole("button", { name: "hour(s)" }).click();
     await a.page
       .locator("#recurringFirstRun")
       .fill(dateTimeLocal(new Date(Date.now() - 2 * 60_000)));
