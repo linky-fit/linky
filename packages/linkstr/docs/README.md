@@ -36,6 +36,7 @@ Never published:
 - [Inbox](./inbox.md) — the single gift-wrap subscription, the event union, cursors, and one-shot fetch
 - [Outbox](./outbox.md) — the durable send queue with retry and backoff
 - [Identity and keys](./identity-and-keys.md) — key codecs and the identity service
+- [NIP-05](./nip05.md) — resolve a `name@domain` identifier to a pubkey and relay hints
 - [Push inbox](./push-inbox.md) — identity-free wrap routing for the push server
 - [Relay health](./relay-health.md) — per-relay status derived from traffic
 - [Inspector](./inspector.md) — diagnostics events and how to consume them

@@ -1,21 +1,12 @@
-import { isRecord } from "./unknown";
-import { asNonEmptyString } from "./validation";
-import { encodeNpub, parsePubkey, RelayUrl } from "@linky/linkstr";
-import { Schema } from "effect";
-import { stripNostrUriPrefix } from "./nostrNpub";
+import {
+  decodeNip05Document,
+  encodeNpub,
+  nip05WellKnownUrl,
+  parseNip05Identifier,
+  type Nip05Identifier,
+} from "@linky/linkstr";
 
 export const DEFAULT_NIP05_DOMAIN = "linky.fit";
-
-const NIP05_LOCAL_PART_RE = /^[a-z0-9._-]+$/i;
-const NIP05_DOMAIN_RE = /^[a-z0-9.-]+$/i;
-
-const isRelayUrl = Schema.is(RelayUrl);
-
-interface Nip05Identifier {
-  domain: string;
-  identifier: string;
-  localPart: string;
-}
 
 type Nip05ResolutionResult =
   | {
@@ -28,99 +19,16 @@ type Nip05ResolutionResult =
   | { identifier: Nip05Identifier; kind: "error"; message: string }
   | { kind: "none" };
 
-const looksLikeDirectNpub = (value: string): boolean => {
-  const normalized = stripNostrUriPrefix(value);
-  const atIndex = normalized.lastIndexOf("@");
-  const candidate = atIndex >= 0 ? normalized.slice(0, atIndex) : normalized;
-  return /^npub1/i.test(candidate.trim());
-};
-
-const normalizeLocalPart = (value: string): string | null => {
-  const localPart = value.trim().toLowerCase();
-  if (!localPart) return null;
-  if (!NIP05_LOCAL_PART_RE.test(localPart)) return null;
-  return localPart;
-};
-
-const normalizeDomain = (value: string): string | null => {
-  const domain = value.trim().toLowerCase();
-  if (!domain) return null;
-  if (!NIP05_DOMAIN_RE.test(domain)) return null;
-  if (domain.includes("..")) return null;
-
-  try {
-    const url = new URL(`https://${domain}`);
-    if (url.hostname !== domain) return null;
-    return domain;
-  } catch {
-    return null;
-  }
-};
-
 export const parseNip05IdentifierInput = (
   value: string,
-): Nip05Identifier | null => {
-  const input = stripNostrUriPrefix(value);
-  if (!input) return null;
-  if (looksLikeDirectNpub(input)) return null;
-
-  const atIndex = input.indexOf("@");
-  if (atIndex >= 0) {
-    if (atIndex !== input.lastIndexOf("@")) return null;
-
-    const localPart = normalizeLocalPart(input.slice(0, atIndex));
-    const domain = normalizeDomain(input.slice(atIndex + 1));
-    if (!localPart || !domain) return null;
-
-    return {
-      domain,
-      identifier: `${localPart}@${domain}`,
-      localPart,
-    };
-  }
-
-  const localPart = normalizeLocalPart(input);
-  if (!localPart) return null;
-
-  return {
-    domain: DEFAULT_NIP05_DOMAIN,
-    identifier: `${localPart}@${DEFAULT_NIP05_DOMAIN}`,
-    localPart,
-  };
-};
+): Nip05Identifier | null => parseNip05Identifier(value, DEFAULT_NIP05_DOMAIN);
 
 export const getDefaultNip05IdentifierFromAddress = (
   value: string,
 ): string | null => {
-  const input = stripNostrUriPrefix(value);
-  const atIndex = input.indexOf("@");
-  if (atIndex < 0 || atIndex !== input.lastIndexOf("@")) return null;
-
-  const localPart = normalizeLocalPart(input.slice(0, atIndex));
-  const domain = normalizeDomain(input.slice(atIndex + 1));
-  if (!localPart || domain !== DEFAULT_NIP05_DOMAIN) return null;
-
-  return `${localPart}@${DEFAULT_NIP05_DOMAIN}`;
-};
-
-const readRelays = (value: unknown, pubkeyHex: string): string[] => {
-  if (!isRecord(value)) return [];
-
-  const rawList = value[pubkeyHex];
-  if (!Array.isArray(rawList)) return [];
-
-  const out: string[] = [];
-  const seen = new Set<string>();
-
-  for (const item of rawList) {
-    const relay = asNonEmptyString(item);
-    if (!relay || !isRelayUrl(relay)) continue;
-    if (seen.has(relay)) continue;
-    seen.add(relay);
-    out.push(relay);
-  }
-
-  return out;
+  const identifier = parseNip05Identifier(value);
+  if (!identifier || identifier.domain !== DEFAULT_NIP05_DOMAIN) return null;
+  return identifier.identifier;
 };
 
 const resolveNip05Identifier = async (
@@ -129,8 +37,7 @@ const resolveNip05Identifier = async (
 ): Promise<Nip05ResolutionResult> => {
   if (options?.signal?.aborted) return { identifier, kind: "not_found" };
 
-  const url = new URL(`https://${identifier.domain}/.well-known/nostr.json`);
-  url.searchParams.set("name", identifier.localPart);
+  const url = nip05WellKnownUrl(identifier);
 
   try {
     const init: RequestInit = {
@@ -145,22 +52,14 @@ const resolveNip05Identifier = async (
     }
 
     const body: unknown = await response.json();
-    if (!isRecord(body)) return { identifier, kind: "not_found" };
-
-    const names = body.names;
-    if (!isRecord(names)) return { identifier, kind: "not_found" };
-
-    const rawPubkey = asNonEmptyString(names[identifier.localPart]);
-    const pubkeyHex = parsePubkey(rawPubkey?.toLowerCase() ?? "");
-    if (!pubkeyHex) {
-      return { identifier, kind: "not_found" };
-    }
+    const resolution = decodeNip05Document(body, identifier);
+    if (!resolution) return { identifier, kind: "not_found" };
 
     return {
       identifier,
       kind: "resolved",
-      npub: encodeNpub(pubkeyHex),
-      relays: readRelays(body.relays, pubkeyHex),
+      npub: encodeNpub(resolution.pubkey),
+      relays: [...resolution.relays],
     };
   } catch (error) {
     if (options?.signal?.aborted) return { identifier, kind: "not_found" };

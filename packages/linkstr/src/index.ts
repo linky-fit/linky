@@ -16,6 +16,7 @@ export * from "./domain/errors";
 export * from "./domain/primitives";
 export * from "./headless";
 export * from "./identity/codec";
+export * from "./nip05/nip05";
 export {
   makeBlossomUploadAuthHeader,
   makeNip98AuthHeader,
