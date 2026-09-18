@@ -259,6 +259,8 @@ export const en = {
   evoluMessagesOwnerRotate: "Rotate messages owner",
   evoluMessagesOwnerRotating: "Rotating messages owner…",
   evoluTransactionsOwnerRotated: "Transactions owner rotated",
+  migratingDataTitle: "Migrating data",
+  migratingDataBody: "This takes a moment. Keep the app open.",
   evoluTransactionsOwnerRotate: "Rotate transactions owner",
   evoluTransactionsOwnerRotating: "Rotating transactions owner…",
   evoluCashuOwnerRotated: "Tokens owner rotated",

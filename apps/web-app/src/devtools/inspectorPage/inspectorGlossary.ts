@@ -22,6 +22,18 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A Nostr contact was saved after duplicate and active owner limit checks. The contact link identifies the new row.",
   "evolu.ownerRotated":
     "The active write owner moved to the next lane. Previous lanes remain visible for reads; owner links join the rotation to sync diagnostics.",
+  LaneMigrationStarted:
+    "First launch on this device after the shard storage update: the old owner lanes are about to be copied into the per-scope shards. Owner links list the legacy lanes read.",
+  LaneMigrationScopeIngested:
+    "One scope of the lane migration finished: how many rows of each table were copied into the active shard and how many were skipped (a required column missing, a reaction without its message).",
+  LaneMigrationDone:
+    "The lane migration finished. The payload carries the synced cutoff, the shard pointers written, and the per-table counts; the grace period for older app versions starts at the cutoff.",
+  LaneGracePeriodReingestStarted:
+    "A later launch inside the grace period: the old lanes are read again so rows written by an older app version reach the shards.",
+  LaneGracePeriodReingested:
+    "The grace-period re-ingest finished; counts show which lane rows were newer than their shard copies.",
+  "evolu.laneMigrationFailed":
+    "The lane migration threw before it could finish; the done flag stays unset and the next launch retries. The app keeps running on the lanes meanwhile.",
   EvoluSyncRetry:
     "The user reloads the app to retry Evolu sync after a quota or server configuration change. Local history is preserved.",
   EvoluError:

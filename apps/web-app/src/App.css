@@ -6302,6 +6302,32 @@ dd {
   }
 }
 
+.migrating-data-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.migrating-data-spinner {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.migrating-data-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.migrating-data-body {
+  margin: 0;
+  color: #94a3b8;
+}
+
 .danger-armed {
   background: var(--app-danger-button-bg) !important;
   color: #f8fafc !important;

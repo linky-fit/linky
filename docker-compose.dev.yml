@@ -121,6 +121,8 @@ services:
         VITE_MAIN_MINT_URL: http://localhost:3338
         VITE_NPUB_CASH_DISABLED: "true"
         VITE_PUSH_SERVER_URL: http://localhost:8787
+        # Installs window.__linkyE2E, the seed/read hooks the Playwright suites use.
+        VITE_E2E: "1"
     ports:
       - "5176:80"
     healthcheck:

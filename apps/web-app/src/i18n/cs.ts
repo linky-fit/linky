@@ -263,6 +263,8 @@ export const cs = {
   evoluMessagesOwnerRotate: "Přesunout zprávy na nového ownera",
   evoluMessagesOwnerRotating: "Přepínám zprávy na nového ownera…",
   evoluTransactionsOwnerRotated: "Transactions owner byl otočen",
+  migratingDataTitle: "Převádím data",
+  migratingDataBody: "Chvíli to potrvá. Nezavírej aplikaci.",
   evoluTransactionsOwnerRotate: "Přepnout transakce na nového ownera",
   evoluTransactionsOwnerRotating: "Přepínám transakce na nového ownera…",
   evoluCashuOwnerRotated: "Owner tokenů byl otočen",

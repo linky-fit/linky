@@ -69,8 +69,12 @@ Rows in an owner outside a scope's shard set (the old BIP-85 lanes, or an older 
 | `shardPointerId`          | the scope name             | one pointer row per scope, upserted by every device    |
 | `createId`                | random                     | everything else                                        |
 
-## Open items for the migration (#383)
+## The migration (#383)
 
-- Transaction `category` is dropped and derived from `method`; legacy rows whose category cannot be derived (a `contacts` category with a null method) need `method` filled in during the migration or they read as `cashu`.
-- Identity rows were written with random ids per lane; the migration writes the newest one as `activeNostrIdentityId`.
-- `conversation` rows are built from the contact chat columns (`archivedAtSec`, `chatLastSeenAtSec`, `chatPeerSeenSinceSec`, `chatPeerSeenAtSec`) with `directConversationIdFor(contact.id)`, and every message's `contactId` becomes that conversation id.
+The app's `laneToShardMigration.ts` copies the old owner lanes into the shards with `ShardStore.ingest`; the package only supplies the ids and the ingest. What it decided:
+
+- Transaction `category` is dropped. A legacy row with a category but no method gets the method the category implies: `contacts` becomes `cashu_chat`, `lightning` becomes `lightning_invoice` (the original lightning flow, before addresses). Any other row reads as `cashu` through `deriveTransactionCategory`.
+- Identity rows had one id per lane; the newest row is written as `activeNostrIdentityId`.
+- One `conversation` row per contact that has chat columns (`archivedAtSec`, `chatLastSeenAtSec`, `chatPeerSeenSinceSec`, `chatPeerSeenAtSec`) or messages, with `directConversationIdFor(contact.id)`; every message's `contactId` becomes that conversation id, and a reaction takes the conversation of the message its `messageId` names (a reaction without a known message is skipped).
+- Shard pointers start at index 0 for every rotating scope.
+- The grace period for older app versions, its cutoff setting, and the removal gate are recorded in `docs/architecture.md` at the repo root.

@@ -26,6 +26,7 @@
     "@gandlaf21/bc-ur": "1.1.12",
     "@linky/identity": "workspace:*",
     "@linky/linkshu": "workspace:*",
+    "@linky/linksync": "workspace:*",
     "@linky/linkstr": "workspace:*",
     "@linky/linkstr-react": "workspace:*",
     "@noble/hashes": "^1.5.0",

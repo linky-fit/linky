@@ -268,6 +268,8 @@ export const de = {
   evoluMessagesOwnerRotate: "Nachrichteneigentümer wechseln",
   evoluMessagesOwnerRotating: "Nachrichteneigentümer wird gewechselt…",
   evoluTransactionsOwnerRotated: "Transaktionseigentümer gewechselt",
+  migratingDataTitle: "Daten werden migriert",
+  migratingDataBody: "Das dauert einen Moment. Lass die App geöffnet.",
   evoluTransactionsOwnerRotate: "Transaktionseigentümer wechseln",
   evoluTransactionsOwnerRotating: "Transaktionseigentümer wird gewechselt…",
   evoluCashuOwnerRotated: "Token-Eigentümer gewechselt",

@@ -1,8 +1,18 @@
-import { ContactId, TransactionId } from "./evoluIds";
+import { ContactId } from "./evoluIds";
 export { ContactId, TransactionId } from "./evoluIds";
 import { Schema as EffectSchema } from "effect";
 import * as Evolu from "@evolu/common";
 import { createEvolu, SimpleName } from "@evolu/common";
+import {
+  appOwnerFromMnemonic,
+  createLinkyStore,
+  LinkySchema,
+  type CashuOperationId,
+  type CashuProofId,
+  type LinkyStore,
+  type NostrIdentityId,
+} from "@linky/linksync";
+import { createEvoluShardDb } from "@linky/linksync/evolu";
 import { createUseEvolu, EvoluProvider } from "@evolu/react";
 import { evoluReactWebDeps } from "@evolu/react-web";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -398,15 +408,7 @@ const probeWebSocketConnection = (
 
 const CashuTokenId = Evolu.id("CashuToken");
 export type CashuTokenId = typeof CashuTokenId.Type;
-
-const CashuProofId = Evolu.id("CashuProof");
-export type CashuProofId = typeof CashuProofId.Type;
-
-const CashuOperationId = Evolu.id("CashuOperation");
-export type CashuOperationId = typeof CashuOperationId.Type;
-
-const NostrIdentityId = Evolu.id("NostrIdentity");
-type NostrIdentityId = typeof NostrIdentityId.Type;
+export type { CashuOperationId, CashuProofId, NostrIdentityId };
 
 const NostrMessageId = Evolu.id("NostrMessage");
 type NostrMessageId = typeof NostrMessageId.Type;
@@ -417,19 +419,18 @@ type NostrReactionId = typeof NostrReactionId.Type;
 const OwnerMetaId = Evolu.id("OwnerMeta");
 type OwnerMetaId = typeof OwnerMetaId.Type;
 
+/**
+ * The app schema is a superset of the package's `LinkySchema` while the
+ * scopes cut over to shards one at a time: the package tables plus the legacy
+ * lane tables (`nostrMessage`, `nostrReaction`, `cashuToken`, `ownerMeta`) and
+ * the legacy columns the lane code still writes (chat state on `contact`,
+ * `category` and `phase` on `transaction`). The package's branded ids are the
+ * source of truth; only the legacy tables keep ids of their own.
+ */
 export const Schema = {
+  ...LinkySchema,
   contact: {
-    id: ContactId,
-    name: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "1" once the user typed a custom name; profile updates then leave `name` alone.
-    nameSetByUser: Evolu.nullOr(Evolu.SqliteBoolean),
-    npub: Evolu.nullOr(Evolu.NonEmptyString1000),
-    lnAddress: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "1" once the user typed a custom lightning address; profile updates
-    // then leave `lnAddress` alone until the override is cleared.
-    lnAddressSetByUser: Evolu.nullOr(Evolu.SqliteBoolean),
-    groupName: Evolu.nullOr(Evolu.NonEmptyString1000),
-    groupNamesJson: Evolu.nullOr(Evolu.NonEmptyString1000),
+    ...LinkySchema.contact,
     archivedAtSec: Evolu.nullOr(Evolu.PositiveInt),
     // Read cursor: created_at (seconds) of the newest chat message the user
     // has seen in this conversation.
@@ -438,14 +439,6 @@ export const Schema = {
     // read receipt): our outgoing messages in (since, upTo] render as seen.
     chatPeerSeenSinceSec: Evolu.nullOr(Evolu.PositiveInt),
     chatPeerSeenAtSec: Evolu.nullOr(Evolu.PositiveInt),
-  },
-  nostrIdentity: {
-    id: NostrIdentityId,
-    // Bech32 NIP-19 secret key, must start with "nsec".
-    nsec: Evolu.NonEmptyString1000,
-    npub: Evolu.nullOr(Evolu.NonEmptyString1000),
-    source: Evolu.nullOr(Evolu.NonEmptyString100),
-    switchedAtSec: Evolu.nullOr(Evolu.PositiveInt),
   },
   nostrMessage: {
     id: NostrMessageId,
@@ -514,79 +507,14 @@ export const Schema = {
     state: Evolu.nullOr(Evolu.NonEmptyString100),
     error: Evolu.nullOr(Evolu.NonEmptyString1000),
   },
-
-  // The wallet inventory: one row per cashu proof, id derived from the
-  // secret so every device converges on one row. Written only by linkshu
-  // through the ProofStore adapter; `cashuToken` above is read-only legacy
-  // input that gets ingested into this table.
-  cashuProof: {
-    id: CashuProofId,
-    mint: Evolu.NonEmptyString1000,
-    unit: Evolu.NonEmptyString100,
-    keysetId: Evolu.NonEmptyString100,
-    amount: Evolu.PositiveInt,
-    secret: Evolu.NonEmptyString1000,
-    // The NUT-00 signature point `C`.
-    c: Evolu.NonEmptyString1000,
-    // JSON of the NUT-12 DLEQ proof when the mint supplied one.
-    dleq: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "available" | "held" | "handedOut" | "externalized" | "spent"
-    state: Evolu.NonEmptyString100,
-    operationId: Evolu.nullOr(CashuOperationId),
-  },
-
-  // Durable links between inputs and outputs: melts, topups, autoswaps,
-  // sends, receives. Quote kinds are what a resumer finishes after a crash
-  // on any device; transfer kinds keep the token text for dedup and returns.
-  cashuOperation: {
-    id: CashuOperationId,
-    // "melt" | "topup" | "autoswap" | "send" | "receive"
-    kind: Evolu.NonEmptyString100,
-    status: Evolu.NonEmptyString100,
-    mint: Evolu.NonEmptyString1000,
-    unit: Evolu.NonEmptyString100,
-    keysetId: Evolu.nullOr(Evolu.NonEmptyString100),
-    amount: Evolu.PositiveInt,
-    feeReserve: Evolu.nullOr(Evolu.NonNegativeInt),
-    inputsTotal: Evolu.nullOr(Evolu.PositiveInt),
-    quoteId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    invoice: Evolu.nullOr(Evolu.NonEmptyString),
-    sourceMint: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // First deterministic output slot of the latest attempt.
-    counter: Evolu.nullOr(Evolu.NonNegativeInt),
-    locked: Evolu.nullOr(Evolu.SqliteBoolean),
-    expiresAtSec: Evolu.nullOr(Evolu.PositiveInt),
-    // Event time, separate from Evolu's updatedAt like `transaction`.
-    createdAtSec: Evolu.PositiveInt,
-    tokenText: Evolu.nullOr(Evolu.NonEmptyString),
-    error: Evolu.nullOr(Evolu.NonEmptyString1000),
-  },
-
   transaction: {
-    id: TransactionId,
-    // Event time is intentionally stored separately from Evolu's updatedAt:
-    // later row updates must not change when the payment actually happened.
-    createdAtSec: Evolu.PositiveInt,
-    direction: Evolu.NonEmptyString100,
-    status: Evolu.NonEmptyString100,
-    amount: Evolu.nullOr(Evolu.PositiveInt),
-    fee: Evolu.nullOr(Evolu.PositiveInt),
+    ...LinkySchema.transaction,
     // Deprecated compatibility column. New writes derive category from method.
     category: Evolu.nullOr(Evolu.NonEmptyString100),
-    method: Evolu.nullOr(Evolu.NonEmptyString100),
     // Deprecated compatibility columns. New writes use method + status and
     // derive labels/icons in the transaction view.
     phase: Evolu.nullOr(Evolu.NonEmptyString100),
-    note: Evolu.nullOr(Evolu.NonEmptyString1000),
-    detailsJson: Evolu.nullOr(Evolu.NonEmptyString),
-    iconKind: Evolu.nullOr(Evolu.NonEmptyString100),
-    contactId: Evolu.nullOr(ContactId),
-    mint: Evolu.nullOr(Evolu.NonEmptyString1000),
-    unit: Evolu.nullOr(Evolu.NonEmptyString100),
-    error: Evolu.nullOr(Evolu.NonEmptyString1000),
-    pendingLabel: Evolu.nullOr(Evolu.NonEmptyString100),
   },
-
   ownerMeta: {
     id: OwnerMetaId,
     scope: Evolu.NonEmptyString100,
@@ -602,13 +530,7 @@ const createEvoluForUser = (mnemonic: string | null) => {
     ? validatedName.value
     : SimpleName.orThrow("linky-default");
 
-  const externalAppOwner = (() => {
-    if (!mnemonic) return null;
-    const mnemonicResult = Evolu.Mnemonic.fromUnknown(mnemonic);
-    if (!mnemonicResult.ok) return null;
-    const ownerSecret = Evolu.mnemonicToOwnerSecret(mnemonicResult.value);
-    return Evolu.createAppOwner(ownerSecret);
-  })();
+  const externalAppOwner = mnemonic ? appOwnerFromMnemonic(mnemonic) : null;
 
   return createEvolu(evoluReactWebDeps)(Schema, {
     name: finalName,
@@ -639,6 +561,29 @@ const getEvolu = (mnemonic?: string | null): EvoluInstance => {
 
 export const evolu = getEvolu();
 
+let linkyStorePromise: Promise<LinkyStore> | null = null;
+
+/**
+ * The shard store over this Evolu instance. Resolves once the app owner is
+ * known and the local database has answered a query; `appOwner` alone
+ * resolves before the database worker is up.
+ */
+export const getLinkyStore = (): Promise<LinkyStore> => {
+  linkyStorePromise ??= Promise.all([
+    evolu.appOwner,
+    evolu.loadQuery(
+      evolu.createQuery((db) =>
+        db.selectFrom("shardPointer").select("id").limit(1),
+      ),
+    ),
+  ]).then(([owner]) => createLinkyStore(createEvoluShardDb(evolu), owner));
+  return linkyStorePromise;
+};
+
+export const createOwnerMetaAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("ownerMeta").selectAll());
+export const createNostrIdentitiesAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("nostrIdentity").selectAll());
 export const createCashuTokensAllQuery = () =>
   evolu.createQuery((db) =>
     db.selectFrom("cashuToken").selectAll().orderBy("createdAt", "desc"),
@@ -678,6 +623,12 @@ export type CashuProofRow = Evolu.InferRow<
 >;
 export type CashuOperationRow = Evolu.InferRow<
   ReturnType<typeof createCashuOperationsAllQuery>
+>;
+export type OwnerMetaRow = Evolu.InferRow<
+  ReturnType<typeof createOwnerMetaAllQuery>
+>;
+export type NostrIdentityRow = Evolu.InferRow<
+  ReturnType<typeof createNostrIdentitiesAllQuery>
 >;
 
 export const useEvoluSyncOwner = (enabled: boolean): Evolu.SyncOwner | null => {
@@ -756,6 +707,9 @@ const getEvoluDatabaseInfo = async (
 }> => {
   const tables = [
     "contact",
+    "conversation",
+    "message",
+    "reaction",
     "cashuToken",
     "cashuProof",
     "cashuOperation",
@@ -764,6 +718,8 @@ const getEvoluDatabaseInfo = async (
     "nostrReaction",
     "transaction",
     "ownerMeta",
+    "shardPointer",
+    "setting",
   ] as const;
 
   const instance = getEvolu();
@@ -1002,6 +958,9 @@ export const loadEvoluCurrentData = async (): Promise<
 > => {
   const tables = [
     "contact",
+    "conversation",
+    "message",
+    "reaction",
     "cashuToken",
     "cashuProof",
     "cashuOperation",
@@ -1010,6 +969,8 @@ export const loadEvoluCurrentData = async (): Promise<
     "nostrReaction",
     "transaction",
     "ownerMeta",
+    "shardPointer",
+    "setting",
   ] as const;
 
   const instance = getEvolu();

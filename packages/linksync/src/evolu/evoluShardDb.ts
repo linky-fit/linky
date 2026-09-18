@@ -1,4 +1,4 @@
-import type { Evolu, OwnerId, SyncOwner } from "@evolu/common";
+import type { OwnerId, SyncOwner } from "@evolu/common";
 import { OwnerId as OwnerIdType } from "@evolu/common";
 import { Effect } from "effect";
 import type { Columns, Mutation, OwnerUsage, Row, ShardDb } from "../core";
@@ -19,17 +19,39 @@ import { LinkySchema, type LinkyDbSchema } from "../model/schema";
  * A query result lags a mutation, so an overlay of this adapter's own writes
  * is served until the loaded rows reflect them. That is what lets the store
  * chain a write and a read inside one operation.
+ *
+ * Evolu runs every mutation queued in one microtask as a single transaction
+ * and drops the whole batch when any of them fails validation, so each row is
+ * validated (`onlyValidate`) before it is queued.
  */
+
+/**
+ * What the adapter needs from an Evolu instance: the typed `useOwner` and,
+ * through untyped calls, the query and mutation methods. Structural so an app
+ * whose schema is a superset of `LinkySchema` can pass its instance.
+ */
+export interface EvoluRuntime {
+  readonly useOwner: (owner: SyncOwner) => () => void;
+}
 
 type LinkyTable = keyof LinkyDbSchema & string;
 
 const isTable = (table: string): table is LinkyTable => table in LinkySchema;
 
-const isStoredRow = (row: UntypedRow): row is Row<Columns> =>
+const isStoredRow = (
+  row: UntypedRow,
+): row is Row<Columns> & { readonly updatedAt: string | null } =>
   typeof row.id === "string" &&
   OwnerIdType.fromUnknown(row.ownerId).ok &&
   typeof row.createdAt === "string" &&
-  typeof row.updatedAt === "string";
+  (row.updatedAt === null || typeof row.updatedAt === "string");
+
+// Evolu stamps `createdAt` on insert and upsert and `updatedAt` only on
+// update, so a row that was never updated reads back with a null
+// `updatedAt`; the port promises the last change time there.
+const withLastChangeTime = (
+  row: Row<Columns> & { readonly updatedAt: string | null },
+): Row<Columns> => ({ ...row, updatedAt: row.updatedAt ?? row.createdAt });
 
 const isMutationResult = (
   value: unknown,
@@ -94,15 +116,20 @@ const asRow = (entry: OverlayEntry, previous?: Row<Columns>): Row<Columns> => {
 };
 
 export const createEvoluShardDb = (
-  evolu: Evolu<typeof LinkySchema>,
+  evolu: EvoluRuntime,
 ): ShardDb<LinkyDbSchema> => {
   const overlay = new Map<string, OverlayEntry>();
-  const queries = new Map<string, object>();
+  // Evolu queries are branded strings that Evolu keys its promise cache by;
+  // they are passed back exactly as received.
+  const queries = new Map<string, string>();
 
-  // Evolu queries are branded strings; `Object` keeps the value opaque and passable.
-  const asQuery = (value: unknown): object => Object(value);
+  const asQuery = (value: unknown): string => {
+    if (typeof value !== "string")
+      throw new Error("evolu.createQuery did not return a query");
+    return value;
+  };
 
-  const tableQuery = (table: LinkyTable): object => {
+  const tableQuery = (table: LinkyTable): string => {
     const cached = queries.get(table);
     if (cached !== undefined) return cached;
     const query = asQuery(
@@ -114,7 +141,7 @@ export const createEvoluShardDb = (
     return query;
   };
 
-  const loadRows = (query: object): Effect.Effect<ReadonlyArray<UntypedRow>> =>
+  const loadRows = (query: string): Effect.Effect<ReadonlyArray<UntypedRow>> =>
     Effect.promise(async () => {
       const rows = await callUntyped(evolu, "loadQuery", query);
       return Array.isArray(rows) ? rows.filter(isUntypedRow) : [];
@@ -154,7 +181,7 @@ export const createEvoluShardDb = (
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     if (!isTable(table)) return Effect.succeed([]);
     return Effect.map(loadRows(tableQuery(table)), (rows) =>
-      mergeOverlay(table, rows.filter(isStoredRow)),
+      mergeOverlay(table, rows.filter(isStoredRow).map(withLastChangeTime)),
     );
   }
 
@@ -176,17 +203,16 @@ export const createEvoluShardDb = (
     const fail = (message: string) =>
       Effect.fail(new ShardDbError({ table: mutation.table, message }));
     if (!isTable(mutation.table)) return fail("unknown table");
-    const result = callUntyped(
-      evolu,
-      mutation.kind,
-      mutation.table,
-      mutation.row,
-      {
+    const call = (onlyValidate: boolean) =>
+      callUntyped(evolu, mutation.kind, mutation.table, mutation.row, {
         ownerId: mutation.ownerId,
-      },
-    );
-    if (!isMutationResult(result)) return fail("unexpected mutation result");
-    if (!result.ok) return fail(JSON.stringify(result.error));
+        onlyValidate,
+      });
+    const validation = call(true);
+    if (!isMutationResult(validation))
+      return fail("unexpected mutation result");
+    if (!validation.ok) return fail(JSON.stringify(validation.error));
+    call(false);
     record(mutation, new Date().toISOString());
     return Effect.void;
   };

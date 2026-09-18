@@ -753,6 +753,11 @@ const bootstrap = async () => {
     setStage("import-evolu");
     const { evolu, EvoluProvider } = await import("./evolu.ts");
     console.log("[linky][boot] evolu loaded");
+    if (import.meta.env.DEV || import.meta.env.VITE_E2E === "1") {
+      const { installLinkyE2eHooks } =
+        await import("./devtools/e2e/installLinkyE2eHooks.ts");
+      installLinkyE2eHooks();
+    }
 
     setStage("await-initial-local-data");
     const root = createRoot(document.getElementById("root")!);

@@ -25,10 +25,10 @@ Rows come back as `Row<Columns>`: the table's columns, every non-id one nullable
 
 ## Evolu 7
 
-`createEvoluShardDb(evolu)` from `@linky/linksync/evolu` (`src/evolu/evoluShardDb.ts`) takes an `Evolu<typeof LinkySchema>` instance. It is the one file that touches the Evolu runtime:
+`createEvoluShardDb(evolu)` from `@linky/linksync/evolu` (`src/evolu/evoluShardDb.ts`) takes an `EvoluRuntime`: structurally, an Evolu instance whose schema contains `LinkySchema` (the type names only `useOwner`; the query and mutation methods are reached through untyped calls). The app passes its instance, whose schema is a superset while the legacy tables are still around. It is the one file that touches the Evolu runtime:
 
-- Reads: `createQuery(db => db.selectFrom(table).selectAll())` and `loadQuery`, cached per table, merged with the write overlay.
-- Writes: `upsert` and `update` with `{ ownerId }`; a rejected mutation becomes `ShardDbError`.
+- Reads: `createQuery(db => db.selectFrom(table).selectAll())` and `loadQuery`, cached per table, merged with the write overlay. Evolu stamps `createdAt` on insert and upsert and `updatedAt` only on update, so a never-updated row comes back with a null `updatedAt`; the adapter reports `createdAt` there, keeping the port's promise that `updatedAt` is the row's last change time.
+- Writes: `upsert` and `update` with `{ ownerId }`. Every row is validated first (`onlyValidate`) and a rejected row becomes `ShardDbError` before anything is queued, because Evolu runs all mutations queued in one microtask as a single transaction and drops the whole batch, unrelated app writes included, when any of them fails validation.
 - `subscribe`: `subscribeQuery` on the table's query.
 - `ownerUsage`: `count(distinct timestamp)` and `sum(length(value))` over `evolu_history` for the owner.
 - `deleteOwner`: `null`; Evolu 7 has no owner deletion.

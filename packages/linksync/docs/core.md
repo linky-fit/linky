@@ -65,3 +65,7 @@ Call `maybeRotate` after writes, the way the app's rotation hook did; the store 
 ## Ids
 
 `shardPointerId(scope)` is deterministic so every device upserts one pointer row. Row ids are the caller's; `createId<"Table">()` from the model makes random ones.
+
+## Owners
+
+`appOwnerFromMnemonic(text)` turns a BIP-39 mnemonic into the Evolu `AppOwner` it names, or `null` when the text is not a mnemonic. The app uses it for its own owner and the lane migration for the legacy owners, so no app file needs Evolu's owner functions.

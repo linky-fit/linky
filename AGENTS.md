@@ -83,6 +83,8 @@ The run is ~20s, so `--headed` mostly shows a blur; `--ui` and the trace viewer 
 
 Shared helpers live in `tests/helpers/`. Use `setSeedLoginStorage` when a test needs a real seed login (deterministic Evolu owner lanes); `setRandomIdentityStorage` is the cheaper "just be logged in" variant and leaves `isSeedLogin` false.
 
+The compose image is built with `VITE_E2E=1`, which makes `main.tsx` install `window.__linkyE2E` (`src/devtools/e2e/installLinkyE2eHooks.ts`): raw Evolu upserts under any owner, `useOwners` for legacy lane mnemonics, and `shardRows(scope, table)` for what the linksync shards hold. `lane-migration.spec.ts` seeds legacy lane rows through it instead of the UI, so it keeps working after the app stops writing to the lanes. When building the image by hand, pass `--build-arg VITE_E2E=1`; production builds never set it.
+
 ## Site E2E tests
 
 `bun run --filter @linky/site test:e2e` uses the existing mints on :3338/:3339 and Nostr relay on :7777, and builds the site on :5180 with `VITE_ALLOW_TEST_MINT=1`.
