@@ -49,8 +49,23 @@ import {
 import { topupRecords } from "./internal/topupRecords";
 import type { PendingTopup } from "./internal/topupRecords";
 
-/** Bolt11 mint quotes settle in seconds. */
+/** Bolt11 mint quotes settle in seconds while the payer looks at them. */
 const POLL_INTERVAL = Duration.seconds(5);
+const POLL_INTERVAL_AFTER_FIVE_MINUTES = Duration.minutes(1);
+const POLL_INTERVAL_AFTER_ONE_HOUR = Duration.minutes(5);
+
+/**
+ * How often the mint is asked about a quote of this age. A payer sits in
+ * front of an invoice for minutes at most; an older quote is a forgotten one
+ * and a NUT-17 push still reports its settlement at once, so the poll only
+ * has to stay a safety net.
+ */
+const pollIntervalFor = (ageSeconds: number): Duration.Duration =>
+  ageSeconds < 5 * 60
+    ? POLL_INTERVAL
+    : ageSeconds < 60 * 60
+      ? POLL_INTERVAL_AFTER_FIVE_MINUTES
+      : POLL_INTERVAL_AFTER_ONE_HOUR;
 /** Transient poll failures are expected offline; a run of them is not. */
 const MAX_CONSECUTIVE_POLL_FAILURES = 10;
 
@@ -107,9 +122,10 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
     const records = topupRecords({ kv, operationStore, inspector });
 
     /**
-     * Polls until the mint reports the invoice settled. Transient failures
-     * keep the poll alive — a topup must survive going offline — while a
-     * definitive rejection (an unknown quote) ends it immediately. Expiry
+     * Polls until the mint reports the invoice settled, slowing down as the
+     * quote ages (`pollIntervalFor`). Transient failures keep the poll alive
+     * — a topup must survive going offline — while a definitive rejection
+     * (an unknown quote) ends it immediately. Expiry
      * needs the mint's own UNPAID answer: declaring it on the deadline alone
      * would drop the record for a quote that was paid while unreachable.
      */
@@ -148,7 +164,8 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
               });
             }
           }
-          yield* Effect.sleep(POLL_INTERVAL);
+          const age = (yield* nowSeconds) - pending.createdAt;
+          yield* Effect.sleep(pollIntervalFor(age));
         }
       });
 
