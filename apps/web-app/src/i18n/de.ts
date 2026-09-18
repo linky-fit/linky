@@ -37,7 +37,7 @@ export const de = {
   recurringTitleLabel: "Bezeichnung",
   recurringRecipientLabel: "Empfänger",
   recurringSelectContact: "Kontakt wählen…",
-  recurringAmountLabel: "Betrag (sat)",
+  recurringAmountLabel: "Betrag",
   recurringIntervalLabel: "Wiederholen",
   recurringEveryPrefix: "alle",
   recurringUnitHours: "Stunde(n)",
@@ -77,6 +77,17 @@ export const de = {
   recurringBindToThisDevice: "Von diesem Gerät zahlen",
   recurringRepeatPayment: "Regelmäßig wiederholen…",
   recurringNotFound: "Dauerauftrag nicht gefunden.",
+  recurringEmptyHint:
+    "Über „Regelmäßig wiederholen…“ bei einer Zahlung an einen Kontakt oder eine Lightning-Adresse anlegen, oder mit dem Plus-Knopf.",
+  recurringChangeRecipient: "Empfänger ändern",
+  recurringTitlePlaceholder: "z. B. Miete",
+  recurringMaxRunsPlaceholder: "unbegrenzt",
+  recurringStatusActive: "aktiv",
+  recurringOtherDeviceHint:
+    "Ein anderes Gerät zahlt diesen Auftrag. Ihn hierher zu übernehmen bedeutet, dass Zahlungen aus dieser Wallet ausgehen.",
+  recurringWalletBusy:
+    "Die Wallet ist gerade beschäftigt, bitte gleich noch einmal versuchen.",
+  recurringRunFailedToast: "Die Zahlung des Dauerauftrags ist fehlgeschlagen.",
   showTransactions: "Transaktionen anzeigen",
   feedback: "Feedback",
   donate: "Spenden",
