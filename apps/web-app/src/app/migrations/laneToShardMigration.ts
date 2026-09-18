@@ -9,8 +9,8 @@
 // ingest, and transactions lose their deprecated columns.
 //
 // The same routine is the mixed-version grace period: an older app version
-// keeps writing to the lanes, so every boot inside the grace period re-runs
-// it over whatever legacy rows the device holds. There is no watermark: a row
+// keeps writing to the lanes, so each boot and subsequent legacy query change
+// inside the grace period re-runs it over the rows the device holds. There is no watermark: a row
 // that syncs in late carries an old `updatedAt`, so a watermark would skip
 // it, while the ingest's per-row comparison costs one map lookup.
 //
@@ -205,6 +205,16 @@ export interface LegacyLaneSnapshot {
   readonly identities: ReadonlyArray<NostrIdentityRow>;
   readonly ownerMeta: ReadonlyArray<OwnerMetaRow>;
 }
+
+export const legacySnapshotKey = (
+  snapshot: LegacyLaneSnapshot,
+  legacyOwnerIds: ReadonlySet<string>,
+): string =>
+  JSON.stringify(
+    Object.values(snapshot).map((rows: ReadonlyArray<LegacyRow>) =>
+      rows.filter((row) => legacyOwnerIds.has(row.ownerId)),
+    ),
+  );
 
 type LegacyRow = { readonly id: string } & SystemColumns;
 /** Any legacy row with extra columns the target table may or may not have. */

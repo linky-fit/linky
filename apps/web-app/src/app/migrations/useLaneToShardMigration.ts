@@ -33,6 +33,7 @@ import {
   isLaneGracePeriodActive,
   isLaneMigrationDoneLocally,
   markLaneMigrationDoneLocally,
+  legacySnapshotKey,
   readLaneMigrationCutoffMs,
   readLegacyLaneIndexes,
   runLaneToShardMigration,
@@ -175,9 +176,10 @@ const bootLaneMigration = async (): Promise<void> => {
     },
   );
 
+  const snapshot = await readLegacyLaneSnapshot();
   const report = await runLaneToShardMigration({
     store,
-    snapshot: await readLegacyLaneSnapshot(),
+    snapshot,
     legacyOwnerIds: new Set(legacyOwnerIds),
     ingestLegacyTokens: (rows) => ingestLegacyTokensThroughShards(store, rows),
     nowMs: startedAtMs,
@@ -233,6 +235,85 @@ const bootLaneMigration = async (): Promise<void> => {
   };
   evolu.subscribeQuery(proofQuery)(() => void mirrorSpentProofs());
   await mirrorSpentProofs();
+
+  let lastSnapshotKey = legacySnapshotKey(snapshot, new Set(legacyOwnerIds));
+  let indexesKey = JSON.stringify(
+    readLegacyLaneIndexes(ownerMeta, store.appOwner.id),
+  );
+  let reingesting = false;
+  let pending = false;
+  const reingestLateRows = async (): Promise<void> => {
+    pending = true;
+    if (reingesting) return;
+    reingesting = true;
+    try {
+      while (pending) {
+        pending = false;
+        const cutoff = await Effect.runPromise(
+          readLaneMigrationCutoffMs(store),
+        );
+        if (!isLaneGracePeriodActive(cutoff, Date.now())) return;
+        const latest = await readLegacyLaneSnapshot();
+        const indexes = readLegacyLaneIndexes(
+          latest.ownerMeta,
+          store.appOwner.id,
+        );
+        const nextIndexesKey = JSON.stringify(indexes);
+        if (seed && nextIndexesKey !== indexesKey) {
+          for (const owner of await deriveLegacyLaneOwners(seed, indexes)) {
+            if (legacyOwnerIds.includes(owner.id)) continue;
+            legacyOwnerIds.push(owner.id);
+            evolu.useOwner(owner);
+          }
+          indexesKey = nextIndexesKey;
+        }
+        const ownerIds = new Set(legacyOwnerIds);
+        const nextKey = legacySnapshotKey(latest, ownerIds);
+        if (nextKey === lastSnapshotKey) continue;
+        const ingested = await runLaneToShardMigration({
+          store,
+          snapshot: latest,
+          legacyOwnerIds: ownerIds,
+          ingestLegacyTokens: (rows) =>
+            ingestLegacyTokensThroughShards(store, rows),
+          nowMs: Date.now(),
+        });
+        lastSnapshotKey = nextKey;
+        await mirrorSpentProofs();
+        emit(
+          "LaneGracePeriodReingested",
+          "Re-ingested legacy rows received after boot",
+          legacyOwnerIds,
+          {
+            cutoffMs: ingested.cutoffMs,
+            counts: ingested.counts,
+          },
+        );
+      }
+    } catch (error: unknown) {
+      console.warn("[linky] late lane migration failed", error);
+      reportAppLog({
+        tag: "evolu.laneMigrationFailed",
+        summary: "Could not ingest late legacy rows",
+        payload: { error: getUnknownErrorMessage(error, "unknown") },
+      });
+    } finally {
+      reingesting = false;
+    }
+  };
+  for (const query of [
+    createContactsAllQuery(),
+    createNostrMessagesAllQuery(),
+    createNostrReactionsAllQuery(),
+    createCashuTokensAllQuery(),
+    createCashuProofsAllQuery(),
+    createCashuOperationsAllQuery(),
+    createTransactionsAllQuery(),
+    createNostrIdentitiesAllQuery(),
+    createOwnerMetaAllQuery(),
+  ])
+    evolu.subscribeQuery(query)(() => void reingestLateRows());
+  await reingestLateRows();
 
   const shardOwnerIds = (await Effect.runPromise(store.syncOwners())).map(
     (owner) => owner.id,

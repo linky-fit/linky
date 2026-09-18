@@ -28,6 +28,7 @@ import {
   LANE_MIGRATION_CUTOFF_SETTING_KEY,
   LANE_MIGRATION_GRACE_PERIOD_MS,
   legacyPointerIndex,
+  legacySnapshotKey,
   readLegacyLaneIndexes,
   runLaneToShardMigration,
   type LegacyLaneSnapshot,
@@ -533,5 +534,33 @@ describe("isLaneGracePeriodActive", () => {
     expect(
       isLaneGracePeriodActive(1_000, 1_000 + LANE_MIGRATION_GRACE_PERIOD_MS),
     ).toBe(false);
+  });
+});
+
+describe("legacy snapshot change detection", () => {
+  it("ignores shard rows and detects late legacy columns with the same timestamp", () => {
+    const legacy = contact(laneA, { name: text("Before") });
+    const owners = new Set([laneA.id]);
+    const snapshot = { ...emptySnapshot, contacts: [legacy] };
+    const key = legacySnapshotKey(snapshot, owners);
+    expect(
+      legacySnapshotKey(
+        { ...snapshot, contacts: [legacy, contact(foreign)] },
+        owners,
+      ),
+    ).toBe(key);
+    expect(
+      legacySnapshotKey(
+        { ...snapshot, contacts: [{ ...legacy, name: text("After") }] },
+        owners,
+      ),
+    ).not.toBe(key);
+  });
+
+  it("detects rows when a newly discovered legacy owner becomes eligible", () => {
+    const snapshot = { ...emptySnapshot, contacts: [contact(laneB)] };
+    expect(legacySnapshotKey(snapshot, new Set([laneA.id, laneB.id]))).not.toBe(
+      legacySnapshotKey(snapshot, new Set([laneA.id])),
+    );
   });
 });

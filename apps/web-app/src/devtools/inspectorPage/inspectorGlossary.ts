@@ -39,7 +39,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   LaneGracePeriodReingestStarted:
     "A later launch inside the grace period: the old lanes are read again so rows written by an older app version reach the shards.",
   LaneGracePeriodReingested:
-    "The grace-period re-ingest finished; counts show which lane rows were newer than their shard copies.",
+    "A boot or late-row grace-period re-ingest finished; counts show which lane rows were newer than their shard copies.",
   LaneSpentProofsMirrored:
     "During the migration grace period, spent shard proofs mark their existing legacy copies spent so older devices stop counting them. Owner and proof links identify the copies; no proof secrets are logged.",
   "evolu.legacySpentProofSyncFailed":

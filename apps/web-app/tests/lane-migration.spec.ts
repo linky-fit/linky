@@ -591,3 +591,60 @@ test("spent shard proofs mark existing legacy copies spent during the grace peri
     await device.context.close();
   }
 });
+
+test("a fresh device ingests late relay rows and discovers later legacy lanes without reloading", async ({
+  browser,
+}, testInfo) => {
+  const identity = await createSeedIdentity();
+  const writer = await openDevice(
+    browser,
+    testInfo.project.use.baseURL,
+    "legacy writer",
+    setRandomIdentityStorage,
+  );
+  const reader = await openDevice(
+    browser,
+    testInfo.project.use.baseURL,
+    "fresh legacy reader",
+    (page) => setSeedLoginStorage(page, identity),
+  );
+  try {
+    const [meta, contacts2] = await hooks.useOwners(writer.page, [
+      identity.evoluMnemonic,
+      ...(await laneMnemonics(identity, [["contacts", 2]])),
+    ]);
+    await hooks.upsert(
+      writer.page,
+      "ownerMeta",
+      {
+        id: await hooks.createId(writer.page),
+        scope: "contacts",
+        value: JSON.stringify({ index: 2 }),
+      },
+      meta,
+    );
+    await hooks.upsert(
+      writer.page,
+      "contact",
+      { id: await hooks.createId(writer.page), name: "Late legacy lane two" },
+      contacts2,
+    );
+    await expect
+      .poll(() =>
+        hooks.shardRows(reader.page, "contacts", "contact").then(byName),
+      )
+      .toEqual(["Late legacy lane two"]);
+    await reader.page.reload();
+    await expect(reader.page.getByLabel("Available balance")).toBeVisible();
+    await expect
+      .poll(() =>
+        hooks.shardRows(reader.page, "contacts", "contact").then(byName),
+      )
+      .toEqual(["Late legacy lane two"]);
+    writer.errors.assertClean();
+    reader.errors.assertClean();
+  } finally {
+    await writer.context.close();
+    await reader.context.close();
+  }
+});
