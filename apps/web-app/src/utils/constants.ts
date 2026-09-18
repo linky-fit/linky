@@ -17,6 +17,8 @@ export const NOSTR_IDENTITY_SOURCE_STORAGE_KEY =
   "linky.nostr_identity_source.v1";
 export const NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY =
   "linky.nostr_identity_switched_at_sec.v1";
+// Random per-install id; a standing order runs only on the device it names.
+export const DEVICE_ID_STORAGE_KEY = "linky.device_id.v1";
 export const INSTALL_PWA_DISMISSED_AT_MS_STORAGE_KEY =
   "linky.install_pwa_dismissed_at_ms.v1";
 export const INSTALL_PWA_DISMISS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;

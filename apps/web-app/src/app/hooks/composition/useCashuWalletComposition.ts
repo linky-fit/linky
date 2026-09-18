@@ -143,6 +143,7 @@ import {
 import { runWrite } from "../../lib/storeWrite";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
 import { useInterruptedReceiveRecovery } from "../cashu/useInterruptedReceiveRecovery";
+import { useRecurringPaymentsScheduler } from "../payments/useRecurringPaymentsScheduler";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
 import type { Translate } from "../../../i18n";
@@ -2415,6 +2416,29 @@ export const useCashuWalletComposition = ({
     showPaidOverlay,
     t,
     touchMintInfo,
+  });
+
+  useRecurringPaymentsScheduler({
+    appendLocalNostrMessage,
+    cashuBalance,
+    cashuIsBusy,
+    contacts,
+    currentNsec,
+    enabled: sendCashuToken !== null && meltCashuInvoice !== null,
+    enqueueOutbox,
+    payContactWithCashuMessage,
+    payLightningAddressWithCashu: (lnAddress, amountSat, options) =>
+      payLightningAddressWithCashuBase(
+        lnAddress,
+        amountSat,
+        null,
+        null,
+        options,
+      ),
+    setCashuIsBusy,
+    t,
+    update,
+    updateLocalNostrMessage,
   });
 
   const requestSelectedContact = React.useCallback(

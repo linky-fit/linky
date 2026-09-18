@@ -27,6 +27,7 @@ export const en = {
   menu: "Menu",
   transactionsTitle: "Transactions",
   recurringPaymentsTitle: "Recurring payments",
+  recurringPaymentChatNote: "Standing order: {title}",
   showTransactions: "Show transactions",
   feedback: "Feedback",
   donate: "Donate",

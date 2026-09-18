@@ -33,6 +33,10 @@ import { safeLocalStorageSet } from "../../utils/storage";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { describeTaggedCashuError } from "../lib/cashuStoredError";
 import { selectSendMintForAmount } from "../lib/paymentMintSelection";
+import {
+  recurringRunDetails,
+  type RecurringRunRef,
+} from "../lib/recurringPaymentOrder";
 import type { SendMintBalance } from "../lib/paymentMintSelection";
 import type {
   ContactPayRowLike,
@@ -50,6 +54,11 @@ interface MeltFailure {
   readonly message: string;
   /** The melt was sent and the mint has not settled it; not a failure yet. */
   readonly pending: PaymentPending | null;
+}
+
+export interface PayLightningAddressOptions {
+  /** Set when a standing order pays: recorded on the transaction, no UI. */
+  recurringRun?: RecurringRunRef | null;
 }
 
 interface UseLightningPaymentsDomainParams {
@@ -287,7 +296,9 @@ export const useLightningPaymentsDomain = ({
       amountSat: number,
       contact: ContactPayRowLike | null,
       comment?: string | null,
+      options?: PayLightningAddressOptions,
     ) => {
+      const recurringRun = options?.recurringRun ?? null;
       const paymentTarget = lnAddress.trim();
       // The LUD-12 comment is the note; an invoice description stands in
       // when there is none.
@@ -397,6 +408,7 @@ export const useLightningPaymentsDomain = ({
                 {
                   lightningAddress: paidLightningAddress,
                   lightningInvoice: attemptInvoice,
+                  ...recurringRunDetails(recurringRun),
                 },
                 contact?.id ?? null,
                 commentNote ?? attemptInvoicePreview?.description ?? null,
@@ -444,6 +456,7 @@ export const useLightningPaymentsDomain = ({
               ...(successActionUrlDescription
                 ? { lnurlSuccessUrlDescription: successActionUrlDescription }
                 : {}),
+              ...recurringRunDetails(recurringRun),
             },
             fee: receipt.feePaid,
             mint: receipt.mint,
@@ -454,6 +467,11 @@ export const useLightningPaymentsDomain = ({
             method: "lightning_address",
             phase: "complete",
           });
+
+          rememberFirstPayment();
+          // A standing order pays in the background: no overlay, no
+          // success-action status, no save-contact prompt.
+          if (recurringRun) return true;
 
           const displayAmount = formatDisplayedAmountParts(receipt.paidAmount);
           showPaidOverlay(
@@ -486,8 +504,6 @@ export const useLightningPaymentsDomain = ({
             );
           }
 
-          rememberFirstPayment();
-
           if (paidLightningAddress && !contact?.id) {
             setPostPaySaveContact({
               lnAddress: paidLightningAddress,
@@ -507,6 +523,7 @@ export const useLightningPaymentsDomain = ({
             ...(lastAttemptInvoice
               ? { lightningInvoice: lastAttemptInvoice }
               : {}),
+            ...recurringRunDetails(recurringRun),
           },
           fee: null,
           mint: finalErrorMint,
