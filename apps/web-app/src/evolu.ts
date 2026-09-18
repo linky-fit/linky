@@ -6,6 +6,7 @@ import { createEvolu, SimpleName } from "@evolu/common";
 import {
   appOwnerFromMnemonic,
   createLinkyStore,
+  linkyScopes,
   LinkySchema,
   type CashuOperationId,
   type CashuProofId,
@@ -584,7 +585,7 @@ const reportShardRotated = (
 
 const reportShardsSubscribed = async (
   store: LinkyStore,
-  reason: "boot" | "rotation",
+  reason: "boot" | "rotation" | "forget",
 ): Promise<void> => {
   if (!getInspectorEmissionEnabled()) return;
   const owners = (await Effect.runPromise(store.syncOwners())).map(
@@ -600,6 +601,44 @@ const reportShardsSubscribed = async (
       payload: { reason, owners: owners.length },
     },
   ]);
+};
+
+const appScopes = {
+  ...linkyScopes,
+  messages: {
+    ...linkyScopes.messages,
+    rotation: linkyScopes.messages.rotation,
+  },
+};
+
+export const setE2eMessagesRotation = (enabled: boolean): void => {
+  if (import.meta.env.VITE_E2E !== "1") throw new Error("E2E build required");
+  appScopes.messages.rotation = enabled
+    ? { maxBytes: 256 * 1024, maxMutations: 30, cooldownMs: 0 }
+    : linkyScopes.messages.rotation;
+};
+
+export const forgetChatShards = async () => {
+  const store = await getLinkyStore();
+  const forgotten = await Effect.runPromise(store.forget("messages"));
+  if (getInspectorEmissionEnabled()) {
+    reportInspectorRows([
+      {
+        at: Date.now(),
+        channel: "evolu.sync",
+        tag: "ShardsForgotten",
+        summary: `Forgot ${forgotten.length} old chat shards locally`,
+        links: {
+          owner: forgotten.map(
+            ({ index }) => store.shardOwner("messages", index).id,
+          ),
+        },
+        payload: forgotten,
+      },
+    ]);
+    await reportShardsSubscribed(store, "forget");
+  }
+  return forgotten;
 };
 
 /**
@@ -618,7 +657,25 @@ export const getLinkyStore = (): Promise<LinkyStore> => {
       ),
     ),
   ]).then(async ([owner]) => {
-    const store = createLinkyStore(createEvoluShardDb(evolu), owner);
+    const key = (scope: string) =>
+      `linky.shards.retainedFrom.${owner.id}.${scope}`;
+    const store = createLinkyStore(createEvoluShardDb(evolu), owner, {
+      scopes: appScopes,
+      retention: {
+        get: (scope) =>
+          safeLocalStorageGetJson(
+            key(scope),
+            EffectSchema.NullOr(
+              EffectSchema.Number.pipe(
+                EffectSchema.int(),
+                EffectSchema.nonNegative(),
+              ),
+            ),
+            null,
+          ) ?? undefined,
+        set: (scope, first) => safeLocalStorageSetJson(key(scope), first),
+      },
+    });
     await Effect.runPromise(store.reconcileSync());
     void reportShardsSubscribed(store, "boot");
     store.followPointers((rotation) => {

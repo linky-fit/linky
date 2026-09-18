@@ -255,6 +255,17 @@ export const de = {
     "Der Standardserver kann nicht entfernt werden.",
   evoluRawDbSize: "Größe der SQLite-Datei",
   evoluRowCounts: "Zeilenanzahl",
+  chatStorage: "Chat-Speicher",
+  chatStoragePolicy:
+    "Neue Geräte synchronisieren die neuesten {count} Chat-Shards. Dieses Gerät behält ältere Shards, bis du sie vergisst.",
+  chatStorageTotal: "Erstellte Chat-Shards",
+  chatStorageSubscribed: "Auf diesem Gerät abonniert",
+  chatStorageForget: "Alte Chat-Shards vergessen",
+  chatStorageForgetHint:
+    "Alte Nachrichten und der Zustand inaktiver Chats verschwinden aus dem Chat-Verlauf dieses Geräts. Kontakte und Guthaben bleiben vollständig. Evolu 7 beendet nur das lokale Abonnement: Die Daten bleiben auf dem Gerät und dem Relay. Das Löschen auf dem Relay wartet auf Evolus deleteOwner-Unterstützung.",
+  chatStorageForgotten: "Alte Chat-Shards auf diesem Gerät vergessen.",
+  chatStorageFailed:
+    "Alte Chat-Shards konnten nicht vergessen werden. Versuche es erneut.",
   evoluShards: "Shards",
   evoluShardIndex: "Aktiver Shard",
   evoluShardVisibleCount: "Sichtbare Shards",

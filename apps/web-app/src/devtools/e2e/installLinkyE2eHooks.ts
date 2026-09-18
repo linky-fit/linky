@@ -11,7 +11,12 @@ import {
 } from "@linky/linksync";
 import { createEvoluShardDb } from "@linky/linksync/evolu";
 import { Effect } from "effect";
-import { evolu, getLinkyStore, Schema } from "../../evolu";
+import {
+  evolu,
+  getLinkyStore,
+  Schema,
+  setE2eMessagesRotation,
+} from "../../evolu";
 
 /**
  * Test-only entry point the Playwright suites reach through
@@ -21,6 +26,7 @@ import { evolu, getLinkyStore, Schema } from "../../evolu";
  * `VITE_E2E=1`; production builds never define it.
  */
 export interface LinkyE2eHooks {
+  readonly setMessagesRotation: (enabled: boolean) => void;
   readonly appOwnerId: () => Promise<string>;
   /** Opts BIP-39 mnemonics' app owners into sync and returns their ids, in order. */
   readonly useOwners: (
@@ -92,6 +98,7 @@ const upsert: LinkyE2eHooks["upsert"] = (table, row, ownerId) =>
 export const installLinkyE2eHooks = (): void => {
   const db = createEvoluShardDb(evolu);
   window.__linkyE2E = {
+    setMessagesRotation: setE2eMessagesRotation,
     appOwnerId: () => evolu.appOwner.then((owner) => owner.id),
     useOwners: (mnemonics) =>
       mnemonics.map((mnemonic) => {

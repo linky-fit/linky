@@ -37,25 +37,26 @@ const store = createShardStore<Schema, typeof scopes>({ db, appOwner, scopes });
 
 `Schema` maps table name to column types and must include `shardPointer` (`CoreSchema`). Pass the two type arguments explicitly; they cannot be inferred from the port.
 
-| Method                            | Contract                                                                                                                              |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `rows(scope, table)`              | Live rows across the visible shards, one per id, the highest shard's copy.                                                            |
-| `copies(scope, table)`            | Every copy in the visible shards, tombstones and duplicate ids included, highest shard first; for a domain rule that beats the merge. |
-| `insert(scope, table, row)`       | Writes into the active shard. `row` needs every non-nullable column; nullable ones may be omitted.                                    |
-| `update(scope, table, id, patch)` | Copy-on-write; fails with `RowNotFound` for an id no visible shard holds.                                                             |
-| `remove(scope, table, id)`        | Tombstones the row where it lives.                                                                                                    |
-| `ingest(scope, table, rows)`      | Copies foreign rows into the active shard, idempotently; returns how many it wrote.                                                   |
-| `foreignRows(table, ownerId)`     | The rows of one owner, for feeding `ingest`.                                                                                          |
-| `activeIndex(scope)`              | The pointer's index, or a locally written rotation the read model has not shown yet.                                                  |
-| `visibleShards(scope)`            | `{ index, owner }` for every shard a device reads and syncs.                                                                          |
-| `rotate(scope)`                   | Moves the pointer unconditionally; returns the new index.                                                                             |
-| `maybeRotate(scope)`              | Rotates when usage crosses `maxBytes` or `maxMutations` and the cooldown passed; returns why it did not otherwise.                    |
-| `syncOwners()`                    | The app owner plus every visible shard of every scope.                                                                                |
-| `reconcileSync()`                 | Calls `useOwner` for owners entering the set and the unuse function for owners leaving it. Call after boot and after rotations.       |
-| `forget()`                        | Shards outside a forgettable scope's window: unsubscribed, and deleted when the port can.                                             |
-| `subscribe(scope, listener)`      | Fires after any change to the scope's tables.                                                                                         |
-| `subscribePointers(listener)`     | Fires after any change to the pointer table, local or synced.                                                                         |
-| `followPointers(onRotated)`       | Reconciles sync whenever a pointer moves (a rotation here or on another device) and reports the scope and new index.                  |
+| Method                            | Contract                                                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rows(scope, table)`              | Live rows across the visible shards, one per id, the highest shard's copy.                                                                        |
+| `copies(scope, table)`            | Every copy in the visible shards, tombstones and duplicate ids included, highest shard first; for a domain rule that beats the merge.             |
+| `insert(scope, table, row)`       | Writes into the active shard. `row` needs every non-nullable column; nullable ones may be omitted.                                                |
+| `update(scope, table, id, patch)` | Copy-on-write; fails with `RowNotFound` for an id no visible shard holds.                                                                         |
+| `remove(scope, table, id)`        | Tombstones the row where it lives.                                                                                                                |
+| `ingest(scope, table, rows)`      | Copies foreign rows into the active shard, idempotently; returns how many it wrote.                                                               |
+| `foreignRows(table, ownerId)`     | The rows of one owner, for feeding `ingest`.                                                                                                      |
+| `activeIndex(scope)`              | The pointer's index, or a locally written rotation the read model has not shown yet.                                                              |
+| `visibleShards(scope)`            | `{ index, owner }` for every shard a device reads and syncs.                                                                                      |
+| `rotate(scope)`                   | Moves the pointer unconditionally; returns the new index.                                                                                         |
+| `maybeRotate(scope)`              | Rotates when usage crosses `maxBytes` or `maxMutations` and the cooldown passed; returns why it did not otherwise.                                |
+| `syncOwners()`                    | The app owner plus every visible shard of every scope.                                                                                            |
+| `reconcileSync()`                 | Calls `useOwner` for owners entering the set and the unuse function for owners leaving it. Call after boot and after rotations.                   |
+| `retainVisibleShards()`           | Retains the current windows after the caller's initial pointer hydration gate settles; existing local rows and writes retain immediately.         |
+| `forget(scope?)`                  | Explicitly forgets one scope, or all forgettable scopes if omitted; notifies readers, unsubscribes old shards and deletes only when the port can. |
+| `subscribe(scope, listener)`      | Fires after a scope table or pointer changes, or after explicit forgetting.                                                                       |
+| `subscribePointers(listener)`     | Fires after a pointer change, local or synced, or explicit forgetting.                                                                            |
+| `followPointers(onRotated)`       | Reconciles sync whenever a pointer moves (a rotation here or on another device) and reports the scope and new index.                              |
 
 Every method returns an `Effect`; errors are `ShardDbError` (the port rejected a write), `RowNotFound`, and `UnknownScope`. Time comes from Effect's `Clock`, so tests drive the cooldown with a manual clock.
 
@@ -74,3 +75,11 @@ A rotation on another device reaches this one as a pointer change. `followPointe
 ## Owners
 
 `appOwnerFromMnemonic(text)` turns a BIP-39 mnemonic into the Evolu `AppOwner` it names, or `null` when the text is not a mnemonic. The app uses it for its own owner and the lane migration for the legacy owners, so no app file needs Evolu's owner functions. The owner types the store speaks (`AppOwner`, `SyncOwner`, `OwnerId`) are re-exported for the same reason.
+
+## Device-local retention
+
+`createShardStore` accepts optional `retention: ShardRetention`, with synchronous `get(scope): number | undefined` and `set(scope, firstIndex): void`. The caller namespaces this durable state by app owner and device. The store owns index decisions; the port only persists them. Never sync it. `createLinkyStore(db, appOwner, { retention, scopes? })` forwards it; `scopes` defaults to `linkyScopes` and allows isolated test rotation rules without mutating the shared registry.
+
+On first read the store restores a saved first index or discovers locally present shard rows. It retains subsequent windows and local writes until `forget`. An empty device's provisional index 0 is not remembered before a pointer or local write establishes it. Forgetting changes both reads and subscriptions immediately, including React readers via scope and pointer listeners; reloading does not expose the cached forgotten rows again when a durable retention port is provided.
+
+Initial pointer hydration can expose intermediate indexes. The store does not retain these provisional windows. After the caller's bootstrap gate settles, call `retainVisibleShards()` once to retain the current windows through later remote rotations. Existing local rows and local writes are retained immediately. Linky reuses its Evolu/Nostr bootstrap gate, which waits for quiet reads with an 8 s fallback because Evolu 7 has no initial-sync-complete signal. A severely delayed initial sync can outlast that heuristic; it is not a protocol acknowledgment.

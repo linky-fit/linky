@@ -164,8 +164,12 @@ export interface ShardStore<
   readonly syncOwners: () => Effect.Effect<ReadonlyArray<SyncOwner>>;
   /** Uses the owners in `syncOwners` and unuses the rest. */
   readonly reconcileSync: () => Effect.Effect<void>;
+  /** Retains the current windows after initial pointer hydration has settled. */
+  readonly retainVisibleShards: () => Effect.Effect<void>;
   /** Shards outside a forgettable scope's window: unsubscribed, deleted when the port can. */
-  readonly forget: () => Effect.Effect<ReadonlyArray<ForgottenShard>>;
+  readonly forget: (
+    scope?: keyof R & string,
+  ) => Effect.Effect<ReadonlyArray<ForgottenShard>>;
   /** Fires after any change to a table of the scope. */
   readonly subscribe: (
     scope: keyof R & string,
@@ -183,6 +187,11 @@ export interface ShardStore<
   ) => () => void;
 }
 
+export interface ShardRetention {
+  readonly get: (scope: string) => number | undefined;
+  readonly set: (scope: string, firstIndex: number) => void;
+}
+
 export interface ShardStoreOptions<
   S extends CoreSchema,
   R extends ScopeRegistry<keyof S & string>,
@@ -190,6 +199,7 @@ export interface ShardStoreOptions<
   readonly db: ShardDb<S>;
   readonly appOwner: AppOwner;
   readonly scopes: R;
+  readonly retention?: ShardRetention;
 }
 
 const SYSTEM_COLUMNS = new Set([
@@ -233,6 +243,13 @@ export const createShardStore = <
   options: ShardStoreOptions<S, R>,
 ): ShardStore<S, R> => {
   const { db, appOwner, scopes } = options;
+  const retainedFrom = new Map<string, number>();
+  const initialized = new Set<string>();
+  const visibilityListeners = new Set<() => void>();
+  const retain = (scope: string, first: number) => {
+    retainedFrom.set(scope, first);
+    options.retention?.set(scope, first);
+  };
   const pendingIndex = new Map<string, number>();
   const rotatedLocallyAtMs = new Map<string, number>();
   const rotationInFlight = new Set<string>();
@@ -273,12 +290,51 @@ export const createShardStore = <
     });
 
   const visibleShards = (scope: string): Effect.Effect<ReadonlyArray<Shard>> =>
-    Effect.map(activeIndex(scope), (active) =>
-      visibleIndexes(definition(scope), active).map((index) => ({
-        index,
-        owner: shardOwner(scope, index),
-      })),
-    );
+    Effect.gen(function* () {
+      const active = yield* activeIndex(scope);
+      const policy = definition(scope);
+      const window = visibleIndexes(policy, active);
+      if (policy.owner === "app" || policy.forget === "never")
+        return window.map((index) => ({
+          index,
+          owner: shardOwner(scope, index),
+        }));
+      if (!initialized.has(scope)) {
+        const saved = options.retention?.get(scope);
+        const localRows = yield* Effect.forEach(policy.tables, (table) =>
+          db.readTable(table),
+        );
+        if (!initialized.has(scope)) {
+          initialized.add(scope);
+          if (saved !== undefined) retainedFrom.set(scope, saved);
+          else {
+            const localOwners = new Set(
+              localRows.flat().map((row) => row.ownerId),
+            );
+            for (let index = 0; index <= active; index += 1) {
+              if (localOwners.has(shardOwner(scope, index).id)) {
+                retain(scope, index);
+                break;
+              }
+            }
+          }
+        }
+      }
+      const first = Math.min(retainedFrom.get(scope) ?? active, window[0] ?? 0);
+
+      return Array.from({ length: active - first + 1 }, (_, offset) => {
+        const index = first + offset;
+        return { index, owner: shardOwner(scope, index) };
+      });
+    });
+
+  const retainBeforeWrite = (scope: string) =>
+    Effect.gen(function* () {
+      const shards = yield* visibleShards(scope);
+      const policy = definition(scope);
+      if (policy.owner === "shard" && policy.forget !== "never")
+        retain(scope, shards[0]?.index ?? 0);
+    });
 
   const indexByOwner = (shards: ReadonlyArray<Shard>): Map<OwnerId, number> =>
     new Map(shards.map((shard) => [shard.owner.id, shard.index]));
@@ -340,6 +396,7 @@ export const createShardStore = <
   ): Effect.Effect<void, ShardDbError | RowNotFound> =>
     Effect.gen(function* () {
       const current = yield* locateLive(scope, table, id);
+      yield* retainBeforeWrite(scope);
       const active = yield* activeOwner(scope);
       if (current.ownerId === active.id) {
         yield* db.mutate([
@@ -393,6 +450,7 @@ export const createShardStore = <
         const existing = known.get(row.id);
         return existing === undefined || existing.updatedAt < row.updatedAt;
       });
+      if (fresh.length > 0) yield* retainBeforeWrite(scope);
       yield* db.mutate(
         fresh.map((row) => ({
           kind: "upsert",
@@ -447,6 +505,7 @@ export const createShardStore = <
       const scopeDefinition = definition(scope);
       if (scopeDefinition.owner === "app" || scopeDefinition.rotation === null)
         return yield* activeIndex(scope);
+      yield* retainBeforeWrite(scope);
       const next = (yield* activeIndex(scope)) + 1;
       const nowMs = yield* Clock.currentTimeMillis;
       yield* writePointer(scope, next, nowMs);
@@ -489,32 +548,52 @@ export const createShardStore = <
       );
     });
 
-  const forget = (): Effect.Effect<ReadonlyArray<ForgottenShard>> =>
+  const forget = (
+    onlyScope?: string,
+  ): Effect.Effect<ReadonlyArray<ForgottenShard>> =>
     Effect.gen(function* () {
-      yield* reconcileSync();
       const forgotten: ForgottenShard[] = [];
-      for (const scope of Object.keys(scopes)) {
+      for (const scope of onlyScope === undefined
+        ? Object.keys(scopes)
+        : [onlyScope]) {
         const active = yield* activeIndex(scope);
-        for (const index of forgottenIndexes(definition(scope), active)) {
+        const indexes = forgottenIndexes(definition(scope), active);
+        if (indexes.length === 0) continue;
+        retain(scope, indexes.length);
+        initialized.add(scope);
+        for (const index of indexes) {
           const owner = shardOwner(scope, index);
           if (db.deleteOwner !== null) yield* db.deleteOwner(owner.id);
           forgotten.push({ scope, index, deleted: db.deleteOwner !== null });
         }
       }
+      yield* reconcileSync();
+      for (const listener of visibilityListeners) listener();
       return forgotten;
     });
 
   const subscribe = (scope: string, listener: () => void): (() => void) => {
-    const unsubscribes = definition(scope).tables.map((table) =>
-      db.subscribe(table, listener),
-    );
+    const notify = () => listener();
+    visibilityListeners.add(notify);
+    const unsubscribes = [
+      ...definition(scope).tables.map((table) => db.subscribe(table, listener)),
+      db.subscribe("shardPointer", listener),
+    ];
     return () => {
+      visibilityListeners.delete(notify);
       for (const unsubscribe of unsubscribes) unsubscribe();
     };
   };
 
-  const subscribePointers = (listener: () => void): (() => void) =>
-    db.subscribe("shardPointer", listener);
+  const subscribePointers = (listener: () => void): (() => void) => {
+    const notify = () => listener();
+    visibilityListeners.add(notify);
+    const stop = db.subscribe("shardPointer", listener);
+    return () => {
+      visibilityListeners.delete(notify);
+      stop();
+    };
+  };
 
   const scopeNames = Object.keys(scopes).filter(
     (scope): scope is keyof R & string => scope in scopes,
@@ -552,9 +631,11 @@ export const createShardStore = <
     rows,
     copies,
     insert: (scope, table, row) =>
-      Effect.flatMap(activeOwner(scope), (owner) =>
-        upsertInto(table, owner.id, row),
-      ),
+      Effect.gen(function* () {
+        yield* retainBeforeWrite(scope);
+        const owner = yield* activeOwner(scope);
+        yield* upsertInto(table, owner.id, row);
+      }),
     update,
     remove,
     ingest,
@@ -566,6 +647,8 @@ export const createShardStore = <
     maybeRotate,
     syncOwners,
     reconcileSync,
+    retainVisibleShards: () =>
+      Effect.forEach(Object.keys(scopes), retainBeforeWrite, { discard: true }),
     forget,
     subscribe,
     subscribePointers,

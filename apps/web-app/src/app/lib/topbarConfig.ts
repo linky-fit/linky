@@ -113,6 +113,7 @@ export const resolveBackAction = (
 
     case "evoluServer":
     case "evoluServerNew":
+    case "chatStorage":
     case "evoluCurrentData":
     case "evoluHistoryData":
       return () => navigateTo({ route: "evoluServers" });
@@ -198,6 +199,7 @@ const SHOWS_MENU_BUTTON: Record<
   contactEdit: false,
   contactPay: true,
   contacts: true,
+  chatStorage: false,
   evoluCurrentData: false,
   evoluData: false,
   evoluHistoryData: false,
@@ -328,6 +330,7 @@ const TOPBAR_TITLE_KEY: Record<
   contactNew: "newContact",
   contactPay: "contactPayTitle",
   contacts: "contactsTitle",
+  chatStorage: "chatStorage",
   evoluCurrentData: "evoluData",
   evoluData: "evoluData",
   evoluHistoryData: "evoluHistory",

@@ -199,3 +199,10 @@ export const useShardRotation = () => {
   );
   return { busyScope, rotate };
 };
+
+export const useRetainShardHistory = (ready: boolean): void => {
+  const store = useLinkyStore();
+  React.useEffect(() => {
+    if (ready) void Effect.runPromise(store.retainVisibleShards());
+  }, [ready, store]);
+};

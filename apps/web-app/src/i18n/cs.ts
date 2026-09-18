@@ -250,6 +250,17 @@ export const cs = {
   evoluDefaultServerCannotRemove: "Výchozí server nejde odebrat.",
   evoluRawDbSize: "Velikost SQLite souboru",
   evoluRowCounts: "Počty řádků",
+  chatStorage: "Úložiště chatů",
+  chatStoragePolicy:
+    "Nová zařízení synchronizují nejnovější {count} shardy chatů. Toto zařízení ponechá starší shardy, dokud je nezapomenete.",
+  chatStorageTotal: "Vytvořené shardy chatů",
+  chatStorageSubscribed: "Odebírané na tomto zařízení",
+  chatStorageForget: "Zapomenout staré shardy chatů",
+  chatStorageForgetHint:
+    "Staré zprávy a stav neaktivních chatů zmizí z historie na tomto zařízení. Kontakty a peníze zůstanou kompletní. V Evolu 7 se pouze zruší místní odběr: data zůstávají na disku i na serveru. Smazání na serveru čeká na podporu deleteOwner v Evolu.",
+  chatStorageForgotten: "Staré shardy chatů byly na tomto zařízení zapomenuty.",
+  chatStorageFailed:
+    "Staré shardy chatů se nepodařilo zapomenout. Zkuste to znovu.",
   evoluShards: "Shardy",
   evoluShardIndex: "Aktivní shard",
   evoluShardVisibleCount: "Viditelné shardy",

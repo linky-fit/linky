@@ -41,6 +41,7 @@ export type {
   Shard,
   ShardPointerColumns,
   ShardRotation,
+  ShardRetention,
   ShardStore,
   ShardStoreOptions,
 } from "./shardStore";

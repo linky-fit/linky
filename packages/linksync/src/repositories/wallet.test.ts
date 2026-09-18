@@ -5,7 +5,7 @@ import { cashuProofIdFor } from "../model/ids";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
 import { linkyStore, runNow } from "../testing/linky";
-import { testAppOwner } from "../testing/toy";
+import { run, testAppOwner, tick } from "../testing/toy";
 import { makeWalletRepository } from "./wallet";
 
 const proof = (secret: string, state: NewProof["state"] = "available") =>
@@ -55,14 +55,23 @@ const operation = (tokenText: string) =>
 describe("wallet repository", () => {
   describe("proof store", () => {
     it("derives the id from the secret and upserts onto the same row", () => {
-      const { store } = linkyStore();
+      const { db, appOwner } = linkyStore();
+      tick(1_700_000_000_000);
+      const delayedDb: ShardDb<LinkyDbSchema> = {
+        ...db,
+        mutate: (mutations) =>
+          Effect.sync(() => tick(1_000)).pipe(
+            Effect.flatMap(() => db.mutate(mutations)),
+          ),
+      };
+      const store = createLinkyStore(delayedDb, appOwner);
       const { proofs } = makeWalletRepository(store);
-      const [first] = runNow(proofs.insert([proof("s1")]));
-      const [again] = runNow(proofs.insert([proof("s1", "spent")]));
+      const [first] = run(proofs.insert([proof("s1")]));
+      const [again] = run(proofs.insert([proof("s1", "spent")]));
       expect(first?.id).toBe(cashuProofIdFor("s1"));
       expect(again?.id).toBe(first?.id);
       expect(again?.createdAt).toBe(first?.createdAt);
-      const all = runNow(proofs.loadAll);
+      const all = run(proofs.loadAll);
       expect(all).toHaveLength(1);
       expect(all[0]?.state).toBe("spent");
     });

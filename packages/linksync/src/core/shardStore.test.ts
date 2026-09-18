@@ -7,7 +7,7 @@ import {
   toyStore,
   type ToySchema,
 } from "../testing/toy";
-import { createShardStore } from "./shardStore";
+import { createShardStore, shardPointerId } from "./shardStore";
 
 const note = (id: string, title = `title ${id}`) => ({ id, title });
 
@@ -234,12 +234,14 @@ describe("shard store", () => {
         expect(used.has(store.shardOwner("notes", index).id)).toBe(true);
     });
 
-    it("keeps only the newest shards of a forgettable scope", () => {
+    it("keeps existing shards until an explicit forget", () => {
       const { db, store } = toyStore();
       run(store.reconcileSync());
       expect(db.usedOwners()).toContain(store.shardOwner("chats", 0).id);
       for (let i = 0; i < 3; i += 1) run(store.rotate("chats"));
       run(store.reconcileSync());
+      expect(db.usedOwners()).toContain(store.shardOwner("chats", 0).id);
+      run(store.forget("chats"));
       const used = new Set(db.usedOwners());
       expect(used.has(store.shardOwner("chats", 0).id)).toBe(false);
       expect(used.has(store.shardOwner("chats", 1).id)).toBe(false);
@@ -249,6 +251,122 @@ describe("shard store", () => {
         2, 3,
       ]);
     });
+  });
+
+  it("a fresh store follows only the newest window and persists explicit forgetting across reloads", () => {
+    const { db, store, appOwner } = toyStore();
+    run(store.insert("chats", "chat", { id: "old", text: "hi" }));
+    for (let i = 0; i < 3; i += 1) run(store.rotate("chats"));
+    const saved = new Map<string, number>();
+    const retention = {
+      get: (scope: string) => saved.get(scope),
+      set: (scope: string, first: number) => {
+        saved.set(scope, first);
+      },
+    };
+    const reopen = () =>
+      createShardStore<ToySchema, typeof toyScopes>({
+        db: { ...db, deleteOwner: null },
+        appOwner,
+        scopes: toyScopes,
+        retention,
+      });
+    const existing = reopen();
+    expect(run(existing.rows("chats", "chat"))).toHaveLength(1);
+    let changed = 0;
+    existing.subscribe("chats", () => {
+      changed += 1;
+    });
+    expect(run(existing.forget("chats"))).toEqual([
+      { scope: "chats", index: 0, deleted: false },
+      { scope: "chats", index: 1, deleted: false },
+    ]);
+    expect(changed).toBe(1);
+    expect(run(db.readTable("chat"))).toHaveLength(1);
+    expect(run(reopen().rows("chats", "chat"))).toEqual([]);
+    const freshDb = {
+      ...db,
+      readTable: <T extends keyof ToySchema & string>(table: T) =>
+        table === "shardPointer" ? db.readTable(table) : Effect.succeed([]),
+    };
+    const fresh = createShardStore<ToySchema, typeof toyScopes>({
+      db: freshDb,
+      appOwner,
+      scopes: toyScopes,
+    });
+    expect(
+      run(fresh.visibleShards("chats")).map((shard) => shard.index),
+    ).toEqual([2, 3]);
+  });
+
+  it("retains a subscribed shard zero when another device jumps several pointers ahead", () => {
+    const { db, appOwner } = toyStore();
+    const setPointer = (index: number) =>
+      run(
+        db.mutate([
+          {
+            kind: "upsert",
+            table: "shardPointer",
+            ownerId: appOwner.id,
+            row: { id: shardPointerId("chats"), scope: "chats", index },
+          },
+        ]),
+      );
+    setPointer(0);
+    const store = createShardStore<ToySchema, typeof toyScopes>({
+      db,
+      appOwner,
+      scopes: toyScopes,
+    });
+    run(store.reconcileSync());
+    run(store.retainVisibleShards());
+    setPointer(3);
+    expect(
+      run(store.visibleShards("chats")).map((shard) => shard.index),
+    ).toEqual([0, 1, 2, 3]);
+    run(store.forget("chats"));
+    expect(
+      run(store.visibleShards("chats")).map((shard) => shard.index),
+    ).toEqual([2, 3]);
+  });
+
+  it("does not retain provisional windows while a fresh device hydrates pointers", () => {
+    const { db, appOwner } = toyStore();
+    const store = createShardStore<ToySchema, typeof toyScopes>({
+      db,
+      appOwner,
+      scopes: toyScopes,
+    });
+    for (const index of [0, 1, 3]) {
+      run(
+        db.mutate([
+          {
+            kind: "upsert",
+            table: "shardPointer",
+            ownerId: appOwner.id,
+            row: { id: shardPointerId("chats"), scope: "chats", index },
+          },
+        ]),
+      );
+      run(store.reconcileSync());
+    }
+    expect(
+      run(store.visibleShards("chats")).map((shard) => shard.index),
+    ).toEqual([2, 3]);
+    run(store.retainVisibleShards());
+    run(
+      db.mutate([
+        {
+          kind: "upsert",
+          table: "shardPointer",
+          ownerId: appOwner.id,
+          row: { id: shardPointerId("chats"), scope: "chats", index: 5 },
+        },
+      ]),
+    );
+    expect(
+      run(store.visibleShards("chats")).map((shard) => shard.index),
+    ).toEqual([2, 3, 4, 5]);
   });
 
   describe("forget", () => {

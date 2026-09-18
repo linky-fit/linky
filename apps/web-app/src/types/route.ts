@@ -55,6 +55,7 @@ export type Route =
   | { kind: "nostrRelays" }
   | { kind: "nostrRelay"; id: string }
   | { kind: "nostrRelayNew" }
+  | { kind: "chatStorage" }
   | { kind: "evoluServers" }
   | { kind: "evoluServer"; id: string }
   | { kind: "evoluServerNew" }
@@ -149,6 +150,7 @@ export const parseRouteFromHash = (): Route => {
   const relayId = decodeHashSegment(hash, relayPrefix);
   if (relayId) return { kind: "nostrRelay", id: relayId };
 
+  if (hash === "#advanced/chat-storage") return { kind: "chatStorage" };
   if (hash === "#evolu-servers") return { kind: "evoluServers" };
   if (hash === "#evolu-data") return { kind: "evoluData" };
   if (hash === "#evolu-current-data") return { kind: "evoluCurrentData" };

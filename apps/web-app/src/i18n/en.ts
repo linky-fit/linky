@@ -246,6 +246,16 @@ export const en = {
   evoluDefaultServerCannotRemove: "Default server cannot be removed.",
   evoluRawDbSize: "SQLite file size",
   evoluRowCounts: "Row counts",
+  chatStorage: "Chat storage",
+  chatStoragePolicy:
+    "New devices sync the newest {count} chat shards. This device keeps older shards until you forget them.",
+  chatStorageTotal: "Chat shards created",
+  chatStorageSubscribed: "Subscribed on this device",
+  chatStorageForget: "Forget old chat shards",
+  chatStorageForgetHint:
+    "Old messages and inactive chat state will disappear from this device’s chat history. Contacts and money stay complete. On Evolu 7 this only unsubscribes locally: stored data remains on disk and on the relay. Relay deletion must wait for Evolu’s deleteOwner support.",
+  chatStorageForgotten: "Old chat shards forgotten on this device.",
+  chatStorageFailed: "Could not forget old chat shards. Try again.",
   evoluShards: "Shards",
   evoluShardIndex: "Active shard",
   evoluShardVisibleCount: "Visible shards",

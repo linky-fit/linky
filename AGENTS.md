@@ -85,6 +85,8 @@ Shared helpers live in `tests/helpers/`. Use `setSeedLoginStorage` when a test n
 
 `tests/shards.spec.ts` is the shard suite: it rotates every scope from `#evolu-current-data` (buttons named `Rotate <scope> shard`), checks the pointer on a second device, edits a shard-0 contact and reads its copy in shard 1 through `window.__linkyE2E.shardRows`, sends and tops up across the rotation, then rotates messages to index 4 and boots a fresh device that must see only the newest 4 message shards (`forget()` and `syncOwnerIds()` on the hook expose the store's view). Keep those assertions when touching rotation, copy-on-write or forgetting.
 
+The natural-rotation case in `tests/shards.spec.ts` uses `window.__linkyE2E.setMessagesRotation(true)` to set only that device's messages rule to 30 mutations and zero cooldown. Repository writes still measure real Evolu history and call `maybeRotate`; four rotations exercise the newest-4 boundary. It restores the production rule before checking cursor copy-on-write, reload retention, fresh-device contacts/proofs and the Chat storage action. The override requires `VITE_E2E=1` and never changes the shared package scope registry.
+
 The compose image is built with `VITE_E2E=1`, which makes `main.tsx` install `window.__linkyE2E` (`src/devtools/e2e/installLinkyE2eHooks.ts`): raw Evolu upserts under any owner, `useOwners` for legacy lane mnemonics, `shardRows(scope, table)` for what the linksync shards hold, `shardOwnerId(scope, index)`, `syncOwnerIds()` and `forget()`. `lane-migration.spec.ts` seeds legacy lane rows through it instead of the UI, so it keeps working after the app stops writing to the lanes. When building the image by hand, pass `--build-arg VITE_E2E=1`; production builds never set it.
 
 ## Site E2E tests

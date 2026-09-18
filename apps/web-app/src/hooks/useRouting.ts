@@ -100,6 +100,7 @@ type NavigationAction =
   | { route: "evoluHistoryData" }
   | { route: "evoluServer"; id: string }
   | { route: "evoluServerNew" }
+  | { route: "chatStorage" }
   | { route: "evoluServers" }
   | { route: "lnAddressPay"; lnAddress: string }
   | { route: "manualPay" }
@@ -239,6 +240,9 @@ export const navigateTo = (action: NavigationAction): void => {
     case "nostrRelayNew":
       window.location.assign("#nostr-relay/new");
       break;
+    case "chatStorage":
+      window.location.assign("#advanced/chat-storage");
+      return;
     case "evoluServers":
       window.location.assign("#evolu-servers");
       break;

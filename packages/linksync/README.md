@@ -28,7 +28,8 @@ to call the package.
   row into the active shard and tombstones the old copy, so a shard's size is
   final once it stops being active.
 - **Forgetting is a per-scope policy.** Contacts, proofs, and operations are
-  never forgotten. Messages and transactions keep the newest shards only.
+  never forgotten. Fresh devices subscribe only the newest message and transaction shards;
+  existing devices keep older shards until an explicit forget.
 - **The generic core knows no domain.** `src/core` is scopes, shards,
   pointers, merged reads, rotation, forgetting, and legacy ingest over a
   small `ShardDb` port, tested against an in-memory implementation with a toy

@@ -51,7 +51,15 @@ System columns (`id`, `ownerId`, `createdAt`, `updatedAt`, `isDeleted`) are Evol
 
 ## Forgetting
 
-Visible shards are all of them for a `never` scope and the newest N for a `keepNewest: N` scope. A shard outside the window is unsubscribed (a fresh device never downloads it) and, once the port can delete an owner, deleted. Evolu 7 cannot delete an owner yet, so `ShardStore.forget` reports `deleted: false` there; the in-memory port deletes.
+Messages keep the newest **4 shards**, including the active shard. Three retired shards preserve recent context when a rotation happens, while a fresh device's initial chat history stays bounded to roughly 1 MiB of local value bytes at the byte threshold. This is not a message-count or age guarantee: mutation thresholds and large writes can change each shard's size. Contacts, proofs and operations remain complete.
+
+A fresh device reads and subscribes only the newest N shards for a forgettable scope. An existing device retains its older locally held shards across rotations and reloads until an explicit forget. The store remembers the first retained index per scope through the optional device-local `ShardRetention` port; this state must never sync to another device. Without that port, retention lasts for the store's lifetime and locally present rows restore it on reopening. A provisional shard 0 before the first pointer arrives does not establish retention on an empty device.
+
+`ShardStore.forget(scope?)` narrows that scope to its newest window, or all forgettable scopes when omitted, and notifies readers. Evolu 7 only unsubscribes and hides the older rows; local bytes and relay history remain, and the result reports `deleted: false`. Actual deletion waits for Evolu's `deleteOwner` support. The in-memory port can delete. Linky's Chat storage action passes `"messages"`, so it never forgets transaction history.
+
+A cursor update copies the conversation into the active messages shard. `markSeen` only writes for a newer message; opening a chat with no new messages does not move its conversation. Inactive chat state may therefore be forgotten with its old messages. A contact itself is never forgotten.
+
+Initial pointer hydration can expose intermediate indexes. The store does not retain these provisional windows. After the caller's bootstrap gate settles, call `retainVisibleShards()` once to retain the current windows through later remote rotations. Existing local rows and local writes are retained immediately. Linky reuses its Evolu/Nostr bootstrap gate, which waits for quiet reads with an 8 s fallback because Evolu 7 has no initial-sync-complete signal. A severely delayed initial sync can outlast that heuristic; it is not a protocol acknowledgment.
 
 ## Legacy ingest
 

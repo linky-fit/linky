@@ -99,6 +99,13 @@ export function EvoluServersPage(): React.ReactElement {
         </button>
       </div>
 
+      <button
+        type="button"
+        className="settings-row settings-link"
+        onClick={() => navigateTo({ route: "chatStorage" })}
+      >
+        {t("chatStorage")}
+      </button>
       <h3 className="evolu-data-heading">{t("evoluShards")}</h3>
 
       {evoluShards.map((shard) => (

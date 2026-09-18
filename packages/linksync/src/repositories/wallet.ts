@@ -25,7 +25,7 @@ import type {
   ProofPatch,
   ProofStoreService,
 } from "@linky/linkshu";
-import { Clock, Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import type { Patch, Row, WriteRow } from "../core";
 import {
   CashuOperationId,
@@ -269,9 +269,6 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
         const existing = new Map(
           (yield* proofTable.all).map((row) => [row.id, row]),
         );
-        const nowSec = UnixSeconds.make(
-          Math.floor((yield* Clock.currentTimeMillis) / 1000),
-        );
         const stored: StoredProof[] = [];
         for (const proof of rows) {
           const id = cashuProofIdFor(proof.secret);
@@ -280,14 +277,16 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
           yield* previous === undefined
             ? store.insert("cashu", "cashuProof", columns)
             : store.update("cashu", "cashuProof", id, columns);
+          const persisted = previous ?? (yield* proofTable.byId(id));
+          if (persisted === null)
+            return yield* Effect.dieMessage("proof vanished after insert");
           stored.push(
             new StoredProof({
               ...proof,
               id: ProofId.make(id),
-              createdAt:
-                previous === undefined
-                  ? nowSec
-                  : UnixSeconds.make(isoToUnixSeconds(previous.createdAt)),
+              createdAt: UnixSeconds.make(
+                isoToUnixSeconds(persisted.createdAt),
+              ),
             }),
           );
         }
