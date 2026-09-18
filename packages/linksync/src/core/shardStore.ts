@@ -247,6 +247,7 @@ export const createShardStore = <
   const initialized = new Set<string>();
   const visibilityListeners = new Set<() => void>();
   const retain = (scope: string, first: number) => {
+    if (retainedFrom.get(scope) === first) return;
     retainedFrom.set(scope, first);
     options.retention?.set(scope, first);
   };

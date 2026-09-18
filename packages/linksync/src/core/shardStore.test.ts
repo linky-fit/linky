@@ -253,6 +253,38 @@ describe("shard store", () => {
     });
   });
 
+  it("persists retention on the first observation and only when it changes", () => {
+    const { db, appOwner } = toyStore();
+    const writes: Array<{ scope: string; first: number }> = [];
+    const store = createShardStore<ToySchema, typeof toyScopes>({
+      db,
+      appOwner,
+      scopes: toyScopes,
+      retention: {
+        get: () => undefined,
+        set: (scope, first) => {
+          writes.push({ scope, first });
+        },
+      },
+    });
+    run(store.insert("chats", "chat", { id: "a", text: "first" }));
+    expect(writes).toEqual([{ scope: "chats", first: 0 }]);
+    run(store.insert("chats", "chat", { id: "b", text: "second" }));
+    run(store.update("chats", "chat", "a", { text: "edited" }));
+    run(store.retainVisibleShards());
+    expect(writes).toEqual([{ scope: "chats", first: 0 }]);
+    run(store.rotate("chats"));
+    run(store.rotate("chats"));
+    run(store.forget("chats"));
+    expect(writes).toEqual([
+      { scope: "chats", first: 0 },
+      { scope: "chats", first: 1 },
+    ]);
+    run(store.insert("chats", "chat", { id: "c", text: "after forget" }));
+    run(store.forget("chats"));
+    expect(writes).toHaveLength(2);
+  });
+
   it("a fresh store follows only the newest window and persists explicit forgetting across reloads", () => {
     const { db, store, appOwner } = toyStore();
     run(store.insert("chats", "chat", { id: "old", text: "hi" }));
