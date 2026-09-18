@@ -270,7 +270,6 @@ export const de = {
   migratingDataBody: "Das dauert einen Moment. Lass die App geöffnet.",
   evoluTransactionsOwnerRotate: "Transaktionseigentümer wechseln",
   evoluTransactionsOwnerRotating: "Transaktionseigentümer wird gewechselt…",
-  evoluCashuOwnerRotated: "Token-Eigentümer gewechselt",
   evoluCashuOwnerRotate: "Token-Eigentümer wechseln",
   evoluCashuOwnerRotating: "Token-Eigentümer wird gewechselt…",
   evoluContactsCashuOwnerRotate: "Kontakt- und Token-Eigentümer wechseln",

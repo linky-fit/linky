@@ -261,7 +261,6 @@ export const en = {
   migratingDataBody: "This takes a moment. Keep the app open.",
   evoluTransactionsOwnerRotate: "Rotate transactions owner",
   evoluTransactionsOwnerRotating: "Rotating transactions owner…",
-  evoluCashuOwnerRotated: "Tokens owner rotated",
   evoluCashuOwnerRotate: "Rotate tokens owner",
   evoluCashuOwnerRotating: "Rotating tokens owner…",
   evoluContactsCashuOwnerRotate: "Rotate contacts and tokens owner",

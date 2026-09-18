@@ -1,10 +1,7 @@
 // Legacy migration; removal gate in docs/architecture.md
 
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  migrateLegacyCashuLocalState,
-  seedLinkshuSeenMintsFromTokenRows,
-} from "./linkshuStorageMigration";
+import { migrateLegacyCashuLocalState } from "./linkshuStorageMigration";
 
 const MINT = "https://mint.example.com";
 const ENC_MINT = encodeURIComponent(MINT);
@@ -298,65 +295,5 @@ describe("migrateLegacyCashuLocalState", () => {
     migrateLegacyCashuLocalState();
     expect(localStorage.getItem(LEGACY_CURSOR_KEY)).toBe("9999");
     expect(localStorage.getItem(LINKSHU_CURSOR_KEY)).toBeNull();
-  });
-});
-
-describe("seedLinkshuSeenMintsFromTokenRows", () => {
-  const jsonToken = (mint: string): string =>
-    JSON.stringify({
-      mint,
-      proofs: [{ id: "00aa", amount: 2, secret: "s", C: "c" }],
-    });
-
-  it("seeds seen-mint keys from the mint column and from token text, then completes", () => {
-    seedLinkshuSeenMintsFromTokenRows([
-      { mint: MINT, rawToken: null, token: "cashuAnotdecodable" },
-      {
-        mint: null,
-        rawToken: jsonToken("https://mint.row.example"),
-        token: null,
-      },
-    ]);
-
-    expect(localStorage.getItem(linkshuSeenMintKey(MINT))).toBe(MINT);
-    expect(
-      localStorage.getItem(linkshuSeenMintKey("https://mint.row.example")),
-    ).toBe("https://mint.row.example");
-    expect(localStorage.getItem("linky.linkshu_seen_mints_backfill_v1")).toBe(
-      "1",
-    );
-  });
-
-  it("does nothing (and stays pending) for an empty row set", () => {
-    seedLinkshuSeenMintsFromTokenRows([]);
-    expect(storageSnapshot()).toEqual({});
-  });
-
-  it("is a no-op once completed", () => {
-    seedLinkshuSeenMintsFromTokenRows([
-      { mint: MINT, rawToken: null, token: null },
-    ]);
-    seedLinkshuSeenMintsFromTokenRows([
-      { mint: "https://mint.late.example", rawToken: null, token: null },
-    ]);
-
-    expect(
-      localStorage.getItem(linkshuSeenMintKey("https://mint.late.example")),
-    ).toBeNull();
-  });
-
-  it("never overwrites an existing linkshu seen-mint key", () => {
-    localStorage.setItem(linkshuSeenMintKey(MINT), MINT);
-    const before = storageSnapshot();
-
-    seedLinkshuSeenMintsFromTokenRows([
-      { mint: MINT, rawToken: null, token: null },
-    ]);
-
-    expect(localStorage.getItem(linkshuSeenMintKey(MINT))).toBe(MINT);
-    expect(storageSnapshot()).toEqual({
-      ...before,
-      "linky.linkshu_seen_mints_backfill_v1": "1",
-    });
   });
 });

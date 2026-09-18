@@ -265,7 +265,6 @@ export const cs = {
   migratingDataBody: "Chvíli to potrvá. Nezavírej aplikaci.",
   evoluTransactionsOwnerRotate: "Přepnout transakce na nového ownera",
   evoluTransactionsOwnerRotating: "Přepínám transakce na nového ownera…",
-  evoluCashuOwnerRotated: "Owner tokenů byl otočen",
   evoluCashuOwnerRotate: "Přepnout owner tokenů",
   evoluCashuOwnerRotating: "Přepínám owner tokenů…",
   evoluContactsCashuOwnerRotate: "Přepnout owner kontaktů a tokenů",

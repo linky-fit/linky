@@ -1,4 +1,4 @@
-import type * as Evolu from "@evolu/common";
+import type { WalletRepository } from "@linky/linksync";
 import {
   Autoswap,
   AutoswapDraft,
@@ -68,34 +68,14 @@ import type { Either } from "effect";
 import React from "react";
 import { linkshuAppInspector } from "../../../devtools/inspector/linkshuInspector";
 import { migrateLegacyCashuLocalState } from "../../migrations/linkshuStorageMigration";
-import type {
-  CashuOperationRow,
-  CashuProofRow,
-  CashuTokenRow,
-  useEvolu,
-} from "../../../evolu";
-import { useLatest } from "../../../hooks/useLatest";
-import { evoluOperationStore } from "../../../platform/linkshu/evoluOperationStore";
-import { evoluProofStore } from "../../../platform/linkshu/evoluProofStore";
 import { localStorageKeyValueStore } from "../../../platform/linkshu/localStorageKeyValueStore";
 import { resolveLinkshuSeed } from "../../../platform/linkshu/resolveLinkshuSeed";
-import { toLegacyTokenRow } from "../../lib/legacyTokenRow";
-
-type EvoluMutations = ReturnType<typeof useEvolu>;
 
 interface UseLinkshuCompositionParams {
-  /** Inventory rows across cashu owner lanes, deduped by id. */
-  cashuProofRows: readonly CashuProofRow[];
-  /** Operation rows across cashu owner lanes, deduped by id. */
-  cashuOperationRows: readonly CashuOperationRow[];
-  /** Read-only legacy `cashuToken` rows, ingested into the inventory on load. */
-  legacyTokenRows: readonly CashuTokenRow[];
   /** Seed resolution re-runs when the active identity changes. */
   currentNsec: string | null;
-  update: EvoluMutations["update"];
-  upsert: EvoluMutations["upsert"];
-  /** Active cashu write lane; null until the owners are ready. */
-  writeOwnerId: Evolu.OwnerId | null;
+  /** The proof and operation stores over the cashu shards. */
+  wallet: WalletRepository;
 }
 
 const emptyBalances = new WalletBalances({
@@ -311,28 +291,16 @@ const quoteLockingKeyOf = (nsec: string | null): QuoteLockingKey | null => {
 
 /**
  * The app's linkshu composition root: resolves the seed, layers
- * `linkshuServices` over the Evolu `ProofStore`/`OperationStore` and
- * localStorage `KeyValueStore` adapters with the app inspector bridged in,
- * and keeps a `ManagedRuntime` alive for the wallet UI. The read model
- * (proofs, transfers, balances) re-runs through `Tokens` whenever the
- * underlying rows change, and legacy `cashuToken` rows are ingested into
- * the inventory whenever they change.
+ * `linkshuServices` over the shard wallet repository's `ProofStore` and
+ * `OperationStore` and the localStorage `KeyValueStore` with the app
+ * inspector bridged in, and keeps a `ManagedRuntime` alive for the wallet
+ * UI. The read model (proofs, transfers, balances) re-runs through `Tokens`
+ * whenever the wallet repository reports a change.
  */
 export const useLinkshuComposition = ({
-  cashuProofRows,
-  cashuOperationRows,
-  legacyTokenRows,
   currentNsec,
-  update,
-  upsert,
-  writeOwnerId,
+  wallet,
 }: UseLinkshuCompositionParams) => {
-  const proofRowsRef = useLatest(cashuProofRows);
-  const operationRowsRef = useLatest(cashuOperationRows);
-  const writeOwnerIdRef = useLatest(writeOwnerId);
-  const updateRef = useLatest(update);
-  const upsertRef = useLatest(upsert);
-
   const [bip39Seed, setBip39Seed] = React.useState<Bip39Seed | null>(null);
 
   React.useEffect(() => {
@@ -358,43 +326,15 @@ export const useLinkshuComposition = ({
 
   const linkshuRuntime = React.useMemo(() => {
     if (bip39Seed === null) return null;
-    const getWriteOwnerId = () => {
-      const ownerId = writeOwnerIdRef.current;
-      if (ownerId === null) {
-        throw new Error("linkshu write before cashu owner is ready");
-      }
-      return ownerId;
-    };
     return ManagedRuntime.make(
       linkshuServices({
         bip39Seed,
         keyValueStore: localStorageKeyValueStore,
-        proofStore: evoluProofStore({
-          loadProofRows: () => proofRowsRef.current,
-          update: (table, payload, options) =>
-            updateRef.current(table, payload, options),
-          upsert: (table, payload, options) =>
-            upsertRef.current(table, payload, options),
-          getWriteOwnerId,
-        }),
-        operationStore: evoluOperationStore({
-          loadOperationRows: () => operationRowsRef.current,
-          update: (table, payload, options) =>
-            updateRef.current(table, payload, options),
-          upsert: (table, payload, options) =>
-            upsertRef.current(table, payload, options),
-          getWriteOwnerId,
-        }),
+        proofStore: wallet.proofStore,
+        operationStore: wallet.operationStore,
       }).pipe(Layer.provideMerge(linkshuAppInspector)),
     );
-  }, [
-    bip39Seed,
-    operationRowsRef,
-    proofRowsRef,
-    updateRef,
-    upsertRef,
-    writeOwnerIdRef,
-  ]);
+  }, [bip39Seed, wallet]);
 
   /**
    * Topup polling fibers outlive the effect that started them but must die
@@ -414,8 +354,16 @@ export const useLinkshuComposition = ({
     };
   }, [linkshuRuntime, topupScope]);
 
-  const [readModel, setReadModel] =
-    React.useState<LinkshuReadModel>(emptyReadModel);
+  const [readModel, setReadModel] = React.useState<{
+    readonly model: LinkshuReadModel;
+    readonly loaded: boolean;
+  }>({ model: emptyReadModel, loaded: false });
+
+  const [walletVersion, setWalletVersion] = React.useState(0);
+  React.useEffect(
+    () => wallet.subscribe(() => setWalletVersion((value) => value + 1)),
+    [wallet],
+  );
 
   React.useEffect(() => {
     if (linkshuRuntime === null) return;
@@ -433,7 +381,7 @@ export const useLinkshuComposition = ({
         }),
       )
       .then((model) => {
-        if (!cancelled) setReadModel(model);
+        if (!cancelled) setReadModel({ model, loaded: true });
       })
       .catch((error: unknown) => {
         console.warn("[linky] linkshu wallet read failed", error);
@@ -441,40 +389,10 @@ export const useLinkshuComposition = ({
     return () => {
       cancelled = true;
     };
-  }, [cashuProofRows, cashuOperationRows, linkshuRuntime]);
+  }, [linkshuRuntime, walletVersion]);
 
-  // The legacy `cashuToken` table is a permanent read-only feed: any row
-  // whose proofs are not yet in the inventory is ingested, on every device,
-  // whenever the rows change. Ids derive from secrets, so devices converge.
-  const ingestInFlightRef = React.useRef(false);
-  React.useEffect(() => {
-    if (linkshuRuntime === null || writeOwnerId === null) return;
-    if (ingestInFlightRef.current) return;
-    const rows = legacyTokenRows.flatMap((row) => {
-      const legacy = toLegacyTokenRow(row);
-      return legacy === null ? [] : [legacy];
-    });
-    if (rows.length === 0) return;
-    ingestInFlightRef.current = true;
-    void linkshuRuntime
-      .runPromise(
-        Effect.flatMap(Tokens, (tokens) => tokens.ingestLegacyRows(rows)),
-      )
-      .catch((error: unknown) => {
-        console.warn("[linky] legacy cashu row ingest failed", error);
-      })
-      .finally(() => {
-        ingestInFlightRef.current = false;
-      });
-  }, [legacyTokenRows, linkshuRuntime, writeOwnerId]);
-
-  // Every operation may write to the active cashu lane (the launch resumers
-  // carry legacy records over into operations), so none is offered before
-  // the lane is known. Later rotations do not rebuild the operations.
-  const ownerReady = writeOwnerId !== null;
   const operations = React.useMemo(() => {
-    if (linkshuRuntime === null || topupScope === null || !ownerReady)
-      return null;
+    if (linkshuRuntime === null || topupScope === null) return null;
     const runtime = linkshuRuntime;
     type Env = ManagedRuntime.ManagedRuntime.Context<typeof runtime>;
 
@@ -704,7 +622,7 @@ export const useLinkshuComposition = ({
       sendCashuToken,
       startCashuTopup,
     };
-  }, [currentNsec, linkshuRuntime, ownerReady, topupScope]);
+  }, [currentNsec, linkshuRuntime, topupScope]);
 
   return {
     adoptPaidCashuQuote: operations?.adoptPaidCashuQuote ?? null,
@@ -724,9 +642,11 @@ export const useLinkshuComposition = ({
     resumePendingCashuTopups: operations?.resumePendingCashuTopups ?? null,
     sendCashuToken: operations?.sendCashuToken ?? null,
     startCashuTopup: operations?.startCashuTopup ?? null,
-    walletBalances: readModel.balances,
-    walletOperations: readModel.operations,
-    walletProofs: readModel.proofs,
-    walletTransfers: readModel.transfers,
+    walletBalances: readModel.model.balances,
+    /** True once the first inventory read answered; false shows as an empty wallet. */
+    walletLoaded: readModel.loaded,
+    walletOperations: readModel.model.operations,
+    walletProofs: readModel.model.proofs,
+    walletTransfers: readModel.model.transfers,
   };
 };

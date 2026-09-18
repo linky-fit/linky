@@ -89,6 +89,18 @@ export interface ShardStore<
     scope: Scope,
     table: T,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  /**
+   * Every copy of every row in the visible shards, tombstones and duplicate
+   * ids included, highest shard first: for a repository whose domain has a
+   * rule that beats "highest shard wins" (a spent proof anywhere is spent).
+   */
+  readonly copies: <
+    Scope extends keyof R & string,
+    T extends TableOf<R, Scope>,
+  >(
+    scope: Scope,
+    table: T,
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /** Writes the row into the active shard. */
   readonly insert: <
     Scope extends keyof R & string,
@@ -283,6 +295,19 @@ export const createShardStore = <
   const rows = <T extends keyof S & string>(scope: string, table: T) =>
     Effect.map(shardCopies(scope, table), ({ copies }) =>
       copies.filter(isLive),
+    );
+
+  const copies = <T extends keyof S & string>(scope: string, table: T) =>
+    Effect.map(
+      Effect.all([visibleShards(scope), db.readTable(table)]),
+      ([shards, all]) => {
+        const index = indexByOwner(shards);
+        return all
+          .filter((row) => index.has(row.ownerId))
+          .sort(
+            (a, b) => (index.get(b.ownerId) ?? 0) - (index.get(a.ownerId) ?? 0),
+          );
+      },
     );
 
   const activeOwner = (scope: string): Effect.Effect<SyncOwner> =>
@@ -525,6 +550,7 @@ export const createShardStore = <
     shardOwner,
     visibleShards,
     rows,
+    copies,
     insert: (scope, table, row) =>
       Effect.flatMap(activeOwner(scope), (owner) =>
         upsertInto(table, owner.id, row),

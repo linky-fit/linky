@@ -26,7 +26,7 @@ import type {
   ProofStoreService,
 } from "@linky/linkshu";
 import { Clock, Effect, Layer, Schema } from "effect";
-import type { Patch, WriteRow } from "../core";
+import type { Patch, Row, WriteRow } from "../core";
 import {
   CashuOperationId,
   cashuOperationIdFor,
@@ -47,6 +47,13 @@ import { tableRepository } from "./tableRepository";
  * converges on one row; the shard store keeps updates on the active shard
  * (copy-on-write), which is what makes an update of a proof born in an old
  * shard land where it belongs instead of creating a phantom row.
+ *
+ * Two devices can still leave two copies of one proof in different shards
+ * (both wrote it while one of them had not yet seen a rotation), and a
+ * copy-forward can tombstone a copy another device marks spent afterwards.
+ * `spent` is terminal, so a proof reads as spent when any copy in any
+ * visible shard says so, tombstoned or not; the next update patches the
+ * copy that wins the ordinary merge and the copies agree again.
  */
 
 const decodeStoredProof = Schema.decodeUnknownOption(StoredProof);
@@ -133,6 +140,24 @@ const toProofColumns = (proof: NewProof, id: CashuProofId): ProofColumns => ({
     ? { operationId: toOperationIdOrThrow(proof.operationId) }
     : {}),
 });
+
+/** One row per id: the highest shard's copy as the core merges, unless any copy is spent. */
+export const mergeProofCopies = (
+  copies: ReadonlyArray<Row<LinkyDbSchema["cashuProof"]>>,
+): ReadonlyArray<Row<LinkyDbSchema["cashuProof"]>> => {
+  const byId = new Map<string, Row<LinkyDbSchema["cashuProof"]>>();
+  for (const copy of copies) {
+    const current = byId.get(copy.id);
+    if (
+      current === undefined ||
+      (copy.state === "spent" && current.state !== "spent")
+    )
+      byId.set(copy.id, copy);
+  }
+  return [...byId.values()].filter(
+    (row) => row.state === "spent" || row.isDeleted !== 1,
+  );
+};
 
 const toProofPatch = (
   patch: ProofPatch,
@@ -238,6 +263,7 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
   const operationTable = tableRepository(store, "cashu", "cashuOperation");
 
   const proofs: ProofStoreService = {
+    // One rotation check for the whole batch, not one per proof.
     insert: (rows) =>
       Effect.gen(function* () {
         const existing = new Map(
@@ -252,8 +278,8 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
           const previous = existing.get(id);
           const columns = toProofColumns(proof, id);
           yield* previous === undefined
-            ? proofTable.insert(columns)
-            : proofTable.update(id, columns);
+            ? store.insert("cashu", "cashuProof", columns)
+            : store.update("cashu", "cashuProof", id, columns);
           stored.push(
             new StoredProof({
               ...proof,
@@ -265,14 +291,15 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
             }),
           );
         }
+        yield* proofTable.maybeRotate;
         return stored;
       }).pipe(Effect.orDie),
     update: (id, patch) =>
       patchKnownRow(CashuProofId.fromUnknown(id), (proofId) =>
         proofTable.update(proofId, toProofPatch(patch)),
       ),
-    loadAll: Effect.map(proofTable.all, (rows) =>
-      rows.flatMap((row) => {
+    loadAll: Effect.map(store.copies("cashu", "cashuProof"), (copies) =>
+      mergeProofCopies(copies).flatMap((row) => {
         const stored = toStoredProof(row);
         return stored === null ? [] : [stored];
       }),

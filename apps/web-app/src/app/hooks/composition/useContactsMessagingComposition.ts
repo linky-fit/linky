@@ -209,8 +209,7 @@ interface UseContactsMessagingCompositionParams {
   activeSyncedNostrIdentity: IdentityOwnersCompositionResult["activeSyncedNostrIdentity"];
   appOwnerId: IdentityOwnersCompositionResult["appOwnerId"];
   appOwnerIdRef: IdentityOwnersCompositionResult["appOwnerIdRef"];
-  cashuOwnerId: IdentityOwnersCompositionResult["cashuOwnerId"];
-  cashuTokensAll: NostrBootstrapParams["tokensSnapshot"];
+  cashuProofs: NostrBootstrapParams["tokensSnapshot"];
   contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   contactsOwnerId: IdentityOwnersCompositionResult["contactsOwnerId"];
   contactsOwnerNewContactsCount: number;
@@ -259,8 +258,7 @@ export const useContactsMessagingComposition = ({
   activeSyncedNostrIdentity,
   appOwnerId,
   appOwnerIdRef,
-  cashuOwnerId,
-  cashuTokensAll,
+  cashuProofs,
   contactPayBackToChatRef,
   contactsOwnerId,
   contactsOwnerNewContactsCount,
@@ -559,7 +557,6 @@ export const useContactsMessagingComposition = ({
 
   const evoluOwnersReadyForNostr = isSeedLogin
     ? Boolean(
-        cashuOwnerId &&
         contactsOwnerId &&
         identityOwnerId &&
         legacyIdentitiesOwnerId &&
@@ -575,7 +572,6 @@ export const useContactsMessagingComposition = ({
     return [
       currentNpub,
       appOwnerId,
-      cashuOwnerId,
       contactsOwnerId,
       identityOwnerId,
       legacyIdentitiesOwnerId,
@@ -588,7 +584,6 @@ export const useContactsMessagingComposition = ({
       .join("|");
   }, [
     appOwnerId,
-    cashuOwnerId,
     contactsOwnerId,
     currentNpub,
     evoluOwnersReadyForNostr,
@@ -636,7 +631,7 @@ export const useContactsMessagingComposition = ({
     messagesSnapshot: nostrMessagesLocal,
     ownerKey: evoluNostrOwnerKey,
     reactionsSnapshot: nostrReactionsLocal,
-    tokensSnapshot: cashuTokensAll,
+    tokensSnapshot: cashuProofs,
     transactionsSnapshot: transactionsBootstrapSnapshot,
   });
   const deferredOnlineReady = useDeferredOnlineReady();

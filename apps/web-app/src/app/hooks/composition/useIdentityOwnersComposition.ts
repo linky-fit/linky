@@ -45,7 +45,6 @@ export const useIdentityOwnersComposition = ({
   upsert,
 }: UseIdentityOwnersCompositionParams) => {
   const appOwnerIdRef = React.useRef<Evolu.OwnerId | null>(null);
-  const cashuOwnerIdRef = React.useRef<Evolu.OwnerId | null>(null);
   const messagesOwnerIdRef = React.useRef<Evolu.OwnerId | null>(null);
 
   const syncOwner = useEvoluSyncOwner(Boolean(currentNsec));
@@ -84,15 +83,12 @@ export const useIdentityOwnersComposition = ({
   });
 
   useOwner(ownerRotation.contactsSyncOwner);
-  useOwner(ownerRotation.cashuSyncOwner);
   useOwner(ownerRotation.messagesSyncOwner);
   useOwner(ownerRotation.metaSyncOwner);
   useOwner(ownerRotation.identitySyncOwner);
 
   const historicalOwnerSetsReady = profileAuth.isSeedLogin
-    ? ownerRotation.cashuVisibleOwnerIds.length ===
-        ownerRotation.cashuOwnerIndex + 1 &&
-      ownerRotation.contactsVisibleOwnerIds.length ===
+    ? ownerRotation.contactsVisibleOwnerIds.length ===
         ownerRotation.contactsOwnerIndex + 1 &&
       ownerRotation.messagesVisibleOwnerIds.length ===
         ownerRotation.messagesOwnerIndex + 1
@@ -116,10 +112,6 @@ export const useIdentityOwnersComposition = ({
     ownerRotation.historicalBootstrapSyncOwners,
     profileAuth.isSeedLogin,
   ]);
-
-  React.useEffect(() => {
-    cashuOwnerIdRef.current = ownerRotation.cashuOwnerId;
-  }, [ownerRotation.cashuOwnerId]);
 
   React.useEffect(() => {
     messagesOwnerIdRef.current = ownerRotation.messagesOwnerId;
@@ -238,7 +230,6 @@ export const useIdentityOwnersComposition = ({
     appOwnerId,
     appOwnerIdRef,
     appendIdentityChangeNoticesRef,
-    cashuOwnerIdRef,
     currentNsec,
     historicalOwnerSetsReady,
     messagesOwnerIdRef,

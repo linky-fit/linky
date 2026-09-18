@@ -4,9 +4,7 @@ import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
 import { readRowOwnerId } from "../app/lib/rowOwnerId";
 import { loadEvoluCurrentData } from "../evolu";
 import { formatEvoluDebugValue } from "../utils/evoluDebugValue";
-import { writeClipboardText } from "../platform/clipboard";
 import {
-  CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
   CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
   MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
 } from "../utils/constants";
@@ -25,7 +23,6 @@ interface EvoluDataSectionConfig {
 function isTrackedTable(tableName: string): boolean {
   return (
     tableName === "contact" ||
-    tableName === "cashuToken" ||
     tableName === "cashuProof" ||
     tableName === "cashuOperation" ||
     tableName === "nostrMessage" ||
@@ -36,8 +33,6 @@ function isTrackedTable(tableName: string): boolean {
 
 export function EvoluCurrentDataPage(): React.ReactElement {
   const {
-    evoluCashuOwnerEditsUntilRotation,
-    evoluCashuOwnerId,
     evoluCashuOwnerIndex,
     evoluCashuVisibleOwnerIds,
     evoluContactsOwnerEditsUntilRotation,
@@ -67,7 +62,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>(
     {},
   );
-  const [copiedCellKey, setCopiedCellKey] = useState<string | null>(null);
 
   useEffect(() => {
     loadEvoluCurrentData().then((data) => {
@@ -76,27 +70,9 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     });
   }, []);
 
-  useEffect(() => {
-    if (copiedCellKey === null) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setCopiedCellKey((current) =>
-        current === copiedCellKey ? null : current,
-      );
-    }, 1500);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [copiedCellKey]);
-
   const filteredCurrentData = React.useMemo(() => {
     const activeContactsOwnerId = (evoluContactsOwnerId ?? "").trim();
-    const visibleCashuOwnerIds = new Set(
-      [evoluCashuOwnerId, ...evoluCashuVisibleOwnerIds]
-        .map((ownerId) => (ownerId ?? "").trim())
-        .filter(Boolean),
-    );
+    const visibleCashuOwnerIds = new Set<string>(evoluCashuVisibleOwnerIds);
     const visibleMessageOwnerIds = new Set(
       [evoluMessagesOwnerId, ...evoluMessagesVisibleOwnerIds]
         .map((ownerId) => (ownerId ?? "").trim())
@@ -121,11 +97,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
               ),
             ];
           }
-          if (
-            tableName === "cashuToken" ||
-            tableName === "cashuProof" ||
-            tableName === "cashuOperation"
-          ) {
+          if (tableName === "cashuProof" || tableName === "cashuOperation") {
             if (visibleCashuOwnerIds.size === 0) return [tableName, []];
             return [
               tableName,
@@ -155,7 +127,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     );
   }, [
     currentData,
-    evoluCashuOwnerId,
     evoluCashuVisibleOwnerIds,
     evoluContactsOwnerId,
     evoluMessagesOwnerId,
@@ -164,16 +135,17 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   ]);
 
   const trackedTableConfigs = React.useMemo(() => {
-    // The three cashu tables share one lane; the inventory carries the
-    // rotate button, the other two only report the shared owner index.
+    // Both cashu tables share one shard; the inventory carries the rotate
+    // button, the other only reports the shared index. The store rotates by
+    // bytes or mutations on its own, so there is no edit counter to show.
     const cashuConfig = (
       label: string,
       withRotate: boolean,
     ): EvoluDataSectionConfig => ({
       label,
       ownerIndex: evoluCashuOwnerIndex,
-      editsUntilRotation: evoluCashuOwnerEditsUntilRotation,
-      rotationLimit: CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+      editsUntilRotation: null,
+      rotationLimit: null,
       onRotate: withRotate ? requestManualRotateCashuOwner : null,
       rotateLabel: withRotate ? t("evoluCashuOwnerRotate") : null,
       rotateIsBusy: rotateCashuOwnerIsBusy,
@@ -204,7 +176,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
           rotatingLabel: t("evoluContactsCashuOwnerRotating"),
         },
       ],
-      ["cashuToken", cashuConfig(t("tokens"), false)],
       ["cashuProof", cashuConfig(t("cashuProofsTable"), true)],
       ["cashuOperation", cashuConfig(t("cashuOperationsTable"), false)],
       ["nostrMessage", messageConfig(t("messagesTitle"))],
@@ -226,7 +197,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
       ],
     ]);
   }, [
-    evoluCashuOwnerEditsUntilRotation,
     evoluCashuOwnerIndex,
     evoluContactsOwnerEditsUntilRotation,
     evoluContactsOwnerIndex,
@@ -303,7 +273,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
                 ? Math.min(100, Math.max(0, (usedEdits / rotationLimit) * 100))
                 : 0;
             const isExpanded = expandedTables[tableName] === true;
-            const isCashuTokenTable = tableName === "cashuToken";
             const visibleRows = isExpanded
               ? rows
               : rows.slice(0, previewRowCount);
@@ -420,44 +389,13 @@ export function EvoluCurrentDataPage(): React.ReactElement {
                                     val,
                                   );
                                   const previewValue = fullValue.slice(0, 50);
-                                  const cellKey = `${tableName}:${idx}:${key}`;
-                                  const isCopied = copiedCellKey === cellKey;
 
                                   return (
                                     <td
                                       key={valueIdx}
                                       className="evolu-data-cell"
                                     >
-                                      {isCashuTokenTable ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            void writeClipboardText(
-                                              fullValue,
-                                            ).then((copied) => {
-                                              if (!copied) return;
-                                              setCopiedCellKey(cellKey);
-                                            });
-                                          }}
-                                          title={
-                                            isCopied
-                                              ? t("copiedToClipboard")
-                                              : t("copy")
-                                          }
-                                          aria-label={
-                                            isCopied
-                                              ? t("copiedToClipboard")
-                                              : t("copy")
-                                          }
-                                          className="evolu-data-button"
-                                        >
-                                          {isCopied
-                                            ? t("copiedToClipboard")
-                                            : previewValue}
-                                        </button>
-                                      ) : (
-                                        previewValue
-                                      )}
+                                      {previewValue}
                                     </td>
                                   );
                                 })}

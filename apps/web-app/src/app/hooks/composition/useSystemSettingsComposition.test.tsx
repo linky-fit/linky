@@ -53,8 +53,6 @@ type EvoluSettingsInput = Omit<
 const createEvoluSettings = (
   wipeEvoluStorage: () => Promise<void>,
 ): EvoluSettingsInput => ({
-  evoluCashuOwnerEditsUntilRotation: 0,
-  evoluCashuOwnerId: null,
   evoluCashuOwnerIndex: 0,
   evoluCashuVisibleOwnerIds: [],
   evoluContactsOwnerEditCount: 0,

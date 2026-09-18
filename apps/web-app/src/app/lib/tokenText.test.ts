@@ -1,46 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildCashuToken } from "../../testUtils/cashuToken";
-import { createCashuTokenRowFixture } from "../../testUtils/cashuTokenRow";
 import {
   extractCashuTokenFromText,
-  extractCashuTokenMeta,
   isStandaloneCashuTokenMessage,
 } from "./tokenText";
-
-describe("extractCashuTokenMeta", () => {
-  it("derives mint, unit, and amount from the token", () => {
-    const token = buildCashuToken({ amounts: [8, 13] });
-
-    expect(
-      extractCashuTokenMeta(createCashuTokenRowFixture({ token })),
-    ).toEqual({
-      tokenText: token,
-      mint: "https://mint.example",
-      unit: "sat",
-      amount: 21,
-    });
-  });
-
-  it("prefers token metadata over deprecated stored snapshots", () => {
-    const token = buildCashuToken({ amounts: [8, 13] });
-
-    expect(
-      extractCashuTokenMeta({
-        ...createCashuTokenRowFixture({
-          token,
-          mint: "https://stale.example",
-          unit: "usd",
-          amount: 999,
-        }),
-      }),
-    ).toEqual({
-      tokenText: token,
-      mint: "https://mint.example",
-      unit: "sat",
-      amount: 21,
-    });
-  });
-});
 
 describe("extractCashuTokenFromText", () => {
   it("normalizes cashu.me legacy proof bundles into claimable tokens", () => {

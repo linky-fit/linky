@@ -20,7 +20,7 @@ What lives where: the `ProofStore` and `OperationStore` are the wallet — sync 
 Complete, short implementations to copy from:
 
 - `apps/linkshu-cli/src/fileKeyValueStore.ts`, `fileProofStore.ts`, and `fileOperationStore.ts` — one JSON file each, safe across processes.
-- `apps/web-app/src/platform/linkshu/localStorageKeyValueStore.ts`, `evoluProofStore.ts`, and `evoluOperationStore.ts` — the browser adapters; `evoluWriteOverlay.ts` is the read-after-write bridge both Evolu adapters share.
+- `apps/web-app/src/platform/linkshu/localStorageKeyValueStore.ts` — the browser `KeyValueStore`; the web app's `ProofStore` and `OperationStore` are `packages/linksync/src/repositories/wallet.ts` over the cashu shards, with the read-after-write overlay in the package's Evolu adapter.
 - `apps/site/src/cashu/walletStorage.ts` — all three stores over `localStorage`, for the public site's redemption page.
 
 ## `KeyValueStore`

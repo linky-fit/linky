@@ -191,13 +191,6 @@ export type ContactFormState = {
   npub: string;
 };
 
-export type CashuTokenMeta = {
-  amount: number | null;
-  mint: string | null;
-  tokenText: string;
-  unit: string | null;
-};
-
 export type TopbarButton = {
   icon: string;
   label: string;

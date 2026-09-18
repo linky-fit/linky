@@ -7,11 +7,7 @@ import {
   subscribeEvoluHistoryMutationVersion,
 } from "../../evolu";
 import {
-  CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
   CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-  EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
   EVOLU_CONTACTS_OWNER_BASELINE_COUNT_STORAGE_KEY,
   EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
   EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
@@ -49,7 +45,6 @@ type UpsertOwnerMeta = (
 type CounterMap = Record<string, number>;
 
 interface RotationSnapshotsByScope {
-  cashu: RotationSnapshot | null;
   contacts: RotationSnapshot | null;
   messages: RotationSnapshot | null;
 }
@@ -71,11 +66,6 @@ interface UseEvoluContactsOwnerRotationParams {
 }
 
 interface UseEvoluContactsOwnerRotationResult {
-  cashuOwnerId: Evolu.OwnerId | null;
-  cashuOwnerEditsUntilRotation: number;
-  cashuOwnerIndex: number;
-  cashuSyncOwner: Evolu.SyncOwner | null;
-  cashuVisibleOwnerIds: Evolu.OwnerId[];
   contactsOwnerEditCount: number;
   contactsOwnerEditsUntilRotation: number;
   contactsOwnerId: Evolu.OwnerId | null;
@@ -96,10 +86,8 @@ interface UseEvoluContactsOwnerRotationResult {
   messagesOwnerEditsUntilRotation: number;
   messagesSyncOwner: Evolu.SyncOwner | null;
   messagesVisibleOwnerIds: Evolu.OwnerId[];
-  requestManualRotateCashuOwner: () => Promise<void>;
   requestManualRotateContactsOwner: () => Promise<void>;
   requestManualRotateMessagesOwner: () => Promise<void>;
-  rotateCashuOwnerIsBusy: boolean;
   rotateContactsOwnerIsBusy: boolean;
   rotateMessagesOwnerIsBusy: boolean;
 }
@@ -125,7 +113,6 @@ const readRotationSnapshotsByScope = (
   metaOwnerId: string,
 ): RotationSnapshotsByScope => {
   const snapshots: RotationSnapshotsByScope = {
-    cashu: null,
     contacts: null,
     messages: null,
   };
@@ -140,13 +127,7 @@ const readRotationSnapshotsByScope = (
         : null;
     const scopeText = typeof scope === "string" ? scope.trim() : "";
 
-    if (
-      scopeText !== "cashu" &&
-      scopeText !== "contacts" &&
-      scopeText !== "messages"
-    ) {
-      continue;
-    }
+    if (scopeText !== "contacts" && scopeText !== "messages") continue;
 
     const decoded = decodeRotationSnapshot(readRowPointerValue(row), scopeText);
     if (!decoded) continue;
@@ -246,14 +227,6 @@ const getCooldownRemainingMs = (
   return Math.max(0, cooldownMs - elapsed);
 };
 
-const getStoredOptionalIndex = (storageKey: string): number | null => {
-  const raw = safeLocalStorageGet(storageKey);
-  if (raw === null) return null;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0) return 0;
-  return Math.trunc(parsed);
-};
-
 const toAppOwnerFromMnemonic = (mnemonic: string): Evolu.AppOwner | null => {
   const parsed = Evolu.Mnemonic.fromUnknown(mnemonic);
   if (!parsed.ok) return null;
@@ -312,7 +285,7 @@ const deriveFixedOwnerSyncDataFromSeed = async (
   };
 };
 
-type RotatingOwnerRole = "contacts" | "cashu" | "messages";
+type RotatingOwnerRole = "contacts" | "messages";
 
 const deriveVisibleOwnerSyncDataFromSeed = async (
   slip39Seed: string,
@@ -353,14 +326,6 @@ const OWNER_LANES: Record<RotatingOwnerRole, OwnerLaneConfig> = {
     rotatedLabel: "evoluContactsOwnerRotated",
     tables: ["contact"],
   },
-  cashu: {
-    indexKey: EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
-    baselineKey: EVOLU_CASHU_OWNER_BASELINE_COUNT_STORAGE_KEY,
-    rotatedAtKey: EVOLU_CASHU_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-    threshold: CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-    rotatedLabel: "evoluCashuOwnerRotated",
-    tables: ["cashuToken", "cashuProof", "cashuOperation"],
-  },
   messages: {
     indexKey: EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
     baselineKey: EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
@@ -378,7 +343,6 @@ interface UseOwnerLaneParams extends UseEvoluContactsOwnerRotationParams {
   rows: readonly object[];
   historyCount: number | undefined;
   allowMissingOwnerMetaBootstrap: boolean;
-  cashuWriteCount?: number;
 }
 
 const countOwnerRows = (rows: readonly object[], ownerId: string): number =>
@@ -397,18 +361,12 @@ export const useOwnerLane = ({
   rows,
   historyCount,
   allowMissingOwnerMetaBootstrap,
-  cashuWriteCount = 0,
 }: UseOwnerLaneParams) => {
   const config = OWNER_LANES[scope];
-  const [initialIndex] = React.useState(() =>
-    scope === "cashu"
-      ? (getStoredOptionalIndex(config.indexKey) ??
-        readStoredNonNegativeInt(OWNER_LANES.contacts.indexKey))
-      : readStoredNonNegativeInt(config.indexKey),
+  const [index, setIndex] = React.useState(() =>
+    readStoredNonNegativeInt(config.indexKey),
   );
-  const [index, setIndex] = React.useState(initialIndex);
   const pendingTarget = React.useRef<number | null>(null);
-  const bootstrapRecoveryPending = React.useRef(scope === "cashu");
   const [owner, setOwner] = React.useState<Evolu.AppOwner | null>(null);
   const [visibleOwners, setVisibleOwners] = React.useState<Evolu.SyncOwner[]>(
     [],
@@ -475,33 +433,6 @@ export const useOwnerLane = ({
   }, [config.baselineKey, index, isSeedLogin, writeCount]);
 
   React.useEffect(() => {
-    if (!bootstrapRecoveryPending.current || !isSeedLogin) return;
-    if (snapshot || index !== initialIndex) {
-      bootstrapRecoveryPending.current = false;
-      return;
-    }
-    if (!allowMissingOwnerMetaBootstrap || !metaOwner || !owner || isBusy)
-      return;
-    bootstrapRecoveryPending.current = false;
-    if (index <= 0 || writeCount > 0) return;
-    writeStoredNonNegativeInt(config.indexKey, 0);
-    setCounterValue(config.baselineKey, 0, 0);
-    writeStoredNonNegativeInt(config.rotatedAtKey, 0);
-    setIndex(0);
-  }, [
-    allowMissingOwnerMetaBootstrap,
-    config,
-    index,
-    initialIndex,
-    isBusy,
-    isSeedLogin,
-    metaOwner,
-    owner,
-    snapshot,
-    writeCount,
-  ]);
-
-  React.useEffect(() => {
     if (!isSeedLogin || !metaOwner || !owner) return;
     const shouldWrite = snapshot
       ? needsStructuredSnapshotUpgrade(snapshot, resolvedIndex)
@@ -510,12 +441,11 @@ export const useOwnerLane = ({
     upsertOwnerMetaSnapshot(upsert, metaOwner.id, scope, {
       index: resolvedIndex,
       baseline: writeCount,
-      cashuBaseline: scope === "contacts" ? cashuWriteCount : null,
+      cashuBaseline: null,
       rotatedAtMs: Date.now(),
     });
   }, [
     allowMissingOwnerMetaBootstrap,
-    cashuWriteCount,
     isSeedLogin,
     metaOwner,
     owner,
@@ -560,7 +490,7 @@ export const useOwnerLane = ({
       const result = upsertOwnerMetaSnapshot(upsert, metaOwner.id, scope, {
         index: nextIndex,
         baseline: 0,
-        cashuBaseline: scope === "contacts" ? cashuWriteCount : null,
+        cashuBaseline: null,
         rotatedAtMs: nowMs,
       });
       if (!result.ok) {
@@ -598,7 +528,6 @@ export const useOwnerLane = ({
       setIsBusy(false);
     }
   }, [
-    cashuWriteCount,
     config,
     isSeedLogin,
     metaOwner,
@@ -714,28 +643,6 @@ export const useEvoluContactsOwnerRotation = (
     [],
   );
   const allContactsRows = useQuery(allContactsQuery);
-  const allCashuTokensQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("cashuToken")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-  const allCashuTokensRows = useQuery(allCashuTokensQuery);
-  const allCashuProofsQuery = React.useMemo(
-    () => evolu.createQuery((db) => db.selectFrom("cashuProof").selectAll()),
-    [],
-  );
-  const allCashuProofsRows = useQuery(allCashuProofsQuery);
-  const allCashuOperationsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) => db.selectFrom("cashuOperation").selectAll()),
-    [],
-  );
-  const allCashuOperationsRows = useQuery(allCashuOperationsQuery);
   const allNostrMessagesQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -796,29 +703,13 @@ export const useEvoluContactsOwnerRotation = (
     () => [...allNostrMessagesRows, ...allNostrReactionsRows],
     [allNostrMessagesRows, allNostrReactionsRows],
   );
-  const cashuRows = React.useMemo(
-    () => [
-      ...allCashuTokensRows,
-      ...allCashuProofsRows,
-      ...allCashuOperationsRows,
-    ],
-    [allCashuOperationsRows, allCashuProofsRows, allCashuTokensRows],
-  );
   const shared = { ...params, metaOwner, allowMissingOwnerMetaBootstrap };
-  const cashu = useOwnerLane({
-    ...shared,
-    scope: "cashu",
-    snapshot: snapshots.cashu,
-    rows: cashuRows,
-    historyCount: historyMutationCounts.cashu,
-  });
   const contacts = useOwnerLane({
     ...shared,
     scope: "contacts",
     snapshot: snapshots.contacts,
     rows: allContactsRows,
     historyCount: historyMutationCounts.contacts,
-    cashuWriteCount: cashu.writeCount,
   });
   const messages = useOwnerLane({
     ...shared,
@@ -834,12 +725,6 @@ export const useEvoluContactsOwnerRotation = (
         ownerId: contacts.ownerId,
         rotatedAtMs: contacts.rotatedAtMs,
         tables: OWNER_LANES.contacts.tables,
-      },
-      {
-        key: "cashu",
-        ownerId: cashu.ownerId,
-        rotatedAtMs: cashu.rotatedAtMs,
-        tables: OWNER_LANES.cashu.tables,
       },
       {
         key: "messages",
@@ -869,8 +754,6 @@ export const useEvoluContactsOwnerRotation = (
       window.clearTimeout(timer);
     };
   }, [
-    cashu.ownerId,
-    cashu.rotatedAtMs,
     contacts.ownerId,
     contacts.rotatedAtMs,
     messages.ownerId,
@@ -880,29 +763,13 @@ export const useEvoluContactsOwnerRotation = (
   ]);
   const historicalBootstrapSyncOwners = React.useMemo(() => {
     if (!isSeedLogin) return EMPTY_SYNC_OWNERS;
-    const owners = [
-      ...cashu.historicalOwners,
-      ...contacts.historicalOwners,
-      ...messages.historicalOwners,
-    ];
+    const owners = [...contacts.historicalOwners, ...messages.historicalOwners];
     return owners.filter(
       (owner, index) =>
         owners.findIndex((candidate) => candidate.id === owner.id) === index,
     );
-  }, [
-    cashu.historicalOwners,
-    contacts.historicalOwners,
-    messages.historicalOwners,
-    isSeedLogin,
-  ]);
+  }, [contacts.historicalOwners, messages.historicalOwners, isSeedLogin]);
   return {
-    cashuOwnerId: cashu.ownerId,
-    cashuOwnerEditsUntilRotation: cashu.editsUntilRotation,
-    cashuOwnerIndex: cashu.index,
-    cashuSyncOwner: cashu.syncOwner,
-    cashuVisibleOwnerIds: cashu.visibleOwnerIds,
-    requestManualRotateCashuOwner: cashu.requestManualRotate,
-    rotateCashuOwnerIsBusy: cashu.isBusy,
     contactsOwnerId: contacts.ownerId,
     contactsOwnerEditsUntilRotation: contacts.editsUntilRotation,
     contactsOwnerIndex: contacts.index,

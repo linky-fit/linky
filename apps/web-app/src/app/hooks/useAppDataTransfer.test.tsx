@@ -1,11 +1,9 @@
 import { act, createRef, useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CashuTokenRow } from "../../evolu";
-import { createCashuTokenRowFixture } from "../../testUtils/cashuTokenRow";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { useAppDataTransfer } from "./useAppDataTransfer";
 
-const mount = async (cashuTokens: readonly CashuTokenRow[] = []) => {
+const mount = async () => {
   const insert = vi.fn();
   const update = vi.fn();
   const pushToast = vi.fn();
@@ -15,7 +13,6 @@ const mount = async (cashuTokens: readonly CashuTokenRow[] = []) => {
       appOwnerId: null,
       cashuOperations: [],
       cashuProofs: [],
-      cashuTokens,
       contacts: [],
       importCashuLegacyRows: null,
       importCashuOperation: null,
@@ -46,40 +43,6 @@ describe("useAppDataTransfer", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-  });
-
-  it("exports the original identity of rewritten tokens in the legacy backup field", async () => {
-    const { transfer } = await mount([
-      createCashuTokenRowFixture({
-        token: "cashuAcurrent",
-        originalTokenText: "cashuAoriginal",
-        rawToken: "cashuAlegacy",
-      }),
-      createCashuTokenRowFixture({
-        token: "cashuAcurrent2",
-        rawToken: "cashuAlegacy2",
-      }),
-    ]);
-    const blobs: Blob[] = [];
-    vi.stubGlobal("URL", {
-      createObjectURL: (blob: Blob) => {
-        blobs.push(blob);
-        return "blob:backup";
-      },
-      revokeObjectURL: vi.fn(),
-    });
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    transfer.exportAppData();
-    expect(blobs).toHaveLength(1);
-    const reader = new FileReader();
-    const text = new Promise<string>((resolve) => {
-      reader.onload = () => resolve(String(reader.result));
-    });
-    reader.readAsText(blobs[0]);
-    expect(JSON.parse(await text).cashuTokens).toEqual([
-      expect.objectContaining({ rawToken: "cashuAoriginal" }),
-      expect.objectContaining({ rawToken: "cashuAlegacy2" }),
-    ]);
   });
 
   it("rejects a backup containing wallet rows before writing contacts when the wallet is unavailable", async () => {

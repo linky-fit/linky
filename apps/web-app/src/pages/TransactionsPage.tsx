@@ -21,7 +21,10 @@ import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
 import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
 import { deriveDefaultProfile } from "../derivedProfile";
 import { evolu } from "../evolu";
-import { useTransactionRecords } from "../app/hooks/useLinksync";
+import {
+  useTransactionRecords,
+  useWalletOperations,
+} from "../app/hooks/useLinksync";
 import type { Translate } from "../i18n";
 import { getLightningInvoicePreview } from "@linky/linkshu";
 import {
@@ -319,16 +322,6 @@ export function TransactionsPage(): React.ReactElement {
     [],
   );
 
-  const cashuTokensQuery = React.useMemo(
-    () => evolu.createQuery((db) => db.selectFrom("cashuToken").selectAll()),
-    [],
-  );
-  const cashuOperationsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) => db.selectFrom("cashuOperation").selectAll()),
-    [],
-  );
-
   const nostrMessagesQuery = React.useMemo(
     () =>
       evolu.createQuery((db) =>
@@ -341,26 +334,21 @@ export function TransactionsPage(): React.ReactElement {
   );
 
   const contactRows = useQuery(contactsQuery);
-  const cashuTokenRows = useQuery(cashuTokensQuery);
-  const cashuOperationRows = useQuery(cashuOperationsQuery);
+  const cashuOperations = useWalletOperations();
   const nostrMessageRows = useQuery(nostrMessagesQuery);
   const transactionRecords = useTransactionRecords();
 
   const tokenByReferenceId = React.useMemo(() => {
     const tokens = new Map<string, string>();
-    for (const row of cashuTokenRows) {
-      for (const candidate of [row.token, row.rawToken]) {
-        const token = asNonEmptyString(candidate);
-        if (!token) continue;
-        tokens.set(createCashuTokenId(token), token);
-      }
-    }
-    for (const row of cashuOperationRows) {
-      const token = asNonEmptyString(row.tokenText);
-      if (token) tokens.set(createCashuTokenId(token), token);
+    for (const operation of cashuOperations) {
+      if (operation.tokenText !== null)
+        tokens.set(
+          createCashuTokenId(operation.tokenText),
+          operation.tokenText,
+        );
     }
     return tokens;
-  }, [cashuOperationRows, cashuTokenRows]);
+  }, [cashuOperations]);
 
   const contactsById = React.useMemo(() => {
     const byId = new Map<string, ContactSummary>();

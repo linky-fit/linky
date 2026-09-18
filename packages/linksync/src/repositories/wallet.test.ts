@@ -1,7 +1,11 @@
 import { NewOperation, NewProof, OperationId, ProofId } from "@linky/linkshu";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+import { makeInMemoryShardDb, type ShardDb } from "../core";
 import { cashuProofIdFor } from "../model/ids";
+import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
+import { createLinkyStore } from "../model/store";
 import { linkyStore, runNow } from "../testing/linky";
+import { testAppOwner } from "../testing/toy";
 import { makeWalletRepository } from "./wallet";
 
 const proof = (secret: string, state: NewProof["state"] = "available") =>
@@ -16,6 +20,16 @@ const proof = (secret: string, state: NewProof["state"] = "available") =>
     state,
     operationId: null,
   });
+
+const toColumns = (p: NewProof) => ({
+  mint: p.mint,
+  unit: p.unit,
+  keysetId: p.keysetId,
+  amount: p.amount,
+  secret: p.secret,
+  c: p.C,
+  state: p.state,
+});
 
 const operation = (tokenText: string) =>
   Schema.decodeUnknownSync(NewOperation)({
@@ -88,6 +102,79 @@ describe("wallet repository", () => {
         isDeleted: null,
       });
       expect(runNow(proofs.loadAll).map((p) => p.state)).toEqual(["spent"]);
+    });
+
+    it("reads a proof as spent when an older shard's copy says so", () => {
+      const { db, store } = linkyStore();
+      const { proofs } = makeWalletRepository(store);
+      const [stored] = runNow(proofs.insert([proof("s1")]));
+      if (stored === undefined) throw new Error("no proof stored");
+      runNow(proofs.update(stored.id, { state: "spent" }));
+      runNow(store.rotate("cashu"));
+      // Another device that had not seen the rotation wrote the same
+      // proof into the new shard before learning it was spent.
+      runNow(
+        db.mutate([
+          {
+            kind: "upsert",
+            table: "cashuProof",
+            ownerId: store.shardOwner("cashu", 1).id,
+            row: { ...toColumns(proof("s1")), id: stored.id },
+          },
+        ]),
+      );
+      expect(runNow(proofs.loadAll).map((p) => p.state)).toEqual(["spent"]);
+    });
+
+    it("reads a proof as spent when the copy a copy-forward tombstoned was spent meanwhile", () => {
+      const { db, store } = linkyStore();
+      const { proofs } = makeWalletRepository(store);
+      const [stored] = runNow(proofs.insert([proof("s1")]));
+      if (stored === undefined) throw new Error("no proof stored");
+      runNow(store.rotate("cashu"));
+      runNow(proofs.update(stored.id, { state: "held" }));
+      // The other device spent it in shard 0 while this one held it in shard 1.
+      runNow(
+        db.mutate([
+          {
+            kind: "update",
+            table: "cashuProof",
+            ownerId: store.shardOwner("cashu", 0).id,
+            row: { id: stored.id, state: "spent" },
+          },
+        ]),
+      );
+      expect(runNow(proofs.loadAll).map((p) => p.state)).toEqual(["spent"]);
+      runNow(proofs.update(stored.id, { state: "spent" }));
+      expect(
+        runNow(db.readTable("cashuProof")).map((row) => row.state),
+      ).toEqual(["spent", "spent"]);
+    });
+
+    it("checks rotation once per inserted batch and still rotates on time", () => {
+      const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns);
+      let usageReads = 0;
+      const counting: ShardDb<LinkyDbSchema> = {
+        ...db,
+        ownerUsage: (ownerId) =>
+          Effect.suspend(() => {
+            usageReads += 1;
+            return db.ownerUsage(ownerId);
+          }),
+      };
+      const store = createLinkyStore(counting, testAppOwner());
+      const { proofs } = makeWalletRepository(store);
+      const batch = Array.from({ length: 20 }, (_, i) => proof(`s${i}`));
+      runNow(proofs.insert(batch));
+      expect(usageReads).toBe(1);
+      for (let i = 1; i < 10; i += 1)
+        runNow(
+          proofs.insert(
+            batch.map((p) => ({ ...p, secret: `${i}-${p.secret}` })),
+          ),
+        );
+      expect(runNow(store.activeIndex("cashu"))).toBe(1);
+      expect(runNow(proofs.loadAll)).toHaveLength(200);
     });
 
     it("skips rows that do not validate", () => {

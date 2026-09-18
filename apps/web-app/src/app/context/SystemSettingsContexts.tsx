@@ -35,8 +35,6 @@ export interface AdvancedSettingsContextValue {
 
 export interface EvoluSettingsContextValue {
   clearDatabaseArmed: boolean;
-  evoluCashuOwnerEditsUntilRotation: number;
-  evoluCashuOwnerId: OwnerId | null;
   evoluCashuOwnerIndex: number;
   evoluCashuVisibleOwnerIds: readonly OwnerId[];
   evoluContactsOwnerEditCount: number;

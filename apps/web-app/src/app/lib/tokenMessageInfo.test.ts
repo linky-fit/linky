@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { buildCashuToken } from "../../testUtils/cashuToken";
-import { createCashuTokenRowFixture } from "../../testUtils/cashuTokenRow";
 import {
   serializePrivateImageMessage,
   type PrivateImageMessagePayload,
@@ -18,7 +17,7 @@ describe("getCashuTokenMessageInfo", () => {
       ],
     });
 
-    expect(getCashuTokenMessageInfo(bundle, [])).toMatchObject({
+    expect(getCashuTokenMessageInfo(bundle)).toMatchObject({
       amount: 5,
       isValid: true,
       mintUrl: "https://cashu.cz",
@@ -39,7 +38,7 @@ describe("getCashuTokenMessageInfo", () => {
       version: 1,
     });
 
-    expect(getCashuTokenMessageInfo(bankOffer, [])).toBeNull();
+    expect(getCashuTokenMessageInfo(bankOffer)).toBeNull();
   });
 
   it("ignores private image messages", () => {
@@ -59,64 +58,23 @@ describe("getCashuTokenMessageInfo", () => {
     } satisfies PrivateImageMessagePayload;
 
     expect(
-      getCashuTokenMessageInfo(serializePrivateImageMessage(payload), []),
+      getCashuTokenMessageInfo(serializePrivateImageMessage(payload)),
     ).toBeNull();
-    expect(getCashuTokenMessageInfo(JSON.stringify(payload), [])).toBeNull();
+    expect(getCashuTokenMessageInfo(JSON.stringify(payload))).toBeNull();
   });
 
   it("ignores empty zero-value Cashu payloads", () => {
     expect(
-      getCashuTokenMessageInfo(buildCashuToken({ amounts: [] }), []),
+      getCashuTokenMessageInfo(buildCashuToken({ amounts: [] })),
     ).toBeNull();
   });
 
-  it("treats accepted matching tokens as already known", () => {
+  it("treats a token a wallet transfer carries as already known", () => {
     const token = buildCashuToken();
 
-    expect(
-      getCashuTokenMessageInfo(token, [
-        createCashuTokenRowFixture({
-          rawToken: token,
-          state: "accepted",
-        }),
-      ])?.isValid,
-    ).toBe(false);
-  });
-
-  it("treats failed accept attempts as already known for auto-import", () => {
-    const token = buildCashuToken();
-
-    expect(
-      getCashuTokenMessageInfo(token, [
-        createCashuTokenRowFixture({ rawToken: token, state: "error" }),
-      ])?.isValid,
-    ).toBe(false);
-  });
-
-  it("treats deleted failed tokens as already known for auto-import", () => {
-    const token = buildCashuToken();
-
-    expect(
-      getCashuTokenMessageInfo(token, [
-        createCashuTokenRowFixture({
-          isDeleted: true,
-          rawToken: token,
-          state: "error",
-        }),
-      ])?.isValid,
-    ).toBe(false);
-  });
-
-  it("recognizes an accepted token by the original token-derived id", () => {
-    const token = buildCashuToken();
-
-    expect(
-      getCashuTokenMessageInfo(token, [
-        createCashuTokenRowFixture({
-          id: token,
-          token: "cashu-accepted-token",
-        }),
-      ])?.isValid,
-    ).toBe(false);
+    expect(getCashuTokenMessageInfo(token, new Set([token]))?.isValid).toBe(
+      false,
+    );
+    expect(getCashuTokenMessageInfo(token, new Set())?.isValid).toBe(true);
   });
 });

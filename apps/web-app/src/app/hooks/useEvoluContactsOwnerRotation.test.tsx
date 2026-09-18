@@ -3,10 +3,7 @@ import { act, useLayoutEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { safeLocalStorageSet } from "../../utils/storage";
-import {
-  EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-} from "../../utils/constants";
+import { EVOLU_CONTACTS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY } from "../../utils/constants";
 import { useOwnerLane } from "./useEvoluContactsOwnerRotation";
 
 vi.mock("../../evolu", () => ({ evolu: {} }));
@@ -94,21 +91,6 @@ describe("owner lanes", () => {
         rotatedAtMs: Date.now(),
       },
     });
-    expect(view.lane().index).toBe(1);
-    await view.unmount();
-  });
-  it("only resets an empty cashu lane during its initial bootstrap", async () => {
-    safeLocalStorageSet(EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY, "3");
-    const params = { ...makeParams(), scope: "cashu" } satisfies Params;
-    const view = await mountLane(params);
-    expect(view.lane().index).toBe(3);
-    await view.update({ ...params, allowMissingOwnerMetaBootstrap: true });
-    expect(view.lane().index).toBe(0);
-    await act(async () => {
-      await view.lane().requestManualRotate();
-    });
-    expect(view.lane().index).toBe(1);
-    await view.update({ ...params, allowMissingOwnerMetaBootstrap: true });
     expect(view.lane().index).toBe(1);
     await view.unmount();
   });

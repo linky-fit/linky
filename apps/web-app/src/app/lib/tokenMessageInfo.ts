@@ -1,7 +1,5 @@
 import { parseTokenText } from "@linky/linkshu";
-import type { CashuTokenRow } from "../../evolu";
 import { getLinkyBankPaymentOfferInfo } from "./bankPaymentOffer";
-import { createCashuTokenId } from "./cashuTokenIdentity";
 import { parsePrivateImageMessage } from "./privateImageMessage";
 import { extractCashuTokenFromText } from "./tokenText";
 
@@ -26,27 +24,8 @@ export const getMintDisplay = (
   }
 };
 
-const isKnownCashuToken = (
-  cashuTokensAll: readonly Pick<CashuTokenRow, "id" | "rawToken" | "token">[],
-  knownTokenTexts: ReadonlySet<string>,
-  tokenRaw: string,
-): boolean => {
-  if (knownTokenTexts.has(tokenRaw)) return true;
-  const tokenId = createCashuTokenId(tokenRaw);
-  return cashuTokensAll.some((row) => {
-    const storedRaw = (row.rawToken ?? "").trim();
-    const storedToken = (row.token ?? "").trim();
-    return (
-      row.id === tokenId ||
-      (storedRaw !== "" && storedRaw === tokenRaw) ||
-      (storedToken !== "" && storedToken === tokenRaw)
-    );
-  });
-};
-
 export const getCashuTokenMessageInfo = (
   text: string,
-  cashuTokensAll: readonly Pick<CashuTokenRow, "id" | "rawToken" | "token">[],
   /** Token texts the wallet's transfers carry (sent or received). */
   knownTokenTexts: ReadonlySet<string> = new Set(),
 ): CashuTokenMessageInfo | null => {
@@ -65,7 +44,8 @@ export const getCashuTokenMessageInfo = (
     mintUrl: parsed.mint,
     amount: parsed.amount,
     unit: parsed.unit,
-    // Best-effort: "valid" means not yet imported into wallet.
-    isValid: !isKnownCashuToken(cashuTokensAll, knownTokenTexts, tokenRaw),
+    // Best-effort: "valid" means no transfer carries this text yet; a token
+    // whose proofs the wallet holds is caught by linkshu's receive dedup.
+    isValid: !knownTokenTexts.has(tokenRaw),
   };
 };

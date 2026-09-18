@@ -92,7 +92,6 @@ interface QueuedNotificationOpenDetail {
 interface UseScanNativeCompositionParams {
   addNewContactFromIdentifier: ContactsMessagingCompositionResult["addNewContactFromIdentifier"];
   cashuBalance: CashuWalletCompositionResult["cashuBalance"];
-  cashuOwnerId: IdentityOwnersCompositionResult["cashuOwnerId"];
   cashuTransfers: CashuWalletCompositionResult["cashuTransfers"];
   contacts: ContactsMessagingCompositionResult["contacts"];
   contactsLatestRef: ContactsMessagingCompositionResult["contactsLatestRef"];
@@ -129,7 +128,6 @@ interface UseScanNativeCompositionParams {
 export const useScanNativeComposition = ({
   addNewContactFromIdentifier,
   cashuBalance,
-  cashuOwnerId,
   cashuTransfers,
   contacts,
   contactsLatestRef,
@@ -798,7 +796,7 @@ export const useScanNativeComposition = ({
       return;
     }
 
-    if (!currentNsec || !cashuOwnerId) {
+    if (!currentNsec) {
       return;
     }
 
@@ -807,7 +805,6 @@ export const useScanNativeComposition = ({
       updatePendingDeepLinkText(pendingDeepLinkText);
     });
   }, [
-    cashuOwnerId,
     currentNsec,
     handleScannedText,
     pendingDeepLinkText,

@@ -38,7 +38,7 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 
 Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `docs/architecture.md` ("Evolu persistence and owner lanes").
 
-- Each Evolu owner lane rotates on its own historical mutation threshold: contacts `220`, cashu `170`, messages `160` (`*_OWNER_ROTATION_TRIGGER_WRITE_COUNT`), with a per-scope `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown.
+- Contacts and messages still rotate as Evolu owner lanes on their own historical mutation thresholds (contacts `220`, messages `160`, `*_OWNER_ROTATION_TRIGGER_WRITE_COUNT`) with a per-scope `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown. Transactions and the cashu wallet (proofs and operations) live on `@linky/linksync` shards, which rotate at 256 KiB of history or the scope's mutation count (transactions `220`, cashu `170`) inside the package; a cashu update moves the proof to the active shard (copy-on-write), so old shards never grow.
 - Transactions already live on `@linky/linksync` shards: the package rotates the `transactions` scope after a write once the active shard holds 256 KiB of history values or 220 mutations (60 s cooldown), keeps the newest 4 shards, and copies a row forward on update so a retired shard never grows.
 - Existing quota failures need relay capacity before rejected history can sync. Keep the device's local data, increase the relay's quota or add a relay with capacity, then reload normally.
 - An upgrade silently adds and enables `wss://evolu.linky.fit` and adds `wss://nostr.linky.fit` to the user's Nostr relay lists once, preserving custom endpoints. Later user edits are respected; explicit development relay overrides skip the migration.

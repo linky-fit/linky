@@ -1,5 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { mnemonicToSeedSync } from "@scure/bip39";
+import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 import { Bip39Seed, Receive, ReceiveDraft, runLinkshu } from "@linky/linkshu";
 import { Effect } from "effect";
 import { fundToken } from "../../../packages/linkshu/tests/integration/helpers";
@@ -14,6 +15,21 @@ import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates } from "./helpers/network";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
 import { topUp } from "./helpers/wallet";
+
+declare global {
+  interface Window {
+    __linkyE2E?: LinkyE2eHooks;
+  }
+}
+
+/** The wallet lives on shards; its pointer is a synced row in the app owner. */
+const cashuShardIndex = (page: Page) =>
+  page.evaluate(async () => {
+    if (!window.__linkyE2E) throw new Error("test hooks missing");
+    const pointers = await window.__linkyE2E.shardRows("meta", "shardPointer");
+    const pointer = pointers.find((row) => row.scope === "cashu");
+    return typeof pointer?.index === "number" ? pointer.index : 0;
+  });
 
 test("restored Cashu funds sync to an open second device and survive an owner rotation", async ({
   browser,
@@ -83,31 +99,19 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
     });
 
     let expectedBalance = restoredAmount;
-    await test.step("rotate twice and keep funds from all three owner lanes", async () => {
+    await test.step("rotate twice and keep funds from all three shards", async () => {
       for (const rotation of [
         { index: 1, amount: 64 },
         { index: 2, amount: 32 },
       ]) {
-        if (rotation.index === 2) {
-          await source.page.evaluate(() => {
-            localStorage.setItem(
-              "linky.evolu.cashu_owner_last_rotated_at_ms.v1",
-              String(Date.now() - 61_000),
-            );
-          });
-        }
         await source.page.goto("/#evolu-current-data");
         await source.page
           .getByRole("button", { name: "Rotate tokens owner", exact: true })
           .click();
         for (const device of devices) {
           await expect
-            .poll(() =>
-              device.page.evaluate(() =>
-                localStorage.getItem("linky.evolu.cashu_owner_index.v1"),
-              ),
-            )
-            .toBe(String(rotation.index));
+            .poll(() => cashuShardIndex(device.page))
+            .toBe(rotation.index);
         }
         await topUp(source.page, rotation.amount);
         expectedBalance += rotation.amount;
@@ -116,7 +120,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
             .poll(() => readBalanceSat(device.page))
             .toBe(expectedBalance);
         }
-        // One topup operation per rotated lane (the restore into lane zero
+        // One topup operation per rotated shard (the restore into shard zero
         // records none): the operation table is the one whose row count
         // tracks rotations, proofs vary per topup amount.
         await source.page.goto("/#evolu-current-data");
@@ -157,33 +161,29 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
   }
 });
 
-test("a stale initial Cashu lane index recovers when no rows or owner pointer exist", async ({
+test("a stale legacy Cashu lane index in storage leaves the shards at index zero", async ({
   page,
 }) => {
   const identity = await createSeedIdentity();
   const errors = watchAppErrors(page, "stale lane");
   await setBaseStorage(page);
   await setSeedLoginStorage(page, identity);
+  // The lane migration derives lanes 0..7 from the mirror, finds nothing
+  // there, and the wallet starts on shard 0 regardless.
   await page.addInitScript(() => {
     localStorage.setItem("linky.evolu.cashu_owner_index.v1", "7");
   });
   await stubFiatRates(page);
   await page.goto("/#wallet");
   await waitForNetworkReady(page);
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        localStorage.getItem("linky.evolu.cashu_owner_index.v1"),
-      ),
-    )
-    .toBe("0");
+  await expect.poll(() => cashuShardIndex(page)).toBe(0);
   expect(await readBalanceSat(page)).toBe(0);
   await expectSingleLoad(page, "stale lane");
   await expectNoBootErrorPanel(page, "stale lane");
   errors.assertClean();
 });
 
-test("token consumption rotates lane zero from its mutation history while few live rows remain", async ({
+test("token consumption rotates shard zero from its mutation history while few live rows remain", async ({
   browser,
 }, testInfo) => {
   const identity = await createSeedIdentity();
@@ -203,18 +203,14 @@ test("token consumption rotates lane zero from its mutation history while few li
     devices.push({ context, page, errors, label });
   }
   const [source, second] = devices;
-  const rotations: {
-    issuedTokens: number;
-    index: string | null;
-    rotatedAt: string | null;
-  }[] = [];
+  const rotations: { issuedTokens: number; index: number }[] = [];
   try {
     await topUp(source.page, 512);
     for (const device of devices) {
       await expect.poll(() => readBalanceSat(device.page)).toBe(512);
     }
 
-    await test.step("issue tokens until the mutation history rotates the lane", async () => {
+    await test.step("issue tokens until the mutation history rotates the shard", async () => {
       for (let index = 0; index < 60; index += 1) {
         await source.page.goto("/#wallet/token/emit");
         await source.page
@@ -226,14 +222,9 @@ test("token consumption rotates lane zero from its mutation history while few li
         await expect(source.page).toHaveURL(
           /#wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/,
         );
-        const lane = await source.page.evaluate(() => ({
-          index: localStorage.getItem("linky.evolu.cashu_owner_index.v1"),
-          rotatedAt: localStorage.getItem(
-            "linky.evolu.cashu_owner_last_rotated_at_ms.v1",
-          ),
-        }));
-        if (rotations.at(-1)?.index !== lane.index) {
-          rotations.push({ issuedTokens: index + 1, ...lane });
+        const shardIndex = await cashuShardIndex(source.page);
+        if (rotations.at(-1)?.index !== shardIndex) {
+          rotations.push({ issuedTokens: index + 1, index: shardIndex });
         }
       }
       // Every issue leaves one send operation behind; the proofs it spent
@@ -254,19 +245,11 @@ test("token consumption rotates lane zero from its mutation history while few li
       // history threshold can trip more than once within the cooldown.
       for (const device of devices) {
         await expect
-          .poll(() =>
-            device.page.evaluate(() =>
-              Number(localStorage.getItem("linky.evolu.cashu_owner_index.v1")),
-            ),
-          )
+          .poll(() => cashuShardIndex(device.page))
           .toBeGreaterThanOrEqual(1);
       }
       const [sourceIndex, secondIndex] = await Promise.all(
-        devices.map((device) =>
-          device.page.evaluate(() =>
-            localStorage.getItem("linky.evolu.cashu_owner_index.v1"),
-          ),
-        ),
+        devices.map((device) => cashuShardIndex(device.page)),
       );
       expect(secondIndex).toBe(sourceIndex);
     });

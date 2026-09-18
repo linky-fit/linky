@@ -5,7 +5,6 @@ import type * as Evolu from "@evolu/common";
 import { ImportProofDraft, LegacyTokenRow, NewOperation } from "@linky/linkshu";
 import type { StoredOperation, StoredProof } from "@linky/linkshu";
 import React from "react";
-import type { CashuTokenRow } from "../../evolu";
 import { JsonValue } from "../../types/json";
 import { nowSeconds } from "../../utils/time";
 import { asRecord } from "../../utils/validation";
@@ -30,8 +29,6 @@ interface UseAppDataTransferParams<TContact extends ContactRowLike> {
   appOwnerId: Evolu.OwnerId | null;
   cashuOperations: readonly StoredOperation[];
   cashuProofs: readonly StoredProof[];
-  /** Legacy rows, exported so a backup imports into older releases too. */
-  cashuTokens: readonly CashuTokenRow[];
   contacts: readonly TContact[];
   /** Null until the wallet runtime is ready to restore wallet rows. */
   importCashuLegacyRows: CashuTransferLifecycle["importLegacyRows"] | null;
@@ -48,7 +45,6 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
   appOwnerId,
   cashuOperations,
   cashuProofs,
-  cashuTokens,
   contacts,
   importCashuLegacyRows,
   importCashuOperation,
@@ -75,18 +71,6 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
           groupName: (contact.groupName ?? "").trim() || null,
           groupNamesJson: (contact.groupNamesJson ?? "").trim() || null,
         })),
-        cashuTokens: cashuTokens.map((token) => {
-          const tokenText = (token.token ?? "").trim();
-          const rawToken =
-            (token.originalTokenText ?? "").trim() ||
-            (token.rawToken ?? "").trim();
-          return {
-            token: tokenText,
-            rawToken: rawToken && rawToken !== tokenText ? rawToken : null,
-            state: (token.state ?? "").trim() || null,
-            error: (token.error ?? "").trim() || null,
-          };
-        }),
         cashuProofs: cashuProofs.map((proof) => ({
           mint: proof.mint,
           unit: proof.unit,
@@ -124,7 +108,7 @@ export const useAppDataTransfer = <TContact extends ContactRowLike>({
     } catch {
       pushToast(t("exportFailed"));
     }
-  }, [cashuOperations, cashuProofs, cashuTokens, contacts, pushToast, t]);
+  }, [cashuOperations, cashuProofs, contacts, pushToast, t]);
 
   const requestImportAppData = React.useCallback(() => {
     const element = importDataFileInputRef.current;

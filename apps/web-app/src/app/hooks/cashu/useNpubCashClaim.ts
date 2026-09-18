@@ -1,6 +1,5 @@
 import { useLatest } from "../../../hooks/useLatest";
 import { Schema } from "effect";
-import * as Evolu from "@evolu/common";
 import { Either } from "effect";
 import React from "react";
 import { parseTokenText } from "@linky/linkshu";
@@ -76,7 +75,6 @@ interface UseNpubCashClaimParams {
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   receiveCashuToken: ReceiveCashuToken | null;
   refreshMintInfo: (mintUrl: string) => Promise<void> | void;
-  resolveOwnerIdForWrite: () => Promise<Evolu.OwnerId | null>;
   rememberCashuTokenKnown: (...tokens: readonly string[]) => void;
   routeKind: Route["kind"];
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
@@ -160,7 +158,6 @@ export const useNpubCashClaim = ({
   npubCashClaimInFlightRef,
   receiveCashuToken,
   refreshMintInfo,
-  resolveOwnerIdForWrite,
   rememberCashuTokenKnown,
   routeKind,
   setCashuIsBusy,
@@ -421,7 +418,6 @@ export const useNpubCashClaim = ({
     if (!currentNsec) return;
     if (receiveCashuToken === null) return;
     if (npubCashClaimInFlightRef.current) return;
-    if (!(await resolveOwnerIdForWrite())) return;
 
     try {
       const lockKey = makeLocalStorageKey(
@@ -476,7 +472,6 @@ export const useNpubCashClaim = ({
     makeLocalStorageKey,
     npubCashClaimInFlightRef,
     receiveCashuToken,
-    resolveOwnerIdForWrite,
     routeKind,
     sweepUpstreamPaidQuotes,
   ]);

@@ -15,17 +15,16 @@
 // without conversion (the claimed stashes are drained by
 // legacyAcceptedTokenDrain). The legacy seen-mints arrays are only read (the
 // mints UI still owns them); linkshu's per-mint seen keys are seeded from
-// them plus the mints of stored token rows.
+// them.
 //
 // Removal requires the supported-upgrade evidence in docs/architecture.md.
 // Keep the seed-bound wipe itself after removing its migration prologue.
 
-import { parseMintUrl, parseTokenText } from "@linky/linkshu";
+import { parseMintUrl } from "@linky/linkshu";
 import { readField } from "../../utils/unknown";
 import { asNonEmptyString } from "../../utils/validation";
 
 const DONE_STORAGE_KEY = "linky.linkshu_storage_migration_v1";
-const ROW_MINTS_DONE_STORAGE_KEY = "linky.linkshu_seen_mints_backfill_v1";
 
 // Legacy writers (deleted in #300–#306): utils/cashuDeterministic.ts,
 // app/lib/topupQuoteStorage.ts, app/lib/autoswapClaim.ts and
@@ -333,35 +332,5 @@ export const migrateLegacyCashuLocalState = (): void => {
   } catch {
     // Storage unavailable: retry next launch — every step is idempotent and
     // existing linkshu values are never overwritten.
-  }
-};
-
-interface TokenRowMintSource {
-  readonly mint: string | null;
-  readonly rawToken: string | null;
-  readonly token: string | null;
-}
-
-/**
- * Seeds linkshu's seen-mint keys from the mints of stored token rows, once
- * the first non-empty row set arrives. Timing is not critical: linkshu's
- * `collectKnownMints` already unions stored-row mints in at every read; this
- * only makes them durable should the rows later be deleted.
- */
-export const seedLinkshuSeenMintsFromTokenRows = (
-  rows: ReadonlyArray<TokenRowMintSource>,
-): void => {
-  try {
-    if (rows.length === 0) return;
-    if (localStorage.getItem(ROW_MINTS_DONE_STORAGE_KEY) === "1") return;
-    for (const row of rows) {
-      const tokenText = row.rawToken ?? row.token ?? "";
-      const candidate =
-        row.mint ?? (tokenText ? parseTokenText(tokenText)?.mint : null);
-      if (typeof candidate === "string") seedSeenMint(candidate);
-    }
-    localStorage.setItem(ROW_MINTS_DONE_STORAGE_KEY, "1");
-  } catch {
-    // Storage unavailable: retry on the next rows change.
   }
 };

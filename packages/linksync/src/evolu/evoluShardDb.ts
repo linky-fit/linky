@@ -1,5 +1,10 @@
 import type { OwnerId, SyncOwner } from "@evolu/common";
-import { OwnerId as OwnerIdType } from "@evolu/common";
+import {
+  OwnerId as OwnerIdType,
+  ownerIdToOwnerIdBytes,
+  sqliteFalse,
+  sqliteTrue,
+} from "@evolu/common";
 import { Effect } from "effect";
 import type { Columns, Mutation, OwnerUsage, Row, ShardDb } from "../core";
 import { ShardDbError } from "../core";
@@ -199,12 +204,21 @@ export const createEvoluShardDb = (
     });
   };
 
+  // The port tombstones with a boolean; Evolu's mutation takes its SqliteBoolean.
+  const toEvoluRow = (row: Mutation["row"]): Columns => {
+    const { isDeleted, ...columns } = row;
+    return isDeleted === undefined
+      ? columns
+      : { ...columns, isDeleted: isDeleted ? sqliteTrue : sqliteFalse };
+  };
+
   const apply = (mutation: Mutation): Effect.Effect<void, ShardDbError> => {
     const fail = (message: string) =>
       Effect.fail(new ShardDbError({ table: mutation.table, message }));
     if (!isTable(mutation.table)) return fail("unknown table");
+    const row = toEvoluRow(mutation.row);
     const call = (onlyValidate: boolean) =>
-      callUntyped(evolu, mutation.kind, mutation.table, mutation.row, {
+      callUntyped(evolu, mutation.kind, mutation.table, row, {
         ownerId: mutation.ownerId,
         onlyValidate,
       });
@@ -217,6 +231,7 @@ export const createEvoluShardDb = (
     return Effect.void;
   };
 
+  // `evolu_history` keys rows by the owner id's bytes, not its base64url text.
   const ownerUsage = (ownerId: OwnerId): Effect.Effect<OwnerUsage> => {
     const query = asQuery(
       callUntyped(evolu, "createQuery", (db: UntypedHistorySelect) =>
@@ -226,7 +241,7 @@ export const createEvoluShardDb = (
             eb.fn.count("timestamp").distinct().as("mutations"),
             eb.fn.sum(eb.fn("length", ["value"])).as("bytes"),
           ])
-          .where("ownerId", "=", ownerId),
+          .where("ownerId", "=", ownerIdToOwnerIdBytes(ownerId)),
       ),
     );
     return Effect.map(loadRows(query), (rows) => {
@@ -262,7 +277,7 @@ interface UntypedHistorySelect {
   selectFrom: (table: "evolu_history") => {
     select: (
       build: (eb: UntypedExpressionBuilder) => ReadonlyArray<object>,
-    ) => { where: (column: string, op: "=", value: string) => object };
+    ) => { where: (column: string, op: "=", value: Uint8Array) => object };
   };
 }
 

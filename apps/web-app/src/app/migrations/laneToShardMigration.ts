@@ -60,7 +60,7 @@ import {
 } from "../../utils/constants";
 import { deriveEvoluOwnerMnemonicFromSlip39 } from "../../utils/slip39Nostr";
 import { safeLocalStorageGet, safeLocalStorageSet } from "../../utils/storage";
-import { toLegacyTokenRow } from "../lib/legacyTokenRow";
+import { toLegacyTokenRow } from "./legacyTokenRow";
 import { decodeRotationSnapshot } from "../lib/rotationSnapshot";
 import { readRowOwnerId } from "../lib/rowOwnerId";
 

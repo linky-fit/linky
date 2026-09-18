@@ -6,9 +6,6 @@ import React, { useMemo, useState } from "react";
 import type { MessageContactsGroupAssignment } from "../components/ChatMessage";
 import { ContactCard } from "../components/ContactCard";
 import {
-  createCashuOperationsAllQuery,
-  createCashuProofsAllQuery,
-  createCashuTokensAllQuery,
   evolu,
   useEvolu,
   useEvoluDatabaseInfoState,
@@ -84,10 +81,11 @@ import { useArmedDeleteTimeouts } from "./hooks/useArmedDeleteTimeouts";
 import { useFiatRates } from "./hooks/useFiatRates";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
 import {
+  useShardIds,
+  useShardRotation,
   useTransactionRecords,
-  useTransactionShards,
   useTransactionsRepository,
-  useTransactionsShardRotation,
+  useWalletProofs,
 } from "./hooks/useLinksync";
 import { useOwnerScopedStorage } from "./hooks/useOwnerScopedStorage";
 import { useStatusToasts } from "./hooks/useStatusToasts";
@@ -139,11 +137,6 @@ export const useAppShellComposition = ({
     appOwnerId,
     appOwnerIdRef,
     appendIdentityChangeNoticesRef,
-    cashuOwnerEditsUntilRotation,
-    cashuOwnerId,
-    cashuOwnerIdRef,
-    cashuOwnerIndex,
-    cashuVisibleOwnerIds,
     contactsOwnerEditCount,
     contactsOwnerEditsUntilRotation,
     contactsOwnerId,
@@ -167,11 +160,9 @@ export const useAppShellComposition = ({
     myProfileMetadataRef,
     nostrIdentityRows,
     requestLogout,
-    requestManualRotateCashuOwner,
     requestManualRotateContactsOwner,
     requestManualRotateMessagesOwner,
     requestPasteNostrKeys,
-    rotateCashuOwnerIsBusy,
     rotateContactsOwnerIsBusy,
     rotateMessagesOwnerIsBusy,
     seedMnemonic,
@@ -192,8 +183,17 @@ export const useAppShellComposition = ({
 
   const transactions = useTransactionsRepository();
   const transactionRecords = useTransactionRecords();
-  const transactionShards = useTransactionShards();
-  const transactionsShardRotation = useTransactionsShardRotation();
+  const transactionShards = useShardIds("transactions");
+  const transactionsShardRotation = useShardRotation("transactions");
+  const cashuShards = useShardIds("cashu");
+  const cashuShardRotation = useShardRotation("cashu");
+  // The contacts lane and the cashu shard were one owner once; the debug
+  // button keeps rotating both until contacts cut over (#386).
+  const rotateContactsAndCashuOwners = React.useCallback(async () => {
+    await requestManualRotateContactsOwner();
+    await cashuShardRotation.rotate();
+  }, [cashuShardRotation, requestManualRotateContactsOwner]);
+  const walletProofs = useWalletProofs();
 
   const {
     logPaymentEvent,
@@ -469,7 +469,7 @@ export const useAppShellComposition = ({
   const evoluHistoryAllowedOwnerIds = React.useMemo(() => {
     const ids = [
       (appOwnerId ?? "").trim(),
-      ...cashuVisibleOwnerIds.map((ownerId) => ownerId.trim()),
+      ...cashuShards.ownerIds,
       ...messagesVisibleOwnerIds.map((ownerId) => ownerId.trim()),
       ...transactionShards.ownerIds,
       (metaOwnerId ?? "").trim(),
@@ -478,7 +478,7 @@ export const useAppShellComposition = ({
     return Array.from(new Set(ids));
   }, [
     appOwnerId,
-    cashuVisibleOwnerIds,
+    cashuShards.ownerIds,
     contactsVisibleOwnerIds,
     messagesVisibleOwnerIds,
     metaOwnerId,
@@ -506,13 +506,6 @@ export const useAppShellComposition = ({
     setStatus,
     status,
   });
-
-  const cashuTokensAllQuery = useMemo(createCashuTokensAllQuery, []);
-  const cashuTokensAll = useQuery(cashuTokensAllQuery);
-  const cashuProofsAllQuery = useMemo(createCashuProofsAllQuery, []);
-  const cashuProofsAll = useQuery(cashuProofsAllQuery);
-  const cashuOperationsAllQuery = useMemo(createCashuOperationsAllQuery, []);
-  const cashuOperationsAll = useQuery(cashuOperationsAllQuery);
 
   const copyText = React.useCallback(
     async (value: string) => {
@@ -651,8 +644,7 @@ export const useAppShellComposition = ({
     activeSyncedNostrIdentity,
     appOwnerId,
     appOwnerIdRef,
-    cashuOwnerId,
-    cashuTokensAll: cashuProofsAll,
+    cashuProofs: walletProofs,
     contactPayBackToChatRef,
     contactsOwnerId,
     contactsOwnerNewContactsCount,
@@ -806,7 +798,6 @@ export const useAppShellComposition = ({
     cashuMeltToMainMintButtonLabel,
     cashuOperations,
     cashuProofs,
-    cashuTokensFiltered,
     cashuTokensHydratedRef,
     cashuTotalBalance,
     cashuTransferLifecycle,
@@ -903,9 +894,6 @@ export const useAppShellComposition = ({
     walletWarningApplies,
     walletWarningDismissed,
   } = useCashuWalletComposition({
-    cashuTokensAll,
-    cashuProofsAll,
-    cashuOperationsAll,
     contactPayBackToChatRef,
     contactsMessaging: {
       saveNpubContact,
@@ -935,12 +923,8 @@ export const useAppShellComposition = ({
     identity: {
       appOwnerId,
       appOwnerIdRef,
-      cashuOwnerId,
-      cashuOwnerIdRef,
-      cashuVisibleOwnerIds,
       currentNpub,
       currentNsec,
-      isSeedLogin,
       metaOwnerId,
     },
     maybeShowPwaNotification,
@@ -968,7 +952,6 @@ export const useAppShellComposition = ({
     setStatus,
     t,
     transactions,
-    update,
     upsert,
   });
 
@@ -1069,7 +1052,6 @@ export const useAppShellComposition = ({
   } = useScanNativeComposition({
     addNewContactFromIdentifier,
     cashuBalance,
-    cashuOwnerId,
     cashuTransfers,
     contacts,
     contactsLatestRef,
@@ -1193,7 +1175,6 @@ export const useAppShellComposition = ({
       appOwnerId: contactsOwnerId,
       cashuOperations,
       cashuProofs,
-      cashuTokens: cashuTokensFiltered,
       contacts,
       importCashuLegacyRows: cashuTransferLifecycle?.importLegacyRows ?? null,
       importCashuOperation: cashuTransferLifecycle?.importOperation ?? null,
@@ -1714,10 +1695,8 @@ export const useAppShellComposition = ({
       setPayWithCashuEnabled,
     },
     evoluSettingsInput: {
-      evoluCashuOwnerEditsUntilRotation: cashuOwnerEditsUntilRotation,
-      evoluCashuOwnerId: cashuOwnerId,
-      evoluCashuOwnerIndex: cashuOwnerIndex,
-      evoluCashuVisibleOwnerIds: cashuVisibleOwnerIds,
+      evoluCashuOwnerIndex: cashuShards.index,
+      evoluCashuVisibleOwnerIds: cashuShards.ownerIds,
       evoluContactsOwnerEditCount: contactsOwnerEditCount,
       evoluContactsOwnerEditsUntilRotation: contactsOwnerEditsUntilRotation,
       evoluContactsOwnerId: contactsOwnerId,
@@ -1743,12 +1722,13 @@ export const useAppShellComposition = ({
       isEvoluServerOffline,
       newEvoluServerUrl,
       pendingEvoluServerDeleteUrl,
-      requestManualRotateCashuOwner,
-      requestManualRotateContactsOwner,
+      requestManualRotateCashuOwner: cashuShardRotation.rotate,
+      requestManualRotateContactsOwner: rotateContactsAndCashuOwners,
       requestManualRotateMessagesOwner,
       requestManualRotateTransactionsOwner: transactionsShardRotation.rotate,
-      rotateCashuOwnerIsBusy,
-      rotateContactsOwnerIsBusy,
+      rotateCashuOwnerIsBusy: cashuShardRotation.isBusy,
+      rotateContactsOwnerIsBusy:
+        rotateContactsOwnerIsBusy || cashuShardRotation.isBusy,
       rotateMessagesOwnerIsBusy,
       rotateTransactionsOwnerIsBusy: transactionsShardRotation.isBusy,
       saveEvoluServerUrls,

@@ -1,12 +1,12 @@
+import { sqliteTrue } from "@evolu/common";
 import { LegacyTokenRow, TokenText, UnixSeconds } from "@linky/linkshu";
 import { Schema } from "effect";
 import type { CashuTokenRow } from "../../evolu";
-import { isDeletedCashuRow } from "./cashuTokenIdentity";
 import {
   CASHU_TOKEN_STATE_ACCEPTED,
   CASHU_TOKEN_STATE_ERROR,
   normalizeCashuTokenState,
-} from "./cashuTokenState";
+} from "../lib/cashuTokenState";
 
 /**
  * Catch-all tagged shape for pre-linkshu plain-text `error` values; rows
@@ -49,9 +49,10 @@ const toPortableErrorText = (error: string | null): string | null => {
  * A legacy `cashuToken` row as linkshu's ingest reads it: deleted rows and
  * rows whose text is not a cashu token yield nothing. Null and unknown
  * states read as `accepted`, matching what the pre-inventory adapter did.
+ * Only the lane migration reads the table; nothing else in the app does.
  */
 export const toLegacyTokenRow = (row: CashuTokenRow): LegacyTokenRow | null => {
-  if (isDeletedCashuRow(row)) return null;
+  if (row.isDeleted === sqliteTrue) return null;
   const tokenText = parseTokenText(row.token);
   if (tokenText === null) return null;
   const state =
