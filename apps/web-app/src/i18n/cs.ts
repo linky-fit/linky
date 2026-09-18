@@ -25,6 +25,7 @@ export const cs = {
   back: "Zpět",
   menu: "Menu",
   transactionsTitle: "Transakce",
+  recurringPaymentsTitle: "Trvalé příkazy",
   showTransactions: "Ukázat transakce",
   feedback: "Zpětná vazba",
   donate: "Přispět",
