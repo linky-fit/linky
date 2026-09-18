@@ -155,10 +155,12 @@ describe("useEditChatMessage", () => {
       2,
       "local-message",
       {
-        createdAtSec: SENT_AT,
+        editedAtSec: SENT_AT,
         rumorId: EDITED_FROM,
       },
     );
+    for (const [, patch] of harness.updateLocalNostrMessage.mock.calls)
+      expect(patch).not.toHaveProperty("createdAtSec");
     expect(harness.setChatDraft).toHaveBeenCalledWith("");
     expect(harness.setEditContext).toHaveBeenCalledWith(null);
     expect(harness.setChatSendIsBusy).toHaveBeenNthCalledWith(1, true);
