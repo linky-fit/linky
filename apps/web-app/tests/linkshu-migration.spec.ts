@@ -367,7 +367,7 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
       await topUp(page, FUNDING_SAT);
       await expect
         .poll(() => readBalanceSat(page), { timeout: 120_000 })
-        .toBeGreaterThanOrEqual(FUNDING_SAT);
+        .toBe(FUNDING_SAT + PENDING_TOPUP_SAT + PENDING_AUTOSWAP_SAT);
 
       // Minting consumed deterministic slots starting at the migrated value.
       const counter = Number(await readStorage(page, linkshu.counter));
