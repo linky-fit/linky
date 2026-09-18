@@ -9,7 +9,6 @@ import {
   CASHU_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
   CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
   MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-  TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
 } from "../utils/constants";
 
 interface EvoluDataSectionConfig {
@@ -48,8 +47,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     evoluMessagesOwnerId,
     evoluMessagesOwnerIndex,
     evoluMessagesVisibleOwnerIds,
-    evoluTransactionsOwnerEditsUntilRotation,
-    evoluTransactionsOwnerId,
     evoluTransactionsOwnerIndex,
     evoluTransactionsVisibleOwnerIds,
     requestManualRotateCashuOwner,
@@ -105,10 +102,8 @@ export function EvoluCurrentDataPage(): React.ReactElement {
         .map((ownerId) => (ownerId ?? "").trim())
         .filter(Boolean),
     );
-    const visibleTransactionOwnerIds = new Set(
-      [evoluTransactionsOwnerId, ...evoluTransactionsVisibleOwnerIds]
-        .map((ownerId) => (ownerId ?? "").trim())
-        .filter(Boolean),
+    const visibleTransactionOwnerIds = new Set<string>(
+      evoluTransactionsVisibleOwnerIds,
     );
 
     return Object.fromEntries(
@@ -165,7 +160,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     evoluContactsOwnerId,
     evoluMessagesOwnerId,
     evoluMessagesVisibleOwnerIds,
-    evoluTransactionsOwnerId,
     evoluTransactionsVisibleOwnerIds,
   ]);
 
@@ -215,13 +209,15 @@ export function EvoluCurrentDataPage(): React.ReactElement {
       ["cashuOperation", cashuConfig(t("cashuOperationsTable"), false)],
       ["nostrMessage", messageConfig(t("messagesTitle"))],
       ["nostrReaction", messageConfig(t("reactionsTitle"))],
+      // Transactions live on shards; the store rotates them by bytes or
+      // mutations on its own, so there is no edit counter to show.
       [
         "transaction",
         {
           label: t("transactionsTitle"),
           ownerIndex: evoluTransactionsOwnerIndex,
-          editsUntilRotation: evoluTransactionsOwnerEditsUntilRotation,
-          rotationLimit: TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
+          editsUntilRotation: null,
+          rotationLimit: null,
           onRotate: requestManualRotateTransactionsOwner,
           rotateLabel: t("evoluTransactionsOwnerRotate"),
           rotateIsBusy: rotateTransactionsOwnerIsBusy,
@@ -236,7 +232,6 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     evoluContactsOwnerIndex,
     evoluMessagesOwnerEditsUntilRotation,
     evoluMessagesOwnerIndex,
-    evoluTransactionsOwnerEditsUntilRotation,
     evoluTransactionsOwnerIndex,
     requestManualRotateCashuOwner,
     requestManualRotateContactsOwner,

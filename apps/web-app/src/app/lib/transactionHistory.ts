@@ -1,5 +1,11 @@
+import type {
+  TransactionCategory,
+  TransactionDirection,
+  TransactionRecord,
+  TransactionStatus,
+} from "@linky/linksync";
 import { Option, Schema } from "effect";
-import type { NostrMessageRow, TransactionRow } from "../../evolu";
+import type { NostrMessageRow } from "../../evolu";
 import { JsonValue } from "../../types/json";
 import { isRecord } from "../../utils/unknown";
 import { asNonEmptyString } from "../../utils/validation";
@@ -8,13 +14,10 @@ import {
   parseLinkyPaymentRequestDeclineMessage,
 } from "./paymentRequestMessage";
 import { createCashuTokenId } from "./cashuTokenIdentity";
-type TransactionStatus = "declined" | "error" | "ok" | "pending";
-
-type TransactionDirection = "in" | "out";
 
 export interface TransactionItem {
   amount: number | null;
-  category: string;
+  category: TransactionCategory;
   contactId: string | null;
   createdAtSec: number;
   details: JsonValue | null;
@@ -26,23 +29,9 @@ export interface TransactionItem {
   mint: string | null;
   note: string | null;
   pendingLabel: string | null;
-  phase: string | null;
   status: TransactionStatus;
   unit: string | null;
 }
-
-const readDirection = (value: string | null): TransactionDirection | null => {
-  return value === "in" || value === "out" ? value : null;
-};
-
-const readStatus = (value: string | null): TransactionStatus | null => {
-  return value === "declined" ||
-    value === "error" ||
-    value === "ok" ||
-    value === "pending"
-    ? value
-    : null;
-};
 
 const parseJsonValue = (value: string | null): JsonValue | null => {
   if (!value) return null;
@@ -104,17 +93,6 @@ export const readIssuedTokenReferenceId = (
   return legacyToken ? createCashuTokenId(legacyToken) : null;
 };
 
-const deriveTransactionCategory = (
-  method: string | null,
-  legacyCategory: string | null,
-): string => {
-  if (method === "cashu_chat") return "contacts";
-  if (method === "lightning_address" || method === "lightning_invoice") {
-    return "lightning";
-  }
-  return legacyCategory || "cashu";
-};
-
 const mergeDetailRecords = (
   primary: JsonValue | null,
   secondary: JsonValue | null,
@@ -138,53 +116,32 @@ export const isPaymentRequestTransaction = (item: TransactionItem): boolean => {
   );
 };
 
+const toTransactionItem = (record: TransactionRecord): TransactionItem => ({
+  amount: record.amount,
+  category: record.category,
+  contactId: record.contactId,
+  createdAtSec: record.createdAtSec,
+  details: parseJsonValue(record.detailsJson),
+  direction: record.direction,
+  error: asNonEmptyString(record.error),
+  fee: record.fee,
+  id: record.id,
+  method: asNonEmptyString(record.method),
+  mint: asNonEmptyString(record.mint),
+  note: asNonEmptyString(record.note),
+  pendingLabel: asNonEmptyString(record.pendingLabel),
+  status: record.status,
+  unit: asNonEmptyString(record.unit),
+});
+
+/** The history view over the repository's records: sorted, requests paired with their fulfillment, emitted tokens folded into their spend. */
 export const buildTransactionHistory = (
-  transactionRows: readonly TransactionRow[],
-  evoluAppOwnerId: string | null | undefined,
-  evoluTransactionsVisibleOwnerIds: readonly (string | null | undefined)[],
+  records: readonly TransactionRecord[],
 ): {
   fulfilledRequestIds: Set<string>;
   transactions: TransactionItem[];
 } => {
-  const items: TransactionItem[] = [];
-  const visibleOwnerIds = new Set(
-    [evoluAppOwnerId, ...evoluTransactionsVisibleOwnerIds]
-      .map((ownerId) => asNonEmptyString(ownerId))
-      .filter((ownerId): ownerId is string => ownerId !== null),
-  );
-  for (const row of transactionRows) {
-    const ownerId = row.ownerId;
-    if (ownerId && visibleOwnerIds.size > 0 && !visibleOwnerIds.has(ownerId)) {
-      continue;
-    }
-    const id = row.id;
-    const createdAtSec = row.createdAtSec;
-    const direction = readDirection(row.direction);
-    const status = readStatus(row.status);
-    if (!id || !createdAtSec || !direction || !status) continue;
-    const method = asNonEmptyString(row.method);
-    items.push({
-      amount: row.amount,
-      category: deriveTransactionCategory(
-        method,
-        asNonEmptyString(row.category),
-      ),
-      contactId: row.contactId,
-      createdAtSec,
-      details: parseJsonValue(row.detailsJson),
-      direction,
-      error: asNonEmptyString(row.error),
-      fee: row.fee,
-      id,
-      method,
-      mint: asNonEmptyString(row.mint),
-      note: asNonEmptyString(row.note),
-      pendingLabel: asNonEmptyString(row.pendingLabel),
-      phase: asNonEmptyString(row.phase),
-      status,
-      unit: asNonEmptyString(row.unit),
-    });
-  }
+  const items = records.map(toTransactionItem);
   items.sort((left, right) => {
     const createdAtDiff = right.createdAtSec - left.createdAtSec;
     if (createdAtDiff !== 0) return createdAtDiff;

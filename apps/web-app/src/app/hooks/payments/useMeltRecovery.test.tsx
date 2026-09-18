@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { OwnerId } from "@evolu/common";
 import {
   Amount,
   MeltReceipt,
@@ -8,33 +8,26 @@ import {
   QuoteId,
   OperationId,
 } from "@linky/linkshu";
+import {
+  NonEmptyString100,
+  PositiveInt,
+  TransactionId,
+  type TransactionRecord,
+} from "@linky/linksync";
+import { Effect } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { useMeltRecovery } from "./useMeltRecovery";
 
-interface PendingTransactionRow {
-  readonly detailsJson: string | null;
-  readonly id: string;
-  readonly ownerId: Evolu.OwnerId;
-}
-
-const { loadQueryMock } = vi.hoisted(() => ({
-  loadQueryMock: vi.fn<() => Promise<ReadonlyArray<PendingTransactionRow>>>(),
-}));
-
-vi.mock("../../../evolu", () => ({
-  evolu: {
-    createQuery: () => "pending-transactions",
-    loadQuery: loadQueryMock,
-  },
-}));
-
 type Params = Parameters<typeof useMeltRecovery>[0];
 
-const owner = Evolu.createAppOwner(
-  Evolu.OwnerSecret.orThrow(new Uint8Array(32).fill(7)),
-);
+const allMock = vi.fn<() => ReadonlyArray<TransactionRecord>>(() => []);
+const updateMock = vi.fn<Params["transactions"]["update"]>(() => Effect.void);
+const transactions: Params["transactions"] = {
+  all: Effect.sync(() => allMock()),
+  update: updateMock,
+};
 
 const result = (
   status: MeltResumeResult["status"],
@@ -59,14 +52,38 @@ const result = (
         : null,
   });
 
+/** Evolu ids are 22 base64url characters; the test names are padded into that shape. */
+const transactionId = (name: string) =>
+  TransactionId.orThrow(name.padEnd(22, "A"));
+
 const pendingRow = (
   id: string,
   quoteId: string | null,
-): PendingTransactionRow => ({
-  id,
-  ownerId: owner.id,
+  status: TransactionRecord["status"] = "pending",
+): TransactionRecord => ({
+  id: transactionId(id),
+  ownerId: OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA"),
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  isDeleted: null,
+  createdAtSec: PositiveInt.orThrow(1),
+  direction: "out",
+  status,
+  category: "lightning",
+  amount: null,
+  fee: null,
+  method: NonEmptyString100.orThrow("lightning_invoice"),
+  note: null,
   detailsJson:
-    quoteId === null ? null : JSON.stringify({ meltQuoteId: quoteId }),
+    quoteId === null
+      ? null
+      : NonEmptyString100.orThrow(JSON.stringify({ meltQuoteId: quoteId })),
+  iconKind: null,
+  contactId: null,
+  mint: null,
+  unit: null,
+  error: null,
+  pendingLabel: null,
 });
 
 const mount = async (results: ReadonlyArray<MeltResumeResult>) => {
@@ -74,8 +91,7 @@ const mount = async (results: ReadonlyArray<MeltResumeResult>) => {
     pushToast: vi.fn(),
     resumePendingCashuMelts: vi.fn(async () => results),
     t: (key) => key,
-    transactionsOwnerId: null,
-    update: vi.fn<Params["update"]>(),
+    transactions,
   };
   const Probe = () => {
     useMeltRecovery(params);
@@ -95,32 +111,32 @@ afterEach(() => {
 
 describe("useMeltRecovery", () => {
   it("marks the matching pending transaction paid with amount and fee", async () => {
-    loadQueryMock.mockResolvedValue([
+    allMock.mockReturnValue([
       pendingRow("tx-other", "quote-9"),
+      pendingRow("tx-settled", "quote-1", "ok"),
       pendingRow("tx-1", "quote-1"),
       pendingRow("tx-chat", null),
     ]);
     const view = await mount([result("paid")]);
 
-    expect(view.params.update).toHaveBeenCalledTimes(1);
-    expect(view.params.update).toHaveBeenCalledWith(
-      "transaction",
-      { id: "tx-1", status: "ok", amount: 40, fee: 1 },
-      { ownerId: owner.id },
-    );
+    expect(updateMock).toHaveBeenCalledTimes(1);
+    expect(updateMock).toHaveBeenCalledWith(transactionId("tx-1"), {
+      status: "ok",
+      amount: 40,
+      fee: 1,
+    });
     expect(view.params.pushToast).toHaveBeenCalledWith("payPendingPaid");
     await act(async () => view.root.unmount());
   });
 
   it("marks an unpaid melt failed", async () => {
-    loadQueryMock.mockResolvedValue([pendingRow("tx-1", "quote-1")]);
+    allMock.mockReturnValue([pendingRow("tx-1", "quote-1")]);
     const view = await mount([result("unpaid")]);
 
-    expect(view.params.update).toHaveBeenCalledWith(
-      "transaction",
-      { id: "tx-1", status: "error", error: "Lightning payment failed" },
-      { ownerId: owner.id },
-    );
+    expect(updateMock).toHaveBeenCalledWith(transactionId("tx-1"), {
+      status: "error",
+      error: "Lightning payment failed",
+    });
     expect(view.params.pushToast).toHaveBeenCalledWith("payPendingFailed");
     await act(async () => view.root.unmount());
   });
@@ -128,8 +144,8 @@ describe("useMeltRecovery", () => {
   it("touches nothing while the mint has not settled the payment", async () => {
     const view = await mount([result("pending"), result("unresolved")]);
 
-    expect(loadQueryMock).not.toHaveBeenCalled();
-    expect(view.params.update).not.toHaveBeenCalled();
+    expect(allMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
     expect(view.params.pushToast).not.toHaveBeenCalled();
     await act(async () => view.root.unmount());
   });

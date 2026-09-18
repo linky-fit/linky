@@ -22,6 +22,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A Nostr contact was saved after duplicate and active owner limit checks. The contact link identifies the new row.",
   "evolu.ownerRotated":
     "The active write owner moved to the next lane. Previous lanes remain visible for reads; owner links join the rotation to sync diagnostics.",
+  ShardRotated:
+    "A scope's shard pointer moved to a new index, rotated on this device (its writes crossed the byte or mutation rule, or the debug page asked) or on another one. The new shard is subscribed for sync; the owner link is its id.",
   LaneMigrationStarted:
     "First launch on this device after the shard storage update: the old owner lanes are about to be copied into the per-scope shards. Owner links list the legacy lanes read.",
   LaneMigrationScopeIngested:

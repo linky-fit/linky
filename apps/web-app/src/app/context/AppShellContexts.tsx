@@ -69,7 +69,6 @@ export interface AppShellCoreContextValue {
   effectiveProfileName: string | null;
   effectiveProfilePicture: string | null;
   evoluAppOwnerId: string | null;
-  evoluTransactionsVisibleOwnerIds: readonly string[];
   applyAmountInputKey: (currentAmount: string, key: string) => string;
   applyAmountInputKeyWithDraft: (
     currentAmount: string,

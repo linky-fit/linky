@@ -9,8 +9,10 @@ import {
   LinkySchema,
   type CashuOperationId,
   type CashuProofId,
+  type LinkyScope,
   type LinkyStore,
   type NostrIdentityId,
+  type ShardRotation,
 } from "@linky/linksync";
 import { createEvoluShardDb } from "@linky/linksync/evolu";
 import { createUseEvolu, EvoluProvider } from "@evolu/react";
@@ -563,10 +565,29 @@ export const evolu = getEvolu();
 
 let linkyStorePromise: Promise<LinkyStore> | null = null;
 
+const reportShardRotated = (
+  store: LinkyStore,
+  rotation: ShardRotation<LinkyScope>,
+): void => {
+  if (!getInspectorEmissionEnabled()) return;
+  reportInspectorRows([
+    {
+      at: Date.now(),
+      channel: "evolu.sync",
+      tag: "ShardRotated",
+      summary: `${rotation.scope} shard pointer moved to index ${rotation.index}`,
+      links: { owner: store.shardOwner(rotation.scope, rotation.index).id },
+      payload: rotation,
+    },
+  ]);
+};
+
 /**
  * The shard store over this Evolu instance. Resolves once the app owner is
  * known and the local database has answered a query; `appOwner` alone
- * resolves before the database worker is up.
+ * resolves before the database worker is up. The store follows its pointers
+ * for the page's lifetime, so a rotation on another device subscribes the
+ * new shard here.
  */
 export const getLinkyStore = (): Promise<LinkyStore> => {
   linkyStorePromise ??= Promise.all([
@@ -576,7 +597,11 @@ export const getLinkyStore = (): Promise<LinkyStore> => {
         db.selectFrom("shardPointer").select("id").limit(1),
       ),
     ),
-  ]).then(([owner]) => createLinkyStore(createEvoluShardDb(evolu), owner));
+  ]).then(([owner]) => {
+    const store = createLinkyStore(createEvoluShardDb(evolu), owner);
+    store.followPointers((rotation) => reportShardRotated(store, rotation));
+    return store;
+  });
   return linkyStorePromise;
 };
 

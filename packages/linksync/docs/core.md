@@ -53,6 +53,8 @@ const store = createShardStore<Schema, typeof scopes>({ db, appOwner, scopes });
 | `reconcileSync()`                 | Calls `useOwner` for owners entering the set and the unuse function for owners leaving it. Call after boot and after rotations. |
 | `forget()`                        | Shards outside a forgettable scope's window: unsubscribed, and deleted when the port can.                                       |
 | `subscribe(scope, listener)`      | Fires after any change to the scope's tables.                                                                                   |
+| `subscribePointers(listener)`     | Fires after any change to the pointer table, local or synced.                                                                   |
+| `followPointers(onRotated)`       | Reconciles sync whenever a pointer moves (a rotation here or on another device) and reports the scope and new index.            |
 
 Every method returns an `Effect`; errors are `ShardDbError` (the port rejected a write), `RowNotFound`, and `UnknownScope`. Time comes from Effect's `Clock`, so tests drive the cooldown with a manual clock.
 
@@ -60,7 +62,9 @@ Every method returns an `Effect`; errors are `ShardDbError` (the port rejected a
 
 `maybeRotate` reads `ownerUsage(activeShard)` from the port: mutations and value bytes of that owner's whole history (a fresh shard starts at zero, so no baseline is needed). It rotates when either number reaches the rule and no rotation of the scope happened within `cooldownMs`, judged by the pointer's `rotatedAtMs` and the store's own last rotation. Rotation writes the pointer into the app owner and immediately reconciles sync so the new shard uploads.
 
-Call `maybeRotate` after writes, the way the app's rotation hook did; the store does not schedule it.
+The store does not schedule `maybeRotate`; every `TableRepository` write (`insert`, `update`, `remove`) calls it after the mutation, so a repository user never rotates by hand. Concurrent writes each run the check, but only the first one whose check passes rotates; the others report `cooldown` while that rotation is in flight.
+
+A rotation on another device reaches this one as a pointer change. `followPointers` is the one subscription an app keeps for the store's lifetime: it reconciles the sync set on every change so the new shard uploads and downloads, and reports each `{ scope, index }` that moved (local rotations included) so the app can log it.
 
 ## Ids
 

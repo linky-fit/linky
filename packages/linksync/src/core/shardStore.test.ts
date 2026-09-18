@@ -360,6 +360,21 @@ describe("shard store", () => {
     });
   });
 
+  it("reports pointer changes and subscribes the new shard", async () => {
+    const { db, store } = toyStore();
+    const rotations: Array<{ scope: string; index: number }> = [];
+    const stop = store.followPointers((rotation) => rotations.push(rotation));
+    await Promise.resolve();
+    run(store.rotate("notes"));
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(rotations).toEqual([{ scope: "notes", index: 1 }]);
+    expect(db.usedOwners()).toContain(store.shardOwner("notes", 1).id);
+    stop();
+    run(store.rotate("notes"));
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(rotations).toHaveLength(1);
+  });
+
   it("notifies subscribers of the scope's tables", () => {
     const { store } = toyStore();
     let calls = 0;

@@ -21,6 +21,7 @@ import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
 import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
 import { deriveDefaultProfile } from "../derivedProfile";
 import { evolu } from "../evolu";
+import { useTransactionRecords } from "../app/hooks/useLinksync";
 import type { Translate } from "../i18n";
 import { getLightningInvoicePreview } from "@linky/linkshu";
 import {
@@ -298,14 +299,8 @@ const TransactionCardView = ({
 const TransactionCard = React.memo(TransactionCardView);
 
 export function TransactionsPage(): React.ReactElement {
-  const {
-    evoluAppOwnerId,
-    evoluTransactionsVisibleOwnerIds,
-    formatDisplayedAmountText,
-    lang,
-    nostrPictureByNpub,
-    t,
-  } = useAppShellCore();
+  const { formatDisplayedAmountText, lang, nostrPictureByNpub, t } =
+    useAppShellCore();
   const { copyText } = useAppShellActions();
   const [expandedById, setExpandedById] = React.useState<
     Record<string, boolean>
@@ -318,17 +313,6 @@ export function TransactionsPage(): React.ReactElement {
       evolu.createQuery((db) =>
         db
           .selectFrom("contact")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-
-  const transactionsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("transaction")
           .selectAll()
           .where("isDeleted", "is not", Evolu.sqliteTrue),
       ),
@@ -360,7 +344,7 @@ export function TransactionsPage(): React.ReactElement {
   const cashuTokenRows = useQuery(cashuTokensQuery);
   const cashuOperationRows = useQuery(cashuOperationsQuery);
   const nostrMessageRows = useQuery(nostrMessagesQuery);
-  const transactionRows = useQuery(transactionsQuery);
+  const transactionRecords = useTransactionRecords();
 
   const tokenByReferenceId = React.useMemo(() => {
     const tokens = new Map<string, string>();
@@ -397,13 +381,10 @@ export function TransactionsPage(): React.ReactElement {
     return byId;
   }, [contactRows]);
 
-  const { fulfilledRequestIds, transactions } = React.useMemo(() => {
-    return buildTransactionHistory(
-      transactionRows,
-      evoluAppOwnerId,
-      evoluTransactionsVisibleOwnerIds,
-    );
-  }, [evoluAppOwnerId, evoluTransactionsVisibleOwnerIds, transactionRows]);
+  const { fulfilledRequestIds, transactions } = React.useMemo(
+    () => buildTransactionHistory(transactionRecords),
+    [transactionRecords],
+  );
 
   const declinedRequestIds = React.useMemo(
     () => deriveDeclinedRequestIds(nostrMessageRows),
@@ -446,9 +427,7 @@ export function TransactionsPage(): React.ReactElement {
       }
       if (item.method === "cashu_receive") return t("transactionCashuInserted");
       if (item.method === "cashu_restore") return t("transactionCashuRestored");
-      if (item.method === "cashu_emit" || item.phase === "swap") {
-        return t("transactionCashuSwap");
-      }
+      if (item.method === "cashu_emit") return t("transactionCashuSwap");
       return t("transactionCashuIssued");
     },
     [contactsById, t],

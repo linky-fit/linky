@@ -1,7 +1,18 @@
-import { Schema } from "effect";
-import { isLocalPaymentTelemetryEvent } from "./useAnonymousPaymentTelemetry";
 import type { OwnerId } from "@evolu/common";
+import {
+  ContactId,
+  createId,
+  NonEmptyString,
+  NonEmptyString100,
+  NonEmptyString1000,
+  PositiveInt,
+  type LinkyDbSchema,
+  type TransactionsRepository,
+  type WriteRow,
+} from "@linky/linksync";
+import { Effect, Schema } from "effect";
 import React from "react";
+import { isLocalPaymentTelemetryEvent } from "./useAnonymousPaymentTelemetry";
 import type { JsonValue } from "../../types/json";
 import {
   LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX,
@@ -30,20 +41,26 @@ import {
 import { isRecord } from "../../utils/unknown";
 import { nowSeconds } from "../../utils/time";
 
-type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
-
 type TransactionInsertPayload = {
-  createdAtSec: number;
-  detailsJson?: string;
-  direction: "in" | "out";
-  status: string;
-  amount?: number;
-  contactId?: string;
-  error?: string;
-  fee?: number;
-  method?: string;
-  mint?: string;
-  unit?: string;
+  -readonly [K in keyof Omit<
+    WriteRow<LinkyDbSchema["transaction"]>,
+    "id"
+  >]: WriteRow<LinkyDbSchema["transaction"]>[K];
+};
+
+interface ColumnType<Input, Value> {
+  readonly from: (
+    value: Input,
+  ) => { readonly ok: true; readonly value: Value } | { readonly ok: false };
+}
+
+/** The column value, or undefined when the input does not fit the column (the payload then omits it). */
+const columnOrOmit = <Input, Value>(
+  type: ColumnType<Input, Value>,
+  value: Input,
+): Value | undefined => {
+  const result = type.from(value);
+  return result.ok ? result.value : undefined;
 };
 
 type TransactionEventLike = {
@@ -197,52 +214,72 @@ export const buildTransactionInsertPayload = (args: {
       : status;
 
   const payload: TransactionInsertPayload = {
-    createdAtSec: args.createdAtSec,
-    direction: args.event.direction,
-    status: transactionStatus,
+    createdAtSec: PositiveInt.orThrow(args.createdAtSec),
+    direction: NonEmptyString100.orThrow(args.event.direction),
+    status: NonEmptyString100.orThrow(transactionStatus),
   };
 
   const contactId = (args.event.contactId ?? "").trim();
-  const storedContactId = isUnknownContactId(contactId) ? "" : contactId;
+  const storedContactId = isUnknownContactId(contactId)
+    ? undefined
+    : columnOrOmit(ContactId, contactId);
   const detailsJson = serializeJsonValue(
     compactTransactionDetails(args.event.details),
   );
 
-  if (amount !== null) payload.amount = amount;
-  if (fee !== null) payload.fee = fee;
-  if (mint) payload.mint = mint;
-  if (unit) payload.unit = unit;
-  if (error) payload.error = error.slice(0, 1000);
-  if (storedContactId) payload.contactId = storedContactId;
-  if (detailsJson) payload.detailsJson = detailsJson;
-  if (storedMethod) payload.method = storedMethod;
+  const optional = {
+    amount: amount === null ? undefined : PositiveInt.orThrow(amount),
+    fee: fee === null ? undefined : PositiveInt.orThrow(fee),
+    mint: columnOrOmit(NonEmptyString1000, mint),
+    unit: columnOrOmit(NonEmptyString100, unit),
+    error: columnOrOmit(NonEmptyString1000, error.slice(0, 1000)),
+    contactId: storedContactId,
+    detailsJson: columnOrOmit(NonEmptyString, detailsJson ?? ""),
+    method: columnOrOmit(NonEmptyString100, storedMethod),
+  };
+  if (optional.amount !== undefined) payload.amount = optional.amount;
+  if (optional.fee !== undefined) payload.fee = optional.fee;
+  if (optional.mint !== undefined) payload.mint = optional.mint;
+  if (optional.unit !== undefined) payload.unit = optional.unit;
+  if (optional.error !== undefined) payload.error = optional.error;
+  if (optional.contactId !== undefined) payload.contactId = optional.contactId;
+  if (optional.detailsJson !== undefined)
+    payload.detailsJson = optional.detailsJson;
+  if (optional.method !== undefined) payload.method = optional.method;
 
   return payload;
 };
 
 interface UseOwnerScopedStorageParams {
   appOwnerIdRef: React.MutableRefObject<OwnerId | null>;
-  insert: EvoluMutations["insert"];
-  transactionsOwnerIdRef: React.MutableRefObject<OwnerId | null>;
+  transactions: Pick<TransactionsRepository, "insert">;
 }
 
 interface UseOwnerScopedStorageResult {
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
   makeLocalStorageKey: (prefix: string) => string;
-  migrateLegacyPaymentEventsToEvolu: (
-    ownerId: OwnerId,
-    transactionOwnerId: OwnerId | null,
-  ) => void;
+  migrateLegacyPaymentEventsToEvolu: (ownerId: OwnerId) => void;
   readSeenMintsFromStorage: () => string[];
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
 }
 
 export const useOwnerScopedStorage = ({
   appOwnerIdRef,
-  insert,
-  transactionsOwnerIdRef,
+  transactions,
 }: UseOwnerScopedStorageParams): UseOwnerScopedStorageResult => {
   const migratedLegacyPaymentsKeyRef = React.useRef<string | null>(null);
+
+  // Transaction history must never break payment receive/send flows.
+  const insertTransaction = React.useCallback(
+    (payload: TransactionInsertPayload): void => {
+      void Effect.runPromise(
+        transactions.insert({ id: createId<"Transaction">(), ...payload }),
+      ).catch((error: unknown) => {
+        console.warn("[linky][transactions] insert failed", error);
+      });
+    },
+    [transactions],
+  );
 
   const makeLocalStorageKey = React.useCallback(
     (prefix: string): string => {
@@ -280,8 +317,7 @@ export const useOwnerScopedStorage = ({
 
   const logPaymentEvent = React.useCallback(
     (event: LoggedPaymentEventParams) => {
-      const ownerId = appOwnerIdRef.current ?? transactionsOwnerIdRef.current;
-      if (!ownerId) return;
+      if (!appOwnerIdRef.current) return;
 
       const nowSec = nowSeconds();
       const transactionPayload = buildTransactionInsertPayload({
@@ -302,18 +338,7 @@ export const useOwnerScopedStorage = ({
         },
       });
 
-      const transactionOwnerId = transactionsOwnerIdRef.current ?? ownerId;
-      try {
-        if (transactionOwnerId) {
-          insert("transaction", transactionPayload, {
-            ownerId: transactionOwnerId,
-          });
-        } else {
-          insert("transaction", transactionPayload);
-        }
-      } catch {
-        // Transaction history must never break payment receive/send flows.
-      }
+      insertTransaction(transactionPayload);
 
       const telemetryEntry = createLocalPaymentTelemetryEvent(event, nowSec);
       const telemetryQueue = safeLocalStorageGetJson(
@@ -330,11 +355,11 @@ export const useOwnerScopedStorage = ({
         nextTelemetryQueue,
       );
     },
-    [appOwnerIdRef, insert, makeLocalStorageKey, transactionsOwnerIdRef],
+    [appOwnerIdRef, insertTransaction, makeLocalStorageKey],
   );
 
   const migrateLegacyPaymentEventsToEvolu = React.useCallback(
-    (ownerId: OwnerId, transactionOwnerId: OwnerId | null) => {
+    (ownerId: OwnerId) => {
       const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${ownerId}`;
       const migratedKey = `${legacyStorageKey}${LEGACY_PAYMENT_EVENTS_MIGRATED_SUFFIX}`;
 
@@ -356,33 +381,20 @@ export const useOwnerScopedStorage = ({
         return;
       }
 
-      const writeOwnerId = transactionOwnerId ?? ownerId;
-
       for (const legacyItem of legacyItems) {
         if (!isLegacyPaymentEvent(legacyItem)) continue;
-
-        const transactionPayload = buildTransactionInsertPayload({
-          createdAtSec: Math.trunc(legacyItem.createdAtSec),
-          event: legacyItem,
-        });
-
-        try {
-          if (writeOwnerId) {
-            insert("transaction", transactionPayload, {
-              ownerId: writeOwnerId,
-            });
-          } else {
-            insert("transaction", transactionPayload);
-          }
-        } catch {
-          // ignore legacy migration failures and keep payment flows unaffected
-        }
+        insertTransaction(
+          buildTransactionInsertPayload({
+            createdAtSec: Math.trunc(legacyItem.createdAtSec),
+            event: legacyItem,
+          }),
+        );
       }
 
       safeLocalStorageSet(migratedKey, "1");
       migratedLegacyPaymentsKeyRef.current = migratedKey;
     },
-    [insert],
+    [insertTransaction],
   );
 
   return {

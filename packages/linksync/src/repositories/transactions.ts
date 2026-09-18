@@ -1,3 +1,4 @@
+import type { PositiveInt } from "@evolu/common";
 import { Effect } from "effect";
 import type { LinkyDbSchema, TransactionRow } from "../model/schema";
 import type { LinkyStore } from "../model/store";
@@ -10,8 +11,9 @@ export type TransactionCategory = "cashu" | "contacts" | "lightning";
 /** A transaction row with its legacy-derived fields normalized. */
 export interface TransactionRecord extends Omit<
   TransactionRow,
-  "direction" | "status"
+  "createdAtSec" | "direction" | "status"
 > {
+  readonly createdAtSec: PositiveInt;
   readonly direction: TransactionDirection;
   readonly status: TransactionStatus;
   readonly category: TransactionCategory;
@@ -21,7 +23,7 @@ export interface TransactionsRepository extends Omit<
   TableRepository<LinkyDbSchema["transaction"]>,
   "all"
 > {
-  /** Rows a reader can trust: direction and status valid, category derived. Incomplete synced rows are skipped. */
+  /** Rows a reader can trust: event time, direction and status valid, category derived. Incomplete synced rows are skipped. */
   readonly all: Effect.Effect<ReadonlyArray<TransactionRecord>>;
 }
 
@@ -51,9 +53,11 @@ export const normalizeTransaction = (
 ): TransactionRecord | null => {
   const direction = readDirection(row.direction);
   const status = readStatus(row.status);
-  if (direction === null || status === null) return null;
+  if (row.createdAtSec === null || direction === null || status === null)
+    return null;
   return {
     ...row,
+    createdAtSec: row.createdAtSec,
     direction,
     status,
     category: deriveTransactionCategory(row.method),

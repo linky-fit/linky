@@ -1,4 +1,5 @@
 import * as Evolu from "@evolu/common";
+import { Effect } from "effect";
 import React, { act } from "react";
 import type { Root } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -18,32 +19,23 @@ beforeAll(() => {
 });
 
 type OwnerScopedStorage = ReturnType<typeof useOwnerScopedStorage>;
-type EvoluInsert = Parameters<typeof useOwnerScopedStorage>[0]["insert"];
+type TransactionInsert = Parameters<
+  typeof useOwnerScopedStorage
+>[0]["transactions"]["insert"];
 
 interface HookHarnessProps {
   appOwnerId: Evolu.OwnerId;
-  insert: EvoluInsert;
+  insert: TransactionInsert;
   onRender: (storage: OwnerScopedStorage) => void;
-  transactionsOwnerId: Evolu.OwnerId;
 }
 
 const HookHarness = ({
   appOwnerId,
   insert,
   onRender,
-  transactionsOwnerId,
 }: HookHarnessProps): React.ReactElement | null => {
   const appOwnerIdRef = React.useRef<Evolu.OwnerId | null>(appOwnerId);
-  const transactionsOwnerIdRef = React.useRef<Evolu.OwnerId | null>(
-    transactionsOwnerId,
-  );
-  onRender(
-    useOwnerScopedStorage({
-      appOwnerIdRef,
-      insert,
-      transactionsOwnerIdRef,
-    }),
-  );
+  onRender(useOwnerScopedStorage({ appOwnerIdRef, transactions: { insert } }));
   return null;
 };
 
@@ -59,8 +51,7 @@ const parseOwnerId = (value: string): Evolu.OwnerId => {
 
 const renderStorageHook = async (
   appOwnerId: Evolu.OwnerId,
-  transactionsOwnerId: Evolu.OwnerId,
-  insert: EvoluInsert,
+  insert: TransactionInsert,
 ): Promise<OwnerScopedStorage> => {
   const resultRef: { current: OwnerScopedStorage | null } = { current: null };
   const { root } = await renderIntoDocument(
@@ -70,7 +61,6 @@ const renderStorageHook = async (
       onRender: (storage) => {
         resultRef.current = storage;
       },
-      transactionsOwnerId,
     }),
   );
   mountedRoots.add(root);
@@ -202,15 +192,10 @@ describe("buildTransactionInsertPayload", () => {
 
 describe("useOwnerScopedStorage", () => {
   const appOwnerId = parseOwnerId("AAAAAAAAAAAAAAAAAAAAAA");
-  const transactionsOwnerId = parseOwnerId("AQEBAQEBAQEBAQEBAQEBAQ");
 
-  it("logs transactions to their owner lane and queues app-owner telemetry", async () => {
-    const insert = vi.fn<EvoluInsert>();
-    const storage = await renderStorageHook(
-      appOwnerId,
-      transactionsOwnerId,
-      insert,
-    );
+  it("logs transactions through the repository and queues app-owner telemetry", async () => {
+    const insert = vi.fn<TransactionInsert>(() => Effect.void);
+    const storage = await renderStorageHook(appOwnerId, insert);
 
     storage.logPaymentEvent({
       amount: 42,
@@ -220,14 +205,13 @@ describe("useOwnerScopedStorage", () => {
     });
 
     expect(insert).toHaveBeenCalledWith(
-      "transaction",
       expect.objectContaining({
+        id: expect.any(String),
         amount: 42,
         direction: "out",
         method: "cashu_chat",
         status: "ok",
       }),
-      { ownerId: transactionsOwnerId },
     );
     expect(
       localStorage.getItem(
@@ -236,15 +220,12 @@ describe("useOwnerScopedStorage", () => {
     ).not.toBeNull();
   });
 
-  it("queues telemetry when transaction insertion throws", async () => {
-    const insert = vi.fn<EvoluInsert>(() => {
-      throw new Error("history unavailable");
-    });
-    const storage = await renderStorageHook(
-      appOwnerId,
-      transactionsOwnerId,
-      insert,
+  it("queues telemetry when the transaction insert fails", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const insert = vi.fn<TransactionInsert>(() =>
+      Effect.die(new Error("history unavailable")),
     );
+    const storage = await renderStorageHook(appOwnerId, insert);
 
     expect(() => {
       storage.logPaymentEvent({
@@ -253,6 +234,9 @@ describe("useOwnerScopedStorage", () => {
         status: "ok",
       });
     }).not.toThrow();
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(
       localStorage.getItem(
         `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${appOwnerId}`,
@@ -260,13 +244,9 @@ describe("useOwnerScopedStorage", () => {
     ).not.toBeNull();
   });
 
-  it("migrates valid legacy payments to the supplied transaction owner lane", async () => {
-    const insert = vi.fn<EvoluInsert>();
-    const storage = await renderStorageHook(
-      appOwnerId,
-      transactionsOwnerId,
-      insert,
-    );
+  it("migrates valid legacy payments through the repository", async () => {
+    const insert = vi.fn<TransactionInsert>(() => Effect.void);
+    const storage = await renderStorageHook(appOwnerId, insert);
     const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${appOwnerId}`;
     localStorage.setItem(
       legacyStorageKey,
@@ -293,22 +273,19 @@ describe("useOwnerScopedStorage", () => {
       ]),
     );
 
-    storage.migrateLegacyPaymentEventsToEvolu(appOwnerId, transactionsOwnerId);
+    storage.migrateLegacyPaymentEventsToEvolu(appOwnerId);
 
     expect(insert).toHaveBeenCalledTimes(1);
-    expect(insert).toHaveBeenCalledWith(
-      "transaction",
-      {
-        amount: 120,
-        createdAtSec: 456,
-        direction: "in",
-        method: "cashu_receive",
-        mint: "https://mint.example",
-        status: "ok",
-        unit: "sat",
-      },
-      { ownerId: transactionsOwnerId },
-    );
+    expect(insert).toHaveBeenCalledWith({
+      id: expect.any(String),
+      amount: 120,
+      createdAtSec: 456,
+      direction: "in",
+      method: "cashu_receive",
+      mint: "https://mint.example",
+      status: "ok",
+      unit: "sat",
+    });
     expect(localStorage.getItem(`${legacyStorageKey}.migratedToEvolu.v2`)).toBe(
       "1",
     );

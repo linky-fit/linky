@@ -13,10 +13,10 @@ import {
   searchProfilesAtom,
   useAtomSet,
 } from "@linky/linkstr-react";
-import { Exit } from "effect";
+import type { TransactionsRepository } from "@linky/linksync";
+import { Effect, Exit } from "effect";
 import React from "react";
-import { evolu } from "../../../evolu";
-import { ContactId, TransactionId } from "../../../evoluIds";
+import { ContactId } from "../../../evoluIds";
 import { navigateTo } from "../../../hooks/useRouting";
 import {
   getProfilePictureUrl,
@@ -122,7 +122,7 @@ interface UseContactEditorParams {
   >;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
-  transactionsOwnerId: Evolu.OwnerId | null;
+  transactions: Pick<TransactionsRepository, "all" | "update">;
   update: EvoluMutations["update"];
   upsert: EvoluMutations["upsert"];
 }
@@ -180,7 +180,7 @@ export const useContactEditor = ({
   setRecentlyAddedContactId,
   setStatus,
   t,
-  transactionsOwnerId,
+  transactions,
   update,
   upsert,
 }: UseContactEditorParams) => {
@@ -197,17 +197,6 @@ export const useContactEditor = ({
     npub: string;
   } | null>(null);
   const previousRouteKindRef = React.useRef<Route["kind"] | null>(null);
-
-  const transactionsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("transaction")
-          .select(["id", "ownerId", "contactId", "method", "detailsJson"])
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
 
   const openScannedContactPendingNpubRef = React.useRef<string | null>(null);
 
@@ -307,62 +296,24 @@ export const useContactEditor = ({
     [appOwnerId, buildFullContactOverridePayload, update, upsert],
   );
 
-  const updateTransactionFields = React.useCallback(
-    (
-      payload: { contactId: ContactId; id: TransactionId },
-      rowOwnerId: unknown,
-    ) => {
-      const parsedOwnerId = Evolu.OwnerId.fromUnknown(rowOwnerId);
-      if (parsedOwnerId.ok) {
-        return update("transaction", payload, {
-          ownerId: parsedOwnerId.value,
-        });
-      }
-
-      if (transactionsOwnerId) {
-        return update("transaction", payload, {
-          ownerId: transactionsOwnerId,
-        });
-      }
-
-      return update("transaction", payload);
-    },
-    [transactionsOwnerId, update],
-  );
-
   const backfillLightningAddressTransactions = React.useCallback(
     async (contactId: ContactId, lnAddress: string) => {
       const normalizedLnAddress = lnAddress.trim().toLowerCase();
       if (!normalizedLnAddress) return;
 
-      const transactionRows = await evolu.loadQuery(transactionsQuery);
-      for (const row of transactionRows) {
-        const transactionId = row.id;
-        if (!transactionId) continue;
-
-        const existingContactId = asNonEmptyString(row.contactId);
-        if (existingContactId) continue;
-
-        const method = asNonEmptyString(row.method);
-        if (method !== "lightning_address") continue;
-
+      const records = await Effect.runPromise(transactions.all);
+      for (const record of records) {
+        if (record.contactId !== null) continue;
+        if (record.method !== "lightning_address") continue;
         const transactionLnAddress = readLightningAddressFromDetailsJson(
-          row.detailsJson,
+          record.detailsJson,
         );
-        if (!transactionLnAddress) continue;
-        if (transactionLnAddress.toLowerCase() !== normalizedLnAddress)
+        if (transactionLnAddress?.toLowerCase() !== normalizedLnAddress)
           continue;
-
-        updateTransactionFields(
-          {
-            id: transactionId,
-            contactId,
-          },
-          row.ownerId,
-        );
+        await Effect.runPromise(transactions.update(record.id, { contactId }));
       }
     },
-    [transactionsQuery, updateTransactionFields],
+    [transactions],
   );
 
   const seededEditContactIdRef = React.useRef<ContactId | null>(null);

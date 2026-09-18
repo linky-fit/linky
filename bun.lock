@@ -258,10 +258,18 @@
       "devDependencies": {
         "@linky/config": "workspace:*",
         "@types/node": "^24.10.1",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
         "eslint": "^9.39.1",
+        "jsdom": "^28.1.0",
         "prettier": "^3.4.2",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
         "typescript": "~5.9.3",
         "vitest": "^4.0.18",
+      },
+      "peerDependencies": {
+        "react": "^19.2.3",
       },
     },
     "tools/nostr-error-tracker": {

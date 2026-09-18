@@ -18,13 +18,9 @@ import {
   EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
   EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-  EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
   MAX_CONTACTS_PER_OWNER,
   MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
   OWNER_ROTATION_COOLDOWN_MS,
-  TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
 } from "../../utils/constants";
 import { deriveEvoluOwnerMnemonicFromSlip39 } from "../../utils/slip39Nostr";
 import {
@@ -56,7 +52,6 @@ interface RotationSnapshotsByScope {
   cashu: RotationSnapshot | null;
   contacts: RotationSnapshot | null;
   messages: RotationSnapshot | null;
-  transactions: RotationSnapshot | null;
 }
 
 interface FixedOwnerSyncData {
@@ -104,18 +99,9 @@ interface UseEvoluContactsOwnerRotationResult {
   requestManualRotateCashuOwner: () => Promise<void>;
   requestManualRotateContactsOwner: () => Promise<void>;
   requestManualRotateMessagesOwner: () => Promise<void>;
-  requestManualRotateTransactionsOwner: () => Promise<void>;
   rotateCashuOwnerIsBusy: boolean;
   rotateContactsOwnerIsBusy: boolean;
   rotateMessagesOwnerIsBusy: boolean;
-  rotateTransactionsOwnerIsBusy: boolean;
-  transactionsOwnerEditsUntilRotation: number;
-  transactionsOwnerId: Evolu.OwnerId | null;
-  transactionsOwnerIndex: number;
-  transactionsOwnerPointer: string;
-  transactionsSyncOwner: Evolu.SyncOwner | null;
-  transactionsBootstrapSnapshot: ReadonlyArray<object>;
-  transactionsVisibleOwnerIds: Evolu.OwnerId[];
 }
 
 const createMetaPointerRowId = (scope: string): Evolu.Id =>
@@ -142,7 +128,6 @@ const readRotationSnapshotsByScope = (
     cashu: null,
     contacts: null,
     messages: null,
-    transactions: null,
   };
 
   if (!metaOwnerId) return snapshots;
@@ -158,8 +143,7 @@ const readRotationSnapshotsByScope = (
     if (
       scopeText !== "cashu" &&
       scopeText !== "contacts" &&
-      scopeText !== "messages" &&
-      scopeText !== "transactions"
+      scopeText !== "messages"
     ) {
       continue;
     }
@@ -192,7 +176,7 @@ const needsStructuredSnapshotUpgrade = (
 const upsertOwnerMetaSnapshot = (
   upsert: UpsertOwnerMeta,
   ownerId: Evolu.OwnerId,
-  scope: "cashu" | "contacts" | "messages" | "transactions",
+  scope: RotatingOwnerRole,
   snapshot: RotationSnapshot,
 ) =>
   upsert(
@@ -328,7 +312,7 @@ const deriveFixedOwnerSyncDataFromSeed = async (
   };
 };
 
-type RotatingOwnerRole = "contacts" | "cashu" | "messages" | "transactions";
+type RotatingOwnerRole = "contacts" | "cashu" | "messages";
 
 const deriveVisibleOwnerSyncDataFromSeed = async (
   slip39Seed: string,
@@ -384,14 +368,6 @@ const OWNER_LANES: Record<RotatingOwnerRole, OwnerLaneConfig> = {
     threshold: MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
     rotatedLabel: "evoluMessagesOwnerRotated",
     tables: ["nostrMessage", "nostrReaction"],
-  },
-  transactions: {
-    indexKey: EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
-    baselineKey: EVOLU_TRANSACTIONS_OWNER_BASELINE_COUNT_STORAGE_KEY,
-    rotatedAtKey: EVOLU_TRANSACTIONS_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-    threshold: TRANSACTIONS_OWNER_ROTATION_TRIGGER_WRITE_COUNT,
-    rotatedLabel: "evoluTransactionsOwnerRotated",
-    tables: ["transaction"],
   },
 };
 
@@ -782,17 +758,6 @@ export const useEvoluContactsOwnerRotation = (
     [],
   );
   const allNostrReactionsRows = useQuery(allNostrReactionsQuery);
-  const allTransactionsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("transaction")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-  const allTransactionsRows = useQuery(allTransactionsQuery);
   React.useEffect(
     () =>
       subscribeEvoluHistoryMutationVersion(() =>
@@ -862,13 +827,6 @@ export const useEvoluContactsOwnerRotation = (
     rows: messageRows,
     historyCount: historyMutationCounts.messages,
   });
-  const transactions = useOwnerLane({
-    ...shared,
-    scope: "transactions",
-    snapshot: snapshots.transactions,
-    rows: allTransactionsRows,
-    historyCount: historyMutationCounts.transactions,
-  });
   React.useEffect(() => {
     const requests = [
       {
@@ -888,12 +846,6 @@ export const useEvoluContactsOwnerRotation = (
         ownerId: messages.ownerId,
         rotatedAtMs: messages.rotatedAtMs,
         tables: OWNER_LANES.messages.tables,
-      },
-      {
-        key: "transactions",
-        ownerId: transactions.ownerId,
-        rotatedAtMs: transactions.rotatedAtMs,
-        tables: OWNER_LANES.transactions.tables,
       },
     ].flatMap((request) =>
       isSeedLogin && request.ownerId
@@ -923,8 +875,6 @@ export const useEvoluContactsOwnerRotation = (
     contacts.rotatedAtMs,
     messages.ownerId,
     messages.rotatedAtMs,
-    transactions.ownerId,
-    transactions.rotatedAtMs,
     historyMutationVersion,
     isSeedLogin,
   ]);
@@ -934,7 +884,6 @@ export const useEvoluContactsOwnerRotation = (
       ...cashu.historicalOwners,
       ...contacts.historicalOwners,
       ...messages.historicalOwners,
-      ...transactions.historicalOwners,
     ];
     return owners.filter(
       (owner, index) =>
@@ -944,7 +893,6 @@ export const useEvoluContactsOwnerRotation = (
     cashu.historicalOwners,
     contacts.historicalOwners,
     messages.historicalOwners,
-    transactions.historicalOwners,
     isSeedLogin,
   ]);
   return {
@@ -969,18 +917,9 @@ export const useEvoluContactsOwnerRotation = (
     messagesVisibleOwnerIds: messages.visibleOwnerIds,
     requestManualRotateMessagesOwner: messages.requestManualRotate,
     rotateMessagesOwnerIsBusy: messages.isBusy,
-    transactionsOwnerId: transactions.ownerId,
-    transactionsOwnerEditsUntilRotation: transactions.editsUntilRotation,
-    transactionsOwnerIndex: transactions.index,
-    transactionsSyncOwner: transactions.syncOwner,
-    transactionsVisibleOwnerIds: transactions.visibleOwnerIds,
-    requestManualRotateTransactionsOwner: transactions.requestManualRotate,
-    rotateTransactionsOwnerIsBusy: transactions.isBusy,
     contactsOwnerEditCount: contacts.editCount,
     contactsOwnerNewContactsCount: contacts.writeCount,
     contactsOwnerPointer: `contacts-${contacts.index}`,
-    transactionsOwnerPointer: `transactions-${transactions.index}`,
-    transactionsBootstrapSnapshot: allTransactionsRows,
     identityOwnerId: isSeedLogin
       ? (fixedOwnerSyncData?.identityOwner.id ?? null)
       : appOwnerId,

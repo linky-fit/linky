@@ -48,4 +48,5 @@ to call the package.
 - `src/repositories/` — contacts, conversations (messages, reactions), wallet
   (linkshu's `ProofStore` and `OperationStore`), transactions, identity, settings
 - `src/evolu/` — the Evolu 7 adapter, exported as `@linky/linksync/evolu`
+- `src/react/`: hooks over repositories and the store, exported as `@linky/linksync/react`
 - `src/testing/` — package-internal fixtures, excluded from the app build

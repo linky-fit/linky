@@ -1,4 +1,11 @@
 import { PaymentFailed, type MeltResumeResult } from "@linky/linkshu";
+import {
+  NonEmptyString100,
+  NonEmptyString1000,
+  PositiveInt,
+  type LinkyDbSchema,
+  type Patch,
+} from "@linky/linksync";
 import { Option, Schema } from "effect";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
@@ -11,11 +18,11 @@ import { describeTaggedCashuError } from "./cashuStoredError";
  * into the row update and the inspector fact that closes the loop.
  */
 
-export interface MeltTransactionPatch {
-  readonly status: "error" | "ok";
-  readonly amount?: number;
-  readonly fee?: number;
-  readonly error?: string;
+/** The column patch for the pending transaction: `status` is `ok` or `error`. */
+export interface MeltTransactionPatch extends Patch<
+  LinkyDbSchema["transaction"]
+> {
+  readonly status: NonEmptyString100;
 }
 
 const decodeMeltDetails = Schema.decodeUnknownOption(
@@ -39,9 +46,11 @@ export const meltTransactionPatch = (
 ): MeltTransactionPatch | null => {
   if (result.status === "paid" && result.receipt !== null) {
     return {
-      status: "ok",
-      amount: result.receipt.paidAmount,
-      ...(result.receipt.feePaid > 0 ? { fee: result.receipt.feePaid } : {}),
+      status: NonEmptyString100.orThrow("ok"),
+      amount: PositiveInt.orThrow(result.receipt.paidAmount),
+      ...(result.receipt.feePaid > 0
+        ? { fee: PositiveInt.orThrow(result.receipt.feePaid) }
+        : {}),
     };
   }
   if (result.status === "unpaid") {
@@ -51,8 +60,10 @@ export const meltTransactionPatch = (
       detail: null,
     });
     return {
-      status: "error",
-      error: describeTaggedCashuError(failure) ?? failure._tag,
+      status: NonEmptyString100.orThrow("error"),
+      error: NonEmptyString1000.orThrow(
+        describeTaggedCashuError(failure) ?? failure._tag,
+      ),
     };
   }
   return null;

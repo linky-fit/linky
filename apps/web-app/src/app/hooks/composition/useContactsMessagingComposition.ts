@@ -5,6 +5,7 @@ import {
 import { writeContact } from "../../lib/writeContact";
 import * as Evolu from "@evolu/common";
 import type { ProfileMetadata } from "@linky/linkstr";
+import type { TransactionsRepository } from "@linky/linksync";
 import {
   decodeNpub,
   encodeNpub,
@@ -248,8 +249,8 @@ interface UseContactsMessagingCompositionParams {
   syncedNostrIdentityMatchesLocal: boolean;
   syncedNostrIdentityResolution: IdentityOwnersCompositionResult["syncedNostrIdentityResolution"];
   t: Translate;
+  transactions: Pick<TransactionsRepository, "all" | "update">;
   transactionsBootstrapSnapshot: NostrBootstrapParams["transactionsSnapshot"];
-  transactionsOwnerId: IdentityOwnersCompositionResult["transactionsOwnerId"];
   update: EvoluMutations["update"];
   upsert: EvoluMutations["upsert"];
 }
@@ -291,8 +292,8 @@ export const useContactsMessagingComposition = ({
   syncedNostrIdentityMatchesLocal,
   syncedNostrIdentityResolution,
   t,
+  transactions,
   transactionsBootstrapSnapshot,
-  transactionsOwnerId,
   update,
   upsert,
 }: UseContactsMessagingCompositionParams) => {
@@ -564,8 +565,7 @@ export const useContactsMessagingComposition = ({
         legacyIdentitiesOwnerId &&
         legacyMessagesIdentityOwnerId &&
         messagesOwnerId &&
-        metaOwnerId &&
-        transactionsOwnerId,
+        metaOwnerId,
       ) && historicalOwnerSetsReady
     : Boolean(appOwnerId);
 
@@ -582,7 +582,6 @@ export const useContactsMessagingComposition = ({
       legacyMessagesIdentityOwnerId,
       messagesOwnerId,
       metaOwnerId,
-      transactionsOwnerId,
     ]
       .map((value) => (value ?? "").trim())
       .filter(Boolean)
@@ -598,7 +597,6 @@ export const useContactsMessagingComposition = ({
     legacyMessagesIdentityOwnerId,
     messagesOwnerId,
     metaOwnerId,
-    transactionsOwnerId,
   ]);
 
   const nostrIdentityBootstrapReady =
@@ -1360,7 +1358,7 @@ export const useContactsMessagingComposition = ({
     setRecentlyAddedContactId,
     setStatus,
     t,
-    transactionsOwnerId,
+    transactions,
     update,
     upsert,
   });

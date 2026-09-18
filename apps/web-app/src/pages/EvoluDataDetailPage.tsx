@@ -29,9 +29,7 @@ export function EvoluDataDetailPage(): React.ReactElement {
     evoluErrorType,
     evoluHistoryCount,
     evoluTableCounts,
-    evoluTransactionsOwnerId,
     evoluTransactionsOwnerIndex,
-    evoluTransactionsOwnerPointer,
     evoluTransactionsVisibleOwnerIds,
     evoluWipeStorageIsBusy,
     requestClearDatabase,
@@ -117,10 +115,8 @@ export function EvoluDataDetailPage(): React.ReactElement {
 
   const currentDataEntries = React.useMemo(() => {
     const activeContactsOwnerId = (evoluContactsOwnerId ?? "").trim();
-    const visibleTransactionsOwnerIds = new Set(
-      [evoluTransactionsOwnerId, ...evoluTransactionsVisibleOwnerIds]
-        .map((ownerId) => (ownerId ?? "").trim())
-        .filter(Boolean),
+    const visibleTransactionsOwnerIds = new Set<string>(
+      evoluTransactionsVisibleOwnerIds,
     );
 
     return Object.entries(currentData)
@@ -156,17 +152,14 @@ export function EvoluDataDetailPage(): React.ReactElement {
   }, [
     currentData,
     evoluContactsOwnerId,
-    evoluTransactionsOwnerId,
     evoluTransactionsVisibleOwnerIds,
     ownerView,
   ]);
 
   const visibleHistoryRows = React.useMemo(() => {
     const activeContactsOwnerId = (evoluContactsOwnerId ?? "").trim();
-    const visibleTransactionsOwnerIds = new Set(
-      [evoluTransactionsOwnerId, ...evoluTransactionsVisibleOwnerIds]
-        .map((ownerId) => (ownerId ?? "").trim())
-        .filter(Boolean),
+    const visibleTransactionsOwnerIds = new Set<string>(
+      evoluTransactionsVisibleOwnerIds,
     );
 
     if (ownerView === "meta") {
@@ -192,7 +185,6 @@ export function EvoluDataDetailPage(): React.ReactElement {
     return historyData;
   }, [
     evoluContactsOwnerId,
-    evoluTransactionsOwnerId,
     evoluTransactionsVisibleOwnerIds,
     historyData,
     ownerView,
@@ -324,17 +316,6 @@ export function EvoluDataDetailPage(): React.ReactElement {
                 {evoluContactsOwnerEditCount} /{" "}
                 {CONTACTS_OWNER_ROTATION_TRIGGER_WRITE_COUNT}
               </span>
-            </div>
-          </div>
-
-          <div className="settings-row">
-            <div className="settings-left">
-              <span className="settings-label">
-                {t("evoluTransactionsOwner")}
-              </span>
-            </div>
-            <div className="settings-right">
-              <span className="muted">{evoluTransactionsOwnerPointer}</span>
             </div>
           </div>
 

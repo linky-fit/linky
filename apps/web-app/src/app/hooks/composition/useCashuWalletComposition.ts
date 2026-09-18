@@ -57,6 +57,7 @@ import {
   parseTokenText,
   type LightningInvoicePreview,
 } from "@linky/linkshu";
+import type { TransactionsRepository } from "@linky/linksync";
 import {
   CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
   formatMintHost,
@@ -202,7 +203,6 @@ interface UseCashuWalletCompositionParams {
     | "currentNsec"
     | "isSeedLogin"
     | "metaOwnerId"
-    | "transactionsOwnerId"
   >;
   maybeShowPwaNotification: (
     title: string,
@@ -236,6 +236,7 @@ interface UseCashuWalletCompositionParams {
   setPayAmount: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
+  transactions: Pick<TransactionsRepository, "all" | "update">;
   update: EvoluMutations["update"];
   upsert: EvoluMutations["upsert"];
 }
@@ -259,6 +260,7 @@ export const useCashuWalletComposition = ({
   setPayAmount,
   setStatus,
   t,
+  transactions,
   update,
   upsert,
 }: UseCashuWalletCompositionParams) => {
@@ -278,7 +280,6 @@ export const useCashuWalletComposition = ({
     currentNsec,
     isSeedLogin,
     metaOwnerId,
-    transactionsOwnerId,
   } = identity;
   const {
     saveNpubContact,
@@ -550,8 +551,8 @@ export const useCashuWalletComposition = ({
 
   React.useEffect(() => {
     if (!appOwnerId) return;
-    migrateLegacyPaymentEventsToEvolu(appOwnerId, transactionsOwnerId);
-  }, [appOwnerId, migrateLegacyPaymentEventsToEvolu, transactionsOwnerId]);
+    migrateLegacyPaymentEventsToEvolu(appOwnerId);
+  }, [appOwnerId, migrateLegacyPaymentEventsToEvolu]);
 
   useRouteAmountResetEffects({
     contactPayBackToChatRef,
@@ -2408,8 +2409,7 @@ export const useCashuWalletComposition = ({
     pushToast,
     resumePendingCashuMelts,
     t,
-    transactionsOwnerId,
-    update,
+    transactions,
   });
 
   const requestSelectedContact = React.useCallback(async () => {

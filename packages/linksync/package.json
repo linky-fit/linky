@@ -8,7 +8,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./evolu": "./src/evolu/index.ts"
+    "./evolu": "./src/evolu/index.ts",
+    "./react": "./src/react/index.ts"
   },
   "scripts": {
     "eslint": "eslint --fix .",
@@ -21,11 +22,19 @@
     "@linky/linkshu": "workspace:*",
     "effect": "^3.19.19"
   },
+  "peerDependencies": {
+    "react": "^19.2.3"
+  },
   "devDependencies": {
     "@linky/config": "workspace:*",
     "@types/node": "^24.10.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "eslint": "^9.39.1",
+    "jsdom": "^28.1.0",
     "prettier": "^3.4.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "typescript": "~5.9.3",
     "vitest": "^4.0.18"
   }

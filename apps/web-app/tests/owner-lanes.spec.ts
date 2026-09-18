@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 import {
   readBalanceSat,
   setBaseStorage,
@@ -10,7 +11,30 @@ import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { topUp } from "./helpers/wallet";
 
+declare global {
+  interface Window {
+    __linkyE2E?: LinkyE2eHooks;
+  }
+}
+
 test.use({ actionTimeout: 20_000 });
+
+/** The old owner lanes mirror their active index in localStorage. */
+const laneIndex = (page: Page, scope: string) =>
+  page.evaluate(
+    (name) =>
+      Number(localStorage.getItem(`linky.evolu.${name}_owner_index.v1`)),
+    scope,
+  );
+
+/** Transactions live on shards; their pointer is a synced row in the app owner. */
+const transactionsShardIndex = (page: Page) =>
+  page.evaluate(async () => {
+    if (!window.__linkyE2E) throw new Error("test hooks missing");
+    const pointers = await window.__linkyE2E.shardRows("meta", "shardPointer");
+    const pointer = pointers.find((row) => row.scope === "transactions");
+    return typeof pointer?.index === "number" ? pointer.index : 0;
+  });
 
 test("contact, message and transaction rotations preserve old rows and sync new writes", async ({
   browser,
@@ -68,13 +92,11 @@ test("contact, message and transaction rotations preserve old rows and sync new 
         for (const device of devices) {
           await expect
             .poll(() =>
-              device.page.evaluate(
-                (scope) =>
-                  localStorage.getItem(`linky.evolu.${scope}_owner_index.v1`),
-                lane.scope,
-              ),
+              lane.scope === "transactions"
+                ? transactionsShardIndex(device.page)
+                : laneIndex(device.page, lane.scope),
             )
-            .toBe("1");
+            .toBe(1);
         }
       }
     });

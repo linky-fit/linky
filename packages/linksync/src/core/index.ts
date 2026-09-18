@@ -40,6 +40,7 @@ export type {
   RotationOutcome,
   Shard,
   ShardPointerColumns,
+  ShardRotation,
   ShardStore,
   ShardStoreOptions,
 } from "./shardStore";

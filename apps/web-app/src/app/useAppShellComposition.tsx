@@ -83,6 +83,12 @@ import { useTopDownTilt } from "./hooks/useTopDownTilt";
 import { useArmedDeleteTimeouts } from "./hooks/useArmedDeleteTimeouts";
 import { useFiatRates } from "./hooks/useFiatRates";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
+import {
+  useTransactionRecords,
+  useTransactionShards,
+  useTransactionsRepository,
+  useTransactionsShardRotation,
+} from "./hooks/useLinksync";
 import { useOwnerScopedStorage } from "./hooks/useOwnerScopedStorage";
 import { useStatusToasts } from "./hooks/useStatusToasts";
 import { useStoragePersistRequestEffect } from "./hooks/useStoragePersistRequestEffect";
@@ -164,24 +170,15 @@ export const useAppShellComposition = ({
     requestManualRotateCashuOwner,
     requestManualRotateContactsOwner,
     requestManualRotateMessagesOwner,
-    requestManualRotateTransactionsOwner,
     requestPasteNostrKeys,
     rotateCashuOwnerIsBusy,
     rotateContactsOwnerIsBusy,
     rotateMessagesOwnerIsBusy,
-    rotateTransactionsOwnerIsBusy,
     seedMnemonic,
     slip39Seed,
     syncedNostrIdentityMatchesLocal,
     syncedNostrIdentityResolution,
     syncOwner,
-    transactionsBootstrapSnapshot,
-    transactionsOwnerEditsUntilRotation,
-    transactionsOwnerId,
-    transactionsOwnerIdRef,
-    transactionsOwnerIndex,
-    transactionsOwnerPointer,
-    transactionsVisibleOwnerIds,
   } = useIdentityOwnersComposition({
     currentNsec,
     evolu,
@@ -193,6 +190,11 @@ export const useAppShellComposition = ({
     upsert,
   });
 
+  const transactions = useTransactionsRepository();
+  const transactionRecords = useTransactionRecords();
+  const transactionShards = useTransactionShards();
+  const transactionsShardRotation = useTransactionsShardRotation();
+
   const {
     logPaymentEvent,
     makeLocalStorageKey,
@@ -201,8 +203,7 @@ export const useAppShellComposition = ({
     rememberSeenMint,
   } = useOwnerScopedStorage({
     appOwnerIdRef,
-    insert,
-    transactionsOwnerIdRef,
+    transactions,
   });
 
   const evoluServers = useEvoluServersManager();
@@ -470,7 +471,7 @@ export const useAppShellComposition = ({
       (appOwnerId ?? "").trim(),
       ...cashuVisibleOwnerIds.map((ownerId) => ownerId.trim()),
       ...messagesVisibleOwnerIds.map((ownerId) => ownerId.trim()),
-      ...transactionsVisibleOwnerIds.map((ownerId) => ownerId.trim()),
+      ...transactionShards.ownerIds,
       (metaOwnerId ?? "").trim(),
       ...contactsVisibleOwnerIds.map((ownerId) => ownerId.trim()),
     ].filter(Boolean);
@@ -481,7 +482,7 @@ export const useAppShellComposition = ({
     contactsVisibleOwnerIds,
     messagesVisibleOwnerIds,
     metaOwnerId,
-    transactionsVisibleOwnerIds,
+    transactionShards.ownerIds,
   ]);
 
   useStoragePersistRequestEffect({ refreshKey: t });
@@ -683,8 +684,8 @@ export const useAppShellComposition = ({
     syncedNostrIdentityMatchesLocal,
     syncedNostrIdentityResolution,
     t,
-    transactionsBootstrapSnapshot,
-    transactionsOwnerId,
+    transactions,
+    transactionsBootstrapSnapshot: transactionRecords,
     update,
     upsert,
   });
@@ -941,7 +942,6 @@ export const useAppShellComposition = ({
       currentNsec,
       isSeedLogin,
       metaOwnerId,
-      transactionsOwnerId,
     },
     maybeShowPwaNotification,
     ownerScopedStorage: {
@@ -967,6 +967,7 @@ export const useAppShellComposition = ({
     setPayAmount,
     setStatus,
     t,
+    transactions,
     update,
     upsert,
   });
@@ -1736,12 +1737,8 @@ export const useAppShellComposition = ({
       evoluServerUrls,
       evoluServersReloadRequired,
       evoluTableCounts: evoluDbInfo.info.tableCounts,
-      evoluTransactionsOwnerEditsUntilRotation:
-        transactionsOwnerEditsUntilRotation,
-      evoluTransactionsOwnerId: transactionsOwnerId,
-      evoluTransactionsOwnerIndex: transactionsOwnerIndex,
-      evoluTransactionsOwnerPointer: transactionsOwnerPointer,
-      evoluTransactionsVisibleOwnerIds: transactionsVisibleOwnerIds,
+      evoluTransactionsOwnerIndex: transactionShards.index,
+      evoluTransactionsVisibleOwnerIds: transactionShards.ownerIds,
       evoluWipeStorageIsBusy,
       isEvoluServerOffline,
       newEvoluServerUrl,
@@ -1749,11 +1746,11 @@ export const useAppShellComposition = ({
       requestManualRotateCashuOwner,
       requestManualRotateContactsOwner,
       requestManualRotateMessagesOwner,
-      requestManualRotateTransactionsOwner,
+      requestManualRotateTransactionsOwner: transactionsShardRotation.rotate,
       rotateCashuOwnerIsBusy,
       rotateContactsOwnerIsBusy,
       rotateMessagesOwnerIsBusy,
-      rotateTransactionsOwnerIsBusy,
+      rotateTransactionsOwnerIsBusy: transactionsShardRotation.isBusy,
       saveEvoluServerUrls,
       setEvoluServerOffline,
       setNewEvoluServerUrl,
@@ -1794,11 +1791,6 @@ export const useAppShellComposition = ({
     t,
   });
 
-  const evoluTransactionsVisibleOwnerIds = React.useMemo(
-    () => transactionsVisibleOwnerIds.map((ownerId) => ownerId),
-    [transactionsVisibleOwnerIds],
-  );
-
   const appState = React.useMemo(
     () => ({
       allowedDisplayCurrencies,
@@ -1824,7 +1816,6 @@ export const useAppShellComposition = ({
       effectiveProfileName,
       effectiveProfilePicture,
       evoluAppOwnerId: appOwnerId ? appOwnerId : null,
-      evoluTransactionsVisibleOwnerIds,
       formatDisplayedAmountParts,
       formatDisplayedAmountText,
       isProfileEditing,
@@ -1896,7 +1887,6 @@ export const useAppShellComposition = ({
       effectiveMyLightningAddress,
       effectiveProfileName,
       effectiveProfilePicture,
-      evoluTransactionsVisibleOwnerIds,
       formatDisplayedAmountParts,
       formatDisplayedAmountText,
       isProfileEditing,

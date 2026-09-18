@@ -46,6 +46,12 @@ export type RotationOutcome =
       readonly reason: "fixed" | "belowThreshold" | "cooldown";
     };
 
+/** A scope whose active index moved, on this device or another. */
+export interface ShardRotation<Scope extends string = string> {
+  readonly scope: Scope;
+  readonly index: number;
+}
+
 export interface ForgottenShard {
   readonly scope: string;
   readonly index: number;
@@ -153,6 +159,16 @@ export interface ShardStore<
     scope: keyof R & string,
     listener: () => void,
   ) => () => void;
+  /** Fires after any change to the pointers, local or synced. */
+  readonly subscribePointers: (listener: () => void) => () => void;
+  /**
+   * Keeps the sync set in step with the pointers: a rotation on another
+   * device arrives as a pointer change and subscribes the new shard here.
+   * Reports every scope whose active index moved, local rotations included.
+   */
+  readonly followPointers: (
+    onRotated: (rotation: ShardRotation<keyof R & string>) => void,
+  ) => () => void;
 }
 
 export interface ShardStoreOptions<
@@ -207,6 +223,7 @@ export const createShardStore = <
   const { db, appOwner, scopes } = options;
   const pendingIndex = new Map<string, number>();
   const rotatedLocallyAtMs = new Map<string, number>();
+  const rotationInFlight = new Set<string>();
   const shardOwners = new Map<string, ShardOwner>();
   const usedOwners = new Map<OwnerId, () => void>();
 
@@ -434,7 +451,17 @@ export const createShardStore = <
       const nowMs = yield* Clock.currentTimeMillis;
       if (rotatedAt.some((at) => nowMs - at < rule.cooldownMs))
         return { rotated: false, reason: "cooldown" };
-      return { rotated: true, index: yield* rotate(scope) };
+      // Concurrent writes each check the rule; only the first one rotates.
+      if (rotationInFlight.has(scope))
+        return { rotated: false, reason: "cooldown" };
+      rotationInFlight.add(scope);
+      return yield* Effect.ensuring(
+        Effect.map(
+          rotate(scope),
+          (index): RotationOutcome => ({ rotated: true, index }),
+        ),
+        Effect.sync(() => rotationInFlight.delete(scope)),
+      );
     });
 
   const forget = (): Effect.Effect<ReadonlyArray<ForgottenShard>> =>
@@ -461,6 +488,37 @@ export const createShardStore = <
     };
   };
 
+  const subscribePointers = (listener: () => void): (() => void) =>
+    db.subscribe("shardPointer", listener);
+
+  const scopeNames = Object.keys(scopes).filter(
+    (scope): scope is keyof R & string => scope in scopes,
+  );
+
+  const followPointers = (
+    onRotated: (rotation: ShardRotation<keyof R & string>) => void,
+  ): (() => void) => {
+    const seen = new Map<string, number>();
+    const check = Effect.gen(function* () {
+      for (const scope of scopeNames) {
+        if (definition(scope).owner === "app") continue;
+        const index = yield* activeIndex(scope);
+        const previous = seen.get(scope);
+        seen.set(scope, index);
+        if (previous === undefined || previous === index) continue;
+        yield* reconcileSync();
+        onRotated({ scope, index });
+      }
+    });
+    // Checks run one after another so two pointer changes cannot interleave.
+    let queue = Promise.resolve();
+    const enqueue = () => {
+      queue = queue.then(() => Effect.runPromise(check));
+    };
+    enqueue();
+    return subscribePointers(enqueue);
+  };
+
   return {
     appOwner,
     activeIndex,
@@ -484,5 +542,7 @@ export const createShardStore = <
     reconcileSync,
     forget,
     subscribe,
+    subscribePointers,
+    followPointers,
   };
 };

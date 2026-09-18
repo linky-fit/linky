@@ -38,12 +38,13 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 
 Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `docs/architecture.md` ("Evolu persistence and owner lanes").
 
-- Each Evolu owner lane rotates on its own historical mutation threshold: contacts `220`, cashu `170`, messages `160`, transactions `220` (`*_OWNER_ROTATION_TRIGGER_WRITE_COUNT`), with a per-scope `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown.
+- Each Evolu owner lane rotates on its own historical mutation threshold: contacts `220`, cashu `170`, messages `160` (`*_OWNER_ROTATION_TRIGGER_WRITE_COUNT`), with a per-scope `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown.
+- Transactions already live on `@linky/linksync` shards: the package rotates the `transactions` scope after a write once the active shard holds 256 KiB of history values or 220 mutations (60 s cooldown), keeps the newest 4 shards, and copies a row forward on update so a retired shard never grows.
 - Existing quota failures need relay capacity before rejected history can sync. Keep the device's local data, increase the relay's quota or add a relay with capacity, then reload normally.
 - An upgrade silently adds and enables `wss://evolu.linky.fit` and adds `wss://nostr.linky.fit` to the user's Nostr relay lists once, preserving custom endpoints. Later user edits are respected; explicit development relay overrides skip the migration.
 - Rotation is pointer-only for every scope: the active lane index moves forward in `ownerMeta`, nothing is copied, and older lanes stay readable instead of being pruned.
 - Contacts are additionally capped at `MAX_CONTACTS_PER_OWNER = 100` per active lane; a full lane triggers rotation to the next one.
-- The lanes are being replaced by `@linky/linksync` shards (linky-fit/linky#380). The first launch after the update shows a short "Migrating data" screen while the lanes are copied into the shards; the lanes still take every write until each scope cuts over, and for 180 days after the migration every launch re-copies rows an older app version wrote to them.
+- The lanes are being replaced by `@linky/linksync` shards (linky-fit/linky#380). The first launch after the update shows a short "Migrating data" screen while the lanes are copied into the shards; the remaining lanes (contacts, cashu, messages) still take every write until their scope cuts over, and for 180 days after the migration every launch re-copies rows an older app version wrote to any lane, transactions included.
 
 ## Features
 

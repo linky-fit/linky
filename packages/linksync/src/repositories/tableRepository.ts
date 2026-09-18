@@ -18,6 +18,7 @@ export type TableOf<Scope extends LinkyScope> =
 export interface TableRepository<C extends Columns> {
   readonly all: Effect.Effect<ReadonlyArray<Row<C>>>;
   readonly byId: (id: C["id"]) => Effect.Effect<Row<C> | null>;
+  /** Writes into the active shard, then rotates the scope if its rule says so. */
   readonly insert: (row: WriteRow<C>) => Effect.Effect<void, ShardDbError>;
   readonly update: (
     id: C["id"],
@@ -39,13 +40,21 @@ export const tableRepository = <
   table: T,
 ): TableRepository<LinkyDbSchema[T]> => {
   const all = store.rows(scope, table);
+  // The scope comes from the registry, so an unknown scope is a defect.
+  const maybeRotate = Effect.asVoid(
+    Effect.catchTag(store.maybeRotate(scope), "UnknownScope", (error) =>
+      Effect.die(error),
+    ),
+  );
+  const rotateAfter = <E>(write: Effect.Effect<void, E>) =>
+    Effect.zipRight(write, maybeRotate);
   return {
     all,
     byId: (id) =>
       Effect.map(all, (rows) => rows.find((row) => row.id === id) ?? null),
-    insert: (row) => store.insert(scope, table, row),
-    update: (id, patch) => store.update(scope, table, id, patch),
-    remove: (id) => store.remove(scope, table, id),
+    insert: (row) => rotateAfter(store.insert(scope, table, row)),
+    update: (id, patch) => rotateAfter(store.update(scope, table, id, patch)),
+    remove: (id) => rotateAfter(store.remove(scope, table, id)),
     subscribe: (listener) => store.subscribe(scope, listener),
   };
 };

@@ -58,10 +58,7 @@ export interface EvoluSettingsContextValue {
   evoluServerUrls: string[];
   evoluServersReloadRequired: boolean;
   evoluTableCounts: Record<string, number | null>;
-  evoluTransactionsOwnerEditsUntilRotation: number;
-  evoluTransactionsOwnerId: OwnerId | null;
   evoluTransactionsOwnerIndex: number;
-  evoluTransactionsOwnerPointer: string;
   evoluTransactionsVisibleOwnerIds: readonly OwnerId[];
   evoluWipeStorageIsBusy: boolean;
   isEvoluServerOffline: (url: string) => boolean;

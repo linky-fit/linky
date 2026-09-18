@@ -1,31 +1,22 @@
-import * as Evolu from "@evolu/common";
 import type { MeltResumeResult } from "@linky/linkshu";
+import type { TransactionsRepository } from "@linky/linksync";
+import { Effect } from "effect";
 import React from "react";
-import { evolu, type TransactionId } from "../../../evolu";
 import type { Translate } from "../../../i18n";
 import {
   meltTransactionPatch,
   readMeltQuoteIdFromDetailsJson,
   reportMeltHistoryResolved,
 } from "../../lib/meltRecovery";
-import type { MeltTransactionPatch } from "../../lib/meltRecovery";
 import type { ResumePendingCashuMelts } from "../composition/useLinkshuComposition";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
-
-/** The slice of Evolu's `update` mutation this hook writes through. */
-type UpdateTransaction = (
-  table: "transaction",
-  payload: MeltTransactionPatch & { readonly id: TransactionId },
-  options?: { readonly ownerId: Evolu.OwnerId },
-) => unknown;
 
 interface UseMeltRecoveryParams {
   pushToast: (message: string) => void;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   resumePendingCashuMelts: ResumePendingCashuMelts | null;
   t: Translate;
-  transactionsOwnerId: Evolu.OwnerId | null;
-  update: UpdateTransaction;
+  transactions: Pick<TransactionsRepository, "all" | "update">;
 }
 
 /**
@@ -39,21 +30,8 @@ export const useMeltRecovery = ({
   pushToast,
   resumePendingCashuMelts,
   t,
-  transactionsOwnerId,
-  update,
+  transactions,
 }: UseMeltRecoveryParams): void => {
-  const pendingTransactionsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("transaction")
-          .select(["id", "ownerId", "detailsJson"])
-          .where("status", "=", Evolu.NonEmptyString100.orThrow("pending"))
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-
   const settleHistory = React.useCallback(
     async (results: ReadonlyArray<MeltResumeResult>) => {
       const settled = results.flatMap((result) => {
@@ -62,19 +40,13 @@ export const useMeltRecovery = ({
       });
       if (settled.length === 0) return;
 
-      const rows = await evolu.loadQuery(pendingTransactionsQuery);
-      for (const row of rows) {
+      const records = await Effect.runPromise(transactions.all);
+      for (const row of records) {
+        if (row.status !== "pending") continue;
         const quoteId = readMeltQuoteIdFromDetailsJson(row.detailsJson);
         const match = settled.find((entry) => entry.result.quoteId === quoteId);
         if (match === undefined) continue;
-        const rowOwnerId = Evolu.OwnerId.fromUnknown(row.ownerId);
-        const ownerId = rowOwnerId.ok ? rowOwnerId.value : transactionsOwnerId;
-        const payload = { id: row.id, ...match.patch };
-        if (ownerId) {
-          update("transaction", payload, { ownerId });
-        } else {
-          update("transaction", payload);
-        }
+        await Effect.runPromise(transactions.update(row.id, match.patch));
         reportMeltHistoryResolved({
           quoteId: match.result.quoteId,
           status: match.patch.status,
@@ -87,7 +59,7 @@ export const useMeltRecovery = ({
         );
       }
     },
-    [pendingTransactionsQuery, pushToast, t, transactionsOwnerId, update],
+    [pushToast, t, transactions],
   );
 
   useResumeOnLaunchAndOnline(

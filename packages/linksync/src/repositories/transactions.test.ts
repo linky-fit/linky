@@ -1,4 +1,8 @@
-import { NonEmptyString100, PositiveInt } from "@evolu/common";
+import {
+  NonEmptyString100,
+  NonEmptyString1000,
+  PositiveInt,
+} from "@evolu/common";
 import { createId } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
 import {
@@ -40,5 +44,20 @@ describe("transactions repository", () => {
     expect(runNow(transactions.all)).toMatchObject([
       { direction: "out", status: "ok", category: "contacts" },
     ]);
+  });
+
+  it("rotates the scope once the writes cross its rule", () => {
+    const { store } = linkyStore();
+    const transactions = makeTransactionsRepository(store);
+    const row = () => ({
+      id: createId<"Transaction">(),
+      createdAtSec: PositiveInt.orThrow(1),
+      direction: text("in"),
+      status: text("ok"),
+      note: NonEmptyString1000.orThrow("x".repeat(1000)),
+    });
+    for (let i = 0; i < 300; i += 1) runNow(transactions.insert(row()));
+    expect(runNow(store.activeIndex("transactions"))).toBe(1);
+    expect(runNow(transactions.all)).toHaveLength(300);
   });
 });

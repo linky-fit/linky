@@ -47,7 +47,6 @@ export const useIdentityOwnersComposition = ({
   const appOwnerIdRef = React.useRef<Evolu.OwnerId | null>(null);
   const cashuOwnerIdRef = React.useRef<Evolu.OwnerId | null>(null);
   const messagesOwnerIdRef = React.useRef<Evolu.OwnerId | null>(null);
-  const transactionsOwnerIdRef = React.useRef<Evolu.OwnerId | null>(null);
 
   const syncOwner = useEvoluSyncOwner(Boolean(currentNsec));
 
@@ -87,7 +86,6 @@ export const useIdentityOwnersComposition = ({
   useOwner(ownerRotation.contactsSyncOwner);
   useOwner(ownerRotation.cashuSyncOwner);
   useOwner(ownerRotation.messagesSyncOwner);
-  useOwner(ownerRotation.transactionsSyncOwner);
   useOwner(ownerRotation.metaSyncOwner);
   useOwner(ownerRotation.identitySyncOwner);
 
@@ -97,9 +95,7 @@ export const useIdentityOwnersComposition = ({
       ownerRotation.contactsVisibleOwnerIds.length ===
         ownerRotation.contactsOwnerIndex + 1 &&
       ownerRotation.messagesVisibleOwnerIds.length ===
-        ownerRotation.messagesOwnerIndex + 1 &&
-      ownerRotation.transactionsVisibleOwnerIds.length ===
-        ownerRotation.transactionsOwnerIndex + 1
+        ownerRotation.messagesOwnerIndex + 1
     : true;
   React.useEffect(() => {
     if (!profileAuth.isSeedLogin || !historicalOwnerSetsReady) return;
@@ -128,10 +124,6 @@ export const useIdentityOwnersComposition = ({
   React.useEffect(() => {
     messagesOwnerIdRef.current = ownerRotation.messagesOwnerId;
   }, [ownerRotation.messagesOwnerId]);
-
-  React.useEffect(() => {
-    transactionsOwnerIdRef.current = ownerRotation.transactionsOwnerId;
-  }, [ownerRotation.transactionsOwnerId]);
 
   const nostrIdentityQuery = React.useMemo(
     () =>
@@ -255,6 +247,5 @@ export const useIdentityOwnersComposition = ({
     syncedNostrIdentityMatchesLocal,
     syncedNostrIdentityResolution,
     syncOwner,
-    transactionsOwnerIdRef,
   };
 };
