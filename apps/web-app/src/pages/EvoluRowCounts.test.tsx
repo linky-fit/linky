@@ -1,5 +1,5 @@
-import type { EvoluError } from "@evolu/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { EvoluErrorType } from "../evolu";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { EvoluDataDetailPage } from "./EvoluDataDetailPage";
 import { EvoluServersPage } from "./EvoluServersPage";
@@ -8,7 +8,7 @@ const counts = vi.hoisted(() => {
   const state: {
     tables: Record<string, number | null>;
     history: number | null;
-    errorType: EvoluError["type"] | null;
+    errorType: EvoluErrorType | null;
     reloadRequired: boolean;
   } = { tables: {}, history: null, errorType: null, reloadRequired: false };
   return state;
@@ -26,7 +26,8 @@ vi.mock("../app/context/SystemSettingsContexts", () => ({
     evoluHistoryCount: counts.history,
     evoluDatabaseBytes: 4096,
     evoluServerUrls: [],
-    evoluTransactionsVisibleOwnerIds: [],
+    evoluShards: [],
+    evoluSyncOwnerIds: [],
   }),
 }));
 

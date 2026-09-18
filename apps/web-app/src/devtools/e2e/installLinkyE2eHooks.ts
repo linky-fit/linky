@@ -37,6 +37,13 @@ export interface LinkyE2eHooks {
     scope: string,
     table: string,
   ) => Promise<ReadonlyArray<Readonly<Record<string, unknown>>>>;
+  /** The owner id of one shard of a scope, whether or not it is visible. */
+  readonly shardOwnerId: (scope: string, index: number) => Promise<string>;
+  /** Unsubscribes the shards outside every forgettable scope's window. */
+  readonly forget: () => Promise<
+    ReadonlyArray<{ scope: string; index: number; deleted: boolean }>
+  >;
+  readonly syncOwnerIds: () => Promise<ReadonlyArray<string>>;
   readonly createId: () => string;
   readonly directConversationIdFor: (contactId: string) => string;
   readonly activeNostrIdentityId: string;
@@ -107,6 +114,21 @@ export const installLinkyE2eHooks = (): void => {
       )
         .filter((row) => row.isDeleted !== 1)
         .map((row) => Object.fromEntries(Object.entries(row)));
+    },
+    shardOwnerId: async (scope, index) => {
+      if (!isScope(scope)) throw new Error(`unknown scope ${scope}`);
+      const store = await getLinkyStore();
+      return store.shardOwner(scope, index).id;
+    },
+    forget: async () => {
+      const store = await getLinkyStore();
+      return [...(await Effect.runPromise(store.forget()))];
+    },
+    syncOwnerIds: async () => {
+      const store = await getLinkyStore();
+      return (await Effect.runPromise(store.syncOwners())).map(
+        (owner) => owner.id,
+      );
     },
     createId: () => createId(),
     directConversationIdFor: (contactId) => {

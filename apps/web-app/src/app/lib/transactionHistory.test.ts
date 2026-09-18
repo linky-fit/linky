@@ -1,10 +1,10 @@
-import * as Evolu from "@evolu/common";
+import { NonEmptyString, OwnerId, PositiveInt } from "@linky/linksync";
 import type { TransactionRecord } from "@linky/linksync";
 import { describe, expect, it } from "vitest";
 import { TransactionId } from "../../evoluIds";
 import { buildTransactionHistory } from "./transactionHistory";
 
-const ownerId = Evolu.OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA");
+const ownerId = OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA");
 const makeRow = (
   overrides: Partial<TransactionRecord> = {},
 ): TransactionRecord => ({
@@ -13,7 +13,7 @@ const makeRow = (
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   isDeleted: null,
-  createdAtSec: Evolu.PositiveInt.orThrow(1_700_000_000),
+  createdAtSec: PositiveInt.orThrow(1_700_000_000),
   direction: "out",
   status: "ok",
   category: "cashu",
@@ -47,7 +47,7 @@ describe("buildTransactionHistory", () => {
 
   it("merges emitted token details into its eventual spend", () => {
     const issued = makeRow({
-      detailsJson: Evolu.NonEmptyString.orThrow(
+      detailsJson: NonEmptyString.orThrow(
         JSON.stringify({
           issuedTokenId: "token-id",
           invoice: "stored invoice",
@@ -56,9 +56,9 @@ describe("buildTransactionHistory", () => {
     });
     const spent = makeRow({
       id: TransactionId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ"),
-      createdAtSec: Evolu.PositiveInt.orThrow(1_700_000_001),
-      amount: Evolu.PositiveInt.orThrow(42),
-      detailsJson: Evolu.NonEmptyString.orThrow(
+      createdAtSec: PositiveInt.orThrow(1_700_000_001),
+      amount: PositiveInt.orThrow(42),
+      detailsJson: NonEmptyString.orThrow(
         JSON.stringify({ usedTokenIds: ["token-id"] }),
       ),
     });

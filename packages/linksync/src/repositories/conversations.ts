@@ -39,6 +39,8 @@ export interface ConversationsRepository extends TableRepository<
   readonly reactionsIn: (
     conversationId: ConversationId,
   ) => Effect.Effect<ReadonlyArray<ReactionRow>>;
+  /** Tombstoned reaction copies in the visible shards, so a removed reaction's wrap is still known. */
+  readonly removedReactions: Effect.Effect<ReadonlyArray<ReactionRow>>;
   /** Moves the read cursor forward; never backwards. */
   readonly markSeen: (
     conversationId: ConversationId,
@@ -96,6 +98,9 @@ export const makeConversationsRepository = (
       Effect.map(reactions.all, (rows) =>
         rows.filter((row) => row.conversationId === conversationId),
       ),
+    removedReactions: Effect.map(store.copies("messages", "reaction"), (rows) =>
+      rows.filter((row) => row.isDeleted === 1),
+    ),
     markSeen: (conversationId, atSec) =>
       Effect.flatMap(conversations.byId(conversationId), (row) =>
         row !== null && (row.lastSeenAtSec ?? 0) >= atSec

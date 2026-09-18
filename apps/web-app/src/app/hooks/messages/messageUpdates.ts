@@ -1,4 +1,3 @@
-import type * as Evolu from "@evolu/common";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,
@@ -10,13 +9,11 @@ import { nowSeconds } from "../../../utils/time";
 
 export interface NostrMessageUpdatePayload {
   clientId?: string | null;
-  contactId?: string;
   content?: string;
   createdAtSec?: number;
   editedAtSec?: number | null;
   editedFromId?: string | null;
   id: string;
-  isDeleted?: typeof Evolu.sqliteTrue;
   isEdited?: string | null;
   localOnly?: string | null;
   originalContent?: string | null;
@@ -33,7 +30,6 @@ export interface NostrReactionUpdatePayload {
   clientId?: string | null;
   emoji?: string;
   id: string;
-  isDeleted?: typeof Evolu.sqliteTrue;
   messageId?: string;
   reactorPubkey?: string;
   status?: "pending" | "sent";
@@ -196,7 +192,6 @@ export const applyMessageUpdate = (
   payload: NostrMessageUpdatePayload,
 ): LocalNostrMessage => {
   const { clientId, pubkey, localOnly, isEdited, ...fields } = payload;
-  delete fields.isDeleted;
   const next: LocalNostrMessage = {
     ...message,
     ...fields,

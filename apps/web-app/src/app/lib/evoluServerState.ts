@@ -1,19 +1,18 @@
-import type { SyncOwner } from "@evolu/common";
-
 type EvoluServerConnectionState = "connected" | "checking" | "disconnected";
 
 interface DeriveEvoluServerStateOptions {
   evoluHasError: boolean;
   isOffline: boolean;
   state: EvoluServerConnectionState | undefined;
-  syncOwner: SyncOwner | null;
+  /** The app owner the store syncs; null before the session has one. */
+  syncOwnerId: string | null;
 }
 
 export function deriveEvoluServerState({
   evoluHasError,
   isOffline,
   state,
-  syncOwner,
+  syncOwnerId,
 }: DeriveEvoluServerStateOptions): {
   state: EvoluServerConnectionState;
   isSynced: boolean;
@@ -25,7 +24,7 @@ export function deriveEvoluServerState({
 } {
   const resolvedState = isOffline ? "disconnected" : (state ?? "checking");
   const isSynced =
-    Boolean(syncOwner) &&
+    Boolean(syncOwnerId) &&
     !evoluHasError &&
     !isOffline &&
     resolvedState === "connected";

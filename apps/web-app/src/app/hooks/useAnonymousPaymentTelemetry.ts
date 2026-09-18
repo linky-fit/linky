@@ -1,4 +1,3 @@
-import type { OwnerId } from "@evolu/common";
 import {
   ClientId,
   decodeNpub,
@@ -22,7 +21,7 @@ import {
 } from "../../utils/storage";
 
 interface UseAnonymousPaymentTelemetryParams {
-  appOwnerId: OwnerId | null;
+  appOwnerId: string | null;
   makeLocalStorageKey: (prefix: string) => string;
 }
 

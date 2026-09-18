@@ -1,4 +1,3 @@
-import type { OwnerId } from "@evolu/common";
 import React from "react";
 import type { StoredProof } from "@linky/linkshu";
 import type { MintIcon } from "../../utils/mint";
@@ -13,8 +12,8 @@ import { getMintInfoIconUrl } from "./mint/mintInfoHelpers";
 import { useMintInfoStore } from "./mint/useMintInfoStore";
 
 interface UseMintDomainParams {
-  appOwnerId: OwnerId | null;
-  appOwnerIdRef: React.MutableRefObject<OwnerId | null>;
+  appOwnerId: string | null;
+  appOwnerIdRef: React.MutableRefObject<string | null>;
   walletProofs: readonly StoredProof[];
   defaultMintUrl: string | null;
   rememberSeenMint: (mintUrl: string | null | undefined) => void;

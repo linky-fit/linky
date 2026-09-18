@@ -1,7 +1,6 @@
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { loadEvoluCurrentData, loadEvoluHistoryData } from "../evolu";
-import { writeClipboardText } from "../platform/clipboard";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { EvoluCurrentDataPage } from "./EvoluCurrentDataPage";
 import { EvoluDataDetailPage } from "./EvoluDataDetailPage";
@@ -12,30 +11,18 @@ vi.mock("../app/context/AppShellContexts", () => ({
 }));
 vi.mock("../app/context/SystemSettingsContexts", () => ({
   useEvoluSettingsContext: () => ({
-    evoluTableCounts: {},
-    evoluCashuOwnerIndex: null,
-    evoluCashuOwnerEditsUntilRotation: null,
-    evoluContactsOwnerIndex: null,
-    evoluContactsOwnerEditsUntilRotation: null,
-    evoluMessagesOwnerIndex: null,
-    evoluMessagesOwnerEditsUntilRotation: null,
-    evoluTransactionsOwnerIndex: null,
-    evoluTransactionsOwnerEditsUntilRotation: null,
     evoluDatabaseBytes: 4096,
-    evoluCashuOwnerId: "owner",
-    evoluCashuVisibleOwnerIds: [],
-    evoluContactsOwnerId: "owner",
-    evoluMessagesOwnerId: "owner",
-    evoluMessagesVisibleOwnerIds: [],
-    evoluTransactionsOwnerId: "owner",
-    evoluTransactionsVisibleOwnerIds: [],
+    evoluShards: [],
+    evoluSyncOwnerIds: [],
+    evoluTableCounts: {},
+    requestRotateShard: vi.fn(),
+    rotatingShardScope: null,
   }),
 }));
 vi.mock("../evolu", () => ({
   loadEvoluCurrentData: vi.fn(),
   loadEvoluHistoryData: vi.fn(),
 }));
-vi.mock("../platform/clipboard", () => ({ writeClipboardText: vi.fn() }));
 
 const secrets = [
   ["nostrIdentity", "nsec", "nsec1auditsecretkeymaterial"],
@@ -93,29 +80,16 @@ beforeEach(() => {
   }
   vi.mocked(loadEvoluCurrentData).mockResolvedValue(data);
   vi.mocked(loadEvoluHistoryData).mockResolvedValue(history);
-  vi.mocked(writeClipboardText).mockResolvedValue(true);
 });
 
 describe("routine Evolu debug views", () => {
-  it("redacts current values before preview, expansion, and copy", async () => {
+  it("redacts current values before preview and expansion", async () => {
     const view = await renderIntoDocument(<EvoluCurrentDataPage />);
     expectNoSecrets(view.container);
     for (const button of view.container.querySelectorAll("button")) {
       await act(async () => button.click());
     }
     expectNoSecrets(view.container);
-    for (const button of view.container.querySelectorAll(
-      ".evolu-data-button",
-    )) {
-      if (button instanceof HTMLButtonElement)
-        await act(async () => button.click());
-    }
-    expect(writeClipboardText).toHaveBeenCalled();
-    for (const [copied] of vi.mocked(writeClipboardText).mock.calls) {
-      expect(secrets.some(([, , secret]) => copied.includes(secret))).toBe(
-        false,
-      );
-    }
     expect(view.container.textContent).toContain("42");
     await view.unmount();
   });

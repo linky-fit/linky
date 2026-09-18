@@ -1,8 +1,13 @@
 import { EvoluHistoryTable } from "../components/EvoluHistoryTable";
+import type { LinkyScope } from "@linky/linksync";
 import React, { useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
 import { readRowOwnerId } from "../app/lib/rowOwnerId";
+import {
+  filterRowsToVisibleShards,
+  scopeOfTable,
+} from "../app/lib/shardTables";
 import {
   loadEvoluCurrentData,
   loadEvoluHistoryData,
@@ -16,21 +21,21 @@ const ONE_MB = 1024 * 1024;
 export function EvoluDataDetailPage(): React.ReactElement {
   const {
     clearDatabaseArmed,
-    evoluContactsOwnerIndex,
-    evoluContactsVisibleOwnerIds,
     evoluDatabaseBytes,
     evoluErrorType,
     evoluHistoryCount,
+    evoluShards,
     evoluTableCounts,
-    evoluTransactionsOwnerIndex,
-    evoluTransactionsVisibleOwnerIds,
     evoluWipeStorageIsBusy,
     requestClearDatabase,
   } = useEvoluSettingsContext();
   const { t } = useAppShellCore();
-  const [ownerView, setOwnerView] = useState<
-    "all" | "meta" | "contacts" | "transactions"
-  >("all");
+  const [scopeView, setScopeView] = useState<LinkyScope | "all">("all");
+  const inScopeView = React.useCallback(
+    (tableName: string): boolean =>
+      scopeView === "all" || scopeOfTable(tableName) === scopeView,
+    [scopeView],
+  );
   const [showHistoryData, setShowHistoryData] = useState(false);
   const [showCurrentData, setShowCurrentData] = useState(false);
   const [historyData, setHistoryData] = useState<EvoluHistoryRow[]>([]);
@@ -45,6 +50,9 @@ export function EvoluDataDetailPage(): React.ReactElement {
   // Separate tables into user data and system tables
   const userTables = [
     "contact",
+    "conversation",
+    "message",
+    "reaction",
     "cashuToken",
     "cashuProof",
     "cashuOperation",
@@ -53,15 +61,10 @@ export function EvoluDataDetailPage(): React.ReactElement {
     "nostrReaction",
     "transaction",
   ];
-  const systemTables = ["ownerMeta"];
+  const systemTables = ["ownerMeta", "shardPointer", "setting"];
 
   const tableEntries = Object.entries(evoluTableCounts);
-  const scopedEntries = tableEntries.filter(([name]) => {
-    if (ownerView === "meta") return name === "ownerMeta";
-    if (ownerView === "contacts") return name === "contact";
-    if (ownerView === "transactions") return name === "transaction";
-    return true;
-  });
+  const scopedEntries = tableEntries.filter(([name]) => inScopeView(name));
   const userTableEntries = scopedEntries
     .filter(([name]) => userTables.includes(name))
     .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0));
@@ -106,90 +109,39 @@ export function EvoluDataDetailPage(): React.ReactElement {
     setShowCurrentData(!showCurrentData);
   };
 
-  const currentDataEntries = React.useMemo(() => {
-    const visibleContactsOwnerIds = new Set<string>(
-      evoluContactsVisibleOwnerIds,
-    );
-    const visibleTransactionsOwnerIds = new Set<string>(
-      evoluTransactionsVisibleOwnerIds,
-    );
+  const currentDataEntries = React.useMemo(
+    () =>
+      Object.entries(currentData)
+        .filter(([tableName]) => inScopeView(tableName))
+        .map(
+          ([tableName, rows]) =>
+            [
+              tableName,
+              filterRowsToVisibleShards(
+                tableName,
+                rows,
+                evoluShards,
+                readRowOwnerId,
+              ),
+            ] as const,
+        ),
+    [currentData, evoluShards, inScopeView],
+  );
 
-    return Object.entries(currentData)
-      .filter(([tableName]) => {
-        if (ownerView === "meta") return tableName === "ownerMeta";
-        if (ownerView === "contacts") return tableName === "contact";
-        if (ownerView === "transactions") return tableName === "transaction";
-        return true;
-      })
-      .map(([tableName, rows]) => {
-        if (tableName === "contact") {
-          if (visibleContactsOwnerIds.size === 0) {
-            return [tableName, rows] as const;
-          }
-          return [
-            tableName,
-            rows.filter((row) =>
-              visibleContactsOwnerIds.has(readRowOwnerId(row)),
-            ),
-          ] as const;
-        }
-
-        if (tableName === "transaction") {
-          if (visibleTransactionsOwnerIds.size === 0) {
-            return [tableName, rows] as const;
-          }
-          return [
-            tableName,
-            rows.filter((row) =>
-              visibleTransactionsOwnerIds.has(readRowOwnerId(row)),
-            ),
-          ] as const;
-        }
-
-        return [tableName, rows] as const;
-      });
-  }, [
-    currentData,
-    evoluContactsVisibleOwnerIds,
-    evoluTransactionsVisibleOwnerIds,
-    ownerView,
-  ]);
-
-  const visibleHistoryRows = React.useMemo(() => {
-    const visibleContactsOwnerIds = new Set<string>(
-      evoluContactsVisibleOwnerIds,
-    );
-    const visibleTransactionsOwnerIds = new Set<string>(
-      evoluTransactionsVisibleOwnerIds,
-    );
-
-    if (ownerView === "meta") {
-      return historyData.filter((row) => row.table === "ownerMeta");
-    }
-
-    if (ownerView === "contacts") {
-      return historyData.filter(
+  const visibleHistoryRows = React.useMemo(
+    () =>
+      historyData.filter(
         (row) =>
-          row.table === "contact" &&
-          visibleContactsOwnerIds.has(readRowOwnerId(row)),
-      );
-    }
-
-    if (ownerView === "transactions") {
-      return historyData.filter(
-        (row) =>
-          row.table === "transaction" &&
-          visibleTransactionsOwnerIds.has(readRowOwnerId(row)),
-      );
-    }
-
-    return historyData;
-  }, [
-    evoluContactsVisibleOwnerIds,
-    evoluTransactionsVisibleOwnerIds,
-    historyData,
-    ownerView,
-  ]);
+          inScopeView(row.table) &&
+          filterRowsToVisibleShards(
+            row.table,
+            [row],
+            evoluShards,
+            readRowOwnerId,
+          ).length === 1,
+      ),
+    [evoluShards, historyData, inScopeView],
+  );
 
   return (
     <section className="panel">
@@ -243,57 +195,38 @@ export function EvoluDataDetailPage(): React.ReactElement {
           <div className="settings-row evolu-owner-tabs">
             <button
               type="button"
-              className={ownerView === "all" ? "secondary" : "btn-wide"}
-              onClick={() => setOwnerView("all")}
+              className={scopeView === "all" ? "secondary" : "btn-wide"}
+              onClick={() => setScopeView("all")}
             >
               {t("all")}
             </button>
-            <button
-              type="button"
-              className={ownerView === "meta" ? "secondary" : "btn-wide"}
-              onClick={() => setOwnerView("meta")}
-            >
-              {t("evoluOwnerViewMeta")}
-            </button>
-            <button
-              type="button"
-              className={ownerView === "contacts" ? "secondary" : "btn-wide"}
-              onClick={() => setOwnerView("contacts")}
-            >
-              {t("contactsTitle")}
-            </button>
-            <button
-              type="button"
-              className={
-                ownerView === "transactions" ? "secondary" : "btn-wide"
-              }
-              onClick={() => setOwnerView("transactions")}
-            >
-              {t("transactionsTitle")}
-            </button>
+            {evoluShards.map((shard) => (
+              <button
+                key={shard.scope}
+                type="button"
+                className={scopeView === shard.scope ? "secondary" : "btn-wide"}
+                onClick={() => setScopeView(shard.scope)}
+              >
+                {shard.scope}
+              </button>
+            ))}
           </div>
 
-          <div className="settings-row">
-            <div className="settings-left">
-              <span className="settings-label">
-                {t("evoluContactsOwnerIndex")}
-              </span>
+          {evoluShards.map((shard) => (
+            <div key={shard.scope} className="settings-row">
+              <div className="settings-left">
+                <span className="settings-label">
+                  {shard.scope} {t("evoluShardIndex").toLowerCase()}
+                </span>
+              </div>
+              <div className="settings-right">
+                <span className="muted">
+                  {shard.index} ({shard.visibleOwnerIds.length}{" "}
+                  {t("evoluShardVisibleCount").toLowerCase()})
+                </span>
+              </div>
             </div>
-            <div className="settings-right">
-              <span className="muted">{evoluContactsOwnerIndex}</span>
-            </div>
-          </div>
-
-          <div className="settings-row">
-            <div className="settings-left">
-              <span className="settings-label">
-                {t("evoluTransactionsOwnerIndex")}
-              </span>
-            </div>
-            <div className="settings-right">
-              <span className="muted">{evoluTransactionsOwnerIndex}</span>
-            </div>
-          </div>
+          ))}
 
           <div className="settings-row">
             <div className="settings-left">

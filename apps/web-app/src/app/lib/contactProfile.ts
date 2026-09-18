@@ -1,5 +1,5 @@
 import { getContactName } from "../../utils/contactName";
-import * as Evolu from "@evolu/common";
+import { SqliteBoolean, sqliteTrue } from "@linky/linksync";
 import type { ProfileMetadata } from "@linky/linkstr";
 import { getBestNostrName } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
@@ -19,8 +19,8 @@ interface ResolvedContactProfile extends ContactPublicProfile {
 }
 
 const readSqliteBool = (value: unknown): boolean => {
-  const parsed = Evolu.SqliteBoolean.fromUnknown(value);
-  return parsed.ok && parsed.value === Evolu.sqliteTrue;
+  const parsed = SqliteBoolean.fromUnknown(value);
+  return parsed.ok && parsed.value === sqliteTrue;
 };
 
 export const getContactPublicProfile = (

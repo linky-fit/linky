@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { NonEmptyString1000 } from "@linky/linksync";
 import { decodeNpub } from "@linky/linkstr";
 import { createId, type ContactsRepository } from "@linky/linksync";
 import React from "react";
@@ -207,7 +207,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           const result = await runWrite(
             contactsRepository.insert({
               id: createId<"Contact">(),
-              npub: Evolu.NonEmptyString1000.orThrow(normalized),
+              npub: NonEmptyString1000.orThrow(normalized),
             }),
           );
 

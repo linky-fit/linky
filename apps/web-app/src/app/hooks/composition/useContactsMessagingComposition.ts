@@ -1,9 +1,9 @@
 import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
-import * as Evolu from "@evolu/common";
 import type { ProfileMetadata } from "@linky/linkstr";
 import {
   ContactId,
   directConversationIdFor,
+  NonEmptyString1000,
   PositiveInt,
   type ContactsRepository,
   type ConversationsRepository,
@@ -212,23 +212,14 @@ interface UseContactsMessagingCompositionParams {
   currentNpub: string | null;
   currentNsec: string | null;
   formatDisplayedAmountText: (amountSat: number) => string;
-  historicalOwnerSetsReady: boolean;
-  identityOwnerId: IdentityOwnersCompositionResult["identityOwnerId"];
   isSeedLogin: boolean;
   lang: Lang;
-  legacyIdentitiesOwnerId: IdentityOwnersCompositionResult["legacyIdentitiesOwnerId"];
-  legacyMessagesIdentityOwnerId: IdentityOwnersCompositionResult["legacyMessagesIdentityOwnerId"];
   logPayStep: (step: string, data?: PaymentLogData) => void;
   maybeShowPwaNotification: (
     title: string,
     body: string,
     tag?: string,
   ) => Promise<void>;
-  messagesOwnerId: IdentityOwnersCompositionResult["messagesOwnerId"];
-  messagesOwnerIdRef: IdentityOwnersCompositionResult["messagesOwnerIdRef"];
-  messagesVisibleOwnerIds: IdentityOwnersCompositionResult["messagesVisibleOwnerIds"];
-  metaOwnerId: IdentityOwnersCompositionResult["metaOwnerId"];
-  nostrIdentityRows: NostrBootstrapParams["identitiesSnapshot"];
   pushToast: (message: string) => void;
   route: ReturnType<typeof useRouting>;
   /** Receipts-enabled baseline; null means "send read receipts" is off. */
@@ -239,7 +230,7 @@ interface UseContactsMessagingCompositionParams {
   setPayAmount: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   syncedNostrIdentityMatchesLocal: boolean;
-  syncedNostrIdentityResolution: IdentityOwnersCompositionResult["syncedNostrIdentityResolution"];
+  syncedNostrIdentityRow: IdentityOwnersCompositionResult["syncedNostrIdentityRow"];
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
   transactionsBootstrapSnapshot: NostrBootstrapParams["transactionsSnapshot"];
@@ -257,19 +248,10 @@ export const useContactsMessagingComposition = ({
   currentNpub,
   currentNsec,
   formatDisplayedAmountText,
-  historicalOwnerSetsReady,
-  identityOwnerId,
   isSeedLogin,
   lang,
-  legacyIdentitiesOwnerId,
-  legacyMessagesIdentityOwnerId,
   logPayStep,
   maybeShowPwaNotification,
-  messagesOwnerId,
-  messagesOwnerIdRef,
-  messagesVisibleOwnerIds,
-  metaOwnerId,
-  nostrIdentityRows,
   pushToast,
   route,
   seenReceiptsEnabledAtSec,
@@ -277,7 +259,7 @@ export const useContactsMessagingComposition = ({
   setPayAmount,
   setStatus,
   syncedNostrIdentityMatchesLocal,
-  syncedNostrIdentityResolution,
+  syncedNostrIdentityRow,
   t,
   transactions,
   transactionsBootstrapSnapshot,
@@ -430,14 +412,6 @@ export const useContactsMessagingComposition = ({
     targetNpub: string;
   } | null>(null);
 
-  const visibleMessageOwnerIds = React.useMemo(() => {
-    const ids = [
-      (appOwnerId ?? "").trim(),
-      ...messagesVisibleOwnerIds.map((ownerId) => ownerId.trim()),
-    ].filter(Boolean);
-    return Array.from(new Set(ids));
-  }, [appOwnerId, messagesVisibleOwnerIds]);
-
   const contactNameCollator = useMemo(
     () =>
       new Intl.Collator(lang, {
@@ -530,52 +504,18 @@ export const useContactsMessagingComposition = ({
     appOwnerIdRef,
     chatForceScrollToBottomRef,
     chatMessagesRef,
-    messagesOwnerId,
-    messagesOwnerIdRef,
+    contacts,
+    conversations: conversationsRepository,
     route,
-    visibleMessageOwnerIds,
   });
 
-  const evoluOwnersReadyForNostr = isSeedLogin
-    ? Boolean(
-        identityOwnerId &&
-        legacyIdentitiesOwnerId &&
-        legacyMessagesIdentityOwnerId &&
-        messagesOwnerId &&
-        metaOwnerId,
-      ) && historicalOwnerSetsReady
-    : Boolean(appOwnerId);
-
-  const evoluNostrOwnerKey = React.useMemo(() => {
-    if (!currentNpub || !evoluOwnersReadyForNostr) return "";
-
-    return [
-      currentNpub,
-      appOwnerId,
-      identityOwnerId,
-      legacyIdentitiesOwnerId,
-      legacyMessagesIdentityOwnerId,
-      messagesOwnerId,
-      metaOwnerId,
-    ]
-      .map((value) => (value ?? "").trim())
-      .filter(Boolean)
-      .join("|");
-  }, [
-    appOwnerId,
-    currentNpub,
-    evoluOwnersReadyForNostr,
-    identityOwnerId,
-    legacyIdentitiesOwnerId,
-    legacyMessagesIdentityOwnerId,
-    messagesOwnerId,
-    metaOwnerId,
-  ]);
+  // The store resolved before the shell mounted and subscribes every shard
+  // itself, so the app owner is the whole readiness signal for Nostr work.
+  const evoluNostrOwnerKey =
+    currentNpub && appOwnerId ? `${currentNpub}|${appOwnerId}` : "";
 
   const nostrIdentityBootstrapReady =
-    Boolean(activeSyncedNostrIdentity) &&
-    !syncedNostrIdentityResolution.shouldMigrateLegacyIdentity &&
-    syncedNostrIdentityMatchesLocal;
+    Boolean(activeSyncedNostrIdentity) && syncedNostrIdentityMatchesLocal;
 
   const [
     missingSyncedIdentityFallbackKey,
@@ -601,10 +541,14 @@ export const useContactsMessagingComposition = ({
       missingSyncedIdentityFallbackKey === evoluNostrOwnerKey
     : true;
 
+  const identitiesSnapshot = React.useMemo(
+    () => (syncedNostrIdentityRow ? [syncedNostrIdentityRow] : []),
+    [syncedNostrIdentityRow],
+  );
   const nostrBootstrapReady = useEvoluNostrBootstrapReady({
     contactsSnapshot: contacts,
     enabled: Boolean(currentNsec),
-    identitiesSnapshot: nostrIdentityRows,
+    identitiesSnapshot: identitiesSnapshot,
     identityReady: identityBootstrapReady,
     messagesSnapshot: nostrMessagesLocal,
     ownerKey: evoluNostrOwnerKey,
@@ -861,10 +805,10 @@ export const useContactsMessagingComposition = ({
         const bestName = matchedMetadata
           ? getBestNostrName(matchedMetadata)
           : null;
-        const parsedNpub = Evolu.NonEmptyString1000.fromUnknown(unknownNpub);
+        const parsedNpub = NonEmptyString1000.fromUnknown(unknownNpub);
         if (!parsedNpub.ok) continue;
         const parsedName = bestName
-          ? Evolu.NonEmptyString1000.fromUnknown(bestName)
+          ? NonEmptyString1000.fromUnknown(bestName)
           : null;
         const patch = {
           npub: parsedNpub.value,
@@ -1828,8 +1772,8 @@ export const useContactsMessagingComposition = ({
       const groups = normalizeContactGroups([rawGroup]);
       if (groups.length === 0) return;
 
-      const groupName = Evolu.NonEmptyString1000.fromUnknown(groups[0]);
-      const groupNamesJson = Evolu.NonEmptyString1000.fromUnknown(
+      const groupName = NonEmptyString1000.fromUnknown(groups[0]);
+      const groupNamesJson = NonEmptyString1000.fromUnknown(
         serializeContactGroups(groups),
       );
       if (!groupName.ok || !groupNamesJson.ok) {

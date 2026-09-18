@@ -1,5 +1,5 @@
+import { PositiveInt } from "@linky/linksync";
 import { Schema } from "effect";
-import * as Evolu from "@evolu/common";
 import React from "react";
 import type { StoredProof } from "@linky/linkshu";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
@@ -49,8 +49,8 @@ const isStoredMintInfoRow = (
   Schema.is(StoredMintInfoRow)(value);
 
 interface UseMintInfoStoreParams {
-  appOwnerId: Evolu.OwnerId | null;
-  appOwnerIdRef: React.MutableRefObject<Evolu.OwnerId | null>;
+  appOwnerId: string | null;
+  appOwnerIdRef: React.MutableRefObject<string | null>;
   walletProofs: readonly StoredProof[];
   defaultMintUrl: string | null;
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
@@ -133,7 +133,7 @@ export const useMintInfoStore = ({
 
       const existing = mintInfoByUrl.get(cleaned);
 
-      const now = Evolu.PositiveInt.orThrow(Math.floor(nowSec));
+      const now = PositiveInt.orThrow(Math.floor(nowSec));
       const ownerId = appOwnerIdRef.current;
       if (!ownerId) return;
 

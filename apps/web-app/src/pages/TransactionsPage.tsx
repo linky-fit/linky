@@ -7,8 +7,6 @@ import {
   buildTransactionHistory,
   deriveDeclinedRequestIds,
 } from "../app/lib/transactionHistory";
-import * as Evolu from "@evolu/common";
-import { useQuery } from "@evolu/react";
 import { Copy as CompactCopyIcon } from "lucide-react";
 import React from "react";
 import {
@@ -20,8 +18,9 @@ import { Avatar } from "../components/Avatar";
 import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
 import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
 import { deriveDefaultProfile } from "../derivedProfile";
-import { evolu } from "../evolu";
 import {
+  useContactRows,
+  useMessageRows,
   useTransactionRecords,
   useWalletOperations,
 } from "../app/hooks/useLinksync";
@@ -311,31 +310,9 @@ export function TransactionsPage(): React.ReactElement {
   const [visibleCount, setVisibleCount] = React.useState(TRANSACTION_PAGE_SIZE);
   const locale = React.useMemo(() => normalizeLocale(lang), [lang]);
 
-  const contactsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("contact")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-
-  const nostrMessagesQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("nostrMessage")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-
-  const contactRows = useQuery(contactsQuery);
+  const contactRows = useContactRows();
   const cashuOperations = useWalletOperations();
-  const nostrMessageRows = useQuery(nostrMessagesQuery);
+  const messageRows = useMessageRows();
   const transactionRecords = useTransactionRecords();
 
   const tokenByReferenceId = React.useMemo(() => {
@@ -375,8 +352,8 @@ export function TransactionsPage(): React.ReactElement {
   );
 
   const declinedRequestIds = React.useMemo(
-    () => deriveDeclinedRequestIds(nostrMessageRows),
-    [nostrMessageRows],
+    () => deriveDeclinedRequestIds(messageRows),
+    [messageRows],
   );
   const visibleTransactions = React.useMemo(
     () => transactions.slice(0, visibleCount),

@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test";
 const LOCAL_STACK_SPECS = [
   "**/boot-recovery.spec.ts",
   "**/appshell-parity.spec.ts",
-  "**/owner-lanes.spec.ts",
+  "**/shards.spec.ts",
   "**/lane-migration.spec.ts",
   "**/private-attachments.spec.ts",
   "**/chat-payment-request.spec.ts",

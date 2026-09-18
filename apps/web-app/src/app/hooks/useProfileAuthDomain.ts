@@ -1,6 +1,11 @@
-import * as Evolu from "@evolu/common";
+import {
+  appOwnerFromMnemonic,
+  NonEmptyString100,
+  NonEmptyString1000,
+  PositiveInt,
+  type IdentityRepository,
+} from "@linky/linksync";
 import React from "react";
-import { ACTIVE_NOSTR_IDENTITY_ROW_ID } from "../lib/nostrIdentitySync";
 import {
   cycleGeneratedAvatar,
   deriveDefaultProfile,
@@ -38,15 +43,7 @@ import {
   writeStoredCashuMnemonic,
 } from "../../platform/identitySecrets";
 import { triggerPasswordManagerSeedSave } from "../../platform/passwordManager";
-import {
-  CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY,
-  EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-  EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
-} from "../../utils/constants";
+import { CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY } from "../../utils/constants";
 import { getDefaultNip05IdentifierFromAddress } from "../../utils/nostrNip05";
 import {
   applySlip39Suggestion,
@@ -61,15 +58,14 @@ import {
 import { looksLikeSlip39Share } from "@linky/identity";
 import type { IdentityChangeMessageSource } from "../lib/identityChangeMessage";
 import { buildLinkstrConfig } from "./useLinkstrConfigSync";
+import { clearLegacyLaneStorage } from "../migrations/laneToShardMigration";
+import { runWrite } from "../lib/storeWrite";
 import {
   getInitialNostrIdentitySource,
-  safeLocalStorageRemove,
   safeLocalStorageSet,
 } from "../../utils/storage";
 import { nowSeconds } from "../../utils/time";
 import type { I18nKey, Translate } from "../../i18n";
-
-type EvoluMutations = ReturnType<typeof import("../../evolu").useEvolu>;
 
 type NostrIdentitySource = "custom" | "derived";
 
@@ -122,11 +118,12 @@ interface UseProfileAuthDomainParams {
     | null
   >;
   currentNsec: string | null;
+  /** Null outside an authenticated session; the identity mirror is then not written. */
+  identityRepository: IdentityRepository | null;
   lang: Lang;
   myProfileMetadataRef: React.MutableRefObject<ProfileMetadata | null>;
   pushToast: (message: string) => void;
   t: Translate;
-  upsert: EvoluMutations["upsert"];
 }
 
 interface UseProfileAuthDomainResult {
@@ -160,29 +157,14 @@ interface UseProfileAuthDomainResult {
   submitReturningSlip39: (inputOverride?: string) => Promise<void>;
 }
 
-const OWNER_ROTATION_STORAGE_KEYS = [
-  EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_BASELINE_COUNT_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_LAST_ROTATED_AT_MS_STORAGE_KEY,
-] as const;
-
-const resetStoredOwnerRotationState = (): void => {
-  for (const storageKey of OWNER_ROTATION_STORAGE_KEYS) {
-    safeLocalStorageRemove(storageKey);
-  }
-};
-
 export const useProfileAuthDomain = ({
   appendIdentityChangeNoticesRef,
   currentNsec,
+  identityRepository,
   lang,
   myProfileMetadataRef,
   pushToast,
   t,
-  upsert,
 }: UseProfileAuthDomainParams): UseProfileAuthDomainResult => {
   const [currentNpub, setCurrentNpub] = React.useState<string | null>(null);
   const [onboardingIsBusy, setOnboardingIsBusy] = React.useState(false);
@@ -243,42 +225,27 @@ export const useProfileAuthDomain = ({
   const upsertActiveNostrIdentity = React.useCallback(
     async (
       nsec: string,
-      sourceSlip39Seed: string,
       source: NostrIdentitySource,
       switchedAtSec: number | null,
     ): Promise<void> => {
-      const normalizedSlip39 = sourceSlip39Seed.trim();
-      if (!normalizedSlip39) return;
-
-      const identityMnemonic = await deriveEvoluOwnerMnemonicFromSlip39(
-        normalizedSlip39,
-        "identity",
-        0,
-      );
-      if (!identityMnemonic) return;
-
-      const parsedMnemonic = Evolu.Mnemonic.fromUnknown(identityMnemonic);
-      if (!parsedMnemonic.ok) return;
-
-      const ownerSecret = Evolu.mnemonicToOwnerSecret(parsedMnemonic.value);
-      const identityOwnerId = Evolu.createAppOwner(ownerSecret).id;
-
+      if (!identityRepository) return;
       const npub = await deriveNpubFromNsec(nsec);
-      if (!npub) return;
+      const nsecText = NonEmptyString1000.from(nsec);
+      const npubText = npub ? NonEmptyString1000.from(npub) : null;
+      const switchedAt =
+        switchedAtSec === null ? null : PositiveInt.from(switchedAtSec);
+      if (!nsecText.ok || !npubText?.ok || switchedAt?.ok === false) return;
 
-      upsert(
-        "nostrIdentity",
-        {
-          id: ACTIVE_NOSTR_IDENTITY_ROW_ID,
-          nsec,
-          npub,
-          source,
-          switchedAtSec,
-        },
-        { ownerId: identityOwnerId },
+      await runWrite(
+        identityRepository.set({
+          nsec: nsecText.value,
+          npub: npubText.value,
+          source: NonEmptyString100.orThrow(source),
+          switchedAtSec: switchedAt?.value ?? null,
+        }),
       );
     },
-    [deriveNpubFromNsec, upsert],
+    [deriveNpubFromNsec, identityRepository],
   );
 
   React.useEffect(() => {
@@ -305,7 +272,7 @@ export const useProfileAuthDomain = ({
   }, [currentNsec, decodeNsecPrivateBytes]);
 
   const deriveAppMnemonicFromSlip39 = React.useCallback(
-    async (seed: string): Promise<Evolu.Mnemonic | null> => {
+    async (seed: string): Promise<string | null> => {
       const normalizedSeed = seed.trim();
       if (!normalizedSeed) return null;
 
@@ -314,11 +281,9 @@ export const useProfileAuthDomain = ({
         "meta",
         0,
       );
-      if (!metaMnemonic) return null;
-
-      const parsed = Evolu.Mnemonic.fromUnknown(metaMnemonic);
-      if (!parsed.ok) return null;
-      return parsed.value;
+      if (!metaMnemonic || appOwnerFromMnemonic(metaMnemonic) === null)
+        return null;
+      return metaMnemonic;
     },
     [],
   );
@@ -528,12 +493,7 @@ export const useProfileAuthDomain = ({
       });
 
       if (options?.persistSyncedIdentity !== false) {
-        await upsertActiveNostrIdentity(
-          raw,
-          normalizedSlip39,
-          identitySource,
-          switchedAtSec,
-        );
+        await upsertActiveNostrIdentity(raw, identitySource, switchedAtSec);
       }
 
       if (shouldRecordChatNotice) {
@@ -543,7 +503,7 @@ export const useProfileAuthDomain = ({
         });
       }
 
-      resetStoredOwnerRotationState();
+      clearLegacyLaneStorage();
 
       setIsSeedLogin(true);
       setActiveNostrIdentitySource(identitySource);
@@ -941,8 +901,8 @@ export const useProfileAuthDomain = ({
         await setIdentityFromNsecAndReload(derived.nsec, normalizedSlip39, {
           identitySource: "derived",
           invalidMessageKey: "onboardingInvalidSeed",
-          // Do not overwrite a custom identity that may still be syncing from
-          // the legacy messages owner lane on this newly restored device.
+          // Do not overwrite a custom identity that may still be syncing to
+          // this newly restored device.
           persistSyncedIdentity: false,
           switchedAtSec: null,
         });
@@ -1055,7 +1015,7 @@ export const useProfileAuthDomain = ({
       setActiveNostrIdentitySource("derived");
       setCashuSeedMnemonic(null);
       setSlip39Seed(null);
-      resetStoredOwnerRotationState();
+      clearLegacyLaneStorage();
 
       try {
         window.location.hash = "#";

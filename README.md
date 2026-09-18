@@ -9,7 +9,7 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 
 - [`packages/linkstr`](./packages/linkstr/README.md) — Nostr protocol library; usage guides in [`packages/linkstr/docs/`](./packages/linkstr/docs/README.md) (also covers `@linky/linkstr-react`)
 - [`packages/linkshu`](./packages/linkshu/README.md) — cashu wallet library; usage guides in [`packages/linkshu/docs/`](./packages/linkshu/docs/README.md)
-- [`packages/linksync`](./packages/linksync/README.md) — synced storage library (Evolu schema, repositories, shards); usage guides in [`packages/linksync/docs/`](./packages/linksync/docs/README.md). Not yet wired into the app (linky-fit/linky#380)
+- [`packages/linksync`](./packages/linksync/README.md) — synced storage library (Evolu schema, repositories, shards); usage guides in [`packages/linksync/docs/`](./packages/linksync/docs/README.md)
 
 ## Protocols and stack
 
@@ -26,19 +26,19 @@ The repo also contains a separate public website in `apps/site/` intended for `l
   - one 20-word **SLIP-39** share
 - With SLIP-39 login:
   - Nostr keypair is derived at `m/44'/1237'/0'/0/0`
-  - the meta owner (`ownerMeta`) is the Evolu app owner and every other scope (contacts, conversations and messages, cashu, transactions, identity) is a `@linky/linksync` shard derived from it; the old `messages-n` owner lane is still derived for messages until linky-fit/linky#387
+  - the meta owner is the Evolu app owner and every other scope (contacts, conversations and messages, cashu, transactions, identity) is a `@linky/linksync` shard derived from it
 - Seed backup uses the browser credential API where supported. Otherwise, use Show/Copy in Master keys and save the seed manually. Linky does not submit the seed to a server to trigger password saving.
 - If user pastes custom `nsec` during a SLIP-39 session, app switches to pasted key locally without immediate Evolu restore/write; choosing Derive switches back to seed-derived key.
 
-## Owner rotation and limits
+## Shards and limits
 
-Constants live in `apps/web-app/src/utils/constants.ts`; the mechanics are in `docs/architecture.md` ("Evolu persistence and owner lanes").
+Every synced scope lives on `@linky/linksync` shards; the scope table in `packages/linksync/docs/concepts.md` and the "Evolu persistence and shards" section of `docs/architecture.md` hold the mechanics.
 
-- Messages still rotate as an Evolu owner lane on a historical mutation threshold (`MESSAGES_OWNER_ROTATION_TRIGGER_WRITE_COUNT = 160`) with an `OWNER_ROTATION_COOLDOWN_MS = 60_000` cooldown. Contacts, conversations (chat read cursor, peer seen window, archive state; stored in the messages scope), transactions and the cashu wallet (proofs and operations) live on `@linky/linksync` shards, which rotate at 256 KiB of history or the scope's mutation count (contacts `220`, transactions `220`, cashu `170`, 60 s cooldown) inside the package; an update moves the row to the active shard (copy-on-write), so old shards never grow. Transactions keep the newest 4 shards; contacts are never forgotten.
+- A scope rotates to its next shard at 256 KiB of history or its mutation count (contacts `220`, messages `160`, cashu `170`, transactions `220`) with a 60 s cooldown per scope, checked after every write inside the package. Rotation is pointer-only: nothing is copied, and an update of a row in an older shard writes the whole row into the active shard and tombstones the old copy, so old shards never grow.
+- Messages and transactions keep the newest 4 shards; a fresh device subscribes only those, so older chat history is not downloaded again. Contacts, the cashu wallet and the identity are never forgotten.
 - Existing quota failures need relay capacity before rejected history can sync. Keep the device's local data, increase the relay's quota or add a relay with capacity, then reload normally.
 - An upgrade silently adds and enables `wss://evolu.linky.fit` and adds `wss://nostr.linky.fit` to the user's Nostr relay lists once, preserving custom endpoints. Later user edits are respected; explicit development relay overrides skip the migration.
-- The messages lane rotation is pointer-only: the active lane index moves forward in `ownerMeta`, nothing is copied, and older lanes stay readable instead of being pruned. There is no cap on the number of contacts any more; the byte-aware shard rule covers it.
-- The lanes are being replaced by `@linky/linksync` shards (linky-fit/linky#380). The first launch after the update shows a short "Migrating data" screen while the lanes are copied into the shards; the remaining messages lane still takes every message write until #387 cuts it over, and for 180 days after the migration every launch re-copies rows an older app version wrote to any lane.
+- The old owner lanes are copied into the shards on the first launch after the update (a short "Migrating data" screen), and for 180 days after that every launch re-copies rows an older app version wrote to a lane.
 
 ## Features
 
@@ -191,10 +191,11 @@ End-to-end tests (Playwright) live in `apps/web-app/tests/*.spec.ts`.
 The `local-stack` runs the proxy-payment flow — three accounts on one machine, talking over the local
 Nostr relay and paying each other with the local Cashu mint — plus the linkshu storage-migration
 scenario, chat/edit/offline-reaction and top-up recovery, and signup/manual password saving
-with checks that recovery seeds stay out of HTTP requests. Attachment tests send encrypted
-images and PDFs between browsers and verify
-decryption, seen receipts, downloads, and bytes handed to the browser sharing API. Owner-lane
-tests verify old and new contacts, messages, transactions, and tokens across devices and reloads.
+with checks that recovery seeds stay out of HTTP requests. Attachment tests send encrypted images and PDFs between browsers and verify
+decryption, seen receipts, downloads, and bytes handed to the browser sharing API. The shards
+test rotates every scope, verifies old and new contacts, messages, transactions, and tokens across
+devices and reloads, checks that an edited row is copied into the active shard, and boots a fresh
+device that sees only the newest message shards.
 Boot and route tests cover fresh profiles, restore, unavailable browser storage, and navigation.
 The full suite and site redemption tests run on pull requests and pushes to main.
 Payments use separate local mints on :3338 and :3339. It needs the

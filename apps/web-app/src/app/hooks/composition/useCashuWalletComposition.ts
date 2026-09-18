@@ -3,8 +3,6 @@ import { getBankOfferForSettlement } from "../../lib/bankOfferSettlement";
 import type { RestoreProgress } from "@linky/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { useLatest } from "../../../hooks/useLatest";
-import * as Evolu from "@evolu/common";
-import { useQuery } from "@evolu/react";
 import {
   CashuTokenText,
   ClientId,
@@ -25,12 +23,7 @@ import {
 } from "@linky/linkstr-react";
 import { Cause, Either, Exit, Option, Schema } from "effect";
 import React, { useMemo, useState } from "react";
-import {
-  evolu,
-  useEvolu,
-  type CashuOperationId,
-  type ContactId,
-} from "../../../evolu";
+import type { CashuOperationId, ContactId } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import {
   inferLightningAddressFromLnurlTarget,
@@ -53,7 +46,10 @@ import {
   getLightningInvoicePreview,
   type LightningInvoicePreview,
 } from "@linky/linkshu";
-import type { TransactionsRepository } from "@linky/linksync";
+import {
+  CashuOperationId as CashuOperationIdType,
+  type TransactionsRepository,
+} from "@linky/linksync";
 import {
   CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
   formatMintHost,
@@ -116,7 +112,13 @@ import {
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 import { drainLegacyAcceptedCashuToken } from "../../migrations/legacyAcceptedTokenDrain";
 import { useLinkshuComposition } from "./useLinkshuComposition";
-import { useWalletRepository } from "../useLinksync";
+import {
+  useSetting,
+  useSettingsRepository,
+  useWalletRepository,
+} from "../useLinksync";
+import { runWrite } from "../../lib/storeWrite";
+import { DEFAULT_MINT_SETTING_KEY } from "../../migrations/laneToShardMigration";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
@@ -124,7 +126,6 @@ import type { Translate } from "../../../i18n";
 
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 const isPubkey = Schema.is(Pubkey);
-const CashuOperationIdFromUnknown = Evolu.id("CashuOperation");
 const decodeCashuTokenText = Schema.decodeUnknownEither(CashuTokenText);
 
 export const logPayStep = (step: string, data?: PaymentLogData): void => {
@@ -149,7 +150,6 @@ type ContactsMessagingCompositionResult = ReturnType<
 >;
 type ProfileCompositionResult = ReturnType<typeof useProfileComposition>;
 type OwnerScopedStorageResult = ReturnType<typeof useOwnerScopedStorage>;
-type EvoluMutations = ReturnType<typeof useEvolu>;
 
 interface UseCashuWalletCompositionParams {
   contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
@@ -183,11 +183,7 @@ interface UseCashuWalletCompositionParams {
   formatDisplayedAmountText: (amountSat: number) => string;
   identity: Pick<
     IdentityOwnersCompositionResult,
-    | "appOwnerId"
-    | "appOwnerIdRef"
-    | "currentNpub"
-    | "currentNsec"
-    | "metaOwnerId"
+    "appOwnerId" | "appOwnerIdRef" | "currentNpub" | "currentNsec"
   >;
   maybeShowPwaNotification: (
     title: string,
@@ -222,7 +218,6 @@ interface UseCashuWalletCompositionParams {
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
-  upsert: EvoluMutations["upsert"];
 }
 
 export const useCashuWalletComposition = ({
@@ -242,17 +237,16 @@ export const useCashuWalletComposition = ({
   setStatus,
   t,
   transactions,
-  upsert,
 }: UseCashuWalletCompositionParams) => {
   const wallet = useWalletRepository();
+  const settingsRepository = useSettingsRepository();
   const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
     mode: "promiseExit",
   });
   const sendPaymentNotice = useAtomSet(sendPaymentNoticeAtom, {
     mode: "promiseExit",
   });
-  const { appOwnerId, appOwnerIdRef, currentNpub, currentNsec, metaOwnerId } =
-    identity;
+  const { appOwnerId, appOwnerIdRef, currentNpub, currentNsec } = identity;
   const {
     saveNpubContact,
     appendLocalNostrMessage,
@@ -413,52 +407,22 @@ export const useCashuWalletComposition = ({
     t,
   });
 
-  // Default mint cross-tab + cross-device sync via Evolu `ownerMeta`.
-  //
-  // Background: the per-owner localStorage override
-  // (`linky.cashu.defaultMintOverride.v1.<owner>`) is tab-local, so other
-  // tabs (and other devices) don't see the change until reload. ownerMeta is
-  // an Evolu lane that already propagates via BroadcastChannel (same-origin
-  // tabs, instant) and via the Evolu sync server (other devices), so we
-  // mirror the default-mint value into it.
-  const ownerMetaDefaultMintRowId = React.useMemo(
-    () => Evolu.createIdFromString<"OwnerMeta">("owner-pointer-defaultMint"),
-    [],
+  // Default mint cross-tab + cross-device sync through the synced
+  // `defaultMint` setting (the per-owner localStorage override is tab-local).
+  const syncedDefaultMintValue = useSetting(DEFAULT_MINT_SETTING_KEY);
+  const ownerMetaDefaultMintValue = React.useMemo(
+    () => normalizeMintUrl(syncedDefaultMintValue ?? "") || null,
+    [syncedDefaultMintValue],
   );
 
-  const ownerMetaDefaultMintQuery = useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("ownerMeta")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue)
-          .where("scope", "=", Evolu.NonEmptyString100.orThrow("defaultMint")),
-      ),
-    [],
-  );
-  const ownerMetaDefaultMintRows = useQuery(ownerMetaDefaultMintQuery);
-
-  const ownerMetaDefaultMintValue = React.useMemo(() => {
-    for (const row of ownerMetaDefaultMintRows) {
-      if (typeof row !== "object" || row === null) continue;
-      if (!("value" in row)) continue;
-      const raw = (row.value ?? "").trim();
-      if (!raw) continue;
-      const cleaned = normalizeMintUrl(raw);
-      if (cleaned) return cleaned;
-    }
-    return null;
-  }, [ownerMetaDefaultMintRows]);
-
-  // ownerMeta -> local state: when another tab/device wrote a different
+  // setting -> local state: when another tab/device wrote a different
   // default mint, pick it up here. This is the ONLY direction watched as an
-  // effect. A symmetric `defaultMintUrl -> ownerMeta` watcher would
+  // effect. A symmetric `defaultMintUrl -> setting` watcher would
   // ping-pong with the remote: in the same render where this effect queues
   // setDefaultMintUrl(remoteValue), the symmetric effect would read the
-  // STALE local `defaultMintUrl` and upsert it back, racing with the remote
-  // value. Two devices in this state oscillate every few ms (visible in
-  // ownerMeta CRDT history). Explicit pushes happen instead from
+  // STALE local `defaultMintUrl` and write it back, racing with the remote
+  // value. Two devices in this state oscillate every few ms (visible in the
+  // setting's CRDT history). Explicit pushes happen instead from
   // `upsertDefaultMintToOwnerMeta` called by user actions and the seed
   // effect.
   React.useEffect(() => {
@@ -486,21 +450,12 @@ export const useCashuWalletComposition = ({
 
   const upsertDefaultMintToOwnerMeta = React.useCallback(
     (mintUrl: string | null | undefined) => {
-      if (!metaOwnerId) return;
       const cleaned = normalizeMintUrl(mintUrl ?? "");
       if (!cleaned) return;
       if (cleaned === ownerMetaDefaultMintValue) return;
-      upsert(
-        "ownerMeta",
-        {
-          id: ownerMetaDefaultMintRowId,
-          scope: Evolu.NonEmptyString100.orThrow("defaultMint"),
-          value: Evolu.NonEmptyString1000.orThrow(cleaned),
-        },
-        { ownerId: metaOwnerId },
-      );
+      void runWrite(settingsRepository.set(DEFAULT_MINT_SETTING_KEY, cleaned));
     },
-    [metaOwnerId, ownerMetaDefaultMintRowId, ownerMetaDefaultMintValue, upsert],
+    [ownerMetaDefaultMintValue, settingsRepository],
   );
 
   const upsertDefaultMintToOwnerMetaRef = React.useRef(
@@ -2109,9 +2064,7 @@ export const useCashuWalletComposition = ({
 
       setCashuEmitAmount("");
       setStatus(null);
-      const routeId = CashuOperationIdFromUnknown.fromUnknown(
-        receipt.operationId,
-      );
+      const routeId = CashuOperationIdType.fromUnknown(receipt.operationId);
       navigateTo(
         routeId.ok
           ? { route: "cashuToken", id: routeId.value }

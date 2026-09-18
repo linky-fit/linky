@@ -1,12 +1,10 @@
 import { createContactNameFormatter } from "../utils/contactName";
 import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
-import * as Evolu from "@evolu/common";
+import { ContactId as ContactIdType } from "@linky/linksync";
 import React, { useMemo, useState } from "react";
 import type { MessageContactsGroupAssignment } from "../components/ChatMessage";
 import { ContactCard } from "../components/ContactCard";
 import {
-  evolu,
-  useEvolu,
   useEvoluDatabaseInfoState,
   useEvoluLastError,
   useEvoluServersManager,
@@ -84,8 +82,9 @@ import {
   useConversationsRepository,
   useSetting,
   useSettingsRepository,
-  useShardIds,
   useShardRotation,
+  useShardSummaries,
+  useSyncOwnerIds,
   useTransactionRecords,
   useTransactionsRepository,
   useWalletProofs,
@@ -114,10 +113,8 @@ import { getDesktopActiveContactId } from "./routes/desktopRouteSection";
 import type { ContactRowLike } from "./types/appTypes";
 import { nowSeconds } from "../utils/time";
 
-const AppContactId = Evolu.id("Contact");
-
 const parseContactId = (value: unknown): ContactId | null => {
-  const result = AppContactId.fromUnknown(value);
+  const result = ContactIdType.fromUnknown(value);
   return result.ok ? result.value : null;
 };
 
@@ -130,8 +127,6 @@ export const useAppShellComposition = ({
   currentNsec,
   setCurrentNsec,
 }: UseAppShellCompositionParams) => {
-  const { upsert } = useEvolu();
-
   const route = useRouting();
   const { dismissToast, toasts, pushToast } = useToasts();
   const { lang, setLang, t } = useAppLanguage();
@@ -141,38 +136,22 @@ export const useAppShellComposition = ({
     appOwnerIdRef,
     appendIdentityChangeNoticesRef,
     currentNpub,
-    historicalOwnerSetsReady,
-    identityOwnerId,
     isSeedLogin,
-    legacyIdentitiesOwnerId,
-    legacyMessagesIdentityOwnerId,
     logoutArmed,
-    messagesOwnerEditsUntilRotation,
-    messagesOwnerId,
-    messagesOwnerIdRef,
-    messagesOwnerIndex,
-    messagesVisibleOwnerIds,
-    metaOwnerId,
     myProfileMetadataRef,
-    nostrIdentityRows,
     requestLogout,
-    requestManualRotateMessagesOwner,
     requestPasteNostrKeys,
-    rotateMessagesOwnerIsBusy,
     seedMnemonic,
     slip39Seed,
     syncedNostrIdentityMatchesLocal,
-    syncedNostrIdentityResolution,
-    syncOwner,
+    syncedNostrIdentityRow,
   } = useIdentityOwnersComposition({
     currentNsec,
-    evolu,
     lang,
     navigation: globalThis.location,
     pushToast,
     setCurrentNsec,
     t,
-    upsert,
   });
 
   const contactsRepository = useContactsRepository();
@@ -180,17 +159,9 @@ export const useAppShellComposition = ({
   const settingsRepository = useSettingsRepository();
   const transactions = useTransactionsRepository();
   const transactionRecords = useTransactionRecords();
-  const contactShards = useShardIds("contacts");
-  const contactsShardRotation = useShardRotation("contacts");
-  const transactionShards = useShardIds("transactions");
-  const transactionsShardRotation = useShardRotation("transactions");
-  const cashuShards = useShardIds("cashu");
-  const cashuShardRotation = useShardRotation("cashu");
-  // Contacts and tokens were one owner once; the debug button still rotates both.
-  const rotateContactsAndCashuOwners = React.useCallback(async () => {
-    await contactsShardRotation.rotate();
-    await cashuShardRotation.rotate();
-  }, [cashuShardRotation, contactsShardRotation]);
+  const evoluShards = useShardSummaries();
+  const evoluSyncOwnerIds = useSyncOwnerIds();
+  const shardRotation = useShardRotation();
   const walletProofs = useWalletProofs();
 
   const {
@@ -398,7 +369,7 @@ export const useAppShellComposition = ({
   }, [evoluActiveServerUrls, evoluServerStatusByUrl]);
 
   const evoluOverallStatus = useMemo(() => {
-    if (!syncOwner) return "disconnected" as const;
+    if (!appOwnerId) return "disconnected" as const;
     if (evoluHasError) return "disconnected" as const;
     if (evoluActiveServerUrls.length === 0) return "disconnected" as const;
     const states = evoluActiveServerUrls.map(
@@ -407,7 +378,12 @@ export const useAppShellComposition = ({
     if (states.some((s) => s === "connected")) return "connected" as const;
     if (states.some((s) => s === "checking")) return "checking" as const;
     return "disconnected" as const;
-  }, [evoluActiveServerUrls, evoluHasError, evoluServerStatusByUrl, syncOwner]);
+  }, [
+    appOwnerId,
+    evoluActiveServerUrls,
+    evoluHasError,
+    evoluServerStatusByUrl,
+  ]);
 
   const [evoluWipeStorageIsBusy, setEvoluWipeStorageIsBusy] =
     useState<boolean>(false);
@@ -445,25 +421,6 @@ export const useAppShellComposition = ({
       ),
     );
   }, [contactsOnboardingDismissedSynced, settingsRepository]);
-
-  const evoluHistoryAllowedOwnerIds = React.useMemo(() => {
-    const ids = [
-      (appOwnerId ?? "").trim(),
-      ...cashuShards.ownerIds,
-      ...messagesVisibleOwnerIds.map((ownerId) => ownerId.trim()),
-      ...transactionShards.ownerIds,
-      (metaOwnerId ?? "").trim(),
-      ...contactShards.ownerIds,
-    ].filter(Boolean);
-    return Array.from(new Set(ids));
-  }, [
-    appOwnerId,
-    cashuShards.ownerIds,
-    contactShards.ownerIds,
-    messagesVisibleOwnerIds,
-    metaOwnerId,
-    transactionShards.ownerIds,
-  ]);
 
   useStoragePersistRequestEffect({ refreshKey: t });
 
@@ -631,19 +588,10 @@ export const useAppShellComposition = ({
     currentNpub,
     currentNsec,
     formatDisplayedAmountText,
-    historicalOwnerSetsReady,
-    identityOwnerId,
     isSeedLogin,
     lang,
-    legacyIdentitiesOwnerId,
-    legacyMessagesIdentityOwnerId,
     logPayStep,
     maybeShowPwaNotification,
-    messagesOwnerId,
-    messagesOwnerIdRef,
-    messagesVisibleOwnerIds,
-    metaOwnerId,
-    nostrIdentityRows,
     pushToast,
     route,
     seenReceiptsEnabledAtSec,
@@ -651,7 +599,7 @@ export const useAppShellComposition = ({
     setPayAmount,
     setStatus,
     syncedNostrIdentityMatchesLocal,
-    syncedNostrIdentityResolution,
+    syncedNostrIdentityRow,
     t,
     transactions,
     transactionsBootstrapSnapshot: transactionRecords,
@@ -900,7 +848,6 @@ export const useAppShellComposition = ({
       appOwnerIdRef,
       currentNpub,
       currentNsec,
-      metaOwnerId,
     },
     maybeShowPwaNotification,
     ownerScopedStorage: {
@@ -927,7 +874,6 @@ export const useAppShellComposition = ({
     setStatus,
     t,
     transactions,
-    upsert,
   });
 
   useArmedDeleteTimeouts({
@@ -1667,44 +1613,28 @@ export const useAppShellComposition = ({
       setPayWithCashuEnabled,
     },
     evoluSettingsInput: {
-      evoluCashuOwnerIndex: cashuShards.index,
-      evoluCashuVisibleOwnerIds: cashuShards.ownerIds,
-      evoluContactsOwnerIndex: contactShards.index,
-      evoluContactsVisibleOwnerIds: contactShards.ownerIds,
       evoluDatabaseBytes: evoluDbInfo.info.bytes,
       evoluHasError,
       evoluErrorType: evoluLastError?.type ?? null,
-      evoluHistoryAllowedOwnerIds,
       evoluHistoryCount: evoluDbInfo.info.historyCount,
-      evoluMessagesOwnerEditsUntilRotation: messagesOwnerEditsUntilRotation,
-      evoluMessagesOwnerId: messagesOwnerId,
-      evoluMessagesOwnerIndex: messagesOwnerIndex,
-      evoluMessagesVisibleOwnerIds: messagesVisibleOwnerIds,
       evoluServerStatusByUrl,
       evoluServerUrls,
       evoluServersReloadRequired,
+      evoluShards,
+      evoluSyncOwnerIds,
       evoluTableCounts: evoluDbInfo.info.tableCounts,
-      evoluTransactionsOwnerIndex: transactionShards.index,
-      evoluTransactionsVisibleOwnerIds: transactionShards.ownerIds,
       evoluWipeStorageIsBusy,
       isEvoluServerOffline,
       newEvoluServerUrl,
       pendingEvoluServerDeleteUrl,
-      requestManualRotateCashuOwner: cashuShardRotation.rotate,
-      requestManualRotateContactsOwner: rotateContactsAndCashuOwners,
-      requestManualRotateMessagesOwner,
-      requestManualRotateTransactionsOwner: transactionsShardRotation.rotate,
-      rotateCashuOwnerIsBusy: cashuShardRotation.isBusy,
-      rotateContactsOwnerIsBusy:
-        contactsShardRotation.isBusy || cashuShardRotation.isBusy,
-      rotateMessagesOwnerIsBusy,
-      rotateTransactionsOwnerIsBusy: transactionsShardRotation.isBusy,
+      requestRotateShard: shardRotation.rotate,
+      rotatingShardScope: shardRotation.busyScope,
       saveEvoluServerUrls,
       setEvoluServerOffline,
       setNewEvoluServerUrl,
       setPendingEvoluServerDeleteUrl,
       setStatus,
-      syncOwner,
+      syncOwnerId: appOwnerId,
       wipeEvoluStorage,
     },
     mintSettingsInput: {

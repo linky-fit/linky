@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { CashuOperationId } from "@linky/linksync";
 import type {
   StoredProof,
   TokenTransfer,
@@ -19,8 +19,6 @@ import {
 } from "../components/CashuTokenHandoff";
 import { navigateTo } from "../hooks/useRouting";
 import { nowSeconds } from "../utils/time";
-
-const CashuOperationIdType = Evolu.id("CashuOperation");
 
 interface CashuTokensPageProps {
   cashuIsBusy: boolean;
@@ -211,7 +209,7 @@ export const CashuTokensPage = ({
                     className="cashu-transfer-open"
                     aria-label={`${t("cashuToken")}: ${formatDisplayedAmountText(transfer.amount)}`}
                     onClick={() => {
-                      const id = CashuOperationIdType.fromUnknown(transfer.id);
+                      const id = CashuOperationId.fromUnknown(transfer.id);
                       if (id.ok)
                         navigateTo({ route: "cashuToken", id: id.value });
                     }}

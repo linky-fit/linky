@@ -1,28 +1,37 @@
 import type { Pubkey } from "@linky/linkstr";
 import { readPendingPayments } from "../lib/pendingPayments";
-import { Schema } from "effect";
-import type { OwnerId } from "@evolu/common";
-import * as Evolu from "@evolu/common";
-import { useQuery } from "@evolu/react";
+import {
+  ContactId,
+  createId,
+  directConversationIdFor,
+  MessageId,
+  ReactionId,
+  type ConversationsRepository,
+  type MessageRow,
+  type ReactionRow,
+} from "@linky/linksync";
+import { useLiveValue } from "@linky/linksync/react";
+import { Effect, Schema } from "effect";
 import React from "react";
 import { useLatest } from "../../hooks/useLatest";
-import {
-  applyMessageUpdate,
-  buildMessageUpdate,
-  buildReactionUpdate,
-  type NostrMessageUpdatePayload,
-  type NostrReactionUpdatePayload,
-  type NostrMessageShadowState,
-  type NostrReactionShadowState,
-} from "./messages/messageUpdates";
-import type { ContactId, NostrMessageRow, NostrReactionRow } from "../../evolu";
-import { evolu, useEvolu } from "../../evolu";
 import type { Route } from "../../types/route";
 import {
   LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX,
   LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX,
 } from "../../utils/constants";
+import { UnknownRecord } from "../../utils/schema";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageGetJson,
+  safeLocalStorageKeys,
+  safeLocalStorageRemove,
+  safeLocalStorageSet,
+  safeLocalStorageSetJson,
+} from "../../utils/storage";
+import { makeLocalId, trimString } from "../../utils/validation";
+import { nowSeconds } from "../../utils/time";
 import { isIdentityChangeMessageContent } from "../lib/identityChangeMessage";
+import { runWrite } from "../lib/storeWrite";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,
@@ -38,30 +47,34 @@ import {
   dedupeNostrMessagesByPriority,
   getLocalNostrMessageRumorKey,
 } from "./messages/messageHelpers";
-import { UnknownRecord } from "../../utils/schema";
 import {
-  safeLocalStorageGet,
-  safeLocalStorageGetJson,
-  safeLocalStorageRemove,
-  safeLocalStorageSet,
-  safeLocalStorageSetJson,
-} from "../../utils/storage";
+  contactIdByConversationId,
+  localMessageFrom,
+  normalizeLegacyLocalMessage,
+  toLocalNostrMessage,
+  toLocalNostrReaction,
+  toMessagePatch,
+  toMessageWriteRow,
+  toReactionPatch,
+  toReactionWriteRow,
+} from "./messages/messageRows";
 import {
-  asNonEmptyString,
-  makeLocalId,
-  trimString,
-} from "../../utils/validation";
-import { nowSeconds } from "../../utils/time";
+  applyMessageUpdate,
+  buildMessageUpdate,
+  buildReactionUpdate,
+  type NostrMessageShadowState,
+  type NostrReactionShadowState,
+} from "./messages/messageUpdates";
+import { useConversationRows } from "./useLinksync";
 
 interface UseMessagesDomainParams {
-  appOwnerId: OwnerId | null;
-  appOwnerIdRef: React.MutableRefObject<OwnerId | null>;
+  appOwnerId: string | null;
+  appOwnerIdRef: React.MutableRefObject<string | null>;
   chatForceScrollToBottomRef: React.MutableRefObject<boolean>;
   chatMessagesRef: React.RefObject<HTMLDivElement | null>;
-  messagesOwnerId: OwnerId | null;
-  messagesOwnerIdRef: React.MutableRefObject<OwnerId | null>;
+  contacts: ReadonlyArray<{ readonly id: ContactId }>;
+  conversations: ConversationsRepository;
   route: Route;
-  visibleMessageOwnerIds: readonly string[];
 }
 
 const MESSAGE_MIGRATION_VERSION = 1;
@@ -73,307 +86,55 @@ const RETENTION_PRUNE_THROTTLE_MS = 900;
 const toText = (value: unknown): string =>
   typeof value === "string" ? value : "";
 
-const toMessageStatus = (value: unknown): "pending" | "sent" => {
-  const normalized = trimString(value);
-  return normalized === "pending" ? "pending" : "sent";
-};
-
-const toReactionStatus = (value: unknown): "pending" | "sent" => {
-  const normalized = trimString(value);
-  return normalized === "pending" ? "pending" : "sent";
-};
-
-const toPositiveInt = (value: unknown, fallback: number): number => {
-  const asNumber = Number(value ?? 0);
-  if (!Number.isFinite(asNumber)) return fallback;
-  const rounded = Math.trunc(asNumber);
-  return rounded > 0 ? rounded : fallback;
-};
-
-const isSqliteTrueish = (value: unknown): boolean => {
-  if (value === true || value === 1 || value === "1") return true;
-  const normalized = trimString(value).toLowerCase();
-  return normalized === "true";
-};
-
-const parseCreatedAtSec = (value: unknown): number =>
-  toPositiveInt(value, Math.ceil(Date.now() / 1000));
-
-const toLocalNostrMessage = (
-  row: NostrMessageRow,
-): LocalNostrMessage | null => {
-  const id = trimString(row.id);
-  const contactId = trimString(row.contactId);
-  const directionRaw = trimString(row.direction);
-  const direction =
-    directionRaw === "in" || directionRaw === "out" ? directionRaw : null;
-  const content = toText(row.content);
-  const wrapId = trimString(row.wrapId);
-
-  if (!id || !contactId || !direction || !content.trim() || !wrapId) {
-    return null;
-  }
-
-  const clientId = asNonEmptyString(row.clientId);
-  const message: LocalNostrMessage = {
-    id,
-    contactId,
-    direction,
-    content,
-    wrapId,
-    rumorId: asNonEmptyString(row.rumorId),
-    pubkey: trimString(row.pubkey),
-    createdAtSec: parseCreatedAtSec(row.createdAtSec),
-    status: toMessageStatus(row.status),
-    localOnly: isSqliteTrueish(row.localOnly),
-    replyToId: asNonEmptyString(row.replyToId),
-    replyToContent: asNonEmptyString(row.replyToContent),
-    rootMessageId: asNonEmptyString(row.rootMessageId),
-    editedAtSec:
-      row.editedAtSec === null || row.editedAtSec === undefined
-        ? null
-        : parseCreatedAtSec(row.editedAtSec),
-    editedFromId: asNonEmptyString(row.editedFromId),
-    isEdited: isSqliteTrueish(row.isEdited),
-    originalContent: asNonEmptyString(row.originalContent),
-    ...(clientId ? { clientId } : {}),
-  };
-
-  return message;
-};
-
-const toLocalNostrReaction = (
-  row: NostrReactionRow,
-): LocalNostrReaction | null => {
-  const id = trimString(row.id);
-  const messageId = trimString(row.messageId);
-  const reactorPubkey = trimString(row.reactorPubkey);
-  const emoji = toText(row.emoji).trim();
-  const wrapId = trimString(row.wrapId);
-
-  if (!id || !messageId || !reactorPubkey || !emoji || !wrapId) return null;
-
-  const clientId = asNonEmptyString(row.clientId);
-  return {
-    id,
-    messageId,
-    reactorPubkey,
-    emoji,
-    wrapId,
-    createdAtSec: parseCreatedAtSec(row.createdAtSec),
-    status: toReactionStatus(row.status),
-    ...(clientId ? { clientId } : {}),
-  };
-};
-
-const normalizeLegacyLocalMessage = (
-  row: Record<string, unknown>,
-): LocalNostrMessage | null => {
-  const contactId = trimString(row.contactId);
-  const directionRaw = trimString(row.direction);
-  const direction =
-    directionRaw === "in" || directionRaw === "out" ? directionRaw : null;
-  const content = toText(row.content);
-  const wrapId = trimString(row.wrapId) || `legacy:${makeLocalId()}`;
-
-  if (!contactId || !direction || !content.trim()) return null;
-
-  const clientId = asNonEmptyString(row.clientId);
-  return {
-    id: trimString(row.id) || makeLocalId(),
-    contactId,
-    direction,
-    content,
-    wrapId,
-    rumorId: asNonEmptyString(row.rumorId),
-    pubkey: trimString(row.pubkey),
-    createdAtSec: toPositiveInt(row.createdAtSec, Math.ceil(Date.now() / 1000)),
-    status: toMessageStatus(row.status),
-    localOnly: Boolean(row.localOnly),
-    replyToId: asNonEmptyString(row.replyToId),
-    replyToContent: asNonEmptyString(row.replyToContent),
-    rootMessageId: asNonEmptyString(row.rootMessageId),
-    editedAtSec: row.editedAtSec
-      ? toPositiveInt(row.editedAtSec, Math.ceil(Date.now() / 1000))
-      : null,
-    editedFromId: asNonEmptyString(row.editedFromId),
-    isEdited: Boolean(row.isEdited),
-    originalContent: asNonEmptyString(row.originalContent),
-    ...(clientId ? { clientId } : {}),
-  };
-};
-
-type NostrMessageInsertPayload = {
-  contactId: string;
-  content: string;
-  createdAtSec: number;
-  direction: "in" | "out";
-  status: "pending" | "sent";
-  wrapId: string;
-  clientId?: string;
-  editedAtSec?: number;
-  editedFromId?: string;
-  isEdited?: "1";
-  localOnly?: "1";
-  originalContent?: string;
-  pubkey?: string;
-  replyToContent?: string;
-  replyToId?: string;
-  rootMessageId?: string;
-  rumorId?: string;
-};
-
-const localMessageFromInsertPayload = (
-  id: string,
-  payload: NostrMessageInsertPayload,
-): LocalNostrMessage => {
-  const message: LocalNostrMessage = {
-    id,
-    contactId: payload.contactId,
-    direction: payload.direction,
-    content: payload.content,
-    wrapId: payload.wrapId,
-    rumorId: payload.rumorId ?? null,
-    pubkey: payload.pubkey ?? "",
-    createdAtSec: payload.createdAtSec,
-    status: payload.status,
-    localOnly: payload.localOnly === "1",
-    replyToId: payload.replyToId ?? null,
-    replyToContent: payload.replyToContent ?? null,
-    rootMessageId: payload.rootMessageId ?? null,
-    editedAtSec: payload.editedAtSec ?? null,
-    editedFromId: payload.editedFromId ?? null,
-    isEdited: payload.isEdited === "1",
-    originalContent: payload.originalContent ?? null,
-  };
-
-  if (payload.clientId) message.clientId = payload.clientId;
-
-  return message;
-};
-
-const buildMessageInsertPayload = (
-  message: NewLocalNostrMessage,
-): NostrMessageInsertPayload | null => {
-  const contactId = trimString(message.contactId);
-  const directionRaw = trimString(message.direction);
-  const direction =
-    directionRaw === "in" || directionRaw === "out" ? directionRaw : null;
-  const content = toText(message.content);
-  if (!contactId || !direction || !content.trim()) return null;
-
-  const wrapId = trimString(message.wrapId) || `pending:${makeLocalId()}`;
-  const createdAtSec = toPositiveInt(
-    message.createdAtSec,
-    Math.ceil(Date.now() / 1000),
-  );
-  const editedAtSec = message.editedAtSec
-    ? toPositiveInt(message.editedAtSec, createdAtSec)
-    : null;
-
-  const payload: NostrMessageInsertPayload = {
-    contactId,
-    direction,
-    content,
-    wrapId,
-    createdAtSec,
-    status: toMessageStatus(message.status),
-  };
-
-  const rumorId = asNonEmptyString(message.rumorId);
-  if (rumorId) payload.rumorId = rumorId;
-
-  const pubkey = asNonEmptyString(message.pubkey);
-  if (pubkey) payload.pubkey = pubkey;
-
-  const clientId = asNonEmptyString(message.clientId);
-  if (clientId) payload.clientId = clientId;
-
-  if (message.localOnly) payload.localOnly = "1";
-
-  const replyToId = asNonEmptyString(message.replyToId);
-  if (replyToId) payload.replyToId = replyToId;
-
-  const replyToContent = asNonEmptyString(message.replyToContent);
-  if (replyToContent) payload.replyToContent = replyToContent;
-
-  const rootMessageId = asNonEmptyString(message.rootMessageId);
-  if (rootMessageId) payload.rootMessageId = rootMessageId;
-
-  if (editedAtSec) payload.editedAtSec = editedAtSec;
-
-  const editedFromId = asNonEmptyString(message.editedFromId);
-  if (editedFromId) payload.editedFromId = editedFromId;
-
-  if (message.isEdited) payload.isEdited = "1";
-
-  const originalContent = asNonEmptyString(message.originalContent);
-  if (originalContent) payload.originalContent = originalContent;
-
-  return payload;
-};
-
-const buildReactionInsertPayload = (
-  reaction: NewLocalNostrReaction,
-): {
-  createdAtSec: number;
-  emoji: string;
-  messageId: string;
-  reactorPubkey: string;
-  status: "pending" | "sent";
-  wrapId: string;
-  clientId?: string;
-} | null => {
-  const messageId = trimString(reaction.messageId);
-  const reactorPubkey = trimString(reaction.reactorPubkey);
-  const emoji = toText(reaction.emoji).trim();
-  if (!messageId || !reactorPubkey || !emoji) return null;
-
-  const wrapId = trimString(reaction.wrapId) || `pending:${makeLocalId()}`;
-
-  const payload: {
-    createdAtSec: number;
-    emoji: string;
-    messageId: string;
-    reactorPubkey: string;
-    status: "pending" | "sent";
-    wrapId: string;
-    clientId?: string;
-  } = {
-    messageId,
-    reactorPubkey,
-    emoji,
-    createdAtSec: toPositiveInt(
-      reaction.createdAtSec,
-      Math.ceil(Date.now() / 1000),
-    ),
-    wrapId,
-    status: toReactionStatus(reaction.status),
-  };
-
-  const clientId = asNonEmptyString(reaction.clientId);
-  if (clientId) payload.clientId = clientId;
-
-  return payload;
-};
+const toMessageStatus = (value: unknown): "pending" | "sent" =>
+  trimString(value) === "pending" ? "pending" : "sent";
 
 const migrationKeyForOwner = (ownerId: string): string =>
   `linky.messages_evolu_migrated_v${MESSAGE_MIGRATION_VERSION}:${ownerId}`;
 
+const LEGACY_MESSAGES_KEY_PREFIX = `${LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX}.`;
+const OVERLAY_KEY_INFIX = ".overlay.";
+
 const overlayMessagesKeyForOwner = (ownerId: string): string =>
-  `${LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX}.overlay.${ownerId}`;
+  `${LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX}${OVERLAY_KEY_INFIX}${ownerId}`;
+
+/** The pre-Evolu message stores still on this device, keyed by the owner they were written for. */
+const legacyLocalMessageOwnerIds = (): string[] =>
+  safeLocalStorageKeys()
+    .filter(
+      (key) =>
+        key.startsWith(LEGACY_MESSAGES_KEY_PREFIX) &&
+        !key.includes(OVERLAY_KEY_INFIX),
+    )
+    .map((key) => key.slice(LEGACY_MESSAGES_KEY_PREFIX.length))
+    .filter(Boolean);
+
+const parseContactId = (value: string): ContactId | null => {
+  const result = ContactId.fromUnknown(value);
+  return result.ok ? result.value : null;
+};
+
+const parseMessageId = (value: string): MessageId | null => {
+  const result = MessageId.fromUnknown(value);
+  return result.ok ? result.value : null;
+};
+
+const parseReactionId = (value: string): ReactionId | null => {
+  const result = ReactionId.fromUnknown(value);
+  return result.ok ? result.value : null;
+};
+
+const NO_ROWS: ReadonlyArray<never> = [];
 
 export const useMessagesDomain = ({
   appOwnerId,
   appOwnerIdRef,
   chatForceScrollToBottomRef,
   chatMessagesRef,
-  messagesOwnerId,
-  messagesOwnerIdRef,
+  contacts,
+  conversations,
   route,
-  visibleMessageOwnerIds,
 }: UseMessagesDomainParams) => {
-  const { insert, update } = useEvolu();
   const activeChatRouteId =
     route.kind === "chat"
       ? route.id
@@ -384,83 +145,98 @@ export const useMessagesDomain = ({
     LocalNostrMessage[]
   >([]);
 
-  const nostrMessagesQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("nostrMessage")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue)
-          .orderBy("createdAtSec", "asc")
-          .orderBy("createdAt", "asc"),
-      ),
-    [],
+  // Null until the first read answers, so the legacy import below cannot
+  // duplicate rows it has not seen yet.
+  const messageSource = React.useMemo(
+    () => ({
+      all: conversations.messages.all,
+      subscribe: conversations.messages.subscribe,
+    }),
+    [conversations],
+  );
+  const loadedMessageRows = useLiveValue<ReadonlyArray<MessageRow> | null>(
+    messageSource,
+    null,
+  );
+  const messageRows = loadedMessageRows ?? NO_ROWS;
+  const reactionSource = React.useMemo(
+    () => ({
+      all: conversations.reactions.all,
+      subscribe: conversations.reactions.subscribe,
+    }),
+    [conversations],
+  );
+  const reactionRows = useLiveValue<ReadonlyArray<ReactionRow>>(
+    reactionSource,
+    NO_ROWS,
+  );
+  const removedReactionSource = React.useMemo(
+    () => ({
+      all: conversations.removedReactions,
+      subscribe: conversations.reactions.subscribe,
+    }),
+    [conversations],
+  );
+  const removedReactionRows = useLiveValue<ReadonlyArray<ReactionRow>>(
+    removedReactionSource,
+    NO_ROWS,
+  );
+  const conversationRows = useConversationRows();
+
+  const contactByConversation = React.useMemo(
+    () => contactIdByConversationId(conversationRows, contacts),
+    [contacts, conversationRows],
   );
 
-  const nostrReactionsQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("nostrReaction")
-          .selectAll()
-          .orderBy("createdAtSec", "asc")
-          .orderBy("createdAt", "asc"),
-      ),
-    [],
-  );
-
-  const nostrMessageRows = useQuery(nostrMessagesQuery);
-  const nostrReactionRows = useQuery(nostrReactionsQuery);
-
-  const visibleMessageOwnerIdsSet = React.useMemo(() => {
-    const ids = visibleMessageOwnerIds
-      .map((ownerId) => trimString(ownerId))
-      .filter(Boolean);
-    return new Set(ids);
-  }, [visibleMessageOwnerIds]);
-
-  const isVisibleMessageOwner = React.useCallback(
-    (row: Pick<NostrMessageRow, "ownerId">) => {
-      if (visibleMessageOwnerIdsSet.size === 0) return true;
-      const ownerId = trimString(row.ownerId);
-      if (!ownerId) return false;
-      return visibleMessageOwnerIdsSet.has(ownerId);
+  // Writes run one after another: an update issued right after an insert
+  // (the send flow stamps the rumor id on its pending row) must find the row.
+  const writeQueueRef = React.useRef(Promise.resolve());
+  const write = React.useCallback(
+    (what: string, effect: Effect.Effect<void, unknown>) => {
+      writeQueueRef.current = writeQueueRef.current
+        .then(() => runWrite(effect))
+        .then((outcome) => {
+          if (outcome.ok) return;
+          console.warn(`[linky][messages] ${what} write failed`, outcome);
+        });
     },
-    [visibleMessageOwnerIdsSet],
+    [],
   );
 
   const normalizedReactionRows = React.useMemo(() => {
     const deletedWrapIds = new Set<string>();
     const seenWrapIds = new Set<string>();
+    for (const row of removedReactionRows) {
+      const wrapId = trimString(row.wrapId);
+      if (!wrapId) continue;
+      deletedWrapIds.add(wrapId);
+      seenWrapIds.add(wrapId);
+    }
     const reactions: LocalNostrReaction[] = [];
-    for (const row of nostrReactionRows) {
-      if (!isVisibleMessageOwner(row)) continue;
+    for (const row of reactionRows) {
       const wrapId = trimString(row.wrapId);
       if (wrapId) seenWrapIds.add(wrapId);
-      if (isSqliteTrueish(row.isDeleted)) {
-        if (wrapId) deletedWrapIds.add(wrapId);
-        continue;
-      }
       const normalized = toLocalNostrReaction(row);
       if (normalized) reactions.push(normalized);
     }
     return { deletedWrapIds, reactions, seenWrapIds };
-  }, [isVisibleMessageOwner, nostrReactionRows]);
-
-  const normalizedMessageRows = React.useMemo(() => {
-    const parsed: LocalNostrMessage[] = [];
-    for (const row of nostrMessageRows) {
-      if (!isVisibleMessageOwner(row)) continue;
-      const normalized = toLocalNostrMessage(row);
-      if (normalized) parsed.push(normalized);
-    }
-    return parsed;
-  }, [isVisibleMessageOwner, nostrMessageRows]);
+  }, [reactionRows, removedReactionRows]);
 
   const evoluNostrMessagesLocal = React.useMemo(() => {
-    const deduped = dedupeNostrMessagesByPriority(normalizedMessageRows);
-    return deduped.sort((a, b) => a.createdAtSec - b.createdAtSec);
-  }, [normalizedMessageRows]);
+    const parsed: LocalNostrMessage[] = [];
+    for (const row of messageRows) {
+      const normalized = toLocalNostrMessage(
+        row,
+        row.conversationId === null
+          ? undefined
+          : contactByConversation.get(row.conversationId),
+      );
+      if (normalized) parsed.push(normalized);
+    }
+    return dedupeNostrMessagesByPriority(parsed).sort(
+      (a, b) => a.createdAtSec - b.createdAtSec,
+    );
+  }, [contactByConversation, messageRows]);
 
   const persistOverlayMessages = React.useCallback(
     (nextMessages: LocalNostrMessage[]) => {
@@ -487,7 +263,7 @@ export const useMessagesDomain = ({
       Schema.Array(UnknownRecord),
       [],
     )
-      .map((message) => normalizeLegacyLocalMessage(message))
+      .map(normalizeLegacyLocalMessage)
       .filter((message): message is LocalNostrMessage => Boolean(message));
 
     setOverlayMessages(dedupeNostrMessagesByPriority(normalized));
@@ -551,263 +327,177 @@ export const useMessagesDomain = ({
     );
   }, [normalizedReactionRows, nostrReactionsLocal]);
 
+  /** Stores a message for a saved contact; null when the payload is not storable. */
   const insertNostrMessage = React.useCallback(
-    (payload: NostrMessageInsertPayload) => {
-      const result = messagesOwnerId
-        ? insert("nostrMessage", payload, { ownerId: messagesOwnerId })
-        : insert("nostrMessage", payload);
-      return result;
+    (message: NewLocalNostrMessage): LocalNostrMessage | null => {
+      const contactId = parseContactId(trimString(message.contactId));
+      if (!contactId) return null;
+      const id = createId<"Message">();
+      const wrapId = trimString(message.wrapId) || `pending:${makeLocalId()}`;
+      const row = toMessageWriteRow(
+        id,
+        directConversationIdFor(contactId),
+        message,
+        wrapId,
+      );
+      if (!row) return null;
+      write(
+        "message",
+        Effect.flatMap(conversations.ensureDirect(contactId), () =>
+          conversations.messages.insert(row),
+        ),
+      );
+      return localMessageFrom(message, id, wrapId);
     },
-    [insert, messagesOwnerId],
+    [conversations, write],
   );
 
-  const insertNostrReaction = React.useCallback(
-    (payload: NonNullable<ReturnType<typeof buildReactionInsertPayload>>) => {
-      const result = messagesOwnerId
-        ? insert("nostrReaction", payload, { ownerId: messagesOwnerId })
-        : insert("nostrReaction", payload);
-      return result;
+  const removeNostrMessage = React.useCallback(
+    (id: string) => {
+      const messageId = parseMessageId(id);
+      if (messageId)
+        write("message removal", conversations.messages.remove(messageId));
     },
-    [insert, messagesOwnerId],
+    [conversations, write],
   );
 
-  const buildVisibleRowOwnerIdsById = React.useCallback(
-    (rows: readonly (NostrMessageRow | NostrReactionRow)[]) => {
-      const ownerIdsById = new Map<string, OwnerId[]>();
-      for (const row of rows) {
-        if (!isVisibleMessageOwner(row)) continue;
-        const id = trimString(row.id);
-        if (!id) continue;
-        const ownerId = row.ownerId;
-        if (!ownerId) continue;
-        const existing = ownerIdsById.get(id);
-        if (!existing) {
-          ownerIdsById.set(id, [ownerId]);
-          continue;
-        }
-        if (!existing.some((candidate) => candidate === ownerId)) {
-          existing.push(ownerId);
-        }
-      }
-      return ownerIdsById;
+  const removeNostrReaction = React.useCallback(
+    (id: string) => {
+      const reactionId = parseReactionId(id);
+      if (reactionId)
+        write("reaction removal", conversations.reactions.remove(reactionId));
     },
-    [isVisibleMessageOwner],
-  );
-  const nostrMessageOwnerIdsById = React.useMemo(
-    () => buildVisibleRowOwnerIdsById(nostrMessageRows),
-    [buildVisibleRowOwnerIdsById, nostrMessageRows],
-  );
-  const nostrReactionOwnerIdsById = React.useMemo(
-    () => buildVisibleRowOwnerIdsById(nostrReactionRows),
-    [buildVisibleRowOwnerIdsById, nostrReactionRows],
-  );
-
-  const updateNostrMessage = React.useCallback(
-    (payload: NostrMessageUpdatePayload) => {
-      const rowOwnerIds =
-        nostrMessageOwnerIdsById.get(trimString(payload.id)) ?? [];
-      if (rowOwnerIds.length > 0) {
-        for (const ownerId of rowOwnerIds) {
-          update("nostrMessage", payload, { ownerId });
-        }
-        return;
-      }
-
-      if (messagesOwnerId)
-        update("nostrMessage", payload, { ownerId: messagesOwnerId });
-      else update("nostrMessage", payload);
-    },
-    [messagesOwnerId, nostrMessageOwnerIdsById, update],
-  );
-
-  const updateNostrReaction = React.useCallback(
-    (payload: NostrReactionUpdatePayload) => {
-      const rowOwnerIds =
-        nostrReactionOwnerIdsById.get(trimString(payload.id)) ?? [];
-      if (rowOwnerIds.length > 0) {
-        for (const ownerId of rowOwnerIds) {
-          update("nostrReaction", payload, { ownerId });
-        }
-        return;
-      }
-
-      if (messagesOwnerId)
-        update("nostrReaction", payload, { ownerId: messagesOwnerId });
-      else update("nostrReaction", payload);
-    },
-    [messagesOwnerId, nostrReactionOwnerIdsById, update],
+    [conversations, write],
   );
 
   const [pendingPayments, setPendingPayments] = React.useState<
     LocalPendingPayment[]
   >(() => []);
 
-  const migrationRunningRef = React.useRef(false);
-  const migrationDoneForOwnerRef = React.useRef<string | null>(null);
+  const legacyImportDoneRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (!messagesOwnerId) return;
-    const ownerKey = trimString(messagesOwnerId);
-    if (!ownerKey) return;
-    if (migrationRunningRef.current) return;
-    if (migrationDoneForOwnerRef.current === ownerKey) return;
+    if (loadedMessageRows === null || legacyImportDoneRef.current) return;
+    legacyImportDoneRef.current = true;
 
-    const migrationKey = migrationKeyForOwner(ownerKey);
-    if (safeLocalStorageGet(migrationKey) === "1") {
-      migrationDoneForOwnerRef.current = ownerKey;
-      return;
+    const existingMessages = dedupeNostrMessagesByPriority(nostrMessagesLocal);
+    const seenWrapIds = new Set<string>();
+    const seenClientIds = new Set<string>();
+    const seenRumorKeys = new Set<string>();
+    for (const existingMessage of existingMessages) {
+      const wrapId = trimString(existingMessage.wrapId);
+      if (wrapId) seenWrapIds.add(wrapId);
+      const clientId = trimString(existingMessage.clientId);
+      if (clientId) seenClientIds.add(clientId);
+      const rumorKey = getLocalNostrMessageRumorKey(existingMessage);
+      if (rumorKey) seenRumorKeys.add(rumorKey);
     }
 
-    migrationRunningRef.current = true;
-    try {
-      const normalizedLegacy = safeLocalStorageGetJson(
-        `${LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX}.${ownerKey}`,
-        Schema.Array(UnknownRecord),
-        [],
+    for (const ownerKey of legacyLocalMessageOwnerIds()) {
+      const migrationKey = migrationKeyForOwner(ownerKey);
+      const storageKey = `${LEGACY_MESSAGES_KEY_PREFIX}${ownerKey}`;
+      if (safeLocalStorageGet(migrationKey) !== "1") {
+        const legacyMessages = dedupeNostrMessagesByPriority(
+          safeLocalStorageGetJson(storageKey, Schema.Array(UnknownRecord), [])
+            .map(normalizeLegacyLocalMessage)
+            .filter((message): message is LocalNostrMessage =>
+              Boolean(message),
+            ),
+        );
+        for (const legacyMessage of legacyMessages) {
+          const wrapId = trimString(legacyMessage.wrapId);
+          const clientId = trimString(legacyMessage.clientId);
+          const rumorKey = getLocalNostrMessageRumorKey(legacyMessage);
+          if (wrapId && seenWrapIds.has(wrapId)) continue;
+          if (clientId && seenClientIds.has(clientId)) continue;
+          if (rumorKey && seenRumorKeys.has(rumorKey)) continue;
+          if (
+            !insertNostrMessage({
+              ...legacyMessage,
+              status: toMessageStatus(legacyMessage.status),
+            })
+          )
+            continue;
+          if (wrapId) seenWrapIds.add(wrapId);
+          if (clientId) seenClientIds.add(clientId);
+          if (rumorKey) seenRumorKeys.add(rumorKey);
+        }
+        safeLocalStorageSet(migrationKey, "1");
+      }
+      safeLocalStorageRemove(storageKey);
+    }
+  }, [insertNostrMessage, loadedMessageRows, nostrMessagesLocal]);
+
+  const scrollActiveChatToBottom = React.useCallback(
+    (contactId: string) => {
+      if (
+        !activeChatRouteId ||
+        trimString(contactId) !== trimString(activeChatRouteId)
       )
-        .map((message) => normalizeLegacyLocalMessage(message))
-        .filter((message): message is LocalNostrMessage => Boolean(message));
-
-      const dedupedLegacy = dedupeNostrMessagesByPriority(normalizedLegacy);
-      const existingMessages =
-        dedupeNostrMessagesByPriority(nostrMessagesLocal);
-
-      const seenWrapIds = new Set<string>();
-      const seenClientIds = new Set<string>();
-      const seenRumorKeys = new Set<string>();
-
-      for (const existingMessage of existingMessages) {
-        const wrapId = trimString(existingMessage.wrapId);
-        if (wrapId) seenWrapIds.add(wrapId);
-
-        const clientId = trimString(existingMessage.clientId);
-        if (clientId) seenClientIds.add(clientId);
-
-        const rumorKey = getLocalNostrMessageRumorKey(existingMessage);
-        if (rumorKey) seenRumorKeys.add(rumorKey);
-      }
-
-      for (const legacyMessage of dedupedLegacy) {
-        const wrapId = trimString(legacyMessage.wrapId);
-        const clientId = trimString(legacyMessage.clientId);
-        const rumorKey = getLocalNostrMessageRumorKey(legacyMessage);
-
-        if (wrapId && seenWrapIds.has(wrapId)) continue;
-        if (clientId && seenClientIds.has(clientId)) continue;
-        if (rumorKey && seenRumorKeys.has(rumorKey)) continue;
-
-        const payload = buildMessageInsertPayload({
-          ...legacyMessage,
-          status: toMessageStatus(legacyMessage.status),
-        });
-        if (!payload) continue;
-
-        const result = insertNostrMessage(payload);
-        if (!result.ok) continue;
-
-        if (wrapId) seenWrapIds.add(wrapId);
-        if (clientId) seenClientIds.add(clientId);
-        if (rumorKey) seenRumorKeys.add(rumorKey);
-      }
-
-      safeLocalStorageSet(migrationKey, "1");
-      safeLocalStorageRemove(
-        `${LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX}.${ownerKey}`,
-      );
-      migrationDoneForOwnerRef.current = ownerKey;
-    } finally {
-      migrationRunningRef.current = false;
-    }
-  }, [
-    insertNostrMessage,
-    messagesOwnerId,
-    evoluNostrMessagesLocal,
-    nostrMessagesLocal,
-  ]);
+        return;
+      chatForceScrollToBottomRef.current = true;
+      requestAnimationFrame(() => {
+        const container = chatMessagesRef.current;
+        if (container) container.scrollTop = container.scrollHeight;
+      });
+    },
+    [activeChatRouteId, chatForceScrollToBottomRef, chatMessagesRef],
+  );
 
   const appendLocalNostrMessage = React.useCallback(
     (message: NewLocalNostrMessage): string => {
-      const payload = buildMessageInsertPayload(message);
-      if (!payload) return "";
+      const contactId = trimString(message.contactId);
+      const direction = trimString(message.direction);
+      const content = toText(message.content);
+      if (!contactId || !direction || !content.trim()) return "";
+      const wrapId = trimString(message.wrapId);
+      const clientId = trimString(message.clientId);
+      const rumorId = trimString(message.rumorId);
 
       const existing = nostrMessagesLatestRef.current.find((current) => {
-        const sameClientId =
-          payload.clientId &&
-          trimString(current.clientId) === trimString(payload.clientId);
-        if (sameClientId) return true;
-
-        const sameWrapId =
-          trimString(current.wrapId) === trimString(payload.wrapId);
-        if (sameWrapId) return true;
-
-        const sameRumor =
-          payload.rumorId &&
-          trimString(current.rumorId) === trimString(payload.rumorId);
-        if (sameRumor) return true;
-
+        if (clientId && trimString(current.clientId) === clientId) return true;
+        if (wrapId && trimString(current.wrapId) === wrapId) return true;
+        if (rumorId && trimString(current.rumorId) === rumorId) return true;
         return (
-          trimString(current.contactId) === trimString(payload.contactId) &&
-          trimString(current.direction) === trimString(payload.direction) &&
-          toText(current.content) === toText(payload.content) &&
-          current.createdAtSec === payload.createdAtSec
+          trimString(current.contactId) === contactId &&
+          trimString(current.direction) === direction &&
+          toText(current.content) === content &&
+          current.createdAtSec === message.createdAtSec
         );
       });
       if (existing) return trimString(existing.id);
 
-      if (isUnknownContactId(payload.contactId)) {
-        const messageId = makeLocalId();
-        const nextMessage = localMessageFromInsertPayload(messageId, payload);
-        const nextOverlayMessages = dedupeNostrMessagesByPriority([
-          ...overlayMessagesRef.current,
-          nextMessage,
-        ]).sort((a, b) => a.createdAtSec - b.createdAtSec);
-        persistOverlayMessages(nextOverlayMessages);
-
-        if (
-          activeChatRouteId &&
-          trimString(message.contactId) === trimString(activeChatRouteId)
-        ) {
-          chatForceScrollToBottomRef.current = true;
-          requestAnimationFrame(() => {
-            const container = chatMessagesRef.current;
-            if (container) container.scrollTop = container.scrollHeight;
-          });
-        }
-
-        return messageId;
+      if (isUnknownContactId(contactId)) {
+        const nextMessage = localMessageFrom(
+          message,
+          makeLocalId(),
+          wrapId || `pending:${makeLocalId()}`,
+        );
+        persistOverlayMessages(
+          dedupeNostrMessagesByPriority([
+            ...overlayMessagesRef.current,
+            nextMessage,
+          ]).sort((a, b) => a.createdAtSec - b.createdAtSec),
+        );
+        scrollActiveChatToBottom(contactId);
+        return nextMessage.id;
       }
 
-      const result = insertNostrMessage(payload);
-      if (!result.ok) return "";
-
-      const messageId = toText(result.value.id);
-      const insertedMessage = localMessageFromInsertPayload(messageId, payload);
+      const insertedMessage = insertNostrMessage(message);
+      if (!insertedMessage) return "";
       nostrMessagesLatestRef.current = dedupeNostrMessagesByPriority([
         ...nostrMessagesLatestRef.current,
         insertedMessage,
       ]);
-      nostrMessageWrapIdsRef.current.add(payload.wrapId);
-
-      if (
-        activeChatRouteId &&
-        trimString(message.contactId) === trimString(activeChatRouteId)
-      ) {
-        chatForceScrollToBottomRef.current = true;
-        requestAnimationFrame(() => {
-          const container = chatMessagesRef.current;
-          if (container) container.scrollTop = container.scrollHeight;
-        });
-      }
-
-      return messageId;
+      nostrMessageWrapIdsRef.current.add(insertedMessage.wrapId);
+      scrollActiveChatToBottom(contactId);
+      return insertedMessage.id;
     },
     [
-      overlayMessagesRef,
-      activeChatRouteId,
-      chatForceScrollToBottomRef,
-      chatMessagesRef,
       insertNostrMessage,
+      overlayMessagesRef,
       persistOverlayMessages,
+      scrollActiveChatToBottom,
     ],
   );
 
@@ -836,51 +526,70 @@ export const useMessagesDomain = ({
       nostrMessageUpdateShadowRef.current.set(normalizedId, shadow);
 
       if (isOverlayMessage && current) {
-        const nextOverlayMessages = overlayMessagesRef.current.map(
-          (message) => {
-            if (trimString(message.id) !== normalizedId) return message;
-            return applyMessageUpdate(message, payload);
-          },
+        persistOverlayMessages(
+          overlayMessagesRef.current.map((message) =>
+            trimString(message.id) === normalizedId
+              ? applyMessageUpdate(message, payload)
+              : message,
+          ),
         );
-        persistOverlayMessages(nextOverlayMessages);
         return;
       }
 
-      updateNostrMessage(payload);
+      const messageId = parseMessageId(normalizedId);
+      if (!messageId) return;
+      write(
+        "message update",
+        conversations.messages.update(messageId, toMessagePatch(payload)),
+      );
     },
-    [overlayMessagesRef, persistOverlayMessages, updateNostrMessage],
+    [conversations, overlayMessagesRef, persistOverlayMessages, write],
   );
 
   const appendLocalNostrReaction = React.useCallback(
     (reaction: NewLocalNostrReaction): string => {
-      const payload = buildReactionInsertPayload(reaction);
-      if (!payload) return "";
+      const messageId = trimString(reaction.messageId);
+      const reactorPubkey = trimString(reaction.reactorPubkey);
+      const emoji = toText(reaction.emoji).trim();
+      if (!messageId || !reactorPubkey || !emoji) return "";
+      const wrapId = trimString(reaction.wrapId);
+      const clientId = trimString(reaction.clientId);
 
       const existing = nostrReactionsLatestRef.current.find((current) => {
-        const sameClientId =
-          payload.clientId &&
-          trimString(current.clientId) === trimString(payload.clientId);
-        if (sameClientId) return true;
-
-        const sameWrapId =
-          trimString(current.wrapId) === trimString(payload.wrapId);
-        if (sameWrapId) return true;
-
+        if (clientId && trimString(current.clientId) === clientId) return true;
+        if (wrapId && trimString(current.wrapId) === wrapId) return true;
         return (
-          trimString(current.messageId) === trimString(payload.messageId) &&
-          trimString(current.reactorPubkey) ===
-            trimString(payload.reactorPubkey) &&
-          trimString(current.emoji) === trimString(payload.emoji) &&
-          current.createdAtSec === payload.createdAtSec
+          trimString(current.messageId) === messageId &&
+          trimString(current.reactorPubkey) === reactorPubkey &&
+          trimString(current.emoji) === emoji &&
+          current.createdAtSec === reaction.createdAtSec
         );
       });
       if (existing) return trimString(existing.id);
 
-      const result = insertNostrReaction(payload);
-      if (!result.ok) return "";
-      return toText(result.value.id);
+      // A reaction belongs to the conversation of the message it targets.
+      const target = nostrMessagesLatestRef.current.find(
+        (message) => trimString(message.rumorId) === messageId,
+      );
+      const contactId = target ? parseContactId(target.contactId) : null;
+      if (!contactId) return "";
+      const id = createId<"Reaction">();
+      const row = toReactionWriteRow(
+        id,
+        directConversationIdFor(contactId),
+        reaction,
+        wrapId || `pending:${makeLocalId()}`,
+      );
+      if (!row) return "";
+      write(
+        "reaction",
+        Effect.flatMap(conversations.ensureDirect(contactId), () =>
+          conversations.reactions.insert(row),
+        ),
+      );
+      return id;
     },
-    [nostrReactionsLatestRef, insertNostrReaction],
+    [conversations, nostrReactionsLatestRef, write],
   );
 
   const updateLocalNostrReaction = React.useCallback<UpdateLocalNostrReaction>(
@@ -903,22 +612,22 @@ export const useMessagesDomain = ({
       if (!payload) return;
 
       nostrReactionUpdateShadowRef.current.set(normalizedId, shadow);
-
-      updateNostrReaction(payload);
+      const reactionId = parseReactionId(normalizedId);
+      if (!reactionId) return;
+      write(
+        "reaction update",
+        conversations.reactions.update(reactionId, toReactionPatch(payload)),
+      );
     },
-    [nostrReactionsLatestRef, updateNostrReaction],
+    [conversations, nostrReactionsLatestRef, write],
   );
 
   const softDeleteLocalNostrReaction = React.useCallback(
     (id: string) => {
       const normalizedId = trimString(id);
-      if (!normalizedId) return;
-      updateNostrReaction({
-        id: normalizedId,
-        isDeleted: Evolu.sqliteTrue,
-      });
+      if (normalizedId) removeNostrReaction(normalizedId);
     },
-    [updateNostrReaction],
+    [removeNostrReaction],
   );
 
   const softDeleteLocalNostrReactionsByWrapIds = React.useCallback(
@@ -934,13 +643,10 @@ export const useMessagesDomain = ({
 
       for (const reaction of nostrReactionsLatestRef.current) {
         if (!targetWrapIds.has(trimString(reaction.wrapId))) continue;
-        updateNostrReaction({
-          id: reaction.id,
-          isDeleted: Evolu.sqliteTrue,
-        });
+        removeNostrReaction(reaction.id);
       }
     },
-    [nostrReactionsLatestRef, updateNostrReaction],
+    [nostrReactionsLatestRef, removeNostrReaction],
   );
 
   const reassignLocalNostrMessagesContactId = React.useCallback(
@@ -950,7 +656,9 @@ export const useMessagesDomain = ({
       if (!normalizedFrom || !normalizedTo) return 0;
 
       const movedMessageIds = new Set<string>();
-      const targetIsUnknown = isUnknownContactId(normalizedTo);
+      const targetContactId = isUnknownContactId(normalizedTo)
+        ? null
+        : parseContactId(normalizedTo);
       const nextOverlayMessages: LocalNostrMessage[] = [];
 
       for (const message of overlayMessagesRef.current) {
@@ -958,54 +666,32 @@ export const useMessagesDomain = ({
           nextOverlayMessages.push(message);
           continue;
         }
-
         movedMessageIds.add(trimString(message.id));
         const movedMessage = { ...message, contactId: normalizedTo };
-
-        if (targetIsUnknown) {
+        if (targetContactId === null || !insertNostrMessage(movedMessage))
           nextOverlayMessages.push(movedMessage);
-          continue;
-        }
-
-        const payload = buildMessageInsertPayload(movedMessage);
-        const result = payload ? insertNostrMessage(payload) : null;
-        if (!result?.ok) nextOverlayMessages.push(movedMessage);
       }
 
-      if (targetIsUnknown) {
-        for (const message of nostrMessagesLatestRef.current) {
-          if (trimString(message.contactId) !== normalizedFrom) continue;
-          const id = trimString(message.id);
-          if (!id) continue;
-          movedMessageIds.add(id);
-          nextOverlayMessages.push({
-            ...message,
-            contactId: normalizedTo,
-          });
-          updateNostrMessage({ id, isDeleted: Evolu.sqliteTrue });
-        }
-      }
-
-      for (const row of nostrMessageRows) {
-        if (!isVisibleMessageOwner(row)) continue;
-        if (trimString(row.contactId) !== normalizedFrom) continue;
-        const id = trimString(row.id);
+      for (const message of evoluNostrMessagesLocal) {
+        if (trimString(message.contactId) !== normalizedFrom) continue;
+        const id = trimString(message.id);
         if (!id) continue;
         movedMessageIds.add(id);
-
-        if (targetIsUnknown) {
-          const message = toLocalNostrMessage(row);
-          if (message) {
-            nextOverlayMessages.push({
-              ...message,
-              contactId: normalizedTo,
-            });
-          }
-          updateNostrMessage({ id, isDeleted: Evolu.sqliteTrue });
+        if (targetContactId === null) {
+          nextOverlayMessages.push({ ...message, contactId: normalizedTo });
+          removeNostrMessage(id);
           continue;
         }
-
-        updateNostrMessage({ id, contactId: normalizedTo });
+        const messageId = parseMessageId(id);
+        if (!messageId) continue;
+        write(
+          "message move",
+          Effect.flatMap(conversations.ensureDirect(targetContactId), () =>
+            conversations.messages.update(messageId, {
+              conversationId: directConversationIdFor(targetContactId),
+            }),
+          ),
+        );
       }
 
       persistOverlayMessages(
@@ -1017,12 +703,13 @@ export const useMessagesDomain = ({
       return movedMessageIds.size;
     },
     [
-      overlayMessagesRef,
+      conversations,
+      evoluNostrMessagesLocal,
       insertNostrMessage,
-      isVisibleMessageOwner,
-      nostrMessageRows,
+      overlayMessagesRef,
       persistOverlayMessages,
-      updateNostrMessage,
+      removeNostrMessage,
+      write,
     ],
   );
 
@@ -1030,25 +717,21 @@ export const useMessagesDomain = ({
     (contactId: string) => {
       const normalizedContactId = trimString(contactId);
       if (!normalizedContactId) return;
-      const nextOverlayMessages = overlayMessagesRef.current.filter(
-        (message) => trimString(message.contactId) !== normalizedContactId,
+      persistOverlayMessages(
+        overlayMessagesRef.current.filter(
+          (message) => trimString(message.contactId) !== normalizedContactId,
+        ),
       );
-      persistOverlayMessages(nextOverlayMessages);
-
-      for (const row of nostrMessageRows) {
-        if (!isVisibleMessageOwner(row)) continue;
-        if (trimString(row.contactId) !== normalizedContactId) continue;
-        const id = trimString(row.id);
-        if (!id) continue;
-        updateNostrMessage({ id, isDeleted: Evolu.sqliteTrue });
+      for (const message of evoluNostrMessagesLocal) {
+        if (trimString(message.contactId) !== normalizedContactId) continue;
+        removeNostrMessage(message.id);
       }
     },
     [
+      evoluNostrMessagesLocal,
       overlayMessagesRef,
-      isVisibleMessageOwner,
-      nostrMessageRows,
       persistOverlayMessages,
-      updateNostrMessage,
+      removeNostrMessage,
     ],
   );
 
@@ -1100,7 +783,7 @@ export const useMessagesDomain = ({
         const messageId = trimString(message.id);
         if (!messageId || keepIds.has(messageId)) continue;
         if (overlayMessageIds.has(messageId)) continue;
-        updateNostrMessage({ id: messageId, isDeleted: Evolu.sqliteTrue });
+        removeNostrMessage(messageId);
       }
 
       const nextOverlayMessages = overlayMessagesRef.current.filter((message) =>
@@ -1131,10 +814,7 @@ export const useMessagesDomain = ({
       for (const reaction of nostrReactionsLocal) {
         const reactionId = trimString(reaction.id);
         if (!reactionId || keepReactionIds.has(reactionId)) continue;
-        updateNostrReaction({
-          id: reactionId,
-          isDeleted: Evolu.sqliteTrue,
-        });
+        removeNostrReaction(reactionId);
       }
     } finally {
       retentionPruneInFlightRef.current = false;
@@ -1144,13 +824,9 @@ export const useMessagesDomain = ({
     nostrMessagesLocal,
     nostrReactionsLocal,
     persistOverlayMessages,
-    updateNostrMessage,
-    updateNostrReaction,
+    removeNostrMessage,
+    removeNostrReaction,
   ]);
-
-  React.useEffect(() => {
-    messagesOwnerIdRef.current = messagesOwnerId;
-  }, [messagesOwnerId, messagesOwnerIdRef]);
 
   React.useEffect(() => {
     const messageCountsByContact = new Map<string, number>();

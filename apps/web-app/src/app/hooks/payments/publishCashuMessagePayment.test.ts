@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { createIdFromString } from "@linky/linksync";
 import {
   ClientId,
   EnqueueReceipt,
@@ -32,7 +32,7 @@ const myPublicKey = getPublicKey(privateKey);
 const currentNpub = nip19.npubEncode(myPublicKey);
 const contactPublicKey = getPublicKey(contactPrivateKey);
 const contactNpub = nip19.npubEncode(contactPublicKey);
-const contactId = Evolu.createIdFromString<"Contact">("contact");
+const contactId = createIdFromString<"Contact">("contact");
 
 const tokenText = buildCashuToken({ amounts: [100], unit: "sat" });
 

@@ -1,4 +1,3 @@
-import type { OwnerId } from "@evolu/common";
 import {
   ContactId,
   createId,
@@ -251,14 +250,14 @@ export const buildTransactionInsertPayload = (args: {
 };
 
 interface UseOwnerScopedStorageParams {
-  appOwnerIdRef: React.MutableRefObject<OwnerId | null>;
+  appOwnerIdRef: React.MutableRefObject<string | null>;
   transactions: Pick<TransactionsRepository, "insert">;
 }
 
 interface UseOwnerScopedStorageResult {
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
   makeLocalStorageKey: (prefix: string) => string;
-  migrateLegacyPaymentEventsToEvolu: (ownerId: OwnerId) => void;
+  migrateLegacyPaymentEventsToEvolu: (ownerId: string) => void;
   readSeenMintsFromStorage: () => string[];
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
 }
@@ -359,7 +358,7 @@ export const useOwnerScopedStorage = ({
   );
 
   const migrateLegacyPaymentEventsToEvolu = React.useCallback(
-    (ownerId: OwnerId) => {
+    (ownerId: string) => {
       const legacyStorageKey = `${LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX}.${ownerId}`;
       const migratedKey = `${legacyStorageKey}${LEGACY_PAYMENT_EVENTS_MIGRATED_SUFFIX}`;
 

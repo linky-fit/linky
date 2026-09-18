@@ -1,6 +1,8 @@
 import {
+  linkyScopes,
   makeContactsRepository,
   makeConversationsRepository,
+  makeIdentityRepository,
   makeSettingsRepository,
   makeTransactionsRepository,
   makeWalletRepository,
@@ -8,18 +10,18 @@ import {
   type ContactsRepository,
   type ConversationRow,
   type ConversationsRepository,
+  type IdentityRepository,
   type LinkyScope,
   type LinkyStore,
+  type MessageRow,
+  type NostrIdentityRow,
+  type ReactionRow,
   type SettingsRepository,
   type TransactionRecord,
   type TransactionsRepository,
   type WalletRepository,
 } from "@linky/linksync";
-import {
-  useLiveValue,
-  useRepositoryRows,
-  useVisibleShards,
-} from "@linky/linksync/react";
+import { useLiveValue, useRepositoryRows } from "@linky/linksync/react";
 import type { StoredOperation, StoredProof } from "@linky/linkshu";
 import { Effect } from "effect";
 import React from "react";
@@ -45,6 +47,27 @@ export const useConversationsRepository = (): ConversationsRepository => {
 
 export const useConversationRows = (): ReadonlyArray<ConversationRow> =>
   useRepositoryRows(useConversationsRepository());
+
+export const useMessageRows = (): ReadonlyArray<MessageRow> =>
+  useRepositoryRows(useConversationsRepository().messages);
+
+export const useReactionRows = (): ReadonlyArray<ReactionRow> =>
+  useRepositoryRows(useConversationsRepository().reactions);
+
+export const useIdentityRepository = (): IdentityRepository => {
+  const store = useLinkyStore();
+  return React.useMemo(() => makeIdentityRepository(store), [store]);
+};
+
+/** The synced active Nostr identity row, kept current; null until one syncs. */
+export const useSyncedNostrIdentityRow = (): NostrIdentityRow | null => {
+  const { current, subscribe } = useIdentityRepository();
+  const source = React.useMemo(
+    () => ({ all: current, subscribe }),
+    [current, subscribe],
+  );
+  return useLiveValue<NostrIdentityRow | null>(source, null);
+};
 
 export const useSettingsRepository = (): SettingsRepository => {
   const store = useLinkyStore();
@@ -97,35 +120,82 @@ export const useWalletOperations = (): ReadonlyArray<StoredOperation> => {
   return useLiveValue(source, NO_OPERATIONS);
 };
 
-/** Active index and owner ids of a scope's shards, kept current across rotations. */
-export const useShardIds = (scope: LinkyScope) => {
-  const shards = useVisibleShards(useLinkyStore(), scope);
-  return React.useMemo(
+export interface ShardSummary {
+  readonly scope: LinkyScope;
+  readonly index: number;
+  /** The active shard's owner id. */
+  readonly ownerId: string;
+  readonly visibleOwnerIds: ReadonlyArray<string>;
+  readonly rotates: boolean;
+}
+
+const NO_SUMMARIES: ReadonlyArray<ShardSummary> = [];
+const NO_OWNER_IDS: ReadonlyArray<string> = [];
+const SCOPES = Object.keys(linkyScopes).filter((scope): scope is LinkyScope =>
+  Object.hasOwn(linkyScopes, scope),
+);
+
+/** Index, owner ids and visible shard count of every scope, kept current across rotations. */
+export const useShardSummaries = (): ReadonlyArray<ShardSummary> => {
+  const store = useLinkyStore();
+  const source = React.useMemo(
     () => ({
-      index: shards.at(-1)?.index ?? 0,
-      ownerIds: shards.map((shard) => shard.owner.id),
+      all: Effect.forEach(SCOPES, (scope) =>
+        Effect.map(
+          store.visibleShards(scope),
+          (shards): ShardSummary => ({
+            scope,
+            index: shards.at(-1)?.index ?? 0,
+            ownerId: shards.at(-1)?.owner.id ?? "",
+            visibleOwnerIds: shards.map((shard) => shard.owner.id),
+            rotates:
+              linkyScopes[scope].owner === "shard" &&
+              linkyScopes[scope].rotation !== null,
+          }),
+        ),
+      ),
+      subscribe: store.subscribePointers,
     }),
-    [shards],
+    [store],
   );
+  return useLiveValue(source, NO_SUMMARIES);
+};
+
+/** The owner ids the store syncs: the app owner and every visible shard. */
+export const useSyncOwnerIds = (): ReadonlyArray<string> => {
+  const store = useLinkyStore();
+  const source = React.useMemo(
+    () => ({
+      all: Effect.map(store.syncOwners(), (owners) =>
+        owners.map((owner) => owner.id),
+      ),
+      subscribe: store.subscribePointers,
+    }),
+    [store],
+  );
+  return useLiveValue(source, NO_OWNER_IDS);
 };
 
 /** The debug page's manual rotation of a scope's shard. */
-export const useShardRotation = (scope: LinkyScope) => {
+export const useShardRotation = () => {
   const store = useLinkyStore();
-  const [isBusy, setIsBusy] = React.useState(false);
-  const rotate = React.useCallback(async () => {
-    setIsBusy(true);
-    try {
-      await Effect.runPromise(store.rotate(scope));
-    } catch (error) {
-      reportAppLog({
-        tag: "evolu.shardRotationFailed",
-        summary: `Manual rotation of the ${scope} shard failed`,
-        payload: { scope, error: getUnknownErrorMessage(error, "unknown") },
-      });
-    } finally {
-      setIsBusy(false);
-    }
-  }, [scope, store]);
-  return { isBusy, rotate };
+  const [busyScope, setBusyScope] = React.useState<LinkyScope | null>(null);
+  const rotate = React.useCallback(
+    async (scope: LinkyScope) => {
+      setBusyScope(scope);
+      try {
+        await Effect.runPromise(store.rotate(scope));
+      } catch (error) {
+        reportAppLog({
+          tag: "evolu.shardRotationFailed",
+          summary: `Manual rotation of the ${scope} shard failed`,
+          payload: { scope, error: getUnknownErrorMessage(error, "unknown") },
+        });
+      } finally {
+        setBusyScope(null);
+      }
+    },
+    [store],
+  );
+  return { busyScope, rotate };
 };

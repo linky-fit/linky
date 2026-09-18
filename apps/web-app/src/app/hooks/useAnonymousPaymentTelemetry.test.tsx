@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { OwnerId } from "@linky/linksync";
 import { OutboxJobId } from "@linky/linkstr";
 import type { EnqueuePaymentTelemetryParams } from "@linky/linkstr-react";
 import { Exit } from "effect";
@@ -23,7 +23,7 @@ vi.mock("@linky/linkstr-react", () => ({
 
 import { useAnonymousPaymentTelemetry } from "./useAnonymousPaymentTelemetry";
 
-const APP_OWNER_ID = Evolu.OwnerId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ");
+const APP_OWNER_ID = OwnerId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ");
 const storageKey = `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${APP_OWNER_ID}`;
 
 const pendingEvent = (id: string): LocalPaymentTelemetryEvent => ({

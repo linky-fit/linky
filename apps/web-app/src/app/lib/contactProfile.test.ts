@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { sqliteTrue } from "@linky/linksync";
 import { ProfileMetadata } from "@linky/linkstr";
 import { describe, expect, it } from "vitest";
 import {
@@ -73,9 +73,9 @@ describe("resolveContactProfile", () => {
     const resolved = resolveContactProfile(
       {
         lnAddress: "custom@ln.example",
-        lnAddressSetByUser: Evolu.sqliteTrue,
+        lnAddressSetByUser: sqliteTrue,
         name: "Moje jméno",
-        nameSetByUser: Evolu.sqliteTrue,
+        nameSetByUser: sqliteTrue,
         npub: NPUB,
       },
       metadata({ lud16: "vitor@vitorpamplona.com", name: "Vitor" }),

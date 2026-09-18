@@ -1,5 +1,4 @@
 import { reportAppLog } from "../../../devtools/inspector/appLog";
-import * as Evolu from "@evolu/common";
 import {
   decodeNpub,
   type Pubkey,
@@ -13,7 +12,7 @@ import {
 } from "@linky/linkstr-react";
 import { Either } from "effect";
 import React from "react";
-import type { ContactId } from "../../../evolu";
+import { ContactId } from "@linky/linksync";
 import { navigateTo } from "../../../hooks/useRouting";
 import { CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY } from "../../../utils/constants";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
@@ -44,8 +43,6 @@ import { nowSeconds } from "../../../utils/time";
 import type { Translate } from "../../../i18n";
 
 type AppendLocalNostrMessage = (message: NewLocalNostrMessage) => string;
-
-const ContactIdSchema = Evolu.id("Contact");
 
 interface UsePayContactWithCashuMessageParams {
   appendLocalNostrMessage: AppendLocalNostrMessage;
@@ -169,7 +166,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         return { error: "missing contact npub", ok: false, queued: false };
       }
 
-      const parsedContactId = ContactIdSchema.fromUnknown(contact.id);
+      const parsedContactId = ContactId.fromUnknown(contact.id);
       if (!parsedContactId.ok) {
         if (notify) setStatus(t("payFailed"));
         return { error: "invalid contact id", ok: false, queued: false };

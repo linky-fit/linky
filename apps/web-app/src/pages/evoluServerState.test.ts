@@ -8,7 +8,7 @@ describe("Evolu relay reachability", () => {
         evoluHasError: true,
         isOffline: false,
         state: "connected",
-        syncOwner: null,
+        syncOwnerId: null,
       }),
     ).toMatchObject({
       state: "connected",
@@ -23,7 +23,7 @@ describe("Evolu relay reachability", () => {
         evoluHasError: false,
         isOffline: true,
         state: "connected",
-        syncOwner: null,
+        syncOwnerId: null,
       }),
     ).toMatchObject({
       state: "disconnected",

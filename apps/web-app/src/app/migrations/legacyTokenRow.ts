@@ -1,4 +1,4 @@
-import { sqliteTrue } from "@evolu/common";
+import { sqliteTrue } from "@linky/linksync";
 import { LegacyTokenRow, TokenText, UnixSeconds } from "@linky/linkshu";
 import { Schema } from "effect";
 import type { CashuTokenRow } from "../../evolu";

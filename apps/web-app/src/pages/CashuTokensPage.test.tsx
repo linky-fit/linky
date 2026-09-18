@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { createIdFromString } from "@linky/linksync";
 import { TokenTransfer } from "@linky/linkshu";
 import { Schema } from "effect";
 import { act, type ComponentProps } from "react";
@@ -31,7 +31,7 @@ const transfer = Schema.decodeUnknownSync(TokenTransfer)({
   error: null,
   createdAt: Math.floor(new Date("2026-09-11T12:00:00Z").getTime() / 1000),
 });
-const contactId = Evolu.createIdFromString<"Contact">("alice");
+const contactId = createIdFromString<"Contact">("alice");
 const proof = createStoredProofFixture({
   state: "handedOut",
   amount: 21,

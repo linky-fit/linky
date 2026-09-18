@@ -21,11 +21,13 @@ import type {
   OwnerMetaRow,
   TransactionRow,
 } from "../../evolu";
-import { EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY } from "../../utils/constants";
 import {
+  clearLegacyLaneStorage,
+  DEFAULT_MINT_SETTING_KEY,
   isLaneGracePeriodActive,
   LANE_MIGRATION_CUTOFF_SETTING_KEY,
   LANE_MIGRATION_GRACE_PERIOD_MS,
+  legacyPointerIndex,
   readLegacyLaneIndexes,
   runLaneToShardMigration,
   type LegacyLaneSnapshot,
@@ -406,6 +408,18 @@ describe("runLaneToShardMigration", () => {
     ).toBe("dismissed");
   });
 
+  it("carries the default mint into settings", async () => {
+    const { run, store } = setup();
+    await run({
+      ownerMeta: [ownerMeta(appOwner, "defaultMint", "https://mint.example")],
+    });
+    expect(
+      Effect.runSync(
+        makeSettingsRepository(store).get(DEFAULT_MINT_SETTING_KEY),
+      ),
+    ).toBe("https://mint.example");
+  });
+
   it("writes pointers and the cutoff once and is idempotent", async () => {
     const { run, store } = setup();
     const peer = contact(laneA);
@@ -467,8 +481,8 @@ describe("runLaneToShardMigration", () => {
 });
 
 describe("readLegacyLaneIndexes", () => {
-  it("takes the highest of the synced pointer and the local mirror", () => {
-    localStorage.setItem(EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY, "3");
+  it("reads the synced pointers of the meta owner and ignores the rest", () => {
+    localStorage.setItem("linky.evolu.messages_owner_index.v1", "3");
     const indexes = readLegacyLaneIndexes(
       [
         ownerMeta(appOwner, "contacts", JSON.stringify({ index: 2 })),
@@ -481,9 +495,34 @@ describe("readLegacyLaneIndexes", () => {
     expect(indexes).toEqual({
       contacts: 2,
       cashu: 1,
-      messages: 3,
+      messages: 1,
       transactions: 0,
     });
+  });
+
+  it("decodes both pointer formats and rejects the rest", () => {
+    expect(legacyPointerIndex("messages-4", "messages")).toBe(4);
+    expect(legacyPointerIndex("contacts-4", "messages")).toBeNull();
+    expect(
+      legacyPointerIndex(JSON.stringify({ index: 2, baseline: 9 }), "cashu"),
+    ).toBe(2);
+    expect(
+      legacyPointerIndex(JSON.stringify({ index: -1 }), "cashu"),
+    ).toBeNull();
+    expect(legacyPointerIndex("{oops", "cashu")).toBeNull();
+    expect(legacyPointerIndex(null, "cashu")).toBeNull();
+  });
+
+  it("clears the localStorage mirrors an older version wrote", () => {
+    localStorage.setItem("linky.evolu.messages_owner_index.v1", "3");
+    localStorage.setItem("linky.evolu.contacts_owner_index.v1", "1");
+    clearLegacyLaneStorage();
+    expect(
+      localStorage.getItem("linky.evolu.messages_owner_index.v1"),
+    ).toBeNull();
+    expect(
+      localStorage.getItem("linky.evolu.contacts_owner_index.v1"),
+    ).toBeNull();
   });
 });
 

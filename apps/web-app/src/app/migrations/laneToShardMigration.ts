@@ -14,10 +14,8 @@
 // that syncs in late carries an old `updatedAt`, so a watermark would skip
 // it, while the ingest's per-row comparison costs one map lookup.
 //
-// This module and the owner rotation hook (deleted in #387) are the only
-// callers of the old lane derivation.
+// This module is the only caller of the old lane derivation.
 
-import type { AppOwner } from "@evolu/common";
 import {
   activeNostrIdentityId,
   appOwnerFromMnemonic,
@@ -36,6 +34,7 @@ import {
   type LinkyStore,
   type LinkyTable,
   type Row,
+  type AppOwner,
   type SystemColumns,
   type TableOf,
 } from "@linky/linksync";
@@ -52,16 +51,13 @@ import type {
   OwnerMetaRow,
   TransactionRow,
 } from "../../evolu";
-import {
-  EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
-  EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
-} from "../../utils/constants";
 import { deriveEvoluOwnerMnemonicFromSlip39 } from "../../utils/slip39Nostr";
-import { safeLocalStorageGet, safeLocalStorageSet } from "../../utils/storage";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageRemove,
+  safeLocalStorageSet,
+} from "../../utils/storage";
 import { toLegacyTokenRow } from "./legacyTokenRow";
-import { decodeRotationSnapshot } from "../lib/rotationSnapshot";
 import { readRowOwnerId } from "../lib/rowOwnerId";
 
 export const LANE_MIGRATION_DONE_STORAGE_KEY = "linky.laneMigration.done.v1";
@@ -71,6 +67,8 @@ export const LANE_MIGRATION_GRACE_PERIOD_MS = 180 * 24 * 60 * 60 * 1000;
 
 const ONBOARDING_TUTORIAL_SETTING_KEY = "onboardingTutorial";
 const ONBOARDING_TUTORIAL_DISMISSED = "dismissed";
+/** The default mint used to be an `ownerMeta` row; it is the `defaultMint` setting now. */
+export const DEFAULT_MINT_SETTING_KEY = "defaultMint";
 
 export const LEGACY_LANE_SCOPES = [
   "contacts",
@@ -81,11 +79,21 @@ export const LEGACY_LANE_SCOPES = [
 export type LegacyLaneScope = (typeof LEGACY_LANE_SCOPES)[number];
 export type LegacyLaneIndexes = Readonly<Record<LegacyLaneScope, number>>;
 
-const LOCAL_INDEX_STORAGE_KEYS: Readonly<Record<LegacyLaneScope, string>> = {
-  contacts: EVOLU_CONTACTS_OWNER_INDEX_STORAGE_KEY,
-  cashu: EVOLU_CASHU_OWNER_INDEX_STORAGE_KEY,
-  messages: EVOLU_MESSAGES_OWNER_INDEX_STORAGE_KEY,
-  transactions: EVOLU_TRANSACTIONS_OWNER_INDEX_STORAGE_KEY,
+/**
+ * localStorage mirrors the old lane code kept per scope. Nothing reads them
+ * any more; logout clears them so an old install leaves nothing behind.
+ */
+const LEGACY_LANE_STORAGE_KEYS = [
+  "linky.evolu.contacts_owner_index.v1",
+  "linky.evolu.cashu_owner_index.v1",
+  "linky.evolu.messages_owner_index.v1",
+  "linky.evolu.transactions_owner_index.v1",
+  "linky.evolu.messages_owner_baseline_count.v1",
+  "linky.evolu.messages_owner_last_rotated_at_ms.v1",
+];
+
+export const clearLegacyLaneStorage = (): void => {
+  for (const key of LEGACY_LANE_STORAGE_KEYS) safeLocalStorageRemove(key);
 };
 
 export const isLaneMigrationDoneLocally = (): boolean =>
@@ -114,12 +122,30 @@ export const readLaneMigrationCutoffMs = (
     },
   );
 
-const localIndex = (scope: LegacyLaneScope): number => {
-  const parsed = Number(safeLocalStorageGet(LOCAL_INDEX_STORAGE_KEYS[scope]));
-  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 0;
+/**
+ * The old pointer value: JSON `{ index, ... }` from later versions, or the
+ * plain `"<scope>-N"` the first ones wrote. Anything else reads as no pointer.
+ */
+export const legacyPointerIndex = (
+  value: string | null,
+  scope: LegacyLaneScope,
+): number | null => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  const plain = new RegExp(`^${scope}-(\\d+)$`).exec(trimmed);
+  if (plain) return Number(plain[1]);
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    const index = Reflect.get(Object(JSON.parse(trimmed)), "index");
+    return typeof index === "number" && Number.isInteger(index) && index >= 0
+      ? index
+      : null;
+  } catch {
+    return null;
+  }
 };
 
-/** The active lane index per scope: the synced `ownerMeta` pointer or the local mirror, whichever is ahead. */
+/** The active lane index per scope as the synced `ownerMeta` pointers say; 0 without one. */
 export const readLegacyLaneIndexes = (
   ownerMetaRows: ReadonlyArray<OwnerMetaRow>,
   metaOwnerId: string,
@@ -133,8 +159,8 @@ export const readLegacyLaneIndexes = (
           row.scope === scope &&
           row.isDeleted !== 1,
       )
-      .map((row) => decodeRotationSnapshot(row.value, scope)?.index ?? 0);
-    indexes[scope] = Math.max(0, ...synced, localIndex(scope));
+      .map((row) => legacyPointerIndex(row.value, scope) ?? 0);
+    indexes[scope] = Math.max(0, ...synced);
   }
   return indexes;
 };
@@ -513,18 +539,17 @@ export const runLaneToShardMigration = ({
             ],
       );
 
-      const dismissedTutorial = visibleRows(
-        snapshot.ownerMeta,
-        legacyOwnerIds,
-      ).find(
+      const ownerMeta = visibleRows(snapshot.ownerMeta, legacyOwnerIds);
+      const dismissedTutorial = ownerMeta.find(
         (row) =>
           row.scope === ONBOARDING_TUTORIAL_SETTING_KEY &&
           row.value === ONBOARDING_TUTORIAL_DISMISSED,
       );
-      yield* ingest(
-        "meta",
-        "setting",
-        dismissedTutorial === undefined
+      const defaultMint = ownerMeta.find(
+        (row) => row.scope === DEFAULT_MINT_SETTING_KEY && row.value !== null,
+      );
+      yield* ingest("meta", "setting", [
+        ...(dismissedTutorial === undefined
           ? []
           : [
               toShardRow("setting", {
@@ -533,8 +558,17 @@ export const runLaneToShardMigration = ({
                 key: ONBOARDING_TUTORIAL_SETTING_KEY,
                 value: ONBOARDING_TUTORIAL_DISMISSED,
               }),
-            ],
-      );
+            ]),
+        ...(defaultMint === undefined
+          ? []
+          : [
+              toShardRow("setting", {
+                ...defaultMint,
+                id: settingIdFor(DEFAULT_MINT_SETTING_KEY),
+                key: DEFAULT_MINT_SETTING_KEY,
+              }),
+            ]),
+      ]);
 
       const pointers = yield* store.rows("meta", "shardPointer");
       let pointersWritten = 0;

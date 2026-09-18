@@ -20,6 +20,7 @@ const messages = await Effect.runPromise(conversations.messagesIn(chat.id));
 | `ensureDirect(contactId)`              | The contact's direct chat, created on first use with `directConversationIdFor(contactId)`.       |
 | `forContact(contactId)`                | The direct chat or `null`.                                                                       |
 | `messagesIn(id)` / `reactionsIn(id)`   | Rows of one conversation, unsorted.                                                              |
+| `removedReactions`                     | Tombstoned reaction copies in the visible shards, so a removed reaction's wrap id stays known.   |
 | `markSeen(id, atSec)`                  | Moves `lastSeenAtSec` forward; a lower value is ignored.                                         |
 | `setPeerSeen(id, { sinceSec, atSec })` | The peer's seen window from their latest read receipt.                                           |
 | `archive(id, atSec)` / `unarchive(id)` | Archive is a chat action, so it lives here and not on the contact.                               |

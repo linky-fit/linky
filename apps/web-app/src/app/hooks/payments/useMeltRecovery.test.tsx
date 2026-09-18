@@ -1,4 +1,4 @@
-import { OwnerId } from "@evolu/common";
+import { OwnerId } from "@linky/linksync";
 import {
   Amount,
   MeltReceipt,

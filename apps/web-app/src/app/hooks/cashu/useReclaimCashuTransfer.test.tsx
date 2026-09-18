@@ -1,4 +1,4 @@
-import { createIdFromString } from "@evolu/common";
+import { createIdFromString } from "@linky/linksync";
 import { NonNegativeAmount, ProofId, ReclaimReport } from "@linky/linkshu";
 import { act, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";

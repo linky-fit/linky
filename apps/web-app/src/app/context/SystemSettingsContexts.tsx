@@ -1,8 +1,9 @@
 import type { MintIcon } from "../../utils/mint";
 /* eslint-disable react-refresh/only-export-components */
-import type { EvoluError, OwnerId, SyncOwner } from "@evolu/common";
+import type { LinkyScope } from "@linky/linksync";
 import React from "react";
-import type { EvoluServerStatus } from "../../evolu";
+import type { EvoluErrorType, EvoluServerStatus } from "../../evolu";
+import type { ShardSummary } from "../hooks/useLinksync";
 import type { PasswordManagerSaveResult } from "../../platform/passwordManager";
 import type { ProbeLightningFee } from "../hooks/composition/useLinkshuComposition";
 import type { LocalMintInfoRow } from "../types/appTypes";
@@ -35,49 +36,36 @@ export interface AdvancedSettingsContextValue {
 
 export interface EvoluSettingsContextValue {
   clearDatabaseArmed: boolean;
-  evoluCashuOwnerIndex: number;
-  evoluCashuVisibleOwnerIds: readonly OwnerId[];
-  evoluContactsOwnerIndex: number;
-  evoluContactsVisibleOwnerIds: readonly OwnerId[];
   evoluDatabaseBytes: number | null;
   evoluHasError: boolean;
-  evoluErrorType: EvoluError["type"] | null;
-  evoluHistoryAllowedOwnerIds: readonly string[];
+  evoluErrorType: EvoluErrorType | null;
   evoluHistoryCount: number | null;
-  evoluMessagesOwnerEditsUntilRotation: number;
-  evoluMessagesOwnerId: OwnerId | null;
-  evoluMessagesOwnerIndex: number;
-  evoluMessagesVisibleOwnerIds: readonly OwnerId[];
   evoluServerStatusByUrl: Record<string, EvoluServerStatus>;
   evoluServerUrls: string[];
   evoluServersReloadRequired: boolean;
+  /** Every scope's active shard and visible shard set. */
+  evoluShards: ReadonlyArray<ShardSummary>;
+  /** The owner ids the store syncs: the app owner and every visible shard. */
+  evoluSyncOwnerIds: ReadonlyArray<string>;
   evoluTableCounts: Record<string, number | null>;
-  evoluTransactionsOwnerIndex: number;
-  evoluTransactionsVisibleOwnerIds: readonly OwnerId[];
   evoluWipeStorageIsBusy: boolean;
   isEvoluServerOffline: (url: string) => boolean;
   newEvoluServerUrl: string;
   pendingEvoluServerDeleteUrl: string | null;
   requestClearDatabase: () => void;
-  requestManualRotateCashuOwner: () => Promise<void>;
-  requestManualRotateContactsOwner: () => Promise<void>;
-  requestManualRotateMessagesOwner: () => Promise<void>;
-  requestManualRotateTransactionsOwner: () => Promise<void>;
-  rotateCashuOwnerIsBusy: boolean;
-  rotateContactsOwnerIsBusy: boolean;
-  rotateMessagesOwnerIsBusy: boolean;
-  rotateTransactionsOwnerIsBusy: boolean;
+  requestRotateShard: (scope: LinkyScope) => Promise<void>;
+  rotatingShardScope: LinkyScope | null;
   saveEvoluServerUrls: (urls: string[]) => void;
   setEvoluServerOffline: (url: string, offline: boolean) => void;
   setNewEvoluServerUrl: (url: string) => void;
   setPendingEvoluServerDeleteUrl: (url: string | null) => void;
   setStatus: (message: string) => void;
-  syncOwner: SyncOwner | null;
+  syncOwnerId: string | null;
   wipeEvoluStorage: () => Promise<void>;
 }
 
 export interface MintSettingsContextValue {
-  appOwnerIdRef: React.RefObject<OwnerId | null>;
+  appOwnerIdRef: React.RefObject<string | null>;
   applyDefaultMintSelection: (mint: string) => Promise<void>;
   cashuIsBusy: boolean;
   cashuMeltToMainMintButtonLabel: string | null;

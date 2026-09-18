@@ -751,7 +751,7 @@ const bootstrap = async () => {
     console.log("[linky][boot] app modules loaded");
 
     setStage("import-evolu");
-    const { evolu, EvoluProvider } = await import("./evolu.ts");
+    const { evolu } = await import("./evolu.ts");
     console.log("[linky][boot] evolu loaded");
     if (import.meta.env.DEV || import.meta.env.VITE_E2E === "1") {
       const { installLinkyE2eHooks } =
@@ -774,25 +774,23 @@ const bootstrap = async () => {
     flushSync(() => {
       root.render(
         <StrictMode>
-          <EvoluProvider value={evolu}>
-            <ErrorBoundary
-              onError={() => {
-                window.clearTimeout(stuckTimer);
-                signalBootFailure();
-              }}
-            >
-              <BootCommitSignal onCommit={recordAppCommit} />
-              <App />
-            </ErrorBoundary>
-          </EvoluProvider>
+          <ErrorBoundary
+            onError={() => {
+              window.clearTimeout(stuckTimer);
+              signalBootFailure();
+            }}
+          >
+            <BootCommitSignal onCommit={recordAppCommit} />
+            <App />
+          </ErrorBoundary>
         </StrictMode>,
       );
     });
     console.log("[linky][boot] render scheduled");
-    // No root Suspense boundary on purpose: Evolu's useQuery suspends on every
-    // new query (owner-lane rotations included), and a boundary above the app
-    // would swap the mounted tree for a fallback. The probe tells a database
-    // that never answers apart from a render that never commits.
+    // No root Suspense boundary on purpose: the shell suspends on the shard
+    // store until the database answers, and a boundary above the app would
+    // swap the mounted tree for a fallback. The probe tells a database that
+    // never answers apart from a render that never commits.
     const localDataProbe = evolu.createQuery((db) =>
       db.selectFrom("ownerMeta").select("id").limit(1),
     );

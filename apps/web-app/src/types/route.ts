@@ -1,10 +1,5 @@
-import * as Evolu from "@evolu/common";
+import { CashuOperationId, ContactId } from "@linky/linksync";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../utils/constants";
-
-const CashuOperationId = Evolu.id("CashuOperation");
-type CashuOperationId = typeof CashuOperationId.Type;
-const ContactId = Evolu.id("Contact");
-type ContactId = typeof ContactId.Type;
 
 const decodeSegment = (value: string): string | null => {
   try {

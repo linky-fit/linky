@@ -9,7 +9,7 @@ import { decodeBase64Url } from "../utils/base64";
 const BATCH_SIZE = 50;
 
 export function EvoluHistoryDataPage(): React.ReactElement {
-  const { evoluHistoryAllowedOwnerIds } = useEvoluSettingsContext();
+  const { evoluSyncOwnerIds } = useEvoluSettingsContext();
   const { t } = useAppShellCore();
   const [historyData, setHistoryData] = useState<EvoluHistoryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,7 +24,7 @@ export function EvoluHistoryDataPage(): React.ReactElement {
   }, []);
 
   const allowedOwnerIds = useMemo(() => {
-    const values = evoluHistoryAllowedOwnerIds
+    const values = evoluSyncOwnerIds
       .map((ownerId) => ownerId.trim())
       .filter(Boolean);
 
@@ -34,7 +34,7 @@ export function EvoluHistoryDataPage(): React.ReactElement {
       out.add(normalizeOwnerId(value));
     }
     return out;
-  }, [evoluHistoryAllowedOwnerIds, normalizeOwnerId]);
+  }, [evoluSyncOwnerIds, normalizeOwnerId]);
 
   const readRowOwnerId = useCallback(
     (row: EvoluHistoryRow): string => {

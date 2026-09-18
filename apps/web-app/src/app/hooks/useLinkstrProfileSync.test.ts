@@ -4,8 +4,7 @@ import {
   ProfileUpdated,
   UnixSeconds,
 } from "@linky/linkstr";
-import { createIdFromString } from "@evolu/common";
-import type { ContactsRepository } from "@linky/linksync";
+import { createIdFromString, type ContactsRepository } from "@linky/linksync";
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveCachedProfile } from "../../profileCache";

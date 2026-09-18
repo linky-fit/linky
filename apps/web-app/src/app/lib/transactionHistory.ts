@@ -1,11 +1,11 @@
 import type {
+  MessageRow,
   TransactionCategory,
   TransactionDirection,
   TransactionRecord,
   TransactionStatus,
 } from "@linky/linksync";
 import { Option, Schema } from "effect";
-import type { NostrMessageRow } from "../../evolu";
 import { JsonValue } from "../../types/json";
 import { isRecord } from "../../utils/unknown";
 import { asNonEmptyString } from "../../utils/validation";
@@ -251,7 +251,7 @@ export const buildTransactionHistory = (
 
 export const deriveDeclinedRequestIds = (
   nostrMessageRows: readonly Pick<
-    NostrMessageRow,
+    MessageRow,
     "content" | "rumorId" | "createdAtSec"
   >[],
 ): Set<string> => {

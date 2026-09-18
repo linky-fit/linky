@@ -1,4 +1,4 @@
-import { sqliteTrue } from "@evolu/common";
+import { sqliteTrue } from "@linky/linksync";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { navigateTo } from "../hooks/useRouting";

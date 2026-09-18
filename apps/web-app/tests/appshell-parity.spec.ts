@@ -415,10 +415,13 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(page).toHaveURL(/#evolu-current-data$/);
     await expect(title).toHaveText("Daten");
     await expect(
-      page.getByText("Eigentümerindex", { exact: true }).first(),
+      page.getByText("Aktiver Shard", { exact: true }).first(),
     ).toBeVisible();
     await expect(
-      page.getByText("Änderungen bis zum Wechsel", { exact: true }).first(),
+      page.getByRole("button", {
+        name: "Shard messages rotieren",
+        exact: true,
+      }),
     ).toBeVisible();
     await close.click();
     await expect(page).toHaveURL(/#evolu-servers$/);

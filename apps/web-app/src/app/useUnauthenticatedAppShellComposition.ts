@@ -1,13 +1,11 @@
 import type { ProfileMetadata } from "@linky/linkstr";
 import React from "react";
-import { useEvolu } from "../evolu";
 import { useToasts } from "../hooks/useToasts";
 import type { IdentityChangeMessageSource } from "./lib/identityChangeMessage";
 import { useAppLanguage } from "./hooks/useAppLanguage";
 import { useProfileAuthDomain } from "./hooks/useProfileAuthDomain";
 
 export const useUnauthenticatedAppShellComposition = () => {
-  const { upsert } = useEvolu();
   const { dismissToast, pushToast, toasts } = useToasts();
   const { lang, setLang, t } = useAppLanguage();
   const appendIdentityChangeNoticesRef = React.useRef<
@@ -21,11 +19,11 @@ export const useUnauthenticatedAppShellComposition = () => {
   const onboarding = useProfileAuthDomain({
     appendIdentityChangeNoticesRef,
     currentNsec: null,
+    identityRepository: null,
     lang,
     myProfileMetadataRef,
     pushToast,
     t,
-    upsert,
   });
 
   return {

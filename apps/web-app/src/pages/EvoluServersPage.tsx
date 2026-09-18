@@ -14,11 +14,13 @@ export function EvoluServersPage(): React.ReactElement {
     evoluHistoryCount,
     evoluServerStatusByUrl,
     evoluServerUrls,
+    evoluShards,
+    evoluSyncOwnerIds,
     evoluTableCounts,
     evoluWipeStorageIsBusy,
     isEvoluServerOffline,
     requestClearDatabase,
-    syncOwner,
+    syncOwnerId,
   } = useEvoluSettingsContext();
   const { t } = useAppShellCore();
 
@@ -42,7 +44,7 @@ export function EvoluServersPage(): React.ReactElement {
               evoluHasError,
               isOffline: isEvoluServerOffline(url),
               state: evoluServerStatusByUrl[url],
-              syncOwner,
+              syncOwnerId,
             });
 
             return (
@@ -95,6 +97,31 @@ export function EvoluServersPage(): React.ReactElement {
         >
           {t("evoluClearDatabase")}
         </button>
+      </div>
+
+      <h3 className="evolu-data-heading">{t("evoluShards")}</h3>
+
+      {evoluShards.map((shard) => (
+        <div key={shard.scope} className="settings-row">
+          <div className="settings-left">
+            <span className="settings-label">{shard.scope}</span>
+          </div>
+          <div className="settings-right">
+            <span className="muted">
+              {shard.index} ({shard.visibleOwnerIds.length}{" "}
+              {t("evoluShardVisibleCount").toLowerCase()})
+            </span>
+          </div>
+        </div>
+      ))}
+
+      <div className="settings-row">
+        <div className="settings-left">
+          <span className="settings-label">{t("evoluSyncedOwners")}</span>
+        </div>
+        <div className="settings-right">
+          <span className="muted">{evoluSyncOwnerIds.length}</span>
+        </div>
       </div>
 
       <h3 className="evolu-data-heading">{t("evoluRowCounts")}</h3>

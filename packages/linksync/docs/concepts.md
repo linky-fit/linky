@@ -76,5 +76,6 @@ The app's `laneToShardMigration.ts` copies the old owner lanes into the shards w
 - Transaction `category` is dropped. A legacy row with a category but no method gets the method the category implies: `contacts` becomes `cashu_chat`, `lightning` becomes `lightning_invoice` (the original lightning flow, before addresses). Any other row reads as `cashu` through `deriveTransactionCategory`.
 - Identity rows had one id per lane; the newest row is written as `activeNostrIdentityId`.
 - One `conversation` row per contact that has chat columns (`archivedAtSec`, `chatLastSeenAtSec`, `chatPeerSeenSinceSec`, `chatPeerSeenAtSec`) or messages, with `directConversationIdFor(contact.id)`; every message's `contactId` becomes that conversation id, and a reaction takes the conversation of the message its `messageId` names (a reaction without a known message is skipped).
+- The `ownerMeta` rows `onboardingTutorial` and `defaultMint` become settings under the same keys.
 - Shard pointers start at index 0 for every rotating scope.
 - The grace period for older app versions, its cutoff setting, and the removal gate are recorded in `docs/architecture.md` at the repo root.

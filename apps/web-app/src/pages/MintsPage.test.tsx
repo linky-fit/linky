@@ -1,4 +1,3 @@
-import type { OwnerId } from "@evolu/common";
 import { LightningFeeProbeResult } from "@linky/linkshu";
 import { Either, Schema } from "effect";
 import React, { act } from "react";
@@ -32,7 +31,7 @@ const probeLightningFee = vi.fn<ProbeLightningFee>(
     ),
 );
 
-const appOwnerIdRef = React.createRef<OwnerId>();
+const appOwnerIdRef = React.createRef<string>();
 
 const createMintSettings = (
   overrides: Partial<MintSettingsContextValue> = {},

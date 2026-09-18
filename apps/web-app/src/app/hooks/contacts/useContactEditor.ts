@@ -1,5 +1,5 @@
+import { NonEmptyString1000, SqliteBoolean, sqliteTrue } from "@linky/linksync";
 import { toContactTextFields } from "../../lib/contactFields";
-import * as Evolu from "@evolu/common";
 import {
   decodeNpub,
   encodeNpub,
@@ -94,12 +94,12 @@ type SelectedContactRow = ContactRowLike & { id: ContactId };
 
 type ContactFieldsPatch = {
   id: ContactId;
-  lnAddressSetByUser?: typeof Evolu.SqliteBoolean.Type | null;
-  nameSetByUser?: typeof Evolu.SqliteBoolean.Type | null;
+  lnAddressSetByUser?: typeof SqliteBoolean.Type | null;
+  nameSetByUser?: typeof SqliteBoolean.Type | null;
 } & Partial<
   Record<
     "groupName" | "groupNamesJson" | "lnAddress" | "name" | "npub",
-    typeof Evolu.NonEmptyString1000.Type | null
+    typeof NonEmptyString1000.Type | null
   >
 >;
 
@@ -431,23 +431,23 @@ export const useContactEditor = ({
         ? resolveContactProfile(selectedContact, cachedMetadata)
         : getContactPublicProfile(npub, cachedMetadata);
     const parsePublicText = (value: string) => {
-      const parsed = value ? Evolu.NonEmptyString1000.fromUnknown(value) : null;
+      const parsed = value ? NonEmptyString1000.fromUnknown(value) : null;
       return parsed?.ok ? parsed.value : null;
     };
 
     const createPayload: Partial<{
-      groupName: typeof Evolu.NonEmptyString1000.Type;
-      groupNamesJson: typeof Evolu.NonEmptyString1000.Type;
-      lnAddress: typeof Evolu.NonEmptyString1000.Type;
-      lnAddressSetByUser: typeof Evolu.SqliteBoolean.Type;
-      name: typeof Evolu.NonEmptyString1000.Type;
-      nameSetByUser: typeof Evolu.SqliteBoolean.Type;
-      npub: typeof Evolu.NonEmptyString1000.Type;
+      groupName: typeof NonEmptyString1000.Type;
+      groupNamesJson: typeof NonEmptyString1000.Type;
+      lnAddress: typeof NonEmptyString1000.Type;
+      lnAddressSetByUser: typeof SqliteBoolean.Type;
+      name: typeof NonEmptyString1000.Type;
+      nameSetByUser: typeof SqliteBoolean.Type;
+      npub: typeof NonEmptyString1000.Type;
     }> = {};
     if (payload.name) {
       createPayload.name = payload.name;
       if (name !== publicProfile.name) {
-        createPayload.nameSetByUser = Evolu.sqliteTrue;
+        createPayload.nameSetByUser = sqliteTrue;
       }
     } else {
       const publicName = parsePublicText(publicProfile.name);
@@ -457,7 +457,7 @@ export const useContactEditor = ({
     if (payload.lnAddress) {
       createPayload.lnAddress = payload.lnAddress;
       if (lnAddress.toLowerCase() !== publicProfile.lnAddress.toLowerCase()) {
-        createPayload.lnAddressSetByUser = Evolu.sqliteTrue;
+        createPayload.lnAddressSetByUser = sqliteTrue;
       }
     } else {
       const publicLnAddress = parsePublicText(publicProfile.lnAddress);
@@ -521,7 +521,7 @@ export const useContactEditor = ({
       // value (the row is the display source) and clear the flag.
       if (changedFields.name !== undefined) {
         const isNameOverride = Boolean(name) && name !== publicProfile.name;
-        changedFields.nameSetByUser = isNameOverride ? Evolu.sqliteTrue : null;
+        changedFields.nameSetByUser = isNameOverride ? sqliteTrue : null;
         if (!isNameOverride) {
           changedFields.name = parsePublicText(publicProfile.name);
         }
@@ -532,7 +532,7 @@ export const useContactEditor = ({
           Boolean(lnAddress) &&
           lnAddress.toLowerCase() !== publicProfile.lnAddress.toLowerCase();
         changedFields.lnAddressSetByUser = isLnAddressOverride
-          ? Evolu.sqliteTrue
+          ? sqliteTrue
           : null;
         if (!isLnAddressOverride) {
           changedFields.lnAddress = parsePublicText(publicProfile.lnAddress);
@@ -814,7 +814,7 @@ export const useContactEditor = ({
         return;
       }
 
-      const parsedNpub = Evolu.NonEmptyString1000.from(npub);
+      const parsedNpub = NonEmptyString1000.from(npub);
       if (!parsedNpub.ok) {
         setStatus(t("contactIdentifierInvalid"));
         return;
@@ -822,15 +822,15 @@ export const useContactEditor = ({
       const name = candidate.name.trim();
       const lnAddress = candidate.lnAddress.trim();
       const createPayload: Partial<{
-        lnAddress: typeof Evolu.NonEmptyString1000.Type;
-        name: typeof Evolu.NonEmptyString1000.Type;
-        npub: typeof Evolu.NonEmptyString1000.Type;
+        lnAddress: typeof NonEmptyString1000.Type;
+        name: typeof NonEmptyString1000.Type;
+        npub: typeof NonEmptyString1000.Type;
       }> = {
         npub: parsedNpub.value,
       };
-      const parsedName = Evolu.NonEmptyString1000.from(name);
+      const parsedName = NonEmptyString1000.from(name);
       if (parsedName.ok) createPayload.name = parsedName.value;
-      const parsedLnAddress = Evolu.NonEmptyString1000.from(lnAddress);
+      const parsedLnAddress = NonEmptyString1000.from(lnAddress);
       if (parsedLnAddress.ok) createPayload.lnAddress = parsedLnAddress.value;
 
       setIsSavingContact(true);
@@ -921,7 +921,7 @@ export const useContactEditor = ({
       if (field === "name") {
         const bestName = metadata ? getBestNostrName(metadata) : null;
         const parsedName = bestName
-          ? Evolu.NonEmptyString1000.fromUnknown(bestName)
+          ? NonEmptyString1000.fromUnknown(bestName)
           : null;
         void updateContactFields({
           id: editingId,
@@ -930,7 +930,7 @@ export const useContactEditor = ({
         });
       } else {
         const ln = getContactPublicProfile(npub, metadata).lnAddress;
-        const parsedLn = ln ? Evolu.NonEmptyString1000.fromUnknown(ln) : null;
+        const parsedLn = ln ? NonEmptyString1000.fromUnknown(ln) : null;
         void updateContactFields({
           id: editingId,
           lnAddress: parsedLn?.ok ? parsedLn.value : null,

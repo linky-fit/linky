@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { OwnerId } from "@linky/linksync";
 import { Effect } from "effect";
 import React, { act } from "react";
 import type { Root } from "react-dom/client";
@@ -24,7 +24,7 @@ type TransactionInsert = Parameters<
 >[0]["transactions"]["insert"];
 
 interface HookHarnessProps {
-  appOwnerId: Evolu.OwnerId;
+  appOwnerId: OwnerId;
   insert: TransactionInsert;
   onRender: (storage: OwnerScopedStorage) => void;
 }
@@ -34,15 +34,15 @@ const HookHarness = ({
   insert,
   onRender,
 }: HookHarnessProps): React.ReactElement | null => {
-  const appOwnerIdRef = React.useRef<Evolu.OwnerId | null>(appOwnerId);
+  const appOwnerIdRef = React.useRef<OwnerId | null>(appOwnerId);
   onRender(useOwnerScopedStorage({ appOwnerIdRef, transactions: { insert } }));
   return null;
 };
 
 const mountedRoots = new Set<Root>();
 
-const parseOwnerId = (value: string): Evolu.OwnerId => {
-  const result = Evolu.OwnerId.fromUnknown(value);
+const parseOwnerId = (value: string): OwnerId => {
+  const result = OwnerId.fromUnknown(value);
   if (!result.ok) {
     throw new Error(`Invalid test owner ID: ${value}`);
   }
@@ -50,7 +50,7 @@ const parseOwnerId = (value: string): Evolu.OwnerId => {
 };
 
 const renderStorageHook = async (
-  appOwnerId: Evolu.OwnerId,
+  appOwnerId: OwnerId,
   insert: TransactionInsert,
 ): Promise<OwnerScopedStorage> => {
   const resultRef: { current: OwnerScopedStorage | null } = { current: null };

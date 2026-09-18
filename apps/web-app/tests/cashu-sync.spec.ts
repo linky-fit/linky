@@ -106,7 +106,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
       ]) {
         await source.page.goto("/#evolu-current-data");
         await source.page
-          .getByRole("button", { name: "Rotate tokens owner", exact: true })
+          .getByRole("button", { name: "Rotate cashu shard", exact: true })
           .click();
         for (const device of devices) {
           await expect
@@ -168,8 +168,8 @@ test("a stale legacy Cashu lane index in storage leaves the shards at index zero
   const errors = watchAppErrors(page, "stale lane");
   await setBaseStorage(page);
   await setSeedLoginStorage(page, identity);
-  // The lane migration derives lanes 0..7 from the mirror, finds nothing
-  // there, and the wallet starts on shard 0 regardless.
+  // An older version's lane mirror means nothing to the shards: the wallet
+  // starts on shard 0 regardless.
   await page.addInitScript(() => {
     localStorage.setItem("linky.evolu.cashu_owner_index.v1", "7");
   });

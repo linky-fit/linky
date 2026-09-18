@@ -20,11 +20,11 @@ interface UseEvoluNostrBootstrapReadyParams {
 }
 
 /**
- * Holds passive Nostr network work until Evolu's owner-based bootstrap has had
- * time to hydrate the local queries. Evolu's current owner API does not expose
- * an initial-sync-complete signal, so readiness is a bounded quiet-window
- * barrier: all owners must be known, relevant queries must stop changing, and
- * an observed identity migration must finish before Nostr is released.
+ * Holds passive Nostr network work until the shard store's initial sync has
+ * had time to hydrate the local reads. Evolu does not expose an
+ * initial-sync-complete signal, so readiness is a bounded quiet-window
+ * barrier: the app owner must be known, relevant reads must stop changing,
+ * and the synced identity must be settled before Nostr is released.
  */
 export const useEvoluNostrBootstrapReady = ({
   contactsSnapshot,

@@ -82,6 +82,29 @@ describe("conversations repository", () => {
     expect(runNow(conversations.reactionsIn(b.id))).toHaveLength(0);
   });
 
+  it("keeps a removed reaction's tombstone readable", () => {
+    const { store } = linkyStore();
+    const conversations = makeConversationsRepository(store);
+    const chat = runNow(conversations.ensureDirect(createId<"Contact">()));
+    const id = createId<"Reaction">();
+    runNow(
+      conversations.reactions.insert({
+        id,
+        conversationId: chat.id,
+        messageId: NonEmptyString1000.orThrow("rumor"),
+        reactorPubkey: NonEmptyString1000.orThrow("pk"),
+        emoji: NonEmptyString100.orThrow("👍"),
+        createdAtSec: sec(2),
+        wrapId: NonEmptyString1000.orThrow("wrap-removed"),
+      }),
+    );
+    runNow(conversations.reactions.remove(id));
+    expect(runNow(conversations.reactions.all)).toHaveLength(0);
+    expect(runNow(conversations.removedReactions).map((r) => r.wrapId)).toEqual(
+      ["wrap-removed"],
+    );
+  });
+
   it("takes an old conversation forward when its cursor moves after a rotation", () => {
     const { db, store } = linkyStore();
     const conversations = makeConversationsRepository(store);

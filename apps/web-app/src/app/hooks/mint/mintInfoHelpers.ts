@@ -1,7 +1,7 @@
+import { sqliteTrue } from "@linky/linksync";
 import { Option, Schema } from "effect";
 import { JsonValue } from "../../../types/json";
 import { findMintInfoIconValue } from "@linky/linkshu";
-import * as Evolu from "@evolu/common";
 import type { StoredProof } from "@linky/linkshu";
 import {
   extractPpk,
@@ -23,7 +23,7 @@ interface MintInfoRowLike {
 }
 
 export const isMintDeletedRow = (row: MintInfoRowLike): boolean =>
-  row.isDeleted === Evolu.sqliteTrue || row.isDeleted === "1";
+  row.isDeleted === sqliteTrue || row.isDeleted === "1";
 
 const getLastSeenAtSec = (row: MintInfoRowLike): number =>
   (row.lastSeenAtSec ?? 0) || 0;
@@ -326,7 +326,7 @@ export const dedupeMintInfoRows = (
 
     for (const row of rows) {
       if (row.id === best.id) continue;
-      applyPatch({ id: row.id, isDeleted: Evolu.sqliteTrue });
+      applyPatch({ id: row.id, isDeleted: sqliteTrue });
     }
   }
 

@@ -1,9 +1,9 @@
-import * as Evolu from "@evolu/common";
+import { NonEmptyString1000 } from "@linky/linksync";
 
 export const toEvoluText = (
   value: string | null | undefined,
-): Evolu.NonEmptyString1000 | null => {
-  const parsed = Evolu.NonEmptyString1000.fromUnknown((value ?? "").trim());
+): NonEmptyString1000 | null => {
+  const parsed = NonEmptyString1000.fromUnknown((value ?? "").trim());
   return parsed.ok ? parsed.value : null;
 };
 

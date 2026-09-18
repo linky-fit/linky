@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { createIdFromString } from "@linky/linksync";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Route } from "../../types/route";
 import { setLinkyBankPaymentOfferMinimized } from "./bankPaymentOffer";
@@ -16,8 +16,8 @@ const assignMock = vi.fn();
 
 vi.stubGlobal("location", { assign: assignMock, hash: "" });
 
-const contactId = Evolu.createIdFromString<"Contact">("contact-1");
-const tokenId = Evolu.createIdFromString<"CashuOperation">("token-1");
+const contactId = createIdFromString<"Contact">("contact-1");
+const tokenId = createIdFromString<"CashuOperation">("token-1");
 
 const closeContactDetail = vi.fn();
 const navigateToMainReturn = vi.fn();

@@ -15,15 +15,14 @@ import {
   type ShardRotation,
 } from "@linky/linksync";
 import { createEvoluShardDb } from "@linky/linksync/evolu";
-import { createUseEvolu, EvoluProvider } from "@evolu/react";
 import { evoluReactWebDeps } from "@evolu/react-web";
+import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "./mnemonic";
 import { shouldUseInMemoryEvoluStorage } from "./platform/evoluWebStorage";
 import type { JsonValue } from "./types/json";
 import { base64 } from "@scure/base";
-import { decodeBase64Url } from "./utils/base64";
 import {
   safeLocalStorageGet,
   safeLocalStorageGetJson,
@@ -52,6 +51,7 @@ const EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY =
 const EVOLU_SERVERS_DISABLED_STORAGE_KEY = "linky.evoluServers.disabled.v1";
 
 export type EvoluServerStatus = "checking" | "connected" | "disconnected";
+export type EvoluErrorType = Evolu.EvoluError["type"];
 
 type EvoluDatabaseInfo = {
   bytes: number | null;
@@ -422,11 +422,11 @@ const OwnerMetaId = Evolu.id("OwnerMeta");
 type OwnerMetaId = typeof OwnerMetaId.Type;
 
 /**
- * The app schema is a superset of the package's `LinkySchema` while the
- * scopes cut over to shards one at a time: the package tables plus the legacy
- * lane tables (`nostrMessage`, `nostrReaction`, `cashuToken`, `ownerMeta`) and
- * the legacy columns the lane code still writes (chat state on `contact`,
- * `category` and `phase` on `transaction`). The package's branded ids are the
+ * The app schema is a superset of the package's `LinkySchema`: the package
+ * tables plus the legacy lane tables (`nostrMessage`, `nostrReaction`,
+ * `cashuToken`, `ownerMeta`) and the legacy columns older versions wrote
+ * (chat state on `contact`, `category` and `phase` on `transaction`), all of
+ * which only the lane migration reads. The package's branded ids are the
  * source of truth; only the legacy tables keep ids of their own.
  */
 export const Schema = {
@@ -582,12 +582,32 @@ const reportShardRotated = (
   ]);
 };
 
+const reportShardsSubscribed = async (
+  store: LinkyStore,
+  reason: "boot" | "rotation",
+): Promise<void> => {
+  if (!getInspectorEmissionEnabled()) return;
+  const owners = (await Effect.runPromise(store.syncOwners())).map(
+    (owner) => owner.id,
+  );
+  reportInspectorRows([
+    {
+      at: Date.now(),
+      channel: "evolu.sync",
+      tag: "ShardsSubscribed",
+      summary: `Syncing the app owner and ${owners.length - 1} shards`,
+      links: { owner: owners },
+      payload: { reason, owners: owners.length },
+    },
+  ]);
+};
+
 /**
  * The shard store over this Evolu instance. Resolves once the app owner is
  * known and the local database has answered a query; `appOwner` alone
- * resolves before the database worker is up. The store follows its pointers
- * for the page's lifetime, so a rotation on another device subscribes the
- * new shard here.
+ * resolves before the database worker is up. The store subscribes the app
+ * owner and every visible shard for the page's lifetime and follows its
+ * pointers, so a rotation here or on another device subscribes the new shard.
  */
 export const getLinkyStore = (): Promise<LinkyStore> => {
   linkyStorePromise ??= Promise.all([
@@ -597,9 +617,14 @@ export const getLinkyStore = (): Promise<LinkyStore> => {
         db.selectFrom("shardPointer").select("id").limit(1),
       ),
     ),
-  ]).then(([owner]) => {
+  ]).then(async ([owner]) => {
     const store = createLinkyStore(createEvoluShardDb(evolu), owner);
-    store.followPointers((rotation) => reportShardRotated(store, rotation));
+    await Effect.runPromise(store.reconcileSync());
+    void reportShardsSubscribed(store, "boot");
+    store.followPointers((rotation) => {
+      reportShardRotated(store, rotation);
+      void reportShardsSubscribed(store, "rotation");
+    });
     return store;
   });
   return linkyStorePromise;
@@ -656,32 +681,6 @@ export type OwnerMetaRow = Evolu.InferRow<
 export type NostrIdentityRow = Evolu.InferRow<
   ReturnType<typeof createNostrIdentitiesAllQuery>
 >;
-
-export const useEvoluSyncOwner = (enabled: boolean): Evolu.SyncOwner | null => {
-  const [syncOwner, setSyncOwner] = useState<Evolu.SyncOwner | null>(null);
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    let cancelled = false;
-    void getEvolu()
-      .appOwner.then((owner) => {
-        if (cancelled) return;
-        setSyncOwner(owner);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setSyncOwner(null);
-      });
-
-    return () => {
-      cancelled = true;
-      setSyncOwner(null);
-    };
-  }, [enabled]);
-
-  return enabled ? syncOwner : null;
-};
 
 export const useEvoluLastError = (opts?: {
   logToConsole?: boolean;
@@ -873,64 +872,6 @@ export interface EvoluHistoryRow {
   timestamp: string;
   [key: string]: JsonValue;
 }
-
-interface EvoluHistoryMutationCountRequest {
-  key: string;
-  ownerId: string;
-  rotatedAtMs: number;
-  tables: readonly string[];
-}
-
-const timestampAfterMs = (timestampMs: number): Uint8Array => {
-  const bytes = new Uint8Array(16);
-  let value = Math.max(0, Math.trunc(timestampMs) + 1);
-  for (let index = 5; index >= 0; index -= 1) {
-    bytes[index] = value % 256;
-    value = Math.floor(value / 256);
-  }
-  return bytes;
-};
-
-export const loadEvoluHistoryMutationCounts = async (
-  requests: readonly EvoluHistoryMutationCountRequest[],
-): Promise<Readonly<Record<string, number>>> => {
-  const instance = getEvolu();
-  const counts: Record<string, number> = {};
-
-  await Promise.all(
-    requests.map(async (request) => {
-      const ownerId = decodeBase64Url(request.ownerId);
-      const tables = request.tables
-        .map((table) => table.trim())
-        .filter(Boolean);
-      if (!ownerId?.length || tables.length === 0) {
-        counts[request.key] = 0;
-        return;
-      }
-
-      try {
-        const q = createUntypedQuery(instance, (db) =>
-          db
-            .selectFrom("evolu_history")
-            .select((eb) => eb.fn.count("timestamp").distinct().as("count"))
-            .where("ownerId", "=", ownerId)
-            .where("table", "in", tables)
-            .where("timestamp", ">=", timestampAfterMs(request.rotatedAtMs))
-            .groupBy(["table", "id"]),
-        );
-        const rows = await loadUntypedQueryRows(instance, q);
-        counts[request.key] = rows.reduce(
-          (total, row) => total + Number(row.count ?? 0),
-          0,
-        );
-      } catch {
-        counts[request.key] = 0;
-      }
-    }),
-  );
-
-  return counts;
-};
 
 export const subscribeEvoluHistoryMutationVersion = (
   listener: () => void,
@@ -1244,7 +1185,3 @@ export const useEvoluServersManager = (opts?: {
     setServerOffline,
   } as const;
 };
-
-export { EvoluProvider };
-
-export const useEvolu = createUseEvolu(getEvolu());

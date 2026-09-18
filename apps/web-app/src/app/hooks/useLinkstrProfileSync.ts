@@ -1,4 +1,4 @@
-import * as Evolu from "@evolu/common";
+import { NonEmptyString1000, SqliteBoolean, sqliteTrue } from "@linky/linksync";
 import type {
   ProfileFetchEntry,
   ProfileFetchResult,
@@ -142,8 +142,8 @@ const syncContactsFromProfile = (
     if (normalizeNpubIdentifier(contact.npub ?? "") !== npub) continue;
 
     const patch: Partial<{
-      lnAddress: typeof Evolu.NonEmptyString1000.Type | null;
-      name: typeof Evolu.NonEmptyString1000.Type | null;
+      lnAddress: typeof NonEmptyString1000.Type | null;
+      name: typeof NonEmptyString1000.Type | null;
     }> = {};
 
     // Non-overridden fields follow the profile. A value the profile never
@@ -153,23 +153,23 @@ const syncContactsFromProfile = (
     const currentName = (contact.name ?? "").trim();
     if (!contact.nameSetByUser) {
       if (bestName && bestName !== currentName) {
-        const parsedName = Evolu.NonEmptyString1000.fromUnknown(bestName);
+        const parsedName = NonEmptyString1000.fromUnknown(bestName);
         if (parsedName.ok) patch.name = parsedName.value;
       } else if (!bestName && currentName && currentName === previousBestName) {
         patch.name = null;
       }
     }
 
-    const parsedLnAddressSetByUser = Evolu.SqliteBoolean.fromUnknown(
+    const parsedLnAddressSetByUser = SqliteBoolean.fromUnknown(
       contact.lnAddressSetByUser,
     );
     const hasLocalLnAddress =
       parsedLnAddressSetByUser.ok &&
-      parsedLnAddressSetByUser.value === Evolu.sqliteTrue;
+      parsedLnAddressSetByUser.value === sqliteTrue;
     const currentLn = (contact.lnAddress ?? "").trim().toLowerCase();
     if (!hasLocalLnAddress) {
       if (profileLn && profileLn.toLowerCase() !== currentLn) {
-        const parsedLn = Evolu.NonEmptyString1000.fromUnknown(profileLn);
+        const parsedLn = NonEmptyString1000.fromUnknown(profileLn);
         if (parsedLn.ok) patch.lnAddress = parsedLn.value;
       } else if (!profileLn && currentLn && currentLn === previousProfileLn) {
         patch.lnAddress = null;

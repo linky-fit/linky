@@ -24,8 +24,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "User archived a contact's chat: the conversation row (messages scope) records the archive time and its read cursor moves there; the contact row is untouched. The contact and conversation links identify both rows.",
   "conversations.unarchived":
     "A conversation left the archive, either by the user restoring the contact or because an incoming message newer than the archive time arrived.",
-  "evolu.ownerRotated":
-    "The active write owner moved to the next lane. Previous lanes remain visible for reads; owner links join the rotation to sync diagnostics.",
+  ShardsSubscribed:
+    "The set of owners this device syncs was reconciled: the app owner plus every visible shard of every scope, at boot and after each rotation. Owner links list the whole set; the payload says why and how many.",
   ShardRotated:
     "A scope's shard pointer moved to a new index, rotated on this device (its writes crossed the byte or mutation rule, or the debug page asked) or on another one. The new shard is subscribed for sync; the owner link is its id.",
   LaneMigrationStarted:

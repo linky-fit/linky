@@ -5,7 +5,7 @@ import { TokenTransfer } from "@linky/linkshu";
 import { Schema } from "effect";
 import { act, type ComponentProps } from "react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
-import { id } from "@evolu/common";
+import { CashuOperationId, ContactId } from "@linky/linksync";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ANIMATED_QR_FRAME_MS } from "../utils/animatedQr";
 import { CashuTokenPage } from "./CashuTokenPage";
@@ -61,7 +61,7 @@ const props = (tokenText: string): ComponentProps<typeof CashuTokenPage> => ({
   pendingCashuDeleteId: null,
   requestDeleteCashuToken: vi.fn(),
   returnCashuTokenToWallet: async () => {},
-  routeId: id("CashuOperation").orThrow("AQEBAQEBAQEBAQEBAQEBAQ"),
+  routeId: CashuOperationId.orThrow("AQEBAQEBAQEBAQEBAQEBAQ"),
   shareTokenText: async () => {},
   showPaidOverlay: vi.fn(),
   startSendCashuTokenToContact: async () => {},
@@ -129,7 +129,7 @@ describe("token QR animation toggle", () => {
       );
       const transfer = pageProps.cashuTransfers[0];
       assert(transfer !== undefined);
-      const nextId = id("CashuOperation").orThrow("AgICAgICAgICAgICAgICAg");
+      const nextId = CashuOperationId.orThrow("AgICAgICAgICAgICAgICAg");
       await rendered.rerender(
         <CashuTokenPage
           {...pageProps}
@@ -367,7 +367,7 @@ it("shows chat handoff and the return action on a delivered token's detail", asy
     ...baseProps.cashuTransfers[0],
     status: "done",
   });
-  const contactId = id("Contact").orThrow("AgICAgICAgICAgICAgICAg");
+  const contactId = ContactId.orThrow("AgICAgICAgICAgICAgICAg");
   const messages: LocalNostrMessage[] = [
     {
       id: "chat-message",
@@ -447,7 +447,7 @@ it("shows a reclaimed token label after return and preserves known chat provenan
     expect(container.textContent).toContain("cashuHandoffReclaimed");
     expect(container.textContent).toContain("cashuTransferReturned");
     expect(container.textContent).not.toContain("cashuHandoffUnknown");
-    const contactId = id("Contact").orThrow("AgICAgICAgICAgICAgICAg");
+    const contactId = ContactId.orThrow("AgICAgICAgICAgICAgICAg");
     await rerender(
       <CashuTokenPage
         {...returnedProps}

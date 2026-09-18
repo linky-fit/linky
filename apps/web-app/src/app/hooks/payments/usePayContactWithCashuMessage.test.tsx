@@ -4,7 +4,7 @@ import {
   parseCashuPaymentRequestMessage,
 } from "../../lib/paymentRequestMessage";
 import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
-import * as Evolu from "@evolu/common";
+import { createIdFromString } from "@linky/linksync";
 import {
   Amount,
   CurrencyUnit,
@@ -66,7 +66,7 @@ vi.mock("@linky/linkstr-react", () => ({
 
 import { usePayContactWithCashuMessage } from "./usePayContactWithCashuMessage";
 
-const CONTACT_ID = Evolu.createIdFromString<"Contact">("contact");
+const CONTACT_ID = createIdFromString<"Contact">("contact");
 const MINT_URL = "https://mint.example";
 
 const currentNpub = nip19.npubEncode(getPublicKey(createSecretKey(1)));

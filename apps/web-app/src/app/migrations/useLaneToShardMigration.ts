@@ -1,6 +1,9 @@
-import type { AppOwner } from "@evolu/common";
 import { linkshuServices, Tokens, type LegacyTokenRow } from "@linky/linkshu";
-import { makeWalletRepository, type LinkyStore } from "@linky/linksync";
+import {
+  makeWalletRepository,
+  type AppOwner,
+  type LinkyStore,
+} from "@linky/linksync";
 import { Effect, ManagedRuntime } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";

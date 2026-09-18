@@ -17,7 +17,7 @@ export function EvoluServerPage(): React.ReactElement {
     setEvoluServerOffline,
     setPendingEvoluServerDeleteUrl,
     setStatus,
-    syncOwner,
+    syncOwnerId,
   } = useEvoluSettingsContext();
   const { route, t } = useAppShellCore();
   const selectedEvoluServerUrl = route.kind === "evoluServer" ? route.id : null;
@@ -36,7 +36,7 @@ export function EvoluServerPage(): React.ReactElement {
               evoluHasError,
               isOffline: offline,
               state: evoluServerStatusByUrl[selectedEvoluServerUrl],
-              syncOwner,
+              syncOwnerId,
             });
 
             return (

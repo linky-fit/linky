@@ -69,8 +69,8 @@ A rotation on another device reaches this one as a pointer change. `followPointe
 
 ## Ids
 
-`shardPointerId(scope)` is deterministic so every device upserts one pointer row. Row ids are the caller's; `createId<"Table">()` from the model makes random ones.
+`shardPointerId(scope)` is deterministic so every device upserts one pointer row. Row ids are the caller's; `createId<"Table">()` from the model makes random ones and `createIdFromString<"Table">(text)` (re-exported from Evolu) derives one from text.
 
 ## Owners
 
-`appOwnerFromMnemonic(text)` turns a BIP-39 mnemonic into the Evolu `AppOwner` it names, or `null` when the text is not a mnemonic. The app uses it for its own owner and the lane migration for the legacy owners, so no app file needs Evolu's owner functions.
+`appOwnerFromMnemonic(text)` turns a BIP-39 mnemonic into the Evolu `AppOwner` it names, or `null` when the text is not a mnemonic. The app uses it for its own owner and the lane migration for the legacy owners, so no app file needs Evolu's owner functions. The owner types the store speaks (`AppOwner`, `SyncOwner`, `OwnerId`) are re-exported for the same reason.
