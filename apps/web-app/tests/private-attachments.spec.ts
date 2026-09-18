@@ -136,9 +136,15 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
     for (const file of files) {
       await test.step(`send, decrypt and export ${file.name}`, async () => {
         const editor = sender.page.getByRole("textbox");
-        const previousMessageCount = await receiver.page
+        const previousMessageIds = await receiver.page
           .locator(".chat-message.in")
-          .count();
+          .evaluateAll((messages) =>
+            messages.map((message) => message.getAttribute("data-message-id")),
+          );
+        const previousMessageCount = previousMessageIds.length;
+        const newMessages = receiver.page.locator(
+          `.chat-message.in${previousMessageIds.map((id) => `:not([data-message-id="${id}"])`).join("")}`,
+        );
         if (file.name === "keyboard-paste.png") {
           await sender.page.bringToFront();
           await editor.fill("Keep this draft");
@@ -202,20 +208,17 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
           sender.page.locator(".chat-attachment-preview"),
         ).toHaveCount(0);
         await expect(editor).toHaveText("");
+        const attachments = newMessages.filter({
+          has: receiver.page.locator(file.selector),
+        });
+        await expect(attachments).toHaveCount(stagedCount);
         if (file.companion)
-          await expect(
-            receiver.page
-              .locator(".chat-message.in")
-              .nth(previousMessageCount + 1)
-              .locator(file.selector),
-          ).toBeVisible();
+          await expect(attachments.nth(1).locator(file.selector)).toBeVisible();
         if (followUpTextCount)
           await expect(
-            receiver.page.locator(".chat-message.in").last(),
-          ).toContainText("Keep this draft");
-        const message = receiver.page
-          .locator(".chat-message.in")
-          .nth(previousMessageCount);
+            newMessages.filter({ hasText: "Keep this draft" }),
+          ).toHaveCount(1);
+        const message = attachments.first();
         await expect(message.locator(file.selector)).toBeVisible();
         await expect
           .poll(() =>
