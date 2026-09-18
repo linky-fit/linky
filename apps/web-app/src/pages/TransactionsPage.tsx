@@ -27,6 +27,7 @@ import {
 
 import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
 import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
+import { readRecurringPaymentIdFromDetails } from "../app/lib/recurringPaymentDisplay";
 import { deriveDefaultProfile } from "../derivedProfile";
 import {
   useContactRows,
@@ -34,6 +35,7 @@ import {
   useTransactionRecords,
   useWalletOperations,
 } from "../app/hooks/useLinksync";
+import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { getLightningInvoicePreview } from "@linky-fit/linkshu";
 import { formatInteger, normalizeLocale } from "../utils/formatting";
@@ -200,6 +202,7 @@ const TransactionCardView = ({
     item.hiddenReason !== null ||
     item.isReturned;
   const lnurlMessage = readLnurlSuccessMessage(item);
+  const recurringPaymentId = readRecurringPaymentIdFromDetails(item.details);
 
   return (
     <Stack
@@ -234,6 +237,19 @@ const TransactionCardView = ({
               <Text variant="caption" color="$colorMuted">
                 {formatDateText(item.createdAtSec)}
               </Text>
+              {recurringPaymentId ? (
+                <Pill
+                  size="sm"
+                  tone="neutral"
+                  label={t("recurringPaymentTitle")}
+                  onPress={() =>
+                    navigateTo({
+                      route: "recurringPayment",
+                      id: recurringPaymentId,
+                    })
+                  }
+                />
+              ) : null}
               {problemStatusPill ? (
                 <Pill
                   size="sm"

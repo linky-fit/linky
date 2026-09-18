@@ -12,6 +12,8 @@ import { useAmountInputKeypad } from "./useAmountInputKeypad";
 interface PaymentAmountPanelProps {
   amount: string;
   cashuIsBusy: boolean;
+  /** Rendered under the submit button (secondary links). */
+  footer?: ReactNode | undefined;
   header: ReactNode;
   /** Shown under the amount when the payment can carry a note. */
   note?: Omit<PaymentNoteInputProps, "t"> | undefined;
@@ -32,6 +34,7 @@ interface PaymentAmountPanelProps {
 export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
   amount,
   cashuIsBusy,
+  footer,
   header,
   note,
   notices,
@@ -79,6 +82,7 @@ export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
         >
           {submitLabel ?? t("paySend")}
         </Button>
+        {footer}
       </Stack>
     </Stack>
   );

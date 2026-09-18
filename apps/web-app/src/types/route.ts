@@ -1,3 +1,4 @@
+import { RecurringPaymentId } from "../evoluIds";
 import { CashuOperationId, ContactId } from "@linky-fit/linksync";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../utils/constants";
 
@@ -45,6 +46,9 @@ export type Route =
   | { kind: "profileEdit" }
   | { kind: "wallet" }
   | { kind: "transactions" }
+  | { kind: "recurringPayments" }
+  | { kind: "recurringPaymentNew" }
+  | { kind: "recurringPayment"; id: RecurringPaymentId }
   | { kind: "topup" }
   | { kind: "topupNoAmount" }
   | { kind: "topupInvoice" }
@@ -119,6 +123,13 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#profile") return { kind: "profile" };
   if (hash === "#wallet") return { kind: "wallet" };
   if (hash === "#wallet/transactions") return { kind: "transactions" };
+  if (hash === "#wallet/recurring") return { kind: "recurringPayments" };
+  if (hash === "#wallet/recurring/new") return { kind: "recurringPaymentNew" };
+  const recurringPaymentIdText = decodeHashSegment(hash, "#wallet/recurring/");
+  if (recurringPaymentIdText) {
+    const id = RecurringPaymentId.fromUnknown(recurringPaymentIdText);
+    if (id.ok) return { kind: "recurringPayment", id: id.value };
+  }
   if (hash === "#wallet/topup") return { kind: "topup" };
   if (hash === "#wallet/topup/no-amount") return { kind: "topupNoAmount" };
   if (hash === "#wallet/topup/invoice") return { kind: "topupInvoice" };
