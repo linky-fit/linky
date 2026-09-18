@@ -133,6 +133,35 @@ Linkstr guarantees the transport side: ephemeral author, no self copy, no push m
 - Do not add fields. The wire is `v: 1`; a new field is a schema change and a review of what it leaks.
 - Through the outbox the draft is persisted in the `OutboxStore` until acked. It is stored under your pubkey for the `identity-changed` check, but that pubkey never leaves the device.
 
+## Wire format
+
+Codec: `paymentTelemetry/codec.ts`. One gift wrap to the analytics pubkey, with rumor author, seal, and wrap all keyed by a fresh ephemeral key per attempt; never push-marked ([wire conventions](./concepts.md#wire-conventions)).
+
+Kind 24134. Tags, in order: `p` collector, `client` (the draft `id`), `["linky", "payment_telemetry"]`. Content is JSON with these keys in this order; nullable fields are written as `null`, never omitted:
+
+```json
+{
+  "v": 1,
+  "id": "…",
+  "createdAtSec": 1758200000,
+  "direction": "…",
+  "status": "…",
+  "method": "…",
+  "phase": "…",
+  "mint": null,
+  "amountBucket": "…",
+  "feeBucket": "…",
+  "errorCode": null,
+  "errorDetail": null,
+  "appHost": "…",
+  "devicePlatform": "…",
+  "appRuntime": "…",
+  "appVersion": "…"
+}
+```
+
+The consent surface and `errorDetail` sanitization are tracked in linky-fit/linky#263.
+
 ## Receiving
 
 Nothing. `WrapInbox` has no decoder for kind 24134 and drops it as `WrapDropped("unsupported-kind")`; the analytics recipient reads reports with its own tooling.

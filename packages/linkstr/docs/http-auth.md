@@ -118,6 +118,16 @@ The app's version, with response decoding and the surrounding subscription flow,
 - NIP-98: the server compares the signed url with the request url, so sign what you actually send. The app signs the bare path and leaves query strings out where the server does (`npubCashUpstreamQuotes.ts`).
 - Blossom: the `sha256` in the header must match the uploaded bytes, or the server rejects the upload.
 
+## Wire format
+
+`httpAuth/codec.ts`. Each proof is a signed event serialized as JSON and never published.
+
+| Proof                   | Kind  | Tags, in order                                                                               | Content               | Sent as                                             |
+| ----------------------- | ----- | -------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------- |
+| Blossom upload (BUD-01) | 24242 | `["t", "upload"]`, `["expiration", now + 600]`, `["x", sha256]`, `["server", serverDomain]`  | `Upload Blob`         | `Authorization: Nostr <base64url(event)>`           |
+| NIP-98                  | 27235 | `["u", url]`, `["method", method]`, `["payload", sha256(JSON body)]` when a payload is given | empty                 | `Authorization: Nostr <base64(event)>`              |
+| Push ownership proof    | 27235 | `["challenge", challenge]`, `["action", "subscribe" \| "unsubscribe"]`, `["pubkey", author]` | `linky-push-<action>` | the `event` field of the subscribe/unsubscribe body |
+
 ## Server-side verification
 
 `verifyPushOwnershipProof` checks signature, kind, the exactly-once `challenge` / `action` / `pubkey` tags, that the `pubkey` tag equals the event author, and the content string. Everything about _your_ request is still yours to check. `apps/push/src/ownership.ts` does it like this:

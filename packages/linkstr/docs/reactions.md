@@ -124,6 +124,17 @@ Enqueue success only means the job is persisted and `rumorId` is fixed. Relay ac
 
 Direct vs outbox: `Reactions.react` is available directly, but the app enqueues it (`{ _tag: "reaction", draft }`) so a reaction tapped offline is delivered later. Retractions stay direct: the app removes the local row immediately, and when the send fails nothing is queued — the user's next tap sends a fresh retraction.
 
+## Wire format
+
+Codec: `reactions/codec.ts`. Two gift wraps, self and peer, never push-marked ([wire conventions](./concepts.md#wire-conventions)).
+
+| Send       | Kind | Tags, in order                                                               | Content   |
+| ---------- | ---- | ---------------------------------------------------------------------------- | --------- |
+| reaction   | 7    | `p` targetAuthor, `p` to, `p` author, `e` target, `k` `14` or `15`, `client` | the emoji |
+| retraction | 5    | `p` to, `p` author, one `e` per retracted reaction id, `client`              | empty     |
+
+The reaction's `e` tag is the target message's rumor id, the same id in both users' inboxes. Decoding requires an `e` tag holding a rumor id, an `Emoji` content, and a `k` tag that is absent, `14`, or `15`. A retraction keeps the `e` values that are rumor ids and needs at least one.
+
 ## Receiving
 
 | Tag                      | Fields                                                                                          | Meaning                                          |

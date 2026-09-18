@@ -55,6 +55,18 @@ A private send wraps the same rumor twice: once to yourself (cross-device echo) 
 
 "Only my self copy landed" is never reported as success. A relay accepting the copy is not the peer reading it; the peer's client still has to receive and decode it. The transport never retries; when you need retries, use the [outbox](./outbox.md).
 
+## Wire conventions
+
+Each vertical guide ends its sending half with a **Wire format** section: kind, tags in order, content, and delivery. These rules are shared by all of them. The codec under `src/<vertical>/codec.ts` is the source of truth; a change to any wire shape updates the guide in the same commit.
+
+- **Layering.** A private send is a rumor (unsigned, kind-specific) inside a seal (kind 13, signed by the sender) inside a gift wrap (kind 1059, signed by a throwaway key, with `["p", recipient]` as its only routing tag). Seal and wrap use NIP-44 v2 via `nostr-tools/nip59`. The wrap's `created_at` is randomized up to two days into the past; the rumor's is the real send time.
+- **Rumor id.** The NIP-01 hash of the unsigned rumor (`rumorWithHash`). Both copies of a send carry the same rumor, so they share one id, and the outbox retries the stored rumor, so the id survives retries.
+- **`p` tag order.** A directed rumor tags the recipient first and the author second. Decoders find the peer by position relative to the reader, so the order is part of the format.
+- **`["client", <ClientId>]`.** An idempotency key that exists before the rumor does and comes back on own echoes, so an optimistic row can be matched. It collides with NIP-89's `client` tag; see linky-fit/linky#254.
+- **`["linky", <value>]`.** Inside a rumor it names a Linky-specific kind (`payment_notice`, `payment_telemetry`, `bank_payment_offer`, `seen_receipt`) and the decoder requires it. On a wrap, `["linky", "push"]` is the plaintext push marker ([push-inbox.md](./push-inbox.md)), set only on a recipient copy; it is a deliberate metadata leak, see linky-fit/linky#245.
+- **Delivery.** A two-copy send publishes both wraps to every write relay in parallel; bank offers publish the recipient copy first. Both copies leave over the same connections, so a relay can pair sender and recipient; see linky-fit/linky#258.
+- **Kind numbers.** Linky-invented kinds are 24133–24136. A new vertical takes the next free number, carries its own `["linky", <value>]` marker, and adds a row to the [kind index](./README.md#kind-index).
+
 ## Branded primitives
 
 All in `domain/primitives.ts`. Each is an effect `Schema` with a brand, so a plain `string` does not type-check where a `Pubkey` is expected.

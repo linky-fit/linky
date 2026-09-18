@@ -77,6 +77,12 @@ The app calls this from `publishCashuMessagePayment` once at least one `chat.tok
 
 Single copy, direct, push-marked. There is no `selfCopy` because nothing is wrapped to you: a notice is a signal, not state your other devices need. It is not an outbox operation; if the send fails the payment itself is unaffected.
 
+## Wire format
+
+Codec: `paymentNotices/codec.ts`. One gift wrap to the recipient, always push-marked ([wire conventions](./concepts.md#wire-conventions)).
+
+Kind 24133. Tags, in order: `p` to, `p` author, `client`, `["linky", "payment_notice"]`, then `["context", context]` and `["offer", offerId]` when set. Content: the literal string `payment_notice`. The token travels as a separate kind 14 message ([chat.md](./chat.md#wire-format)); a notice carries no value and is never ingested as a wallet event. Decoding requires the marker, the reader among the `p` tags, and an author other than the reader. The notification path end to end is tracked in linky-fit/linky#246.
+
 ## Receiving
 
 | Tag                     | Fields                                                                                                                         | Meaning         |

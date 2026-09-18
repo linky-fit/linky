@@ -71,7 +71,11 @@ There is no draft class: `publishMuteList(pubkeys: ReadonlyArray<Pubkey>)` takes
 
 `PlainEventReceipt` carries `eventId`, `kind` (10000), `sentAt`, `results: RelayPublishResult[]`, and `.accepted`.
 
-Direct only. The content is empty; muted pubkeys are public `p` tags. Linkstr does not encrypt a private section.
+Direct only.
+
+## Wire format
+
+`muteList/MuteList.ts`. Kind 10000, plain and replaceable: one `["p", pubkey]` per muted contact, empty content, no encrypted section. Anyone can read the list; moving it into encrypted content is tracked in linky-fit/linky#262.
 
 ## Loading and enforcing the list
 

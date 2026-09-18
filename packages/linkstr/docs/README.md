@@ -31,6 +31,30 @@ Never published:
 
 - [HTTP auth](./http-auth.md) — signed events as HTTP credentials for Blossom, the push server, and NIP-98
 
+## Kind index
+
+Every event kind linkstr produces. Wrapped kinds travel inside a kind 1059 gift wrap; "push" says whether the recipient copy carries the `["linky", "push"]` marker.
+
+| Kind  | What                                      | Wrapped | Push                | Guide                                                      |
+| ----- | ----------------------------------------- | ------- | ------------------- | ---------------------------------------------------------- |
+| 14    | chat text, cashu token, edit              | yes     | text yes, others no | [chat.md](./chat.md#wire-format)                           |
+| 15    | chat image or PDF                         | yes     | yes                 | [chat.md](./chat.md#wire-format)                           |
+| 7     | reaction                                  | yes     | no                  | [reactions.md](./reactions.md#wire-format)                 |
+| 5     | reaction retraction                       | yes     | no                  | [reactions.md](./reactions.md#wire-format)                 |
+| 24133 | payment notice                            | yes     | yes                 | [payment-notices.md](./payment-notices.md#wire-format)     |
+| 24134 | payment telemetry                         | yes     | no                  | [payment-telemetry.md](./payment-telemetry.md#wire-format) |
+| 24135 | bank payment offer snapshot               | yes     | per status          | [bank-offers.md](./bank-offers.md#wire-format)             |
+| 24136 | seen receipt                              | yes     | no                  | [seen-receipts.md](./seen-receipts.md#wire-format)         |
+| 0     | profile metadata                          | no      | —                   | [profiles.md](./profiles.md#wire-format)                   |
+| 30315 | status                                    | no      | —                   | [profiles.md](./profiles.md#wire-format)                   |
+| 10000 | mute list                                 | no      | —                   | [mute-list.md](./mute-list.md#wire-format)                 |
+| 10002 | relay list                                | no      | —                   | [relay-lists.md](./relay-lists.md#wire-format)             |
+| 10050 | DM relay list                             | no      | —                   | [relay-lists.md](./relay-lists.md#wire-format)             |
+| 24242 | Blossom upload auth (never published)     | no      | —                   | [http-auth.md](./http-auth.md#wire-format)                 |
+| 27235 | NIP-98 auth, push proof (never published) | no      | —                   | [http-auth.md](./http-auth.md#wire-format)                 |
+
+Tag order, content schemas, and the conventions shared by all kinds (`p` order, `client`, `linky` markers, delivery) are in [Concepts → Wire conventions](./concepts.md#wire-conventions).
+
 ## Receiving, retries, and diagnostics
 
 - [Inbox](./inbox.md) — the single gift-wrap subscription, the event union, cursors, and one-shot fetch
@@ -48,6 +72,6 @@ Never published:
 ## Finding your way
 
 - Looking for a type or method name? Open `src/index.ts` and follow the export; every guide names the file it documents.
-- Wondering what arrives on the wire? Each vertical guide states its kinds and whether it is gift-wrapped; [Inbox](./inbox.md) lists every inbound event tag in one table.
+- Wondering what arrives on the wire? The [kind index](#kind-index) above, each guide's Wire format section, and [Inbox](./inbox.md) for every inbound event tag in one table.
 - A send failed? The vertical guide's errors table says what each failure means; [Concepts](./concepts.md#honest-delivery) explains why "only my copy landed" is a failure.
 - Want a working consumer to copy from? The web app hooks named in [React](./react.md), the service worker for `runLinkstr`, and `apps/push` for the push inbox.

@@ -73,6 +73,12 @@ Direct only, and silent by design:
 - Not through the outbox. A retried receipt would republish a cursor that a later receipt already superseded. A lost send self-heals on the next trigger (new message, tab refocus, route re-entry) because that receipt carries the newer cursor anyway.
 - No `["linky", "push"]` marker on either wrap, so a receipt never produces a notification.
 
+## Wire format
+
+Codec: `seenReceipts/codec.ts`. Two gift wraps, self and peer, never push-marked ([wire conventions](./concepts.md#wire-conventions)).
+
+Kind 24136. Tags, in order: `p` to, `p` author, `client`, `["linky", "seen_receipt"]`, `["since", sinceSec]`. Content: `seenUpToSec` as a decimal string. Both numbers must be positive integers of at most eleven digits with `since` below the content, or the wrap is dropped as `invalid-seen-receipt`.
+
 ## Receiving
 
 | Tag                       | Fields                                                                                              | Meaning                                                      |

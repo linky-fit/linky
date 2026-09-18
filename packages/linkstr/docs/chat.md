@@ -112,6 +112,21 @@ Linkstr neither encrypts nor uploads. Before building an `ImageMessageDraft`, en
 
 `parseCashuToken(raw)` returns `{ amount, mint, unit }` for a standard `cashuA`/`cashuB` token, else `null`; `extractWholeCashuToken(text)` strips a `cashu:` / `web+cashu://` prefix and returns the token when the whole input is one token, else `null`. On the wire a token message is a plain kind 14 whose content is the token; the decoder classifies it as `TokenBody`.
 
+## Wire format
+
+Codec: `chat/codec.ts`. Every send is a NIP-17 rumor delivered as two gift wraps, self and peer, published in parallel ([wire conventions](./concepts.md#wire-conventions)).
+
+| Send  | Kind | Tags, in order                                                                                                                                                                                                                                                                               | Content                             |
+| ----- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| text  | 14   | `p` to, `p` author, `client`, reply tags                                                                                                                                                                                                                                                     | the text                            |
+| token | 14   | as text                                                                                                                                                                                                                                                                                      | the whole `cashuA…`/`cashuB…` token |
+| edit  | 14   | `p` to, `p` author, `edited_from` editOf, `client`                                                                                                                                                                                                                                           | the replacement text                |
+| file  | 15   | `p` to, `p` author, `client`, `file-type`, `encryption-algorithm` (`aes-gcm`), `decryption-key`, `decryption-nonce`, `x` encryptedSha256, `ox` originalSha256, `size`, `dim` `<w>x<h>` (images only), `name` (when a file name is set), `encoding` `base64` (when stored base64), reply tags | the Blossom url of the ciphertext   |
+
+- Reply tags are `["e", root ?? replyTo, "", "root"]` then `["e", replyTo, "", "reply"]`, present only when `replyTo` is set. Marker-less `e` tags from other clients are tolerated: the first is root and, with two or more, the last is the reply.
+- A token message has no tag of its own; the receiver classifies by content (`extractWholeCashuToken`).
+- Push marker on the recipient wrap: text and file yes, token and edit no.
+
 ## Receiving
 
 Chat facts arrive on the wrap inbox ([inbox.md](./inbox.md)). Edits are not a separate event: both facts carry `editOf`.

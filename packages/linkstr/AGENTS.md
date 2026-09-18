@@ -1,6 +1,6 @@
 # @linky/linkstr
 
-Usage guides for this package and for `@linky/linkstr-react` live in `docs/` (index: `docs/README.md`). Read the guide for a vertical before changing it; the guide states the wire kinds, delivery contract, and inbound event shapes callers rely on.
+Usage guides for this package and for `@linky/linkstr-react` live in `docs/` (index: `docs/README.md`). Read the guide for a vertical before changing it; the guide states the wire kinds, delivery contract, and inbound event shapes callers rely on, and its Wire format section is the specification of the codec's tags and content (shared rules: `docs/concepts.md`, kind table: `docs/README.md`).
 
 ## Keep the docs in sync
 

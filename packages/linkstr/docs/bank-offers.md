@@ -139,6 +139,33 @@ Repeat every field on every snapshot: the wire carries the full state, not a dif
 
 Direct only: offers are not outbox operations. A snapshot that fails is simply resent by the user or the app's timers.
 
+## Wire format
+
+Codec: `bankOffers/codec.ts`. Two gift wraps, recipient first; the recipient wrap is push-marked per the status table above ([wire conventions](./concepts.md#wire-conventions)).
+
+Kind 24135. Tags, in order: `p` to, `p` author, `client`, `["offer", offerId]`, `["offerer", offerer]`, `["linky", "bank_payment_offer"]`, `["status", status]`. Content is the snapshot JSON; key order is part of the format and `null` fields are omitted:
+
+```json
+{
+  "amountText": "250 CZK",
+  "offerId": "…",
+  "offererPublicKey": "<hex pubkey>",
+  "status": "offered",
+  "statusUpdatedAtSec": 1758200000,
+  "text": "…",
+  "type": "linky.bank_payment_offer",
+  "version": 1,
+  "initiatedAtSec": 1758200000,
+  "bankPaidAtSec": 1758200300,
+  "expiresAtSec": 1758200600,
+  "extensionSec": 300,
+  "amountSat": 10000,
+  "spdPayload": "SPD*1.0*…"
+}
+```
+
+Decoding requires the marker, the reader among the `p` tags, and `type`, `offerId`, `amountText`, plus a known `status` in the content. `offererPublicKey` falls back to the `offerer` tag. Every other field is optional and dropped when malformed rather than failing the snapshot.
+
 ## Receiving
 
 Both facts carry the draft fields above as nullable values (`text`, `amountSat`, the timestamps, `extensionSec`, `spdPayload`, `clientId`), plus `snapshotId: RumorId`, `statusUpdatedAtSec`, and `sentAt`. They differ only in who authored the wrap:

@@ -111,7 +111,18 @@ Changing `watchedProfilesAtom` resubscribes without rebuilding the runtime. Swap
 
 Both return a `PlainEventReceipt`: `eventId`, `kind`, `sentAt`, `results: RelayPublishResult[]` (`relay`, `accepted`, `detail`), and `.accepted`. Success means at least one write relay accepted the event.
 
-Wire notes: `displayName` is written as `display_name`; empty strings are omitted. Status content is opaque to linkstr — Linky's conventions (currency list on the last line) live in `apps/web-app/src/nostrStatus.ts`.
+Status content is opaque to linkstr — Linky's conventions (currency list on the last line) live in `apps/web-app/src/nostrStatus.ts`.
+
+## Wire format
+
+Codec: `profiles/codec.ts`. Plain signed events, no wrapping.
+
+| Event   | Kind  | Tags                                                     | Content                                                                                          |
+| ------- | ----- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| profile | 0     | none                                                     | JSON `name`, `display_name`, `picture`, `lud16`, `lud06`, `nip05`, `about`; empty fields omitted |
+| status  | 30315 | `["d", "general"]`, `["expiration", expiresAt]` when set | opaque string; empty clears                                                                      |
+
+Decoding kind 0 is tolerant: unknown fields are ignored, non-string values are dropped, `displayName` is accepted when `display_name` is absent, and `picture` falls back to a legacy `image`. A status whose `d` tag is not `general`, or whose expiration has passed, is dropped.
 
 ## Fetching
 
