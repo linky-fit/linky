@@ -11,6 +11,7 @@ import {
   getLnurlPayDisplayText,
   inferLightningAddressFromLnurlTarget,
 } from "../lnurlPay";
+import { navigateTo } from "../hooks/useRouting";
 import { formatMiddleDots } from "../utils/formatting";
 
 interface LnAddressPayKnownContact {
@@ -148,6 +149,29 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
           preview={preview}
           t={t}
         />
+      }
+      footer={
+        <Button
+          variant="ghost"
+          size="sm"
+          onPress={() =>
+            navigateTo({
+              route: "recurringPaymentNew",
+              prefill: {
+                lnAddress:
+                  knownContact?.lnAddress ??
+                  preview?.lightningAddress ??
+                  inferredLightningAddress ??
+                  lnAddress,
+                ...(Number.isFinite(amountSat) && amountSat > 0
+                  ? { amountSat }
+                  : {}),
+              },
+            })
+          }
+        >
+          {t("recurringRepeatPayment")}
+        </Button>
       }
       onAmountChange={setLnAddressPayAmount}
       onSubmit={() => {

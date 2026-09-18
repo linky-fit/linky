@@ -56,6 +56,9 @@ import {
   TopupInvoicePage,
   TopupNoAmountPage,
   TopupPage,
+  RecurringPaymentNewPage,
+  RecurringPaymentPage,
+  RecurringPaymentsPage,
   TransactionsPage,
 } from "../../pages";
 import {
@@ -175,6 +178,12 @@ const RoutePage = (): React.ReactElement => {
       return <TopupPage {...moneyRoutes.topupProps} />;
     case "transactions":
       return <TransactionsPage />;
+    case "recurringPayments":
+      return <RecurringPaymentsPage />;
+    case "recurringPaymentNew":
+      return <RecurringPaymentNewPage />;
+    case "recurringPayment":
+      return <RecurringPaymentPage id={route.id} />;
     case "topupNoAmount":
       return <TopupNoAmountPage />;
     case "topupInvoice":
