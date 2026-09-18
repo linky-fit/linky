@@ -1,5 +1,5 @@
-import { ContactId } from "./evoluIds";
-export { ContactId, TransactionId } from "./evoluIds";
+import { ContactId, RecurringPaymentId } from "./evoluIds";
+export { ContactId, RecurringPaymentId, TransactionId } from "./evoluIds";
 import { Schema as EffectSchema } from "effect";
 import * as Evolu from "@evolu/common";
 import { createEvolu, SimpleName } from "@evolu/common";
@@ -515,6 +515,40 @@ export const Schema = {
     // derive labels/icons in the transaction view.
     phase: Evolu.nullOr(Evolu.NonEmptyString100),
   },
+
+  // Standing orders ("trvalé příkazy"). Lives in the transactions owner lane;
+  // each run is recorded as a `transaction` row that carries the order id and
+  // the due time it settles, so a run is never paid twice across devices.
+  recurringPayment: {
+    id: RecurringPaymentId,
+    createdAtSec: Evolu.PositiveInt,
+    title: Evolu.NonEmptyString1000,
+    // "contact" | "lnAddress"
+    recipientKind: Evolu.NonEmptyString100,
+    contactId: Evolu.nullOr(ContactId),
+    lnAddress: Evolu.nullOr(Evolu.NonEmptyString1000),
+    amountSat: Evolu.PositiveInt,
+    // "hour" | "day" | "week" | "month", multiplied by intervalCount
+    intervalUnit: Evolu.NonEmptyString100,
+    intervalCount: Evolu.PositiveInt,
+    // First due time; every later due time is anchor + n intervals, so a
+    // month-end anchor clamps per month instead of drifting earlier.
+    anchorAtSec: Evolu.PositiveInt,
+    // IANA zone the calendar units are evaluated in on every device.
+    timeZone: Evolu.nullOr(Evolu.NonEmptyString100),
+    nextDueAtSec: Evolu.PositiveInt,
+    lastRunAtSec: Evolu.nullOr(Evolu.PositiveInt),
+    // "paid" | "failed" | "skipped"
+    lastRunStatus: Evolu.nullOr(Evolu.NonEmptyString100),
+    runCount: Evolu.nullOr(Evolu.NonNegativeInt),
+    maxRuns: Evolu.nullOr(Evolu.PositiveInt),
+    endAtSec: Evolu.nullOr(Evolu.PositiveInt),
+    pausedAtSec: Evolu.nullOr(Evolu.PositiveInt),
+    // Device that runs this order; other devices only display it.
+    executorDeviceId: Evolu.nullOr(Evolu.NonEmptyString100),
+    note: Evolu.nullOr(Evolu.NonEmptyString1000),
+  },
+
   ownerMeta: {
     id: OwnerMetaId,
     scope: Evolu.NonEmptyString100,
@@ -833,6 +867,8 @@ export const createNostrReactionsAllQuery = () =>
   evolu.createQuery((db) => db.selectFrom("nostrReaction").selectAll());
 export const createTransactionsAllQuery = () =>
   evolu.createQuery((db) => db.selectFrom("transaction").selectAll());
+export const createRecurringPaymentsAllQuery = () =>
+  evolu.createQuery((db) => db.selectFrom("recurringPayment").selectAll());
 /** A `contact` row with its legacy chat columns; read only by the lane migration. */
 export type LegacyContactRow = Evolu.InferRow<
   ReturnType<typeof createContactsAllQuery>
@@ -845,6 +881,9 @@ export type NostrReactionRow = Evolu.InferRow<
 >;
 export type TransactionRow = Evolu.InferRow<
   ReturnType<typeof createTransactionsAllQuery>
+>;
+export type RecurringPaymentRow = Evolu.InferRow<
+  ReturnType<typeof createRecurringPaymentsAllQuery>
 >;
 
 export type CashuTokenRow = Evolu.InferRow<
@@ -924,6 +963,7 @@ const getEvoluDatabaseInfo = async (
     "nostrMessage",
     "nostrReaction",
     "transaction",
+    "recurringPayment",
     "ownerMeta",
     "shardPointer",
     "setting",
@@ -1118,6 +1158,7 @@ export const loadEvoluCurrentData = async (): Promise<
     "nostrMessage",
     "nostrReaction",
     "transaction",
+    "recurringPayment",
     "ownerMeta",
     "shardPointer",
     "setting",

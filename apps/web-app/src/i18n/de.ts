@@ -26,6 +26,7 @@ export const de = {
   back: "Zurück",
   menu: "Menü",
   transactionsTitle: "Transaktionen",
+  recurringPaymentsTitle: "Daueraufträge",
   showTransactions: "Transaktionen anzeigen",
   feedback: "Feedback",
   donate: "Spenden",

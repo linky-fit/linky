@@ -26,6 +26,7 @@ export const en = {
   back: "Back",
   menu: "Menu",
   transactionsTitle: "Transactions",
+  recurringPaymentsTitle: "Recurring payments",
   showTransactions: "Show transactions",
   feedback: "Feedback",
   donate: "Donate",
