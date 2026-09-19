@@ -71,6 +71,8 @@ Always go through `parseMintUrl` (or `MintUrl.make` on already-normalized input)
 
 Successful wallet loads are cached for the runtime's lifetime; a failed load is evicted so the next call retries. Wallet loading propagates keyset verification and ID-mapping errors as `MintRejected`; there is no fallback that accepts the rejected keys. cashu-ts 4.5.1 discards invalid keys during initial loading and rejects them when an operation requests that keyset. A mint with only inactive keysets can still load for restore. Inactive keysets load verified keys on demand when old proofs or restore need them. Mints must serve keys matching their advertised IDs before affected operations can proceed.
 
+A keyset id is bound to the first mint URL that presents it (stored under `linkshu.keysetMint.<id>`, trust-on-first-use). Loading a mint whose active keyset id is already bound to a different mint URL fails with `MintRejected` on every load, cached included. A keyset id is a hash of the keyset's public keys (NUT-02), so honest mints never collide; the check stops a mint from impersonating another mint's keyset to force NUT-13 counter reuse (the same `(seed, keysetId, counter)` derives the same secret regardless of mint URL). The trade-off is that a mint added only after an impostor claimed its keyset id is refused, which is a denial of service, never fund loss.
+
 ### Icons (`mint/icons.ts`)
 
 Pure helpers, no runtime needed:

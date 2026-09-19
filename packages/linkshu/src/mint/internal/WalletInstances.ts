@@ -40,6 +40,48 @@ export const SEEN_MINTS_KEY_PREFIX = "linkshu.seenMints.";
 export const seenMintKey = (mint: MintUrl): string =>
   SEEN_MINTS_KEY_PREFIX + encodeURIComponent(mint);
 
+export const KEYSET_MINT_KEY_PREFIX = "linkshu.keysetMint.";
+
+/** Storage key binding one keyset id to the mint that first presented it. */
+export const keysetMintKey = (keysetId: string): string =>
+  KEYSET_MINT_KEY_PREFIX + encodeURIComponent(keysetId);
+
+/**
+ * First-seen-wins binding of a keyset id to its mint. A keyset id is a hash of
+ * the keyset's public keys (NUT-02), so two honest mints never share one; a
+ * mint presenting a keyset id already bound to a different mint URL is
+ * impersonating that mint to make the wallet reuse its NUT-13 derivation slots
+ * — the same (seed, keysetId, counter) yields the same secret regardless of
+ * mint URL — so it is rejected before it can be used for any operation.
+ *
+ * This is trust-on-first-use: the first mint to present a keyset id owns it. A
+ * mint added only after an impostor claimed its keyset id is refused (a denial
+ * of service, never fund loss), which is the accepted trade-off for having no
+ * global keyset registry.
+ */
+export const ensureKeysetMintBinding = (
+  kv: KeyValueStoreService,
+  mint: MintUrl,
+  keysetId: string,
+): Effect.Effect<void, MintRejected> =>
+  Effect.gen(function* () {
+    const key = keysetMintKey(keysetId);
+    const boundMint = yield* kv.get(key);
+    if (boundMint === null) {
+      yield* kv.set(key, mint);
+      return;
+    }
+    if (boundMint !== mint) {
+      return yield* Effect.fail(
+        new MintRejected({
+          mint,
+          code: null,
+          detail: `keyset id ${keysetId} is already bound to ${boundMint}; refusing to use it under ${mint}`,
+        }),
+      );
+    }
+  });
+
 /**
  * The slice of a loaded cashu-ts wallet the package reads back after load.
  * The real `Wallet` satisfies it structurally; widen it as verticals need
@@ -200,6 +242,9 @@ export const makeWalletInstances = (
       ),
     );
 
+  const enforceKeysetMintBinding = (mint: MintUrl, wallet: LoadedWallet) =>
+    ensureKeysetMintBinding(kv, mint, wallet.keysetId);
+
   const get = (
     mint: MintUrl,
     unit: CurrencyUnit,
@@ -207,11 +252,17 @@ export const makeWalletInstances = (
     Effect.suspend(() => {
       const key = `${mint}|${unit}`;
       const cached = inFlight.get(key);
-      if (cached !== undefined) return awaitLoad(mint, key, cached);
+      // The binding is checked on every load, cached included: a rejected mint
+      // whose wallet promise is already cached must stay rejected.
+      if (cached !== undefined)
+        return awaitLoad(mint, key, cached).pipe(
+          Effect.tap((wallet) => enforceKeysetMintBinding(mint, wallet)),
+        );
 
       const loading = load(mint, unit);
       inFlight.set(key, loading);
       return awaitLoad(mint, key, loading).pipe(
+        Effect.tap((wallet) => enforceKeysetMintBinding(mint, wallet)),
         Effect.tap(() => kv.set(seenMintKey(mint), mint)),
       );
     });
