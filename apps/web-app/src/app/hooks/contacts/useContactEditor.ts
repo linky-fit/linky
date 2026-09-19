@@ -277,10 +277,10 @@ export const useContactEditor = ({
       seededEditContactIdRef.current = null;
       return;
     }
-    setPendingDeleteId(null);
 
     if (!selectedContact) {
       seededEditContactIdRef.current = null;
+      setPendingDeleteId(null);
       setEditingId(null);
       setContactEditInitial(null);
       setForm(makeEmptyContactForm());
@@ -292,6 +292,7 @@ export const useContactEditor = ({
     if (seededEditContactIdRef.current === selectedContact.id) return;
     seededEditContactIdRef.current = selectedContact.id;
 
+    setPendingDeleteId(null);
     setEditingId(selectedContact.id);
     const resolvedProfile = resolveContactProfile(
       selectedContact,

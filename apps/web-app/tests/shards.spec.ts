@@ -119,6 +119,30 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
       await expect(
         follower.page.locator(".chat-bubble").filter({ hasText: text }),
       ).toBeVisible();
+    await test.step("both messages finish publishing in shard 0 before rotation", async () => {
+      for (const device of devices) {
+        const ownerId = await hooks.shardOwnerId(device.page, "messages", 0);
+        await expect
+          .poll(async () => {
+            const rows = await hooks.shardRows(
+              device.page,
+              "messages",
+              "message",
+            );
+            return rows
+              .filter(
+                (row) =>
+                  row.ownerId === ownerId &&
+                  row.status === "sent" &&
+                  typeof row.wrapId === "string" &&
+                  !row.wrapId.startsWith("pending:"),
+              )
+              .map((row) => row.content)
+              .sort();
+          })
+          .toEqual(["Also before rotation", "Before shard rotation"]);
+      }
+    });
     await topUp(source.page, 32);
     await expect.poll(() => readBalanceSat(source.page)).toBe(32);
     for (const device of devices) {
