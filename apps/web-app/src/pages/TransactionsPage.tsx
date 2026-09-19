@@ -25,7 +25,7 @@ import {
   useAppShellCore,
 } from "../app/context/AppShellContexts";
 
-import { RecurringPaymentsSection } from "../components/RecurringPaymentsSection";
+import { RecurringPaymentsSummaryRow } from "../components/RecurringPaymentsSummaryRow";
 import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
 import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
 import { readRecurringPaymentIdFromDetails } from "../app/lib/recurringPaymentDisplay";
@@ -706,7 +706,7 @@ export function TransactionsPage(): React.ReactElement {
 
   return (
     <Stack paddingTop="$sm" paddingBottom="$xl">
-      <RecurringPaymentsSection />
+      <RecurringPaymentsSummaryRow />
       {transactions.length === 0 ? (
         <EmptyState title={t("paymentsHistoryEmpty")} />
       ) : (

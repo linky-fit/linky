@@ -97,7 +97,7 @@ test("a due recurring payment pays the contact once and shows up in history", as
 
   await test.step("A sets up an already-due payment from the history", async () => {
     await a.page.goto("/#wallet/transactions");
-    await a.page.getByRole("button", { name: "New recurring payment" }).click();
+    await a.page.locator(".recurring-summary-row").click();
     await a.page.waitForURL(/#wallet\/recurring\/new$/);
     await a.page.locator(".recurring-picker-list button").first().click();
     for (const digit of String(ORDER_SAT).split("")) {
@@ -111,9 +111,13 @@ test("a due recurring payment pays the contact once and shows up in history", as
     await a.page
       .getByRole("button", { name: "Set up recurring payment" })
       .click();
-    await a.page.waitForURL(/#wallet\/transactions$/);
-    await expect(a.page.locator(".recurring-section")).toContainText(
+    await a.page.waitForURL(/#wallet\/recurring$/);
+    await expect(a.page.locator(".recurring-order-card")).toContainText(
       "every day",
+    );
+    await a.page.goto("/#wallet/transactions");
+    await expect(a.page.locator(".recurring-summary-row")).toContainText(
+      "1 active",
     );
   });
 
@@ -159,6 +163,17 @@ test("a due recurring payment pays the contact once and shows up in history", as
     await expect(
       a.page.locator(".settings-row", { hasText: "Last payment" }),
     ).toContainText("paid");
+  });
+
+  await test.step("B can start one from A's contact page", async () => {
+    await b.page.goto("/#contacts");
+    await b.page.locator("[data-guide='contact-card']").first().click();
+    await b.page.waitForURL(/#chat\/[^/]+$/);
+    const contactId = new URL(b.page.url()).hash.replace(/^#chat\//, "");
+    await b.page.goto(`/#contact/${contactId}`);
+    await b.page.locator("[data-guide='contact-recurring']").click();
+    await b.page.waitForURL(/#wallet\/recurring\/new\?contact=/);
+    await expect(b.page.locator(".recurring-recipient-header")).toBeVisible();
   });
 
   await test.step("a second pass does not pay again", async () => {

@@ -28,6 +28,10 @@ export const cs = {
   recurringPaymentsTitle: "Pravidelné platby",
   recurringPaymentTitle: "Pravidelná platba",
   recurringPaymentNewTitle: "Nová pravidelná platba",
+  recurringEmpty: "Zatím žádné pravidelné platby.",
+  recurringSummaryActive: "{count} aktivní",
+  recurringSummaryNext: "další {date}",
+  recurringSummaryNoneActive: "žádná aktivní",
   recurringPaymentChatNote: "Pravidelná platba",
   recurringNotifyBody:
     "{amount} {unit} pro {name} odejde za {minutes} min. Otevřete Linky, pokud ji chcete zrušit.",

@@ -46,6 +46,7 @@ export type Route =
   | { kind: "profileEdit" }
   | { kind: "wallet" }
   | { kind: "transactions" }
+  | { kind: "recurringPayments" }
   | { kind: "recurringPaymentNew" }
   | { kind: "recurringPayment"; id: RecurringPaymentId }
   | { kind: "topup" }
@@ -122,7 +123,7 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#profile") return { kind: "profile" };
   if (hash === "#wallet") return { kind: "wallet" };
   if (hash === "#wallet/transactions") return { kind: "transactions" };
-  if (hash === "#wallet/recurring") return { kind: "transactions" };
+  if (hash === "#wallet/recurring") return { kind: "recurringPayments" };
   if (hash === "#wallet/recurring/new") return { kind: "recurringPaymentNew" };
   const recurringPaymentIdText = decodeHashSegment(hash, "#wallet/recurring/");
   if (recurringPaymentIdText) {

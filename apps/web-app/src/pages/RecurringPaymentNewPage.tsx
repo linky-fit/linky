@@ -224,7 +224,7 @@ export function RecurringPaymentNewPage(): React.ReactElement {
       setError(t("recurringInvalidForm"));
       return;
     }
-    navigateTo({ route: "transactions" });
+    navigateTo({ route: "recurringPayments" });
   };
 
   return (
