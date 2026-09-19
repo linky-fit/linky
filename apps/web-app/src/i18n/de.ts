@@ -29,6 +29,10 @@ export const de = {
   recurringPaymentsTitle: "Wiederkehrende Zahlungen",
   recurringPaymentTitle: "Wiederkehrende Zahlung",
   recurringPaymentNewTitle: "Neue wiederkehrende Zahlung",
+  recurringEmpty: "Noch keine wiederkehrenden Zahlungen.",
+  recurringSummaryActive: "{count} aktiv",
+  recurringSummaryNext: "nächste {date}",
+  recurringSummaryNoneActive: "keine aktiv",
   recurringPaymentChatNote: "Wiederkehrende Zahlung",
   recurringNotifyBody:
     "{amount} {unit} an {name} geht in {minutes} Min. raus. Öffne Linky, um sie abzubrechen.",
