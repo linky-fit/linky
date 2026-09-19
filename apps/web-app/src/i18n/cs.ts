@@ -872,6 +872,13 @@ export const cs = {
   availablePrefix: "dostupné:",
   payAmount: "Kolik poslat",
   paySend: "Zaplatit",
+  paymentRequestConfirmTitle: "Potvrdit platbu",
+  paymentRequestConfirmRecipient: "Příjemce: {recipient}",
+  paymentRequestConfirmMint: "Mint: {mint}",
+  paymentRequestInsecureTransport:
+    "Platební požadavek používá nezabezpečený přenos (http). Odmítnuto.",
+  paymentRequestInsecureTransportWarning:
+    "Pozor: tento požadavek posílá tokeny přes nezabezpečené spojení (http).",
   payCancel: "Zrušit",
   lnurlAuthTitleLogin: "Přihlásit se na {domain}?",
   lnurlAuthTitleRegister: "Vytvořit účet na {domain}?",

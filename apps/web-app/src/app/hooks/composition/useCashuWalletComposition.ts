@@ -98,6 +98,7 @@ import {
   buildCashuPaymentRequestMessage,
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,
+  paymentRequestPostUrlIsAllowed,
 } from "../../lib/paymentRequestMessage";
 import { getCashuTokenMessageInfo as getCashuTokenMessageInfoBase } from "../../lib/tokenMessageInfo";
 import type {
@@ -379,6 +380,10 @@ export const useCashuWalletComposition = ({
     pendingLightningInvoiceConfirmation,
     setPendingLightningInvoiceConfirmation,
   ] = useState<LightningInvoicePreview | null>(null);
+  const [
+    pendingCashuPaymentRequestConfirmation,
+    setPendingCashuPaymentRequestConfirmation,
+  ] = useState<CashuPaymentRequestMessageInfo | null>(null);
   const [
     pendingLnurlWithdrawConfirmation,
     setPendingLnurlWithdrawConfirmation,
@@ -1115,8 +1120,14 @@ export const useCashuWalletComposition = ({
         return false;
       }
 
-      if (postUrl.protocol !== "https:" && postUrl.protocol !== "http:") {
-        setStatus(t("paymentRequestUnknownContact"));
+      // An `http:` POST target exposes the bearer proofs to anyone on the
+      // network path, so it is only accepted in development builds.
+      if (
+        !paymentRequestPostUrlIsAllowed(postUrlRaw, {
+          allowHttp: import.meta.env.DEV,
+        })
+      ) {
+        setStatus(t("paymentRequestInsecureTransport"));
         return false;
       }
 
@@ -1306,7 +1317,7 @@ export const useCashuWalletComposition = ({
     ],
   );
 
-  const payCashuPaymentRequest = React.useCallback(
+  const runCashuPaymentRequest = React.useCallback(
     async (requestInfo: CashuPaymentRequestMessageInfo) => {
       if (cashuIsBusy) return;
 
@@ -1475,6 +1486,44 @@ export const useCashuWalletComposition = ({
   const closeLightningInvoiceConfirmation = React.useCallback(() => {
     setPendingLightningInvoiceConfirmation(null);
   }, []);
+
+  // A scanned, pasted or typed NUT-18 request has an attacker-controlled
+  // amount, recipient and mint, so it must be confirmed before any funds move
+  // instead of paying on sight (chat requests keep their own in-thread flow).
+  const payCashuPaymentRequest = React.useCallback(
+    async (requestInfo: CashuPaymentRequestMessageInfo) => {
+      if (cashuIsBusy) return;
+
+      const ownPubkeyHex = normalizePubkeyHex(decodeNpub(currentNpub ?? ""));
+      const targetPubkeyHex = normalizePubkeyHex(
+        requestInfo.transportPubkeyHex,
+      );
+      // Self-payment moves no funds out; complete it without a confirmation.
+      if (ownPubkeyHex && targetPubkeyHex && ownPubkeyHex === targetPubkeyHex) {
+        await runCashuPaymentRequest(requestInfo);
+        return;
+      }
+
+      setPendingCashuPaymentRequestConfirmation(requestInfo);
+    },
+    [cashuIsBusy, currentNpub, runCashuPaymentRequest],
+  );
+
+  const closeCashuPaymentRequestConfirmation = React.useCallback(() => {
+    if (cashuIsBusy) return;
+    setPendingCashuPaymentRequestConfirmation(null);
+  }, [cashuIsBusy]);
+
+  const confirmCashuPaymentRequest = React.useCallback(async () => {
+    const pending = pendingCashuPaymentRequestConfirmation;
+    if (!pending || cashuIsBusy) return;
+    setPendingCashuPaymentRequestConfirmation(null);
+    await runCashuPaymentRequest(pending);
+  }, [
+    cashuIsBusy,
+    pendingCashuPaymentRequestConfirmation,
+    runCashuPaymentRequest,
+  ]);
 
   const confirmLightningInvoicePayment = React.useCallback(async () => {
     const pending = pendingLightningInvoiceConfirmation;
@@ -2502,10 +2551,13 @@ export const useCashuWalletComposition = ({
     markCashuTokenIssued,
     meltLargestForeignMintToMainMint,
     mintInfoByUrl,
+    closeCashuPaymentRequestConfirmation,
+    confirmCashuPaymentRequest,
     onPayChatPaymentRequest,
     paidOverlayIsOpen,
     paidOverlayTitle,
     payCashuPaymentRequest,
+    pendingCashuPaymentRequestConfirmation,
     payLightningAddressWithCashu,
     payLightningInvoiceWithCashu,
     paySelectedContact,

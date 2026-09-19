@@ -7533,3 +7533,8 @@ button.cashu-token-pill {
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+
+.payment-request-confirm-warning {
+  margin-top: 8px;
+  color: #fca5a5;
+}

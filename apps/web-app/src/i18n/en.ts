@@ -862,6 +862,13 @@ export const en = {
   availablePrefix: "available:",
   payAmount: "Amount",
   paySend: "Pay",
+  paymentRequestConfirmTitle: "Confirm payment",
+  paymentRequestConfirmRecipient: "Recipient: {recipient}",
+  paymentRequestConfirmMint: "Mint: {mint}",
+  paymentRequestInsecureTransport:
+    "The payment request uses an insecure (http) transport. Rejected.",
+  paymentRequestInsecureTransportWarning:
+    "Warning: this request sends the tokens over an insecure (http) connection.",
   payCancel: "Cancel",
   lnurlAuthTitleLogin: "Log in to {domain}?",
   lnurlAuthTitleRegister: "Create an account on {domain}?",

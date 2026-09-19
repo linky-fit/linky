@@ -7,6 +7,7 @@ import { useDesktopSplitView } from "../hooks/useDesktopSplitView";
 import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
 import { ContactsGuideOverlay } from "./ContactsGuideOverlay";
 import { LightningInvoiceConfirmModal } from "./LightningInvoiceConfirmModal";
+import { CashuPaymentRequestConfirmModal } from "./CashuPaymentRequestConfirmModal";
 import { LnurlAuthConfirmModal } from "./LnurlAuthConfirmModal";
 import { LnurlWithdrawConfirmModal } from "./LnurlWithdrawConfirmModal";
 import { MenuModal } from "./MenuModal";
@@ -78,6 +79,19 @@ export function AuthenticatedLayout({
           confirmation={state.pendingLightningInvoiceConfirmation}
           onClose={actions.closeLightningInvoiceConfirmation}
           onConfirm={actions.confirmLightningInvoicePayment}
+          t={state.t}
+        />
+      ) : null}
+
+      {state.pendingCashuPaymentRequestConfirmation &&
+      !state.pendingPaymentMintMeltConfirmation &&
+      !state.paidOverlayIsOpen ? (
+        <CashuPaymentRequestConfirmModal
+          cashuBalance={state.cashuBalanceAfterMelt}
+          cashuIsBusy={state.cashuIsBusy}
+          confirmation={state.pendingCashuPaymentRequestConfirmation}
+          onClose={actions.closeCashuPaymentRequestConfirmation}
+          onConfirm={actions.confirmCashuPaymentRequest}
           t={state.t}
         />
       ) : null}

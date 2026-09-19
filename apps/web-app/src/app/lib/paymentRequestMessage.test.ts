@@ -6,6 +6,7 @@ import {
   buildLinkyPaymentRequestDeclineMessage,
   parseCashuPaymentRequestMessage,
   parseLinkyPaymentRequestDeclineMessage,
+  paymentRequestPostUrlIsAllowed,
 } from "./paymentRequestMessage";
 import { encodeBase64Url } from "../../utils/base64";
 
@@ -69,5 +70,41 @@ describe("paymentRequestMessage", () => {
     expect(parseLinkyPaymentRequestDeclineMessage(message)).toEqual({
       requestRumorId: "rumor-123",
     });
+  });
+});
+
+describe("paymentRequestPostUrlIsAllowed", () => {
+  it("allows https targets", () => {
+    expect(
+      paymentRequestPostUrlIsAllowed("https://pay.example/req", {
+        allowHttp: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects http targets in production but allows them in dev", () => {
+    expect(
+      paymentRequestPostUrlIsAllowed("http://pay.example/req", {
+        allowHttp: false,
+      }),
+    ).toBe(false);
+    expect(
+      paymentRequestPostUrlIsAllowed("http://localhost:3338/req", {
+        allowHttp: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects non-http(s) schemes and unparseable input", () => {
+    for (const url of [
+      "ftp://pay.example",
+      "javascript:alert(1)",
+      "not a url",
+      "",
+    ]) {
+      expect(paymentRequestPostUrlIsAllowed(url, { allowHttp: true })).toBe(
+        false,
+      );
+    }
   });
 });

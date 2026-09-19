@@ -730,9 +730,11 @@ export const useAppShellComposition = ({
     checkAndRefreshCashuToken,
     checkIssuedCashuTokensAndDeleteClaimed,
     checkSingleIssuedCashuTokenIsClaimed,
+    closeCashuPaymentRequestConfirmation,
     closeLightningInvoiceConfirmation,
     closeLnurlWithdrawConfirmation,
     closePaymentMintMeltConfirmation,
+    confirmCashuPaymentRequest,
     confirmLightningInvoicePayment,
     confirmLnurlWithdraw,
     confirmPaymentMintMelt,
@@ -769,6 +771,7 @@ export const useAppShellComposition = ({
     payWithCashuEnabled,
     pendingCashuContactSend,
     pendingCashuDeleteId,
+    pendingCashuPaymentRequestConfirmation,
     pendingCashuTokenContactPickId,
     pendingLightningInvoiceConfirmation,
     pendingLnurlWithdrawConfirmation,
@@ -1198,6 +1201,9 @@ export const useAppShellComposition = ({
     }
     if (pendingLightningInvoiceConfirmation) {
       return closeLightningInvoiceConfirmation;
+    }
+    if (pendingCashuPaymentRequestConfirmation) {
+      return closeCashuPaymentRequestConfirmation;
     }
     if (postPaySaveContact) return () => setPostPaySaveContact(null);
     return null;
@@ -1708,6 +1714,7 @@ export const useAppShellComposition = ({
       pendingLnurlAuthConfirmation,
       pendingLnurlWithdrawConfirmation,
       pendingLightningInvoiceConfirmation,
+      pendingCashuPaymentRequestConfirmation,
       postPaySaveContact,
       profileCustomPictureUrl,
       profileEditInitialRef,
@@ -1779,6 +1786,7 @@ export const useAppShellComposition = ({
       paidOverlayIsOpen,
       paidOverlayTitle,
       pendingLightningInvoiceConfirmation,
+      pendingCashuPaymentRequestConfirmation,
       pendingLnurlAuthConfirmation,
       pendingLnurlWithdrawConfirmation,
       pendingPaymentMintMeltConfirmation,
@@ -1825,10 +1833,12 @@ export const useAppShellComposition = ({
       closeShareOptions,
       closeLightningInvoiceConfirmation,
       closeScan,
+      closeCashuPaymentRequestConfirmation,
       confirmPaymentMintMelt,
       confirmLnurlAuth,
       confirmLnurlWithdraw,
       confirmLightningInvoicePayment,
+      confirmCashuPaymentRequest,
       contactsGuideNav: stableContactsGuideNav,
       copyShareOptionsText,
       copyText,
@@ -1880,7 +1890,9 @@ export const useAppShellComposition = ({
       closeProfileShareOverlay,
       closeScan,
       closeShareOptions,
+      closeCashuPaymentRequestConfirmation,
       confirmLightningInvoicePayment,
+      confirmCashuPaymentRequest,
       confirmLnurlAuth,
       confirmLnurlWithdraw,
       confirmPaymentMintMelt,

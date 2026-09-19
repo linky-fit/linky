@@ -146,3 +146,22 @@ export const parseLinkyPaymentRequestDeclineMessage = (
     requestRumorId: requestRumorId || null,
   };
 };
+
+/**
+ * A NUT-18 POST transport target must use https, otherwise the bearer cashu
+ * proofs it receives travel in the clear and any network observer can redeem
+ * them. `http:` is accepted only in development builds (localhost testing).
+ */
+export const paymentRequestPostUrlIsAllowed = (
+  rawUrl: string,
+  options: { allowHttp: boolean },
+): boolean => {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "https:") return true;
+  return url.protocol === "http:" && options.allowHttp;
+};

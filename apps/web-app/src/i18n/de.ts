@@ -872,6 +872,13 @@ export const de = {
   availablePrefix: "verfügbar:",
   payAmount: "Betrag",
   paySend: "Bezahlen",
+  paymentRequestConfirmTitle: "Zahlung bestätigen",
+  paymentRequestConfirmRecipient: "Empfänger: {recipient}",
+  paymentRequestConfirmMint: "Mint: {mint}",
+  paymentRequestInsecureTransport:
+    "Die Zahlungsanforderung nutzt einen unsicheren (http) Transport. Abgelehnt.",
+  paymentRequestInsecureTransportWarning:
+    "Achtung: Diese Anforderung sendet die Token über eine unsichere (http) Verbindung.",
   payCancel: "Abbrechen",
   lnurlAuthTitleLogin: "Bei {domain} anmelden?",
   lnurlAuthTitleRegister: "Konto bei {domain} erstellen?",
