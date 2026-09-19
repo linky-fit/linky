@@ -58,7 +58,6 @@ import {
   TopupPage,
   RecurringPaymentNewPage,
   RecurringPaymentPage,
-  RecurringPaymentsPage,
   TransactionsPage,
 } from "../../pages";
 import {
@@ -178,8 +177,6 @@ const RoutePage = (): React.ReactElement => {
       return <TopupPage {...moneyRoutes.topupProps} />;
     case "transactions":
       return <TransactionsPage />;
-    case "recurringPayments":
-      return <RecurringPaymentsPage />;
     case "recurringPaymentNew":
       // The prefill lives in the hash query, which is not part of `route`;
       // keying on it gives each "Repeat regularly…" entry a fresh form.

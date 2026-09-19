@@ -100,13 +100,6 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
           >
             {t("showTransactions")}
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onPress={() => navigateTo({ route: "recurringPayments" })}
-          >
-            {t("showRecurringPayments")}
-          </Button>
         </Stack>
       </Stack>
     );

@@ -1,10 +1,11 @@
-import { Repeat } from "lucide-react";
+import { Minus, Plus, Repeat } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
 import {
+  contactSummaryLabel,
+  isPayableContact,
   useRecurringContactSummaries,
-  type RecurringContactSummary,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
 import {
   dateTimeLocalToEpoch,
@@ -12,19 +13,32 @@ import {
   epochToDateTimeLocal,
   nextFullHourSec,
 } from "../app/lib/recurringPaymentDisplay";
-import type { RecurringPaymentRecipient } from "../app/lib/recurringPaymentOrder";
 import {
+  currentTimeZone,
   isValidRecurringInterval,
   MAX_RECURRING_INTERVAL_COUNT,
   RECURRING_INTERVAL_UNITS,
+  recurringDueAt,
+  type RecurringInterval,
   type RecurringIntervalUnit,
 } from "../app/lib/recurringSchedule";
-import { Avatar } from "../components/Avatar";
-import { deriveDefaultProfile } from "../derivedProfile";
+import { AmountDisplay } from "../components/AmountDisplay";
+import { Keypad } from "../components/Keypad";
+import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
+import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
-import { getInitials } from "../utils/formatting";
+import { normalizeLocale } from "../utils/formatting";
 import { nowSeconds } from "../utils/time";
+
+type Frequency = "day" | "week" | "month" | "custom";
+
+const FREQUENCIES: ReadonlyArray<{ key: Frequency; label: I18nKey }> = [
+  { key: "day", label: "recurringPresetDaily" },
+  { key: "week", label: "recurringPresetWeekly" },
+  { key: "month", label: "recurringPresetMonthly" },
+  { key: "custom", label: "recurringPresetCustom" },
+];
 
 const UNIT_LABEL_KEYS: Record<RecurringIntervalUnit, I18nKey> = {
   hour: "recurringUnitHours",
@@ -33,13 +47,14 @@ const UNIT_LABEL_KEYS: Record<RecurringIntervalUnit, I18nKey> = {
   month: "recurringUnitMonths",
 };
 
+const DEFAULT_MAX_RUNS = 12;
+
 interface Prefill {
   amountSat: string;
   contactId: string;
-  lnAddress: string;
 }
 
-// `#wallet/recurring/new?contact=…&ln=…&amount=…` from the pay pages.
+// `#wallet/recurring/new?contact=…&amount=…` from a completed payment.
 const readPrefillFromHash = (): Prefill => {
   const query = (globalThis.location?.hash ?? "").split("?")[1] ?? "";
   const params = new URLSearchParams(query);
@@ -47,229 +62,232 @@ const readPrefillFromHash = (): Prefill => {
   return {
     amountSat: Number.isFinite(amount) && amount > 0 ? String(amount) : "",
     contactId: params.get("contact")?.trim() ?? "",
-    lnAddress: params.get("ln")?.trim() ?? "",
   };
 };
 
-const parsePositiveInt = (value: string): number | null => {
-  const parsed = Number.parseInt(value.trim(), 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-};
-
-const contactLabel = (contact: RecurringContactSummary): string =>
-  contact.name ?? contact.lnAddress ?? contact.npub ?? "";
+const pill = (active: boolean): string =>
+  active
+    ? "group-filter-btn contact-group-pill is-active"
+    : "group-filter-btn contact-group-pill";
 
 export function RecurringPaymentNewPage(): React.ReactElement {
-  const { nostrPictureByNpub, t } = useAppShellCore();
+  const { cashuIsBusy, displayUnit, lang, t } = useAppShellCore();
   const { createRecurringPayment } = useRecurringPaymentsContext();
   const contacts = useRecurringContactSummaries();
   const [prefill] = React.useState(readPrefillFromHash);
 
-  const [recipientKind, setRecipientKind] = React.useState<
-    RecurringPaymentRecipient["kind"]
-  >(prefill.lnAddress && !prefill.contactId ? "lnAddress" : "contact");
   const [contactId, setContactId] = React.useState(prefill.contactId);
-  const [lnAddress, setLnAddress] = React.useState(prefill.lnAddress);
-  const [recipientLocked, setRecipientLocked] = React.useState(
-    Boolean(prefill.contactId || prefill.lnAddress),
-  );
-  const [title, setTitle] = React.useState("");
-  const [amountText, setAmountText] = React.useState(prefill.amountSat);
-  const [intervalCountText, setIntervalCountText] = React.useState("1");
-  const [intervalUnit, setIntervalUnit] =
-    React.useState<RecurringIntervalUnit>("month");
-  const [firstRunText, setFirstRunText] = React.useState(() =>
-    epochToDateTimeLocal(nextFullHourSec(nowSeconds())),
-  );
-  const [maxRunsText, setMaxRunsText] = React.useState("");
-  const [note, setNote] = React.useState("");
+  const [search, setSearch] = React.useState("");
+  const [amount, setAmount] = React.useState(prefill.amountSat);
+  const [frequency, setFrequency] = React.useState<Frequency>("month");
+  const [customCount, setCustomCount] = React.useState("2");
+  const [customUnit, setCustomUnit] =
+    React.useState<RecurringIntervalUnit>("week");
+  const [showMore, setShowMore] = React.useState(false);
+  const [firstRunText, setFirstRunText] = React.useState<string | null>(null);
+  const [maxRuns, setMaxRuns] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const amountInput = useAmountInputKeypad({
+    amount,
+    onAmountChange: setAmount,
+  });
 
-  const payableContacts = React.useMemo(
+  const contact = contactId ? contacts.get(contactId) : undefined;
+  const interval = React.useMemo((): RecurringInterval | null => {
+    if (frequency !== "custom") return { unit: frequency, count: 1 };
+    const count = Number.parseInt(customCount, 10);
+    return Number.isInteger(count) && count > 0
+      ? { unit: customUnit, count }
+      : null;
+  }, [customCount, customUnit, frequency]);
+  const intervalValid = interval !== null && isValidRecurringInterval(interval);
+
+  // Repeating a finished payment starts one period later; a fresh one starts
+  // at the next full hour. Either way the user can move it.
+  const defaultFirstRunSec = React.useMemo(() => {
+    const now = nowSeconds();
+    if (prefill.contactId && interval !== null && intervalValid) {
+      return recurringDueAt(now, interval, 1, currentTimeZone());
+    }
+    return nextFullHourSec(now);
+  }, [interval, intervalValid, prefill.contactId]);
+  const firstRunSec =
+    firstRunText === null
+      ? defaultFirstRunSec
+      : dateTimeLocalToEpoch(firstRunText);
+
+  const dateFormatter = React.useMemo(
     () =>
-      Array.from(contacts.values())
-        .filter((contact) => contact.npub !== null)
-        .sort((a, b) => contactLabel(a).localeCompare(contactLabel(b))),
-    [contacts],
+      new Intl.DateTimeFormat(normalizeLocale(lang), {
+        day: "numeric",
+        month: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    [lang],
   );
+  const formatDate = (epochSec: number) =>
+    dateFormatter.format(new Date(epochSec * 1000));
 
-  const selectedContact = contactId ? contacts.get(contactId) : undefined;
-  const recipientName =
-    recipientKind === "contact"
-      ? selectedContact
-        ? contactLabel(selectedContact)
-        : ""
-      : lnAddress.trim();
-  const intervalCount = parsePositiveInt(intervalCountText);
-  const intervalPreview =
-    intervalCount === null
-      ? null
-      : describeRecurringInterval(
-          { unit: intervalUnit, count: intervalCount },
-          t,
-        );
+  const payableContacts = React.useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return Array.from(contacts.values())
+      .filter(isPayableContact)
+      .filter(
+        (candidate) =>
+          !query ||
+          [candidate.name, candidate.lnAddress, candidate.npub].some((value) =>
+            value?.toLowerCase().includes(query),
+          ),
+      )
+      .sort((a, b) =>
+        contactSummaryLabel(a).localeCompare(contactSummaryLabel(b)),
+      );
+  }, [contacts, search]);
+
+  if (!contact) {
+    return (
+      <section className="panel panel-plain recurring-picker">
+        <label htmlFor="recurringSearch">{t("recurringChooseContact")}</label>
+        <input
+          id="recurringSearch"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t("recurringSearchContacts")}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+        />
+        {payableContacts.length === 0 ? (
+          <p className="muted recurring-hint">
+            {t("recurringNoPayableContacts")}
+          </p>
+        ) : (
+          <div className="transactions-list recurring-picker-list">
+            {payableContacts.map((candidate) => (
+              <button
+                type="button"
+                key={candidate.id}
+                className="transaction-card recurring-order-card"
+                onClick={() => setContactId(candidate.id)}
+              >
+                <article className="transaction-row">
+                  <RecurringContactAvatar
+                    className="contact-avatar transaction-avatar"
+                    contact={candidate}
+                  />
+                  <div className="transaction-main">
+                    <div className="transaction-title">
+                      {contactSummaryLabel(candidate)}
+                    </div>
+                    {candidate.name && candidate.lnAddress ? (
+                      <div className="transaction-meta recurring-truncate">
+                        {candidate.lnAddress}
+                      </div>
+                    ) : null}
+                  </div>
+                </article>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  const amountSat = Number.parseInt(amount.trim(), 10);
+  const amountValid = Number.isFinite(amountSat) && amountSat > 0;
+  const lastRunSec =
+    maxRuns !== null && interval !== null && firstRunSec !== null
+      ? recurringDueAt(firstRunSec, interval, maxRuns - 1, currentTimeZone())
+      : null;
 
   const submit = (): void => {
-    const trimmedTitle = title.trim() || recipientName;
-    const amountSat = parsePositiveInt(amountText);
-    const firstDueAtSec = dateTimeLocalToEpoch(firstRunText);
-    const maxRuns = maxRunsText.trim() ? parsePositiveInt(maxRunsText) : null;
-    const recipient: RecurringPaymentRecipient | null =
-      recipientKind === "contact"
-        ? contactId && contacts.has(contactId)
-          ? { kind: "contact", contactId }
-          : null
-        : lnAddress.trim()
-          ? { kind: "lnAddress", lnAddress: lnAddress.trim() }
-          : null;
-    const interval =
-      intervalCount === null
-        ? null
-        : { unit: intervalUnit, count: intervalCount };
     if (
-      !trimmedTitle ||
-      recipient === null ||
-      amountSat === null ||
+      !amountValid ||
       interval === null ||
-      !isValidRecurringInterval(interval) ||
-      firstDueAtSec === null ||
-      (maxRunsText.trim() !== "" && maxRuns === null)
+      !intervalValid ||
+      firstRunSec === null
     ) {
       setError(t("recurringInvalidForm"));
       return;
     }
     const created = createRecurringPayment({
       amountSat,
-      endAtSec: null,
-      firstDueAtSec,
+      contactId: contact.id,
+      firstDueAtSec: firstRunSec,
       interval,
       maxRuns,
-      note: note.trim() || null,
-      recipient,
-      title: trimmedTitle,
     });
     if (!created) {
       setError(t("recurringInvalidForm"));
       return;
     }
-    navigateTo({ route: "recurringPayments" });
+    navigateTo({ route: "transactions" });
   };
 
-  const lockedPictureUrl = selectedContact?.npub
-    ? nostrPictureByNpub[selectedContact.npub] ||
-      deriveDefaultProfile(selectedContact.npub).pictureUrl
-    : null;
-
-  const recipientField =
-    recipientLocked && recipientName ? (
+  return (
+    <section className="panel recurring-form">
       <div className="contact-header recurring-recipient-header">
-        <div className="contact-avatar is-large" aria-hidden="true">
-          {recipientKind === "contact" ? (
-            <Avatar
-              pictureUrl={lockedPictureUrl}
-              fallback={getInitials(recipientName)}
-              fallbackClassName="contact-avatar-fallback"
-              loading="lazy"
-            />
-          ) : (
-            <span className="contact-avatar-fallback">⚡️</span>
-          )}
-        </div>
+        <RecurringContactAvatar
+          className="contact-avatar is-large"
+          contact={contact}
+        />
         <div className="contact-header-text">
-          <h3 className="unspaced">{recipientName}</h3>
+          <h3 className="unspaced recurring-truncate">
+            {contactSummaryLabel(contact)}
+          </h3>
           <button
             type="button"
             className="wallet-subtle-link recurring-inline-link"
-            onClick={() => setRecipientLocked(false)}
+            onClick={() => setContactId("")}
           >
             {t("recurringChangeRecipient")}
           </button>
         </div>
       </div>
-    ) : (
-      <>
-        <div
-          className="contact-group-selector recurring-pills"
-          role="radiogroup"
-          aria-label={t("recurringRecipientLabel")}
-        >
-          {(["contact", "lnAddress"] as const).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              className={
-                recipientKind === kind
-                  ? "group-filter-btn contact-group-pill is-active"
-                  : "group-filter-btn contact-group-pill"
-              }
-              aria-pressed={recipientKind === kind}
-              onClick={() => setRecipientKind(kind)}
-            >
-              {kind === "contact" ? t("contact") : t("lightningAddress")}
-            </button>
-          ))}
-        </div>
-        {recipientKind === "contact" ? (
-          <select
-            id="recurringContact"
-            className="recurring-select"
-            value={contactId}
-            onChange={(event) => setContactId(event.target.value)}
+
+      <AmountDisplay
+        amount={amount}
+        cycleOnClick
+        inputDisplayValue={amountInput.inputDisplayValue}
+      />
+      <Keypad
+        ariaLabel={`${t("payAmount")} (${displayUnit})`}
+        decimalKeyEnabled={amountInput.decimalKeyEnabled}
+        disabled={false}
+        onKeyPress={(key: string) => amountInput.onKeyPress(key)}
+        translations={{
+          clearForm: t("clearForm"),
+          decimalPoint: t("decimalPoint"),
+          delete: t("delete"),
+        }}
+      />
+
+      <label>{t("recurringFrequencyLabel")}</label>
+      <div className="contact-group-selector recurring-pills" role="radiogroup">
+        {FREQUENCIES.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            className={pill(frequency === option.key)}
+            aria-pressed={frequency === option.key}
+            onClick={() => setFrequency(option.key)}
           >
-            <option value="">{t("recurringSelectContact")}</option>
-            {payableContacts.map((contact) => (
-              <option key={contact.id} value={contact.id}>
-                {contactLabel(contact)}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            id="recurringLnAddress"
-            value={lnAddress}
-            onChange={(event) => setLnAddress(event.target.value)}
-            placeholder={t("lightningAddressPlaceholder")}
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            inputMode="email"
-          />
-        )}
-      </>
-    );
-
-  return (
-    <section className="panel panel-plain">
-      <div className="form-grid">
-        <div className="form-col recurring-form">
-          <label>{t("recurringRecipientLabel")}</label>
-          {recipientField}
-
-          <label htmlFor="recurringAmount">{t("recurringAmountLabel")}</label>
-          <div className="recurring-amount-field">
-            <input
-              id="recurringAmount"
-              value={amountText}
-              onChange={(event) => setAmountText(event.target.value)}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="0"
-            />
-            <span className="recurring-amount-unit" aria-hidden="true">
-              sat
-            </span>
-          </div>
-
-          <label htmlFor="recurringIntervalCount">
-            {t("recurringIntervalLabel")}
-          </label>
+            {t(option.label)}
+          </button>
+        ))}
+      </div>
+      {frequency === "custom" ? (
+        <>
           <div className="recurring-interval-row">
             <span className="muted">{t("recurringEveryPrefix")}</span>
             <input
               id="recurringIntervalCount"
               className="recurring-interval-count"
-              value={intervalCountText}
-              onChange={(event) => setIntervalCountText(event.target.value)}
+              value={customCount}
+              onChange={(event) => setCustomCount(event.target.value)}
               inputMode="numeric"
               pattern="[0-9]*"
               min={1}
@@ -279,81 +297,136 @@ export function RecurringPaymentNewPage(): React.ReactElement {
           <div
             className="contact-group-selector recurring-pills"
             role="radiogroup"
-            aria-label={t("recurringIntervalLabel")}
           >
             {RECURRING_INTERVAL_UNITS.map((unit) => (
               <button
                 key={unit}
                 type="button"
-                className={
-                  intervalUnit === unit
-                    ? "group-filter-btn contact-group-pill is-active"
-                    : "group-filter-btn contact-group-pill"
-                }
-                aria-pressed={intervalUnit === unit}
-                onClick={() => setIntervalUnit(unit)}
+                className={pill(customUnit === unit)}
+                aria-pressed={customUnit === unit}
+                onClick={() => setCustomUnit(unit)}
               >
                 {t(UNIT_LABEL_KEYS[unit])}
               </button>
             ))}
           </div>
-          {intervalPreview ? (
-            <p className="muted recurring-hint recurring-interval-preview">
-              <Repeat size={14} aria-hidden="true" /> {intervalPreview}
-            </p>
-          ) : null}
+        </>
+      ) : null}
 
+      <p className="muted recurring-summary">
+        <Repeat size={14} aria-hidden="true" />
+        <span>
+          {[
+            interval !== null && intervalValid
+              ? describeRecurringInterval(interval, t)
+              : null,
+            firstRunSec !== null
+              ? t("recurringSummaryFirst").replace(
+                  "{date}",
+                  formatDate(firstRunSec),
+                )
+              : null,
+            lastRunSec !== null
+              ? t("recurringSummaryLast").replace(
+                  "{date}",
+                  formatDate(lastRunSec),
+                )
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      </p>
+
+      <button
+        type="button"
+        className="wallet-subtle-link recurring-inline-link"
+        aria-expanded={showMore}
+        onClick={() => setShowMore((value) => !value)}
+      >
+        {t("recurringMoreOptions")}
+      </button>
+      {showMore ? (
+        <div className="recurring-more">
           <label htmlFor="recurringFirstRun">
             {t("recurringFirstRunLabel")}
           </label>
           <input
             id="recurringFirstRun"
             type="datetime-local"
-            value={firstRunText}
+            value={firstRunText ?? epochToDateTimeLocal(defaultFirstRunSec)}
             onChange={(event) => setFirstRunText(event.target.value)}
           />
 
-          <label htmlFor="recurringTitle">{t("recurringTitleLabel")}</label>
-          <input
-            id="recurringTitle"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder={recipientName || t("recurringTitlePlaceholder")}
-            maxLength={200}
-          />
-
-          <label htmlFor="recurringMaxRuns">{t("recurringMaxRunsLabel")}</label>
-          <input
-            id="recurringMaxRuns"
-            value={maxRunsText}
-            onChange={(event) => setMaxRunsText(event.target.value)}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            placeholder={t("recurringMaxRunsPlaceholder")}
-          />
-
-          <label htmlFor="recurringNote">{t("recurringNoteLabel")}</label>
-          <input
-            id="recurringNote"
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            maxLength={500}
-          />
-
-          {error ? <p className="error-text">{error}</p> : null}
-          <p className="muted recurring-hint">{t("recurringOnlyWhileOpen")}</p>
-
-          <div className="actions">
-            <button type="button" className="btn-wide" onClick={submit}>
-              <span className="btn-label-with-icon">
-                <span className="btn-label-icon" aria-hidden="true">
-                  <Repeat size={18} />
-                </span>
-                <span>{t("recurringSave")}</span>
-              </span>
+          <label>{t("recurringEndLabel")}</label>
+          <div
+            className="contact-group-selector recurring-pills"
+            role="radiogroup"
+          >
+            <button
+              type="button"
+              className={pill(maxRuns === null)}
+              aria-pressed={maxRuns === null}
+              onClick={() => setMaxRuns(null)}
+            >
+              {t("recurringEndForever")}
+            </button>
+            <button
+              type="button"
+              className={pill(maxRuns !== null)}
+              aria-pressed={maxRuns !== null}
+              onClick={() => setMaxRuns((value) => value ?? DEFAULT_MAX_RUNS)}
+            >
+              {t("recurringEndLimited")}
             </button>
           </div>
+          {maxRuns !== null ? (
+            <div className="recurring-stepper">
+              <button
+                type="button"
+                className="secondary"
+                aria-label={t("recurringDecrease")}
+                disabled={maxRuns <= 1}
+                onClick={() =>
+                  setMaxRuns((value) => Math.max(1, (value ?? 1) - 1))
+                }
+              >
+                <Minus size={18} aria-hidden="true" />
+              </button>
+              <span className="recurring-stepper-value" aria-live="polite">
+                {maxRuns}×
+              </span>
+              <button
+                type="button"
+                className="secondary"
+                aria-label={t("recurringIncrease")}
+                disabled={maxRuns >= MAX_RECURRING_INTERVAL_COUNT}
+                onClick={() => setMaxRuns((value) => (value ?? 0) + 1)}
+              >
+                <Plus size={18} aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
         </div>
+      ) : null}
+
+      {error ? <p className="error-text">{error}</p> : null}
+      <p className="muted recurring-hint">{t("recurringOnlyWhileOpen")}</p>
+
+      <div className="actions">
+        <button
+          type="button"
+          className="btn-wide"
+          onClick={submit}
+          disabled={cashuIsBusy || !amountValid || !intervalValid}
+        >
+          <span className="btn-label-with-icon">
+            <span className="btn-label-icon" aria-hidden="true">
+              <Repeat size={18} />
+            </span>
+            <span>{t("recurringSave")}</span>
+          </span>
+        </button>
       </div>
     </section>
   );

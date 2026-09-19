@@ -116,10 +116,9 @@ type NavigationAction =
   | { route: "settingsUnits" }
   | { route: "settingsReceiveMethod" }
   | { route: "transactions" }
-  | { route: "recurringPayments" }
   | {
       route: "recurringPaymentNew";
-      prefill?: { amountSat?: number; contactId?: string; lnAddress?: string };
+      prefill?: { amountSat?: number; contactId?: string };
     }
   | { route: "recurringPayment"; id: string }
   | { route: "topup" }
@@ -200,14 +199,10 @@ export const navigateTo = (action: NavigationAction): void => {
     case "transactions":
       window.location.assign("#wallet/transactions");
       break;
-    case "recurringPayments":
-      window.location.assign("#wallet/recurring");
-      break;
     case "recurringPaymentNew": {
       const query = new URLSearchParams();
       if (action.prefill?.contactId)
         query.set("contact", action.prefill.contactId);
-      if (action.prefill?.lnAddress) query.set("ln", action.prefill.lnAddress);
       if (action.prefill?.amountSat) {
         query.set("amount", String(action.prefill.amountSat));
       }

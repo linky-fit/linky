@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { RecurringPaymentOrder } from "./recurringPaymentOrder";
 import {
   planRecurringPaymentTick,
+  RECURRING_CLAIM_TAKEOVER_SEC,
+  RECURRING_NOTICE_SEC,
   RECURRING_RUN_GRACE_SEC,
   RECURRING_RUN_STALE_SEC,
+  recurringUpcoming,
 } from "./recurringPaymentTick";
 
 const HOUR = 3600;
 const DUE = 1_800_000_000;
+const NOTICE = RECURRING_NOTICE_SEC;
 
 const order = (
   overrides: Partial<RecurringPaymentOrder> = {},
@@ -15,8 +19,7 @@ const order = (
   id: "rp-1",
   ownerId: "owner-1",
   createdAtSec: DUE - 10 * HOUR,
-  title: "Coffee",
-  recipient: { kind: "contact", contactId: "contact-1" },
+  contactId: "contact-1",
   amountSat: 100,
   schedule: {
     anchorAtSec: DUE,
@@ -30,93 +33,155 @@ const order = (
   },
   lastRunAtSec: null,
   lastRunStatus: null,
-  executorDeviceId: "device-a",
-  note: null,
+  claim: null,
   ...overrides,
+});
+
+const claimedBy = (
+  deviceId: string,
+  atSec: number,
+  dueAtSec = DUE,
+): Partial<RecurringPaymentOrder> => ({
+  claim: { deviceId, atSec, dueAtSec },
 });
 
 const plan = (
   orders: RecurringPaymentOrder[],
   nowSec: number,
-  extra: { cashuBalance?: number; retry?: [string, number][] } = {},
+  extra: {
+    cashuBalance?: number;
+    deviceId?: string;
+    retry?: [string, number][];
+  } = {},
 ) =>
   planRecurringPaymentTick({
     orders,
     nowSec,
-    deviceId: "device-a",
+    deviceId: extra.deviceId ?? "device-a",
     cashuBalance: extra.cashuBalance ?? 1_000,
     retryNotBeforeSec: new Map(extra.retry ?? []),
   });
 
 describe("planRecurringPaymentTick", () => {
-  it("runs a due order and advances past the periods that passed", () => {
-    const [action] = plan([order()], DUE + 13 * HOUR);
-    expect(action).toMatchObject({
-      kind: "run",
-      dueAtSec: DUE,
-      missedCount: 2,
-      advance: { nextDueAtSec: DUE + 18 * HOUR, runCount: 1 },
+  describe("claiming", () => {
+    it("does nothing before the notice window opens", () => {
+      expect(plan([order()], DUE - NOTICE - 1)).toEqual([]);
+    });
+
+    it("claims a payment once it is within the notice window", () => {
+      expect(plan([order()], DUE - NOTICE)).toMatchObject([
+        { kind: "claim", dueAtSec: DUE, takeover: false },
+      ]);
+    });
+
+    it("claims again when the claim is for an earlier due time", () => {
+      const stale = order(
+        claimedBy("device-b", DUE - 7 * HOUR, DUE - 6 * HOUR),
+      );
+      expect(plan([stale], DUE - 60)).toMatchObject([
+        { kind: "claim", takeover: false },
+      ]);
+    });
+
+    it("any device may claim, so a second device claims too", () => {
+      expect(plan([order()], DUE, { deviceId: "device-b" })).toMatchObject([
+        { kind: "claim" },
+      ]);
     });
   });
 
-  it("does nothing before the due time", () => {
-    expect(plan([order()], DUE - 1)).toEqual([]);
-  });
-
-  it("leaves orders bound to another device alone", () => {
-    expect(plan([order({ executorDeviceId: "device-b" })], DUE)).toEqual([]);
-  });
-
-  it("waits for funds inside the grace window, then skips", () => {
-    const poor = { cashuBalance: 50 };
-    expect(plan([order()], DUE + HOUR, poor)).toMatchObject([
-      { kind: "waitFunds", dueAtSec: DUE },
-    ]);
-    // The next occurrence (6 h) comes before the 24 h grace: skip there.
-    expect(plan([order()], DUE + 6 * HOUR, poor)).toMatchObject([
-      { kind: "skip", reason: "insufficientFunds", dueAtSec: DUE },
-    ]);
-  });
-
-  it("applies the full grace window when the interval is longer", () => {
-    const monthly = order({
-      schedule: {
-        ...order().schedule,
-        interval: { unit: "month", count: 1 },
-      },
+  describe("sending", () => {
+    it("waits out the notice window, then the claimant pays", () => {
+      const claimed = order(claimedBy("device-a", DUE - NOTICE));
+      expect(plan([claimed], DUE - 1)).toEqual([]);
+      expect(plan([claimed], DUE)).toMatchObject([
+        {
+          kind: "run",
+          dueAtSec: DUE,
+          missedCount: 0,
+          advance: { nextDueAtSec: DUE + 6 * HOUR, runCount: 1 },
+        },
+      ]);
     });
-    const poor = { cashuBalance: 50 };
-    expect(
-      plan([monthly], DUE + RECURRING_RUN_GRACE_SEC - 1, poor),
-    ).toMatchObject([{ kind: "waitFunds" }]);
-    expect(plan([monthly], DUE + RECURRING_RUN_GRACE_SEC, poor)).toMatchObject([
-      { kind: "skip", reason: "insufficientFunds" },
-    ]);
-  });
 
-  it("holds back a failed order until its retry time", () => {
-    const failed = order({ lastRunStatus: "failed", lastRunAtSec: DUE + 60 });
-    expect(
-      plan([failed], DUE + 5 * 60, { retry: [["rp-1", DUE + 10 * 60]] }),
-    ).toEqual([]);
-    expect(
-      plan([failed], DUE + 10 * 60, { retry: [["rp-1", DUE + 10 * 60]] }),
-    ).toMatchObject([{ kind: "run" }]);
-  });
-
-  it("skips a failed order once the deadline passes", () => {
-    const failed = order({ lastRunStatus: "failed", lastRunAtSec: DUE + 60 });
-    expect(plan([failed], DUE + 6 * HOUR)).toMatchObject([
-      { kind: "skip", reason: "failed" },
-    ]);
-  });
-
-  it("still pays once when a fresh due time is long overdue", () => {
-    const stale = order({
-      lastRunStatus: "paid",
-      lastRunAtSec: DUE - 6 * HOUR,
+    it("gives a late claim its full notice window after the due time", () => {
+      const late = order(claimedBy("device-a", DUE + 13 * HOUR));
+      expect(plan([late], DUE + 13 * HOUR + NOTICE - 1)).toEqual([]);
+      expect(plan([late], DUE + 13 * HOUR + NOTICE)).toMatchObject([
+        { kind: "run", dueAtSec: DUE, missedCount: 2 },
+      ]);
     });
-    expect(plan([stale], DUE + 3 * 24 * HOUR)).toMatchObject([{ kind: "run" }]);
+
+    it("leaves a payment claimed by another device to that device", () => {
+      const theirs = order(claimedBy("device-b", DUE - NOTICE));
+      expect(plan([theirs], DUE)).toEqual([]);
+    });
+
+    it("takes over when the claimant never paid", () => {
+      const theirs = order(claimedBy("device-b", DUE - NOTICE));
+      expect(plan([theirs], DUE + RECURRING_CLAIM_TAKEOVER_SEC - 1)).toEqual(
+        [],
+      );
+      expect(plan([theirs], DUE + RECURRING_CLAIM_TAKEOVER_SEC)).toMatchObject([
+        { kind: "claim", takeover: true },
+      ]);
+    });
+  });
+
+  describe("funds and failures", () => {
+    const mine = claimedBy("device-a", DUE - NOTICE);
+
+    it("waits for funds inside the grace window, then skips", () => {
+      const poor = { cashuBalance: 50 };
+      expect(plan([order(mine)], DUE + HOUR, poor)).toMatchObject([
+        { kind: "waitFunds", dueAtSec: DUE },
+      ]);
+      // The next occurrence (6 h) comes before the 24 h grace: skip there.
+      expect(plan([order(mine)], DUE + 6 * HOUR, poor)).toMatchObject([
+        { kind: "skip", reason: "insufficientFunds", dueAtSec: DUE },
+      ]);
+    });
+
+    it("applies the full grace window when the interval is longer", () => {
+      const monthly = order({
+        ...mine,
+        schedule: {
+          ...order().schedule,
+          interval: { unit: "month", count: 1 },
+        },
+      });
+      const poor = { cashuBalance: 50 };
+      expect(
+        plan([monthly], DUE + RECURRING_RUN_GRACE_SEC - 1, poor),
+      ).toMatchObject([{ kind: "waitFunds" }]);
+      expect(
+        plan([monthly], DUE + RECURRING_RUN_GRACE_SEC, poor),
+      ).toMatchObject([{ kind: "skip", reason: "insufficientFunds" }]);
+    });
+
+    it("holds back a failed payment until its retry time", () => {
+      const failed = order({
+        ...mine,
+        lastRunStatus: "failed",
+        lastRunAtSec: DUE + 60,
+      });
+      const retry: [string, number][] = [["rp-1", DUE + 10 * 60]];
+      expect(plan([failed], DUE + 5 * 60, { retry })).toEqual([]);
+      expect(plan([failed], DUE + 10 * 60, { retry })).toMatchObject([
+        { kind: "run" },
+      ]);
+    });
+
+    it("skips a failed payment once the deadline passes", () => {
+      const failed = order({
+        ...mine,
+        lastRunStatus: "failed",
+        lastRunAtSec: DUE + 60,
+      });
+      expect(plan([failed], DUE + 6 * HOUR)).toMatchObject([
+        { kind: "skip", reason: "failed" },
+      ]);
+    });
   });
 
   it("marks a stale running mark interrupted and waits on a fresh one", () => {
@@ -127,7 +192,14 @@ describe("planRecurringPaymentTick", () => {
     ]);
   });
 
-  it("orders runs by due time", () => {
+  it("does nothing for a paused payment", () => {
+    const paused = order({
+      schedule: { ...order().schedule, pausedAtSec: DUE - HOUR },
+    });
+    expect(plan([paused], DUE + HOUR)).toEqual([]);
+  });
+
+  it("orders actions by due time", () => {
     const later = order({
       id: "rp-2",
       schedule: {
@@ -137,6 +209,33 @@ describe("planRecurringPaymentTick", () => {
       },
     });
     const actions = plan([later, order()], DUE + 2 * HOUR);
-    expect(actions.map((a) => a.order.id)).toEqual(["rp-1", "rp-2"]);
+    expect(actions.map((action) => action.order.id)).toEqual(["rp-1", "rp-2"]);
+  });
+});
+
+describe("recurringUpcoming", () => {
+  it("reports an unclaimed payment inside the notice window", () => {
+    expect(recurringUpcoming(order(), DUE - 60)).toEqual({
+      dueAtSec: DUE,
+      sendAtSec: null,
+      claimDeviceId: null,
+    });
+  });
+
+  it("reports when a claimed payment goes out", () => {
+    expect(
+      recurringUpcoming(order(claimedBy("device-b", DUE - 60)), DUE - 30),
+    ).toEqual({
+      dueAtSec: DUE,
+      sendAtSec: DUE - 60 + NOTICE,
+      claimDeviceId: "device-b",
+    });
+  });
+
+  it("is quiet while a run is in flight or nothing is due soon", () => {
+    expect(
+      recurringUpcoming(order({ lastRunStatus: "running" }), DUE),
+    ).toBeNull();
+    expect(recurringUpcoming(order(), DUE - NOTICE - 1)).toBeNull();
   });
 });

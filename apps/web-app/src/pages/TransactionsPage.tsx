@@ -25,6 +25,7 @@ import {
   useAppShellCore,
 } from "../app/context/AppShellContexts";
 
+import { RecurringPaymentsSection } from "../components/RecurringPaymentsSection";
 import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
 import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
 import { readRecurringPaymentIdFromDetails } from "../app/lib/recurringPaymentDisplay";
@@ -160,6 +161,25 @@ interface TransactionCardProps {
   tokenByReferenceId: ReadonlyMap<string, string>;
 }
 
+/**
+ * A completed outgoing payment to a saved contact that can be turned into a
+ * recurring payment with the same recipient and amount.
+ */
+const readRepeatablePayment = (
+  item: TransactionItem,
+  contactsById: ReadonlyMap<string, ContactSummary>,
+): { amountSat: number; contactId: string } | null => {
+  if (item.direction !== "out" || item.status !== "ok") return null;
+  if (item.amount === null || (item.unit && item.unit !== "sat")) return null;
+  if (item.method !== "cashu_chat" && item.method !== "lightning_address") {
+    return null;
+  }
+  if (!item.contactId) return null;
+  const contact = contactsById.get(item.contactId);
+  if (!contact || (!contact.npub && !contact.lnAddress)) return null;
+  return { amountSat: item.amount, contactId: item.contactId };
+};
+
 const TransactionCardView = ({
   buildDetailEntries,
   buildProblemStatusPill,
@@ -203,6 +223,9 @@ const TransactionCardView = ({
     item.isReturned;
   const lnurlMessage = readLnurlSuccessMessage(item);
   const recurringPaymentId = readRecurringPaymentIdFromDetails(item.details);
+  const repeatable = recurringPaymentId
+    ? null
+    : readRepeatablePayment(item, contactsById);
 
   return (
     <Stack
@@ -303,6 +326,17 @@ const TransactionCardView = ({
           }
         />
       ))}
+      {isExpanded && repeatable ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          onPress={() =>
+            navigateTo({ route: "recurringPaymentNew", prefill: repeatable })
+          }
+        >
+          {t("recurringRepeatAction")}
+        </Button>
+      ) : null}
     </Stack>
   );
 };
@@ -672,6 +706,7 @@ export function TransactionsPage(): React.ReactElement {
 
   return (
     <Stack paddingTop="$sm" paddingBottom="$xl">
+      <RecurringPaymentsSection />
       {transactions.length === 0 ? (
         <EmptyState title={t("paymentsHistoryEmpty")} />
       ) : (
