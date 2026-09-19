@@ -1,22 +1,23 @@
-import { Pause, Play, Send, Trash2 } from "lucide-react";
+import { Pause, Play, Send, SkipForward, Trash2 } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
+import { useNowSeconds } from "../app/hooks/payments/useNowSeconds";
 import {
   recurringRecipientLabel,
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
+import { formatCountdown } from "../app/lib/recurringCountdown";
 import {
   describeRecurringInterval,
   recurringLastRunLabel,
   recurringOrderState,
 } from "../app/lib/recurringPaymentDisplay";
-import { Avatar } from "../components/Avatar";
-import { deriveDefaultProfile } from "../derivedProfile";
+import { recurringUpcoming } from "../app/lib/recurringPaymentTick";
+import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
 import { navigateTo } from "../hooks/useRouting";
-import { getInitials, normalizeLocale } from "../utils/formatting";
-import { nowSeconds } from "../utils/time";
+import { normalizeLocale } from "../utils/formatting";
 
 interface RecurringPaymentPageProps {
   id: string;
@@ -25,31 +26,25 @@ interface RecurringPaymentPageProps {
 export function RecurringPaymentPage({
   id,
 }: RecurringPaymentPageProps): React.ReactElement {
+  const { cashuIsBusy, formatDisplayedAmountText, lang, t } = useAppShellCore();
   const {
-    cashuIsBusy,
-    formatDisplayedAmountText,
-    lang,
-    nostrPictureByNpub,
-    t,
-  } = useAppShellCore();
-  const {
-    bindRecurringPaymentToThisDevice,
-    deviceId,
     pendingRecurringPaymentDeleteId,
     requestDeleteRecurringPayment,
     runRecurringPaymentNow,
     setRecurringPaymentPaused,
+    skipNextRecurringPayment,
   } = useRecurringPaymentsContext();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
   const [isRunning, setIsRunning] = React.useState(false);
   const order = orders.find((candidate) => candidate.id === id) ?? null;
+  const nowSec = useNowSeconds(order !== null);
   const dateFormatter = React.useMemo(
     () =>
       new Intl.DateTimeFormat(normalizeLocale(lang), {
         year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
+        month: "numeric",
+        day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
       }),
@@ -64,33 +59,28 @@ export function RecurringPaymentPage({
     );
   }
 
-  const nowSec = nowSeconds();
   const state = recurringOrderState(order, nowSec);
+  const upcoming = recurringUpcoming(order, nowSec);
   const formatDate = (epochSec: number): string =>
     dateFormatter.format(new Date(epochSec * 1000));
-  const runsOnThisDevice =
-    order.executorDeviceId === null || order.executorDeviceId === deviceId;
   const lastRun = recurringLastRunLabel(order, t);
   const runsText =
     order.schedule.maxRuns === null
       ? String(order.schedule.runCount)
       : `${order.schedule.runCount} / ${order.schedule.maxRuns}`;
   const deleteArmed = pendingRecurringPaymentDeleteId === order.id;
-  const contact =
-    order.recipient.kind === "contact"
-      ? contacts.get(order.recipient.contactId)
-      : undefined;
-  const pictureUrl = contact?.npub
-    ? nostrPictureByNpub[contact.npub] ||
-      deriveDefaultProfile(contact.npub).pictureUrl
-    : null;
-  const recipient = recurringRecipientLabel(order, contacts);
   const stateLabel =
     state === "paused"
       ? t("recurringStatusPaused")
       : state === "finished"
         ? t("recurringStatusFinished")
         : t("recurringStatusActive");
+  const nextText =
+    upcoming?.sendAtSec != null
+      ? upcoming.sendAtSec > nowSec
+        ? formatCountdown(upcoming.sendAtSec, nowSec)
+        : t("recurringRunRunning")
+      : formatDate(order.schedule.nextDueAtSec);
 
   const row = (label: string, value: string): React.ReactElement => (
     <div className="settings-row">
@@ -117,21 +107,17 @@ export function RecurringPaymentPage({
       <div className="form-grid">
         <div className="form-col recurring-detail">
           <div className="contact-header">
-            <div className="contact-avatar is-large" aria-hidden="true">
-              {contact ? (
-                <Avatar
-                  pictureUrl={pictureUrl}
-                  fallback={getInitials(contact.name ?? "")}
-                  fallbackClassName="contact-avatar-fallback"
-                  loading="lazy"
-                />
-              ) : (
-                <span className="contact-avatar-fallback">⚡️</span>
-              )}
-            </div>
+            <RecurringContactAvatar
+              className="contact-avatar is-large"
+              contact={contacts.get(order.contactId)}
+            />
             <div className="contact-header-text">
-              <h3 className="unspaced recurring-truncate">{order.title}</h3>
-              <p className="muted unspaced recurring-truncate">{recipient}</p>
+              <h3 className="unspaced recurring-truncate">
+                {recurringRecipientLabel(order, contacts)}
+              </h3>
+              <p className="muted unspaced">
+                {describeRecurringInterval(order.schedule.interval, t)}
+              </p>
             </div>
             <span
               className={`pill transaction-status-pill${state === "active" ? "" : " pill-muted"}`}
@@ -144,17 +130,9 @@ export function RecurringPaymentPage({
             <span className="recurring-detail-amount-value">
               {formatDisplayedAmountText(order.amountSat)}
             </span>
-            <span className="muted">
-              {describeRecurringInterval(order.schedule.interval, t)}
-            </span>
           </div>
 
-          {state === "active"
-            ? row(
-                t("recurringNextRun"),
-                formatDate(order.schedule.nextDueAtSec),
-              )
-            : null}
+          {state === "active" ? row(t("recurringNextRun"), nextText) : null}
           {order.lastRunAtSec !== null
             ? row(
                 t("recurringLastRun"),
@@ -162,22 +140,6 @@ export function RecurringPaymentPage({
               )
             : null}
           {row(t("recurringRunsCount"), runsText)}
-          {row(
-            t("recurringFirstRunLabel"),
-            formatDate(order.schedule.anchorAtSec),
-          )}
-          {order.note ? row(t("recurringNoteLabel"), order.note) : null}
-          {row(
-            t("recurringDeviceLabel"),
-            runsOnThisDevice
-              ? t("recurringRunsOnThisDevice")
-              : t("recurringRunsOnOtherDevice"),
-          )}
-          {!runsOnThisDevice ? (
-            <p className="muted recurring-hint">
-              {t("recurringOtherDeviceHint")}
-            </p>
-          ) : null}
 
           <div className="actions recurring-actions">
             {state === "active" ? (
@@ -201,13 +163,18 @@ export function RecurringPaymentPage({
                 </span>
               </button>
             ) : null}
-            {!runsOnThisDevice ? (
+            {state === "active" ? (
               <button
                 type="button"
                 className="btn-wide secondary"
-                onClick={() => bindRecurringPaymentToThisDevice(order)}
+                onClick={() => skipNextRecurringPayment(order)}
               >
-                {t("recurringBindToThisDevice")}
+                <span className="btn-label-with-icon">
+                  <span className="btn-label-icon" aria-hidden="true">
+                    <SkipForward size={18} />
+                  </span>
+                  <span>{t("recurringSkipNext")}</span>
+                </span>
               </button>
             ) : null}
             {state !== "finished" ? (
@@ -239,7 +206,7 @@ export function RecurringPaymentPage({
               className={deleteArmed ? "btn-wide danger" : "btn-wide secondary"}
               onClick={() => {
                 if (requestDeleteRecurringPayment(order)) {
-                  navigateTo({ route: "recurringPayments" });
+                  navigateTo({ route: "transactions" });
                 }
               }}
             >
@@ -251,6 +218,7 @@ export function RecurringPaymentPage({
               </span>
             </button>
           </div>
+          <p className="muted recurring-hint">{t("recurringOnlyWhileOpen")}</p>
         </div>
       </div>
     </section>

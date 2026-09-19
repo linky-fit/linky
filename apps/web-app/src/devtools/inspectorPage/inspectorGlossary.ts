@@ -226,14 +226,18 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A receive.resumeDeferred pass ended with an error instead of a result, usually because the wallet runtime shut down mid-pass. Nothing about the kept tokens changed beyond what earlier rows show; the next pass retries them.",
   "melt.historyResolved":
     "The app updated a pending Lightning payment in the transaction history after melt.resume settled it — to paid (amount and fee) or failed. The quote link connects it to the melt rows.",
+  "recurring.claimed":
+    "This device claimed an upcoming recurring payment: it wrote its device id and the due time to the row and notified the user. The payment goes out after a five-minute notice window, from whichever device the synced claim names. takeover means the previous claimant never paid.",
   "recurring.run":
-    "A standing order (recurring payment) was executed on this device: paid or failed, with the amount, the due time it settles, and how many due times were skipped because Linky was closed. The recurringPayment link ties it to the order's other rows; a contact link joins the chat payment steps.",
+    "A recurring payment was executed on this device: paid or failed, with the amount, the due time it settles, and how many due times were skipped because Linky was closed. The recurringPayment and contact links join it to the chat payment steps.",
   "recurring.skipped":
-    "A due standing order was skipped without paying — funds stayed insufficient or attempts kept failing until the grace window closed, or the contact no longer exists. The schedule moved on to the next due time.",
+    "A due recurring payment was skipped without paying — funds stayed insufficient or attempts kept failing until the grace window closed, or the contact can no longer be paid. The schedule moved on to the next due time.",
+  "recurring.skippedByUser":
+    "The user cancelled the upcoming recurring payment (banner Cancel or Skip the next payment). The schedule moved on without paying.",
   "recurring.waitingForFunds":
-    "A standing order is due but the spendable balance is below its amount; the scheduler retries every minute until the grace window closes. Reported once per due time.",
+    "A recurring payment is due but the spendable balance is below its amount; the scheduler keeps retrying until the grace window closes. Reported once per due time.",
   "recurring.interrupted":
-    "A standing order was found marked running for longer than a run can take, so an earlier launch died mid-run. The mark was cleared; check the transaction history for whether the payment went out.",
+    "A recurring payment was found marked running for longer than a run can take, so an earlier launch died mid-run. The mark was cleared; check the transaction history for whether the payment went out.",
   "send.rowForgotten":
     "The app dropped a pending send row because its token verifiably reached the recipient (chat message published, or payment request POSTed). Follow the row link back to the send.send operation that produced it.",
 };

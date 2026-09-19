@@ -5,6 +5,7 @@ import { CashuContactSendBanner } from "../components/CashuContactSendBanner";
 import { InstallPwaBanner } from "../components/InstallPwaBanner";
 import { PwaUpdateBanner } from "../components/PwaUpdateBanner";
 import { MigratingDataScreen } from "../components/MigratingDataScreen";
+import { RecurringUpcomingBanner } from "../components/RecurringUpcomingBanner";
 import { ToastNotifications } from "../components/ToastNotifications";
 import { UnauthenticatedLayout } from "../components/UnauthenticatedLayout";
 import { usePersistentInspectorLogStartup } from "../devtools/inspector/usePersistentInspectorLogStartup";
@@ -114,6 +115,7 @@ const AuthenticatedAppShell = ({
         routes={routeContextValue}
       >
         <RecurringPaymentsProvider value={recurringPaymentsContext}>
+          <RecurringUpcomingBanner />
           <AuthenticatedLayout>
             <AppRouteContent />
           </AuthenticatedLayout>

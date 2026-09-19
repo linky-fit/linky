@@ -516,17 +516,14 @@ export const Schema = {
     phase: Evolu.nullOr(Evolu.NonEmptyString100),
   },
 
-  // Standing orders ("trvalé příkazy"). Lives in the transactions owner lane;
-  // each run is recorded as a `transaction` row that carries the order id and
-  // the due time it settles, so a run is never paid twice across devices.
+  // Recurring payments. Lives in the transactions owner lane; each run is
+  // recorded as a `transaction` row that carries the payment id and the due
+  // time it settles.
   recurringPayment: {
     id: RecurringPaymentId,
     createdAtSec: Evolu.PositiveInt,
-    title: Evolu.NonEmptyString1000,
-    // "contact" | "lnAddress"
-    recipientKind: Evolu.NonEmptyString100,
-    contactId: Evolu.nullOr(ContactId),
-    lnAddress: Evolu.nullOr(Evolu.NonEmptyString1000),
+    // Always a saved contact; its npub or Lightning address decides the rail.
+    contactId: ContactId,
     amountSat: Evolu.PositiveInt,
     // "hour" | "day" | "week" | "month", multiplied by intervalCount
     intervalUnit: Evolu.NonEmptyString100,
@@ -538,15 +535,17 @@ export const Schema = {
     timeZone: Evolu.nullOr(Evolu.NonEmptyString100),
     nextDueAtSec: Evolu.PositiveInt,
     lastRunAtSec: Evolu.nullOr(Evolu.PositiveInt),
-    // "paid" | "failed" | "skipped"
+    // "running" | "paid" | "failed" | "skipped" | "interrupted"
     lastRunStatus: Evolu.nullOr(Evolu.NonEmptyString100),
     runCount: Evolu.nullOr(Evolu.NonNegativeInt),
     maxRuns: Evolu.nullOr(Evolu.PositiveInt),
     endAtSec: Evolu.nullOr(Evolu.PositiveInt),
     pausedAtSec: Evolu.nullOr(Evolu.PositiveInt),
-    // Device that runs this order; other devices only display it.
-    executorDeviceId: Evolu.nullOr(Evolu.NonEmptyString100),
-    note: Evolu.nullOr(Evolu.NonEmptyString1000),
+    // Which device pays the upcoming due time. Every online device may write
+    // a claim; Evolu's last-writer-wins leaves one value on every device.
+    claimDeviceId: Evolu.nullOr(Evolu.NonEmptyString100),
+    claimAtSec: Evolu.nullOr(Evolu.PositiveInt),
+    claimDueAtSec: Evolu.nullOr(Evolu.PositiveInt),
   },
 
   ownerMeta: {

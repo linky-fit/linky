@@ -57,7 +57,7 @@ interface MeltFailure {
 }
 
 export interface PayLightningAddressOptions {
-  /** Set when a standing order pays: recorded on the transaction, no UI. */
+  /** Set when a recurring payment pays: recorded on the transaction, no UI. */
   recurringRun?: RecurringRunRef | null;
 }
 
@@ -469,7 +469,7 @@ export const useLightningPaymentsDomain = ({
           });
 
           rememberFirstPayment();
-          // A standing order pays in the background: no overlay, no
+          // A recurring payment reports its own result: no overlay, no
           // success-action status, no save-contact prompt.
           if (recurringRun) return true;
 

@@ -2,39 +2,29 @@ import * as Evolu from "@evolu/common";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { ContactId, RecurringPaymentId } from "../../../evoluIds";
-import { nowSeconds } from "../../../utils/time";
 import type { Translate } from "../../../i18n";
-import type { DisplayAmountParts } from "../../../utils/displayAmounts";
-import { getDeviceId } from "../../lib/deviceId";
-import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
-import type {
-  RecurringPaymentOrder,
-  RecurringPaymentRecipient,
-} from "../../lib/recurringPaymentOrder";
+import { nowSeconds } from "../../../utils/time";
+import type { RecurringPaymentOrder } from "../../lib/recurringPaymentOrder";
 import {
   currentTimeZone,
   nextRecurringOccurrenceAfter,
   resolveTimeZone,
   type RecurringInterval,
 } from "../../lib/recurringSchedule";
+import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
 
 type EvoluMutations = ReturnType<typeof import("../../../evolu").useEvolu>;
 
 export interface NewRecurringPaymentInput {
   amountSat: number;
-  endAtSec: number | null;
+  contactId: string;
   firstDueAtSec: number;
   interval: RecurringInterval;
   maxRuns: number | null;
-  note: string | null;
-  recipient: RecurringPaymentRecipient;
-  title: string;
 }
 
 export interface RecurringPaymentsActions {
-  bindRecurringPaymentToThisDevice: (order: RecurringPaymentOrder) => void;
   createRecurringPayment: (input: NewRecurringPaymentInput) => boolean;
-  deviceId: string;
   pendingRecurringPaymentDeleteId: string | null;
   requestDeleteRecurringPayment: (order: RecurringPaymentOrder) => boolean;
   runRecurringPaymentNow: (order: RecurringPaymentOrder) => Promise<void>;
@@ -42,14 +32,13 @@ export interface RecurringPaymentsActions {
     order: RecurringPaymentOrder,
     paused: boolean,
   ) => void;
+  skipNextRecurringPayment: (order: RecurringPaymentOrder) => void;
 }
 
 interface UseRecurringPaymentsActionsParams {
-  formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   insert: EvoluMutations["insert"];
   pushToast: (message: string) => void;
   runOrderNow: RecurringPaymentsScheduler["runOrderNow"];
-  showPaidOverlay: (title: string) => void;
   t: Translate;
   transactionsOwnerId: Evolu.OwnerId | null;
   update: EvoluMutations["update"];
@@ -72,17 +61,24 @@ const orderKeys = (
   };
 };
 
+/** First due time strictly after `afterSec` on the payment's own grid. */
+const nextDueAfter = (order: RecurringPaymentOrder, afterSec: number) =>
+  nextRecurringOccurrenceAfter(
+    order.schedule.anchorAtSec,
+    order.schedule.interval,
+    afterSec,
+    resolveTimeZone(order.schedule.timeZone),
+  ).dueAtSec;
+
 /**
- * User-facing mutations on standing orders. Inserts go to the active
+ * User-facing mutations on recurring payments. Inserts go to the active
  * transactions lane; updates target the row's own lane, like every other
  * lane-routed table. Deleting is a two-tap armed action.
  */
 export const useRecurringPaymentsActions = ({
-  formatDisplayedAmountParts,
   insert,
   pushToast,
   runOrderNow,
-  showPaidOverlay,
   t,
   transactionsOwnerId,
   update,
@@ -90,7 +86,6 @@ export const useRecurringPaymentsActions = ({
   const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(
     null,
   );
-  const deviceId = React.useMemo(() => getDeviceId(), []);
 
   React.useEffect(() => {
     if (pendingDeleteId === null) return;
@@ -103,20 +98,11 @@ export const useRecurringPaymentsActions = ({
 
   const createRecurringPayment = React.useCallback(
     (input: NewRecurringPaymentInput): boolean => {
-      const now = nowSeconds();
-      const contactId =
-        input.recipient.kind === "contact"
-          ? ContactId.fromUnknown(input.recipient.contactId)
-          : null;
-      if (contactId !== null && !contactId.ok) return false;
+      const contactId = ContactId.fromUnknown(input.contactId);
+      if (!contactId.ok) return false;
       const payload = {
-        createdAtSec: now,
-        title: input.title,
-        recipientKind: input.recipient.kind,
-        ...(contactId?.ok ? { contactId: contactId.value } : {}),
-        ...(input.recipient.kind === "lnAddress"
-          ? { lnAddress: input.recipient.lnAddress }
-          : {}),
+        createdAtSec: nowSeconds(),
+        contactId: contactId.value,
         amountSat: input.amountSat,
         intervalUnit: input.interval.unit,
         intervalCount: input.interval.count,
@@ -125,9 +111,6 @@ export const useRecurringPaymentsActions = ({
         nextDueAtSec: input.firstDueAtSec,
         runCount: 0,
         ...(input.maxRuns !== null ? { maxRuns: input.maxRuns } : {}),
-        ...(input.endAtSec !== null ? { endAtSec: input.endAtSec } : {}),
-        executorDeviceId: deviceId,
-        ...(input.note ? { note: input.note } : {}),
       };
       const result = transactionsOwnerId
         ? insert("recurringPayment", payload, { ownerId: transactionsOwnerId })
@@ -135,23 +118,21 @@ export const useRecurringPaymentsActions = ({
       if (!result.ok) return false;
       reportAppLog({
         tag: "recurring.created",
-        summary: `standing order created: ${input.title}`,
+        summary: "recurring payment created",
         links: {
           recurringPayment: result.value.id,
-          ...(input.recipient.kind === "contact"
-            ? { contact: input.recipient.contactId }
-            : {}),
+          contact: input.contactId,
         },
         payload: {
           amountSat: input.amountSat,
           firstDueAtSec: input.firstDueAtSec,
           interval: input.interval,
-          recipientKind: input.recipient.kind,
+          maxRuns: input.maxRuns,
         },
       });
       return true;
     },
-    [deviceId, insert, transactionsOwnerId],
+    [insert, transactionsOwnerId],
   );
 
   const setRecurringPaymentPaused = React.useCallback(
@@ -170,12 +151,7 @@ export const useRecurringPaymentsActions = ({
         const nextDueAtSec =
           order.schedule.nextDueAtSec > now
             ? order.schedule.nextDueAtSec
-            : nextRecurringOccurrenceAfter(
-                order.schedule.anchorAtSec,
-                order.schedule.interval,
-                now,
-                resolveTimeZone(order.schedule.timeZone),
-              ).dueAtSec;
+            : nextDueAfter(order, now);
         update(
           "recurringPayment",
           { id: keys.id, pausedAtSec: null, nextDueAtSec },
@@ -184,12 +160,41 @@ export const useRecurringPaymentsActions = ({
       }
       reportAppLog({
         tag: paused ? "recurring.paused" : "recurring.resumed",
-        summary: `standing order ${paused ? "paused" : "resumed"}: ${order.title}`,
+        summary: `recurring payment ${paused ? "paused" : "resumed"}`,
         links: { recurringPayment: order.id },
         payload: null,
       });
     },
     [update],
+  );
+
+  const skipNextRecurringPayment = React.useCallback(
+    (order: RecurringPaymentOrder): void => {
+      const keys = orderKeys(order);
+      if (!keys) return;
+      const now = nowSeconds();
+      update(
+        "recurringPayment",
+        {
+          id: keys.id,
+          nextDueAtSec: nextDueAfter(
+            order,
+            Math.max(now, order.schedule.nextDueAtSec),
+          ),
+          lastRunAtSec: now,
+          lastRunStatus: "skipped",
+        },
+        keys.options,
+      );
+      pushToast(t("recurringSkippedToast"));
+      reportAppLog({
+        tag: "recurring.skippedByUser",
+        summary: "recurring payment skipped by the user",
+        links: { recurringPayment: order.id, contact: order.contactId },
+        payload: { dueAtSec: order.schedule.nextDueAtSec },
+      });
+    },
+    [pushToast, t, update],
   );
 
   const requestDeleteRecurringPayment = React.useCallback(
@@ -208,7 +213,7 @@ export const useRecurringPaymentsActions = ({
       setPendingDeleteId(null);
       reportAppLog({
         tag: "recurring.deleted",
-        summary: `standing order deleted: ${order.title}`,
+        summary: "recurring payment deleted",
         links: { recurringPayment: order.id },
         payload: null,
       });
@@ -217,62 +222,20 @@ export const useRecurringPaymentsActions = ({
     [pendingDeleteId, update],
   );
 
-  const bindRecurringPaymentToThisDevice = React.useCallback(
-    (order: RecurringPaymentOrder): void => {
-      const keys = orderKeys(order);
-      if (!keys) return;
-      update(
-        "recurringPayment",
-        { id: keys.id, executorDeviceId: deviceId },
-        keys.options,
-      );
-    },
-    [deviceId, update],
-  );
-
   const runRecurringPaymentNow = React.useCallback(
     async (order: RecurringPaymentOrder): Promise<void> => {
-      const keys = orderKeys(order);
-      if (!keys) return;
-      if (order.executorDeviceId !== deviceId) {
-        update(
-          "recurringPayment",
-          { id: keys.id, executorDeviceId: deviceId },
-          keys.options,
-        );
-      }
       const outcome = await runOrderNow(order.id);
-      if (outcome === "paid") {
-        const amount = formatDisplayedAmountParts(order.amountSat);
-        showPaidOverlay(
-          t("paidSent")
-            .replace("{amount}", `${amount.approxPrefix}${amount.amountText}`)
-            .replace("{unit}", amount.unitLabel),
-        );
-      } else if (outcome === "busy") {
-        pushToast(t("recurringWalletBusy"));
-      } else if (outcome === "failed") {
-        pushToast(t("recurringRunFailedToast"));
-      }
+      if (outcome === "busy") pushToast(t("recurringWalletBusy"));
     },
-    [
-      deviceId,
-      formatDisplayedAmountParts,
-      pushToast,
-      runOrderNow,
-      showPaidOverlay,
-      t,
-      update,
-    ],
+    [pushToast, runOrderNow, t],
   );
 
   return {
-    bindRecurringPaymentToThisDevice,
     createRecurringPayment,
-    deviceId,
     pendingRecurringPaymentDeleteId: pendingDeleteId,
     requestDeleteRecurringPayment,
     runRecurringPaymentNow,
     setRecurringPaymentPaused,
+    skipNextRecurringPayment,
   };
 };

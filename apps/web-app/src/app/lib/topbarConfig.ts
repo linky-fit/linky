@@ -88,7 +88,6 @@ export const resolveBackAction = (
         : () => navigateTo({ route: "wallet" });
 
     case "transactions":
-    case "recurringPayments":
     case "manualPay":
     case "cashuTokens":
     case "cashuTokenEmit":
@@ -97,7 +96,7 @@ export const resolveBackAction = (
 
     case "recurringPaymentNew":
     case "recurringPayment":
-      return () => navigateTo({ route: "recurringPayments" });
+      return () => navigateTo({ route: "transactions" });
 
     case "topupNoAmount":
     case "topupInvoice":
@@ -245,7 +244,6 @@ const SHOWS_MENU_BUTTON: Record<
   topupInvoice: false,
   topupNoAmount: false,
   transactions: false,
-  recurringPayments: false,
   recurringPaymentNew: false,
   recurringPayment: false,
   wallet: false,
@@ -291,6 +289,14 @@ export const buildTopbarRight = ({
       icon: "Plus",
       label: t("addRelay"),
       onClick: () => navigateTo({ route: "nostrRelayNew" }),
+    };
+  }
+
+  if (route.kind === "transactions") {
+    return {
+      icon: "+",
+      label: t("recurringPaymentNewTitle"),
+      onClick: () => navigateTo({ route: "recurringPaymentNew" }),
     };
   }
 
@@ -411,7 +417,6 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   topupInvoice: "topupInvoiceTitle",
   topupNoAmount: "topupNoAmountTitle",
   transactions: "transactionsTitle",
-  recurringPayments: "recurringPaymentsTitle",
   recurringPaymentNew: "recurringPaymentNewTitle",
   recurringPayment: "recurringPaymentTitle",
   wallet: "wallet",

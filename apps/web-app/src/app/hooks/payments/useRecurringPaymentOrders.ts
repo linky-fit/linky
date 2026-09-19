@@ -2,13 +2,14 @@ import * as Evolu from "@evolu/common";
 import { useQuery } from "@evolu/react";
 import React from "react";
 import { evolu } from "../../../evolu";
+import { formatShortNpub } from "../../../utils/formatting";
 import { asNonEmptyString } from "../../../utils/validation";
 import {
   readRecurringPaymentOrder,
   type RecurringPaymentOrder,
 } from "../../lib/recurringPaymentOrder";
 
-/** Live standing orders, soonest due first. */
+/** Live recurring payments, soonest due first. */
 export const useRecurringPaymentOrders = (): RecurringPaymentOrder[] => {
   const query = React.useMemo(
     () =>
@@ -72,11 +73,18 @@ export const useRecurringContactSummaries = (): Map<
   }, [rows]);
 };
 
+export const isPayableContact = (contact: RecurringContactSummary): boolean =>
+  contact.npub !== null || contact.lnAddress !== null;
+
+export const contactSummaryLabel = (contact: RecurringContactSummary): string =>
+  contact.name ??
+  contact.lnAddress ??
+  (contact.npub ? formatShortNpub(contact.npub) : "?");
+
 export const recurringRecipientLabel = (
   order: RecurringPaymentOrder,
   contacts: ReadonlyMap<string, RecurringContactSummary>,
 ): string => {
-  if (order.recipient.kind === "lnAddress") return order.recipient.lnAddress;
-  const contact = contacts.get(order.recipient.contactId);
-  return contact?.name ?? contact?.lnAddress ?? contact?.npub ?? "?";
+  const contact = contacts.get(order.contactId);
+  return contact ? contactSummaryLabel(contact) : "?";
 };

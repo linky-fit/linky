@@ -2429,26 +2429,29 @@ export const useCashuWalletComposition = ({
     currentNsec,
     enabled: sendCashuToken !== null && meltCashuInvoice !== null,
     enqueueOutbox,
+    formatDisplayedAmountParts,
+    maybeShowPwaNotification,
     payContactWithCashuMessage,
-    payLightningAddressWithCashu: (lnAddress, amountSat, options) =>
+    payLightningAddressWithCashu: (lnAddress, amountSat, contact, options) =>
       payLightningAddressWithCashuBase(
         lnAddress,
         amountSat,
-        null,
+        contact,
         null,
         options,
       ),
+    payWithCashuEnabled,
+    pushToast,
     setCashuIsBusy,
+    showPaidOverlay,
     t,
     update,
     updateLocalNostrMessage,
   });
   const recurringPaymentsActions = useRecurringPaymentsActions({
-    formatDisplayedAmountParts,
     insert,
     pushToast,
     runOrderNow: recurringScheduler.runOrderNow,
-    showPaidOverlay,
     t,
     transactionsOwnerId,
     update,

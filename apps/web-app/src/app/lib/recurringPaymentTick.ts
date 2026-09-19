@@ -7,6 +7,14 @@ import {
   type RecurringScheduleAdvance,
 } from "./recurringSchedule";
 
+/**
+ * Lead time between claiming a due payment and sending it. Every device shows
+ * the upcoming payment with a cancel button for this long, and claims written
+ * by devices that raced each other converge through sync in the meantime.
+ */
+export const RECURRING_NOTICE_SEC = 5 * 60;
+/** A claim this far past its send time belongs to a device that went away. */
+export const RECURRING_CLAIM_TAKEOVER_SEC = 10 * 60;
 /** How long a due run waits for funds or retries failures before it is skipped. */
 export const RECURRING_RUN_GRACE_SEC = 24 * 60 * 60;
 /** Pause between attempts of a run whose last attempt failed. */
@@ -14,12 +22,15 @@ export const RECURRING_RUN_RETRY_DELAY_SEC = 10 * 60;
 /** A `running` mark older than this belongs to a launch that died mid-run. */
 export const RECURRING_RUN_STALE_SEC = 15 * 60;
 
-export type RecurringSkipReason =
-  | "insufficientFunds"
-  | "failed"
-  | "invalidRecipient";
+export type RecurringSkipReason = "insufficientFunds" | "failed";
 
 export type RecurringTickAction =
+  | {
+      kind: "claim";
+      order: RecurringPaymentOrder;
+      dueAtSec: number;
+      takeover: boolean;
+    }
   | {
       kind: "run";
       order: RecurringPaymentOrder;
@@ -46,6 +57,39 @@ export interface RecurringTickInput {
   retryNotBeforeSec: ReadonlyMap<string, number>;
 }
 
+export interface RecurringUpcoming {
+  dueAtSec: number;
+  /** When the claiming device sends it; null while nobody has claimed it. */
+  sendAtSec: number | null;
+  claimDeviceId: string | null;
+}
+
+/**
+ * The due payment inside the notice window (or already overdue), with its
+ * claim when one exists for that due time. Null when nothing is due soon.
+ */
+export const recurringUpcoming = (
+  order: RecurringPaymentOrder,
+  nowSec: number,
+): RecurringUpcoming | null => {
+  if (order.lastRunStatus === "running") return null;
+  const decision = decideRecurringRun(
+    order.schedule,
+    nowSec + RECURRING_NOTICE_SEC,
+  );
+  if (decision.kind !== "due") return null;
+  const claim =
+    order.claim?.dueAtSec === decision.dueAtSec ? order.claim : null;
+  return {
+    dueAtSec: decision.dueAtSec,
+    sendAtSec:
+      claim === null
+        ? null
+        : Math.max(decision.dueAtSec, claim.atSec + RECURRING_NOTICE_SEC),
+    claimDeviceId: claim?.deviceId ?? null,
+  };
+};
+
 /** End of the window in which a due run may still be attempted. */
 export const recurringSkipDeadlineSec = (
   order: RecurringPaymentOrder,
@@ -65,21 +109,25 @@ const planOrder = (
   order: RecurringPaymentOrder,
   input: RecurringTickInput,
 ): RecurringTickAction | null => {
-  if (
-    order.executorDeviceId !== null &&
-    order.executorDeviceId !== input.deviceId
-  ) {
-    return null;
-  }
   if (order.lastRunStatus === "running") {
     const startedAt = order.lastRunAtSec ?? 0;
     return input.nowSec - startedAt > RECURRING_RUN_STALE_SEC
       ? { kind: "markInterrupted", order }
       : null;
   }
-  const decision = decideRecurringRun(order.schedule, input.nowSec);
-  if (decision.kind !== "due") return null;
-  const dueAtSec = decision.dueAtSec;
+  const upcoming = recurringUpcoming(order, input.nowSec);
+  if (upcoming === null) return null;
+  const { dueAtSec, sendAtSec, claimDeviceId } = upcoming;
+  if (sendAtSec === null) {
+    return { kind: "claim", order, dueAtSec, takeover: false };
+  }
+  if (input.nowSec < sendAtSec) return null;
+  if (claimDeviceId !== input.deviceId) {
+    return input.nowSec >= sendAtSec + RECURRING_CLAIM_TAKEOVER_SEC
+      ? { kind: "claim", order, dueAtSec, takeover: true }
+      : null;
+  }
+
   const advance = advanceRecurringSchedule(order.schedule, input.nowSec);
   const deadlinePassed =
     input.nowSec >= recurringSkipDeadlineSec(order, dueAtSec);
@@ -97,18 +145,19 @@ const planOrder = (
   }
   const retryNotBefore = input.retryNotBeforeSec.get(order.id) ?? 0;
   if (input.nowSec < retryNotBefore) return null;
+  const decision = decideRecurringRun(order.schedule, input.nowSec);
   return {
     kind: "run",
     order,
     dueAtSec,
-    missedCount: decision.missedCount,
+    missedCount: decision.kind === "due" ? decision.missedCount : 0,
     advance,
   };
 };
 
 /**
- * What one scheduler pass should do. Runs come out ordered by due time so
- * the longest-overdue order goes first when the wallet is free.
+ * What one scheduler pass should do. Actions come out ordered by due time so
+ * the longest-overdue payment goes first when the wallet is free.
  */
 export const planRecurringPaymentTick = (
   input: RecurringTickInput,

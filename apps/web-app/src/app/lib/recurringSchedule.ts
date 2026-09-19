@@ -1,4 +1,4 @@
-// Schedule math for standing orders ("trvalé příkazy"): when the next run is
+// Schedule math for recurring payments: when the next run is
 // due, how many due times were missed, and how the order advances after a
 // run. Pure and storage-agnostic; the engine and the UI build on it.
 //
