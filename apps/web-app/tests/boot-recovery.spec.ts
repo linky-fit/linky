@@ -135,6 +135,64 @@ test("recovers when the authenticated app never commits", async ({ page }) => {
   expect(databaseWorkerRequests).toBeGreaterThanOrEqual(1);
 });
 
+for (const failureTiming of ["before", "after"]) {
+  test(`a SQLite pool lock failure ${failureTiming} other acquisitions preserves local contacts`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await setBaseStorage(page);
+    await setSeedLoginStorage(page, await createSeedIdentity());
+    await page.addInitScript(() => {
+      localStorage.setItem("linky.evoluServers.defaultRemoved.v1", "true");
+      localStorage.setItem("linky.evoluServers.v1", "[]");
+    });
+    await page.goto("/#wallet");
+    await expect(page.getByLabel("Available balance")).toBeVisible();
+    await addContactByNpub(page, (await createSeedIdentity()).npub);
+    await page.goto("/#contacts");
+    await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
+
+    const recoveries: string[] = [];
+    page.on("console", (message) => {
+      if (message.text().includes("local database failed to open")) {
+        recoveries.push(message.text());
+      }
+    });
+    let injected = false;
+    await page.route(/\/assets\/Db\.worker-[^/]+\.js$/, async (route) => {
+      if (injected) return route.continue();
+      injected = true;
+      const response = await route.fetch();
+      const fault = `
+      const openHandle = FileSystemFileHandle.prototype.createSyncAccessHandle;
+      let failed = false;
+      FileSystemFileHandle.prototype.createSyncAccessHandle = async function (...args) {
+        if (this.name.startsWith(".")) return openHandle.apply(this, args);
+        if (!failed) {
+          failed = true;
+          if (${failureTiming === "after"}) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          throw new DOMException("Injected pool lock conflict", "NoModificationAllowedError");
+        }
+        const handle = await openHandle.apply(this, args);
+        if (${failureTiming === "before"}) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return handle;
+      };
+    `;
+      await route.fulfill({ response, body: fault + (await response.text()) });
+    });
+
+    await page.reload();
+    await expect.poll(() => recoveries.length).toBe(1);
+    await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
+    await page.reload();
+    await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
+  });
+}
+
 for (const channelState of ["missing", "blocked"]) {
   test(`boots and persists contacts with ${channelState} BroadcastChannel and no Web Locks`, async ({
     page,

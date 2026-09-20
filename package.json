@@ -41,6 +41,7 @@
   },
   "patchedDependencies": {
     "nostr-tools@2.23.3": "patches/nostr-tools@2.23.3.patch",
-    "bysquare@4.0.0": "patches/bysquare@4.0.0.patch"
+    "bysquare@4.0.0": "patches/bysquare@4.0.0.patch",
+    "@evolu/sqlite-wasm@2.2.4": "patches/@evolu%2Fsqlite-wasm@2.2.4.patch"
   }
 }

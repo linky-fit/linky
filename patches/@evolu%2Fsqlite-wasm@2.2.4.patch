@@ -1,0 +1,165 @@
+diff --git a/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs b/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs
+index 1e35522cb97757472bd623dd0a332c8640b2d806..3405ca411644ebfb4dbdc90e5d481cf8bcf7d5d5 100644
+--- a/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs
++++ b/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs
+@@ -13055,7 +13055,7 @@ var sqlite3InitModule = (() => {
+                 files.push([name, h]);
+               }
+             }
+-            return Promise.all(
++            const acquisitions = await Promise.allSettled(
+               files.map(async ([name, h]) => {
+                 try {
+                   const ah = await h.createSyncAccessHandle();
+@@ -13073,11 +13073,15 @@ var sqlite3InitModule = (() => {
+                   }
+                 } catch (e) {
+                   this.storeErr(e);
+-                  this.releaseAccessHandles();
+                   throw e;
+                 }
+               }),
+             );
++            const failure = acquisitions.find((result) => result.status === 'rejected');
++            if (failure) {
++              this.releaseAccessHandles();
++              throw failure.reason;
++            }
+           }
+ 
+           getAssociatedPath(sah) {
+@@ -13234,13 +13238,14 @@ var sqlite3InitModule = (() => {
+             return this.#mapFilenameToSAH.get(path);
+           }
+ 
+-          async removeVfs() {
++          async removeVfs(removeFiles = true) {
+             if (!this.#cVfs.pointer || !this.#dhOpaque) return false;
+             capi.sqlite3_vfs_unregister(this.#cVfs.pointer);
+             this.#cVfs.dispose();
+             delete initPromises[this.vfsName];
+             try {
+               this.releaseAccessHandles();
++              if (!removeFiles) return true;
+               await this.#dhVfsRoot.removeEntry(OPAQUE_DIR_NAME, {
+                 recursive: true,
+               });
+@@ -13524,7 +13529,7 @@ var sqlite3InitModule = (() => {
+                   return poolUtil;
+                 })
+                 .catch(async (e) => {
+-                  await thePool.removeVfs().catch(() => {});
++                  await thePool.removeVfs(false).catch(() => {});
+                   throw e;
+                 });
+             })
+diff --git a/sqlite-wasm/jswasm/sqlite3.js b/sqlite-wasm/jswasm/sqlite3.js
+index 45118cbd11d374185291c51a5c76266e9ea1babc..c247edfc1e39c88d82882091295153afa5181be0 100644
+--- a/sqlite-wasm/jswasm/sqlite3.js
++++ b/sqlite-wasm/jswasm/sqlite3.js
+@@ -13082,7 +13082,7 @@ var sqlite3InitModule = (() => {
+                 files.push([name, h]);
+               }
+             }
+-            return Promise.all(
++            const acquisitions = await Promise.allSettled(
+               files.map(async ([name, h]) => {
+                 try {
+                   const ah = await h.createSyncAccessHandle();
+@@ -13100,11 +13100,15 @@ var sqlite3InitModule = (() => {
+                   }
+                 } catch (e) {
+                   this.storeErr(e);
+-                  this.releaseAccessHandles();
+                   throw e;
+                 }
+               }),
+             );
++            const failure = acquisitions.find((result) => result.status === 'rejected');
++            if (failure) {
++              this.releaseAccessHandles();
++              throw failure.reason;
++            }
+           }
+ 
+           getAssociatedPath(sah) {
+@@ -13261,13 +13265,14 @@ var sqlite3InitModule = (() => {
+             return this.#mapFilenameToSAH.get(path);
+           }
+ 
+-          async removeVfs() {
++          async removeVfs(removeFiles = true) {
+             if (!this.#cVfs.pointer || !this.#dhOpaque) return false;
+             capi.sqlite3_vfs_unregister(this.#cVfs.pointer);
+             this.#cVfs.dispose();
+             delete initPromises[this.vfsName];
+             try {
+               this.releaseAccessHandles();
++              if (!removeFiles) return true;
+               await this.#dhVfsRoot.removeEntry(OPAQUE_DIR_NAME, {
+                 recursive: true,
+               });
+@@ -13551,7 +13556,7 @@ var sqlite3InitModule = (() => {
+                   return poolUtil;
+                 })
+                 .catch(async (e) => {
+-                  await thePool.removeVfs().catch(() => {});
++                  await thePool.removeVfs(false).catch(() => {});
+                   throw e;
+                 });
+             })
+diff --git a/sqlite-wasm/jswasm/sqlite3.mjs b/sqlite-wasm/jswasm/sqlite3.mjs
+index efd020a12f20938520958a8f359e8114d66c364c..0cf832ce65b8054903615248ad357e2e2056d636 100644
+--- a/sqlite-wasm/jswasm/sqlite3.mjs
++++ b/sqlite-wasm/jswasm/sqlite3.mjs
+@@ -13057,7 +13057,7 @@ var sqlite3InitModule = (() => {
+                 files.push([name, h]);
+               }
+             }
+-            return Promise.all(
++            const acquisitions = await Promise.allSettled(
+               files.map(async ([name, h]) => {
+                 try {
+                   const ah = await h.createSyncAccessHandle();
+@@ -13075,11 +13075,15 @@ var sqlite3InitModule = (() => {
+                   }
+                 } catch (e) {
+                   this.storeErr(e);
+-                  this.releaseAccessHandles();
+                   throw e;
+                 }
+               }),
+             );
++            const failure = acquisitions.find((result) => result.status === 'rejected');
++            if (failure) {
++              this.releaseAccessHandles();
++              throw failure.reason;
++            }
+           }
+ 
+           getAssociatedPath(sah) {
+@@ -13236,13 +13240,14 @@ var sqlite3InitModule = (() => {
+             return this.#mapFilenameToSAH.get(path);
+           }
+ 
+-          async removeVfs() {
++          async removeVfs(removeFiles = true) {
+             if (!this.#cVfs.pointer || !this.#dhOpaque) return false;
+             capi.sqlite3_vfs_unregister(this.#cVfs.pointer);
+             this.#cVfs.dispose();
+             delete initPromises[this.vfsName];
+             try {
+               this.releaseAccessHandles();
++              if (!removeFiles) return true;
+               await this.#dhVfsRoot.removeEntry(OPAQUE_DIR_NAME, {
+                 recursive: true,
+               });
+@@ -13526,7 +13531,7 @@ var sqlite3InitModule = (() => {
+                   return poolUtil;
+                 })
+                 .catch(async (e) => {
+-                  await thePool.removeVfs().catch(() => {});
++                  await thePool.removeVfs(false).catch(() => {});
+                   throw e;
+                 });
+             })
