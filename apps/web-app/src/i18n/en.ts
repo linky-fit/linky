@@ -30,9 +30,9 @@ export const en = {
   recurringPaymentTitle: "Recurring payment",
   recurringPaymentNewTitle: "New recurring payment",
   recurringEmpty: "No recurring payments yet.",
-  recurringSummaryActive: "{count} active",
-  recurringSummaryNext: "next {date}",
-  recurringSummaryNoneActive: "none active",
+  recurringScheduledSection: "Scheduled",
+  recurringHistorySection: "History",
+  recurringInsufficientFundsHint: "low balance",
   recurringNotifyBody:
     "{amount} {unit} to {name} goes out in {minutes} min. Open Linky to cancel it.",
   recurringSentBody: "Sent {amount} {unit} to {name}.",

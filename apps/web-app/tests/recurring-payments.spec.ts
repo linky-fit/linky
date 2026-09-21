@@ -2,12 +2,12 @@
  * Recurring payments — happy path, two real app instances.
  *
  * A funds its wallet, saves B, and sets up a recurring payment to B from the
- * transaction history with the first payment already due. The scheduler
- * claims it and every device shows the upcoming payment with a countdown;
- * the test takes the banner's "Pay now" instead of waiting out the five-minute
- * notice. B receives the "Recurring payment" chat note and the token, A sees
- * the usual paid confirmation and a history pill that opens the payment, and a
- * second scheduler pass does not pay again.
+ * transaction history's floating button with the first payment already due.
+ * The order shows in the "Scheduled" section at the top of the history; the
+ * test opens it and pays it now instead of waiting out the notice window. B
+ * receives the token (no chat note), A sees the usual paid confirmation and a
+ * history pill that opens the payment, and a second scheduler pass does not pay
+ * again.
  *
  * Needs the docker stack up — see "E2E tests" in CLAUDE.md.
  */
@@ -97,7 +97,7 @@ test("a due recurring payment pays the contact once and shows up in history", as
 
   await test.step("A sets up an already-due payment from the history", async () => {
     await a.page.goto("/#wallet/transactions");
-    await a.page.locator(".recurring-summary-row").click();
+    await a.page.locator(".transactions-page .contacts-fab").click();
     await a.page.waitForURL(/#wallet\/recurring\/new$/);
     await a.page.locator(".recurring-picker-list button").first().click();
     for (const digit of String(ORDER_SAT).split("")) {
@@ -111,27 +111,19 @@ test("a due recurring payment pays the contact once and shows up in history", as
     await a.page
       .getByRole("button", { name: "Set up recurring payment" })
       .click();
-    await a.page.waitForURL(/#wallet\/recurring$/);
+    await a.page.waitForURL(/#wallet\/transactions$/);
     await expect(a.page.locator(".recurring-order-card")).toContainText(
       "every day",
     );
-    await a.page.goto("/#wallet/transactions");
-    await expect(a.page.locator(".recurring-summary-row")).toContainText(
-      "1 active",
-    );
   });
 
-  await test.step("the upcoming payment is announced and paid on request", async () => {
-    await triggerSchedulerPass(a.page);
-    const banner = a.page.locator(".recurring-upcoming-banner");
-    await expect(banner).toContainText("recurring payment of", {
-      timeout: 30_000,
-    });
-    await banner.getByRole("button", { name: "Pay now" }).click();
+  await test.step("A pays the scheduled payment now", async () => {
+    await a.page.locator(".recurring-order-card").first().click();
+    await a.page.waitForURL(/#wallet\/recurring\/[^/]+$/);
+    await a.page.getByRole("button", { name: "Pay now" }).click();
     await expect(a.page.getByText(/^Sent 10 sat to /)).toBeVisible({
       timeout: 60_000,
     });
-    await expect(banner).toHaveCount(0);
     await a.page.goto("/#wallet");
     await expect
       .poll(() => readBalanceSat(a.page), { timeout: 60_000 })
@@ -140,15 +132,6 @@ test("a due recurring payment pays the contact once and shows up in history", as
     await expect
       .poll(() => readBalanceSat(b.page), { timeout: 60_000 })
       .toBeGreaterThanOrEqual(ORDER_SAT - MAX_FEE_SAT);
-  });
-
-  await test.step("B sees the chat note", async () => {
-    await b.page.goto("/#contacts");
-    await b.page.locator("[data-guide='contact-card']").first().click();
-    await b.page.waitForURL(/#chat\/[^/]+$/);
-    await expect(
-      b.page.getByText("Recurring payment", { exact: true }),
-    ).toBeVisible();
   });
 
   await test.step("A's history links the run to the payment", async () => {

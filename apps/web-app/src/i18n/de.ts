@@ -30,9 +30,9 @@ export const de = {
   recurringPaymentTitle: "Wiederkehrende Zahlung",
   recurringPaymentNewTitle: "Neue wiederkehrende Zahlung",
   recurringEmpty: "Noch keine wiederkehrenden Zahlungen.",
-  recurringSummaryActive: "{count} aktiv",
-  recurringSummaryNext: "nächste {date}",
-  recurringSummaryNoneActive: "keine aktiv",
+  recurringScheduledSection: "Geplant",
+  recurringHistorySection: "Verlauf",
+  recurringInsufficientFundsHint: "geringes Guthaben",
   recurringNotifyBody:
     "{amount} {unit} an {name} geht in {minutes} Min. raus. Öffne Linky, um sie abzubrechen.",
   recurringSentBody: "{amount} {unit} an {name} gesendet.",

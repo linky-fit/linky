@@ -14,6 +14,7 @@ import {
   ListRow,
   opacity,
   Row,
+  Section,
   Stack,
   Text,
   Pill,
@@ -24,8 +25,13 @@ import {
   useAppShellActions,
   useAppShellCore,
 } from "../app/context/AppShellContexts";
+import {
+  FloatingActionButton,
+  floatingActionButtonClearance,
+} from "../components/FloatingActionButton";
+import { RecurringPaymentsList } from "../components/RecurringPaymentsList";
+import { useRecurringPaymentOrders } from "../app/hooks/payments/useRecurringPaymentOrders";
 
-import { RecurringPaymentsSummaryRow } from "../components/RecurringPaymentsSummaryRow";
 import { createCashuTokenId } from "../app/lib/cashuTokenIdentity";
 import { calculateTransactionHistoryFee } from "../app/lib/transactionHistoryFee";
 import { readRecurringPaymentIdFromDetails } from "../app/lib/recurringPaymentDisplay";
@@ -362,6 +368,8 @@ export function TransactionsPage(): React.ReactElement {
   const cashuOperations = useWalletOperations();
   const messageRows = useMessageRows();
   const transactionRecords = useTransactionRecords();
+  const recurringOrders = useRecurringPaymentOrders();
+  const hasScheduled = recurringOrders.length > 0;
 
   const tokenByReferenceId = React.useMemo(() => {
     const tokens = new Map<string, string>();
@@ -705,45 +713,58 @@ export function TransactionsPage(): React.ReactElement {
   }, []);
 
   return (
-    <Stack paddingTop="$sm" paddingBottom="$xl">
-      <RecurringPaymentsSummaryRow />
-      {transactions.length === 0 ? (
-        <EmptyState title={t("paymentsHistoryEmpty")} />
-      ) : (
-        <>
-          <Stack gap="$xs">
-            {visibleTransactions.map((item) => (
-              <TransactionCard
-                buildDetailEntries={buildDetailEntries}
-                buildProblemStatusPill={buildProblemStatusPill}
-                buildTitle={buildTitle}
-                contactsById={contactsById}
-                copyText={copyText}
-                formatAmountText={formatAmountText}
-                formatDateText={formatDateText}
-                getRequestStatus={getRequestStatus}
-                isExpanded={expandedById[item.id] === true}
-                item={item}
-                key={item.id}
-                nostrPictureByNpub={nostrPictureByNpub}
-                onToggle={toggleExpanded}
-                t={t}
-                tokenByReferenceId={tokenByReferenceId}
-              />
-            ))}
-          </Stack>
-          {visibleCount < transactions.length ? (
-            <Button
-              variant="secondary"
-              onPress={() =>
-                setVisibleCount((count) => count + TRANSACTION_PAGE_SIZE)
-              }
-            >
-              {t("loadMore")}
-            </Button>
-          ) : null}
-        </>
-      )}
+    <Stack paddingTop="$sm" paddingBottom={floatingActionButtonClearance}>
+      {hasScheduled ? (
+        <Section title={t("recurringScheduledSection")}>
+          <RecurringPaymentsList />
+        </Section>
+      ) : null}
+      <Section
+        title={hasScheduled ? t("recurringHistorySection") : undefined}
+      >
+        {transactions.length === 0 ? (
+          <EmptyState title={t("paymentsHistoryEmpty")} />
+        ) : (
+          <>
+            <Stack gap="$xs">
+              {visibleTransactions.map((item) => (
+                <TransactionCard
+                  buildDetailEntries={buildDetailEntries}
+                  buildProblemStatusPill={buildProblemStatusPill}
+                  buildTitle={buildTitle}
+                  contactsById={contactsById}
+                  copyText={copyText}
+                  formatAmountText={formatAmountText}
+                  formatDateText={formatDateText}
+                  getRequestStatus={getRequestStatus}
+                  isExpanded={expandedById[item.id] === true}
+                  item={item}
+                  key={item.id}
+                  nostrPictureByNpub={nostrPictureByNpub}
+                  onToggle={toggleExpanded}
+                  t={t}
+                  tokenByReferenceId={tokenByReferenceId}
+                />
+              ))}
+            </Stack>
+            {visibleCount < transactions.length ? (
+              <Button
+                variant="secondary"
+                onPress={() =>
+                  setVisibleCount((count) => count + TRANSACTION_PAGE_SIZE)
+                }
+              >
+                {t("loadMore")}
+              </Button>
+            ) : null}
+          </>
+        )}
+      </Section>
+      <FloatingActionButton
+        icon="Plus"
+        label={t("recurringSave")}
+        onPress={() => navigateTo({ route: "recurringPaymentNew" })}
+      />
     </Stack>
   );
 }
