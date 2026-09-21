@@ -32,7 +32,6 @@ export interface RecurringPaymentsActions {
     order: RecurringPaymentOrder,
     paused: boolean,
   ) => void;
-  skipNextRecurringPayment: (order: RecurringPaymentOrder) => void;
 }
 
 interface UseRecurringPaymentsActionsParams {
@@ -168,35 +167,6 @@ export const useRecurringPaymentsActions = ({
     [update],
   );
 
-  const skipNextRecurringPayment = React.useCallback(
-    (order: RecurringPaymentOrder): void => {
-      const keys = orderKeys(order);
-      if (!keys) return;
-      const now = nowSeconds();
-      update(
-        "recurringPayment",
-        {
-          id: keys.id,
-          nextDueAtSec: nextDueAfter(
-            order,
-            Math.max(now, order.schedule.nextDueAtSec),
-          ),
-          lastRunAtSec: now,
-          lastRunStatus: "skipped",
-        },
-        keys.options,
-      );
-      pushToast(t("recurringSkippedToast"));
-      reportAppLog({
-        tag: "recurring.skippedByUser",
-        summary: "recurring payment skipped by the user",
-        links: { recurringPayment: order.id, contact: order.contactId },
-        payload: { dueAtSec: order.schedule.nextDueAtSec },
-      });
-    },
-    [pushToast, t, update],
-  );
-
   const requestDeleteRecurringPayment = React.useCallback(
     (order: RecurringPaymentOrder): boolean => {
       if (pendingDeleteId !== order.id) {
@@ -236,6 +206,5 @@ export const useRecurringPaymentsActions = ({
     requestDeleteRecurringPayment,
     runRecurringPaymentNow,
     setRecurringPaymentPaused,
-    skipNextRecurringPayment,
   };
 };

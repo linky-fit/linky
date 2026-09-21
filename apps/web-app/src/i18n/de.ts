@@ -36,12 +36,6 @@ export const de = {
   recurringNotifyBody:
     "{amount} {unit} an {name} geht in {minutes} Min. raus. Öffne Linky, um sie abzubrechen.",
   recurringSentBody: "{amount} {unit} an {name} gesendet.",
-  recurringUpcomingBanner:
-    "Wiederkehrende Zahlung von {amount} an {name} in {time}",
-  recurringUpcomingSending:
-    "Sende wiederkehrende Zahlung von {amount} an {name}",
-  recurringPayNowShort: "Jetzt zahlen",
-  recurringSkippedToast: "Diese Zahlung wird übersprungen.",
   recurringWaitingForFunds:
     "Für eine wiederkehrende Zahlung reicht das Guthaben gerade nicht. Sie wird erneut versucht.",
   recurringRecipientUnavailable:

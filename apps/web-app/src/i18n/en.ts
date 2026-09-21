@@ -36,10 +36,6 @@ export const en = {
   recurringNotifyBody:
     "{amount} {unit} to {name} goes out in {minutes} min. Open Linky to cancel it.",
   recurringSentBody: "Sent {amount} {unit} to {name}.",
-  recurringUpcomingBanner: "In {time}: recurring payment of {amount} to {name}",
-  recurringUpcomingSending: "Sending recurring payment of {amount} to {name}",
-  recurringPayNowShort: "Pay now",
-  recurringSkippedToast: "This payment will be skipped.",
   recurringWaitingForFunds:
     "Not enough funds for a recurring payment right now. It will be retried.",
   recurringRecipientUnavailable:

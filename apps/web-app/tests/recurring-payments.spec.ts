@@ -165,7 +165,6 @@ test("a due recurring payment pays the contact once and shows up in history", as
     await triggerSchedulerPass(a.page);
     await a.page.waitForTimeout(5_000);
     expect(await readBalanceSat(a.page)).toBe(before);
-    await expect(a.page.locator(".recurring-upcoming-banner")).toHaveCount(0);
   });
 
   a.errors.assertClean();

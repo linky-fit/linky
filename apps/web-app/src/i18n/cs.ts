@@ -35,11 +35,6 @@ export const cs = {
   recurringNotifyBody:
     "{amount} {unit} pro {name} odejde za {minutes} min. Otevřete Linky, pokud ji chcete zrušit.",
   recurringSentBody: "{amount} {unit} pro {name} odesláno.",
-  recurringUpcomingBanner:
-    "Za {time} odejde pravidelná platba {amount} pro {name}",
-  recurringUpcomingSending: "Odesílám pravidelnou platbu {amount} pro {name}",
-  recurringPayNowShort: "Zaplatit hned",
-  recurringSkippedToast: "Tato platba se přeskočí.",
   recurringWaitingForFunds:
     "Na pravidelnou platbu teď nemáte dost prostředků. Zkusím to znovu.",
   recurringRecipientUnavailable:
