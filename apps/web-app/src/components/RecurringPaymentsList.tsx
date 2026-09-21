@@ -19,7 +19,8 @@ import { RecurringContactAvatar } from "./RecurringContactAvatar";
 
 /** Every recurring payment with its interval, amount, and next due time. */
 export const RecurringPaymentsList: FC = () => {
-  const { formatDisplayedAmountText, lang, t } = useAppShellCore();
+  const { cashuBalance, formatDisplayedAmountText, lang, t } =
+    useAppShellCore();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
   const nowSec = useNowSeconds(orders.length > 0);
@@ -42,6 +43,8 @@ export const RecurringPaymentsList: FC = () => {
       {orders.map((order) => {
         const state = recurringOrderState(order, nowSec);
         const upcoming = recurringUpcoming(order, nowSec);
+        const underfunded =
+          state === "active" && cashuBalance < order.amountSat;
         const when =
           state === "paused"
             ? t("recurringStatusPaused")
@@ -83,6 +86,11 @@ export const RecurringPaymentsList: FC = () => {
                   >
                     {when}
                   </span>
+                  {underfunded ? (
+                    <span className="recurring-underfunded-hint">
+                      {t("recurringInsufficientFundsHint")}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="transaction-amount is-negative">

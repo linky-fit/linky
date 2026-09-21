@@ -191,7 +191,7 @@ export function RecurringPaymentPage({
               className={deleteArmed ? "btn-wide danger" : "btn-wide secondary"}
               onClick={() => {
                 if (requestDeleteRecurringPayment(order)) {
-                  navigateTo({ route: "recurringPayments" });
+                  navigateTo({ route: "transactions" });
                 }
               }}
             >

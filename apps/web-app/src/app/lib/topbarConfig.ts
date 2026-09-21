@@ -94,12 +94,9 @@ export const resolveBackAction = (
     case "topup":
       return () => navigateTo({ route: "wallet" });
 
-    case "recurringPayments":
-      return () => navigateTo({ route: "transactions" });
-
     case "recurringPaymentNew":
     case "recurringPayment":
-      return () => navigateTo({ route: "recurringPayments" });
+      return () => navigateTo({ route: "transactions" });
 
     case "topupNoAmount":
     case "topupInvoice":
@@ -247,7 +244,6 @@ const SHOWS_MENU_BUTTON: Record<
   topupInvoice: false,
   topupNoAmount: false,
   transactions: false,
-  recurringPayments: false,
   recurringPaymentNew: false,
   recurringPayment: false,
   wallet: false,
@@ -413,7 +409,6 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   topupInvoice: "topupInvoiceTitle",
   topupNoAmount: "topupNoAmountTitle",
   transactions: "transactionsTitle",
-  recurringPayments: "recurringPaymentsTitle",
   recurringPaymentNew: "recurringPaymentNewTitle",
   recurringPayment: "recurringPaymentTitle",
   wallet: "wallet",

@@ -29,9 +29,9 @@ export const cs = {
   recurringPaymentTitle: "Pravidelná platba",
   recurringPaymentNewTitle: "Nová pravidelná platba",
   recurringEmpty: "Zatím žádné pravidelné platby.",
-  recurringSummaryActive: "{count} aktivní",
-  recurringSummaryNext: "další {date}",
-  recurringSummaryNoneActive: "žádná aktivní",
+  recurringScheduledSection: "Naplánované",
+  recurringHistorySection: "Historie",
+  recurringInsufficientFundsHint: "nízký zůstatek",
   recurringNotifyBody:
     "{amount} {unit} pro {name} odejde za {minutes} min. Otevřete Linky, pokud ji chcete zrušit.",
   recurringSentBody: "{amount} {unit} pro {name} odesláno.",
