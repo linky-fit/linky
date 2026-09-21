@@ -1,12 +1,4 @@
 import * as Evolu from "@evolu/common";
-import {
-  ClientId,
-  MessageText,
-  OutboxRef,
-  Pubkey,
-  TextMessageDraft,
-} from "@linky/linkstr";
-import { Either, Exit, Schema } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { evolu, type RecurringPaymentId } from "../../../evolu";
@@ -15,7 +7,6 @@ import type { Translate } from "../../../i18n";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { formatShortNpub } from "../../../utils/formatting";
 import { nowSeconds } from "../../../utils/time";
-import { makeLocalId } from "../../../utils/validation";
 import { getDeviceId } from "../../lib/deviceId";
 import {
   readRecurringPaymentOrder,
@@ -33,13 +24,7 @@ import {
   nextRecurringOccurrenceAfter,
   resolveTimeZone,
 } from "../../lib/recurringSchedule";
-import type {
-  ContactRowLike,
-  NewLocalNostrMessage,
-  UpdateLocalNostrMessage,
-} from "../../types/appTypes";
-import { resolveNostrChatIdentity } from "../messages/contactIdentity";
-import type { EnqueueOutbox } from "./publishCashuMessagePayment";
+import type { ContactRowLike } from "../../types/appTypes";
 
 /** Short enough that a payment goes out within seconds of its send time. */
 export const RECURRING_TICK_INTERVAL_MS = 15_000;
@@ -79,13 +64,9 @@ export interface RecurringPaymentsScheduler {
 }
 
 interface UseRecurringPaymentsSchedulerParams {
-  appendLocalNostrMessage: (message: NewLocalNostrMessage) => string;
   cashuBalance: number;
   cashuIsBusy: boolean;
   contacts: readonly ContactRowLike[];
-  currentNsec: string | null;
-  /** Null until the linkstr runtime is composed. */
-  enqueueOutbox: EnqueueOutbox | null;
   /** False until the linkshu runtime is composed (seed + owners resolved). */
   enabled: boolean;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
@@ -112,7 +93,6 @@ interface UseRecurringPaymentsSchedulerParams {
   showPaidOverlay: (title: string) => void;
   t: Translate;
   update: UpdateRecurringPayment;
-  updateLocalNostrMessage: UpdateLocalNostrMessage;
   dependencies?: {
     deviceId?: string;
     nowSec?: () => number;
@@ -126,9 +106,6 @@ interface RecurringPaymentRowLike {
 }
 
 type RunAction = Extract<RecurringTickAction, { kind: "run" }>;
-
-const isPubkey = Schema.is(Pubkey);
-const decodeMessageText = Schema.decodeUnknownEither(MessageText);
 
 const orderLinks = (order: RecurringPaymentOrder): Record<string, string> => ({
   recurringPayment: order.id,
@@ -156,14 +133,11 @@ export const contactDisplayName = (contact: ContactRowLike): string => {
  * schedule back for a retry within the grace window.
  */
 export const useRecurringPaymentsScheduler = ({
-  appendLocalNostrMessage,
   cashuBalance,
   cashuIsBusy,
   contacts,
-  currentNsec,
   dependencies,
   enabled,
-  enqueueOutbox,
   formatDisplayedAmountParts,
   maybeShowPwaNotification,
   payContactWithCashuMessage,
@@ -174,16 +148,12 @@ export const useRecurringPaymentsScheduler = ({
   showPaidOverlay,
   t,
   update,
-  updateLocalNostrMessage,
 }: UseRecurringPaymentsSchedulerParams): RecurringPaymentsScheduler => {
   const latest = useLatest({
-    appendLocalNostrMessage,
     cashuBalance,
     cashuIsBusy,
     contacts,
-    currentNsec,
     enabled,
-    enqueueOutbox,
     formatDisplayedAmountParts,
     maybeShowPwaNotification,
     payContactWithCashuMessage,
@@ -194,7 +164,6 @@ export const useRecurringPaymentsScheduler = ({
     showPaidOverlay,
     t,
     update,
-    updateLocalNostrMessage,
   });
   const nowSec = dependencies?.nowSec ?? nowSeconds;
   const deviceId = dependencies?.deviceId ?? getDeviceId();
@@ -262,48 +231,6 @@ export const useRecurringPaymentsScheduler = ({
     [latest],
   );
 
-  const sendChatNote = React.useCallback(
-    async (contact: ContactRowLike, text: string): Promise<void> => {
-      const { currentNsec: nsec, enqueueOutbox: enqueue } = latest.current;
-      if (!nsec || enqueue === null) return;
-      const identity = await resolveNostrChatIdentity(nsec, contact);
-      if (!identity || !isPubkey(identity.contactPubHex)) return;
-      const content = decodeMessageText(text);
-      if (Either.isLeft(content)) return;
-      const clientId = ClientId.make(makeLocalId());
-      const pendingId = latest.current.appendLocalNostrMessage({
-        clientId,
-        contactId: String(contact.id ?? ""),
-        content: text,
-        createdAtSec: nowSec(),
-        direction: "out",
-        pubkey: identity.myPubHex,
-        rumorId: null,
-        status: "pending",
-        wrapId: `pending:${clientId}`,
-      });
-      if (!pendingId) return;
-      const exit = await enqueue({
-        op: {
-          _tag: "chat.text",
-          draft: new TextMessageDraft({
-            to: identity.contactPubHex,
-            content: content.right,
-            clientId,
-          }),
-        },
-        ref: OutboxRef.make(`message:${pendingId}`),
-      });
-      if (Exit.isSuccess(exit)) {
-        latest.current.updateLocalNostrMessage(pendingId, {
-          createdAtSec: exit.value.sentAt,
-          rumorId: exit.value.rumorId,
-        });
-      }
-    },
-    [latest, nowSec],
-  );
-
   const claimOrder = React.useCallback(
     (
       row: RecurringPaymentRowLike,
@@ -361,13 +288,25 @@ export const useRecurringPaymentsScheduler = ({
         patchOrder(row, { lastRunStatus: "paid" });
         const contact = findContact(order.contactId);
         const { amount, unit } = formatAmount(order.amountSat);
+        const name = contact ? contactDisplayName(contact) : "";
         latest.current.showPaidOverlay(
           latest.current
             .t("paidSentTo")
             .replace("{amount}", amount)
             .replace("{unit}", unit)
-            .replace("{name}", contact ? contactDisplayName(contact) : ""),
+            .replace("{name}", name),
         );
+        void latest.current
+          .maybeShowPwaNotification(
+            latest.current.t("recurringPaymentTitle"),
+            latest.current
+              .t("recurringSentBody")
+              .replace("{amount}", amount)
+              .replace("{unit}", unit)
+              .replace("{name}", name),
+            `recurring-sent:${order.id}:${action.dueAtSec}`,
+          )
+          .catch(() => undefined);
       } else {
         // Back to the due time so the next pass retries; the planner skips
         // the run for good once the grace window closes.
@@ -475,14 +414,6 @@ export const useRecurringPaymentsScheduler = ({
       latest.current.setCashuIsBusy(true);
       let outcome: { ok: true } | { ok: false; error: string };
       try {
-        try {
-          await sendChatNote(
-            contact,
-            latest.current.t("recurringPaymentChatNote"),
-          );
-        } catch {
-          // The note is a courtesy; the payment still goes out.
-        }
         const result = await latest.current.payContactWithCashuMessage({
           amountSat: order.amountSat,
           contact,
@@ -500,7 +431,7 @@ export const useRecurringPaymentsScheduler = ({
       settleRun(row, action, outcome, startedAtSec);
       return outcome.ok ? "paid" : "failed";
     },
-    [findContact, latest, nowSec, patchOrder, sendChatNote, settleRun],
+    [findContact, latest, nowSec, patchOrder, settleRun],
   );
 
   const runOrderNow = React.useCallback(

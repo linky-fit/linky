@@ -32,9 +32,9 @@ export const cs = {
   recurringSummaryActive: "{count} aktivní",
   recurringSummaryNext: "další {date}",
   recurringSummaryNoneActive: "žádná aktivní",
-  recurringPaymentChatNote: "Pravidelná platba",
   recurringNotifyBody:
     "{amount} {unit} pro {name} odejde za {minutes} min. Otevřete Linky, pokud ji chcete zrušit.",
+  recurringSentBody: "{amount} {unit} pro {name} odesláno.",
   recurringUpcomingBanner:
     "Za {time} odejde pravidelná platba {amount} pro {name}",
   recurringUpcomingSending: "Odesílám pravidelnou platbu {amount} pro {name}",
@@ -94,7 +94,6 @@ export const cs = {
   recurringPause: "Pozastavit",
   recurringResume: "Obnovit",
   recurringRunNow: "Zaplatit hned",
-  recurringSkipNext: "Přeskočit příští platbu",
   recurringNotFound: "Pravidelná platba nenalezena.",
   recurringOnlyWhileOpen:
     "Platbu odešle kterékoli vaše zařízení, na kterém je zrovna otevřená Linky. Pět minut předem dostanete upozornění a můžete ji zrušit.",
