@@ -8,11 +8,13 @@ import {
 } from "./recurringSchedule";
 
 /**
- * Lead time between claiming a due payment and sending it. Every device shows
- * the upcoming payment with a cancel button for this long, and claims written
- * by devices that raced each other converge through sync in the meantime.
+ * Lead time between claiming a due payment and sending it. Kept short and no
+ * longer shown as a countdown: its only job now is to let claims written by
+ * devices that raced each other converge through sync, so a single device pays.
+ * The user is told once at claim time (a notification) rather than watching a
+ * timer run down.
  */
-export const RECURRING_NOTICE_SEC = 5 * 60;
+export const RECURRING_NOTICE_SEC = 60;
 /** A claim this far past its send time belongs to a device that went away. */
 export const RECURRING_CLAIM_TAKEOVER_SEC = 10 * 60;
 /** How long a due run waits for funds or retries failures before it is skipped. */
