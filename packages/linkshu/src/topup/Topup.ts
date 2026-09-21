@@ -54,6 +54,9 @@ const POLL_INTERVAL = Duration.seconds(5);
 /** Transient poll failures are expected offline; a run of them is not. */
 const MAX_CONSECUTIVE_POLL_FAILURES = 10;
 
+const watcherKey = (pending: PendingTopup): string =>
+  `${pending.mint}|${pending.quoteId}`;
+
 const quoteOf = (pending: PendingTopup): TopupQuote =>
   new TopupQuote({
     quoteId: pending.quoteId,
@@ -249,19 +252,45 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
         ),
       );
 
+    const watchers = new Map<
+      string,
+      Fiber.RuntimeFiber<TopupReceipt, TopupError>
+    >();
+
+    const watch = (
+      key: string,
+      completion: Effect.Effect<TopupReceipt, TopupError>,
+    ): Effect.Effect<
+      Fiber.RuntimeFiber<TopupReceipt, TopupError>,
+      never,
+      Scope.Scope
+    > =>
+      Effect.map(Effect.forkScoped(completion), (fiber) => {
+        watchers.set(key, fiber);
+        fiber.addObserver(() => {
+          if (watchers.get(key) === fiber) watchers.delete(key);
+        });
+        return fiber;
+      });
+
     /**
      * Polling runs in the scope, not in `result`: the topup completes itself
-     * even when nobody awaits the handle, and closing the scope stops it
-     * while the persisted record keeps the quote claimable.
+     * even when nobody awaits the handle. A quote is watched by one fiber
+     * per runtime, owned by the scope of the call that forked it; a later
+     * call gets a handle onto that fiber and its own scope owns nothing.
+     * Closing the owning scope stops the poll while the persisted record
+     * keeps the quote claimable.
      */
     const handleFor = (
       pending: PendingTopup,
       options: TopupLockingOptions,
     ): Effect.Effect<TopupHandle, never, Scope.Scope> =>
-      Effect.map(Effect.forkScoped(complete(pending, options)), (fiber) => ({
-        quote: quoteOf(pending),
-        result: Fiber.join(fiber),
-      }));
+      Effect.gen(function* () {
+        const key = watcherKey(pending);
+        const fiber =
+          watchers.get(key) ?? (yield* watch(key, complete(pending, options)));
+        return { quote: quoteOf(pending), result: Fiber.join(fiber) };
+      });
 
     /**
      * The record is persisted before the handle exists, so the invoice the

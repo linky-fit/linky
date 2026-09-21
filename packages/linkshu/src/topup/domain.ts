@@ -87,8 +87,10 @@ export type TopupAdoptError = typeof TopupAdoptError.Type;
 /**
  * A running topup: `quote` is available immediately for display; `result`
  * resolves once the invoice is paid and the proofs are minted and persisted.
- * The handle is scoped — closing the scope stops the polling, while the
- * persisted quote stays claimable through `resumePending` for a day.
+ * The watcher runs in the scope of the call that started it, and a handle
+ * from a later call for the same quote only observes that fiber. Closing
+ * the owning scope stops the polling, while the persisted quote stays
+ * claimable through `resumePending` for a day.
  */
 export interface TopupHandle {
   readonly quote: TopupQuote;
