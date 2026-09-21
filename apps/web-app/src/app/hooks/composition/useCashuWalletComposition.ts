@@ -2422,13 +2422,10 @@ export const useCashuWalletComposition = ({
   });
 
   const recurringScheduler = useRecurringPaymentsScheduler({
-    appendLocalNostrMessage,
     cashuBalance,
     cashuIsBusy,
     contacts,
-    currentNsec,
     enabled: sendCashuToken !== null && meltCashuInvoice !== null,
-    enqueueOutbox,
     formatDisplayedAmountParts,
     maybeShowPwaNotification,
     payContactWithCashuMessage,
@@ -2446,7 +2443,6 @@ export const useCashuWalletComposition = ({
     showPaidOverlay,
     t,
     update,
-    updateLocalNostrMessage,
   });
   const recurringPaymentsActions = useRecurringPaymentsActions({
     insert,

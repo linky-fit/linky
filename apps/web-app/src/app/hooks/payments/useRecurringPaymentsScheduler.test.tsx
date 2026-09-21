@@ -73,13 +73,10 @@ const claimedBy = (deviceId: string, atSec = DUE - RECURRING_NOTICE_SEC) => ({
 });
 
 const makeParams = (overrides: Partial<Params> = {}): Params => ({
-  appendLocalNostrMessage: vi.fn(() => "local-1"),
   cashuBalance: 1_000,
   cashuIsBusy: false,
   contacts: [nostrContact, lightningContact],
-  currentNsec: null,
   enabled: true,
-  enqueueOutbox: null,
   formatDisplayedAmountParts: (amountSat) => ({
     amountText: String(amountSat),
     approxPrefix: "",
@@ -94,7 +91,6 @@ const makeParams = (overrides: Partial<Params> = {}): Params => ({
   showPaidOverlay: vi.fn(),
   t: (key) => key,
   update: vi.fn<Params["update"]>(),
-  updateLocalNostrMessage: vi.fn(),
   dependencies: { deviceId: "device-a", nowSec: () => NOW },
   ...overrides,
 });

@@ -33,9 +33,9 @@ export const en = {
   recurringSummaryActive: "{count} active",
   recurringSummaryNext: "next {date}",
   recurringSummaryNoneActive: "none active",
-  recurringPaymentChatNote: "Recurring payment",
   recurringNotifyBody:
     "{amount} {unit} to {name} goes out in {minutes} min. Open Linky to cancel it.",
+  recurringSentBody: "Sent {amount} {unit} to {name}.",
   recurringUpcomingBanner: "In {time}: recurring payment of {amount} to {name}",
   recurringUpcomingSending: "Sending recurring payment of {amount} to {name}",
   recurringPayNowShort: "Pay now",
@@ -93,7 +93,6 @@ export const en = {
   recurringPause: "Pause",
   recurringResume: "Resume",
   recurringRunNow: "Pay now",
-  recurringSkipNext: "Skip the next payment",
   recurringNotFound: "Recurring payment not found.",
   recurringOnlyWhileOpen:
     "Any of your devices with Linky open sends the payment. You are notified five minutes ahead and can cancel it.",

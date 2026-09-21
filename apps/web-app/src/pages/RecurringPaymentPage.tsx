@@ -1,4 +1,4 @@
-import { Pause, Play, Send, SkipForward, Trash2 } from "lucide-react";
+import { Pause, Play, Send, Trash2 } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
@@ -32,7 +32,6 @@ export function RecurringPaymentPage({
     requestDeleteRecurringPayment,
     runRecurringPaymentNow,
     setRecurringPaymentPaused,
-    skipNextRecurringPayment,
   } = useRecurringPaymentsContext();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
@@ -160,20 +159,6 @@ export function RecurringPaymentPage({
                   <span>
                     {isRunning ? t("payPaying") : t("recurringRunNow")}
                   </span>
-                </span>
-              </button>
-            ) : null}
-            {state === "active" ? (
-              <button
-                type="button"
-                className="btn-wide secondary"
-                onClick={() => skipNextRecurringPayment(order)}
-              >
-                <span className="btn-label-with-icon">
-                  <span className="btn-label-icon" aria-hidden="true">
-                    <SkipForward size={18} />
-                  </span>
-                  <span>{t("recurringSkipNext")}</span>
                 </span>
               </button>
             ) : null}
