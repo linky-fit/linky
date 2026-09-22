@@ -4,13 +4,16 @@ import {
   MintInfo as CashuMintInfo,
   MintOperationError,
 } from "@cashu/cashu-ts";
-import { Effect, Exit } from "effect";
+import { Effect, Either, Exit } from "effect";
 import { CurrencyUnit, MintUrl } from "../../domain/primitives";
+import { LeaseId } from "../../ports/KeyValueStore";
 import type { KeyValueStoreService } from "../../ports/KeyValueStore";
+import { makeInMemoryKeyValueStore } from "../../ports/inMemoryKeyValueStore";
 import { fakeWallet as stubWallet } from "../../testing/fakeWallet";
 import type { LoadedWallet, WalletLoader } from "./WalletInstances";
 import {
   classifyMintError,
+  keysetMintKey,
   makeWalletInstances,
   seenMintKey,
 } from "./WalletInstances";
@@ -33,17 +36,23 @@ const infoFixture: GetInfoResponse = {
 const fakeWallet = (keysetId: string): LoadedWallet =>
   stubWallet({ keysetId, getMintInfo: () => new CashuMintInfo(infoFixture) });
 
-const stubKv = (sets: Array<[string, string]>): KeyValueStoreService => ({
-  get: () => Effect.succeed(null),
-  set: (key, value) =>
-    Effect.sync(() => {
-      sets.push([key, value]);
-    }),
-  remove: () => Effect.die("not under test"),
-  listKeys: () => Effect.die("not under test"),
-  tryAcquireLease: () => Effect.die("not under test"),
-  releaseLease: () => Effect.die("not under test"),
-});
+const stubKv = (sets: Array<[string, string]>): KeyValueStoreService => {
+  const store = new Map<string, string>();
+  return {
+    get: (key) => Effect.succeed(store.get(key) ?? null),
+    set: (key, value) =>
+      Effect.sync(() => {
+        store.set(key, value);
+        sets.push([key, value]);
+      }),
+    remove: () => Effect.die("not under test"),
+    listKeys: () => Effect.die("not under test"),
+    // A trivially-granting lease: the binding tests are single-threaded, so
+    // mutual exclusion is exercised separately with the in-memory store.
+    tryAcquireLease: () => Effect.succeed(LeaseId.make("lease")),
+    releaseLease: () => Effect.void,
+  };
+};
 
 describe("makeWalletInstances", () => {
   it("shares one load between concurrent callers for the same mint/unit", async () => {
@@ -86,9 +95,12 @@ describe("makeWalletInstances", () => {
     await Effect.runPromise(instances.get(mint, msat));
     expect(calls).toBe(2);
 
-    // Only the creating load records the mint as seen.
+    // Each fresh load binds its keyset id to the mint and records it as seen;
+    // the cached second `sat` load re-checks the binding without writing.
     expect(sets).toEqual([
+      [keysetMintKey("keyset-sat"), mint],
       [seenMintKey(mint), mint],
+      [keysetMintKey("keyset-msat"), mint],
       [seenMintKey(mint), mint],
     ]);
   });
@@ -118,6 +130,143 @@ describe("makeWalletInstances", () => {
     const retried = await Effect.runPromise(instances.get(mint, sat));
     expect(calls).toBe(2);
     expect(retried).toBe(wallet);
+  });
+});
+
+describe("keyset id / mint binding (LNK-01)", () => {
+  const honest = MintUrl.make("https://cashu.cz");
+  const evil = MintUrl.make("https://evil.example");
+  const keyset = "00ad268c4d1f5826";
+
+  const loaderFor = (byMint: Record<string, string>): WalletLoader => {
+    let calls = 0;
+    const load: WalletLoader = (m) => {
+      calls += 1;
+      return Promise.resolve(fakeWallet(byMint[m] ?? "unknown"));
+    };
+    return Object.assign(load, {
+      get calls() {
+        return calls;
+      },
+    });
+  };
+
+  it("binds a keyset id to the first mint that presents it", async () => {
+    const sets: Array<[string, string]> = [];
+    const instances = makeWalletInstances(
+      stubKv(sets),
+      loaderFor({ [honest]: keyset }),
+    );
+
+    await Effect.runPromise(instances.get(honest, sat));
+
+    expect(sets).toContainEqual([keysetMintKey(keyset), honest]);
+  });
+
+  it("rejects a mint presenting a keyset id bound to another mint", async () => {
+    const instances = makeWalletInstances(
+      stubKv([]),
+      loaderFor({ [honest]: keyset, [evil]: keyset }),
+    );
+
+    await Effect.runPromise(instances.get(honest, sat));
+    const rejected = await Effect.runPromiseExit(instances.get(evil, sat));
+
+    assert(Exit.isFailure(rejected));
+    expect(rejected).toEqual(
+      Exit.fail(
+        expect.objectContaining({
+          _tag: "MintRejected",
+          mint: evil,
+        }),
+      ),
+    );
+  });
+
+  it("keeps rejecting the impostor on the cached path", async () => {
+    const instances = makeWalletInstances(
+      stubKv([]),
+      loaderFor({ [honest]: keyset, [evil]: keyset }),
+    );
+
+    await Effect.runPromise(instances.get(honest, sat));
+    const first = await Effect.runPromiseExit(instances.get(evil, sat));
+    const second = await Effect.runPromiseExit(instances.get(evil, sat));
+
+    expect(Exit.isFailure(first)).toBe(true);
+    expect(Exit.isFailure(second)).toBe(true);
+  });
+
+  it("lets the same mint keep using its own keyset id across reloads", async () => {
+    const instances = makeWalletInstances(
+      stubKv([]),
+      loaderFor({ [honest]: keyset }),
+    );
+
+    const first = await Effect.runPromise(instances.get(honest, sat));
+    const second = await Effect.runPromise(instances.get(honest, sat));
+    expect(second).toBe(first);
+  });
+
+  it("rejects a mint whose keyset id is already held under another mint", async () => {
+    // Empty binding store (as after an upgrade), but the wallet already holds
+    // proofs under the honest mint for this keyset. The impostor must be
+    // rejected from the holdings, not accepted just for loading first.
+    const instances = makeWalletInstances(
+      stubKv([]),
+      loaderFor({ [evil]: keyset }),
+      () => Effect.succeed(honest),
+    );
+
+    const rejected = await Effect.runPromiseExit(instances.get(evil, sat));
+    assert(Exit.isFailure(rejected));
+    expect(rejected).toEqual(
+      Exit.fail(expect.objectContaining({ _tag: "MintRejected", mint: evil })),
+    );
+  });
+
+  it("serializes concurrent claims so only one mint binds an unbound keyset", async () => {
+    // A real lease store: two mints presenting the same keyset id load at once.
+    const instances = makeWalletInstances(
+      makeInMemoryKeyValueStore(),
+      loaderFor({ [honest]: keyset, [evil]: keyset }),
+    );
+
+    const outcomes = await Effect.runPromise(
+      Effect.all(
+        [
+          Effect.either(instances.get(honest, sat)),
+          Effect.either(instances.get(evil, sat)),
+        ],
+        { concurrency: "unbounded" },
+      ),
+    );
+    const successes = outcomes.filter(Either.isRight).length;
+    const failures = outcomes.filter(Either.isLeft).length;
+    expect(successes).toBe(1);
+    expect(failures).toBe(1);
+  });
+
+  it("does not bind or crash for a mint with no active keyset", async () => {
+    const sets: Array<[string, string]> = [];
+    const load: WalletLoader = () =>
+      Promise.resolve(
+        new Proxy(fakeWallet(keyset), {
+          get(target, prop, receiver) {
+            if (prop === "keysetId") {
+              throw new Error("no active keyset");
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        }),
+      );
+    const instances = makeWalletInstances(stubKv(sets), load);
+
+    // Loading succeeds (restore-only access), and nothing is bound.
+    await Effect.runPromise(instances.get(honest, sat));
+    expect(sets.some(([key]) => key.startsWith("linkshu.keysetMint."))).toBe(
+      false,
+    );
   });
 });
 

@@ -25,6 +25,8 @@ import {
 } from "@cashu/cashu-ts";
 import { Effect, Schema } from "effect";
 import { MintRejected, MintUnreachable } from "../../domain/errors";
+import { withKeyLease } from "../../internal/lease";
+import { ProofStore } from "../../ports/ProofStore";
 import { KeysetId } from "../../domain/primitives";
 import type { CurrencyUnit, MintUrl } from "../../domain/primitives";
 import { CashuSeed } from "../../ports/CashuSeed";
@@ -39,6 +41,37 @@ export const SEEN_MINTS_KEY_PREFIX = "linkshu.seenMints.";
 
 export const seenMintKey = (mint: MintUrl): string =>
   SEEN_MINTS_KEY_PREFIX + encodeURIComponent(mint);
+
+export const KEYSET_MINT_KEY_PREFIX = "linkshu.keysetMint.";
+export const KEYSET_MINT_LOCK_PREFIX = "linkshu.keysetMintLock.";
+
+/** Storage key binding one keyset id to the mint that owns it. */
+export const keysetMintKey = (keysetId: string): string =>
+  KEYSET_MINT_KEY_PREFIX + encodeURIComponent(keysetId);
+
+const keysetMintLockKey = (keysetId: string): string =>
+  KEYSET_MINT_LOCK_PREFIX + encodeURIComponent(keysetId);
+
+/**
+ * Resolves the mint that owns a keyset id from existing holdings (the proofs
+ * already stored under it), so ownership does not depend on which mint the
+ * runtime happens to load first. Returns null when nothing is held under it.
+ */
+export type HoldingsOwnerResolver = (
+  keysetId: string,
+) => Effect.Effect<MintUrl | null>;
+
+// cashu-ts throws from the `keysetId` getter when the wallet has no active
+// keyset (a restore-only load of an inactive-only mint). Read it defensively:
+// no active keyset means no new outputs are derived in this load, so there is
+// nothing to bind.
+const readActiveKeysetId = (wallet: LoadedWallet): string | null => {
+  try {
+    return wallet.keysetId;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * The slice of a loaded cashu-ts wallet the package reads back after load.
@@ -179,6 +212,7 @@ export type WalletLoader = (
 export const makeWalletInstances = (
   kv: KeyValueStoreService,
   load: WalletLoader,
+  resolveHoldingsOwner: HoldingsOwnerResolver = () => Effect.succeed(null),
 ) => {
   const inFlight = new Map<string, Promise<LoadedWallet>>();
 
@@ -200,6 +234,64 @@ export const makeWalletInstances = (
       ),
     );
 
+  /**
+   * Binds a keyset id to the mint that owns it and rejects any other mint that
+   * presents it. Ownership is established from existing holdings first, then
+   * from the stored binding, so an impostor cannot claim a keyset the wallet
+   * already holds proofs under (e.g. after an upgrade with an empty binding
+   * store or a fresh device sync). The check-and-write runs under a per-keyset
+   * lease, so two concurrent loads cannot both claim an unbound keyset. A keyset
+   * id is a hash of the keyset's public keys (NUT-02), so two honest mints
+   * never share one.
+   */
+  const enforceKeysetMintBinding = (
+    mint: MintUrl,
+    wallet: LoadedWallet,
+  ): Effect.Effect<void, MintRejected | MintUnreachable> =>
+    Effect.gen(function* () {
+      const keysetId = readActiveKeysetId(wallet);
+      if (keysetId === null) return;
+
+      const key = keysetMintKey(keysetId);
+      // Fast path: already bound to this mint, no lock or holdings scan needed.
+      if ((yield* kv.get(key)) === mint) return;
+
+      const claim = Effect.gen(function* () {
+        const stored = yield* kv.get(key);
+        const owner = stored ?? (yield* resolveHoldingsOwner(keysetId));
+        if (owner === null) {
+          yield* kv.set(key, mint);
+          return;
+        }
+        if (owner !== mint) {
+          return yield* Effect.fail(
+            new MintRejected({
+              mint,
+              code: null,
+              detail: `keyset id ${keysetId} belongs to ${owner}; refusing to use it under ${mint}`,
+            }),
+          );
+        }
+        // Persist an ownership derived from holdings so later loads take the
+        // fast path.
+        if (stored === null) yield* kv.set(key, mint);
+      });
+
+      yield* withKeyLease(
+        kv,
+        keysetMintLockKey(keysetId),
+      )(claim).pipe(
+        Effect.catchTag(
+          "LeaseLockTimeout",
+          () =>
+            new MintUnreachable({
+              mint,
+              detail: `could not lock the keyset ${keysetId} binding`,
+            }),
+        ),
+      );
+    });
+
   const get = (
     mint: MintUrl,
     unit: CurrencyUnit,
@@ -207,11 +299,17 @@ export const makeWalletInstances = (
     Effect.suspend(() => {
       const key = `${mint}|${unit}`;
       const cached = inFlight.get(key);
-      if (cached !== undefined) return awaitLoad(mint, key, cached);
+      // The binding is checked on every load, cached included: a rejected mint
+      // whose wallet promise is already cached must stay rejected.
+      if (cached !== undefined)
+        return awaitLoad(mint, key, cached).pipe(
+          Effect.tap((wallet) => enforceKeysetMintBinding(mint, wallet)),
+        );
 
       const loading = load(mint, unit);
       inFlight.set(key, loading);
       return awaitLoad(mint, key, loading).pipe(
+        Effect.tap((wallet) => enforceKeysetMintBinding(mint, wallet)),
         Effect.tap(() => kv.set(seenMintKey(mint), mint)),
       );
     });
@@ -230,8 +328,23 @@ export class WalletInstances extends Effect.Service<WalletInstances>()(
     effect: Effect.gen(function* () {
       const { bip39Seed } = yield* CashuSeed;
       const kv = yield* KeyValueStore;
-      return makeWalletInstances(kv, (mint, unit) =>
-        loadWallet({ Mint, Wallet, mintUrl: mint, unit, bip39seed: bip39Seed }),
+      const proofs = yield* ProofStore;
+      const resolveHoldingsOwner: HoldingsOwnerResolver = (keysetId) =>
+        Effect.map(proofs.loadAll, (stored) => {
+          const match = stored.find((proof) => proof.keysetId === keysetId);
+          return match ? match.mint : null;
+        });
+      return makeWalletInstances(
+        kv,
+        (mint, unit) =>
+          loadWallet({
+            Mint,
+            Wallet,
+            mintUrl: mint,
+            unit,
+            bip39seed: bip39Seed,
+          }),
+        resolveHoldingsOwner,
       );
     }),
   },
