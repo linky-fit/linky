@@ -262,7 +262,9 @@ describe("useBankPaymentOffers", () => {
       );
     });
     expect(current().getBankPaymentOfferForSettlement(paid)).toBeNull();
-    expect(current().isBankPaymentOfferCanceled("offer-1")).toBe(true);
+    expect(
+      current().isBankPaymentOfferCanceled(BankOfferId.make("offer-1")),
+    ).toBe(true);
   });
 
   it("keeps one row per recipient with the latest status and dedupes persisted chat rows", async () => {
@@ -341,7 +343,7 @@ describe("useBankPaymentOffers", () => {
       amountText: "250 Kč",
       createdAtSec: NOW,
       expiresAtSec: NOW + 300,
-      offerId: "offer-1",
+      offerId: BankOfferId.make("offer-1"),
       ownerPubkey: owner.pubkey,
       pending: [{ dueAtSec: NOW + 10, peer: recipient.pubkey }],
     });
@@ -360,7 +362,7 @@ describe("useBankPaymentOffers", () => {
 
   it("sends bank details once after an acceptance and tells the other recipient", async () => {
     rememberBankPaymentOfferSpdPayload({
-      offerId: "offer-1",
+      offerId: BankOfferId.make("offer-1"),
       ownerPubkey: owner.pubkey,
       spdPayload: SPD,
     });
@@ -499,7 +501,9 @@ describe("useBankPaymentOffers", () => {
     expect(sendBankOfferMock.mock.calls[0]?.[0]).toMatchObject({
       status: "canceled",
     });
-    expect(current().isBankPaymentOfferCanceled("offer-1")).toBe(true);
+    expect(
+      current().isBankPaymentOfferCanceled(BankOfferId.make("offer-1")),
+    ).toBe(true);
   });
 
   it("responds from a chat row by looking the thread up, never from the row's content", async () => {

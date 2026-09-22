@@ -1,6 +1,8 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
+import { BankOfferId } from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { BankPaymentOfferInfo } from "@linky-fit/proxy-payment";
 import type { CashuPaymentRequestMessageInfo } from "../app/lib/paymentRequestMessage";
 import { serializePrivateImageMessage } from "../app/lib/privateImageMessage";
@@ -434,8 +436,8 @@ describe("ChatMessage bank payment offer actions", () => {
       expiresAtSec: 1_700_000_300,
       extensionSec: null,
       initiatedAtSec: 1_699_999_900,
-      offerId: "offer-1",
-      offererPublicKey: "offerer-pubkey",
+      offerId: BankOfferId.make("offer-1"),
+      offererPublicKey: makeIdentity().pubkey,
       spdPayload: null,
       status: "bank_paid",
       statusUpdatedAtSec: 1_700_000_000,

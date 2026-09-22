@@ -1,4 +1,10 @@
-import type { BankOfferStatus } from "@linky-fit/linkstr";
+import type {
+  BankOfferId,
+  BankOfferStatus,
+  ClientId,
+  Pubkey,
+  RumorId,
+} from "@linky-fit/linkstr";
 import type { BankPaymentOfferInfo } from "./content";
 import {
   BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
@@ -13,14 +19,14 @@ export interface BankPaymentOffer extends BankPaymentOfferInfo {
   /** Send time of the first evidence seen that the peer received the bank
    * details, kept the same way; the peer was the chosen payer from then on. */
   bankDetailsSentAtSec: number | null;
-  clientId: string | null;
+  clientId: ClientId | null;
   /** The encoded snapshot JSON, byte for byte what the wire carried. */
   content: string;
   /** Send time of the first snapshot seen for this thread. */
   createdAtSec: number;
-  offererPublicKey: string;
-  peer: string;
-  snapshotId: string;
+  offererPublicKey: Pubkey;
+  peer: Pubkey;
+  snapshotId: RumorId;
 }
 
 interface OfferPhase {
@@ -107,13 +113,13 @@ export const offerUpdatedAtSec = (offer: BankPaymentOffer): number =>
 
 export const bankPaymentOffersOf = (
   offers: readonly BankPaymentOffer[],
-  offerId: string,
+  offerId: BankOfferId,
 ): BankPaymentOffer[] => offers.filter((offer) => offer.offerId === offerId);
 
 export const findBankPaymentOffer = (
   offers: readonly BankPaymentOffer[],
-  peer: string,
-  offerId: string,
+  peer: Pubkey,
+  offerId: BankOfferId,
 ): BankPaymentOffer | null =>
   offers.find((offer) => offer.peer === peer && offer.offerId === offerId) ??
   null;

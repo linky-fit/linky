@@ -3,9 +3,9 @@ import {
   NonEmptyString1000,
   PositiveInt,
 } from "@evolu/common";
+import { createId } from "@linky-fit/domain";
 import { NewOperation, ProofId } from "@linky-fit/linkshu";
 import { Schema } from "effect";
-import { createId } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
 import {
   deriveTransactionCategory,

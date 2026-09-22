@@ -1,3 +1,4 @@
+import type { BankOfferId, Pubkey } from "@linky-fit/linkstr";
 import {
   BankPaymentOfferStaggerRecord,
   isBankPaymentOfferStaggerRecordExpired,
@@ -185,7 +186,7 @@ export const forgetBankPaymentOfferSpdPayload = (offerId: string): void => {
   safeLocalStorageRemove(spdKey(offerId));
 };
 
-const staggerKey = (offerId: string): string =>
+const staggerKey = (offerId: BankOfferId): string =>
   `${STAGGER_KEY_PREFIX}.${encodeURIComponent(offerId)}`;
 
 const readStaggerRecordByKey = (
@@ -197,19 +198,21 @@ const readStaggerRecordByKey = (
     null,
   );
 
-export const forgetBankPaymentOfferStaggerQueue = (offerId: string): void => {
+export const forgetBankPaymentOfferStaggerQueue = (
+  offerId: BankOfferId,
+): void => {
   safeLocalStorageRemove(staggerKey(offerId));
 };
 
 export const rememberBankPaymentOfferStaggerQueue = (
   record: BankPaymentOfferStaggerRecord,
 ): void => {
-  if (!record.offerId.trim() || record.pending.length === 0) return;
+  if (record.pending.length === 0) return;
   safeLocalStorageSetJson(staggerKey(record.offerId), record);
 };
 
 export const readBankPaymentOfferStaggerRecords = (
-  ownerPubkey: string,
+  ownerPubkey: Pubkey,
 ): BankPaymentOfferStaggerRecord[] => {
   const records: BankPaymentOfferStaggerRecord[] = [];
   const nowSec = nowSeconds();
@@ -226,8 +229,8 @@ export const readBankPaymentOfferStaggerRecords = (
 };
 
 export const removeBankPaymentOfferStaggerRecipients = (
-  offerId: string,
-  peers: readonly string[],
+  offerId: BankOfferId,
+  peers: readonly Pubkey[],
 ): void => {
   const record = readStaggerRecordByKey(staggerKey(offerId));
   if (!record) return;

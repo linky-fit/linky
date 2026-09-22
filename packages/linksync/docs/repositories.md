@@ -82,6 +82,10 @@ Ids are `cashuProofIdFor(secret)` and `cashuOperationIdFor(operationKeyOf(op))`,
 
 A row's id says which event it records, so writing the same event again (a retry, a second tab, another device resuming the same operation) upserts one row instead of adding a duplicate. Build ids with `transactionIdForOperation(operationId)` for anything a linkshu operation carries, `transactionIdForQuote(kind, mint, quoteId)` for a melt or topup known only by its quote (the same id as its operation), `transactionIdForRequest(requestId)` for a payment request, and `transactionIdForRestore(proofIds)` for a restore. The consumer can join a row to its operation by comparing `transactionIdForOperation(operation.id)` with the row id.
 
+## Recurring payments
+
+`makeRecurringPaymentsRepository(store)` over `recurringPayment` in the `transactions` scope, next to the history the payments produce and forgotten with it. `all` returns `RecurringPaymentRecord`s: the columns a scheduler acts on are present and non-null, and a row still arriving column by column from sync is skipped until it completes (`normalizeRecurringPayment`). `unit` and `intervalUnit` stay strings here; their values, the schedule math and the claim protocol between devices belong to `@linky-fit/recurring-payment`, whose `readRecurringPaymentOrder` validates a record into an order.
+
 ## Identity
 
 `makeIdentityRepository(store)` mirrors the active Nostr key in the `identity` scope (one fixed shard, never forgotten) so another device can adopt it. `set` upserts the one row `activeNostrIdentityId`; `current` is the newest row by `updatedAt`, or `null`. `switchedAtSec` is the cutoff after which older incoming events are ignored following a custom override. The row carries the `nsec`; keep it out of logs.
