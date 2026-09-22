@@ -1,34 +1,42 @@
 import type { FC } from "react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import { useNowSeconds } from "../app/hooks/payments/useNowSeconds";
 import {
   recurringRecipientLabel,
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
-import { formatCountdown } from "../app/lib/recurringCountdown";
+import {
+  formatRecurringAmountText,
+  recurringAmountSat,
+} from "../app/lib/recurringAmount";
 import {
   describeRecurringInterval,
   recurringOrderState,
 } from "../app/lib/recurringPaymentDisplay";
-import { recurringUpcoming } from "../app/lib/recurringPaymentTick";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeLocale } from "../utils/formatting";
+import { nowSeconds } from "../utils/time";
 import { RecurringContactAvatar } from "./RecurringContactAvatar";
 
-/** Every recurring payment with its interval, amount, and next due time. */
+/** Every recurring payment with its interval pill, amount, and next due date. */
 export const RecurringPaymentsList: FC = () => {
-  const { cashuBalance, formatDisplayedAmountText, lang, t } =
-    useAppShellCore();
+  const {
+    cashuBalance,
+    displayCurrency,
+    fiatRates,
+    formatDisplayedAmountParts,
+    lang,
+    t,
+  } = useAppShellCore();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
-  const nowSec = useNowSeconds(orders.length > 0);
   const dateFormatter = React.useMemo(
     () =>
       new Intl.DateTimeFormat(normalizeLocale(lang), {
-        day: "numeric",
-        month: "numeric",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
       }),
@@ -37,24 +45,15 @@ export const RecurringPaymentsList: FC = () => {
   if (orders.length === 0) {
     return <p className="muted recurring-empty">{t("recurringEmpty")}</p>;
   }
+  const nowSec = nowSeconds();
 
   return (
     <div className="transactions-list">
       {orders.map((order) => {
         const state = recurringOrderState(order, nowSec);
-        const upcoming = recurringUpcoming(order, nowSec);
+        const amountSat = recurringAmountSat(order.amount, fiatRates);
         const underfunded =
-          state === "active" && cashuBalance < order.amountSat;
-        const when =
-          state === "paused"
-            ? t("recurringStatusPaused")
-            : state === "finished"
-              ? t("recurringStatusFinished")
-              : upcoming?.sendAtSec != null
-                ? formatCountdown(upcoming.sendAtSec, nowSec)
-                : dateFormatter.format(
-                    new Date(order.schedule.nextDueAtSec * 1000),
-                  );
+          state === "active" && amountSat !== null && cashuBalance < amountSat;
         return (
           <button
             type="button"
@@ -75,16 +74,14 @@ export const RecurringPaymentsList: FC = () => {
                 </div>
                 <div className="transaction-meta">
                   <span>
-                    {describeRecurringInterval(order.schedule.interval, t)}
+                    {state === "paused"
+                      ? t("recurringStatusPaused")
+                      : dateFormatter.format(
+                          new Date(order.schedule.nextDueAtSec * 1000),
+                        )}
                   </span>
-                  <span
-                    className={
-                      upcoming?.sendAtSec != null && state === "active"
-                        ? "pill transaction-status-pill"
-                        : "pill pill-muted transaction-status-pill"
-                    }
-                  >
-                    {when}
+                  <span className="pill pill-muted transaction-status-pill">
+                    {describeRecurringInterval(order.schedule.interval, t)}
                   </span>
                   {underfunded ? (
                     <span className="recurring-underfunded-hint">
@@ -94,7 +91,12 @@ export const RecurringPaymentsList: FC = () => {
                 </div>
               </div>
               <div className="transaction-amount is-negative">
-                {formatDisplayedAmountText(order.amountSat)}
+                {formatRecurringAmountText(order.amount, {
+                  displayCurrency,
+                  fiatRates,
+                  formatSat: formatDisplayedAmountParts,
+                  lang,
+                })}
               </div>
             </article>
           </button>

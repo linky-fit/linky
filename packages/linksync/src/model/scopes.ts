@@ -49,7 +49,7 @@ export const linkyScopes = {
     forget: "never",
   }),
   transactions: shardScope({
-    tables: ["transaction"],
+    tables: ["transaction", "recurringPayment"],
     rotation: rotation(220),
     forget: { keepNewest: 4 },
   }),

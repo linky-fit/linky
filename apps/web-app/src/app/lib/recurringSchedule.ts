@@ -238,14 +238,11 @@ export interface RecurringScheduleState {
   timeZone: string | null;
   nextDueAtSec: number;
   runCount: number;
-  maxRuns: number | null;
-  endAtSec: number | null;
   pausedAtSec: number | null;
 }
 
 export type RecurringScheduleDecision =
   | { kind: "paused" }
-  | { kind: "finished"; reason: "maxRuns" | "endAt" }
   | { kind: "wait"; untilSec: number }
   | { kind: "due"; dueAtSec: number; missedCount: number };
 
@@ -259,12 +256,6 @@ export const decideRecurringRun = (
   nowSec: number,
 ): RecurringScheduleDecision => {
   if (state.pausedAtSec !== null) return { kind: "paused" };
-  if (state.maxRuns !== null && state.runCount >= state.maxRuns) {
-    return { kind: "finished", reason: "maxRuns" };
-  }
-  if (state.endAtSec !== null && state.nextDueAtSec > state.endAtSec) {
-    return { kind: "finished", reason: "endAt" };
-  }
   if (nowSec < state.nextDueAtSec) {
     return { kind: "wait", untilSec: state.nextDueAtSec };
   }

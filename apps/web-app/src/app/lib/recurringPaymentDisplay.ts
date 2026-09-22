@@ -31,17 +31,15 @@ export const describeRecurringInterval = (
     ? t(SINGLE_KEYS[interval.unit])
     : t(PLURAL_KEYS[interval.unit]).replace("{count}", String(interval.count));
 
-export type RecurringOrderState = "active" | "paused" | "finished";
+export type RecurringOrderState = "active" | "paused";
 
 export const recurringOrderState = (
   order: RecurringPaymentOrder,
   nowSec: number,
-): RecurringOrderState => {
-  const decision = decideRecurringRun(order.schedule, nowSec);
-  if (decision.kind === "paused") return "paused";
-  if (decision.kind === "finished") return "finished";
-  return "active";
-};
+): RecurringOrderState =>
+  decideRecurringRun(order.schedule, nowSec).kind === "paused"
+    ? "paused"
+    : "active";
 
 export const recurringLastRunLabel = (
   order: RecurringPaymentOrder,

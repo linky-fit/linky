@@ -1,50 +1,52 @@
-import * as Evolu from "@evolu/common";
+import type {
+  RecurringPaymentId,
+  RecurringPaymentsRepository,
+  TransactionsRepository,
+} from "@linky-fit/linksync";
+import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
-import { evolu, type RecurringPaymentId } from "../../../evolu";
 import { useLatest } from "../../../hooks/useLatest";
 import type { Translate } from "../../../i18n";
-import type { DisplayAmountParts } from "../../../utils/displayAmounts";
+import type {
+  DisplayAmountParts,
+  FiatRates,
+} from "../../../utils/displayAmounts";
 import { formatShortNpub } from "../../../utils/formatting";
 import { nowSeconds } from "../../../utils/time";
 import { getDeviceId } from "../../lib/deviceId";
 import {
+  paidOverlayContact,
+  type PaidOverlayDetails,
+} from "../../lib/paidOverlay";
+import { recurringAmountSat } from "../../lib/recurringAmount";
+import {
   readRecurringPaymentOrder,
+  recurringRunRecorded,
   type RecurringPaymentOrder,
-  type RecurringPaymentRunStatus,
   type RecurringRunRef,
 } from "../../lib/recurringPaymentOrder";
 import {
   planRecurringPaymentTick,
+  RECURRING_CONFIRM_SEC,
   RECURRING_NOTICE_SEC,
   RECURRING_RUN_RETRY_DELAY_SEC,
   type RecurringTickAction,
 } from "../../lib/recurringPaymentTick";
 import {
+  recurringPaymentPatch,
+  type RecurringPaymentPatchInput,
+} from "../../lib/recurringPaymentWrite";
+import {
+  advanceRecurringSchedule,
   nextRecurringOccurrenceAfter,
   resolveTimeZone,
 } from "../../lib/recurringSchedule";
+import { runWrite } from "../../lib/storeWrite";
 import type { ContactRowLike } from "../../types/appTypes";
 
 /** Short enough that a payment goes out within seconds of its send time. */
 export const RECURRING_TICK_INTERVAL_MS = 15_000;
-
-interface RecurringPaymentPatch {
-  readonly claimAtSec?: number;
-  readonly claimDeviceId?: string;
-  readonly claimDueAtSec?: number;
-  readonly lastRunAtSec?: number;
-  readonly lastRunStatus?: RecurringPaymentRunStatus;
-  readonly nextDueAtSec?: number;
-  readonly runCount?: number;
-}
-
-/** The slice of Evolu's `update` mutation this hook writes through. */
-type UpdateRecurringPayment = (
-  table: "recurringPayment",
-  payload: RecurringPaymentPatch & { readonly id: RecurringPaymentId },
-  options?: { readonly ownerId: Evolu.OwnerId },
-) => unknown;
 
 interface PayContactResult {
   ok: boolean;
@@ -53,6 +55,15 @@ interface PayContactResult {
 
 export type RecurringRunOutcome = "paid" | "failed" | "busy" | "missing";
 
+/** A due payment waiting for the in-app countdown to end (or the user to decide). */
+export interface RecurringDueConfirmation {
+  orderId: RecurringPaymentId;
+  dueAtSec: number;
+  amountSat: number;
+  /** When the countdown ends and the payment goes out on its own. */
+  sendAtSec: number;
+}
+
 export interface RecurringPaymentsScheduler {
   /** One scheduler pass over every payment. */
   runNow: () => Promise<void>;
@@ -60,7 +71,12 @@ export interface RecurringPaymentsScheduler {
    * Pay one payment right away, skipping its notice window and consuming its
    * pending period. `busy` means the wallet was occupied and nothing moved.
    */
-  runOrderNow: (orderId: string) => Promise<RecurringRunOutcome>;
+  runOrderNow: (orderId: RecurringPaymentId) => Promise<RecurringRunOutcome>;
+  dueConfirmation: RecurringDueConfirmation | null;
+  /** Pay the confirmed-due payment now instead of waiting the countdown out. */
+  confirmDueNow: () => Promise<void>;
+  /** Skip the confirmed-due payment's period; the schedule moves to the next due time. */
+  cancelDue: () => Promise<void>;
 }
 
 interface UseRecurringPaymentsSchedulerParams {
@@ -69,6 +85,7 @@ interface UseRecurringPaymentsSchedulerParams {
   contacts: readonly ContactRowLike[];
   /** False until the linkshu runtime is composed (seed + owners resolved). */
   enabled: boolean;
+  fiatRates: FiatRates | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   maybeShowPwaNotification: (
     title: string,
@@ -89,20 +106,19 @@ interface UseRecurringPaymentsSchedulerParams {
   ) => Promise<boolean>;
   payWithCashuEnabled: boolean;
   pushToast: (message: string) => void;
+  repository: RecurringPaymentsRepository;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
-  showPaidOverlay: (title: string) => void;
+  showPaidOverlay: (title: string, details: PaidOverlayDetails) => void;
   t: Translate;
-  update: UpdateRecurringPayment;
+  /** The history decides whether an interrupted run had already moved money. */
+  transactions: Pick<TransactionsRepository, "all">;
   dependencies?: {
     deviceId?: string;
+    /** Whether the user is looking at Linky; a visible app asks before paying. */
+    isVisible?: () => boolean;
     nowSec?: () => number;
     tickIntervalMs?: number;
   };
-}
-
-interface RecurringPaymentRowLike {
-  readonly id: RecurringPaymentId;
-  readonly ownerId: unknown;
 }
 
 type RunAction = Extract<RecurringTickAction, { kind: "run" }>;
@@ -111,6 +127,9 @@ const orderLinks = (order: RecurringPaymentOrder): Record<string, string> => ({
   recurringPayment: order.id,
   contact: order.contactId,
 });
+
+const documentIsVisible = (): boolean =>
+  typeof document === "undefined" || document.visibilityState === "visible";
 
 export const contactDisplayName = (contact: ContactRowLike): string => {
   const npub = String(contact.npub ?? "").trim();
@@ -124,13 +143,13 @@ export const contactDisplayName = (contact: ContactRowLike): string => {
 /**
  * Runs recurring payments on whichever device is online. Before a payment is
  * due (or as soon as an overdue one is noticed) a device claims it on the row
- * and notifies the user; every device then shows it with a cancel button for
- * the notice window. When the window ends the device named by the claim —
- * Evolu's last writer, the same on every device once synced — pays it through
- * the ordinary contact payment path and shows the usual paid confirmation. The
- * run is marked `running` with the schedule already advanced before money
- * moves, so no other pass or device pays it again; a failure rolls the
- * schedule back for a retry within the grace window.
+ * and notifies the user. When the notice window ends the device named by the
+ * claim (Evolu's last writer, the same on every device once synced) pays it:
+ * silently when Linky is in the background, after a short in-app countdown
+ * with pay-now and cancel when it is visible. The run is marked `running` with
+ * the schedule already advanced before money moves, so no other pass or device
+ * pays it again; a failure rolls the schedule back for a retry within the
+ * grace window.
  */
 export const useRecurringPaymentsScheduler = ({
   cashuBalance,
@@ -138,75 +157,70 @@ export const useRecurringPaymentsScheduler = ({
   contacts,
   dependencies,
   enabled,
+  fiatRates,
   formatDisplayedAmountParts,
   maybeShowPwaNotification,
   payContactWithCashuMessage,
   payLightningAddressWithCashu,
   payWithCashuEnabled,
   pushToast,
+  repository,
   setCashuIsBusy,
   showPaidOverlay,
   t,
-  update,
+  transactions,
 }: UseRecurringPaymentsSchedulerParams): RecurringPaymentsScheduler => {
   const latest = useLatest({
     cashuBalance,
     cashuIsBusy,
     contacts,
     enabled,
+    fiatRates,
     formatDisplayedAmountParts,
     maybeShowPwaNotification,
     payContactWithCashuMessage,
     payLightningAddressWithCashu,
     payWithCashuEnabled,
     pushToast,
+    repository,
     setCashuIsBusy,
     showPaidOverlay,
     t,
-    update,
+    transactions,
   });
   const nowSec = dependencies?.nowSec ?? nowSeconds;
+  const isVisible = dependencies?.isVisible ?? documentIsVisible;
   const deviceId = dependencies?.deviceId ?? getDeviceId();
   const tickIntervalMs =
     dependencies?.tickIntervalMs ?? RECURRING_TICK_INTERVAL_MS;
   const tickInFlightRef = React.useRef<Promise<void> | null>(null);
   const retryNotBeforeRef = React.useRef(new Map<string, number>());
   const reportedWaitsRef = React.useRef(new Set<string>());
-
-  const ordersQuery = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("recurringPayment")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
+  const [dueConfirmation, setDueConfirmation] =
+    React.useState<RecurringDueConfirmation | null>(null);
+  const dueConfirmationRef = useLatest(dueConfirmation);
 
   const loadOrders = React.useCallback(async () => {
-    const rows = await evolu.loadQuery(ordersQuery);
-    const rowsById = new Map<string, RecurringPaymentRowLike>();
-    const orders: RecurringPaymentOrder[] = [];
-    for (const row of rows) {
-      const order = readRecurringPaymentOrder(row);
-      if (order === null) continue;
-      rowsById.set(order.id, row);
-      orders.push(order);
-    }
-    return { orders, rowsById };
-  }, [ordersQuery]);
+    const records = await Effect.runPromise(latest.current.repository.all);
+    return records.flatMap((record) => {
+      const order = readRecurringPaymentOrder(record);
+      return order === null ? [] : [order];
+    });
+  }, [latest]);
 
   const patchOrder = React.useCallback(
-    (row: RecurringPaymentRowLike, patch: RecurringPaymentPatch): void => {
-      const ownerId = Evolu.OwnerId.fromUnknown(row.ownerId);
-      const payload = { id: row.id, ...patch };
-      if (ownerId.ok) {
-        latest.current.update("recurringPayment", payload, {
-          ownerId: ownerId.value,
-        });
-      } else {
-        latest.current.update("recurringPayment", payload);
+    async (
+      order: RecurringPaymentOrder,
+      patch: RecurringPaymentPatchInput,
+    ): Promise<void> => {
+      const outcome = await runWrite(
+        latest.current.repository.update(
+          order.id,
+          recurringPaymentPatch(patch),
+        ),
+      );
+      if (!outcome.ok) {
+        console.warn("[linky][recurring] row update failed", outcome.error);
       }
     },
     [latest],
@@ -231,20 +245,70 @@ export const useRecurringPaymentsScheduler = ({
     [latest],
   );
 
+  const amountSatOf = React.useCallback(
+    (order: RecurringPaymentOrder): number | null =>
+      recurringAmountSat(order.amount, latest.current.fiatRates),
+    [latest],
+  );
+
+  /**
+   * A run that never finished (Linky was killed mid-payment) has its schedule
+   * already advanced. If the history holds no transaction for that due time
+   * the money never moved, so the due time is restored and the payment goes
+   * out on a later pass instead of silently disappearing.
+   */
+  const settleInterruptedRun = React.useCallback(
+    async (order: RecurringPaymentOrder): Promise<void> => {
+      const dueAtSec = order.claim?.dueAtSec ?? null;
+      const recorded =
+        dueAtSec === null
+          ? null
+          : recurringRunRecorded(
+              await Effect.runPromise(latest.current.transactions.all),
+              { recurringPaymentId: order.id, dueAtSec },
+            );
+      if (recorded === true) {
+        await patchOrder(order, { lastRunStatus: "paid" });
+      } else if (dueAtSec !== null && recorded === false) {
+        await patchOrder(order, {
+          lastRunStatus: "interrupted",
+          nextDueAtSec: dueAtSec,
+          runCount: Math.max(0, order.schedule.runCount - 1),
+        });
+      } else {
+        await patchOrder(order, { lastRunStatus: "interrupted" });
+      }
+      reportAppLog({
+        tag: "recurring.interrupted",
+        summary:
+          recorded === true
+            ? "recurring payment run did not finish but its payment is recorded"
+            : "recurring payment run did not finish; due time restored",
+        links: orderLinks(order),
+        payload: {
+          dueAtSec,
+          lastRunAtSec: order.lastRunAtSec,
+          recorded,
+        },
+      });
+    },
+    [latest, patchOrder],
+  );
+
   const claimOrder = React.useCallback(
-    (
-      row: RecurringPaymentRowLike,
+    async (
       action: Extract<RecurringTickAction, { kind: "claim" }>,
-    ): void => {
+    ): Promise<void> => {
       const { order, dueAtSec, takeover } = action;
       const now = nowSec();
-      patchOrder(row, {
+      await patchOrder(order, {
         claimDeviceId: deviceId,
         claimAtSec: now,
         claimDueAtSec: dueAtSec,
       });
       const contact = findContact(order.contactId);
-      const { amount, unit } = formatAmount(order.amountSat);
+      const amountSat = amountSatOf(order);
+      const { amount, unit } = formatAmount(amountSat ?? 0);
       const minutes = Math.max(
         1,
         Math.ceil((Math.max(dueAtSec, now + RECURRING_NOTICE_SEC) - now) / 60),
@@ -273,21 +337,28 @@ export const useRecurringPaymentsScheduler = ({
         },
       });
     },
-    [deviceId, findContact, formatAmount, latest, nowSec, patchOrder],
+    [
+      amountSatOf,
+      deviceId,
+      findContact,
+      formatAmount,
+      latest,
+      nowSec,
+      patchOrder,
+    ],
   );
 
   const settleRun = React.useCallback(
-    (
-      row: RecurringPaymentRowLike,
+    async (
       action: RunAction,
       outcome: { ok: true } | { ok: false; error: string },
       startedAtSec: number,
-    ): void => {
+    ): Promise<void> => {
       const { order } = action;
       if (outcome.ok) {
-        patchOrder(row, { lastRunStatus: "paid" });
+        await patchOrder(order, { lastRunStatus: "paid" });
         const contact = findContact(order.contactId);
-        const { amount, unit } = formatAmount(order.amountSat);
+        const { amount, unit } = formatAmount(action.amountSat);
         const name = contact ? contactDisplayName(contact) : "";
         latest.current.showPaidOverlay(
           latest.current
@@ -295,6 +366,11 @@ export const useRecurringPaymentsScheduler = ({
             .replace("{amount}", amount)
             .replace("{unit}", unit)
             .replace("{name}", name),
+          {
+            direction: "out",
+            amountSat: action.amountSat,
+            contact: paidOverlayContact(contact),
+          },
         );
         void latest.current
           .maybeShowPwaNotification(
@@ -310,7 +386,7 @@ export const useRecurringPaymentsScheduler = ({
       } else {
         // Back to the due time so the next pass retries; the planner skips
         // the run for good once the grace window closes.
-        patchOrder(row, {
+        await patchOrder(order, {
           lastRunStatus: "failed",
           nextDueAtSec: order.schedule.nextDueAtSec,
           runCount: order.schedule.runCount,
@@ -328,7 +404,8 @@ export const useRecurringPaymentsScheduler = ({
           : "recurring payment failed",
         links: orderLinks(order),
         payload: {
-          amountSat: order.amountSat,
+          amount: order.amount,
+          amountSat: action.amountSat,
           dueAtSec: action.dueAtSec,
           missedCount: action.missedCount,
           status: outcome.ok ? "paid" : "failed",
@@ -340,11 +417,8 @@ export const useRecurringPaymentsScheduler = ({
   );
 
   const executeRun = React.useCallback(
-    async (
-      row: RecurringPaymentRowLike,
-      action: RunAction,
-    ): Promise<"paid" | "failed"> => {
-      const { order, advance, dueAtSec } = action;
+    async (action: RunAction): Promise<"paid" | "failed"> => {
+      const { order, advance, amountSat, dueAtSec } = action;
       const startedAtSec = nowSec();
       const recurringRun: RecurringRunRef = {
         recurringPaymentId: order.id,
@@ -363,7 +437,7 @@ export const useRecurringPaymentsScheduler = ({
               : null;
 
       if (contact === undefined || rail === null) {
-        patchOrder(row, {
+        await patchOrder(order, {
           lastRunAtSec: startedAtSec,
           lastRunStatus: "skipped",
           nextDueAtSec: advance.nextDueAtSec,
@@ -381,7 +455,7 @@ export const useRecurringPaymentsScheduler = ({
         return "failed";
       }
 
-      patchOrder(row, {
+      await patchOrder(order, {
         lastRunAtSec: startedAtSec,
         lastRunStatus: "running",
         nextDueAtSec: advance.nextDueAtSec,
@@ -395,15 +469,14 @@ export const useRecurringPaymentsScheduler = ({
         try {
           paid = await latest.current.payLightningAddressWithCashu(
             lnAddress,
-            order.amountSat,
+            amountSat,
             contact,
             { recurringRun },
           );
         } catch (caught) {
           error = String(caught);
         }
-        settleRun(
-          row,
+        await settleRun(
           action,
           paid ? { ok: true } : { ok: false, error },
           startedAtSec,
@@ -415,7 +488,7 @@ export const useRecurringPaymentsScheduler = ({
       let outcome: { ok: true } | { ok: false; error: string };
       try {
         const result = await latest.current.payContactWithCashuMessage({
-          amountSat: order.amountSat,
+          amountSat,
           contact,
           fromQueue: true,
           recurringRun,
@@ -428,20 +501,24 @@ export const useRecurringPaymentsScheduler = ({
       } finally {
         latest.current.setCashuIsBusy(false);
       }
-      settleRun(row, action, outcome, startedAtSec);
+      await settleRun(action, outcome, startedAtSec);
       return outcome.ok ? "paid" : "failed";
     },
     [findContact, latest, nowSec, patchOrder, settleRun],
   );
 
   const runOrderNow = React.useCallback(
-    async (orderId: string): Promise<RecurringRunOutcome> => {
+    async (orderId: RecurringPaymentId): Promise<RecurringRunOutcome> => {
       if (tickInFlightRef.current) await tickInFlightRef.current;
       if (latest.current.cashuIsBusy) return "busy";
-      const { orders, rowsById } = await loadOrders();
+      const orders = await loadOrders();
       const order = orders.find((candidate) => candidate.id === orderId);
-      const row = rowsById.get(orderId);
-      if (!order || !row) return "missing";
+      if (!order) return "missing";
+      const amountSat = amountSatOf(order);
+      if (amountSat === null) {
+        latest.current.pushToast(latest.current.t("recurringWaitingForRates"));
+        return "failed";
+      }
       const now = nowSec();
       // Paying early consumes the pending period: the next due time is the
       // first one after whichever is later, now or the pending due time.
@@ -452,27 +529,33 @@ export const useRecurringPaymentsScheduler = ({
         Math.max(now, schedule.nextDueAtSec),
         resolveTimeZone(schedule.timeZone),
       );
-      patchOrder(row, {
-        claimDeviceId: deviceId,
-        claimAtSec: now,
-        claimDueAtSec: schedule.nextDueAtSec,
-      });
-      const pass = executeRun(row, {
-        kind: "run",
-        order,
-        dueAtSec: schedule.nextDueAtSec,
-        missedCount: 0,
-        advance: {
-          nextDueAtSec: next.dueAtSec,
-          runCount: schedule.runCount + 1,
-        },
-      }).finally(() => {
+      setDueConfirmation((current) =>
+        current?.orderId === orderId ? null : current,
+      );
+      const pass = (async () => {
+        await patchOrder(order, {
+          claimDeviceId: deviceId,
+          claimAtSec: now,
+          claimDueAtSec: schedule.nextDueAtSec,
+        });
+        return executeRun({
+          kind: "run",
+          order,
+          amountSat,
+          dueAtSec: schedule.nextDueAtSec,
+          missedCount: 0,
+          advance: {
+            nextDueAtSec: next.dueAtSec,
+            runCount: schedule.runCount + 1,
+          },
+        });
+      })().finally(() => {
         tickInFlightRef.current = null;
       });
       tickInFlightRef.current = pass.then(() => undefined);
       return pass;
     },
-    [deviceId, executeRun, latest, loadOrders, nowSec, patchOrder],
+    [amountSatOf, deviceId, executeRun, latest, loadOrders, nowSec, patchOrder],
   );
 
   const tick = React.useCallback(async (): Promise<void> => {
@@ -481,36 +564,28 @@ export const useRecurringPaymentsScheduler = ({
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
 
     const pass = (async () => {
-      const { orders, rowsById } = await loadOrders();
-      if (orders.length === 0) return;
-
+      const orders = await loadOrders();
       const now = nowSec();
       const actions = planRecurringPaymentTick({
         orders,
         nowSec: now,
         deviceId,
         cashuBalance: latest.current.cashuBalance,
+        amountSatOf,
         retryNotBeforeSec: retryNotBeforeRef.current,
       });
+      let awaitingConfirmation: RecurringDueConfirmation | null = null;
 
       for (const action of actions) {
-        const row = rowsById.get(action.order.id);
-        if (!row) continue;
         switch (action.kind) {
           case "claim":
-            claimOrder(row, action);
+            await claimOrder(action);
             break;
           case "markInterrupted":
-            patchOrder(row, { lastRunStatus: "interrupted" });
-            reportAppLog({
-              tag: "recurring.interrupted",
-              summary: "recurring payment run did not finish",
-              links: orderLinks(action.order),
-              payload: { lastRunAtSec: action.order.lastRunAtSec },
-            });
+            await settleInterruptedRun(action.order);
             break;
           case "skip":
-            patchOrder(row, {
+            await patchOrder(action.order, {
               lastRunAtSec: now,
               lastRunStatus: "skipped",
               nextDueAtSec: action.advance.nextDueAtSec,
@@ -523,33 +598,75 @@ export const useRecurringPaymentsScheduler = ({
               payload: { dueAtSec: action.dueAtSec, reason: action.reason },
             });
             break;
-          case "waitFunds": {
-            const key = `${action.order.id}:${action.dueAtSec}`;
+          case "waitFunds":
+          case "waitRates": {
+            const key = `${action.kind}:${action.order.id}:${action.dueAtSec}`;
             if (reportedWaitsRef.current.has(key)) break;
             reportedWaitsRef.current.add(key);
             latest.current.pushToast(
-              latest.current.t("recurringWaitingForFunds"),
+              latest.current.t(
+                action.kind === "waitFunds"
+                  ? "recurringWaitingForFunds"
+                  : "recurringWaitingForRates",
+              ),
             );
             reportAppLog({
-              tag: "recurring.waitingForFunds",
-              summary: "recurring payment waits for funds",
+              tag:
+                action.kind === "waitFunds"
+                  ? "recurring.waitingForFunds"
+                  : "recurring.waitingForRates",
+              summary:
+                action.kind === "waitFunds"
+                  ? "recurring payment waits for funds"
+                  : "recurring payment waits for an exchange rate",
               links: orderLinks(action.order),
               payload: {
-                amountSat: action.order.amountSat,
+                amount: action.order.amount,
                 balanceSat: latest.current.cashuBalance,
                 dueAtSec: action.dueAtSec,
               },
             });
             break;
           }
-          case "run":
+          case "run": {
             // The wallet serializes payments; a busy wallet means the next
             // pass picks this run up.
             if (latest.current.cashuIsBusy) return;
-            await executeRun(row, action);
+            if (isVisible()) {
+              // The user is looking at Linky: show the countdown instead of
+              // paying silently. One payment at a time; the rest follow.
+              const current = dueConfirmationRef.current;
+              awaitingConfirmation =
+                current?.orderId === action.order.id &&
+                current.dueAtSec === action.dueAtSec
+                  ? current
+                  : {
+                      orderId: action.order.id,
+                      dueAtSec: action.dueAtSec,
+                      amountSat: action.amountSat,
+                      sendAtSec: now + RECURRING_CONFIRM_SEC,
+                    };
+              if (awaitingConfirmation !== current) {
+                reportAppLog({
+                  tag: "recurring.confirmationShown",
+                  summary: "recurring payment countdown shown",
+                  links: orderLinks(action.order),
+                  payload: {
+                    amountSat: action.amountSat,
+                    dueAtSec: action.dueAtSec,
+                    sendAtSec: awaitingConfirmation.sendAtSec,
+                  },
+                });
+              }
+              setDueConfirmation(awaitingConfirmation);
+              return;
+            }
+            await executeRun(action);
             break;
+          }
         }
       }
+      if (awaitingConfirmation === null) setDueConfirmation(null);
     })()
       .catch((error: unknown) => {
         console.warn("[linky][recurring] scheduler tick failed", error);
@@ -560,14 +677,57 @@ export const useRecurringPaymentsScheduler = ({
     tickInFlightRef.current = pass;
     return pass;
   }, [
+    amountSatOf,
     claimOrder,
     deviceId,
+    dueConfirmationRef,
     executeRun,
+    isVisible,
     latest,
     loadOrders,
     nowSec,
     patchOrder,
+    settleInterruptedRun,
   ]);
+
+  const confirmDueNow = React.useCallback(async (): Promise<void> => {
+    const pending = dueConfirmationRef.current;
+    if (pending === null) return;
+    setDueConfirmation(null);
+    const outcome = await runOrderNow(pending.orderId);
+    if (outcome === "busy") {
+      latest.current.pushToast(latest.current.t("recurringWalletBusy"));
+    }
+  }, [dueConfirmationRef, latest, runOrderNow]);
+
+  const cancelDue = React.useCallback(async (): Promise<void> => {
+    const pending = dueConfirmationRef.current;
+    if (pending === null) return;
+    setDueConfirmation(null);
+    if (tickInFlightRef.current) await tickInFlightRef.current;
+    const orders = await loadOrders();
+    const order = orders.find((candidate) => candidate.id === pending.orderId);
+    if (!order) return;
+    const now = nowSec();
+    const advance = advanceRecurringSchedule(order.schedule, now);
+    await patchOrder(order, {
+      lastRunAtSec: now,
+      lastRunStatus: "skipped",
+      nextDueAtSec: advance.nextDueAtSec,
+      runCount: advance.runCount,
+    });
+    latest.current.pushToast(latest.current.t("recurringCancelledToast"));
+    reportAppLog({
+      tag: "recurring.skipped",
+      summary: "recurring payment skipped (cancelled by the user)",
+      links: orderLinks(order),
+      payload: {
+        dueAtSec: pending.dueAtSec,
+        nextDueAtSec: advance.nextDueAtSec,
+        reason: "cancelled",
+      },
+    });
+  }, [dueConfirmationRef, latest, loadOrders, nowSec, patchOrder]);
 
   React.useEffect(() => {
     if (!enabled) return;
@@ -586,5 +746,11 @@ export const useRecurringPaymentsScheduler = ({
     };
   }, [enabled, tick, tickIntervalMs]);
 
-  return { runNow: tick, runOrderNow };
+  return {
+    runNow: tick,
+    runOrderNow,
+    dueConfirmation,
+    confirmDueNow,
+    cancelDue,
+  };
 };

@@ -43,6 +43,7 @@ const USER_TABLES = [
   "nostrMessage",
   "nostrReaction",
   "transaction",
+  "recurringPayment",
 ];
 const SYSTEM_TABLES = ["ownerMeta", "shardPointer", "setting"];
 

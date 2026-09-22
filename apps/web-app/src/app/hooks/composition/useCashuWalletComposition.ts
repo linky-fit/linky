@@ -44,7 +44,10 @@ import {
   WALLET_WARNING_BALANCE_THRESHOLD_SAT,
   WALLET_WARNING_DISMISSED_STORAGE_KEY,
 } from "../../../utils/constants";
-import { formatDisplayAmountParts } from "../../../utils/displayAmounts";
+import {
+  formatDisplayAmountParts,
+  type FiatRates,
+} from "../../../utils/displayAmounts";
 import {
   isNpubCashDisabled,
   NPUB_CASH_SERVER_BASE_URL,
@@ -137,6 +140,7 @@ import { drainLegacyAcceptedCashuToken } from "../../migrations/legacyAcceptedTo
 import { useLinkshuComposition } from "./useLinkshuComposition";
 import {
   useSetting,
+  useRecurringPaymentsRepository,
   useSettingsRepository,
   useWalletRepository,
 } from "../useLinksync";
@@ -202,6 +206,7 @@ interface UseCashuWalletCompositionParams {
     | "setContactsOnboardingHasPaid"
     | "updateLocalNostrMessage"
   >;
+  fiatRates: FiatRates | null;
   formatDisplayedAmountParts: (
     amountSat: number,
   ) => ReturnType<typeof formatDisplayAmountParts>;
@@ -242,14 +247,13 @@ interface UseCashuWalletCompositionParams {
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
-  insert: EvoluMutations["insert"];
-  update: EvoluMutations["update"];
 }
 
 export const useCashuWalletComposition = ({
   contactPayBackToChatRef,
   copyText,
   contactsMessaging,
+  fiatRates,
   formatDisplayedAmountParts,
   formatDisplayedAmountText,
   identity,
@@ -268,6 +272,7 @@ export const useCashuWalletComposition = ({
   const wallet = useWalletRepository();
   const settingsRepository = useSettingsRepository();
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
+  const recurringPaymentsRepository = useRecurringPaymentsRepository();
   const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
     mode: "promiseExit",
   });
@@ -2421,38 +2426,6 @@ export const useCashuWalletComposition = ({
     touchMintInfo,
   });
 
-  const recurringScheduler = useRecurringPaymentsScheduler({
-    cashuBalance,
-    cashuIsBusy,
-    contacts,
-    enabled: sendCashuToken !== null && meltCashuInvoice !== null,
-    formatDisplayedAmountParts,
-    maybeShowPwaNotification,
-    payContactWithCashuMessage,
-    payLightningAddressWithCashu: (lnAddress, amountSat, contact, options) =>
-      payLightningAddressWithCashuBase(
-        lnAddress,
-        amountSat,
-        contact,
-        null,
-        options,
-      ),
-    payWithCashuEnabled,
-    pushToast,
-    setCashuIsBusy,
-    showPaidOverlay,
-    t,
-    update,
-  });
-  const recurringPaymentsActions = useRecurringPaymentsActions({
-    insert,
-    pushToast,
-    runOrderNow: recurringScheduler.runOrderNow,
-    t,
-    transactionsOwnerId,
-    update,
-  });
-
   const requestSelectedContact = React.useCallback(
     async (options?: { note?: string | null }) => {
       if (route.kind !== "contactPay") return;
@@ -2601,6 +2574,52 @@ export const useCashuWalletComposition = ({
     ],
   );
 
+  const recurringScheduler = useRecurringPaymentsScheduler({
+    cashuBalance,
+    cashuIsBusy,
+    contacts,
+    enabled: sendCashuToken !== null && meltCashuInvoice !== null,
+    fiatRates,
+    formatDisplayedAmountParts,
+    maybeShowPwaNotification,
+    payContactWithCashuMessage,
+    payLightningAddressWithCashu: (lnAddress, amountSat, contact, options) =>
+      payLightningAddressWithCashuBase(
+        lnAddress,
+        amountSat,
+        contact,
+        null,
+        options,
+      ),
+    payWithCashuEnabled,
+    pushToast,
+    repository: recurringPaymentsRepository,
+    setCashuIsBusy,
+    showPaidOverlay,
+    t,
+    transactions,
+  });
+  const recurringPaymentsActions = useRecurringPaymentsActions({
+    pushToast,
+    repository: recurringPaymentsRepository,
+    runOrderNow: recurringScheduler.runOrderNow,
+    t,
+  });
+  const recurringPaymentsContext = React.useMemo(
+    () => ({
+      ...recurringPaymentsActions,
+      cancelDue: recurringScheduler.cancelDue,
+      confirmDueNow: recurringScheduler.confirmDueNow,
+      dueConfirmation: recurringScheduler.dueConfirmation,
+    }),
+    [
+      recurringPaymentsActions,
+      recurringScheduler.cancelDue,
+      recurringScheduler.confirmDueNow,
+      recurringScheduler.dueConfirmation,
+    ],
+  );
+
   const knownTransferTexts = React.useMemo(
     () => takenTokenTexts(walletTransfers, walletOperations),
     [walletOperations, walletTransfers],
@@ -2628,6 +2647,7 @@ export const useCashuWalletComposition = ({
   });
 
   return {
+    recurringPaymentsContext,
     reclaimCashuTransfer,
     cashuTransferLifecycle,
     // Backup export and the Nostr bootstrap snapshot need every proof,
@@ -2701,7 +2721,6 @@ export const useCashuWalletComposition = ({
     payLightningAddressWithCashu,
     payLightningInvoiceWithCashu,
     paySelectedContact,
-    recurringPaymentsActions,
     payWithCashuEnabled,
     pendingCashuContactSend,
     pendingCashuTokenContactPickId,

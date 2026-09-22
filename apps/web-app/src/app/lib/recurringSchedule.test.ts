@@ -137,8 +137,6 @@ describe("recurringSchedule", () => {
       timeZone: PRAGUE,
       nextDueAtSec: anchor,
       runCount: 0,
-      maxRuns: null,
-      endAtSec: null,
       pausedAtSec: null,
     };
 
@@ -170,30 +168,6 @@ describe("recurringSchedule", () => {
         decideRecurringRun({ ...base, pausedAtSec: anchor }, utc(2026, 2, 1)),
       ).toEqual({ kind: "paused" });
     });
-
-    it("finishes when the run limit is reached", () => {
-      expect(
-        decideRecurringRun(
-          { ...base, maxRuns: 2, runCount: 2 },
-          utc(2026, 2, 1),
-        ),
-      ).toEqual({ kind: "finished", reason: "maxRuns" });
-    });
-
-    it("finishes when the next due time is past the end", () => {
-      const state = { ...base, endAtSec: utc(2026, 1, 1, 12) };
-      expect(decideRecurringRun(state, anchor)).toEqual({
-        kind: "due",
-        dueAtSec: anchor,
-        missedCount: 0,
-      });
-      expect(
-        decideRecurringRun(
-          { ...state, nextDueAtSec: utc(2026, 1, 2, 8) },
-          anchor,
-        ),
-      ).toEqual({ kind: "finished", reason: "endAt" });
-    });
   });
 
   describe("advanceRecurringSchedule", () => {
@@ -205,8 +179,6 @@ describe("recurringSchedule", () => {
         timeZone: PRAGUE,
         nextDueAtSec: anchor,
         runCount: 4,
-        maxRuns: null,
-        endAtSec: null,
         pausedAtSec: null,
       };
       expect(advanceRecurringSchedule(state, utc(2026, 1, 4, 11))).toEqual({

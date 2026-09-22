@@ -8,6 +8,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "transactions":
     case "recurringPaymentNew":
     case "recurringPayment":
+    case "recurringPaymentEdit":
     case "topup":
     case "topupNoAmount":
     case "topupInvoice":

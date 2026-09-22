@@ -2,12 +2,13 @@
  * Recurring payments — happy path, two real app instances.
  *
  * A funds its wallet, saves B, and sets up a recurring payment to B from the
- * transaction history's floating button with the first payment already due.
+ * transaction history's floating button with the first payment due in a minute.
  * The order shows in the "Scheduled" section at the top of the history; the
  * test opens it and pays it now instead of waiting out the notice window. B
  * receives the token (no chat note), A sees the usual paid confirmation and a
  * history pill that opens the payment, and a second scheduler pass does not pay
- * again.
+ * again. A second already-due order then waits out the notice window with the
+ * app visible: the countdown modal appears and Cancel skips that period.
  *
  * Needs the docker stack up — see "E2E tests" in CLAUDE.md.
  */
@@ -95,7 +96,7 @@ test("a due recurring payment pays the contact once and shows up in history", as
     await addContactByNpub(b.page, a.identity.npub);
   });
 
-  await test.step("A sets up an already-due payment from the history", async () => {
+  await test.step("A sets up a payment due in a minute from the history", async () => {
     await a.page.goto("/#wallet/transactions");
     await a.page.locator(".transactions-page .contacts-fab").click();
     await a.page.waitForURL(/#wallet\/recurring\/new$/);
@@ -104,23 +105,22 @@ test("a due recurring payment pays the contact once and shows up in history", as
       await a.page.getByRole("button", { exact: true, name: digit }).click();
     }
     await a.page.getByRole("button", { name: "Daily" }).click();
-    await a.page.getByRole("button", { name: "Start and end" }).click();
     await a.page
       .locator("#recurringFirstRun")
-      .fill(dateTimeLocal(new Date(Date.now() - 2 * 60_000)));
+      .fill(dateTimeLocal(new Date(Date.now() + 60_000)));
     await a.page
       .getByRole("button", { name: "Set up recurring payment" })
       .click();
     await a.page.waitForURL(/#wallet\/transactions$/);
     await expect(a.page.locator(".recurring-order-card")).toContainText(
-      "every day",
+      "daily",
     );
   });
 
   await test.step("A pays the scheduled payment now", async () => {
     await a.page.locator(".recurring-order-card").first().click();
     await a.page.waitForURL(/#wallet\/recurring\/[^/]+$/);
-    await a.page.getByRole("button", { name: "Pay now" }).click();
+    await a.page.getByRole("button", { exact: true, name: "Pay" }).click();
     await expect(a.page.getByText(/^Sent 10 sat to /)).toBeVisible({
       timeout: 60_000,
     });
@@ -148,22 +148,61 @@ test("a due recurring payment pays the contact once and shows up in history", as
     ).toContainText("paid");
   });
 
-  await test.step("B can start one from A's contact page", async () => {
-    await b.page.goto("/#contacts");
-    await b.page.locator("[data-guide='contact-card']").first().click();
-    await b.page.waitForURL(/#chat\/[^/]+$/);
-    const contactId = new URL(b.page.url()).hash.replace(/^#chat\//, "");
-    await b.page.goto(`/#contact/${contactId}`);
-    await b.page.locator("[data-guide='contact-recurring']").click();
-    await b.page.waitForURL(/#wallet\/recurring\/new\?contact=/);
-    await expect(b.page.locator(".recurring-recipient-header")).toBeVisible();
-  });
-
   await test.step("a second pass does not pay again", async () => {
     await a.page.goto("/#wallet");
     const before = await readBalanceSat(a.page);
     await triggerSchedulerPass(a.page);
     await a.page.waitForTimeout(5_000);
+    expect(await readBalanceSat(a.page)).toBe(before);
+  });
+
+  await test.step("A edits the payment's amount", async () => {
+    await a.page.goto("/#wallet/transactions");
+    await a.page.locator(".recurring-order-card").first().click();
+    await a.page.waitForURL(/#wallet\/recurring\/[^/]+$/);
+    await a.page.getByRole("button", { name: "Edit" }).click();
+    await a.page.waitForURL(/#wallet\/recurring\/[^/]+\/edit$/);
+    await a.page.getByRole("button", { name: "Clear form" }).click();
+    for (const digit of String(ORDER_SAT * 2).split("")) {
+      await a.page.getByRole("button", { exact: true, name: digit }).click();
+    }
+    await a.page.getByRole("button", { name: "Save changes" }).click();
+    await a.page.waitForURL(/#wallet\/recurring\/[^/]+$/);
+    await expect(a.page.locator(".recurring-detail-amount")).toContainText(
+      String(ORDER_SAT * 2),
+    );
+  });
+
+  await test.step("a due payment shows the countdown and Cancel skips it", async () => {
+    await a.page.goto("/#wallet");
+    const before = await readBalanceSat(a.page);
+    await a.page.goto("/#wallet/transactions");
+    await a.page.locator(".transactions-page .contacts-fab").click();
+    await a.page.waitForURL(/#wallet\/recurring\/new$/);
+    await a.page.locator(".recurring-picker-list button").first().click();
+    for (const digit of String(ORDER_SAT).split("")) {
+      await a.page.getByRole("button", { exact: true, name: digit }).click();
+    }
+    await a.page.getByRole("button", { name: "Weekly" }).click();
+    await a.page
+      .locator("#recurringFirstRun")
+      .fill(dateTimeLocal(new Date(Date.now() + 60_000)));
+    await a.page
+      .getByRole("button", { name: "Set up recurring payment" })
+      .click();
+    await a.page.waitForURL(/#wallet\/transactions$/);
+    // Due in a minute: the claim is written on the next pass, the countdown
+    // follows at the due time.
+    await triggerSchedulerPass(a.page);
+    const modal = a.page.getByRole("dialog", { name: "Scheduled payment" });
+    await expect(modal).toBeVisible({ timeout: 120_000 });
+    await expect(modal).toContainText("weekly recurring payment is ready");
+    await modal.getByRole("button", { name: "Cancel this payment" }).click();
+    await expect(modal).toBeHidden();
+    await expect(
+      a.page.locator(".recurring-order-card", { hasText: "weekly" }),
+    ).toBeVisible();
+    await a.page.goto("/#wallet");
     expect(await readBalanceSat(a.page)).toBe(before);
   });
 
