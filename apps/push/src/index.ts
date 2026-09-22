@@ -5,6 +5,7 @@ import { PushDeliveryService } from "./push";
 import { InMemoryRateLimiter } from "./rateLimit";
 import { MAX_REQUEST_BODY_BYTES } from "./requestSecurity";
 import { RelayWatcher } from "./relayWatcher";
+import { ReminderDispatcher } from "./reminderDispatcher";
 import { PushStorage } from "./storage";
 
 const config = loadConfig(Bun.env);
@@ -27,7 +28,10 @@ const relayWatcher = new RelayWatcher({
   pushDelivery,
 });
 
+const reminderDispatcher = new ReminderDispatcher({ storage, pushDelivery });
+
 relayWatcher.start();
+reminderDispatcher.start();
 const cleanupTimer = setInterval(() => {
   const nowMs = Date.now();
   storage.pruneChallenges(nowMs);
@@ -60,6 +64,7 @@ async function shutdown(signal: string): Promise<void> {
   console.info(`[push] shutting down on ${signal}`);
   clearInterval(cleanupTimer);
   await relayWatcher.stop();
+  await reminderDispatcher.stop();
   storage.close();
   server.stop(true);
 }

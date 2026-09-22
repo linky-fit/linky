@@ -30,6 +30,9 @@ export const CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY =
   "linky.contacts_onboarding_has_paid";
 export const CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY =
   "linky.contacts_onboarding_has_backuped_keys";
+// Per pubkey: the reminder set last accepted by the push service, to skip no-op syncs.
+export const RECURRING_REMINDERS_SYNCED_STORAGE_KEY_PREFIX =
+  "linky.recurring_reminders_synced.v1.";
 export const CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY =
   "linky.cashu_onboarding_set_main_mint.v1";
 export const PAY_WITH_CASHU_STORAGE_KEY = "linky.pay_with_cashu";

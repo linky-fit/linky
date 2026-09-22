@@ -44,12 +44,29 @@ export interface StoredNativeSubscription {
   token: string;
 }
 
-export interface PushNotificationData {
+export interface InboxNotificationData {
   type: "nostr_inbox";
   outerEventId: string;
   recipientPubkey: string;
   recipientNpub: string;
   createdAt: number;
+}
+
+/** A recurring payment is about to be due; the app must be opened to send it. */
+export interface ReminderNotificationData {
+  type: "recurring_reminder";
+  recipientPubkey: string;
+  recipientNpub: string;
+  notifyAtSec: number;
+}
+
+export type PushNotificationData =
+  | InboxNotificationData
+  | ReminderNotificationData;
+
+export interface StoredReminder {
+  pubkey: string;
+  notifyAtSec: number;
 }
 
 export interface PushNotificationEnvelope {
@@ -71,6 +88,13 @@ export interface NativeSubscribeRequestBody {
   installationId: string | null;
   device: NativePushSubscriptionData;
   recipientPubkeys: string[];
+  proofs: OwnershipProofInput[];
+}
+
+export interface RemindersRequestBody {
+  /** The one pubkey whose reminder set is replaced; mirrors the proof list. */
+  recipientPubkeys: string[];
+  notifyAtSecs: number[];
   proofs: OwnershipProofInput[];
 }
 

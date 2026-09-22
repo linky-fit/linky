@@ -28,7 +28,24 @@ interface PushDeliveryServiceOptions {
 }
 
 const DELIVERY_TTL_SECONDS = 24 * 60 * 60;
+/** Reminders age out fast: a day-old "payment is ready" is noise. */
+const REMINDER_TTL_SECONDS = 60 * 60;
 const NOTIFICATION_BODY = "Nová aktivita v Linky";
+const REMINDER_BODY = "Pravidelná platba je připravena. Otevřete Linky.";
+
+const notificationBody = (payloadData: PushNotificationData): string =>
+  payloadData.type === "recurring_reminder" ? REMINDER_BODY : NOTIFICATION_BODY;
+
+const deliveryTtlSeconds = (payloadData: PushNotificationData): number =>
+  payloadData.type === "recurring_reminder"
+    ? REMINDER_TTL_SECONDS
+    : DELIVERY_TTL_SECONDS;
+
+/** What identifies the event in logs; never the recipient alone. */
+const describePayload = (payloadData: PushNotificationData): string =>
+  payloadData.type === "recurring_reminder"
+    ? `reminder=${payloadData.notifyAtSec}`
+    : `outerEventId=${payloadData.outerEventId}`;
 
 function formatShortNpub(value: string): string {
   const trimmed = value.trim();
@@ -119,8 +136,12 @@ function toWebPushSubscription(
 }
 
 function buildPushTopic(payloadData: PushNotificationData): string {
+  const eventKey =
+    payloadData.type === "recurring_reminder"
+      ? `reminder:${payloadData.notifyAtSec}`
+      : payloadData.outerEventId;
   return createHash("sha256")
-    .update(`${payloadData.outerEventId}:${payloadData.recipientPubkey}`)
+    .update(`${eventKey}:${payloadData.recipientPubkey}`)
     .digest("base64url")
     .slice(0, 32);
 }
@@ -168,7 +189,7 @@ export class PushDeliveryService {
     const endpointHash = hashSecret(subscription.endpoint);
     const payload: PushNotificationEnvelope = {
       title: buildNotificationTitle(payloadData),
-      body: NOTIFICATION_BODY,
+      body: notificationBody(payloadData),
       data: payloadData,
     };
 
@@ -178,14 +199,14 @@ export class PushDeliveryService {
           toWebPushSubscription(subscription),
           JSON.stringify(payload),
           {
-            TTL: DELIVERY_TTL_SECONDS,
+            TTL: deliveryTtlSeconds(payloadData),
             urgency: "normal",
             topic: buildPushTopic(payloadData),
           },
         ),
       );
       console.info(
-        `[push] sent notification successfully id=${subscription.id} outerEventId=${payloadData.outerEventId} recipient=${payloadData.recipientPubkey} endpoint=${endpointHash} ttl=${DELIVERY_TTL_SECONDS}`,
+        `[push] sent notification successfully id=${subscription.id} ${describePayload(payloadData)} recipient=${payloadData.recipientPubkey} endpoint=${endpointHash} ttl=${deliveryTtlSeconds(payloadData)}`,
       );
     } catch (error) {
       const statusCode = readErrorStatusCode(error);
@@ -201,7 +222,7 @@ export class PushDeliveryService {
         );
       }
       console.warn(
-        `[push] delivery failed ${payloadData.outerEventId} to ${payloadData.recipientPubkey} endpoint=${endpointHash} status=${statusCode ?? "unknown"}`,
+        `[push] delivery failed ${describePayload(payloadData)} to ${payloadData.recipientPubkey} endpoint=${endpointHash} status=${statusCode ?? "unknown"}`,
       );
       throw error;
     }
@@ -219,13 +240,17 @@ export class PushDeliveryService {
     const message: Message = {
       token: subscription.token,
       data: {
-        body: NOTIFICATION_BODY,
-        createdAt: String(payloadData.createdAt),
-        outerEventId: payloadData.outerEventId,
+        body: notificationBody(payloadData),
         recipientNpub: payloadData.recipientNpub,
         recipientPubkey: payloadData.recipientPubkey,
         title: buildNotificationTitle(payloadData),
         type: payloadData.type,
+        ...(payloadData.type === "recurring_reminder"
+          ? { notifyAtSec: String(payloadData.notifyAtSec) }
+          : {
+              createdAt: String(payloadData.createdAt),
+              outerEventId: payloadData.outerEventId,
+            }),
       },
       android: {
         priority: "high",
@@ -235,7 +260,7 @@ export class PushDeliveryService {
     try {
       const messageId = await this.messaging.send(message, false);
       console.info(
-        `[push] sent native notification successfully id=${subscription.id} outerEventId=${payloadData.outerEventId} recipient=${payloadData.recipientPubkey} token=${tokenHash} messageId=${messageId}`,
+        `[push] sent native notification successfully id=${subscription.id} ${describePayload(payloadData)} recipient=${payloadData.recipientPubkey} token=${tokenHash} messageId=${messageId}`,
       );
     } catch (error) {
       const code = readFirebaseErrorCode(error);
@@ -246,7 +271,7 @@ export class PushDeliveryService {
         );
       }
       console.warn(
-        `[push] native delivery failed ${payloadData.outerEventId} to ${payloadData.recipientPubkey} token=${tokenHash} code=${code ?? "unknown"}`,
+        `[push] native delivery failed ${describePayload(payloadData)} to ${payloadData.recipientPubkey} token=${tokenHash} code=${code ?? "unknown"}`,
         error,
       );
       throw error;

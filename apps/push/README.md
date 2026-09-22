@@ -4,6 +4,8 @@ Bun HTTP service that sends Web Push and Android FCM notifications when a push-m
 
 A client proves it owns a pubkey by signing a short-lived challenge: `POST /auth/challenge`, then `POST /subscribe` or `POST /native/subscribe` with one proof per pubkey. `/unsubscribe` and `/native/unsubscribe` work the same way. Other endpoints: `GET /vapid-public-key`, `GET /health` and `GET /` (build commit). Subscriptions, native tokens and challenges live in SQLite. A subscription the provider reports as gone (`404`, `410`, VAPID mismatch, unregistered FCM token) is deleted.
 
+`POST /reminders` replaces a pubkey's set of recurring-payment reminder times (at most `PUSH_MAX_REMINDERS_PER_PUBKEY`, default 32; an empty array clears them) under a `subscribe` proof. The server stores only the pubkey and the times, never amounts or recipients. Every 15 seconds the dispatcher sends `{ "type": "recurring_reminder", "notifyAtSec": … }` to each web and Android subscription of a pubkey whose time has come (web push TTL one hour) and drops reminders more than an hour overdue.
+
 ## Run
 
 ```bash

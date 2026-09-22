@@ -20,6 +20,7 @@ export interface PushServiceConfig {
   proofMaxAgeSeconds: number;
   maxPubkeysPerSubscription: number;
   maxSubscriptionsPerPubkey: number;
+  maxRemindersPerPubkey: number;
   authRateLimitMax: number;
   authRateLimitWindowMs: number;
   subscribeRateLimitMax: number;
@@ -191,6 +192,11 @@ export function loadConfig(
       env,
       "PUSH_MAX_SUBSCRIPTIONS_PER_PUBKEY",
       16,
+    ),
+    maxRemindersPerPubkey: readEnvInteger(
+      env,
+      "PUSH_MAX_REMINDERS_PER_PUBKEY",
+      32,
     ),
     authRateLimitMax: readEnvInteger(env, "PUSH_RATE_LIMIT_AUTH_MAX", 30),
     authRateLimitWindowMs: readEnvInteger(
