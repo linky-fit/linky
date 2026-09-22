@@ -8,7 +8,7 @@ import {
   recurringDueAt,
   resolveTimeZone,
   type RecurringScheduleState,
-} from "./recurringSchedule";
+} from "./schedule";
 
 const PRAGUE = "Europe/Prague";
 const utc = (

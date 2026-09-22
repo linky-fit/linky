@@ -1,4 +1,13 @@
 import type { RecurringPaymentId } from "@linky-fit/linksync";
+import {
+  currentTimeZone,
+  isFiatRecurringAmount,
+  recurringAmountSat,
+  recurringDueAt,
+  recurringFiatValue,
+  type RecurringInterval,
+  type RecurringIntervalUnit,
+} from "@linky-fit/recurring-payment";
 import { Repeat } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
@@ -10,24 +19,13 @@ import {
   useRecurringPaymentOrders,
   type RecurringContactSummary,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
-import {
-  isFiatRecurringAmount,
-  recurringAmountFromInput,
-  recurringAmountSat,
-  recurringFiatValue,
-} from "../app/lib/recurringAmount";
+import { recurringAmountFromInput } from "../app/lib/recurringAmount";
 import {
   dateTimeLocalToEpoch,
   epochToDateTimeLocal,
   nextFullHourSec,
 } from "../app/lib/recurringPaymentDisplay";
-import type { RecurringPaymentOrder } from "../app/lib/recurringPaymentOrder";
-import {
-  currentTimeZone,
-  recurringDueAt,
-  type RecurringInterval,
-  type RecurringIntervalUnit,
-} from "../app/lib/recurringSchedule";
+import type { RecurringPaymentOrder } from "../app/lib/recurringPaymentStore";
 import { AmountDisplay } from "../components/AmountDisplay";
 import { Keypad } from "../components/Keypad";
 import { RecurringContactAvatar } from "../components/RecurringContactAvatar";

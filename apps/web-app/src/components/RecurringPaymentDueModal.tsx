@@ -1,3 +1,7 @@
+import {
+  RECURRING_CONFIRM_SEC,
+  type RecurringInterval,
+} from "@linky-fit/recurring-payment";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
@@ -7,8 +11,6 @@ import {
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
-import { RECURRING_CONFIRM_SEC } from "../app/lib/recurringPaymentTick";
-import type { RecurringInterval } from "../app/lib/recurringSchedule";
 import type { I18nKey } from "../i18n";
 import { PaymentConfirmDialog } from "./PaymentConfirmDialog";
 import { RecurringContactAvatar } from "./RecurringContactAvatar";

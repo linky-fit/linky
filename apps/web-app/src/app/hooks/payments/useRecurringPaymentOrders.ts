@@ -4,7 +4,7 @@ import { asNonEmptyString } from "../../../utils/validation";
 import {
   readRecurringPaymentOrder,
   type RecurringPaymentOrder,
-} from "../../lib/recurringPaymentOrder";
+} from "../../lib/recurringPaymentStore";
 import { useContactRows, useRecurringPaymentRecords } from "../useLinksync";
 
 /** Live recurring payments, soonest due first. */

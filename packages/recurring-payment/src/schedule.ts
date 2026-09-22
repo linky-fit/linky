@@ -241,6 +241,21 @@ export interface RecurringScheduleState {
   pausedAtSec: number | null;
 }
 
+/** First due time strictly after `afterSec` on the schedule's own grid. */
+export const nextDueAfter = (
+  schedule: Pick<
+    RecurringScheduleState,
+    "anchorAtSec" | "interval" | "timeZone"
+  >,
+  afterSec: number,
+): number =>
+  nextRecurringOccurrenceAfter(
+    schedule.anchorAtSec,
+    schedule.interval,
+    afterSec,
+    resolveTimeZone(schedule.timeZone),
+  ).dueAtSec;
+
 export type RecurringScheduleDecision =
   | { kind: "paused" }
   | { kind: "wait"; untilSec: number }
@@ -293,11 +308,6 @@ export const advanceRecurringSchedule = (
   state: RecurringScheduleState,
   nowSec: number,
 ): RecurringScheduleAdvance => ({
-  nextDueAtSec: nextRecurringOccurrenceAfter(
-    state.anchorAtSec,
-    state.interval,
-    nowSec,
-    resolveTimeZone(state.timeZone),
-  ).dueAtSec,
+  nextDueAtSec: nextDueAfter(state, nowSec),
   runCount: state.runCount + 1,
 });

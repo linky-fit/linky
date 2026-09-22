@@ -1,3 +1,7 @@
+import {
+  recurringAmountSat,
+  recurringOrderState,
+} from "@linky-fit/recurring-payment";
 import type { FC } from "react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
@@ -6,14 +10,8 @@ import {
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
-import {
-  formatRecurringAmountText,
-  recurringAmountSat,
-} from "../app/lib/recurringAmount";
-import {
-  describeRecurringInterval,
-  recurringOrderState,
-} from "../app/lib/recurringPaymentDisplay";
+import { formatRecurringAmountText } from "../app/lib/recurringAmount";
+import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeLocale } from "../utils/formatting";
 import { nowSeconds } from "../utils/time";

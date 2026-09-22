@@ -4,7 +4,6 @@ import {
   describeRecurringInterval,
   epochToDateTimeLocal,
   nextFullHourSec,
-  readRecurringPaymentIdFromDetails,
 } from "./recurringPaymentDisplay";
 
 describe("recurringPaymentDisplay", () => {
@@ -34,13 +33,5 @@ describe("recurringPaymentDisplay", () => {
     expect(describeRecurringInterval({ unit: "week", count: 3 }, t)).toBe(
       "recurringEveryNWeeks",
     );
-  });
-
-  it("reads the order id from transaction details", () => {
-    expect(
-      readRecurringPaymentIdFromDetails({ recurringPaymentId: "rp-1" }),
-    ).toBe("rp-1");
-    expect(readRecurringPaymentIdFromDetails({ requestId: "x" })).toBeNull();
-    expect(readRecurringPaymentIdFromDetails(null)).toBeNull();
   });
 });

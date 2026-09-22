@@ -1,11 +1,11 @@
-import type { RecurringPaymentOrder } from "./recurringPaymentOrder";
+import { recurringAmountSat, type FiatRatesPerBtc } from "./amount";
+import type { RecurringPaymentOrder } from "./order";
 import {
   advanceRecurringSchedule,
   decideRecurringRun,
-  nextRecurringOccurrenceAfter,
-  resolveTimeZone,
+  nextDueAfter,
   type RecurringScheduleAdvance,
-} from "./recurringSchedule";
+} from "./schedule";
 
 /**
  * Lead time between claiming a due payment and sending it. The user is
@@ -15,7 +15,7 @@ import {
 export const RECURRING_NOTICE_SEC = 60;
 /**
  * Countdown shown in the app before a due payment goes out, with pay-now and
- * cancel. Only when Linky is visible; in the background the payment is sent
+ * cancel. Only when the app is visible; in the background the payment is sent
  * at its send time without it.
  */
 export const RECURRING_CONFIRM_SEC = 10;
@@ -32,39 +32,43 @@ export type RecurringSkipReason =
   | "cancelled"
   | "invalidRecipient";
 
-export type RecurringTickAction =
-  | {
-      kind: "claim";
-      order: RecurringPaymentOrder;
-      dueAtSec: number;
-      takeover: boolean;
-    }
-  | {
-      kind: "run";
-      order: RecurringPaymentOrder;
-      amountSat: number;
-      dueAtSec: number;
-      missedCount: number;
-      advance: RecurringScheduleAdvance;
-    }
+export interface RecurringRunAction<
+  Order extends RecurringPaymentOrder = RecurringPaymentOrder,
+> {
+  kind: "run";
+  order: Order;
+  amountSat: number;
+  dueAtSec: number;
+  missedCount: number;
+  advance: RecurringScheduleAdvance;
+}
+
+export type RecurringTickAction<
+  Order extends RecurringPaymentOrder = RecurringPaymentOrder,
+> =
+  | { kind: "claim"; order: Order; dueAtSec: number; takeover: boolean }
+  | RecurringRunAction<Order>
   | {
       kind: "skip";
-      order: RecurringPaymentOrder;
+      order: Order;
       dueAtSec: number;
       reason: Extract<RecurringSkipReason, "insufficientFunds" | "failed">;
       advance: RecurringScheduleAdvance;
     }
-  | { kind: "waitFunds"; order: RecurringPaymentOrder; dueAtSec: number }
-  | { kind: "waitRates"; order: RecurringPaymentOrder; dueAtSec: number }
-  | { kind: "markInterrupted"; order: RecurringPaymentOrder };
+  | { kind: "waitFunds"; order: Order; dueAtSec: number }
+  | { kind: "waitRates"; order: Order; dueAtSec: number }
+  | { kind: "markInterrupted"; order: Order };
 
-export interface RecurringTickInput {
-  orders: ReadonlyArray<RecurringPaymentOrder>;
+export interface RecurringTickInput<
+  Order extends RecurringPaymentOrder = RecurringPaymentOrder,
+> {
+  orders: ReadonlyArray<Order>;
   nowSec: number;
   deviceId: string;
-  cashuBalance: number;
-  /** Sats the payment sends now; null while a fiat amount has no exchange rate. */
-  amountSatOf: (order: RecurringPaymentOrder) => number | null;
+  /** Spendable sats; a due run waits until they cover the amount. */
+  balanceSat: number;
+  /** Null while no rate is known; a fiat payment then waits. */
+  fiatRates: FiatRatesPerBtc | null;
   /** Per order id: no new attempt before this time (set after a failure). */
   retryNotBeforeSec: ReadonlyMap<string, number>;
 }
@@ -111,18 +115,12 @@ export const recurringUpcoming = (
 export const recurringSkipDeadlineSec = (
   order: RecurringPaymentOrder,
   dueAtSec: number,
-): number =>
-  nextRecurringOccurrenceAfter(
-    order.schedule.anchorAtSec,
-    order.schedule.interval,
-    dueAtSec,
-    resolveTimeZone(order.schedule.timeZone),
-  ).dueAtSec;
+): number => nextDueAfter(order.schedule, dueAtSec);
 
-const planOrder = (
-  order: RecurringPaymentOrder,
-  input: RecurringTickInput,
-): RecurringTickAction | null => {
+const planOrder = <Order extends RecurringPaymentOrder>(
+  order: Order,
+  input: RecurringTickInput<Order>,
+): RecurringTickAction<Order> | null => {
   if (order.lastRunStatus === "running") {
     const startedAt = order.lastRunAtSec ?? 0;
     return input.nowSec - startedAt > RECURRING_RUN_STALE_SEC
@@ -152,9 +150,9 @@ const planOrder = (
   if (attemptedThisPeriod && deadlinePassed) {
     return { kind: "skip", order, dueAtSec, reason: "failed", advance };
   }
-  const amountSat = input.amountSatOf(order);
+  const amountSat = recurringAmountSat(order.amount, input.fiatRates);
   if (amountSat === null) return { kind: "waitRates", order, dueAtSec };
-  if (input.cashuBalance < amountSat) {
+  if (input.balanceSat < amountSat) {
     return deadlinePassed
       ? { kind: "skip", order, dueAtSec, reason: "insufficientFunds", advance }
       : { kind: "waitFunds", order, dueAtSec };
@@ -176,14 +174,41 @@ const planOrder = (
  * What one scheduler pass should do. Actions come out ordered by due time so
  * the longest-overdue payment goes first when the wallet is free.
  */
-export const planRecurringPaymentTick = (
-  input: RecurringTickInput,
-): RecurringTickAction[] => {
+export const planRecurringPaymentTick = <Order extends RecurringPaymentOrder>(
+  input: RecurringTickInput<Order>,
+): RecurringTickAction<Order>[] => {
   const actions = input.orders.flatMap((order) => {
     const action = planOrder(order, input);
     return action === null ? [] : [action];
   });
-  const dueOf = (action: RecurringTickAction): number =>
+  const dueOf = (action: RecurringTickAction<Order>): number =>
     action.kind === "markInterrupted" ? 0 : action.dueAtSec;
   return actions.sort((a, b) => dueOf(a) - dueOf(b));
+};
+
+/**
+ * A run started on demand, outside the planner: it skips the notice window
+ * and consumes the pending period, so the next due time is the first one
+ * after whichever is later, now or the pending due time.
+ */
+export const runNowAction = <Order extends RecurringPaymentOrder>(
+  order: Order,
+  amountSat: number,
+  nowSec: number,
+): RecurringRunAction<Order> => {
+  const { schedule } = order;
+  return {
+    kind: "run",
+    order,
+    amountSat,
+    dueAtSec: schedule.nextDueAtSec,
+    missedCount: 0,
+    advance: {
+      nextDueAtSec: nextDueAfter(
+        schedule,
+        Math.max(nowSec, schedule.nextDueAtSec),
+      ),
+      runCount: schedule.runCount + 1,
+    },
+  };
 };

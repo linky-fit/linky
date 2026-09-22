@@ -10,7 +10,7 @@ import {
   contactIdFor,
   recurringPaymentIdFor,
 } from "../../testUtils/recurringOrders";
-import { readRecurringPaymentOrder } from "./recurringPaymentOrder";
+import { readRecurringPaymentOrder } from "./recurringPaymentStore";
 
 const { appOwner } = makeTestLinkyStore();
 

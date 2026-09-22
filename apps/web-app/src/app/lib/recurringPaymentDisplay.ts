@@ -1,13 +1,9 @@
+import type {
+  RecurringInterval,
+  RecurringIntervalUnit,
+  RecurringPaymentOrder,
+} from "@linky-fit/recurring-payment";
 import type { I18nKey, Translate } from "../../i18n";
-import type { JsonValue } from "../../types/json";
-import { asNonEmptyString } from "../../utils/validation";
-import type { RecurringPaymentOrder } from "./recurringPaymentOrder";
-import {
-  decideRecurringRun,
-  type RecurringInterval,
-  type RecurringIntervalUnit,
-} from "./recurringSchedule";
-import { readJsonRecord } from "./transactionHistory";
 
 const SINGLE_KEYS: Record<RecurringIntervalUnit, I18nKey> = {
   hour: "recurringEveryHour",
@@ -31,16 +27,6 @@ export const describeRecurringInterval = (
     ? t(SINGLE_KEYS[interval.unit])
     : t(PLURAL_KEYS[interval.unit]).replace("{count}", String(interval.count));
 
-export type RecurringOrderState = "active" | "paused";
-
-export const recurringOrderState = (
-  order: RecurringPaymentOrder,
-  nowSec: number,
-): RecurringOrderState =>
-  decideRecurringRun(order.schedule, nowSec).kind === "paused"
-    ? "paused"
-    : "active";
-
 export const recurringLastRunLabel = (
   order: RecurringPaymentOrder,
   t: Translate,
@@ -60,11 +46,6 @@ export const recurringLastRunLabel = (
       return null;
   }
 };
-
-export const readRecurringPaymentIdFromDetails = (
-  details: JsonValue | null,
-): string | null =>
-  asNonEmptyString(readJsonRecord(details)?.recurringPaymentId);
 
 const pad2 = (value: number): string => String(value).padStart(2, "0");
 

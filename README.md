@@ -31,6 +31,7 @@ Packages:
 - [`packages/linkshu`](./packages/linkshu/README.md): cashu wallet library; guides in [`docs/`](./packages/linkshu/docs/)
 - [`packages/linksync`](./packages/linksync/README.md): synced storage (Evolu schema, repositories, shards); guides in [`docs/`](./packages/linksync/docs/)
 - [`packages/proxy-payment`](./packages/proxy-payment/README.md): proxy bank payments (bank QR parsing, offer rules); guides in [`docs/`](./packages/proxy-payment/docs/)
+- [`packages/recurring-payment`](./packages/recurring-payment/README.md): recurring payments (schedule math, the planner, claims between devices); guides in [`docs/`](./packages/recurring-payment/docs/)
 - [`packages/ui`](./packages/ui/README.md): Tamagui design system for Expo and the web (react-native-web)
 - `packages/identity`: key derivation (SLIP-39, Nostr, LNURL auth) shared by the app and the error tracker
 - `packages/config`: shared eslint, prettier, tsconfig and npm packaging

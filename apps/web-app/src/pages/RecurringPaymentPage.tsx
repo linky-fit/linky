@@ -1,3 +1,4 @@
+import { recurringOrderState } from "@linky-fit/recurring-payment";
 import { Pause, Play, Send, Trash2 } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
@@ -14,7 +15,6 @@ import {
 import {
   describeRecurringInterval,
   recurringLastRunLabel,
-  recurringOrderState,
 } from "../app/lib/recurringPaymentDisplay";
 import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
 import { navigateTo } from "../hooks/useRouting";

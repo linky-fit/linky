@@ -1,34 +1,29 @@
 import {
-  ContactId,
   createId,
-  NonEmptyString100,
   NonNegativeInt,
   PositiveInt,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
+import {
+  CLEAR_CLAIM_PATCH,
+  pausePatch,
+  resumePatch,
+} from "@linky-fit/recurring-payment";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import type { Translate } from "../../../i18n";
 import { nowSeconds } from "../../../utils/time";
-import type { RecurringAmount } from "../../lib/recurringAmount";
-import type { RecurringPaymentOrder } from "../../lib/recurringPaymentOrder";
-import { recurringPaymentPatch } from "../../lib/recurringPaymentWrite";
 import {
-  currentTimeZone,
-  nextRecurringOccurrenceAfter,
-  resolveTimeZone,
-  type RecurringInterval,
-} from "../../lib/recurringSchedule";
+  readContactId,
+  recurringPaymentColumns,
+  recurringPaymentUpdate,
+  type RecurringPaymentInput,
+  type RecurringPaymentOrder,
+} from "../../lib/recurringPaymentStore";
 import { runWrite } from "../../lib/storeWrite";
 import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
 
-export interface RecurringPaymentInput {
-  amount: RecurringAmount;
-  contactId: string;
-  /** The next due time; also the anchor every later due time is counted from. */
-  firstDueAtSec: number;
-  interval: RecurringInterval;
-}
+export type { RecurringPaymentInput } from "../../lib/recurringPaymentStore";
 
 export interface RecurringPaymentsActions {
   createRecurringPayment: (input: RecurringPaymentInput) => Promise<boolean>;
@@ -55,26 +50,6 @@ interface UseRecurringPaymentsActionsParams {
 }
 
 const DELETE_ARM_MS = 5000;
-
-/** First due time strictly after `afterSec` on the payment's own grid. */
-const nextDueAfter = (order: RecurringPaymentOrder, afterSec: number) =>
-  nextRecurringOccurrenceAfter(
-    order.schedule.anchorAtSec,
-    order.schedule.interval,
-    afterSec,
-    resolveTimeZone(order.schedule.timeZone),
-  ).dueAtSec;
-
-/** The schedule and amount columns a form writes, for both insert and edit. */
-const scheduleColumns = (input: RecurringPaymentInput) => ({
-  amount: PositiveInt.orThrow(input.amount.amount),
-  unit: NonEmptyString100.orThrow(input.amount.unit),
-  intervalUnit: NonEmptyString100.orThrow(input.interval.unit),
-  intervalCount: PositiveInt.orThrow(input.interval.count),
-  anchorAtSec: PositiveInt.orThrow(input.firstDueAtSec),
-  timeZone: NonEmptyString100.orThrow(currentTimeZone()),
-  nextDueAtSec: PositiveInt.orThrow(input.firstDueAtSec),
-});
 
 /**
  * User-facing mutations on recurring payments, all through the linksync
@@ -110,16 +85,15 @@ export const useRecurringPaymentsActions = ({
 
   const createRecurringPayment = React.useCallback(
     async (input: RecurringPaymentInput): Promise<boolean> => {
-      const contactId = ContactId.fromUnknown(input.contactId);
-      if (!contactId.ok) return false;
+      const contactId = readContactId(input.contactId);
+      if (contactId === null) return false;
       const id = createId<"RecurringPayment">();
       const outcome = await runWrite(
         repository.insert({
           id,
           createdAtSec: PositiveInt.orThrow(nowSeconds()),
-          contactId: contactId.value,
           runCount: NonNegativeInt.orThrow(0),
-          ...scheduleColumns(input),
+          ...recurringPaymentColumns(input, contactId),
         }),
       );
       if (!outcome.ok) return reportWriteFailure(outcome.error);
@@ -143,19 +117,12 @@ export const useRecurringPaymentsActions = ({
       order: RecurringPaymentOrder,
       input: RecurringPaymentInput,
     ): Promise<boolean> => {
-      const contactId = ContactId.fromUnknown(input.contactId);
-      if (!contactId.ok) return false;
-      // A new first due time starts a new grid; an in-flight claim for the
-      // old due time no longer applies.
+      const contactId = readContactId(input.contactId);
+      if (contactId === null) return false;
       const outcome = await runWrite(
         repository.update(order.id, {
-          contactId: contactId.value,
-          ...scheduleColumns(input),
-          ...recurringPaymentPatch({
-            claimAtSec: null,
-            claimDeviceId: null,
-            claimDueAtSec: null,
-          }),
+          ...recurringPaymentColumns(input, contactId),
+          ...recurringPaymentUpdate(CLEAR_CLAIM_PATCH),
         }),
       );
       if (!outcome.ok) return reportWriteFailure(outcome.error);
@@ -183,18 +150,13 @@ export const useRecurringPaymentsActions = ({
   const setRecurringPaymentPaused = React.useCallback(
     async (order: RecurringPaymentOrder, paused: boolean): Promise<void> => {
       const now = nowSeconds();
-      // Periods that passed while paused are not paid retroactively.
-      const patch = paused
-        ? { pausedAtSec: now }
-        : {
-            pausedAtSec: null,
-            nextDueAtSec:
-              order.schedule.nextDueAtSec > now
-                ? order.schedule.nextDueAtSec
-                : nextDueAfter(order, now),
-          };
       const outcome = await runWrite(
-        repository.update(order.id, recurringPaymentPatch(patch)),
+        repository.update(
+          order.id,
+          recurringPaymentUpdate(
+            paused ? pausePatch(now) : resumePatch(order, now),
+          ),
+        ),
       );
       if (!outcome.ok) {
         reportWriteFailure(outcome.error);

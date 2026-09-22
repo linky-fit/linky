@@ -4,7 +4,6 @@ import { formatDisplayAmountParts } from "../../utils/displayAmounts";
 import {
   formatRecurringAmountParts,
   recurringAmountFromInput,
-  recurringAmountSat,
   recurringAmountSecondaryText,
 } from "./recurringAmount";
 
@@ -15,24 +14,6 @@ const rates: FiatRates = {
   fetchedAtMs: 1,
   usdPerBtc: 110_000,
 };
-
-describe("recurringAmountSat", () => {
-  it("returns sats as they are and converts fiat at the current rate", () => {
-    expect(recurringAmountSat({ amount: 2_100, unit: "sat" }, null)).toBe(
-      2_100,
-    );
-    // 150.00 CZK at 2 000 000 CZK/BTC = 7 500 sat
-    expect(recurringAmountSat({ amount: 15_000, unit: "czk" }, rates)).toBe(
-      7_500,
-    );
-  });
-
-  it("has no sat amount for fiat without a rate", () => {
-    expect(
-      recurringAmountSat({ amount: 15_000, unit: "czk" }, null),
-    ).toBeNull();
-  });
-});
 
 describe("recurringAmountFromInput", () => {
   it("fixes the amount in the typed fiat currency, in hundredths", () => {
