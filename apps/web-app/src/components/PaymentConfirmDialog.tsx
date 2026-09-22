@@ -1,16 +1,22 @@
-import { Button, Dialog, Notice, Stack, Text } from "@linky-fit/ui";
+import { Button, Dialog, Notice, Progress, Stack, Text } from "@linky-fit/ui";
 import type { ReactNode } from "react";
 import { DisplayAmount } from "./DisplayAmount";
 
 interface PaymentConfirmDialogProps {
   amountSat: number | null;
   cancelLabel: string;
+  /** False keeps a tap outside the sheet from counting as Cancel. */
+  closeOnBackdrop?: boolean;
   confirmLabel: string;
+  /** 0..1 progress shown above the confirm button, for a confirm that fires on its own when it reaches 1. */
+  confirmProgress?: number | null;
   description: ReactNode;
   disabled?: boolean;
   disabledReason?: string;
   isBusy: boolean;
   label: string;
+  /** "amount-first" (default) or "description-first": the amount then sits under the description. */
+  layout?: "amount-first" | "description-first";
   meta?: ReactNode;
   onClose: () => void;
   onConfirm: () => Promise<void>;
@@ -29,12 +35,15 @@ const caption = (content: ReactNode, bold = false) =>
 export function PaymentConfirmDialog({
   amountSat,
   cancelLabel,
+  closeOnBackdrop = true,
   confirmLabel,
+  confirmProgress = null,
   description,
   disabled = false,
   disabledReason,
   isBusy,
   label,
+  layout = "amount-first",
   meta,
   onClose,
   onConfirm,
@@ -44,12 +53,18 @@ export function PaymentConfirmDialog({
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open && closeOnBackdrop) onClose();
       }}
       title={label}
       hideTitle
       actions={
         <>
+          {confirmProgress === null ? null : (
+            <Progress
+              value={confirmProgress}
+              accessibilityLabel={confirmLabel}
+            />
+          )}
           <Button
             loading={isBusy}
             onPress={() => void onConfirm()}
@@ -65,6 +80,9 @@ export function PaymentConfirmDialog({
       }
     >
       <Stack alignItems="center" gap="$sm" paddingBottom="$lg">
+        {layout === "description-first" && description
+          ? caption(description)
+          : null}
         {amountSat === null ? (
           <Text variant="heading" color="$color" textAlign="center">
             {unknownAmountLabel}
@@ -72,7 +90,7 @@ export function PaymentConfirmDialog({
         ) : (
           <DisplayAmount amount={amountSat} accessibilityLabel={label} />
         )}
-        {description ? caption(description) : null}
+        {layout === "amount-first" && description ? caption(description) : null}
         {meta ? caption(meta, true) : null}
         {disabled && disabledReason ? (
           <Notice tone="accent" icon="CircleAlert" title={disabledReason} />
