@@ -254,6 +254,20 @@ _Avoid_: drip, throttle
 The end of an offer in which the payer paid the bank transfer and the offerer paid them; **canceled** is the other way an offer ends for everyone.
 _Avoid_: completed, finished, done
 
+## Recurring payments
+
+**Recurring payment**:
+The user's instruction to pay a contact a fixed amount daily, weekly or monthly until it is paused or deleted.
+_Avoid_: standing order, subscription, scheduled payment
+
+**Run**:
+One payment a recurring payment makes for one due time; a missed period is paid once and the rest are skipped.
+_Avoid_: execution, instance, occurrence
+
+**Claim**:
+The mark a device writes on a recurring payment before a due time, naming itself as the one device that pays it.
+_Avoid_: lock, lease, reservation
+
 ## Sync and devices
 
 **Device**:

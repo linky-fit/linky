@@ -27,7 +27,7 @@ export const buildUnknownContactId = (
 
 const readUnknownPubkeyHex = (
   contact: ContactIdentityRowLike | null,
-): string | null => {
+): Pubkey | null => {
   return normalizePubkeyHex(contact?.unknownPubkeyHex);
 };
 

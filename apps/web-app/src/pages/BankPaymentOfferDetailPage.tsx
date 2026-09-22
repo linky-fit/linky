@@ -27,7 +27,7 @@ import {
   parsePrivateImageMessage,
 } from "../app/lib/privateImageMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
-import { decodeNpub } from "@linky-fit/linkstr";
+import { decodeNpub, parsePubkey } from "@linky-fit/linkstr";
 import { readUnknownContactIdPubkey } from "../app/hooks/messages/contactIdentity";
 import { navigateTo, returnFromBankPaymentOffer } from "../hooks/useRouting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
@@ -250,7 +250,7 @@ export const BankPaymentOfferDetailPage: React.FC<
   // Recipients still waiting for their staggered send; the queue drains via
   // state updates, so offerEntries changing keeps this list current.
   const queuedRecipients = React.useMemo(() => {
-    const ownerPubkey = (chatOwnPubkeyHex ?? "").trim();
+    const ownerPubkey = parsePubkey(chatOwnPubkeyHex ?? "");
     if (!ownerPubkey) return [];
 
     const record = readBankPaymentOfferStaggerRecords(ownerPubkey).find(

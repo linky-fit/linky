@@ -148,9 +148,9 @@ import {
 } from "../useLinksync";
 import { runWrite } from "../../lib/storeWrite";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
-import { useInterruptedReceiveRecovery } from "../cashu/useInterruptedReceiveRecovery";
 import { useRecurringPaymentsActions } from "../payments/useRecurringPaymentsActions";
 import { useRecurringPaymentsScheduler } from "../payments/useRecurringPaymentsScheduler";
+import { useInterruptedReceiveRecovery } from "../cashu/useInterruptedReceiveRecovery";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
 import type { Translate } from "../../../i18n";
@@ -273,8 +273,8 @@ export const useCashuWalletComposition = ({
 }: UseCashuWalletCompositionParams) => {
   const wallet = useWalletRepository();
   const settingsRepository = useSettingsRepository();
-  const { allowTestMints, setAllowTestMints } = useAllowTestMints();
   const recurringPaymentsRepository = useRecurringPaymentsRepository();
+  const { allowTestMints, setAllowTestMints } = useAllowTestMints();
   const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
     mode: "promiseExit",
   });

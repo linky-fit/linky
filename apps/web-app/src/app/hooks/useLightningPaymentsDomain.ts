@@ -332,11 +332,13 @@ export const useLightningPaymentsDomain = ({
         }
         const mintBalance =
           walletMintBalances.find((entry) => entry.mint === mint)?.amount ?? 0;
-        showPaymentSending({
-          direction: "out",
-          amountSat,
-          contact: paidOverlayContact(contact),
-        });
+        if (!recurringRun) {
+          showPaymentSending({
+            direction: "out",
+            amountSat,
+            contact: paidOverlayContact(contact),
+          });
+        }
 
         // Paying the full balance leaves no headroom for fees; the ladder
         // degrades the requested LNURL amount until amount + fees fit.

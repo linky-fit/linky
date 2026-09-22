@@ -1,8 +1,10 @@
 import {
+  BankOfferId,
   decodeNpub,
   identityFromNsec,
   type BankOfferDraft,
   type BankOfferInboxEvent,
+  type Pubkey,
 } from "@linky-fit/linkstr";
 import { sendBankOfferAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import {
@@ -92,8 +94,8 @@ interface UseBankPaymentOffersParams {
 // unknown peer saved as a contact moves its offers without any bookkeeping.
 const useContactPubkeys = (contacts: readonly ContactRowLike[]) =>
   React.useMemo(() => {
-    const contactIdByPubkey = new Map<string, string>();
-    const pubkeyByContactId = new Map<string, string>();
+    const contactIdByPubkey = new Map<Pubkey, string>();
+    const pubkeyByContactId = new Map<string, Pubkey>();
     for (const contact of contacts) {
       const id = (contact.id ?? "").trim();
       const npub = normalizeNpubIdentifier(contact.npub ?? "");
@@ -103,9 +105,9 @@ const useContactPubkeys = (contacts: readonly ContactRowLike[]) =>
       pubkeyByContactId.set(id, pubkey);
     }
     return {
-      contactIdFor: (pubkey: string): string | null =>
+      contactIdFor: (pubkey: Pubkey): string | null =>
         contactIdByPubkey.get(pubkey) ?? buildUnknownContactId(pubkey),
-      pubkeyFor: (contactId: string): string | null =>
+      pubkeyFor: (contactId: string): Pubkey | null =>
         pubkeyByContactId.get(contactId.trim()) ??
         readUnknownContactIdPubkey(contactId),
     };
@@ -174,7 +176,7 @@ export const useBankPaymentOffers = ({
 
   const publish = React.useCallback(
     async (
-      peer: string,
+      peer: Pubkey,
       draft: BankOfferDraft,
     ): Promise<BankPaymentOffer | null> => {
       const exit = await sendBankOffer(draft);
@@ -326,9 +328,9 @@ export const useBankPaymentOffers = ({
       amountSat: number | null;
       amountText: string;
       expiresAtSec?: number;
-      offerId: string;
-      offerer: string;
-      to: string;
+      offerId: BankOfferId;
+      offerer: Pubkey;
+      to: Pubkey;
     }): Promise<BankPaymentOffer | null> => {
       const draft = bankPaymentOfferedDraft(args);
       return draft ? publish(args.to, draft) : null;
@@ -381,7 +383,7 @@ export const useBankPaymentOffers = ({
           return null;
         }
 
-        const offerId = makeLocalId();
+        const offerId = BankOfferId.make(makeLocalId());
         if (spdPayload) {
           // Persisted so the offer survives an app reload: the auto-responder
           // needs this payload when a recipient's acceptance arrives later.
@@ -394,7 +396,7 @@ export const useBankPaymentOffers = ({
         }
 
         let first: { contactId: string; sentAtSec: number } | null = null;
-        const queued: string[] = [];
+        const queued: Pubkey[] = [];
         for (const recipient of recipients) {
           // With a stagger delay only the first reachable recipient gets the
           // offer now; the rest wait in the persisted queue.
@@ -831,7 +833,7 @@ export const useBankPaymentOffers = ({
     chatMessagesWithBankPaymentOffers,
     getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled: React.useCallback(
-      (offerId: string) => isBankPaymentOfferCanceled(offers, offerId.trim()),
+      (offerId: BankOfferId) => isBankPaymentOfferCanceled(offers, offerId),
       [offers],
     ),
     recentBankPaymentOfferOutcomesByContactId,
