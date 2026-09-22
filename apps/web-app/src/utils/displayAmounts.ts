@@ -2,7 +2,7 @@ import type { FiatRates } from "@linky/linkshu";
 export type { FiatRates } from "@linky/linkshu";
 import { formatInteger, normalizeLocale } from "./formatting";
 
-type FiatDisplayCurrency = "czk" | "eur" | "chf" | "usd";
+export type FiatDisplayCurrency = "czk" | "eur" | "chf" | "usd";
 
 export type DisplayCurrency = "sat" | "btc" | FiatDisplayCurrency | "hidden";
 
@@ -172,6 +172,26 @@ const getFiatValue = (
   return btcAmount * rate;
 };
 
+/** Fiat value of `amountSat` at the given rates, unrounded. */
+export const convertSatToFiat = (
+  amountSat: number,
+  currency: FiatDisplayCurrency,
+  fiatRates: FiatRates,
+): number => getFiatValue(normalizeAmountSat(amountSat), currency, fiatRates);
+
+/** Whole sats for a fiat value at the given rates; 0 when the value is not positive. */
+export const convertFiatToSat = (
+  fiatValue: number,
+  currency: FiatDisplayCurrency,
+  fiatRates: FiatRates,
+): number => {
+  if (!Number.isFinite(fiatValue) || fiatValue <= 0) return 0;
+  const amountSat = Math.round(
+    (fiatValue / getRateForCurrency(currency, fiatRates)) * SATS_PER_BTC,
+  );
+  return Number.isFinite(amountSat) && amountSat > 0 ? amountSat : 0;
+};
+
 const parsePositiveInteger = (value: string): number => {
   const digitsOnly = value.replace(/\D/g, "");
   if (!digitsOnly) return 0;
@@ -221,9 +241,11 @@ const toAmountSatFromDisplayInput = (
   if (parsedDisplayValue <= 0) return 0;
 
   if (isFiatDisplayCurrency(options.displayCurrency) && options.fiatRates) {
-    const rate = getRateForCurrency(options.displayCurrency, options.fiatRates);
-    const amountSat = Math.round((parsedDisplayValue / rate) * SATS_PER_BTC);
-    return Number.isFinite(amountSat) && amountSat > 0 ? amountSat : 0;
+    return convertFiatToSat(
+      parsedDisplayValue,
+      options.displayCurrency,
+      options.fiatRates,
+    );
   }
 
   return parsedDisplayValue;

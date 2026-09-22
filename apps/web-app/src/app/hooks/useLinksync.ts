@@ -3,6 +3,7 @@ import {
   makeContactsRepository,
   makeConversationsRepository,
   makeIdentityRepository,
+  makeRecurringPaymentsRepository,
   makeSettingsRepository,
   makeTransactionsRepository,
   makeWalletRepository,
@@ -16,6 +17,8 @@ import {
   type MessageRow,
   type NostrIdentityRow,
   type ReactionRow,
+  type RecurringPaymentRecord,
+  type RecurringPaymentsRepository,
   type SettingsRepository,
   type TransactionRecord,
   type TransactionsRepository,
@@ -91,6 +94,16 @@ export const useTransactionsRepository = (): TransactionsRepository => {
 
 export const useTransactionRecords = (): ReadonlyArray<TransactionRecord> =>
   useRepositoryRows(useTransactionsRepository());
+
+export const useRecurringPaymentsRepository =
+  (): RecurringPaymentsRepository => {
+    const store = useLinkyStore();
+    return React.useMemo(() => makeRecurringPaymentsRepository(store), [store]);
+  };
+
+export const useRecurringPaymentRecords =
+  (): ReadonlyArray<RecurringPaymentRecord> =>
+    useRepositoryRows(useRecurringPaymentsRepository());
 
 /** linkshu's stores over the cashu shards; the wallet runtime is built on it. */
 export const useWalletRepository = (): WalletRepository => {

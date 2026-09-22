@@ -7,10 +7,12 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 
 ## Packages
 
+- [`packages/domain`](./packages/domain/README.md) — the branded ids shared by every package and the app
 - [`packages/linkstr`](./packages/linkstr/README.md) — Nostr protocol library; usage guides in [`packages/linkstr/docs/`](./packages/linkstr/docs/README.md) (also covers `@linky/linkstr-react`)
 - [`packages/linkshu`](./packages/linkshu/README.md) — cashu wallet library; usage guides in [`packages/linkshu/docs/`](./packages/linkshu/docs/README.md)
 - [`packages/linksync`](./packages/linksync/README.md) — synced storage library (Evolu schema, repositories, shards); usage guides in [`packages/linksync/docs/`](./packages/linksync/docs/README.md)
 - [`packages/proxy-payment`](./packages/proxy-payment/README.md) — proxy bank-payment domain (bank QR parsing, offer rules and reducer, stagger scheduling); usage guides in [`packages/proxy-payment/docs/`](./packages/proxy-payment/docs/README.md)
+- [`packages/recurring-payment`](./packages/recurring-payment/README.md) — recurring-payment domain (schedule math, planner, transition patches); usage guides in [`packages/recurring-payment/docs/`](./packages/recurring-payment/docs/README.md)
 
 ## Protocols and stack
 
@@ -54,6 +56,7 @@ Every synced scope lives on `@linky/linksync` shards; the scope table in `packag
   - Lightning invoice and LN address payment; a payment the mint has not settled shows as pending in the history and is finished (or refunded to the balance) on the next launch or reconnect
   - contact payment via Cashu message flow
   - proxy payment of a scanned bank QR (SPD, EPC, PAY by square) with editable fields before the offer is sent
+  - recurring payments to a contact daily, weekly, or monthly, managed in the Scheduled section at the top of the transaction history (also started from a completed payment) and editable later; the amount is fixed in the unit it was typed in (sats, or a fiat currency converted at each run); any of the user's devices running Linky sends a due payment, in the background silently after a one-minute notice, in the foreground after a 10-second countdown with pay and cancel; a missed period is paid once and the rest skipped, and each run appears in the history
 - Push: optional Bun push service in `apps/push/` for generic Web Push notifications on new outer inbox `kind: 1059` events
 - Debug pages for Evolu current/history data and owner/rotation diagnostics
 
@@ -193,7 +196,10 @@ End-to-end tests (Playwright) live in `apps/web-app/tests/*.spec.ts`.
 The `local-stack` runs the proxy-payment flow — three accounts on one machine, talking over the local
 Nostr relay and paying each other with the local Cashu mint — plus the linkshu storage-migration
 scenario, chat/edit/offline-reaction and top-up recovery, handing an issued token to a contact
-from its page, and signup/manual password saving
+from its page, recurring payments (pay now, the countdown confirmed, run out and cancelled, a
+payment waiting for funds until a top-up, two devices of one user paying once, pause and resume,
+edit, two-tap delete, form validation, a fiat amount converted at the fixture rate, and "Repeat
+regularly" from the history), and signup/manual password saving
 with checks that recovery seeds stay out of HTTP requests. Attachment tests send encrypted
 images and PDFs between browsers and verify
 decryption, seen receipts, downloads, and bytes handed to the browser sharing API. The shards

@@ -124,7 +124,7 @@ describe("bankPaymentOfferGroupResponses", () => {
     );
     const { alreadyDone, targets } = bankPaymentOfferGroupResponses(
       offers,
-      "offer-1",
+      BankOfferId.make("offer-1"),
       "canceled",
     );
     expect(alreadyDone).toBe(false);
@@ -142,12 +142,18 @@ describe("bankPaymentOfferGroupResponses", () => {
       snapshot("accepted_by_other", true, { from: other }),
     );
     expect(
-      bankPaymentOfferGroupResponses(offers, "offer-1", "canceled").targets.map(
-        ({ offer }) => offer.peer,
-      ),
+      bankPaymentOfferGroupResponses(
+        offers,
+        BankOfferId.make("offer-1"),
+        "canceled",
+      ).targets.map(({ offer }) => offer.peer),
     ).toEqual([other]);
     expect(
-      bankPaymentOfferGroupResponses(offers, "offer-1", "settled"),
+      bankPaymentOfferGroupResponses(
+        offers,
+        BankOfferId.make("offer-1"),
+        "settled",
+      ),
     ).toMatchObject({ alreadyDone: true });
   });
 });

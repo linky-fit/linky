@@ -1,6 +1,7 @@
 import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
 import type { RestoreProgress } from "@linky/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
+import { paidOverlayContact } from "../../lib/paidOverlay";
 import { useLatest } from "../../../hooks/useLatest";
 import {
   CashuTokenText,
@@ -24,6 +25,8 @@ import { Cause, Either, Exit, Option, Schema } from "effect";
 import React, { useMemo, useState } from "react";
 import type { CashuOperationId, ContactId } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
+import { useRecurringPaymentOrders } from "../payments/useRecurringPaymentOrders";
+import { useRecurringReminderSync } from "../payments/useRecurringReminderSync";
 import {
   inferLightningAddressFromLnurlTarget,
   redeemLnurlWithdraw,
@@ -36,7 +39,10 @@ import {
   WALLET_WARNING_BALANCE_THRESHOLD_SAT,
   WALLET_WARNING_DISMISSED_STORAGE_KEY,
 } from "../../../utils/constants";
-import { formatDisplayAmountParts } from "../../../utils/displayAmounts";
+import {
+  formatDisplayAmountParts,
+  type FiatRates,
+} from "../../../utils/displayAmounts";
 import {
   isNpubCashDisabled,
   NPUB_CASH_SERVER_BASE_URL,
@@ -114,12 +120,15 @@ import { drainLegacyAcceptedCashuToken } from "../../migrations/legacyAcceptedTo
 import { useLinkshuComposition } from "./useLinkshuComposition";
 import {
   useSetting,
+  useRecurringPaymentsRepository,
   useSettingsRepository,
   useWalletRepository,
 } from "../useLinksync";
 import { runWrite } from "../../lib/storeWrite";
 import { DEFAULT_MINT_SETTING_KEY } from "../../migrations/laneToShardMigration";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
+import { useRecurringPaymentsActions } from "../payments/useRecurringPaymentsActions";
+import { useRecurringPaymentsScheduler } from "../payments/useRecurringPaymentsScheduler";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
 import type { Translate } from "../../../i18n";
@@ -177,6 +186,7 @@ interface UseCashuWalletCompositionParams {
     | "setContactsOnboardingHasPaid"
     | "updateLocalNostrMessage"
   >;
+  fiatRates: FiatRates | null;
   formatDisplayedAmountParts: (
     amountSat: number,
   ) => ReturnType<typeof formatDisplayAmountParts>;
@@ -223,6 +233,7 @@ interface UseCashuWalletCompositionParams {
 export const useCashuWalletComposition = ({
   contactPayBackToChatRef,
   contactsMessaging,
+  fiatRates,
   formatDisplayedAmountParts,
   formatDisplayedAmountText,
   identity,
@@ -240,6 +251,7 @@ export const useCashuWalletComposition = ({
 }: UseCashuWalletCompositionParams) => {
   const wallet = useWalletRepository();
   const settingsRepository = useSettingsRepository();
+  const recurringPaymentsRepository = useRecurringPaymentsRepository();
   const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
     mode: "promiseExit",
   });
@@ -399,6 +411,7 @@ export const useCashuWalletComposition = ({
   const npubCashMintSyncRef = React.useRef<string | null>(null);
 
   const {
+    paidOverlayDetails,
     paidOverlayIsOpen,
     paidOverlayTitle,
     showPaidOverlay,
@@ -1272,6 +1285,7 @@ export const useCashuWalletComposition = ({
               "{name}",
               requestInfo.description || postUrl.hostname || t("appTitle"),
             ),
+          { direction: "out", amountSat: receipt.amount },
         );
         safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
         setContactsOnboardingHasPaid(true);
@@ -1551,8 +1565,16 @@ export const useCashuWalletComposition = ({
     setWalletWarningDismissed(true);
   }, []);
 
+  const findPaidOverlayContact = React.useCallback(
+    (contactId: string) =>
+      paidOverlayContact(
+        contacts.find((contact) => (contact.id ?? "") === contactId),
+      ),
+    [contacts],
+  );
   const saveCashuFromText = useSaveCashuFromText({
     enqueueCashuOp,
+    findContact: findPaidOverlayContact,
     formatDisplayedAmountParts,
     isCashuTokenStored,
     isMintDeleted,
@@ -2404,6 +2426,45 @@ export const useCashuWalletComposition = ({
     ],
   );
 
+  const recurringScheduler = useRecurringPaymentsScheduler({
+    cashuBalance,
+    cashuIsBusy,
+    contacts,
+    enabled: sendCashuToken !== null && meltCashuInvoice !== null,
+    fiatRates,
+    formatDisplayedAmountParts,
+    maybeShowPwaNotification,
+    payContactWithCashuMessage,
+    payLightningAddressWithCashu: payLightningAddressWithCashuBase,
+    payWithCashuEnabled,
+    pushToast,
+    repository: recurringPaymentsRepository,
+    setCashuIsBusy,
+    showPaidOverlay,
+    t,
+    transactions,
+  });
+  const recurringPaymentsActions = useRecurringPaymentsActions({
+    pushToast,
+    repository: recurringPaymentsRepository,
+    runOrderNow: recurringScheduler.runOrderNow,
+    t,
+  });
+  const recurringPaymentsContext = React.useMemo(
+    () => ({
+      ...recurringPaymentsActions,
+      cancelDue: recurringScheduler.cancelDue,
+      confirmDueNow: recurringScheduler.confirmDueNow,
+      dueConfirmation: recurringScheduler.dueConfirmation,
+    }),
+    [
+      recurringPaymentsActions,
+      recurringScheduler.cancelDue,
+      recurringScheduler.confirmDueNow,
+      recurringScheduler.dueConfirmation,
+    ],
+  );
+
   const knownTransferTexts = React.useMemo(
     () => new Set(walletTransfers.map((transfer) => transfer.tokenText)),
     [walletTransfers],
@@ -2412,6 +2473,13 @@ export const useCashuWalletComposition = ({
     (text: string) => getCashuTokenMessageInfoBase(text, knownTransferTexts),
     [knownTransferTexts],
   );
+
+  const recurringOrders = useRecurringPaymentOrders();
+  useRecurringReminderSync({
+    currentNsec,
+    enabled: sendCashuToken !== null && meltCashuInvoice !== null,
+    orders: recurringOrders,
+  });
 
   const knownLnAddressPayContact = React.useMemo(() => {
     if (route.kind !== "lnAddressPay") return null;
@@ -2435,6 +2503,7 @@ export const useCashuWalletComposition = ({
   }, [knownLnAddressPayContact, nostrPictureByNpub]);
 
   return {
+    recurringPaymentsContext,
     reclaimCashuTransfer,
     cashuTransferLifecycle,
     applyDefaultMintSelection,
@@ -2491,6 +2560,7 @@ export const useCashuWalletComposition = ({
     closeCashuPaymentRequestConfirmation,
     confirmCashuPaymentRequest,
     onPayChatPaymentRequest,
+    paidOverlayDetails,
     paidOverlayIsOpen,
     paidOverlayTitle,
     payCashuPaymentRequest,

@@ -33,7 +33,7 @@ export interface TransactionItem {
   unit: string | null;
 }
 
-const parseJsonValue = (value: string | null): JsonValue | null => {
+export const parseJsonValue = (value: string | null): JsonValue | null => {
   if (!value) return null;
   const result = Schema.decodeUnknownOption(Schema.parseJson(JsonValue))(value);
   return Option.getOrNull(result);

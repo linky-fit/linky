@@ -1,4 +1,4 @@
-export * from "./ids";
+export * from "@linky/domain";
 export { LinkySchema, linkyTableColumns } from "./schema";
 export type {
   CashuOperationRow,
@@ -11,6 +11,7 @@ export type {
   MessageRow,
   NostrIdentityRow,
   ReactionRow,
+  RecurringPaymentRow,
   SettingRow,
   ShardPointerRow,
   TransactionRow,

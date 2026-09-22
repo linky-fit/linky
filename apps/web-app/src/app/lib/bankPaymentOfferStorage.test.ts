@@ -1,3 +1,5 @@
+import { BankOfferId } from "@linky/linkstr";
+import { makeIdentity } from "@linky/linkstr/testing";
 import type { BankPaymentOfferStaggerRecord } from "@linky/proxy-payment";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -117,6 +119,11 @@ describe("bank payment offer SPD payload storage", () => {
   });
 });
 
+const ownerA = makeIdentity().pubkey;
+const ownerB = makeIdentity().pubkey;
+const pubB = makeIdentity().pubkey;
+const pubC = makeIdentity().pubkey;
+
 describe("bank payment offer stagger queue storage", () => {
   const record = (
     overrides: Partial<BankPaymentOfferStaggerRecord> = {},
@@ -125,25 +132,25 @@ describe("bank payment offer stagger queue storage", () => {
     amountText: "480 Kč",
     createdAtSec: NOW,
     expiresAtSec: NOW + 300,
-    offerId: "offer-1",
-    ownerPubkey: "owner-a",
+    offerId: BankOfferId.make("offer-1"),
+    ownerPubkey: ownerA,
     pending: [
-      { dueAtSec: NOW + 10, peer: "pub-b" },
-      { dueAtSec: NOW + 20, peer: "pub-c" },
+      { dueAtSec: NOW + 10, peer: pubB },
+      { dueAtSec: NOW + 20, peer: pubC },
     ],
     ...overrides,
   });
 
   it("persists a queue and reads it back for the owner only", () => {
     rememberBankPaymentOfferStaggerQueue(record());
-    expect(readBankPaymentOfferStaggerRecords("owner-a")).toEqual([record()]);
-    expect(readBankPaymentOfferStaggerRecords("owner-b")).toEqual([]);
+    expect(readBankPaymentOfferStaggerRecords(ownerA)).toEqual([record()]);
+    expect(readBankPaymentOfferStaggerRecords(ownerB)).toEqual([]);
   });
 
   it("deletes an expired queue on read", () => {
     rememberBankPaymentOfferStaggerQueue(record());
     vi.setSystemTime((NOW + 300) * 1000);
-    expect(readBankPaymentOfferStaggerRecords("owner-a")).toEqual([]);
+    expect(readBankPaymentOfferStaggerRecords(ownerA)).toEqual([]);
     expect(
       localStorage.getItem("linky.bank_payment_offer_stagger.v1.offer-1"),
     ).toBeNull();
@@ -151,19 +158,23 @@ describe("bank payment offer stagger queue storage", () => {
 
   it("removes dequeued recipients and drops the emptied queue", () => {
     rememberBankPaymentOfferStaggerQueue(record());
-    removeBankPaymentOfferStaggerRecipients("offer-1", ["pub-b"]);
-    expect(readBankPaymentOfferStaggerRecords("owner-a")[0]?.pending).toEqual([
-      { dueAtSec: NOW + 20, peer: "pub-c" },
+    removeBankPaymentOfferStaggerRecipients(BankOfferId.make("offer-1"), [
+      pubB,
     ]);
-    removeBankPaymentOfferStaggerRecipients("offer-1", ["pub-c"]);
-    expect(readBankPaymentOfferStaggerRecords("owner-a")).toEqual([]);
+    expect(readBankPaymentOfferStaggerRecords(ownerA)[0]?.pending).toEqual([
+      { dueAtSec: NOW + 20, peer: pubC },
+    ]);
+    removeBankPaymentOfferStaggerRecipients(BankOfferId.make("offer-1"), [
+      pubC,
+    ]);
+    expect(readBankPaymentOfferStaggerRecords(ownerA)).toEqual([]);
   });
 
   it("forgets a queue, ignores empty ones and survives corrupted or outdated records", () => {
     rememberBankPaymentOfferStaggerQueue(record({ pending: [] }));
-    expect(readBankPaymentOfferStaggerRecords("owner-a")).toEqual([]);
+    expect(readBankPaymentOfferStaggerRecords(ownerA)).toEqual([]);
     rememberBankPaymentOfferStaggerQueue(record());
-    forgetBankPaymentOfferStaggerQueue("offer-1");
+    forgetBankPaymentOfferStaggerQueue(BankOfferId.make("offer-1"));
     localStorage.setItem(
       "linky.bank_payment_offer_stagger.v1.offer-2",
       "{not json",
@@ -171,11 +182,11 @@ describe("bank payment offer stagger queue storage", () => {
     localStorage.setItem(
       "linky.bank_payment_offer_stagger.v1.offer-3",
       JSON.stringify({
-        ...record({ offerId: "offer-3" }),
+        ...record({ offerId: BankOfferId.make("offer-3") }),
         pending: [{ contactId: "c", contactPubHex: "p", dueAtSec: NOW + 1 }],
       }),
     );
-    expect(readBankPaymentOfferStaggerRecords("owner-a")).toEqual([]);
+    expect(readBankPaymentOfferStaggerRecords(ownerA)).toEqual([]);
     expect(
       localStorage.getItem("linky.bank_payment_offer_stagger.v1.offer-3"),
     ).toBeNull();

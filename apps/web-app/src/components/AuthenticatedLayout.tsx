@@ -15,6 +15,7 @@ import { NfcWriteModal } from "./NfcWriteModal";
 import { PaidOverlay } from "./PaidOverlay";
 import { PaymentMintMeltConfirmModal } from "./PaymentMintMeltConfirmModal";
 import { ProfileShareOverlay } from "./ProfileShareOverlay";
+import { RecurringPaymentDueModal } from "./RecurringPaymentDueModal";
 import { SaveContactPromptModal } from "./SaveContactPromptModal";
 import { ScanModal } from "./ScanModal";
 import { ShareOptionsModal } from "./ShareOptionsModal";
@@ -128,7 +129,11 @@ export function AuthenticatedLayout({
       ) : null}
 
       {state.paidOverlayIsOpen ? (
-        <PaidOverlay paidOverlayTitle={state.paidOverlayTitle} t={state.t} />
+        <PaidOverlay
+          details={state.paidOverlayDetails}
+          paidOverlayTitle={state.paidOverlayTitle}
+          t={state.t}
+        />
       ) : null}
 
       {state.nfcWritePromptKind && shouldRenderNativeNfcWritePrompt() ? (
@@ -160,6 +165,8 @@ export function AuthenticatedLayout({
           t={state.t}
         />
       ) : null}
+
+      {!state.paidOverlayIsOpen ? <RecurringPaymentDueModal /> : null}
     </>
   );
 }

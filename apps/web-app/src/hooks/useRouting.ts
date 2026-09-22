@@ -118,6 +118,12 @@ type NavigationAction =
   | { route: "settingsMasterKeys" }
   | { route: "settingsUnits" }
   | { route: "transactions" }
+  | {
+      route: "recurringPaymentNew";
+      prefill?: { amountSat?: number; contactId?: string };
+    }
+  | { route: "recurringPayment"; id: string }
+  | { route: "recurringPaymentEdit"; id: string }
   | { route: "topup" }
   | { route: "topupNoAmount" }
   | { route: "topupInvoice" }
@@ -183,6 +189,27 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "transactions":
       window.location.assign("#wallet/transactions");
+      break;
+    case "recurringPaymentNew": {
+      const query = new URLSearchParams();
+      if (action.prefill?.contactId)
+        query.set("contact", action.prefill.contactId);
+      if (action.prefill?.amountSat) {
+        query.set("amount", String(action.prefill.amountSat));
+      }
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      window.location.assign(`#wallet/recurring/new${suffix}`);
+      break;
+    }
+    case "recurringPayment":
+      window.location.assign(
+        `#wallet/recurring/${encodeURIComponent(action.id)}`,
+      );
+      break;
+    case "recurringPaymentEdit":
+      window.location.assign(
+        `#wallet/recurring/${encodeURIComponent(action.id)}/edit`,
+      );
       break;
     case "topup":
       window.location.assign("#wallet/topup");

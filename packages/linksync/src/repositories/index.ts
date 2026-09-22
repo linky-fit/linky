@@ -6,6 +6,14 @@ export { makeIdentityRepository } from "./identity";
 export type { IdentityRepository } from "./identity";
 export { makeSettingsRepository } from "./settings";
 export type { SettingsRepository } from "./settings";
+export {
+  makeRecurringPaymentsRepository,
+  normalizeRecurringPayment,
+} from "./recurringPayments";
+export type {
+  RecurringPaymentRecord,
+  RecurringPaymentsRepository,
+} from "./recurringPayments";
 export { tableRepository } from "./tableRepository";
 export type { TableOf, TableRepository } from "./tableRepository";
 export {

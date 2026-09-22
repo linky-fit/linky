@@ -1,4 +1,8 @@
-import type { BankOfferInboxEvent, BankOfferReceipt } from "@linky/linkstr";
+import type {
+  BankOfferInboxEvent,
+  BankOfferReceipt,
+  Pubkey,
+} from "@linky/linkstr";
 import {
   bankOfferContentFromSnapshot,
   decodeBankPaymentOffer,
@@ -42,7 +46,7 @@ const MAX_PENDING_SNAPSHOTS = 256;
 
 export const bankPaymentOfferSnapshotPeer = (
   event: BankOfferInboxEvent,
-): string =>
+): Pubkey =>
   event._tag === "BankOfferSnapshotReceived" ? event.from : event.to;
 
 const upsertOffer = (
@@ -105,7 +109,7 @@ const isStaleFor = (
 export const applyBankPaymentOfferSnapshot = (
   state: BankPaymentOfferState,
   event: BankOfferInboxEvent,
-  me: string,
+  me: Pubkey,
   nowSec: number,
 ): BankPaymentOfferSnapshotResult => {
   const unchanged = { accepted: [], state };
@@ -209,7 +213,7 @@ export const applyBankPaymentOfferSnapshot = (
 /** Records a snapshot this device just published; the wire content is trusted as sent. */
 export const applyBankPaymentOfferReceipt = (
   state: BankPaymentOfferState,
-  peer: string,
+  peer: Pubkey,
   receipt: BankOfferReceipt,
 ): { offer: BankPaymentOffer | null; state: BankPaymentOfferState } => {
   const info = decodeBankPaymentOffer(receipt.content);

@@ -2,6 +2,7 @@ import {
   identityFromNsec,
   parsePubkey,
   type NostrSecretKey,
+  type Pubkey,
 } from "@linky/linkstr";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../../../utils/constants";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
@@ -9,7 +10,7 @@ import type { ContactIdentityRowLike } from "../../types/appTypes";
 
 export const normalizePubkeyHex = (
   value: string | null | undefined,
-): string | null => {
+): Pubkey | null => {
   const normalized = (value ?? "").trim().toLowerCase();
   return parsePubkey(normalized);
 };
@@ -24,7 +25,7 @@ export const buildUnknownContactId = (
 
 const readUnknownPubkeyHex = (
   contact: ContactIdentityRowLike | null,
-): string | null => {
+): Pubkey | null => {
   return normalizePubkeyHex(contact?.unknownPubkeyHex);
 };
 
@@ -36,7 +37,7 @@ export const isUnknownContactId = (id: string | null | undefined): boolean => {
 
 export const readUnknownContactIdPubkey = (
   id: string | null | undefined,
-): string | null => {
+): Pubkey | null => {
   const normalizedId = (id ?? "").trim().toLowerCase();
   if (!normalizedId.startsWith(UNKNOWN_CONTACT_ID_PREFIX)) return null;
   return normalizePubkeyHex(

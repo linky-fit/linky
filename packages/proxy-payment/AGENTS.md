@@ -10,4 +10,5 @@ Changing the public surface — anything exported from `src/index.ts` (the offer
 
 - No React, no Evolu, no `window`/`localStorage`, no i18n. Device state (lease locks, stored bank QR payloads, stagger queues) and user-facing labels stay in the app; the package receives `nowSec` as an argument and never reads a clock.
 - Offers are keyed by peer pubkey and offer id, never by contact id or chat row. The app maps pubkeys to contacts at its edge.
+- Ids keep linkstr's brands through every public type: `Pubkey` for peers and offerers, `BankOfferId`, `RumorId` for snapshots, `ClientId`. Never widen one to `string`; a caller that has a string validates it into the brand first.
 - `@linky/linkstr` is a dependency for the snapshot facts, drafts and receipts only; the package never touches relays. The wire text templates live here because every outgoing draft needs them.

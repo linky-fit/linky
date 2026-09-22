@@ -1,7 +1,7 @@
 import { NewOperation, NewProof, OperationId, ProofId } from "@linky/linkshu";
 import { Effect, Schema } from "effect";
 import { makeInMemoryShardDb, type ShardDb } from "../core";
-import { cashuProofIdFor } from "../model/ids";
+import { cashuProofIdFor } from "@linky/domain";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
 import { linkyStore, runNow } from "../testing/linky";

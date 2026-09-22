@@ -243,6 +243,17 @@ const REQUIRED_COLUMNS: {
   cashuProof: ["mint", "unit", "keysetId", "amount", "secret", "c", "state"],
   cashuOperation: ["kind", "status", "mint", "unit", "amount", "createdAtSec"],
   transaction: ["createdAtSec", "direction", "status"],
+  // Never ingested from a lane: no legacy version wrote recurring payments.
+  recurringPayment: [
+    "createdAtSec",
+    "contactId",
+    "amount",
+    "unit",
+    "intervalUnit",
+    "intervalCount",
+    "anchorAtSec",
+    "nextDueAtSec",
+  ],
 };
 
 // The overload types the picked row against the package schema; the

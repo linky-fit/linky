@@ -37,19 +37,13 @@ export const bankPaymentOfferedDraft = (args: {
   amountSat: number | null;
   amountText: string;
   expiresAtSec?: number | null;
-  offerId: string;
-  offerer: string;
-  to: string;
+  offerId: BankOfferId;
+  offerer: Pubkey;
+  to: Pubkey;
 }): BankOfferDraft | null => {
   const amountText = args.amountText.trim();
   const text = bankPaymentOfferMessageText(amountText, "offered");
-  if (
-    !isPubkey(args.to) ||
-    !isPubkey(args.offerer) ||
-    !isBankOfferId(args.offerId) ||
-    !isNonEmptyTrimmedString(amountText) ||
-    !isNonEmptyTrimmedString(text)
-  ) {
+  if (!isNonEmptyTrimmedString(amountText) || !isNonEmptyTrimmedString(text)) {
     return null;
   }
   const amountSat = positiveInt(args.amountSat);
@@ -78,7 +72,7 @@ export interface BankPaymentOfferResponseOptions {
 export const bankPaymentOfferResponseDraft = (
   offer: BankPaymentOffer,
   nextStatus: BankOfferStatus,
-  me: string,
+  me: Pubkey,
   options: BankPaymentOfferResponseOptions = {},
 ): BankOfferDraft | null => {
   const offerer = offer.offererPublicKey;

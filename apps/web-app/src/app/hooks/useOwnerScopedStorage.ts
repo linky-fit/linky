@@ -102,6 +102,16 @@ const readDetailString = (
   return trimmed || null;
 };
 
+const readDetailPositiveInt = (
+  value: Record<string, unknown>,
+  key: string,
+): number | null => {
+  const candidate = value[key];
+  if (typeof candidate !== "number" || !Number.isInteger(candidate))
+    return null;
+  return candidate > 0 ? candidate : null;
+};
+
 const readDetailStrings = (
   value: Record<string, unknown>,
   key: string,
@@ -133,6 +143,9 @@ const compactTransactionDetails = (
   copyString("lnurlSuccessMessage");
   copyString("lnurlSuccessUrl");
   copyString("lnurlSuccessUrlDescription");
+  copyString("recurringPaymentId");
+  const recurringDueAtSec = readDetailPositiveInt(value, "recurringDueAtSec");
+  if (recurringDueAtSec !== null) compact.recurringDueAtSec = recurringDueAtSec;
 
   const usedTokenIds = readDetailStrings(value, "usedInputTokens").map(
     (token) => createCashuTokenId(token),

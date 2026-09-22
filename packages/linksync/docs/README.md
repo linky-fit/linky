@@ -14,6 +14,7 @@ How to use Linky's synced storage library. These are guides, not an API referenc
 - [Conversations](./conversations.md) — chats, read cursors, archive state, messages, reactions
 - [Wallet](./wallet.md) — linkshu's `ProofStore` and `OperationStore` over the cashu scope
 - [Transactions](./transactions.md) — the payment history, normalized
+- [Recurring payments](./recurring-payments.md) — standing instructions to pay a contact on a schedule
 - [Identity](./identity.md) — the mirrored active Nostr key
 - [Settings](./settings.md) — small synced key/value state
 

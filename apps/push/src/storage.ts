@@ -10,6 +10,7 @@ import type {
   StoredNativeSubscription,
   StoredSubscription,
   WebPushSubscriptionData,
+  StoredReminder,
 } from "./types";
 
 interface SubscriptionAssociationParams {
@@ -93,6 +94,14 @@ const NATIVE_TABLES: SubscriptionTables = {
   key: "token",
   columns: ["token", "platform"],
 };
+
+interface ReplaceRemindersParams {
+  pubkey: string;
+  notifyAtSecs: number[];
+  consumedChallengeNonces: string[];
+  maxRemindersPerPubkey: number;
+  nowMs: number;
+}
 
 export class StorageLimitError extends Error {
   readonly status = 409;
@@ -207,6 +216,16 @@ export class PushStorage {
 
       CREATE INDEX IF NOT EXISTS idx_seen_events_first_seen_at
       ON seen_events (first_seen_at);
+
+      CREATE TABLE IF NOT EXISTS recurring_reminders (
+        pubkey TEXT NOT NULL,
+        notify_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (pubkey, notify_at)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_recurring_reminders_notify_at
+      ON recurring_reminders (notify_at);
     `);
     this.ensureSubscriptionsInstallationIdColumn();
     this.db.exec(`
@@ -373,6 +392,78 @@ export class PushStorage {
       ),
       (row) => ({ id: row.id, platform: row.platform, token: row.token }),
     );
+  }
+
+  /**
+   * Replaces the pubkey's whole reminder set: the client sends every upcoming
+   * due time it knows, so a paid, paused, edited or deleted payment simply
+   * disappears from the next set. Times already in the past are not stored.
+   */
+  replaceReminders(params: ReplaceRemindersParams): void {
+    if (params.notifyAtSecs.length > params.maxRemindersPerPubkey) {
+      throw new StorageLimitError(
+        `A pubkey may register at most ${params.maxRemindersPerPubkey} reminders`,
+      );
+    }
+    const nowSec = Math.floor(params.nowMs / 1000);
+    this.transaction(() => {
+      this.consumeChallenges(params.consumedChallengeNonces, params.nowMs);
+      this.db
+        .query("DELETE FROM recurring_reminders WHERE pubkey = ?")
+        .run(params.pubkey);
+      for (const notifyAtSec of params.notifyAtSecs) {
+        if (notifyAtSec < nowSec) continue;
+        this.db
+          .query(
+            `
+              INSERT OR IGNORE INTO recurring_reminders (pubkey, notify_at, created_at)
+              VALUES (?, ?, ?)
+            `,
+          )
+          .run(params.pubkey, notifyAtSec, params.nowMs);
+      }
+    });
+  }
+
+  getReminders(pubkey: string): number[] {
+    return this.db
+      .query<{ notifyAtSec: number }, [string]>(
+        `
+          SELECT notify_at AS notifyAtSec
+          FROM recurring_reminders
+          WHERE pubkey = ?
+          ORDER BY notify_at ASC
+        `,
+      )
+      .all(pubkey)
+      .map((row) => row.notifyAtSec);
+  }
+
+  /**
+   * Removes and returns the reminders due by `nowSec`. Ones older than
+   * `staleBeforeSec` are dropped unsent: a reminder the service could not
+   * deliver for that long is about a payment the user already dealt with.
+   */
+  takeDueReminders(nowSec: number, staleBeforeSec: number): StoredReminder[] {
+    return this.transaction(() => {
+      this.db
+        .query("DELETE FROM recurring_reminders WHERE notify_at < ?")
+        .run(staleBeforeSec);
+      const due = this.db
+        .query<StoredReminder, [number]>(
+          `
+            SELECT pubkey, notify_at AS notifyAtSec
+            FROM recurring_reminders
+            WHERE notify_at <= ?
+            ORDER BY notify_at ASC
+          `,
+        )
+        .all(nowSec);
+      this.db
+        .query("DELETE FROM recurring_reminders WHERE notify_at <= ?")
+        .run(nowSec);
+      return due;
+    });
   }
 
   recordSeenEvent(eventId: string, firstSeenAt: number): boolean {

@@ -1,9 +1,9 @@
 import {
+  BankOfferId,
   BankOfferStatus,
   encodeBankOfferContent,
   isUnixSeconds,
-  type BankOfferId,
-  type Pubkey,
+  Pubkey,
 } from "@linky/linkstr";
 import { Option, Schema } from "effect";
 import {
@@ -20,8 +20,8 @@ export interface BankPaymentOfferInfo {
   expiresAtSec: number | null;
   extensionSec: number | null;
   initiatedAtSec: number | null;
-  offerId: string;
-  offererPublicKey: string | null;
+  offerId: BankOfferId;
+  offererPublicKey: Pubkey | null;
   spdPayload: string | null;
   status: BankOfferStatus;
   statusUpdatedAtSec: number | null;
@@ -71,7 +71,7 @@ const OfferContent = Schema.Struct({
   expiresAtSec: Schema.optional(Schema.Unknown),
   extensionSec: Schema.optional(Schema.Unknown),
   initiatedAtSec: Schema.optional(Schema.Unknown),
-  offerId: NonBlankString,
+  offerId: BankOfferId,
   offererPublicKey: Schema.optional(Schema.Unknown),
   spdPayload: Schema.optional(Schema.Unknown),
   status: BankOfferStatus,
@@ -85,6 +85,9 @@ const decodeOfferContent = Schema.decodeUnknownOption(
 
 const readPositiveSeconds = (value: unknown): number | null =>
   isPositiveFiniteNumber(value) ? Math.trunc(value) : null;
+
+const readPubkey = (value: unknown): Pubkey | null =>
+  Option.getOrNull(Schema.decodeUnknownOption(Pubkey)(value));
 
 export const decodeBankPaymentOffer = (
   content: string,
@@ -102,8 +105,8 @@ export const decodeBankPaymentOffer = (
     expiresAtSec: readPositiveSeconds(message.expiresAtSec),
     extensionSec: readPositiveSeconds(message.extensionSec),
     initiatedAtSec: readPositiveSeconds(message.initiatedAtSec),
-    offerId: message.offerId.trim(),
-    offererPublicKey: asNonEmptyString(message.offererPublicKey),
+    offerId: message.offerId,
+    offererPublicKey: readPubkey(message.offererPublicKey),
     spdPayload: asNonEmptyString(message.spdPayload),
     status: message.status,
     statusUpdatedAtSec: readPositiveSeconds(message.statusUpdatedAtSec),

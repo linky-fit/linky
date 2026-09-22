@@ -1,7 +1,12 @@
 import { createContactNameFormatter } from "../../../utils/contactName";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { Schema } from "effect";
-import { decodeNpub, identityFromNsec, UnixSeconds } from "@linky/linkstr";
+import {
+  decodeNpub,
+  identityFromNsec,
+  UnixSeconds,
+  type Pubkey,
+} from "@linky/linkstr";
 import type {
   BankOfferInboxEvent,
   InboxDelivery,
@@ -75,7 +80,7 @@ const isBlockedPubkey = (pubkey: string): boolean => {
     [],
   )
     .map(normalizePubkeyHex)
-    .filter((entry): entry is string => Boolean(entry))
+    .filter((entry): entry is Pubkey => entry !== null)
     .includes(normalizedPubkey);
 };
 

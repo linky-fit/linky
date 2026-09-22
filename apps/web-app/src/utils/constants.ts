@@ -17,6 +17,8 @@ export const NOSTR_IDENTITY_SOURCE_STORAGE_KEY =
   "linky.nostr_identity_source.v1";
 export const NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY =
   "linky.nostr_identity_switched_at_sec.v1";
+// Random per-install id; names the device that claims a recurring payment.
+export const DEVICE_ID_STORAGE_KEY = "linky.device_id.v1";
 export const INSTALL_PWA_DISMISSED_AT_MS_STORAGE_KEY =
   "linky.install_pwa_dismissed_at_ms.v1";
 export const INSTALL_PWA_DISMISS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -28,6 +30,9 @@ export const CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY =
   "linky.contacts_onboarding_has_paid";
 export const CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY =
   "linky.contacts_onboarding_has_backuped_keys";
+// Per pubkey: the reminder set last accepted by the push service, to skip no-op syncs.
+export const RECURRING_REMINDERS_SYNCED_STORAGE_KEY_PREFIX =
+  "linky.recurring_reminders_synced.v1.";
 export const CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY =
   "linky.cashu_onboarding_set_main_mint.v1";
 export const PAY_WITH_CASHU_STORAGE_KEY = "linky.pay_with_cashu";

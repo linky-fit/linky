@@ -1,9 +1,9 @@
 import {
   ArchiveRestore,
+  HandCoins as PayIcon,
   HeartHandshake as DonateIcon,
   MessageCircle as FeedbackIcon,
   MessageCircleMore as MessagesIcon,
-  HandCoins as PayIcon,
 } from "lucide-react";
 import { useEffect, useState, type FC } from "react";
 import { Avatar } from "../components/Avatar";

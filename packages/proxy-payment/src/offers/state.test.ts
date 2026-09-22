@@ -1,4 +1,4 @@
-import { UnixSeconds } from "@linky/linkstr";
+import { BankOfferId, UnixSeconds } from "@linky/linkstr";
 import { describe, expect, it } from "vitest";
 import {
   me,
@@ -196,7 +196,7 @@ describe("applyBankPaymentOfferSnapshot", () => {
     const draft = bankPaymentOfferedDraft({
       amountSat: 1000,
       amountText: "500 CZK",
-      offerId: "offer-1",
+      offerId: BankOfferId.make("offer-1"),
       offerer: me,
       to: payer,
     });
@@ -404,7 +404,7 @@ describe("applyBankPaymentOfferReceipt", () => {
     const draft = bankPaymentOfferedDraft({
       amountSat: 1000,
       amountText: "500 CZK",
-      offerId: "offer-1",
+      offerId: BankOfferId.make("offer-1"),
       offerer: me,
       to: payer,
     });

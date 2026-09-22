@@ -1,7 +1,7 @@
 import { NonEmptyString100, NonEmptyString1000 } from "@evolu/common";
 import { Effect } from "effect";
 import type { ShardDbError } from "../core";
-import { settingIdFor } from "../model/ids";
+import { settingIdFor } from "@linky/domain";
 import type { LinkyStore } from "../model/store";
 import { tableRepository } from "./tableRepository";
 

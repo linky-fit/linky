@@ -196,7 +196,10 @@ describe("useTopupFlow", () => {
         status: "ok",
       }),
     );
-    expect(harness.showPaidOverlay).toHaveBeenCalledWith("topupOverlay");
+    expect(harness.showPaidOverlay).toHaveBeenCalledWith(
+      "topupOverlay",
+      expect.objectContaining({ direction: "in" }),
+    );
     expect(harness.flow().topupInvoice).toBeNull();
     expect(harness.flow().topupAmount).toBe("");
     // The finalized quote never restarts even though the route is unchanged.
@@ -261,7 +264,10 @@ describe("useTopupFlow", () => {
 
     await deferred.settle(Either.right(topupReceipt(quote)));
 
-    expect(harness.showPaidOverlay).toHaveBeenCalledWith("topupOverlay");
+    expect(harness.showPaidOverlay).toHaveBeenCalledWith(
+      "topupOverlay",
+      expect.objectContaining({ direction: "in" }),
+    );
     expect(harness.logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 21, direction: "in", status: "ok" }),
     );

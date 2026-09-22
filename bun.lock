@@ -109,6 +109,7 @@
         "@linky/linkstr-react": "workspace:*",
         "@linky/linksync": "workspace:*",
         "@linky/proxy-payment": "workspace:*",
+        "@linky/recurring-payment": "workspace:*",
         "@noble/hashes": "^1.5.0",
         "@scure/base": "^2.0.0",
         "@scure/bip32": "^2.0.1",
@@ -161,6 +162,21 @@
         "prettier": "^3.4.2",
         "typescript": "~5.9.3",
         "typescript-eslint": "^8.46.4",
+      },
+    },
+    "packages/domain": {
+      "name": "@linky/domain",
+      "version": "0.1.0",
+      "dependencies": {
+        "@evolu/common": "^7.4.1",
+      },
+      "devDependencies": {
+        "@linky/config": "workspace:*",
+        "@types/node": "^24.10.1",
+        "eslint": "^9.39.1",
+        "prettier": "^3.4.2",
+        "typescript": "~5.9.3",
+        "vitest": "^4.0.18",
       },
     },
     "packages/identity": {
@@ -252,6 +268,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@evolu/common": "^7.4.1",
+        "@linky/domain": "workspace:*",
         "@linky/linkshu": "workspace:*",
         "effect": "^3.19.19",
       },
@@ -283,6 +300,22 @@
       "devDependencies": {
         "@linky/config": "workspace:*",
         "@scure/base": "^2.0.0",
+        "@types/node": "^24.10.1",
+        "eslint": "^9.39.1",
+        "prettier": "^3.4.2",
+        "typescript": "~5.9.3",
+        "vitest": "^4.0.18",
+      },
+    },
+    "packages/recurring-payment": {
+      "name": "@linky/recurring-payment",
+      "version": "0.1.0",
+      "dependencies": {
+        "@linky/domain": "workspace:*",
+        "effect": "^3.19.19",
+      },
+      "devDependencies": {
+        "@linky/config": "workspace:*",
         "@types/node": "^24.10.1",
         "eslint": "^9.39.1",
         "prettier": "^3.4.2",
@@ -732,6 +765,8 @@
 
     "@linky/config": ["@linky/config@workspace:packages/config"],
 
+    "@linky/domain": ["@linky/domain@workspace:packages/domain"],
+
     "@linky/identity": ["@linky/identity@workspace:packages/identity"],
 
     "@linky/linkshu": ["@linky/linkshu@workspace:packages/linkshu"],
@@ -751,6 +786,8 @@
     "@linky/proxy-payment": ["@linky/proxy-payment@workspace:packages/proxy-payment"],
 
     "@linky/push": ["@linky/push@workspace:apps/push"],
+
+    "@linky/recurring-payment": ["@linky/recurring-payment@workspace:packages/recurring-payment"],
 
     "@linky/site": ["@linky/site@workspace:apps/site"],
 
