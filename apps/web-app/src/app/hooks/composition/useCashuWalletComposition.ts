@@ -33,6 +33,8 @@ import { Cause, Either, Exit, Option, Schema } from "effect";
 import React, { type ComponentRef, useMemo, useState } from "react";
 import type { CashuOperationId, ContactId } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
+import { useRecurringPaymentOrders } from "../payments/useRecurringPaymentOrders";
+import { useRecurringReminderSync } from "../payments/useRecurringReminderSync";
 import {
   redeemLnurlWithdraw,
   type LnurlWithdrawPreview,
@@ -2629,6 +2631,13 @@ export const useCashuWalletComposition = ({
       getCashuTokenMessageInfoBase(text, knownTransferTexts, allowTestMints),
     [allowTestMints, knownTransferTexts],
   );
+
+  const recurringOrders = useRecurringPaymentOrders();
+  useRecurringReminderSync({
+    currentNsec,
+    enabled: sendCashuToken !== null && meltCashuInvoice !== null,
+    orders: recurringOrders,
+  });
 
   const knownLnAddressPayContactPictureUrl = React.useMemo(() => {
     const npub = normalizeNpubIdentifier(knownLnAddressPayContact?.npub ?? "");

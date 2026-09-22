@@ -129,6 +129,68 @@ export function setPushNotificationsDisabledByUser(disabled: boolean): void {
   safeLocalStorageRemove(PUSH_NOTIFICATIONS_DISABLED_STORAGE_KEY);
 }
 
+/** Whether this install registered push for the identity, on the web or natively. */
+export function isPushRegisteredForIdentity(currentNsec: string): boolean {
+  let pubkey: string;
+  try {
+    pubkey = derivePushIdentity(currentNsec).pubkey;
+  } catch {
+    return false;
+  }
+  const store = isNativePlatform()
+    ? nativeRegistrationStore
+    : pwaRegistrationStore;
+  const registration = store.read();
+  return registration.id !== null && registration.pubkey === pubkey;
+}
+
+/**
+ * Tells the push service when to remind this identity of upcoming recurring
+ * payments. The whole set is replaced on every call; the server learns only
+ * that this pubkey wants a nudge at those moments.
+ */
+export async function syncRecurringReminders(
+  currentNsec: string,
+  notifyAtSecs: readonly number[],
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { pubkey } = derivePushIdentity(currentNsec);
+    const challenge = await requestChallenge(pubkey, "subscribe");
+    const proof = await createOwnershipProof({
+      action: "subscribe",
+      challenge: challenge.challenge,
+      currentNsec,
+    });
+    const response = await fetch(`${PUSH_SERVER_URL}/reminders`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pubkey,
+        notifyAtSecs: [...notifyAtSecs],
+        proofs: [proof],
+      }),
+    });
+    if (!response.ok) {
+      const errorMessage = await readErrorMessage(response);
+      appendPushDebugLog("client", "recurring reminders sync server error", {
+        count: notifyAtSecs.length,
+        errorMessage,
+        status: response.status,
+      });
+      return { success: false, error: errorMessage };
+    }
+    appendPushDebugLog("client", "recurring reminders synced", {
+      count: notifyAtSecs.length,
+    });
+    return { success: true };
+  } catch (error) {
+    appendPushDebugLog("client", "recurring reminders sync exception", {
+      error,
+    });
+    return { success: false, error: String(error ?? "") };
+  }
+}
+
 export async function hasNativePushRegistrationForIdentity(
   currentNsec: string,
 ): Promise<boolean> {
