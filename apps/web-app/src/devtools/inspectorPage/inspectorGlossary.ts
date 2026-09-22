@@ -231,11 +231,17 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "recurring.run":
     "A recurring payment was executed on this device: paid or failed, with the amount, the due time it settles, and how many due times were skipped because Linky was closed. The recurringPayment and contact links join it to the chat payment steps.",
   "recurring.skipped":
-    "A due recurring payment was skipped without paying — funds stayed insufficient or attempts kept failing until the grace window closed, or the contact can no longer be paid. The schedule moved on to the next due time.",
+    "A due recurring payment was skipped without paying — the user cancelled it from the in-app countdown, funds stayed insufficient or attempts kept failing until the grace window closed, or the contact can no longer be paid. The payload's reason says which; the schedule moved on to the next due time.",
+  "recurring.confirmationShown":
+    "A due recurring payment was about to go out while Linky was visible, so the app showed the countdown with pay-now and cancel instead of paying silently. sendAtSec is when it pays on its own.",
+  "recurring.waitingForRates":
+    "A recurring payment fixed in a fiat currency is due but no exchange rate is available to turn it into sats; the scheduler retries on the next pass. Reported once per due time.",
+  "recurring.updated":
+    "The user edited a recurring payment: amount, interval, recipient, or next payment date. The payload carries the new values and the previous ones; any claim for the old due time was dropped.",
   "recurring.waitingForFunds":
     "A recurring payment is due but the spendable balance is below its amount; the scheduler keeps retrying until the grace window closes. Reported once per due time.",
   "recurring.interrupted":
-    "A recurring payment was found marked running for longer than a run can take, so an earlier launch died mid-run. The mark was cleared; check the transaction history for whether the payment went out.",
+    "A recurring payment was found marked running for longer than a run can take, so an earlier launch died mid-run. recorded says whether the transaction history holds a payment for that due time: true marks the run paid, false restores the due time so the payment goes out on a later pass instead of being lost.",
   "send.rowForgotten":
     "The app dropped a pending send row because its token verifiably reached the recipient (chat message published, or payment request POSTed). Follow the row link back to the send.send operation that produced it.",
 };

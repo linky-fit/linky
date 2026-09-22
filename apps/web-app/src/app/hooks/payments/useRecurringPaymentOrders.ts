@@ -1,36 +1,24 @@
-import * as Evolu from "@evolu/common";
-import { useQuery } from "@evolu/react";
 import React from "react";
-import { evolu } from "../../../evolu";
 import { formatShortNpub } from "../../../utils/formatting";
 import { asNonEmptyString } from "../../../utils/validation";
 import {
   readRecurringPaymentOrder,
   type RecurringPaymentOrder,
 } from "../../lib/recurringPaymentOrder";
+import { useContactRows, useRecurringPaymentRecords } from "../useLinksync";
 
 /** Live recurring payments, soonest due first. */
 export const useRecurringPaymentOrders = (): RecurringPaymentOrder[] => {
-  const query = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("recurringPayment")
-          .selectAll()
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-  const rows = useQuery(query);
+  const records = useRecurringPaymentRecords();
   return React.useMemo(
     () =>
-      rows
-        .flatMap((row) => {
-          const order = readRecurringPaymentOrder(row);
+      records
+        .flatMap((record) => {
+          const order = readRecurringPaymentOrder(record);
           return order === null ? [] : [order];
         })
         .sort((a, b) => a.schedule.nextDueAtSec - b.schedule.nextDueAtSec),
-    [rows],
+    [records],
   );
 };
 
@@ -46,17 +34,7 @@ export const useRecurringContactSummaries = (): Map<
   string,
   RecurringContactSummary
 > => {
-  const query = React.useMemo(
-    () =>
-      evolu.createQuery((db) =>
-        db
-          .selectFrom("contact")
-          .select(["id", "lnAddress", "name", "npub"])
-          .where("isDeleted", "is not", Evolu.sqliteTrue),
-      ),
-    [],
-  );
-  const rows = useQuery(query);
+  const rows = useContactRows();
   return React.useMemo(() => {
     const byId = new Map<string, RecurringContactSummary>();
     for (const row of rows) {

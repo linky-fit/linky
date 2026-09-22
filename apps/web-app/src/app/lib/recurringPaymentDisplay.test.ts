@@ -44,12 +44,3 @@ describe("recurringPaymentDisplay", () => {
     expect(readRecurringPaymentIdFromDetails(null)).toBeNull();
   });
 });
-
-describe("formatCountdown", () => {
-  it("shows minutes and zero-padded seconds, never negative", async () => {
-    const { formatCountdown } = await import("./recurringCountdown");
-    expect(formatCountdown(1_000 + 299, 1_000)).toBe("4:59");
-    expect(formatCountdown(1_000 + 5, 1_000)).toBe("0:05");
-    expect(formatCountdown(1_000, 1_000 + 30)).toBe("0:00");
-  });
-});

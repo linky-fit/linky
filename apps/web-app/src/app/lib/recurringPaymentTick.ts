@@ -8,23 +8,29 @@ import {
 } from "./recurringSchedule";
 
 /**
- * Lead time between claiming a due payment and sending it. Kept short and no
- * longer shown as a countdown: its only job now is to let claims written by
- * devices that raced each other converge through sync, so a single device pays.
- * The user is told once at claim time (a notification) rather than watching a
- * timer run down.
+ * Lead time between claiming a due payment and sending it. The user is
+ * notified at claim time; the window also lets claims written by devices that
+ * raced each other converge through sync, so a single device pays.
  */
 export const RECURRING_NOTICE_SEC = 60;
+/**
+ * Countdown shown in the app before a due payment goes out, with pay-now and
+ * cancel. Only when Linky is visible; in the background the payment is sent
+ * at its send time without it.
+ */
+export const RECURRING_CONFIRM_SEC = 10;
 /** A claim this far past its send time belongs to a device that went away. */
 export const RECURRING_CLAIM_TAKEOVER_SEC = 10 * 60;
-/** How long a due run waits for funds or retries failures before it is skipped. */
-export const RECURRING_RUN_GRACE_SEC = 24 * 60 * 60;
 /** Pause between attempts of a run whose last attempt failed. */
 export const RECURRING_RUN_RETRY_DELAY_SEC = 10 * 60;
 /** A `running` mark older than this belongs to a launch that died mid-run. */
 export const RECURRING_RUN_STALE_SEC = 15 * 60;
 
-export type RecurringSkipReason = "insufficientFunds" | "failed";
+export type RecurringSkipReason =
+  | "insufficientFunds"
+  | "failed"
+  | "cancelled"
+  | "invalidRecipient";
 
 export type RecurringTickAction =
   | {
@@ -36,6 +42,7 @@ export type RecurringTickAction =
   | {
       kind: "run";
       order: RecurringPaymentOrder;
+      amountSat: number;
       dueAtSec: number;
       missedCount: number;
       advance: RecurringScheduleAdvance;
@@ -44,10 +51,11 @@ export type RecurringTickAction =
       kind: "skip";
       order: RecurringPaymentOrder;
       dueAtSec: number;
-      reason: RecurringSkipReason;
+      reason: Extract<RecurringSkipReason, "insufficientFunds" | "failed">;
       advance: RecurringScheduleAdvance;
     }
   | { kind: "waitFunds"; order: RecurringPaymentOrder; dueAtSec: number }
+  | { kind: "waitRates"; order: RecurringPaymentOrder; dueAtSec: number }
   | { kind: "markInterrupted"; order: RecurringPaymentOrder };
 
 export interface RecurringTickInput {
@@ -55,6 +63,8 @@ export interface RecurringTickInput {
   nowSec: number;
   deviceId: string;
   cashuBalance: number;
+  /** Sats the payment sends now; null while a fiat amount has no exchange rate. */
+  amountSatOf: (order: RecurringPaymentOrder) => number | null;
   /** Per order id: no new attempt before this time (set after a failure). */
   retryNotBeforeSec: ReadonlyMap<string, number>;
 }
@@ -92,20 +102,22 @@ export const recurringUpcoming = (
   };
 };
 
-/** End of the window in which a due run may still be attempted. */
+/**
+ * End of the window in which a due run may still be attempted: the next due
+ * time. A payment waits for funds or retries failures for its whole period,
+ * so a late or unfunded one still goes out once the wallet allows; only when
+ * the following period is already due does the missed one fold into it.
+ */
 export const recurringSkipDeadlineSec = (
   order: RecurringPaymentOrder,
   dueAtSec: number,
 ): number =>
-  Math.min(
-    dueAtSec + RECURRING_RUN_GRACE_SEC,
-    nextRecurringOccurrenceAfter(
-      order.schedule.anchorAtSec,
-      order.schedule.interval,
-      dueAtSec,
-      resolveTimeZone(order.schedule.timeZone),
-    ).dueAtSec,
-  );
+  nextRecurringOccurrenceAfter(
+    order.schedule.anchorAtSec,
+    order.schedule.interval,
+    dueAtSec,
+    resolveTimeZone(order.schedule.timeZone),
+  ).dueAtSec;
 
 const planOrder = (
   order: RecurringPaymentOrder,
@@ -140,7 +152,9 @@ const planOrder = (
   if (attemptedThisPeriod && deadlinePassed) {
     return { kind: "skip", order, dueAtSec, reason: "failed", advance };
   }
-  if (input.cashuBalance < order.amountSat) {
+  const amountSat = input.amountSatOf(order);
+  if (amountSat === null) return { kind: "waitRates", order, dueAtSec };
+  if (input.cashuBalance < amountSat) {
     return deadlinePassed
       ? { kind: "skip", order, dueAtSec, reason: "insufficientFunds", advance }
       : { kind: "waitFunds", order, dueAtSec };
@@ -151,6 +165,7 @@ const planOrder = (
   return {
     kind: "run",
     order,
+    amountSat,
     dueAtSec,
     missedCount: decision.kind === "due" ? decision.missedCount : 0,
     advance,

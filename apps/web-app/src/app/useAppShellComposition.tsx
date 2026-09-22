@@ -785,9 +785,8 @@ export const useAppShellComposition = ({
     topupMintUrl,
     walletWarningApplies,
     walletWarningDismissed,
-    recurringPaymentsActions,
+    recurringPaymentsContext,
   } = useCashuWalletComposition({
-    insert,
     contactPayBackToChatRef,
     copyText,
     contactsMessaging: {
@@ -812,6 +811,7 @@ export const useAppShellComposition = ({
       setContactsOnboardingHasPaid,
       updateLocalNostrMessage,
     },
+    fiatRates,
     formatDisplayedAmountParts,
     formatDisplayedAmountText,
     identity: {
@@ -1658,6 +1658,7 @@ export const useAppShellComposition = ({
       effectiveProfileName,
       effectiveProfilePicture,
       evoluAppOwnerId: appOwnerId ? appOwnerId : null,
+      fiatRates,
       formatDisplayedAmountParts,
       formatDisplayedAmountText,
       isProfileEditing,
@@ -1731,6 +1732,7 @@ export const useAppShellComposition = ({
       effectiveMyLightningAddress,
       effectiveProfileName,
       effectiveProfilePicture,
+      fiatRates,
       formatDisplayedAmountParts,
       formatDisplayedAmountText,
       isProfileEditing,
@@ -1915,7 +1917,7 @@ export const useAppShellComposition = ({
     advancedSettingsContext,
     evoluSettingsContext,
     mintSettingsContext,
-    recurringPaymentsContext: recurringPaymentsActions,
+    recurringPaymentsContext,
     relaySettingsContext,
     t,
     toasts,

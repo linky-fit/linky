@@ -11,6 +11,7 @@ export type {
   MessageRow,
   NostrIdentityRow,
   ReactionRow,
+  RecurringPaymentRow,
   SettingRow,
   ShardPointerRow,
   TransactionRow,

@@ -97,6 +97,8 @@ export const resolveBackAction = (
     case "recurringPaymentNew":
     case "recurringPayment":
       return () => navigateTo({ route: "transactions" });
+    case "recurringPaymentEdit":
+      return () => navigateTo({ route: "recurringPayment", id: route.id });
 
     case "topupNoAmount":
     case "topupInvoice":
@@ -246,6 +248,7 @@ const SHOWS_MENU_BUTTON: Record<
   transactions: false,
   recurringPaymentNew: false,
   recurringPayment: false,
+  recurringPaymentEdit: false,
   wallet: false,
 };
 
@@ -323,6 +326,15 @@ export const buildTopbarRight = ({
       icon: "Pencil",
       label: t("editContact"),
       onClick: () => navigateTo({ route: "contactEdit", id: route.id }),
+    };
+  }
+
+  if (route.kind === "recurringPayment") {
+    return {
+      icon: "edit",
+      label: t("edit"),
+      onClick: () =>
+        navigateTo({ route: "recurringPaymentEdit", id: route.id }),
     };
   }
 
@@ -411,6 +423,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   transactions: "transactionsTitle",
   recurringPaymentNew: "recurringPaymentNewTitle",
   recurringPayment: "recurringPaymentTitle",
+  recurringPaymentEdit: "recurringPaymentEditTitle",
   wallet: "wallet",
 };
 

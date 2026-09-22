@@ -201,21 +201,6 @@ export const ContactPage: FC<ContactPageProps> = ({
         </Button>
       )}
 
-      {canPayThisContact && !isArchivedContact && !isFeedbackContact && (
-        <Button
-          variant="secondary"
-          onPress={() =>
-            navigateTo({
-              route: "recurringPaymentNew",
-              prefill: { contactId },
-            })
-          }
-          data-guide="contact-recurring"
-        >
-          {t("recurringPaymentTitle")}
-        </Button>
-      )}
-
       {canMessage && (
         <Button
           variant="secondary"

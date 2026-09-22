@@ -1,64 +1,60 @@
-import * as Evolu from "@evolu/common";
+import {
+  ContactId,
+  createId,
+  NonEmptyString100,
+  NonNegativeInt,
+  PositiveInt,
+  type RecurringPaymentsRepository,
+} from "@linky-fit/linksync";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
-import { ContactId, RecurringPaymentId } from "../../../evoluIds";
 import type { Translate } from "../../../i18n";
 import { nowSeconds } from "../../../utils/time";
+import type { RecurringAmount } from "../../lib/recurringAmount";
 import type { RecurringPaymentOrder } from "../../lib/recurringPaymentOrder";
+import { recurringPaymentPatch } from "../../lib/recurringPaymentWrite";
 import {
   currentTimeZone,
   nextRecurringOccurrenceAfter,
   resolveTimeZone,
   type RecurringInterval,
 } from "../../lib/recurringSchedule";
+import { runWrite } from "../../lib/storeWrite";
 import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
 
-type EvoluMutations = ReturnType<typeof import("../../../evolu").useEvolu>;
-
-export interface NewRecurringPaymentInput {
-  amountSat: number;
+export interface RecurringPaymentInput {
+  amount: RecurringAmount;
   contactId: string;
+  /** The next due time; also the anchor every later due time is counted from. */
   firstDueAtSec: number;
   interval: RecurringInterval;
-  maxRuns: number | null;
 }
 
 export interface RecurringPaymentsActions {
-  createRecurringPayment: (input: NewRecurringPaymentInput) => boolean;
+  createRecurringPayment: (input: RecurringPaymentInput) => Promise<boolean>;
   pendingRecurringPaymentDeleteId: string | null;
-  requestDeleteRecurringPayment: (order: RecurringPaymentOrder) => boolean;
+  requestDeleteRecurringPayment: (
+    order: RecurringPaymentOrder,
+  ) => Promise<boolean>;
   runRecurringPaymentNow: (order: RecurringPaymentOrder) => Promise<void>;
   setRecurringPaymentPaused: (
     order: RecurringPaymentOrder,
     paused: boolean,
-  ) => void;
+  ) => Promise<void>;
+  updateRecurringPayment: (
+    order: RecurringPaymentOrder,
+    input: RecurringPaymentInput,
+  ) => Promise<boolean>;
 }
 
 interface UseRecurringPaymentsActionsParams {
-  insert: EvoluMutations["insert"];
   pushToast: (message: string) => void;
+  repository: RecurringPaymentsRepository;
   runOrderNow: RecurringPaymentsScheduler["runOrderNow"];
   t: Translate;
-  transactionsOwnerId: Evolu.OwnerId | null;
-  update: EvoluMutations["update"];
 }
 
 const DELETE_ARM_MS = 5000;
-
-const orderKeys = (
-  order: RecurringPaymentOrder,
-): {
-  id: RecurringPaymentId;
-  options: { ownerId: Evolu.OwnerId } | undefined;
-} | null => {
-  const id = RecurringPaymentId.fromUnknown(order.id);
-  if (!id.ok) return null;
-  const ownerId = Evolu.OwnerId.fromUnknown(order.ownerId);
-  return {
-    id: id.value,
-    options: ownerId.ok ? { ownerId: ownerId.value } : undefined,
-  };
-};
 
 /** First due time strictly after `afterSec` on the payment's own grid. */
 const nextDueAfter = (order: RecurringPaymentOrder, afterSec: number) =>
@@ -69,18 +65,26 @@ const nextDueAfter = (order: RecurringPaymentOrder, afterSec: number) =>
     resolveTimeZone(order.schedule.timeZone),
   ).dueAtSec;
 
+/** The schedule and amount columns a form writes, for both insert and edit. */
+const scheduleColumns = (input: RecurringPaymentInput) => ({
+  amount: PositiveInt.orThrow(input.amount.amount),
+  unit: NonEmptyString100.orThrow(input.amount.unit),
+  intervalUnit: NonEmptyString100.orThrow(input.interval.unit),
+  intervalCount: PositiveInt.orThrow(input.interval.count),
+  anchorAtSec: PositiveInt.orThrow(input.firstDueAtSec),
+  timeZone: NonEmptyString100.orThrow(currentTimeZone()),
+  nextDueAtSec: PositiveInt.orThrow(input.firstDueAtSec),
+});
+
 /**
- * User-facing mutations on recurring payments. Inserts go to the active
- * transactions lane; updates target the row's own lane, like every other
- * lane-routed table. Deleting is a two-tap armed action.
+ * User-facing mutations on recurring payments, all through the linksync
+ * repository. Deleting is a two-tap armed action.
  */
 export const useRecurringPaymentsActions = ({
-  insert,
   pushToast,
+  repository,
   runOrderNow,
   t,
-  transactionsOwnerId,
-  update,
 }: UseRecurringPaymentsActionsParams): RecurringPaymentsActions => {
   const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(
     null,
@@ -95,67 +99,106 @@ export const useRecurringPaymentsActions = ({
     return () => window.clearTimeout(timeout);
   }, [pendingDeleteId]);
 
+  const reportWriteFailure = React.useCallback(
+    (error: string): false => {
+      console.warn("[linky][recurring] write failed", error);
+      pushToast(t("recurringSaveFailed"));
+      return false;
+    },
+    [pushToast, t],
+  );
+
   const createRecurringPayment = React.useCallback(
-    (input: NewRecurringPaymentInput): boolean => {
+    async (input: RecurringPaymentInput): Promise<boolean> => {
       const contactId = ContactId.fromUnknown(input.contactId);
       if (!contactId.ok) return false;
-      const payload = {
-        createdAtSec: nowSeconds(),
-        contactId: contactId.value,
-        amountSat: input.amountSat,
-        intervalUnit: input.interval.unit,
-        intervalCount: input.interval.count,
-        anchorAtSec: input.firstDueAtSec,
-        timeZone: currentTimeZone(),
-        nextDueAtSec: input.firstDueAtSec,
-        runCount: 0,
-        ...(input.maxRuns !== null ? { maxRuns: input.maxRuns } : {}),
-      };
-      const result = transactionsOwnerId
-        ? insert("recurringPayment", payload, { ownerId: transactionsOwnerId })
-        : insert("recurringPayment", payload);
-      if (!result.ok) return false;
+      const id = createId<"RecurringPayment">();
+      const outcome = await runWrite(
+        repository.insert({
+          id,
+          createdAtSec: PositiveInt.orThrow(nowSeconds()),
+          contactId: contactId.value,
+          runCount: NonNegativeInt.orThrow(0),
+          ...scheduleColumns(input),
+        }),
+      );
+      if (!outcome.ok) return reportWriteFailure(outcome.error);
       reportAppLog({
         tag: "recurring.created",
         summary: "recurring payment created",
-        links: {
-          recurringPayment: result.value.id,
-          contact: input.contactId,
-        },
+        links: { recurringPayment: id, contact: input.contactId },
         payload: {
-          amountSat: input.amountSat,
+          amount: input.amount,
           firstDueAtSec: input.firstDueAtSec,
           interval: input.interval,
-          maxRuns: input.maxRuns,
         },
       });
       return true;
     },
-    [insert, transactionsOwnerId],
+    [reportWriteFailure, repository],
+  );
+
+  const updateRecurringPayment = React.useCallback(
+    async (
+      order: RecurringPaymentOrder,
+      input: RecurringPaymentInput,
+    ): Promise<boolean> => {
+      const contactId = ContactId.fromUnknown(input.contactId);
+      if (!contactId.ok) return false;
+      // A new first due time starts a new grid; an in-flight claim for the
+      // old due time no longer applies.
+      const outcome = await runWrite(
+        repository.update(order.id, {
+          contactId: contactId.value,
+          ...scheduleColumns(input),
+          ...recurringPaymentPatch({
+            claimAtSec: null,
+            claimDeviceId: null,
+            claimDueAtSec: null,
+          }),
+        }),
+      );
+      if (!outcome.ok) return reportWriteFailure(outcome.error);
+      reportAppLog({
+        tag: "recurring.updated",
+        summary: "recurring payment edited",
+        links: { recurringPayment: order.id, contact: input.contactId },
+        payload: {
+          amount: input.amount,
+          firstDueAtSec: input.firstDueAtSec,
+          interval: input.interval,
+          previous: {
+            amount: order.amount,
+            contactId: order.contactId,
+            interval: order.schedule.interval,
+            nextDueAtSec: order.schedule.nextDueAtSec,
+          },
+        },
+      });
+      return true;
+    },
+    [reportWriteFailure, repository],
   );
 
   const setRecurringPaymentPaused = React.useCallback(
-    (order: RecurringPaymentOrder, paused: boolean): void => {
-      const keys = orderKeys(order);
-      if (!keys) return;
+    async (order: RecurringPaymentOrder, paused: boolean): Promise<void> => {
       const now = nowSeconds();
-      if (paused) {
-        update(
-          "recurringPayment",
-          { id: keys.id, pausedAtSec: now },
-          keys.options,
-        );
-      } else {
-        // Periods that passed while paused are not paid retroactively.
-        const nextDueAtSec =
-          order.schedule.nextDueAtSec > now
-            ? order.schedule.nextDueAtSec
-            : nextDueAfter(order, now);
-        update(
-          "recurringPayment",
-          { id: keys.id, pausedAtSec: null, nextDueAtSec },
-          keys.options,
-        );
+      // Periods that passed while paused are not paid retroactively.
+      const patch = paused
+        ? { pausedAtSec: now }
+        : {
+            pausedAtSec: null,
+            nextDueAtSec:
+              order.schedule.nextDueAtSec > now
+                ? order.schedule.nextDueAtSec
+                : nextDueAfter(order, now),
+          };
+      const outcome = await runWrite(
+        repository.update(order.id, recurringPaymentPatch(patch)),
+      );
+      if (!outcome.ok) {
+        reportWriteFailure(outcome.error);
+        return;
       }
       reportAppLog({
         tag: paused ? "recurring.paused" : "recurring.resumed",
@@ -164,23 +207,18 @@ export const useRecurringPaymentsActions = ({
         payload: null,
       });
     },
-    [update],
+    [reportWriteFailure, repository],
   );
 
   const requestDeleteRecurringPayment = React.useCallback(
-    (order: RecurringPaymentOrder): boolean => {
+    async (order: RecurringPaymentOrder): Promise<boolean> => {
       if (pendingDeleteId !== order.id) {
         setPendingDeleteId(order.id);
         return false;
       }
-      const keys = orderKeys(order);
-      if (!keys) return false;
-      update(
-        "recurringPayment",
-        { id: keys.id, isDeleted: Evolu.sqliteTrue },
-        keys.options,
-      );
+      const outcome = await runWrite(repository.remove(order.id));
       setPendingDeleteId(null);
+      if (!outcome.ok) return reportWriteFailure(outcome.error);
       reportAppLog({
         tag: "recurring.deleted",
         summary: "recurring payment deleted",
@@ -189,7 +227,7 @@ export const useRecurringPaymentsActions = ({
       });
       return true;
     },
-    [pendingDeleteId, update],
+    [pendingDeleteId, reportWriteFailure, repository],
   );
 
   const runRecurringPaymentNow = React.useCallback(
@@ -206,5 +244,6 @@ export const useRecurringPaymentsActions = ({
     requestDeleteRecurringPayment,
     runRecurringPaymentNow,
     setRecurringPaymentPaused,
+    updateRecurringPayment,
   };
 };

@@ -121,6 +121,7 @@ type NavigationAction =
       prefill?: { amountSat?: number; contactId?: string };
     }
   | { route: "recurringPayment"; id: string }
+  | { route: "recurringPaymentEdit"; id: string }
   | { route: "topup" }
   | { route: "topupNoAmount" }
   | { route: "topupInvoice" }
@@ -213,6 +214,11 @@ export const navigateTo = (action: NavigationAction): void => {
     case "recurringPayment":
       window.location.assign(
         `#wallet/recurring/${encodeURIComponent(action.id)}`,
+      );
+      break;
+    case "recurringPaymentEdit":
+      window.location.assign(
+        `#wallet/recurring/${encodeURIComponent(action.id)}/edit`,
       );
       break;
     case "topup":

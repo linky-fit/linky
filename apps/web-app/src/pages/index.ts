@@ -40,7 +40,7 @@ export { SpdPaymentPage } from "./SpdPaymentPage";
 export { TopupInvoicePage } from "./TopupInvoicePage";
 export { TopupNoAmountPage } from "./TopupNoAmountPage";
 export { TopupPage } from "./TopupPage";
-export { RecurringPaymentNewPage } from "./RecurringPaymentNewPage";
+export { RecurringPaymentFormPage } from "./RecurringPaymentFormPage";
 export { RecurringPaymentPage } from "./RecurringPaymentPage";
 export { TransactionsPage } from "./TransactionsPage";
 export { WalletPage } from "./WalletPage";
