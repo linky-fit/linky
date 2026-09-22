@@ -10,7 +10,10 @@ import {
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
-import { formatRecurringAmountText } from "../app/lib/recurringAmount";
+import {
+  formatRecurringAmountText,
+  recurringAmountSecondaryText,
+} from "../app/lib/recurringAmount";
 import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeLocale } from "../utils/formatting";
@@ -52,6 +55,12 @@ export const RecurringPaymentsList: FC = () => {
         const amountSat = recurringAmountSat(order.amount, fiatRates);
         const underfunded =
           state === "active" && amountSat !== null && cashuBalance < amountSat;
+        const secondaryAmount = recurringAmountSecondaryText(
+          order.amount,
+          fiatRates,
+          lang,
+          t,
+        );
         return (
           <button
             type="button"
@@ -95,6 +104,11 @@ export const RecurringPaymentsList: FC = () => {
                   formatSat: formatDisplayedAmountParts,
                   lang,
                 })}
+                {secondaryAmount ? (
+                  <span className="muted recurring-order-amount-secondary">
+                    {secondaryAmount}
+                  </span>
+                ) : null}
               </div>
             </article>
           </button>

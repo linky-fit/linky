@@ -248,12 +248,7 @@ export const useRecurringPaymentsScheduler = ({
     [latest],
   );
 
-  /**
-   * A run that never finished (Linky was killed mid-payment) has its schedule
-   * already advanced. If the history holds no transaction for that due time
-   * the money never moved, so the due time is restored and the payment goes
-   * out on a later pass instead of silently disappearing.
-   */
+  /** The history decides whether a run that never finished had moved money. */
   const settleInterruptedRun = React.useCallback(
     async (order: RecurringPaymentOrder): Promise<void> => {
       const dueAtSec = order.claim?.dueAtSec;
