@@ -40,7 +40,7 @@ state = applyBankPaymentOfferReceipt(state, peerPubkey, receipt).state;
 
 A payer snapshot with no known thread, or `bank_paid` before `bank_details_sent`, waits in `pending` (at most 256, oldest dropped) and is replayed in `sentAt` order once the offerer's snapshot for that peer is accepted. Payer copies never change `expiresAtSec`, `extensionSec` or `spdPayload`; those stay as the offerer sent them, and `bankPaidAtSec` is stamped from the payer's `sentAt`.
 
-`applyBankPaymentOfferReceipt` trusts the receipt: this device sent it. `createdAtSec` keeps the thread's earliest time in both paths.
+`applyBankPaymentOfferReceipt` trusts the receipt's content because this device sent it, but applies the same staleness rules as incoming snapshots before replacing a known thread. A delayed `accepted` receipt cannot overwrite bank details that arrived while the send was awaiting acknowledgments. A stale receipt returns the unchanged state and the current offer, so a successful send remains successful without rolling back the UI. `createdAtSec` keeps the thread's earliest time when merging an accepted update.
 
 ## Rules
 

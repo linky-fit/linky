@@ -71,7 +71,7 @@ const withPending = (
 
 const isStaleFor = (
   known: BankPaymentOffer,
-  event: BankOfferInboxEvent,
+  event: Pick<BankOfferInboxEvent, "sentAt" | "status">,
   isOfferer: boolean,
 ): boolean => {
   const knownUpdatedAt = offerUpdatedAtSec(known);
@@ -209,6 +209,12 @@ export const applyBankPaymentOfferReceipt = (
   if (!info?.offererPublicKey) return { offer: null, state };
 
   const known = findBankPaymentOffer(state.offers, peer, info.offerId);
+  if (
+    known &&
+    isStaleFor(known, receipt, isOffererBankPaymentOfferStatus(info.status))
+  ) {
+    return { offer: known, state };
+  }
   const offer: BankPaymentOffer = {
     ...info,
     clientId: receipt.clientId,

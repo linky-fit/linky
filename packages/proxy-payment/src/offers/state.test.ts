@@ -8,7 +8,10 @@ import {
   snapshot,
   START,
 } from "../testing/offers";
-import { bankPaymentOfferedDraft } from "./drafts";
+import {
+  bankPaymentOfferedDraft,
+  bankPaymentOfferResponseDraft,
+} from "./drafts";
 import {
   applyBankPaymentOfferReceipt,
   applyBankPaymentOfferSnapshot,
@@ -244,4 +247,118 @@ describe("applyBankPaymentOfferSnapshot", () => {
     expect(book.apply(snapshot("offered", true), START + 300)).toEqual([]);
     expect(book.apply(snapshot("offered", true), START + 299)).toHaveLength(1);
   });
+});
+
+describe("applyBankPaymentOfferReceipt", () => {
+  it.each([0, 1])(
+    "keeps bank details when an acceptance receipt from %i seconds earlier completes",
+    (detailsDelaySec) => {
+      const received = applyBankPaymentOfferSnapshot(
+        emptyBankPaymentOfferState,
+        snapshot("offered", false, { from: me }),
+        payer,
+        NOW,
+      ).state;
+      const offered = received.offers[0];
+      if (!offered) throw new Error("Missing received offer");
+      const draft = bankPaymentOfferResponseDraft(offered, "accepted", payer);
+      if (!draft) throw new Error("Missing acceptance draft");
+
+      const withDetails = applyBankPaymentOfferSnapshot(
+        received,
+        snapshot("bank_details_sent", false, {
+          from: me,
+          sentAt: UnixSeconds.make(START + detailsDelaySec),
+          spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399*AM:1.00*CC:CZK",
+          expiresAtSec: UnixSeconds.make(START + 300),
+        }),
+        payer,
+        NOW,
+      ).state;
+
+      const result = applyBankPaymentOfferReceipt(
+        withDetails,
+        me,
+        receiptFor(draft),
+      );
+      expect(result.state).toBe(withDetails);
+      expect(result.offer).toBe(withDetails.offers[0]);
+      expect(result.offer).toMatchObject({
+        status: "bank_details_sent",
+        spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399*AM:1.00*CC:CZK",
+        expiresAtSec: START + 300,
+      });
+    },
+  );
+
+  it("keeps an acceptance when the original offer receipt completes later", () => {
+    const draft = bankPaymentOfferedDraft({
+      amountSat: 1000,
+      amountText: "500 CZK",
+      offerId: "offer-1",
+      offerer: me,
+      to: payer,
+    });
+    if (!draft) throw new Error("Missing offered draft");
+    const book = new Book();
+    book.apply(snapshot("offered", true));
+    book.apply(snapshot("accepted", false));
+
+    const result = applyBankPaymentOfferReceipt(
+      book.state,
+      payer,
+      receiptFor(draft),
+    );
+    expect(result.state).toBe(book.state);
+    expect(result.offer?.status).toBe("accepted");
+  });
+
+  it("keeps payment confirmation when the bank-details receipt completes later", () => {
+    const book = new Book();
+    book.authorizePayer();
+    const details = book.state.offers[0];
+    if (!details) throw new Error("Missing bank details");
+    const draft = bankPaymentOfferResponseDraft(
+      details,
+      "bank_details_sent",
+      me,
+    );
+    if (!draft) throw new Error("Missing bank-details draft");
+    book.apply(
+      snapshot("bank_paid", false, { sentAt: UnixSeconds.make(START + 1) }),
+    );
+
+    const result = applyBankPaymentOfferReceipt(
+      book.state,
+      payer,
+      receiptFor(draft),
+    );
+    expect(result.state).toBe(book.state);
+    expect(result.offer?.status).toBe("bank_paid");
+  });
+
+  it.each<"canceled" | "settled">(["canceled", "settled"])(
+    "does not reopen a %s thread even when the receipt has a later timestamp",
+    (status) => {
+      const book = new Book();
+      book.authorizePayer();
+      const details = book.state.offers[0];
+      if (!details) throw new Error("Missing bank details");
+      const draft = bankPaymentOfferResponseDraft(
+        details,
+        "bank_details_sent",
+        me,
+      );
+      if (!draft) throw new Error("Missing bank-details draft");
+      book.apply(snapshot(status, true));
+
+      const result = applyBankPaymentOfferReceipt(
+        book.state,
+        payer,
+        receiptFor(draft, UnixSeconds.make(START + 1)),
+      );
+      expect(result.state).toBe(book.state);
+      expect(result.offer?.status).toBe(status);
+    },
+  );
 });
