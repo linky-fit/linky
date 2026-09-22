@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
+import type { RecurringPaymentId } from "@linky-fit/domain";
 import type { FiatRatesPerBtc } from "./amount";
 import type { RecurringPaymentOrder } from "./order";
-import { DUE, HOUR, recurringOrderFixture } from "./testing/orders";
+import {
+  DUE,
+  HOUR,
+  recurringOrderFixture,
+  recurringPaymentIdFor,
+} from "./testing/orders";
 import {
   planRecurringPaymentTick,
   RECURRING_CLAIM_TAKEOVER_SEC,
@@ -29,7 +35,7 @@ const plan = (
     balanceSat?: number;
     deviceId?: string;
     fiatRates?: FiatRatesPerBtc | null;
-    retry?: [string, number][];
+    retry?: [RecurringPaymentId, number][];
   } = {},
 ) =>
   planRecurringPaymentTick({
@@ -164,7 +170,9 @@ describe("planRecurringPaymentTick", () => {
         lastRunStatus: "failed",
         lastRunAtSec: DUE + 60,
       });
-      const retry: [string, number][] = [["rp-1", DUE + 10 * 60]];
+      const retry: [RecurringPaymentId, number][] = [
+        [recurringPaymentIdFor("rp-1"), DUE + 10 * 60],
+      ];
       expect(plan([failed], DUE + 5 * 60, { retry })).toEqual([]);
       expect(plan([failed], DUE + 10 * 60, { retry })).toMatchObject([
         { kind: "run" },
@@ -200,7 +208,7 @@ describe("planRecurringPaymentTick", () => {
 
   it("orders actions by due time", () => {
     const later = order({
-      id: "rp-2",
+      id: recurringPaymentIdFor("rp-2"),
       schedule: {
         ...order().schedule,
         anchorAtSec: DUE + HOUR,
@@ -208,7 +216,10 @@ describe("planRecurringPaymentTick", () => {
       },
     });
     const actions = plan([later, order()], DUE + 2 * HOUR);
-    expect(actions.map((action) => action.order.id)).toEqual(["rp-1", "rp-2"]);
+    expect(actions.map((action) => action.order.id)).toEqual([
+      recurringPaymentIdFor("rp-1"),
+      recurringPaymentIdFor("rp-2"),
+    ]);
   });
 });
 

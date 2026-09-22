@@ -6,7 +6,7 @@ import {
 } from "@linky-fit/linkshu";
 import { Effect, Schema } from "effect";
 import { makeInMemoryShardDb, type ShardDb } from "../core";
-import { cashuProofIdFor } from "../model/ids";
+import { cashuProofIdFor } from "@linky-fit/domain";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
 import { linkyStore, runNow } from "../testing/linky";

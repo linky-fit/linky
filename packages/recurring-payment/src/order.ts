@@ -1,3 +1,4 @@
+import { RecurringPaymentId, type ContactId } from "@linky-fit/domain";
 import { Option, Schema } from "effect";
 import { isRecurringAmountUnit, type RecurringAmount } from "./amount";
 import {
@@ -27,14 +28,11 @@ export interface RecurringPaymentClaim {
   dueAtSec: number;
 }
 
-/**
- * A recurring payment as the planner and the UI see it. Ids are plain
- * strings here; the app narrows them to its own branded ids.
- */
+/** A recurring payment as the planner and the UI see it. */
 export interface RecurringPaymentOrder {
-  id: string;
+  id: RecurringPaymentId;
   createdAtSec: number;
-  contactId: string;
+  contactId: ContactId;
   amount: RecurringAmount;
   schedule: RecurringScheduleState;
   lastRunAtSec: number | null;
@@ -44,9 +42,9 @@ export interface RecurringPaymentOrder {
 
 /** The stored columns an order is read from, before any validation. */
 export interface RecurringPaymentColumns {
-  id: string;
+  id: RecurringPaymentId;
   createdAtSec: number;
-  contactId: string;
+  contactId: ContactId;
   amount: number;
   unit: string;
   intervalUnit: string;
@@ -82,11 +80,9 @@ const readClaim = (
 };
 
 /** Null for rows this build cannot act on (unknown interval or amount unit). */
-export const readRecurringPaymentOrder = <
-  Columns extends RecurringPaymentColumns,
->(
-  columns: Columns,
-): (RecurringPaymentOrder & Pick<Columns, "id" | "contactId">) | null => {
+export const readRecurringPaymentOrder = (
+  columns: RecurringPaymentColumns,
+): RecurringPaymentOrder | null => {
   if (!isRecurringIntervalUnit(columns.intervalUnit)) return null;
   if (!isRecurringAmountUnit(columns.unit)) return null;
   return {
@@ -122,7 +118,7 @@ export const recurringOrderState = (
 
 /** Ties a transaction to the payment and the due time it settled. */
 export interface RecurringRunRef {
-  recurringPaymentId: string;
+  recurringPaymentId: RecurringPaymentId;
   dueAtSec: number;
 }
 
@@ -142,18 +138,19 @@ export const recurringRunDetails = (
       }
     : {};
 
-/** The run a transaction's parsed details name, if any. */
-export const readRecurringRunRef = (
-  details: unknown,
+const runRefFrom = (
+  details: typeof RunDetails.Type | null,
 ): RecurringRunRef | null => {
-  const decoded = Schema.decodeUnknownOption(RunDetails)(details);
-  return Option.isSome(decoded)
-    ? {
-        recurringPaymentId: decoded.value.recurringPaymentId,
-        dueAtSec: decoded.value.recurringDueAtSec,
-      }
+  if (details === null) return null;
+  const id = RecurringPaymentId.fromUnknown(details.recurringPaymentId);
+  return id.ok
+    ? { recurringPaymentId: id.value, dueAtSec: details.recurringDueAtSec }
     : null;
 };
+
+/** The run a transaction's parsed details name, if any. */
+export const readRecurringRunRef = (details: unknown): RecurringRunRef | null =>
+  runRefFrom(Option.getOrNull(Schema.decodeUnknownOption(RunDetails)(details)));
 
 export interface RecordedTransaction {
   status: string | null;
@@ -176,11 +173,11 @@ export const recurringRunRecorded = (
   transactions.some((transaction) => {
     if (transaction.status === "error" || transaction.status === "declined")
       return false;
-    const details = Option.getOrNull(
-      readRunRefFromJson(transaction.detailsJson),
+    const recorded = runRefFrom(
+      Option.getOrNull(readRunRefFromJson(transaction.detailsJson)),
     );
     return (
-      details?.recurringPaymentId === run.recurringPaymentId &&
-      details.recurringDueAtSec === run.dueAtSec
+      recorded?.recurringPaymentId === run.recurringPaymentId &&
+      recorded.dueAtSec === run.dueAtSec
     );
   });

@@ -2,7 +2,7 @@
 
 ## The order
 
-`readRecurringPaymentOrder(columns)` turns stored columns (`RecurringPaymentColumns`, the shape of a linksync `RecurringPaymentRecord`) into a `RecurringPaymentOrder`: the `amount`, the `schedule`, the last run (`lastRunAtSec`, `lastRunStatus`) and the `claim`. It returns `null` for a row this build cannot act on (unknown interval or amount unit), so an older client never misreads a newer row. The function is generic over its input, so a caller passing branded ids gets them back on the order.
+`readRecurringPaymentOrder(columns)` turns stored columns (`RecurringPaymentColumns`, the shape of a linksync `RecurringPaymentRecord`) into a `RecurringPaymentOrder`: the `amount`, the `schedule`, the last run (`lastRunAtSec`, `lastRunStatus`) and the `claim`. It returns `null` for a row this build cannot act on (unknown interval or amount unit), so an older client never misreads a newer row. `id` and `contactId` are the `@linky-fit/domain` brands (`RecurringPaymentId`, `ContactId`), the same types linksync's rows carry.
 
 | `lastRunStatus` | Meaning                                                                            |
 | --------------- | ---------------------------------------------------------------------------------- |

@@ -7,6 +7,7 @@ import {
   recurringFiatValue,
   type RecurringInterval,
   type RecurringIntervalUnit,
+  type RecurringPaymentOrder,
 } from "@linky-fit/recurring-payment";
 import { Repeat } from "lucide-react";
 import React from "react";
@@ -25,7 +26,6 @@ import {
   epochToDateTimeLocal,
   nextFullHourSec,
 } from "../app/lib/recurringPaymentDisplay";
-import type { RecurringPaymentOrder } from "../app/lib/recurringPaymentStore";
 import { AmountDisplay } from "../components/AmountDisplay";
 import { Keypad } from "../components/Keypad";
 import { RecurringContactAvatar } from "../components/RecurringContactAvatar";

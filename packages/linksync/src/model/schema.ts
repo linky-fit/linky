@@ -21,7 +21,7 @@ import {
   SettingId,
   ShardPointerId,
   TransactionId,
-} from "./ids";
+} from "@linky-fit/domain";
 
 /** The columns a message has wherever it is stored. */
 export const messageContentColumns = {

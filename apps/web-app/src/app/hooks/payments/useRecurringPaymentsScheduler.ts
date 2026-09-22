@@ -8,6 +8,7 @@ import {
   claimPatch,
   interruptedRunPatch,
   planRecurringPaymentTick,
+  readRecurringPaymentOrder,
   RECURRING_CONFIRM_SEC,
   RECURRING_NOTICE_SEC,
   RECURRING_RUN_RETRY_DELAY_SEC,
@@ -18,6 +19,7 @@ import {
   runNowAction,
   runSkippedPatch,
   runStartedPatch,
+  type RecurringPaymentOrder,
   type RecurringPaymentPatch,
   type RecurringRunAction,
   type RecurringRunRef,
@@ -39,11 +41,7 @@ import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../../lib/paidOverlay";
-import {
-  readRecurringPaymentOrder,
-  recurringPaymentUpdate,
-  type RecurringPaymentOrder,
-} from "../../lib/recurringPaymentStore";
+import { recurringPaymentUpdate } from "../../lib/recurringPaymentStore";
 import { runWrite } from "../../lib/storeWrite";
 import type { ContactRowLike } from "../../types/appTypes";
 
@@ -123,9 +121,6 @@ interface UseRecurringPaymentsSchedulerParams {
   };
 }
 
-type TickAction = RecurringTickAction<RecurringPaymentOrder>;
-type RunAction = RecurringRunAction<RecurringPaymentOrder>;
-
 const orderLinks = (order: RecurringPaymentOrder): Record<string, string> => ({
   recurringPayment: order.id,
   contact: order.contactId,
@@ -197,7 +192,7 @@ export const useRecurringPaymentsScheduler = ({
   const tickIntervalMs =
     dependencies?.tickIntervalMs ?? RECURRING_TICK_INTERVAL_MS;
   const tickInFlightRef = React.useRef<Promise<void> | null>(null);
-  const retryNotBeforeRef = React.useRef(new Map<string, number>());
+  const retryNotBeforeRef = React.useRef(new Map<RecurringPaymentId, number>());
   const reportedWaitsRef = React.useRef(new Set<string>());
   const [dueConfirmation, setDueConfirmation] =
     React.useState<RecurringDueConfirmation | null>(null);
@@ -276,7 +271,9 @@ export const useRecurringPaymentsScheduler = ({
   );
 
   const claimOrder = React.useCallback(
-    async (action: Extract<TickAction, { kind: "claim" }>): Promise<void> => {
+    async (
+      action: Extract<RecurringTickAction, { kind: "claim" }>,
+    ): Promise<void> => {
       const { order, dueAtSec, takeover } = action;
       const now = nowSec();
       await patchOrder(order, claimPatch(deviceId, now, dueAtSec));
@@ -319,7 +316,7 @@ export const useRecurringPaymentsScheduler = ({
 
   const settleRun = React.useCallback(
     async (
-      action: RunAction,
+      action: RecurringRunAction,
       outcome: { ok: true } | { ok: false; error: string },
       startedAtSec: number,
     ): Promise<void> => {
@@ -380,7 +377,7 @@ export const useRecurringPaymentsScheduler = ({
   );
 
   const executeRun = React.useCallback(
-    async (action: RunAction): Promise<"paid" | "failed"> => {
+    async (action: RecurringRunAction): Promise<"paid" | "failed"> => {
       const { order, advance, amountSat, dueAtSec } = action;
       const startedAtSec = nowSec();
       const recurringRun: RecurringRunRef = {

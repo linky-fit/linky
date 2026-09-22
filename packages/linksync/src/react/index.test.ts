@@ -2,7 +2,7 @@
 import { NonEmptyString100, PositiveInt } from "@evolu/common";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { createId } from "../model/ids";
+import { createId } from "@linky-fit/domain";
 import { makeTransactionsRepository } from "../repositories/transactions";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeInMemoryShardDb } from "../core";

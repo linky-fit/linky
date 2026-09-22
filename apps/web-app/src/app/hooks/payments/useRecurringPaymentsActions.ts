@@ -8,6 +8,7 @@ import {
   CLEAR_CLAIM_PATCH,
   pausePatch,
   resumePatch,
+  type RecurringPaymentOrder,
 } from "@linky-fit/recurring-payment";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
@@ -18,7 +19,6 @@ import {
   recurringPaymentColumns,
   recurringPaymentUpdate,
   type RecurringPaymentInput,
-  type RecurringPaymentOrder,
 } from "../../lib/recurringPaymentStore";
 import { runWrite } from "../../lib/storeWrite";
 import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";

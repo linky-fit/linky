@@ -26,7 +26,7 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 ## Conventions
 
 - Emit an inspector event for every meaningful operation: user actions, relay/mint/sync/push traffic, notable state transitions
-- Ids are the branded types from `@linky-fit/linksync` (`ContactId`, `TransactionId`, ...), never plain strings; use a library's exported types instead of redefining them
+- Ids are the branded types from `@linky-fit/domain`, re-exported by `@linky-fit/linksync` (`ContactId`, `TransactionId`, `RecurringPaymentId`, ...), never plain strings, in packages as in the app; use a library's exported types instead of redefining them
 - Validate stored and wire JSON with effect `Schema` (shared pieces in `utils/schema.ts`); take `nowSeconds()` and `sleep()` from `utils/time.ts`
 - Evolu inserts omit empty optional fields instead of writing `null`
 - New browser storage names use the `linky.` prefix; existing names are frozen, because renaming one needs a page and service-worker migration

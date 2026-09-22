@@ -1,6 +1,6 @@
 import { NonEmptyString100, PositiveInt } from "@evolu/common";
 import { describe, expect, it } from "vitest";
-import { createId } from "../model/ids";
+import { createId } from "@linky-fit/domain";
 import { linkyStore, runNow } from "../testing/linky";
 import {
   makeRecurringPaymentsRepository,

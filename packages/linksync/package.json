@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@evolu/common": "7.4.1",
+    "@linky-fit/domain": "workspace:*",
     "@linky-fit/linkshu": "workspace:*",
     "@linky-fit/linkstr": "workspace:*",
     "effect": "^3.19.19"

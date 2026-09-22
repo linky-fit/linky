@@ -1,3 +1,4 @@
+import type { RecurringPaymentId } from "@linky-fit/domain";
 import { recurringAmountSat, type FiatRatesPerBtc } from "./amount";
 import type { RecurringPaymentOrder } from "./order";
 import {
@@ -32,37 +33,36 @@ export type RecurringSkipReason =
   | "cancelled"
   | "invalidRecipient";
 
-export interface RecurringRunAction<
-  Order extends RecurringPaymentOrder = RecurringPaymentOrder,
-> {
+export interface RecurringRunAction {
   kind: "run";
-  order: Order;
+  order: RecurringPaymentOrder;
   amountSat: number;
   dueAtSec: number;
   missedCount: number;
   advance: RecurringScheduleAdvance;
 }
 
-export type RecurringTickAction<
-  Order extends RecurringPaymentOrder = RecurringPaymentOrder,
-> =
-  | { kind: "claim"; order: Order; dueAtSec: number; takeover: boolean }
-  | RecurringRunAction<Order>
+export type RecurringTickAction =
+  | {
+      kind: "claim";
+      order: RecurringPaymentOrder;
+      dueAtSec: number;
+      takeover: boolean;
+    }
+  | RecurringRunAction
   | {
       kind: "skip";
-      order: Order;
+      order: RecurringPaymentOrder;
       dueAtSec: number;
       reason: Extract<RecurringSkipReason, "insufficientFunds" | "failed">;
       advance: RecurringScheduleAdvance;
     }
-  | { kind: "waitFunds"; order: Order; dueAtSec: number }
-  | { kind: "waitRates"; order: Order; dueAtSec: number }
-  | { kind: "markInterrupted"; order: Order };
+  | { kind: "waitFunds"; order: RecurringPaymentOrder; dueAtSec: number }
+  | { kind: "waitRates"; order: RecurringPaymentOrder; dueAtSec: number }
+  | { kind: "markInterrupted"; order: RecurringPaymentOrder };
 
-export interface RecurringTickInput<
-  Order extends RecurringPaymentOrder = RecurringPaymentOrder,
-> {
-  orders: ReadonlyArray<Order>;
+export interface RecurringTickInput {
+  orders: ReadonlyArray<RecurringPaymentOrder>;
   nowSec: number;
   deviceId: string;
   /** Spendable sats; a due run waits until they cover the amount. */
@@ -70,7 +70,7 @@ export interface RecurringTickInput<
   /** Null while no rate is known; a fiat payment then waits. */
   fiatRates: FiatRatesPerBtc | null;
   /** Per order id: no new attempt before this time (set after a failure). */
-  retryNotBeforeSec: ReadonlyMap<string, number>;
+  retryNotBeforeSec: ReadonlyMap<RecurringPaymentId, number>;
 }
 
 export interface RecurringUpcoming {
@@ -117,10 +117,10 @@ export const recurringSkipDeadlineSec = (
   dueAtSec: number,
 ): number => nextDueAfter(order.schedule, dueAtSec);
 
-const planOrder = <Order extends RecurringPaymentOrder>(
-  order: Order,
-  input: RecurringTickInput<Order>,
-): RecurringTickAction<Order> | null => {
+const planOrder = (
+  order: RecurringPaymentOrder,
+  input: RecurringTickInput,
+): RecurringTickAction | null => {
   if (order.lastRunStatus === "running") {
     const startedAt = order.lastRunAtSec ?? 0;
     return input.nowSec - startedAt > RECURRING_RUN_STALE_SEC
@@ -174,14 +174,14 @@ const planOrder = <Order extends RecurringPaymentOrder>(
  * What one scheduler pass should do. Actions come out ordered by due time so
  * the longest-overdue payment goes first when the wallet is free.
  */
-export const planRecurringPaymentTick = <Order extends RecurringPaymentOrder>(
-  input: RecurringTickInput<Order>,
-): RecurringTickAction<Order>[] => {
+export const planRecurringPaymentTick = (
+  input: RecurringTickInput,
+): RecurringTickAction[] => {
   const actions = input.orders.flatMap((order) => {
     const action = planOrder(order, input);
     return action === null ? [] : [action];
   });
-  const dueOf = (action: RecurringTickAction<Order>): number =>
+  const dueOf = (action: RecurringTickAction): number =>
     action.kind === "markInterrupted" ? 0 : action.dueAtSec;
   return actions.sort((a, b) => dueOf(a) - dueOf(b));
 };
@@ -191,11 +191,11 @@ export const planRecurringPaymentTick = <Order extends RecurringPaymentOrder>(
  * and consumes the pending period, so the next due time is the first one
  * after whichever is later, now or the pending due time.
  */
-export const runNowAction = <Order extends RecurringPaymentOrder>(
-  order: Order,
+export const runNowAction = (
+  order: RecurringPaymentOrder,
   amountSat: number,
   nowSec: number,
-): RecurringRunAction<Order> => {
+): RecurringRunAction => {
   const { schedule } = order;
   return {
     kind: "run",

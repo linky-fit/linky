@@ -17,6 +17,7 @@ COPY packages/linksync/package.json packages/linksync/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/linkstr/package.json packages/linkstr/package.json
 COPY packages/linkstr-react/package.json packages/linkstr-react/package.json
+COPY packages/domain/package.json packages/domain/package.json
 COPY packages/proxy-payment/package.json packages/proxy-payment/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/recurring-payment/package.json packages/recurring-payment/package.json
