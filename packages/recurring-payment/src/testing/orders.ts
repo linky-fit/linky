@@ -1,4 +1,15 @@
+import {
+  createIdFromString,
+  type ContactId,
+  type RecurringPaymentId,
+} from "@linky-fit/domain";
 import type { RecurringPaymentOrder } from "../order";
+
+export const recurringPaymentIdFor = (key: string): RecurringPaymentId =>
+  createIdFromString<"RecurringPayment">(`test/recurring/${key}`);
+
+export const contactIdFor = (key: string): ContactId =>
+  createIdFromString<"Contact">(`test/contact/${key}`);
 
 export const HOUR = 3600;
 export const DUE = 1_800_000_000;
@@ -7,9 +18,9 @@ export const DUE = 1_800_000_000;
 export const recurringOrderFixture = (
   overrides: Partial<RecurringPaymentOrder> = {},
 ): RecurringPaymentOrder => ({
-  id: "rp-1",
+  id: recurringPaymentIdFor("rp-1"),
   createdAtSec: DUE - 10 * HOUR,
-  contactId: "contact-1",
+  contactId: contactIdFor("contact-1"),
   amount: { amount: 100, unit: "sat" },
   schedule: {
     anchorAtSec: DUE,

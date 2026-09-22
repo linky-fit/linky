@@ -9,4 +9,4 @@ The recurring-payment domain: a saved contact is paid a fixed amount on a schedu
 - **Transitions** (`transitions.ts`) — the column patch each state change writes: claim, run started/paid/failed/skipped, interrupted-run settlement, pause and resume.
 - **Reminders** (`reminders.ts`) — the notice times a reminder server should push for a closed app.
 
-Environment-agnostic: no React, Evolu, browser storage or i18n; `nowSec` is always an argument. Ids are plain strings that keep whatever brand the caller's rows carry. See [`docs/`](./docs/README.md) for usage and [`AGENTS.md`](./AGENTS.md) for the rules.
+Environment-agnostic: no React, Evolu, browser storage or i18n; `nowSec` is always an argument. Orders carry the shared branded ids from `@linky-fit/domain` (`RecurringPaymentId`, `ContactId`), never plain strings. See [`docs/`](./docs/README.md) for usage and [`AGENTS.md`](./AGENTS.md) for the rules.

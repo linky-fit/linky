@@ -7,14 +7,20 @@ import {
   recurringRunRecorded,
   type RecurringPaymentColumns,
 } from "./order";
-import { DUE, HOUR, recurringOrderFixture } from "./testing/orders";
+import {
+  contactIdFor,
+  DUE,
+  HOUR,
+  recurringOrderFixture,
+  recurringPaymentIdFor,
+} from "./testing/orders";
 
 const columns = (
   overrides: Partial<RecurringPaymentColumns> = {},
 ): RecurringPaymentColumns => ({
-  id: "rp-1",
+  id: recurringPaymentIdFor("rp-1"),
   createdAtSec: 1_700_000_000,
-  contactId: "contact-1",
+  contactId: contactIdFor("contact-1"),
   amount: 21_000,
   unit: "sat",
   intervalUnit: "month",
@@ -35,9 +41,9 @@ const columns = (
 describe("readRecurringPaymentOrder", () => {
   it("reads a payment with defaults filled in", () => {
     expect(readRecurringPaymentOrder(columns())).toEqual({
-      id: "rp-1",
+      id: recurringPaymentIdFor("rp-1"),
       createdAtSec: 1_700_000_000,
-      contactId: "contact-1",
+      contactId: contactIdFor("contact-1"),
       amount: { amount: 21_000, unit: "sat" },
       schedule: {
         anchorAtSec: 1_700_000_000,
@@ -111,16 +117,25 @@ describe("recurringOrderState", () => {
 });
 
 describe("run references", () => {
-  const run = { recurringPaymentId: "rp-1", dueAtSec: DUE };
+  const run = {
+    recurringPaymentId: recurringPaymentIdFor("rp-1"),
+    dueAtSec: DUE,
+  };
 
   it("round-trips through transaction details", () => {
     expect(recurringRunDetails(run)).toEqual({
-      recurringPaymentId: "rp-1",
+      recurringPaymentId: recurringPaymentIdFor("rp-1"),
       recurringDueAtSec: DUE,
     });
     expect(recurringRunDetails(null)).toEqual({});
     expect(readRecurringRunRef(recurringRunDetails(run))).toEqual(run);
     expect(readRecurringRunRef({ requestId: "x" })).toBeNull();
+    expect(
+      readRecurringRunRef({
+        recurringPaymentId: "not an id",
+        recurringDueAtSec: DUE,
+      }),
+    ).toBeNull();
     expect(readRecurringRunRef(null)).toBeNull();
   });
 

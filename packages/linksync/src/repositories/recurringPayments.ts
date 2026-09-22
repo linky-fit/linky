@@ -1,6 +1,6 @@
 import type { PositiveInt } from "@evolu/common";
 import { Effect } from "effect";
-import type { ContactId } from "../model/ids";
+import type { ContactId } from "@linky-fit/domain";
 import type { LinkyDbSchema, RecurringPaymentRow } from "../model/schema";
 import type { LinkyStore } from "../model/store";
 import { tableRepository, type TableRepository } from "./tableRepository";

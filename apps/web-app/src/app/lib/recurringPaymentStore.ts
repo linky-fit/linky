@@ -3,29 +3,14 @@ import {
   NonEmptyString100,
   NonNegativeInt,
   PositiveInt,
-  type RecurringPaymentId,
-  type RecurringPaymentRecord,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
 import {
   currentTimeZone,
-  readRecurringPaymentOrder as readOrder,
   type RecurringAmount,
   type RecurringInterval,
-  type RecurringPaymentOrder as RecurringPaymentOrderModel,
   type RecurringPaymentPatch,
 } from "@linky-fit/recurring-payment";
-
-/** The package's order with this app's branded ids. */
-export interface RecurringPaymentOrder extends RecurringPaymentOrderModel {
-  id: RecurringPaymentId;
-  contactId: ContactId;
-}
-
-/** Null for records this build cannot act on (unknown interval or amount unit). */
-export const readRecurringPaymentOrder = (
-  record: RecurringPaymentRecord,
-): RecurringPaymentOrder | null => readOrder(record);
 
 export interface RecurringPaymentInput {
   amount: RecurringAmount;

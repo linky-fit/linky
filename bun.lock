@@ -213,6 +213,21 @@
         "typescript-eslint": "^8.46.4",
       },
     },
+    "packages/domain": {
+      "name": "@linky-fit/domain",
+      "version": "0.1.0",
+      "dependencies": {
+        "@evolu/common": "^7.4.1",
+      },
+      "devDependencies": {
+        "@linky-fit/config": "workspace:*",
+        "@types/node": "^24.10.1",
+        "eslint": "^9.39.1",
+        "prettier": "^3.4.2",
+        "typescript": "~5.9.3",
+        "vitest": "^4.0.18",
+      },
+    },
     "packages/identity": {
       "name": "@linky-fit/identity",
       "version": "0.1.0",
@@ -310,6 +325,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@evolu/common": "7.4.1",
+        "@linky-fit/domain": "workspace:*",
         "@linky-fit/linkshu": "workspace:*",
         "@linky-fit/linkstr": "workspace:*",
         "effect": "^3.19.19",
@@ -353,6 +369,7 @@
       "name": "@linky-fit/recurring-payment",
       "version": "0.1.0",
       "dependencies": {
+        "@linky-fit/domain": "workspace:*",
         "effect": "^3.19.19",
       },
       "devDependencies": {
@@ -987,6 +1004,8 @@
     "@linky-fit/config": ["@linky-fit/config@workspace:packages/config"],
 
     "@linky-fit/desktop": ["@linky-fit/desktop@workspace:apps/desktop"],
+
+    "@linky-fit/domain": ["@linky-fit/domain@workspace:packages/domain"],
 
     "@linky-fit/identity": ["@linky-fit/identity@workspace:packages/identity"],
 
