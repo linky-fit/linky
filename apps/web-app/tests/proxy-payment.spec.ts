@@ -6,6 +6,8 @@
  * the other ends at accepted_by_other without ever seeing them. The winner
  * marks the bank payment paid, A confirms settlement, and the winner receives sats.
  *
+ * Also covers C accepting after A chose B but before C receives that decision.
+ *
  * Needs the docker stack up — see "E2E tests" in CLAUDE.md.
  *
  * Two recipients, not one, is deliberate: with a single recipient the lease
@@ -23,6 +25,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
+  type TestInfo,
 } from "@playwright/test";
 import {
   expectSingleLoad,
@@ -77,6 +80,7 @@ interface Account {
 const bootAccount = async (
   browser: Browser,
   label: string,
+  inbox?: { paused: boolean; pending: (() => void)[] },
 ): Promise<Account> => {
   const identity = await createSeedIdentity();
   const context = await browser.newContext({
@@ -88,6 +92,19 @@ const bootAccount = async (
   });
 
   const page = await context.newPage();
+  if (inbox) {
+    await page.routeWebSocket(/ws:\/\/localhost:7777\/?$/, (socket) => {
+      const server = socket.connectToServer();
+      server.onMessage((message) => {
+        const frame: unknown = JSON.parse(String(message));
+        if (inbox.paused && Array.isArray(frame) && frame[0] === "EVENT") {
+          inbox.pending.push(() => socket.send(message));
+        } else {
+          socket.send(message);
+        }
+      });
+    });
+  }
   const errors = watchAppErrors(page, label);
   const waitForInbox = watchNostrInbox(page, identity.npub);
 
@@ -131,12 +148,19 @@ const offerDetailUrl = (page: Page) =>
     /^#chat\/([^/]+)\/bank-payment-offer\/([^/]+)$/,
   );
 
-test("proxy payment: bank details reach exactly one acceptor, who is paid in sats", async ({
-  browser,
-}, testInfo) => {
+const runProxyPayment = async (
+  browser: Browser,
+  testInfo: TestInfo,
+  delayLoserNotification: boolean,
+) => {
   const a = await bootAccount(browser, "A");
   const b = await bootAccount(browser, "B");
-  const c = await bootAccount(browser, "C");
+  const inbox = { paused: false, pending: new Array<() => void>() };
+  const c = await bootAccount(
+    browser,
+    "C",
+    delayLoserNotification ? inbox : undefined,
+  );
   const accounts = [a, b, c];
 
   try {
@@ -229,7 +253,7 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
         return decodeURIComponent(match[2]);
       });
 
-    await test.step("B and C accept before A reconnects", async () => {
+    await test.step("B and C accept before C learns someone else won", async () => {
       // Both acceptors must be on the offer page before the first accept:
       // A's auto-responder terminates every other candidate the moment one
       // accept arrives, so an acceptor whose offer delivery lags the winner's
@@ -241,6 +265,28 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
           new RegExp(`bank-payment-offer/${offerId}$`),
           { timeout: 120_000 },
         );
+      }
+      if (delayLoserNotification) {
+        inbox.paused = true;
+        await b.page
+          .getByRole("button", { name: "Accept", exact: true })
+          .click();
+        await expect(b.page.locator(".bank-payment-offer-qr")).toBeVisible();
+        await expect(a.page.locator(".is-accepted_by_other")).toBeVisible();
+        expect(inbox.pending.length).toBeGreaterThan(0);
+        const decisionObservedSec = Math.floor(Date.now() / 1000);
+        await expect
+          .poll(() => Math.floor(Date.now() / 1000))
+          .toBeGreaterThan(decisionObservedSec);
+        await c.page
+          .getByRole("button", { name: "Accept", exact: true })
+          .click();
+        await expect(
+          c.page.getByText("Waiting for bank details.", { exact: false }),
+        ).toBeVisible();
+        inbox.paused = false;
+        for (const deliver of inbox.pending.splice(0)) deliver();
+        return;
       }
       // Let both acceptances reach the relay before A can close the loser's offer.
       await a.context.setOffline(true);
@@ -288,6 +334,14 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
           exact: false,
         }),
       ).toBeVisible({ timeout: 90_000 });
+
+      await expect(
+        loser.page.getByText("Waiting for bank details.", { exact: false }),
+      ).toBeHidden();
+      await testInfo.attach("losing recipient sees the winner decision", {
+        body: await loser.page.screenshot(),
+        contentType: "image/png",
+      });
 
       const record = await a.page.evaluate(
         (id) =>
@@ -431,4 +485,16 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
   } finally {
     for (const account of accounts) await account.context.close();
   }
+};
+
+test("proxy payment: bank details reach exactly one acceptor, who is paid in sats", async ({
+  browser,
+}, testInfo) => {
+  await runProxyPayment(browser, testInfo, false);
+});
+
+test("proxy payment: delayed loser notification closes a newer acceptance", async ({
+  browser,
+}, testInfo) => {
+  await runProxyPayment(browser, testInfo, true);
 });

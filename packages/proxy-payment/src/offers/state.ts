@@ -74,6 +74,13 @@ const isStaleFor = (
   event: Pick<BankOfferInboxEvent, "sentAt" | "status">,
   isOfferer: boolean,
 ): boolean => {
+  if (
+    isOfferer &&
+    event.status === "accepted_by_other" &&
+    known.status === "accepted"
+  ) {
+    return false;
+  }
   const knownUpdatedAt = offerUpdatedAtSec(known);
   return (
     event.sentAt < knownUpdatedAt ||

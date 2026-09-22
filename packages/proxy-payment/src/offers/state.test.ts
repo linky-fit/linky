@@ -38,6 +38,43 @@ class Book {
 }
 
 describe("applyBankPaymentOfferSnapshot", () => {
+  it.each([false, true])(
+    "closes a losing acceptance even when its timestamp is newer than the offerer's decision (self: %s)",
+    (self) => {
+      const viewer = self ? me : payer;
+      const offered = applyBankPaymentOfferSnapshot(
+        emptyBankPaymentOfferState,
+        snapshot("offered", self, self ? {} : { from: me }),
+        viewer,
+        NOW,
+      ).state;
+      const accepted = applyBankPaymentOfferSnapshot(
+        offered,
+        snapshot("accepted", !self, {
+          from: self ? payer : me,
+          sentAt: UnixSeconds.make(START + 2),
+        }),
+        viewer,
+        NOW,
+      ).state;
+      expect(accepted.offers[0]?.status).toBe("accepted");
+      const result = applyBankPaymentOfferSnapshot(
+        accepted,
+        snapshot("accepted_by_other", self, {
+          ...(self ? {} : { from: me }),
+          sentAt: UnixSeconds.make(START + 1),
+        }),
+        viewer,
+        NOW,
+      );
+      expect(result.accepted).toHaveLength(1);
+      expect(result.state.offers[0]).toMatchObject({
+        status: "accepted_by_other",
+        spdPayload: null,
+      });
+    },
+  );
+
   it("does not create a fabricated outgoing paid offer", () => {
     const book = new Book();
     expect(book.apply(snapshot("bank_paid", false))).toEqual([]);
@@ -250,6 +287,78 @@ describe("applyBankPaymentOfferSnapshot", () => {
 });
 
 describe("applyBankPaymentOfferReceipt", () => {
+  it.each([false, true])(
+    "keeps the offerer's earlier winner decision when the acceptance receipt arrives first: %s",
+    (receiptFirst) => {
+      const received = applyBankPaymentOfferSnapshot(
+        emptyBankPaymentOfferState,
+        snapshot("offered", false, { from: me }),
+        payer,
+        NOW,
+      ).state;
+      const offered = received.offers[0];
+      if (!offered) throw new Error("Missing received offer");
+      const draft = bankPaymentOfferResponseDraft(offered, "accepted", payer);
+      if (!draft) throw new Error("Missing acceptance draft");
+      const receipt = receiptFor(draft, UnixSeconds.make(START + 2));
+      const decision = snapshot("accepted_by_other", false, {
+        from: me,
+        sentAt: UnixSeconds.make(START + 1),
+      });
+      const beforeDecision = receiptFirst
+        ? applyBankPaymentOfferReceipt(received, me, receipt).state
+        : received;
+      const decided = applyBankPaymentOfferSnapshot(
+        beforeDecision,
+        decision,
+        payer,
+        NOW,
+      ).state;
+      const result = applyBankPaymentOfferReceipt(decided, me, receipt);
+      expect(result.state.offers[0]).toMatchObject({
+        status: "accepted_by_other",
+        spdPayload: null,
+      });
+      const echoed = applyBankPaymentOfferSnapshot(
+        result.state,
+        snapshot("accepted", true, {
+          from: me,
+          sentAt: UnixSeconds.make(START + 2),
+        }),
+        payer,
+        NOW,
+      );
+      expect(echoed.state).toBe(result.state);
+    },
+  );
+
+  it("merges a winner-decision receipt over a newer losing acceptance", () => {
+    const book = new Book();
+    book.apply(snapshot("offered", true));
+    const offered = book.state.offers[0];
+    if (!offered) throw new Error("Missing sent offer");
+    const draft = bankPaymentOfferResponseDraft(
+      offered,
+      "accepted_by_other",
+      me,
+    );
+    if (!draft) throw new Error("Missing winner-decision draft");
+    book.apply(
+      snapshot("accepted", false, {
+        sentAt: UnixSeconds.make(START + 2),
+      }),
+    );
+    const result = applyBankPaymentOfferReceipt(
+      book.state,
+      payer,
+      receiptFor(draft, UnixSeconds.make(START + 1)),
+    );
+    expect(result.offer).toMatchObject({
+      status: "accepted_by_other",
+      spdPayload: null,
+    });
+  });
+
   it.each([0, 1])(
     "keeps bank details when an acceptance receipt from %i seconds earlier completes",
     (detailsDelaySec) => {
