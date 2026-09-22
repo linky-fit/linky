@@ -1,63 +1,20 @@
+import {
+  fiatRecurringAmount,
+  isFiatRecurringAmount,
+  recurringAmountSat,
+  recurringFiatValue,
+  type RecurringAmount,
+} from "@linky-fit/recurring-payment";
 import type { I18nKey, Translate } from "../../i18n";
 import {
-  convertFiatToSat,
   convertSatToFiat,
   getDisplayUnitLabel,
   isFiatDisplayCurrency,
   type DisplayAmountParts,
   type DisplayCurrency,
-  type FiatDisplayCurrency,
   type FiatRates,
 } from "../../utils/displayAmounts";
 import { formatInteger, normalizeLocale } from "../../utils/formatting";
-
-/** The unit a recurring payment is fixed in: sats, or the fiat currency the user typed. */
-export type RecurringAmountUnit = "sat" | FiatDisplayCurrency;
-
-/**
- * A recurring payment's amount as the user set it. A fiat amount is stored in
- * hundredths (cents, haléře) and converted to sats at each run, so what goes
- * out follows the exchange rate instead of the day the payment was set up.
- */
-export interface RecurringAmount {
-  amount: number;
-  unit: RecurringAmountUnit;
-}
-
-const FIAT_MINOR_PER_UNIT = 100;
-
-export const isRecurringAmountUnit = (
-  value: unknown,
-): value is RecurringAmountUnit =>
-  value === "sat" ||
-  value === "czk" ||
-  value === "eur" ||
-  value === "chf" ||
-  value === "usd";
-
-export const isFiatRecurringAmount = (
-  amount: RecurringAmount,
-): amount is RecurringAmount & { unit: FiatDisplayCurrency } =>
-  amount.unit !== "sat";
-
-/** Whole fiat units of a fiat amount (150.50 for 15050 hundredths). */
-export const recurringFiatValue = (amount: RecurringAmount): number =>
-  amount.amount / FIAT_MINOR_PER_UNIT;
-
-/** Sats a run would send at the given rates; null while a fiat amount has no rate. */
-export const recurringAmountSat = (
-  amount: RecurringAmount,
-  fiatRates: FiatRates | null,
-): number | null => {
-  if (!isFiatRecurringAmount(amount)) return amount.amount;
-  if (fiatRates === null) return null;
-  const sat = convertFiatToSat(
-    recurringFiatValue(amount),
-    amount.unit,
-    fiatRates,
-  );
-  return sat > 0 ? sat : null;
-};
 
 const parseDisplayValue = (value: string): number | null => {
   const normalized = value.trim().replace(",", ".");
@@ -88,9 +45,9 @@ export const recurringAmountFromInput = (input: {
       (hasSat && input.fiatRates
         ? convertSatToFiat(sat, input.displayCurrency, input.fiatRates)
         : null);
-    if (fiatValue === null) return null;
-    const minor = Math.round(fiatValue * FIAT_MINOR_PER_UNIT);
-    return minor > 0 ? { amount: minor, unit: input.displayCurrency } : null;
+    return fiatValue === null
+      ? null
+      : fiatRecurringAmount(fiatValue, input.displayCurrency);
   }
   return hasSat ? { amount: sat, unit: "sat" } : null;
 };

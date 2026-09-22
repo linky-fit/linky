@@ -9,6 +9,10 @@ import {
   type RecurringPaymentId,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
+import {
+  RECURRING_CONFIRM_SEC,
+  RECURRING_NOTICE_SEC,
+} from "@linky-fit/recurring-payment";
 import { Effect } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,10 +24,6 @@ import {
   recurringPaymentIdFor,
 } from "../../../testUtils/recurringOrders";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
-import {
-  RECURRING_CONFIRM_SEC,
-  RECURRING_NOTICE_SEC,
-} from "../../lib/recurringPaymentTick";
 import type { ContactRowLike } from "../../types/appTypes";
 import { useRecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
 

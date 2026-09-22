@@ -36,7 +36,7 @@ import { selectSendMintForAmount } from "../lib/paymentMintSelection";
 import {
   recurringRunDetails,
   type RecurringRunRef,
-} from "../lib/recurringPaymentOrder";
+} from "@linky-fit/recurring-payment";
 import type { SendMintBalance } from "../lib/paymentMintSelection";
 import type {
   ContactPayRowLike,

@@ -1,27 +1,19 @@
 import { describe, expect, it } from "vitest";
-import {
-  DUE,
-  HOUR,
-  recurringOrderFixture,
-  recurringPaymentIdFor,
-} from "../../../testUtils/recurringOrders";
-import { RECURRING_NOTICE_SEC } from "../../lib/recurringPaymentTick";
-import {
-  MAX_SYNCED_REMINDERS,
-  reminderTimesFor,
-} from "./useRecurringReminderSync";
+import { MAX_SYNCED_REMINDERS, reminderTimesFor } from "./reminders";
+import { DUE, HOUR, recurringOrderFixture } from "./testing/orders";
+import { RECURRING_NOTICE_SEC } from "./tick";
 
 describe("reminderTimesFor", () => {
   it("notifies the notice window before each unpaused next due time, soonest first", () => {
     const later = recurringOrderFixture({
-      id: recurringPaymentIdFor("rp-2"),
+      id: "rp-2",
       schedule: {
         ...recurringOrderFixture().schedule,
         nextDueAtSec: DUE + HOUR,
       },
     });
     const paused = recurringOrderFixture({
-      id: recurringPaymentIdFor("rp-3"),
+      id: "rp-3",
       schedule: {
         ...recurringOrderFixture().schedule,
         pausedAtSec: DUE - HOUR,
@@ -39,7 +31,7 @@ describe("reminderTimesFor", () => {
     expect(reminderTimesFor([recurringOrderFixture()], DUE)).toEqual([]);
     const many = Array.from({ length: MAX_SYNCED_REMINDERS + 5 }, (_, index) =>
       recurringOrderFixture({
-        id: recurringPaymentIdFor(`rp-${index}`),
+        id: `rp-${index}`,
         schedule: {
           ...recurringOrderFixture().schedule,
           nextDueAtSec: DUE + index * HOUR,

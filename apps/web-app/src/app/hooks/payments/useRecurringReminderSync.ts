@@ -1,4 +1,8 @@
 import { identityFromNsec } from "@linky-fit/linkstr";
+import {
+  reminderTimesFor,
+  type RecurringPaymentOrder,
+} from "@linky-fit/recurring-payment";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { RECURRING_REMINDERS_SYNCED_STORAGE_KEY_PREFIX } from "../../../utils/constants";
@@ -7,11 +11,6 @@ import {
   safeLocalStorageSet,
 } from "../../../utils/storage";
 import { nowSeconds } from "../../../utils/time";
-import type { RecurringPaymentOrder } from "../../lib/recurringPaymentOrder";
-import { RECURRING_NOTICE_SEC } from "../../lib/recurringPaymentTick";
-
-/** The server keeps at most this many per pubkey; the soonest ones matter. */
-export const MAX_SYNCED_REMINDERS = 32;
 const SYNC_DEBOUNCE_MS = 2_000;
 /** Re-send an unchanged set this often so a server that lost it recovers. */
 const RESYNC_AFTER_MS = 12 * 60 * 60 * 1000;
@@ -29,18 +28,6 @@ interface UseRecurringReminderSyncParams {
     ) => Promise<{ success: boolean; error?: string }>;
   };
 }
-
-/** When the push service should nudge the user: the notice window before each next due time. */
-export const reminderTimesFor = (
-  orders: ReadonlyArray<RecurringPaymentOrder>,
-  nowSec: number,
-): number[] =>
-  orders
-    .filter((order) => order.schedule.pausedAtSec === null)
-    .map((order) => order.schedule.nextDueAtSec - RECURRING_NOTICE_SEC)
-    .filter((notifyAtSec) => notifyAtSec >= nowSec)
-    .sort((a, b) => a - b)
-    .slice(0, MAX_SYNCED_REMINDERS);
 
 interface SyncedRemindersRecord {
   atMs: number;

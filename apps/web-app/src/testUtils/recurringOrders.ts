@@ -3,7 +3,10 @@ import {
   type ContactId,
   type RecurringPaymentId,
 } from "@linky-fit/linksync";
-import type { RecurringPaymentOrder } from "../app/lib/recurringPaymentOrder";
+import { recurringOrderFixture as baseFixture } from "@linky-fit/recurring-payment/testing";
+import type { RecurringPaymentOrder } from "../app/lib/recurringPaymentStore";
+
+export { DUE, HOUR } from "@linky-fit/recurring-payment/testing";
 
 export const recurringPaymentIdFor = (key: string): RecurringPaymentId =>
   createIdFromString<"RecurringPayment">(`test/recurring/${key}`);
@@ -11,27 +14,12 @@ export const recurringPaymentIdFor = (key: string): RecurringPaymentId =>
 export const contactIdFor = (key: string): ContactId =>
   createIdFromString<"Contact">(`test/contact/${key}`);
 
-export const HOUR = 3600;
-export const DUE = 1_800_000_000;
-
-/** A 6-hourly sat payment due at `DUE`, unclaimed, never run. */
+/** The package fixture with this app's branded ids. */
 export const recurringOrderFixture = (
   overrides: Partial<RecurringPaymentOrder> = {},
 ): RecurringPaymentOrder => ({
+  ...baseFixture(),
   id: recurringPaymentIdFor("rp-1"),
-  createdAtSec: DUE - 10 * HOUR,
   contactId: contactIdFor("contact-1"),
-  amount: { amount: 100, unit: "sat" },
-  schedule: {
-    anchorAtSec: DUE,
-    interval: { unit: "hour", count: 6 },
-    timeZone: "UTC",
-    nextDueAtSec: DUE,
-    runCount: 0,
-    pausedAtSec: null,
-  },
-  lastRunAtSec: null,
-  lastRunStatus: null,
-  claim: null,
   ...overrides,
 });

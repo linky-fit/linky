@@ -31,6 +31,7 @@
     "@linky-fit/linkstr-react": "workspace:*",
     "@linky-fit/linksync": "workspace:*",
     "@linky-fit/proxy-payment": "workspace:*",
+    "@linky-fit/recurring-payment": "workspace:*",
     "@linky-fit/site": "workspace:*",
     "@linky-fit/ui": "workspace:*",
     "@noble/hashes": "^1.5.0",
