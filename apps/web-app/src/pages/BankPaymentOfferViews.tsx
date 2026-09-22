@@ -212,6 +212,35 @@ export function ExpiredOfferView({ t, closeOffer }: ExpiredOfferViewProps) {
   );
 }
 
+interface CanceledOfferViewProps {
+  t: Translate;
+  requesterName: string;
+  closeOffer: () => void;
+}
+
+export function CanceledOfferView({
+  t,
+  requesterName,
+  closeOffer,
+}: CanceledOfferViewProps) {
+  return (
+    <section className="panel panel-plain bank-payment-offer-state-page">
+      <div className="bank-payment-offer-state-copy">
+        <h2>{t("bankPaymentOfferCanceledTitle")}</h2>
+        <p className="muted">
+          {t("bankPaymentOfferCanceledDescription").replace(
+            "{name}",
+            requesterName,
+          )}
+        </p>
+      </div>
+      <button type="button" className="btn-wide" onClick={closeOffer}>
+        {t("close")}
+      </button>
+    </section>
+  );
+}
+
 interface OwnerOfferViewProps {
   activeEntry: BankPaymentOfferEntry;
   activeAmountText: string;

@@ -625,6 +625,9 @@ export const en = {
   bankPaymentOfferBackupRecipient: "This contact is kept as a backup.",
   bankPaymentOfferDeclinedNotification: "Payment was declined.",
   bankPaymentOfferExpired: "This phase has expired",
+  bankPaymentOfferCanceledTitle: "Offer canceled",
+  bankPaymentOfferCanceledDescription:
+    "{name} canceled the offer. Do not send the bank payment.",
   bankPaymentOfferExpiredTitle: "This offer has expired",
   bankPaymentOfferExpiredDescription:
     "This proxy payment offer is no longer valid.",

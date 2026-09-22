@@ -186,6 +186,33 @@ describe("BankPaymentOfferDetailPage", () => {
     expect(window.location.hash).toBe("#chat/contact-1");
   });
 
+  it("shows a canceled offer as closed even when bank details were already sent", async () => {
+    const createdAtSec = Math.floor(Date.now() / 1_000);
+    const canceled: LocalNostrMessage = {
+      ...createOfferMessage("bank_details_sent"),
+      content: createLinkyBankPaymentOfferEvent({
+        amountSat: 1_000,
+        amountText: "1,000 sat",
+        clientId: "client-offer-1",
+        createdAt: createdAtSec,
+        offerId: "offer-1",
+        offererPublicKey: OFFERER_PUBKEY,
+        recipientPublicKey: RECIPIENT_PUBKEY,
+        senderPublicKey: OFFERER_PUBKEY,
+        spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399*AM:100.00*CC:CZK",
+        status: "canceled",
+      }).content,
+    };
+    const container = await renderOffer({
+      bankPaymentOfferMessages: [canceled],
+    });
+
+    expect(container.textContent).toContain("bankPaymentOfferCanceledTitle");
+    expect(container.textContent).not.toContain("bankPaymentOfferMarkPaid");
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelectorAll("button")).toHaveLength(1);
+  });
+
   it("shows that another candidate accepted first as a closed state", async () => {
     const container = await renderOffer({ status: "accepted_by_other" });
 

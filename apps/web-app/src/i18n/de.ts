@@ -629,6 +629,9 @@ export const de = {
     "Dieser Kontakt bleibt als Reserve erhalten.",
   bankPaymentOfferDeclinedNotification: "Zahlung wurde abgelehnt.",
   bankPaymentOfferExpired: "Diese Phase ist abgelaufen",
+  bankPaymentOfferCanceledTitle: "Angebot storniert",
+  bankPaymentOfferCanceledDescription:
+    "{name} hat das Angebot storniert. Sende die Banküberweisung nicht.",
   bankPaymentOfferExpiredTitle: "Dieses Angebot ist abgelaufen",
   bankPaymentOfferExpiredDescription:
     "Der Zahlungsprozess wurde nicht rechtzeitig abgeschlossen.",

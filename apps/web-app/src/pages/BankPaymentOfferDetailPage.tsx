@@ -36,6 +36,7 @@ import {
   AcceptedByOtherOfferView,
   AwaitingBankDetailsOfferView,
   BankDetailsOfferView,
+  CanceledOfferView,
   ExpiredOfferView,
   IncomingOfferView,
   InvalidOfferView,
@@ -542,6 +543,17 @@ export const BankPaymentOfferDetailPage: React.FC<
 
   if (entry.info.status === "accepted_by_other") {
     return <AcceptedByOtherOfferView t={t} closeOffer={closeOffer} />;
+  }
+  // A cancellation after the bank details went out keeps the pinned payload,
+  // so the recipient must never fall through to the payment instructions.
+  if (entry.info.status === "canceled") {
+    return (
+      <CanceledOfferView
+        t={t}
+        requesterName={requesterName}
+        closeOffer={closeOffer}
+      />
+    );
   }
 
   if (entry.info.status === "offered" && entry.message.direction === "in") {
