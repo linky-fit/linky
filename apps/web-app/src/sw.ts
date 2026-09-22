@@ -23,7 +23,7 @@ import { ExpirationPlugin } from "workbox-expiration";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { CacheFirst } from "workbox-strategies";
 import { normalizePubkeyHex } from "./app/hooks/messages/contactIdentity";
-import { getLinkyBankPaymentOfferMessageText } from "./app/lib/bankPaymentOffer";
+import { bankPaymentOfferMessageText } from "@linky/proxy-payment";
 import { extractCashuTokenFromText } from "./app/lib/tokenText";
 import {
   getBankPaymentReimbursementCopyForLanguage,
@@ -292,7 +292,7 @@ function buildDecryptedPushMessage(
       return {
         body:
           event.text ??
-          getLinkyBankPaymentOfferMessageText(event.amountText, event.status),
+          bankPaymentOfferMessageText(event.amountText, event.status),
         isCashu: false,
         isPaymentNotice: false,
         senderPub: event.from,

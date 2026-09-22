@@ -19,12 +19,14 @@ import { aggregateReactions } from "../app/hooks/messages/chatReactions";
 import type { EditChatContext } from "../app/hooks/messages/useEditChatMessage";
 import type { ReplyContext } from "../app/hooks/messages/useSendChatMessage";
 import {
-  getLinkyBankPaymentOfferInfo,
-  isLinkyBankPaymentOfferExpired,
-  isLinkyBankPaymentOfferMinimized,
-  setLinkyBankPaymentOfferMinimized,
-  type LinkyBankPaymentOfferInfo,
-} from "../app/lib/bankPaymentOffer";
+  type BankPaymentOfferInfo,
+  decodeBankPaymentOffer,
+  isBankPaymentOfferExpired,
+} from "@linky/proxy-payment";
+import {
+  isBankPaymentOfferMinimized,
+  setBankPaymentOfferMinimized,
+} from "../app/lib/bankPaymentOfferStorage";
 import { formatChatMessagePreviewText } from "../app/lib/chatMessageDisplay";
 import {
   captureChatViewportAnchor,
@@ -140,12 +142,12 @@ interface ChatPageProps {
 
 interface IndexedBankPaymentOffer {
   contactId: string;
-  info: LinkyBankPaymentOfferInfo;
+  info: BankPaymentOfferInfo;
   updatedAtSec: number;
 }
 
 interface ParsedChatMessage {
-  bankPaymentOfferInfo: LinkyBankPaymentOfferInfo | null;
+  bankPaymentOfferInfo: BankPaymentOfferInfo | null;
   declineInfo: ReturnType<typeof parseLinkyPaymentRequestDeclineMessage>;
   isCashuToken: boolean;
   paymentRequestInfo: CashuPaymentRequestMessageInfo | null;
@@ -178,7 +180,7 @@ const buildBankPaymentOfferIndex = (
   const byOfferId = new Map<string, IndexedBankPaymentOffer[]>();
 
   for (const message of messages) {
-    const info = getLinkyBankPaymentOfferInfo(message.content);
+    const info = decodeBankPaymentOffer(message.content);
     if (!info) continue;
 
     const indexed = {
@@ -196,7 +198,7 @@ const buildBankPaymentOfferIndex = (
 
 const getBankPaymentOfferPeerNotice = (
   message: LocalNostrMessage,
-  offerInfo: LinkyBankPaymentOfferInfo | null,
+  offerInfo: BankPaymentOfferInfo | null,
   offersById: Map<string, IndexedBankPaymentOffer[]>,
 ): BankPaymentOfferPeerNotice | null => {
   if (!offerInfo || message.direction !== "out") return null;
@@ -349,7 +351,7 @@ const ChatMessageList = memo(function ChatMessageList({
       const rumorId = (message.rumorId ?? "").trim();
       if (rumorId) byRumorId.set(rumorId, message);
       parsedByMessage.set(message, {
-        bankPaymentOfferInfo: getLinkyBankPaymentOfferInfo(content),
+        bankPaymentOfferInfo: decodeBankPaymentOffer(content),
         declineInfo: parseLinkyPaymentRequestDeclineMessage(content),
         isCashuToken: Boolean(getCashuTokenMessageInfo(content)),
         paymentRequestInfo: parseCashuPaymentRequestMessage(content),
@@ -455,7 +457,7 @@ const ChatMessageList = memo(function ChatMessageList({
           const offerId = (parsed.bankPaymentOfferInfo?.offerId ?? "").trim();
           const chatId = message.contactId.trim();
           if (!offerId || !chatId) return;
-          setLinkyBankPaymentOfferMinimized(chatId, offerId, false);
+          setBankPaymentOfferMinimized(chatId, offerId, false);
           navigateTo({ route: "bankPaymentOffer", chatId, offerId });
         },
         onPayPaymentRequest: (requestInfo) => {
@@ -1220,12 +1222,12 @@ export const ChatPage: FC<ChatPageProps> = ({
       if (message.contactId.trim() !== chatId) continue;
       if (message.direction !== "in") continue;
 
-      const info = getLinkyBankPaymentOfferInfo(message.content);
+      const info = decodeBankPaymentOffer(message.content);
       if (!info || info.status !== "offered") continue;
-      if (isLinkyBankPaymentOfferExpired(info, message.createdAtSec, nowSec)) {
+      if (isBankPaymentOfferExpired(info, message.createdAtSec, nowSec)) {
         continue;
       }
-      if (isLinkyBankPaymentOfferMinimized(chatId, info.offerId)) continue;
+      if (isBankPaymentOfferMinimized(chatId, info.offerId)) continue;
 
       const updatedAtSec = info.statusUpdatedAtSec ?? message.createdAtSec;
       if (!newestOffer || updatedAtSec > newestOffer.updatedAtSec) {

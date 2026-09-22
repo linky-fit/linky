@@ -12,12 +12,14 @@ import { useAppShellCore } from "../app/context/AppShellContexts";
 import {
   formatRemainingTime,
   getBankPaymentOfferStatusLabel,
+} from "../app/lib/bankPaymentOfferLabels";
+import {
+  BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
+  type BankOfferStatus,
+  type BankPaymentOfferInfo,
   hasBankPaymentOfferTimedPhase,
-  isLinkyBankPaymentOfferTerminalStatus,
-  LINKY_BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
-  type LinkyBankPaymentOfferInfo,
-  type LinkyBankPaymentOfferStatus,
-} from "../app/lib/bankPaymentOffer";
+  isTerminalBankPaymentOfferStatus,
+} from "@linky/proxy-payment";
 import { parseIdentityChangeMessageContent } from "../app/lib/identityChangeMessage";
 import {
   extractMessageLinks,
@@ -79,7 +81,7 @@ interface ChatMessageProps {
     save: string;
     share: string;
   };
-  bankPaymentOfferInfo: LinkyBankPaymentOfferInfo | null;
+  bankPaymentOfferInfo: BankPaymentOfferInfo | null;
   bankPaymentOfferPeerNotice: BankPaymentOfferPeerNotice | null;
   canOpenBankPaymentOfferDetails: boolean;
   canSettleBankPaymentOffer: boolean;
@@ -138,7 +140,7 @@ const getChatTimeFormatter = (locale: string): Intl.DateTimeFormat => {
 };
 
 const getBankPaymentOfferDescriptionKey = (
-  status: LinkyBankPaymentOfferStatus,
+  status: BankOfferStatus,
   isOut: boolean,
 ): I18nKey | null => {
   switch (status) {
@@ -164,7 +166,7 @@ const getBankPaymentOfferDescriptionKey = (
 };
 
 const getBankPaymentOfferDescription = (
-  status: LinkyBankPaymentOfferStatus,
+  status: BankOfferStatus,
   amountText: string,
   isOut: boolean,
   t: Translate,
@@ -278,7 +280,7 @@ function ChatMessageComponent({
   const bankOfferPhaseTtlSec =
     bankPaymentOfferInfo &&
     hasBankPaymentOfferTimedPhase(bankPaymentOfferInfo.status)
-      ? LINKY_BANK_PAYMENT_OFFER_PHASE_TTL_SEC
+      ? BANK_PAYMENT_OFFER_PHASE_TTL_SEC
       : null;
   const bankOfferPhaseStartedAtSec =
     bankPaymentOfferInfo?.statusUpdatedAtSec ?? createdAtSec;
@@ -789,7 +791,7 @@ function ChatMessageComponent({
                     </div>
                   ) : null}
                   {canOpenBankPaymentOfferDetails &&
-                  !isLinkyBankPaymentOfferTerminalStatus(
+                  !isTerminalBankPaymentOfferStatus(
                     bankPaymentOfferInfo.status,
                   ) ? (
                     <div className="chat-payment-request-actions">

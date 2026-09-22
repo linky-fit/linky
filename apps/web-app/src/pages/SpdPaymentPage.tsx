@@ -3,25 +3,23 @@ import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useFiatRates } from "../app/hooks/useFiatRates";
 import {
-  LINKY_BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
-  LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC,
-  LINKY_BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC,
-} from "../app/lib/bankPaymentOffer";
+  BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
+  BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC,
+  BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC,
+  type BankPayment,
+  type BankPaymentFieldKey,
+  formatDomesticBankAccount,
+  getBankPaymentEditableFieldKeys,
+  tryParseBankPayment,
+  updateBankPaymentFields,
+} from "@linky/proxy-payment";
 import { Avatar } from "../components/Avatar";
 import { BankPaymentAmount } from "../components/BankPaymentAmount";
 import { SettingsStepper } from "../components/SettingsStepper";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey, Translate } from "../i18n";
-import { formatDomesticBankAccount } from "../utils/bankAccount";
 import type { FiatRates } from "../utils/displayAmounts";
 import { formatInteger, getInitials } from "../utils/formatting";
-import {
-  getBankPaymentEditableFieldKeys,
-  tryParseBankPayment,
-  updateBankPaymentFields,
-  type BankPayment,
-  type BankPaymentFieldKey,
-} from "../utils/spdPayment";
 
 interface SpdPaymentPageProps {
   cashuBalanceAfterMelt: number;
@@ -74,11 +72,10 @@ const getInitialOfferContactKeys = (
   contacts.slice(0, Math.max(0, count)).map(getOfferContactKey).filter(Boolean);
 
 const clampOfferDelaySec = (value: number): number => {
-  if (!Number.isFinite(value))
-    return LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC;
+  if (!Number.isFinite(value)) return BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC;
   return Math.min(
-    LINKY_BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
-    Math.max(LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC, Math.trunc(value)),
+    BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
+    Math.max(BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC, Math.trunc(value)),
   );
 };
 
@@ -501,10 +498,10 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
           ariaLabel={t("bankPaymentOfferStaggerDelay")}
           decreaseLabel={t("bankPaymentOfferStaggerDelayDecrease")}
           increaseLabel={t("bankPaymentOfferStaggerDelayIncrease")}
-          max={LINKY_BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC}
-          min={LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC}
+          max={BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC}
+          min={BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC}
           onChange={(value) => setOfferDelaySec(clampOfferDelaySec(value))}
-          step={LINKY_BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC}
+          step={BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC}
           value={offerDelaySec}
           valueText={`${offerDelaySec} s`}
         />

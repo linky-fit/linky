@@ -1,7 +1,7 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import type { LinkyBankPaymentOfferInfo } from "../app/lib/bankPaymentOffer";
+import type { BankPaymentOfferInfo } from "@linky/proxy-payment";
 import { serializePrivateImageMessage } from "../app/lib/privateImageMessage";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import {
@@ -62,7 +62,7 @@ const contactInfo = (
 });
 
 interface RenderChatMessageOptions {
-  bankPaymentOfferInfo?: LinkyBankPaymentOfferInfo | null;
+  bankPaymentOfferInfo?: BankPaymentOfferInfo | null;
   canReplyOrReact?: boolean;
   canSettleBankPaymentOffer?: boolean;
   direction?: "in" | "out";
@@ -369,7 +369,7 @@ describe("ChatMessage bank payment offer actions", () => {
 
   it("settles a paid offer from the chat card", async () => {
     const onSettleBankPaymentOffer = vi.fn(async () => undefined);
-    const bankPaymentOfferInfo: LinkyBankPaymentOfferInfo = {
+    const bankPaymentOfferInfo: BankPaymentOfferInfo = {
       amountSat: 10,
       amountText: "10 sat",
       bankPaidAtSec: 1_700_000_000,

@@ -1,6 +1,4 @@
 import {
-  BankOfferId,
-  BankOfferSnapshotReceived,
   PaymentNoticeReceived,
   Pubkey,
   RumorId,
@@ -11,12 +9,11 @@ import { describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { buildCashuToken } from "../../../testUtils/cashuToken";
 import type { PushToastOptions } from "../../../hooks/useToasts";
-import { getLinkyBankPaymentOfferInfo } from "../../lib/bankPaymentOffer";
+import type { BankPaymentOffer } from "@linky/proxy-payment";
 import type { LocalNostrMessage } from "../../types/appTypes";
 import {
-  bankOfferContentFromSnapshot,
-  handleBankOfferSnapshotReceived,
   handlePaymentNoticeReceived,
+  notifyBankOfferSnapshot,
   notifyInsertedChatMessage,
   type InboxNotificationsContext,
 } from "./inboxNotifications";
@@ -27,7 +24,6 @@ const SNAPSHOT_RUMOR_ID = "b".repeat(64);
 const SENT_AT = 1_700_000_100;
 
 interface HarnessOptions {
-  bankPaymentOfferMessages?: LocalNostrMessage[];
   messages?: LocalNostrMessage[];
   route?: { id?: string; kind: string; offerId?: string };
 }
@@ -36,15 +32,12 @@ const createHarness = (options: HarnessOptions = {}) => {
   const maybeShowPwaNotification = vi.fn<
     (title: string, body: string, tag?: string) => Promise<void>
   >(async () => {});
-  const onBankPaymentOfferMessage =
-    vi.fn<(message: LocalNostrMessage) => void>();
   const onOpenInboxMessageToast =
     vi.fn<(params: { contactId: string; messageId?: string }) => void>();
   const pushToast =
     vi.fn<(message: string, options?: PushToastOptions) => void>();
 
   const ctx: InboxNotificationsContext = {
-    bankPaymentOfferMessages: options.bankPaymentOfferMessages ?? [],
     findContact: (pubkey) =>
       pubkey === peerPubkey
         ? { id: "contact-1", name: "Alice", npub: null }
@@ -52,7 +45,6 @@ const createHarness = (options: HarnessOptions = {}) => {
     formatDisplayedAmountText: (amountSat) => `${amountSat} sat`,
     maybeShowPwaNotification,
     messages: options.messages ?? [],
-    onBankPaymentOfferMessage,
     onOpenInboxMessageToast,
     pushToast,
     route: options.route ?? { kind: "contacts" },
@@ -63,7 +55,6 @@ const createHarness = (options: HarnessOptions = {}) => {
   return {
     ctx,
     maybeShowPwaNotification,
-    onBankPaymentOfferMessage,
     onOpenInboxMessageToast,
     pushToast,
   };
@@ -211,31 +202,28 @@ describe("handlePaymentNoticeReceived", () => {
   });
 });
 
-describe("handleBankOfferSnapshotReceived", () => {
-  const snapshot = (
-    overrides: Partial<
-      ConstructorParameters<typeof BankOfferSnapshotReceived>[0]
-    > = {},
-  ): BankOfferSnapshotReceived =>
-    new BankOfferSnapshotReceived({
-      snapshotId: RumorId.make(SNAPSHOT_RUMOR_ID),
-      from: Pubkey.make(peerPubkey),
-      offerId: BankOfferId.make("offer-1"),
-      offerer: Pubkey.make(peerPubkey),
-      status: "offered",
-      amountText: "500 Kč",
-      text: "Zaplatíš za mě?",
-      amountSat: 40_000,
-      initiatedAtSec: UnixSeconds.make(SENT_AT),
-      bankPaidAtSec: null,
-      expiresAtSec: null,
-      extensionSec: null,
-      spdPayload: null,
-      statusUpdatedAtSec: UnixSeconds.make(SENT_AT),
-      clientId: null,
-      sentAt: UnixSeconds.make(SENT_AT),
-      ...overrides,
-    });
+describe("notifyBankOfferSnapshot", () => {
+  const offer = (
+    status: BankPaymentOffer["status"] = "offered",
+  ): BankPaymentOffer => ({
+    amountSat: 40_000,
+    amountText: "500 Kč",
+    bankPaidAtSec: null,
+    clientId: null,
+    content: "{}",
+    createdAtSec: SENT_AT,
+    expiresAtSec: null,
+    extensionSec: null,
+    initiatedAtSec: SENT_AT,
+    offerId: "offer-1",
+    offererPublicKey: peerPubkey,
+    peer: peerPubkey,
+    snapshotId: SNAPSHOT_RUMOR_ID,
+    spdPayload: null,
+    status,
+    statusUpdatedAtSec: SENT_AT,
+    text: "Zaplatíš za mě?",
+  });
 
   const incomingScope = {
     contactId: "contact-1",
@@ -245,50 +233,9 @@ describe("handleBankOfferSnapshotReceived", () => {
     peerPubkey,
   } as const;
 
-  it("re-encodes the snapshot into parseable offer content", () => {
-    const info = getLinkyBankPaymentOfferInfo(
-      bankOfferContentFromSnapshot(snapshot()),
-    );
-
-    expect(info).toEqual(
-      expect.objectContaining({
-        amountSat: 40_000,
-        amountText: "500 Kč",
-        offerId: "offer-1",
-        offererPublicKey: peerPubkey,
-        status: "offered",
-        statusUpdatedAtSec: SENT_AT,
-        text: "Zaplatíš za mě?",
-      }),
-    );
-  });
-
-  it("upserts the offer message and notifies for a live incoming offer", () => {
+  it("toasts and notifies for a live incoming offer", () => {
     const harness = createHarness();
-    const now = Math.floor(Date.now() / 1e3);
-
-    handleBankOfferSnapshotReceived(
-      snapshot({
-        initiatedAtSec: UnixSeconds.make(now),
-        sentAt: UnixSeconds.make(now),
-        statusUpdatedAtSec: UnixSeconds.make(now),
-      }),
-      incomingScope,
-      harness.ctx,
-    );
-
-    expect(harness.onBankPaymentOfferMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        contactId: "contact-1",
-        direction: "in",
-        id: `bank-payment-offer:${SNAPSHOT_RUMOR_ID}`,
-        localOnly: true,
-        pubkey: peerPubkey,
-        rumorId: SNAPSHOT_RUMOR_ID,
-        status: "sent",
-        wrapId: SNAPSHOT_RUMOR_ID,
-      }),
-    );
+    notifyBankOfferSnapshot(offer(), incomingScope, harness.ctx);
     expect(harness.pushToast).toHaveBeenCalledWith("Alice: Zaplatíš za mě?");
     expect(harness.maybeShowPwaNotification).toHaveBeenCalledWith(
       "Alice",
@@ -297,51 +244,24 @@ describe("handleBankOfferSnapshotReceived", () => {
     );
   });
 
-  it("upserts without notifying on backfill", () => {
-    const harness = createHarness();
-    const now = Math.floor(Date.now() / 1e3);
-
-    handleBankOfferSnapshotReceived(
-      snapshot({
-        initiatedAtSec: UnixSeconds.make(now),
-        sentAt: UnixSeconds.make(now),
-        statusUpdatedAtSec: UnixSeconds.make(now),
-      }),
-      { ...incomingScope, delivery: "backfill" },
-      harness.ctx,
-    );
-
-    expect(harness.onBankPaymentOfferMessage).toHaveBeenCalledTimes(1);
-    expect(harness.pushToast).not.toHaveBeenCalled();
-    expect(harness.maybeShowPwaNotification).not.toHaveBeenCalled();
-  });
-
-  it("skips expired offers entirely", () => {
-    const harness = createHarness();
-
-    handleBankOfferSnapshotReceived(
-      snapshot({
-        expiresAtSec: UnixSeconds.make(SENT_AT + 60),
-      }),
-      incomingScope,
-      harness.ctx,
-    );
-
-    expect(harness.onBankPaymentOfferMessage).not.toHaveBeenCalled();
-    expect(harness.pushToast).not.toHaveBeenCalled();
+  it("stays silent on backfill, for self-authored snapshots and inside the open chat", () => {
+    for (const [scope, options] of [
+      [{ ...incomingScope, delivery: "backfill" }, {}],
+      [{ ...incomingScope, isSelfAuthored: true }, {}],
+      [incomingScope, { route: { kind: "chat", id: "contact-1" } }],
+    ] as const) {
+      const harness = createHarness(options);
+      notifyBankOfferSnapshot(offer(), scope, harness.ctx);
+      expect(harness.pushToast).not.toHaveBeenCalled();
+    }
   });
 
   it("notifies the offerer of a decline and opens the contact chat from the toast", () => {
     const harness = createHarness();
-
-    handleBankOfferSnapshotReceived(
-      snapshot({ status: "declined" }),
+    notifyBankOfferSnapshot(
+      offer("declined"),
       { ...incomingScope, isOutgoing: true },
       harness.ctx,
-    );
-
-    expect(harness.onBankPaymentOfferMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ direction: "out" }),
     );
     expect(harness.maybeShowPwaNotification).toHaveBeenCalledWith(
       "Alice",
@@ -353,24 +273,5 @@ describe("handleBankOfferSnapshotReceived", () => {
     expect(harness.onOpenInboxMessageToast).toHaveBeenCalledWith({
       contactId: "contact-1",
     });
-  });
-
-  it("suppresses self-authored snapshots' notifications but still upserts", () => {
-    const harness = createHarness();
-    const now = Math.floor(Date.now() / 1e3);
-
-    handleBankOfferSnapshotReceived(
-      snapshot({
-        initiatedAtSec: UnixSeconds.make(now),
-        sentAt: UnixSeconds.make(now),
-        statusUpdatedAtSec: UnixSeconds.make(now),
-      }),
-      { ...incomingScope, isSelfAuthored: true },
-      harness.ctx,
-    );
-
-    expect(harness.onBankPaymentOfferMessage).toHaveBeenCalledTimes(1);
-    expect(harness.pushToast).not.toHaveBeenCalled();
-    expect(harness.maybeShowPwaNotification).not.toHaveBeenCalled();
   });
 });

@@ -4,7 +4,7 @@ import {
   isCashuAutoAcceptResolved,
   markCashuAutoAcceptResolved,
 } from "../../lib/autoAcceptedCashuMessages";
-import { getLinkyBankPaymentOfferInfo } from "../../lib/bankPaymentOffer";
+import { decodeBankPaymentOffer } from "@linky/proxy-payment";
 import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import { parsePrivateImageMessage } from "../../lib/privateImageMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
@@ -105,7 +105,7 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
         if (message.direction !== "in") continue;
 
         const content = message.content;
-        if (getLinkyBankPaymentOfferInfo(content)) continue;
+        if (decodeBankPaymentOffer(content)) continue;
         if (parsePrivateImageMessage(content)) continue;
 
         const info = getCashuTokenMessageInfo(content);

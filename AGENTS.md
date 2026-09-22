@@ -40,7 +40,7 @@ IMPORTANT: When you make or change an architectural decision, document it in `do
 
 ## Package docs
 
-`packages/linkshu/docs/`, `packages/linkstr/docs/`, and `packages/linksync/docs/` hold usage guides for the three libraries (linkstr-react is documented in `packages/linkstr/docs/react.md`; linksync's scope table in `packages/linksync/docs/concepts.md` is the source of truth for owner types, rotation rules, and forget policies). Read the relevant guide before using or changing a package, and follow the package's `AGENTS.md`: a change to an exported surface or documented behavior updates the matching guide in the same commit.
+`packages/linkshu/docs/`, `packages/linkstr/docs/`, `packages/linksync/docs/`, and `packages/proxy-payment/docs/` hold usage guides for the four libraries (linkstr-react is documented in `packages/linkstr/docs/react.md`; linksync's scope table in `packages/linksync/docs/concepts.md` is the source of truth for owner types, rotation rules, and forget policies; proxy-payment's `docs/offers.md` states the offer authorization order and the selectors the app's effects run on). Read the relevant guide before using or changing a package, and follow the package's `AGENTS.md`: a change to an exported surface or documented behavior updates the matching guide in the same commit.
 
 ## Inspector events
 
@@ -124,7 +124,7 @@ The compose image is built with `VITE_E2E=1`, which makes `main.tsx` install `wi
 - The local Nutshell mint charges `input_fee_ppk: 100`, so it is **not** fee-free; a receiver nets slightly less than the amount sent
 - The dev mint uses `MINT_RATE_LIMIT=FALSE` for HTTP and a high `MINT_TRANSACTION_RATE_LIMIT_PER_MINUTE` for NUT-17 WebSocket subscriptions. Nutshell 0.20.3's `limit_websocket` calls `assert_limit` directly and ignores the HTTP switch, so the default 20/minute still interrupts multi-browser E2E runs
 - The `nostr-rs-relay` image's `/bin/sh` is dash, so its healthcheck must invoke `bash` explicitly for `/dev/tcp`
-- `bysquare@4.0.0` is patched in both `src/pay/decode.ts` (Bun) and `lib/pay/decode.js` (browser): bound input and decoded text, reject zero/short LZMA output lengths, and bound payment/account loops by available fields. Keep both entry paths covered when upgrading; run `bysquareSafety.test.ts` and `spdPayment.test.ts`.
+- `bysquare@4.0.0` is patched in both `src/pay/decode.ts` (Bun) and `lib/pay/decode.js` (browser): bound input and decoded text, reject zero/short LZMA output lengths, and bound payment/account loops by available fields. Keep both entry paths covered when upgrading; run `packages/proxy-payment/src/bankQr/bysquareSafety.test.ts` and `bankPayment.test.ts`.
 - `nostr-tools` is patched via Bun `patchedDependencies` (`patches/nostr-tools@2.23.3.patch`): the browser keepalive REQ uses `limit: 1` because nostr-rs-relay silently ignores `limit: 0` REQs, so the unanswered ping killed every healthy connection ~every 50s. The ping code is duplicated into every `lib/` entry bundle (13 files) — when bumping nostr-tools, re-apply to all copies or drop the patch if upstream fixed it, and verify at runtime (a partial patch still sends `limit: 0`). Dockerfiles that run `bun install` must `COPY patches` first
 - `docker/web-app/Dockerfile` and `apps/push/Dockerfile` copy every workspace `package.json` before `bun install --frozen-lockfile`; adding a workspace under `apps/`, `packages/`, or `tools/` requires its manifest COPY in both Dockerfiles
 - SQLite WASM files served from `public/sqlite-wasm/` with `cache-control: no-store` in dev

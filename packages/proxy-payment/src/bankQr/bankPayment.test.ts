@@ -7,7 +7,7 @@ import {
   parseSpdPayment,
   tryParseBankPayment,
   updateBankPaymentFields,
-} from "./spdPayment";
+} from "./bankPayment";
 
 describe("spdPayment", () => {
   it("parses Czech SPD payment fields", () => {

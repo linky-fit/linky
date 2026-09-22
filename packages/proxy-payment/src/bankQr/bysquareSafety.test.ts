@@ -9,7 +9,7 @@ import {
   type DataModel,
 } from "bysquare/pay";
 import { describe, expect, it } from "vitest";
-import { isBankPaymentPayload, parseBankPayment } from "./spdPayment";
+import { isBankPaymentPayload, parseBankPayment } from "./bankPayment";
 
 const model: DataModel = {
   payments: [

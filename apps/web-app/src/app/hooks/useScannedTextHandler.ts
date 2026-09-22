@@ -19,7 +19,7 @@ import {
   getLightningInvoicePreview,
   type LightningInvoicePreview,
 } from "@linky/linkshu";
-import { isBankPaymentPayload, parseBankPayment } from "../../utils/spdPayment";
+import { isBankPaymentPayload, parseBankPayment } from "@linky/proxy-payment";
 import {
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,

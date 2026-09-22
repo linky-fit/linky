@@ -1,7 +1,7 @@
 import type { ContactId } from "../../evolu";
 import { navigateTo, returnFromBankPaymentOffer } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
-import { setLinkyBankPaymentOfferMinimized } from "./bankPaymentOffer";
+import { setBankPaymentOfferMinimized } from "./bankPaymentOfferStorage";
 import type { TopbarButton } from "../types/appTypes";
 import type { I18nKey, Translate } from "../../i18n";
 
@@ -90,7 +90,7 @@ export const resolveBackAction = (
     case "bankPaymentOffer": {
       const { chatId, offerId } = route;
       return () => {
-        setLinkyBankPaymentOfferMinimized(chatId, offerId, true);
+        setBankPaymentOfferMinimized(chatId, offerId, true);
         returnFromBankPaymentOffer(chatId);
       };
     }

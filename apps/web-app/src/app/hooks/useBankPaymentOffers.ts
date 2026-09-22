@@ -1,15 +1,39 @@
-import { getAuthorizedBankOffer } from "../lib/bankOfferSettlement";
 import {
-  BankOfferDraft,
-  BankOfferId,
-  ClientId,
   decodeNpub,
   identityFromNsec,
-  Pubkey,
-  UnixSeconds,
+  type BankOfferDraft,
+  type BankOfferInboxEvent,
 } from "@linky/linkstr";
 import { sendBankOfferAtom, useAtomSet } from "@linky/linkstr-react";
-import { Exit, Schema } from "effect";
+import {
+  activeBankPaymentOffers,
+  applyBankPaymentOfferReceipt,
+  applyBankPaymentOfferSnapshot,
+  bankPaymentOfferedDraft,
+  bankPaymentOfferGroupResponses,
+  bankPaymentOfferResponderSteps,
+  bankPaymentOfferResponseDraft,
+  bankPaymentOfferStaggerDue,
+  bankPaymentOfferStaggerQueue,
+  BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
+  BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
+  clampBankPaymentOfferRecipientCount,
+  clampBankPaymentOfferStaggerDelaySec,
+  decodeBankPaymentOffer,
+  emptyBankPaymentOfferState,
+  findBankPaymentOffer,
+  hasPendingBankPaymentOfferResponderWork,
+  isBankPaymentOfferCanceled,
+  isBankPaymentOfferStaggerQueueOpen,
+  lastBankPaymentOfferResponseSecByPeer,
+  ownBankPaymentOfferExpiries,
+  type AppliedBankPaymentOfferSnapshot,
+  type BankOfferStatus,
+  type BankPaymentOffer,
+  type BankPaymentOfferResponseOptions,
+  type BankPaymentOfferState,
+} from "@linky/proxy-payment";
+import { Exit } from "effect";
 import React, { useState } from "react";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
@@ -24,363 +48,258 @@ import {
 import { nowSeconds } from "../../utils/time";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { makeLocalId } from "../../utils/validation";
-import type { useContactsDomain } from "./useContactsDomain";
-import type { ContactRowLike, LocalNostrMessage } from "../types/appTypes";
-import { getBankPaymentOfferMessageKeys } from "../lib/bankPaymentOfferMessageKeys";
 import {
-  forgetLinkyBankPaymentOfferSpdPayload,
-  getLinkyBankPaymentOfferExpiresAtSec,
-  getLinkyBankPaymentOfferInfo,
-  getLinkyBankPaymentOfferMessageText,
-  getLinkyBankPaymentOfferStatusRank,
-  isLinkyBankPaymentOfferExpired,
-  isLinkyBankPaymentOfferTerminalStatus,
-  isLinkyBankPaymentOfferWholeOfferTerminalStatus,
-  forgetLinkyBankPaymentOfferStaggerQueue,
-  LINKY_BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
-  LINKY_BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
-  LINKY_BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX,
-  LINKY_BANK_PAYMENT_OFFER_MAX_RECIPIENT_COUNT,
-  LINKY_BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
-  LINKY_BANK_PAYMENT_OFFER_MIN_RECIPIENT_COUNT,
-  LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC,
-  LINKY_BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
-  LINKY_BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX,
-  markLinkyBankPaymentOfferBankDetailsSent,
-  readLinkyBankPaymentOfferSpdRecord,
-  readLinkyBankPaymentOfferStaggerRecords,
-  rememberLinkyBankPaymentOfferSpdPayload,
-  rememberLinkyBankPaymentOfferStaggerQueue,
-  removeLinkyBankPaymentOfferStaggerRecipients,
-  type LinkyBankPaymentOfferStatus,
-} from "../lib/bankPaymentOffer";
+  bankPaymentOfferMessageRow,
+  compareBankPaymentOfferRows,
+  mergeBankPaymentOffersIntoChatMessages,
+} from "../lib/bankPaymentOfferRows";
+import {
+  BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX,
+  BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX,
+  forgetBankPaymentOfferSpdPayload,
+  forgetBankPaymentOfferStaggerQueue,
+  markBankPaymentOfferBankDetailsSent,
+  readBankPaymentOfferSpdRecord,
+  readBankPaymentOfferStaggerRecords,
+  rememberBankPaymentOfferSpdPayload,
+  rememberBankPaymentOfferStaggerQueue,
+  removeBankPaymentOfferStaggerRecipients,
+} from "../lib/bankPaymentOfferStorage";
+import type { ContactRowLike, LocalNostrMessage } from "../types/appTypes";
+import {
+  buildUnknownContactId,
+  readUnknownContactIdPubkey,
+} from "./messages/contactIdentity";
 
-const isPubkey = Schema.is(Pubkey);
-const isBankOfferId = Schema.is(BankOfferId);
-const isNonEmptyTrimmedString = Schema.is(Schema.NonEmptyTrimmedString);
-const isPositiveInt = Schema.is(Schema.Int.pipe(Schema.positive()));
-const isUnixSeconds = Schema.is(UnixSeconds);
-
-const positiveInt = (value: unknown): number | undefined => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    return undefined;
-  }
-  const integer = Math.trunc(value);
-  return isPositiveInt(integer) ? integer : undefined;
-};
-
-const positiveUnixSeconds = (value: unknown): UnixSeconds | undefined => {
-  const integer = positiveInt(value);
-  return integer !== undefined && isUnixSeconds(integer) ? integer : undefined;
-};
-
-const BANK_PAYMENT_OFFER_RESPONDER_RETRY_MS = 30_000;
-
-const hasPendingBankPaymentOfferResponderWork = (
-  messages: readonly LocalNostrMessage[],
-  offererPubkeyHex: string,
-  nowSec: number,
-): boolean => {
-  const entriesByOfferId = new Map<
-    string,
-    { hasPendingAccepted: boolean; wholeOfferTerminal: boolean }
-  >();
-  for (const message of messages) {
-    const info = getLinkyBankPaymentOfferInfo(message.content);
-    if (!info || (info.offererPublicKey ?? "").trim() !== offererPubkeyHex) {
-      continue;
-    }
-
-    const entry = entriesByOfferId.get(info.offerId) ?? {
-      hasPendingAccepted: false,
-      wholeOfferTerminal: false,
-    };
-    if (isLinkyBankPaymentOfferWholeOfferTerminalStatus(info.status)) {
-      entry.wholeOfferTerminal = true;
-    } else if (
-      info.status === "accepted" &&
-      !isLinkyBankPaymentOfferExpired(info, message.createdAtSec, nowSec)
-    ) {
-      entry.hasPendingAccepted = true;
-    }
-    entriesByOfferId.set(info.offerId, entry);
-  }
-
-  return Array.from(entriesByOfferId.values()).some(
-    (entry) => entry.hasPendingAccepted && !entry.wholeOfferTerminal,
-  );
-};
-
-const clampBankPaymentOfferRecipientCount = (value: number): number => {
-  if (!Number.isFinite(value)) {
-    return LINKY_BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT;
-  }
-
-  return Math.min(
-    LINKY_BANK_PAYMENT_OFFER_MAX_RECIPIENT_COUNT,
-    Math.max(LINKY_BANK_PAYMENT_OFFER_MIN_RECIPIENT_COUNT, Math.round(value)),
-  );
-};
-
-const clampBankPaymentOfferStaggerDelaySec = (value: number): number => {
-  if (!Number.isFinite(value)) {
-    return LINKY_BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC;
-  }
-
-  return Math.min(
-    LINKY_BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
-    Math.max(LINKY_BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC, Math.round(value)),
-  );
-};
-
-const BANK_PAYMENT_OFFER_STAGGER_RETRY_MS = 5_000;
-
-// Statuses that keep the offer open for more recipients: anything else means a
-// winner exists or the whole offer ended, so extending it would be pointless.
-const bankPaymentOfferStaggerQueueStillWanted = (
-  status: LinkyBankPaymentOfferStatus,
-): boolean => status === "offered" || status === "declined";
+const RESPONDER_RETRY_MS = 30_000;
+const STAGGER_RETRY_MS = 5_000;
 
 interface UseBankPaymentOffersParams {
   chatMessages: LocalNostrMessage[];
-  contacts: ReturnType<typeof useContactsDomain>["contacts"];
-  currentNpub: string | null;
+  contacts: readonly ContactRowLike[];
   currentNsec: string | null;
   route: ReturnType<typeof useRouting>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
 }
 
+// Offers are keyed by peer pubkey; the contact id is a display concern, so an
+// unknown peer saved as a contact moves its offers without any bookkeeping.
+const useContactPubkeys = (contacts: readonly ContactRowLike[]) =>
+  React.useMemo(() => {
+    const contactIdByPubkey = new Map<string, string>();
+    const pubkeyByContactId = new Map<string, string>();
+    for (const contact of contacts) {
+      const id = (contact.id ?? "").trim();
+      const npub = normalizeNpubIdentifier(contact.npub ?? "");
+      const pubkey = npub ? decodeNpub(npub) : null;
+      if (!id || !pubkey) continue;
+      if (!contactIdByPubkey.has(pubkey)) contactIdByPubkey.set(pubkey, id);
+      pubkeyByContactId.set(id, pubkey);
+    }
+    return {
+      contactIdFor: (pubkey: string): string | null =>
+        contactIdByPubkey.get(pubkey) ?? buildUnknownContactId(pubkey),
+      pubkeyFor: (contactId: string): string | null =>
+        pubkeyByContactId.get(contactId.trim()) ??
+        readUnknownContactIdPubkey(contactId),
+    };
+  }, [contacts]);
+
 export const useBankPaymentOffers = ({
   chatMessages,
   contacts,
-  currentNpub,
   currentNsec,
   route,
   setStatus,
   t,
 }: UseBankPaymentOffersParams) => {
-  const sendBankOffer = useAtomSet(sendBankOfferAtom, {
-    mode: "promiseExit",
-  });
-  const [
-    bankPaymentOfferRecipientCount,
-    setBankPaymentOfferRecipientCountState,
-  ] = useState<number>(() =>
+  const sendBankOffer = useAtomSet(sendBankOfferAtom, { mode: "promiseExit" });
+  const myPubHex = React.useMemo(
+    () =>
+      currentNsec ? (identityFromNsec(currentNsec)?.pubkey ?? null) : null,
+    [currentNsec],
+  );
+  const { contactIdFor, pubkeyFor } = useContactPubkeys(contacts);
+
+  const [recipientCount, setRecipientCountState] = useState(() =>
     clampBankPaymentOfferRecipientCount(
       getInitialBankPaymentOfferRecipientCount(
-        LINKY_BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
+        BANK_PAYMENT_OFFER_DEFAULT_RECIPIENT_COUNT,
       ),
     ),
   );
-
-  const setBankPaymentOfferRecipientCount = React.useCallback(
-    (value: number) => {
-      setBankPaymentOfferRecipientCountState(
-        clampBankPaymentOfferRecipientCount(value),
-      );
-    },
-    [],
-  );
-
-  const [
-    bankPaymentOfferStaggerDelaySec,
-    setBankPaymentOfferStaggerDelaySecState,
-  ] = useState<number>(() =>
+  const [staggerDelaySec, setStaggerDelaySecState] = useState(() =>
     clampBankPaymentOfferStaggerDelaySec(
       getInitialBankPaymentOfferStaggerDelaySec(
-        LINKY_BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
+        BANK_PAYMENT_OFFER_DEFAULT_STAGGER_DELAY_SEC,
       ),
     ),
   );
 
-  const setBankPaymentOfferStaggerDelaySec = React.useCallback(
-    (value: number) => {
-      setBankPaymentOfferStaggerDelaySecState(
-        clampBankPaymentOfferStaggerDelaySec(value),
+  // The inbox applies snapshots synchronously against the newest state, so
+  // the ref is the source of truth and the React state mirrors it for renders.
+  const stateRef = React.useRef<BankPaymentOfferState>(
+    emptyBankPaymentOfferState,
+  );
+  const [state, setState] = useState(emptyBankPaymentOfferState);
+  const update = React.useCallback((next: BankPaymentOfferState) => {
+    stateRef.current = next;
+    setState(next);
+  }, []);
+  React.useEffect(() => {
+    update(emptyBankPaymentOfferState);
+  }, [myPubHex, update]);
+  const offers = state.offers;
+
+  const applySnapshot = React.useCallback(
+    (event: BankOfferInboxEvent): AppliedBankPaymentOfferSnapshot[] => {
+      if (!myPubHex) return [];
+      const result = applyBankPaymentOfferSnapshot(
+        stateRef.current,
+        event,
+        myPubHex,
+        nowSeconds(),
       );
+      if (result.state !== stateRef.current) update(result.state);
+      return [...result.accepted];
     },
-    [],
+    [myPubHex, update],
   );
 
-  const [bankPaymentOfferMessages, setBankPaymentOfferMessages] = useState<
-    LocalNostrMessage[]
-  >([]);
+  const publish = React.useCallback(
+    async (
+      peer: string,
+      draft: BankOfferDraft,
+    ): Promise<BankPaymentOffer | null> => {
+      const exit = await sendBankOffer(draft);
+      if (!Exit.isSuccess(exit)) return null;
+      const result = applyBankPaymentOfferReceipt(
+        stateRef.current,
+        peer,
+        exit.value,
+      );
+      update(result.state);
+      return result.offer;
+    },
+    [sendBankOffer, update],
+  );
 
-  const bankPaymentOfferExpiryInFlightRef = React.useRef(false);
+  const resolveOffer = React.useCallback(
+    (message: LocalNostrMessage): BankPaymentOffer | null => {
+      const offerId = decodeBankPaymentOffer(message.content)?.offerId;
+      const peer = pubkeyFor(message.contactId);
+      return offerId && peer
+        ? findBankPaymentOffer(stateRef.current.offers, peer, offerId)
+        : null;
+    },
+    [pubkeyFor],
+  );
 
-  const upsertBankPaymentOfferMessage = React.useCallback(
-    (message: LocalNostrMessage) => {
-      const messageContactId = message.contactId.trim();
-      const messageKeys = new Set(getBankPaymentOfferMessageKeys(message));
-      const messageOfferId =
-        getLinkyBankPaymentOfferInfo(message.content)?.offerId ?? "";
-      const messageOfferKey =
-        messageOfferId && messageContactId
-          ? `${messageContactId}:${messageOfferId}`
-          : "";
-
-      setBankPaymentOfferMessages((prev) => {
-        const existingOfferMessage = messageOfferKey
-          ? (prev.find((existing) => {
-              const existingContactId = existing.contactId.trim();
-              const existingOfferId = getLinkyBankPaymentOfferInfo(
-                existing.content,
-              )?.offerId;
-              return (
-                `${existingContactId}:${existingOfferId ?? ""}` ===
-                messageOfferKey
-              );
-            }) ?? null)
-          : null;
-        const next = prev.filter(
-          (existing) =>
-            !getBankPaymentOfferMessageKeys(existing).some((key) =>
-              messageKeys.has(key),
-            ),
+  const respondToOffer = React.useCallback(
+    async (
+      offer: BankPaymentOffer,
+      nextStatus: BankOfferStatus,
+      options?: BankPaymentOfferResponseOptions,
+    ): Promise<boolean> => {
+      const draft = myPubHex
+        ? bankPaymentOfferResponseDraft(offer, nextStatus, myPubHex, options)
+        : null;
+      if (!draft) {
+        setStatus(t(myPubHex ? "spdPaymentOfferFailed" : "profileMissingNpub"));
+        return false;
+      }
+      try {
+        if (await publish(offer.peer, draft)) return true;
+        setStatus(t("spdPaymentOfferFailed"));
+      } catch (error) {
+        setStatus(
+          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "publish failed")}`,
         );
-
-        const mergedMessage = existingOfferMessage
-          ? (() => {
-              const existingInfo = getLinkyBankPaymentOfferInfo(
-                existingOfferMessage.content,
-              );
-              const messageInfo = getLinkyBankPaymentOfferInfo(message.content);
-              const existingCreatedAt = existingOfferMessage.createdAtSec || 0;
-              const messageCreatedAt = message.createdAtSec || 0;
-              const existingUpdatedAt =
-                existingInfo?.statusUpdatedAtSec ?? existingCreatedAt;
-              const messageUpdatedAt =
-                messageInfo?.statusUpdatedAtSec ?? messageCreatedAt;
-              const latest =
-                messageUpdatedAt > existingUpdatedAt
-                  ? message
-                  : messageUpdatedAt < existingUpdatedAt
-                    ? existingOfferMessage
-                    : messageInfo && existingInfo
-                      ? getLinkyBankPaymentOfferStatusRank(
-                          messageInfo.status,
-                        ) >=
-                        getLinkyBankPaymentOfferStatusRank(existingInfo.status)
-                        ? message
-                        : existingOfferMessage
-                      : messageCreatedAt >= existingCreatedAt
-                        ? message
-                        : existingOfferMessage;
-
-              return {
-                ...existingOfferMessage,
-                ...latest,
-                contactId: existingOfferMessage.contactId,
-                createdAtSec:
-                  existingCreatedAt && messageCreatedAt
-                    ? Math.min(existingCreatedAt, messageCreatedAt)
-                    : existingCreatedAt || messageCreatedAt,
-                direction: existingOfferMessage.direction,
-                id: messageOfferKey
-                  ? `bank-payment-offer:${messageOfferKey}`
-                  : latest.id,
-              };
-            })()
-          : messageOfferKey
-            ? {
-                ...message,
-                id: `bank-payment-offer:${messageOfferKey}`,
-              }
-            : message;
-
-        next.push(mergedMessage);
-        next.sort((a, b) => {
-          const createdA = a.createdAtSec;
-          const createdB = b.createdAtSec;
-          return createdA - createdB;
-        });
-        return next;
-      });
+      }
+      return false;
     },
-    [],
+    [myPubHex, publish, setStatus, t],
   );
 
-  const reassignBankPaymentOfferMessages = React.useCallback(
-    (normalizedFrom: string, normalizedTo: string) => {
-      setBankPaymentOfferMessages((previous) => {
-        let changed = false;
-        const next = previous.map((message) => {
-          if (message.contactId.trim() !== normalizedFrom) {
-            return message;
-          }
-          changed = true;
-          return { ...message, contactId: normalizedTo };
-        });
-        return changed ? next : previous;
-      });
+  // UI rows only name the thread; every field comes from the authenticated state.
+  const respondToBankPaymentOffer = React.useCallback(
+    async (
+      message: LocalNostrMessage,
+      nextStatus: BankOfferStatus,
+      options?: BankPaymentOfferResponseOptions,
+    ): Promise<boolean> => {
+      const offer = resolveOffer(message);
+      if (offer) return respondToOffer(offer, nextStatus, options);
+      setStatus(t("spdPaymentOfferFailed"));
+      return false;
     },
-    [],
+    [resolveOffer, respondToOffer, setStatus, t],
   );
 
-  const sendBankPaymentOfferedMessage = React.useCallback(
+  const respondToBankPaymentOfferWithGroupState = React.useCallback(
+    async (
+      message: LocalNostrMessage,
+      nextStatus: BankOfferStatus,
+      options?: BankPaymentOfferResponseOptions,
+    ): Promise<boolean> => {
+      if (nextStatus !== "canceled" && nextStatus !== "settled") {
+        return respondToBankPaymentOffer(message, nextStatus, options);
+      }
+      const offer = resolveOffer(message);
+      if (!offer) {
+        setStatus(t("spdPaymentOfferFailed"));
+        return false;
+      }
+      const { alreadyDone, targets } = bankPaymentOfferGroupResponses(
+        stateRef.current.offers,
+        offer.offerId,
+        nextStatus,
+      );
+      let sentAny = alreadyDone;
+      for (const target of targets) {
+        const sent = await respondToOffer(target.offer, nextStatus, {
+          ...(options?.spdPayload === undefined
+            ? {}
+            : { spdPayload: options.spdPayload }),
+          withPush: target.withPush,
+        });
+        sentAny = sentAny || sent;
+      }
+      return sentAny;
+    },
+    [resolveOffer, respondToBankPaymentOffer, respondToOffer, setStatus, t],
+  );
+
+  const getBankPaymentOfferForSettlement = React.useCallback(
+    (message: LocalNostrMessage): BankPaymentOffer | null => {
+      const offer = resolveOffer(message);
+      return offer &&
+        myPubHex &&
+        offer.offererPublicKey === myPubHex &&
+        offer.status === "bank_paid"
+        ? offer
+        : null;
+    },
+    [myPubHex, resolveOffer],
+  );
+
+  const sendOffered = React.useCallback(
     async (args: {
       amountSat: number | null;
       amountText: string;
-      contactId: string;
-      contactPubHex: string;
       expiresAtSec?: number;
-      myPubHex: string;
       offerId: string;
-    }): Promise<number | null> => {
-      const { amountSat, amountText, contactId, contactPubHex, myPubHex } =
-        args;
-      const offerId = args.offerId;
-      if (
-        !isPubkey(contactPubHex) ||
-        !isPubkey(myPubHex) ||
-        !isBankOfferId(offerId) ||
-        !isNonEmptyTrimmedString(amountText)
-      ) {
-        return null;
-      }
-
-      const text = getLinkyBankPaymentOfferMessageText(amountText, "offered");
-      if (!isNonEmptyTrimmedString(text)) return null;
-
-      const clientId = ClientId.make(makeLocalId());
-      const expiresAtSec = positiveUnixSeconds(args.expiresAtSec);
-      const exit = await sendBankOffer(
-        new BankOfferDraft({
-          to: contactPubHex,
-          offerId,
-          offerer: myPubHex,
-          status: "offered",
-          amountText,
-          text,
-          ...(amountSat !== null && isPositiveInt(amountSat)
-            ? { amountSat }
-            : {}),
-          ...(expiresAtSec === undefined ? {} : { expiresAtSec }),
-        }),
-      );
-      if (!Exit.isSuccess(exit)) return null;
-
-      upsertBankPaymentOfferMessage({
-        clientId,
-        contactId,
-        content: exit.value.content,
-        createdAtSec: exit.value.sentAt,
-        direction: "out",
-        id: `bank-payment-offer:${contactId}:${offerId}`,
-        localOnly: true,
-        pubkey: myPubHex,
-        rumorId: exit.value.rumorId,
-        status: "sent",
-        wrapId: exit.value.selfCopy.wrapId,
-      });
-      return exit.value.sentAt;
+      offerer: string;
+      to: string;
+    }): Promise<BankPaymentOffer | null> => {
+      const draft = bankPaymentOfferedDraft(args);
+      return draft ? publish(args.to, draft) : null;
     },
-    [sendBankOffer, upsertBankPaymentOfferMessage],
+    [publish],
   );
 
-  const [bankPaymentOfferStaggerTick, setBankPaymentOfferStaggerTick] =
-    useState(0);
+  const [staggerTick, setStaggerTick] = useState(0);
 
   const requestBankPaymentOffer = React.useCallback(
     async (args: {
@@ -397,7 +316,7 @@ export const useBankPaymentOffers = ({
           : null;
       const amountText = args.amountText.trim();
       const spdPayload = String(args.spdPayload ?? "").trim();
-      const staggerDelaySec = clampBankPaymentOfferStaggerDelaySec(
+      const delaySec = clampBankPaymentOfferStaggerDelaySec(
         Number(args.staggerDelaySec ?? 0),
       );
       if (!amountText) {
@@ -408,110 +327,80 @@ export const useBankPaymentOffers = ({
         setStatus(t("spdPaymentOfferFailed"));
         return null;
       }
-      if (!currentNsec) {
+      if (!myPubHex) {
         setStatus(t("profileMissingNpub"));
         return null;
       }
 
       try {
-        const identity = identityFromNsec(currentNsec);
-        if (!identity) throw new Error("invalid nsec");
-        const myPubHex = identity.pubkey;
-
-        const recipients: {
-          contactId: string;
-          contactPubHex: string;
-        }[] = [];
-        for (const contact of args.contacts) {
+        const recipients = args.contacts.flatMap((contact) => {
           const contactId = (contact.id ?? "").trim();
-          const contactNpub = normalizeNpubIdentifier(contact.npub ?? "");
-          if (!contactId || !contactNpub) continue;
-
-          const contactPubHex = decodeNpub(contactNpub);
-          if (!contactPubHex) continue;
-          recipients.push({ contactId, contactPubHex });
-        }
-
+          const peer = contactId ? pubkeyFor(contactId) : null;
+          return contactId && peer ? [{ contactId, peer }] : [];
+        });
         if (recipients.length === 0) {
           setStatus(t("chatMissingContactNpub"));
           return null;
         }
 
         const offerId = makeLocalId();
-        if (!isBankOfferId(offerId)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return null;
-        }
         if (spdPayload) {
           // Persisted so the offer survives an app reload: the auto-responder
           // needs this payload when a recipient's acceptance arrives later.
-          rememberLinkyBankPaymentOfferSpdPayload({
+          rememberBankPaymentOfferSpdPayload({
             offerId,
             ownerPubkey: myPubHex,
             spdPayload,
           });
         }
 
-        let sentCount = 0;
-        let firstSentContactId = "";
-        let firstSentAtSec: number | null = null;
-        const queuedRecipients: { contactId: string; contactPubHex: string }[] =
-          [];
-
+        let first: { contactId: string; sentAtSec: number } | null = null;
+        const queued: string[] = [];
         for (const recipient of recipients) {
           // With a stagger delay only the first reachable recipient gets the
           // offer now; the rest wait in the persisted queue.
-          if (staggerDelaySec > 0 && firstSentAtSec !== null) {
-            queuedRecipients.push(recipient);
+          if (delaySec > 0 && first) {
+            queued.push(recipient.peer);
             continue;
           }
-
-          const sentAtSec = await sendBankPaymentOfferedMessage({
+          const sent = await sendOffered({
             amountSat,
             amountText,
-            contactId: recipient.contactId,
-            contactPubHex: recipient.contactPubHex,
-            myPubHex,
             offerId,
+            offerer: myPubHex,
+            to: recipient.peer,
           });
-          if (sentAtSec === null) continue;
-
-          sentCount += 1;
-          if (firstSentAtSec === null) {
-            firstSentAtSec = sentAtSec;
-            firstSentContactId = recipient.contactId;
+          if (sent && !first) {
+            first = {
+              contactId: recipient.contactId,
+              sentAtSec: sent.createdAtSec,
+            };
           }
         }
-
-        if (sentCount === 0 || firstSentAtSec === null) {
+        if (!first) {
           setStatus(t("spdPaymentOfferFailed"));
           return null;
         }
 
-        if (queuedRecipients.length > 0) {
-          // Delayed recipients share the first send's expiry, so extending
-          // the offer never extends its total lifetime.
-          const staggerBaseSec = firstSentAtSec;
-          rememberLinkyBankPaymentOfferStaggerQueue({
-            amountSat,
-            amountText,
-            createdAtSec: staggerBaseSec,
-            expiresAtSec:
-              staggerBaseSec + LINKY_BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
-            offerId,
-            ownerPubkey: myPubHex,
-            pending: queuedRecipients.map((recipient, index) => ({
-              contactId: recipient.contactId,
-              contactPubHex: recipient.contactPubHex,
-              dueAtSec: staggerBaseSec + (index + 1) * staggerDelaySec,
-            })),
-          });
-          setBankPaymentOfferStaggerTick((tick) => tick + 1);
+        const queue = bankPaymentOfferStaggerQueue({
+          amountSat,
+          amountText,
+          delaySec,
+          firstSentAtSec: first.sentAtSec,
+          offerId,
+          ownerPubkey: myPubHex,
+          peers: queued,
+        });
+        if (queue) {
+          rememberBankPaymentOfferStaggerQueue(queue);
+          setStaggerTick((tick) => tick + 1);
         }
 
-        setBankPaymentOfferRecipientCount(args.contacts.length);
-        setBankPaymentOfferStaggerDelaySec(staggerDelaySec);
-        return { chatId: firstSentContactId, offerId };
+        setRecipientCountState(
+          clampBankPaymentOfferRecipientCount(args.contacts.length),
+        );
+        setStaggerDelaySecState(delaySec);
+        return { chatId: first.contactId, offerId };
       } catch (error) {
         setStatus(
           `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "publish failed")}`,
@@ -519,443 +408,80 @@ export const useBankPaymentOffers = ({
         return null;
       }
     },
-    [
-      currentNsec,
-      sendBankPaymentOfferedMessage,
-      setBankPaymentOfferRecipientCount,
-      setBankPaymentOfferStaggerDelaySec,
-      setStatus,
-      t,
-    ],
+    [myPubHex, pubkeyFor, sendOffered, setStatus, t],
   );
 
-  const respondToBankPaymentOffer = React.useCallback(
-    async (
-      message: LocalNostrMessage,
-      nextStatus: LinkyBankPaymentOfferStatus,
-      options?: {
-        expiresAtSec?: number | null;
-        extensionSec?: number | null;
-        spdPayload?: string | null;
-        withPush?: boolean;
-      },
-    ): Promise<boolean> => {
-      const authorizedMessage = getAuthorizedBankOffer(
-        message,
-        bankPaymentOfferMessages,
-      );
-      const offerInfo = authorizedMessage
-        ? getLinkyBankPaymentOfferInfo(authorizedMessage.content)
-        : null;
-      if (!offerInfo) {
-        setStatus(t("spdPaymentOfferFailed"));
-        return false;
-      }
-      if (!currentNsec) {
-        setStatus(t("profileMissingNpub"));
-        return false;
-      }
-
-      try {
-        const identity = identityFromNsec(currentNsec);
-        if (!identity) throw new Error("invalid nsec");
-        const myPubHex = identity.pubkey;
-        const messageDirection = message.direction.trim();
-        const offererPublicKey =
-          (offerInfo.offererPublicKey ?? "").trim() ||
-          (messageDirection === "out" ? myPubHex : message.pubkey.trim());
-
-        const offererStatus =
-          nextStatus === "offered" ||
-          nextStatus === "bank_details_sent" ||
-          nextStatus === "accepted_by_other" ||
-          nextStatus === "canceled" ||
-          nextStatus === "settled";
-        if (
-          !isPubkey(offererPublicKey) ||
-          offererStatus !== (offererPublicKey === myPubHex)
-        ) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        const messageContactId = message.contactId.trim();
-        const messageContact =
-          contacts.find((contact) => contact.id.trim() === messageContactId) ??
-          null;
-        const contactNpub = normalizeNpubIdentifier(messageContact?.npub ?? "");
-        let contactPubkey: string | null = null;
-        if (contactNpub) {
-          contactPubkey = decodeNpub(contactNpub);
-        }
-
-        const messagePubkey = message.pubkey.trim();
-        const recipientPublicKey =
-          offererPublicKey === myPubHex
-            ? (contactPubkey ??
-              (messagePubkey !== myPubHex ? messagePubkey : ""))
-            : offererPublicKey;
-        if (!isPubkey(recipientPublicKey) || recipientPublicKey === myPubHex) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        const offerId = offerInfo.offerId;
-        const amountText = offerInfo.amountText;
-        if (!isBankOfferId(offerId) || !isNonEmptyTrimmedString(amountText)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        const clientId = ClientId.make(makeLocalId());
-        const initiatedAtSec = positiveUnixSeconds(
-          offerInfo.initiatedAtSec ?? message.createdAtSec,
-        );
-        const bankPaidAtSec = positiveUnixSeconds(
-          offerInfo.bankPaidAtSec ??
-            (offerInfo.status === "bank_paid"
-              ? offerInfo.statusUpdatedAtSec
-              : null),
-        );
-        const expiresAtSec = positiveUnixSeconds(options?.expiresAtSec);
-        const extensionSec = positiveInt(options?.extensionSec);
-        const amountSat = positiveInt(offerInfo.amountSat);
-        const spdPayload = (
-          options?.spdPayload ??
-          offerInfo.spdPayload ??
-          ""
-        ).trim();
-        const text = getLinkyBankPaymentOfferMessageText(
-          amountText,
-          nextStatus,
-          extensionSec,
-        );
-        if (!isNonEmptyTrimmedString(text)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        const exit = await sendBankOffer(
-          new BankOfferDraft({
-            to: recipientPublicKey,
-            offerId,
-            offerer: offererPublicKey,
-            status: nextStatus,
-            amountText,
-            text,
-            ...(amountSat === undefined ? {} : { amountSat }),
-            ...(initiatedAtSec === undefined ? {} : { initiatedAtSec }),
-            ...(bankPaidAtSec === undefined ? {} : { bankPaidAtSec }),
-            ...(expiresAtSec === undefined ? {} : { expiresAtSec }),
-            ...(extensionSec === undefined ? {} : { extensionSec }),
-            ...(isNonEmptyTrimmedString(spdPayload) ? { spdPayload } : {}),
-            ...(options?.withPush === undefined
-              ? {}
-              : { pushMark: options.withPush }),
-            clientId,
-          }),
-        );
-        if (!Exit.isSuccess(exit)) {
-          setStatus(t("spdPaymentOfferFailed"));
-          return false;
-        }
-
-        upsertBankPaymentOfferMessage({
-          clientId,
-          contactId: message.contactId.trim(),
-          content: exit.value.content,
-          createdAtSec: exit.value.sentAt,
-          direction: offererPublicKey === myPubHex ? "out" : "in",
-          id: `bank-payment-offer:${offerInfo.offerId}`,
-          localOnly: true,
-          pubkey: offererPublicKey === myPubHex ? myPubHex : offererPublicKey,
-          rumorId: exit.value.rumorId,
-          status: "sent",
-          wrapId: exit.value.selfCopy.wrapId,
-        });
-
-        return true;
-      } catch (error) {
-        setStatus(
-          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "publish failed")}`,
-        );
-        return false;
-      }
-    },
-    [
-      currentNsec,
-      contacts,
-      bankPaymentOfferMessages,
-      sendBankOffer,
-      setStatus,
-      t,
-      upsertBankPaymentOfferMessage,
-    ],
-  );
-
-  const getBankPaymentOfferGroupMessages = React.useCallback(
-    (message: LocalNostrMessage): LocalNostrMessage[] => {
-      const offerInfo = getLinkyBankPaymentOfferInfo(message.content);
-      if (!offerInfo) return [message];
-
-      const group = bankPaymentOfferMessages.filter((candidate) => {
-        const candidateInfo = getLinkyBankPaymentOfferInfo(candidate.content);
-        return candidateInfo?.offerId === offerInfo.offerId;
-      });
-
-      if (
-        !group.some(
-          (candidate) =>
-            candidate.contactId.trim() === message.contactId.trim(),
-        )
-      ) {
-        group.push(message);
-      }
-
-      return group;
-    },
-    [bankPaymentOfferMessages],
-  );
-
-  const isBankPaymentOfferCanceled = React.useCallback(
-    (offerId: string): boolean => {
-      const normalizedOfferId = offerId.trim();
-      if (!normalizedOfferId) return false;
-
-      return bankPaymentOfferMessages.some((message) => {
-        const info = getLinkyBankPaymentOfferInfo(message.content);
-        return (
-          info?.offerId === normalizedOfferId && info.status === "canceled"
-        );
-      });
-    },
-    [bankPaymentOfferMessages],
-  );
-
-  const respondToBankPaymentOfferWithGroupState = React.useCallback(
-    async (
-      message: LocalNostrMessage,
-      nextStatus: LinkyBankPaymentOfferStatus,
-      options?: {
-        expiresAtSec?: number | null;
-        extensionSec?: number | null;
-        spdPayload?: string | null;
-        withPush?: boolean;
-      },
-    ): Promise<boolean> => {
-      if (nextStatus !== "canceled" && nextStatus !== "settled") {
-        return await respondToBankPaymentOffer(message, nextStatus, options);
-      }
-
-      const group = getBankPaymentOfferGroupMessages(message);
-      const cancellationPushContactId =
-        nextStatus === "canceled"
-          ? (group
-              .filter((candidate) => {
-                const info = getLinkyBankPaymentOfferInfo(candidate.content);
-                return (
-                  info?.status === "accepted" ||
-                  info?.status === "bank_details_sent" ||
-                  info?.status === "bank_paid"
-                );
-              })
-              .sort((left, right) => {
-                const leftInfo = getLinkyBankPaymentOfferInfo(left.content);
-                const rightInfo = getLinkyBankPaymentOfferInfo(right.content);
-                const rank = (status: LinkyBankPaymentOfferStatus): number =>
-                  status === "bank_paid"
-                    ? 0
-                    : status === "bank_details_sent"
-                      ? 1
-                      : 2;
-                const rankDifference =
-                  rank(leftInfo?.status ?? "accepted") -
-                  rank(rightInfo?.status ?? "accepted");
-                if (rankDifference !== 0) return rankDifference;
-                return (
-                  (leftInfo?.statusUpdatedAtSec ?? left.createdAtSec) -
-                  (rightInfo?.statusUpdatedAtSec ?? right.createdAtSec)
-                );
-              })[0]?.contactId ?? null)
-          : null;
-      let sentAny = false;
-
-      for (const groupMessage of group) {
-        const info = getLinkyBankPaymentOfferInfo(groupMessage.content);
-        if (!info) continue;
-        if (info.status === nextStatus) {
-          sentAny = true;
-          continue;
-        }
-        if (nextStatus === "canceled" && info.status === "settled") continue;
-
-        const sent = await respondToBankPaymentOffer(groupMessage, nextStatus, {
-          ...(options?.spdPayload !== undefined
-            ? { spdPayload: options.spdPayload }
-            : {}),
-          withPush:
-            nextStatus === "canceled" &&
-            groupMessage.contactId.trim() ===
-              (cancellationPushContactId ?? "").trim(),
-        });
-        sentAny = sentAny || sent;
-      }
-
-      return sentAny;
-    },
-    [getBankPaymentOfferGroupMessages, respondToBankPaymentOffer],
-  );
-
+  // The offerer's auto-responder: bank details go to exactly one winner,
+  // guarded by a per-offer lease lock across tabs, and everyone else who is
+  // still offered or accepted learns that someone else won.
   React.useEffect(() => {
-    if (!currentNsec) return;
-    if (bankPaymentOfferMessages.length === 0) return;
+    if (!myPubHex || offers.length === 0) return;
 
     let cancelled = false;
-    let retryTimeoutHandle: number | undefined;
+    let retryTimeoutId: number | undefined;
 
     const run = async () => {
       try {
-        const identity = identityFromNsec(currentNsec);
-        if (!identity) return;
-        const myPubHex = identity.pubkey;
-        const groups = new Map<
-          string,
-          {
-            info: ReturnType<typeof getLinkyBankPaymentOfferInfo>;
-            message: LocalNostrMessage;
-          }[]
-        >();
-
-        for (const message of bankPaymentOfferMessages) {
-          const info = getLinkyBankPaymentOfferInfo(message.content);
-          if (!info) continue;
-          if ((info.offererPublicKey ?? "").trim() !== myPubHex) {
-            continue;
-          }
-
-          const group = groups.get(info.offerId) ?? [];
-          group.push({ info, message });
-          groups.set(info.offerId, group);
-        }
-
-        for (const [offerId, group] of groups) {
+        for (const step of bankPaymentOfferResponderSteps(offers, myPubHex)) {
           if (cancelled) return;
-
-          if (
-            group.some(
-              (entry) =>
-                entry.info &&
-                isLinkyBankPaymentOfferWholeOfferTerminalStatus(
-                  entry.info.status,
-                ),
-            )
-          ) {
-            forgetLinkyBankPaymentOfferSpdPayload(offerId);
+          if (step.ended) {
+            forgetBankPaymentOfferSpdPayload(step.offerId);
             continue;
           }
-
-          const notifyNonWinningCandidates = async (
-            winner: LocalNostrMessage,
-          ): Promise<void> => {
-            const winnerContactId = winner.contactId.trim();
-            for (const entry of group) {
-              const contactId = entry.message.contactId.trim();
-              if (!contactId || contactId === winnerContactId) continue;
-              if (
-                entry.info?.status !== "offered" &&
-                entry.info?.status !== "accepted"
-              ) {
-                continue;
-              }
-
-              await respondToBankPaymentOffer(
-                entry.message,
-                "accepted_by_other",
-              );
+          const lockKey = `${BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.${step.offerId}`;
+          const closeLosers = async () => {
+            for (const loser of step.losers) {
+              await respondToOffer(loser, "accepted_by_other");
             }
           };
-
-          const activeBankDetails = group
-            .filter(
-              (entry) =>
-                entry.info?.status === "bank_details_sent" ||
-                entry.info?.status === "bank_paid",
-            )
-            .sort((left, right) => {
-              const leftSec =
-                left.info?.statusUpdatedAtSec ?? left.message.createdAtSec;
-              const rightSec =
-                right.info?.statusUpdatedAtSec ?? right.message.createdAtSec;
-              return leftSec - rightSec;
-            })[0];
-          if (activeBankDetails) {
+          if (step.winner) {
             try {
               await withLocalStorageLeaseLock({
-                key: `${LINKY_BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.${offerId}`,
+                key: lockKey,
                 timeoutMs: 0,
-                fn: async () => {
-                  await notifyNonWinningCandidates(activeBankDetails.message);
-                },
+                fn: closeLosers,
               });
             } catch {
               // Another tab is already closing the non-winning candidates.
             }
             continue;
           }
-
-          const accepted = group
-            .filter((entry) => entry.info?.status === "accepted")
-            .sort((a, b) => {
-              const aSec = a.info?.statusUpdatedAtSec ?? a.message.createdAtSec;
-              const bSec = b.info?.statusUpdatedAtSec ?? b.message.createdAtSec;
-              if (aSec !== bSec) return aSec - bSec;
-              return a.message.contactId.localeCompare(b.message.contactId);
-            });
-
-          const candidate = accepted[0] ?? null;
-          if (!candidate?.info) continue;
-
-          const candidateKey = `${offerId}:${candidate.message.contactId.trim()}`;
-          const record = readLinkyBankPaymentOfferSpdRecord({
-            offerId,
+          const candidate = step.candidate;
+          if (!candidate) continue;
+          const record = readBankPaymentOfferSpdRecord({
+            offerId: step.offerId,
             ownerPubkey: myPubHex,
           });
-          // Details go to exactly one winner, so any recorded send blocks the
-          // offer — a per-candidate check would let a tab with a lagging
-          // message view send the same bank details to a second recipient.
-          if (!record || record.sentCandidateKeys.length > 0) {
-            continue;
-          }
+          // Any recorded send blocks the offer: a per-candidate check would
+          // let a tab with a lagging view send the details to a second recipient.
+          if (!record || record.sentCandidateKeys.length > 0) continue;
 
           try {
             await withLocalStorageLeaseLock({
-              key: `${LINKY_BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.${offerId}`,
+              key: lockKey,
               timeoutMs: 0,
               fn: async () => {
                 // Re-read under the lock: another tab may have just sent.
-                const lockedRecord = readLinkyBankPaymentOfferSpdRecord({
-                  offerId,
+                const locked = readBankPaymentOfferSpdRecord({
+                  offerId: step.offerId,
                   ownerPubkey: myPubHex,
                 });
-                if (!lockedRecord) return;
-                if (lockedRecord.sentCandidateKeys.length > 0) return;
-
-                const sent = await respondToBankPaymentOffer(
-                  candidate.message,
+                if (!locked || locked.sentCandidateKeys.length > 0) return;
+                const sent = await respondToOffer(
+                  candidate,
                   "bank_details_sent",
                   {
-                    spdPayload: lockedRecord.spdPayload,
+                    spdPayload: locked.spdPayload,
                   },
                 );
                 // Marked only after a successful publish so an interrupted
                 // send retries; the lease lock covers the concurrent window.
-                if (sent) {
-                  markLinkyBankPaymentOfferBankDetailsSent({
-                    candidateKey,
-                    offerId,
-                  });
-                  await notifyNonWinningCandidates(candidate.message);
-                }
+                if (!sent) return;
+                markBankPaymentOfferBankDetailsSent({
+                  candidateKey: `${step.offerId}:${candidate.peer}`,
+                  offerId: step.offerId,
+                });
+                await closeLosers();
               },
             });
           } catch {
@@ -964,19 +490,20 @@ export const useBankPaymentOffers = ({
         }
 
         if (cancelled) return;
-        // A failed publish or a skipped lease lock leaves the message state
-        // unchanged, so nothing re-runs this effect; keep retrying while an
-        // accepted entry of my own offer is still waiting for bank details.
+        // A failed publish or a skipped lease lock leaves the state unchanged,
+        // so nothing re-runs this effect; keep retrying while an accepted
+        // entry of my own offer is still waiting for bank details.
         if (
           hasPendingBankPaymentOfferResponderWork(
-            bankPaymentOfferMessages,
+            offers,
             myPubHex,
             nowSeconds(),
           )
         ) {
-          retryTimeoutHandle = window.setTimeout(() => {
-            void run();
-          }, BANK_PAYMENT_OFFER_RESPONDER_RETRY_MS);
+          retryTimeoutId = window.setTimeout(
+            () => void run(),
+            RESPONDER_RETRY_MS,
+          );
         }
       } catch {
         // Best effort; the sender can retry when the accepted event reappears.
@@ -984,54 +511,30 @@ export const useBankPaymentOffers = ({
     };
 
     void run();
-
     return () => {
       cancelled = true;
-      if (retryTimeoutHandle !== undefined) {
-        window.clearTimeout(retryTimeoutHandle);
-      }
+      window.clearTimeout(retryTimeoutId);
     };
-  }, [bankPaymentOfferMessages, currentNsec, respondToBankPaymentOffer]);
+  }, [myPubHex, offers, respondToOffer]);
 
-  // Staggered proxy payment offers: queued recipients (persisted by
-  // requestBankPaymentOffer) receive the offer once their delay elapses,
-  // unless the offer meanwhile found a winner or ended.
+  // Staggered offers: queued recipients (persisted by requestBankPaymentOffer)
+  // receive the offer once their delay elapses, unless the offer meanwhile
+  // found a winner or ended.
   React.useEffect(() => {
-    if (!currentNsec) return;
-    const identity = identityFromNsec(currentNsec);
-    if (!identity) return;
-    const myPubHex = identity.pubkey;
-
-    const records = readLinkyBankPaymentOfferStaggerRecords(myPubHex);
+    if (!myPubHex) return;
+    const records = readBankPaymentOfferStaggerRecords(myPubHex);
     if (records.length === 0) return;
-
-    const closedOfferIds = new Set<string>();
-    const offeredContactIdsByOfferId = new Map<string, Set<string>>();
-    for (const message of bankPaymentOfferMessages) {
-      const info = getLinkyBankPaymentOfferInfo(message.content);
-      if (!info) continue;
-      if (!bankPaymentOfferStaggerQueueStillWanted(info.status)) {
-        closedOfferIds.add(info.offerId);
-      }
-      const contactId = message.contactId.trim();
-      if (contactId) {
-        const contactIds =
-          offeredContactIdsByOfferId.get(info.offerId) ?? new Set<string>();
-        contactIds.add(contactId);
-        offeredContactIdsByOfferId.set(info.offerId, contactIds);
-      }
-    }
 
     let cancelled = false;
     let timeoutId: number | undefined;
-    const bumpTick = () => setBankPaymentOfferStaggerTick((tick) => tick + 1);
-
+    const bumpTick = () => setStaggerTick((tick) => tick + 1);
     const nowSec = nowSeconds();
     const dueRecords: typeof records = [];
     let nextDueAtSec: number | null = null;
+
     for (const record of records) {
-      if (closedOfferIds.has(record.offerId)) {
-        forgetLinkyBankPaymentOfferStaggerQueue(record.offerId);
+      if (!isBankPaymentOfferStaggerQueueOpen(record, offers)) {
+        forgetBankPaymentOfferStaggerQueue(record.offerId);
         if (getInspectorEmissionEnabled()) {
           reportInspectorRows([
             {
@@ -1040,29 +543,23 @@ export const useBankPaymentOffers = ({
               tag: "bankOffer.staggerDropped",
               summary: `proxy payment offer is no longer open — dropped ${record.pending.length} queued recipients`,
               links: {
-                contact: record.pending.map((recipient) => recipient.contactId),
                 offer: record.offerId,
+                pubkey: record.pending.map((recipient) => recipient.peer),
               },
-              payload: {
-                offerId: record.offerId,
-                pendingContactIds: record.pending.map(
-                  (recipient) => recipient.contactId,
-                ),
-              },
+              payload: { offerId: record.offerId },
             },
           ]);
         }
         continue;
       }
-
-      const dueAtSec = Math.min(
-        ...record.pending.map((recipient) => recipient.dueAtSec),
-      );
-      if (dueAtSec <= nowSec) {
+      const due = bankPaymentOfferStaggerDue(record, offers, nowSec);
+      if (due.send.length > 0 || due.alreadyOffered.length > 0) {
         dueRecords.push(record);
-      } else {
+      } else if (due.nextDueAtSec !== null) {
         nextDueAtSec =
-          nextDueAtSec === null ? dueAtSec : Math.min(nextDueAtSec, dueAtSec);
+          nextDueAtSec === null
+            ? due.nextDueAtSec
+            : Math.min(nextDueAtSec, due.nextDueAtSec);
       }
     }
 
@@ -1072,45 +569,35 @@ export const useBankPaymentOffers = ({
         if (cancelled) return;
         try {
           await withLocalStorageLeaseLock({
-            key: `${LINKY_BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX}.${record.offerId}`,
+            key: `${BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX}.${record.offerId}`,
             timeoutMs: 0,
             fn: async () => {
               // Re-read under the lock: another tab may have just sent.
-              const lockedRecord = readLinkyBankPaymentOfferStaggerRecords(
-                myPubHex,
-              ).find((candidate) => candidate.offerId === record.offerId);
-              if (!lockedRecord) {
+              const locked = readBankPaymentOfferStaggerRecords(myPubHex).find(
+                (candidate) => candidate.offerId === record.offerId,
+              );
+              if (!locked) {
                 progressed = true;
                 return;
               }
-
-              const dueNowSec = nowSeconds();
-              const sentContactIds: string[] = [];
-              for (const recipient of lockedRecord.pending) {
+              const due = bankPaymentOfferStaggerDue(
+                locked,
+                offers,
+                nowSeconds(),
+              );
+              const dequeue = [...due.alreadyOffered];
+              for (const peer of due.send) {
                 if (cancelled) return;
-                if (recipient.dueAtSec > dueNowSec) continue;
-                if (
-                  offeredContactIdsByOfferId
-                    .get(record.offerId)
-                    ?.has(recipient.contactId)
-                ) {
-                  // Already offered (e.g. by another tab); just dequeue.
-                  sentContactIds.push(recipient.contactId);
-                  continue;
-                }
-
-                const sentAtSec = await sendBankPaymentOfferedMessage({
-                  amountSat: lockedRecord.amountSat,
-                  amountText: lockedRecord.amountText,
-                  contactId: recipient.contactId,
-                  contactPubHex: recipient.contactPubHex,
-                  expiresAtSec: lockedRecord.expiresAtSec,
-                  myPubHex,
-                  offerId: lockedRecord.offerId,
+                const sent = await sendOffered({
+                  amountSat: locked.amountSat,
+                  amountText: locked.amountText,
+                  expiresAtSec: locked.expiresAtSec,
+                  offerId: locked.offerId,
+                  offerer: myPubHex,
+                  to: peer,
                 });
-                if (sentAtSec === null) continue;
-
-                sentContactIds.push(recipient.contactId);
+                if (!sent) continue;
+                dequeue.push(peer);
                 if (getInspectorEmissionEnabled()) {
                   reportInspectorRows([
                     {
@@ -1119,25 +606,19 @@ export const useBankPaymentOffers = ({
                       tag: "bankOffer.staggerExtended",
                       summary:
                         "proxy payment offer extended to the next queued recipient",
-                      links: {
-                        contact: recipient.contactId,
-                        offer: lockedRecord.offerId,
-                      },
+                      links: { offer: locked.offerId, pubkey: peer },
                       payload: {
-                        contactId: recipient.contactId,
-                        dueAtSec: recipient.dueAtSec,
-                        offerId: lockedRecord.offerId,
-                        sentAtSec,
+                        offerId: locked.offerId,
+                        sentAtSec: sent.createdAtSec,
                       },
                     },
                   ]);
                 }
               }
-
-              if (sentContactIds.length > 0) {
-                removeLinkyBankPaymentOfferStaggerRecipients(
+              if (dequeue.length > 0) {
+                removeBankPaymentOfferStaggerRecipients(
                   record.offerId,
-                  sentContactIds,
+                  dequeue,
                 );
                 progressed = true;
               }
@@ -1149,18 +630,11 @@ export const useBankPaymentOffers = ({
       }
 
       if (cancelled) return;
-      if (progressed) {
-        // Successful sends also re-run this effect via the message upsert;
-        // the tick covers dequeues that left the messages untouched.
-        bumpTick();
-      } else {
-        // A failed publish leaves both queue and messages unchanged, so
-        // nothing re-runs this effect on its own; nudge a retry.
-        timeoutId = window.setTimeout(
-          bumpTick,
-          BANK_PAYMENT_OFFER_STAGGER_RETRY_MS,
-        );
-      }
+      // Successful sends re-run this effect through the state update; the tick
+      // covers dequeues that left the state untouched, and a failed publish
+      // changes nothing at all, so it needs a nudge.
+      if (progressed) bumpTick();
+      else timeoutId = window.setTimeout(bumpTick, STAGGER_RETRY_MS);
     };
 
     if (dueRecords.length > 0) {
@@ -1174,160 +648,125 @@ export const useBankPaymentOffers = ({
 
     return () => {
       cancelled = true;
-      if (timeoutId !== undefined) {
-        window.clearTimeout(timeoutId);
-      }
+      window.clearTimeout(timeoutId);
     };
-  }, [
-    bankPaymentOfferMessages,
-    bankPaymentOfferStaggerTick,
-    currentNsec,
-    sendBankPaymentOfferedMessage,
-  ]);
+  }, [myPubHex, offers, sendOffered, staggerTick]);
 
-  const bankPaymentOfferExpiryGroups = React.useMemo(() => {
-    if (!currentNpub || bankPaymentOfferMessages.length === 0) return [];
-
-    const myPubHex = decodeNpub(currentNpub);
-    if (!myPubHex) return [];
-
-    const groups = new Map<
-      string,
-      {
-        info: NonNullable<ReturnType<typeof getLinkyBankPaymentOfferInfo>>;
-        message: LocalNostrMessage;
-      }[]
-    >();
-    for (const message of bankPaymentOfferMessages) {
-      const info = getLinkyBankPaymentOfferInfo(message.content);
-      if (
-        !info ||
-        (info.offererPublicKey ?? "").trim() !== myPubHex ||
-        isLinkyBankPaymentOfferTerminalStatus(info.status)
-      ) {
-        continue;
-      }
-      const group = groups.get(info.offerId) ?? [];
-      group.push({ info, message });
-      groups.set(info.offerId, group);
-    }
-
-    const nowSec = nowSeconds();
-    const statusPriority: LinkyBankPaymentOfferStatus[] = [
-      "bank_paid",
-      "bank_details_sent",
-      "accepted",
-      "offered",
-    ];
-    return Array.from(groups.values()).flatMap((group) => {
-      const activeStatus = statusPriority.find((status) =>
-        group.some((entry) => entry.info.status === status),
-      );
-      if (!activeStatus) return [];
-
-      const expiresAtSec = Math.max(
-        ...group
-          .filter((entry) => entry.info.status === activeStatus)
-          .map(
-            (entry) =>
-              getLinkyBankPaymentOfferExpiresAtSec(
-                entry.info,
-                entry.message.createdAtSec,
-              ) ?? nowSec,
-          ),
-      );
-      return [
-        {
-          expiresAtMs: expiresAtSec * 1_000,
-          messages: group.map((entry) => entry.message),
-        },
-      ];
-    });
-  }, [bankPaymentOfferMessages, currentNpub]);
+  const expiryGroups = React.useMemo(
+    () =>
+      myPubHex
+        ? ownBankPaymentOfferExpiries(offers, myPubHex, nowSeconds())
+        : [],
+    [myPubHex, offers],
+  );
+  const expiryInFlightRef = React.useRef(false);
 
   React.useEffect(() => {
-    const nextExpiryMs = Math.min(
-      ...bankPaymentOfferExpiryGroups.map((group) => group.expiresAtMs),
+    const nextExpiryAtSec = Math.min(
+      ...expiryGroups.map((group) => group.expiresAtSec),
     );
-    if (!Number.isFinite(nextExpiryMs)) return;
+    if (!Number.isFinite(nextExpiryAtSec)) return;
 
     let cancelled = false;
     let timeoutId = 0;
     const expireDueGroups = () => {
       if (cancelled) return;
-      if (bankPaymentOfferExpiryInFlightRef.current) {
+      if (expiryInFlightRef.current) {
         timeoutId = window.setTimeout(expireDueGroups, 100);
         return;
       }
-
-      bankPaymentOfferExpiryInFlightRef.current = true;
+      expiryInFlightRef.current = true;
       void (async () => {
         try {
-          const nowMs = Date.now();
-          for (const group of bankPaymentOfferExpiryGroups) {
-            if (group.expiresAtMs > nowMs) continue;
-            for (const message of group.messages) {
+          const nowSec = nowSeconds();
+          for (const group of expiryGroups) {
+            if (group.expiresAtSec > nowSec) continue;
+            for (const offer of group.offers) {
               if (cancelled) return;
-              await respondToBankPaymentOffer(message, "canceled");
+              await respondToOffer(offer, "canceled");
             }
           }
         } finally {
-          bankPaymentOfferExpiryInFlightRef.current = false;
+          expiryInFlightRef.current = false;
         }
       })();
     };
     timeoutId = window.setTimeout(
       expireDueGroups,
-      Math.max(0, nextExpiryMs - Date.now()),
+      Math.max(0, nextExpiryAtSec * 1000 - Date.now()),
     );
-
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [bankPaymentOfferExpiryGroups, respondToBankPaymentOffer]);
+  }, [expiryGroups, respondToOffer]);
+
+  const bankPaymentOfferMessages = React.useMemo(
+    () =>
+      myPubHex
+        ? offers
+            .flatMap((offer) => {
+              const contactId = contactIdFor(offer.peer);
+              return contactId
+                ? [bankPaymentOfferMessageRow(offer, contactId, myPubHex)]
+                : [];
+            })
+            .sort(compareBankPaymentOfferRows)
+        : [],
+    [contactIdFor, myPubHex, offers],
+  );
 
   const chatMessagesWithBankPaymentOffers = React.useMemo(() => {
     if (route.kind !== "chat") return chatMessages;
-
     const activeContactId = route.id.trim();
-    if (!activeContactId) return chatMessages;
-
     const offerMessages = bankPaymentOfferMessages.filter(
-      (message) => message.contactId.trim() === activeContactId,
+      (message) => message.contactId === activeContactId,
     );
-    if (offerMessages.length === 0) return chatMessages;
-
-    const seenKeys = new Set(
-      chatMessages.flatMap(getBankPaymentOfferMessageKeys),
-    );
-    const merged = [...chatMessages];
-    for (const message of offerMessages) {
-      const keys = getBankPaymentOfferMessageKeys(message);
-      if (keys.some((key) => seenKeys.has(key))) continue;
-      merged.push(message);
-      for (const key of keys) seenKeys.add(key);
-    }
-
-    merged.sort((a, b) => {
-      const createdA = a.createdAtSec;
-      const createdB = b.createdAtSec;
-      if (createdA !== createdB) return createdA - createdB;
-      return a.id.localeCompare(b.id);
-    });
-
-    return merged;
+    return offerMessages.length === 0
+      ? chatMessages
+      : mergeBankPaymentOffersIntoChatMessages(chatMessages, offerMessages);
   }, [bankPaymentOfferMessages, chatMessages, route]);
 
+  const activeBankPaymentOfferContacts = React.useCallback(
+    (nowSec: number) => {
+      const active = activeBankPaymentOffers(offers, nowSec);
+      const contactIds = new Set<string>();
+      for (const peer of active.peers) {
+        const contactId = contactIdFor(peer);
+        if (contactId) contactIds.add(contactId);
+      }
+      return { contactIds, nextExpiryAtSec: active.nextExpiryAtSec };
+    },
+    [contactIdFor, offers],
+  );
+
+  const lastBankPaymentOfferResponseSecByContactId = React.useMemo(() => {
+    const byContactId = new Map<string, number>();
+    if (!myPubHex) return byContactId;
+    for (const [peer, sec] of lastBankPaymentOfferResponseSecByPeer(
+      offers,
+      myPubHex,
+    )) {
+      const contactId = contactIdFor(peer);
+      if (contactId) byContactId.set(contactId, sec);
+    }
+    return byContactId;
+  }, [contactIdFor, myPubHex, offers]);
+
   return {
+    activeBankPaymentOfferContacts,
+    applyBankPaymentOfferSnapshot: applySnapshot,
     bankPaymentOfferMessages,
-    bankPaymentOfferRecipientCount,
-    bankPaymentOfferStaggerDelaySec,
+    bankPaymentOfferRecipientCount: recipientCount,
+    bankPaymentOfferStaggerDelaySec: staggerDelaySec,
     chatMessagesWithBankPaymentOffers,
-    isBankPaymentOfferCanceled,
-    reassignBankPaymentOfferMessages,
+    getBankPaymentOfferForSettlement,
+    isBankPaymentOfferCanceled: React.useCallback(
+      (offerId: string) => isBankPaymentOfferCanceled(offers, offerId.trim()),
+      [offers],
+    ),
+    lastBankPaymentOfferResponseSecByContactId,
     requestBankPaymentOffer,
     respondToBankPaymentOfferWithGroupState,
-    upsertBankPaymentOfferMessage,
   };
 };

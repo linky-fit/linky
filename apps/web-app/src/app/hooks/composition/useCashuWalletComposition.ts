@@ -1,5 +1,4 @@
 import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
-import { getBankOfferForSettlement } from "../../lib/bankOfferSettlement";
 import type { RestoreProgress } from "@linky/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { useLatest } from "../../../hooks/useLatest";
@@ -86,7 +85,6 @@ import { useOwnerScopedStorage } from "../useOwnerScopedStorage";
 import { usePaidOverlayState } from "../usePaidOverlayState";
 import { usePaymentsDomain } from "../usePaymentsDomain";
 import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
-import { getLinkyBankPaymentOfferInfo } from "../../lib/bankPaymentOffer";
 import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { isIssuedTransfer, isOpenTransfer } from "../../lib/cashuTransfers";
@@ -162,7 +160,7 @@ interface UseCashuWalletCompositionParams {
     | "chatMessages"
     | "contacts"
     | "enqueuePendingPayment"
-    | "bankPaymentOfferMessages"
+    | "getBankPaymentOfferForSettlement"
     | "isBankPaymentOfferCanceled"
     | "nostrBootstrapReady"
     | "nostrMessagesLatestRef"
@@ -255,7 +253,7 @@ export const useCashuWalletComposition = ({
     chatMessages,
     contacts,
     enqueuePendingPayment,
-    bankPaymentOfferMessages,
+    getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled,
     nostrBootstrapReady,
     nostrMessagesLatestRef,
@@ -878,23 +876,16 @@ export const useCashuWalletComposition = ({
     async (message: LocalNostrMessage) => {
       if (cashuIsBusy) return;
 
-      const authorizedMessage = getBankOfferForSettlement(
-        message,
-        bankPaymentOfferMessages,
-        currentNsec ? (identityFromNsec(currentNsec)?.pubkey ?? null) : null,
-      );
-      const offerInfo = authorizedMessage
-        ? getLinkyBankPaymentOfferInfo(authorizedMessage.content)
-        : null;
-      if (!authorizedMessage || !offerInfo) {
+      const offer = getBankPaymentOfferForSettlement(message);
+      if (!offer) {
         setStatus(t("spdPaymentOfferFailed"));
         return;
       }
-      if (isBankPaymentOfferCanceled(offerInfo.offerId)) {
+      if (isBankPaymentOfferCanceled(offer.offerId)) {
         setStatus(t("bankPaymentOfferStatusCanceled"));
         return;
       }
-      if (!offerInfo.amountSat) {
+      if (!offer.amountSat) {
         setStatus(t("payInvalidAmount"));
         return;
       }
@@ -911,17 +902,14 @@ export const useCashuWalletComposition = ({
       try {
         const result = await payContactWithCashuMessage({
           contact,
-          amountSat: offerInfo.amountSat,
+          amountSat: offer.amountSat,
           logCompletedOnly: true,
           paymentNoticeContext: "bank_payment_offer",
-          paymentNoticeOfferId: offerInfo.offerId,
+          paymentNoticeOfferId: offer.offerId,
         });
         if (!result.ok) return;
 
-        await respondToBankPaymentOfferWithGroupState(
-          authorizedMessage,
-          "settled",
-        );
+        await respondToBankPaymentOfferWithGroupState(message, "settled");
       } finally {
         setCashuIsBusy(false);
       }
@@ -929,8 +917,7 @@ export const useCashuWalletComposition = ({
     [
       cashuIsBusy,
       contacts,
-      currentNsec,
-      bankPaymentOfferMessages,
+      getBankPaymentOfferForSettlement,
       isBankPaymentOfferCanceled,
       payContactWithCashuMessage,
       respondToBankPaymentOfferWithGroupState,

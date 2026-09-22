@@ -1,21 +1,11 @@
-import type {
-  BankOfferInboxEvent,
-  PaymentNoticeReceived,
-} from "@linky/linkstr";
-import {
-  encodeBankOfferContent,
-  encodeNpub,
-  parsePubkey,
-} from "@linky/linkstr";
+import type { PaymentNoticeReceived } from "@linky/linkstr";
+import { encodeNpub, parsePubkey } from "@linky/linkstr";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { formatShortNpub } from "../../../utils/formatting";
 import {
-  getLinkyBankPaymentOfferInfo,
-  getLinkyBankPaymentOfferMessageText,
-  isLinkyBankPaymentOfferExpired,
-  isLinkyBankPaymentOfferTerminalStatus,
-  isLinkyBankPaymentOfferWholeOfferTerminalStatus,
-} from "../../lib/bankPaymentOffer";
+  isTerminalBankPaymentOfferStatus,
+  type BankPaymentOffer,
+} from "@linky/proxy-payment";
 import { extractCashuTokenFromText } from "../../lib/tokenText";
 import { formatChatMessagePreviewText } from "../../lib/chatMessageDisplay";
 import {
@@ -28,7 +18,6 @@ import type {
 } from "../../types/appTypes";
 import type { InsertedChatMessage } from "./chatInbox";
 import { trimString } from "../../../utils/validation";
-import { nowSeconds } from "../../../utils/time";
 import type { Translate } from "../../../i18n";
 
 const PAYMENT_NOTICE_MATCH_WINDOW_SECONDS = 120;
@@ -40,7 +29,6 @@ export interface InboxContact {
 }
 
 export interface InboxNotificationsContext {
-  bankPaymentOfferMessages: readonly LocalNostrMessage[];
   findContact: (pubkey: string) => InboxContact | null;
   formatDisplayedAmountText: (amountSat: number) => string;
   maybeShowPwaNotification: (
@@ -49,7 +37,6 @@ export interface InboxNotificationsContext {
     tag?: string,
   ) => Promise<void>;
   messages: readonly LocalNostrMessage[];
-  onBankPaymentOfferMessage: (message: LocalNostrMessage) => void;
   onOpenInboxMessageToast: (params: {
     contactId: string;
     messageId?: string;
@@ -184,30 +171,6 @@ export const handlePaymentNoticeReceived = (
   );
 };
 
-export const bankOfferContentFromSnapshot = (
-  snapshot: BankOfferInboxEvent,
-): string =>
-  encodeBankOfferContent({
-    offerId: snapshot.offerId,
-    offerer: snapshot.offerer,
-    status: snapshot.status,
-    amountText: snapshot.amountText,
-    text:
-      snapshot.text ??
-      getLinkyBankPaymentOfferMessageText(
-        snapshot.amountText,
-        snapshot.status,
-        snapshot.extensionSec,
-      ),
-    statusUpdatedAtSec: snapshot.statusUpdatedAtSec,
-    initiatedAtSec: snapshot.initiatedAtSec,
-    bankPaidAtSec: snapshot.bankPaidAtSec,
-    expiresAtSec: snapshot.expiresAtSec,
-    extensionSec: snapshot.extensionSec,
-    amountSat: snapshot.amountSat,
-    spdPayload: snapshot.spdPayload,
-  });
-
 interface BankOfferSnapshotScope {
   contactId: string;
   delivery: "backfill" | "live";
@@ -216,53 +179,16 @@ interface BankOfferSnapshotScope {
   peerPubkey: string;
 }
 
-export const handleBankOfferSnapshotReceived = (
-  event: BankOfferInboxEvent,
+/** Interruptions for an accepted snapshot; state was already applied. */
+export const notifyBankOfferSnapshot = (
+  offer: BankPaymentOffer,
   scope: BankOfferSnapshotScope,
   ctx: InboxNotificationsContext,
 ): void => {
-  const content = bankOfferContentFromSnapshot(event);
-  const offerInfo = getLinkyBankPaymentOfferInfo(content);
-  const offerText = offerInfo?.text ?? null;
-  if (!offerText) return;
-  const offerId = trimString(offerInfo?.offerId);
-  const isTerminalOffer = offerInfo
-    ? isLinkyBankPaymentOfferTerminalStatus(offerInfo.status)
-    : false;
-  // Whole-offer statuses only: one recipient's declined thread must not
-  // swallow another recipient's later acceptance of the offer.
-  const hasTerminalKnownOffer = offerId
-    ? ctx.bankPaymentOfferMessages.some((message) => {
-        const knownInfo = getLinkyBankPaymentOfferInfo(message.content);
-        return (
-          knownInfo?.offerId === offerId &&
-          isLinkyBankPaymentOfferWholeOfferTerminalStatus(knownInfo.status)
-        );
-      })
-    : false;
-  const isExpiredOffer =
-    offerInfo && !isTerminalOffer
-      ? isLinkyBankPaymentOfferExpired(offerInfo, event.sentAt, nowSeconds())
-      : false;
-  if (isExpiredOffer || (!isTerminalOffer && hasTerminalKnownOffer)) return;
-
-  ctx.onBankPaymentOfferMessage({
-    contactId: scope.contactId,
-    content,
-    createdAtSec: event.sentAt,
-    direction: scope.isOutgoing ? "out" : "in",
-    id: `bank-payment-offer:${event.snapshotId}`,
-    localOnly: true,
-    pubkey: event.offerer,
-    rumorId: event.snapshotId,
-    status: "sent",
-    wrapId: event.snapshotId,
-    ...(event.clientId !== null ? { clientId: event.clientId } : {}),
-  });
   if (scope.delivery !== "live") return;
 
   const activeChat = isOpenChatForContact(ctx.route, scope.contactId);
-  const activeOffer = isOpenBankPaymentOffer(ctx.route, offerId);
+  const activeOffer = isOpenBankPaymentOffer(ctx.route, offer.offerId);
   const notifyOffer = (notificationText: string): void => {
     const label = senderLabel(ctx, scope.peerPubkey);
     showVisibleToast(
@@ -279,12 +205,12 @@ export const handleBankOfferSnapshotReceived = (
     void ctx.maybeShowPwaNotification(
       label,
       notificationText,
-      event.snapshotId,
+      offer.snapshotId,
     );
   };
-  if (isTerminalOffer) {
+  if (isTerminalBankPaymentOfferStatus(offer.status)) {
     if (
-      offerInfo?.status === "accepted_by_other" &&
+      offer.status === "accepted_by_other" &&
       !scope.isOutgoing &&
       !scope.isSelfAuthored &&
       !activeChat &&
@@ -293,7 +219,7 @@ export const handleBankOfferSnapshotReceived = (
       notifyOffer(ctx.t("bankPaymentOfferAcceptedByOther"));
     }
     if (
-      offerInfo?.status === "declined" &&
+      offer.status === "declined" &&
       scope.isOutgoing &&
       !scope.isSelfAuthored &&
       !activeChat &&
@@ -304,20 +230,19 @@ export const handleBankOfferSnapshotReceived = (
     return;
   }
 
-  if (!activeChat && !activeOffer && !scope.isSelfAuthored) {
+  if (scope.isSelfAuthored) return;
+  if (!activeChat && !activeOffer) {
     showVisibleToast(
       ctx,
       ctx
         .t("chatIncomingMessageToast")
         .replace("{name}", senderLabel(ctx, scope.peerPubkey))
-        .replace("{message}", offerText),
+        .replace("{message}", offer.text),
     );
   }
-  if (!scope.isSelfAuthored) {
-    void ctx.maybeShowPwaNotification(
-      notificationTitle(ctx, scope.peerPubkey),
-      offerText,
-      event.snapshotId,
-    );
-  }
+  void ctx.maybeShowPwaNotification(
+    notificationTitle(ctx, scope.peerPubkey),
+    offer.text,
+    offer.snapshotId,
+  );
 };

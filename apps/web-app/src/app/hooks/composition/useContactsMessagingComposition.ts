@@ -61,11 +61,8 @@ import {
 import { formatShortNpub, getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorage";
-import { getBankPaymentOfferCurrency } from "../../../utils/spdPayment";
-import {
-  getLastBankPaymentOfferResponseSecByContactId,
-  mergeBankPaymentOffersIntoLastMessageByContactId,
-} from "../../lib/bankPaymentOffer";
+import { getBankPaymentOfferCurrency } from "@linky/proxy-payment";
+import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
 import { useBankPaymentOffers } from "../useBankPaymentOffers";
 import { collectUnreadNewestIncomingByContactId } from "../../lib/chatUnread";
 import { findUniqueContactByLightningAddress } from "../../lib/contactIdentity";
@@ -600,19 +597,20 @@ export const useContactsMessagingComposition = ({
   });
 
   const {
+    activeBankPaymentOfferContacts,
+    applyBankPaymentOfferSnapshot,
     bankPaymentOfferMessages,
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
     chatMessagesWithBankPaymentOffers,
+    getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled,
-    reassignBankPaymentOfferMessages,
+    lastBankPaymentOfferResponseSecByContactId,
     requestBankPaymentOffer,
     respondToBankPaymentOfferWithGroupState,
-    upsertBankPaymentOfferMessage,
   } = useBankPaymentOffers({
     chatMessages,
     contacts,
-    currentNpub,
     currentNsec,
     route,
     setStatus,
@@ -627,14 +625,9 @@ export const useContactsMessagingComposition = ({
         return 0;
       }
 
-      const movedMessageCount = reassignLocalNostrMessagesContactId(
-        normalizedFrom,
-        normalizedTo,
-      );
-      reassignBankPaymentOfferMessages(normalizedFrom, normalizedTo);
-      return movedMessageCount;
+      return reassignLocalNostrMessagesContactId(normalizedFrom, normalizedTo);
     },
-    [reassignBankPaymentOfferMessages, reassignLocalNostrMessagesContactId],
+    [reassignLocalNostrMessagesContactId],
   );
 
   reassignContactMessagesRef.current = reassignNostrConversationContactId;
@@ -1185,12 +1178,6 @@ export const useContactsMessagingComposition = ({
     route.kind === "bankPayment"
       ? getBankPaymentOfferCurrency(route.spdPayload)
       : null;
-
-  const lastBankPaymentOfferResponseSecByContactId = React.useMemo(
-    () =>
-      getLastBankPaymentOfferResponseSecByContactId(bankPaymentOfferMessages),
-    [bankPaymentOfferMessages],
-  );
 
   const bankPaymentOfferContacts = React.useMemo(() => {
     if (!bankPaymentOfferCurrency) return [];
@@ -2067,7 +2054,7 @@ export const useContactsMessagingComposition = ({
     advanceContactPeerSeen,
     appendLocalNostrMessage,
     appendLocalNostrReaction,
-    bankPaymentOfferMessages,
+    applyBankPaymentOfferSnapshot,
     contacts,
     currentNsec,
     enabled: nostrBootstrapReady,
@@ -2079,7 +2066,6 @@ export const useContactsMessagingComposition = ({
     nostrMessagesLocal,
     nostrReactionWrapIdsRef,
     nostrReactionsLocal,
-    onBankPaymentOfferMessage: upsertBankPaymentOfferMessage,
     onOpenInboxMessageToast: openInboxMessageToast,
     pushToast,
     recordSentSeenReceipt,
@@ -2121,6 +2107,7 @@ export const useContactsMessagingComposition = ({
     closeContactsGroupAssignment,
     pendingContactsGroupAssignment,
     autoAcceptedChatMessageIdsRef,
+    activeBankPaymentOfferContacts,
     bankPaymentOfferContacts,
     bankPaymentOfferMessages,
     bankPaymentOfferRecipientCount,
@@ -2163,6 +2150,7 @@ export const useContactsMessagingComposition = ({
     getNpubMessageContactInfo,
     groupNames,
     handleSaveContact,
+    getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled,
     isSavingContact,
     lastMessageByContactId: lastVisibleMessageByContactId,

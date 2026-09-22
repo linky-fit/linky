@@ -10,6 +10,7 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 - [`packages/linkstr`](./packages/linkstr/README.md) — Nostr protocol library; usage guides in [`packages/linkstr/docs/`](./packages/linkstr/docs/README.md) (also covers `@linky/linkstr-react`)
 - [`packages/linkshu`](./packages/linkshu/README.md) — cashu wallet library; usage guides in [`packages/linkshu/docs/`](./packages/linkshu/docs/README.md)
 - [`packages/linksync`](./packages/linksync/README.md) — synced storage library (Evolu schema, repositories, shards); usage guides in [`packages/linksync/docs/`](./packages/linksync/docs/README.md)
+- [`packages/proxy-payment`](./packages/proxy-payment/README.md) — proxy bank-payment domain (bank QR parsing, offer rules and reducer, stagger scheduling); usage guides in [`packages/proxy-payment/docs/`](./packages/proxy-payment/docs/README.md)
 
 ## Protocols and stack
 

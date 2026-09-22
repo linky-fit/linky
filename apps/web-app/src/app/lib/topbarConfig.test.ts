@@ -1,15 +1,15 @@
 import { createIdFromString } from "@linky/linksync";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Route } from "../../types/route";
-import { setLinkyBankPaymentOfferMinimized } from "./bankPaymentOffer";
+import { setBankPaymentOfferMinimized } from "./bankPaymentOfferStorage";
 import {
   buildTopbarRight,
   resolveBackAction,
   type BackActionContext,
 } from "./topbarConfig";
 
-vi.mock("./bankPaymentOffer", () => ({
-  setLinkyBankPaymentOfferMinimized: vi.fn(),
+vi.mock("./bankPaymentOfferStorage", () => ({
+  setBankPaymentOfferMinimized: vi.fn(),
 }));
 
 const assignMock = vi.fn();
@@ -128,7 +128,7 @@ describe("resolveBackAction", () => {
       baseContext,
     )?.();
 
-    expect(setLinkyBankPaymentOfferMinimized).toHaveBeenCalledWith(
+    expect(setBankPaymentOfferMinimized).toHaveBeenCalledWith(
       "chat-1",
       "offer-1",
       true,

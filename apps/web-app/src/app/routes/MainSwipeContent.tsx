@@ -10,19 +10,19 @@ import { WalletPage } from "../../pages/WalletPage";
 import type { Route } from "../../types/route";
 import { nowSeconds } from "../../utils/time";
 import { useMainSwipeRoutes } from "../context/AppShellContexts";
-import { getActiveBankPaymentOfferContacts } from "../lib/bankPaymentOffer";
 import { useMainSwipeProgress } from "../lib/mainSwipeProgressStore";
-import type {
-  ContactRowLike,
-  ContactsGuideKey,
-  LocalNostrMessage,
-} from "../types/appTypes";
+import type { ContactRowLike, ContactsGuideKey } from "../types/appTypes";
+
+type ActiveBankPaymentOfferContacts = (nowSec: number) => {
+  contactIds: ReadonlySet<string>;
+  nextExpiryAtSec: number | null;
+};
 
 export interface MainSwipeRouteProps {
   activeGroup: string | null;
   bottomTabActive: "contacts" | "wallet" | null;
   cashuTotalBalance: number;
-  bankPaymentOfferMessages: readonly LocalNostrMessage[];
+  activeBankPaymentOfferContacts: ActiveBankPaymentOfferContacts;
   contactsOnboardingCelebrating: boolean;
   contactsOnboardingTasks: {
     done: number;
@@ -73,13 +73,13 @@ interface VisibleContactSections {
 }
 
 const useVisibleContactSections = (
-  bankPaymentOfferMessages: readonly LocalNostrMessage[],
+  activeBankPaymentOfferContacts: ActiveBankPaymentOfferContacts,
   visibleContacts: MainSwipeRouteProps["visibleContacts"],
 ): VisibleContactSections => {
   const [nowSec, setNowSec] = React.useState(() => nowSeconds());
   const activeOffers = React.useMemo(
-    () => getActiveBankPaymentOfferContacts(bankPaymentOfferMessages, nowSec),
-    [bankPaymentOfferMessages, nowSec],
+    () => activeBankPaymentOfferContacts(nowSec),
+    [activeBankPaymentOfferContacts, nowSec],
   );
 
   React.useEffect(() => {
@@ -182,7 +182,7 @@ export const MainSwipeContent = (): React.ReactElement => {
     activeGroup,
     bottomTabActive,
     cashuTotalBalance,
-    bankPaymentOfferMessages,
+    activeBankPaymentOfferContacts,
     contactsOnboardingCelebrating,
     contactsOnboardingTasks,
     contactsSearch,
@@ -210,7 +210,7 @@ export const MainSwipeContent = (): React.ReactElement => {
   } = mainSwipeProps;
   const isDesktopSplitView = useDesktopSplitView();
   const visibleContactSections = useVisibleContactSections(
-    bankPaymentOfferMessages,
+    activeBankPaymentOfferContacts,
     visibleContacts,
   );
 
@@ -293,8 +293,8 @@ export const MainSwipeContent = (): React.ReactElement => {
 export const DesktopContactsPane = (): React.ReactElement => {
   const { mainSwipeProps } = useMainSwipeRoutes();
   const {
+    activeBankPaymentOfferContacts,
     activeGroup,
-    bankPaymentOfferMessages,
     contactsOnboardingCelebrating,
     contactsOnboardingTasks,
     contactsSearch,
@@ -313,7 +313,7 @@ export const DesktopContactsPane = (): React.ReactElement => {
     visibleContacts,
   } = mainSwipeProps;
   const visibleContactSections = useVisibleContactSections(
-    bankPaymentOfferMessages,
+    activeBankPaymentOfferContacts,
     visibleContacts,
   );
 

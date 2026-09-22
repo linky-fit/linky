@@ -1,9 +1,13 @@
 import { createContactNameFormatter } from "../../../utils/contactName";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
-import { BankOfferAuthorization } from "./bankOfferAuthorization";
 import { Schema } from "effect";
 import { decodeNpub, identityFromNsec, UnixSeconds } from "@linky/linkstr";
-import type { InboxDelivery, WrapInboxEvent } from "@linky/linkstr";
+import type {
+  BankOfferInboxEvent,
+  InboxDelivery,
+  WrapInboxEvent,
+} from "@linky/linkstr";
+import type { AppliedBankPaymentOfferSnapshot } from "@linky/proxy-payment";
 import {
   useAtomMount,
   useAtomSet,
@@ -32,7 +36,7 @@ import {
 } from "./chatInbox";
 import { buildUnknownContactId, normalizePubkeyHex } from "./contactIdentity";
 import {
-  handleBankOfferSnapshotReceived,
+  notifyBankOfferSnapshot,
   handlePaymentNoticeReceived,
   notifyInsertedChatMessage,
   type InboxContact,
@@ -111,7 +115,9 @@ interface UseLinkstrInboxSyncParams {
   advanceContactPeerSeen: (contactId: string, window: PeerSeenWindow) => void;
   appendLocalNostrMessage: (message: NewLocalNostrMessage) => string;
   appendLocalNostrReaction: (reaction: NewLocalNostrReaction) => string;
-  bankPaymentOfferMessages: readonly LocalNostrMessage[];
+  applyBankPaymentOfferSnapshot: (
+    event: BankOfferInboxEvent,
+  ) => readonly AppliedBankPaymentOfferSnapshot[];
   contacts: readonly InboxContactRowLike[];
   currentNsec: string | null;
   enabled: boolean;
@@ -127,7 +133,6 @@ interface UseLinkstrInboxSyncParams {
   nostrMessagesLocal: readonly LocalNostrMessage[];
   nostrReactionWrapIdsRef: React.MutableRefObject<Set<string>>;
   nostrReactionsLocal: readonly LocalNostrReaction[];
-  onBankPaymentOfferMessage: (message: LocalNostrMessage) => void;
   onOpenInboxMessageToast: (params: {
     contactId: string;
     messageId?: string;
@@ -162,7 +167,6 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
     [currentNsec],
   );
 
-  const bankOfferAuthorizationRef = React.useRef(new BankOfferAuthorization());
   const reactionSessionStateRef = React.useRef(
     createReactionInboxSessionState(),
   );
@@ -228,12 +232,10 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
     };
 
     const notificationsCtx: InboxNotificationsContext = {
-      bankPaymentOfferMessages: latest.bankPaymentOfferMessages,
       findContact,
       formatDisplayedAmountText: latest.formatDisplayedAmountText,
       maybeShowPwaNotification: latest.maybeShowPwaNotification,
       messages: latest.nostrMessagesLatestRef.current,
-      onBankPaymentOfferMessage: latest.onBankPaymentOfferMessage,
       onOpenInboxMessageToast: latest.onOpenInboxMessageToast,
       pushToast: latest.pushToast,
       route: latest.route,
@@ -293,26 +295,22 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
             notificationsCtx.findContact(peerPubkey)?.id ??
             buildUnknownContactId(peerPubkey);
           if (!contactId) return;
-          const snapshots = bankOfferAuthorizationRef.current.receive(
-            event,
-            myPubkey,
-            contactId,
-            notificationsCtx.bankPaymentOfferMessages,
-          );
-          if (snapshots.length === 0)
+          const accepted =
+            paramsRef.current.applyBankPaymentOfferSnapshot(event);
+          if (accepted.length === 0)
             reportAppLog({
               tag: "bankOffer.snapshotNotAuthorized",
               summary: "Bank offer snapshot lacks matching authorization",
               links: { rumor: event.snapshotId, offer: event.offerId },
               payload: { status: event.status },
             });
-          for (const snapshot of snapshots)
-            handleBankOfferSnapshotReceived(
-              snapshot,
+          for (const { event: snapshot, offer } of accepted)
+            notifyBankOfferSnapshot(
+              offer,
               {
                 contactId,
                 delivery,
-                isOutgoing: event.offerer === myPubkey,
+                isOutgoing: offer.offererPublicKey === myPubkey,
                 isSelfAuthored:
                   snapshot._tag === "OwnBankOfferSnapshotConfirmed",
                 peerPubkey,
@@ -336,7 +334,6 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
 
   React.useEffect(() => {
     if (!enabled || !currentNsec || myPubkey === null) return;
-    bankOfferAuthorizationRef.current = new BankOfferAuthorization();
     reactionSessionStateRef.current = createReactionInboxSessionState();
     identitySinceSecRef.current =
       getInitialNostrIdentitySource() === "custom"

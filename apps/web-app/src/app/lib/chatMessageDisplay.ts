@@ -1,10 +1,8 @@
 import type { Translate } from "../../i18n";
 import { formatShortNpub, previewTokenText } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
-import {
-  getBankPaymentOfferStatusLabel,
-  getLinkyBankPaymentOfferInfo,
-} from "./bankPaymentOffer";
+import { decodeBankPaymentOffer } from "@linky/proxy-payment";
+import { getBankPaymentOfferStatusLabel } from "./bankPaymentOfferLabels";
 import {
   parseCashuPaymentRequestMessage,
   parseLinkyPaymentRequestDeclineMessage,
@@ -49,7 +47,7 @@ export const formatChatMessagePreviewText = ({
     return privateImagePreviewText(t, privateImage);
   }
 
-  const bankPaymentOffer = getLinkyBankPaymentOfferInfo(content);
+  const bankPaymentOffer = decodeBankPaymentOffer(content);
   if (bankPaymentOffer) {
     if (bankPaymentOffer.status === "offered") {
       const key =

@@ -31,12 +31,10 @@ describe("safe notification names", () => {
         peerPubkey: "remote",
       },
       {
-        bankPaymentOfferMessages: [],
         findContact: () => ({ id: "remote", name, npub: other }),
         formatDisplayedAmountText: String,
         maybeShowPwaNotification,
         messages: [],
-        onBankPaymentOfferMessage: vi.fn(),
         onOpenInboxMessageToast: vi.fn(),
         pushToast: vi.fn(),
         route: { kind: "contacts" },

@@ -1,7 +1,8 @@
+import { encodeNpub, Pubkey } from "@linky/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { act, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LinkyBankPaymentOfferStatus } from "../app/lib/bankPaymentOffer";
+import type { BankOfferStatus } from "@linky/proxy-payment";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import { createLinkyBankPaymentOfferEvent } from "../testUtils/bankPaymentOfferEvent";
 import { createSecretKey } from "../testUtils/nostrKeys";
@@ -36,9 +37,10 @@ vi.mock("../components/PrivateImageBubble", () => ({
 
 const OFFERER_PUBKEY = getPublicKey(createSecretKey(1));
 const RECIPIENT_PUBKEY = getPublicKey(createSecretKey(2));
+const QUEUED_PUBKEY = getPublicKey(createSecretKey(3));
 
 const createOfferMessage = (
-  status: LinkyBankPaymentOfferStatus = "offered",
+  status: BankOfferStatus = "offered",
 ): LocalNostrMessage => {
   const createdAtSec = Math.floor(Date.now() / 1_000);
   const event = createLinkyBankPaymentOfferEvent({
@@ -72,7 +74,7 @@ const createOfferMessage = (
 type PageProps = ComponentProps<typeof BankPaymentOfferDetailPage>;
 
 interface RenderOfferOptions extends Partial<PageProps> {
-  status?: LinkyBankPaymentOfferStatus;
+  status?: BankOfferStatus;
 }
 
 /** Renders the recipient's view of a fresh offer from Alice unless overridden. */
@@ -317,13 +319,7 @@ describe("BankPaymentOfferDetailPage", () => {
         expiresAtSec: nowSec + 300,
         offerId: "offer-1",
         ownerPubkey: OFFERER_PUBKEY,
-        pending: [
-          {
-            contactId: "contact-2",
-            contactPubHex: "b".repeat(64),
-            dueAtSec: nowSec + 10,
-          },
-        ],
+        pending: [{ dueAtSec: nowSec + 10, peer: QUEUED_PUBKEY }],
       }),
     );
 
@@ -331,7 +327,11 @@ describe("BankPaymentOfferDetailPage", () => {
       chatOwnPubkeyHex: OFFERER_PUBKEY,
       contacts: [
         { id: "contact-1", name: "Alice" },
-        { id: "contact-2", name: "Bob" },
+        {
+          id: "contact-2",
+          name: "Bob",
+          npub: encodeNpub(Pubkey.make(QUEUED_PUBKEY)),
+        },
       ],
     });
 

@@ -1,5 +1,5 @@
 import { parseTokenText } from "@linky/linkshu";
-import { getLinkyBankPaymentOfferInfo } from "./bankPaymentOffer";
+import { decodeBankPaymentOffer } from "@linky/proxy-payment";
 import { parsePrivateImageMessage } from "./privateImageMessage";
 import { extractCashuTokenFromText } from "./tokenText";
 
@@ -29,7 +29,7 @@ export const getCashuTokenMessageInfo = (
   /** Token texts the wallet's transfers carry (sent or received). */
   knownTokenTexts: ReadonlySet<string> = new Set(),
 ): CashuTokenMessageInfo | null => {
-  if (getLinkyBankPaymentOfferInfo(text)) return null;
+  if (decodeBankPaymentOffer(text)) return null;
   if (parsePrivateImageMessage(text)) return null;
 
   const tokenRaw = extractCashuTokenFromText(text);

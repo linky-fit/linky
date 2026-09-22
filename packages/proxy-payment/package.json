@@ -1,0 +1,32 @@
+{
+  "name": "@linky/proxy-payment",
+  "private": true,
+  "version": "0.1.0",
+  "license": "0BSD",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "eslint": "eslint --fix .",
+    "prettier": "prettier --write .",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@linky/linkstr": "workspace:*",
+    "bysquare": "^4.0.0",
+    "effect": "^3.19.19"
+  },
+  "devDependencies": {
+    "@linky/config": "workspace:*",
+    "@scure/base": "^2.0.0",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.18"
+  }
+}

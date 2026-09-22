@@ -1,30 +1,36 @@
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { formatRemainingTime } from "../app/lib/bankPaymentOfferLabels";
 import {
-  formatRemainingTime,
-  getLinkyBankPaymentOfferExpiresAtSec,
-  getLinkyBankPaymentOfferInfo,
-  getLinkyBankPaymentOfferStatusRank,
+  BANK_PAYMENT_OFFER_EXTENSION_SEC,
+  bankPaymentOfferExpiresAtSec,
+  bankPaymentOfferStatusRank,
+  decodeBankPaymentOffer,
   hasBankPaymentOfferTimedPhase,
-  isLinkyBankPaymentOfferExpired,
-  isLinkyBankPaymentOfferTerminalStatus,
-  readLinkyBankPaymentOfferStaggerRecords,
-  setLinkyBankPaymentOfferMinimized,
-  type LinkyBankPaymentOfferStatus,
-} from "../app/lib/bankPaymentOffer";
+  isBankPaymentOfferExpired,
+  isTerminalBankPaymentOfferStatus,
+  tryParseBankPayment,
+  type BankOfferStatus,
+  type BankPayment,
+} from "@linky/proxy-payment";
+import {
+  readBankPaymentOfferStaggerRecords,
+  setBankPaymentOfferMinimized,
+} from "../app/lib/bankPaymentOfferStorage";
+import {
+  openSpdPaymentInBank,
+  shareSpdPaymentQrJpeg,
+} from "../utils/spdPayment";
 import {
   getChatAttachmentRejection,
   parsePrivateImageMessage,
 } from "../app/lib/privateImageMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
+import { decodeNpub } from "@linky/linkstr";
+import { readUnknownContactIdPubkey } from "../app/hooks/messages/contactIdentity";
 import { navigateTo, returnFromBankPaymentOffer } from "../hooks/useRouting";
+import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import type { Translate } from "../i18n";
-import {
-  openSpdPaymentInBank,
-  shareSpdPaymentQrJpeg,
-  tryParseBankPayment,
-  type BankPayment,
-} from "../utils/spdPayment";
 import { nowSeconds } from "../utils/time";
 import {
   AcceptedByOtherOfferView,
@@ -52,7 +58,7 @@ interface BankPaymentOfferDetailPageProps {
   onCopyText: (text: string) => void;
   onRespondBankPaymentOffer: (
     message: LocalNostrMessage,
-    nextStatus: LinkyBankPaymentOfferStatus,
+    nextStatus: BankOfferStatus,
     options?: {
       expiresAtSec?: number | null;
       extensionSec?: number | null;
@@ -77,60 +83,30 @@ const compareEntries = (
   right: BankPaymentOfferEntry,
 ): number => {
   const rankDelta =
-    getLinkyBankPaymentOfferStatusRank(left.info.status) -
-    getLinkyBankPaymentOfferStatusRank(right.info.status);
+    bankPaymentOfferStatusRank(left.info.status) -
+    bankPaymentOfferStatusRank(right.info.status);
   if (rankDelta !== 0) return rankDelta;
 
   return getEntryTime(left) - getEntryTime(right);
 };
 
-const findOfferEntry = (
-  messages: readonly LocalNostrMessage[],
-  chatId: string,
-  offerId: string,
-): BankPaymentOfferEntry | null => {
-  const normalizedChatId = chatId.trim();
-  const normalizedOfferId = offerId.trim();
-  if (!normalizedChatId || !normalizedOfferId) return null;
-
-  let best: BankPaymentOfferEntry | null = null;
-  for (const message of messages) {
-    if (message.contactId.trim() !== normalizedChatId) continue;
-
-    const info = getLinkyBankPaymentOfferInfo(message.content);
-    if (!info || info.offerId !== normalizedOfferId) continue;
-
-    const entry = { info, message };
-    if (!best || compareEntries(entry, best) > 0) {
-      best = entry;
-    }
-  }
-
-  return best;
-};
-
+// Offer rows are unique per contact and offer, so the thread is a plain lookup.
 const findOfferEntries = (
   messages: readonly LocalNostrMessage[],
   offerId: string,
-): BankPaymentOfferEntry[] => {
-  const normalizedOfferId = offerId.trim();
-  const latestByContact = new Map<string, BankPaymentOfferEntry>();
-  if (!normalizedOfferId) return [];
+): BankPaymentOfferEntry[] =>
+  messages.flatMap((message) => {
+    const info = decodeBankPaymentOffer(message.content);
+    return info?.offerId === offerId.trim() && message.contactId.trim()
+      ? [{ info, message }]
+      : [];
+  });
 
-  for (const message of messages) {
-    const info = getLinkyBankPaymentOfferInfo(message.content);
-    if (!info || info.offerId !== normalizedOfferId) continue;
-    const contactId = message.contactId.trim();
-    if (!contactId) continue;
-
-    const entry = { info, message };
-    const current = latestByContact.get(contactId);
-    if (!current || compareEntries(entry, current) > 0) {
-      latestByContact.set(contactId, entry);
-    }
-  }
-
-  return [...latestByContact.values()];
+const contactPubkey = (contact: ContactRowLike): string | null => {
+  const npub = normalizeNpubIdentifier(contact.npub ?? "");
+  return (
+    (npub ? decodeNpub(npub) : null) ?? readUnknownContactIdPubkey(contact.id)
+  );
 };
 
 const findPaymentConfirmation = (
@@ -142,7 +118,7 @@ const findPaymentConfirmation = (
   const paymentMessageIds = new Set<string>();
   for (const message of offerMessages) {
     if (message.contactId.trim() !== chatId.trim()) continue;
-    const info = getLinkyBankPaymentOfferInfo(message.content);
+    const info = decodeBankPaymentOffer(message.content);
     if (
       !info ||
       info.offerId !== offerId.trim() ||
@@ -227,8 +203,6 @@ const getOpenErrorText = (error: unknown, t: Translate) => {
   return t("spdPaymentOpenFailed");
 };
 
-const BANK_PAYMENT_OFFER_EXTENSION_SEC = 60;
-
 export const BankPaymentOfferDetailPage: React.FC<
   BankPaymentOfferDetailPageProps
 > = ({
@@ -261,33 +235,42 @@ export const BankPaymentOfferDetailPage: React.FC<
   >(null);
   const [errorText, setErrorText] = React.useState<string | null>(null);
   const [nowMs, setNowMs] = React.useState(() => Date.now());
-  const entry = React.useMemo(
-    () => findOfferEntry(bankPaymentOfferMessages, chatId, offerId),
-    [bankPaymentOfferMessages, chatId, offerId],
-  );
   const offerEntries = React.useMemo(
     () => findOfferEntries(bankPaymentOfferMessages, offerId),
     [bankPaymentOfferMessages, offerId],
   );
+  const entry =
+    offerEntries.find(
+      ({ message }) => message.contactId.trim() === chatId.trim(),
+    ) ?? null;
   const [showPaymentRows, setShowPaymentRows] = React.useState(false);
   // Recipients still waiting for their staggered send; the queue drains via
-  // message upserts, so offerEntries changing keeps this list current.
+  // state updates, so offerEntries changing keeps this list current.
   const queuedRecipients = React.useMemo(() => {
     const ownerPubkey = (chatOwnPubkeyHex ?? "").trim();
     if (!ownerPubkey) return [];
 
-    const record = readLinkyBankPaymentOfferStaggerRecords(ownerPubkey).find(
+    const record = readBankPaymentOfferStaggerRecords(ownerPubkey).find(
       (candidate) => candidate.offerId === offerId.trim(),
     );
     if (!record) return [];
 
+    const contactByPubkey = new Map(
+      contacts.flatMap((contact) => {
+        const pubkey = contactPubkey(contact);
+        return pubkey ? [[pubkey, contact] as const] : [];
+      }),
+    );
     const offeredContactIds = new Set(
       offerEntries.map((offerEntry) => offerEntry.message.contactId.trim()),
     );
-    return record.pending.filter(
-      (recipient) => !offeredContactIds.has(recipient.contactId),
-    );
-  }, [chatOwnPubkeyHex, offerEntries, offerId]);
+    return record.pending.flatMap((recipient) => {
+      const contact = contactByPubkey.get(recipient.peer) ?? null;
+      return contact && offeredContactIds.has((contact.id ?? "").trim())
+        ? []
+        : [{ contact, peer: recipient.peer }];
+    });
+  }, [chatOwnPubkeyHex, contacts, offerEntries, offerId]);
   const confirmation = React.useMemo(
     () =>
       findPaymentConfirmation(
@@ -368,17 +351,17 @@ export const BankPaymentOfferDetailPage: React.FC<
   React.useEffect(() => {
     if (!entry || entry.info.status !== "settled" || isCreatedByMe) return;
 
-    setLinkyBankPaymentOfferMinimized(chatId, offerId, true);
+    setBankPaymentOfferMinimized(chatId, offerId, true);
     returnFromBankPaymentOffer(chatId);
   }, [chatId, entry, isCreatedByMe, offerId]);
 
   const closeOffer = () => {
-    setLinkyBankPaymentOfferMinimized(chatId, offerId, true);
+    setBankPaymentOfferMinimized(chatId, offerId, true);
     returnFromBankPaymentOffer(chatId);
   };
 
   const isExpired = entry
-    ? isLinkyBankPaymentOfferExpired(
+    ? isBankPaymentOfferExpired(
         entry.info,
         entry.message.createdAtSec,
         Math.floor(nowMs / 1_000),
@@ -401,7 +384,7 @@ export const BankPaymentOfferDetailPage: React.FC<
   const extendTime = async (offerEntry: BankPaymentOfferEntry) => {
     if (isExtending || !hasBankPaymentOfferTimedPhase(offerEntry.info.status))
       return;
-    const currentExpiresAtSec = getLinkyBankPaymentOfferExpiresAtSec(
+    const currentExpiresAtSec = bankPaymentOfferExpiresAtSec(
       offerEntry.info,
       offerEntry.message.createdAtSec,
     );
@@ -455,9 +438,7 @@ export const BankPaymentOfferDetailPage: React.FC<
   if (isCreatedByMe) {
     const activeEntry =
       offerEntries
-        .filter(
-          ({ info }) => !isLinkyBankPaymentOfferTerminalStatus(info.status),
-        )
+        .filter(({ info }) => !isTerminalBankPaymentOfferStatus(info.status))
         .sort(compareEntries)
         .at(-1) ??
       [...offerEntries].sort(compareEntries).at(-1) ??
@@ -465,7 +446,7 @@ export const BankPaymentOfferDetailPage: React.FC<
     const activeAmountText = activeEntry.info.amountSat
       ? formatDisplayedAmountText(activeEntry.info.amountSat)
       : activeEntry.info.amountText;
-    const activeExpiresAtSec = getLinkyBankPaymentOfferExpiresAtSec(
+    const activeExpiresAtSec = bankPaymentOfferExpiresAtSec(
       activeEntry.info,
       activeEntry.message.createdAtSec,
     );
@@ -584,10 +565,8 @@ export const BankPaymentOfferDetailPage: React.FC<
     };
 
     const remainingSec =
-      (getLinkyBankPaymentOfferExpiresAtSec(
-        entry.info,
-        entry.message.createdAtSec,
-      ) ?? Math.floor(nowMs / 1_000)) - Math.floor(nowMs / 1_000);
+      (bankPaymentOfferExpiresAtSec(entry.info, entry.message.createdAtSec) ??
+        Math.floor(nowMs / 1_000)) - Math.floor(nowMs / 1_000);
 
     return (
       <IncomingOfferView
@@ -612,7 +591,7 @@ export const BankPaymentOfferDetailPage: React.FC<
     return <InvalidOfferView t={t} />;
   }
 
-  const expiresAtSec = getLinkyBankPaymentOfferExpiresAtSec(
+  const expiresAtSec = bankPaymentOfferExpiresAtSec(
     entry.info,
     entry.message.createdAtSec,
   );

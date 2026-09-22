@@ -108,12 +108,12 @@
         "@linky/linkstr": "workspace:*",
         "@linky/linkstr-react": "workspace:*",
         "@linky/linksync": "workspace:*",
+        "@linky/proxy-payment": "workspace:*",
         "@noble/hashes": "^1.5.0",
         "@scure/base": "^2.0.0",
         "@scure/bip32": "^2.0.1",
         "@scure/bip39": "^1.4.0",
         "buffer": "^6.0.3",
-        "bysquare": "^4.0.0",
         "cbor-x": "^1.6.0",
         "effect": "^3.19.19",
         "jsqr": "^1.4.0",
@@ -270,6 +270,24 @@
       },
       "peerDependencies": {
         "react": "^19.2.3",
+      },
+    },
+    "packages/proxy-payment": {
+      "name": "@linky/proxy-payment",
+      "version": "0.1.0",
+      "dependencies": {
+        "@linky/linkstr": "workspace:*",
+        "bysquare": "^4.0.0",
+        "effect": "^3.19.19",
+      },
+      "devDependencies": {
+        "@linky/config": "workspace:*",
+        "@scure/base": "^2.0.0",
+        "@types/node": "^24.10.1",
+        "eslint": "^9.39.1",
+        "prettier": "^3.4.2",
+        "typescript": "~5.9.3",
+        "vitest": "^4.0.18",
       },
     },
     "tools/nostr-error-tracker": {
@@ -729,6 +747,8 @@
     "@linky/native-shell": ["@linky/native-shell@workspace:apps/native-shell"],
 
     "@linky/nostr-error-tracker": ["@linky/nostr-error-tracker@workspace:tools/nostr-error-tracker"],
+
+    "@linky/proxy-payment": ["@linky/proxy-payment@workspace:packages/proxy-payment"],
 
     "@linky/push": ["@linky/push@workspace:apps/push"],
 

@@ -8,9 +8,9 @@ import {
 } from "@linky/linkstr";
 import type { UnsignedEvent } from "nostr-tools";
 import {
-  getLinkyBankPaymentOfferMessageText,
-  type LinkyBankPaymentOfferStatus,
-} from "../app/lib/bankPaymentOffer";
+  type BankOfferStatus,
+  bankPaymentOfferMessageText,
+} from "@linky/proxy-payment";
 
 const unixSeconds = (value: number | null | undefined): UnixSeconds | null =>
   value === null || value === undefined ? null : UnixSeconds.make(value);
@@ -30,7 +30,7 @@ export const createLinkyBankPaymentOfferEvent = (args: {
   recipientPublicKey: string;
   senderPublicKey: string;
   spdPayload?: string | null;
-  status?: LinkyBankPaymentOfferStatus;
+  status?: BankOfferStatus;
 }): UnsignedEvent => {
   const status = args.status ?? "offered";
   const offerId = BankOfferId.make(args.offerId ?? args.clientId);
@@ -52,7 +52,7 @@ export const createLinkyBankPaymentOfferEvent = (args: {
     spdPayload: args.spdPayload ?? null,
     status,
     statusUpdatedAtSec: sentAt,
-    text: getLinkyBankPaymentOfferMessageText(
+    text: bankPaymentOfferMessageText(
       args.amountText,
       status,
       args.extensionSec,
