@@ -131,6 +131,7 @@
         "workbox-window": "^7.3.0",
       },
       "devDependencies": {
+        "@evolu/sqlite-wasm": "2.2.4",
         "@linky/config": "workspace:*",
         "@playwright/test": "^1.58.1",
         "@types/node": "^24.10.1",
