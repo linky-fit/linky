@@ -118,6 +118,10 @@ test("incoming 2-sat requests recover a CDK output collision after local counter
         await expect(
           requester.page.locator(".chat-payment-request-status.is-paid"),
         ).toHaveCount(paymentNumber);
+        // Paid renders before the send finishes and navigates back to chat.
+        await expect(
+          payer.page.locator('[data-guide="chat-pay"]'),
+        ).toBeEnabled();
         // The dev mint takes one sat for the payer swap and one for receipt.
         await expectBalance(payer.page, 50 - paymentNumber * 3);
         await expectBalance(requester.page, paymentNumber);
