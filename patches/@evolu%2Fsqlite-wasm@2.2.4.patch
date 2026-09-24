@@ -1,8 +1,18 @@
 diff --git a/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs b/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs
-index 1e35522cb97757472bd623dd0a332c8640b2d806..1447943319bc9e6732bbfe92098b45f0fbce302b 100644
+index 1e35522cb97757472bd623dd0a332c8640b2d806..e2f0b5d12bad6b1622a3ed1c8ab927501eb79083 100644
 --- a/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs
 +++ b/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs
-@@ -13524,7 +13524,9 @@ var sqlite3InitModule = (() => {
+@@ -12674,7 +12674,8 @@ var sqlite3InitModule = (() => {
+             const pool = getPoolForPFile(pFile);
+             pool.log('xCheckReservedLock');
+             pool.storeErr();
+-            wasm.poke32(pOut, 1);
++            const file = pool.getOFileForS3File(pFile);
++            wasm.poke32(pOut, file.lockType > capi.SQLITE_LOCK_SHARED ? 1 : 0);
+             return 0;
+           },
+           xClose: function (pFile) {
+@@ -13524,7 +13525,9 @@ var sqlite3InitModule = (() => {
                    return poolUtil;
                  })
                  .catch(async (e) => {
@@ -14,10 +24,20 @@ index 1e35522cb97757472bd623dd0a332c8640b2d806..1447943319bc9e6732bbfe92098b45f0
                  });
              })
 diff --git a/sqlite-wasm/jswasm/sqlite3.js b/sqlite-wasm/jswasm/sqlite3.js
-index 45118cbd11d374185291c51a5c76266e9ea1babc..75abe48084c767d238475692bd84537cdf3850a6 100644
+index 45118cbd11d374185291c51a5c76266e9ea1babc..9e7b60c3597eb49b6e7a7a5ca09a7f03ccf7fe43 100644
 --- a/sqlite-wasm/jswasm/sqlite3.js
 +++ b/sqlite-wasm/jswasm/sqlite3.js
-@@ -13551,7 +13551,9 @@ var sqlite3InitModule = (() => {
+@@ -12701,7 +12701,8 @@ var sqlite3InitModule = (() => {
+             const pool = getPoolForPFile(pFile);
+             pool.log('xCheckReservedLock');
+             pool.storeErr();
+-            wasm.poke32(pOut, 1);
++            const file = pool.getOFileForS3File(pFile);
++            wasm.poke32(pOut, file.lockType > capi.SQLITE_LOCK_SHARED ? 1 : 0);
+             return 0;
+           },
+           xClose: function (pFile) {
+@@ -13551,7 +13552,9 @@ var sqlite3InitModule = (() => {
                    return poolUtil;
                  })
                  .catch(async (e) => {
@@ -29,10 +49,20 @@ index 45118cbd11d374185291c51a5c76266e9ea1babc..75abe48084c767d238475692bd84537c
                  });
              })
 diff --git a/sqlite-wasm/jswasm/sqlite3.mjs b/sqlite-wasm/jswasm/sqlite3.mjs
-index efd020a12f20938520958a8f359e8114d66c364c..6adb7c2301fa8ad69e4966f0e2cdc578e1f865c3 100644
+index efd020a12f20938520958a8f359e8114d66c364c..3efba0b8f0b19882e814852b96e4d0b8653c3fd9 100644
 --- a/sqlite-wasm/jswasm/sqlite3.mjs
 +++ b/sqlite-wasm/jswasm/sqlite3.mjs
-@@ -13526,7 +13526,9 @@ var sqlite3InitModule = (() => {
+@@ -12676,7 +12676,8 @@ var sqlite3InitModule = (() => {
+             const pool = getPoolForPFile(pFile);
+             pool.log('xCheckReservedLock');
+             pool.storeErr();
+-            wasm.poke32(pOut, 1);
++            const file = pool.getOFileForS3File(pFile);
++            wasm.poke32(pOut, file.lockType > capi.SQLITE_LOCK_SHARED ? 1 : 0);
+             return 0;
+           },
+           xClose: function (pFile) {
+@@ -13526,7 +13527,9 @@ var sqlite3InitModule = (() => {
                    return poolUtil;
                  })
                  .catch(async (e) => {
