@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BankOfferId } from "@linky/linkstr";
 import { me, other, payer, snapshot, START } from "../testing/offers";
 import {
   applyBankPaymentOfferSnapshot,
@@ -16,7 +17,7 @@ const queue = bankPaymentOfferStaggerQueue({
   amountText: "250 Kč",
   delaySec: 10,
   firstSentAtSec: START,
-  offerId: "offer-1",
+  offerId: BankOfferId.make("offer-1"),
   ownerPubkey: me,
   peers: [payer, other],
 });

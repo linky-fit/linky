@@ -187,4 +187,63 @@ describe("push HTTP boundaries", () => {
       storage.getSubscriptionsForPubkeys([pubkey]).get(pubkey)?.[0]?.endpoint,
     ).toBe(body.subscription.endpoint);
   });
+  it("replaces a pubkey's reminders with a subscribe proof and rejects bad times", async () => {
+    const { server, storage } = serve();
+    const nowSec = Math.floor(Date.now() / 1000);
+    const proofFor = () => {
+      const nonce = storage.createChallenge(
+        pubkey,
+        "subscribe",
+        Date.now() + 60_000,
+        Date.now(),
+      );
+      return {
+        pubkey,
+        event: makePushOwnershipProof(
+          { action: "subscribe", challenge: nonce },
+          secretKey,
+          UnixSeconds.make(nowSec),
+        ),
+      };
+    };
+    expect(
+      (
+        await post(server, "/reminders", {
+          pubkey,
+          notifyAtSecs: [nowSec + 3600, "soon"],
+          proofs: [proofFor()],
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await post(server, "/reminders", {
+          pubkey,
+          notifyAtSecs: [nowSec + 3600, nowSec + 60],
+          proofs: [proofFor()],
+        })
+      ).status,
+    ).toBe(200);
+    expect(storage.getReminders(pubkey)).toEqual([nowSec + 60, nowSec + 3600]);
+    expect(
+      (
+        await post(server, "/reminders", {
+          pubkey,
+          notifyAtSecs: [],
+          proofs: [proofFor()],
+        })
+      ).status,
+    ).toBe(200);
+    expect(storage.getReminders(pubkey)).toEqual([]);
+    // No proof, no change.
+    expect(
+      (
+        await post(server, "/reminders", {
+          pubkey,
+          notifyAtSecs: [nowSec + 60],
+          proofs: [],
+        })
+      ).status,
+    ).toBe(400);
+  });
 });

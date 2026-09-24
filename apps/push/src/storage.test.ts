@@ -428,3 +428,94 @@ describe("PushStorage rowids", () => {
     });
   });
 });
+
+describe("PushStorage recurring reminders", () => {
+  const reminderDefaults = {
+    consumedChallengeNonces: [],
+    maxRemindersPerPubkey: 32,
+    nowMs,
+  };
+  const nowSec = Math.floor(nowMs / 1000);
+
+  it("replaces a pubkey's reminder set and drops times already past", () => {
+    withStorage((storage) => {
+      storage.replaceReminders({
+        ...reminderDefaults,
+        pubkey: pubkeyA,
+        notifyAtSecs: [nowSec + 60, nowSec + 3600, nowSec - 1],
+      });
+      storage.replaceReminders({
+        ...reminderDefaults,
+        pubkey: pubkeyB,
+        notifyAtSecs: [nowSec + 120],
+      });
+      expect(storage.getReminders(pubkeyA)).toEqual([
+        nowSec + 60,
+        nowSec + 3600,
+      ]);
+
+      storage.replaceReminders({
+        ...reminderDefaults,
+        pubkey: pubkeyA,
+        notifyAtSecs: [nowSec + 7200],
+      });
+      expect(storage.getReminders(pubkeyA)).toEqual([nowSec + 7200]);
+      expect(storage.getReminders(pubkeyB)).toEqual([nowSec + 120]);
+    });
+  });
+
+  it("enforces the per-pubkey limit and consumes the challenge", () => {
+    withStorage((storage) => {
+      expect(() =>
+        storage.replaceReminders({
+          ...reminderDefaults,
+          maxRemindersPerPubkey: 2,
+          pubkey: pubkeyA,
+          notifyAtSecs: [nowSec + 1, nowSec + 2, nowSec + 3],
+        }),
+      ).toThrow(StorageLimitError);
+
+      const nonce = storage.createChallenge(
+        pubkeyA,
+        "subscribe",
+        nowMs + 60_000,
+        nowMs,
+      );
+      storage.replaceReminders({
+        ...reminderDefaults,
+        consumedChallengeNonces: [nonce],
+        pubkey: pubkeyA,
+        notifyAtSecs: [nowSec + 1],
+      });
+      expect(() =>
+        storage.replaceReminders({
+          ...reminderDefaults,
+          consumedChallengeNonces: [nonce],
+          pubkey: pubkeyA,
+          notifyAtSecs: [],
+        }),
+      ).toThrow(StorageConflictError);
+    });
+  });
+
+  it("hands out due reminders once and forgets stale ones unsent", () => {
+    withStorage((storage) => {
+      storage.replaceReminders({
+        ...reminderDefaults,
+        pubkey: pubkeyA,
+        notifyAtSecs: [nowSec + 10, nowSec + 100, nowSec + 5000],
+      });
+      expect(storage.takeDueReminders(nowSec + 5, nowSec - 3600)).toEqual([]);
+      expect(storage.takeDueReminders(nowSec + 100, nowSec - 3600)).toEqual([
+        { pubkey: pubkeyA, notifyAtSec: nowSec + 10 },
+        { pubkey: pubkeyA, notifyAtSec: nowSec + 100 },
+      ]);
+      expect(storage.takeDueReminders(nowSec + 100, nowSec - 3600)).toEqual([]);
+      // The service was down for hours: the remaining one is stale, not sent.
+      expect(
+        storage.takeDueReminders(nowSec + 20_000, nowSec + 20_000 - 3600),
+      ).toEqual([]);
+      expect(storage.getReminders(pubkeyA)).toEqual([]);
+    });
+  });
+});

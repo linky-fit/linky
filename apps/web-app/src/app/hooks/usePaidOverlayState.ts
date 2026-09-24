@@ -1,6 +1,7 @@
 import React from "react";
 
 import type { Translate } from "../../i18n";
+import type { PaidOverlayDetails } from "../lib/paidOverlay";
 
 interface UsePaidOverlayStateParams {
   t: Translate;
@@ -9,7 +10,8 @@ interface UsePaidOverlayStateParams {
 interface UsePaidOverlayStateResult {
   paidOverlayIsOpen: boolean;
   paidOverlayTitle: string | null;
-  showPaidOverlay: (title?: string) => void;
+  paidOverlayDetails: PaidOverlayDetails | null;
+  showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   topupPaidNavTimerRef: React.MutableRefObject<number | null>;
 }
 
@@ -20,6 +22,8 @@ export const usePaidOverlayState = ({
   const [paidOverlayTitle, setPaidOverlayTitle] = React.useState<string | null>(
     null,
   );
+  const [paidOverlayDetails, setPaidOverlayDetails] =
+    React.useState<PaidOverlayDetails | null>(null);
   const paidOverlayTimerRef = React.useRef<number | null>(null);
   const topupPaidNavTimerRef = React.useRef<number | null>(null);
 
@@ -48,9 +52,10 @@ export const usePaidOverlayState = ({
   }, []);
 
   const showPaidOverlay = React.useCallback(
-    (title?: string) => {
+    (title?: string, details?: PaidOverlayDetails) => {
       const resolved = title ?? t("paid");
       setPaidOverlayTitle(resolved);
+      setPaidOverlayDetails(details ?? null);
       setPaidOverlayIsOpen(true);
       if (paidOverlayTimerRef.current !== null) {
         try {
@@ -68,6 +73,7 @@ export const usePaidOverlayState = ({
   );
 
   return {
+    paidOverlayDetails,
     paidOverlayIsOpen,
     paidOverlayTitle,
     showPaidOverlay,

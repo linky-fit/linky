@@ -4,7 +4,7 @@ import {
   NonEmptyString1000,
   PositiveInt,
 } from "@evolu/common";
-import { createId, directConversationIdFor } from "../model/ids";
+import { createId, directConversationIdFor } from "@linky/domain";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeConversationsRepository } from "./conversations";
 

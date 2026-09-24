@@ -1,6 +1,6 @@
 # Offers
 
-A proxy payment is one **offer** (`offerId`) sent to several peers. Every snapshot linkstr delivers (`BankOfferSnapshotReceived`, `OwnBankOfferSnapshotConfirmed`) or every receipt this device gets for its own send lands in one `BankPaymentOfferState`: a list of **threads** (`BankPaymentOffer`, one per peer pubkey and offer id, always the latest authorized status) plus a buffer of payer snapshots waiting for their offerer's snapshot.
+A proxy payment is one **offer** (`offerId`) sent to several peers. Every snapshot linkstr delivers (`BankOfferSnapshotReceived`, `OwnBankOfferSnapshotConfirmed`) or every receipt this device gets for its own send lands in one `BankPaymentOfferState`: a list of **threads** (`BankPaymentOffer`, one per peer `Pubkey` and `BankOfferId`, always the latest authorized status; every id keeps its linkstr brand) plus a buffer of payer snapshots waiting for their offerer's snapshot.
 
 ```ts
 import {

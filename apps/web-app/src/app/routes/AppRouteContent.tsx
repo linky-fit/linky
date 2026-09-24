@@ -41,6 +41,8 @@ import {
   TopupInvoicePage,
   TopupNoAmountPage,
   TopupPage,
+  RecurringPaymentFormPage,
+  RecurringPaymentPage,
   TransactionsPage,
 } from "../../pages";
 import {
@@ -152,6 +154,14 @@ const RoutePage = (): React.ReactElement => {
       return <TopupPage {...moneyRoutes.topupProps} />;
     case "transactions":
       return <TransactionsPage />;
+    case "recurringPaymentNew":
+      // The prefill lives in the hash query, which is not part of `route`;
+      // keying on it gives each "Repeat regularly…" entry a fresh form.
+      return <RecurringPaymentFormPage key={globalThis.location?.hash ?? ""} />;
+    case "recurringPaymentEdit":
+      return <RecurringPaymentFormPage editId={route.id} />;
+    case "recurringPayment":
+      return <RecurringPaymentPage id={route.id} />;
     case "topupNoAmount":
       return <TopupNoAmountPage />;
     case "topupInvoice":

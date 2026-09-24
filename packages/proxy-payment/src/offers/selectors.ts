@@ -1,4 +1,4 @@
-import type { BankOfferStatus } from "@linky/linkstr";
+import type { BankOfferId, BankOfferStatus, Pubkey } from "@linky/linkstr";
 import {
   bankPaymentOfferBankPaidAtSec,
   bankPaymentOfferExpiresAtSec,
@@ -14,8 +14,8 @@ import {
 
 const groupByOfferId = (
   offers: readonly BankPaymentOffer[],
-): Map<string, BankPaymentOffer[]> => {
-  const groups = new Map<string, BankPaymentOffer[]>();
+): Map<BankOfferId, BankPaymentOffer[]> => {
+  const groups = new Map<BankOfferId, BankPaymentOffer[]>();
   for (const offer of offers) {
     const group = groups.get(offer.offerId) ?? [];
     group.push(offer);
@@ -27,20 +27,20 @@ const groupByOfferId = (
 const byUpdatedAt = (left: BankPaymentOffer, right: BankPaymentOffer) =>
   offerUpdatedAtSec(left) - offerUpdatedAtSec(right);
 
-const ownOffers = (offers: readonly BankPaymentOffer[], me: string) =>
+const ownOffers = (offers: readonly BankPaymentOffer[], me: Pubkey) =>
   offers.filter((offer) => offer.offererPublicKey === me);
 
 export interface ActiveBankPaymentOffers {
   nextExpiryAtSec: number | null;
   /** Peers with a live, non-terminal thread of an offer that has not ended. */
-  peers: ReadonlySet<string>;
+  peers: ReadonlySet<Pubkey>;
 }
 
 export const activeBankPaymentOffers = (
   offers: readonly BankPaymentOffer[],
   nowSec: number,
 ): ActiveBankPaymentOffers => {
-  const peers = new Set<string>();
+  const peers = new Set<Pubkey>();
   let nextExpiryAtSec: number | null = null;
 
   for (const group of groupByOfferId(offers).values()) {
@@ -68,7 +68,7 @@ export const activeBankPaymentOffers = (
 
 export const isBankPaymentOfferCanceled = (
   offers: readonly BankPaymentOffer[],
-  offerId: string,
+  offerId: BankOfferId,
 ): boolean =>
   offers.some(
     (offer) => offer.offerId === offerId && offer.status === "canceled",
@@ -81,14 +81,14 @@ export interface BankPaymentOfferResponderStep {
   ended: boolean;
   /** Recipients still offered or accepted who must learn someone else won. */
   losers: readonly BankPaymentOffer[];
-  offerId: string;
+  offerId: BankOfferId;
   /** The recipient who already received bank details. */
   winner: BankPaymentOffer | null;
 }
 
 export const bankPaymentOfferResponderSteps = (
   offers: readonly BankPaymentOffer[],
-  me: string,
+  me: Pubkey,
 ): BankPaymentOfferResponderStep[] =>
   Array.from(groupByOfferId(ownOffers(offers, me)), ([offerId, group]) => {
     if (group.some((offer) => isWholeOfferTerminalStatus(offer.status))) {
@@ -130,7 +130,7 @@ export const bankPaymentOfferResponderSteps = (
 /** True while one of my offers has a live acceptance without bank details. */
 export const hasPendingBankPaymentOfferResponderWork = (
   offers: readonly BankPaymentOffer[],
-  me: string,
+  me: Pubkey,
   nowSec: number,
 ): boolean =>
   Array.from(groupByOfferId(ownOffers(offers, me)).values()).some(
@@ -158,7 +158,7 @@ const EXPIRY_STATUS_PRIORITY: readonly BankOfferStatus[] = [
 /** My offers' threads grouped by offer with the deadline of their most advanced phase. */
 export const ownBankPaymentOfferExpiries = (
   offers: readonly BankPaymentOffer[],
-  me: string,
+  me: Pubkey,
   nowSec: number,
 ): BankPaymentOfferExpiryGroup[] => {
   const live = ownOffers(offers, me).filter(
@@ -199,7 +199,7 @@ const cancellationPushRank = (status: BankOfferStatus): number =>
  * cancellation pushes only the most advanced recipient. */
 export const bankPaymentOfferGroupResponses = (
   offers: readonly BankPaymentOffer[],
-  offerId: string,
+  offerId: BankOfferId,
   nextStatus: "canceled" | "settled",
 ): BankPaymentOfferGroupResponses => {
   const group = offers.filter((offer) => offer.offerId === offerId);
@@ -233,10 +233,10 @@ export const bankPaymentOfferGroupResponses = (
 /** Seconds each peer needed to pay my most recent offer they completed. */
 export const lastBankPaymentOfferResponseSecByPeer = (
   offers: readonly BankPaymentOffer[],
-  me: string,
-): ReadonlyMap<string, number> => {
+  me: Pubkey,
+): ReadonlyMap<Pubkey, number> => {
   const latest = new Map<
-    string,
+    Pubkey,
     { bankPaidAtSec: number; durationSec: number }
   >();
   for (const offer of ownOffers(offers, me)) {

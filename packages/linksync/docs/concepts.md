@@ -22,7 +22,7 @@ Recorded here and in `docs/architecture.md` at the repo root. Tracked in linky-f
 | `contacts`     | `ShardOwner` `["contacts", n]`     | `contact`                             | 256 KiB or 220 mutations | never         |
 | `messages`     | `ShardOwner` `["messages", n]`     | `conversation`, `message`, `reaction` | 256 KiB or 160 mutations | keep newest 4 |
 | `cashu`        | `ShardOwner` `["cashu", n]`        | `cashuProof`, `cashuOperation`        | 256 KiB or 170 mutations | never         |
-| `transactions` | `ShardOwner` `["transactions", n]` | `transaction`                         | 256 KiB or 220 mutations | keep newest 4 |
+| `transactions` | `ShardOwner` `["transactions", n]` | `transaction`, `recurringPayment`     | 256 KiB or 220 mutations | keep newest 4 |
 
 Copy-on-write identity is the row `id` in every table; the ids that are deterministic are listed under [Ids](#ids).
 
@@ -39,6 +39,7 @@ System columns (`id`, `ownerId`, `createdAt`, `updatedAt`, `isDeleted`) are Evol
 - `reaction`: the former `nostrReaction` plus `conversationId`, so a forgotten shard takes its reactions with it. `messageId` still points at `message.rumorId`.
 - `cashuProof`, `cashuOperation`: unchanged from the app. There is no `cashuToken`; the migration ingests it into `cashuProof`.
 - `transaction`: the former table minus `category` and `phase`.
+- `recurringPayment`: a standing instruction to pay `contactId` an `amount` in `unit` (sats, or a fiat code in hundredths) every `intervalCount` × `intervalUnit` from `anchorAtSec` in `timeZone`; `nextDueAtSec`, run bookkeeping (`runCount`, `lastRunAtSec`, `lastRunStatus`), `pausedAtSec`, and the claim triple (`claimDeviceId`, `claimAtSec`, `claimDueAtSec`) that names the device paying the upcoming due time. Lives with the history it produces and is forgotten with it.
 
 ## How a row moves
 

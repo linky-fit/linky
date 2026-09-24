@@ -17,10 +17,11 @@ import {
   MessageId,
   NostrIdentityId,
   ReactionId,
+  RecurringPaymentId,
   SettingId,
   ShardPointerId,
   TransactionId,
-} from "./ids";
+} from "@linky/domain";
 
 /**
  * Linky's synced data model, the shape every device converges on. System
@@ -195,6 +196,39 @@ export const LinkySchema = {
     error: nullOr(NonEmptyString1000),
     pendingLabel: nullOr(NonEmptyString100),
   },
+  /**
+   * Transactions scope: a standing instruction to pay a contact on a
+   * schedule. Each executed run is an ordinary `transaction` row that names
+   * the payment in its details.
+   */
+  recurringPayment: {
+    id: RecurringPaymentId,
+    createdAtSec: PositiveInt,
+    // The recipient; its npub or Lightning address decides the payment rail.
+    contactId: ContactId,
+    // In `unit`: sats for "sat", hundredths (cents, haléře) for a fiat code.
+    amount: PositiveInt,
+    // "sat" | "czk" | "eur" | "chf" | "usd"
+    unit: NonEmptyString100,
+    // "hour" | "day" | "week" | "month", multiplied by intervalCount.
+    intervalUnit: NonEmptyString100,
+    intervalCount: PositiveInt,
+    // First due time; every later due time is anchor + n intervals evaluated
+    // as a wall clock in `timeZone`, so a month-end anchor clamps per month.
+    anchorAtSec: PositiveInt,
+    timeZone: nullOr(NonEmptyString100),
+    nextDueAtSec: PositiveInt,
+    lastRunAtSec: nullOr(PositiveInt),
+    // "running" | "paid" | "failed" | "skipped" | "interrupted"
+    lastRunStatus: nullOr(NonEmptyString100),
+    runCount: nullOr(NonNegativeInt),
+    pausedAtSec: nullOr(PositiveInt),
+    // Which device pays the upcoming due time: every online device may write
+    // a claim, Evolu's last writer wins on all of them once synced.
+    claimDeviceId: nullOr(NonEmptyString100),
+    claimAtSec: nullOr(PositiveInt),
+    claimDueAtSec: nullOr(PositiveInt),
+  },
 } satisfies EvoluSchema;
 
 /** The column value types of an Evolu schema, the shape the shard store reads and writes. */
@@ -217,6 +251,7 @@ export type ReactionRow = Row<LinkyDbSchema["reaction"]>;
 export type CashuProofRow = Row<LinkyDbSchema["cashuProof"]>;
 export type CashuOperationRow = Row<LinkyDbSchema["cashuOperation"]>;
 export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
+export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
 
 const columnNames = <Table extends Record<string, unknown>>(
   table: Table,
@@ -235,4 +270,5 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   cashuProof: columnNames(LinkySchema.cashuProof),
   cashuOperation: columnNames(LinkySchema.cashuOperation),
   transaction: columnNames(LinkySchema.transaction),
+  recurringPayment: columnNames(LinkySchema.recurringPayment),
 };

@@ -9,6 +9,7 @@ Bun HTTP service for Web Push and Android FCM delivery on top of outer NIP-17 in
 - Persists web subscriptions, native Android tokens, and challenges in SQLite
 - Watches configured Nostr relays through Linkstr's identity-free `PushInbox` for new push-marked outer `1059` events
 - Sends a generic Web Push or Android FCM notification for every matching subscribed recipient pubkey
+- Stores the times at which a pubkey wants to be reminded of an upcoming recurring payment and sends a generic "payment is ready" notification when they come; amounts and recipients never reach the server
 - Removes permanently invalid subscriptions when push delivery returns `404` or `410`, or when the push provider reports a VAPID public key mismatch
 - Removes permanently invalid Android registration tokens when Firebase reports them as invalid or unregistered
 
@@ -116,6 +117,34 @@ Request:
 ```
 
 The server returns `503 native_push_unavailable` until `PUSH_FIREBASE_SERVICE_ACCOUNT_JSON` is configured.
+
+### `POST /reminders`
+
+Replace the caller's whole set of recurring-payment reminders. The app sends every upcoming due time it knows (at most `PUSH_MAX_REMINDERS_PER_PUBKEY`, default 32), so a paid, paused, edited or deleted payment disappears from the next set; an empty array clears them. Times already in the past are ignored. The proof uses the `subscribe` action:
+
+```json
+{
+  "pubkey": "<hex-pubkey>",
+  "notifyAtSecs": [1760000000, 1762592000],
+  "proofs": [
+    {
+      "pubkey": "<hex-pubkey>",
+      "event": {
+        "kind": 27235,
+        "content": "linky-push-subscribe",
+        "tags": [
+          ["challenge", "<nonce>"],
+          ["action", "subscribe"],
+          ["pubkey", "<hex-pubkey>"]
+        ],
+        "...": "..."
+      }
+    }
+  ]
+}
+```
+
+The dispatcher checks every 15 seconds and sends `{ "type": "recurring_reminder", "notifyAtSec": … }` to every web and Android subscription of the pubkey (web push TTL one hour). A reminder more than an hour overdue when the service gets to it, for example after downtime, is dropped unsent.
 
 ### `POST /unsubscribe`
 

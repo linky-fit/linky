@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { Patch, ShardDbError } from "../core";
-import { activeNostrIdentityId } from "../model/ids";
+import { activeNostrIdentityId } from "@linky/domain";
 import type { LinkyDbSchema, NostrIdentityRow } from "../model/schema";
 import type { LinkyStore } from "../model/store";
 import { tableRepository } from "./tableRepository";

@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@evolu/common": "^7.4.1",
+    "@linky/domain": "workspace:*",
     "@linky/linkshu": "workspace:*",
     "effect": "^3.19.19"
   },

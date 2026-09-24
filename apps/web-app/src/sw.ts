@@ -3,8 +3,12 @@
 /// <reference lib="webworker" />
 
 const SW_BUILD_TAG = "linky-sw-2026-08-14T00:00-linkstr-wrap-fetch";
-const NOTIFICATION_OPEN_URL = "/#contacts";
 const NOTIFICATION_OPEN_HASH_PARAM = "notificationOpen";
+const RECURRING_REMINDER_TYPE = "recurring_reminder";
+
+/** Where a tap lands: a reminder opens the scheduled payments, everything else the inbox. */
+const notificationOpenRoute = (data: PushNotificationData): string =>
+  data.type === RECURRING_REMINDER_TYPE ? "#wallet/transactions" : "#contacts";
 
 import { buildPushNotificationTitle } from "./utils/pushNotificationTitle";
 import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
@@ -29,6 +33,7 @@ import {
   getBankPaymentReimbursementCopyForLanguage,
   getChatAttachmentCopyForLanguage,
   getReceivedMoneyCopyForLanguage,
+  getRecurringReminderCopyForLanguage,
 } from "./app/lib/cashuNotificationCopy";
 import {
   NOSTR_RELAYS,
@@ -101,7 +106,7 @@ function buildNotificationOpenDetail(
   data: PushNotificationData,
 ): Record<string, unknown> {
   return {
-    route: "#contacts",
+    route: notificationOpenRoute(data),
     ...data,
   };
 }
@@ -112,7 +117,7 @@ function buildNotificationOpenUrl(data: PushNotificationData): string {
       buildNotificationOpenDetail(data),
     ),
   });
-  return `${NOTIFICATION_OPEN_URL}?${params.toString()}`;
+  return `/${notificationOpenRoute(data)}?${params.toString()}`;
 }
 
 async function postClientMessage(
@@ -506,11 +511,14 @@ self.addEventListener("push", (event) => {
         return;
       }
 
-      const decryptedMessage = await decryptIncomingMessageBody(envelope).catch(
-        () => null,
-      );
-      const fallbackBody =
-        typeof envelope.body === "string" && envelope.body.trim().length > 0
+      const isReminder = data.type === RECURRING_REMINDER_TYPE;
+      // A reminder carries no wrap to decrypt; its copy is the app's own.
+      const decryptedMessage = isReminder
+        ? null
+        : await decryptIncomingMessageBody(envelope).catch(() => null);
+      const fallbackBody = isReminder
+        ? getRecurringReminderCopyForLanguage(self.navigator.language)
+        : typeof envelope.body === "string" && envelope.body.trim().length > 0
           ? truncateNotificationBody(envelope.body)
           : "";
       const notificationBody = decryptedMessage?.body ?? fallbackBody;
@@ -537,7 +545,9 @@ self.addEventListener("push", (event) => {
         },
         icon: "/pwa-192x192.png",
         requireInteraction: false,
-        tag: data.outerEventId ?? "linky-inbox",
+        tag: isReminder
+          ? "linky-recurring-reminder"
+          : (data.outerEventId ?? "linky-inbox"),
       };
 
       logSw("push received", {

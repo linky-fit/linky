@@ -1,3 +1,7 @@
+import type {
+  PaidOverlayContact,
+  PaidOverlayDetails,
+} from "../../lib/paidOverlay";
 import { Either } from "effect";
 import React from "react";
 import { parseTokenText } from "@linky/linkshu";
@@ -33,6 +37,8 @@ interface SaveCashuFromTextOptions {
 
 interface UseSaveCashuFromTextParams {
   enqueueCashuOp: (op: () => Promise<void>) => Promise<void>;
+  /** Names the sender on the paid overlay when the token came from a saved contact. */
+  findContact?: (contactId: string) => PaidOverlayContact | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   isCashuTokenStored: (tokenRaw: string) => boolean;
   isMintDeleted: (mintUrl: string) => boolean;
@@ -45,7 +51,7 @@ interface UseSaveCashuFromTextParams {
   setCashuDraft: React.Dispatch<React.SetStateAction<string>>;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  showPaidOverlay: (title?: string) => void;
+  showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   t: Translate;
   touchMintInfo: (mintUrl: string, nowSec: number) => void;
 }
@@ -66,6 +72,7 @@ const navigateAfterSave = (options?: SaveCashuFromTextOptions): void => {
  */
 export const useSaveCashuFromText = ({
   enqueueCashuOp,
+  findContact,
   formatDisplayedAmountParts,
   isCashuTokenStored,
   isMintDeleted,
@@ -207,7 +214,14 @@ export const useSaveCashuFromText = ({
                     .replace("{unit}", displayAmount.unitLabel);
                 })()
               : t("cashuAccepted");
-          showPaidOverlay(title);
+          showPaidOverlay(title, {
+            direction: "in",
+            amountSat: receipt.amount > 0 ? receipt.amount : null,
+            contact:
+              options?.contactId && findContact
+                ? findContact(options.contactId)
+                : null,
+          });
 
           navigateAfterSave(options);
         } catch (error) {
@@ -222,6 +236,7 @@ export const useSaveCashuFromText = ({
     },
     [
       enqueueCashuOp,
+      findContact,
       formatDisplayedAmountParts,
       isCashuTokenStored,
       isMintDeleted,

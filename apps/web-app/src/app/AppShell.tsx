@@ -14,6 +14,7 @@ import {
   type AppShellCoreContextValue,
   type AppShellRouteContextValue,
 } from "./context/AppShellContexts";
+import { RecurringPaymentsProvider } from "./context/RecurringPaymentsContext";
 import { useCurrentNsec } from "./hooks/useCurrentNsec";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
@@ -44,6 +45,7 @@ const AuthenticatedAppShell = ({
     pageClassNameWithSwipe,
     peopleRouteProps,
     pendingCashuContactSend,
+    recurringPaymentsContext,
     relaySettingsContext,
     t,
     toasts,
@@ -96,9 +98,11 @@ const AuthenticatedAppShell = ({
         relaySettings={relaySettingsContext}
         routes={routeContextValue}
       >
-        <AuthenticatedLayout>
-          <AppRouteContent />
-        </AuthenticatedLayout>
+        <RecurringPaymentsProvider value={recurringPaymentsContext}>
+          <AuthenticatedLayout>
+            <AppRouteContent />
+          </AuthenticatedLayout>
+        </RecurringPaymentsProvider>
       </AppShellContextsProvider>
     </div>
   );

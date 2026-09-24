@@ -690,7 +690,7 @@ export const useContactsMessagingComposition = ({
         [],
       )
         .map((entry) => normalizePubkeyHex(entry))
-        .filter((entry): entry is string => Boolean(entry)),
+        .filter((entry): entry is Pubkey => entry !== null),
     );
 
     const unknownById = new Map<string, UnknownChatContact>();
@@ -1393,7 +1393,7 @@ export const useContactsMessagingComposition = ({
             [],
           )
             .map((entry) => normalizePubkeyHex(entry))
-            .filter((entry): entry is string => Boolean(entry))
+            .filter((entry): entry is Pubkey => entry !== null)
             .concat(normalizedPubkey),
         ),
       );

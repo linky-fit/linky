@@ -60,6 +60,7 @@ export function EvoluDataDetailPage(): React.ReactElement {
     "nostrMessage",
     "nostrReaction",
     "transaction",
+    "recurringPayment",
   ];
   const systemTables = ["ownerMeta", "shardPointer", "setting"];
 

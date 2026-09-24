@@ -18,6 +18,8 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
 };
 
 const TAG_DESCRIPTIONS: Record<string, string> = {
+  "recurring.remindersSynced":
+    "The app told the push service when to remind this identity of upcoming recurring payments (the notice window before each next due time), or failed to. The server stores only the times, never amounts or recipients; a reminder arrives as a push when Linky is closed.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "conversations.archived":
@@ -152,6 +154,22 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "One pass over every persisted unsettled melt, run when the wallet runtime comes up and when the browser comes back online; the payload lists each record's outcome.",
   "melt.historyResolved":
     "The app updated a pending Lightning payment in the transaction history after melt.resume settled it — to paid (amount and fee) or failed. The quote link connects it to the melt rows.",
+  "recurring.claimed":
+    "This device claimed an upcoming recurring payment: it wrote its device id and the due time to the row and notified the user. The payment goes out after a short claim window (long enough for racing claims to converge), from whichever device the synced claim names. takeover means the previous claimant never paid.",
+  "recurring.run":
+    "A recurring payment was executed on this device: paid or failed, with the amount, the due time it settles, and how many due times were skipped because Linky was closed. The recurringPayment and contact links join it to the chat payment steps.",
+  "recurring.skipped":
+    "A due recurring payment was skipped without paying — the user cancelled it from the in-app countdown, funds stayed insufficient or attempts kept failing until the grace window closed, or the contact can no longer be paid. The payload's reason says which; the schedule moved on to the next due time.",
+  "recurring.confirmationShown":
+    "A due recurring payment was about to go out while Linky was visible, so the app showed the countdown with pay-now and cancel instead of paying silently. sendAtSec is when it pays on its own.",
+  "recurring.waitingForRates":
+    "A recurring payment fixed in a fiat currency is due but no exchange rate is available to turn it into sats; the scheduler retries on the next pass. Reported once per due time.",
+  "recurring.updated":
+    "The user edited a recurring payment: amount, interval, recipient, or next payment date. The payload carries the new values and the previous ones; any claim for the old due time was dropped.",
+  "recurring.waitingForFunds":
+    "A recurring payment is due but the spendable balance is below its amount; the scheduler keeps retrying until the grace window closes. Reported once per due time.",
+  "recurring.interrupted":
+    "A recurring payment was found marked running for longer than a run can take, so an earlier launch died mid-run. recorded says whether the transaction history holds a payment for that due time: true marks the run paid, false restores the due time so the payment goes out on a later pass instead of being lost.",
   "send.rowForgotten":
     "The app dropped a pending send row because its token verifiably reached the recipient (chat message published, or payment request POSTed). Follow the row link back to the send.send operation that produced it.",
 };

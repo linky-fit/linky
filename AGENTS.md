@@ -20,7 +20,7 @@ IMPORTANT: When you make or change an architectural decision, document it in `do
 
 - TypeScript strict mode with `exactOptionalPropertyTypes`
 - **NEVER use `as` or `any` to cast types** - validate with a runtime type guard instead of casting
-- Branded ID types from Evolu (`ContactId`, `CashuProofId`, `CashuOperationId`, `MintId`, etc.) - don't use plain strings
+- Branded ID types from `@linky/domain` (`ContactId`, `CashuProofId`, `CashuOperationId`, `RecurringPaymentId`, etc.; linksync re-exports them) - don't use plain strings, in packages as much as in the app: a brand travels with its type across the whole stack
 - Components use `interface` for props, not `type`
 - New browser storage names use the `linky.` prefix (e.g., `linky.nostr_nsec`, `linky.lang`). Existing exceptions are listed in `docs/architecture.md` under "Compatibility and audit decisions"; preserve those names for upgrades.
 - Use types from libraries (e.g., Evolu, Cashu, Nostr) instead of redefining them - look up the library's exported types first
@@ -40,7 +40,7 @@ IMPORTANT: When you make or change an architectural decision, document it in `do
 
 ## Package docs
 
-`packages/linkshu/docs/`, `packages/linkstr/docs/`, `packages/linksync/docs/`, and `packages/proxy-payment/docs/` hold usage guides for the four libraries (linkstr-react is documented in `packages/linkstr/docs/react.md`; linksync's scope table in `packages/linksync/docs/concepts.md` is the source of truth for owner types, rotation rules, and forget policies; proxy-payment's `docs/offers.md` states the offer authorization order and the selectors the app's effects run on). Read the relevant guide before using or changing a package, and follow the package's `AGENTS.md`: a change to an exported surface or documented behavior updates the matching guide in the same commit.
+`packages/linkshu/docs/`, `packages/linkstr/docs/`, `packages/linksync/docs/`, `packages/proxy-payment/docs/`, and `packages/recurring-payment/docs/` hold usage guides for the five libraries (linkstr-react is documented in `packages/linkstr/docs/react.md`; linksync's scope table in `packages/linksync/docs/concepts.md` is the source of truth for owner types, rotation rules, and forget policies; proxy-payment's `docs/offers.md` states the offer authorization order and the selectors the app's effects run on; recurring-payment's `docs/runs.md` states the claim protocol and the planner's actions). Read the relevant guide before using or changing a package, and follow the package's `AGENTS.md`: a change to an exported surface or documented behavior updates the matching guide in the same commit.
 
 ## Inspector events
 

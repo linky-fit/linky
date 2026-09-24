@@ -6793,6 +6793,21 @@ dd {
   margin-bottom: 16px;
 }
 
+.lightning-invoice-confirm-summary.is-description-first {
+  display: flex;
+  flex-direction: column;
+}
+
+.lightning-invoice-confirm-summary.is-description-first
+  .lightning-invoice-confirm-amount {
+  order: 2;
+}
+
+.lightning-invoice-confirm-summary.is-description-first
+  .lightning-invoice-confirm-meta {
+  order: 1;
+}
+
 .lightning-invoice-confirm-amount {
   display: flex;
   justify-content: center;
@@ -6831,18 +6846,24 @@ dd {
 }
 
 .paid-sheet {
-  width: min(420px, calc(100vw - 48px));
-  border: 1px solid #1f2937;
-  background: #0b1222;
-  border-radius: 18px;
   padding: 28px 22px;
   text-align: center;
+}
+
+.paid-figure {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  margin: 0 auto 14px;
+}
+
+.paid-avatar {
+  animation: paid-pop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
 }
 
 .paid-check {
   width: 92px;
   height: 92px;
-  margin: 0 auto 14px;
   border-radius: 999px;
   border: 2px solid #22c55e;
   color: #22c55e;
@@ -6851,6 +6872,108 @@ dd {
   font-size: 56px;
   font-weight: 800;
   line-height: 1;
+  animation: paid-pop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.paid-direction-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #040913;
+  color: #fff;
+}
+
+.paid-figure.is-out .paid-direction-badge {
+  background: #f97316;
+  animation: paid-fly-out 1.1s cubic-bezier(0.2, 0.8, 0.4, 1) 200ms both;
+}
+
+.paid-figure.is-in .paid-direction-badge {
+  background: #22c55e;
+  animation: paid-fly-in 1.1s cubic-bezier(0.2, 0.8, 0.4, 1) 200ms both;
+}
+
+@keyframes paid-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes paid-fly-out {
+  0% {
+    transform: translateY(18px) scale(0.6);
+    opacity: 0;
+  }
+  35% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(-14px) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes paid-fly-in {
+  0% {
+    transform: translateY(-30px) scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(4px) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.btn-progress-host {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-progress {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: rgba(255, 255, 255, 0.22);
+  transition: transform 1s linear;
+  pointer-events: none;
+}
+
+.btn-progress-label {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paid-avatar,
+  .paid-check,
+  .paid-figure .paid-direction-badge {
+    animation: none;
+  }
+}
+
+.paid-contact-name {
+  margin: -6px auto 12px;
+  max-width: min(360px, calc(100vw - 96px));
+  font-size: 14px;
+  color: #94a3b8;
 }
 
 .paid-title {
@@ -6859,6 +6982,21 @@ dd {
   color: #e2e8f0;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.paid-amount {
+  margin-top: 6px;
+  font-size: 34px;
+  font-weight: 800;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+
+.paid-amount-unit {
+  margin-left: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #94a3b8;
 }
 
 @media (max-width: 640px) {
@@ -7532,6 +7670,172 @@ button.cashu-token-pill {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
+}
+
+/* Recurring payments */
+.transactions-section + .transactions-section {
+  margin-top: 20px;
+}
+
+.transactions-section-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.recurring-underfunded-hint {
+  font-size: 12px;
+  color: var(--color-warning, #d49b32);
+}
+
+.recurring-empty {
+  padding: 24px 0 8px;
+  text-align: center;
+}
+
+.recurring-order-card {
+  width: 100%;
+  padding: 0;
+  border: none;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: none;
+  transform: none;
+}
+
+.recurring-order-card:hover {
+  background: rgba(148, 163, 184, 0.1);
+  box-shadow: none;
+  transform: none;
+}
+
+.recurring-hint {
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.recurring-picker label:first-child {
+  margin-top: 0;
+}
+
+.recurring-picker-list {
+  margin-top: 12px;
+}
+
+.recurring-recipient-header {
+  margin: 0 0 12px;
+}
+
+.recurring-inline-link {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.recurring-form > label {
+  margin-top: 18px;
+}
+
+.recurring-pills {
+  margin-bottom: 10px;
+}
+
+.recurring-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 6px;
+  font-size: 13px;
+}
+
+.recurring-detail .contact-header {
+  margin-top: 0;
+}
+
+.recurring-detail .contact-header-text {
+  flex: 1;
+}
+
+.recurring-detail .contact-header .pill {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.recurring-truncate {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recurring-detail-amount {
+  margin: 14px 0 8px;
+}
+
+.recurring-detail-amount-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.recurring-order-card .transaction-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.recurring-order-amount-secondary {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.recurring-detail-amount-secondary {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recurring-due-recipient {
+  margin-bottom: 4px;
+}
+
+.recurring-due-name {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #e2e8f0;
+  max-width: min(360px, calc(100vw - 96px));
+}
+
+.recurring-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.transaction-recurring-pill {
+  cursor: pointer;
+  box-shadow: none;
+  transform: none;
+}
+
+.transaction-repeat-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.error-text {
+  color: #fecaca;
+  font-size: 13px;
 }
 
 .payment-request-confirm-warning {

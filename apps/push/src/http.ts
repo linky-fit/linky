@@ -5,6 +5,7 @@ import {
   readNativeUnsubscribeRequest,
   readProofAction,
   readPubkey,
+  readRemindersRequest,
   readSubscribeRequest,
   readUnsubscribeRequest,
   RequestError,
@@ -312,6 +313,46 @@ export function createHttpHandler({
           platform: body.device.platform,
           recipientPubkeys: body.recipientPubkeys,
           token: body.device.token,
+        });
+      }
+
+      if (request.method === "POST" && url.pathname === "/reminders") {
+        rateLimiter.check(
+          `reminders:${ip}`,
+          config.subscribeRateLimitMax,
+          config.subscribeRateLimitWindowMs,
+          nowMs,
+        );
+
+        // Registering reminders is a form of subscribing, so it rides on the
+        // subscribe proof; the client owns the pubkey either way.
+        const { body, consumedChallengeNonces } =
+          await readVerifiedOwnershipRequest(
+            request,
+            readRemindersRequest,
+            "subscribe",
+            ownershipVerifier,
+            nowMs,
+          );
+        const [pubkey] = body.recipientPubkeys;
+        if (pubkey === undefined) {
+          throw new RequestError(400, "invalid_request", "pubkey is required");
+        }
+
+        storage.replaceReminders({
+          pubkey,
+          notifyAtSecs: body.notifyAtSecs,
+          consumedChallengeNonces,
+          maxRemindersPerPubkey: config.maxRemindersPerPubkey,
+          nowMs,
+        });
+        console.info(
+          `[push] reminders replaced count=${body.notifyAtSecs.length}`,
+        );
+
+        return jsonResponse(config, request, 200, {
+          ok: true,
+          count: body.notifyAtSecs.length,
         });
       }
 

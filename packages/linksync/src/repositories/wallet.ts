@@ -32,7 +32,7 @@ import {
   cashuOperationIdFor,
   CashuProofId,
   cashuProofIdFor,
-} from "../model/ids";
+} from "@linky/domain";
 import type {
   CashuOperationRow,
   CashuProofRow,

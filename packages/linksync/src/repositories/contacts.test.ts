@@ -1,5 +1,5 @@
 import { NonEmptyString1000 } from "@evolu/common";
-import { createId } from "../model/ids";
+import { createId } from "@linky/domain";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeContactsRepository } from "./contacts";
 

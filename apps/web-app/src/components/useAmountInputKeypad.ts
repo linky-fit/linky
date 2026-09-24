@@ -10,6 +10,8 @@ interface AmountInputDraft {
 
 interface UseAmountInputKeypadParams {
   amount: string;
+  /** What the keypad shows for the initial `amount` in the current display unit, when known exactly. */
+  initialDisplayValue?: string | null;
   onAmountChange: (amount: string) => void;
 }
 
@@ -31,6 +33,7 @@ export const normalizePastedAmountInput = (
 
 export const useAmountInputKeypad = ({
   amount,
+  initialDisplayValue = null,
   onAmountChange,
 }: UseAmountInputKeypadParams): UseAmountInputKeypadResult => {
   const {
@@ -38,7 +41,15 @@ export const useAmountInputKeypad = ({
     decimalAmountInputKeyVisible,
     displayCurrency,
   } = useAppShellCore();
-  const [draft, setDraft] = React.useState<AmountInputDraft | null>(null);
+  const [draft, setDraft] = React.useState<AmountInputDraft | null>(() =>
+    initialDisplayValue === null
+      ? null
+      : {
+          amountSat: amount,
+          displayCurrency,
+          displayValue: initialDisplayValue,
+        },
+  );
   const currentDisplayValue =
     draft?.amountSat === amount && draft.displayCurrency === displayCurrency
       ? draft.displayValue

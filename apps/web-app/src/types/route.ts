@@ -1,4 +1,8 @@
-import { CashuOperationId, ContactId } from "@linky/linksync";
+import {
+  CashuOperationId,
+  ContactId,
+  RecurringPaymentId,
+} from "@linky/linksync";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../utils/constants";
 
 const decodeSegment = (value: string): string | null => {
@@ -41,6 +45,9 @@ export type Route =
   | { kind: "profileEdit" }
   | { kind: "wallet" }
   | { kind: "transactions" }
+  | { kind: "recurringPaymentNew" }
+  | { kind: "recurringPayment"; id: RecurringPaymentId }
+  | { kind: "recurringPaymentEdit"; id: RecurringPaymentId }
   | { kind: "topup" }
   | { kind: "topupNoAmount" }
   | { kind: "topupInvoice" }
@@ -106,6 +113,17 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#profile") return { kind: "profile" };
   if (hash === "#wallet") return { kind: "wallet" };
   if (hash === "#wallet/transactions") return { kind: "transactions" };
+  if (hash === "#wallet/recurring/new") return { kind: "recurringPaymentNew" };
+  const recurringPrefix = "#wallet/recurring/";
+  if (hash.startsWith(recurringPrefix)) {
+    const [rawId, rawSub] = hash.slice(recurringPrefix.length).split("/");
+    const id = RecurringPaymentId.fromUnknown(decodeSegment(rawId ?? ""));
+    if (id.ok) {
+      return (rawSub ?? "") === "edit"
+        ? { kind: "recurringPaymentEdit", id: id.value }
+        : { kind: "recurringPayment", id: id.value };
+    }
+  }
   if (hash === "#wallet/topup") return { kind: "topup" };
   if (hash === "#wallet/topup/no-amount") return { kind: "topupNoAmount" };
   if (hash === "#wallet/topup/invoice") return { kind: "topupInvoice" };

@@ -26,6 +26,9 @@ export type CashuOperationId = typeof CashuOperationId.Type;
 export const TransactionId = id("Transaction");
 export type TransactionId = typeof TransactionId.Type;
 
+export const RecurringPaymentId = id("RecurringPayment");
+export type RecurringPaymentId = typeof RecurringPaymentId.Type;
+
 export const NostrIdentityId = id("NostrIdentity");
 export type NostrIdentityId = typeof NostrIdentityId.Type;
 

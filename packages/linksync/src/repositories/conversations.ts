@@ -6,7 +6,7 @@ import {
   directConversationIdFor,
   type ContactId,
   type ConversationId,
-} from "../model/ids";
+} from "@linky/domain";
 import type {
   ConversationRow,
   LinkyDbSchema,

@@ -5,6 +5,7 @@ import type {
   NativeUnsubscribeRequestBody,
   OwnershipProofInput,
   ProofAction,
+  RemindersRequestBody,
   SubscribeRequestBody,
   UnsubscribeRequestBody,
   WebPushSubscriptionData,
@@ -360,6 +361,48 @@ function readEndpointOrSubscriptionEndpoint(value: RequestBody): string {
     );
   }
   return subscription.endpoint;
+}
+
+const MAX_REMINDERS_PER_REQUEST = 256;
+
+function readNotifyAtSecs(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    throw new RequestError(
+      400,
+      "invalid_request",
+      "notifyAtSecs must be an array",
+    );
+  }
+  if (value.length > MAX_REMINDERS_PER_REQUEST) {
+    throw new RequestError(
+      400,
+      "invalid_request",
+      `notifyAtSecs exceeds max length ${MAX_REMINDERS_PER_REQUEST}`,
+    );
+  }
+  const out = new Set<number>();
+  for (const item of value) {
+    const notifyAtSec = readNumber(item, "notifyAtSecs");
+    if (!Number.isSafeInteger(notifyAtSec) || notifyAtSec <= 0) {
+      throw new RequestError(
+        400,
+        "invalid_request",
+        "notifyAtSecs must contain positive integer unix seconds",
+      );
+    }
+    out.add(notifyAtSec);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+/** `{ pubkey, notifyAtSecs, proofs }`: the whole reminder set of one pubkey. */
+export function readRemindersRequest(value: unknown): RemindersRequestBody {
+  const body = readRequestBody(value);
+  return {
+    recipientPubkeys: [readPubkey(body.pubkey)],
+    notifyAtSecs: readNotifyAtSecs(body.notifyAtSecs),
+    proofs: readOwnershipProofs(body.proofs),
+  };
 }
 
 export function readUnsubscribeRequest(value: unknown): UnsubscribeRequestBody {

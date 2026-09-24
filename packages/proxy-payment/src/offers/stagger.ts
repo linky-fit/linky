@@ -1,3 +1,4 @@
+import { BankOfferId, Pubkey } from "@linky/linkstr";
 import { Schema } from "effect";
 import { NonBlankString, PositiveFiniteNumber } from "../internal/schema";
 import { findBankPaymentOffer, type BankPaymentOffer } from "./offer";
@@ -5,7 +6,7 @@ import { BANK_PAYMENT_OFFER_PHASE_TTL_SEC } from "./status";
 
 const StaggerRecipient = Schema.Struct({
   dueAtSec: PositiveFiniteNumber,
-  peer: NonBlankString,
+  peer: Pubkey,
 });
 
 /** Recipients of one offer still waiting for their delayed send. */
@@ -14,8 +15,8 @@ export const BankPaymentOfferStaggerRecord = Schema.Struct({
   amountText: NonBlankString,
   createdAtSec: PositiveFiniteNumber,
   expiresAtSec: PositiveFiniteNumber,
-  offerId: NonBlankString,
-  ownerPubkey: NonBlankString,
+  offerId: BankOfferId,
+  ownerPubkey: Pubkey,
   pending: Schema.Array(StaggerRecipient),
 });
 export type BankPaymentOfferStaggerRecord =
@@ -28,9 +29,9 @@ export const bankPaymentOfferStaggerQueue = (args: {
   amountText: string;
   delaySec: number;
   firstSentAtSec: number;
-  offerId: string;
-  ownerPubkey: string;
-  peers: readonly string[];
+  offerId: BankOfferId;
+  ownerPubkey: Pubkey;
+  peers: readonly Pubkey[];
 }): BankPaymentOfferStaggerRecord | null =>
   args.peers.length === 0
     ? null
@@ -69,9 +70,9 @@ export const isBankPaymentOfferStaggerQueueOpen = (
 
 export interface BankPaymentOfferStaggerDue {
   /** Due recipients that already hold a thread (another tab sent it); just dequeue them. */
-  alreadyOffered: readonly string[];
+  alreadyOffered: readonly Pubkey[];
   nextDueAtSec: number | null;
-  send: readonly string[];
+  send: readonly Pubkey[];
 }
 
 export const bankPaymentOfferStaggerDue = (
@@ -79,8 +80,8 @@ export const bankPaymentOfferStaggerDue = (
   offers: readonly BankPaymentOffer[],
   nowSec: number,
 ): BankPaymentOfferStaggerDue => {
-  const alreadyOffered: string[] = [];
-  const send: string[] = [];
+  const alreadyOffered: Pubkey[] = [];
+  const send: Pubkey[] = [];
   let nextDueAtSec: number | null = null;
   for (const recipient of record.pending) {
     if (recipient.dueAtSec > nowSec) {

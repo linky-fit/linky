@@ -25,6 +25,19 @@ export const getChatAttachmentCopyForLanguage = (
   return kind === "pdf" ? "PDF" : "Image";
 };
 
+export const getRecurringReminderCopyForLanguage = (
+  language: string | null | undefined,
+): string => {
+  const normalized = (language ?? "").trim().toLowerCase();
+  if (normalized.startsWith("cs")) {
+    return "Pravidelná platba je připravena. Otevřete Linky a odešlete ji.";
+  }
+  if (normalized.startsWith("de")) {
+    return "Eine wiederkehrende Zahlung ist bereit. Öffne Linky, um sie zu senden.";
+  }
+  return "A recurring payment is ready. Open Linky to send it.";
+};
+
 export const getBankPaymentReimbursementCopyForLanguage = (
   language: string | null | undefined,
 ): string => {

@@ -12,6 +12,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+### en-US
+
+- Recurring payments: pay a contact daily, weekly, or monthly from the Scheduled section of the transaction history, in sats or in your currency. Any device running Linky sends them; when the app is open you see a countdown with pay-now and cancel.
+
+### cs-CZ
+
+- Pravidelné platby: plaťte kontaktu denně, týdně nebo měsíčně ze sekce Naplánované v historii transakcí, v satech nebo ve vaší měně. Odešle je kterékoli zařízení s běžící Linky; při otevřené aplikaci uvidíte odpočet s možností zaplatit hned nebo zrušit.
+
 ## [26.9.19] - 2026-09-20
 
 ### en-US

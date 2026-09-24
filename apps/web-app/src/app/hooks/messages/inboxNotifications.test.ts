@@ -1,4 +1,5 @@
 import {
+  BankOfferId,
   PaymentNoticeReceived,
   Pubkey,
   RumorId,
@@ -18,9 +19,9 @@ import {
   type InboxNotificationsContext,
 } from "./inboxNotifications";
 
-const peerPubkey = getPublicKey(createSecretKey(2));
+const peerPubkey = Pubkey.make(getPublicKey(createSecretKey(2)));
 const NOTICE_RUMOR_ID = "a".repeat(64);
-const SNAPSHOT_RUMOR_ID = "b".repeat(64);
+const SNAPSHOT_RUMOR_ID = RumorId.make("b".repeat(64));
 const SENT_AT = 1_700_000_100;
 
 interface HarnessOptions {
@@ -215,7 +216,7 @@ describe("notifyBankOfferSnapshot", () => {
     expiresAtSec: null,
     extensionSec: null,
     initiatedAtSec: SENT_AT,
-    offerId: "offer-1",
+    offerId: BankOfferId.make("offer-1"),
     offererPublicKey: peerPubkey,
     peer: peerPubkey,
     snapshotId: SNAPSHOT_RUMOR_ID,

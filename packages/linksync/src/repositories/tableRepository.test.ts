@@ -1,6 +1,6 @@
 import { Effect, Logger, LogLevel } from "effect";
 import { makeInMemoryShardDb, ShardDbError, type ShardDb } from "../core";
-import { createId } from "../model/ids";
+import { createId } from "@linky/domain";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
 import { runNow } from "../testing/linky";
