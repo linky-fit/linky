@@ -12,6 +12,18 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.9.20] - 2026-09-25
+
+### en-US
+
+- Fixed local storage recovery: a write interrupted by a reload is now rolled back safely instead of leaving the database damaged.
+- Proxy payments: a canceled payment now shows as closed for the recipient, late delivery receipts no longer roll back newer state, and losing acceptances close after a delayed winner decision.
+
+### cs-CZ
+
+- Opravena obnova místního úložiště: zápis přerušený obnovením stránky se nyní bezpečně vrátí zpět místo poškození databáze.
+- Proxy platby: zrušená platba se příjemci nyní zobrazí jako uzavřená, opožděná potvrzení o doručení už nevracejí novější stav a neúspěšná přijetí se po opožděném rozhodnutí o vítězi uzavřou.
+
 ## [26.9.19] - 2026-09-20
 
 ### en-US

@@ -93,7 +93,7 @@
     },
     "apps/web-app": {
       "name": "@linky/web-app",
-      "version": "26.9.19",
+      "version": "26.9.20",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
         "@capacitor/core": "^7.4.3",
