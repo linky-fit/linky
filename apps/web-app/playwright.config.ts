@@ -15,6 +15,7 @@ const LOCAL_STACK_SPECS = [
   "**/proxy-payment.spec.ts",
   "**/issued-token-to-contact.spec.ts",
   "**/linkshu-migration.spec.ts",
+  "**/mint-management.spec.ts",
   "**/password-manager-save.spec.ts",
   "**/profile-tilt-permission.spec.ts",
   "**/spayd-response.spec.ts",
