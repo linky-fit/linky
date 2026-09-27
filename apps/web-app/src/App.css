@@ -3380,38 +3380,21 @@ button.mint-choice {
   background: rgba(20, 184, 166, 0.14);
 }
 
-.mint-choice-row {
-  display: flex;
-  align-items: stretch;
-}
-
-.mint-choice-row button.mint-choice {
-  flex: 1;
-  min-width: 0;
+.mint-choice-item button.mint-choice {
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
-.mint-choice-row button:hover {
+.mint-choice-item button.mint-choice:hover {
   transform: none;
+  background: rgba(148, 163, 184, 0.08);
+  border-radius: 12px;
 }
 
-button.mint-choice-more {
+.mint-choice-chevron {
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  background: transparent;
-  border: none;
-  box-shadow: none;
   color: #94a3b8;
-}
-
-button.mint-choice-more:hover,
-button.mint-choice-more:focus-visible {
-  background: rgba(148, 163, 184, 0.12);
-  border-radius: 0 12px 12px 0;
 }
 
 .mint-choice-label {

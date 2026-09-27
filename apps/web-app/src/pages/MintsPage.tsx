@@ -1,6 +1,5 @@
 import type { LightningFeeProbeResult } from "@linky/linkshu";
 import { Either } from "effect";
-import { ChevronRight } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
@@ -211,34 +210,23 @@ export function MintsPage() {
         key={mint}
         className={`mint-choice-item${isSelected ? " is-selected" : ""}`}
       >
-        <div className="mint-choice-row">
-          <MintButton
-            mint={mint}
-            getMintIconUrl={getMintIconUrl}
-            isSelected={isSelected}
-            isTestMint={isTestMint}
-            label={label}
-            badgeLabel={
-              isTestMint
-                ? t("testMintBadge")
-                : isRecommended
-                  ? t("recommendedMintBadge")
-                  : ""
-            }
-            badgeTone={isRecommended ? "recommended" : "test"}
-            fallbackLetter={fallbackLetter}
-            disabled={cashuIsBusy}
-            onClick={() => void applyDefaultMintSelection(mint)}
-          />
-          <button
-            type="button"
-            className="mint-choice-more"
-            aria-label={`${t("mintManage")} ${label}`}
-            onClick={() => navigateTo({ route: "mint", mintUrl: normalized })}
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
+        <MintButton
+          mint={mint}
+          getMintIconUrl={getMintIconUrl}
+          isSelected={isSelected}
+          isTestMint={isTestMint}
+          label={label}
+          badgeLabel={
+            isTestMint
+              ? t("testMintBadge")
+              : isRecommended
+                ? t("recommendedMintBadge")
+                : ""
+          }
+          badgeTone={isRecommended ? "recommended" : "test"}
+          fallbackLetter={fallbackLetter}
+          onClick={() => navigateTo({ route: "mint", mintUrl: normalized })}
+        />
         {renderHolding(normalized)}
         {isSelected ? renderFees() : null}
       </div>

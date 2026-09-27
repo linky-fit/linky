@@ -9,6 +9,12 @@ import { MintsPage } from "./MintsPage";
 
 let mintSettings: MintSettingsContextValue;
 
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+
+vi.mock("../hooks/useRouting", () => ({
+  navigateTo: mockNavigate,
+}));
+
 vi.mock("../app/context/AppShellContexts", () => ({
   useAppShellCore: () => ({
     formatDisplayedAmountText: (amount: number) => `${amount} sat`,
@@ -94,7 +100,7 @@ describe("MintsPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("routes preset selection and custom save to their callbacks", async () => {
+  it("opens a mint's detail page and saves a custom default", async () => {
     const applyDefaultMintSelection = vi.fn(async () => {});
     mintSettings = createMintSettings({ applyDefaultMintSelection });
 
@@ -103,7 +109,11 @@ describe("MintsPage", () => {
     await act(async () => {
       click(findButton(container, "kashu.me"));
     });
-    expect(applyDefaultMintSelection).toHaveBeenCalledWith("https://kashu.me");
+    expect(mockNavigate).toHaveBeenCalledWith({
+      route: "mint",
+      mintUrl: "https://kashu.me",
+    });
+    expect(applyDefaultMintSelection).not.toHaveBeenCalled();
 
     await act(async () => {
       click(findButton(container, "saveChanges"));
@@ -197,7 +207,7 @@ describe("MintsPage", () => {
     await unmount();
   });
 
-  it("updates the custom draft and blocks selection and save while busy", async () => {
+  it("blocks the custom save while busy", async () => {
     const applyDefaultMintSelection = vi.fn(async () => {});
     const setDefaultMintUrlDraft = vi.fn();
     mintSettings = createMintSettings({
@@ -214,13 +224,10 @@ describe("MintsPage", () => {
     }
     expect(input.disabled).toBe(true);
 
-    const presetButton = findButton(container, "kashu.me");
     const saveButton = findButton(container, "saveChanges");
-    expect(presetButton.disabled).toBe(true);
     expect(saveButton.disabled).toBe(true);
 
     await act(async () => {
-      click(presetButton);
       click(saveButton);
     });
     expect(applyDefaultMintSelection).not.toHaveBeenCalled();

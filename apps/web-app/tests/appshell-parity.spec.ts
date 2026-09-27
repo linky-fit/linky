@@ -375,7 +375,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(title).toHaveText("Mints");
     await expect(
       page.getByRole("button", { name: "localhost:3338 Test", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
+    ).toHaveAttribute("aria-current", "true");
     await close.click();
     await expect(page).toHaveURL(/#settings$/);
   });

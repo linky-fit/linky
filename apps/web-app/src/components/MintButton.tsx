@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import React from "react";
 import type { MintIcon } from "../utils/mint";
 import { getNextMintIconUrl } from "../utils/mint";
@@ -5,7 +6,6 @@ import { getNextMintIconUrl } from "../utils/mint";
 interface MintButtonProps {
   badgeLabel?: string;
   badgeTone?: "recommended" | "test";
-  disabled?: boolean;
   fallbackLetter: string;
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   isSelected: boolean;
@@ -18,7 +18,6 @@ interface MintButtonProps {
 export function MintButton({
   badgeLabel,
   badgeTone = "test",
-  disabled = false,
   fallbackLetter,
   getMintIconUrl,
   isSelected,
@@ -39,8 +38,7 @@ export function MintButton({
       key={mint}
       type="button"
       className={`ghost mint-choice${isTestMint ? " is-test-mint" : ""}${isSelected ? " is-selected" : ""}`}
-      aria-pressed={isSelected}
-      disabled={disabled}
+      aria-current={isSelected ? "true" : undefined}
       onClick={onClick}
     >
       {renderedIconUrl ? (
@@ -79,6 +77,7 @@ export function MintButton({
           ✓
         </span>
       ) : null}
+      <ChevronRight size={18} className="mint-choice-chevron" aria-hidden />
     </button>
   );
 }
