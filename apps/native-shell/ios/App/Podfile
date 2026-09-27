@@ -12,6 +12,7 @@ def capacitor_pods
   pod 'Capacitor', :path => '../../../../node_modules/.bun/@capacitor+ios@7.6.0+49675fcae9c66213/node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../../../node_modules/.bun/@capacitor+ios@7.6.0+49675fcae9c66213/node_modules/@capacitor/ios'
   pod 'CapacitorClipboard', :path => '../../../../node_modules/.bun/@capacitor+clipboard@7.0.4+49675fcae9c66213/node_modules/@capacitor/clipboard'
+  pod 'CapacitorFilesystem', :path => '../../../../node_modules/.bun/@capacitor+filesystem@7.1.8+49675fcae9c66213/node_modules/@capacitor/filesystem'
   pod 'CapacitorPushNotifications', :path => '../../../../node_modules/.bun/@capacitor+push-notifications@7.0.6+49675fcae9c66213/node_modules/@capacitor/push-notifications'
   pod 'CapacitorShare', :path => '../../../../node_modules/.bun/@capacitor+share@7.0.4+49675fcae9c66213/node_modules/@capacitor/share'
 end
