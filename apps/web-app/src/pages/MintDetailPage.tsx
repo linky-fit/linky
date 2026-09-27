@@ -233,7 +233,6 @@ export function MintDetailPage() {
               fundedMints,
               allowTestMints,
             )}
-            t={t}
           />
         </div>
       ) : null}

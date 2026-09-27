@@ -4,10 +4,42 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MintMove } from "../app/hooks/mint/useMoveMintFunds";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
+import { applyAmountInputKeyWithDraft } from "../utils/displayAmounts";
 import { MintMoveFundsForm } from "./MintMoveFundsForm";
 
+const satOptions = { displayCurrency: "sat", fiatRates: null } as const;
+
+vi.mock("../app/context/AppShellContexts", () => ({
+  useAppShellCore: () => ({
+    allowedDisplayCurrencies: ["sat"],
+    applyAmountInputKeyWithDraft: (
+      currentAmount: string,
+      currentDisplayValue: string | null,
+      key: string,
+    ) =>
+      applyAmountInputKeyWithDraft(
+        currentAmount,
+        currentDisplayValue,
+        key,
+        satOptions,
+        false,
+      ),
+    decimalAmountInputKeyVisible: false,
+    displayCurrency: "sat",
+    displayUnit: "sat",
+    formatDisplayedAmountParts: (amountSat: number) => ({
+      amountText: String(amountSat),
+      approxPrefix: "",
+      unitLabel: "sat",
+    }),
+    formatDisplayedAmountText: (amountSat: number) => `${amountSat} sat`,
+    lang: "en",
+    t: (key: string) => key,
+  }),
+  useAppShellActions: () => ({ cycleDisplayCurrency: vi.fn() }),
+}));
+
 const decodeEstimate = Schema.decodeUnknownSync(AutoswapEstimate);
-const t = (key: string): string => key;
 
 const estimateFor = (move: MintMove, feeReserve: number) =>
   decodeEstimate({
@@ -18,16 +50,6 @@ const estimateFor = (move: MintMove, feeReserve: number) =>
     inputFee: 1,
     totalFromSource: move.amountSat + feeReserve + 1,
   });
-
-const setInputValue = (input: HTMLInputElement, value: string): void => {
-  const setter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
-  if (!setter) throw new Error("HTML input value setter missing");
-  setter.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-};
 
 const buttonNamed = (container: HTMLElement, text: string) => {
   const button = Array.from(container.querySelectorAll("button")).find(
@@ -52,14 +74,13 @@ const renderForm = async (feeReserve: number) => {
       moveMintFunds={moveMintFunds}
       sourceMint="https://cashu.cz"
       targets={["https://kashu.me"]}
-      t={t}
     />,
   );
-  const input = rendered.container.querySelector("#mintMoveAmount");
-  if (!(input instanceof HTMLInputElement)) throw new Error("input missing");
-  await act(async () => {
-    setInputValue(input, "50");
-  });
+  for (const digit of "50") {
+    await act(async () => {
+      buttonNamed(rendered.container, digit).click();
+    });
+  }
   await act(async () => {
     buttonNamed(rendered.container, "mintMoveEstimate").click();
   });
@@ -71,7 +92,7 @@ describe("MintMoveFundsForm", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows the estimate before moving the requested amount", async () => {
+  it("takes the amount on the keypad and shows the estimate before moving", async () => {
     const { container, estimateMintMove, moveMintFunds, unmount } =
       await renderForm(4);
     const move = {

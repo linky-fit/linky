@@ -1,8 +1,11 @@
 import type { AutoswapEstimate } from "@linky/linkshu";
 import React from "react";
+import { useAppShellCore } from "../app/context/AppShellContexts";
 import type { MintMove } from "../app/hooks/mint/useMoveMintFunds";
-import type { Translate } from "../i18n";
 import { formatMintHost } from "../utils/mint";
+import { AmountDisplay } from "./AmountDisplay";
+import { Keypad } from "./Keypad";
+import { useAmountInputKeypad } from "./useAmountInputKeypad";
 
 interface MintMoveFundsFormProps {
   /** Sat available at the source mint. */
@@ -13,15 +16,12 @@ interface MintMoveFundsFormProps {
   sourceMint: string;
   /** Candidate target mints, the preferred one first. */
   targets: readonly string[];
-  t: Translate;
 }
 
 const parseSat = (value: string): number | null => {
-  const amount = Number(value.trim());
+  const amount = Number.parseInt(value.trim(), 10);
   return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
 };
-
-const formatSat = (amount: number): string => `${amount} sat`;
 
 export function MintMoveFundsForm({
   available,
@@ -30,10 +30,15 @@ export function MintMoveFundsForm({
   moveMintFunds,
   sourceMint,
   targets,
-  t,
 }: MintMoveFundsFormProps) {
+  const { displayUnit, formatDisplayedAmountText, t } = useAppShellCore();
   const [targetMint, setTargetMint] = React.useState(targets[0] ?? "");
-  const [amountText, setAmountText] = React.useState("");
+  // Sat, as every keypad-driven amount in the app; the display unit is the user's.
+  const [amount, setAmount] = React.useState("");
+  const amountInput = useAmountInputKeypad({
+    amount,
+    onAmountChange: setAmount,
+  });
   const [estimated, setEstimated] = React.useState<{
     readonly move: MintMove;
     readonly estimate: AutoswapEstimate;
@@ -41,7 +46,7 @@ export function MintMoveFundsForm({
   const [estimating, setEstimating] = React.useState(false);
 
   const target = targets.includes(targetMint) ? targetMint : targets[0];
-  const amountSat = parseSat(amountText);
+  const amountSat = parseSat(amount);
   const move: MintMove | null =
     target !== undefined && amountSat !== null && amountSat <= available
       ? { sourceMint, targetMint: target, amountSat }
@@ -74,7 +79,7 @@ export function MintMoveFundsForm({
   const runMove = async () => {
     if (move === null) return;
     if (await moveMintFunds(move)) {
-      setAmountText("");
+      setAmount("");
       setEstimated(null);
     }
   };
@@ -96,27 +101,34 @@ export function MintMoveFundsForm({
         ))}
       </select>
 
-      <label htmlFor="mintMoveAmount">{t("mintMoveAmount")}</label>
-      <input
-        id="mintMoveAmount"
-        inputMode="numeric"
-        value={amountText}
+      <AmountDisplay
+        amount={amount}
+        cycleOnClick
+        inputDisplayValue={amountInput.inputDisplayValue}
+      />
+      <Keypad
+        ariaLabel={`${t("payAmount")} (${displayUnit})`}
+        decimalKeyEnabled={amountInput.decimalKeyEnabled}
         disabled={busy}
-        placeholder={String(available)}
-        onChange={(event) => setAmountText(event.target.value)}
+        onKeyPress={amountInput.onKeyPress}
+        translations={{
+          clearForm: t("clearForm"),
+          decimalPoint: t("decimalPoint"),
+          delete: t("delete"),
+        }}
       />
 
       {estimate !== null ? (
         <>
           <dl className="mint-move-estimate" aria-label={t("mintMoveEstimate")}>
             <dt className="muted">{t("mintMoveArrives")}</dt>
-            <dd>{formatSat(estimate.amount)}</dd>
+            <dd>{formatDisplayedAmountText(estimate.amount)}</dd>
             <dt className="muted">{t("mintMoveFeeLightning")}</dt>
-            <dd>{formatSat(estimate.lightningFeeReserve)}</dd>
+            <dd>{formatDisplayedAmountText(estimate.lightningFeeReserve)}</dd>
             <dt className="muted">{t("mintMoveFeeInput")}</dt>
-            <dd>{formatSat(estimate.inputFee)}</dd>
+            <dd>{formatDisplayedAmountText(estimate.inputFee)}</dd>
             <dt className="muted">{t("mintMoveTotal")}</dt>
-            <dd>{formatSat(estimate.totalFromSource)}</dd>
+            <dd>{formatDisplayedAmountText(estimate.totalFromSource)}</dd>
           </dl>
           <p className="muted">
             {exceedsBalance

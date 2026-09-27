@@ -93,7 +93,7 @@ test("test mints can be hidden and funds move between mints", async ({
     await page.goto("/#advanced/mints");
     await expect(
       page.getByRole("button", { name: /^localhost:3338\b/ }),
-    ).toHaveAttribute("aria-pressed", "true");
+    ).toHaveAttribute("aria-current", "true");
   });
 
   let targetBefore = 0;
@@ -113,7 +113,9 @@ test("test mints can be hidden and funds move between mints", async ({
   await test.step("estimate and move an explicit amount to the target mint", async () => {
     await page.goto(`/#advanced/mint/${encodeURIComponent(SOURCE_MINT_URL)}`);
     await page.getByLabel("To mint").selectOption({ label: "localhost:3339" });
-    await page.getByLabel("Amount (sat)").fill(String(MOVE_SAT));
+    for (const digit of String(MOVE_SAT)) {
+      await page.getByRole("button", { exact: true, name: digit }).click();
+    }
     await page
       .getByRole("button", { name: "Estimate fees", exact: true })
       .click();
