@@ -4,7 +4,7 @@ import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { navigateTo } from "../hooks/useRouting";
 import { LOCAL_MINT_INFO_STORAGE_KEY_PREFIX } from "../utils/constants";
 import { normalizeLocale } from "../utils/formatting";
-import { extractPpk, normalizeMintUrl } from "../utils/mint";
+import { extractPpk, isHiddenTestMint, normalizeMintUrl } from "../utils/mint";
 import { safeLocalStorageSetJson } from "../utils/storage";
 
 const isPpkSearchInput = (
@@ -25,6 +25,7 @@ const isPpkSearchInput = (
 
 export function MintDetailPage() {
   const {
+    allowTestMints,
     appOwnerIdRef,
     getMintRuntime,
     mintInfoByUrl,
@@ -40,7 +41,7 @@ export function MintDetailPage() {
   const cleaned = normalizeMintUrl(mintUrl);
   const row = mintInfoByUrl.get(cleaned) ?? null;
 
-  if (!row) {
+  if (!row || isHiddenTestMint(cleaned, allowTestMints)) {
     return (
       <section className="panel">
         <p className="muted">{t("mintNotFound")}</p>

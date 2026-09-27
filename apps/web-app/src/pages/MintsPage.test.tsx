@@ -36,6 +36,7 @@ const appOwnerIdRef = React.createRef<string>();
 const createMintSettings = (
   overrides: Partial<MintSettingsContextValue> = {},
 ): MintSettingsContextValue => ({
+  allowTestMints: true,
   appOwnerIdRef,
   applyDefaultMintSelection: vi.fn(async () => {}),
   cashuIsBusy: false,
@@ -54,6 +55,9 @@ const createMintSettings = (
   pendingMintDeleteUrl: null,
   probeLightningFee,
   refreshMintInfo: async () => {},
+  setAllowTestMints: vi.fn<MintSettingsContextValue["setAllowTestMints"]>(
+    async () => ({ ok: true }),
+  ),
   setDefaultMintUrlDraft: vi.fn(),
   setMintInfoAll: vi.fn(),
   setPendingMintDeleteUrl: vi.fn(),
@@ -219,5 +223,34 @@ describe("MintsPage", () => {
     await act(async () => {
       root.unmount();
     });
+  });
+
+  it("hides test mints and refuses a test-mint URL while they are off", async () => {
+    const applyDefaultMintSelection = vi.fn(async () => {});
+    const setStatus = vi.fn();
+    mintSettings = createMintSettings({
+      allowTestMints: false,
+      applyDefaultMintSelection,
+      defaultMintUrlDraft: "https://testnut.cashu.space",
+      setStatus,
+    });
+
+    const { container, unmount } = await renderIntoDocument(<MintsPage />);
+    expect(container.textContent).not.toContain("testnut.cashu.space");
+    expect(container.querySelector(".mint-choice-test-group")).toBeNull();
+
+    await act(async () => {
+      click(findButton(container, "saveChanges"));
+    });
+    expect(setStatus).toHaveBeenCalledWith("mintTestMintNotAllowed");
+    expect(applyDefaultMintSelection).not.toHaveBeenCalled();
+    await unmount();
+  });
+
+  it("shows the test group while test mints are allowed", async () => {
+    mintSettings = createMintSettings();
+    const { container, unmount } = await renderIntoDocument(<MintsPage />);
+    expect(container.textContent).toContain("testnut.cashu.space");
+    await unmount();
   });
 });

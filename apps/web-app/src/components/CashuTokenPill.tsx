@@ -38,6 +38,8 @@ interface CashuTokenPillProps {
   ariaLabel?: string;
   className?: string;
   compact?: boolean;
+  /** Short visible note after the amount, also the pill's tooltip. */
+  hint?: string;
   icon: Pick<MintIcon, "url"> & Partial<Omit<MintIcon, "url">>;
   isError?: boolean;
   isMuted?: boolean;
@@ -50,6 +52,7 @@ export function CashuTokenPill({
   ariaLabel,
   className = "",
   compact = false,
+  hint,
   icon,
   isError = false,
   isMuted = false,
@@ -76,6 +79,7 @@ export function CashuTokenPill({
         <span className="muted chat-token-pill-fallback">{icon.host}</span>
       ) : null}
       <span className="chat-token-pill-label">{amountText}</span>
+      {hint ? <span className="cashu-token-pill-hint">{hint}</span> : null}
     </>
   );
   return onClick ? (
@@ -83,12 +87,13 @@ export function CashuTokenPill({
       type="button"
       className={pillClassName}
       aria-label={ariaLabel}
+      title={hint}
       onClick={onClick}
     >
       {content}
     </button>
   ) : (
-    <span className={pillClassName} aria-label={ariaLabel}>
+    <span className={pillClassName} aria-label={ariaLabel} title={hint}>
       {content}
     </span>
   );

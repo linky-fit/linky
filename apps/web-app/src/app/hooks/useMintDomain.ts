@@ -7,6 +7,7 @@ import { resolveMintIcon } from "./mint/mintInfoHelpers";
 import { useMintInfoStore } from "./mint/useMintInfoStore";
 
 interface UseMintDomainParams {
+  allowTestMints: boolean;
   appOwnerId: string | null;
   appOwnerIdRef: React.MutableRefObject<string | null>;
   walletProofs: readonly StoredProof[];
@@ -29,6 +30,7 @@ interface UseMintDomainResult {
 }
 
 export const useMintDomain = ({
+  allowTestMints,
   appOwnerId,
   appOwnerIdRef,
   walletProofs,
@@ -49,6 +51,7 @@ export const useMintDomain = ({
     setMintInfoAll,
     touchMintInfo,
   } = useMintInfoStore({
+    allowTestMints,
     appOwnerId,
     appOwnerIdRef,
     walletProofs,

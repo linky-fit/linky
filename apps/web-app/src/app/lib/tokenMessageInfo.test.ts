@@ -77,4 +77,19 @@ describe("getCashuTokenMessageInfo", () => {
     );
     expect(getCashuTokenMessageInfo(token, new Set())?.isValid).toBe(true);
   });
+
+  it("flags a test-mint token only while test mints are off", () => {
+    const token = buildCashuToken({ mint: "http://localhost:3338" });
+
+    expect(
+      getCashuTokenMessageInfo(token, new Set(), false)?.isHiddenTestMint,
+    ).toBe(true);
+    expect(
+      getCashuTokenMessageInfo(token, new Set(), true)?.isHiddenTestMint,
+    ).toBe(false);
+    expect(
+      getCashuTokenMessageInfo(buildCashuToken(), new Set(), false)
+        ?.isHiddenTestMint,
+    ).toBe(false);
+  });
 });

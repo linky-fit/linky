@@ -3948,6 +3948,12 @@ button.icon {
   align-self: center;
 }
 
+.cashu-token-pill-hint {
+  align-self: center;
+  font-size: 0.75em;
+  opacity: 0.85;
+}
+
 .pill.pill-error {
   background: rgba(239, 68, 68, 0.12);
   color: #fecaca;

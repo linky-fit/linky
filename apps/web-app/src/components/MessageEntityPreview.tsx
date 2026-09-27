@@ -50,7 +50,9 @@ export const MessageEntityPreview: React.FC<MessageEntityPreviewProps> = ({
         className="chat-token-pill"
         icon={icon}
         amountText={formatDisplayedAmountText(standaloneTokenInfo.amount ?? 0)}
-        isMuted={!standaloneTokenInfo.isValid}
+        isMuted={
+          !standaloneTokenInfo.isValid || standaloneTokenInfo.isHiddenTestMint
+        }
       />,
     );
   }
@@ -105,7 +107,7 @@ export const MessageEntityPreview: React.FC<MessageEntityPreviewProps> = ({
           className="chat-token-pill"
           icon={icon}
           amountText={formatDisplayedAmountText(tokenInfo.amount ?? 0)}
-          isMuted={!tokenInfo.isValid}
+          isMuted={!tokenInfo.isValid || tokenInfo.isHiddenTestMint}
         />,
       );
     } else {

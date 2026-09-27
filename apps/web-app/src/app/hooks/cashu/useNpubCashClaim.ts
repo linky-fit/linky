@@ -43,6 +43,7 @@ import type {
 } from "../../types/appTypes";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { nowSeconds } from "../../../utils/time";
+import { isHiddenTestMint } from "../../../utils/mint";
 import type { Translate } from "../../../i18n";
 import type {
   AdoptPaidCashuQuote,
@@ -50,6 +51,7 @@ import type {
 } from "../composition/useLinkshuComposition";
 
 interface UseNpubCashClaimParams {
+  allowTestMints: boolean;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   adoptPaidCashuQuote: AdoptPaidCashuQuote | null;
   cashuIsBusy: boolean;
@@ -144,6 +146,7 @@ const reportUpstreamQuotesListed = (
  */
 export const useNpubCashClaim = ({
   adoptPaidCashuQuote,
+  allowTestMints,
   cashuIsBusy,
   currentNpub,
   currentNsec,
@@ -258,6 +261,10 @@ export const useNpubCashClaim = ({
         };
 
         try {
+          if (isHiddenTestMint(parsedMint, allowTestMints)) {
+            logFailure(t("cashuTestMintRejected"));
+            return;
+          }
           const outcome = await receiveCashuToken(tokenRaw);
 
           if (Either.isLeft(outcome)) {
@@ -287,6 +294,7 @@ export const useNpubCashClaim = ({
       });
     },
     [
+      allowTestMints,
       announceReceived,
       enqueueCashuOp,
       logPaymentEvent,
@@ -320,6 +328,8 @@ export const useNpubCashClaim = ({
   const adoptUpstreamQuote = React.useCallback(
     async (quote: UpstreamPaidQuote): Promise<boolean> => {
       if (adoptPaidCashuQuote === null) return false;
+      // Left in the ledger: turning test mints back on adopts it.
+      if (isHiddenTestMint(quote.mint, allowTestMints)) return false;
       const outcome = await enqueueCashuOp(async () => {
         setCashuIsBusy(true);
         try {
@@ -369,6 +379,7 @@ export const useNpubCashClaim = ({
     },
     [
       adoptPaidCashuQuote,
+      allowTestMints,
       announceReceived,
       enqueueCashuOp,
       logPaymentEvent,

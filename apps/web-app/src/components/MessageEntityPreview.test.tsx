@@ -26,6 +26,7 @@ describe("MessageEntityPreview", () => {
         content="cashuABC123"
         getCashuTokenMessageInfo={() => ({
           amount: 21,
+          isHiddenTestMint: false,
           isValid: true,
           mintDisplay: "mint.example",
           mintUrl: "https://mint.example",
@@ -56,6 +57,7 @@ describe("MessageEntityPreview", () => {
         content={content}
         getCashuTokenMessageInfo={() => ({
           amount: 2,
+          isHiddenTestMint: false,
           isValid: false,
           mintDisplay: "cashu.cz",
           mintUrl: "https://cashu.cz",

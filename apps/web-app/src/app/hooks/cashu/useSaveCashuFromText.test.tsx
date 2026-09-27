@@ -18,6 +18,7 @@ const setup = async (
 
   const Probe = (): null => {
     const save = useSaveCashuFromText({
+      allowTestMints: true,
       enqueueCashuOp: async (op) => {
         await op();
       },

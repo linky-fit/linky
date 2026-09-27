@@ -50,6 +50,7 @@ const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
   };
   const Harness: React.FC = () => {
     const restore = useRestoreMissingTokens({
+      allowTestMints: true,
       cashuIsBusy: false,
       walletMints: overrides.walletMints ?? [],
       defaultMintUrl: null,

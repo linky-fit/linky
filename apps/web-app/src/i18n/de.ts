@@ -348,6 +348,12 @@ export const de = {
   mintRefresh: "Informationen aktualisieren",
   mintDelete: "Mint löschen",
   mintLastChecked: "Zuletzt geprüft",
+  allowTestMints: "Test-Mints erlauben",
+  mintTestMintNotAllowed:
+    "Test-Mints sind in den erweiterten Einstellungen ausgeschaltet.",
+  cashuTestMintRejected:
+    "Dieser Token stammt von einem Test-Mint; Test-Mints sind ausgeschaltet.",
+  cashuTestMintHiddenHint: "Test-Mint aus",
   chat: "Chat",
 
   sendMessage: "Nachrichten",

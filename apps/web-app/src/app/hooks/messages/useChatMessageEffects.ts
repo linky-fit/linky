@@ -20,9 +20,11 @@ interface UseChatMessageEffectsParams<TContact extends ContactRowLike> {
   chatMessages: LocalNostrMessage[];
   chatMessagesRef: React.RefObject<HTMLDivElement | null>;
   chatScrollTargetIdRef: React.MutableRefObject<string | null>;
-  getCashuTokenMessageInfo: (
-    text: string,
-  ) => { isValid: boolean; tokenRaw: string } | null;
+  getCashuTokenMessageInfo: (text: string) => {
+    isHiddenTestMint: boolean;
+    isValid: boolean;
+    tokenRaw: string;
+  } | null;
   isCashuTokenKnownAny: (tokenRaw: string) => boolean;
   isCashuTokenStored: (tokenRaw: string) => boolean;
   nostrMessagesRecent: readonly LocalNostrMessage[];
@@ -110,6 +112,8 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
 
         const info = getCashuTokenMessageInfo(content);
         if (!info) continue;
+        // Not marked attempted: allowing test mints later accepts it.
+        if (info.isHiddenTestMint) continue;
 
         autoAcceptedChatMessageIdsRef.current.add(id);
         if (!info.isValid) continue;

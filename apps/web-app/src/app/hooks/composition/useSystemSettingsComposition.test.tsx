@@ -80,6 +80,7 @@ const createEvoluSettings = (
 const appOwnerIdRef = React.createRef<string>();
 
 const mintSettings: MintSettingsContextValue = {
+  allowTestMints: true,
   appOwnerIdRef,
   applyDefaultMintSelection: noopAsync,
   cashuIsBusy: false,
@@ -98,6 +99,7 @@ const mintSettings: MintSettingsContextValue = {
   pendingMintDeleteUrl: null,
   probeLightningFee: null,
   refreshMintInfo: noopAsync,
+  setAllowTestMints: () => Promise.resolve({ ok: true }),
   setDefaultMintUrlDraft: noop,
   setMintInfoAll: noop,
   setPendingMintDeleteUrl: noop,

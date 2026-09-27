@@ -344,6 +344,12 @@ export const cs = {
   mintRefresh: "Obnovit info",
   mintDelete: "Odstranit mint",
   mintLastChecked: "Naposledy ověřeno",
+  allowTestMints: "Povolit testovací minty",
+  mintTestMintNotAllowed:
+    "Testovací minty jsou vypnuté v Pokročilém nastavení.",
+  cashuTestMintRejected:
+    "Token je z testovacího mintu; testovací minty jsou vypnuté.",
+  cashuTestMintHiddenHint: "testovací mint vypnut",
 
   chat: "Chat",
   sendMessage: "Zprávy",

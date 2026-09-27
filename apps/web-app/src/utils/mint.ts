@@ -13,11 +13,14 @@ export {
 } from "@linky/linkshu";
 const envMainMintUrl = (import.meta.env.VITE_MAIN_MINT_URL ?? "").trim();
 
-export const MAIN_MINT_URL = envMainMintUrl || "https://cashu.cz";
+/** Where funds go when the configured default mint is a hidden test mint. */
+export const FALLBACK_PRODUCTION_MINT_URL = "https://cashu.cz";
+
+export const MAIN_MINT_URL = envMainMintUrl || FALLBACK_PRODUCTION_MINT_URL;
 
 // An explicit development mint keeps preset discovery and recovery local.
 export const PRODUCTION_MINTS = [
-  "https://cashu.cz",
+  FALLBACK_PRODUCTION_MINT_URL,
   "https://mint.minibits.cash/Bitcoin",
   "https://kashu.me",
   "https://cashu.21m.lol",
@@ -125,6 +128,25 @@ export const getMintOriginAndHost = (
 
 export const isTestMintUrl = (mint: MintStringInput): boolean =>
   sharedIsTestMintUrl(normalizeMintUrl(mint));
+
+/** A test mint while the "Allow test mints" setting is off: never shown, used, or accepted. */
+export const isHiddenTestMint = (
+  mint: string | null | undefined,
+  allowTestMints: boolean,
+): boolean => !allowTestMints && isTestMintUrl(mint);
+
+/**
+ * The default mint the wallet uses. A hidden test mint (or no stored choice
+ * while the build's main mint is one) falls back to the first production mint;
+ * the stored preference is left as is.
+ */
+export const effectiveDefaultMintUrl = (
+  storedMintUrl: string | null,
+  allowTestMints: boolean,
+): string | null =>
+  isHiddenTestMint(storedMintUrl ?? MAIN_MINT_URL, allowTestMints)
+    ? FALLBACK_PRODUCTION_MINT_URL
+    : storedMintUrl;
 
 export const getNextMintIconUrl = (
   currentUrl: string | null,

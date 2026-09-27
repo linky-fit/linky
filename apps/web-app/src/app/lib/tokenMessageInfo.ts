@@ -2,9 +2,12 @@ import { parseTokenText } from "@linky/linkshu";
 import { decodeBankPaymentOffer } from "@linky/proxy-payment";
 import { parsePrivateImageMessage } from "./privateImageMessage";
 import { extractCashuTokenFromText } from "./tokenText";
+import { isHiddenTestMint } from "../../utils/mint";
 
 export interface CashuTokenMessageInfo {
   amount: number | null;
+  /** A test-mint token while test mints are off: shown, never accepted. */
+  isHiddenTestMint: boolean;
   isValid: boolean;
   mintDisplay: string | null;
   mintUrl: string | null;
@@ -28,6 +31,7 @@ export const getCashuTokenMessageInfo = (
   text: string,
   /** Token texts the wallet's transfers carry (sent or received). */
   knownTokenTexts: ReadonlySet<string> = new Set(),
+  allowTestMints = true,
 ): CashuTokenMessageInfo | null => {
   if (decodeBankPaymentOffer(text)) return null;
   if (parsePrivateImageMessage(text)) return null;
@@ -44,6 +48,7 @@ export const getCashuTokenMessageInfo = (
     mintUrl: parsed.mint,
     amount: parsed.amount,
     unit: parsed.unit,
+    isHiddenTestMint: isHiddenTestMint(parsed.mint, allowTestMints),
     // Best-effort: "valid" means no transfer carries this text yet; a token
     // whose proofs the wallet holds is caught by linkshu's receive dedup.
     isValid: !knownTokenTexts.has(tokenRaw),

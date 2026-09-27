@@ -51,6 +51,7 @@ import {
 } from "@linky/linksync";
 import {
   CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
+  effectiveDefaultMintUrl,
   formatMintHost,
   MAIN_MINT_URL,
   normalizeMintUrl,
@@ -81,6 +82,7 @@ import { useAnonymousPaymentTelemetry } from "../useAnonymousPaymentTelemetry";
 import { useCashuDomain } from "../useCashuDomain";
 import { useLightningPaymentsDomain } from "../useLightningPaymentsDomain";
 import { useMintDomain } from "../useMintDomain";
+import { useAllowTestMints } from "../useAllowTestMints";
 import { useOwnerScopedStorage } from "../useOwnerScopedStorage";
 import { usePaidOverlayState } from "../usePaidOverlayState";
 import { usePaymentsDomain } from "../usePaymentsDomain";
@@ -240,6 +242,7 @@ export const useCashuWalletComposition = ({
 }: UseCashuWalletCompositionParams) => {
   const wallet = useWalletRepository();
   const settingsRepository = useSettingsRepository();
+  const { allowTestMints, setAllowTestMints } = useAllowTestMints();
   const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
     mode: "promiseExit",
   });
@@ -367,7 +370,13 @@ export const useCashuWalletComposition = ({
     [],
   );
 
-  const [defaultMintUrl, setDefaultMintUrl] = useState<string | null>(null);
+  const [storedDefaultMintUrl, setDefaultMintUrl] = useState<string | null>(
+    null,
+  );
+  const defaultMintUrl = effectiveDefaultMintUrl(
+    storedDefaultMintUrl,
+    allowTestMints,
+  );
   const [defaultMintUrlDraft, setDefaultMintUrlDraft] = useState<string>("");
 
   const [lnAddressPayAmount, setLnAddressPayAmount] = useState<string>("");
@@ -428,7 +437,7 @@ export const useCashuWalletComposition = ({
   React.useEffect(() => {
     if (!ownerMetaDefaultMintValue) return;
     if (!appOwnerId) return;
-    const current = normalizeMintUrl(defaultMintUrl ?? "");
+    const current = normalizeMintUrl(storedDefaultMintUrl ?? "");
     if (current === ownerMetaDefaultMintValue) return;
     setDefaultMintUrl(ownerMetaDefaultMintValue);
     setDefaultMintUrlDraft(ownerMetaDefaultMintValue);
@@ -443,9 +452,9 @@ export const useCashuWalletComposition = ({
     }
   }, [
     appOwnerId,
-    defaultMintUrl,
     makeLocalStorageKey,
     ownerMetaDefaultMintValue,
+    storedDefaultMintUrl,
   ]);
 
   const upsertDefaultMintToOwnerMeta = React.useCallback(
@@ -485,6 +494,7 @@ export const useCashuWalletComposition = ({
 
   const {
     adoptPaidCashuQuote,
+    allWalletProofs,
     autoswapCashu,
     cashuTransferLifecycle,
     checkAllCashuTokens,
@@ -505,7 +515,7 @@ export const useCashuWalletComposition = ({
     walletOperations,
     walletProofs,
     walletTransfers,
-  } = useLinkshuComposition({ currentNsec, wallet });
+  } = useLinkshuComposition({ allowTestMints, currentNsec, wallet });
 
   const cashuOpenTransfers = React.useMemo(
     () => walletTransfers.filter(isOpenTransfer),
@@ -536,6 +546,7 @@ export const useCashuWalletComposition = ({
     setMintInfoAll,
     touchMintInfo,
   } = useMintDomain({
+    allowTestMints,
     appOwnerId,
     appOwnerIdRef,
     walletProofs,
@@ -714,7 +725,8 @@ export const useCashuWalletComposition = ({
   } = useNpubCashMintSelection({
     currentNpub,
     currentNsec,
-    defaultMintUrl,
+    // npub.cash keeps the stored choice; the test-mint fallback stays local.
+    defaultMintUrl: storedDefaultMintUrl,
     defaultMintUrlDraft,
     hasMintOverrideRef,
     makeLocalStorageKey,
@@ -795,6 +807,7 @@ export const useCashuWalletComposition = ({
   ]);
 
   const { claimNpubCashOnce, claimNpubCashOnceLatestRef } = useNpubCashClaim({
+    allowTestMints,
     adoptPaidCashuQuote,
     cashuIsBusy,
     currentNpub: nostrBootstrapReady ? currentNpub : null,
@@ -1552,6 +1565,7 @@ export const useCashuWalletComposition = ({
   }, []);
 
   const saveCashuFromText = useSaveCashuFromText({
+    allowTestMints,
     enqueueCashuOp,
     formatDisplayedAmountParts,
     isCashuTokenStored,
@@ -1988,6 +2002,7 @@ export const useCashuWalletComposition = ({
   }, [walletOperations, walletProofs]);
 
   const recoverTokens = useRestoreMissingTokens({
+    allowTestMints,
     cashuIsBusy,
     walletMints,
     defaultMintUrl,
@@ -2409,8 +2424,9 @@ export const useCashuWalletComposition = ({
     [walletTransfers],
   );
   const getCashuTokenMessageInfo = React.useCallback(
-    (text: string) => getCashuTokenMessageInfoBase(text, knownTransferTexts),
-    [knownTransferTexts],
+    (text: string) =>
+      getCashuTokenMessageInfoBase(text, knownTransferTexts, allowTestMints),
+    [allowTestMints, knownTransferTexts],
   );
 
   const knownLnAddressPayContact = React.useMemo(() => {
@@ -2437,6 +2453,8 @@ export const useCashuWalletComposition = ({
   return {
     reclaimCashuTransfer,
     cashuTransferLifecycle,
+    allCashuProofs: allWalletProofs,
+    allowTestMints,
     applyDefaultMintSelection,
     canPayWithCashu,
     cancelPendingCashuContactSend,
@@ -2524,6 +2542,7 @@ export const useCashuWalletComposition = ({
     setLightningInvoiceAutoPayLimit,
     setLnAddressPayAmount,
     setMintInfoAll,
+    setAllowTestMints,
     setPayWithCashuEnabled,
     setPendingCashuDeleteId,
     setPendingLightningInvoiceConfirmation,

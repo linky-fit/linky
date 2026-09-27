@@ -1,7 +1,7 @@
 import { parseMintUrl } from "@linky/linkshu";
 import type { MintUrl, RestoreProgress } from "@linky/linkshu";
 import React from "react";
-import { MAIN_MINT_URL } from "../../../utils/mint";
+import { isHiddenTestMint, MAIN_MINT_URL } from "../../../utils/mint";
 import type { LoggedPaymentEventParams } from "../../types/appTypes";
 import type {
   ReclaimCashuTokens,
@@ -10,6 +10,7 @@ import type {
 import type { Translate } from "../../../i18n";
 
 interface UseRestoreMissingTokensParams {
+  allowTestMints: boolean;
   cashuIsBusy: boolean;
   /**
    * Every mint the wallet ever held funds at, including mints of legacy
@@ -44,6 +45,7 @@ interface UseRestoreMissingTokensParams {
  * what makes restore work on a fresh device with an empty store.
  */
 export const useRestoreMissingTokens = ({
+  allowTestMints,
   cashuIsBusy,
   walletMints,
   defaultMintUrl,
@@ -108,7 +110,9 @@ export const useRestoreMissingTokens = ({
             for (const mint of alwaysInclude) candidates.add(mint);
 
             const mints = [...candidates].filter(
-              (mint) => alwaysInclude.has(mint) || !isMintDeleted(mint),
+              (mint) =>
+                (alwaysInclude.has(mint) || !isMintDeleted(mint)) &&
+                !isHiddenTestMint(mint, allowTestMints),
             );
             if (mints.length === 0) {
               pushToast(t("restoreNothing"));
@@ -176,6 +180,7 @@ export const useRestoreMissingTokens = ({
       }
     },
     [
+      allowTestMints,
       cashuIsBusy,
       walletMints,
       defaultMintUrl,

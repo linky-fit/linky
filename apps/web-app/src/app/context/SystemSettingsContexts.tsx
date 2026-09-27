@@ -6,6 +6,7 @@ import type { EvoluErrorType, EvoluServerStatus } from "../../evolu";
 import type { ShardSummary } from "../hooks/useLinksync";
 import type { PasswordManagerSaveResult } from "../../platform/passwordManager";
 import type { ProbeLightningFee } from "../hooks/composition/useLinkshuComposition";
+import type { WriteOutcome } from "../lib/storeWrite";
 import type { LocalMintInfoRow } from "../types/appTypes";
 
 export interface AdvancedSettingsContextValue {
@@ -65,10 +66,12 @@ export interface EvoluSettingsContextValue {
 }
 
 export interface MintSettingsContextValue {
+  allowTestMints: boolean;
   appOwnerIdRef: React.RefObject<string | null>;
   applyDefaultMintSelection: (mint: string) => Promise<void>;
   cashuIsBusy: boolean;
   cashuMeltToMainMintButtonLabel: string | null;
+  /** The effective default mint: a hidden test mint falls back to production. */
   defaultMintUrl: string | null;
   defaultMintUrlDraft: string;
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
@@ -81,6 +84,7 @@ export interface MintSettingsContextValue {
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   probeLightningFee: ProbeLightningFee | null;
   refreshMintInfo: (url: string) => Promise<void>;
+  setAllowTestMints: (allow: boolean) => Promise<WriteOutcome>;
   setDefaultMintUrlDraft: (value: string) => void;
   setMintInfoAll: React.Dispatch<React.SetStateAction<LocalMintInfoRow[]>>;
   setPendingMintDeleteUrl: (url: string | null) => void;

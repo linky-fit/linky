@@ -9,6 +9,7 @@ import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { isUnknownContactId } from "../messages/contactIdentity";
 import type { ReceiveCashuToken } from "../composition/useLinkshuComposition";
 import { nowSeconds } from "../../../utils/time";
+import { isHiddenTestMint } from "../../../utils/mint";
 import type { Translate } from "../../../i18n";
 
 interface CashuTokenMetaRow {
@@ -32,6 +33,7 @@ interface SaveCashuFromTextOptions {
 }
 
 interface UseSaveCashuFromTextParams {
+  allowTestMints: boolean;
   enqueueCashuOp: (op: () => Promise<void>) => Promise<void>;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   isCashuTokenStored: (tokenRaw: string) => boolean;
@@ -65,6 +67,7 @@ const navigateAfterSave = (options?: SaveCashuFromTextOptions): void => {
  * payment-history events, mint bookkeeping, and navigation.
  */
 export const useSaveCashuFromText = ({
+  allowTestMints,
   enqueueCashuOp,
   formatDisplayedAmountParts,
   isCashuTokenStored,
@@ -99,9 +102,6 @@ export const useSaveCashuFromText = ({
         options?.onResolved?.("transient");
         return;
       }
-      setCashuDraft("");
-      setStatus(t("cashuAccepting"));
-
       // Best-effort metadata so failures still log mint/amount context.
       const parsed = parseTokenText(tokenRaw);
       const parsedMint = parsed?.mint ?? null;
@@ -134,6 +134,17 @@ export const useSaveCashuFromText = ({
           phase: "receive",
         });
       };
+
+      if (isHiddenTestMint(parsedMint, allowTestMints)) {
+        const message = t("cashuTestMintRejected");
+        setStatus(message);
+        logFailure(message);
+        options?.onResolved?.("terminal");
+        return;
+      }
+
+      setCashuDraft("");
+      setStatus(t("cashuAccepting"));
 
       await enqueueCashuOp(async () => {
         setCashuIsBusy(true);
@@ -221,6 +232,7 @@ export const useSaveCashuFromText = ({
       });
     },
     [
+      allowTestMints,
       enqueueCashuOp,
       formatDisplayedAmountParts,
       isCashuTokenStored,

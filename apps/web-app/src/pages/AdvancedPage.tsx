@@ -9,6 +9,7 @@ import {
   Coins,
   Copy,
   Download,
+  FlaskConical,
   MessageCircle as FeedbackIcon,
   Smartphone,
   Landmark,
@@ -26,7 +27,10 @@ import {
   useAppShellActions,
   useAppShellCore,
 } from "../app/context/AppShellContexts";
-import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
+import {
+  useAdvancedSettingsContext,
+  useMintSettingsContext,
+} from "../app/context/SystemSettingsContexts";
 import {
   countConnectedRelays,
   overallRelayStatus,
@@ -62,6 +66,7 @@ export function AdvancedPage(): React.ReactElement {
     seedMnemonic,
     setPayWithCashuEnabled,
   } = useAdvancedSettingsContext();
+  const { allowTestMints, setAllowTestMints } = useMintSettingsContext();
   const relayHealth = useRelayHealth();
   const connectedRelayCount = countConnectedRelays(relayUrls, relayHealth);
   const nostrRelayOverallStatus = overallRelayStatus(relayUrls, relayHealth);
@@ -373,6 +378,17 @@ export function AdvancedPage(): React.ReactElement {
                 {defaultMintDisplay}
               </span>
             ) : null
+          }
+        />
+
+        <SettingsToggleRow
+          icon={<FlaskConical size={18} />}
+          label={t("allowTestMints")}
+          checked={allowTestMints}
+          onChange={(checked) =>
+            void setAllowTestMints(checked).then((outcome) => {
+              if (!outcome.ok) pushToast(outcome.error);
+            })
           }
         />
       </div>

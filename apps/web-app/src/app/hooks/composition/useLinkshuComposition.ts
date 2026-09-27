@@ -67,11 +67,17 @@ import { Effect, Exit, Layer, ManagedRuntime, Schema, Scope } from "effect";
 import type { Either } from "effect";
 import React from "react";
 import { linkshuAppInspector } from "../../../devtools/inspector/linkshuInspector";
+import {
+  visibleWalletBalances,
+  withoutHiddenTestMints,
+} from "../../lib/testMintGate";
 import { migrateLegacyCashuLocalState } from "../../migrations/linkshuStorageMigration";
 import { localStorageKeyValueStore } from "../../../platform/linkshu/localStorageKeyValueStore";
 import { resolveLinkshuSeed } from "../../../platform/linkshu/resolveLinkshuSeed";
 
 interface UseLinkshuCompositionParams {
+  /** Off: test-mint proofs are left out of `walletBalances` and `walletProofs`. */
+  allowTestMints: boolean;
   /** Seed resolution re-runs when the active identity changes. */
   currentNsec: string | null;
   /** The proof and operation stores over the cashu shards. */
@@ -298,6 +304,7 @@ const quoteLockingKeyOf = (nsec: string | null): QuoteLockingKey | null => {
  * whenever the wallet repository reports a change.
  */
 export const useLinkshuComposition = ({
+  allowTestMints,
   currentNsec,
   wallet,
 }: UseLinkshuCompositionParams) => {
@@ -624,8 +631,19 @@ export const useLinkshuComposition = ({
     };
   }, [currentNsec, linkshuRuntime, topupScope]);
 
+  const walletBalances = React.useMemo(
+    () => visibleWalletBalances(readModel.model.balances, allowTestMints),
+    [allowTestMints, readModel.model.balances],
+  );
+  const walletProofs = React.useMemo(
+    () => withoutHiddenTestMints(readModel.model.proofs, allowTestMints),
+    [allowTestMints, readModel.model.proofs],
+  );
+
   return {
     adoptPaidCashuQuote: operations?.adoptPaidCashuQuote ?? null,
+    /** Every stored proof, test mints included; backups must not lose hidden funds. */
+    allWalletProofs: readModel.model.proofs,
     autoswapCashu: operations?.autoswapCashu ?? null,
     cashuTransferLifecycle: operations?.cashuTransferLifecycle ?? null,
     checkAllCashuTokens: operations?.checkAllCashuTokens ?? null,
@@ -642,11 +660,11 @@ export const useLinkshuComposition = ({
     resumePendingCashuTopups: operations?.resumePendingCashuTopups ?? null,
     sendCashuToken: operations?.sendCashuToken ?? null,
     startCashuTopup: operations?.startCashuTopup ?? null,
-    walletBalances: readModel.model.balances,
+    walletBalances,
     /** True once the first inventory read answered; false shows as an empty wallet. */
     walletLoaded: readModel.loaded,
     walletOperations: readModel.model.operations,
-    walletProofs: readModel.model.proofs,
+    walletProofs,
     walletTransfers: readModel.model.transfers,
   };
 };

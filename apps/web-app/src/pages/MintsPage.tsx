@@ -7,6 +7,7 @@ import type { ProbeLightningFee } from "../app/hooks/composition/useLinkshuCompo
 import { getMintFeePpk } from "../app/hooks/mint/mintInfoHelpers";
 import { MintButton } from "../components/MintButton";
 import {
+  isHiddenTestMint,
   isTestMintUrl,
   MAIN_MINT_URL,
   normalizeMintUrl,
@@ -92,6 +93,7 @@ const useLightningFeeProbe = (
 
 export function MintsPage() {
   const {
+    allowTestMints,
     applyDefaultMintSelection,
     cashuIsBusy,
     defaultMintUrl,
@@ -101,6 +103,7 @@ export function MintsPage() {
     probeLightningFee,
     refreshMintInfo,
     setDefaultMintUrlDraft,
+    setStatus,
   } = useMintSettingsContext();
   const { t } = useAppShellCore();
   const selectedMint =
@@ -140,7 +143,9 @@ export function MintsPage() {
   const buttonMints = (() => {
     const set = new Set<string>(PRESET_MINTS);
     if (selectedMint) set.add(selectedMint);
-    return Array.from(set.values());
+    return Array.from(set.values()).filter(
+      (mint) => !isHiddenTestMint(mint, allowTestMints),
+    );
   })();
   const standardMints = buttonMints.filter((mint) => !isTestMintUrl(mint));
   const testMints = buttonMints.filter((mint) => isTestMintUrl(mint));
@@ -165,6 +170,14 @@ export function MintsPage() {
       </span>
     </div>
   );
+
+  const saveCustomMint = async () => {
+    if (isHiddenTestMint(cleanedDraft, allowTestMints)) {
+      setStatus(t("mintTestMintNotAllowed"));
+      return;
+    }
+    await applyDefaultMintSelection(cleanedDraft);
+  };
 
   const renderMintButton = (mint: string) => {
     const normalized = normalizeMintUrl(mint);
@@ -236,9 +249,7 @@ export function MintsPage() {
           <button
             type="button"
             disabled={cashuIsBusy}
-            onClick={async () => {
-              await applyDefaultMintSelection(cleanedDraft);
-            }}
+            onClick={() => void saveCustomMint()}
           >
             {t("saveChanges")}
           </button>

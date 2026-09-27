@@ -5,6 +5,7 @@ import type { StoredProof } from "@linky/linkshu";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
 import { LOCAL_MINT_INFO_STORAGE_KEY_PREFIX } from "../../../utils/constants";
 import {
+  isHiddenTestMint,
   MAIN_MINT_URL,
   normalizeMintUrl,
   PRESET_MINTS,
@@ -50,6 +51,7 @@ const isStoredMintInfoRow = (
   Schema.is(StoredMintInfoRow)(value);
 
 interface UseMintInfoStoreParams {
+  allowTestMints: boolean;
   appOwnerId: string | null;
   appOwnerIdRef: React.MutableRefObject<string | null>;
   walletProofs: readonly StoredProof[];
@@ -70,6 +72,7 @@ interface UseMintInfoStoreResult {
 }
 
 export const useMintInfoStore = ({
+  allowTestMints,
   appOwnerId,
   appOwnerIdRef,
   walletProofs,
@@ -401,7 +404,12 @@ export const useMintInfoStore = ({
 
     for (const mintUrl of candidates) {
       const cleaned = mintUrl.trim().replace(/\/+$/, "");
-      if (!cleaned || isMintDeleted(cleaned)) continue;
+      if (
+        !cleaned ||
+        isMintDeleted(cleaned) ||
+        isHiddenTestMint(cleaned, allowTestMints)
+      )
+        continue;
 
       const existing = mintInfoByUrl.get(cleaned);
       if (!existing) {
@@ -426,6 +434,7 @@ export const useMintInfoStore = ({
       }
     }
   }, [
+    allowTestMints,
     canRunNetworkWork,
     defaultMintUrl,
     encounteredMintUrls,

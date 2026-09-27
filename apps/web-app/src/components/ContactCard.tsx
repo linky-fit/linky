@@ -202,7 +202,7 @@ const TokenPreview: React.FC<TokenPreviewProps> = ({
         amountText={amountText}
         ariaLabel={amountText}
         className="chat-token-pill"
-        isMuted={!tokenInfo.isValid}
+        isMuted={!tokenInfo.isValid || tokenInfo.isHiddenTestMint}
         onMintIconError={onIconError}
       />
     </div>

@@ -362,12 +362,15 @@ function ChatMessageComponent({
               : amountText
           }
           className="chat-token-pill"
-          isMuted={!info.isValid}
+          {...(info.isHiddenTestMint
+            ? { hint: t("cashuTestMintHiddenHint") }
+            : {})}
+          isMuted={!info.isValid || info.isHiddenTestMint}
           onMintIconError={onMintIconError}
         />
       );
     },
-    [formatDisplayedAmountText, getMintIconUrl, onMintIconError],
+    [formatDisplayedAmountText, getMintIconUrl, onMintIconError, t],
   );
 
   const inlineMessageContent = React.useMemo(() => {

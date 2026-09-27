@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   GENERIC_MINT_ICON_DATA_URL,
   getNextMintIconUrl,
+  isHiddenTestMint,
   isTestMintUrl,
 } from "./mint";
 
@@ -64,5 +65,51 @@ describe("mint presets", () => {
       "https://testnut.cashu.space",
       ...PRODUCTION_MINTS.slice(1),
     ]);
+  });
+});
+
+describe("isHiddenTestMint", () => {
+  it("hides test mints only while they are not allowed", () => {
+    expect(isHiddenTestMint("http://localhost:3338", false)).toBe(true);
+    expect(isHiddenTestMint("http://localhost:3338", true)).toBe(false);
+    expect(isHiddenTestMint("https://cashu.cz", false)).toBe(false);
+    expect(isHiddenTestMint(null, false)).toBe(false);
+  });
+});
+
+describe("effectiveDefaultMintUrl", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  const loadWithMainMint = async (mainMint: string) => {
+    vi.stubEnv("VITE_MAIN_MINT_URL", mainMint);
+    vi.resetModules();
+    return import("./mint");
+  };
+
+  it("falls back to the first production mint for a hidden test mint", async () => {
+    const { effectiveDefaultMintUrl } = await loadWithMainMint("");
+    expect(effectiveDefaultMintUrl("https://testnut.cashu.space", false)).toBe(
+      "https://cashu.cz",
+    );
+    expect(effectiveDefaultMintUrl("https://testnut.cashu.space", true)).toBe(
+      "https://testnut.cashu.space",
+    );
+    expect(effectiveDefaultMintUrl("https://kashu.me", false)).toBe(
+      "https://kashu.me",
+    );
+  });
+
+  it("keeps an unset default unless the build's main mint is hidden", async () => {
+    const production = await loadWithMainMint("");
+    expect(production.effectiveDefaultMintUrl(null, false)).toBeNull();
+
+    const development = await loadWithMainMint("http://localhost:3338");
+    expect(development.effectiveDefaultMintUrl(null, true)).toBeNull();
+    expect(development.effectiveDefaultMintUrl(null, false)).toBe(
+      "https://cashu.cz",
+    );
   });
 });

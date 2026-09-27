@@ -339,6 +339,11 @@ export const en = {
   mintRefresh: "Refresh info",
   mintDelete: "Delete mint",
   mintLastChecked: "Last checked",
+  allowTestMints: "Allow test mints",
+  mintTestMintNotAllowed: "Test mints are turned off in Advanced settings.",
+  cashuTestMintRejected:
+    "This token is from a test mint; test mints are turned off.",
+  cashuTestMintHiddenHint: "test mint off",
 
   chat: "Chat",
   sendMessage: "Messages",
