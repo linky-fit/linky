@@ -424,6 +424,65 @@ describe("Topup", () => {
     expect((await onlyTopup(storage)).status).toBe("done");
   });
 
+  it("polls every 5 s for five minutes, then every minute, then every five minutes", async () => {
+    const storage = freshStorage();
+    await writePendingTopup(storage, { counter: null, createdAt: 1000 });
+    let checks = 0;
+    const { wallet } = makeWallet({
+      states: [],
+      check: () => {
+        checks += 1;
+        return Promise.resolve(quoteResponse("UNPAID"));
+      },
+    });
+    const { run } = makeHarness(wallet, storage);
+
+    const settle = Effect.promise(
+      () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+    );
+    /** Moves the clock `seconds` ahead in `step`s, letting each poll land. */
+    const advance = (seconds: number, step: number) =>
+      Effect.gen(function* () {
+        for (let left = seconds; left > 0; left -= step) {
+          yield* settle;
+          yield* TestClock.adjust(`${Math.min(step, left)} seconds`);
+        }
+      });
+    /** Polls seen while the quote ages from the current point by `seconds`. */
+    const pollsOver = (seconds: number, step: number) =>
+      Effect.gen(function* () {
+        const before = checks;
+        yield* advance(seconds, step);
+        return checks - before;
+      });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.adjust("1000 seconds");
+        return yield* Effect.scoped(
+          Effect.gen(function* () {
+            yield* (yield* Topup).resumePending();
+            yield* advance(2, 1);
+            const fresh = yield* pollsOver(60, 1); // age 2 → 62
+            yield* advance(330 - 62, 5);
+            const afterFiveMinutes = yield* pollsOver(120, 5); // 330 → 450
+            yield* advance(3690 - 450, 60);
+            const afterOneHour = yield* pollsOver(600, 60); // 3690 → 4290
+            return { fresh, afterFiveMinutes, afterOneHour };
+          }),
+        );
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value).toEqual({
+      fresh: 12,
+      afterFiveMinutes: 2,
+      afterOneHour: 2,
+    });
+    expect(await pendingTopups(storage)).toHaveLength(1);
+  });
+
   it("fails with QuoteExpired and closes the operation once an unpaid quote expires", async () => {
     const storage = freshStorage();
     const expired = Math.floor(Date.now() / 1000) - 60;
