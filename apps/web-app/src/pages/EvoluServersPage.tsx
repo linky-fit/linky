@@ -1,7 +1,9 @@
+import { MessageCircle } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
 import { deriveEvoluServerState } from "../app/lib/evoluServerState";
+import { SettingsLinkRow } from "../components/SettingsRows";
 import { navigateTo } from "../hooks/useRouting";
 import { EvoluReloadNotice } from "./EvoluReloadNotice";
 import { EvoluSyncErrorNotice } from "./EvoluSyncErrorNotice";
@@ -99,13 +101,6 @@ export function EvoluServersPage(): React.ReactElement {
         </button>
       </div>
 
-      <button
-        type="button"
-        className="settings-row settings-link"
-        onClick={() => navigateTo({ route: "chatStorage" })}
-      >
-        {t("chatStorage")}
-      </button>
       <h3 className="evolu-data-heading">{t("evoluShards")}</h3>
 
       {evoluShards.map((shard) => (
@@ -170,6 +165,12 @@ export function EvoluServersPage(): React.ReactElement {
           </span>
         </div>
       </div>
+
+      <SettingsLinkRow
+        onClick={() => navigateTo({ route: "chatStorage" })}
+        icon={<MessageCircle size={18} />}
+        label={t("chatStorage")}
+      />
     </section>
   );
 }

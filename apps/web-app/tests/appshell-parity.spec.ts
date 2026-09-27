@@ -398,6 +398,9 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
   });
 
   await test.step("inspect Evolu server, current data, history, and capacity", async () => {
+    await expect(
+      page.getByRole("button", { name: "Chat-Speicher", exact: true }),
+    ).toHaveCount(0);
     await page.getByRole("button", { name: /^Evolu \d+\/\d+/ }).click();
     await expect(page).toHaveURL(/#evolu-servers$/);
     await expect(title).toHaveText("Evolu-Server");

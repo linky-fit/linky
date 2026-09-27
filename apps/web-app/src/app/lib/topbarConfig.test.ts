@@ -66,6 +66,7 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "mintNew" })).toBe("#advanced/mints");
     expect(backHashFor({ kind: "nostrRelays" })).toBe("#settings");
     expect(backHashFor({ kind: "evoluServers" })).toBe("#settings");
+    expect(backHashFor({ kind: "chatStorage" })).toBe("#evolu-servers");
   });
 
   it("walks wallet sub-pages back up one level at a time", () => {

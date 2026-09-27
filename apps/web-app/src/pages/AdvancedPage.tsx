@@ -363,12 +363,6 @@ export function AdvancedPage(): React.ReactElement {
         />
 
         <SettingsLinkRow
-          onClick={() => navigateTo({ route: "chatStorage" })}
-          icon={<Cloud size={18} />}
-          label={t("chatStorage")}
-        />
-
-        <SettingsLinkRow
           onClick={() => navigateTo({ route: "mints" })}
           icon={<Landmark size={18} />}
           label="Mint"
