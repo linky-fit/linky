@@ -3372,11 +3372,46 @@ button.mint-choice {
 .mint-choice-item {
   display: flex;
   flex-direction: column;
+  border-radius: 12px;
+  background: var(--app-secondary-button-bg);
 }
 
 .mint-choice-item.is-selected {
-  border-radius: 12px;
-  background: rgba(20, 184, 166, 0.08);
+  background: rgba(20, 184, 166, 0.14);
+}
+
+.mint-choice-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.mint-choice-row button.mint-choice {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.mint-choice-row button:hover {
+  transform: none;
+}
+
+button.mint-choice-more {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #94a3b8;
+}
+
+button.mint-choice-more:hover,
+button.mint-choice-more:focus-visible {
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 0 12px 12px 0;
 }
 
 .mint-choice-label {
@@ -3394,24 +3429,12 @@ button.mint-choice {
 
 button.mint-choice.is-selected,
 button.mint-choice.is-selected:hover {
-  background: rgba(20, 184, 166, 0.18);
-  border: none;
-  box-shadow: none;
   color: #99f6e4;
   font-weight: 600;
 }
 
 .mint-choice-holding {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 14px 8px;
-  font-size: 13px;
-}
-
-.mint-choice-manage {
-  padding: 4px 10px;
+  padding: 0 14px 10px;
   font-size: 13px;
 }
 
@@ -3422,11 +3445,22 @@ button.mint-choice.is-selected:hover {
   width: 100%;
 }
 
+.mint-move-form .select {
+  width: 100%;
+}
+
 .mint-move-estimate {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 6px 12px;
+  margin: 4px 0 0;
   font-size: 13px;
+}
+
+.mint-move-estimate dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .mint-fees {
@@ -3447,13 +3481,15 @@ button.mint-choice.is-selected:hover {
   flex-direction: column;
   gap: 8px;
   width: 100%;
+}
+
+.mint-choice-test-group.has-separator {
   margin-top: 4px;
   padding-top: 10px;
   border-top: 1px solid rgba(148, 163, 184, 0.18);
 }
 
 button.mint-choice.is-test-mint {
-  background: rgba(148, 163, 184, 0.16);
   color: #e2e8f0;
 }
 

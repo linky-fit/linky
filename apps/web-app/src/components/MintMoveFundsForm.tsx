@@ -84,6 +84,7 @@ export function MintMoveFundsForm({
       <label htmlFor="mintMoveTarget">{t("mintMoveTarget")}</label>
       <select
         id="mintMoveTarget"
+        className="select"
         value={target}
         disabled={busy}
         onChange={(event) => setTargetMint(event.target.value)}

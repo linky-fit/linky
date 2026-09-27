@@ -1,5 +1,6 @@
 import type { LightningFeeProbeResult } from "@linky/linkshu";
 import { Either } from "effect";
+import { ChevronRight } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
@@ -178,25 +179,13 @@ export function MintsPage() {
     </div>
   );
 
-  const renderHolding = (mint: string, label: string) => {
+  const renderHolding = (mint: string) => {
     const holding = holdingOf(holdings, mint);
+    if (holding.balance <= 0) return null;
     return (
-      <div className="mint-choice-holding">
-        <span className="muted">
-          {formatDisplayedAmountText(holding.balance)} ·{" "}
-          {t("mintProofCount").replace(
-            "{count}",
-            String(holding.availableCount),
-          )}
-        </span>
-        <button
-          type="button"
-          className="ghost mint-choice-manage"
-          aria-label={`${t("mintManage")} ${label}`}
-          onClick={() => navigateTo({ route: "mint", mintUrl: mint })}
-        >
-          {t("mintManage")}
-        </button>
+      <div className="mint-choice-holding muted">
+        {formatDisplayedAmountText(holding.balance)} ·{" "}
+        {t("mintProofCount").replace("{count}", String(holding.availableCount))}
       </div>
     );
   };
@@ -222,25 +211,35 @@ export function MintsPage() {
         key={mint}
         className={`mint-choice-item${isSelected ? " is-selected" : ""}`}
       >
-        <MintButton
-          mint={mint}
-          getMintIconUrl={getMintIconUrl}
-          isSelected={isSelected}
-          isTestMint={isTestMint}
-          label={label}
-          badgeLabel={
-            isTestMint
-              ? t("testMintBadge")
-              : isRecommended
-                ? t("recommendedMintBadge")
-                : ""
-          }
-          badgeTone={isRecommended ? "recommended" : "test"}
-          fallbackLetter={fallbackLetter}
-          disabled={cashuIsBusy}
-          onClick={() => void applyDefaultMintSelection(mint)}
-        />
-        {renderHolding(normalized, label)}
+        <div className="mint-choice-row">
+          <MintButton
+            mint={mint}
+            getMintIconUrl={getMintIconUrl}
+            isSelected={isSelected}
+            isTestMint={isTestMint}
+            label={label}
+            badgeLabel={
+              isTestMint
+                ? t("testMintBadge")
+                : isRecommended
+                  ? t("recommendedMintBadge")
+                  : ""
+            }
+            badgeTone={isRecommended ? "recommended" : "test"}
+            fallbackLetter={fallbackLetter}
+            disabled={cashuIsBusy}
+            onClick={() => void applyDefaultMintSelection(mint)}
+          />
+          <button
+            type="button"
+            className="mint-choice-more"
+            aria-label={`${t("mintManage")} ${label}`}
+            onClick={() => navigateTo({ route: "mint", mintUrl: normalized })}
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+        {renderHolding(normalized)}
         {isSelected ? renderFees() : null}
       </div>
     );
@@ -254,7 +253,9 @@ export function MintsPage() {
             {standardMints.map((mint) => renderMintButton(mint))}
           </div>
           {testMints.length > 0 ? (
-            <div className="mint-choice-test-group">
+            <div
+              className={`mint-choice-test-group${standardMints.length > 0 ? " has-separator" : ""}`}
+            >
               <div className="mint-choice-group">
                 {testMints.map((mint) => renderMintButton(mint))}
               </div>
