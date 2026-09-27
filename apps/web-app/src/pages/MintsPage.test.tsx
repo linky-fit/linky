@@ -10,7 +10,10 @@ import { MintsPage } from "./MintsPage";
 let mintSettings: MintSettingsContextValue;
 
 vi.mock("../app/context/AppShellContexts", () => ({
-  useAppShellCore: () => ({ t: (key: string) => key }),
+  useAppShellCore: () => ({
+    formatDisplayedAmountText: (amount: number) => `${amount} sat`,
+    t: (key: string) => key,
+  }),
 }));
 
 vi.mock("../app/context/SystemSettingsContexts", () => ({
@@ -41,8 +44,10 @@ const createMintSettings = (
   applyDefaultMintSelection: vi.fn(async () => {}),
   cashuIsBusy: false,
   cashuMeltToMainMintButtonLabel: "Melt foreign balance",
+  cashuProofs: [],
   defaultMintUrl: "https://cashu.cz",
   defaultMintUrlDraft: "https://custom.example",
+  estimateMintMove: vi.fn(async () => null),
   getMintIconUrl: () => ({
     failed: false,
     host: null,
@@ -52,6 +57,7 @@ const createMintSettings = (
   getMintRuntime: () => null,
   meltLargestForeignMintToMainMint: vi.fn(async () => {}),
   mintInfoByUrl: new Map(),
+  moveMintFunds: vi.fn(async () => false),
   pendingMintDeleteUrl: null,
   probeLightningFee,
   refreshMintInfo: async () => {},

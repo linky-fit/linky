@@ -1,11 +1,13 @@
 import type { MintIcon } from "../../utils/mint";
 /* eslint-disable react-refresh/only-export-components */
 import type { LinkyScope } from "@linky/linksync";
+import type { AutoswapEstimate, StoredProof } from "@linky/linkshu";
 import React from "react";
 import type { EvoluErrorType, EvoluServerStatus } from "../../evolu";
 import type { ShardSummary } from "../hooks/useLinksync";
 import type { PasswordManagerSaveResult } from "../../platform/passwordManager";
 import type { ProbeLightningFee } from "../hooks/composition/useLinkshuComposition";
+import type { MintMove } from "../hooks/mint/useMoveMintFunds";
 import type { WriteOutcome } from "../lib/storeWrite";
 import type { LocalMintInfoRow } from "../types/appTypes";
 
@@ -71,15 +73,19 @@ export interface MintSettingsContextValue {
   applyDefaultMintSelection: (mint: string) => Promise<void>;
   cashuIsBusy: boolean;
   cashuMeltToMainMintButtonLabel: string | null;
+  /** Stored proofs without hidden test mints. */
+  cashuProofs: readonly StoredProof[];
   /** The effective default mint: a hidden test mint falls back to production. */
   defaultMintUrl: string | null;
   defaultMintUrlDraft: string;
+  estimateMintMove: (move: MintMove) => Promise<AutoswapEstimate | null>;
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   getMintRuntime: (
     url: string,
   ) => { lastCheckedAtSec: number; latencyMs: number | null } | null;
   meltLargestForeignMintToMainMint: () => Promise<void>;
   mintInfoByUrl: Map<string, LocalMintInfoRow>;
+  moveMintFunds: (move: MintMove) => Promise<boolean>;
   pendingMintDeleteUrl: string | null;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   probeLightningFee: ProbeLightningFee | null;

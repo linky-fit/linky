@@ -1,10 +1,19 @@
+import { parseMintUrl } from "@linky/linkshu";
 import { sqliteTrue } from "@linky/linksync";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
+import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
+import { MintMoveFundsForm } from "../components/MintMoveFundsForm";
 import { navigateTo } from "../hooks/useRouting";
 import { LOCAL_MINT_INFO_STORAGE_KEY_PREFIX } from "../utils/constants";
 import { normalizeLocale } from "../utils/formatting";
-import { extractPpk, isHiddenTestMint, normalizeMintUrl } from "../utils/mint";
+import {
+  extractPpk,
+  isHiddenTestMint,
+  MAIN_MINT_URL,
+  normalizeMintUrl,
+  PRESET_MINTS,
+} from "../utils/mint";
 import { safeLocalStorageSetJson } from "../utils/storage";
 
 const isPpkSearchInput = (
@@ -23,30 +32,127 @@ const isPpkSearchInput = (
   );
 };
 
+/** Other mints funds can move to: the default first, then funded mints and presets. */
+const moveTargets = (
+  sourceMint: string,
+  defaultMint: string,
+  fundedMints: readonly string[],
+  allowTestMints: boolean,
+): string[] =>
+  [defaultMint, ...fundedMints, ...PRESET_MINTS]
+    .map(normalizeMintUrl)
+    .filter(
+      (mint, index, all) =>
+        all.indexOf(mint) === index &&
+        mint !== sourceMint &&
+        !isHiddenTestMint(mint, allowTestMints),
+    );
+
 export function MintDetailPage() {
   const {
     allowTestMints,
     appOwnerIdRef,
+    applyDefaultMintSelection,
+    cashuIsBusy,
+    cashuProofs,
+    defaultMintUrl,
+    estimateMintMove,
     getMintRuntime,
     mintInfoByUrl,
+    moveMintFunds,
     pendingMintDeleteUrl,
     refreshMintInfo,
     setMintInfoAll,
     setPendingMintDeleteUrl,
     setStatus,
   } = useMintSettingsContext();
-  const { lang, route, t } = useAppShellCore();
+  const { formatDisplayedAmountText, lang, route, t } = useAppShellCore();
   const mintUrl = route.kind === "mint" ? route.mintUrl : "";
 
   const cleaned = normalizeMintUrl(mintUrl);
   const row = mintInfoByUrl.get(cleaned) ?? null;
+  const holdings = mintHoldings(cashuProofs);
+  const holding = holdingOf(holdings, cleaned);
+  const defaultMint = normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL);
 
-  if (!row || isHiddenTestMint(cleaned, allowTestMints)) {
+  if (
+    parseMintUrl(cleaned) === null ||
+    isHiddenTestMint(cleaned, allowTestMints)
+  ) {
     return (
       <section className="panel">
         <p className="muted">{t("mintNotFound")}</p>
       </section>
     );
+  }
+
+  const fundedMints = [...holdings]
+    .filter(([, mintHolding]) => mintHolding.balance > 0)
+    .map(([mint]) => mint);
+
+  const renderCountRow = (label: string, value: string) => (
+    <div className="settings-row">
+      <div className="settings-left">
+        <span className="settings-label">{label}</span>
+      </div>
+      <div className="settings-right">
+        <span className="relay-url" aria-label={label}>
+          {value}
+        </span>
+      </div>
+    </div>
+  );
+
+  const holdingSection = (
+    <div>
+      {renderCountRow(
+        t("mintBalance"),
+        formatDisplayedAmountText(holding.balance),
+      )}
+      {renderCountRow(t("mintProofsAvailable"), String(holding.availableCount))}
+      {renderCountRow(t("mintProofsHeld"), String(holding.heldCount))}
+      {renderCountRow(t("mintProofsHandedOut"), String(holding.handedOutCount))}
+      <div className="settings-row">
+        {cleaned === defaultMint ? (
+          <span className="muted">✓ {t("mintIsDefault")}</span>
+        ) : (
+          <button
+            type="button"
+            className="btn-wide secondary"
+            disabled={cashuIsBusy}
+            onClick={() => void applyDefaultMintSelection(cleaned)}
+          >
+            {t("mintSetAsDefault")}
+          </button>
+        )}
+      </div>
+      {holding.balance > 0 ? (
+        <div className="settings-row">
+          <div className="mint-move-form">
+            <h2 className="settings-section-title">{t("mintMoveTitle")}</h2>
+            <MintMoveFundsForm
+              key={cleaned}
+              available={holding.balance}
+              busy={cashuIsBusy}
+              estimateMintMove={estimateMintMove}
+              moveMintFunds={moveMintFunds}
+              sourceMint={cleaned}
+              targets={moveTargets(
+                cleaned,
+                defaultMint,
+                fundedMints,
+                allowTestMints,
+              )}
+              t={t}
+            />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (row === null) {
+    return <section className="panel">{holdingSection}</section>;
   }
 
   const feesJson = (row.feesJson ?? "").trim();
@@ -72,6 +178,7 @@ export function MintDetailPage() {
 
   return (
     <section className="panel">
+      {holdingSection}
       <div>
         <div className="settings-row">
           <div className="settings-left">

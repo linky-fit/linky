@@ -85,8 +85,10 @@ const mintSettings: MintSettingsContextValue = {
   applyDefaultMintSelection: noopAsync,
   cashuIsBusy: false,
   cashuMeltToMainMintButtonLabel: null,
+  cashuProofs: [],
   defaultMintUrl: null,
   defaultMintUrlDraft: "",
+  estimateMintMove: () => Promise.resolve(null),
   getMintIconUrl: () => ({
     failed: false,
     host: null,
@@ -96,6 +98,7 @@ const mintSettings: MintSettingsContextValue = {
   getMintRuntime: () => null,
   meltLargestForeignMintToMainMint: noopAsync,
   mintInfoByUrl: new Map(),
+  moveMintFunds: () => Promise.resolve(false),
   pendingMintDeleteUrl: null,
   probeLightningFee: null,
   refreshMintInfo: noopAsync,

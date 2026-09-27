@@ -5,7 +5,9 @@ import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import type { ProbeLightningFee } from "../app/hooks/composition/useLinkshuComposition";
 import { getMintFeePpk } from "../app/hooks/mint/mintInfoHelpers";
+import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
 import { MintButton } from "../components/MintButton";
+import { navigateTo } from "../hooks/useRouting";
 import {
   isHiddenTestMint,
   isTestMintUrl,
@@ -96,6 +98,7 @@ export function MintsPage() {
     allowTestMints,
     applyDefaultMintSelection,
     cashuIsBusy,
+    cashuProofs,
     defaultMintUrl,
     defaultMintUrlDraft,
     getMintIconUrl,
@@ -105,7 +108,7 @@ export function MintsPage() {
     setDefaultMintUrlDraft,
     setStatus,
   } = useMintSettingsContext();
-  const { t } = useAppShellCore();
+  const { formatDisplayedAmountText, t } = useAppShellCore();
   const selectedMint =
     normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) || MAIN_MINT_URL;
   const stripped = (value: string) => value.replace(/^https?:\/\//i, "");
@@ -140,9 +143,13 @@ export function MintsPage() {
 
   const lightningFee = useLightningFeeProbe(probeLightningFee, selectedMint);
 
+  const holdings = mintHoldings(cashuProofs);
   const buttonMints = (() => {
-    const set = new Set<string>(PRESET_MINTS);
+    const set = new Set<string>(PRESET_MINTS.map(normalizeMintUrl));
     if (selectedMint) set.add(selectedMint);
+    for (const [mint, holding] of holdings) {
+      if (holding.balance > 0) set.add(mint);
+    }
     return Array.from(set.values()).filter(
       (mint) => !isHiddenTestMint(mint, allowTestMints),
     );
@@ -170,6 +177,29 @@ export function MintsPage() {
       </span>
     </div>
   );
+
+  const renderHolding = (mint: string, label: string) => {
+    const holding = holdingOf(holdings, mint);
+    return (
+      <div className="mint-choice-holding">
+        <span className="muted">
+          {formatDisplayedAmountText(holding.balance)} ·{" "}
+          {t("mintProofCount").replace(
+            "{count}",
+            String(holding.availableCount),
+          )}
+        </span>
+        <button
+          type="button"
+          className="ghost mint-choice-manage"
+          aria-label={`${t("mintManage")} ${label}`}
+          onClick={() => navigateTo({ route: "mint", mintUrl: mint })}
+        >
+          {t("mintManage")}
+        </button>
+      </div>
+    );
+  };
 
   const saveCustomMint = async () => {
     if (isHiddenTestMint(cleanedDraft, allowTestMints)) {
@@ -210,6 +240,7 @@ export function MintsPage() {
           disabled={cashuIsBusy}
           onClick={() => void applyDefaultMintSelection(mint)}
         />
+        {renderHolding(normalized, label)}
         {isSelected ? renderFees() : null}
       </div>
     );

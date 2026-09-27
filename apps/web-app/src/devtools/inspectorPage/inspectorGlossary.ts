@@ -142,6 +142,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A mint or melt quote was observed in a new state while a linkshu flow (topup, autoswap, melt) watched it; the quote link ties the sequence together. `via` says which watcher saw it — the poll, or a NUT-17 websocket subscription the mint pushed it over.",
   "topup.subscribe":
     "A topup's NUT-17 subscription failed or its socket closed. It will retry with backoff while HTTP polling continues. The quote link connects the retry to settlement; normal cancellation emits no failure.",
+  "autoswap.estimate":
+    "linkshu priced moving an amount between mints: a mint quote at the target and a melt quote for its invoice at the source, plus the source's input fee allowance. Nothing is paid; both quotes expire unused. A following autoswap.claim with the same mints performs the move.",
   "settings.allowTestMints":
     'The user switched the synced "Allow test mints" setting. Off hides test-mint balances, mint lists and chat tokens and refuses new test-mint tokens; stored test-mint proofs stay untouched.',
   LightningFeeProbed:

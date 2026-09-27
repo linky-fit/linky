@@ -28,6 +28,8 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import type {
   AutoswapClaimResult,
   AutoswapError,
+  AutoswapEstimate,
+  AutoswapEstimateError,
   AutoswapReceipt,
   Bip39Seed,
   FeeProbeError,
@@ -196,12 +198,19 @@ export type AdoptPaidCashuQuote = (
 interface AutoswapCashuArgs {
   readonly sourceMint: string;
   readonly targetMint: string;
+  /** What the target mint issues; omitted sweeps the whole source balance. */
+  readonly amountSat?: number;
 }
 
-/** linkshu Autoswap claim; invalid mint input and defects reject. */
-type AutoswapCashu = (
+/** linkshu Autoswap claim; invalid mint/amount input and defects reject. */
+export type AutoswapCashu = (
   args: AutoswapCashuArgs,
 ) => Promise<Either.Either<AutoswapReceipt, AutoswapError>>;
+
+/** linkshu Autoswap estimate; pays nothing. Invalid input and defects reject. */
+export type EstimateAutoswapCashu = (
+  args: AutoswapCashuArgs & { readonly amountSat: number },
+) => Promise<Either.Either<AutoswapEstimate, AutoswapEstimateError>>;
 
 /** Drains persisted pending claims (linkshu `Autoswap.resumePendingClaims`). */
 type ResumePendingCashuAutoswapClaims = () => Promise<
@@ -488,11 +497,37 @@ export const useLinkshuComposition = ({
         }),
       );
 
-    const autoswapCashu: AutoswapCashu = ({ sourceMint, targetMint }) =>
+    const autoswapCashu: AutoswapCashu = ({
+      sourceMint,
+      targetMint,
+      amountSat,
+    }) =>
       runEither(
         Effect.suspend(() => {
-          const draft = decodeAutoswapDraft({ sourceMint, targetMint });
+          const draft = decodeAutoswapDraft({
+            sourceMint,
+            targetMint,
+            ...(amountSat === undefined ? {} : { amount: amountSat }),
+          });
           return Effect.flatMap(Autoswap, (autoswap) => autoswap.claim(draft));
+        }),
+      );
+
+    const estimateAutoswapCashu: EstimateAutoswapCashu = ({
+      sourceMint,
+      targetMint,
+      amountSat,
+    }) =>
+      runEither(
+        Effect.suspend(() => {
+          const draft = decodeAutoswapDraft({
+            sourceMint,
+            targetMint,
+            amount: amountSat,
+          });
+          return Effect.flatMap(Autoswap, (autoswap) =>
+            autoswap.estimate(draft),
+          );
         }),
       );
 
@@ -618,6 +653,7 @@ export const useLinkshuComposition = ({
       checkAllCashuTokens,
       inspectCashuProofStates,
       checkCashuTransfer,
+      estimateAutoswapCashu,
       meltCashuInvoice,
       probeLightningFee,
       receiveCashuToken,
@@ -649,6 +685,7 @@ export const useLinkshuComposition = ({
     checkAllCashuTokens: operations?.checkAllCashuTokens ?? null,
     inspectCashuProofStates: operations?.inspectCashuProofStates ?? null,
     checkCashuTransfer: operations?.checkCashuTransfer ?? null,
+    estimateAutoswapCashu: operations?.estimateAutoswapCashu ?? null,
     meltCashuInvoice: operations?.meltCashuInvoice ?? null,
     probeLightningFee: operations?.probeLightningFee ?? null,
     receiveCashuToken: operations?.receiveCashuToken ?? null,

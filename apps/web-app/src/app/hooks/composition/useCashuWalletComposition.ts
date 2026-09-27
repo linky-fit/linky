@@ -83,6 +83,7 @@ import { useCashuDomain } from "../useCashuDomain";
 import { useLightningPaymentsDomain } from "../useLightningPaymentsDomain";
 import { useMintDomain } from "../useMintDomain";
 import { useAllowTestMints } from "../useAllowTestMints";
+import { useMoveMintFunds } from "../mint/useMoveMintFunds";
 import { useOwnerScopedStorage } from "../useOwnerScopedStorage";
 import { usePaidOverlayState } from "../usePaidOverlayState";
 import { usePaymentsDomain } from "../usePaymentsDomain";
@@ -500,6 +501,7 @@ export const useCashuWalletComposition = ({
     checkAllCashuTokens,
     inspectCashuProofStates,
     checkCashuTransfer,
+    estimateAutoswapCashu,
     meltCashuInvoice,
     probeLightningFee,
     receiveCashuToken,
@@ -2450,6 +2452,17 @@ export const useCashuWalletComposition = ({
     return npub ? (nostrPictureByNpub[npub] ?? null) : null;
   }, [knownLnAddressPayContact, nostrPictureByNpub]);
 
+  const { estimateMintMove, moveMintFunds } = useMoveMintFunds({
+    autoswapCashu,
+    cashuIsBusy,
+    estimateAutoswapCashu,
+    formatDisplayedAmountParts,
+    rememberSeenMint,
+    setCashuIsBusy,
+    setStatus,
+    t,
+  });
+
   return {
     reclaimCashuTransfer,
     cashuTransferLifecycle,
@@ -2490,6 +2503,7 @@ export const useCashuWalletComposition = ({
     defaultMintUrlDraft,
     dismissWalletWarning,
     emitCashuToken,
+    estimateMintMove,
     getCashuTokenMessageInfo,
     getMintIconUrl,
     getMintRuntime,
@@ -2506,6 +2520,7 @@ export const useCashuWalletComposition = ({
     markMintIconFailed,
     meltLargestForeignMintToMainMint,
     mintInfoByUrl,
+    moveMintFunds,
     closeCashuPaymentRequestConfirmation,
     confirmCashuPaymentRequest,
     onPayChatPaymentRequest,
