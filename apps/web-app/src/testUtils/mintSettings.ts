@@ -28,12 +28,11 @@ export const createMintSettings = (
 ): MintSettingsContextValue => ({
   allowTestMints: true,
   appOwnerIdRef,
-  applyDefaultMintSelection: vi.fn(async () => {}),
+  applyDefaultMintSelection: vi.fn(async () => true),
   cashuIsBusy: false,
   cashuMeltToMainMintButtonLabel: "Melt foreign balance",
   cashuProofs: [],
   defaultMintUrl: "https://cashu.cz",
-  defaultMintUrlDraft: "https://custom.example",
   estimateMintMove: vi.fn(async () => null),
   getMintIconUrl: () => ({
     failed: false,
@@ -51,7 +50,6 @@ export const createMintSettings = (
   setAllowTestMints: vi.fn<MintSettingsContextValue["setAllowTestMints"]>(
     async () => ({ ok: true }),
   ),
-  setDefaultMintUrlDraft: vi.fn(),
   setMintInfoAll: vi.fn(),
   setPendingMintDeleteUrl: vi.fn(),
   setStatus: vi.fn(),

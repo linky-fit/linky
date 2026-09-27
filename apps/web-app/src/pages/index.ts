@@ -25,6 +25,7 @@ export { LanguagePage } from "./LanguagePage";
 export { ManualPayPage } from "./ManualPayPage";
 export { MasterKeysPage } from "./MasterKeysPage";
 export { MintDetailPage } from "./MintDetailPage";
+export { MintNewPage } from "./MintNewPage";
 export { MintsPage } from "./MintsPage";
 export { NostrRelayNewPage } from "./NostrRelayNewPage";
 export { NostrRelayPage } from "./NostrRelayPage";

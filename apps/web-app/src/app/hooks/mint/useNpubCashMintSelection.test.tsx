@@ -6,12 +6,11 @@ import { CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY } from "../../../utils/mint";
 import { useNpubCashMintSelection } from "./useNpubCashMintSelection";
 
 interface SelectionHarnessProps {
-  applyRef: React.RefObject<((mintUrl: string) => Promise<void>) | null>;
+  applyRef: React.RefObject<((mintUrl: string) => Promise<boolean>) | null>;
   defaultMintUrl: string;
   makeLocalStorageKey: (prefix: string) => string;
   pushToast: (message: string) => void;
   setDefaultMintUrl: React.Dispatch<React.SetStateAction<string | null>>;
-  setDefaultMintUrlDraft: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
@@ -25,7 +24,6 @@ const SelectionHarness = ({
   makeLocalStorageKey,
   pushToast,
   setDefaultMintUrl,
-  setDefaultMintUrlDraft,
   setStatus,
 }: SelectionHarnessProps): null => {
   const hasMintOverrideRef = React.useRef(false);
@@ -34,13 +32,11 @@ const SelectionHarness = ({
     currentNpub: "npub-test",
     currentNsec: validNsec,
     defaultMintUrl,
-    defaultMintUrlDraft: defaultMintUrl,
     hasMintOverrideRef,
     makeLocalStorageKey,
     npubCashMintSyncRef,
     pushToast,
     setDefaultMintUrl,
-    setDefaultMintUrlDraft,
     setStatus,
     t: (key) => key,
   });
@@ -51,8 +47,8 @@ const SelectionHarness = ({
 };
 
 const readApplyMintSelection = (
-  applyRef: React.RefObject<((mintUrl: string) => Promise<void>) | null>,
-): ((mintUrl: string) => Promise<void>) => {
+  applyRef: React.RefObject<((mintUrl: string) => Promise<boolean>) | null>,
+): ((mintUrl: string) => Promise<boolean>) => {
   if (applyRef.current === null) {
     throw new Error("mint selection callback missing");
   }
@@ -69,13 +65,11 @@ const renderSelectionHarness = async ({
   const pushToast = vi.fn();
   const setDefaultMintUrl =
     vi.fn<React.Dispatch<React.SetStateAction<string | null>>>();
-  const setDefaultMintUrlDraft =
-    vi.fn<React.Dispatch<React.SetStateAction<string>>>();
   const setStatus =
     vi.fn<React.Dispatch<React.SetStateAction<string | null>>>();
   const makeLocalStorageKey = (prefix: string): string => `${prefix}.owner`;
   const applyRef = React.createRef<
-    ((mintUrl: string) => Promise<void>) | null
+    ((mintUrl: string) => Promise<boolean>) | null
   >();
 
   const { root } = await renderIntoDocument(
@@ -85,7 +79,6 @@ const renderSelectionHarness = async ({
       makeLocalStorageKey={makeLocalStorageKey}
       pushToast={pushToast}
       setDefaultMintUrl={setDefaultMintUrl}
-      setDefaultMintUrlDraft={setDefaultMintUrlDraft}
       setStatus={setStatus}
     />,
   );
@@ -96,7 +89,6 @@ const renderSelectionHarness = async ({
     pushToast,
     root,
     setDefaultMintUrl,
-    setDefaultMintUrlDraft,
     setStatus,
   };
 };
@@ -124,7 +116,6 @@ describe("useNpubCashMintSelection", () => {
       ),
     ).toBeNull();
     expect(harness.setDefaultMintUrl).not.toHaveBeenCalled();
-    expect(harness.setDefaultMintUrlDraft).not.toHaveBeenCalled();
     expect(harness.pushToast).toHaveBeenCalledWith("mintUpdateFailed");
 
     await act(async () => {
@@ -149,9 +140,6 @@ describe("useNpubCashMintSelection", () => {
       ),
     ).toBe("https://kashu.me");
     expect(harness.setDefaultMintUrl).toHaveBeenCalledWith("https://kashu.me");
-    expect(harness.setDefaultMintUrlDraft).toHaveBeenCalledWith(
-      "https://kashu.me",
-    );
     expect(harness.setStatus).toHaveBeenLastCalledWith("mintSaved");
 
     await act(async () => {

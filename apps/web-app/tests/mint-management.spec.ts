@@ -1,7 +1,8 @@
 /**
  * Mint management: the "Allow test mints" switch hides the local FakeWallet
- * mint's funds without touching them, and an explicit amount moves from
- * :3338 to :3339 after its fee estimate is shown.
+ * mint's funds without touching them, an explicit amount moves from
+ * :3338 to :3339 after its fee estimate is shown, and the add button makes a
+ * typed mint the default.
  *
  * Needs the docker stack up — see "E2E tests" in AGENTS.md.
  */
@@ -134,6 +135,22 @@ test("test mints can be hidden and funds move between mints", async ({
     const sourceAfter = await readMintBalanceSat(page, SOURCE_MINT_URL);
     expect(sourceAfter).toBeLessThanOrEqual(FUNDING_SAT - MOVE_SAT);
     expect(sourceAfter).toBeGreaterThanOrEqual(FUNDING_SAT - estimatedTotal);
+  });
+
+  await test.step("the add button makes a typed mint the default", async () => {
+    await page.goto("/#advanced/mints");
+    await page.getByRole("button", { name: "Add mint", exact: true }).click();
+    await page.waitForURL(/#advanced\/mints\/new$/);
+    // A bare host would get https:// prepended, which the local mint does not serve.
+    await page.getByLabel("Mint URL").fill(targetMintUrl);
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+
+    await page.waitForURL(/#advanced\/mint\//);
+    await expect(page.locator(".mint-choice-badge.is-default")).toBeVisible();
+    await page.goto("/#advanced/mints");
+    await expect(
+      page.getByRole("button", { name: /^localhost:3339\b/ }),
+    ).toHaveAttribute("aria-current", "true");
   });
 
   errors.assertClean();

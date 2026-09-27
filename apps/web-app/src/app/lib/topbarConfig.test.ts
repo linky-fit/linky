@@ -63,6 +63,7 @@ describe("resolveBackAction", () => {
       "#advanced/inspector",
     );
     expect(backHashFor({ kind: "mints" })).toBe("#settings");
+    expect(backHashFor({ kind: "mintNew" })).toBe("#advanced/mints");
     expect(backHashFor({ kind: "nostrRelays" })).toBe("#settings");
     expect(backHashFor({ kind: "evoluServers" })).toBe("#settings");
   });

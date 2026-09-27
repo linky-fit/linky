@@ -30,6 +30,7 @@ import {
   ManualPayPage,
   MasterKeysPage,
   MintDetailPage,
+  MintNewPage,
   MintsPage,
   NostrRelayNewPage,
   NostrRelayPage,
@@ -126,6 +127,8 @@ const RoutePage = (): React.ReactElement => {
       return <PushDebugPage />;
     case "mints":
       return <MintsPage />;
+    case "mintNew":
+      return <MintNewPage />;
     case "mint":
       return <MintDetailPage />;
     case "chatStorage":

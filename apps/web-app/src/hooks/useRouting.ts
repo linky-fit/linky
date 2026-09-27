@@ -108,6 +108,7 @@ type NavigationAction =
   | { route: "bankPaymentOffer"; chatId: string; offerId: string }
   | { route: "mint"; mintUrl: string }
   | { route: "mints" }
+  | { route: "mintNew" }
   | { route: "nostrRelay"; id: string }
   | { route: "nostrRelayNew" }
   | { route: "nostrRelays" }
@@ -157,6 +158,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "mints":
       window.location.assign("#advanced/mints");
+      break;
+    case "mintNew":
+      window.location.assign("#advanced/mints/new");
       break;
     case "mint":
       window.location.assign(

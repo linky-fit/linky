@@ -36,6 +36,7 @@ export type Route =
   | { kind: "advancedInspectorTimeline" }
   | { kind: "advancedPushDebug" }
   | { kind: "mints" }
+  | { kind: "mintNew" }
   | { kind: "mint"; mintUrl: string }
   | { kind: "profile" }
   | { kind: "profileEdit" }
@@ -95,6 +96,7 @@ export const parseRouteFromHash = (): Route => {
     return { kind: "advancedPushDebug" };
   }
   if (hash === "#advanced/mints") return { kind: "mints" };
+  if (hash === "#advanced/mints/new") return { kind: "mintNew" };
 
   const mintPrefix = "#advanced/mint/";
   const mintUrl = decodeHashSegment(hash, mintPrefix);

@@ -70,14 +70,13 @@ export interface EvoluSettingsContextValue {
 export interface MintSettingsContextValue {
   allowTestMints: boolean;
   appOwnerIdRef: React.RefObject<string | null>;
-  applyDefaultMintSelection: (mint: string) => Promise<void>;
+  applyDefaultMintSelection: (mint: string) => Promise<boolean>;
   cashuIsBusy: boolean;
   cashuMeltToMainMintButtonLabel: string | null;
   /** Stored proofs without hidden test mints. */
   cashuProofs: readonly StoredProof[];
   /** The effective default mint: a hidden test mint falls back to production. */
   defaultMintUrl: string | null;
-  defaultMintUrlDraft: string;
   estimateMintMove: (move: MintMove) => Promise<AutoswapEstimate | null>;
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   getMintRuntime: (
@@ -91,7 +90,6 @@ export interface MintSettingsContextValue {
   probeLightningFee: ProbeLightningFee | null;
   refreshMintInfo: (url: string) => Promise<void>;
   setAllowTestMints: (allow: boolean) => Promise<WriteOutcome>;
-  setDefaultMintUrlDraft: (value: string) => void;
   setMintInfoAll: React.Dispatch<React.SetStateAction<LocalMintInfoRow[]>>;
   setPendingMintDeleteUrl: (url: string | null) => void;
   setStatus: (message: string) => void;

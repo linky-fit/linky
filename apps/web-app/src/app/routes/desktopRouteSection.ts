@@ -24,6 +24,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "advancedInspectorTimeline":
     case "advancedPushDebug":
     case "mints":
+    case "mintNew":
     case "mint":
     case "nostrRelays":
     case "nostrRelay":

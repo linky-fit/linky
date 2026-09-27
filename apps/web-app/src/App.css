@@ -5639,6 +5639,17 @@ button.bank-payment-amount-button:hover {
     bottom: 26px;
   }
 
+  /* Anchor a detail page's fab to the pane instead of its scrolling content. */
+  .desktop-secondary-content:has(> .contacts-fab) {
+    position: static;
+  }
+
+  .desktop-secondary-pane .contacts-fab {
+    position: absolute;
+    right: 28px;
+    bottom: 26px;
+  }
+
   .desktop-wallet-pane .wallet-panel {
     padding-bottom: 24px;
   }

@@ -22,7 +22,6 @@ interface UseProfileNpubCashEffectsParams {
   npubCashInfoLoadedForNpubRef: React.MutableRefObject<string | null>;
   routeKind: string;
   setDefaultMintUrl: React.Dispatch<React.SetStateAction<string | null>>;
-  setDefaultMintUrlDraft: React.Dispatch<React.SetStateAction<string>>;
   setIsProfileEditing: React.Dispatch<React.SetStateAction<boolean>>;
   setMyProfileQr: React.Dispatch<React.SetStateAction<string | null>>;
 }
@@ -40,7 +39,6 @@ export const useProfileNpubCashEffects = ({
   npubCashInfoLoadedForNpubRef,
   routeKind,
   setDefaultMintUrl,
-  setDefaultMintUrlDraft,
   setIsProfileEditing,
   setMyProfileQr,
 }: UseProfileNpubCashEffectsParams) => {
@@ -127,7 +125,6 @@ export const useProfileNpubCashEffects = ({
           const cleaned = normalizeMintUrl(mintUrl);
           if (cleaned) {
             setDefaultMintUrl(cleaned);
-            setDefaultMintUrlDraft(cleaned);
           }
         }
 
@@ -168,7 +165,6 @@ export const useProfileNpubCashEffects = ({
     npubCashInfoLoadedAtMsRef,
     npubCashInfoLoadedForNpubRef,
     setDefaultMintUrl,
-    setDefaultMintUrlDraft,
   ]);
 
   React.useEffect(() => {

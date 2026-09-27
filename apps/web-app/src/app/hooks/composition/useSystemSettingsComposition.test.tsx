@@ -82,12 +82,11 @@ const appOwnerIdRef = React.createRef<string>();
 const mintSettings: MintSettingsContextValue = {
   allowTestMints: true,
   appOwnerIdRef,
-  applyDefaultMintSelection: noopAsync,
+  applyDefaultMintSelection: async () => true,
   cashuIsBusy: false,
   cashuMeltToMainMintButtonLabel: null,
   cashuProofs: [],
   defaultMintUrl: null,
-  defaultMintUrlDraft: "",
   estimateMintMove: () => Promise.resolve(null),
   getMintIconUrl: () => ({
     failed: false,
@@ -103,7 +102,6 @@ const mintSettings: MintSettingsContextValue = {
   probeLightningFee: null,
   refreshMintInfo: noopAsync,
   setAllowTestMints: () => Promise.resolve({ ok: true }),
-  setDefaultMintUrlDraft: noop,
   setMintInfoAll: noop,
   setPendingMintDeleteUrl: noop,
   setStatus: noop,

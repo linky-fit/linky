@@ -1,3 +1,4 @@
+import { CirclePlus } from "lucide-react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
@@ -14,37 +15,12 @@ import {
   PRESET_MINTS,
 } from "../utils/mint";
 
-const ensureHttpsScheme = (value: string): string =>
-  /^https?:\/\//i.test(value) ? value : `https://${value}`;
-
 export function MintsPage() {
-  const {
-    allowTestMints,
-    applyDefaultMintSelection,
-    cashuIsBusy,
-    cashuProofs,
-    defaultMintUrl,
-    defaultMintUrlDraft,
-    getMintIconUrl,
-    setDefaultMintUrlDraft,
-    setStatus,
-  } = useMintSettingsContext();
+  const { allowTestMints, cashuProofs, defaultMintUrl, getMintIconUrl } =
+    useMintSettingsContext();
   const { formatDisplayedAmountText, t } = useAppShellCore();
   const selectedMint =
     normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) || MAIN_MINT_URL;
-  const draftValue = defaultMintUrlDraft.trim();
-  const cleanedDraft = draftValue
-    ? normalizeMintUrl(ensureHttpsScheme(draftValue))
-    : "";
-  const isDraftValid = (() => {
-    if (!cleanedDraft) return false;
-    try {
-      return new URL(cleanedDraft).hostname.includes(".");
-    } catch {
-      return false;
-    }
-  })();
-  const canSave = isDraftValid && cleanedDraft !== selectedMint;
 
   const holdings = mintHoldings(cashuProofs);
   const buttonMints = (() => {
@@ -69,14 +45,6 @@ export function MintsPage() {
         {t("mintProofCount").replace("{count}", String(holding.availableCount))}
       </div>
     );
-  };
-
-  const saveCustomMint = async () => {
-    if (isHiddenTestMint(cleanedDraft, allowTestMints)) {
-      setStatus(t("mintTestMintNotAllowed"));
-      return;
-    }
-    await applyDefaultMintSelection(cleanedDraft);
   };
 
   const renderMintButton = (mint: string) => {
@@ -105,47 +73,34 @@ export function MintsPage() {
   };
 
   return (
-    <section className="panel">
-      <div className="settings-row mints-content">
-        <div className="mint-choice-list">
-          <div className="mint-choice-group">
-            {standardMints.map((mint) => renderMintButton(mint))}
-          </div>
-          {testMints.length > 0 ? (
-            <div
-              className={`mint-choice-test-group${standardMints.length > 0 ? " has-separator" : ""}`}
-            >
-              <div className="mint-choice-group">
-                {testMints.map((mint) => renderMintButton(mint))}
-              </div>
+    <>
+      <section className="panel">
+        <div className="settings-row mints-content">
+          <div className="mint-choice-list">
+            <div className="mint-choice-group">
+              {standardMints.map((mint) => renderMintButton(mint))}
             </div>
-          ) : null}
+            {testMints.length > 0 ? (
+              <div
+                className={`mint-choice-test-group${standardMints.length > 0 ? " has-separator" : ""}`}
+              >
+                <div className="mint-choice-group">
+                  {testMints.map((mint) => renderMintButton(mint))}
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
-
-      <label htmlFor="defaultMintUrl">{t("setCustomMint")}</label>
-      <input
-        id="defaultMintUrl"
-        value={defaultMintUrlDraft}
-        onChange={(e) => setDefaultMintUrlDraft(e.target.value)}
-        placeholder="https://…"
-        disabled={cashuIsBusy}
-        autoCapitalize="none"
-        autoCorrect="off"
-        spellCheck={false}
-      />
-
-      <div className="panel-header panel-header-layout">
-        {canSave ? (
-          <button
-            type="button"
-            disabled={cashuIsBusy}
-            onClick={() => void saveCustomMint()}
-          >
-            {t("saveChanges")}
-          </button>
-        ) : null}
-      </div>
-    </section>
+      </section>
+      <button
+        type="button"
+        className="contacts-fab"
+        onClick={() => navigateTo({ route: "mintNew" })}
+        aria-label={t("mintAdd")}
+        title={t("mintAdd")}
+      >
+        <CirclePlus className="contacts-fab-svgIcon" />
+      </button>
+    </>
   );
 }

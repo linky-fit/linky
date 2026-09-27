@@ -47,11 +47,10 @@ describe("MintsPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("opens a mint's detail page and saves a custom default", async () => {
-    const applyDefaultMintSelection = vi.fn(async () => {});
-    mintSettings = createMintSettings({ applyDefaultMintSelection });
+  it("opens a mint's detail page and marks the default", async () => {
+    mintSettings = createMintSettings();
 
-    const { container, root } = await renderIntoDocument(<MintsPage />);
+    const { container, unmount } = await renderIntoDocument(<MintsPage />);
 
     await act(async () => {
       click(findButton(container, "kashu.me"));
@@ -60,28 +59,6 @@ describe("MintsPage", () => {
       route: "mint",
       mintUrl: "https://kashu.me",
     });
-    expect(applyDefaultMintSelection).not.toHaveBeenCalled();
-
-    await act(async () => {
-      click(findButton(container, "saveChanges"));
-    });
-    expect(applyDefaultMintSelection).toHaveBeenCalledWith(
-      "https://custom.example",
-    );
-
-    mintSettings = createMintSettings({
-      applyDefaultMintSelection,
-      defaultMintUrlDraft: "kashu.me",
-    });
-    await act(async () => {
-      root.render(<MintsPage />);
-    });
-    await act(async () => {
-      click(findButton(container, "saveChanges"));
-    });
-    expect(applyDefaultMintSelection).toHaveBeenLastCalledWith(
-      "https://kashu.me",
-    );
 
     expect(
       container.querySelector(".mint-choice-badge.is-recommended"),
@@ -96,61 +73,32 @@ describe("MintsPage", () => {
     expect(selectedItem?.querySelector(".mint-fees")).not.toBeNull();
     expect(container.querySelectorAll(".mint-fees")).toHaveLength(1);
 
-    await act(async () => {
-      root.unmount();
-    });
+    await unmount();
   });
 
-  it("blocks the custom save while busy", async () => {
-    const applyDefaultMintSelection = vi.fn(async () => {});
-    const setDefaultMintUrlDraft = vi.fn();
-    mintSettings = createMintSettings({
-      applyDefaultMintSelection,
-      cashuIsBusy: true,
-      setDefaultMintUrlDraft,
-    });
+  it("opens the add-mint page from the add button", async () => {
+    mintSettings = createMintSettings();
 
-    const { container, root } = await renderIntoDocument(<MintsPage />);
-
-    const input = container.querySelector("#defaultMintUrl");
-    if (!(input instanceof HTMLInputElement)) {
-      throw new Error("custom mint input missing");
+    const { container, unmount } = await renderIntoDocument(<MintsPage />);
+    const addButton = container.querySelector('button[aria-label="mintAdd"]');
+    if (!(addButton instanceof HTMLButtonElement)) {
+      throw new Error("add mint button missing");
     }
-    expect(input.disabled).toBe(true);
-
-    const saveButton = findButton(container, "saveChanges");
-    expect(saveButton.disabled).toBe(true);
 
     await act(async () => {
-      click(saveButton);
+      click(addButton);
     });
-    expect(applyDefaultMintSelection).not.toHaveBeenCalled();
-    expect(setDefaultMintUrlDraft).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith({ route: "mintNew" });
 
-    await act(async () => {
-      root.unmount();
-    });
+    await unmount();
   });
 
-  it("hides test mints and refuses a test-mint URL while they are off", async () => {
-    const applyDefaultMintSelection = vi.fn(async () => {});
-    const setStatus = vi.fn();
-    mintSettings = createMintSettings({
-      allowTestMints: false,
-      applyDefaultMintSelection,
-      defaultMintUrlDraft: "https://testnut.cashu.space",
-      setStatus,
-    });
+  it("hides test mints while they are off", async () => {
+    mintSettings = createMintSettings({ allowTestMints: false });
 
     const { container, unmount } = await renderIntoDocument(<MintsPage />);
     expect(container.textContent).not.toContain("testnut.cashu.space");
     expect(container.querySelector(".mint-choice-test-group")).toBeNull();
-
-    await act(async () => {
-      click(findButton(container, "saveChanges"));
-    });
-    expect(setStatus).toHaveBeenCalledWith("mintTestMintNotAllowed");
-    expect(applyDefaultMintSelection).not.toHaveBeenCalled();
     await unmount();
   });
 

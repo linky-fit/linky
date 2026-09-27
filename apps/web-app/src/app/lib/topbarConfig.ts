@@ -63,6 +63,7 @@ export const resolveBackAction = (
       return () => navigateTo({ route: "advancedInspector" });
 
     case "mint":
+    case "mintNew":
       return () => navigateTo({ route: "mints" });
 
     case "profileEdit":
@@ -208,6 +209,7 @@ const SHOWS_MENU_BUTTON: Record<
   lnAddressPay: true,
   manualPay: false,
   mint: true,
+  mintNew: false,
   mints: false,
   nostrRelay: true,
   nostrRelayNew: true,
@@ -340,6 +342,7 @@ const TOPBAR_TITLE_KEY: Record<
   lnAddressPay: "pay",
   manualPay: "manualPayTitle",
   mint: "mints",
+  mintNew: "mintAdd",
   mints: "mints",
   nostrRelay: "nostrRelay",
   nostrRelayNew: "nostrRelay",

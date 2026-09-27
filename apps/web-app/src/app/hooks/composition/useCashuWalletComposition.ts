@@ -328,7 +328,6 @@ export const useCashuWalletComposition = ({
         safeLocalStorageRemove(CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY);
         hasMintOverrideRef.current = true;
         setDefaultMintUrl(seededMint);
-        setDefaultMintUrlDraft(seededMint);
         // Mirror the onboarding-seeded value into Evolu so a brand-new
         // account converges to cashu.cz across devices even before the user
         // touches the mint UI.
@@ -340,7 +339,6 @@ export const useCashuWalletComposition = ({
     if (override) {
       hasMintOverrideRef.current = true;
       setDefaultMintUrl(override);
-      setDefaultMintUrlDraft(override);
     } else {
       if (shouldSeedMainMint) {
         safeLocalStorageRemove(CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY);
@@ -378,7 +376,6 @@ export const useCashuWalletComposition = ({
     storedDefaultMintUrl,
     allowTestMints,
   );
-  const [defaultMintUrlDraft, setDefaultMintUrlDraft] = useState<string>("");
 
   const [lnAddressPayAmount, setLnAddressPayAmount] = useState<string>("");
 
@@ -441,7 +438,6 @@ export const useCashuWalletComposition = ({
     const current = normalizeMintUrl(storedDefaultMintUrl ?? "");
     if (current === ownerMetaDefaultMintValue) return;
     setDefaultMintUrl(ownerMetaDefaultMintValue);
-    setDefaultMintUrlDraft(ownerMetaDefaultMintValue);
     hasMintOverrideRef.current = true;
     try {
       const overrideKey = makeLocalStorageKey(
@@ -729,24 +725,24 @@ export const useCashuWalletComposition = ({
     currentNsec,
     // npub.cash keeps the stored choice; the test-mint fallback stays local.
     defaultMintUrl: storedDefaultMintUrl,
-    defaultMintUrlDraft,
     hasMintOverrideRef,
     makeLocalStorageKey,
     npubCashMintSyncRef,
     pushToast,
     setDefaultMintUrl,
-    setDefaultMintUrlDraft,
     setStatus,
     t,
   });
 
   const applyDefaultMintSelection = React.useCallback(
-    async (mintUrl: string): Promise<void> => {
-      await applyDefaultMintSelectionInner(mintUrl);
+    async (mintUrl: string): Promise<boolean> => {
+      const applied = await applyDefaultMintSelectionInner(mintUrl);
+      if (!applied) return false;
       // Mirror the user's explicit choice into Evolu's ownerMeta so other
       // tabs/devices converge. Done here (not in a defaultMintUrl-watch
       // effect) to avoid stale-closure ping-pong with the remote.
       upsertDefaultMintToOwnerMetaRef.current(mintUrl);
+      return true;
     },
     [applyDefaultMintSelectionInner],
   );
@@ -847,7 +843,6 @@ export const useCashuWalletComposition = ({
     npubCashInfoLoadedForNpubRef,
     routeKind: route.kind,
     setDefaultMintUrl,
-    setDefaultMintUrlDraft,
     setIsProfileEditing,
     setMyProfileQr,
   });
@@ -2500,7 +2495,6 @@ export const useCashuWalletComposition = ({
     contactPayMethod,
     defaultMintDisplay,
     defaultMintUrl,
-    defaultMintUrlDraft,
     dismissWalletWarning,
     emitCashuToken,
     estimateMintMove,
@@ -2553,7 +2547,6 @@ export const useCashuWalletComposition = ({
     setCashuDraft,
     setCashuEmitAmount,
     setContactPayMethod,
-    setDefaultMintUrlDraft,
     setLightningInvoiceAutoPayLimit,
     setLnAddressPayAmount,
     setMintInfoAll,

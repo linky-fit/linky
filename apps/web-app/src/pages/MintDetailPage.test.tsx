@@ -50,7 +50,7 @@ describe("MintDetailPage", () => {
 
   it("offers to make another mint the default", async () => {
     mintUrl = "https://mint.minibits.cash/Bitcoin";
-    const applyDefaultMintSelection = vi.fn(async () => {});
+    const applyDefaultMintSelection = vi.fn(async () => true);
     mintSettings = createMintSettings({ applyDefaultMintSelection });
 
     const { container, unmount } = await renderIntoDocument(<MintDetailPage />);
