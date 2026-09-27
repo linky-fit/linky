@@ -23,6 +23,30 @@ const parseSat = (value: string): number | null => {
   return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
 };
 
+interface MoveEstimateRows {
+  readonly arrives: number;
+  readonly inputFee: number;
+  readonly leaves: number;
+  readonly lightningFeeReserve: number;
+}
+
+/** A sweep's estimate prices its first attempt; the claim steps down until the fees fit the balance. */
+const estimateRows = (
+  estimate: AutoswapEstimate,
+  sweptBalance: number | null,
+): MoveEstimateRows => {
+  const overshoot =
+    sweptBalance === null
+      ? 0
+      : Math.max(0, estimate.totalFromSource - sweptBalance);
+  return {
+    arrives: estimate.amount - overshoot,
+    inputFee: estimate.inputFee,
+    leaves: estimate.totalFromSource - overshoot,
+    lightningFeeReserve: estimate.lightningFeeReserve,
+  };
+};
+
 export function MintMoveFundsForm({
   available,
   busy,
@@ -33,11 +57,12 @@ export function MintMoveFundsForm({
 }: MintMoveFundsFormProps) {
   const { displayUnit, formatDisplayedAmountText, t } = useAppShellCore();
   const [targetMint, setTargetMint] = React.useState(targets[0] ?? "");
-  // Sat, as every keypad-driven amount in the app; the display unit is the user's.
-  const [amount, setAmount] = React.useState("");
+  // Sat, as every keypad-driven amount in the app; null until edited means the whole balance.
+  const [editedAmount, setEditedAmount] = React.useState<string | null>(null);
+  const amount = editedAmount ?? String(available);
   const amountInput = useAmountInputKeypad({
     amount,
-    onAmountChange: setAmount,
+    onAmountChange: setEditedAmount,
   });
   const [estimated, setEstimated] = React.useState<{
     readonly move: MintMove;
@@ -47,19 +72,22 @@ export function MintMoveFundsForm({
 
   const target = targets.includes(targetMint) ? targetMint : targets[0];
   const amountSat = parseSat(amount);
+  const isSweep = amountSat === available;
   const move: MintMove | null =
-    target !== undefined && amountSat !== null && amountSat <= available
-      ? { sourceMint, targetMint: target, amountSat }
-      : null;
-  const estimate =
+    target === undefined || amountSat === null || amountSat > available
+      ? null
+      : isSweep
+        ? { sourceMint, targetMint: target }
+        : { sourceMint, targetMint: target, amountSat };
+  const rows =
     estimated !== null &&
     move !== null &&
     estimated.move.targetMint === move.targetMint &&
     estimated.move.amountSat === move.amountSat
-      ? estimated.estimate
+      ? estimateRows(estimated.estimate, isSweep ? available : null)
       : null;
   const exceedsBalance =
-    estimate !== null && estimate.totalFromSource > available;
+    rows !== null && (rows.leaves > available || rows.arrives <= 0);
 
   if (targets.length === 0) {
     return <p className="muted">{t("mintMoveNoTarget")}</p>;
@@ -79,7 +107,7 @@ export function MintMoveFundsForm({
   const runMove = async () => {
     if (move === null) return;
     if (await moveMintFunds(move)) {
-      setAmount("");
+      setEditedAmount(null);
       setEstimated(null);
     }
   };
@@ -106,6 +134,12 @@ export function MintMoveFundsForm({
         cycleOnClick
         inputDisplayValue={amountInput.inputDisplayValue}
       />
+      <p className="muted mint-move-maximum">
+        {t("mintMoveMaximum").replace(
+          "{amount}",
+          formatDisplayedAmountText(available),
+        )}
+      </p>
       <Keypad
         ariaLabel={`${t("payAmount")} (${displayUnit})`}
         decimalKeyEnabled={amountInput.decimalKeyEnabled}
@@ -118,22 +152,24 @@ export function MintMoveFundsForm({
         }}
       />
 
-      {estimate !== null ? (
+      {rows !== null ? (
         <>
           <dl className="mint-move-estimate" aria-label={t("mintMoveEstimate")}>
             <dt className="muted">{t("mintMoveArrives")}</dt>
-            <dd>{formatDisplayedAmountText(estimate.amount)}</dd>
+            <dd>{formatDisplayedAmountText(rows.arrives)}</dd>
             <dt className="muted">{t("mintMoveFeeLightning")}</dt>
-            <dd>{formatDisplayedAmountText(estimate.lightningFeeReserve)}</dd>
+            <dd>{formatDisplayedAmountText(rows.lightningFeeReserve)}</dd>
             <dt className="muted">{t("mintMoveFeeInput")}</dt>
-            <dd>{formatDisplayedAmountText(estimate.inputFee)}</dd>
+            <dd>{formatDisplayedAmountText(rows.inputFee)}</dd>
             <dt className="muted">{t("mintMoveTotal")}</dt>
-            <dd>{formatDisplayedAmountText(estimate.totalFromSource)}</dd>
+            <dd>{formatDisplayedAmountText(rows.leaves)}</dd>
           </dl>
           <p className="muted">
             {exceedsBalance
               ? t("mintMoveExceedsBalance")
-              : t("mintMoveEstimateNote")}
+              : isSweep
+                ? t("mintMoveSweepNote")
+                : t("mintMoveEstimateNote")}
           </p>
           <button
             type="button"

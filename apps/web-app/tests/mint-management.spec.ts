@@ -1,8 +1,8 @@
 /**
  * Mint management: the "Allow test mints" switch hides the local FakeWallet
- * mint's funds without touching them, an explicit amount moves from
- * :3338 to :3339 after its fee estimate is shown, and the add button makes a
- * typed mint the default.
+ * mint's funds without touching them, the move form opens with the whole
+ * balance, an explicit amount moves from :3338 to :3339 after its fee
+ * estimate is shown, and the add button makes a typed mint the default.
  *
  * Needs the docker stack up — see "E2E tests" in AGENTS.md.
  */
@@ -113,7 +113,13 @@ test("test mints can be hidden and funds move between mints", async ({
 
   await test.step("estimate and move an explicit amount to the target mint", async () => {
     await page.goto(`/#advanced/mint/${encodeURIComponent(SOURCE_MINT_URL)}`);
+    const moveForm = page.locator(".mint-move-form");
+    await expect(moveForm.locator(".amount-number")).toHaveText(
+      String(FUNDING_SAT),
+    );
+    await expect(moveForm).toContainText(`Maximum ${FUNDING_SAT} sat`);
     await page.getByLabel("To mint").selectOption({ label: "localhost:3339" });
+    await page.getByRole("button", { name: "Clear form", exact: true }).click();
     for (const digit of String(MOVE_SAT)) {
       await page.getByRole("button", { exact: true, name: digit }).click();
     }

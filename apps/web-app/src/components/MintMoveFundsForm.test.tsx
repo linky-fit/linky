@@ -41,15 +41,23 @@ vi.mock("../app/context/AppShellContexts", () => ({
 
 const decodeEstimate = Schema.decodeUnknownSync(AutoswapEstimate);
 
-const estimateFor = (move: MintMove, feeReserve: number) =>
-  decodeEstimate({
+const AVAILABLE = 100;
+const INPUT_FEE = 1;
+const SOURCE_MINT = "https://cashu.cz";
+const TARGET_MINT = "https://kashu.me";
+
+/** A sweep is priced at its first attempt: the balance minus the input fee. */
+const estimateFor = (move: MintMove, feeReserve: number) => {
+  const amount = move.amountSat ?? AVAILABLE - INPUT_FEE;
+  return decodeEstimate({
     sourceMint: move.sourceMint,
     targetMint: move.targetMint,
-    amount: move.amountSat,
+    amount,
     lightningFeeReserve: feeReserve,
-    inputFee: 1,
-    totalFromSource: move.amountSat + feeReserve + 1,
+    inputFee: INPUT_FEE,
+    totalFromSource: amount + feeReserve + INPUT_FEE,
   });
+};
 
 const buttonNamed = (container: HTMLElement, text: string) => {
   const button = Array.from(container.querySelectorAll("button")).find(
@@ -61,59 +69,92 @@ const buttonNamed = (container: HTMLElement, text: string) => {
   return button;
 };
 
+const press = async (container: HTMLElement, keys: readonly string[]) => {
+  for (const key of keys) {
+    await act(async () => {
+      buttonNamed(container, key).click();
+    });
+  }
+};
+
 const renderForm = async (feeReserve: number) => {
   const estimateMintMove = vi.fn(async (move: MintMove) =>
     estimateFor(move, feeReserve),
   );
-  const moveMintFunds = vi.fn(async () => true);
+  const moveMintFunds = vi.fn<(move: MintMove) => Promise<boolean>>(
+    async () => true,
+  );
   const rendered = await renderIntoDocument(
     <MintMoveFundsForm
-      available={100}
+      available={AVAILABLE}
       busy={false}
       estimateMintMove={estimateMintMove}
       moveMintFunds={moveMintFunds}
-      sourceMint="https://cashu.cz"
-      targets={["https://kashu.me"]}
+      sourceMint={SOURCE_MINT}
+      targets={[TARGET_MINT]}
     />,
   );
-  for (const digit of "50") {
-    await act(async () => {
-      buttonNamed(rendered.container, digit).click();
-    });
-  }
-  await act(async () => {
-    buttonNamed(rendered.container, "mintMoveEstimate").click();
-  });
   return { ...rendered, estimateMintMove, moveMintFunds };
 };
+
+const amountShown = (container: HTMLElement) =>
+  container.querySelector(".amount-number")?.textContent;
 
 describe("MintMoveFundsForm", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
 
-  it("takes the amount on the keypad and shows the estimate before moving", async () => {
+  it("sweeps the whole balance it opens with, fees coming out of it", async () => {
     const { container, estimateMintMove, moveMintFunds, unmount } =
       await renderForm(4);
+    expect(amountShown(container)).toBe(String(AVAILABLE));
+
+    await press(container, ["mintMoveEstimate"]);
+    const sweep = { sourceMint: SOURCE_MINT, targetMint: TARGET_MINT };
+    expect(estimateMintMove.mock.calls[0]?.[0]).toStrictEqual(sweep);
+    const values = Array.from(container.querySelectorAll("dd")).map(
+      (value) => value.textContent,
+    );
+    expect(values).toEqual(["95 sat", "4 sat", "1 sat", "100 sat"]);
+    expect(container.textContent).toContain("mintMoveSweepNote");
+
+    await press(container, ["mintMoveConfirm"]);
+    expect(moveMintFunds.mock.calls[0]?.[0]).toStrictEqual(sweep);
+    await unmount();
+  });
+
+  it("takes an explicit amount on the keypad and shows the estimate before moving", async () => {
+    const { container, estimateMintMove, moveMintFunds, unmount } =
+      await renderForm(4);
+    await press(container, ["C", "5", "0", "mintMoveEstimate"]);
     const move = {
-      sourceMint: "https://cashu.cz",
-      targetMint: "https://kashu.me",
+      sourceMint: SOURCE_MINT,
+      targetMint: TARGET_MINT,
       amountSat: 50,
     };
     expect(estimateMintMove).toHaveBeenCalledWith(move);
     expect(container.textContent).toContain("55 sat");
+    expect(container.textContent).toContain("mintMoveEstimateNote");
 
-    await act(async () => {
-      buttonNamed(container, "mintMoveConfirm").click();
-    });
+    await press(container, ["mintMoveConfirm"]);
     expect(moveMintFunds).toHaveBeenCalledWith(move);
     await unmount();
   });
 
   it("blocks a move whose fees exceed the balance", async () => {
     const { container, unmount } = await renderForm(60);
+    await press(container, ["C", "5", "0", "mintMoveEstimate"]);
     expect(container.textContent).toContain("mintMoveExceedsBalance");
     expect(buttonNamed(container, "mintMoveConfirm").disabled).toBe(true);
+    await unmount();
+  });
+
+  it("cannot estimate more than the balance", async () => {
+    const { container, unmount } = await renderForm(4);
+    await press(container, ["5"]);
+    expect(amountShown(container)).toBe(`${AVAILABLE}5`);
+    expect(buttonNamed(container, "mintMoveEstimate").disabled).toBe(true);
     await unmount();
   });
 });

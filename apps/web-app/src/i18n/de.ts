@@ -357,6 +357,7 @@ export const de = {
   mintLatency: "Latenz",
   mintMoveTitle: "Guthaben verschieben",
   mintMoveTarget: "Zum Mint",
+  mintMoveMaximum: "Höchstens {amount}",
   mintMoveEstimate: "Gebühren schätzen",
   mintMoveEstimating: "Schätze…",
   mintMoveConfirm: "Verschieben",
@@ -366,6 +367,8 @@ export const de = {
   mintMoveTotal: "Verlässt diesen Mint (höchstens)",
   mintMoveEstimateNote:
     "Die Gebühren sind Obergrenzen; ungenutzte Lightning-Reserve kommt als Wechselgeld zurück.",
+  mintMoveSweepNote:
+    "Verschiebt das gesamte Guthaben; die Gebühren werden davon abgezogen, ungenutzte Lightning-Reserve kommt als Wechselgeld zurück.",
   mintMoveExceedsBalance:
     "Betrag plus Gebühren übersteigt das Guthaben dieses Mints.",
   mintMoveNoTarget:

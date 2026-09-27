@@ -353,6 +353,7 @@ export const cs = {
   mintLatency: "Odezva",
   mintMoveTitle: "Přesunout prostředky",
   mintMoveTarget: "Do mintu",
+  mintMoveMaximum: "Nejvýše {amount}",
   mintMoveEstimate: "Odhadnout poplatky",
   mintMoveEstimating: "Odhaduji…",
   mintMoveConfirm: "Přesunout",
@@ -362,6 +363,8 @@ export const cs = {
   mintMoveTotal: "Odejde z tohoto mintu (nejvýše)",
   mintMoveEstimateNote:
     "Poplatky jsou horní odhad; nevyužitá Lightning rezerva se vrátí jako drobné.",
+  mintMoveSweepNote:
+    "Přesune celý zůstatek; poplatky se z něj odečtou a nevyužitá Lightning rezerva se vrátí jako drobné.",
   mintMoveExceedsBalance: "Částka s poplatky přesahuje zůstatek tohoto mintu.",
   mintMoveNoTarget: "Není žádný jiný mint, kam prostředky přesunout.",
   mintMoveUnavailable: "Peněženka ještě není připravena.",

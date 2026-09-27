@@ -207,9 +207,12 @@ export type AutoswapCashu = (
   args: AutoswapCashuArgs,
 ) => Promise<Either.Either<AutoswapReceipt, AutoswapError>>;
 
-/** linkshu Autoswap estimate; pays nothing. Invalid input and defects reject. */
+/**
+ * linkshu Autoswap estimate; pays nothing. Without `amountSat` it prices the
+ * sweep's first attempt. Invalid input and defects reject.
+ */
 export type EstimateAutoswapCashu = (
-  args: AutoswapCashuArgs & { readonly amountSat: number },
+  args: AutoswapCashuArgs,
 ) => Promise<Either.Either<AutoswapEstimate, AutoswapEstimateError>>;
 
 /** Drains persisted pending claims (linkshu `Autoswap.resumePendingClaims`). */
@@ -523,7 +526,7 @@ export const useLinkshuComposition = ({
           const draft = decodeAutoswapDraft({
             sourceMint,
             targetMint,
-            amount: amountSat,
+            ...(amountSat === undefined ? {} : { amount: amountSat }),
           });
           return Effect.flatMap(Autoswap, (autoswap) =>
             autoswap.estimate(draft),

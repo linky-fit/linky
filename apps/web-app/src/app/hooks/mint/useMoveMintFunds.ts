@@ -14,8 +14,8 @@ import type {
 export interface MintMove {
   readonly sourceMint: string;
   readonly targetMint: string;
-  /** What arrives at the target mint. */
-  readonly amountSat: number;
+  /** What arrives at the target mint; absent sweeps the whole balance. */
+  readonly amountSat?: number;
 }
 
 interface UseMoveMintFundsParams {
@@ -32,7 +32,7 @@ interface UseMoveMintFundsParams {
 const describeError = (error: unknown): string =>
   describeTaggedCashuError(error) ?? getUnknownErrorMessage(error, "unknown");
 
-/** Moving an explicit amount between mints (linkshu Autoswap), priced first. */
+/** Moving funds between mints (linkshu Autoswap), priced first. */
 export const useMoveMintFunds = ({
   autoswapCashu,
   cashuIsBusy,

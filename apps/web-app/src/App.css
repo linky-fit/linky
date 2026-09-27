@@ -3450,6 +3450,12 @@ button.mint-choice.is-selected:hover {
   width: 100%;
 }
 
+.mint-move-maximum {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+}
+
 .mint-move-estimate {
   display: grid;
   grid-template-columns: 1fr auto;

@@ -348,6 +348,7 @@ export const en = {
   mintLatency: "Latency",
   mintMoveTitle: "Move funds",
   mintMoveTarget: "To mint",
+  mintMoveMaximum: "Maximum {amount}",
   mintMoveEstimate: "Estimate fees",
   mintMoveEstimating: "Estimating…",
   mintMoveConfirm: "Move",
@@ -357,6 +358,8 @@ export const en = {
   mintMoveTotal: "Leaves this mint (at most)",
   mintMoveEstimateNote:
     "Fees are upper bounds; unused Lightning reserve comes back as change.",
+  mintMoveSweepNote:
+    "Moves the whole balance; the fees come out of it and unused Lightning reserve comes back as change.",
   mintMoveExceedsBalance: "The amount plus fees exceeds this mint's balance.",
   mintMoveNoTarget: "There is no other mint to move funds to.",
   mintMoveUnavailable: "The wallet is not ready yet.",
