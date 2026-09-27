@@ -2,7 +2,11 @@ import type {
   MintQuoteBolt11Response,
   Proof as CashuProof,
 } from "@cashu/cashu-ts";
-import { Amount as CashuAmount, MintOperationError } from "@cashu/cashu-ts";
+import {
+  Amount as CashuAmount,
+  Keyset,
+  MintOperationError,
+} from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import { InsufficientFunds } from "../domain/errors";
 import {
@@ -15,7 +19,7 @@ import {
   QuoteId,
   UnixSeconds,
 } from "../domain/primitives";
-import { MeltReceipt } from "../melt/domain";
+import { MeltQuote, MeltReceipt } from "../melt/domain";
 import type { MeltDraft } from "../melt/domain";
 import { Melt } from "../melt/Melt";
 import { WalletInstances } from "../mint/internal/WalletInstances";
@@ -79,6 +83,8 @@ interface FakeWalletArgs {
     proofs: CashuProof[];
     lastCounterWithSignature?: number;
   }>;
+  /** Input fee of the bound keyset at both mints; none published when unset. */
+  readonly inputFeePpk?: number;
 }
 
 const makeWallets = (args: FakeWalletArgs) => {
@@ -89,6 +95,12 @@ const makeWallets = (args: FakeWalletArgs) => {
   const wallet = (): LoadedWallet =>
     fakeWallet({
       keysetId: KEYSET_HEX,
+      keyChain: {
+        getKeysets: () =>
+          args.inputFeePpk === undefined
+            ? []
+            : [new Keyset(KEYSET_HEX, "sat", true, args.inputFeePpk)],
+      },
       checkProofsStates: answerProofStates(),
       // Every quote gets its own id, so each sizing attempt is its own
       // operation: target-quote-1, target-quote-2, ...
@@ -130,9 +142,21 @@ const makeMelt = (
   >,
 ) => {
   const invoices: string[] = [];
+  const quotedInvoices: string[] = [];
   const service = Melt.make({
     status: () => Effect.succeed("UNPAID"),
-    quote: () => Effect.die("melt.quote not under test"),
+    quote: (draft: MeltDraft) => {
+      quotedInvoices.push(draft.invoice);
+      return Effect.succeed(
+        new MeltQuote({
+          quoteId: QuoteId.make("melt-quote-1"),
+          mint: draft.mint,
+          amount: Amount.make(50),
+          feeReserve: NonNegativeAmount.make(4),
+          expiresAt: null,
+        }),
+      );
+    },
     resumePending: Effect.succeed([]),
     melt: (draft: MeltDraft) => {
       const index = invoices.length;
@@ -142,7 +166,7 @@ const makeMelt = (
       return outcome(index);
     },
   });
-  return { service, invoices };
+  return { service, invoices, quotedInvoices };
 };
 
 const paidReceipt = (): Effect.Effect<MeltReceipt, InsufficientFunds> =>
@@ -257,6 +281,26 @@ const writePendingClaim = (
 const claimDraft = Effect.flatMap(Autoswap, (autoswap) =>
   autoswap.claim(draft),
 );
+const claimAmount = (amount: number) =>
+  Effect.flatMap(Autoswap, (autoswap) =>
+    autoswap.claim(
+      new AutoswapDraft({
+        sourceMint,
+        targetMint,
+        amount: Amount.make(amount),
+      }),
+    ),
+  );
+const estimateAmount = (amount: number) =>
+  Effect.flatMap(Autoswap, (autoswap) =>
+    autoswap.estimate(
+      new AutoswapDraft({
+        sourceMint,
+        targetMint,
+        amount: Amount.make(amount),
+      }),
+    ),
+  );
 const resume = Effect.flatMap(
   Autoswap,
   (autoswap) => autoswap.resumePendingClaims,
@@ -378,6 +422,118 @@ describe("Autoswap.claim", () => {
     // The funds are at the target mint; the operation is what gets them out.
     expect(await pendingClaims(storage)).toMatchObject([{ counter: 1 }]);
     expect(await targetProofs(storage)).toEqual([]);
+  });
+});
+
+describe("Autoswap.claim with an explicit amount", () => {
+  it("moves exactly the requested amount in one attempt", async () => {
+    const storage = freshStorage();
+    await seedSource(storage);
+    const melt = makeMelt([paidReceipt]);
+    const harness = makeHarness(storage, { states: ["PAID"] }, melt);
+
+    const exit = await harness.run(claimAmount(50));
+
+    assert(Exit.isSuccess(exit));
+    expect(harness.quotedAmounts).toEqual([50]);
+    expect(melt.invoices).toEqual([invoice]);
+    expect(await onlyClaim(storage)).toMatchObject({
+      amount: 50,
+      status: "done",
+    });
+  });
+
+  it("fails before quoting when the amount and input fee exceed the balance", async () => {
+    const storage = freshStorage();
+    await seedSource(storage);
+    const melt = makeMelt([paidReceipt]);
+    // 1000 ppk over three proofs: a 3 sat input fee.
+    const harness = makeHarness(
+      storage,
+      { states: ["PAID"], inputFeePpk: 1000 },
+      melt,
+    );
+
+    const exit = await harness.run(Effect.either(claimAmount(98)));
+
+    assert(Exit.isSuccess(exit));
+    assert(exit.value._tag === "Left");
+    expect(exit.value.left).toMatchObject({
+      _tag: "InsufficientFunds",
+      required: 101,
+      available: 100,
+    });
+    expect(harness.quotedAmounts).toEqual([]);
+    expect(melt.invoices).toEqual([]);
+    expect(await claimOperations(storage)).toEqual([]);
+  });
+
+  it("surfaces the melt's shortage without stepping down", async () => {
+    const storage = freshStorage();
+    await seedSource(storage);
+    const melt = makeMelt([() => short(105)]);
+    const harness = makeHarness(storage, { states: ["PAID"] }, melt);
+
+    const exit = await harness.run(Effect.either(claimAmount(100)));
+
+    assert(Exit.isSuccess(exit));
+    assert(exit.value._tag === "Left");
+    expect(exit.value.left).toMatchObject({
+      _tag: "InsufficientFunds",
+      required: 105,
+    });
+    expect(harness.quotedAmounts).toEqual([100]);
+    expect(await pendingClaims(storage)).toEqual([]);
+  });
+});
+
+describe("Autoswap.estimate", () => {
+  it("adds the Lightning fee reserve and the input fee to the amount", async () => {
+    const storage = freshStorage();
+    await seedSource(storage);
+    const melt = makeMelt([paidReceipt]);
+    const harness = makeHarness(storage, { inputFeePpk: 1000 }, melt);
+
+    const exit = await harness.run(estimateAmount(50));
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value).toMatchObject({
+      sourceMint,
+      targetMint,
+      amount: 50,
+      lightningFeeReserve: 4,
+      inputFee: 3,
+      totalFromSource: 57,
+    });
+    // Priced against the target's invoice; nothing paid, nothing recorded.
+    expect(harness.quotedAmounts).toEqual([50]);
+    expect(melt.quotedInvoices).toEqual([invoice]);
+    expect(melt.invoices).toEqual([]);
+    expect(await claimOperations(storage)).toEqual([]);
+    const proofs = await Effect.runPromise(storage.proofs.loadAll);
+    expect(proofs.every((proof) => proof.state === "available")).toBe(true);
+    expect(
+      harness.events.some(
+        (event) =>
+          event._tag === "OperationSucceeded" &&
+          event.name === "autoswap.estimate",
+      ),
+    ).toBe(true);
+  });
+
+  it("fails before quoting when the amount does not fit", async () => {
+    const storage = freshStorage();
+    await seedSource(storage);
+    const melt = makeMelt([paidReceipt]);
+    const harness = makeHarness(storage, {}, melt);
+
+    const exit = await harness.run(Effect.either(estimateAmount(101)));
+
+    assert(Exit.isSuccess(exit));
+    assert(exit.value._tag === "Left");
+    expect(exit.value.left._tag).toBe("InsufficientFunds");
+    expect(harness.quotedAmounts).toEqual([]);
+    expect(melt.quotedInvoices).toEqual([]);
   });
 });
 

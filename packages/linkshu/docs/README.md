@@ -15,7 +15,7 @@ How to use Linky's cashu wallet library. These are guides, not an API reference:
 - [Send](./send.md) — swap an amount out into an encoded token
 - [Melt](./melt.md) — pay a bolt11 invoice
 - [Top up](./topup.md) — mint quote, invoice, settlement, and resuming interrupted topups
-- [Autoswap](./autoswap.md) — move a foreign-mint balance to the main mint
+- [Autoswap](./autoswap.md) — move a balance, or part of it, from one mint to another
 - [Validation](./validation.md) — NUT-07 proof-state checks
 - [Restore](./restore.md) — NUT-09 seed recovery and the seed-bound wipe
 - [Tokens](./tokens.md) — read model, balances, send transitions, `returnToWallet`, backup import, legacy ingest, token codec

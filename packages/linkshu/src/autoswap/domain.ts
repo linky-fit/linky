@@ -19,8 +19,29 @@ export class AutoswapDraft extends Schema.Class<AutoswapDraft>("AutoswapDraft")(
   {
     sourceMint: MintUrl,
     targetMint: MintUrl,
+    /**
+     * What the target mint issues. The source pays it plus the Lightning fee
+     * reserve and its cashu input fee. Omitted: sweep the whole balance.
+     */
+    amount: Schema.optional(Amount),
   },
 ) {}
+
+/** Upper bound on what moving `amount` costs; nothing was paid for it. */
+export class AutoswapEstimate extends Schema.Class<AutoswapEstimate>(
+  "AutoswapEstimate",
+)({
+  sourceMint: MintUrl,
+  targetMint: MintUrl,
+  /** What the target mint would issue. */
+  amount: Amount,
+  /** Lightning fee reserve the source mint quoted for the invoice. */
+  lightningFeeReserve: NonNegativeAmount,
+  /** Cashu input fee allowance over the source's available proofs. */
+  inputFee: NonNegativeAmount,
+  /** `amount + lightningFeeReserve + inputFee`. */
+  totalFromSource: Amount,
+}) {}
 
 export class AutoswapReceipt extends Schema.Class<AutoswapReceipt>(
   "AutoswapReceipt",
@@ -58,3 +79,10 @@ export const AutoswapError = Schema.Union(
   CounterLockTimeout,
 );
 export type AutoswapError = typeof AutoswapError.Type;
+
+export const AutoswapEstimateError = Schema.Union(
+  InsufficientFunds,
+  MintUnreachable,
+  MintRejected,
+);
+export type AutoswapEstimateError = typeof AutoswapEstimateError.Type;

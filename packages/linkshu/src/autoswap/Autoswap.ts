@@ -14,6 +14,7 @@ import {
 import type { ClaimedQuote, QuoteClaimContext } from "../internal/quoteClaim";
 import { decodeMintQuote, emitQuoteState } from "../internal/quotes";
 import type { DecodedMintQuote } from "../internal/quotes";
+import { proofsAt, totalAmount } from "../internal/proofs";
 import { selectSpendableProofs } from "../internal/spend";
 import { nowSeconds } from "../internal/time";
 import { sat } from "../internal/units";
@@ -30,8 +31,16 @@ import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
-import { AutoswapClaimResult, AutoswapReceipt } from "./domain";
-import type { AutoswapDraft, AutoswapError } from "./domain";
+import {
+  AutoswapClaimResult,
+  AutoswapEstimate,
+  AutoswapReceipt,
+} from "./domain";
+import type {
+  AutoswapDraft,
+  AutoswapError,
+  AutoswapEstimateError,
+} from "./domain";
 import { autoswapRecords } from "./internal/autoswapRecords";
 import type { PendingAutoswapClaim } from "./internal/autoswapRecords";
 
@@ -197,25 +206,36 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
         );
       });
 
-    const claim = (
+    /** Move exactly `amount`: one attempt, no step-down. */
+    const claimAmount = (
       draft: AutoswapDraft,
+      target: LoadedWallet,
+      keysetId: PendingAutoswapClaim["keysetId"],
+      amount: Amount,
+      inputFee: number,
+      available: number,
     ): Effect.Effect<AutoswapReceipt, AutoswapError> =>
       Effect.gen(function* () {
-        const source = yield* instances.get(draft.sourceMint, sat);
-        const target = yield* instances.get(draft.targetMint, sat);
-        const keysetId = yield* boundKeysetId(draft.targetMint, target);
-        const { spendable, available } = yield* selectSpendableProofs({
-          proofStore,
-          inspector,
-          wallet: source,
-          mint: draft.sourceMint,
-          unit: sat,
-          reason: "autoswap",
-        });
-        // Upper bound on what the melt's own swap pays the source mint in
-        // cashu input fees; the Lightning fee reserve is learned per attempt.
-        const inputFee = inputFeeAllowance(source, spendable.length);
+        if (amount + inputFee > available) {
+          return yield* new InsufficientFunds({
+            mint: draft.sourceMint,
+            required: Amount.make(amount + inputFee),
+            available: NonNegativeAmount.make(available),
+          });
+        }
+        const outcome = yield* swapAmount(draft, target, keysetId, amount);
+        return yield* outcome;
+      });
 
+    /** Move the whole balance, stepping down until the fees fit. */
+    const sweep = (
+      draft: AutoswapDraft,
+      target: LoadedWallet,
+      keysetId: PendingAutoswapClaim["keysetId"],
+      inputFee: number,
+      available: number,
+    ): Effect.Effect<AutoswapReceipt, AutoswapError> =>
+      Effect.gen(function* () {
         let amount = available - inputFee;
         let shortfall: InsufficientFunds | null = null;
         for (let attempt = 0; attempt < MAX_AMOUNT_ATTEMPTS; attempt += 1) {
@@ -240,12 +260,117 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
             required: Amount.make(Math.max(inputFee, 1)),
             available: NonNegativeAmount.make(available),
           });
+      });
+
+    const claim = (
+      draft: AutoswapDraft,
+    ): Effect.Effect<AutoswapReceipt, AutoswapError> =>
+      Effect.gen(function* () {
+        const source = yield* instances.get(draft.sourceMint, sat);
+        const target = yield* instances.get(draft.targetMint, sat);
+        const keysetId = yield* boundKeysetId(draft.targetMint, target);
+        const { spendable, available } = yield* selectSpendableProofs({
+          proofStore,
+          inspector,
+          wallet: source,
+          mint: draft.sourceMint,
+          unit: sat,
+          reason: "autoswap",
+        });
+        // Upper bound on what the melt's own swap pays the source mint in
+        // cashu input fees; the Lightning fee reserve is learned per attempt.
+        const inputFee = inputFeeAllowance(source, spendable.length);
+        return draft.amount === undefined
+          ? yield* sweep(draft, target, keysetId, inputFee, available)
+          : yield* claimAmount(
+              draft,
+              target,
+              keysetId,
+              draft.amount,
+              inputFee,
+              available,
+            );
       }).pipe(
         inspectOperationWith(
           inspector,
           "autoswap.claim",
-          { sourceMint: draft.sourceMint, targetMint: draft.targetMint },
+          {
+            sourceMint: draft.sourceMint,
+            targetMint: draft.targetMint,
+            amount: draft.amount ?? null,
+          },
           (receipt) => receipt,
+        ),
+      );
+
+    /**
+     * Prices a move without paying anything: a mint quote at the target and a
+     * melt quote for its invoice at the source, both left to expire. Reads
+     * the stored `available` proofs without a NUT-07 check, so no proof
+     * changes state.
+     */
+    const estimate = (
+      draft: AutoswapDraft,
+    ): Effect.Effect<AutoswapEstimate, AutoswapEstimateError> =>
+      Effect.gen(function* () {
+        const source = yield* instances.get(draft.sourceMint, sat);
+        const target = yield* instances.get(draft.targetMint, sat);
+        const candidates = proofsAt(
+          yield* proofStore.loadAll,
+          draft.sourceMint,
+          sat,
+        ).filter((proof) => proof.state === "available");
+        const available = totalAmount(candidates);
+        const inputFee = inputFeeAllowance(source, candidates.length);
+        const amount = draft.amount ?? available - inputFee;
+        if (amount <= 0 || amount + inputFee > available) {
+          return yield* new InsufficientFunds({
+            mint: draft.sourceMint,
+            required: Amount.make(Math.max(amount, 1) + inputFee),
+            available: NonNegativeAmount.make(available),
+          });
+        }
+        const targetQuote = yield* createTargetQuote(
+          target,
+          draft.targetMint,
+          amount,
+        );
+        const meltQuote = yield* melt
+          .quote(
+            new MeltDraft({
+              mint: draft.sourceMint,
+              invoice: targetQuote.invoice,
+            }),
+          )
+          .pipe(
+            // A melt quote only prices; it never pays, holds, or counts.
+            Effect.catchTags({
+              PaymentFailed: Effect.die,
+              PaymentPending: Effect.die,
+              QuoteExpired: Effect.die,
+              CounterLockTimeout: Effect.die,
+            }),
+          );
+        return new AutoswapEstimate({
+          sourceMint: draft.sourceMint,
+          targetMint: draft.targetMint,
+          amount: Amount.make(amount),
+          lightningFeeReserve: meltQuote.feeReserve,
+          inputFee: NonNegativeAmount.make(inputFee),
+          totalFromSource: Amount.make(
+            amount + meltQuote.feeReserve + inputFee,
+          ),
+        });
+      }).pipe(
+        inspectOperationWith(
+          inspector,
+          "autoswap.estimate",
+          {
+            sourceMint: draft.sourceMint,
+            targetMint: draft.targetMint,
+            amount: draft.amount ?? null,
+          },
+          (estimated) => estimated,
         ),
       );
 
@@ -332,6 +457,6 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       ),
     );
 
-    return { claim, resumePendingClaims } as const;
+    return { claim, estimate, resumePendingClaims } as const;
   }),
 }) {}
