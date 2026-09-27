@@ -347,7 +347,6 @@ export const cs = {
   mintDelete: "Odstranit mint",
   mintLastChecked: "Naposledy ověřeno",
   mintBalance: "Zůstatek",
-  mintProofCount: "{count} důkazů",
   mintSetAsDefault: "Nastavit jako výchozí",
   mintFundsTitle: "Prostředky",
   mintInfoTitle: "Informace o mintu",

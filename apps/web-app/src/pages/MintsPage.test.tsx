@@ -1,6 +1,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
+import { createStoredProofFixture } from "../testUtils/cashuInventory";
 import { createMintSettings } from "../testUtils/mintSettings";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintsPage } from "./MintsPage";
@@ -73,6 +74,48 @@ describe("MintsPage", () => {
     expect(selectedItem?.querySelector(".mint-fees")).not.toBeNull();
     expect(container.querySelectorAll(".mint-fees")).toHaveLength(1);
 
+    await unmount();
+  });
+
+  it("shows each funded mint's balance with its share of the total", async () => {
+    mintSettings = createMintSettings({
+      cashuProofs: [
+        createStoredProofFixture({
+          id: "a",
+          mint: "https://cashu.cz",
+          amount: 64,
+        }),
+        createStoredProofFixture({
+          id: "b",
+          mint: "https://cashu.cz",
+          amount: 11,
+        }),
+        createStoredProofFixture({
+          id: "c",
+          mint: "https://kashu.me",
+          amount: 25,
+        }),
+        createStoredProofFixture({
+          id: "d",
+          mint: "https://kashu.me",
+          amount: 100,
+          state: "spent",
+        }),
+      ],
+    });
+
+    const { container, unmount } = await renderIntoDocument(<MintsPage />);
+    const holdings = Array.from(
+      container.querySelectorAll<HTMLElement>(".mint-choice-holding"),
+    ).map((holding) => ({
+      text: holding.textContent,
+      share: holding.querySelector<HTMLElement>(".mint-choice-share-fill")
+        ?.style.width,
+    }));
+    expect(holdings).toEqual([
+      { text: "75 sat", share: "75%" },
+      { text: "25 sat", share: "25%" },
+    ]);
     await unmount();
   });
 

@@ -4,23 +4,16 @@ import { normalizeMintUrl } from "../../utils/mint";
 export interface MintHolding {
   /** Sum of `available` proofs, in sat. */
   readonly balance: number;
-  readonly availableCount: number;
 }
 
-const emptyHolding: MintHolding = {
-  balance: 0,
-  availableCount: 0,
-};
+const emptyHolding: MintHolding = { balance: 0 };
 
 const addAvailableProof = (
   holding: MintHolding,
   proof: StoredProof,
-): MintHolding => ({
-  balance: holding.balance + proof.amount,
-  availableCount: holding.availableCount + 1,
-});
+): MintHolding => ({ balance: holding.balance + proof.amount });
 
-/** Per-mint balance and count of `available` proofs, keyed by normalized mint url. */
+/** Per-mint balance of `available` proofs, keyed by normalized mint url. */
 export const mintHoldings = (
   proofs: ReadonlyArray<StoredProof>,
 ): ReadonlyMap<string, MintHolding> => {

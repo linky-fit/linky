@@ -35,14 +35,23 @@ export function MintsPage() {
   })();
   const standardMints = buttonMints.filter((mint) => !isTestMintUrl(mint));
   const testMints = buttonMints.filter((mint) => isTestMintUrl(mint));
+  const listedBalance = buttonMints.reduce(
+    (sum, mint) => sum + holdingOf(holdings, mint).balance,
+    0,
+  );
 
   const renderHolding = (mint: string) => {
-    const holding = holdingOf(holdings, mint);
-    if (holding.balance <= 0) return null;
+    const { balance } = holdingOf(holdings, mint);
+    if (balance <= 0) return null;
     return (
-      <div className="mint-choice-holding muted">
-        {formatDisplayedAmountText(holding.balance)} ·{" "}
-        {t("mintProofCount").replace("{count}", String(holding.availableCount))}
+      <div className="mint-choice-holding">
+        <span className="muted">{formatDisplayedAmountText(balance)}</span>
+        <div className="mint-choice-share" aria-hidden="true">
+          <span
+            className="mint-choice-share-fill"
+            style={{ width: `${(balance / listedBalance) * 100}%` }}
+          />
+        </div>
       </div>
     );
   };

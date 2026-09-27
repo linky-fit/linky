@@ -351,7 +351,6 @@ export const de = {
   mintDelete: "Mint löschen",
   mintLastChecked: "Zuletzt geprüft",
   mintBalance: "Guthaben",
-  mintProofCount: "{count} Proofs",
   mintSetAsDefault: "Als Standard festlegen",
   mintFundsTitle: "Guthaben",
   mintInfoTitle: "Mint-Info",

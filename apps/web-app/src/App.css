@@ -3417,8 +3417,26 @@ button.mint-choice.is-selected:hover {
 }
 
 .mint-choice-holding {
-  padding: 0 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 14px 12px;
   font-size: 13px;
+}
+
+.mint-choice-share {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.mint-choice-share-fill {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: #2dd4bf;
 }
 
 .mint-move-form {

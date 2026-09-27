@@ -342,7 +342,6 @@ export const en = {
   mintDelete: "Delete mint",
   mintLastChecked: "Last checked",
   mintBalance: "Balance",
-  mintProofCount: "{count} proofs",
   mintSetAsDefault: "Set as default",
   mintFundsTitle: "Funds",
   mintInfoTitle: "Mint info",
