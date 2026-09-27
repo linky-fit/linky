@@ -35,6 +35,31 @@ describe("contact identity labels", () => {
     );
     expect(markup).toContain("Alice (npub1remote)");
     expect(markup).not.toContain("\u202e");
+    expect(markup).toContain(">A<");
+    expect(markup).not.toContain("A(");
     expect(remote.name).toBe("Ali\u202ece");
+  });
+
+  it("marks the title when a status is rendered next to the name", () => {
+    const contact = { id: "c", name: "Alice", npub: "npub1alice" };
+    const render = (statusText: string | null) =>
+      renderToStaticMarkup(
+        <ContactCard
+          contact={contact}
+          nameLabel="Alice"
+          avatarUrl={null}
+          getMintIconUrl={() => ({ url: null })}
+          getNpubMessageContactInfo={() => null}
+          hasAttention={false}
+          onMintIconError={vi.fn()}
+          onSelect={vi.fn()}
+          statusText={statusText}
+          tokenInfo={null}
+        />,
+      );
+    const withStatus = render("Away for a while");
+    expect(withStatus).toContain('class="contact-title has-status"');
+    expect(withStatus).toContain('<bdi dir="auto">Away for a while</bdi>');
+    expect(render(null)).toContain('class="contact-title"');
   });
 });

@@ -20,6 +20,9 @@ const collisionKey = (name: string): string =>
     .replace(/\p{Default_Ignorable_Code_Point}/gu, "")
     .toLowerCase();
 
+const identityKey = (npub: string | null | undefined): string =>
+  (npub ?? "").trim().toLowerCase();
+
 export const createContactNameFormatter = (
   contacts: readonly NamedContact[],
 ) => {
@@ -28,7 +31,7 @@ export const createContactNameFormatter = (
     const key = collisionKey(getContactName(contact));
     if (!key) continue;
     const identities = identitiesByName.get(key) ?? new Set<string>();
-    identities.add(contact.npub ?? "");
+    identities.add(identityKey(contact.npub));
     identitiesByName.set(key, identities);
   }
   return (contact: NamedContact): string => {

@@ -65,4 +65,12 @@ describe("remote profile names", () => {
     expect(format(second)).toBe(`alice (${formatShortNpub(other)})`);
     expect(createContactNameFormatter([first, first])(first)).toBe("Alice");
   });
+
+  it("treats differently formatted copies of one npub as a single identity", () => {
+    const stored = { name: "Alice", npub: alice };
+    const scanned = { name: "Alice", npub: ` ${alice.toUpperCase()} ` };
+    const format = createContactNameFormatter([stored, scanned]);
+    expect(format(stored)).toBe("Alice");
+    expect(format(scanned)).toBe("Alice");
+  });
 });

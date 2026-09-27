@@ -5948,12 +5948,15 @@ button.bank-payment-amount-button:hover {
   margin: 0;
   flex: 1 1 auto;
   font-size: clamp(28px, 7vw, 36px);
-  line-height: 1.05;
+  line-height: 1.1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   text-align: center;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .contact-detail-nip05-check {
@@ -6181,12 +6184,21 @@ button.bank-payment-amount-button:hover {
 
 .contact-title-text {
   min-width: 0;
-  flex: 1;
+  max-width: 100%;
+  flex: 1 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* The name never shrinks below its text; a long name only yields the room
+   a truncated status needs, so some of both stay visible. */
+.contact-title.has-status .contact-title-text {
+  max-width: calc(100% - 5rem);
+}
+
+/* rtl on the box puts the ellipsis at the start, so a cut status keeps its
+   end ("…EUR, CZK"); the isolated bdi keeps the text itself in reading order. */
 .contact-status-text {
   min-width: 0;
   flex: 0 1 auto;
@@ -6197,6 +6209,12 @@ button.bank-payment-amount-button:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.contact-status-text > bdi {
+  unicode-bidi: isolate;
 }
 
 .muted {

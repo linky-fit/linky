@@ -6,6 +6,7 @@ import { hasMessageEntityPreview } from "../app/lib/messageEntityPreview";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
 import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
 import { formatDisplayGeneralStatus } from "../nostrStatus";
+import { getContactName } from "../utils/contactName";
 import {
   formatContactMessageTimestamp,
   getInitials,
@@ -50,7 +51,7 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
     isUnknownContact = false,
   }) => {
     const { formatDisplayedAmountText, t } = useAppShellCore();
-    const initials = getInitials(nameLabel);
+    const initials = getInitials(getContactName(contact) || nameLabel);
     const contactStatus = formatDisplayGeneralStatus({
       status: statusText,
       providesLabel: t("contactStatusProvides"),
@@ -126,13 +127,15 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
           <div className="card-main">
             <div className="card-title-row">
               {nameLabel ? (
-                <h4 className="contact-title">
+                <h4
+                  className={`contact-title${contactStatus ? " has-status" : ""}`}
+                >
                   <span className="contact-title-text" title={nameLabel}>
                     {nameLabel}
                   </span>
                   {contactStatus ? (
                     <span className="contact-status-text" title={contactStatus}>
-                      {contactStatus}
+                      <bdi dir="auto">{contactStatus}</bdi>
                     </span>
                   ) : null}
                 </h4>
