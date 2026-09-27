@@ -2,9 +2,12 @@ import type { AutoswapEstimate } from "@linky/linkshu";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import type { MintMove } from "../app/hooks/mint/useMoveMintFunds";
-import { formatMintHost } from "../utils/mint";
+import type { MintIcon as MintIconSource } from "../utils/mint";
+import { formatMintLabel, mintKindBadge } from "../utils/mint";
 import { AmountDisplay } from "./AmountDisplay";
 import { Keypad } from "./Keypad";
+import { MintBadge } from "./MintBadge";
+import { MintIcon } from "./MintIcon";
 import { useAmountInputKeypad } from "./useAmountInputKeypad";
 
 interface MintMoveFundsFormProps {
@@ -12,6 +15,7 @@ interface MintMoveFundsFormProps {
   available: number;
   busy: boolean;
   estimateMintMove: (move: MintMove) => Promise<AutoswapEstimate | null>;
+  getMintIconUrl: (mint: string | null | undefined) => MintIconSource;
   moveMintFunds: (move: MintMove) => Promise<boolean>;
   sourceMint: string;
   /** Candidate target mints, the preferred one first. */
@@ -51,6 +55,7 @@ export function MintMoveFundsForm({
   available,
   busy,
   estimateMintMove,
+  getMintIconUrl,
   moveMintFunds,
   sourceMint,
   targets,
@@ -114,20 +119,44 @@ export function MintMoveFundsForm({
 
   return (
     <div className="mint-move-form">
-      <label htmlFor="mintMoveTarget">{t("mintMoveTarget")}</label>
-      <select
-        id="mintMoveTarget"
-        className="select"
-        value={target}
-        disabled={busy}
-        onChange={(event) => setTargetMint(event.target.value)}
+      <span className="mint-move-target-title" aria-hidden="true">
+        {t("mintMoveTarget")}
+      </span>
+      <div
+        className="mint-choice-group"
+        role="group"
+        aria-label={t("mintMoveTarget")}
       >
-        {targets.map((mint) => (
-          <option key={mint} value={mint}>
-            {formatMintHost(mint)}
-          </option>
-        ))}
-      </select>
+        {targets.map((mint) => {
+          const isSelected = mint === target;
+          const badge = mintKindBadge(mint);
+          return (
+            <div
+              key={mint}
+              className={`mint-choice-item${isSelected ? " is-selected" : ""}`}
+            >
+              <button
+                type="button"
+                className={`ghost mint-choice${isSelected ? " is-selected" : ""}`}
+                aria-pressed={isSelected}
+                disabled={busy}
+                onClick={() => setTargetMint(mint)}
+              >
+                <MintIcon getMintIconUrl={getMintIconUrl} mint={mint} />
+                <span className="mint-choice-label">
+                  {formatMintLabel(mint)}
+                </span>
+                {badge !== null ? <MintBadge kind={badge} /> : null}
+                {isSelected ? (
+                  <span className="mint-choice-check" aria-hidden="true">
+                    ✓
+                  </span>
+                ) : null}
+              </button>
+            </div>
+          );
+        })}
+      </div>
 
       <AmountDisplay
         amount={amount}

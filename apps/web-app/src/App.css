@@ -3446,8 +3446,9 @@ button.mint-choice.is-selected:hover {
   width: 100%;
 }
 
-.mint-move-form .select {
-  width: 100%;
+.mint-move-target-title {
+  color: #cbd5e1;
+  font-weight: 600;
 }
 
 .mint-move-maximum {

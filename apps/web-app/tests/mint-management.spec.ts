@@ -118,7 +118,11 @@ test("test mints can be hidden and funds move between mints", async ({
       String(FUNDING_SAT),
     );
     await expect(moveForm).toContainText(`Maximum ${FUNDING_SAT} sat`);
-    await page.getByLabel("To mint").selectOption({ label: "localhost:3339" });
+    const targetMint = page
+      .getByLabel("To mint")
+      .getByRole("button", { name: "localhost:3339" });
+    await targetMint.click();
+    await expect(targetMint).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Clear form", exact: true }).click();
     for (const digit of String(MOVE_SAT)) {
       await page.getByRole("button", { exact: true, name: digit }).click();

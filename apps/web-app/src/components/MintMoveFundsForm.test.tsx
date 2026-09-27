@@ -45,6 +45,14 @@ const AVAILABLE = 100;
 const INPUT_FEE = 1;
 const SOURCE_MINT = "https://cashu.cz";
 const TARGET_MINT = "https://kashu.me";
+const OTHER_TARGET_MINT = "http://localhost:3339";
+
+const noMintIcon = () => ({
+  failed: false,
+  host: null,
+  origin: null,
+  url: null,
+});
 
 /** A sweep is priced at its first attempt: the balance minus the input fee. */
 const estimateFor = (move: MintMove, feeReserve: number) => {
@@ -89,9 +97,10 @@ const renderForm = async (feeReserve: number) => {
       available={AVAILABLE}
       busy={false}
       estimateMintMove={estimateMintMove}
+      getMintIconUrl={noMintIcon}
       moveMintFunds={moveMintFunds}
       sourceMint={SOURCE_MINT}
-      targets={[TARGET_MINT]}
+      targets={[TARGET_MINT, OTHER_TARGET_MINT]}
     />,
   );
   return { ...rendered, estimateMintMove, moveMintFunds };
@@ -147,6 +156,35 @@ describe("MintMoveFundsForm", () => {
     await press(container, ["C", "5", "0", "mintMoveEstimate"]);
     expect(container.textContent).toContain("mintMoveExceedsBalance");
     expect(buttonNamed(container, "mintMoveConfirm").disabled).toBe(true);
+    await unmount();
+  });
+
+  it("picks the target from the mint buttons, the preferred one first", async () => {
+    const { container, estimateMintMove, unmount } = await renderForm(4);
+    const group = container.querySelector(
+      '[role="group"][aria-label="mintMoveTarget"]',
+    );
+    const targetButtons = Array.from(group?.querySelectorAll("button") ?? []);
+    expect(
+      targetButtons.map((button) => [
+        button.querySelector(".mint-choice-label")?.textContent,
+        button.querySelector(".mint-choice-badge")?.textContent,
+        button.getAttribute("aria-pressed"),
+      ]),
+    ).toEqual([
+      ["kashu.me", undefined, "true"],
+      ["localhost:3339", "testMintBadge", "false"],
+    ]);
+    expect(group?.querySelectorAll(".mint-icon-fallback")).toHaveLength(2);
+
+    await act(async () => {
+      targetButtons[1]?.click();
+    });
+    expect(targetButtons[1]?.getAttribute("aria-pressed")).toBe("true");
+    await press(container, ["mintMoveEstimate"]);
+    expect(estimateMintMove.mock.calls[0]?.[0].targetMint).toBe(
+      OTHER_TARGET_MINT,
+    );
     await unmount();
   });
 

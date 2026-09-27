@@ -176,6 +176,7 @@ export function MintDetailPage() {
             available={holding.balance}
             busy={cashuIsBusy}
             estimateMintMove={estimateMintMove}
+            getMintIconUrl={getMintIconUrl}
             moveMintFunds={moveMintFunds}
             sourceMint={cleaned}
             targets={moveTargets(
