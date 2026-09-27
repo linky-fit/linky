@@ -195,6 +195,22 @@ export const extractPpk = (value: PpkSearchValue): number | null => {
   return null;
 };
 
+/** The mint url as the mints list names it: without the scheme, path kept. */
+export const formatMintLabel = (mintUrl: string): string =>
+  mintUrl.replace(/^https?:\/\//i, "");
+
+export type MintBadgeKind = "default" | "recommended" | "test";
+
+const RECOMMENDED_MINT_URL = "https://cashu.cz";
+
+/** The badge the mints list shows next to a mint, if any. */
+export const mintKindBadge = (mintUrl: string): MintBadgeKind | null => {
+  if (isTestMintUrl(mintUrl)) return "test";
+  return normalizeMintUrl(mintUrl) === RECOMMENDED_MINT_URL
+    ? "recommended"
+    : null;
+};
+
 export const formatMintHost = (mintUrl: string): string => {
   const withoutScheme = mintUrl.replace(/^https?:\/\//i, "");
   try {

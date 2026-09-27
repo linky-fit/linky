@@ -1,10 +1,8 @@
-import { LightningFeeProbeResult } from "@linky/linkshu";
-import { Either, Schema } from "effect";
-import React, { act } from "react";
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
-import type { ProbeLightningFee } from "../app/hooks/composition/useLinkshuComposition";
+import { createMintSettings } from "../testUtils/mintSettings";
+import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintsPage } from "./MintsPage";
 
 let mintSettings: MintSettingsContextValue;
@@ -25,57 +23,6 @@ vi.mock("../app/context/AppShellContexts", () => ({
 vi.mock("../app/context/SystemSettingsContexts", () => ({
   useMintSettingsContext: () => mintSettings,
 }));
-
-const decodeProbeResult = Schema.decodeUnknownSync(LightningFeeProbeResult);
-const probeLightningFee = vi.fn<ProbeLightningFee>(
-  async ({ mint, probeMint }) =>
-    Either.right(
-      decodeProbeResult({
-        mint,
-        probeMint,
-        amount: 10000,
-        feeReserve: 120,
-        percent: 1.2,
-      }),
-    ),
-);
-
-const appOwnerIdRef = React.createRef<string>();
-
-const createMintSettings = (
-  overrides: Partial<MintSettingsContextValue> = {},
-): MintSettingsContextValue => ({
-  allowTestMints: true,
-  appOwnerIdRef,
-  applyDefaultMintSelection: vi.fn(async () => {}),
-  cashuIsBusy: false,
-  cashuMeltToMainMintButtonLabel: "Melt foreign balance",
-  cashuProofs: [],
-  defaultMintUrl: "https://cashu.cz",
-  defaultMintUrlDraft: "https://custom.example",
-  estimateMintMove: vi.fn(async () => null),
-  getMintIconUrl: () => ({
-    failed: false,
-    host: null,
-    origin: null,
-    url: null,
-  }),
-  getMintRuntime: () => null,
-  meltLargestForeignMintToMainMint: vi.fn(async () => {}),
-  mintInfoByUrl: new Map(),
-  moveMintFunds: vi.fn(async () => false),
-  pendingMintDeleteUrl: null,
-  probeLightningFee,
-  refreshMintInfo: async () => {},
-  setAllowTestMints: vi.fn<MintSettingsContextValue["setAllowTestMints"]>(
-    async () => ({ ok: true }),
-  ),
-  setDefaultMintUrlDraft: vi.fn(),
-  setMintInfoAll: vi.fn(),
-  setPendingMintDeleteUrl: vi.fn(),
-  setStatus: vi.fn(),
-  ...overrides,
-});
 
 const findButton = (
   container: HTMLElement,
@@ -152,59 +99,6 @@ describe("MintsPage", () => {
     await act(async () => {
       root.unmount();
     });
-  });
-
-  it("shows the selected mint's keyset fee and requests a refresh when unknown", async () => {
-    const refreshMintInfo = vi.fn(async () => {});
-    mintSettings = createMintSettings({ refreshMintInfo });
-
-    const { container, root } = await renderIntoDocument(<MintsPage />);
-    expect(refreshMintInfo).toHaveBeenCalledWith("https://cashu.cz");
-    expect(container.textContent).toContain("unknown");
-
-    mintSettings = createMintSettings({
-      mintInfoByUrl: new Map([
-        [
-          "https://cashu.cz",
-          {
-            id: "row",
-            url: "https://cashu.cz",
-            feesJson: JSON.stringify({ ppk: 100, raw: null }),
-          },
-        ],
-      ]),
-    });
-    await act(async () => {
-      root.render(<MintsPage />);
-    });
-    expect(container.textContent).toContain("~1 sat");
-    expect(probeLightningFee).toHaveBeenCalledWith({
-      mint: "https://cashu.cz",
-      probeMint: "https://mint.minibits.cash/Bitcoin",
-    });
-    expect(container.textContent).toContain("~1.2 %");
-
-    await act(async () => {
-      root.unmount();
-    });
-  });
-
-  it("keeps the Lightning fee's tenths above ten percent", async () => {
-    probeLightningFee.mockResolvedValueOnce(
-      Either.right(
-        decodeProbeResult({
-          mint: "https://cashu.cz",
-          probeMint: "https://mint.minibits.cash/Bitcoin",
-          amount: 10000,
-          feeReserve: 1250,
-          percent: 12.5,
-        }),
-      ),
-    );
-    mintSettings = createMintSettings();
-    const { container, unmount } = await renderIntoDocument(<MintsPage />);
-    expect(container.textContent).toContain("~12.5 %");
-    await unmount();
   });
 
   it("blocks the custom save while busy", async () => {

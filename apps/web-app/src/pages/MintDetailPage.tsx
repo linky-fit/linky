@@ -1,59 +1,26 @@
 import { parseMintUrl } from "@linky/linkshu";
 import { sqliteTrue } from "@linky/linksync";
-import {
-  Coins,
-  Gauge,
-  HandCoins,
-  Link,
-  Lock,
-  Receipt,
-  Star,
-  Wallet,
-} from "lucide-react";
+import { Gauge, Wallet } from "lucide-react";
 import type React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
+import { MintBadge } from "../components/MintBadge";
+import { MintFees } from "../components/MintFees";
+import { MintIcon } from "../components/MintIcon";
 import { MintMoveFundsForm } from "../components/MintMoveFundsForm";
 import { navigateTo } from "../hooks/useRouting";
 import { LOCAL_MINT_INFO_STORAGE_KEY_PREFIX } from "../utils/constants";
 import { normalizeLocale } from "../utils/formatting";
 import {
-  extractPpk,
+  formatMintLabel,
   isHiddenTestMint,
   MAIN_MINT_URL,
+  mintKindBadge,
   normalizeMintUrl,
   PRESET_MINTS,
 } from "../utils/mint";
 import { safeLocalStorageSetJson } from "../utils/storage";
-
-const isPpkSearchInput = (
-  value: unknown,
-): value is Parameters<typeof extractPpk>[0] => {
-  if (value === null) return true;
-  if (Array.isArray(value)) return true;
-  const valueType = typeof value;
-  return (
-    valueType === "string" ||
-    valueType === "number" ||
-    valueType === "boolean" ||
-    valueType === "bigint" ||
-    valueType === "symbol" ||
-    valueType === "object"
-  );
-};
-
-const parsePpk = (feesJson: string): number | null => {
-  if (!feesJson) return null;
-  try {
-    const parsed: unknown = JSON.parse(feesJson);
-    if (!isPpkSearchInput(parsed)) return null;
-    const found = extractPpk(parsed);
-    return typeof found === "number" && Number.isFinite(found) ? found : null;
-  } catch {
-    return null;
-  }
-};
 
 /** Other mints funds can move to: the default first, then funded mints and presets. */
 const moveTargets = (
@@ -104,6 +71,7 @@ export function MintDetailPage() {
     cashuProofs,
     defaultMintUrl,
     estimateMintMove,
+    getMintIconUrl,
     getMintRuntime,
     mintInfoByUrl,
     moveMintFunds,
@@ -141,8 +109,7 @@ export function MintDetailPage() {
   const runtime = getMintRuntime(cleaned);
   const lastCheckedAtSec = runtime?.lastCheckedAtSec ?? 0;
   const latencyMs = runtime?.latencyMs ?? null;
-  const feesJson = (row?.feesJson ?? "").trim();
-  const ppk = parsePpk(feesJson);
+  const kindBadge = mintKindBadge(cleaned);
 
   const deleteMint = () => {
     if (pendingMintDeleteUrl !== cleaned) {
@@ -171,39 +138,14 @@ export function MintDetailPage() {
 
   return (
     <section className="panel settings-page">
-      <div className="settings-section">
-        <h2 className="settings-section-title">{t("mintFundsTitle")}</h2>
-        <InfoRow
-          icon={<Wallet size={18} />}
-          label={t("mintBalance")}
-          value={formatDisplayedAmountText(holding.balance)}
-        />
-        <InfoRow
-          icon={<Coins size={18} />}
-          label={t("mintProofsAvailable")}
-          value={holding.availableCount}
-        />
-        {holding.heldCount > 0 ? (
-          <InfoRow
-            icon={<Lock size={18} />}
-            label={t("mintProofsHeld")}
-            value={holding.heldCount}
-          />
-        ) : null}
-        {holding.handedOutCount > 0 ? (
-          <InfoRow
-            icon={<HandCoins size={18} />}
-            label={t("mintProofsHandedOut")}
-            value={holding.handedOutCount}
-          />
-        ) : null}
-        {isDefault ? (
-          <InfoRow
-            icon={<Star size={18} />}
-            label={t("mintIsDefault")}
-            value="✓"
-          />
-        ) : (
+      <div className="settings-section mint-detail-header">
+        <div className="mint-detail-identity">
+          <MintIcon getMintIconUrl={getMintIconUrl} mint={cleaned} />
+          <h2 className="mint-detail-name">{formatMintLabel(cleaned)}</h2>
+          {isDefault ? <MintBadge kind="default" /> : null}
+          {kindBadge !== null ? <MintBadge kind={kindBadge} /> : null}
+        </div>
+        {isDefault ? null : (
           <div className="settings-row">
             <button
               type="button"
@@ -215,6 +157,15 @@ export function MintDetailPage() {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="settings-section">
+        <h2 className="settings-section-title">{t("mintFundsTitle")}</h2>
+        <InfoRow
+          icon={<Wallet size={18} />}
+          label={t("mintBalance")}
+          value={formatDisplayedAmountText(holding.balance)}
+        />
       </div>
 
       {holding.balance > 0 ? (
@@ -238,67 +189,56 @@ export function MintDetailPage() {
       ) : null}
 
       <div className="settings-section">
-        <h2 className="settings-section-title">{t("mintInfoTitle")}</h2>
-        <InfoRow
-          icon={<Link size={18} />}
-          label={t("mintUrl")}
-          value={<span className="relay-url">{cleaned}</span>}
-        />
-        {row !== null ? (
-          <>
-            <InfoRow
-              icon={<Receipt size={18} />}
-              label={t("mintFees")}
-              value={
-                ppk !== null
-                  ? `ppk: ${ppk}`
-                  : feesJson || <span className="muted">{t("unknown")}</span>
-              }
-            />
-            <InfoRow
-              icon={<Gauge size={18} />}
-              label={t("mintLatency")}
-              value={
-                latencyMs !== null ? (
-                  `${latencyMs} ms`
-                ) : (
-                  <span className="muted">{t("unknown")}</span>
-                )
-              }
-            />
-            <div className="settings-row">
-              <button
-                type="button"
-                className="btn-wide secondary"
-                onClick={() => void refreshMintInfo(cleaned)}
-              >
-                {t("mintRefresh")}
-              </button>
-            </div>
-            <div className="settings-row">
-              <button
-                type="button"
-                className={
-                  pendingMintDeleteUrl === cleaned
-                    ? "btn-wide danger"
-                    : "btn-wide"
-                }
-                onClick={deleteMint}
-              >
-                {t("mintDelete")}
-              </button>
-            </div>
-            {lastCheckedAtSec ? (
-              <p className="muted settings-error-note">
-                {t("mintLastChecked")}:{" "}
-                {new Date(lastCheckedAtSec * 1000).toLocaleString(
-                  normalizeLocale(lang),
-                )}
-              </p>
-            ) : null}
-          </>
-        ) : null}
+        <h2 className="settings-section-title">{t("mintFees")}</h2>
+        <MintFees mint={cleaned} />
       </div>
+
+      {row !== null ? (
+        <div className="settings-section">
+          <h2 className="settings-section-title">{t("mintInfoTitle")}</h2>
+          <InfoRow
+            icon={<Gauge size={18} />}
+            label={t("mintLatency")}
+            value={
+              latencyMs !== null ? (
+                `${latencyMs} ms`
+              ) : (
+                <span className="muted">{t("unknown")}</span>
+              )
+            }
+          />
+          <div className="settings-row">
+            <button
+              type="button"
+              className="btn-wide secondary"
+              onClick={() => void refreshMintInfo(cleaned)}
+            >
+              {t("mintRefresh")}
+            </button>
+          </div>
+          <div className="settings-row">
+            <button
+              type="button"
+              className={
+                pendingMintDeleteUrl === cleaned
+                  ? "btn-wide danger"
+                  : "btn-wide"
+              }
+              onClick={deleteMint}
+            >
+              {t("mintDelete")}
+            </button>
+          </div>
+          {lastCheckedAtSec ? (
+            <p className="muted settings-error-note">
+              {t("mintLastChecked")}:{" "}
+              {new Date(lastCheckedAtSec * 1000).toLocaleString(
+                normalizeLocale(lang),
+              )}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

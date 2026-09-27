@@ -1,13 +1,11 @@
 import { ChevronRight } from "lucide-react";
-import React from "react";
-import type { MintIcon } from "../utils/mint";
-import { getNextMintIconUrl } from "../utils/mint";
+import type { MintBadgeKind, MintIcon as MintIconSource } from "../utils/mint";
+import { MintBadge } from "./MintBadge";
+import { MintIcon } from "./MintIcon";
 
 interface MintButtonProps {
-  badgeLabel?: string;
-  badgeTone?: "recommended" | "test";
-  fallbackLetter: string;
-  getMintIconUrl: (mint: string | null | undefined) => MintIcon;
+  badge: MintBadgeKind | null;
+  getMintIconUrl: (mint: string | null | undefined) => MintIconSource;
   isSelected: boolean;
   isTestMint?: boolean;
   label: string;
@@ -16,9 +14,7 @@ interface MintButtonProps {
 }
 
 export function MintButton({
-  badgeLabel,
-  badgeTone = "test",
-  fallbackLetter,
+  badge,
   getMintIconUrl,
   isSelected,
   isTestMint = false,
@@ -26,52 +22,16 @@ export function MintButton({
   mint,
   onClick,
 }: MintButtonProps) {
-  const icon = getMintIconUrl(mint);
-  const [renderedIconUrl, setRenderedIconUrl] = React.useState(icon.url);
-
-  React.useEffect(() => {
-    setRenderedIconUrl(icon.url);
-  }, [icon.url]);
-
   return (
     <button
-      key={mint}
       type="button"
       className={`ghost mint-choice${isTestMint ? " is-test-mint" : ""}${isSelected ? " is-selected" : ""}`}
       aria-current={isSelected ? "true" : undefined}
       onClick={onClick}
     >
-      {renderedIconUrl ? (
-        <img
-          src={renderedIconUrl}
-          alt=""
-          width={14}
-          height={14}
-          className="mint-icon"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => {
-            const nextUrl = getNextMintIconUrl(renderedIconUrl, icon.origin);
-            if (nextUrl) {
-              setRenderedIconUrl(nextUrl);
-              return;
-            }
-            setRenderedIconUrl(null);
-          }}
-        />
-      ) : (
-        <span aria-hidden="true" className="mint-icon-fallback">
-          {fallbackLetter}
-        </span>
-      )}
+      <MintIcon getMintIconUrl={getMintIconUrl} mint={mint} />
       <span className="mint-choice-label">{label}</span>
-      {badgeLabel ? (
-        <span
-          className={`mint-choice-badge${badgeTone === "recommended" ? " is-recommended" : ""}`}
-        >
-          {badgeLabel}
-        </span>
-      ) : null}
+      {badge !== null ? <MintBadge kind={badge} /> : null}
       {isSelected ? (
         <span className="mint-choice-check" aria-hidden="true">
           ✓

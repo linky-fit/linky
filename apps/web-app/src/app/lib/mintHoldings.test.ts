@@ -7,7 +7,7 @@ const proof = (mint: string, amount: number, state: StoredProof["state"]) =>
   createStoredProofFixture({ mint, amount, state });
 
 describe("mintHoldings", () => {
-  it("sums available proofs and counts every other state per mint", () => {
+  it("sums and counts only available proofs per mint", () => {
     const holdings = mintHoldings([
       proof("https://cashu.cz", 8, "available"),
       proof("https://cashu.cz", 4, "available"),
@@ -21,8 +21,6 @@ describe("mintHoldings", () => {
     expect(holdingOf(holdings, "https://cashu.cz/")).toEqual({
       balance: 12,
       availableCount: 2,
-      heldCount: 1,
-      handedOutCount: 2,
     });
     expect(holdingOf(holdings, "https://kashu.me").balance).toBe(32);
     expect(holdingOf(holdings, "https://unknown.example").balance).toBe(0);
