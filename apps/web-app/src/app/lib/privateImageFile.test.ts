@@ -3,10 +3,10 @@ import type { InspectorRow } from "../../devtools/inspector/inspectorRows";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
 import {
   downloadPrivateImageBlob,
-  isCancelledShareError,
   sanitizeExportFileName,
   sharePrivateImageBlob,
 } from "./privateImageFile";
+import { isCancelledShareError } from "../../platform/fileExport";
 
 vi.mock("../../devtools/inspector/reportInspectorRows", () => ({
   reportInspectorRows: vi.fn(),

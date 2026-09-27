@@ -1,6 +1,6 @@
 import { createId } from "@linky/linksync";
 import { Effect } from "effect";
-import { act, useState } from "react";
+import { act } from "react";
 import { expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { useContactEditor } from "./useContactEditor";
@@ -29,7 +29,6 @@ const params: Params = {
   selectedContactMetadata: null,
   selectedContact: initialContact,
   setContactNewPrefill: vi.fn(),
-  setPendingDeleteId: vi.fn(),
   setRecentlyAddedContactId: vi.fn(),
   setStatus: vi.fn(),
   t: (key) => key,
@@ -42,35 +41,28 @@ interface EditorProps {
 }
 
 const Editor = ({ selectedContact, route }: EditorProps) => {
-  const [pendingDeleteId, setPendingDeleteId] = useState<
-    typeof contactId | null
-  >(null);
   const { editingId, form, setForm } = useContactEditor({
     ...params,
     selectedContact,
     route,
-    setPendingDeleteId,
   });
   return (
     <>
-      <button onClick={() => setPendingDeleteId(editingId)}>Arm archive</button>
       <button onClick={() => setForm({ ...form, name: "Unsaved name" })}>
         Edit name
       </button>
-      <output>{pendingDeleteId}</output>
+      <output>{editingId}</output>
       <input readOnly value={form.name} />
     </>
   );
 };
 
-it("keeps archive confirmation and unsaved edits through contact updates, but resets them when changing contacts", async () => {
+it("keeps unsaved edits through contact updates, but resets them when changing contacts", async () => {
   const view = await renderIntoDocument(
     <Editor selectedContact={initialContact} route={params.route} />,
   );
-  const buttons = view.container.querySelectorAll("button");
   await act(async () => {
-    buttons[0]?.click();
-    buttons[1]?.click();
+    view.container.querySelector("button")?.click();
   });
   expect(view.container.querySelector("output")?.textContent).toBe(contactId);
   await view.rerender(
@@ -87,7 +79,7 @@ it("keeps archive confirmation and unsaved edits through contact updates, but re
       route={{ kind: "contactEdit", id: otherId }}
     />,
   );
-  expect(view.container.querySelector("output")?.textContent).toBe("");
+  expect(view.container.querySelector("output")?.textContent).toBe(otherId);
   expect(view.container.querySelector("input")?.value).toBe("Bob");
   await view.unmount();
 });

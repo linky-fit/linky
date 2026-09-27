@@ -68,6 +68,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "User saved a decrypted chat PDF as a file download; the rumor link ties it to the message it came from.",
   ChatFileShareFailed:
     "System share of a chat PDF failed for a reason other than the user cancelling; the app fell back to a file download when triggered from the message menu.",
+  AppDataExported:
+    "User exported contacts and the cashu wallet as a backup file: a browser download on the web, the system share sheet in the native shell. The payload holds counts only, never the rows.",
+  AppDataExportFailed:
+    "The backup file could not be built or handed to the platform for a reason other than the user dismissing the share sheet.",
   "bankOffer.staggerExtended":
     "A staggered proxy payment offer reached its next queued recipient: the configured delay elapsed without a winner, so the offer was extended while keeping the original expiry.",
   "payment.queuedApprovalRejected":

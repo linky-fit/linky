@@ -118,6 +118,7 @@ import {
   safeLocalStorageSetJson,
 } from "../../../utils/storage";
 import type { Translate } from "../../../i18n";
+import type { PushToastOptions } from "../../../hooks/useToasts";
 
 const inMemoryNostrPictureCache = new Map<string, string | null>();
 
@@ -218,7 +219,7 @@ interface UseContactsMessagingCompositionParams {
     body: string,
     tag?: string,
   ) => Promise<void>;
-  pushToast: (message: string) => void;
+  pushToast: (message: string, options?: PushToastOptions) => void;
   route: ReturnType<typeof useRouting>;
   /** Receipts-enabled baseline; null means "send read receipts" is off. */
   seenReceiptsEnabledAtSec: number | null;
@@ -262,10 +263,6 @@ export const useContactsMessagingComposition = ({
   transactions,
   transactionsBootstrapSnapshot,
 }: UseContactsMessagingCompositionParams) => {
-  const [pendingDeleteId, setPendingDeleteId] = useState<ContactId | null>(
-    null,
-  );
-
   const [recentlyAddedContactId, setRecentlyAddedContactId] =
     useState<ContactId | null>(null);
 
@@ -1256,7 +1253,6 @@ export const useContactsMessagingComposition = ({
     selectedContactMetadata,
     selectedContact,
     setContactNewPrefill,
-    setPendingDeleteId,
     setRecentlyAddedContactId,
     setStatus,
     t,
@@ -1265,12 +1261,10 @@ export const useContactsMessagingComposition = ({
 
   const closeContactDetail = React.useCallback(() => {
     clearContactForm();
-    setPendingDeleteId(null);
     navigateTo({ route: "contacts" });
   }, [clearContactForm]);
 
   const openNewContactPage = React.useCallback(() => {
-    setPendingDeleteId(null);
     setPayAmount("");
     clearContactForm();
     const prefill = contactNewPrefill;
@@ -1302,32 +1296,6 @@ export const useContactsMessagingComposition = ({
   const contactsOnboardingHasSentMessage = useMemo(() => {
     return nostrMessagesRecent.some((m) => m.direction === "out");
   }, [nostrMessagesRecent]);
-
-  // Archiving is a conversation action and marks the chat read; the messages
-  // stay on this contact and a newer incoming message restores it.
-  const handleDelete = async (id: ContactId) => {
-    const archivedAtSec = PositiveInt.orThrow(Math.ceil(Date.now() / 1e3));
-    const result = await runWrite(
-      Effect.flatMap(conversationsRepository.ensureDirect(id), (chat) =>
-        Effect.zipRight(
-          conversationsRepository.archive(chat.id, archivedAtSec),
-          conversationsRepository.markSeen(chat.id, archivedAtSec),
-        ),
-      ),
-    );
-    if (result.ok) {
-      reportAppLog({
-        tag: "conversations.archived",
-        summary: "Archived a contact's conversation",
-        links: { contact: id, conversation: directConversationIdFor(id) },
-        payload: { archivedAtSec },
-      });
-      setStatus(t("contactArchived"));
-      closeContactDetail();
-      return;
-    }
-    setStatus(`${t("errorPrefix")}: ${result.error}`);
-  };
 
   const unarchiveContact = React.useCallback(
     async (id: ContactId) => {
@@ -1376,6 +1344,62 @@ export const useContactsMessagingComposition = ({
     [closeContactDetail, setStatus, t, unarchiveContact],
   );
 
+  const undoArchiveContact = React.useCallback(
+    async (id: ContactId) => {
+      const result = await unarchiveContact(id);
+      setStatus(
+        result.ok
+          ? t("contactRestored")
+          : `${t("errorPrefix")}: ${result.error}`,
+      );
+    },
+    [setStatus, t, unarchiveContact],
+  );
+
+  // Archiving is a conversation action and marks the chat read; the messages
+  // stay on this contact and a newer incoming message restores it. It runs on
+  // one click; the toast offers to undo it.
+  const archiveContact = React.useCallback(
+    async (id: ContactId) => {
+      const archivedAtSec = PositiveInt.orThrow(Math.ceil(Date.now() / 1e3));
+      const result = await runWrite(
+        Effect.flatMap(conversationsRepository.ensureDirect(id), (chat) =>
+          Effect.zipRight(
+            conversationsRepository.archive(chat.id, archivedAtSec),
+            conversationsRepository.markSeen(chat.id, archivedAtSec),
+          ),
+        ),
+      );
+      if (!result.ok) {
+        setStatus(`${t("errorPrefix")}: ${result.error}`);
+        return;
+      }
+      reportAppLog({
+        tag: "conversations.archived",
+        summary: "Archived a contact's conversation",
+        links: { contact: id, conversation: directConversationIdFor(id) },
+        payload: { archivedAtSec },
+      });
+      closeContactDetail();
+      pushToast(t("contactArchived"), {
+        action: {
+          label: t("undoArchiveContact"),
+          onClick: () => {
+            void undoArchiveContact(id);
+          },
+        },
+      });
+    },
+    [
+      closeContactDetail,
+      conversationsRepository,
+      pushToast,
+      setStatus,
+      t,
+      undoArchiveContact,
+    ],
+  );
+
   const publishMuteList = useAtomSet(publishMuteListAtom, {
     mode: "promiseExit",
   });
@@ -1413,15 +1437,10 @@ export const useContactsMessagingComposition = ({
     [currentNsec, publishMuteList],
   );
 
-  const requestDeleteCurrentContact = () => {
+  const archiveCurrentContact = React.useCallback(() => {
     if (!editingId) return;
-    if (pendingDeleteId === editingId) {
-      setPendingDeleteId(null);
-      void handleDelete(editingId);
-      return;
-    }
-    setPendingDeleteId(editingId);
-  };
+    void archiveContact(editingId);
+  }, [archiveContact, editingId]);
 
   const { openFeedbackContact } = useFeedbackContact<(typeof contacts)[number]>(
     { contacts, contactsRepository, pushToast, t },
@@ -1517,7 +1536,6 @@ export const useContactsMessagingComposition = ({
       const contactId = (contact.id ?? "").trim();
       if (!contactId) return;
 
-      setPendingDeleteId(null);
       contactPayBackToChatRef.current = null;
 
       if (contact.isUnknownContact) {
@@ -2176,7 +2194,6 @@ export const useContactsMessagingComposition = ({
     openNewContactPage,
     openNpubMessageContact,
     openScannedContactPendingNpubRef,
-    pendingDeleteId,
     pendingPayments,
     pendingRelayDeleteUrl,
     reactionsByMessageId,
@@ -2184,7 +2201,7 @@ export const useContactsMessagingComposition = ({
     removePendingPayment,
     replyContext,
     requestBankPaymentOffer,
-    requestDeleteCurrentContact,
+    archiveCurrentContact,
     requestDeleteSelectedRelay,
     resetEditedContactFieldFromNostr,
     respondToBankPaymentOfferWithGroupState,
@@ -2207,7 +2224,6 @@ export const useContactsMessagingComposition = ({
     setContactsSearch,
     setForm,
     setNewRelayUrl,
-    setPendingDeleteId,
     statusFilterCurrencies,
     ungroupedCount,
     unreadByContactId,

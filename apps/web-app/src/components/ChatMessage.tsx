@@ -29,9 +29,9 @@ import type { CashuPaymentRequestMessageInfo } from "../app/lib/paymentRequestMe
 import {
   canSharePrivateImage,
   downloadPrivateImageBlob,
-  isCancelledShareError,
   sharePrivateImageBlob,
 } from "../app/lib/privateImageFile";
+import { isCancelledShareError } from "../platform/fileExport";
 import {
   isPrivatePdfPayload,
   parsePrivateImageMessage,

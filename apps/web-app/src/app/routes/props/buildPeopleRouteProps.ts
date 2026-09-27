@@ -80,7 +80,6 @@ interface BuildPeopleRoutePropsParams {
   reactionsByMessageId: PeopleRoutesProps["chatProps"]["reactionsByMessageId"];
   route: Route;
   selectedContactStatusText: PeopleRoutesProps["contactProps"]["statusText"];
-  pendingDeleteId: PeopleRoutesProps["contactEditProps"]["pendingDeleteId"];
   profileCustomPictureUrl: PeopleRoutesProps["profileProps"]["profileCustomPictureUrl"];
   profileEditLnAddress: PeopleRoutesProps["profileProps"]["profileEditLnAddress"];
   profileEditName: PeopleRoutesProps["profileProps"]["profileEditName"];
@@ -95,7 +94,7 @@ interface BuildPeopleRoutePropsParams {
   profileSelectedPictureKind: PeopleRoutesProps["profileProps"]["profileSelectedPictureKind"];
   restoreArchivedContact: PeopleRoutesProps["contactEditProps"]["restoreArchivedContact"];
   restoreSelectedContact: PeopleRoutesProps["contactProps"]["restoreArchivedContact"];
-  requestDeleteCurrentContact: PeopleRoutesProps["contactEditProps"]["requestDeleteCurrentContact"];
+  archiveCurrentContact: PeopleRoutesProps["contactEditProps"]["archiveCurrentContact"];
   requestSelectedContact: PeopleRoutesProps["contactPayProps"]["requestSelectedContact"];
   resetEditedContactFieldFromNostr: PeopleRoutesProps["contactEditProps"]["resetEditedContactFieldFromNostr"];
   saveClaimedLightningAddress: PeopleRoutesProps["profileProps"]["saveClaimedLightningAddress"];
@@ -197,7 +196,6 @@ export const buildPeopleRouteProps = ({
   reactionsByMessageId,
   route,
   selectedContactStatusText,
-  pendingDeleteId,
   profileCustomPictureUrl,
   profileEditLnAddress,
   profileEditName,
@@ -212,7 +210,7 @@ export const buildPeopleRouteProps = ({
   profileSelectedPictureKind,
   restoreArchivedContact,
   restoreSelectedContact,
-  requestDeleteCurrentContact,
+  archiveCurrentContact,
   requestSelectedContact,
   resetEditedContactFieldFromNostr,
   saveClaimedLightningAddress,
@@ -310,12 +308,11 @@ export const buildPeopleRouteProps = ({
       contactEditsSavable,
       publicLnAddress: selectedContactPublicProfile.lnAddress,
       publicName: selectedContactPublicProfile.name,
-      pendingDeleteId,
       handleSaveContact,
       isSavingContact,
       blockArchivedContact,
       restoreArchivedContact,
-      requestDeleteCurrentContact,
+      archiveCurrentContact,
       resetEditedContactFieldFromNostr,
       t,
     },

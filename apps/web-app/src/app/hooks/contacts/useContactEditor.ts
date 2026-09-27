@@ -114,7 +114,6 @@ interface UseContactEditorParams {
   setContactNewPrefill: React.Dispatch<
     React.SetStateAction<ContactNewPrefill | null>
   >;
-  setPendingDeleteId: React.Dispatch<React.SetStateAction<ContactId | null>>;
   setRecentlyAddedContactId: React.Dispatch<
     React.SetStateAction<ContactId | null>
   >;
@@ -170,7 +169,6 @@ export const useContactEditor = ({
   selectedContactMetadata,
   selectedContact,
   setContactNewPrefill,
-  setPendingDeleteId,
   setRecentlyAddedContactId,
   setStatus,
   t,
@@ -256,7 +254,6 @@ export const useContactEditor = ({
 
     if (route.kind === "contactNew") {
       seededEditContactIdRef.current = null;
-      setPendingDeleteId(null);
       setEditingId(null);
       setContactEditInitial(null);
       if (contactNewPrefill) {
@@ -280,7 +277,6 @@ export const useContactEditor = ({
 
     if (!selectedContact) {
       seededEditContactIdRef.current = null;
-      setPendingDeleteId(null);
       setEditingId(null);
       setContactEditInitial(null);
       setForm(makeEmptyContactForm());
@@ -292,7 +288,6 @@ export const useContactEditor = ({
     if (seededEditContactIdRef.current === selectedContact.id) return;
     seededEditContactIdRef.current = selectedContact.id;
 
-    setPendingDeleteId(null);
     setEditingId(selectedContact.id);
     const resolvedProfile = resolveContactProfile(
       selectedContact,
@@ -317,7 +312,6 @@ export const useContactEditor = ({
     selectedContactMetadata,
     selectedContact,
     setContactNewPrefill,
-    setPendingDeleteId,
   ]);
 
   const selectedContactPublicProfile = React.useMemo(() => {
@@ -580,7 +574,6 @@ export const useContactEditor = ({
     }
 
     clearContactForm();
-    setPendingDeleteId(null);
     navigateTo({ route: "contacts" });
     setIsSavingContact(false);
   }, [
@@ -598,7 +591,6 @@ export const useContactEditor = ({
     isSavingContact,
     route.kind,
     selectedContact,
-    setPendingDeleteId,
     setRecentlyAddedContactId,
     setStatus,
     t,
@@ -852,7 +844,6 @@ export const useContactEditor = ({
         await backfillLightningAddressTransactions(id, lnAddress);
       }
       clearContactForm();
-      setPendingDeleteId(null);
       navigateTo({ route: "contacts" });
       setIsSavingContact(false);
     },
@@ -863,7 +854,6 @@ export const useContactEditor = ({
       contactsRepository,
       currentNpub,
       isSavingContact,
-      setPendingDeleteId,
       setRecentlyAddedContactId,
       setStatus,
       t,

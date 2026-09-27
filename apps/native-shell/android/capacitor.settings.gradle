@@ -5,6 +5,9 @@ project(':capacitor-android').projectDir = new File('../../../node_modules/.bun/
 include ':capacitor-clipboard'
 project(':capacitor-clipboard').projectDir = new File('../../../node_modules/.bun/@capacitor+clipboard@7.0.4+49675fcae9c66213/node_modules/@capacitor/clipboard/android')
 
+include ':capacitor-filesystem'
+project(':capacitor-filesystem').projectDir = new File('../../../node_modules/.bun/@capacitor+filesystem@7.1.8+49675fcae9c66213/node_modules/@capacitor/filesystem/android')
+
 include ':capacitor-push-notifications'
 project(':capacitor-push-notifications').projectDir = new File('../../../node_modules/.bun/@capacitor+push-notifications@7.0.6+49675fcae9c66213/node_modules/@capacitor/push-notifications/android')
 

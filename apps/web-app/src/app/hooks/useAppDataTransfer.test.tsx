@@ -3,6 +3,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { useAppDataTransfer } from "./useAppDataTransfer";
 
+const mocks = vi.hoisted(() => ({
+  saveFile: vi.fn<(file: { fileName: string }) => Promise<void>>(
+    async () => undefined,
+  ),
+}));
+
+vi.mock("../../platform/fileExport", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../platform/fileExport")>();
+  return { ...actual, saveFile: mocks.saveFile };
+});
+
 const mount = async () => {
   const insert = vi.fn();
   const update = vi.fn();
@@ -44,6 +56,36 @@ describe("useAppDataTransfer", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    mocks.saveFile.mockReset();
+    mocks.saveFile.mockResolvedValue(undefined);
+  });
+
+  it("hands the export file to the platform and confirms with a toast", async () => {
+    const { transfer, pushToast } = await mount();
+    await act(() => {
+      transfer.exportAppData();
+    });
+    const file = mocks.saveFile.mock.calls[0]?.[0];
+    expect(file?.fileName).toMatch(/^linky-export-\d{4}-\d{2}-\d{2}\.txt$/);
+    expect(pushToast).toHaveBeenCalledWith("exportDone");
+  });
+
+  it("stays quiet when the native share sheet is dismissed", async () => {
+    mocks.saveFile.mockRejectedValueOnce(new Error("Share canceled"));
+    const { transfer, pushToast } = await mount();
+    await act(() => {
+      transfer.exportAppData();
+    });
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed export", async () => {
+    mocks.saveFile.mockRejectedValueOnce(new Error("disk full"));
+    const { transfer, pushToast } = await mount();
+    await act(() => {
+      transfer.exportAppData();
+    });
+    expect(pushToast).toHaveBeenCalledWith("exportFailed");
   });
 
   it("rejects a backup containing wallet rows before writing contacts when the wallet is unavailable", async () => {

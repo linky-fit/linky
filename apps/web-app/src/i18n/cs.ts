@@ -496,7 +496,7 @@ export const cs = {
   archive: "Archiv",
   archiveFilter: "Archiv",
   archiveContact: "Archivovat",
-  archiveArmedHint: "Pro archivaci klikněte ještě jednou.",
+  undoArchiveContact: "Vrátit zpět",
   restoreArchivedContact: "Vrátit mezi kontakty",
   archivedContactBadge: "Archivovaný kontakt",
   avatarCropTitle: "Oříznout profilovou fotku",

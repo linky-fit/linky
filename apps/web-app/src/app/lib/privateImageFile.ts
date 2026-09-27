@@ -1,4 +1,10 @@
 import { reportAppLog } from "../../devtools/inspector/appLog";
+import {
+  downloadFileInBrowser,
+  isCancelledShareError,
+  shareFileNatively,
+} from "../../platform/fileExport";
+import { isNativePlatform } from "../../platform/runtime";
 
 const PDF_FILE_TYPE = "application/pdf";
 const EXTENSION_BY_IMAGE_TYPE: Record<string, string> = {
@@ -72,18 +78,31 @@ const reportPrivateImageExport = (
   });
 };
 
-export const isCancelledShareError = (error: unknown): boolean => {
-  if (typeof error !== "object" || error === null) return false;
-
-  const name =
-    "name" in error && typeof error.name === "string" ? error.name : "";
-  if (name === "AbortError") return true;
-
-  const message =
-    "message" in error && typeof error.message === "string"
-      ? error.message
-      : "";
-  return /cancel|abort|dismiss/i.test(message);
+const shareFileNativelyReported = async (
+  file: File,
+  title: string,
+  links: PrivateImageExportLinks,
+): Promise<void> => {
+  try {
+    await shareFileNatively({ blob: file, fileName: file.name, title });
+  } catch (error) {
+    if (!isCancelledShareError(error)) {
+      reportPrivateImageExport(
+        "ShareFailed",
+        "System share of a chat file failed",
+        file,
+        links,
+        error,
+      );
+    }
+    throw error;
+  }
+  reportPrivateImageExport(
+    "Shared",
+    "Chat file shared via the system share sheet",
+    file,
+    links,
+  );
 };
 
 export const downloadPrivateImageBlob = (
@@ -92,20 +111,18 @@ export const downloadPrivateImageBlob = (
   fileName?: string,
 ): void => {
   const file = toPrivateImageFile(blob, fileName);
-  const url = URL.createObjectURL(file);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = file.name;
-  anchor.rel = "noopener";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  if (isNativePlatform()) {
+    void shareFileNativelyReported(file, file.name, links).catch(
+      () => undefined,
+    );
+    return;
+  }
+  downloadFileInBrowser(file, file.name);
   reportPrivateImageExport("Saved", "Chat file saved as a file", file, links);
 };
 
 export const canSharePrivateImage = (): boolean =>
-  typeof navigator.share === "function";
+  isNativePlatform() || typeof navigator.share === "function";
 
 export const sharePrivateImageBlob = async (
   blob: Blob,
@@ -118,6 +135,10 @@ export const sharePrivateImageBlob = async (
   }
 
   const file = toPrivateImageFile(blob, fileName);
+  if (isNativePlatform()) {
+    await shareFileNativelyReported(file, title, links);
+    return;
+  }
   const shareData: ShareData = {
     files: [file],
     title,

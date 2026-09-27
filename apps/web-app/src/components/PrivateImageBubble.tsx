@@ -5,9 +5,9 @@ import React from "react";
 import { createPortal } from "react-dom";
 import {
   downloadPrivateImageBlob,
-  isCancelledShareError,
   sharePrivateImageBlob,
 } from "../app/lib/privateImageFile";
+import { isCancelledShareError } from "../platform/fileExport";
 import {
   decryptPrivateImageMessage,
   type PrivateImageMessagePayload,

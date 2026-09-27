@@ -6367,6 +6367,32 @@ dd {
   font: inherit;
 }
 
+.toast-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toast-action {
+  appearance: none;
+  flex-shrink: 0;
+  margin: -4px -6px -4px 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #93c5fd;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast-action:hover,
+.toast-action:focus-visible {
+  background: rgba(147, 197, 253, 0.12);
+}
+
 .profile-share-overlay {
   position: fixed;
   inset: 0;

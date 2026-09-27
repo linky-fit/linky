@@ -16,7 +16,21 @@ export const ToastNotifications: React.FC<ToastNotificationsProps> = ({
         <div className="toast-container" aria-live="polite">
           {toasts.map((toast) => (
             <React.Fragment key={toast.id}>
-              {toast.onClick ? (
+              {toast.action ? (
+                <div className="toast toast-with-action">
+                  <span>{toast.message}</span>
+                  <button
+                    className="toast-action"
+                    type="button"
+                    onClick={() => {
+                      dismissToast(toast.id);
+                      toast.action?.onClick();
+                    }}
+                  >
+                    {toast.action.label}
+                  </button>
+                </div>
+              ) : toast.onClick ? (
                 <button
                   className="toast toast-button"
                   type="button"

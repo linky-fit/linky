@@ -322,8 +322,10 @@ test("supports chat reply, edit, reaction toggle, and copy actions", async ({
     exact: true,
   });
   await archiveButton.click();
-  await archiveButton.click();
   await page.waitForURL(/#(?:contacts)?$/, { timeout: 10_000 });
+  await expect(
+    page.locator(".toast").filter({ hasText: "Contact archived." }),
+  ).toBeVisible();
 
   await expect(page.locator("[data-guide='contact-card']")).toHaveCount(0);
   await page.goto(`/#contact/${encodeURIComponent(contactId)}`);

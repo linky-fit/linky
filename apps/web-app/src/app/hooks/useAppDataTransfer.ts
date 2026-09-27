@@ -8,6 +8,12 @@ import {
   type ContactsRepository,
 } from "@linky/linksync";
 import React from "react";
+import { reportAppLog } from "../../devtools/inspector/appLog";
+import {
+  isCancelledShareError,
+  saveFile,
+  type FileExport,
+} from "../../platform/fileExport";
 import { JsonValue } from "../../types/json";
 import { nowSeconds } from "../../utils/time";
 import { asRecord } from "../../utils/validation";
@@ -28,6 +34,57 @@ const decodeImportProofDrafts = Schema.decodeUnknownOption(
 );
 const decodeNewOperation = Schema.decodeUnknownOption(NewOperation);
 const decodeLegacyTokenRow = Schema.decodeUnknownOption(LegacyTokenRow);
+
+interface ExportSource {
+  cashuOperations: readonly StoredOperation[];
+  cashuProofs: readonly StoredProof[];
+  contacts: readonly ContactRowLike[];
+  title: string;
+}
+
+const buildExportFile = ({
+  cashuOperations,
+  cashuProofs,
+  contacts,
+  title,
+}: ExportSource): FileExport => {
+  const now = new Date();
+  const filenameDate = now.toISOString().slice(0, 10);
+
+  const payload = {
+    app: "linky",
+    version: 2,
+    exportedAt: now.toISOString(),
+    contacts: contacts.map((contact) => ({
+      name: (contact.name ?? "").trim() || null,
+      npub: (contact.npub ?? "").trim() || null,
+      lnAddress: (contact.lnAddress ?? "").trim() || null,
+      groupName: (contact.groupName ?? "").trim() || null,
+      groupNamesJson: (contact.groupNamesJson ?? "").trim() || null,
+    })),
+    cashuProofs: cashuProofs.map((proof) => ({
+      mint: proof.mint,
+      unit: proof.unit,
+      keysetId: proof.keysetId,
+      amount: proof.amount,
+      secret: proof.secret,
+      C: proof.C,
+      dleq: proof.dleq,
+      state: proof.state,
+      operationId: proof.operationId,
+    })),
+    cashuOperations: cashuOperations.map((operation) =>
+      Struct.omit(operation, "id"),
+    ),
+  };
+
+  const text = JSON.stringify(payload, null, 2);
+  return {
+    blob: new Blob([text], { type: "text/plain;charset=utf-8" }),
+    fileName: `linky-export-${filenameDate}.txt`,
+    title,
+  };
+};
 
 interface UseAppDataTransferParams<TContact extends ImportableContact> {
   cashuOperations: readonly StoredOperation[];
@@ -56,58 +113,35 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
   t,
 }: UseAppDataTransferParams<TContact>) => {
   const exportAppData = React.useCallback(() => {
-    try {
-      const now = new Date();
-      const filenameDate = now.toISOString().slice(0, 10);
-
-      const payload = {
-        app: "linky",
-        version: 2,
-        exportedAt: now.toISOString(),
-        contacts: contacts.map((contact) => ({
-          name: (contact.name ?? "").trim() || null,
-          npub: (contact.npub ?? "").trim() || null,
-          lnAddress: (contact.lnAddress ?? "").trim() || null,
-          groupName: (contact.groupName ?? "").trim() || null,
-          groupNamesJson: (contact.groupNamesJson ?? "").trim() || null,
-        })),
-        cashuProofs: cashuProofs.map((proof) => ({
-          mint: proof.mint,
-          unit: proof.unit,
-          keysetId: proof.keysetId,
-          amount: proof.amount,
-          secret: proof.secret,
-          C: proof.C,
-          dleq: proof.dleq,
-          state: proof.state,
-          operationId: proof.operationId,
-        })),
-        cashuOperations: cashuOperations.map((operation) =>
-          Struct.omit(operation, "id"),
-        ),
-      };
-
-      const text = JSON.stringify(payload, null, 2);
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `linky-export-${filenameDate}.txt`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => {
-        try {
-          URL.revokeObjectURL(url);
-        } catch {
-          // ignore
-        }
-      }, 1000);
-
+    const summary = {
+      contacts: contacts.length,
+      proofs: cashuProofs.length,
+      operations: cashuOperations.length,
+    };
+    const run = async () => {
+      const file = buildExportFile({
+        cashuOperations,
+        cashuProofs,
+        contacts,
+        title: t("exportData"),
+      });
+      await saveFile(file);
+      reportAppLog({
+        tag: "AppDataExported",
+        summary: "App data export handed to the platform",
+        payload: { ...summary, fileName: file.fileName, size: file.blob.size },
+      });
       pushToast(t("exportDone"));
-    } catch {
+    };
+    void run().catch((error: unknown) => {
+      if (isCancelledShareError(error)) return;
+      reportAppLog({
+        tag: "AppDataExportFailed",
+        summary: "App data export failed",
+        payload: { ...summary, error },
+      });
       pushToast(t("exportFailed"));
-    }
+    });
   }, [cashuOperations, cashuProofs, contacts, pushToast, t]);
 
   const requestImportAppData = React.useCallback(() => {

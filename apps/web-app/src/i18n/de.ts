@@ -499,7 +499,7 @@ export const de = {
   archive: "Archiv",
   archiveFilter: "Archiv",
   archiveContact: "Kontakt archivieren",
-  archiveArmedHint: "Klicke zum Archivieren noch einmal.",
+  undoArchiveContact: "Rückgängig",
   restoreArchivedContact: "Kontakt wiederherstellen",
   archivedContactBadge: "Archivierter Kontakt",
   avatarCropTitle: "Profilfoto zuschneiden",

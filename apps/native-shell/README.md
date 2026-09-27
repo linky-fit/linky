@@ -122,5 +122,6 @@ Android:
 - Native QR scanning when WebKit camera APIs are unavailable.
 - `nostr://` and `cashu://` URL handling forwarded to the web app, which resolves `nostr://npub...` into the saved contact (creating it when needed) and imports `cashu://cashu...` tokens into the wallet.
 - NFC: reads NDEF URI and `text/plain` records carrying those schemes, and writes `cashu://cashu...` from token detail and `nostr://npub...` from the profile.
+- File export (data backup, chat images and PDFs) writes to the app cache through `@capacitor/filesystem` and opens the `@capacitor/share` sheet, because the WebView ignores anchor downloads of `blob:` URLs.
 
 iOS: local Capacitor plugins for Keychain-backed secret storage, native QR scanning, and CoreNFC NDEF writing for the same payloads. Native notifications and deep links are not wired on iOS yet.

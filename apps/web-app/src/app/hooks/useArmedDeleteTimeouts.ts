@@ -1,15 +1,11 @@
 import React from "react";
 
-interface UseArmedDeleteTimeoutsParams<TPendingDelete, TPendingCashuDelete> {
+interface UseArmedDeleteTimeoutsParams<TPendingCashuDelete> {
   pendingCashuDeleteId: TPendingCashuDelete | null;
-  pendingDeleteId: TPendingDelete | null;
   pendingEvoluServerDeleteUrl: string | null;
   pendingMintDeleteUrl: string | null;
   setPendingCashuDeleteId: React.Dispatch<
     React.SetStateAction<TPendingCashuDelete | null>
-  >;
-  setPendingDeleteId: React.Dispatch<
-    React.SetStateAction<TPendingDelete | null>
   >;
   setPendingEvoluServerDeleteUrl: React.Dispatch<
     React.SetStateAction<string | null>
@@ -35,21 +31,14 @@ const useResetAfterDelay = <TValue>({
   }, [delayMs, setValue, value]);
 };
 
-export const useArmedDeleteTimeouts = <TPendingDelete, TPendingCashuDelete>({
+export const useArmedDeleteTimeouts = <TPendingCashuDelete>({
   pendingCashuDeleteId,
-  pendingDeleteId,
   pendingEvoluServerDeleteUrl,
   pendingMintDeleteUrl,
   setPendingCashuDeleteId,
-  setPendingDeleteId,
   setPendingEvoluServerDeleteUrl,
   setPendingMintDeleteUrl,
-}: UseArmedDeleteTimeoutsParams<TPendingDelete, TPendingCashuDelete>): void => {
-  useResetAfterDelay({
-    delayMs: 5000,
-    setValue: setPendingDeleteId,
-    value: pendingDeleteId,
-  });
+}: UseArmedDeleteTimeoutsParams<TPendingCashuDelete>): void => {
   useResetAfterDelay({
     delayMs: 5000,
     setValue: setPendingCashuDeleteId,

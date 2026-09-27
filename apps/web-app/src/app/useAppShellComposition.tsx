@@ -541,7 +541,6 @@ export const useAppShellComposition = ({
     openNewContactPage,
     openNpubMessageContact,
     openScannedContactPendingNpubRef,
-    pendingDeleteId,
     pendingPayments,
     pendingRelayDeleteUrl,
     reactionsByMessageId,
@@ -549,7 +548,7 @@ export const useAppShellComposition = ({
     removePendingPayment,
     replyContext,
     requestBankPaymentOffer,
-    requestDeleteCurrentContact,
+    archiveCurrentContact,
     requestDeleteSelectedRelay,
     resetEditedContactFieldFromNostr,
     respondToBankPaymentOfferWithGroupState,
@@ -572,7 +571,6 @@ export const useAppShellComposition = ({
     setContactsSearch,
     setForm,
     setNewRelayUrl,
-    setPendingDeleteId,
     statusFilterCurrencies,
     ungroupedCount,
     unreadByContactId,
@@ -881,11 +879,9 @@ export const useAppShellComposition = ({
 
   useArmedDeleteTimeouts({
     pendingCashuDeleteId,
-    pendingDeleteId,
     pendingEvoluServerDeleteUrl,
     pendingMintDeleteUrl,
     setPendingCashuDeleteId,
-    setPendingDeleteId,
     setPendingEvoluServerDeleteUrl,
     setPendingMintDeleteUrl,
   });
@@ -911,10 +907,6 @@ export const useAppShellComposition = ({
     routeKind: route.kind,
   });
 
-  const clearPendingDeleteOnMenuChange = React.useCallback(() => {
-    setPendingDeleteId(null);
-  }, [setPendingDeleteId]);
-
   const {
     closeLnurlAuthConfirmation,
     confirmLnurlAuth,
@@ -924,11 +916,7 @@ export const useAppShellComposition = ({
   } = useLnurlAuth({ currentNsec, setStatus, t });
 
   const { closeMenu, menuIsOpen, navigateToMainReturn, toggleMenu } =
-    useMainMenuState({
-      onClose: clearPendingDeleteOnMenuChange,
-      onOpen: clearPendingDeleteOnMenuChange,
-      route,
-    });
+    useMainMenuState({ route });
 
   const {
     cancelPendingNfcWrite,
@@ -1001,7 +989,6 @@ export const useAppShellComposition = ({
     requestLnurlAuthConfirmation,
     route,
     saveCashuFromText,
-    setPendingDeleteId,
     setPendingLightningInvoiceConfirmation,
     setPendingLnurlWithdrawConfirmation,
     setStatus,
@@ -1507,7 +1494,6 @@ export const useAppShellComposition = ({
         const npub = normalizeNpubIdentifier(peopleSelectedContact?.npub ?? "");
         return npub ? (nostrStatusByNpub[npub] ?? null) : null;
       })(),
-      pendingDeleteId,
       reactionsByMessageId,
       profileCustomPictureUrl,
       profileEditLnAddress,
@@ -1523,7 +1509,7 @@ export const useAppShellComposition = ({
       selectedProfileStatusCurrencies,
       restoreArchivedContact: restoreEditingContact,
       restoreSelectedContact: restoreCurrentContact,
-      requestDeleteCurrentContact,
+      archiveCurrentContact,
       resetEditedContactFieldFromNostr,
       replyContext,
       saveClaimedLightningAddress,

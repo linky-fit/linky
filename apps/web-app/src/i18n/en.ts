@@ -492,7 +492,7 @@ export const en = {
   archive: "Archive",
   archiveFilter: "Archive",
   archiveContact: "Archive contact",
-  archiveArmedHint: "Click once more to archive.",
+  undoArchiveContact: "Undo",
   restoreArchivedContact: "Restore contact",
   archivedContactBadge: "Archived contact",
   avatarCropTitle: "Crop profile photo",

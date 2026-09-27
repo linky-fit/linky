@@ -9,9 +9,9 @@ import {
 } from "../app/lib/pdfPreview";
 import {
   downloadPrivateImageBlob,
-  isCancelledShareError,
   sharePrivateImageBlob,
 } from "../app/lib/privateImageFile";
+import { isCancelledShareError } from "../platform/fileExport";
 import {
   decryptPrivateImageMessage,
   type PrivateImageMessagePayload,

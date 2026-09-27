@@ -113,7 +113,6 @@ interface UseScanNativeCompositionParams {
   requestLnurlAuthConfirmation: LnurlAuthResult["requestLnurlAuthConfirmation"];
   route: ReturnType<typeof useRouting>;
   saveCashuFromText: CashuWalletCompositionResult["saveCashuFromText"];
-  setPendingDeleteId: ContactsMessagingCompositionResult["setPendingDeleteId"];
   setPendingLightningInvoiceConfirmation: CashuWalletCompositionResult["setPendingLightningInvoiceConfirmation"];
   setPendingLnurlWithdrawConfirmation: CashuWalletCompositionResult["setPendingLnurlWithdrawConfirmation"];
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
@@ -148,7 +147,6 @@ export const useScanNativeComposition = ({
   requestLnurlAuthConfirmation,
   route,
   saveCashuFromText,
-  setPendingDeleteId,
   setPendingLightningInvoiceConfirmation,
   setPendingLnurlWithdrawConfirmation,
   setStatus,
@@ -541,7 +539,6 @@ export const useScanNativeComposition = ({
             return false;
           }
 
-          setPendingDeleteId(null);
           navigateTo({ route: "chat", id: knownContactId });
           return true;
         };
@@ -585,20 +582,13 @@ export const useScanNativeComposition = ({
           return false;
         }
 
-        setPendingDeleteId(null);
         navigateTo({ route: "chat", id: contactId });
         return true;
       } catch {
         return openedFromNotificationData;
       }
     },
-    [
-      contactsLatestRef,
-      currentNsec,
-      dispatchInboxEvent,
-      fetchWrapEvent,
-      setPendingDeleteId,
-    ],
+    [contactsLatestRef, currentNsec, dispatchInboxEvent, fetchWrapEvent],
   );
 
   const handleContactIdentifierScanned = React.useCallback(
@@ -639,7 +629,6 @@ export const useScanNativeComposition = ({
         return;
       }
 
-      setPendingDeleteId(null);
       updatePendingDeepLinkText(parsed.text);
       consumePendingNativeDeepLinkUrl();
     };
@@ -663,7 +652,7 @@ export const useScanNativeComposition = ({
 
     window.addEventListener(NATIVE_DEEP_LINK_EVENT, onDeepLink);
     return () => window.removeEventListener(NATIVE_DEEP_LINK_EVENT, onDeepLink);
-  }, [setPendingDeleteId, updatePendingDeepLinkText]);
+  }, [updatePendingDeepLinkText]);
 
   React.useEffect(() => {
     const openNotificationRoute = (rawRoute: unknown) => {
@@ -772,7 +761,6 @@ export const useScanNativeComposition = ({
       return;
     }
 
-    setPendingDeleteId(null);
     updatePendingDeepLinkText(`cashu:${token}`);
 
     const cleanHash = rawHash.split("?")[0] ?? "#wallet";
@@ -782,7 +770,7 @@ export const useScanNativeComposition = ({
       "",
       `${window.location.pathname}${window.location.search}${nextHash}`,
     );
-  }, [setPendingDeleteId, updatePendingDeepLinkText]);
+  }, [updatePendingDeepLinkText]);
 
   React.useEffect(() => {
     if (!pendingDeepLinkText) {

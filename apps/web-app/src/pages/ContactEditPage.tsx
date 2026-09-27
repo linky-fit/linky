@@ -11,6 +11,7 @@ interface Contact {
 }
 
 interface ContactEditPageProps {
+  archiveCurrentContact: () => void;
   contactEditsSavable: boolean;
   editingId: ContactId | null;
   form: ContactFormData;
@@ -20,9 +21,7 @@ interface ContactEditPageProps {
   blockArchivedContact: () => Promise<void>;
   publicLnAddress: string;
   publicName: string;
-  pendingDeleteId: ContactId | null;
   restoreArchivedContact: () => void;
-  requestDeleteCurrentContact: () => void;
   resetEditedContactFieldFromNostr: (field: "name" | "lnAddress") => void;
   selectedContact: Contact | null;
   setForm: (value: ContactFormData) => void;
@@ -30,6 +29,7 @@ interface ContactEditPageProps {
 }
 
 export const ContactEditPage: FC<ContactEditPageProps> = ({
+  archiveCurrentContact,
   contactEditsSavable,
   editingId,
   form,
@@ -39,9 +39,7 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
   blockArchivedContact,
   publicLnAddress,
   publicName,
-  pendingDeleteId,
   restoreArchivedContact,
-  requestDeleteCurrentContact,
   resetEditedContactFieldFromNostr,
   selectedContact,
   setForm,
@@ -154,14 +152,10 @@ export const ContactEditPage: FC<ContactEditPageProps> = ({
               </>
             ) : (
               <button
-                className={pendingDeleteId === editingId ? "danger" : "ghost"}
-                onClick={requestDeleteCurrentContact}
+                className="ghost"
+                onClick={archiveCurrentContact}
                 disabled={!editingId}
-                title={
-                  pendingDeleteId === editingId
-                    ? t("archiveArmedHint")
-                    : t("archiveContact")
-                }
+                title={t("archiveContact")}
               >
                 <span className="btn-label-with-icon">
                   <span className="btn-label-icon" aria-hidden="true">

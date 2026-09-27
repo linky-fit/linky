@@ -1,15 +1,24 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
 const MAX_VISIBLE_TOASTS = 2;
+const TOAST_DURATION_MS = 2500;
+const ACTION_TOAST_DURATION_MS = 6000;
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 export interface Toast {
   id: string;
   message: string;
   onClick?: () => void;
+  action?: ToastAction;
 }
 
 export interface PushToastOptions {
   onClick?: () => void;
+  action?: ToastAction;
 }
 
 export const useToasts = () => {
@@ -38,6 +47,7 @@ export const useToasts = () => {
             id,
             message: text,
             ...(options?.onClick ? { onClick: options.onClick } : {}),
+            ...(options?.action ? { action: options.action } : {}),
           },
         ];
         const removed = next.slice(
@@ -54,10 +64,13 @@ export const useToasts = () => {
         return next.slice(-MAX_VISIBLE_TOASTS);
       });
 
-      const timeoutId = window.setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-        toastTimersRef.current.delete(id);
-      }, 2500);
+      const timeoutId = window.setTimeout(
+        () => {
+          setToasts((prev) => prev.filter((t) => t.id !== id));
+          toastTimersRef.current.delete(id);
+        },
+        options?.action ? ACTION_TOAST_DURATION_MS : TOAST_DURATION_MS,
+      );
 
       toastTimersRef.current.set(id, timeoutId);
     },
