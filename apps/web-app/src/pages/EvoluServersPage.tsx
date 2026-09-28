@@ -37,7 +37,9 @@ export function EvoluServersPage(): React.ReactElement {
       <EvoluSyncErrorNotice />
       <EvoluReloadNotice />
       {evoluServerUrls.every(isEvoluServerOffline) && (
-        <p role="status">{t("evoluNoBackupWarning")}</p>
+        <p className="muted" role="status">
+          {t("evoluNoBackupWarning")}
+        </p>
       )}
       {/* Server list */}
       {evoluServerUrls.length === 0 ? (

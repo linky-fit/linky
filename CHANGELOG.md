@@ -12,6 +12,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+### en-US
+
+- Every Evolu server can be removed or disabled, including the defaults; removing one default no longer restores the other. The server list warns when no server is enabled, so data stays on this device only.
+
+### cs-CZ
+
+- Každý Evolu server jde odebrat nebo vypnout, včetně výchozích; odebrání jednoho výchozího už neobnoví druhý. Seznam serverů upozorní, když není zapnutý žádný server a data tak zůstávají jen na tomto zařízení.
+
 ## [26.9.21] - 2026-09-28
 
 ### en-US
