@@ -1,3 +1,4 @@
+import "./platform/browserPolyfills";
 import { Buffer } from "buffer";
 import { StrictMode } from "react";
 import { flushSync } from "react-dom";

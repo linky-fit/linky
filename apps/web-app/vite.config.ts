@@ -17,6 +17,25 @@ import { fetchLinkPreview } from "./server/linkPreview";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Workers have their own globals, so the page's polyfills cannot protect Evolu.
+const evoluWorkerPolyfills = (): Plugin => ({
+  name: "evolu-worker-polyfills",
+  enforce: "pre",
+  transform(code, id) {
+    if (
+      !id.includes("/@evolu/web/") ||
+      !id.split("?")[0]?.endsWith("/Db.worker.js")
+    )
+      return;
+    const polyfills = path.join(__dirname, "src/platform/browserPolyfills.ts");
+    return {
+      code: `import ${JSON.stringify(polyfills)};\n${code}`,
+      map: null,
+    };
+  },
+});
+
 const sqliteWasmPath = path.join(__dirname, "public/sqlite-wasm/sqlite3.wasm");
 const workspacePackageJsonPath = path.join(
   __dirname,
@@ -233,6 +252,7 @@ export default defineConfig({
   },
   plugins: [
     bootDiagnosticRedaction(),
+    evoluWorkerPolyfills(),
     serveSqliteWasm(),
     inspectorCollector(),
     linkPreviewApi(),
@@ -300,6 +320,7 @@ export default defineConfig({
     contentSecurityPolicyMeta(),
   ],
   ...(useHttps ? { server: { host: true, https: {} } } : {}),
+  worker: { plugins: () => [evoluWorkerPolyfills()] },
   build: {
     rollupOptions: {
       output: {
@@ -310,6 +331,7 @@ export default defineConfig({
           // Keep `buffer` and its deps together to avoid an ESM circular init:
           // polyfills -> vendor (base64-js/ieee754) and vendor -> polyfills.
           if (
+            id.includes("/node_modules/core-js/") ||
             id.includes("/node_modules/buffer/") ||
             id.includes("/node_modules/base64-js/") ||
             id.includes("/node_modules/ieee754/")
