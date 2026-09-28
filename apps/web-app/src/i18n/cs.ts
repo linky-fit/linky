@@ -247,7 +247,8 @@ export const cs = {
   evoluRetrySync: "Zkusit synchronizaci znovu",
   evoluServersReloadButton: "Obnovit teď",
   evoluServerRemove: "Odebrat server",
-  evoluDefaultServerCannotRemove: "Výchozí server nejde odebrat.",
+  evoluNoBackupWarning:
+    "Žádný Evolu server není zapnutý. Data aplikace se přes Evolu nezálohují ani nesynchronizují. Při ztrátě zařízení nebo smazání jeho dat o ně můžete přijít. Pro obnovení zálohování přidejte nebo zapněte server.",
   evoluRawDbSize: "Velikost SQLite souboru",
   evoluRowCounts: "Počty řádků",
   chatStorage: "Úložiště chatů",

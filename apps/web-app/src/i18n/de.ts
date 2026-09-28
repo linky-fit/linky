@@ -251,8 +251,8 @@ export const de = {
   evoluRetrySync: "Synchronisierung erneut versuchen",
   evoluServersReloadButton: "Jetzt neu laden",
   evoluServerRemove: "Server entfernen",
-  evoluDefaultServerCannotRemove:
-    "Der Standardserver kann nicht entfernt werden.",
+  evoluNoBackupWarning:
+    "Kein Evolu-Server ist aktiviert. Deine App-Daten werden über Evolu weder gesichert noch synchronisiert. Wenn du dieses Gerät verlierst oder seine Daten löschst, können Daten verloren gehen. Füge einen Server hinzu oder aktiviere ihn, um die Sicherung fortzusetzen.",
   evoluRawDbSize: "Größe der SQLite-Datei",
   evoluRowCounts: "Zeilenanzahl",
   chatStorage: "Chat-Speicher",

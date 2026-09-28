@@ -243,7 +243,8 @@ export const en = {
   evoluRetrySync: "Retry sync",
   evoluServersReloadButton: "Reload now",
   evoluServerRemove: "Remove server",
-  evoluDefaultServerCannotRemove: "Default server cannot be removed.",
+  evoluNoBackupWarning:
+    "No Evolu servers are enabled. Your app data is not being backed up or synced via Evolu. Losing or clearing this device can lose data. Add or enable a server to resume backups.",
   evoluRawDbSize: "SQLite file size",
   evoluRowCounts: "Row counts",
   chatStorage: "Chat storage",

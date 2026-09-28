@@ -297,31 +297,10 @@ const getEvoluActiveServerUrls = (): ReadonlyArray<string> => {
 };
 
 const setEvoluServerUrls = (urls: ReadonlyArray<string>): void => {
-  const normalized = urls
-    .map(normalizeEvoluServerUrl)
-    .filter((v): v is string => Boolean(v));
-
-  const unique: string[] = [];
-  const seen = new Set<string>();
-  for (const url of normalized) {
-    const key = url.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(url);
-  }
-
-  // Persist whether defaults are removed, and persist only non-default extras.
-  const defaultsLower = new Set(
-    DEFAULT_EVOLU_SERVER_URLS.map((u) => u.toLowerCase()),
-  );
-  const hasAnyDefault = unique.some((u) => defaultsLower.has(u.toLowerCase()));
-  safeLocalStorageSetJson(
-    EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY,
-    !hasAnyDefault,
-  );
-
-  const extras = unique.filter((u) => !defaultsLower.has(u.toLowerCase()));
-  safeLocalStorageSetJson(EVOLU_SERVERS_STORAGE_KEY, extras);
+  // The legacy reader merges defaults unless this flag is set. Store the full
+  // selection so individual defaults and an empty list survive reloads.
+  safeLocalStorageSetJson(EVOLU_SERVERS_STORAGE_KEY, normalizeUrlList(urls));
+  safeLocalStorageSetJson(EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY, true);
 };
 
 const migrateLinkyEvoluServer = (): void => {
@@ -1159,6 +1138,16 @@ export const useEvoluServersManager = (opts?: {
   const setServerUrls = useCallback(
     (nextUrls: string[]) => {
       setEvoluServerUrls(nextUrls);
+      if (getInspectorEmissionEnabled()) {
+        reportAppLog({
+          tag: "evolu.serversChanged",
+          summary: "Updated Evolu servers; reload required",
+          payload: {
+            configuredUrls: getEvoluConfiguredServerUrls(),
+            activeUrls: getEvoluActiveServerUrls(),
+          },
+        });
+      }
       refreshFromStorage();
       setReloadRequired(true);
     },

@@ -104,6 +104,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
   "relayList.syncFailed":
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
+  "evolu.serversChanged":
+    "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":
     "The one-time upgrade enabled the Linky Evolu relay before database startup, preserving the other configured servers and their disabled states.",
   "relayList.linkyRelayMigrated":

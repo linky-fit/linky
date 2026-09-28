@@ -36,6 +36,9 @@ export function EvoluServersPage(): React.ReactElement {
     <section className="panel">
       <EvoluSyncErrorNotice />
       <EvoluReloadNotice />
+      {evoluServerUrls.every(isEvoluServerOffline) && (
+        <p role="status">{t("evoluNoBackupWarning")}</p>
+      )}
       {/* Server list */}
       {evoluServerUrls.length === 0 ? (
         <p className="muted evolu-server-empty">{t("evoluServersEmpty")}</p>

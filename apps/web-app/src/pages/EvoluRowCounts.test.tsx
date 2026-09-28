@@ -10,7 +10,16 @@ const counts = vi.hoisted(() => {
     history: number | null;
     errorType: EvoluErrorType | null;
     reloadRequired: boolean;
-  } = { tables: {}, history: null, errorType: null, reloadRequired: false };
+    servers: string[];
+    disabled: string[];
+  } = {
+    tables: {},
+    history: null,
+    errorType: null,
+    reloadRequired: false,
+    servers: [],
+    disabled: [],
+  };
   return state;
 });
 
@@ -25,7 +34,9 @@ vi.mock("../app/context/SystemSettingsContexts", () => ({
     evoluServersReloadRequired: counts.reloadRequired,
     evoluHistoryCount: counts.history,
     evoluDatabaseBytes: 4096,
-    evoluServerUrls: [],
+    evoluServerUrls: counts.servers,
+    evoluServerStatusByUrl: {},
+    isEvoluServerOffline: (url: string) => counts.disabled.includes(url),
     evoluShards: [],
     evoluSyncOwnerIds: [],
   }),
@@ -53,6 +64,8 @@ beforeEach(() => {
   counts.history = null;
   counts.errorType = null;
   counts.reloadRequired = false;
+  counts.servers = [];
+  counts.disabled = [];
 });
 
 describe("Evolu row counts", () => {
@@ -123,4 +136,27 @@ describe("Evolu row counts", () => {
     expect(rowValue(detail.container, "contact")).toBe("7 rows");
     await detail.unmount();
   });
+});
+
+describe("Evolu backup warning", () => {
+  it.each([
+    { servers: [], disabled: [], warning: true },
+    {
+      servers: ["wss://sync.example.com"],
+      disabled: ["wss://sync.example.com"],
+      warning: true,
+    },
+    { servers: ["wss://sync.example.com"], disabled: [], warning: false },
+  ])(
+    "shows warning=$warning for $servers with $disabled disabled",
+    async ({ servers, disabled, warning }) => {
+      counts.servers = servers;
+      counts.disabled = disabled;
+      const view = await renderIntoDocument(<EvoluServersPage />);
+      expect(view.container.textContent?.includes("evoluNoBackupWarning")).toBe(
+        warning,
+      );
+      await view.unmount();
+    },
+  );
 });

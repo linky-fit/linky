@@ -106,3 +106,22 @@ describe("Linky Evolu relay upgrade", () => {
     expect(localStorage.getItem(migrationKey)).toBe("true");
   });
 });
+
+describe("saved Evolu transport selection", () => {
+  it.each([
+    { urls: [relay] },
+    { urls: ["wss://free.evoluhq.com"] },
+    { urls: [] },
+  ])("boots with exactly $urls after the upgrade", async ({ urls }) => {
+    localStorage.setItem(migrationKey, "true");
+    localStorage.setItem(removedKey, "true");
+    localStorage.setItem(serversKey, JSON.stringify(urls));
+    await boot();
+    expect(createDatabase).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        transports: urls.map((url) => ({ type: "WebSocket", url })),
+      }),
+    );
+  });
+});
