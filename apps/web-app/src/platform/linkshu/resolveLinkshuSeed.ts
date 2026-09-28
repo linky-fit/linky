@@ -1,4 +1,4 @@
-import { Bip39Seed } from "@linky/linkshu";
+import { Bip39Seed } from "@linky-fit/linkshu";
 import {
   generateMnemonic,
   mnemonicToSeedSync,

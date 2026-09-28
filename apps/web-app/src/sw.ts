@@ -15,15 +15,15 @@ import {
   runLinkstr,
   WrapId,
   WrapInbox,
-} from "@linky/linkstr";
-import type { ChatMessageReceived, WrapInboxEvent } from "@linky/linkstr";
+} from "@linky-fit/linkstr";
+import type { ChatMessageReceived, WrapInboxEvent } from "@linky-fit/linkstr";
 import { Effect, Schema } from "effect";
 import { createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
 import { ExpirationPlugin } from "workbox-expiration";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { CacheFirst } from "workbox-strategies";
 import { normalizePubkeyHex } from "./app/hooks/messages/contactIdentity";
-import { bankPaymentOfferMessageText } from "@linky/proxy-payment";
+import { bankPaymentOfferMessageText } from "@linky-fit/proxy-payment";
 import { extractCashuTokenFromText } from "./app/lib/tokenText";
 import {
   getBankPaymentReimbursementCopyForLanguage,

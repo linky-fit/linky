@@ -8,8 +8,8 @@ Prerequisites: a runtime built from the wallet's **original seed** ([getting-sta
 
 ```ts
 import { Effect } from "effect";
-import { Restore, RestoreDraft } from "@linky/linkshu";
-import type { MintUrl } from "@linky/linkshu";
+import { Restore, RestoreDraft } from "@linky-fit/linkshu";
+import type { MintUrl } from "@linky-fit/linkshu";
 
 const restoreFrom = (mints: ReadonlyArray<MintUrl>) =>
   Effect.gen(function* () {
@@ -71,8 +71,8 @@ import {
   linkshuServices,
   Restore,
   runLinkshu,
-} from "@linky/linkshu";
-import type { Bip39Seed, LinkshuServicesConfig } from "@linky/linkshu";
+} from "@linky-fit/linkshu";
+import type { Bip39Seed, LinkshuServicesConfig } from "@linky-fit/linkshu";
 
 const switchSeed = async (
   current: { dispose: () => Promise<void> },

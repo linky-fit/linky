@@ -4,7 +4,7 @@ import {
   linkyTableColumns,
   makeInMemoryShardDb,
   type LinkyDbSchema,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 
 /** A linksync store over the in-memory port, for hooks and helpers that take a repository. */
 export const makeTestLinkyStore = (seed = 1) => {

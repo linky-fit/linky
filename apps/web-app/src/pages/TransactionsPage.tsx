@@ -25,7 +25,7 @@ import {
   useWalletOperations,
 } from "../app/hooks/useLinksync";
 import type { Translate } from "../i18n";
-import { getLightningInvoicePreview } from "@linky/linkshu";
+import { getLightningInvoicePreview } from "@linky-fit/linkshu";
 import {
   formatInteger,
   getInitials,

@@ -1,5 +1,5 @@
 {
-  "name": "@linky/linkstr",
+  "name": "@linky-fit/linkstr",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
@@ -24,7 +24,7 @@
     "nostr-tools": "^2.23.3"
   },
   "devDependencies": {
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",

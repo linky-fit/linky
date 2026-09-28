@@ -1,5 +1,5 @@
-import { MuteList } from "@linky/linkstr";
-import type { Pubkey } from "@linky/linkstr";
+import { MuteList } from "@linky-fit/linkstr";
+import type { Pubkey } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

@@ -1,9 +1,9 @@
 # React
 
-`@linky/linksync/react` (`src/react/index.ts`) binds a component to the store. React is a peer dependency of this entry only; the main entry stays framework-free.
+`@linky-fit/linksync/react` (`src/react/index.ts`) binds a component to the store. React is a peer dependency of this entry only; the main entry stays framework-free.
 
 ```ts
-import { useRepositoryRows, useVisibleShards } from "@linky/linksync/react";
+import { useRepositoryRows, useVisibleShards } from "@linky-fit/linksync/react";
 
 const records = useRepositoryRows(transactions); // ReadonlyArray<TransactionRecord>
 const shards = useVisibleShards(store, "transactions"); // [{ index, owner }, ...]

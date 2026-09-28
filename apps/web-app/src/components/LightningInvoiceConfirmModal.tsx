@@ -1,6 +1,6 @@
 import React from "react";
 import type { Translate } from "../i18n";
-import type { LightningInvoicePreview } from "@linky/linkshu";
+import type { LightningInvoicePreview } from "@linky-fit/linkshu";
 import { PaymentConfirmDialog } from "./PaymentConfirmDialog";
 
 interface LightningInvoiceConfirmModalProps {

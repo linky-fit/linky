@@ -1,5 +1,5 @@
-import { BankOffers } from "@linky/linkstr";
-import type { BankOfferDraft } from "@linky/linkstr";
+import { BankOffers } from "@linky-fit/linkstr";
+import type { BankOfferDraft } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

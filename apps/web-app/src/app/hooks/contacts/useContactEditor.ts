@@ -1,21 +1,25 @@
-import { NonEmptyString1000, SqliteBoolean, sqliteTrue } from "@linky/linksync";
+import {
+  NonEmptyString1000,
+  SqliteBoolean,
+  sqliteTrue,
+} from "@linky-fit/linksync";
 import { toContactTextFields } from "../../lib/contactFields";
 import {
   decodeNpub,
   encodeNpub,
   type ProfileMetadata,
   type ProfileSearchHit,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   fetchProfileAtom,
   searchProfilesAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import {
   createId,
   type ContactsRepository,
   type TransactionsRepository,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Effect, Exit } from "effect";
 import React from "react";
 import { ContactId } from "../../../evoluIds";

@@ -2,7 +2,7 @@ import {
   directConversationIdFor,
   type ContactRow,
   type ConversationRow,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 
 /** The direct conversation's state, read alongside the contact for display. */
 export interface ContactChatState {

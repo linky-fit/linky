@@ -4,7 +4,7 @@ import {
   RumorId,
   SeenReceiptReceived,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../../../testUtils/nostrKeys";

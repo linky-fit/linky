@@ -1,5 +1,5 @@
 import * as Evolu from "@evolu/common";
-import type { LegacyTokenRow } from "@linky/linkshu";
+import type { LegacyTokenRow } from "@linky-fit/linkshu";
 import {
   activeNostrIdentityId,
   createId,
@@ -9,7 +9,7 @@ import {
   makeInMemoryShardDb,
   makeSettingsRepository,
   type LinkyDbSchema,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {

@@ -1,4 +1,4 @@
-import { decodeNpub } from "@linky/linkstr";
+import { decodeNpub } from "@linky-fit/linkstr";
 import type { ContactRowLike, LocalNostrMessage } from "../types/appTypes";
 import {
   parseCashuPaymentRequestMessage,

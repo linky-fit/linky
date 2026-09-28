@@ -1,10 +1,14 @@
-import { linkshuServices, Tokens, type LegacyTokenRow } from "@linky/linkshu";
+import {
+  linkshuServices,
+  Tokens,
+  type LegacyTokenRow,
+} from "@linky-fit/linkshu";
 import {
   makeWalletRepository,
   NonEmptyString100,
   type AppOwner,
   type LinkyStore,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Effect, ManagedRuntime } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";

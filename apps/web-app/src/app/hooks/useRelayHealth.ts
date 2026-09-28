@@ -1,5 +1,9 @@
-import type { RelayHealthState } from "@linky/linkstr";
-import { relayHealthAtom, Result, useAtomValue } from "@linky/linkstr-react";
+import type { RelayHealthState } from "@linky-fit/linkstr";
+import {
+  relayHealthAtom,
+  Result,
+  useAtomValue,
+} from "@linky-fit/linkstr-react";
 
 export type RelayDotState = "checking" | "connected" | "disconnected";
 

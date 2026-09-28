@@ -15,7 +15,7 @@ import type {
   DisplayAmountParts,
   DisplayCurrency,
 } from "../../utils/displayAmounts";
-import type { LightningInvoicePreview } from "@linky/linkshu";
+import type { LightningInvoicePreview } from "@linky-fit/linkshu";
 import type { CashuPaymentRequestMessageInfo } from "../lib/paymentRequestMessage";
 import type {
   MainSwipeRoutesProps,

@@ -31,7 +31,7 @@ All in `src/domain/primitives.ts`. Each is an effect `Schema` with a brand, so a
 Three ways to construct one:
 
 ```ts
-import { Amount, MintUrl, SendDraft } from "@linky/linkshu";
+import { Amount, MintUrl, SendDraft } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 
 // 1. `.make` — throws on invalid input; use when the value is already known good.
@@ -120,7 +120,7 @@ Only what you need to use this package.
 **Write sequential code with `Effect.gen`**; `yield*` unwraps an effect (or fails the whole generator with its error):
 
 ```ts
-import { Tokens } from "@linky/linkshu";
+import { Tokens } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 
 const total = Effect.gen(function* () {

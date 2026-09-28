@@ -4,7 +4,7 @@ import {
   isCashuAutoAcceptResolved,
   markCashuAutoAcceptResolved,
 } from "../../lib/autoAcceptedCashuMessages";
-import { decodeBankPaymentOffer } from "@linky/proxy-payment";
+import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import { parsePrivateImageMessage } from "../../lib/privateImageMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";

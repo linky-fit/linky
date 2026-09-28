@@ -14,7 +14,7 @@ import { getBankPaymentOfferStatusLabel } from "../app/lib/bankPaymentOfferLabel
 import type {
   BankOfferStatus,
   BankPaymentOfferInfo,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import {
   isPrivatePdfPayload,
   type PrivateImageMessagePayload,

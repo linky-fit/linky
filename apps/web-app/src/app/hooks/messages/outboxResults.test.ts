@@ -13,8 +13,8 @@ import {
   UnixSeconds,
   WrapDelivery,
   WrapId,
-} from "@linky/linkstr";
-import type { OutboxReceipt, OutboxResult } from "@linky/linkstr";
+} from "@linky-fit/linkstr";
+import type { OutboxReceipt, OutboxResult } from "@linky-fit/linkstr";
 import { describe, expect, it, vi } from "vitest";
 import { applyOutboxResult } from "./outboxResults";
 

@@ -3,16 +3,16 @@ import {
   decodeNpub,
   type Pubkey,
   type PaymentNoticeContext,
-} from "@linky/linkstr";
-import type { SendError, SendReceipt } from "@linky/linkshu";
+} from "@linky-fit/linkstr";
+import type { SendError, SendReceipt } from "@linky-fit/linkshu";
 import {
   enqueueOutboxAtom,
   sendPaymentNoticeAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Either } from "effect";
 import React from "react";
-import { ContactId } from "@linky/linksync";
+import { ContactId } from "@linky-fit/linksync";
 import { navigateTo } from "../../../hooks/useRouting";
 import { CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY } from "../../../utils/constants";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";

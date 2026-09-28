@@ -16,7 +16,7 @@ import {
   StoredOperation,
   StoredProof,
   UnixSeconds,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import type {
   NewOperation,
   NewProof,
@@ -24,7 +24,7 @@ import type {
   OperationStoreService,
   ProofPatch,
   ProofStoreService,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { Effect, Layer, Schema } from "effect";
 import type { Patch, Row, WriteRow } from "../core";
 import {

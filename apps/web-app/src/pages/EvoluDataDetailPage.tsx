@@ -1,5 +1,5 @@
 import { EvoluHistoryTable } from "../components/EvoluHistoryTable";
-import type { LinkyScope } from "@linky/linksync";
+import type { LinkyScope } from "@linky-fit/linksync";
 import React, { useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";

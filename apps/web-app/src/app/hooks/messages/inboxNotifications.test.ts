@@ -3,13 +3,13 @@ import {
   Pubkey,
   RumorId,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { buildCashuToken } from "../../../testUtils/cashuToken";
 import type { PushToastOptions } from "../../../hooks/useToasts";
-import type { BankPaymentOffer } from "@linky/proxy-payment";
+import type { BankPaymentOffer } from "@linky-fit/proxy-payment";
 import type { LocalNostrMessage } from "../../types/appTypes";
 import {
   handlePaymentNoticeReceived,

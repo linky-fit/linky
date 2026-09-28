@@ -1,5 +1,5 @@
-import { DEFAULT_NOSTR_RELAYS } from "@linky/linkstr";
-import { RelayUrl } from "@linky/linkstr";
+import { DEFAULT_NOSTR_RELAYS } from "@linky-fit/linkstr";
+import { RelayUrl } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import { safeLocalStorageGetJson, safeLocalStorageSetJson } from "./storage";
 

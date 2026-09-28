@@ -5,8 +5,8 @@ import {
   ProofStore,
   StoredProof,
   UnixSeconds,
-} from "@linky/linkshu";
-import type { ProofStoreService } from "@linky/linkshu";
+} from "@linky-fit/linkshu";
+import type { ProofStoreService } from "@linky-fit/linkshu";
 import { Clock, Effect, Layer, Schema } from "effect";
 import { makeJsonFile } from "./jsonFile";
 

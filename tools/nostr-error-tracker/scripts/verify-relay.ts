@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { Effect, Schema } from "effect";
-import { createSlip39Share } from "@linky/identity";
+import { createSlip39Share } from "@linky-fit/identity";
 import { finalizeEvent, generateSecretKey, type Event } from "nostr-tools";
 import { wrapEvent } from "nostr-tools/nip59";
 import { loginWithSecret } from "../src/auth";

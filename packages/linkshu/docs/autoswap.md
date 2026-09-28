@@ -8,8 +8,8 @@ Prerequisites: a configured runtime ([getting-started.md](./getting-started.md))
 
 ```ts
 import { Effect } from "effect";
-import { Autoswap, AutoswapDraft } from "@linky/linkshu";
-import type { MintUrl } from "@linky/linkshu";
+import { Autoswap, AutoswapDraft } from "@linky-fit/linkshu";
+import type { MintUrl } from "@linky-fit/linkshu";
 
 const consolidate = (sourceMint: MintUrl, targetMint: MintUrl) =>
   Effect.gen(function* () {
@@ -25,8 +25,8 @@ To move a fixed amount, price it first and show the user the total, then claim w
 
 ```ts
 import { Effect } from "effect";
-import { Amount, Autoswap, AutoswapDraft } from "@linky/linkshu";
-import type { MintUrl } from "@linky/linkshu";
+import { Amount, Autoswap, AutoswapDraft } from "@linky-fit/linkshu";
+import type { MintUrl } from "@linky-fit/linkshu";
 
 const moveAmount = (sourceMint: MintUrl, targetMint: MintUrl, sat: number) =>
   Effect.gen(function* () {

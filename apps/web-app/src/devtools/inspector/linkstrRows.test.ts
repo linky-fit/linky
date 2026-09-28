@@ -26,7 +26,7 @@ import {
   WrapDelivery,
   WrapDropped,
   WrapId,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it } from "vitest";
 import { createSecretKey } from "../../testUtils/nostrKeys";

@@ -2,8 +2,8 @@
 
 Two helper sets give you throwaway identities, transport stubs, an in-memory relay, and a polling helper, so a vertical test runs in milliseconds with no network:
 
-- `@linky/linkstr/testing`, a public subpath of the linkstr package, for tests in any workspace.
-- `@linky/linkstr-react/testing`, the same for linkstr-react: `configWith`, `settle`, `fakeTransport`, and a re-export of `makeIdentity`.
+- `@linky-fit/linkstr/testing`, a public subpath of the linkstr package, for tests in any workspace.
+- `@linky-fit/linkstr-react/testing`, the same for linkstr-react: `configWith`, `settle`, `fakeTransport`, and a re-export of `makeIdentity`.
 
 Never import either from production code.
 
@@ -12,12 +12,12 @@ Never import either from production code.
 Tests are Vitest, live next to their subject as `*.test.ts`, and use globals: `describe`, `it`, `expect`, and `assert` need no import (`vitest.config.ts` sets `globals: true`; `tsconfig.test.json` adds the types).
 
 ```bash
-bun run --filter @linky/linkstr test                 # one package
+bun run --filter @linky-fit/linkstr test                 # one package
 cd packages/linkstr && bunx vitest run reactions     # files matching a name
 bun run test                                         # every workspace
 ```
 
-## `@linky/linkstr/testing`
+## `@linky-fit/linkstr/testing`
 
 | Helper                                             | Use                                                                                                    |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -47,13 +47,13 @@ import {
   RelayPolicy,
   RelayUrl,
   RumorId,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   makeIdentity,
   recipientOf,
   stubWrapTransport,
-} from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
+} from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -115,7 +115,7 @@ import {
   RumorId,
   WrapInbox,
   type WrapInboxEvent,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   eventually,
   FakeRelay,
@@ -123,8 +123,8 @@ import {
   poolFor,
   recipientOf,
   stubWrapTransport,
-} from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
+} from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -198,7 +198,7 @@ it("routes a wrap into a typed fact", async () => {
 
 `fake.emit` before `fake.eose()` yields `delivery: "backfill"`; after it, `"live"`. `fake.closeFromRelay("reason")` ends the subscription so you can watch the resubscribe loop; set `fake.down = true` to make `ensureRelay` reject.
 
-## `@linky/linkstr-react/testing`
+## `@linky-fit/linkstr-react/testing`
 
 | Helper                                                              | Use                                                                      |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -212,15 +212,19 @@ it("routes a wrap into a typed fact", async () => {
 Drive atoms with a bare `Registry` instead of rendering:
 
 ```ts
-import { ClientId, RetractionDraft, RumorId } from "@linky/linkstr";
-import { stubWrapTransport } from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
+import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
+import { stubWrapTransport } from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import {
   linkstrConfigAtom,
   Registry,
   retractReactionAtom,
-} from "@linky/linkstr-react";
-import { configWith, makeIdentity, settle } from "@linky/linkstr-react/testing";
+} from "@linky-fit/linkstr-react";
+import {
+  configWith,
+  makeIdentity,
+  settle,
+} from "@linky-fit/linkstr-react/testing";
 import { Exit } from "effect";
 
 it("retracts through the configured transport", async () => {
@@ -253,7 +257,7 @@ For stream atoms (`wrapInboxAtom`, `outboxResultsAtom`, `relayHealthAtom`), set 
 
 ## Rules
 
-- Never import `@linky/linkstr/testing` or `@linky/linkstr-react/testing` from production code. Both packages exclude their `testing` directory from the app build.
+- Never import `@linky-fit/linkstr/testing` or `@linky-fit/linkstr-react/testing` from production code. Both packages exclude their `testing` directory from the app build.
 - Extend these helpers instead of redeclaring fixtures per test file.
 - Build inbound fixtures through the public send API where you can, as above; tests that need an independent implementation may use `nostr-tools` directly (it is a devDependency for that reason).
 

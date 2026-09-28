@@ -1,7 +1,7 @@
 import type { Translate } from "../../i18n";
 import { formatShortNpub, previewTokenText } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
-import { decodeBankPaymentOffer } from "@linky/proxy-payment";
+import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import { getBankPaymentOfferStatusLabel } from "./bankPaymentOfferLabels";
 import {
   parseCashuPaymentRequestMessage,

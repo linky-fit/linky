@@ -8,7 +8,7 @@ import {
   applyBankPaymentOfferSnapshot,
   emptyBankPaymentOfferState,
   type BankPaymentOfferState,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 
 let state: BankPaymentOfferState = emptyBankPaymentOfferState;
 

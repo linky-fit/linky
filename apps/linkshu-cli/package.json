@@ -1,5 +1,5 @@
 {
-  "name": "@linky/linkshu-cli",
+  "name": "@linky-fit/linkshu-cli",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
@@ -15,11 +15,11 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@linky/linkshu": "workspace:*",
+    "@linky-fit/linkshu": "workspace:*",
     "effect": "^3.19.19"
   },
   "devDependencies": {
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@types/bun": "^1.3.2",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",

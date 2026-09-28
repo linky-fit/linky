@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { linkyScopes } from "@linky/linksync";
+import { linkyScopes } from "@linky-fit/linksync";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useShardSummaries } from "../app/hooks/useLinksync";
 import { forgetChatShards } from "../evolu";

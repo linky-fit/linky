@@ -18,7 +18,7 @@ import {
   type NostrSecretKey,
   type Pubkey,
   type RelayUrl,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const publishBlocked = (
   secretKey: NostrSecretKey,
@@ -39,8 +39,8 @@ The promise resolves with a `PlainEventReceipt`; `receipt.accepted` is true when
 React — block locally first, then publish the whole list. A failed publish keeps the local block and leaves the list to be republished on the next change:
 
 ```ts
-import { Pubkey } from "@linky/linkstr";
-import { publishMuteListAtom, useAtomSet } from "@linky/linkstr-react";
+import { Pubkey } from "@linky-fit/linkstr";
+import { publishMuteListAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Exit, Schema } from "effect";
 
 interface BlockStore {
@@ -82,7 +82,7 @@ Direct only.
 There is no fetch of your own mute list and no watch. Load the list from your own storage (the app treats local storage as authoritative and never reads kind 10000 back) and apply it in the inbox handler:
 
 ```ts
-import type { Pubkey, WrapInboxEvent } from "@linky/linkstr";
+import type { Pubkey, WrapInboxEvent } from "@linky-fit/linkstr";
 
 export const dropBlocked =
   (

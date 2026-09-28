@@ -1,4 +1,4 @@
-import { encodeNpub, Pubkey } from "@linky/linkstr";
+import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import type { CashuPaymentRequestMessageInfo } from "../app/lib/paymentRequestMessage";
 import type { Translate } from "../i18n";

@@ -1,6 +1,9 @@
 import { Registry } from "./index";
-import { ProfileMetadata, StatusDraft, UnixSeconds } from "@linky/linkstr";
-import type { LinkstrIdentityService, ProfileWatchEvent } from "@linky/linkstr";
+import { ProfileMetadata, StatusDraft, UnixSeconds } from "@linky-fit/linkstr";
+import type {
+  LinkstrIdentityService,
+  ProfileWatchEvent,
+} from "@linky-fit/linkstr";
 import { Exit } from "effect";
 import { finalizeEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";

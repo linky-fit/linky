@@ -2,7 +2,7 @@ import {
   createId,
   makeConversationsRepository,
   type ContactId,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { act } from "react";
 import { describe, expect, it } from "vitest";

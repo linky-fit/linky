@@ -1,5 +1,5 @@
 import { useLatest } from "../../hooks/useLatest";
-import type { TokenTransfer } from "@linky/linkshu";
+import type { TokenTransfer } from "@linky-fit/linkshu";
 import React from "react";
 
 interface UseCashuDomainParams {

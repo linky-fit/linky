@@ -1,5 +1,5 @@
-import { sqliteTrue } from "@linky/linksync";
-import { ProfileMetadata } from "@linky/linkstr";
+import { sqliteTrue } from "@linky-fit/linksync";
+import { ProfileMetadata } from "@linky-fit/linkstr";
 import { describe, expect, it } from "vitest";
 import {
   getContactPublicProfile,

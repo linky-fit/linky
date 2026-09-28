@@ -1,11 +1,11 @@
-import type { RestoreProgress } from "@linky/linkshu";
+import type { RestoreProgress } from "@linky-fit/linkshu";
 import {
   MintUrl,
   NonNegativeAmount,
   ReclaimReport,
   RestoreReport,
   ProofId,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";

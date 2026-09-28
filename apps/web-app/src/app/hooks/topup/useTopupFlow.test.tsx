@@ -8,7 +8,7 @@ import {
   TokenText,
   TopupQuote,
   TopupReceipt,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { Either } from "effect";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";

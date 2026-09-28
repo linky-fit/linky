@@ -1,10 +1,10 @@
-import * as lnurl from "@linky/linkshu";
-import { signLnurlAuthChallenge } from "@linky/identity";
-import { identityFromNsec } from "@linky/linkstr";
+import * as lnurl from "@linky-fit/linkshu";
+import { signLnurlAuthChallenge } from "@linky-fit/identity";
+import { identityFromNsec } from "@linky-fit/linkstr";
 import { hexToBytes } from "@noble/hashes/utils.js";
 import { isNativePlatform } from "./platform/runtime";
-export { isLnurlAuthTarget, parseLnurlAuthTarget } from "@linky/linkshu";
-export type { LnurlAuthAction, LnurlAuthPreview } from "@linky/linkshu";
+export { isLnurlAuthTarget, parseLnurlAuthTarget } from "@linky-fit/linkshu";
+export type { LnurlAuthAction, LnurlAuthPreview } from "@linky-fit/linkshu";
 
 const fallback: lnurl.LnurlFallback = async (url) => {
   if (typeof window === "undefined") throw new Error("LNURL request failed");

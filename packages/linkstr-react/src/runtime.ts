@@ -6,7 +6,7 @@ import {
   makeNostrTransportSimplePool,
   observeTransport,
   RelayHealth,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Layer } from "effect";
 import { linkstrConfigAtom } from "./config";
 import { LinkstrNotConfigured } from "./errors";

@@ -1,10 +1,10 @@
-import { encodeNprofile, Pubkey } from "@linky/linkstr";
+import { encodeNprofile, Pubkey } from "@linky-fit/linkstr";
 import {
   buildCashuPaymentRequestMessage,
   parseCashuPaymentRequestMessage,
 } from "../../lib/paymentRequestMessage";
 import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
-import { createIdFromString } from "@linky/linksync";
+import { createIdFromString } from "@linky-fit/linksync";
 import {
   Amount,
   CurrencyUnit,
@@ -15,7 +15,7 @@ import {
   ReceiveReceipt,
   OperationId,
   TokenText,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import {
   ClientId,
   EnqueueReceipt,
@@ -27,7 +27,7 @@ import {
   UnixSeconds,
   WrapDelivery,
   WrapId,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Either, Exit } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import React, { act } from "react";
@@ -57,7 +57,7 @@ vi.mock("../../../hooks/useRouting", () => ({
   navigateTo: navigateToMock,
 }));
 
-vi.mock("@linky/linkstr-react", () => ({
+vi.mock("@linky-fit/linkstr-react", () => ({
   enqueueOutboxAtom: "enqueueOutboxAtom",
   sendPaymentNoticeAtom: "sendPaymentNoticeAtom",
   useAtomSet: (atom: unknown) =>

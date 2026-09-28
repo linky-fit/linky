@@ -4,10 +4,10 @@ How to test code that uses linkshu, and how the package tests itself. Consumers 
 
 ## Two kinds of tests
 
-| Suite       | Where                         | Mint                              | Run                                                |
-| ----------- | ----------------------------- | --------------------------------- | -------------------------------------------------- |
-| Unit        | `src/**/*.test.ts`            | `fakeWallet` (no network)         | `bun run --filter @linky/linkshu test`             |
-| Integration | `tests/integration/*.test.ts` | Docker Nutshell mints :3338/:3339 | `bun run --filter @linky/linkshu test:integration` |
+| Suite       | Where                         | Mint                              | Run                                                    |
+| ----------- | ----------------------------- | --------------------------------- | ------------------------------------------------------ |
+| Unit        | `src/**/*.test.ts`            | `fakeWallet` (no network)         | `bun run --filter @linky-fit/linkshu test`             |
+| Integration | `tests/integration/*.test.ts` | Docker Nutshell mints :3338/:3339 | `bun run --filter @linky-fit/linkshu test:integration` |
 
 Both use vitest with globals (`describe`/`it`/`expect` without imports). Unit tests run in the root `bun run test`; the integration suite is separate and runs in CI as `linkshu-integration`.
 
@@ -18,7 +18,7 @@ You have the public API and the in-memory ports; nothing else is exported for te
 **One clean wallet per runtime.** Omit the stores from `runLinkshu` (or provide `inMemoryKeyValueStore`/`inMemoryProofStore`/`inMemoryOperationStore`) and each runtime starts empty:
 
 ```ts
-import { Bip39Seed, ProofStore, runLinkshu } from "@linky/linkshu";
+import { Bip39Seed, ProofStore, runLinkshu } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 
 const proofsOfFreshWallet = () =>
@@ -109,7 +109,7 @@ const settleOnTestClock = <A, E>(program: Effect.Effect<A, E>) =>
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d --wait cashu-mint cashu-mint-target
-bun run --filter @linky/linkshu test:integration
+bun run --filter @linky-fit/linkshu test:integration
 ```
 
 Override the mints with `LINKSHU_MINT_URL` (source, default `http://localhost:3338`) and `LINKSHU_TARGET_MINT_URL` (target, default `http://localhost:3339`). Test timeout is 30 s per case.
@@ -135,7 +135,7 @@ Override the mints with `LINKSHU_MINT_URL` (source, default `http://localhost:33
 A typical case, in a new file under `tests/integration/`:
 
 ```ts
-import { Receive, ReceiveDraft, runLinkshu, Tokens } from "@linky/linkshu";
+import { Receive, ReceiveDraft, runLinkshu, Tokens } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 import { durableStorage, fundToken, randomSeed } from "./helpers";
 

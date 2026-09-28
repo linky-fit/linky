@@ -8,7 +8,7 @@ Prerequisites: a configured runtime ([getting-started.md](./getting-started.md))
 
 ```ts
 import { Effect } from "effect";
-import { Tokens } from "@linky/linkshu";
+import { Tokens } from "@linky-fit/linkshu";
 
 const walletView = Effect.gen(function* () {
   const tokens = yield* Tokens;
@@ -78,7 +78,7 @@ Linky's handed-out action selects `handedOut` and `externalized` proofs. Its ful
 
 ```ts
 import { Effect, Schema } from "effect";
-import { ImportProofDraft, NewOperation, Tokens } from "@linky/linkshu";
+import { ImportProofDraft, NewOperation, Tokens } from "@linky-fit/linkshu";
 
 const decodeProofs = Schema.decodeUnknownOption(Schema.Array(ImportProofDraft));
 const decodeOperations = Schema.decodeUnknownOption(Schema.Array(NewOperation));
@@ -116,7 +116,7 @@ Rows whose text no longer decodes are skipped. Linky runs it from `useLinkshuCom
 
 ## Token codec
 
-Pure and total: malformed input yields `null`, never a throw. Import from `@linky/linkshu`.
+Pure and total: malformed input yields `null`, never a throw. Import from `@linky-fit/linkshu`.
 
 | Function                           | Use                                                                                                                    |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |

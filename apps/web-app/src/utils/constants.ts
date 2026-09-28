@@ -9,7 +9,7 @@ export const SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY =
 export {
   FIAT_RATES_CACHE_STORAGE_KEY,
   FIAT_RATES_TTL_MS,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 export const NOSTR_NSEC_STORAGE_KEY = "linky.nostr_nsec";
 export const NOSTR_SLIP39_SEED_STORAGE_KEY = "linky.nostr_slip39_seed";
 export const CASHU_BIP85_MNEMONIC_STORAGE_KEY = "linky.cashu_bip85_mnemonic";
@@ -44,7 +44,7 @@ export const BANK_PAYMENT_OFFER_STAGGER_DELAY_SEC_STORAGE_KEY =
   "linky.bank_payment_offer_stagger_delay_sec.v1";
 export const FEEDBACK_CONTACT_NPUB =
   "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
-export { PAYMENT_ANALYTICS_RECIPIENT_NPUB } from "@linky/linkstr";
+export { PAYMENT_ANALYTICS_RECIPIENT_NPUB } from "@linky-fit/linkstr";
 export const NO_GROUP_FILTER = "__linky_no_group__";
 export const ARCHIVED_CONTACTS_FILTER = "__linky_archived_contacts__";
 

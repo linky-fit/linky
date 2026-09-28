@@ -17,7 +17,7 @@ import {
   type NostrSecretKey,
   type Pubkey,
   type RelayUrl,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const publishThenFetch = (
   secretKey: NostrSecretKey,
@@ -41,12 +41,12 @@ The result is a `ProfileFetchResult`: `result.profile?.metadata.displayName`, `r
 React — a publish handler:
 
 ```ts
-import { ProfileMetadata, StatusDraft } from "@linky/linkstr";
+import { ProfileMetadata, StatusDraft } from "@linky-fit/linkstr";
 import {
   publishProfileAtom,
   publishStatusAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 
 export const usePublishProfile = () => {
@@ -68,14 +68,14 @@ export const usePublishProfile = () => {
 React — a watch hook that lives as long as the session. `onEvent` is read through a ref so a new callback does not reopen the subscriptions:
 
 ```ts
-import type { ProfileWatchEvent, Pubkey } from "@linky/linkstr";
+import type { ProfileWatchEvent, Pubkey } from "@linky-fit/linkstr";
 import {
   profileWatchAtom,
   profileWatchHandlerAtom,
   useAtomMount,
   useAtomSet,
   watchedProfilesAtom,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { useEffect, useRef } from "react";
 
 export const useProfileWatch = (
@@ -147,7 +147,11 @@ Search streams ranked matches through `onHits` each time a relay answers, until 
 | `StatusUpdated`  | `pubkey`, `content: string` (empty = cleared), `expiresAt: UnixSeconds \| null`, `updatedAt` | a newer `d=general` kind 30315        |
 
 ```ts
-import type { ProfileWatchEvent, Pubkey, UnixSeconds } from "@linky/linkstr";
+import type {
+  ProfileWatchEvent,
+  Pubkey,
+  UnixSeconds,
+} from "@linky-fit/linkstr";
 
 /** Placeholder: your cache; compare updatedAt with what you have before overwriting. */
 type Save = (pubkey: Pubkey, updatedAt: UnixSeconds, value: string) => void;

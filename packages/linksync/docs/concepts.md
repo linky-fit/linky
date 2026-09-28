@@ -6,7 +6,7 @@ What the package stores, where, and why. The scope table below is the source of 
 
 Recorded here and in `docs/architecture.md` at the repo root. Tracked in linky-fit/linky#380.
 
-1. **Package name: `@linky/linksync`.** The family is `linkstr` (nostr) and `linkshu` (cashu); this one is named for what it is, synced storage, not for Evolu.
+1. **Package name: `@linky-fit/linksync`.** The family is `linkstr` (nostr) and `linkshu` (cashu); this one is named for what it is, synced storage, not for Evolu.
 2. **Rotation is byte-aware and count-aware, whichever fires first.** A shard rotates once its Evolu history holds `SHARD_MAX_BYTES` (256 KiB) of column values or the scope's mutation count (the pre-package thresholds). The byte number is a quarter of the official Evolu relay's 1 MB per-owner quota, because the relay stores encrypted history with per-row overhead that local value bytes do not show. Both numbers are meant to be tuned with real data. A 60 s cooldown per scope stays.
 3. **Transactions are forgettable.** Money truth is the proofs and operations, which are never forgotten; the transaction history is a view of it. Messages and transactions keep the newest 4 shards.
 4. **Only the meta owner is an Evolu `AppOwner`.** Every other scope is a `ShardOwner` derived with `deriveShardOwner(appOwner, [scope, index])`.

@@ -1,6 +1,6 @@
 # Testing
 
-Unit tests only, `src/**/*.test.ts`, vitest with globals, run by `bun run --filter @linky/linksync test` and by the root `bun run test`. Nothing here needs Evolu's runtime or a worker; only `src/react/index.test.ts` opts into jsdom (a file-level `@vitest-environment` comment) to render the hooks with `react-dom`.
+Unit tests only, `src/**/*.test.ts`, vitest with globals, run by `bun run --filter @linky-fit/linksync test` and by the root `bun run test`. Nothing here needs Evolu's runtime or a worker; only `src/react/index.test.ts` opts into jsdom (a file-level `@vitest-environment` comment) to render the hooks with `react-dom`.
 
 ## Testing a consumer
 
@@ -12,8 +12,8 @@ import {
   linkyTableColumns,
   makeContactsRepository,
   makeInMemoryShardDb,
-} from "@linky/linksync";
-import type { LinkyDbSchema } from "@linky/linksync";
+} from "@linky-fit/linksync";
+import type { LinkyDbSchema } from "@linky-fit/linksync";
 import { createAppOwner, OwnerSecret } from "@evolu/common";
 
 const appOwner = createAppOwner(

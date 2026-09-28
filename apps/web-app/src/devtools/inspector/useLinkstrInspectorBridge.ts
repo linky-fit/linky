@@ -3,7 +3,7 @@ import {
   inspectorHandlerAtom,
   useAtomMount,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import React from "react";
 import { useInspectorEmissionEnabled } from "./inspectorEnabled";
 import { linkstrEventToRow } from "./linkstrRows";

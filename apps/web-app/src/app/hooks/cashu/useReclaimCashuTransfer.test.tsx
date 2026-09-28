@@ -1,5 +1,5 @@
-import { createIdFromString } from "@linky/linksync";
-import { NonNegativeAmount, ProofId, ReclaimReport } from "@linky/linkshu";
+import { createIdFromString } from "@linky-fit/linksync";
+import { NonNegativeAmount, ProofId, ReclaimReport } from "@linky-fit/linkshu";
 import { act, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";

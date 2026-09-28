@@ -1,4 +1,4 @@
-import type { WalletRepository } from "@linky/linksync";
+import type { WalletRepository } from "@linky-fit/linksync";
 import {
   Autoswap,
   AutoswapDraft,
@@ -22,8 +22,8 @@ import {
   TopupDraft,
   Validation,
   WalletBalances,
-} from "@linky/linkshu";
-import { decodeNsec } from "@linky/linkstr";
+} from "@linky-fit/linkshu";
+import { decodeNsec } from "@linky-fit/linkstr";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type {
   AutoswapClaimResult,
@@ -64,7 +64,7 @@ import type {
   TopupReceipt,
   TransferCheckResult,
   ValidationReport,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { Effect, Exit, Layer, ManagedRuntime, Schema, Scope } from "effect";
 import type { Either } from "effect";
 import React from "react";

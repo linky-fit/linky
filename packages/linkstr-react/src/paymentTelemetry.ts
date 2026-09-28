@@ -1,5 +1,9 @@
-import { Outbox } from "@linky/linkstr";
-import type { OutboxRef, PaymentTelemetryDraft, Pubkey } from "@linky/linkstr";
+import { Outbox } from "@linky-fit/linkstr";
+import type {
+  OutboxRef,
+  PaymentTelemetryDraft,
+  Pubkey,
+} from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

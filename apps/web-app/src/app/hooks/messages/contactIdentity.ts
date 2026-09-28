@@ -2,7 +2,7 @@ import {
   identityFromNsec,
   parsePubkey,
   type NostrSecretKey,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../../../utils/constants";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type { ContactIdentityRowLike } from "../../types/appTypes";

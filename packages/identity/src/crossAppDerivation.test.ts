@@ -10,7 +10,7 @@ import { describe, expect, test } from "vitest";
 import { IdentityProvider } from "./IdentityProvider";
 import { MasterSecretProvider } from "./MasterSecretProvider";
 import { OwnerLaneIndex, type OwnerRole } from "./domain";
-import { encodeNpub, encodeNsec } from "@linky/linkstr";
+import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
 import { deriveOwnerMnemonicsFromMasterSecret } from "./derive";
 import { parseSlip39Share, recoverMasterSecretFromSlip39Share } from "./slip39";
 
@@ -184,7 +184,7 @@ describe("cross-app derivation vectors (shared with Payky)", () => {
   );
 });
 
-// ── Linky-specific binding: the public @linky/identity API must land on
+// ── Linky-specific binding: the public @linky-fit/identity API must land on
 // the shared vectors above. Payky's copy binds its own key-derivation API here.
 
 const lane = (index: number): OwnerLaneIndex =>
@@ -192,7 +192,7 @@ const lane = (index: number): OwnerLaneIndex =>
 
 const hex = (u8: Uint8Array): string => bytesToHex(u8);
 
-describe("@linky/identity API matches the cross-app vectors", () => {
+describe("@linky-fit/identity API matches the cross-app vectors", () => {
   const loadIdentity = async () => {
     const share = await Effect.runPromise(parseSlip39Share(SLIP39_SHARE));
     const masterSecret = await Effect.runPromise(

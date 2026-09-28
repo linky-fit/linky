@@ -5,7 +5,7 @@ import {
   makeConversationsRepository,
   NonEmptyString1000,
   PositiveInt,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";

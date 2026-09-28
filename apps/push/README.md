@@ -252,19 +252,19 @@ bun install
 Start the service in watch mode:
 
 ```bash
-bun run --filter @linky/push dev
+bun run --filter @linky-fit/push dev
 ```
 
 Run once:
 
 ```bash
-bun run --filter @linky/push start
+bun run --filter @linky-fit/push start
 ```
 
 Type-check just this workspace:
 
 ```bash
-bun run --filter @linky/push typecheck
+bun run --filter @linky-fit/push typecheck
 ```
 
 Run the repo-wide checks after changes:

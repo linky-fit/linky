@@ -1,4 +1,4 @@
-# @linky/native-shell
+# @linky-fit/native-shell
 
 Capacitor-based native shell for shipping the existing web app as:
 
@@ -27,7 +27,7 @@ bun run native:ios:add
 bun run native:apk:debug
 ```
 
-This builds `@linky/web-app`, syncs the Capacitor Android project (`android:prepare`), and runs `assembleDebug`.
+This builds `@linky-fit/web-app`, syncs the Capacitor Android project (`android:prepare`), and runs `assembleDebug`.
 
 The debug APK installs alongside the production app as the separate package `fit.linky.app.debug` and appears in the launcher as `Linky Dev`. Native FCM push works in it only when `android/app/google-services.json` contains a client for `fit.linky.app.debug`; otherwise the Google Services plugin is skipped for debug-only builds and push stays disabled.
 

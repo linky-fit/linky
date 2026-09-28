@@ -1,6 +1,6 @@
 import { isRecord } from "./unknown";
 import { asNonEmptyString } from "./validation";
-import { encodeNpub, parsePubkey, RelayUrl } from "@linky/linkstr";
+import { encodeNpub, parsePubkey, RelayUrl } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import { stripNostrUriPrefix } from "./nostrNpub";
 

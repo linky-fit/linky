@@ -1,6 +1,6 @@
 import { useRetainShardHistory } from "../useLinksync";
 import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
-import type { ProfileMetadata } from "@linky/linkstr";
+import type { ProfileMetadata } from "@linky-fit/linkstr";
 import {
   ContactId,
   directConversationIdFor,
@@ -9,19 +9,19 @@ import {
   type ContactsRepository,
   type ConversationsRepository,
   type TransactionsRepository,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import {
   decodeNpub,
   encodeNpub,
   identityFromNsec,
   Pubkey,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   fetchProfilesAtom,
   publishMuteListAtom,
   useAtomSet,
   useOutboxResults,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Effect, Schema } from "effect";
 import React, { useMemo, useState } from "react";
 import {
@@ -61,7 +61,7 @@ import {
 import { formatShortNpub, getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorage";
-import { getBankPaymentOfferCurrency } from "@linky/proxy-payment";
+import { getBankPaymentOfferCurrency } from "@linky-fit/proxy-payment";
 import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
 import { useBankPaymentOffers } from "../useBankPaymentOffers";
 import { collectUnreadNewestIncomingByContactId } from "../../lib/chatUnread";

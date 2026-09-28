@@ -1,15 +1,15 @@
 import { Context, Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { makeIdentity } from "@linky/linkstr/testing";
-import { encodeNsec } from "@linky/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
+import { encodeNsec } from "@linky-fit/linkstr";
 
 const state = vi.hoisted(() => ({
   fetchWrapEvent: vi.fn(() => Effect.succeed(null)),
   runConfig: vi.fn(),
   nsec: "",
 }));
-vi.mock("@linky/linkstr", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@linky/linkstr")>();
+vi.mock("@linky-fit/linkstr", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@linky-fit/linkstr")>();
   interface Inbox {
     fetchWrapEvent: typeof state.fetchWrapEvent;
   }

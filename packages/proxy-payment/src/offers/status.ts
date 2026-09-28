@@ -1,4 +1,4 @@
-import type { BankOfferStatus } from "@linky/linkstr";
+import type { BankOfferStatus } from "@linky-fit/linkstr";
 
 export const BANK_PAYMENT_OFFER_PHASE_TTL_SEC = 5 * 60;
 export const BANK_PAYMENT_OFFER_EXTENSION_SEC = 60;

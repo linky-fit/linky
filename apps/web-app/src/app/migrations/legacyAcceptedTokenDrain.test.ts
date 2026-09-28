@@ -5,7 +5,7 @@ import {
   parseMintUrl,
   ReceiveReceipt,
   TokenAlreadyKnown,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { Either, Schema } from "effect";
 import { beforeEach, describe, expect, it } from "vitest";
 import { drainLegacyAcceptedCashuToken } from "./legacyAcceptedTokenDrain";

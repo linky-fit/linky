@@ -18,7 +18,7 @@ import {
   UnixSeconds,
   type NostrSecretKey,
   type SignedPlainEvent,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   getNativeNotificationPermissionState,
   NATIVE_PUSH_ACTION_EVENT,

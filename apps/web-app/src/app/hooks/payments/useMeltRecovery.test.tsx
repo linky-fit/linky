@@ -1,4 +1,4 @@
-import { OwnerId } from "@linky/linksync";
+import { OwnerId } from "@linky-fit/linksync";
 import {
   Amount,
   MeltReceipt,
@@ -7,13 +7,13 @@ import {
   NonNegativeAmount,
   QuoteId,
   OperationId,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import {
   NonEmptyString100,
   PositiveInt,
   TransactionId,
   type TransactionRecord,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";

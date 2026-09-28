@@ -40,7 +40,7 @@ import {
   NostrTransportSimplePool,
   observeTransport,
   RelayHealth,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const services = linkstrServices({
   secretKey,
@@ -56,7 +56,7 @@ This is what the linkstr-react runtime does. Both taps wrap the same raw transpo
 
 ```ts
 import { Effect, Stream } from "effect";
-import { RelayHealth } from "@linky/linkstr";
+import { RelayHealth } from "@linky-fit/linkstr";
 
 const logHealth = Effect.gen(function* () {
   const health = yield* RelayHealth;
@@ -75,8 +75,12 @@ const logHealth = Effect.gen(function* () {
 `relayHealthAtom` mirrors `changes` as a `Result<ReadonlyMap<string, RelayHealthState>>`, keyed by plain string so UI code can look up its own relay list. It resets when the runtime is rebuilt.
 
 ```tsx
-import type { RelayHealthState } from "@linky/linkstr";
-import { relayHealthAtom, Result, useAtomValue } from "@linky/linkstr-react";
+import type { RelayHealthState } from "@linky-fit/linkstr";
+import {
+  relayHealthAtom,
+  Result,
+  useAtomValue,
+} from "@linky-fit/linkstr-react";
 
 const EMPTY: ReadonlyMap<string, RelayHealthState> = new Map();
 

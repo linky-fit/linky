@@ -1,4 +1,4 @@
-import { NonEmptyString1000 } from "@linky/linksync";
+import { NonEmptyString1000 } from "@linky-fit/linksync";
 
 export const toEvoluText = (
   value: string | null | undefined,

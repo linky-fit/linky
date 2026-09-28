@@ -1,6 +1,6 @@
-import { encodeNpub } from "@linky/linkstr";
-import { makeIdentity } from "@linky/linkstr/testing";
-import { ShardDbError, type ContactsRepository } from "@linky/linksync";
+import { encodeNpub } from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
+import { ShardDbError, type ContactsRepository } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { act, useLayoutEffect } from "react";
 import { describe, expect, it, vi } from "vitest";

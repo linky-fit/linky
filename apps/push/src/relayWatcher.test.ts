@@ -4,7 +4,7 @@ import {
   WrapId,
   type DeliveredPushWrap,
   type InboxDelivery,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { describe, expect, it, setSystemTime } from "bun:test";
 import { Database } from "bun:sqlite";
 

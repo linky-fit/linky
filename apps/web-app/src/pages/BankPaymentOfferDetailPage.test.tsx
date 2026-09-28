@@ -1,8 +1,8 @@
-import { encodeNpub, Pubkey } from "@linky/linkstr";
+import { encodeNpub, Pubkey } from "@linky-fit/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { act, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { BankOfferStatus } from "@linky/proxy-payment";
+import type { BankOfferStatus } from "@linky-fit/proxy-payment";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import { createLinkyBankPaymentOfferEvent } from "../testUtils/bankPaymentOfferEvent";
 import { createSecretKey } from "../testUtils/nostrKeys";

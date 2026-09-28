@@ -1,4 +1,4 @@
-import type { Pubkey } from "@linky/linkstr";
+import type { Pubkey } from "@linky-fit/linkstr";
 import { readPendingPayments } from "../lib/pendingPayments";
 import {
   ContactId,
@@ -9,8 +9,8 @@ import {
   type ConversationsRepository,
   type MessageRow,
   type ReactionRow,
-} from "@linky/linksync";
-import { useLiveValue } from "@linky/linksync/react";
+} from "@linky-fit/linksync";
+import { useLiveValue } from "@linky-fit/linksync/react";
 import { Effect, Schema } from "effect";
 import React from "react";
 import { useLatest } from "../../hooks/useLatest";

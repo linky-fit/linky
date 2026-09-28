@@ -7,13 +7,13 @@
 Set `LinkstrConfig.inspector: true`, register a handler, and mount the events atom:
 
 ```tsx
-import type { InspectorEvent } from "@linky/linkstr";
+import type { InspectorEvent } from "@linky-fit/linkstr";
 import {
   inspectorEventsAtom,
   inspectorHandlerAtom,
   useAtomMount,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import React from "react";
 
 export const useInspectorBridge = (
@@ -48,7 +48,7 @@ import {
   type NostrSecretKey,
   type ReactionDraft,
   type RelayUrl,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const inspectedServices = (
   secretKey: NostrSecretKey,

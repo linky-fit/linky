@@ -1,5 +1,5 @@
-import { createIdFromString } from "@linky/linksync";
-import { TokenTransfer } from "@linky/linkshu";
+import { createIdFromString } from "@linky-fit/linksync";
+import { TokenTransfer } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 import { act, type ComponentProps } from "react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";

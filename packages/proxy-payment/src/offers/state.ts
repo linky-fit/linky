@@ -1,4 +1,4 @@
-import type { BankOfferInboxEvent, BankOfferReceipt } from "@linky/linkstr";
+import type { BankOfferInboxEvent, BankOfferReceipt } from "@linky-fit/linkstr";
 import {
   bankOfferContentFromSnapshot,
   decodeBankPaymentOffer,

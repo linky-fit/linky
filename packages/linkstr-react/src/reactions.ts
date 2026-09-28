@@ -1,5 +1,5 @@
-import { Reactions } from "@linky/linkstr";
-import type { RetractionDraft } from "@linky/linkstr";
+import { Reactions } from "@linky-fit/linkstr";
+import type { RetractionDraft } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

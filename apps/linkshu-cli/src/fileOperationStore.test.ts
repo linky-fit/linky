@@ -5,7 +5,7 @@ import {
   NewOperation,
   QuoteId,
   UnixSeconds,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { describe, expect, it } from "bun:test";
 import { Effect } from "effect";
 import * as fs from "node:fs";

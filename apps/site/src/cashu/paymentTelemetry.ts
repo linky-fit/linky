@@ -16,16 +16,16 @@ import {
   UnixSeconds,
   classifyPaymentErrorCode,
   detectTelemetryEnvironment,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import type {
   PaymentTelemetryDirection,
   PaymentTelemetryMethod,
   PaymentTelemetryPhase,
   PaymentTelemetryStatus,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { Effect, Schema, Stream } from "effect";
-export { PAYMENT_ANALYTICS_RECIPIENT_NPUB } from "@linky/linkstr";
+export { PAYMENT_ANALYTICS_RECIPIENT_NPUB } from "@linky-fit/linkstr";
 
 const key = "linky.site.nostr.secret";
 const secretHex = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));

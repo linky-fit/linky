@@ -5,12 +5,12 @@ export interface MintIcon {
   url: string | null;
 }
 
-import { isTestMintUrl as sharedIsTestMintUrl } from "@linky/linkshu";
-import { GENERIC_MINT_ICON_DATA_URL } from "@linky/linkshu";
+import { isTestMintUrl as sharedIsTestMintUrl } from "@linky-fit/linkshu";
+import { GENERIC_MINT_ICON_DATA_URL } from "@linky-fit/linkshu";
 export {
   GENERIC_MINT_ICON_DATA_URL,
   getMintIconOverride,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 const envMainMintUrl = (import.meta.env.VITE_MAIN_MINT_URL ?? "").trim();
 
 /** Where funds go when the configured default mint is a hidden test mint. */

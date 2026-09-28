@@ -1,9 +1,9 @@
-import { CashuOperationId } from "@linky/linksync";
+import { CashuOperationId } from "@linky-fit/linksync";
 import type {
   StoredProof,
   TokenTransfer,
   RestoreProgress,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { ChevronRight, CirclePlus as TokenAddIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";

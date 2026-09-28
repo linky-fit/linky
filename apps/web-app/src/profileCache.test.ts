@@ -1,4 +1,4 @@
-import { ProfileMetadata } from "@linky/linkstr";
+import { ProfileMetadata } from "@linky-fit/linkstr";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   isDisplayableProfilePictureUrl,

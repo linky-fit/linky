@@ -2,12 +2,12 @@ import {
   identityFromNsec,
   RelayListEntry,
   RelayListsDraft,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   fetchOwnRelayListsAtom,
   publishRelayListsAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";

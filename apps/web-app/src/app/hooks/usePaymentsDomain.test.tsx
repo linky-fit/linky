@@ -1,5 +1,5 @@
-import { encodeNpub } from "@linky/linkstr";
-import { makeIdentity } from "@linky/linkstr/testing";
+import { encodeNpub } from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";

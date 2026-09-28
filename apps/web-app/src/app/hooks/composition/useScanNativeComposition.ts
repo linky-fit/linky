@@ -1,10 +1,10 @@
 import { Share } from "@capacitor/share";
-import { decodeNpub, identityFromNsec, WrapId } from "@linky/linkstr";
-import type { WrapInboxEvent } from "@linky/linkstr";
-import { fetchWrapEventAtom, useAtomSet } from "@linky/linkstr-react";
+import { decodeNpub, identityFromNsec, WrapId } from "@linky-fit/linkstr";
+import type { WrapInboxEvent } from "@linky-fit/linkstr";
+import { fetchWrapEventAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Exit, Schema } from "effect";
 import React from "react";
-import type { ContactsRepository } from "@linky/linksync";
+import type { ContactsRepository } from "@linky-fit/linksync";
 import type { CashuOperationId } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import {

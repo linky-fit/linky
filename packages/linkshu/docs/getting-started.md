@@ -1,10 +1,10 @@
 # Getting started
 
-Wire `@linky/linkshu` and make a first wallet call. Read this before touching cashu code in the web app, the CLI, or a script.
+Wire `@linky-fit/linkshu` and make a first wallet call. Read this before touching cashu code in the web app, the CLI, or a script.
 
 ## What it is
 
-`@linky/linkshu` is Linky's cashu wallet as an Effect library. Every wallet operation (receive, send, pay an invoice, top up, validate, restore, …) is a typed service that takes a draft and returns a receipt. You bring the seed and three storage ports; the package owns everything else, including the proof inventory and the deterministic counters.
+`@linky-fit/linkshu` is Linky's cashu wallet as an Effect library. Every wallet operation (receive, send, pay an invoice, top up, validate, restore, …) is a typed service that takes a draft and returns a receipt. You bring the seed and three storage ports; the package owns everything else, including the proof inventory and the deterministic counters.
 
 ## Core concepts
 
@@ -21,15 +21,17 @@ Wire `@linky/linkshu` and make a first wallet call. Read this before touching ca
 Add the workspace dependency and import from the package root:
 
 ```json
-{ "dependencies": { "@linky/linkshu": "workspace:*", "effect": "^3.19.19" } }
+{
+  "dependencies": { "@linky-fit/linkshu": "workspace:*", "effect": "^3.19.19" }
+}
 ```
 
 ```ts
-import { Receive, ReceiveDraft, runLinkshu } from "@linky/linkshu";
+import { Receive, ReceiveDraft, runLinkshu } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 ```
 
-`@linky/linkshu/lightning-address` is a second entry for the lightning-address helpers; see [lightning-utilities.md](./lightning-utilities.md).
+`@linky-fit/linkshu/lightning-address` is a second entry for the lightning-address helpers; see [lightning-utilities.md](./lightning-utilities.md).
 
 ## First run
 
@@ -42,7 +44,7 @@ import {
   ReceiveDraft,
   runLinkshu,
   Tokens,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { Effect, Either } from "effect";
 
 // Disposable seed: random bytes own nothing and are gone when the process exits.
@@ -113,8 +115,8 @@ import {
   Receive,
   ReceiveDraft,
   Tokens,
-} from "@linky/linkshu";
-import type { LinkshuServicesConfig } from "@linky/linkshu";
+} from "@linky-fit/linkshu";
+import type { LinkshuServicesConfig } from "@linky-fit/linkshu";
 import { Effect, Layer, ManagedRuntime } from "effect";
 
 export const makeWallet = (config: LinkshuServicesConfig) => {
@@ -144,7 +146,7 @@ Rebuild the runtime when the seed changes and dispose the old one. Topup handles
 `new SendDraft({...})` needs already-branded values. From plain strings and numbers, decode the whole draft instead; every field is validated at once and a bad one throws a `ParseError`:
 
 ```ts
-import { Send, SendDraft } from "@linky/linkshu";
+import { Send, SendDraft } from "@linky-fit/linkshu";
 import { Effect, Schema } from "effect";
 
 const decodeSendDraft = Schema.decodeUnknownSync(SendDraft);

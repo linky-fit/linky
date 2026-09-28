@@ -7,12 +7,12 @@ import {
   RetractionDraft,
   RumorId,
   TargetKind,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   enqueueOutboxAtom,
   retractReactionAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Cause, Exit, Schema } from "effect";
 import React from "react";
 import { makeLocalId } from "../../../utils/validation";

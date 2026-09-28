@@ -11,8 +11,8 @@ import {
   type BankOfferDraft,
   type BankOfferInboxEvent,
   type BankOfferStatus,
-} from "@linky/linkstr";
-import { makeIdentity } from "@linky/linkstr/testing";
+} from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { bankOfferContentFromSnapshot } from "../offers/content";
 
 export const me = makeIdentity().pubkey;

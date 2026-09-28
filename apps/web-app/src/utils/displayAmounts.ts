@@ -1,5 +1,5 @@
-import type { FiatRates } from "@linky/linkshu";
-export type { FiatRates } from "@linky/linkshu";
+import type { FiatRates } from "@linky-fit/linkshu";
+export type { FiatRates } from "@linky-fit/linkshu";
 import { formatInteger, normalizeLocale } from "./formatting";
 
 type FiatDisplayCurrency = "czk" | "eur" | "chf" | "usd";

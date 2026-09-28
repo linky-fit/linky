@@ -19,7 +19,7 @@ import {
   type BankPaymentOfferInfo,
   hasBankPaymentOfferTimedPhase,
   isTerminalBankPaymentOfferStatus,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import { parseIdentityChangeMessageContent } from "../app/lib/identityChangeMessage";
 import {
   extractMessageLinks,

@@ -3,7 +3,7 @@ import type {
   OwnRetractionConfirmed,
   ReactionAdded,
   ReactionRetracted,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,

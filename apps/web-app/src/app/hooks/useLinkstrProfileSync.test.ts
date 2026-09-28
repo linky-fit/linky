@@ -3,8 +3,11 @@ import {
   ProfileMetadata,
   ProfileUpdated,
   UnixSeconds,
-} from "@linky/linkstr";
-import { createIdFromString, type ContactsRepository } from "@linky/linksync";
+} from "@linky-fit/linkstr";
+import {
+  createIdFromString,
+  type ContactsRepository,
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveCachedProfile } from "../../profileCache";

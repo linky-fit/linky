@@ -6,7 +6,7 @@ import {
   QuoteId,
   QuoteStateChanged,
   parseMintUrl,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { describe, expect, it } from "vitest";
 import { isInspectorChannel, parseInspectorRow } from "./inspectorRows";
 import { linkshuEventToRow } from "./linkshuRows";

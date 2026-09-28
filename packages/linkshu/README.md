@@ -1,4 +1,4 @@
-# @linky/linkshu
+# @linky-fit/linkshu
 
 Linky's cashu wallet as a typed library. Every wallet operation the app
 performs (receive a token, send an amount, pay an invoice, top up, validate,
@@ -138,7 +138,7 @@ already injectable).
   later check, never treated as spent or offered to a swap.
 - **Serializable errors.** All errors are `Schema.TaggedError`, so failures
   can be persisted on operations without ad-hoc stringification.
-- **No dependency edge to `@linky/linkstr`** in either direction. linkstr's
+- **No dependency edge to `@linky-fit/linkstr`** in either direction. linkstr's
   small internal token classifier is an accepted duplicate.
 - **Deferred verticals are designed-around, not built:** LNURL/LN-address
   payment, npub.cash claim and mint-preference sync, and contact payment
@@ -151,13 +151,13 @@ already injectable).
 ## Tests
 
 Unit tests are colocated (`src/**/*.test.ts`) and run with
-`bun run --filter @linky/linkshu test` (included in the root `bun run test`).
+`bun run --filter @linky-fit/linkshu test` (included in the root `bun run test`).
 The integration suite in `tests/integration/` exercises the public API
 against two dev-stack docker mints:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d --wait cashu-mint cashu-mint-target
-bun run --filter @linky/linkshu test:integration
+bun run --filter @linky-fit/linkshu test:integration
 ```
 
 CI runs it as the `linkshu-integration` job in `tests.yml`. Source and target
@@ -175,7 +175,7 @@ optional `inspector` layer:
 
 ```ts
 import { Effect } from "effect";
-import { Receive, ReceiveDraft, runLinkshu } from "@linky/linkshu";
+import { Receive, ReceiveDraft, runLinkshu } from "@linky-fit/linkshu";
 
 const receipt = await runLinkshu(
   { bip39Seed, keyValueStore, proofStore, operationStore },

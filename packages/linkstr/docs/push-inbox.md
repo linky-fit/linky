@@ -11,7 +11,7 @@ Senders opt a wrap into push by adding a `["linky", "push"]` tag to the recipien
 The Promise-facing entry for long-lived services. No identity is needed. Keep the subscription handle and close it from your shutdown path:
 
 ```ts
-import { RelayUrl, watchPushInbox } from "@linky/linkstr";
+import { RelayUrl, watchPushInbox } from "@linky-fit/linkstr";
 
 /** App callback placeholder: look up subscriptions for `recipient` and send the push. */
 declare const notify: (recipient: string, wrapId: string) => void;

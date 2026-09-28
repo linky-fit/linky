@@ -13,7 +13,7 @@ import {
   StoredOperation,
   StoredProof,
   UnixSeconds,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { Effect, Layer, Schema } from "effect";
 
 const SeedJson = Schema.parseJson(

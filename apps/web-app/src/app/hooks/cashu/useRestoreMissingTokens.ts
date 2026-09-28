@@ -1,5 +1,5 @@
-import { parseMintUrl } from "@linky/linkshu";
-import type { MintUrl, RestoreProgress } from "@linky/linkshu";
+import { parseMintUrl } from "@linky-fit/linkshu";
+import type { MintUrl, RestoreProgress } from "@linky-fit/linkshu";
 import React from "react";
 import { isHiddenTestMint, MAIN_MINT_URL } from "../../../utils/mint";
 import type { LoggedPaymentEventParams } from "../../types/appTypes";

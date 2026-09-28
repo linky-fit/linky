@@ -1,4 +1,4 @@
-import { encodeNprofile } from "@linky/linkstr";
+import { encodeNprofile } from "@linky-fit/linkstr";
 import { buildCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import {
   ChatMessageReceived,
@@ -10,7 +10,7 @@ import {
   RumorId,
   TextBody,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../../../testUtils/nostrKeys";

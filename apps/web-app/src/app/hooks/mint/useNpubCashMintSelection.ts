@@ -2,7 +2,7 @@ import {
   decodeNsec,
   makeNip98AuthHeader as makeLinkstrNip98AuthHeader,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import React from "react";
 import {
   CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,

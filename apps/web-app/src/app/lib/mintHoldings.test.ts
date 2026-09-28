@@ -1,4 +1,4 @@
-import type { StoredProof } from "@linky/linkshu";
+import type { StoredProof } from "@linky-fit/linkshu";
 import { describe, expect, it } from "vitest";
 import { createStoredProofFixture } from "../../testUtils/cashuInventory";
 import { holdingOf, mintHoldings } from "./mintHoldings";

@@ -1,6 +1,6 @@
 import { Either } from "effect";
 import React from "react";
-import { parseTokenText } from "@linky/linkshu";
+import { parseTokenText } from "@linky-fit/linkshu";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { getUnknownErrorMessage } from "../../../utils/unknown";

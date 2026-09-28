@@ -5,8 +5,8 @@ import {
   type ContactId,
   type ContactsRepository,
   type ConversationsRepository,
-} from "@linky/linksync";
-import { useRepositoryRows } from "@linky/linksync/react";
+} from "@linky-fit/linksync";
+import { useRepositoryRows } from "@linky-fit/linksync/react";
 import React from "react";
 import { isStatusFilterValue } from "../../nostrStatus";
 import type { Route } from "../../types/route";

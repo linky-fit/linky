@@ -22,7 +22,7 @@ import {
   type BankPaymentOfferInfo,
   decodeBankPaymentOffer,
   isBankPaymentOfferExpired,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import {
   isBankPaymentOfferMinimized,
   setBankPaymentOfferMinimized,

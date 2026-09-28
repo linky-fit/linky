@@ -7,8 +7,8 @@ import {
   Pubkey,
   RumorId,
   TextMessageDraft,
-} from "@linky/linkstr";
-import { enqueueOutboxAtom, useAtomSet } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Cause, Either, Exit, Schema } from "effect";
 import React from "react";
 import { appendPushDebugLog } from "../../../utils/pushDebugLog";

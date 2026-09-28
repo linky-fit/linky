@@ -1,5 +1,5 @@
 {
-  "name": "@linky/identity",
+  "name": "@linky-fit/identity",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
@@ -16,7 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@linky/linkstr": "workspace:*",
+    "@linky-fit/linkstr": "workspace:*",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^2.0.1",
     "@scure/bip32": "^2.0.1",
@@ -25,7 +25,7 @@
     "slip39-ts": "^0.1.13"
   },
   "devDependencies": {
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",

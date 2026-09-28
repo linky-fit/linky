@@ -14,7 +14,7 @@ import {
   type ReactionId,
   type ReactionRow,
   type WriteRow,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,

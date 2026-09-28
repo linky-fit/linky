@@ -1,6 +1,6 @@
-import { NonEmptyString1000 } from "@linky/linksync";
-import { decodeNpub } from "@linky/linkstr";
-import { createId, type ContactsRepository } from "@linky/linksync";
+import { NonEmptyString1000 } from "@linky-fit/linksync";
+import { decodeNpub } from "@linky-fit/linkstr";
+import { createId, type ContactsRepository } from "@linky-fit/linksync";
 import React from "react";
 import { ContactId } from "../../evoluIds";
 import { navigateTo } from "../../hooks/useRouting";
@@ -18,8 +18,11 @@ import { parseNativeDeepLinkUrl } from "../../utils/deepLinks";
 import {
   getLightningInvoicePreview,
   type LightningInvoicePreview,
-} from "@linky/linkshu";
-import { isBankPaymentPayload, parseBankPayment } from "@linky/proxy-payment";
+} from "@linky-fit/linkshu";
+import {
+  isBankPaymentPayload,
+  parseBankPayment,
+} from "@linky-fit/proxy-payment";
 import {
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,

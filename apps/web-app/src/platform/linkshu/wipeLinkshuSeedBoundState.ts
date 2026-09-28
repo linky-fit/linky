@@ -1,4 +1,4 @@
-import { Bip39Seed, Restore, runLinkshu } from "@linky/linkshu";
+import { Bip39Seed, Restore, runLinkshu } from "@linky-fit/linkshu";
 import { mnemonicToSeedSync } from "@scure/bip39";
 import { Effect } from "effect";
 import { migrateLegacyCashuLocalState } from "../../app/migrations/linkshuStorageMigration";

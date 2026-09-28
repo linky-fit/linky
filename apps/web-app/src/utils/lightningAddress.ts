@@ -1,2 +1,2 @@
-export { splitLightningAddress } from "@linky/linkshu/lightning-address";
-export type { LightningAddressParts } from "@linky/linkshu/lightning-address";
+export { splitLightningAddress } from "@linky-fit/linkshu/lightning-address";
+export type { LightningAddressParts } from "@linky-fit/linkshu/lightning-address";

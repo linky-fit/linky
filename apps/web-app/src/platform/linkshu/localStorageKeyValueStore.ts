@@ -1,5 +1,5 @@
-import { KeyValueStore, LeaseId } from "@linky/linkshu";
-import type { KeyValueStoreService } from "@linky/linkshu";
+import { KeyValueStore, LeaseId } from "@linky-fit/linkshu";
+import type { KeyValueStoreService } from "@linky-fit/linkshu";
 import { Clock, Effect, Layer } from "effect";
 
 /**

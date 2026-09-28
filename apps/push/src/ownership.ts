@@ -1,5 +1,5 @@
-import { verifyPushOwnershipProof } from "@linky/linkstr";
-import type { PushOwnershipProofFailure } from "@linky/linkstr";
+import { verifyPushOwnershipProof } from "@linky-fit/linkstr";
+import type { PushOwnershipProofFailure } from "@linky-fit/linkstr";
 
 import { RequestError } from "./guards";
 import type {

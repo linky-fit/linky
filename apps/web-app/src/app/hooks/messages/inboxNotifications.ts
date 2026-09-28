@@ -1,11 +1,11 @@
-import type { PaymentNoticeReceived } from "@linky/linkstr";
-import { encodeNpub, parsePubkey } from "@linky/linkstr";
+import type { PaymentNoticeReceived } from "@linky-fit/linkstr";
+import { encodeNpub, parsePubkey } from "@linky-fit/linkstr";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { formatShortNpub } from "../../../utils/formatting";
 import {
   isTerminalBankPaymentOfferStatus,
   type BankPaymentOffer,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import { extractCashuTokenFromText } from "../../lib/tokenText";
 import { formatChatMessagePreviewText } from "../../lib/chatMessageDisplay";
 import {

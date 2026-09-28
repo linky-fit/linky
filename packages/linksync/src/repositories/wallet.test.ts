@@ -1,4 +1,9 @@
-import { NewOperation, NewProof, OperationId, ProofId } from "@linky/linkshu";
+import {
+  NewOperation,
+  NewProof,
+  OperationId,
+  ProofId,
+} from "@linky-fit/linkshu";
 import { Effect, Schema } from "effect";
 import { makeInMemoryShardDb, type ShardDb } from "../core";
 import { cashuProofIdFor } from "../model/ids";

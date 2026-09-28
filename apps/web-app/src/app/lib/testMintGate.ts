@@ -1,4 +1,4 @@
-import { NonNegativeAmount, WalletBalances } from "@linky/linkshu";
+import { NonNegativeAmount, WalletBalances } from "@linky-fit/linkshu";
 import { isHiddenTestMint } from "../../utils/mint";
 
 /** Synced `setting` key; the value is "1" or "0", absent means the build default. */

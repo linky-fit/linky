@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSlip39Share } from "@linky/identity";
+import { createSlip39Share } from "@linky-fit/identity";
 import { Effect } from "effect";
 import { generateSecretKey, nip19 } from "nostr-tools";
 import {

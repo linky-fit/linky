@@ -1,4 +1,4 @@
-import { parseTokenText } from "@linky/linkshu";
+import { parseTokenText } from "@linky-fit/linkshu";
 import { normalizeNpubIdentifier } from "./nostrNpub";
 import { safeDecodeURIComponent } from "./url";
 

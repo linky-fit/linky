@@ -1,7 +1,7 @@
 import {
   decodeBankPaymentOffer,
   type BankPaymentOffer,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import type { LocalNostrMessage } from "../types/appTypes";
 
 /** The chat row of an offer thread; `pubkey` is the offerer, not the author. */

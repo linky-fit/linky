@@ -8,7 +8,7 @@ Prerequisite: a configured runtime ([getting-started.md](./getting-started.md#fi
 
 ```ts
 import { Effect, Stream } from "effect";
-import { UnixSeconds, WrapInbox } from "@linky/linkstr";
+import { UnixSeconds, WrapInbox } from "@linky-fit/linkstr";
 
 /** Backfill window for a first session without a stored cursor. */
 const LOOKBACK_SECONDS = 3 * 24 * 60 * 60;
@@ -49,7 +49,7 @@ Own echoes carry `clientId` (nullable) so you can reconcile an optimistic local 
 
 ```ts
 import { Match } from "effect";
-import type { WrapInboxEvent } from "@linky/linkstr";
+import type { WrapInboxEvent } from "@linky-fit/linkstr";
 
 const describe = (event: WrapInboxEvent): string =>
   Match.value(event).pipe(
@@ -103,7 +103,7 @@ The inbox tracks the newest authenticated wrap `created_at` (clamped to now) and
 Supply the store through `runLinkstr({ inboxCursorStore })`, `linkstrServices({ inboxCursorStore })`, or `LinkstrConfig.inboxCursorStore`; the default is in-memory, so a headless run without one replays the full `since` window every time.
 
 ```ts
-import { InboxCursorStore, type Pubkey } from "@linky/linkstr";
+import { InboxCursorStore, type Pubkey } from "@linky-fit/linkstr";
 
 // web: one key per identity, so switching accounts never reuses a cursor
 const cursorStoreFor = (pubkey: Pubkey) =>
@@ -128,7 +128,7 @@ import {
   type NostrSecretKey,
   type RelayUrl,
   type WrapInboxEvent,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const isWrapId = Schema.is(WrapId);
 

@@ -1,18 +1,18 @@
 # React
 
-`@linky/linkstr-react` is the effect-atom binding: one config atom, one runtime atom built from it, and a fn atom per operation. Use it for every linkstr call made from a component or hook in the web app; never build layers by hand there.
+`@linky-fit/linkstr-react` is the effect-atom binding: one config atom, one runtime atom built from it, and a fn atom per operation. Use it for every linkstr call made from a component or hook in the web app; never build layers by hand there.
 
 ## Configure
 
 `linkstrConfigAtom` holds a `LinkstrConfig | null`. Set it when an identity is available; set it to `null` on logout. While it is null, every fn atom fails with `LinkstrNotConfigured`. The minimum is a key and relays:
 
 ```tsx
-import { identityFromNsec, RelayUrl } from "@linky/linkstr";
+import { identityFromNsec, RelayUrl } from "@linky-fit/linkstr";
 import {
   linkstrConfigAtom,
   useAtomSet,
   type LinkstrConfig,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Schema } from "effect";
 import React from "react";
 
@@ -57,8 +57,8 @@ import {
   ReactionDraft,
   type Pubkey,
   type RumorId,
-} from "@linky/linkstr";
-import { enqueueOutboxAtom, useAtomSet } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Cause, Exit } from "effect";
 
 interface ReactButtonProps {
@@ -136,13 +136,13 @@ import {
   UnixSeconds,
   type InboxDelivery,
   type WrapInboxEvent,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   useAtomMount,
   useAtomSet,
   wrapInboxAtom,
   wrapInboxHandlerAtom,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import React from "react";
 
 /** Backfill window for a first session without a stored cursor. */
@@ -182,8 +182,8 @@ Rules that follow from the atom design:
 `useOutboxResults(handler)` mounts the results stream for the component's lifetime. A job is acked only after your handler resolves; a rejection leaves it to be re-delivered on the next runtime build. Mount it once, high in the tree, inside a hook that owns the app callbacks:
 
 ```tsx
-import type { OutboxRef, RumorId } from "@linky/linkstr";
-import { useOutboxResults } from "@linky/linkstr-react";
+import type { OutboxRef, RumorId } from "@linky-fit/linkstr";
+import { useOutboxResults } from "@linky-fit/linkstr-react";
 
 interface OutboxSyncCallbacks {
   /** App callback: mark the local row named by `ref` as sent. */
@@ -219,7 +219,7 @@ The web app's version is `applyOutboxResult` in `apps/web-app/src/app/hooks/mess
 
 ## Testing
 
-`@linky/linkstr-react/testing` exports `configWith`, `settle`, `fakeTransport`, `fakeTransportLayer`, `relayA`, `relayB`, and re-exports `makeIdentity`. Tests use a bare `Registry.make()` instead of rendering; see [testing.md](./testing.md#linkylinkstr-reacttesting).
+`@linky-fit/linkstr-react/testing` exports `configWith`, `settle`, `fakeTransport`, `fakeTransportLayer`, `relayA`, `relayB`, and re-exports `makeIdentity`. Tests use a bare `Registry.make()` instead of rendering; see [testing.md](./testing.md#linky-fitlinkstr-reacttesting).
 
 ## Related
 

@@ -1,4 +1,4 @@
-import type { StoredProof, TokenTransfer } from "@linky/linkshu";
+import type { StoredProof, TokenTransfer } from "@linky-fit/linkshu";
 import type { LocalNostrMessage } from "../types/appTypes";
 import { isOpenTransfer } from "./cashuTransfers";
 import { extractCashuTokenFromText } from "./tokenText";

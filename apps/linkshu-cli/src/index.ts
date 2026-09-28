@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-import { parseMintUrl, runLinkshu } from "@linky/linkshu";
-import type { MintUrl } from "@linky/linkshu";
+import { parseMintUrl, runLinkshu } from "@linky-fit/linkshu";
+import type { MintUrl } from "@linky-fit/linkshu";
 import { Effect, Either } from "effect";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -16,7 +16,7 @@ import { stderrInspector } from "./stderrInspector";
 
 const DEFAULT_MINT = "http://localhost:3338";
 
-const USAGE = `linkshu — a cashu wallet on @linky/linkshu
+const USAGE = `linkshu — a cashu wallet on @linky-fit/linkshu
 
 usage: linkshu [options] <command> [arguments]
 

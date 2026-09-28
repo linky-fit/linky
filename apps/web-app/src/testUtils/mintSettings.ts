@@ -1,4 +1,4 @@
-import { LightningFeeProbeResult } from "@linky/linkshu";
+import { LightningFeeProbeResult } from "@linky-fit/linkshu";
 import { Either, Schema } from "effect";
 import React from "react";
 import { vi } from "vitest";

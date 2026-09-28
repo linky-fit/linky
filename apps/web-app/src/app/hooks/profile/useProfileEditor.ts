@@ -1,9 +1,9 @@
-import { ProfileMetadata, StatusDraft } from "@linky/linkstr";
+import { ProfileMetadata, StatusDraft } from "@linky-fit/linkstr";
 import {
   publishProfileAtom,
   publishStatusAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import {

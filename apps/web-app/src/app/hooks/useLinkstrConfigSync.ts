@@ -2,12 +2,12 @@ import {
   identityFromNsec,
   InboxCursorStore,
   OutboxStore,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   linkstrConfigAtom,
   useAtomSet,
   type LinkstrConfig,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import React from "react";
 import {
   getInspectorEmissionEnabled,

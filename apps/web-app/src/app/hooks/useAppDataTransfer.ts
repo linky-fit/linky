@@ -1,12 +1,16 @@
 import { toContactTextFields } from "../lib/contactFields";
 import { Option, Schema, Struct } from "effect";
-import { ImportProofDraft, LegacyTokenRow, NewOperation } from "@linky/linkshu";
-import type { StoredOperation, StoredProof } from "@linky/linkshu";
+import {
+  ImportProofDraft,
+  LegacyTokenRow,
+  NewOperation,
+} from "@linky-fit/linkshu";
+import type { StoredOperation, StoredProof } from "@linky-fit/linkshu";
 import {
   createId,
   type ContactId,
   type ContactsRepository,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import {

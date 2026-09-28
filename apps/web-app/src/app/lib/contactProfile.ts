@@ -1,6 +1,6 @@
 import { getContactName } from "../../utils/contactName";
-import { SqliteBoolean, sqliteTrue } from "@linky/linksync";
-import type { ProfileMetadata } from "@linky/linkstr";
+import { SqliteBoolean, sqliteTrue } from "@linky-fit/linksync";
+import type { ProfileMetadata } from "@linky-fit/linkstr";
 import { getBestNostrName } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import type { ContactRowLike } from "../types/appTypes";

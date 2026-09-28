@@ -1,4 +1,4 @@
-import { createSlip39Share } from "@linky/identity";
+import { createSlip39Share } from "@linky-fit/identity";
 import { expect, test, type Page } from "@playwright/test";
 import { Effect } from "effect";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";

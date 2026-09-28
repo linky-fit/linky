@@ -1,12 +1,12 @@
-import { createId } from "@linky/linksync";
+import { createId } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { act } from "react";
 import { expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { useContactEditor } from "./useContactEditor";
 
-vi.mock("@linky/linkstr-react", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@linky/linkstr-react")>()),
+vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
   useAtomSet: () => vi.fn(),
 }));
 vi.mock("./useContactSuggestions", () => ({

@@ -1,4 +1,4 @@
-import type { InspectorEvent } from "@linky/linkstr";
+import type { InspectorEvent } from "@linky-fit/linkstr";
 import {
   NoRelayReachable,
   OwnReactionConfirmed,
@@ -12,7 +12,7 @@ import {
   RetractionDraft,
   StatusUpdated,
   WrapDropped,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Option, Schema } from "effect";
 import { nostrKindLabel } from "../nostrKindNames";
 import type { InspectorRow } from "./inspectorRows";

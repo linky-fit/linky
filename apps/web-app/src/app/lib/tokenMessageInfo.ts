@@ -1,5 +1,5 @@
-import { parseTokenText } from "@linky/linkshu";
-import { decodeBankPaymentOffer } from "@linky/proxy-payment";
+import { parseTokenText } from "@linky-fit/linkshu";
+import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import { parsePrivateImageMessage } from "./privateImageMessage";
 import { extractCashuTokenFromText } from "./tokenText";
 import { isHiddenTestMint } from "../../utils/mint";

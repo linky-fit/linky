@@ -1,4 +1,4 @@
-import { ProofStateSnapshot } from "@linky/linkshu";
+import { ProofStateSnapshot } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 import { act, type ComponentProps } from "react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";

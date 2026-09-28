@@ -3,13 +3,13 @@ import {
   type DiscoverActiveProfilesOptions,
   type DiscoveredProfile,
   type ProfileMetadata,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   discoverActiveProfilesAtom,
   linkstrConfigAtom,
   useAtomSet,
   useAtomValue,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import { omitSyntheticContactLightningAddress } from "../../../derivedProfile";

@@ -1,6 +1,6 @@
 import { Atom } from "@effect-atom/atom-react";
-import { Inspector } from "@linky/linkstr";
-import type { InspectorEvent } from "@linky/linkstr";
+import { Inspector } from "@linky-fit/linkstr";
+import type { InspectorEvent } from "@linky-fit/linkstr";
 import { Effect, Stream } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

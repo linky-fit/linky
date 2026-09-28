@@ -1,7 +1,7 @@
-import { PositiveInt } from "@linky/linksync";
+import { PositiveInt } from "@linky-fit/linksync";
 import { Schema } from "effect";
 import React from "react";
-import type { StoredProof } from "@linky/linkshu";
+import type { StoredProof } from "@linky-fit/linkshu";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
 import { LOCAL_MINT_INFO_STORAGE_KEY_PREFIX } from "../../../utils/constants";
 import {

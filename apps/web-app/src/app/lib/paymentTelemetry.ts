@@ -1,5 +1,5 @@
-import { classifyPaymentErrorCode } from "@linky/linkstr";
-export { classifyPaymentErrorCode } from "@linky/linkstr";
+import { classifyPaymentErrorCode } from "@linky-fit/linkstr";
+export { classifyPaymentErrorCode } from "@linky-fit/linkstr";
 import {
   getTelemetryAppHost,
   getTelemetryAppRuntime,

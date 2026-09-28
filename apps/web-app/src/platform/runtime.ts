@@ -5,7 +5,7 @@ import {
   type PaymentTelemetryDevicePlatform,
   type TelemetryEnvironment,
   type TelemetryEnvironmentFacts,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 type PlatformTarget = "android" | "ios" | "web";
 

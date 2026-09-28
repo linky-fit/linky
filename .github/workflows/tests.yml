@@ -47,7 +47,7 @@ jobs:
         run: docker compose -f docker-compose.dev.yml up -d --wait cashu-mint cashu-mint-target
 
       - name: Run linkshu integration tests
-        run: bun run --filter @linky/linkshu test:integration
+        run: bun run --filter @linky-fit/linkshu test:integration
 
       - name: Dump mint logs
         if: failure()

@@ -1,4 +1,4 @@
-import { linkyScopes, type LinkyScope } from "@linky/linksync";
+import { linkyScopes, type LinkyScope } from "@linky-fit/linksync";
 import type { ShardSummary } from "../hooks/useLinksync";
 
 const SCOPES = Object.keys(linkyScopes).filter((scope): scope is LinkyScope =>

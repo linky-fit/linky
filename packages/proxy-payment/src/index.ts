@@ -1,4 +1,4 @@
-export type { BankOfferStatus } from "@linky/linkstr";
+export type { BankOfferStatus } from "@linky-fit/linkstr";
 export * from "./bankQr/bankAccount";
 export * from "./bankQr/bankPayment";
 export * from "./offers/content";

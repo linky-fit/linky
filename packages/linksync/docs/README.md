@@ -1,4 +1,4 @@
-# @linky/linksync guides
+# @linky-fit/linksync guides
 
 How to use Linky's synced storage library. These are guides, not an API reference: the exported types are the reference, and the [package README](../README.md) holds the design rules and rationale.
 
@@ -19,7 +19,7 @@ How to use Linky's synced storage library. These are guides, not an API referenc
 
 ## Integrating the package
 
-- [React](./react.md): `useRepositoryRows` and `useVisibleShards` from `@linky/linksync/react`
+- [React](./react.md): `useRepositoryRows` and `useVisibleShards` from `@linky-fit/linksync/react`
 - [Ports](./ports.md) — the `ShardDb` port, the in-memory implementation, the Evolu 7 adapter
 - [Testing](./testing.md) — the in-memory store, fixtures, what the package tests
 

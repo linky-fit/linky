@@ -1,4 +1,4 @@
-import { createIdFromString } from "@linky/linksync";
+import { createIdFromString } from "@linky-fit/linksync";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Route } from "../../types/route";
 import { setBankPaymentOfferMinimized } from "./bankPaymentOfferStorage";

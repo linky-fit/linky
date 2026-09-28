@@ -13,7 +13,7 @@ import {
   SeenReceipts,
   UnixSeconds,
   runLinkstr,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 await runLinkstr(
   { secretKey, readRelays, writeRelays },
@@ -33,8 +33,8 @@ await runLinkstr(
 React:
 
 ```ts
-import { SeenReceiptDraft, UnixSeconds } from "@linky/linkstr";
-import { sendSeenReceiptAtom, useAtomSet } from "@linky/linkstr-react";
+import { SeenReceiptDraft, UnixSeconds } from "@linky-fit/linkstr";
+import { sendSeenReceiptAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 
 const sendSeenReceipt = useAtomSet(sendSeenReceiptAtom, {
@@ -87,7 +87,7 @@ Kind 24136. Tags, in order: `p` to, `p` author, `client`, `["linky", "seen_recei
 | `OwnSeenReceiptConfirmed` | `receiptId`, `to: Pubkey`, `sinceSec`, `seenUpToSec`, `clientId: ClientId \| null`, `sentAt`        | your own receipt echoed; `to` is the peer it was sent to     |
 
 ```ts
-import type { WrapInboxEvent } from "@linky/linkstr";
+import type { WrapInboxEvent } from "@linky-fit/linkstr";
 
 const onEvent = (event: WrapInboxEvent): void => {
   switch (event._tag) {

@@ -8,7 +8,7 @@ Prerequisites: a configured runtime ([getting-started.md](./getting-started.md))
 
 ```ts
 import { Effect } from "effect";
-import { FeeProbe, FeeProbeDraft, MintUrl } from "@linky/linkshu";
+import { FeeProbe, FeeProbeDraft, MintUrl } from "@linky-fit/linkshu";
 
 const lightningFee = Effect.gen(function* () {
   const feeProbe = yield* FeeProbe;

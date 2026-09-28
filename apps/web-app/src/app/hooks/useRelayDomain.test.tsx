@@ -1,16 +1,20 @@
-import { NostrTransport, RelayPublishResult, RelayUrl } from "@linky/linkstr";
-import type { NostrTransportService } from "@linky/linkstr";
+import {
+  NostrTransport,
+  RelayPublishResult,
+  RelayUrl,
+} from "@linky-fit/linkstr";
+import type { NostrTransportService } from "@linky-fit/linkstr";
 import {
   Registry,
   RegistryContext,
   linkstrConfigAtom,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import {
   configWith,
   fakeTransport,
   makeIdentity,
-} from "@linky/linkstr-react/testing";
-import type { PublishedEvent } from "@linky/linkstr-react/testing";
+} from "@linky-fit/linkstr-react/testing";
+import type { PublishedEvent } from "@linky-fit/linkstr-react/testing";
 import { Effect, Layer } from "effect";
 import { finalizeEvent, nip19, verifyEvent } from "nostr-tools";
 import { act, useEffect } from "react";

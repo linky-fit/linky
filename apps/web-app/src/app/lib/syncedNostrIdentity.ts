@@ -1,4 +1,4 @@
-import type { NostrIdentityRow } from "@linky/linksync";
+import type { NostrIdentityRow } from "@linky-fit/linksync";
 import { trimString } from "../../utils/validation";
 
 export interface SyncedNostrIdentity {

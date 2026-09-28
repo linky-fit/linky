@@ -1,5 +1,5 @@
-import { RelayHealth } from "@linky/linkstr";
-import type { RelayHealthState } from "@linky/linkstr";
+import { RelayHealth } from "@linky-fit/linkstr";
+import type { RelayHealthState } from "@linky-fit/linkstr";
 import { Effect, Stream } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

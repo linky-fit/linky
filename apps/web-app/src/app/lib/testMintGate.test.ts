@@ -3,7 +3,7 @@ import {
   MintUrl,
   NonNegativeAmount,
   WalletBalances,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { describe, expect, it } from "vitest";
 import {
   resolveAllowTestMints,

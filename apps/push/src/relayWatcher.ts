@@ -1,5 +1,8 @@
-import { encodeNpub, RelayUrl, watchPushInbox } from "@linky/linkstr";
-import type { DeliveredPushWrap, PushInboxSubscription } from "@linky/linkstr";
+import { encodeNpub, RelayUrl, watchPushInbox } from "@linky-fit/linkstr";
+import type {
+  DeliveredPushWrap,
+  PushInboxSubscription,
+} from "@linky-fit/linkstr";
 
 import {
   CATCH_UP_LOOKBACK_SECONDS,

@@ -3,8 +3,8 @@
 `makeWalletRepository(store)` (`src/repositories/wallet.ts`) implements linkshu's `ProofStore` and `OperationStore` ports over the `cashu` scope, which is never forgotten. Give the layers to `linkshuServices` or `runLinkshu`:
 
 ```ts
-import { makeWalletRepository } from "@linky/linksync";
-import { runLinkshu } from "@linky/linkshu";
+import { makeWalletRepository } from "@linky-fit/linksync";
+import { runLinkshu } from "@linky-fit/linkshu";
 
 const wallet = makeWalletRepository(store);
 await runLinkshu(

@@ -1,4 +1,4 @@
-import { parseTokenText } from "@linky/linkshu";
+import { parseTokenText } from "@linky-fit/linkshu";
 
 const readNonNegativeFiniteInt = (value: number | null): number | null => {
   if (value === null || !Number.isFinite(value) || value < 0) return null;

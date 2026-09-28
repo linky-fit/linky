@@ -1,10 +1,10 @@
 import { Atom, useAtomMount, useAtomSet } from "@effect-atom/atom-react";
-import { Outbox } from "@linky/linkstr";
+import { Outbox } from "@linky-fit/linkstr";
 import type {
   OutboxRef,
   OutboxResult,
   RumorFixedOperation,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Effect, Stream } from "effect";
 import { useEffect, useRef } from "react";
 import { linkstrRuntimeAtom } from "./runtime";

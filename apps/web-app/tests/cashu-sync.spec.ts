@@ -1,7 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mnemonicToSeedSync } from "@scure/bip39";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
-import { Bip39Seed, Receive, ReceiveDraft, runLinkshu } from "@linky/linkshu";
+import {
+  Bip39Seed,
+  Receive,
+  ReceiveDraft,
+  runLinkshu,
+} from "@linky-fit/linkshu";
 import { Effect } from "effect";
 import { fundToken } from "../../../packages/linkshu/tests/integration/helpers";
 import {

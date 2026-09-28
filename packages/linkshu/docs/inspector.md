@@ -26,8 +26,8 @@ Three layers ship with the package:
 The layer must sit **around** the services layer, because services read the inspector while the layer is being built. `runLinkshu` does this for you through its `inspector` option:
 
 ```ts
-import { Inspector, runLinkshu, Tokens } from "@linky/linkshu";
-import type { Bip39Seed } from "@linky/linkshu";
+import { Inspector, runLinkshu, Tokens } from "@linky-fit/linkshu";
+import type { Bip39Seed } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 
 const balancesWithInspector = (bip39Seed: Bip39Seed) =>
@@ -40,8 +40,8 @@ const balancesWithInspector = (bip39Seed: Bip39Seed) =>
 With `linkshuServices`, provide-merge it onto the services layer:
 
 ```ts
-import { Inspector, linkshuServices } from "@linky/linkshu";
-import type { Bip39Seed } from "@linky/linkshu";
+import { Inspector, linkshuServices } from "@linky-fit/linkshu";
+import type { Bip39Seed } from "@linky-fit/linkshu";
 import { Layer } from "effect";
 
 const inspectedServices = (bip39Seed: Bip39Seed) =>
@@ -53,8 +53,8 @@ const inspectedServices = (bip39Seed: Bip39Seed) =>
 A callback sink is the simplest consumer and needs no stream plumbing:
 
 ```ts
-import { Inspector } from "@linky/linkshu";
-import type { LinkshuInspectorEvent } from "@linky/linkshu";
+import { Inspector } from "@linky-fit/linkshu";
+import type { LinkshuInspectorEvent } from "@linky-fit/linkshu";
 import { Layer, Stream } from "effect";
 
 export const consoleInspector = (
@@ -77,8 +77,8 @@ Keep the `try/catch`: `emit` is total by contract, and your sink is part of it.
 To consume `Inspector.live` as a stream, fork the consumer in a runtime that has the layer, and stop it before the runtime goes away:
 
 ```ts
-import { Inspector, linkshuServices } from "@linky/linkshu";
-import type { Bip39Seed } from "@linky/linkshu";
+import { Inspector, linkshuServices } from "@linky-fit/linkshu";
+import type { Bip39Seed } from "@linky-fit/linkshu";
 import { Effect, Fiber, Layer, ManagedRuntime, Stream } from "effect";
 
 export const startInspectedWallet = (bip39Seed: Bip39Seed) => {

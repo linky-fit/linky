@@ -1,4 +1,4 @@
-import type { ProofStateSnapshot, StoredProof } from "@linky/linkshu";
+import type { ProofStateSnapshot, StoredProof } from "@linky-fit/linkshu";
 import { useMemo } from "react";
 import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
 import { useAppShellCore } from "../app/context/AppShellContexts";

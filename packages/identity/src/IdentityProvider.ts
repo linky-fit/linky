@@ -1,4 +1,4 @@
-import { derivePubkey, NostrSecretKey, type Pubkey } from "@linky/linkstr";
+import { derivePubkey, NostrSecretKey, type Pubkey } from "@linky-fit/linkstr";
 import { HDKey } from "@scure/bip32";
 import { entropyToMnemonic, mnemonicToSeedSync } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";

@@ -19,7 +19,7 @@ import {
   type Pubkey,
   type RelayUrl,
   type RumorId,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const react = (
   secretKey: NostrSecretKey,
@@ -57,12 +57,12 @@ import {
   type Emoji,
   type Pubkey,
   type RumorId,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   enqueueOutboxAtom,
   retractReactionAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 
 interface ReactionStore {
@@ -145,7 +145,7 @@ The reaction's `e` tag is the target message's rumor id, the same id in both use
 | `OwnRetractionConfirmed` | `retractionId: RumorId`, `reactionIds`, `clientId: ClientId \| null`, `sentAt`                  | your retraction echoed                           |
 
 ```ts
-import type { Pubkey, RumorId, WrapInboxEvent } from "@linky/linkstr";
+import type { Pubkey, RumorId, WrapInboxEvent } from "@linky-fit/linkstr";
 
 interface ReactionStore {
   // Placeholders for your persistence layer.

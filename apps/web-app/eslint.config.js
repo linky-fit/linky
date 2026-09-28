@@ -1,3 +1,3 @@
-import webAppEslintConfig from "@linky/config/eslint";
+import webAppEslintConfig from "@linky-fit/config/eslint";
 
 export default webAppEslintConfig;

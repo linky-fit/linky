@@ -1,5 +1,5 @@
-import { NonEmptyString, OwnerId, PositiveInt } from "@linky/linksync";
-import type { TransactionRecord } from "@linky/linksync";
+import { NonEmptyString, OwnerId, PositiveInt } from "@linky-fit/linksync";
+import type { TransactionRecord } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import { TransactionId } from "../../evoluIds";
 import { buildTransactionHistory } from "./transactionHistory";

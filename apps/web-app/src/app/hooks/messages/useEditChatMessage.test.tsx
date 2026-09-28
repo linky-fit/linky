@@ -6,8 +6,8 @@ import {
   OutboxRef,
   RumorId,
   UnixSeconds,
-} from "@linky/linkstr";
-import type { EnqueueOutboxInput } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import type { EnqueueOutboxInput } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import React, { act } from "react";
@@ -27,7 +27,7 @@ const { enqueueOutboxMock } = vi.hoisted(() => ({
   enqueueOutboxMock: vi.fn<EnqueueOutbox>(),
 }));
 
-vi.mock("@linky/linkstr-react", () => ({
+vi.mock("@linky-fit/linkstr-react", () => ({
   enqueueOutboxAtom: "enqueueOutboxAtom",
   useAtomSet: () => enqueueOutboxMock,
 }));

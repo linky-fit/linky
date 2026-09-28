@@ -1,5 +1,5 @@
 {
-  "name": "@linky/site",
+  "name": "@linky-fit/site",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
@@ -19,13 +19,13 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "undici": "^7.22.0",
-    "@linky/linkshu": "workspace:*",
-    "@linky/linkstr": "workspace:*",
+    "@linky-fit/linkshu": "workspace:*",
+    "@linky-fit/linkstr": "workspace:*",
     "effect": "^3.19.19",
     "@noble/hashes": "^2.0.1"
   },
   "devDependencies": {
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

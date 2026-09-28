@@ -1,5 +1,5 @@
-import type { MeltResumeResult } from "@linky/linkshu";
-import type { TransactionsRepository } from "@linky/linksync";
+import type { MeltResumeResult } from "@linky-fit/linkshu";
+import type { TransactionsRepository } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React from "react";
 import type { Translate } from "../../../i18n";

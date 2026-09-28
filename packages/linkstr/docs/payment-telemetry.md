@@ -15,7 +15,7 @@ import {
   UnixSeconds,
   decodeNpub,
   PAYMENT_ANALYTICS_RECIPIENT_NPUB,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const recipient = decodeNpub(PAYMENT_ANALYTICS_RECIPIENT_NPUB);
 if (recipient === null) throw new Error("bad analytics npub");
@@ -50,7 +50,7 @@ import {
   type PaymentTelemetryDraft,
   type Pubkey,
   type RelayUrl,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const publishReport = (
   secretKey: NostrSecretKey,
@@ -74,8 +74,11 @@ import {
   OutboxRef,
   type PaymentTelemetryDraft,
   type Pubkey,
-} from "@linky/linkstr";
-import { enqueuePaymentTelemetryAtom, useAtomSet } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import {
+  enqueuePaymentTelemetryAtom,
+  useAtomSet,
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 
 export const useEnqueueReport = () => {

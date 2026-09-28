@@ -1,5 +1,5 @@
 import React from "react";
-import type { StoredProof } from "@linky/linkshu";
+import type { StoredProof } from "@linky-fit/linkshu";
 import type { MintIcon } from "../../utils/mint";
 import { normalizeMintUrl } from "../../utils/mint";
 import type { LocalMintInfoRow } from "../types/appTypes";

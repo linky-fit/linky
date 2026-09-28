@@ -23,7 +23,7 @@ RUN bun install --frozen-lockfile
 COPY apps/push apps/push
 COPY packages/linkstr packages/linkstr
 
-RUN bun run --filter @linky/push build
+RUN bun run --filter @linky-fit/push build
 
 FROM oven/bun:1.3.9-alpine AS runtime
 

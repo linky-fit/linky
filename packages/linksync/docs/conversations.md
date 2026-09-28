@@ -3,7 +3,7 @@
 `makeConversationsRepository(store)` (`src/repositories/conversations.ts`): chats with their read cursor and archive state, plus the messages and reactions in them. All three tables live in the `messages` scope, which keeps the newest 4 shards.
 
 ```ts
-import { makeConversationsRepository, PositiveInt } from "@linky/linksync";
+import { makeConversationsRepository, PositiveInt } from "@linky-fit/linksync";
 import { Effect } from "effect";
 
 const conversations = makeConversationsRepository(store);

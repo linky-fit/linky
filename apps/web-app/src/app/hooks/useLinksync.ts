@@ -20,9 +20,9 @@ import {
   type TransactionRecord,
   type TransactionsRepository,
   type WalletRepository,
-} from "@linky/linksync";
-import { useLiveValue, useRepositoryRows } from "@linky/linksync/react";
-import type { StoredOperation, StoredProof } from "@linky/linkshu";
+} from "@linky-fit/linksync";
+import { useLiveValue, useRepositoryRows } from "@linky-fit/linksync/react";
+import type { StoredOperation, StoredProof } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";

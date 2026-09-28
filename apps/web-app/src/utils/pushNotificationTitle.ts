@@ -1,4 +1,4 @@
-import { encodeNpub, parsePubkey } from "@linky/linkstr";
+import { encodeNpub, parsePubkey } from "@linky-fit/linkstr";
 import { formatShortNpub } from "./formatting";
 import { normalizeProfileName } from "./profileName";
 

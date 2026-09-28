@@ -17,7 +17,7 @@ import {
   type NostrSecretKey,
   type Pubkey,
   type RelayUrl,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const notifyPaid = (
   secretKey: NostrSecretKey,
@@ -38,8 +38,8 @@ The promise resolves with a `PaymentNoticeReceipt` once a relay accepted the wra
 React — called after the token message was enqueued:
 
 ```ts
-import { PaymentNoticeDraft, type Pubkey } from "@linky/linkstr";
-import { sendPaymentNoticeAtom, useAtomSet } from "@linky/linkstr-react";
+import { PaymentNoticeDraft, type Pubkey } from "@linky-fit/linkstr";
+import { sendPaymentNoticeAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 
 export const useNotifyPaid = () => {
@@ -92,7 +92,7 @@ Kind 24133. Tags, in order: `p` to, `p` author, `client`, `["linky", "payment_no
 The notice carries no token. The token arrives on the same inbox as a `ChatMessageReceived` with a `TokenBody` ([chat.md](./chat.md#cashu-tokens)), and that handler is where you ingest it. Treat the notice as a wake-up: make sure the inbox is open so the token message can arrive, and show a notification unless a matching token message is already stored.
 
 ```ts
-import type { InboxDelivery, Pubkey, WrapInboxEvent } from "@linky/linkstr";
+import type { InboxDelivery, Pubkey, WrapInboxEvent } from "@linky-fit/linkstr";
 
 interface PaymentUi {
   // Placeholders for your app.

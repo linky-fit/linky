@@ -1,7 +1,7 @@
 import {
   BankPaymentOfferStaggerRecord,
   isBankPaymentOfferStaggerRecordExpired,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import { Schema } from "effect";
 import { NonBlankString, PositiveFiniteNumber } from "../../utils/schema";
 import {

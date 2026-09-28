@@ -8,8 +8,8 @@ import {
   parseSlip39Share,
   recoverMasterSecretFromSlip39Share,
   type OwnerRole,
-} from "@linky/identity";
-import { encodeNpub, encodeNsec } from "@linky/linkstr";
+} from "@linky-fit/identity";
+import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
 import { Effect, Layer } from "effect";
 
 interface DerivedNostrKeys {

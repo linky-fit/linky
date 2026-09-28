@@ -1,5 +1,5 @@
-import { PaymentNotices } from "@linky/linkstr";
-import type { PaymentNoticeDraft } from "@linky/linkstr";
+import { PaymentNotices } from "@linky-fit/linkstr";
+import type { PaymentNoticeDraft } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

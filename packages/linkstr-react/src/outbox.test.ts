@@ -6,11 +6,11 @@ import {
   OutboxStore,
   StoredOutboxJob,
   TextMessageDraft,
-} from "@linky/linkstr";
-import type { OutboxResult } from "@linky/linkstr";
-import { stubStorage, stubWrapTransport } from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
-import type { StubStorage } from "@linky/linkstr/testing";
+} from "@linky-fit/linkstr";
+import type { OutboxResult } from "@linky-fit/linkstr";
+import { stubStorage, stubWrapTransport } from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
+import type { StubStorage } from "@linky-fit/linkstr/testing";
 import { Exit, Schema } from "effect";
 import { linkstrConfigAtom } from "./config";
 import {

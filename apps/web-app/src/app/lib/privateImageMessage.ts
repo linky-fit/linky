@@ -2,7 +2,7 @@ import {
   makeBlossomUploadAuthHeader,
   NostrSecretKey,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { Schema } from "effect";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";

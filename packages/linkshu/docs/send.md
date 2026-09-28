@@ -8,8 +8,8 @@ Prerequisites: a configured runtime ([getting-started.md](./getting-started.md))
 
 ```ts
 import { Effect } from "effect";
-import { Send, SendDraft } from "@linky/linkshu";
-import type { Amount, MintUrl } from "@linky/linkshu";
+import { Send, SendDraft } from "@linky-fit/linkshu";
+import type { Amount, MintUrl } from "@linky-fit/linkshu";
 
 const issueToken = (mint: MintUrl, amount: Amount) =>
   Effect.gen(function* () {

@@ -1,7 +1,7 @@
 import { Either } from "effect";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { MintUrl, TokenAlreadySpent } from "@linky/linkshu";
+import { MintUrl, TokenAlreadySpent } from "@linky-fit/linkshu";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type { Translate } from "../../../i18n";
 import type { ReceiveCashuToken } from "../composition/useLinkshuComposition";

@@ -1,4 +1,4 @@
-import { parseBankPayment } from "@linky/proxy-payment";
+import { parseBankPayment } from "@linky-fit/proxy-payment";
 
 const SPAYD_FILENAME = "platba.spayd";
 const SPD_QR_JPEG_FILENAME = "platba.jpg";

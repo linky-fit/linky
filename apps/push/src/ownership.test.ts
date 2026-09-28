@@ -3,7 +3,7 @@ import {
   makePushOwnershipProof,
   NostrSecretKey,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { describe, expect, it } from "bun:test";
 
 import { signPlainEvent } from "../../../packages/linkstr/src/internal/plainEvent";

@@ -10,7 +10,7 @@ import {
   decodeFiatRates,
   isFiatRatesStale,
   fetchFiatRates,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 
 const readCachedFiatRates = () =>
   decodeFiatRates(safeLocalStorageGet(FIAT_RATES_CACHE_STORAGE_KEY));

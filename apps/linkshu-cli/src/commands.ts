@@ -12,8 +12,8 @@ import {
   Tokens,
   Topup,
   TopupDraft,
-} from "@linky/linkshu";
-import type { LinkshuServices, MintUrl } from "@linky/linkshu";
+} from "@linky-fit/linkshu";
+import type { LinkshuServices, MintUrl } from "@linky-fit/linkshu";
 import { Effect, Schema } from "effect";
 import { UsageError } from "./args";
 

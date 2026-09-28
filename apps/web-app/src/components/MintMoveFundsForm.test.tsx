@@ -1,4 +1,4 @@
-import { AutoswapEstimate } from "@linky/linkshu";
+import { AutoswapEstimate } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";

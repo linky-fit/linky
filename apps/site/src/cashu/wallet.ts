@@ -23,8 +23,12 @@ import {
   runLinkshu,
   Tokens,
   Validation,
-} from "@linky/linkshu";
-import type { LinkshuServices, StoredProof, TokenText } from "@linky/linkshu";
+} from "@linky-fit/linkshu";
+import type {
+  LinkshuServices,
+  StoredProof,
+  TokenText,
+} from "@linky-fit/linkshu";
 import { Effect, Schema } from "effect";
 import { walletStorage } from "./walletStorage";
 

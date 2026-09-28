@@ -1,4 +1,4 @@
-import type { TokenTransfer } from "@linky/linkshu";
+import type { TokenTransfer } from "@linky-fit/linkshu";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import type { ContactId } from "../evolu";

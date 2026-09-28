@@ -1,4 +1,4 @@
-import { ProfileMetadata } from "@linky/linkstr";
+import { ProfileMetadata } from "@linky-fit/linkstr";
 import { getDefaultNip05IdentifierFromAddress } from "../../utils/nostrNip05";
 
 export const applyLightningAddressToProfileMetadata = (

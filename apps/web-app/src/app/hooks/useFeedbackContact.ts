@@ -3,7 +3,7 @@ import {
   NonEmptyString1000,
   type ContactId,
   type ContactsRepository,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
 import { FEEDBACK_CONTACT_NPUB } from "../../utils/constants";

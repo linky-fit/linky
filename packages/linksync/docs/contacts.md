@@ -7,7 +7,7 @@ import {
   createId,
   makeContactsRepository,
   NonEmptyString1000,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 
 const contacts = makeContactsRepository(store);

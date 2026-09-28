@@ -5,7 +5,7 @@ import type {
   NostrTransport,
   OutboxStore,
   RelayUrl,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import type { Layer } from "effect";
 
 export interface LinkstrConfig {

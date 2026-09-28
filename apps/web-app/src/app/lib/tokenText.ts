@@ -1,8 +1,8 @@
-import { extractTokenText, parseTokenText } from "@linky/linkshu";
+import { extractTokenText, parseTokenText } from "@linky-fit/linkshu";
 import {
   decodeBankPaymentOffer,
   isBankPaymentPayload,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 
 /** linkshu's `extractTokenText` behind a bank-payment-payload exclusion. */
 export const extractCashuTokenFromText = (text: string): string | null => {

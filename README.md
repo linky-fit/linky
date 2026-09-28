@@ -7,7 +7,7 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 
 ## Packages
 
-- [`packages/linkstr`](./packages/linkstr/README.md) — Nostr protocol library; usage guides in [`packages/linkstr/docs/`](./packages/linkstr/docs/README.md) (also covers `@linky/linkstr-react`)
+- [`packages/linkstr`](./packages/linkstr/README.md) — Nostr protocol library; usage guides in [`packages/linkstr/docs/`](./packages/linkstr/docs/README.md) (also covers `@linky-fit/linkstr-react`)
 - [`packages/linkshu`](./packages/linkshu/README.md) — cashu wallet library; usage guides in [`packages/linkshu/docs/`](./packages/linkshu/docs/README.md)
 - [`packages/linksync`](./packages/linksync/README.md) — synced storage library (Evolu schema, repositories, shards); usage guides in [`packages/linksync/docs/`](./packages/linksync/docs/README.md)
 - [`packages/proxy-payment`](./packages/proxy-payment/README.md) — proxy bank-payment domain (bank QR parsing, offer rules and reducer, stagger scheduling); usage guides in [`packages/proxy-payment/docs/`](./packages/proxy-payment/docs/README.md)
@@ -27,13 +27,13 @@ The repo also contains a separate public website in `apps/site/` intended for `l
   - one 20-word **SLIP-39** share
 - With SLIP-39 login:
   - Nostr keypair is derived at `m/44'/1237'/0'/0/0`
-  - the meta owner is the Evolu app owner and every other scope (contacts, conversations and messages, cashu, transactions, identity) is a `@linky/linksync` shard derived from it
+  - the meta owner is the Evolu app owner and every other scope (contacts, conversations and messages, cashu, transactions, identity) is a `@linky-fit/linksync` shard derived from it
 - Seed backup uses the browser credential API where supported. Otherwise, use Show/Copy in Master keys and save the seed manually. Linky does not submit the seed to a server to trigger password saving.
 - If user pastes custom `nsec` during a SLIP-39 session, app switches to pasted key locally without immediate Evolu restore/write; choosing Derive switches back to seed-derived key.
 
 ## Shards and limits
 
-Every synced scope lives on `@linky/linksync` shards; the scope table in `packages/linksync/docs/concepts.md` and the "Evolu persistence and shards" section of `docs/architecture.md` hold the mechanics.
+Every synced scope lives on `@linky-fit/linksync` shards; the scope table in `packages/linksync/docs/concepts.md` and the "Evolu persistence and shards" section of `docs/architecture.md` hold the mechanics.
 
 - A scope rotates to its next shard at 256 KiB of history or its mutation count (contacts `220`, messages `160`, cashu `170`, transactions `220`) with a 60 s cooldown per scope, checked after every write inside the package. Rotation is pointer-only: nothing is copied, and an update of a row in an older shard writes the whole row into the active shard and tombstones the old copy, so old shards never grow.
 - Messages and transactions keep the newest 4 shards; a fresh device subscribes only those, so older chat history is not downloaded again. Existing devices keep older shards until an explicit forget. Contacts, the cashu wallet and the identity are never forgotten.
@@ -82,7 +82,7 @@ Evolu. New occurrences reopen solved issues. See
 
 ### linkshu CLI wallet
 
-`apps/linkshu-cli/` is a terminal cashu wallet and `@linky/linkshu`'s first consumer — it runs
+`apps/linkshu-cli/` is a terminal cashu wallet and `@linky-fit/linkshu`'s first consumer — it runs
 under plain Bun with file-based implementations of all three platform ports, which is how the
 package's independence from the browser stays honest. It needs the dev stack's mint:
 
@@ -183,11 +183,11 @@ Unit tests (Vitest) across all workspaces:
 bun run test
 ```
 
-`@linky/linkshu` additionally has an integration suite against the local
+`@linky-fit/linkshu` additionally has an integration suite against the local
 docker mints (started via `docker compose -f docker-compose.dev.yml up -d
---wait cashu-mint cashu-mint-target`): `bun run --filter @linky/linkshu test:integration`.
+--wait cashu-mint cashu-mint-target`): `bun run --filter @linky-fit/linkshu test:integration`.
 
-`@linky/linkshu-cli` runs its port and argument-parsing tests under `bun test` (no mint needed);
+`@linky-fit/linkshu-cli` runs its port and argument-parsing tests under `bun test` (no mint needed);
 they are part of `bun run test`.
 
 End-to-end tests (Playwright) live in `apps/web-app/tests/*.spec.ts`.
@@ -246,18 +246,18 @@ This runs:
 Workspace-scoped commands (web app only):
 
 ```bash
-bun run --filter @linky/web-app typecheck
-bun run --filter @linky/web-app eslint
-bun run --filter @linky/web-app prettier
+bun run --filter @linky-fit/web-app typecheck
+bun run --filter @linky-fit/web-app eslint
+bun run --filter @linky-fit/web-app prettier
 ```
 
 Workspace-scoped commands (public site only):
 
 ```bash
-bun run --filter @linky/site dev
-bun run --filter @linky/site build
-bun run --filter @linky/site preview
-bun run --filter @linky/site test:e2e
+bun run --filter @linky-fit/site dev
+bun run --filter @linky-fit/site build
+bun run --filter @linky-fit/site preview
+bun run --filter @linky-fit/site test:e2e
 ```
 
 The site smoke suite needs the local mints on 3338/3339 and Nostr relay on 7777. It builds and serves the site on 5180, enabling test-mint redemption only for that build. It covers direct and proxied LNURL payments plus reload recovery after lost swap and melt responses.
@@ -265,16 +265,16 @@ The site smoke suite needs the local mints on 3338/3339 and Nostr relay on 7777.
 Workspace-scoped commands (native shell):
 
 ```bash
-bun run --filter @linky/native-shell android:sync
-bun run --filter @linky/native-shell android:open
-bun run --filter @linky/native-shell android:apk:debug
+bun run --filter @linky-fit/native-shell android:sync
+bun run --filter @linky-fit/native-shell android:open
+bun run --filter @linky-fit/native-shell android:apk:debug
 ```
 
 Push service workspace commands:
 
 ```bash
-bun run --filter @linky/push typecheck
-bun run --filter @linky/push start
+bun run --filter @linky-fit/push typecheck
+bun run --filter @linky-fit/push start
 ```
 
 Push service container artifacts live in `apps/push/`:

@@ -1,4 +1,4 @@
-# @linky/linksync
+# @linky-fit/linksync
 
 Linky's synced storage as a typed library. Everything that has to reach
 another device through Evolu is defined here: the data model (one Evolu
@@ -48,6 +48,6 @@ to call the package.
 - `src/model/` — the Evolu schema, branded ids, the scope table, the store factory
 - `src/repositories/` — contacts, conversations (messages, reactions), wallet
   (linkshu's `ProofStore` and `OperationStore`), transactions, identity, settings
-- `src/evolu/` — the Evolu 7 adapter, exported as `@linky/linksync/evolu`
-- `src/react/`: hooks over repositories and the store, exported as `@linky/linksync/react`
+- `src/evolu/` — the Evolu 7 adapter, exported as `@linky-fit/linksync/evolu`
+- `src/react/`: hooks over repositories and the store, exported as `@linky-fit/linksync/react`
 - `src/testing/` — package-internal fixtures, excluded from the app build

@@ -1,4 +1,4 @@
-import type { BankOfferStatus } from "@linky/proxy-payment";
+import type { BankOfferStatus } from "@linky-fit/proxy-payment";
 import type { Translate } from "../../i18n";
 
 export const formatRemainingTime = (

@@ -65,8 +65,8 @@ cannot retrieve events a relay has deleted or refuses to return; the UI exposes
 known incomplete scans, but undisclosed relay caps can still hide events.
 
 ```sh
-bun run --filter @linky/nostr-error-tracker test
-bun run --filter @linky/nostr-error-tracker build
+bun run --filter @linky-fit/nostr-error-tracker test
+bun run --filter @linky-fit/nostr-error-tracker build
 ```
 
 For browser verification with encrypted Nostr fixtures and real Evolu sync across
@@ -74,7 +74,7 @@ isolated browser contexts:
 
 ```sh
 docker compose -f docker-compose.dev.yml up -d --wait evolu-relay
-bun run --filter @linky/nostr-error-tracker test:e2e
+bun run --filter @linky-fit/nostr-error-tracker test:e2e
 ```
 
 The check starts its own Vite server and uses only the local Evolu relay on :4001.

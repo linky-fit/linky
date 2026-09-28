@@ -4,13 +4,13 @@ import {
   NostrTransport,
   RetractionDraft,
   RumorId,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   recipientOf,
   stubWrapTransport,
   stubWrapTransportService,
-} from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
+} from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import { Effect, Exit, Layer } from "effect";
 import { linkstrConfigAtom } from "./config";
 import { retractReactionAtom } from "./reactions";

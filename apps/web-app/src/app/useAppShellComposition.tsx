@@ -1,6 +1,6 @@
 import { createContactNameFormatter } from "../utils/contactName";
 import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
-import { ContactId as ContactIdType } from "@linky/linksync";
+import { ContactId as ContactIdType } from "@linky-fit/linksync";
 import React, { useMemo, useState } from "react";
 import type { MessageContactsGroupAssignment } from "../components/ChatMessage";
 import { ContactCard } from "../components/ContactCard";

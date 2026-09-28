@@ -4,7 +4,7 @@ import {
   isUnixSeconds,
   type BankOfferId,
   type Pubkey,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Option, Schema } from "effect";
 import {
   asNonEmptyString,

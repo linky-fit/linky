@@ -1,4 +1,4 @@
-import type { ProofStateSnapshot } from "@linky/linkshu";
+import type { ProofStateSnapshot } from "@linky-fit/linkshu";
 import { useEffect, useState } from "react";
 import type { InspectCashuProofStates } from "../app/hooks/composition/useLinkshuComposition";
 import { nowSeconds } from "../utils/time";

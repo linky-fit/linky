@@ -1,3 +1,3 @@
-import eslintConfig from "@linky/config/eslint";
+import eslintConfig from "@linky-fit/config/eslint";
 
 export default eslintConfig;

@@ -1,21 +1,21 @@
-import { ClientId, RetractionDraft, RumorId } from "@linky/linkstr";
-import { stubWrapTransport } from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
+import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
+import { stubWrapTransport } from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import {
   linkstrConfigAtom,
   Registry,
   retractReactionAtom,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import {
   configWith,
   makeIdentity,
   relayA,
   settle,
-} from "@linky/linkstr-react/testing";
+} from "@linky-fit/linkstr-react/testing";
 import { Exit } from "effect";
 import { expect, it } from "vitest";
 
-it("drives a linkstr-react atom with helpers imported through @linky/linkstr-react/testing", async () => {
+it("drives a linkstr-react atom with helpers imported through @linky-fit/linkstr-react/testing", async () => {
   const alice = makeIdentity();
   const bob = makeIdentity();
   const registry = Registry.make();

@@ -5,7 +5,7 @@ import {
 import { tokenChatMessages } from "../app/lib/pendingTokenTransfers";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import { useLatest } from "../hooks/useLatest";
-import type { StoredProof, TokenTransfer } from "@linky/linkshu";
+import type { StoredProof, TokenTransfer } from "@linky-fit/linkshu";
 import { Radio as NfcIcon } from "lucide-react";
 import type { FC } from "react";
 import React from "react";

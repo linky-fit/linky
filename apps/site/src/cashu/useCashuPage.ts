@@ -1,14 +1,17 @@
-import { stripLightningPrefix } from "@linky/linkshu";
+import { stripLightningPrefix } from "@linky-fit/linkshu";
 import {
   decodeFiatRates,
   fetchFiatRates as fetchSiteFiatRates,
   isFiatRatesStale as areSiteFiatRatesStale,
   FIAT_RATES_CACHE_STORAGE_KEY as fiatRatesStorageKey,
   FIAT_RATES_TTL_MS as fiatRatesTtlMs,
-} from "@linky/linkshu";
-import type { FiatRates as SiteFiatRates } from "@linky/linkshu";
+} from "@linky-fit/linkshu";
+import type { FiatRates as SiteFiatRates } from "@linky-fit/linkshu";
 import { copy } from "./copy";
-import { GENERIC_MINT_ICON_DATA_URL, isLightningAddress } from "@linky/linkshu";
+import {
+  GENERIC_MINT_ICON_DATA_URL,
+  isLightningAddress,
+} from "@linky-fit/linkshu";
 import {
   getErrorMessage,
   inspectToken,

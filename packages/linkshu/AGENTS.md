@@ -1,4 +1,4 @@
-# @linky/linkshu
+# @linky-fit/linkshu
 
 Usage guides for this package live in `docs/` (index: `docs/README.md`). Read the guide for a vertical before changing it; the guide states the persistence order and error contract callers rely on.
 

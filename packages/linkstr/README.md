@@ -1,4 +1,4 @@
-# @linky/linkstr
+# @linky-fit/linkstr
 
 Linky's Nostr protocol as a typed library. Every operation the app publishes
 (send a chat message, react, pay, update profile/status, …) and every inbound
@@ -10,7 +10,7 @@ listeners consume a tagged union of app-level facts.
 
 Usage guides live in [`docs/`](./docs/README.md): start with
 [getting started](./docs/getting-started.md), the [React guide](./docs/react.md)
-for `@linky/linkstr-react`, then the guide for the vertical you need (chat,
+for `@linky-fit/linkstr-react`, then the guide for the vertical you need (chat,
 reactions, profiles, …). This README holds the design rules; the guides show
 how to call the package.
 
@@ -106,13 +106,13 @@ found, without adding subscription delivery metadata.
 ## Usage
 
 Service assembly has one home: `linkstrServices(config)` layers every vertical
-over the base services. React apps should use `@linky/linkstr-react` (config +
+over the base services. React apps should use `@linky-fit/linkstr-react` (config +
 runtime atoms, fn atoms per vertical) instead of wiring layers themselves.
 Non-React environments (the service worker) use the headless one-shot runner:
 
 ```ts
 import { Effect } from "effect";
-import { Reactions, runLinkstr } from "@linky/linkstr";
+import { Reactions, runLinkstr } from "@linky-fit/linkstr";
 
 const receipt = await runLinkstr(
   { secretKey, readRelays, writeRelays },

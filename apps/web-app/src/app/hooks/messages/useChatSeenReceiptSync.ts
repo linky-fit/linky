@@ -1,5 +1,5 @@
-import { decodeNpub, SeenReceiptDraft, UnixSeconds } from "@linky/linkstr";
-import { sendSeenReceiptAtom, useAtomSet } from "@linky/linkstr-react";
+import { decodeNpub, SeenReceiptDraft, UnixSeconds } from "@linky-fit/linkstr";
+import { sendSeenReceiptAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";

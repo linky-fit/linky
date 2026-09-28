@@ -6,7 +6,7 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
-import { createSlip39Share } from "@linky/identity";
+import { createSlip39Share } from "@linky-fit/identity";
 import { Effect, Schema } from "effect";
 import { generateSecretKey, type Event } from "nostr-tools";
 import { wrapEvent } from "nostr-tools/nip59";

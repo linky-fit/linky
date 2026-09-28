@@ -4,7 +4,7 @@ import {
   makePushOwnershipProof,
   NostrSecretKey,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 import { loadConfig } from "./config";
 import { createHttpHandler } from "./http";

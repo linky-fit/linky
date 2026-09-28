@@ -4,8 +4,11 @@ import {
   OutboxRef,
   PaymentTelemetryDraft,
   UnixSeconds,
-} from "@linky/linkstr";
-import { enqueuePaymentTelemetryAtom, useAtomSet } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import {
+  enqueuePaymentTelemetryAtom,
+  useAtomSet,
+} from "@linky-fit/linkstr-react";
 import { Exit, Schema } from "effect";
 import React from "react";
 import {

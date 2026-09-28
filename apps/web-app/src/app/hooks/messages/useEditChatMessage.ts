@@ -5,8 +5,8 @@ import {
   OutboxRef,
   Pubkey,
   RumorId,
-} from "@linky/linkstr";
-import { enqueueOutboxAtom, useAtomSet } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Cause, Either, Exit, Schema } from "effect";
 import React from "react";
 import { makeLocalId } from "../../../utils/validation";

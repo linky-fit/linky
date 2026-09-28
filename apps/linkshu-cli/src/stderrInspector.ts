@@ -1,5 +1,5 @@
-import { Inspector } from "@linky/linkshu";
-import type { LinkshuInspectorEvent } from "@linky/linkshu";
+import { Inspector } from "@linky-fit/linkshu";
+import type { LinkshuInspectorEvent } from "@linky-fit/linkshu";
 import { Layer, Stream } from "effect";
 
 const format = ({ _tag, ...fields }: LinkshuInspectorEvent): string =>

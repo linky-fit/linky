@@ -5,8 +5,8 @@ import {
   operationKeyOf,
   OperationStore,
   StoredOperation,
-} from "@linky/linkshu";
-import type { OperationStoreService } from "@linky/linkshu";
+} from "@linky-fit/linkshu";
+import type { OperationStoreService } from "@linky-fit/linkshu";
 import { Layer, Schema } from "effect";
 import { makeJsonFile } from "./jsonFile";
 

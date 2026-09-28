@@ -13,7 +13,7 @@ import {
   UnixSeconds,
   makeBlossomUploadAuthHeader,
   type NostrSecretKey,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const now = () => UnixSeconds.make(Math.floor(Date.now() / 1000));
 
@@ -47,7 +47,7 @@ import {
   UnixSeconds,
   makeNip98AuthHeader,
   type NostrSecretKey,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 export const putMintPreference = async (
   secretKey: NostrSecretKey,
@@ -79,7 +79,7 @@ import {
   makePushOwnershipProof,
   type NostrSecretKey,
   type Pubkey,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 export const proveSubscribe = async (
   pushServerUrl: string,
@@ -133,8 +133,8 @@ The app's version, with response decoding and the surrounding subscription flow,
 `verifyPushOwnershipProof` checks signature, kind, the exactly-once `challenge` / `action` / `pubkey` tags, that the `pubkey` tag equals the event author, and the content string. Everything about _your_ request is still yours to check. `apps/push/src/ownership.ts` does it like this:
 
 ```ts
-import { verifyPushOwnershipProof } from "@linky/linkstr";
-import type { PushOwnershipProofFailure } from "@linky/linkstr";
+import { verifyPushOwnershipProof } from "@linky-fit/linkstr";
+import type { PushOwnershipProofFailure } from "@linky-fit/linkstr";
 
 const failureStatus: Record<PushOwnershipProofFailure, number> = {
   "malformed-event": 400,

@@ -12,7 +12,7 @@ import {
   tryParseBankPayment,
   type BankOfferStatus,
   type BankPayment,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import {
   readBankPaymentOfferStaggerRecords,
   setBankPaymentOfferMinimized,
@@ -26,7 +26,7 @@ import {
   parsePrivateImageMessage,
 } from "../app/lib/privateImageMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
-import { decodeNpub } from "@linky/linkstr";
+import { decodeNpub } from "@linky-fit/linkstr";
 import { readUnknownContactIdPubkey } from "../app/hooks/messages/contactIdentity";
 import { navigateTo, returnFromBankPaymentOffer } from "../hooks/useRouting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";

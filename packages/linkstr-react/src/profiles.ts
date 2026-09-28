@@ -1,5 +1,5 @@
 import { Atom } from "@effect-atom/atom-react";
-import { Profiles, ProfileWatch } from "@linky/linkstr";
+import { Profiles, ProfileWatch } from "@linky-fit/linkstr";
 import type {
   DiscoverActiveProfilesOptions,
   ProfileMetadata,
@@ -7,7 +7,7 @@ import type {
   Pubkey,
   SearchProfilesOptions,
   StatusDraft,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Effect, Stream } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

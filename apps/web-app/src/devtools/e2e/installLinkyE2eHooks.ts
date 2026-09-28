@@ -9,8 +9,8 @@ import {
   OwnerId,
   type LinkyScope,
   type LinkyTable,
-} from "@linky/linksync";
-import { createEvoluShardDb } from "@linky/linksync/evolu";
+} from "@linky-fit/linksync";
+import { createEvoluShardDb } from "@linky-fit/linksync/evolu";
 import { Effect } from "effect";
 import {
   evolu,

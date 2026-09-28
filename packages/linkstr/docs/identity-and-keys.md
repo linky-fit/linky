@@ -4,7 +4,7 @@ How strings become keys and how keys become the `LinkstrIdentity` service. You n
 
 ## Codecs
 
-All in `identity/codec.ts`, exported from `@linky/linkstr`. Decoders return `null` on any bad input; nothing throws.
+All in `identity/codec.ts`, exported from `@linky-fit/linkstr`. Decoders return `null` on any bad input; nothing throws.
 
 | Function                         | In → Out                                         | Notes                            |
 | -------------------------------- | ------------------------------------------------ | -------------------------------- |
@@ -19,7 +19,7 @@ All in `identity/codec.ts`, exported from `@linky/linkstr`. Decoders return `nul
 | `encodeNprofile(pubkey, relays)` | → `nprofile1…`                                   | `relays` are plain strings       |
 
 ```ts
-import { encodeNpub, identityFromNsec, parsePubkey } from "@linky/linkstr";
+import { encodeNpub, identityFromNsec, parsePubkey } from "@linky-fit/linkstr";
 
 const login = (nsec: string) => {
   const identity = identityFromNsec(nsec.trim());
@@ -40,7 +40,7 @@ The service every signing and unwrapping path reads: `{ pubkey, secretKey }`. Bu
 
 ```ts
 import { Effect } from "effect";
-import { LinkstrIdentity } from "@linky/linkstr";
+import { LinkstrIdentity } from "@linky-fit/linkstr";
 
 const whoAmI = Effect.map(LinkstrIdentity, (identity) => identity.pubkey);
 ```

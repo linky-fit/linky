@@ -1,4 +1,8 @@
-import type { MeltError, MeltReceipt, PaymentPending } from "@linky/linkshu";
+import type {
+  MeltError,
+  MeltReceipt,
+  PaymentPending,
+} from "@linky-fit/linkshu";
 import { Either } from "effect";
 import React from "react";
 import {
@@ -15,7 +19,7 @@ import {
   getLightningInvoicePreview,
   isRetryablePaymentAmountFailure,
   type LightningInvoicePreview,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { normalizeMintUrl } from "../../utils/mint";
 import { safeLocalStorageSet } from "../../utils/storage";
 import { getUnknownErrorMessage } from "../../utils/unknown";

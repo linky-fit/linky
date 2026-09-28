@@ -3,7 +3,7 @@ import {
   createSlip39Share,
   IdentityProvider,
   MasterSecretProvider,
-} from "@linky/identity";
+} from "@linky-fit/identity";
 import { Effect, Layer } from "effect";
 import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import {

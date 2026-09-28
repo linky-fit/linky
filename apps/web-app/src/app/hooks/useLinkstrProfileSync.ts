@@ -1,4 +1,8 @@
-import { NonEmptyString1000, SqliteBoolean, sqliteTrue } from "@linky/linksync";
+import {
+  NonEmptyString1000,
+  SqliteBoolean,
+  sqliteTrue,
+} from "@linky-fit/linksync";
 import type {
   ProfileFetchEntry,
   ProfileFetchResult,
@@ -6,16 +10,16 @@ import type {
   ProfileUpdated,
   ProfileWatchEvent,
   StatusUpdated,
-} from "@linky/linkstr";
-import { decodeNpub, encodeNpub, Pubkey } from "@linky/linkstr";
-import type { ContactId, ContactsRepository } from "@linky/linksync";
+} from "@linky-fit/linkstr";
+import { decodeNpub, encodeNpub, Pubkey } from "@linky-fit/linkstr";
+import type { ContactId, ContactsRepository } from "@linky-fit/linksync";
 import {
   profileWatchAtom,
   profileWatchHandlerAtom,
   useAtomMount,
   useAtomSet,
   watchedProfilesAtom,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import {

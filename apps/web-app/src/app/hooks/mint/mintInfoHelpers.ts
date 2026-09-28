@@ -1,8 +1,8 @@
-import { sqliteTrue } from "@linky/linksync";
+import { sqliteTrue } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import { JsonValue } from "../../../types/json";
-import { findMintInfoIconValue } from "@linky/linkshu";
-import type { StoredProof } from "@linky/linkshu";
+import { findMintInfoIconValue } from "@linky-fit/linkshu";
+import type { StoredProof } from "@linky-fit/linkshu";
 import {
   extractPpk,
   GENERIC_MINT_ICON_DATA_URL,

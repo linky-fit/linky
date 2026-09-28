@@ -1,6 +1,6 @@
-# @linky/linkshu-cli
+# @linky-fit/linkshu-cli
 
-A cashu wallet in a terminal, and `@linky/linkshu`'s first consumer.
+A cashu wallet in a terminal, and `@linky-fit/linkshu`'s first consumer.
 
 Its real job is to keep the package honest: it runs under plain Bun with no
 browser, no React, and no Evolu, and every platform capability comes from the

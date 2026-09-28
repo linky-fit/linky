@@ -1,11 +1,11 @@
 {
-  "name": "@linky/native-shell",
+  "name": "@linky-fit/native-shell",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
   "type": "module",
   "scripts": {
-    "build:web": "bun run --filter @linky/web-app build",
+    "build:web": "bun run --filter @linky-fit/web-app build",
     "android:icons": "bash ./scripts/generate-android-icons.sh",
     "android:release:check": "bash ./scripts/check-android-release-prereqs.sh",
     "android:add": "bash ./scripts/with-java17.sh cap add android && bash ./scripts/patch-android-java.sh",
@@ -33,7 +33,7 @@
     "@capacitor/android": "^7.4.3",
     "@capacitor/cli": "^7.4.3",
     "@capacitor/ios": "^7.4.3",
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",

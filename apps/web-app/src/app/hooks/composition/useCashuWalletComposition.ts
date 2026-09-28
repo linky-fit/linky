@@ -1,6 +1,6 @@
 import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
 import type { ReceiveMethod } from "../../../utils/receiveMethod";
-import type { RestoreProgress } from "@linky/linkshu";
+import type { RestoreProgress } from "@linky-fit/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { useLatest } from "../../../hooks/useLatest";
 import {
@@ -15,12 +15,12 @@ import {
   parsePubkey,
   Pubkey,
   TokenMessageDraft,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   enqueueOutboxAtom,
   sendPaymentNoticeAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Cause, Either, Exit, Option, Schema } from "effect";
 import React, { useMemo, useState } from "react";
 import type { CashuOperationId, ContactId } from "../../../evolu";
@@ -45,11 +45,11 @@ import {
 import {
   getLightningInvoicePreview,
   type LightningInvoicePreview,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import {
   CashuOperationId as CashuOperationIdType,
   type TransactionsRepository,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import {
   CASHU_DEFAULT_MINT_OVERRIDE_STORAGE_KEY,
   effectiveDefaultMintUrl,

@@ -1,5 +1,5 @@
 {
-  "name": "@linky/linkshu",
+  "name": "@linky-fit/linkshu",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
@@ -25,7 +25,7 @@
     "light-bolt11-decoder": "^3.2.0"
   },
   "devDependencies": {
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "@types/ws": "^8.18.1",
     "eslint": "^9.39.1",

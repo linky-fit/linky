@@ -1,4 +1,4 @@
-import type { BankPaymentOfferStaggerRecord } from "@linky/proxy-payment";
+import type { BankPaymentOfferStaggerRecord } from "@linky-fit/proxy-payment";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   forgetBankPaymentOfferSpdPayload,

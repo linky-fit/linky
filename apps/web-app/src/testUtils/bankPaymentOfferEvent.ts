@@ -5,12 +5,12 @@ import {
   encodeBankOfferContent,
   Pubkey,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import type { UnsignedEvent } from "nostr-tools";
 import {
   type BankOfferStatus,
   bankPaymentOfferMessageText,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 
 const unixSeconds = (value: number | null | undefined): UnixSeconds | null =>
   value === null || value === undefined ? null : UnixSeconds.make(value);

@@ -1,8 +1,8 @@
 import type { MintIcon } from "../../utils/mint";
 import type { ReceiveMethod } from "../../utils/receiveMethod";
 /* eslint-disable react-refresh/only-export-components */
-import type { LinkyScope } from "@linky/linksync";
-import type { AutoswapEstimate, StoredProof } from "@linky/linkshu";
+import type { LinkyScope } from "@linky-fit/linksync";
+import type { AutoswapEstimate, StoredProof } from "@linky-fit/linkshu";
 import React from "react";
 import type { EvoluErrorType, EvoluServerStatus } from "../../evolu";
 import type { ShardSummary } from "../hooks/useLinksync";

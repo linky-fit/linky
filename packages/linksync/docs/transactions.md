@@ -6,10 +6,10 @@
 
 `insert`, `update`, `remove`, `byId`, and `subscribe` are the plain `TableRepository` methods; every write ends with `maybeRotate` of the scope (see [core](./core.md#rotation-in-detail)). There is no `category` or `phase` column to write.
 
-In the app, `useRepositoryRows(repository)` from [`@linky/linksync/react`](./react.md) keeps a component on the current records:
+In the app, `useRepositoryRows(repository)` from [`@linky-fit/linksync/react`](./react.md) keeps a component on the current records:
 
 ```ts
-import { useRepositoryRows } from "@linky/linksync/react";
+import { useRepositoryRows } from "@linky-fit/linksync/react";
 
 const records = useRepositoryRows(makeTransactionsRepository(store));
 ```

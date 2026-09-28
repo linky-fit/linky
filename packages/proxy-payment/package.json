@@ -1,5 +1,5 @@
 {
-  "name": "@linky/proxy-payment",
+  "name": "@linky-fit/proxy-payment",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
@@ -16,12 +16,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@linky/linkstr": "workspace:*",
+    "@linky-fit/linkstr": "workspace:*",
     "bysquare": "^4.0.0",
     "effect": "^3.19.19"
   },
   "devDependencies": {
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@scure/base": "^2.0.0",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",

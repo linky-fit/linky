@@ -71,8 +71,8 @@ export class Reactions extends Effect.Service<Reactions>()(
 5. **React** — `packages/linkstr-react/src/<vertical>.ts`: one fn atom per **direct** operation, then `export * from "./<vertical>"` in `index.ts`. Operations that go through the outbox get no atom of their own: the app enqueues them with the existing `enqueueOutboxAtom` and observes them through `useOutboxResults` ([react.md](./react.md#outbox)), which is why there is a `retractReactionAtom` but no `reactAtom`.
 
 ```ts
-import { Reactions } from "@linky/linkstr";
-import type { RetractionDraft } from "@linky/linkstr";
+import { Reactions } from "@linky-fit/linkstr";
+import type { RetractionDraft } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 
@@ -92,7 +92,7 @@ export const retractReactionAtom = linkstrRuntimeAtom.fn<RetractionDraft>()(
 | `linkstr-react/src/<vertical>.test.ts`         | `reactions.test.ts`                            | the fn atom delivers through the configured transport and fails with `LinkstrNotConfigured` |
 | Outbox tests, if queued                        | `outbox/Outbox.test.ts`, `OutboxStore.test.ts` | stored job decodes; the result carries your receipt                                         |
 
-Use `@linky/linkstr/testing` and `@linky/linkstr-react/testing` ([testing.md](./testing.md)).
+Use `@linky-fit/linkstr/testing` and `@linky-fit/linkstr-react/testing` ([testing.md](./testing.md)).
 
 ## Inspector events to emit
 

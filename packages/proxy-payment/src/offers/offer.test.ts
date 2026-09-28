@@ -1,4 +1,4 @@
-import { UnixSeconds } from "@linky/linkstr";
+import { UnixSeconds } from "@linky-fit/linkstr";
 import { describe, expect, it } from "vitest";
 import { snapshot, START } from "../testing/offers";
 import {

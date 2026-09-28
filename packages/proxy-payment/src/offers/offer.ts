@@ -1,4 +1,4 @@
-import type { BankOfferStatus } from "@linky/linkstr";
+import type { BankOfferStatus } from "@linky-fit/linkstr";
 import type { BankPaymentOfferInfo } from "./content";
 import {
   BANK_PAYMENT_OFFER_PHASE_TTL_SEC,

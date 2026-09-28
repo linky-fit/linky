@@ -1,4 +1,4 @@
-import type { OutboxRef, OutboxResult } from "@linky/linkstr";
+import type { OutboxRef, OutboxResult } from "@linky-fit/linkstr";
 import { appendPushDebugLog } from "../../../utils/pushDebugLog";
 import type {
   UpdateLocalNostrMessage,

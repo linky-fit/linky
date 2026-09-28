@@ -18,7 +18,7 @@ import {
   type NostrSecretKey,
   type Pubkey,
   type RelayUrl,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const sendText = (
   secretKey: NostrSecretKey,
@@ -49,8 +49,8 @@ import {
   TextMessageDraft,
   type Pubkey,
   type RumorId,
-} from "@linky/linkstr";
-import { enqueueOutboxAtom, useAtomSet } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 
 interface ChatStore {
@@ -145,7 +145,7 @@ import type {
   RumorId,
   UnixSeconds,
   WrapInboxEvent,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 interface ChatStore {
   // Placeholders for your persistence layer.

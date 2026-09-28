@@ -1,4 +1,4 @@
-import { Inspector } from "@linky/linkshu";
+import { Inspector } from "@linky-fit/linkshu";
 import { Layer, Stream } from "effect";
 import { getInspectorEmissionEnabled } from "./inspectorEnabled";
 import { linkshuEventToRow } from "./linkshuRows";

@@ -1,4 +1,4 @@
-import { PositiveInt, type ConversationsRepository } from "@linky/linksync";
+import { PositiveInt, type ConversationsRepository } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React from "react";
 import type { ContactId } from "../../../evolu";

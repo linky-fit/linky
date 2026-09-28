@@ -1,4 +1,4 @@
-import type { OperationId, TokenTransfer } from "@linky/linkshu";
+import type { OperationId, TokenTransfer } from "@linky-fit/linkshu";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import type { MintIcon } from "../utils/mint";

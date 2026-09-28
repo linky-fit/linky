@@ -8,7 +8,7 @@ import {
   type LinkyDbSchema,
   type TransactionsRepository,
   type WriteRow,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Effect, Schema } from "effect";
 import React from "react";
 import { isLocalPaymentTelemetryEvent } from "./useAnonymousPaymentTelemetry";

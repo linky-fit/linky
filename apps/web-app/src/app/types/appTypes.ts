@@ -5,7 +5,7 @@ import type {
   Pubkey,
   PaymentTelemetryAppRuntime,
   PaymentTelemetryDevicePlatform,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import type { JsonValue } from "../../types/json";
 
 export type PaymentTelemetryStatus = "declined" | "error" | "ok";

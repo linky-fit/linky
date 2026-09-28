@@ -7,13 +7,13 @@ import {
   Pubkey,
   RumorId,
   TokenMessageDraft,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import type {
   EnqueueReceipt,
   PaymentNoticeContext,
   PaymentNoticeReceipt,
-} from "@linky/linkstr";
-import type { EnqueueOutboxInput } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import type { EnqueueOutboxInput } from "@linky-fit/linkstr-react";
 import { Cause, Either, Exit, Option, Schema } from "effect";
 import type { ContactId } from "../../../evolu";
 import { previewTokenText } from "../../../utils/formatting";

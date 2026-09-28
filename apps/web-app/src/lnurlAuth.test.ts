@@ -1,8 +1,8 @@
 import {
   deriveLnurlAuthPublicKeyHex,
   signLnurlAuthChallenge,
-} from "@linky/identity";
-import { identityFromNsec } from "@linky/linkstr";
+} from "@linky-fit/identity";
+import { identityFromNsec } from "@linky-fit/linkstr";
 import { hexToBytes } from "@noble/hashes/utils.js";
 import { nip19 } from "nostr-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -1,7 +1,7 @@
 import type {
   OwnSeenReceiptConfirmed,
   SeenReceiptReceived,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 /** Peer's reported seen window: our messages in (sinceSec, seenUpToSec]. */
 export interface PeerSeenWindow {

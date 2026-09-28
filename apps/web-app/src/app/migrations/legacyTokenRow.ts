@@ -1,5 +1,5 @@
-import { sqliteTrue } from "@linky/linksync";
-import { LegacyTokenRow, TokenText, UnixSeconds } from "@linky/linkshu";
+import { sqliteTrue } from "@linky-fit/linksync";
+import { LegacyTokenRow, TokenText, UnixSeconds } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 import type { CashuTokenRow } from "../../evolu";
 import {

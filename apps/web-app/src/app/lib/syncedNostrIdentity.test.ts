@@ -5,7 +5,7 @@ import {
   OwnerId,
   PositiveInt,
   type NostrIdentityRow,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import { toSyncedNostrIdentity } from "./syncedNostrIdentity";
 

@@ -1,4 +1,4 @@
-import { parsePubkey } from "@linky/linkstr";
+import { parsePubkey } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import { UnknownRecord } from "../../utils/schema";
 import { safeLocalStorageGetJson } from "../../utils/storage";

@@ -1,4 +1,7 @@
-import { GENERIC_MINT_ICON_DATA_URL, isLightningAddress } from "@linky/linkshu";
+import {
+  GENERIC_MINT_ICON_DATA_URL,
+  isLightningAddress,
+} from "@linky-fit/linkshu";
 import { SiteFooter } from "../SiteFooter";
 import { SiteHeaderMenu } from "../SiteHeaderMenu";
 import { useCashuPage } from "./useCashuPage";

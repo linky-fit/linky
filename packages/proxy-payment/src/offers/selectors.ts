@@ -1,4 +1,4 @@
-import type { BankOfferStatus } from "@linky/linkstr";
+import type { BankOfferStatus } from "@linky-fit/linkstr";
 import {
   bankPaymentOfferBankPaidAtSec,
   bankPaymentOfferExpiresAtSec,

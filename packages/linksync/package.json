@@ -1,5 +1,5 @@
 {
-  "name": "@linky/linksync",
+  "name": "@linky-fit/linksync",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
@@ -19,14 +19,14 @@
   },
   "dependencies": {
     "@evolu/common": "^7.4.1",
-    "@linky/linkshu": "workspace:*",
+    "@linky-fit/linkshu": "workspace:*",
     "effect": "^3.19.19"
   },
   "peerDependencies": {
     "react": "^19.2.3"
   },
   "devDependencies": {
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

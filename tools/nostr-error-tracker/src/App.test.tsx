@@ -17,7 +17,7 @@ import {
   rememberSessionSeed,
   clearSavedSession,
 } from "./auth";
-import { createSlip39Share } from "@linky/identity";
+import { createSlip39Share } from "@linky-fit/identity";
 import { Effect } from "effect";
 import { createTrackerStore } from "./issueStore";
 import type { IssueResolution } from "./issueState";

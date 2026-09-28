@@ -18,7 +18,7 @@ import {
   type NostrSecretKey,
   type Pubkey,
   type RelayUrl,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const offer = (
   secretKey: NostrSecretKey,
@@ -54,8 +54,8 @@ import {
   BankOfferDraft,
   type BankOfferSnapshotReceived,
   type BankOfferStatus,
-} from "@linky/linkstr";
-import { sendBankOfferAtom, useAtomSet } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import { sendBankOfferAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 
 const nextSnapshot = (
@@ -135,7 +135,7 @@ Delivery order is `recipientFirst`: the self copy is published only after a rela
 
 Repeat every field on every snapshot: the wire carries the full state, not a diff. `statusUpdatedAtSec` is always the send time.
 
-`BankOfferReceipt` carries `rumorId`, `offerId`, `status`, `content: string`, `clientId`, `sentAt`, `selfCopy`, and `recipientCopy`. `content` is the encoded JSON snapshot; the app stores it as the message content of the offer row so the local view and the wire agree byte for byte. To produce that JSON without sending — for a local-only placeholder row — call `encodeBankOfferContent` with every field (`null` for absent ones); its parameter type is not exported, and `bankOfferContentFromSnapshot` in `@linky/proxy-payment` is a complete call.
+`BankOfferReceipt` carries `rumorId`, `offerId`, `status`, `content: string`, `clientId`, `sentAt`, `selfCopy`, and `recipientCopy`. `content` is the encoded JSON snapshot; the app stores it as the message content of the offer row so the local view and the wire agree byte for byte. To produce that JSON without sending — for a local-only placeholder row — call `encodeBankOfferContent` with every field (`null` for absent ones); its parameter type is not exported, and `bankOfferContentFromSnapshot` in `@linky-fit/proxy-payment` is a complete call.
 
 Direct only: offers are not outbox operations. A snapshot that fails is simply resent by the user or the app's timers.
 
@@ -180,7 +180,7 @@ import type {
   BankOfferInboxEvent,
   Pubkey,
   WrapInboxEvent,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 /** Placeholder: authorize roles, terms and payer selection before merging. */
 type ApplySnapshot = (peer: Pubkey, snapshot: BankOfferInboxEvent) => void;
@@ -195,7 +195,7 @@ export const bankOfferHandler =
   };
 ```
 
-`event.offerer === myPubkey` tells you whether the offer is outgoing only after stateful authorization. The codec cannot establish that a counterparty's claimed outgoing offer exists. Before applying a payer snapshot, require an authenticated offerer snapshot for that peer and offer ID, preserve its amount and initiation time, and require offerer-authorized `bank_details_sent` before accepting `bank_paid`. `@linky/proxy-payment`'s `applyBankPaymentOfferSnapshot` does all of this for Linky: it queues up to 256 early payer snapshots for out-of-order backfill and rechecks them when the offerer's snapshot arrives, pins expiry, extension, and bank details to the offerer's state and uses the rumor timestamp for updates.
+`event.offerer === myPubkey` tells you whether the offer is outgoing only after stateful authorization. The codec cannot establish that a counterparty's claimed outgoing offer exists. Before applying a payer snapshot, require an authenticated offerer snapshot for that peer and offer ID, preserve its amount and initiation time, and require offerer-authorized `bank_details_sent` before accepting `bank_paid`. `@linky-fit/proxy-payment`'s `applyBankPaymentOfferSnapshot` does all of this for Linky: it queues up to 256 early payer snapshots for out-of-order backfill and rechecks them when the offerer's snapshot arrives, pins expiry, extension, and bank details to the offerer's state and uses the rumor timestamp for updates.
 
 Backfill replays old snapshots, so the merge must be idempotent. The offer state starts empty on reload and is rebuilt from authenticated inbox events; persisted ordinary chat content cannot authorize responses or settlement, which the app resolves by peer and offer id against that state.
 

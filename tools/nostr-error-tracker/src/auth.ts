@@ -5,7 +5,7 @@ import {
   parseSlip39Share,
   recoverMasterSecretFromSlip39Share,
   type Bip39Mnemonic12,
-} from "@linky/identity";
+} from "@linky-fit/identity";
 import { Effect, Layer, Schema } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import { decrypt, getConversationKey } from "nostr-tools/nip44";

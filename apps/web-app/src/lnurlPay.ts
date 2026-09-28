@@ -1,4 +1,4 @@
-import * as lnurl from "@linky/linkshu";
+import * as lnurl from "@linky-fit/linkshu";
 import { isNativePlatform } from "./platform/runtime";
 export {
   LnurlTagMismatchError,
@@ -8,13 +8,13 @@ export {
   isLnurlPayTarget,
   isLnurlWithdrawTarget,
   resolveLnurlPayRequestUrl,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 export type {
   LnurlPaySuccessAction,
   LnurlPayInvoiceResult,
   LnurlWithdrawPreview,
   LnurlPayPreview,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 const fallback: lnurl.LnurlFallback = async (url) => {
   if (typeof window === "undefined") throw new Error("LNURL request failed");
   const origin = isNativePlatform() ? "https://app.linky.fit" : "";

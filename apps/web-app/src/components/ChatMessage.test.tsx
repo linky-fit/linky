@@ -1,7 +1,7 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import type { BankPaymentOfferInfo } from "@linky/proxy-payment";
+import type { BankPaymentOfferInfo } from "@linky-fit/proxy-payment";
 import { serializePrivateImageMessage } from "../app/lib/privateImageMessage";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import {

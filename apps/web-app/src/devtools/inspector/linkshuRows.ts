@@ -1,4 +1,4 @@
-import type { LinkshuInspectorEvent } from "@linky/linkshu";
+import type { LinkshuInspectorEvent } from "@linky-fit/linkshu";
 import type { InspectorRow } from "./inspectorRows";
 import { isRecord } from "../../utils/unknown";
 

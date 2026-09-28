@@ -1,4 +1,4 @@
-# @linky/linksync
+# @linky-fit/linksync
 
 Usage guides for this package live in `docs/` (index: `docs/README.md`). Read [concepts](./docs/concepts.md) before changing a scope or a table: the scope table there is the source of truth for owner type, rotation rule, and forget policy, and `src/model/scopes.ts` must match it.
 

@@ -1,5 +1,5 @@
-import { SeenReceipts } from "@linky/linkstr";
-import type { SeenReceiptDraft } from "@linky/linkstr";
+import { SeenReceipts } from "@linky-fit/linkstr";
+import type { SeenReceiptDraft } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

@@ -1,4 +1,4 @@
-import { makeIdentity } from "@linky/linkstr/testing";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { describe, expect, it } from "vitest";
 import { readNotificationOpenData } from "./notificationOpen";
 import {

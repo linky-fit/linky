@@ -6,9 +6,12 @@ import {
   RumorId,
   UnixSeconds,
   WrapId,
-} from "@linky/linkstr";
-import type { LinkstrIdentityService, WrapInboxEvent } from "@linky/linkstr";
-import { recipientOf } from "@linky/linkstr/testing";
+} from "@linky-fit/linkstr";
+import type {
+  LinkstrIdentityService,
+  WrapInboxEvent,
+} from "@linky-fit/linkstr";
+import { recipientOf } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
 import type { Event as NostrToolsEvent } from "nostr-tools";
 import type { LinkstrConfig } from "./config";

@@ -1,6 +1,6 @@
-# @linky/linkstr guides
+# @linky-fit/linkstr guides
 
-How to use Linky's Nostr protocol library and its React binding `@linky/linkstr-react`. These are guides, not an API reference: the exported types are the reference, and the [package README](../README.md) holds the design rules and rationale.
+How to use Linky's Nostr protocol library and its React binding `@linky-fit/linkstr-react`. These are guides, not an API reference: the exported types are the reference, and the [package README](../README.md) holds the design rules and rationale.
 
 ## Where to start
 

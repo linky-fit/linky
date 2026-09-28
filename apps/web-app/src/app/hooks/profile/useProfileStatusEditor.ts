@@ -1,5 +1,5 @@
-import { StatusDraft } from "@linky/linkstr";
-import { publishStatusAtom, useAtomSet } from "@linky/linkstr-react";
+import { StatusDraft } from "@linky-fit/linkstr";
+import { publishStatusAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import {

@@ -37,8 +37,8 @@ import {
   type AppOwner,
   type SystemColumns,
   type TableOf,
-} from "@linky/linksync";
-import type { LegacyTokenRow } from "@linky/linkshu";
+} from "@linky-fit/linksync";
+import type { LegacyTokenRow } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 import type {
   CashuOperationRow,

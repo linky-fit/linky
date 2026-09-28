@@ -1,5 +1,5 @@
 import { Atom } from "@effect-atom/atom-react";
-import { WrapInbox } from "@linky/linkstr";
+import { WrapInbox } from "@linky-fit/linkstr";
 import type {
   DeliveredInboxEvent,
   InboxDelivery,
@@ -7,7 +7,7 @@ import type {
   UnixSeconds,
   WrapId,
   WrapInboxEvent,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Effect, Stream } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

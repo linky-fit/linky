@@ -13,7 +13,7 @@ import {
   getBankPaymentEditableFieldKeys,
   tryParseBankPayment,
   updateBankPaymentFields,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import { Avatar } from "../components/Avatar";
 import { BankPaymentAmount } from "../components/BankPaymentAmount";
 import { SettingsStepper } from "../components/SettingsStepper";

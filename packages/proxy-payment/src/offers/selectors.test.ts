@@ -1,4 +1,4 @@
-import { BankOfferId, UnixSeconds } from "@linky/linkstr";
+import { BankOfferId, UnixSeconds } from "@linky-fit/linkstr";
 import { describe, expect, it } from "vitest";
 import { me, other, payer, snapshot, START } from "../testing/offers";
 import {

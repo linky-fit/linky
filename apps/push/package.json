@@ -1,5 +1,5 @@
 {
-  "name": "@linky/push",
+  "name": "@linky-fit/push",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
@@ -14,13 +14,13 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@linky/linkstr": "workspace:*",
+    "@linky-fit/linkstr": "workspace:*",
     "firebase-admin": "^13.7.0",
     "web-push": "^3.6.7",
     "undici": "^7.22.0"
   },
   "devDependencies": {
-    "@linky/config": "workspace:*",
+    "@linky-fit/config": "workspace:*",
     "@types/bun": "^1.3.2",
     "@types/node": "^24.10.1",
     "@types/web-push": "^3.6.4",

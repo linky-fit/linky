@@ -1,4 +1,4 @@
-import { ProfileMetadata } from "@linky/linkstr";
+import { ProfileMetadata } from "@linky-fit/linkstr";
 import { describe, expect, it } from "vitest";
 import { applyLightningAddressToProfileMetadata } from "./profileMetadata";
 

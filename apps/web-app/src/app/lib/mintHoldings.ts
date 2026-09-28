@@ -1,4 +1,4 @@
-import type { StoredProof } from "@linky/linkshu";
+import type { StoredProof } from "@linky-fit/linkshu";
 import { normalizeMintUrl } from "../../utils/mint";
 
 export interface MintHolding {

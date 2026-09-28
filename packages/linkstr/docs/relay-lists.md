@@ -15,7 +15,7 @@ import {
   RelayListsDraft,
   RelayUrl,
   runLinkstr,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const relays = DEFAULT_NOSTR_RELAYS.filter(Schema.is(RelayUrl));
 
@@ -40,12 +40,12 @@ lists.relays?.map((entry) => entry.relay);
 React:
 
 ```ts
-import { RelayListEntry, RelayListsDraft } from "@linky/linkstr";
+import { RelayListEntry, RelayListsDraft } from "@linky-fit/linkstr";
 import {
   fetchOwnRelayListsAtom,
   publishRelayListsAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 
 const publishRelayLists = useAtomSet(publishRelayListsAtom, {

@@ -1,5 +1,5 @@
 import { reportAppLog } from "../../devtools/inspector/appLog";
-import { decodeNpub, encodeNpub } from "@linky/linkstr";
+import { decodeNpub, encodeNpub } from "@linky-fit/linkstr";
 import { useLatest } from "../../hooks/useLatest";
 import React from "react";
 import type {

@@ -7,7 +7,7 @@ The generic shard store: no Linky in it. Use it directly only when adding a scop
 A scope is one kind of data with one storage policy (`src/core/scope.ts`):
 
 ```ts
-import { appScope, shardScope } from "@linky/linksync";
+import { appScope, shardScope } from "@linky-fit/linksync";
 
 const scopes = {
   meta: appScope(["shardPointer", "setting"]),
@@ -29,7 +29,7 @@ An `appScope` lives in the Evolu `AppOwner`, one fixed partition. A `shardScope`
 ## The store
 
 ```ts
-import { createShardStore, makeInMemoryShardDb } from "@linky/linksync";
+import { createShardStore, makeInMemoryShardDb } from "@linky-fit/linksync";
 
 const db = makeInMemoryShardDb<Schema>(tableColumns);
 const store = createShardStore<Schema, typeof scopes>({ db, appOwner, scopes });

@@ -1,4 +1,4 @@
-import { decodeNpub } from "@linky/linkstr";
+import { decodeNpub } from "@linky-fit/linkstr";
 import { useCallback, useState } from "react";
 import type { CashuPaymentRequestMessageInfo } from "../../lib/paymentRequestMessage";
 import { normalizePubkeyHex } from "../messages/contactIdentity";

@@ -1,4 +1,4 @@
-import type { ProfileMetadata } from "@linky/linkstr";
+import type { ProfileMetadata } from "@linky-fit/linkstr";
 import React from "react";
 import type { Lang, Translate } from "../../../i18n";
 import { persistSyncedActiveNostrIdentity } from "../../../platform/identitySecrets";

@@ -5,7 +5,7 @@ import {
   Pubkey,
   UnixSeconds,
   type BankOfferStatus,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import { bankPaymentOfferMessageText } from "./content";
 import { bankPaymentOfferBankPaidAtSec, type BankPaymentOffer } from "./offer";

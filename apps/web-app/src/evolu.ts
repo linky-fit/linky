@@ -14,8 +14,8 @@ import {
   type LinkyStore,
   type NostrIdentityId,
   type ShardRotation,
-} from "@linky/linksync";
-import { createEvoluShardDb } from "@linky/linksync/evolu";
+} from "@linky-fit/linksync";
+import { createEvoluShardDb } from "@linky-fit/linksync/evolu";
 import { evoluReactWebDeps } from "@evolu/react-web";
 import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

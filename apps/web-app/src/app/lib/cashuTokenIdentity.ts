@@ -1,4 +1,4 @@
-import { createIdFromString } from "@linky/linksync";
+import { createIdFromString } from "@linky-fit/linksync";
 import type { CashuTokenId } from "../../evolu";
 
 /** The id a token text maps to; transaction details reference tokens by it. */

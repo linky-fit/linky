@@ -1,4 +1,4 @@
-import type { CashuProofId, OwnerId } from "@linky/linksync";
+import type { CashuProofId, OwnerId } from "@linky-fit/linksync";
 
 interface ProofState {
   readonly id: CashuProofId;

@@ -1,5 +1,5 @@
 {
-  "extends": "@linky/config/tsconfig/app",
+  "extends": "@linky-fit/config/tsconfig/app",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo",
     "types": ["vite/client", "node", "bun"]

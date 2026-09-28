@@ -1,7 +1,7 @@
 import { Registry } from "./index";
-import { ClientId, SeenReceiptDraft, UnixSeconds } from "@linky/linkstr";
-import { recipientOf, stubWrapTransport } from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
+import { ClientId, SeenReceiptDraft, UnixSeconds } from "@linky-fit/linkstr";
+import { recipientOf, stubWrapTransport } from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
 import { linkstrConfigAtom } from "./config";
 import { sendSeenReceiptAtom } from "./seenReceipts";

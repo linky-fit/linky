@@ -4,7 +4,7 @@ import type {
   TransactionDirection,
   TransactionRecord,
   TransactionStatus,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import { JsonValue } from "../../types/json";
 import { isRecord } from "../../utils/unknown";

@@ -3,8 +3,8 @@ import {
   identityFromNsec,
   type BankOfferDraft,
   type BankOfferInboxEvent,
-} from "@linky/linkstr";
-import { sendBankOfferAtom, useAtomSet } from "@linky/linkstr-react";
+} from "@linky-fit/linkstr";
+import { sendBankOfferAtom, useAtomSet } from "@linky-fit/linkstr-react";
 import {
   activeBankPaymentOffers,
   applyBankPaymentOfferReceipt,
@@ -32,7 +32,7 @@ import {
   type BankPaymentOffer,
   type BankPaymentOfferResponseOptions,
   type BankPaymentOfferState,
-} from "@linky/proxy-payment";
+} from "@linky-fit/proxy-payment";
 import { Exit } from "effect";
 import React, { useState } from "react";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";

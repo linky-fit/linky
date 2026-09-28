@@ -1,6 +1,6 @@
 import type { JsonValue } from "../types/json";
-import type { PayableLightningInvoice } from "@linky/linkshu";
-import { getPayableLightningInvoice } from "@linky/linkshu";
+import type { PayableLightningInvoice } from "@linky-fit/linkshu";
+import { getPayableLightningInvoice } from "@linky-fit/linkshu";
 import { getUnknownErrorMessage } from "./unknown";
 import { asNonEmptyString, asRecord } from "./validation";
 import { nowSeconds, sleep } from "./time";

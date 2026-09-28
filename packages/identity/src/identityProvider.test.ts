@@ -1,4 +1,9 @@
-import { decodeNpub, decodeNsec, encodeNpub, encodeNsec } from "@linky/linkstr";
+import {
+  decodeNpub,
+  decodeNsec,
+  encodeNpub,
+  encodeNsec,
+} from "@linky-fit/linkstr";
 import { Effect, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { IdentityProvider, IdentityProviderError } from "./IdentityProvider";

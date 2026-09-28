@@ -1,4 +1,4 @@
-import { makeIdentity } from "@linky/linkstr/testing";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   safeLocalStorageRemove,

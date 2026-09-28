@@ -1,5 +1,5 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import type { NostrSecretKey } from "@linky/linkstr";
+import type { NostrSecretKey } from "@linky-fit/linkstr";
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";

@@ -1,4 +1,4 @@
-import { createId } from "@linky/linksync";
+import { createId } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { legacyProofsToMarkSpent } from "./legacySpentProofs";

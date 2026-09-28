@@ -1,4 +1,4 @@
-import { CashuOperationId, ContactId } from "@linky/linksync";
+import { CashuOperationId, ContactId } from "@linky-fit/linksync";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../utils/constants";
 
 const decodeSegment = (value: string): string | null => {

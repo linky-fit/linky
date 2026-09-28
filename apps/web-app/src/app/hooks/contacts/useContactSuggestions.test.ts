@@ -4,7 +4,7 @@ import {
   ProfileMetadata,
   Pubkey,
   UnixSeconds,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { generateSecretKey, getPublicKey } from "nostr-tools";
 import { describe, expect, it } from "vitest";
 import { selectContactSuggestions } from "./useContactSuggestions";

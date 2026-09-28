@@ -8,8 +8,14 @@ Prerequisites: a seed ([getting-started.md](./getting-started.md)) and the dev m
 
 ```ts
 import { Effect } from "effect";
-import { Amount, MintUrl, runLinkshu, Topup, TopupDraft } from "@linky/linkshu";
-import type { Bip39Seed } from "@linky/linkshu";
+import {
+  Amount,
+  MintUrl,
+  runLinkshu,
+  Topup,
+  TopupDraft,
+} from "@linky-fit/linkshu";
+import type { Bip39Seed } from "@linky-fit/linkshu";
 
 const topupOnce = (bip39Seed: Bip39Seed) =>
   runLinkshu(
@@ -48,7 +54,7 @@ Pending topups outlive the process. Nothing polls them until you call `resumePen
 
 ```ts
 import { Effect, Either } from "effect";
-import { Topup } from "@linky/linkshu";
+import { Topup } from "@linky-fit/linkshu";
 
 const resumeTopups = Effect.scoped(
   Effect.gen(function* () {
@@ -84,7 +90,7 @@ A lightning-address server can create a mint quote for the wallet and pay its in
 
 ```ts
 import { Effect, Schema } from "effect";
-import { PaidQuoteDraft, QuoteLockingKey, Topup } from "@linky/linkshu";
+import { PaidQuoteDraft, QuoteLockingKey, Topup } from "@linky-fit/linkshu";
 
 const decodePaidQuote = Schema.decodeUnknown(PaidQuoteDraft);
 

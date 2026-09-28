@@ -1,6 +1,6 @@
 # Getting started
 
-`@linky/linkstr` is Linky's Nostr protocol as a typed library: hand in a draft, get a receipt back, and consume everything inbound as one tagged union. Raw Nostr events never cross the package boundary. This page takes you from two keys to a delivered message and its inbox echo, in one file you run.
+`@linky-fit/linkstr` is Linky's Nostr protocol as a typed library: hand in a draft, get a receipt back, and consume everything inbound as one tagged union. Raw Nostr events never cross the package boundary. This page takes you from two keys to a delivered message and its inbox echo, in one file you run.
 
 ## Core concepts
 
@@ -14,12 +14,12 @@
 
 ## Import paths
 
-| Path                           | What you get                                                                                               |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `@linky/linkstr`               | services, drafts, receipts, facts, key codecs, `runLinkstr`, `linkstrServices`                             |
-| `@linky/linkstr/testing`       | `makeIdentity`, publish stubs, `FakeRelay`, `stubStorage`; tests only ([testing.md](./testing.md))         |
-| `@linky/linkstr-react`         | effect-atom bindings for the web app ([react.md](./react.md))                                              |
-| `@linky/linkstr-react/testing` | `configWith`, `settle`, `fakeTransport`; tests only ([testing.md](./testing.md#linkylinkstr-reacttesting)) |
+| Path                               | What you get                                                                                                   |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `@linky-fit/linkstr`               | services, drafts, receipts, facts, key codecs, `runLinkstr`, `linkstrServices`                                 |
+| `@linky-fit/linkstr/testing`       | `makeIdentity`, publish stubs, `FakeRelay`, `stubStorage`; tests only ([testing.md](./testing.md))             |
+| `@linky-fit/linkstr-react`         | effect-atom bindings for the web app ([react.md](./react.md))                                                  |
+| `@linky-fit/linkstr-react/testing` | `configWith`, `settle`, `fakeTransport`; tests only ([testing.md](./testing.md#linky-fitlinkstr-reacttesting)) |
 
 Never import `nostr-tools` in consumer code; the codecs in [identity-and-keys.md](./identity-and-keys.md) cover keys and ids.
 
@@ -37,7 +37,7 @@ You need two keys: yours and the peer's. Mint throwaway ones from the package di
 
 ```bash
 cd packages/linkstr
-bun -e 'import { makeIdentity } from "@linky/linkstr/testing"; import { encodeNpub, encodeNsec } from "@linky/linkstr"; const id = makeIdentity(); console.log(encodeNsec(id.secretKey), encodeNpub(id.pubkey));'
+bun -e 'import { makeIdentity } from "@linky-fit/linkstr/testing"; import { encodeNpub, encodeNsec } from "@linky-fit/linkstr"; const id = makeIdentity(); console.log(encodeNsec(id.secretKey), encodeNpub(id.pubkey));'
 ```
 
 Run it twice. Keep the first `nsec` as `NSEC` and the second `npub` as `PEER`. Save this as `packages/linkstr/firstRun.ts` (workspace imports resolve there):
@@ -55,7 +55,7 @@ import {
   UnixSeconds,
   WrapInbox,
   type WrapInboxEvent,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 const input = (name: string): string => {
   const value = process.env[name];
@@ -167,7 +167,7 @@ The example opts into loopback WS for the local relay. Leave `allowInsecureLocal
 Both take `secretKey`, `readRelays`, and `writeRelays` (arrays of `RelayUrl`).
 
 - **`runLinkstr(config, effect)`**: one-shot, as above. Builds the services, runs the effect, tears down the pool. Use it in the service worker, scripts, and tests. `writeRelays` defaults to `[]` for read-only consumers; optional `outboxStore`, `inboxCursorStore`, and `transport` (test seam). Both stores default to memory, so a runner that opens the inbox and wants to resume from its last checkpoint passes an `InboxCursorStore` ([inbox.md](./inbox.md#the-cursor-and-inboxcursorstore)).
-- **`linkstrServices(config)`**: the same composition as a `Layer`, for a runtime that outlives one call. `writeRelays` and `transport` (normally `NostrTransportSimplePool`) are required; `outboxStore` and `inboxCursorStore` are optional and default to memory. In React do not use it by hand: `@linky/linkstr-react` builds this layer from `linkstrConfigAtom` and rebuilds it on identity change ([react.md](./react.md)).
+- **`linkstrServices(config)`**: the same composition as a `Layer`, for a runtime that outlives one call. `writeRelays` and `transport` (normally `NostrTransportSimplePool`) are required; `outboxStore` and `inboxCursorStore` are optional and default to memory. In React do not use it by hand: `@linky-fit/linkstr-react` builds this layer from `linkstrConfigAtom` and rebuilds it on identity change ([react.md](./react.md)).
 
 ## Next
 

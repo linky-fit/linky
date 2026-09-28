@@ -8,7 +8,7 @@ import {
   PositiveInt,
   type ConversationRow,
   type MessageRow,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import {
   contactIdByConversationId,

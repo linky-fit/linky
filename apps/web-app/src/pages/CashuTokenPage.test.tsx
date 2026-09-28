@@ -1,11 +1,11 @@
 import { buildCashuToken } from "../testUtils/cashuToken";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
-import { TokenTransfer } from "@linky/linkshu";
+import { TokenTransfer } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 import { act, type ComponentProps } from "react";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
-import { CashuOperationId, ContactId } from "@linky/linksync";
+import { CashuOperationId, ContactId } from "@linky-fit/linksync";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ANIMATED_QR_FRAME_MS } from "../utils/animatedQr";
 import { CashuTokenPage } from "./CashuTokenPage";

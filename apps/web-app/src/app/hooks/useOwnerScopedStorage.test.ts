@@ -1,4 +1,4 @@
-import { OwnerId } from "@linky/linksync";
+import { OwnerId } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React, { act } from "react";
 import type { Root } from "react-dom/client";

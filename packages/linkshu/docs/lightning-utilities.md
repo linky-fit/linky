@@ -12,7 +12,7 @@ import {
   fetchLnurlInvoiceForTarget,
   getLightningInvoicePreview,
   isLightningAddress,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 
 const invoiceFor = async (target: string, amountSat: number) => {
   if (!isLightningAddress(target)) throw new Error("not a lightning address");
@@ -81,8 +81,11 @@ All LNURL targets and pay/withdraw/auth callbacks require HTTPS, including bech3
 The withdrawing service pays an invoice you give it, so the invoice comes from a [topup](./topup.md): preview the offer, open a topup for an amount inside its range, hand the topup's invoice to the callback, and let the topup handle complete on its own.
 
 ```ts
-import { fetchLnurlWithdrawPreview, redeemLnurlWithdraw } from "@linky/linkshu";
-import type { TopupHandle } from "@linky/linkshu";
+import {
+  fetchLnurlWithdrawPreview,
+  redeemLnurlWithdraw,
+} from "@linky-fit/linkshu";
+import type { TopupHandle } from "@linky-fit/linkshu";
 
 /** `startTopup` runs `Topup.start` on your runtime (see topup.md). */
 const withdraw = async (
@@ -109,7 +112,7 @@ LUD-04 logs the user into a third-party site. The whole request is in the scanne
 The linking key is the user's, so this package never derives or holds it: `submitLnurlAuth` asks the caller's `sign` for a signature over the challenge and appends `sig`/`key` to the LNURL's own query.
 
 ```ts
-import { parseLnurlAuthTarget, submitLnurlAuth } from "@linky/linkshu";
+import { parseLnurlAuthTarget, submitLnurlAuth } from "@linky-fit/linkshu";
 
 const login = async (scanned: string) => {
   const preview = parseLnurlAuthTarget(scanned);
@@ -136,7 +139,7 @@ const login = async (scanned: string) => {
 
 `isLightningAddress`, `splitLightningAddress` → `{ user, domain } | null`, `stripLightningPrefix`, `getLightningAddressRequestUrl` (lowercases user and domain; LUD-16 servers reject mixed case). All four are on the main entry.
 
-The same file is also exported as **`@linky/linkshu/lightning-address`**. Use the subpath when the importing code must not pull cashu-ts or Effect into its bundle — the web app's `utils/lightningAddress.ts` and the site's serverless functions.
+The same file is also exported as **`@linky-fit/linkshu/lightning-address`**. Use the subpath when the importing code must not pull cashu-ts or Effect into its bundle — the web app's `utils/lightningAddress.ts` and the site's serverless functions.
 
 ## Fiat rates (`fiatRates.ts`)
 

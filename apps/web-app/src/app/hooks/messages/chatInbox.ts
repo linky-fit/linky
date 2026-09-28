@@ -4,7 +4,7 @@ import type {
   ChatMessageReceived,
   MessageBody,
   OwnChatMessageConfirmed,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { serializePrivateImageMessage } from "../../lib/privateImageMessage";
 import type {
   LocalNostrMessage,

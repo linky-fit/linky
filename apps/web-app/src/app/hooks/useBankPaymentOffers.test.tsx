@@ -13,9 +13,9 @@ import {
   type BankOfferDraft,
   type BankOfferInboxEvent,
   type BankOfferStatus,
-} from "@linky/linkstr";
-import { makeIdentity } from "@linky/linkstr/testing";
-import { decodeBankPaymentOffer } from "@linky/proxy-payment";
+} from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
+import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import { Exit } from "effect";
 import { nip19 } from "nostr-tools";
 import { act, useEffect } from "react";
@@ -37,7 +37,7 @@ type SendBankOffer = (
 const { sendBankOfferMock } = vi.hoisted(() => ({
   sendBankOfferMock: vi.fn<SendBankOffer>(),
 }));
-vi.mock("@linky/linkstr-react", () => ({
+vi.mock("@linky-fit/linkstr-react", () => ({
   sendBankOfferAtom: "sendBankOfferAtom",
   useAtomSet: () => sendBankOfferMock,
 }));

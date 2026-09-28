@@ -1,5 +1,5 @@
-import { encodeNprofile, encodeNpub } from "@linky/linkstr";
-import { makeIdentity } from "@linky/linkstr/testing";
+import { encodeNprofile, encodeNpub } from "@linky-fit/linkstr";
+import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { encode } from "cbor-x";
 import { bech32 } from "@scure/base";
 import { Effect } from "effect";

@@ -28,7 +28,7 @@ import {
   type Pubkey,
   type RelayUrl,
   type StringStorage,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 
 /** App callback placeholder: write the outcome to the row named by `result.ref`. */
 declare const persistResult: (result: OutboxResult) => Promise<void>;

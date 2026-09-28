@@ -1,7 +1,7 @@
 import { Registry } from "./index";
-import { RelayListEntry, RelayListsDraft, RelayUrl } from "@linky/linkstr";
-import type { SignedPlainEvent } from "@linky/linkstr";
-import { stubPlainTransport } from "@linky/linkstr/testing";
+import { RelayListEntry, RelayListsDraft, RelayUrl } from "@linky-fit/linkstr";
+import type { SignedPlainEvent } from "@linky-fit/linkstr";
+import { stubPlainTransport } from "@linky-fit/linkstr/testing";
 import { Effect, Exit } from "effect";
 import { finalizeEvent } from "nostr-tools";
 import { linkstrConfigAtom } from "./config";

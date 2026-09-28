@@ -1,19 +1,19 @@
 import { createContactNameFormatter } from "../../../utils/contactName";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { Schema } from "effect";
-import { decodeNpub, identityFromNsec, UnixSeconds } from "@linky/linkstr";
+import { decodeNpub, identityFromNsec, UnixSeconds } from "@linky-fit/linkstr";
 import type {
   BankOfferInboxEvent,
   InboxDelivery,
   WrapInboxEvent,
-} from "@linky/linkstr";
-import type { AppliedBankPaymentOfferSnapshot } from "@linky/proxy-payment";
+} from "@linky-fit/linkstr";
+import type { AppliedBankPaymentOfferSnapshot } from "@linky-fit/proxy-payment";
 import {
   useAtomMount,
   useAtomSet,
   wrapInboxAtom,
   wrapInboxHandlerAtom,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import React from "react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY } from "../../../utils/constants";

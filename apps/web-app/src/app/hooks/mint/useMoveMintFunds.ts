@@ -1,4 +1,4 @@
-import type { AutoswapEstimate } from "@linky/linkshu";
+import type { AutoswapEstimate } from "@linky-fit/linkshu";
 import { Either } from "effect";
 import React from "react";
 import type { Translate } from "../../../i18n";

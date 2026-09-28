@@ -1,7 +1,7 @@
 // Legacy migration; removal gate in docs/architecture.md
 //
 // Carries a device's legacy cashu localStorage state to the key formats
-// @linky/linkshu reads through the localStorage KeyValueStore adapter (#307).
+// @linky-fit/linkshu reads through the localStorage KeyValueStore adapter (#307).
 // Both sides store the same "next unused derivation slot" accounting, so
 // counters and restore cursors copy verbatim — a key rename, never a
 // recomputation. Where a linkshu key already exists the existing value wins:
@@ -20,7 +20,7 @@
 // Removal requires the supported-upgrade evidence in docs/architecture.md.
 // Keep the seed-bound wipe itself after removing its migration prologue.
 
-import { parseMintUrl } from "@linky/linkshu";
+import { parseMintUrl } from "@linky-fit/linkshu";
 import { readField } from "../../utils/unknown";
 import { asNonEmptyString } from "../../utils/validation";
 

@@ -1,4 +1,4 @@
-import { NostrSecretKey } from "@linky/linkstr";
+import { NostrSecretKey } from "@linky-fit/linkstr";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { hexToBytes } from "@noble/hashes/utils.js";
 import { describe, expect, it } from "vitest";

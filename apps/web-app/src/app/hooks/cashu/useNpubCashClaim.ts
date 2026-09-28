@@ -2,7 +2,7 @@ import { useLatest } from "../../../hooks/useLatest";
 import { Schema } from "effect";
 import { Either } from "effect";
 import React from "react";
-import { parseTokenText } from "@linky/linkshu";
+import { parseTokenText } from "@linky-fit/linkshu";
 import { JsonValue } from "../../../types/json";
 import {
   LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX,

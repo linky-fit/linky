@@ -8,7 +8,7 @@ Prerequisites: a configured runtime ([getting-started.md](./getting-started.md))
 
 ```ts
 import { Effect } from "effect";
-import { Validation } from "@linky/linkshu";
+import { Validation } from "@linky-fit/linkshu";
 
 const checkWallet = Effect.gen(function* () {
   const validation = yield* Validation;

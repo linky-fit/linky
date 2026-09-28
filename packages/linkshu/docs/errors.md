@@ -56,7 +56,7 @@ Invalid input is not a package error. `new SendDraft({ … })` and `Schema.decod
 Handle one tag and keep the rest typed:
 
 ```ts
-import { Receive, ReceiveDraft } from "@linky/linkshu";
+import { Receive, ReceiveDraft } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 
 const receiveOrReuse = (text: string) =>
@@ -75,7 +75,7 @@ const receiveOrReuse = (text: string) =>
 Handle several tags at once — the classification rule in one place:
 
 ```ts
-import type { ReceiveError } from "@linky/linkshu";
+import type { ReceiveError } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 
 const withRetryHint = <A, R>(operation: Effect.Effect<A, ReceiveError, R>) =>
@@ -90,7 +90,7 @@ const withRetryHint = <A, R>(operation: Effect.Effect<A, ReceiveError, R>) =>
 Get the outcome as a value at the Promise boundary (what both real consumers do). One complete operation, run one-shot:
 
 ```ts
-import { Bip39Seed, runLinkshu, Send, SendDraft } from "@linky/linkshu";
+import { Bip39Seed, runLinkshu, Send, SendDraft } from "@linky-fit/linkshu";
 import { Effect, Either, Schema } from "effect";
 
 const decodeSendDraft = Schema.decodeUnknownSync(SendDraft);
@@ -128,7 +128,7 @@ The web app turns tags into display text in `apps/web-app/src/app/lib/cashuStore
 Because every error is a `Schema.TaggedError`, it round-trips through JSON via `Schema.parseJson`. This is how operations carry their last failure in the `error` column:
 
 ```ts
-import { MintUrl, ReceiveError, TokenAlreadySpent } from "@linky/linkshu";
+import { MintUrl, ReceiveError, TokenAlreadySpent } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 
 const encodeReceiveError = Schema.encodeSync(Schema.parseJson(ReceiveError));

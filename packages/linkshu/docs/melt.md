@@ -8,8 +8,8 @@ Prerequisites: a configured runtime ([getting-started.md](./getting-started.md))
 
 ```ts
 import { Effect } from "effect";
-import { Melt, MeltDraft } from "@linky/linkshu";
-import type { Bolt11Invoice, MeltQuote, MintUrl } from "@linky/linkshu";
+import { Melt, MeltDraft } from "@linky-fit/linkshu";
+import type { Bolt11Invoice, MeltQuote, MintUrl } from "@linky-fit/linkshu";
 
 // Step 1: price it. Touches no proof; show `amount + feeReserve` to the user.
 const priceInvoice = (mint: MintUrl, invoice: Bolt11Invoice) =>
@@ -65,7 +65,7 @@ Only the mint's own answer retires a melt. Quote expiry is not an unlock deadlin
 
 ```ts
 import { Effect } from "effect";
-import { Melt } from "@linky/linkshu";
+import { Melt } from "@linky-fit/linkshu";
 
 const settleInterruptedMelts = Effect.gen(function* () {
   const melt = yield* Melt;

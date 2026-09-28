@@ -1,5 +1,5 @@
-import { parseMintUrl } from "@linky/linkshu";
-import { sqliteTrue } from "@linky/linksync";
+import { parseMintUrl } from "@linky-fit/linkshu";
+import { sqliteTrue } from "@linky-fit/linksync";
 import { Gauge, Wallet } from "lucide-react";
 import type React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";

@@ -1,4 +1,4 @@
-# @linky/linkshu guides
+# @linky-fit/linkshu guides
 
 How to use Linky's cashu wallet library. These are guides, not an API reference: the exported types are the reference, and the [package README](../README.md) holds the design rules and rationale.
 

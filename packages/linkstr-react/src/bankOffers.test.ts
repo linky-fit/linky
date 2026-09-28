@@ -1,8 +1,8 @@
 // Registry comes through the package index to cover the atom-react re-export.
 import { Registry } from "./index";
-import { BankOfferDraft, BankOfferId, ClientId } from "@linky/linkstr";
-import { recipientOf, stubWrapTransport } from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
+import { BankOfferDraft, BankOfferId, ClientId } from "@linky-fit/linkstr";
+import { recipientOf, stubWrapTransport } from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
 import { sendBankOfferAtom } from "./bankOffers";
 import { linkstrConfigAtom } from "./config";

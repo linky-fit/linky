@@ -4,7 +4,7 @@ import {
   NonEmptyString1000,
   PositiveInt,
   type IdentityRepository,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import React from "react";
 import {
   cycleGeneratedAvatar,
@@ -19,13 +19,13 @@ import {
   encodeNpub,
   ProfileMetadata,
   StatusDraft,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import {
   linkstrConfigAtom,
   publishProfileAtom,
   publishStatusAtom,
   useAtomSet,
-} from "@linky/linkstr-react";
+} from "@linky-fit/linkstr-react";
 import { Cause, Exit, Option } from "effect";
 import type { Lang } from "../../i18n";
 import {
@@ -55,7 +55,7 @@ import {
   deriveEvoluOwnerMnemonicFromSlip39,
   deriveNostrKeysFromSlip39,
 } from "../../utils/slip39Nostr";
-import { looksLikeSlip39Share } from "@linky/identity";
+import { looksLikeSlip39Share } from "@linky-fit/identity";
 import type { IdentityChangeMessageSource } from "../lib/identityChangeMessage";
 import { buildLinkstrConfig } from "./useLinkstrConfigSync";
 import { clearLegacyLaneStorage } from "../migrations/laneToShardMigration";

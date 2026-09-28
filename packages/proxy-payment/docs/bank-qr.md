@@ -3,7 +3,10 @@
 `parseBankPayment(text)` recognizes the three bank QR formats Linky supports and returns one shape:
 
 ```ts
-import { parseBankPayment, tryParseBankPayment } from "@linky/proxy-payment";
+import {
+  parseBankPayment,
+  tryParseBankPayment,
+} from "@linky-fit/proxy-payment";
 
 const payment = parseBankPayment(
   "SPD*1.0*ACC:CZ6508000000192000145399+GIBACZPX*AM:250*CC:CZK",

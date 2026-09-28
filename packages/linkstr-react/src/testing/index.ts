@@ -1,8 +1,12 @@
-import { NostrTransport, RelayPublishResult, RelayUrl } from "@linky/linkstr";
+import {
+  NostrTransport,
+  RelayPublishResult,
+  RelayUrl,
+} from "@linky-fit/linkstr";
 import type {
   LinkstrIdentityService,
   NostrTransportService,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Effect, Layer } from "effect";
 import type { Exit } from "effect";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
@@ -10,7 +14,7 @@ import type { LinkstrConfig } from "../config";
 import { Registry } from "../index";
 import type { Atom, Result } from "../index";
 
-export { makeIdentity } from "@linky/linkstr/testing";
+export { makeIdentity } from "@linky-fit/linkstr/testing";
 
 export const relayA = RelayUrl.make("wss://relay-a.test");
 export const relayB = RelayUrl.make("wss://relay-b.test");

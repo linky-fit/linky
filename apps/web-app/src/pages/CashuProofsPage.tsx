@@ -2,7 +2,7 @@ import type {
   ProofState,
   ProofStateSnapshot,
   StoredProof,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";

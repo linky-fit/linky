@@ -107,7 +107,7 @@ You need exactly this much Effect to use the package.
 
 ```ts
 import { Effect, Stream } from "effect";
-import { Reactions, WrapInbox } from "@linky/linkstr";
+import { Reactions, WrapInbox } from "@linky-fit/linkstr";
 
 // An Effect<A, E, R> is a description of a computation: success A,
 // typed failure E, required services R. Nothing runs until you run it.
@@ -133,7 +133,7 @@ Every failure is a class with a `_tag` and serializable fields. Match on `_tag`,
 
 ```ts
 import { Effect, Either } from "effect";
-import { Reactions, type ReactionDraft } from "@linky/linkstr";
+import { Reactions, type ReactionDraft } from "@linky-fit/linkstr";
 
 const describeFailure = (draft: ReactionDraft) =>
   Effect.flatMap(Reactions, (reactions) => reactions.react(draft)).pipe(

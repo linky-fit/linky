@@ -8,8 +8,8 @@ Prerequisites: a seed and, for anything but a throwaway wallet, durable stores â
 
 ```ts
 import { Effect } from "effect";
-import { Receive, ReceiveDraft, runLinkshu } from "@linky/linkshu";
-import type { Bip39Seed, ReceiveReceipt } from "@linky/linkshu";
+import { Receive, ReceiveDraft, runLinkshu } from "@linky-fit/linkshu";
+import type { Bip39Seed, ReceiveReceipt } from "@linky-fit/linkshu";
 
 const receiveText = (
   bip39Seed: Bip39Seed,

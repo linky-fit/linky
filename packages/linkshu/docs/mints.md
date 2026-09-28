@@ -10,8 +10,8 @@ Two fields need their units first. `inputFeePpk` is the mint's cashu input fee i
 
 ```ts
 import { Effect } from "effect";
-import { Mints, parseMintUrl } from "@linky/linkshu";
-import type { MintUrl } from "@linky/linkshu";
+import { Mints, parseMintUrl } from "@linky-fit/linkshu";
+import type { MintUrl } from "@linky-fit/linkshu";
 
 const describeMint = (raw: string) =>
   Effect.gen(function* () {

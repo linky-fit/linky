@@ -1,6 +1,6 @@
-import { OwnerId } from "@linky/linksync";
-import { OutboxJobId } from "@linky/linkstr";
-import type { EnqueuePaymentTelemetryParams } from "@linky/linkstr-react";
+import { OwnerId } from "@linky-fit/linksync";
+import { OutboxJobId } from "@linky-fit/linkstr";
+import type { EnqueuePaymentTelemetryParams } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,7 @@ const { enqueuePaymentTelemetryMock } = vi.hoisted(() => ({
   enqueuePaymentTelemetryMock: vi.fn<EnqueuePaymentTelemetry>(),
 }));
 
-vi.mock("@linky/linkstr-react", () => ({
+vi.mock("@linky-fit/linkstr-react", () => ({
   enqueuePaymentTelemetryAtom: "enqueuePaymentTelemetryAtom",
   useAtomSet: () => enqueuePaymentTelemetryMock,
 }));

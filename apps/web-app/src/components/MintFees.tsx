@@ -1,4 +1,4 @@
-import type { LightningFeeProbeResult } from "@linky/linkshu";
+import type { LightningFeeProbeResult } from "@linky-fit/linkshu";
 import { Either } from "effect";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";

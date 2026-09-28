@@ -1,4 +1,4 @@
-import type { AutoswapEstimate } from "@linky/linkshu";
+import type { AutoswapEstimate } from "@linky-fit/linkshu";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import type { MintMove } from "../app/hooks/mint/useMoveMintFunds";

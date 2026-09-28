@@ -1,5 +1,5 @@
-import { RelayLists } from "@linky/linkstr";
-import type { RelayListsDraft } from "@linky/linkstr";
+import { RelayLists } from "@linky-fit/linkstr";
+import type { RelayListsDraft } from "@linky-fit/linkstr";
 import { Effect } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 

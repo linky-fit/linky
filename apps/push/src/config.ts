@@ -1,4 +1,4 @@
-import { DEFAULT_NOSTR_RELAYS } from "@linky/linkstr";
+import { DEFAULT_NOSTR_RELAYS } from "@linky-fit/linkstr";
 import { resolve } from "node:path";
 import { normalizeIp } from "./requestSecurity";
 

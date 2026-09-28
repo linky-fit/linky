@@ -1,4 +1,4 @@
-import type { TokenTransfer } from "@linky/linkshu";
+import type { TokenTransfer } from "@linky-fit/linkshu";
 
 /** A transfer the user is still waiting on: something can still happen to it. */
 export const isOpenTransfer = (transfer: TokenTransfer): boolean =>

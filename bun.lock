@@ -6,17 +6,17 @@
       "name": "linky",
     },
     "apps/linkshu-cli": {
-      "name": "@linky/linkshu-cli",
+      "name": "@linky-fit/linkshu-cli",
       "version": "0.1.0",
       "bin": {
         "linkshu": "./src/index.ts",
       },
       "dependencies": {
-        "@linky/linkshu": "workspace:*",
+        "@linky-fit/linkshu": "workspace:*",
         "effect": "^3.19.19",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@types/bun": "^1.3.2",
         "@types/node": "^24.10.1",
         "eslint": "^9.39.1",
@@ -25,7 +25,7 @@
       },
     },
     "apps/native-shell": {
-      "name": "@linky/native-shell",
+      "name": "@linky-fit/native-shell",
       "version": "0.1.0",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
@@ -38,7 +38,7 @@
         "@capacitor/android": "^7.4.3",
         "@capacitor/cli": "^7.4.3",
         "@capacitor/ios": "^7.4.3",
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
         "eslint": "^9.39.1",
         "prettier": "^3.4.2",
@@ -46,16 +46,16 @@
       },
     },
     "apps/push": {
-      "name": "@linky/push",
+      "name": "@linky-fit/push",
       "version": "0.1.0",
       "dependencies": {
-        "@linky/linkstr": "workspace:*",
+        "@linky-fit/linkstr": "workspace:*",
         "firebase-admin": "^13.7.0",
         "undici": "^7.22.0",
         "web-push": "^3.6.7",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@types/bun": "^1.3.2",
         "@types/node": "^24.10.1",
         "@types/web-push": "^3.6.4",
@@ -65,11 +65,11 @@
       },
     },
     "apps/site": {
-      "name": "@linky/site",
+      "name": "@linky-fit/site",
       "version": "0.1.0",
       "dependencies": {
-        "@linky/linkshu": "workspace:*",
-        "@linky/linkstr": "workspace:*",
+        "@linky-fit/linkshu": "workspace:*",
+        "@linky-fit/linkstr": "workspace:*",
         "@noble/hashes": "^2.0.1",
         "effect": "^3.19.19",
         "qrcode": "^1.5.4",
@@ -79,7 +79,7 @@
       },
       "devDependencies": {
         "@cashu/cashu-ts": "^4.0.0",
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@playwright/test": "^1.58.1",
         "@types/node": "^24.10.1",
         "@types/react": "^19.0.0",
@@ -93,7 +93,7 @@
       },
     },
     "apps/web-app": {
-      "name": "@linky/web-app",
+      "name": "@linky-fit/web-app",
       "version": "26.9.21",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
@@ -105,12 +105,12 @@
         "@evolu/react": "^10.4.0",
         "@evolu/react-web": "^2.4.0",
         "@gandlaf21/bc-ur": "1.1.12",
-        "@linky/identity": "workspace:*",
-        "@linky/linkshu": "workspace:*",
-        "@linky/linkstr": "workspace:*",
-        "@linky/linkstr-react": "workspace:*",
-        "@linky/linksync": "workspace:*",
-        "@linky/proxy-payment": "workspace:*",
+        "@linky-fit/identity": "workspace:*",
+        "@linky-fit/linkshu": "workspace:*",
+        "@linky-fit/linkstr": "workspace:*",
+        "@linky-fit/linkstr-react": "workspace:*",
+        "@linky-fit/linksync": "workspace:*",
+        "@linky-fit/proxy-payment": "workspace:*",
         "@noble/hashes": "^1.5.0",
         "@scure/base": "^2.0.0",
         "@scure/bip32": "^2.0.1",
@@ -135,7 +135,7 @@
       },
       "devDependencies": {
         "@evolu/sqlite-wasm": "2.2.4",
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@playwright/test": "^1.58.1",
         "@types/node": "^24.10.1",
         "@types/react": "^19.0.0",
@@ -153,7 +153,7 @@
       },
     },
     "packages/config": {
-      "name": "@linky/config",
+      "name": "@linky-fit/config",
       "version": "1.0.0",
       "devDependencies": {
         "@eslint/js": "^9.39.1",
@@ -168,10 +168,10 @@
       },
     },
     "packages/identity": {
-      "name": "@linky/identity",
+      "name": "@linky-fit/identity",
       "version": "0.1.0",
       "dependencies": {
-        "@linky/linkstr": "workspace:*",
+        "@linky-fit/linkstr": "workspace:*",
         "@noble/curves": "^1.9.7",
         "@noble/hashes": "^2.0.1",
         "@scure/bip32": "^2.0.1",
@@ -180,7 +180,7 @@
         "slip39-ts": "^0.1.13",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
         "eslint": "^9.39.1",
         "prettier": "^3.4.2",
@@ -189,7 +189,7 @@
       },
     },
     "packages/linkshu": {
-      "name": "@linky/linkshu",
+      "name": "@linky-fit/linkshu",
       "version": "0.1.0",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
@@ -199,7 +199,7 @@
         "light-bolt11-decoder": "^3.2.0",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
         "@types/ws": "^8.18.1",
         "eslint": "^9.39.1",
@@ -210,7 +210,7 @@
       },
     },
     "packages/linkstr": {
-      "name": "@linky/linkstr",
+      "name": "@linky-fit/linkstr",
       "version": "0.1.0",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
@@ -220,7 +220,7 @@
         "nostr-tools": "^2.23.3",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
         "eslint": "^9.39.1",
         "prettier": "^3.4.2",
@@ -229,15 +229,15 @@
       },
     },
     "packages/linkstr-react": {
-      "name": "@linky/linkstr-react",
+      "name": "@linky-fit/linkstr-react",
       "version": "0.1.0",
       "dependencies": {
         "@effect-atom/atom-react": "^0.5.0",
-        "@linky/linkstr": "workspace:*",
+        "@linky-fit/linkstr": "workspace:*",
         "effect": "^3.19.19",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
         "@types/react": "^19.0.0",
         "eslint": "^9.39.1",
@@ -252,15 +252,15 @@
       },
     },
     "packages/linksync": {
-      "name": "@linky/linksync",
+      "name": "@linky-fit/linksync",
       "version": "0.1.0",
       "dependencies": {
         "@evolu/common": "^7.4.1",
-        "@linky/linkshu": "workspace:*",
+        "@linky-fit/linkshu": "workspace:*",
         "effect": "^3.19.19",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
@@ -277,15 +277,15 @@
       },
     },
     "packages/proxy-payment": {
-      "name": "@linky/proxy-payment",
+      "name": "@linky-fit/proxy-payment",
       "version": "0.1.0",
       "dependencies": {
-        "@linky/linkstr": "workspace:*",
+        "@linky-fit/linkstr": "workspace:*",
         "bysquare": "^4.0.0",
         "effect": "^3.19.19",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@scure/base": "^2.0.0",
         "@types/node": "^24.10.1",
         "eslint": "^9.39.1",
@@ -295,12 +295,12 @@
       },
     },
     "tools/nostr-error-tracker": {
-      "name": "@linky/nostr-error-tracker",
+      "name": "@linky-fit/nostr-error-tracker",
       "version": "0.1.0",
       "dependencies": {
         "@evolu/common": "^7.4.1",
         "@evolu/react-web": "^2.4.0",
-        "@linky/identity": "workspace:*",
+        "@linky-fit/identity": "workspace:*",
         "@noble/hashes": "^2.0.1",
         "effect": "^3.19.19",
         "nostr-tools": "^2.23.3",
@@ -308,7 +308,7 @@
         "react-dom": "^19.2.3",
       },
       "devDependencies": {
-        "@linky/config": "workspace:*",
+        "@linky-fit/config": "workspace:*",
         "@playwright/test": "^1.58.2",
         "@types/bun": "^1.3.2",
         "@types/node": "^24.10.1",
@@ -738,31 +738,31 @@
 
     "@js-sdsl/ordered-map": ["@js-sdsl/ordered-map@4.4.2", "", {}, "sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw=="],
 
-    "@linky/config": ["@linky/config@workspace:packages/config"],
+    "@linky-fit/config": ["@linky-fit/config@workspace:packages/config"],
 
-    "@linky/identity": ["@linky/identity@workspace:packages/identity"],
+    "@linky-fit/identity": ["@linky-fit/identity@workspace:packages/identity"],
 
-    "@linky/linkshu": ["@linky/linkshu@workspace:packages/linkshu"],
+    "@linky-fit/linkshu": ["@linky-fit/linkshu@workspace:packages/linkshu"],
 
-    "@linky/linkshu-cli": ["@linky/linkshu-cli@workspace:apps/linkshu-cli"],
+    "@linky-fit/linkshu-cli": ["@linky-fit/linkshu-cli@workspace:apps/linkshu-cli"],
 
-    "@linky/linkstr": ["@linky/linkstr@workspace:packages/linkstr"],
+    "@linky-fit/linkstr": ["@linky-fit/linkstr@workspace:packages/linkstr"],
 
-    "@linky/linkstr-react": ["@linky/linkstr-react@workspace:packages/linkstr-react"],
+    "@linky-fit/linkstr-react": ["@linky-fit/linkstr-react@workspace:packages/linkstr-react"],
 
-    "@linky/linksync": ["@linky/linksync@workspace:packages/linksync"],
+    "@linky-fit/linksync": ["@linky-fit/linksync@workspace:packages/linksync"],
 
-    "@linky/native-shell": ["@linky/native-shell@workspace:apps/native-shell"],
+    "@linky-fit/native-shell": ["@linky-fit/native-shell@workspace:apps/native-shell"],
 
-    "@linky/nostr-error-tracker": ["@linky/nostr-error-tracker@workspace:tools/nostr-error-tracker"],
+    "@linky-fit/nostr-error-tracker": ["@linky-fit/nostr-error-tracker@workspace:tools/nostr-error-tracker"],
 
-    "@linky/proxy-payment": ["@linky/proxy-payment@workspace:packages/proxy-payment"],
+    "@linky-fit/proxy-payment": ["@linky-fit/proxy-payment@workspace:packages/proxy-payment"],
 
-    "@linky/push": ["@linky/push@workspace:apps/push"],
+    "@linky-fit/push": ["@linky-fit/push@workspace:apps/push"],
 
-    "@linky/site": ["@linky/site@workspace:apps/site"],
+    "@linky-fit/site": ["@linky-fit/site@workspace:apps/site"],
 
-    "@linky/web-app": ["@linky/web-app@workspace:apps/web-app"],
+    "@linky-fit/web-app": ["@linky-fit/web-app@workspace:apps/web-app"],
 
     "@msgpackr-extract/msgpackr-extract-darwin-arm64": ["@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3", "", { "os": "darwin", "cpu": "arm64" }, "sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw=="],
 
@@ -2044,9 +2044,9 @@
 
     "@ionic/utils-fs/fs-extra": ["fs-extra@9.1.0", "", { "dependencies": { "at-least-node": "^1.0.0", "graceful-fs": "^4.2.0", "jsonfile": "^6.0.1", "universalify": "^2.0.0" } }, "sha512-hcg3ZmepS30/7BSFqRvoo3DOMQu7IjqxO5nCDt+zM9XWjb33Wg7ziNT+Qvqbuc3+gWpzO02JubVyk2G4Zvo1OQ=="],
 
-    "@linky/web-app/@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
+    "@linky-fit/web-app/@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
 
-    "@linky/web-app/@scure/bip39": ["@scure/bip39@1.6.0", "", { "dependencies": { "@noble/hashes": "~1.8.0", "@scure/base": "~1.2.5" } }, "sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A=="],
+    "@linky-fit/web-app/@scure/bip39": ["@scure/bip39@1.6.0", "", { "dependencies": { "@noble/hashes": "~1.8.0", "@scure/base": "~1.2.5" } }, "sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A=="],
 
     "@noble/curves/@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
 
@@ -2164,7 +2164,7 @@
 
     "@grpc/proto-loader/yargs/yargs-parser": ["yargs-parser@21.1.1", "", {}, "sha512-tVpsJW7DdjecAiFpbIB1e3qxIQsE6NoPc5/eTdrbbIC4h0LVsWhnoa3g+m2HclBIujHzsxZ4VJVA+GUuc2/LBw=="],
 
-    "@linky/web-app/@scure/bip39/@scure/base": ["@scure/base@1.2.6", "", {}, "sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg=="],
+    "@linky-fit/web-app/@scure/bip39/@scure/base": ["@scure/base@1.2.6", "", {}, "sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg=="],
 
     "@rollup/plugin-node-resolve/@rollup/pluginutils/estree-walker": ["estree-walker@2.0.2", "", {}, "sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w=="],
 

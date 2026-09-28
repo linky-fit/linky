@@ -1,4 +1,4 @@
-import type { ProfileMetadata } from "@linky/linkstr";
+import type { ProfileMetadata } from "@linky-fit/linkstr";
 import React from "react";
 import { useToasts } from "../hooks/useToasts";
 import type { IdentityChangeMessageSource } from "./lib/identityChangeMessage";

@@ -1,4 +1,4 @@
-import { StoredOperation, StoredProof } from "@linky/linkshu";
+import { StoredOperation, StoredProof } from "@linky-fit/linkshu";
 import { Schema } from "effect";
 
 interface StoredProofInput {

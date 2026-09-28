@@ -2,7 +2,7 @@ import { asNonEmptyString } from "./utils/validation";
 /**
  * Linky's kind-30315 status conventions: the last status line may carry a
  * comma-separated exchange-currency list; everything transport-level lives in
- * `@linky/linkstr`.
+ * `@linky-fit/linkstr`.
  */
 
 // The currencies a user can offer to pay for friends (proxy payments).

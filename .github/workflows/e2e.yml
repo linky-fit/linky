@@ -64,7 +64,7 @@ jobs:
       # background image prep while still failing the `e2e` check that gates
       # deploys.
       - name: Typecheck web app
-        run: bun run --filter @linky/web-app typecheck
+        run: bun run --filter @linky-fit/web-app typecheck
 
       - name: Resolve Playwright version
         id: playwright-version
@@ -98,7 +98,7 @@ jobs:
         run: bunx playwright test --project=local-stack
 
       - name: Run site redemption and recovery tests
-        run: bun run --filter @linky/site test:e2e
+        run: bun run --filter @linky-fit/site test:e2e
 
       - name: Dump service logs
         if: failure()

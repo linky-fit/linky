@@ -76,8 +76,8 @@ Read the clock through Effect's `Clock`, not `Date.now()`, so tests can drive ti
 Wiring a layer from your service object (skeleton, not compilable as-is: `makeMyKeyValueStore` must return all six methods):
 
 ```ts
-import { KeyValueStore } from "@linky/linkshu";
-import type { KeyValueStoreService } from "@linky/linkshu";
+import { KeyValueStore } from "@linky-fit/linkshu";
+import type { KeyValueStoreService } from "@linky-fit/linkshu";
 import { Layer } from "effect";
 
 declare const makeMyKeyValueStore: () => KeyValueStoreService;
@@ -201,7 +201,7 @@ insert: (operation) =>
 ## `CashuSeed`
 
 ```ts
-import { Bip39Seed, CashuSeed } from "@linky/linkshu";
+import { Bip39Seed, CashuSeed } from "@linky-fit/linkshu";
 
 const seedLayer = (seedBytes: Uint8Array) =>
   CashuSeed.fromBytes(Bip39Seed.make(seedBytes));
@@ -221,7 +221,7 @@ import {
   makeInMemoryProofStore,
   OperationStore,
   ProofStore,
-} from "@linky/linkshu";
+} from "@linky-fit/linkshu";
 import { Layer } from "effect";
 
 const kv = makeInMemoryKeyValueStore();

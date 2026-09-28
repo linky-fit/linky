@@ -1,4 +1,4 @@
-import { ShardDbError } from "@linky/linksync";
+import { ShardDbError } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import { runWrite } from "./storeWrite";

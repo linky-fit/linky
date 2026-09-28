@@ -5,10 +5,10 @@ import {
   PaymentTelemetryDraft,
   PaymentTelemetryReceipt,
   UnixSeconds,
-} from "@linky/linkstr";
-import type { OutboxResult } from "@linky/linkstr";
-import { stubWrapTransport } from "@linky/linkstr/testing";
-import type { SignedWrapEvent } from "@linky/linkstr/testing";
+} from "@linky-fit/linkstr";
+import type { OutboxResult } from "@linky-fit/linkstr";
+import { stubWrapTransport } from "@linky-fit/linkstr/testing";
+import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
 import { linkstrConfigAtom } from "./config";
 import { outboxResultsAtom, outboxResultsHandlerAtom } from "./outbox";

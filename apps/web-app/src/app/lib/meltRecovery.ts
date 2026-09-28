@@ -1,11 +1,11 @@
-import { PaymentFailed, type MeltResumeResult } from "@linky/linkshu";
+import { PaymentFailed, type MeltResumeResult } from "@linky-fit/linkshu";
 import {
   NonEmptyString100,
   NonEmptyString1000,
   PositiveInt,
   type LinkyDbSchema,
   type Patch,
-} from "@linky/linksync";
+} from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";

@@ -1,4 +1,4 @@
-import { createIdFromString } from "@linky/linksync";
+import { createIdFromString } from "@linky-fit/linksync";
 import {
   ClientId,
   EnqueueReceipt,
@@ -13,7 +13,7 @@ import {
   UnixSeconds,
   WrapDelivery,
   WrapId,
-} from "@linky/linkstr";
+} from "@linky-fit/linkstr";
 import { Exit } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
