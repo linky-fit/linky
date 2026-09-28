@@ -15,7 +15,8 @@
     "prettier": "prettier --write .",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "build:npm": "tsdown"
   },
   "dependencies": {
     "@cashu/cashu-ts": "^4.0.0",
@@ -30,8 +31,22 @@
     "@types/ws": "^8.18.1",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",
+    "tsdown": "0.23.0",
     "typescript": "~5.9.3",
     "vitest": "^4.0.18",
     "ws": "^8.21.3"
+  },
+  "description": "Typed Cashu wallet services with pluggable storage, built on Effect.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linky-fit/linky.git",
+    "directory": "packages/linkshu"
+  },
+  "homepage": "https://github.com/linky-fit/linky/tree/main/packages/linkshu",
+  "bugs": {
+    "url": "https://github.com/linky-fit/linky/issues"
+  },
+  "engines": {
+    "node": ">=22.14.0"
   }
 }

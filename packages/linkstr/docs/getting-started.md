@@ -12,6 +12,14 @@
 
 [concepts.md](./concepts.md) defines the vocabulary (rumor, gift wrap, own echo, EOSE) and goes deeper on each point.
 
+## Install
+
+```bash
+bun add @linky-fit/linkstr effect
+```
+
+The package ships ESM and TypeScript declarations for Node 22.14+ and modern browser bundlers. Inside the Linky monorepo, keep using `"@linky-fit/linkstr": "workspace:*"`. The `linkstr-react` entries below are private workspace packages and are not included in the npm release.
+
 ## Import paths
 
 | Path                               | What you get                                                                                                   |
@@ -33,14 +41,13 @@ The two decoders return `null` on bad input instead of throwing. Check for it be
 
 ## First run
 
-You need two keys: yours and the peer's. Mint throwaway ones from the package directory. The testing helper is fine in a script you delete afterwards; never import it from app code.
+You need two keys: yours and the peer's. Generate throwaway keys in the project where you installed the package.
 
 ```bash
-cd packages/linkstr
-bun -e 'import { makeIdentity } from "@linky-fit/linkstr/testing"; import { encodeNpub, encodeNsec } from "@linky-fit/linkstr"; const id = makeIdentity(); console.log(encodeNsec(id.secretKey), encodeNpub(id.pubkey));'
+bun -e 'import { NostrSecretKey, derivePubkey, encodeNpub, encodeNsec } from "@linky-fit/linkstr"; const secretKey = NostrSecretKey.make(crypto.getRandomValues(new Uint8Array(32))); console.log(encodeNsec(secretKey), encodeNpub(derivePubkey(secretKey)));'
 ```
 
-Run it twice. Keep the first `nsec` as `NSEC` and the second `npub` as `PEER`. Save this as `packages/linkstr/firstRun.ts` (workspace imports resolve there):
+Run it twice. Keep the first `nsec` as `NSEC` and the second `npub` as `PEER`. Save this as `firstRun.ts` in the project where you installed the package:
 
 ```ts
 import { Effect, Option, Schema, Stream } from "effect";

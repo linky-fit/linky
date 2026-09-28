@@ -6,6 +6,16 @@ action it expects are defined here as Effect `Schema` types. Raw nostr events
 never cross the package boundary: callers hand in drafts and get receipts;
 listeners consume a tagged union of app-level facts.
 
+## Install
+
+```bash
+bun add @linky-fit/linkstr effect
+```
+
+ESM with TypeScript declarations, for Node 22.14+ and modern browser bundlers.
+Linkshu and linkstr share a semantic version and release together. The source stays in the Linky
+monorepo; the published package contains compiled JavaScript and these guides.
+
 ## Documentation
 
 Usage guides live in [`docs/`](./docs/README.md): start with
@@ -106,8 +116,9 @@ found, without adding subscription delivery metadata.
 ## Usage
 
 Service assembly has one home: `linkstrServices(config)` layers every vertical
-over the base services. React apps should use `@linky-fit/linkstr-react` (config +
-runtime atoms, fn atoms per vertical) instead of wiring layers themselves.
+over the base services. Inside this monorepo, React apps use the private `@linky-fit/linkstr-react`
+workspace. External React apps can manage a runtime over `linkstrServices`;
+`@linky-fit/linkstr-react` is not part of the npm release.
 Non-React environments (the service worker) use the headless one-shot runner:
 
 ```ts

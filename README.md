@@ -12,6 +12,9 @@ The repo also contains a separate public website in `apps/site/` intended for `l
 - [`packages/linksync`](./packages/linksync/README.md) — synced storage library (Evolu schema, repositories, shards); usage guides in [`packages/linksync/docs/`](./packages/linksync/docs/README.md)
 - [`packages/proxy-payment`](./packages/proxy-payment/README.md) — proxy bank-payment domain (bank QR parsing, offer rules and reducer, stagger scheduling); usage guides in [`packages/proxy-payment/docs/`](./packages/proxy-payment/docs/README.md)
 
+`@linky-fit/linkshu` and `@linky-fit/linkstr` release together through GitHub Actions using `packages-vX.Y.Z` tags.
+See [npm releases](./docs/npm-releases.md) for setup, verification and release tags.
+
 ## Protocols and stack
 
 - Nostr (chat, profile, auth-related flows)

@@ -1,0 +1,8 @@
+{
+  "name": "linky-npm-consumer-check",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "effect": "^3.19.19"
+  }
+}

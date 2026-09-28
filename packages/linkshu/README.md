@@ -6,6 +6,16 @@ restore, …) is defined here as an Effect service over branded `Schema` types.
 Raw cashu-ts types never cross the package boundary: callers hand in drafts
 and get receipts; token text is the currency of the API.
 
+## Install
+
+```bash
+bun add @linky-fit/linkshu effect
+```
+
+ESM with TypeScript declarations, for Node 22.14+ and modern browser bundlers.
+Linkshu and linkstr share a semantic version and release together. The source stays in the Linky
+monorepo; the published package contains compiled JavaScript and these guides.
+
 ## Documentation
 
 Usage guides live in [`docs/`](./docs/README.md): start with
@@ -145,8 +155,8 @@ already injectable).
   (the app composes a linkshu `send` receipt with linkstr delivery, and
   confirms it via the send's `pending` status). Nothing in this surface may
   preclude them.
-- **Linky's needs win** every generality conflict; the package is not built
-  for publication.
+- **Linky's needs win** every generality conflict; publication does not
+  change the package's focus on Linky's wallet behavior.
 
 ## Tests
 

@@ -29,7 +29,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.0.0",
     "eslint": "^9.39.1",
-    "nostr-tools": "^2.23.3",
+    "nostr-tools": "^2.25.2",
     "prettier": "^3.4.2",
     "react": "^19.2.3",
     "typescript": "~5.9.3",

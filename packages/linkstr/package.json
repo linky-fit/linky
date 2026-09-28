@@ -14,21 +14,44 @@
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:npm": "tsdown"
   },
   "dependencies": {
     "@cashu/cashu-ts": "^4.0.0",
     "@noble/curves": "^1.4.1",
     "@noble/hashes": "^2.0.1",
     "effect": "^3.19.19",
-    "nostr-tools": "^2.23.3"
+    "nostr-tools": "^2.25.2"
   },
   "devDependencies": {
     "@linky-fit/config": "workspace:*",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",
     "prettier": "^3.4.2",
+    "tsdown": "0.23.0",
     "typescript": "~5.9.3",
     "vitest": "^4.0.18"
+  },
+  "description": "Typed Nostr messaging, profiles and relay services, built on Effect.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linky-fit/linky.git",
+    "directory": "packages/linkstr"
+  },
+  "homepage": "https://github.com/linky-fit/linky/tree/main/packages/linkstr",
+  "bugs": {
+    "url": "https://github.com/linky-fit/linky/issues"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "peerDependencies": {
+    "vitest": "^4.0.18"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   }
 }

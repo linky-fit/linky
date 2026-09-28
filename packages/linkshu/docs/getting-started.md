@@ -18,13 +18,13 @@ Wire `@linky-fit/linkshu` and make a first wallet call. Read this before touchin
 
 ## Install and import
 
-Add the workspace dependency and import from the package root:
+Install from npm and import from the package root:
 
-```json
-{
-  "dependencies": { "@linky-fit/linkshu": "workspace:*", "effect": "^3.19.19" }
-}
+```bash
+bun add @linky-fit/linkshu effect
 ```
+
+The package ships ESM and TypeScript declarations for Node 22.14+ and modern browser bundlers. Inside the Linky monorepo, keep using `"@linky-fit/linkshu": "workspace:*"`.
 
 ```ts
 import { Receive, ReceiveDraft, runLinkshu } from "@linky-fit/linkshu";

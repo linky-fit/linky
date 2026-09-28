@@ -7,6 +7,10 @@ Two helper sets give you throwaway identities, transport stubs, an in-memory rel
 
 Never import either from production code.
 
+The published `@linky-fit/linkstr/testing` entry requires Vitest 4 as an optional peer.
+Install it in a test project with `bun add --dev vitest`; use these helpers inside
+a Vitest run. The main `@linky-fit/linkstr` entry does not require Vitest.
+
 ## Running tests
 
 Tests are Vitest, live next to their subject as `*.test.ts`, and use globals: `describe`, `it`, `expect`, and `assert` need no import (`vitest.config.ts` sets `globals: true`; `tsconfig.test.json` adds the types).

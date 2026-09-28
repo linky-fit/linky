@@ -17,7 +17,7 @@
   "dependencies": {
     "@linky-fit/identity": "workspace:*",
     "effect": "^3.19.19",
-    "nostr-tools": "^2.23.3",
+    "nostr-tools": "^2.25.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "@evolu/common": "^7.4.1",

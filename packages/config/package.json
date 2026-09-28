@@ -9,7 +9,8 @@
     "./prettier": "./prettier/index.js",
     "./tsconfig/base": "./tsconfig/base.json",
     "./tsconfig/app": "./tsconfig/app.json",
-    "./tsconfig/node": "./tsconfig/node.json"
+    "./tsconfig/node": "./tsconfig/node.json",
+    "./npm": "./npm/index.ts"
   },
   "scripts": {
     "eslint": "eslint .",

@@ -52,6 +52,10 @@ When implementing or refactoring a meaningful operation — user-initiated actio
 
 Exception: August 2026 accidentally shipped as `26.9.0`, so keep releasing as `26.9.MICRO` (bump `MICRO` each release) through both August and September 2026 — do not reset the counter in September. Normal scheme resumes with `26.10` in October 2026; delete this paragraph then.
 
+## npm library releases
+
+For packaging, publishing or changing library versions, read `docs/npm-releases.md`. Linkshu and linkstr release together with one shared SemVer and `packages-vX.Y.Z` tags; the app retains CalVer. Publish the verified tarballs from `dist/npm/`; workspace manifests remain private and export source. `bun run check:npm` requires Node 24, npm and Playwright Chromium.
+
 ## Local dev environment
 
 - `bun run dev` starts the local service stack (`docker-compose.dev.yml`: Nostr relay :7777, Evolu relay :4001, FakeWallet mint :3338) detached, then the web app (:5173) and push service (:8787) against it; requires Docker
@@ -125,7 +129,7 @@ The compose image is built with `VITE_E2E=1`, which makes `main.tsx` install `wi
 - The dev mint uses `MINT_RATE_LIMIT=FALSE` for HTTP and a high `MINT_TRANSACTION_RATE_LIMIT_PER_MINUTE` for NUT-17 WebSocket subscriptions. Nutshell 0.20.3's `limit_websocket` calls `assert_limit` directly and ignores the HTTP switch, so the default 20/minute still interrupts multi-browser E2E runs
 - The `nostr-rs-relay` image's `/bin/sh` is dash, so its healthcheck must invoke `bash` explicitly for `/dev/tcp`
 - `bysquare@4.0.0` is patched in both `src/pay/decode.ts` (Bun) and `lib/pay/decode.js` (browser): bound input and decoded text, reject zero/short LZMA output lengths, and bound payment/account loops by available fields. Keep both entry paths covered when upgrading; run `packages/proxy-payment/src/bankQr/bysquareSafety.test.ts` and `bankPayment.test.ts`.
-- `nostr-tools` is patched via Bun `patchedDependencies` (`patches/nostr-tools@2.23.3.patch`): the browser keepalive REQ uses `limit: 1` because nostr-rs-relay silently ignores `limit: 0` REQs, so the unanswered ping killed every healthy connection ~every 50s. The ping code is duplicated into every `lib/` entry bundle (13 files) — when bumping nostr-tools, re-apply to all copies or drop the patch if upstream fixed it, and verify at runtime (a partial patch still sends `limit: 0`). Dockerfiles that run `bun install` must `COPY patches` first
+- `nostr-tools` 2.25.2 includes the browser keepalive fix formerly carried by `patches/nostr-tools@2.23.3.patch`: use `limit: 1`, because nostr-rs-relay ignores `limit: 0` REQs. Run `bun run check:npm` when upgrading it; the isolated consumer observes two real keepalives on one connection. Keep the minimum dependency version at a release containing the fix.
 - `docker/web-app/Dockerfile` and `apps/push/Dockerfile` copy every workspace `package.json` before `bun install --frozen-lockfile`; adding a workspace under `apps/`, `packages/`, or `tools/` requires its manifest COPY in both Dockerfiles
 - SQLite WASM files served from `public/sqlite-wasm/` with `cache-control: no-store` in dev
 - `@evolu/sqlite-wasm` is patched (`patches/@evolu%2Fsqlite-wasm@2.2.4.patch`) so a failed OPFS pool initialization calls `pauseVfs()` instead of upstream's `removeVfs()`, which deletes the pool directory and can wipe or corrupt the local database when a reload races the previous worker's handles. The patch also makes `xCheckReservedLock` report the actual SQLite lock state so interrupted transactions recover from their hot journals instead of opening partially written data. Keep both fixes in all three JS bundles when upgrading; run `tests/sqlite-crash-recovery.spec.ts`, the SQLite lock-failure cases in `tests/boot-recovery.spec.ts`, and the quota-recovery E2E test

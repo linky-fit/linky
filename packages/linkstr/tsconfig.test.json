@@ -2,7 +2,8 @@
   "extends": "@linky-fit/config/tsconfig/node",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals"],
+    "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": ["src", "tsdown.config.ts"]
 }
