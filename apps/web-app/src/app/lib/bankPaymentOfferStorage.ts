@@ -55,6 +55,7 @@ const BankPaymentOfferSpdRecord = Schema.Struct({
   createdAtSec: PositiveFiniteNumber,
   ownerPubkey: Schema.String,
   sentCandidateKeys: Schema.Array(Schema.String),
+  detailsSent: Schema.optional(Schema.Boolean),
   spdPayload: NonBlankString,
 });
 type BankPaymentOfferSpdRecord = typeof BankPaymentOfferSpdRecord.Type;
@@ -127,15 +128,54 @@ export const readBankPaymentOfferSpdRecord = (args: {
   return record.ownerPubkey === args.ownerPubkey ? record : null;
 };
 
+export const reserveBankPaymentOfferBankDetails = async (args: {
+  candidateKey: string;
+  offerId: string;
+  ownerPubkey: string;
+}): Promise<boolean> => {
+  // The boot compatibility shim has no query method and cannot lock across tabs.
+  if (!navigator.locks?.query) return false;
+  return navigator.locks.request(
+    `${BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.recipient.${args.offerId}`,
+    () => {
+      const record = readBankPaymentOfferSpdRecord(args);
+      if (!record) return false;
+      if (record.sentCandidateKeys.length > 0) {
+        return (
+          record.sentCandidateKeys.length === 1 &&
+          record.sentCandidateKeys[0] === args.candidateKey
+        );
+      }
+      writeSpdRecord(args.offerId, {
+        ...record,
+        sentCandidateKeys: [args.candidateKey],
+        detailsSent: false,
+      });
+      const saved = readBankPaymentOfferSpdRecord(args);
+      return (
+        saved?.sentCandidateKeys.length === 1 &&
+        saved.sentCandidateKeys[0] === args.candidateKey
+      );
+    },
+  );
+};
+
 export const markBankPaymentOfferBankDetailsSent = (args: {
   candidateKey: string;
   offerId: string;
 }): void => {
   const record = readSpdRecordByKey(spdKey(args.offerId));
-  if (!record || record.sentCandidateKeys.includes(args.candidateKey)) return;
+  if (
+    !record ||
+    (record.sentCandidateKeys.length > 0 &&
+      (record.sentCandidateKeys.length !== 1 ||
+        record.sentCandidateKeys[0] !== args.candidateKey))
+  )
+    return;
   writeSpdRecord(args.offerId, {
     ...record,
-    sentCandidateKeys: [...record.sentCandidateKeys, args.candidateKey],
+    sentCandidateKeys: [args.candidateKey],
+    detailsSent: true,
   });
 };
 

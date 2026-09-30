@@ -62,6 +62,7 @@ import {
   readBankPaymentOfferSpdRecord,
   readBankPaymentOfferStaggerRecords,
   rememberBankPaymentOfferSpdPayload,
+  reserveBankPaymentOfferBankDetails,
   rememberBankPaymentOfferStaggerQueue,
   removeBankPaymentOfferStaggerRecipients,
 } from "../lib/bankPaymentOfferStorage";
@@ -210,6 +211,34 @@ export const useBankPaymentOffers = ({
         return false;
       }
       try {
+        if (nextStatus === "bank_details_sent") {
+          const reserved = await reserveBankPaymentOfferBankDetails({
+            candidateKey: `${offer.offerId}:${offer.peer}`,
+            offerId: offer.offerId,
+            ownerPubkey: myPubHex ?? "",
+          });
+          if (!reserved) {
+            setStatus(t("spdPaymentOfferFailed"));
+            return false;
+          }
+          if (getInspectorEmissionEnabled()) {
+            reportInspectorRows([
+              {
+                at: Date.now(),
+                channel: "nostr.operation",
+                tag: "bankOffer.recipientPinned",
+                summary:
+                  "proxy payment bank details are pinned to one recipient",
+                links: {
+                  offer: offer.offerId,
+                  pubkey: offer.peer,
+                  client: draft.clientId ?? "",
+                },
+                payload: { offerId: offer.offerId, peer: offer.peer },
+              },
+            ]);
+          }
+        }
         if (await publish(offer.peer, draft)) return true;
         setStatus(t("spdPaymentOfferFailed"));
       } catch (error) {
@@ -446,27 +475,50 @@ export const useBankPaymentOffers = ({
             }
             continue;
           }
-          const candidate = step.candidate;
-          if (!candidate) continue;
+          if (!step.candidate) continue;
           const record = readBankPaymentOfferSpdRecord({
             offerId: step.offerId,
             ownerPubkey: myPubHex,
           });
-          // Any recorded send blocks the offer: a per-candidate check would
-          // let a tab with a lagging view send the details to a second recipient.
-          if (!record || record.sentCandidateKeys.length > 0) continue;
+          if (
+            !record ||
+            (record.sentCandidateKeys.length > 0 &&
+              record.detailsSent !== false)
+          )
+            continue;
 
           try {
             await withLocalStorageLeaseLock({
               key: lockKey,
               timeoutMs: 0,
               fn: async () => {
-                // Re-read under the lock: another tab may have just sent.
+                // Re-read both storage and inbox state after acquiring the lock.
                 const locked = readBankPaymentOfferSpdRecord({
                   offerId: step.offerId,
                   ownerPubkey: myPubHex,
                 });
-                if (!locked || locked.sentCandidateKeys.length > 0) return;
+                if (
+                  !locked ||
+                  (locked.sentCandidateKeys.length > 0 &&
+                    locked.detailsSent !== false)
+                )
+                  return;
+                const currentStep = bankPaymentOfferResponderSteps(
+                  stateRef.current.offers,
+                  myPubHex,
+                ).find((current) => current.offerId === step.offerId);
+                if (!currentStep || currentStep.ended || currentStep.winner)
+                  return;
+                const pinnedKey = locked.sentCandidateKeys[0];
+                const candidate = pinnedKey
+                  ? stateRef.current.offers.find(
+                      (offer) =>
+                        `${offer.offerId}:${offer.peer}` === pinnedKey &&
+                        offer.offererPublicKey === myPubHex &&
+                        offer.status === "accepted",
+                    )
+                  : currentStep.candidate;
+                if (!candidate) return;
                 const sent = await respondToOffer(
                   candidate,
                   "bank_details_sent",
@@ -474,14 +526,19 @@ export const useBankPaymentOffers = ({
                     spdPayload: locked.spdPayload,
                   },
                 );
-                // Marked only after a successful publish so an interrupted
-                // send retries; the lease lock covers the concurrent window.
+                // Failed or ambiguous delivery retries only the pinned recipient.
                 if (!sent) return;
                 markBankPaymentOfferBankDetailsSent({
                   candidateKey: `${step.offerId}:${candidate.peer}`,
                   offerId: step.offerId,
                 });
-                await closeLosers();
+                for (const loser of bankPaymentOfferResponderSteps(
+                  stateRef.current.offers,
+                  myPubHex,
+                ).find((current) => current.offerId === step.offerId)?.losers ??
+                  []) {
+                  await respondToOffer(loser, "accepted_by_other");
+                }
               },
             });
           } catch {

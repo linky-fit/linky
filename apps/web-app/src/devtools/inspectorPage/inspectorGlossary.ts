@@ -72,6 +72,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "User exported contacts and the cashu wallet as a backup file: a browser download on the web, the system share sheet in the native shell. The payload holds counts only, never the rows.",
   AppDataExportFailed:
     "The backup file could not be built or handed to the platform for a reason other than the user dismissing the share sheet.",
+  "bankOffer.recipientPinned":
+    "Bank details are reserved for this recipient before publishing. Retries keep the same recipient even if delivery acknowledgments are lost or earlier acceptances arrive late.",
   "bankOffer.staggerExtended":
     "A staggered proxy payment offer reached its next queued recipient: the configured delay elapsed without a winner, so the offer was extended while keeping the original expiry.",
   "payment.queuedApprovalRejected":

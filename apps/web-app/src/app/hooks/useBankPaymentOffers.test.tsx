@@ -24,6 +24,7 @@ import { createLinkyBankPaymentOfferEvent } from "../../testUtils/bankPaymentOff
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import {
   readBankPaymentOfferSpdRecord,
+  markBankPaymentOfferBankDetailsSent,
   readBankPaymentOfferStaggerRecords,
   rememberBankPaymentOfferSpdPayload,
   rememberBankPaymentOfferStaggerQueue,
@@ -186,6 +187,13 @@ describe("useBankPaymentOffers", () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW * 1000);
     window.localStorage.clear();
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: {
+        query: async () => ({ held: [], pending: [] }),
+        request: async (_name: string, callback: () => unknown) => callback(),
+      },
+    });
     sendBankOfferMock.mockImplementation(async (draft) =>
       Exit.succeed(receipt(draft)),
     );
@@ -385,6 +393,98 @@ describe("useBankPaymentOffers", () => {
     ]);
     await act(async () => vi.advanceTimersByTimeAsync(30_000));
     expect(sendBankOfferMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("pins the first attempted recipient across a failed publish and a reordered acceptance", async () => {
+    rememberBankPaymentOfferSpdPayload({
+      offerId: "offer-1",
+      ownerPubkey: owner.pubkey,
+      spdPayload: SPD,
+    });
+    sendBankOfferMock.mockImplementation(async (draft) =>
+      draft.status === "bank_details_sent"
+        ? Exit.fail(new Error("acknowledgment lost"))
+        : Exit.succeed(receipt(draft)),
+    );
+    const current = await setup();
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(snapshot("offered"));
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("offered", second.pubkey),
+      );
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("accepted", recipient.pubkey, NOW + 2),
+      );
+    });
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("accepted", second.pubkey, NOW + 1),
+      );
+    });
+    const attempts = () =>
+      sendBankOfferMock.mock.calls
+        .filter(([draft]) => draft.status === "bank_details_sent")
+        .map(([draft]) => draft.to);
+    expect(attempts().length).toBeGreaterThan(0);
+    expect(new Set(attempts())).toEqual(new Set([recipient.pubkey]));
+    // Reload rebuilds the state from snapshots, but must retain the recipient choice.
+    await unmounts.shift()?.();
+    const reloaded = await setup();
+    await act(async () => {
+      reloaded().applyBankPaymentOfferSnapshot(snapshot("offered"));
+      reloaded().applyBankPaymentOfferSnapshot(
+        snapshot("offered", second.pubkey),
+      );
+      reloaded().applyBankPaymentOfferSnapshot(
+        snapshot("accepted", second.pubkey, NOW + 1),
+      );
+      reloaded().applyBankPaymentOfferSnapshot(
+        snapshot("accepted", recipient.pubkey, NOW + 2),
+      );
+    });
+    sendBankOfferMock.mockImplementation(async (draft) =>
+      Exit.succeed(receipt(draft)),
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(new Set(attempts())).toEqual(new Set([recipient.pubkey]));
+    expect(reloaded().bankPaymentOfferMessages.map(statusOf)).toEqual([
+      "bank_details_sent",
+      "accepted_by_other",
+    ]);
+  });
+
+  it("does not retry legacy successful-send markers without detailsSent", async () => {
+    rememberBankPaymentOfferSpdPayload({
+      offerId: "offer-1",
+      ownerPubkey: owner.pubkey,
+      spdPayload: SPD,
+    });
+    markBankPaymentOfferBankDetailsSent({
+      offerId: "offer-1",
+      candidateKey: `offer-1:${recipient.pubkey}`,
+    });
+    const key = "linky.bank_payment_offer_spd.v1.offer-1";
+    const record = readBankPaymentOfferSpdRecord({
+      offerId: "offer-1",
+      ownerPubkey: owner.pubkey,
+    });
+    if (!record) throw new Error("missing SPD record");
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        createdAtSec: record.createdAtSec,
+        ownerPubkey: record.ownerPubkey,
+        sentCandidateKeys: record.sentCandidateKeys,
+        spdPayload: record.spdPayload,
+      }),
+    );
+    const current = await setup();
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(snapshot("offered"));
+      current().applyBankPaymentOfferSnapshot(snapshot("accepted"));
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(sendBankOfferMock).not.toHaveBeenCalled();
   });
 
   it("cancels an owned offer when its phase expires", async () => {

@@ -7,6 +7,7 @@ import {
   readBankPaymentOfferSpdRecord,
   readBankPaymentOfferStaggerRecords,
   rememberBankPaymentOfferSpdPayload,
+  reserveBankPaymentOfferBankDetails,
   rememberBankPaymentOfferStaggerQueue,
   removeBankPaymentOfferStaggerRecipients,
 } from "./bankPaymentOfferStorage";
@@ -15,6 +16,13 @@ const NOW = 1_700_000_000;
 
 beforeEach(() => {
   localStorage.clear();
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: {
+      query: async () => ({ held: [], pending: [] }),
+      request: async (_name: string, callback: () => unknown) => callback(),
+    },
+  });
   vi.useFakeTimers();
   vi.setSystemTime(NOW * 1000);
 });
@@ -101,6 +109,77 @@ describe("bank payment offer SPD payload storage", () => {
         ownerPubkey: "owner-a",
       })?.sentCandidateKeys,
     ).toEqual([]);
+  });
+
+  it("reserves one recipient before delivery and never replaces it", async () => {
+    remember();
+    const args = {
+      offerId: "offer-1",
+      ownerPubkey: "owner-a",
+      candidateKey: "offer-1:peer",
+    };
+    expect(await reserveBankPaymentOfferBankDetails(args)).toBe(true);
+    expect(readBankPaymentOfferSpdRecord(args)).toMatchObject({
+      sentCandidateKeys: [args.candidateKey],
+      detailsSent: false,
+    });
+    expect(
+      await reserveBankPaymentOfferBankDetails({
+        ...args,
+        candidateKey: "offer-1:other",
+      }),
+    ).toBe(false);
+    markBankPaymentOfferBankDetailsSent({
+      ...args,
+      candidateKey: "offer-1:other",
+    });
+    expect(readBankPaymentOfferSpdRecord(args)?.detailsSent).toBe(false);
+    markBankPaymentOfferBankDetailsSent(args);
+    expect(readBankPaymentOfferSpdRecord(args)?.detailsSent).toBe(true);
+    expect(await reserveBankPaymentOfferBankDetails(args)).toBe(true);
+    expect(
+      await reserveBankPaymentOfferBankDetails({
+        ...args,
+        ownerPubkey: "owner-b",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not authorize delivery if the reservation cannot be persisted", async () => {
+    remember();
+    const write = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("quota exceeded");
+      });
+    try {
+      expect(
+        await reserveBankPaymentOfferBankDetails({
+          offerId: "offer-1",
+          ownerPubkey: "owner-a",
+          candidateKey: "offer-1:peer",
+        }),
+      ).toBe(false);
+    } finally {
+      write.mockRestore();
+    }
+  });
+
+  it("does not authorize delivery with the single-tab lock compatibility shim", async () => {
+    remember();
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: {
+        request: async (_name: string, callback: () => unknown) => callback(),
+      },
+    });
+    expect(
+      await reserveBankPaymentOfferBankDetails({
+        offerId: "offer-1",
+        ownerPubkey: "owner-a",
+        candidateKey: "offer-1:peer",
+      }),
+    ).toBe(false);
   });
 
   it("survives corrupted storage content", () => {
