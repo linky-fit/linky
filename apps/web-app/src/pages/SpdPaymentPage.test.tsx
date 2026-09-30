@@ -236,18 +236,28 @@ describe("SpdPaymentPage offer recipients", () => {
       />,
     );
 
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>(".bank-payment-request")
-        ?.click();
-    });
-    expect(onRequestReimbursement).not.toHaveBeenCalled();
+    expect(container.querySelector(".bank-payment-request")).toBeNull();
+    expect(
+      container.querySelector(
+        ".bank-payment-single-tab-warning .wallet-warning-close",
+      ),
+    ).toBeNull();
 
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
           ".bank-payment-single-tab-warning .btn-wide",
         )
+        ?.click();
+    });
+    expect(onRequestReimbursement).not.toHaveBeenCalled();
+    expect(
+      container.querySelector(".bank-payment-single-tab-warning"),
+    ).toBeNull();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".bank-payment-request")
         ?.click();
     });
     expect(onRequestReimbursement).toHaveBeenCalledWith(

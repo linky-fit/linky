@@ -251,7 +251,7 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
   const fiatRates = useFiatRates();
   const [isRequestingOffer, setIsRequestingOffer] = React.useState(false);
   const [offerStatus, setOfferStatus] = React.useState<string | null>(null);
-  const [isSingleTabWarningShown, setIsSingleTabWarningShown] =
+  const [singleTabRiskAccepted, setSingleTabRiskAccepted] =
     React.useState(false);
   const [hasEditedOfferContacts, setHasEditedOfferContacts] =
     React.useState(false);
@@ -393,22 +393,20 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
             String(offerContactsCount),
           );
 
-  const requestReimbursement = async (singleTabRiskAccepted: boolean) => {
+  const needsSingleTabConsent = !singleTabRiskAccepted && !canLockAcrossTabs();
+
+  const requestReimbursement = async () => {
     if (
       !activePayment ||
       selectedOfferContacts.length === 0 ||
       !amountText ||
       !hasEnoughCashuForProxy ||
-      isRequestingOffer
+      isRequestingOffer ||
+      needsSingleTabConsent
     ) {
       return;
     }
-    if (!singleTabRiskAccepted && !canLockAcrossTabs()) {
-      setIsSingleTabWarningShown(true);
-      return;
-    }
 
-    setIsSingleTabWarningShown(false);
     setIsRequestingOffer(true);
     setOfferStatus(null);
     try {
@@ -549,20 +547,11 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
         ))}
       </div>
 
-      {isSingleTabWarningShown ? (
+      {needsSingleTabConsent ? (
         <div
           className="wallet-warning bank-payment-single-tab-warning"
           role="alert"
         >
-          <button
-            type="button"
-            className="wallet-warning-close"
-            onClick={() => setIsSingleTabWarningShown(false)}
-            aria-label={t("close")}
-            title={t("close")}
-          >
-            ×
-          </button>
           <span className="wallet-warning-icon" aria-hidden="true">
             !
           </span>
@@ -576,36 +565,33 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
             <button
               type="button"
               className="btn-wide secondary"
-              disabled={isRequestingOffer}
-              onClick={() => {
-                void requestReimbursement(true);
-              }}
+              onClick={() => setSingleTabRiskAccepted(true)}
             >
               {t("spdPaymentSingleTabContinue")}
             </button>
           </div>
         </div>
-      ) : null}
-
-      <button
-        type="button"
-        className="btn-wide bank-payment-request"
-        disabled={
-          !activePayment ||
-          selectedOfferContacts.length === 0 ||
-          !amountText ||
-          !hasEnoughCashuForProxy ||
-          isRequestingOffer
-        }
-        title={!hasEnoughCashuForProxy ? t("payInsufficient") : undefined}
-        onClick={() => {
-          void requestReimbursement(false);
-        }}
-      >
-        {isRequestingOffer
-          ? t("spdPaymentOfferSending")
-          : requestReimbursementLabel}
-      </button>
+      ) : (
+        <button
+          type="button"
+          className="btn-wide bank-payment-request"
+          disabled={
+            !activePayment ||
+            selectedOfferContacts.length === 0 ||
+            !amountText ||
+            !hasEnoughCashuForProxy ||
+            isRequestingOffer
+          }
+          title={!hasEnoughCashuForProxy ? t("payInsufficient") : undefined}
+          onClick={() => {
+            void requestReimbursement();
+          }}
+        >
+          {isRequestingOffer
+            ? t("spdPaymentOfferSending")
+            : requestReimbursementLabel}
+        </button>
+      )}
 
       <div className="bank-payment-offer-delay">
         <span className="bank-payment-offer-delay-label">

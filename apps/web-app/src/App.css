@@ -3910,6 +3910,10 @@ button.danger {
   margin-bottom: 0;
 }
 
+.bank-payment-single-tab-warning {
+  padding-right: 12px;
+}
+
 .cashu-emit-mint-warning + .panel {
   margin-top: 10px;
 }
