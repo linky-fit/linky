@@ -1,55 +1,55 @@
 # Android Play Console CI
 
-Verzované Android releasy (změna verze v `package.json` na `main`, ručně pushnutý `v*` tag nebo ruční spuštění workflow `Android APK Release`) nahrávají podepsaný AAB do Google Play na tracky `internal` a `beta` (Open testing) a APK na GitHub Releases. Běžný push do `main` Play build nepublikuje. Workflow je v [.github/workflows/android-apk-release.yml](../.github/workflows/android-apk-release.yml); CI nastavuje `versionCode = 200000000 + github.run_number` v [android-release-setup](../.github/actions/android-release-setup/action.yml). Ponech název souboru release workflow, aby čítač pokračoval.
+Versioned Android releases (a version change in `package.json` on `main`, a manually pushed `v*` tag or a manual run of the `Android APK Release` workflow) upload the signed AAB to Google Play on the `internal` and `beta` (Open testing) tracks and the APK to GitHub Releases. An ordinary push to `main` does not publish a Play build. The workflow lives in [.github/workflows/android-apk-release.yml](../.github/workflows/android-apk-release.yml); CI sets `versionCode = 200000000 + github.run_number` in [android-release-setup](../.github/actions/android-release-setup/action.yml). Keep the release workflow's file name so the counter continues.
 
-## 1. Připrav Google Play Console
+## 1. Prepare Google Play Console
 
-1. založ aplikaci `fit.linky.app`, pokud ještě neexistuje
-2. nastav `Testing` -> `Open testing`, dostupné země a testery interního tracku
-3. dokonči store listing a povinné formuláře v app setupu; účet musí mít přístup k Open testing
-4. v `Publishing overview` vypni Managed publishing, pokud se mají schválené verze zveřejnit automaticky
+1. create the app `fit.linky.app` if it does not exist yet
+2. set up `Testing` -> `Open testing`, the available countries and the internal track testers
+3. finish the store listing and the mandatory forms in the app setup; the account must have access to Open testing
+4. in `Publishing overview`, turn off Managed publishing if approved versions should go live automatically
 
-Bez dokončeného základního nastavení umí Play API vracet chyby, i když je AAB validní.
+Without the basic setup finished, the Play API can return errors even when the AAB is valid.
 
-## 2. Vytvoř service account pro Play API
+## 2. Create a service account for the Play API
 
-V Google Cloud projektu propojeném s Play Console:
+In the Google Cloud project linked to the Play Console:
 
-1. otevři `APIs & Services` -> `Credentials`
-2. vytvoř nový `Service account`
-3. vygeneruj JSON key
-4. v Play Console otevři `Users and permissions`
-5. přidej service account a dej mu oprávnění `Release apps to testing tracks` pro tuto aplikaci
+1. open `APIs & Services` -> `Credentials`
+2. create a new `Service account`
+3. generate a JSON key
+4. in the Play Console open `Users and permissions`
+5. add the service account and grant it `Release apps to testing tracks` for this app
 
-Obsah JSON klíče ulož do GitHub secretu `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` jako čistý JSON text.
+Store the JSON key contents in the GitHub secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` as plain JSON text.
 
-## 3. Připrav upload key secrets
+## 3. Prepare the upload key secrets
 
-Upload key vygeneruj podle [docs/android-upload-key.md](./android-upload-key.md), pak z něj vytvoř base64 hodnotu:
+Generate the upload key per [docs/android-upload-key.md](./android-upload-key.md), then base64-encode it:
 
 ```bash
 base64 -i "$HOME/.keys/linky/linky-upload-key.jks" | pbcopy
 ```
 
-Do GitHub repository secrets přidej `ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS` a `ANDROID_UPLOAD_KEY_PASSWORD`.
+Add `ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS` and `ANDROID_UPLOAD_KEY_PASSWORD` to the GitHub repository secrets.
 
-## 4. Přidej Firebase config secret
+## 4. Add the Firebase config secret
 
-Android build používá FCM push konfiguraci, takže do GitHub secrets přidej i base64 obsah `google-services.json` jako `ANDROID_GOOGLE_SERVICES_JSON_BASE64`:
+The Android build uses the FCM push configuration, so also add the base64 contents of `google-services.json` to the GitHub secrets as `ANDROID_GOOGLE_SERVICES_JSON_BASE64`:
 
 ```bash
 base64 -i apps/native-shell/android/app/google-services.json | pbcopy
 ```
 
-## 5. Ověř první run
+## 5. Verify the first run
 
-1. vydej novou verzi změnou `package.json` a doplněním `CHANGELOG.md`
-2. v GitHub Actions počkej na job `Publish to Google Play open testing`
-3. v Play Console zkontroluj `Open testing` a `Publishing overview`
+1. release a new version by changing `package.json` and extending `CHANGELOG.md`
+2. in GitHub Actions wait for the `Publish to Google Play open testing` job
+3. in the Play Console check `Open testing` and `Publishing overview`
 
-## Poznámky
+## Notes
 
-- Google může release kontrolovat; úspěšný upload neznamená okamžitou dostupnost testerům. Se zapnutým Managed publishing je po schválení potřeba ruční publikace a některé stavy po zamítnutí vyžadují ruční odeslání ke kontrole.
-- AAB zůstává i jako GitHub Actions artifact; neúspěšný Play job lze spustit znovu bez nového buildu.
-- Nastavení testování: https://support.google.com/googleplay/android-developer/answer/9845334
-- Kontrola a publikování: https://support.google.com/googleplay/android-developer/answer/9859654
+- Google may review the release; a successful upload does not mean testers get it immediately. With Managed publishing on, an approved release needs manual publication, and some states after a rejection require a manual resubmission for review.
+- The AAB also stays available as a GitHub Actions artifact; a failed Play job can be re-run without a new build.
+- Testing setup: https://support.google.com/googleplay/android-developer/answer/9845334
+- Review and publishing: https://support.google.com/googleplay/android-developer/answer/9859654

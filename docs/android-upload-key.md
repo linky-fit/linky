@@ -1,36 +1,36 @@
 # Android Upload Key
 
-Prvni krok pro Google Play release je vygenerovat upload key:
+The first step of a Google Play release is generating the upload key:
 
 ```bash
 mkdir -p "$HOME/.keys/linky" && keytool -genkeypair -v -keystore "$HOME/.keys/linky/linky-upload-key.jks" -alias linky-upload -keyalg RSA -keysize 4096 -validity 10000 -storetype JKS -dname "CN=Linky, OU=Mobile, O=Linky, L=Prague, S=Prague, C=CZ"
 ```
 
-Po vygenerovani zkopirujte `apps/native-shell/android/keystore.properties.example` na `apps/native-shell/android/keystore.properties` a doplnte hodnoty:
+After generating it, copy `apps/native-shell/android/keystore.properties.example` to `apps/native-shell/android/keystore.properties` and fill in the values:
 
 ```properties
 storeFile=/Users/<you>/.keys/linky/linky-upload-key.jks
-storePassword=VASE_HESLO
+storePassword=YOUR_PASSWORD
 keyAlias=linky-upload
-keyPassword=VASE_HESLO_NEBO_JINE
+keyPassword=YOUR_PASSWORD_OR_A_DIFFERENT_ONE
 ```
 
-Nenechavejte tam vychozi placeholder `storeFile=/absolute/path/to/linky-upload-key.jks`; release build pak spadne na chybe `Keystore file not found`.
+Do not leave the default placeholder `storeFile=/absolute/path/to/linky-upload-key.jks` in place; the release build then fails with `Keystore file not found`.
 
-Pak overte konfiguraci:
+Then verify the configuration:
 
 ```bash
 bun run native:android:release:check
 ```
 
-Kdyz kontrola projde, spustte release build:
+When the check passes, run the release build:
 
 ```bash
 bun run native:aab:release
 ```
 
-Poznamky:
+Notes:
 
-- `google-services.json` neni signing key. Je to Firebase konfigurace pro push notifikace.
-- Pokud `bun run native:android:release:check` selze na `keystore.properties`, vytvorte nejdriv lokalni `apps/native-shell/android/keystore.properties` ze vzoru `apps/native-shell/android/keystore.properties.example`.
-- `.jks` soubor i hesla zalohujte mimo repozitar.
+- `google-services.json` is not a signing key. It is the Firebase configuration for push notifications.
+- If `bun run native:android:release:check` fails on `keystore.properties`, first create the local `apps/native-shell/android/keystore.properties` from the template `apps/native-shell/android/keystore.properties.example`.
+- Back up the `.jks` file and the passwords outside the repository.
