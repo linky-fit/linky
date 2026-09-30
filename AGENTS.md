@@ -19,11 +19,14 @@ Emit an inspector event for every meaningful operation (user actions, relay/mint
 - Contacts, conversations, messages, reactions, identity, transactions and the cashu wallet are written only through the `@linky-fit/linksync` repositories (`app/hooks/useLinksync.ts`); app code never picks an owner id and never writes `category` or `phase`. Only `app/migrations/useLaneToShardMigration.ts` reads the legacy lane tables; its header lists the exceptions
 - Translation keys are `I18nKey`, translators `Translate` (`src/i18n`); `cs.ts` is the reference locale, `en.ts`/`de.ts` `satisfies` its key set
 - Plain CSS in `App.css`
+- Everything in English: identifiers, comments, docs, test names and developer-facing logs. Czech is allowed only in localized UI copy (the `cs` locale), fixed wire text and test fixtures whose Czech input is the point of the test
 - Comments explain unidiomatic code, briefly. A comment that restates the code or justifies an overcomplicated design means the code should be simplified instead
 
 ## Versions
 
-App releases use CalVer `YY.M.MICRO` (`26.10.1`; the counter resets monthly). Library releases: `docs/npm-releases.md`.
+App releases use CalVer `YY.M.MICRO` (`26.10.1`; the counter resets monthly), independent of the libraries.
+
+`@linky-fit/linkshu` and `@linky-fit/linkstr` are the only npm packages. They share one SemVer version, set in both manifests and released by a matching `packages-vX.Y.Z` tag on `main`; the tag publishes both even when only one changed. Bumping is a release step (`docs/npm-releases.md`, also the `check:npm` requirements): a change to an exported surface or documented behavior leaves `version` alone and states its SemVer effect in the PR description. While the version is 0.x, a breaking change to an export or documented behavior is a minor bump and anything else a patch; from 1.0.0, breaking is major, a new export or option minor, a fix patch. Every other workspace is private and its `version` field is inert.
 
 ## Local dev
 
