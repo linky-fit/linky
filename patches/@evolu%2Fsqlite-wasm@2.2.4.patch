@@ -1,3 +1,13 @@
+Two OPFS fixes that must stay in all three bundles (sqlite3-bundler-friendly.mjs,
+sqlite3.mjs, sqlite3.js) when upgrading:
+- A failed OPFS pool initialization calls pauseVfs() instead of upstream's
+  removeVfs(), which deletes the pool directory and can wipe or corrupt the
+  local database when a reload races the previous worker's handles.
+- xCheckReservedLock reports the real SQLite lock state, so an interrupted
+  transaction recovers from its hot journal instead of opening partial data.
+Verify with apps/web-app/tests/sqlite-crash-recovery.spec.ts, the SQLite
+lock-failure cases in tests/boot-recovery.spec.ts, and the quota-recovery E2E test.
+
 diff --git a/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs b/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs
 index 1e35522cb97757472bd623dd0a332c8640b2d806..e2f0b5d12bad6b1622a3ed1c8ab927501eb79083 100644
 --- a/sqlite-wasm/jswasm/sqlite3-bundler-friendly.mjs

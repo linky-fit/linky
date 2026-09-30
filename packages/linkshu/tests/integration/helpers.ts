@@ -44,7 +44,7 @@ export const targetMintUrl = MintUrl.make(
   process.env.LINKSHU_TARGET_MINT_URL ?? "http://localhost:3339",
 );
 
-/** The local mint charges input_fee_ppk=100 on purpose (see CLAUDE.md). */
+/** Nutshell's default input_fee_ppk; the dev mint keeps it (docker-compose.dev.yml). */
 export const INPUT_FEE_PPK = 100;
 export const inputFee = (proofCount: number): number =>
   Math.ceil((proofCount * INPUT_FEE_PPK) / 1000);

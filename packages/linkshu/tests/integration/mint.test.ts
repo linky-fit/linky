@@ -16,7 +16,7 @@ describe("local mint via the public API", () => {
 
     expect(info.url).toBe(mintUrl);
     expect(info.name).toBeTruthy();
-    // The local mint is deliberately not fee-free (see CLAUDE.md).
+    // The dev mint keeps Nutshell's default fee (docker-compose.dev.yml).
     expect(info.inputFeePpk).toBe(100);
     expect(info.supportsMpp).toBe(false);
   });

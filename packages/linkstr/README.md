@@ -1,10 +1,6 @@
 # @linky-fit/linkstr
 
-Linky's Nostr protocol as a typed library. Every operation the app publishes
-(send a chat message, react, pay, update profile/status, …) and every inbound
-action it expects are defined here as Effect `Schema` types. Raw nostr events
-never cross the package boundary: callers hand in drafts and get receipts;
-listeners consume a tagged union of app-level facts.
+Typed Nostr messaging, profiles and relay services, built on Effect. Every operation is an Effect service that takes a draft and returns a receipt; everything inbound arrives on one stream as a tagged union of facts. Raw Nostr events never cross the package boundary, so consumers never import `nostr-tools`.
 
 ## Install
 
@@ -12,124 +8,23 @@ listeners consume a tagged union of app-level facts.
 bun add @linky-fit/linkstr effect
 ```
 
-ESM with TypeScript declarations, for Node 22.14+ and modern browser bundlers.
-Linkshu and linkstr share a semantic version and release together. The source stays in the Linky
-monorepo; the published package contains compiled JavaScript and these guides.
+ESM with TypeScript declarations, for Node 22.14+ and modern browser bundlers. The `@linky-fit/linkstr/testing` subpath needs Vitest 4 as an optional peer; the main entry does not.
 
-## Documentation
+## What is in the box
 
-Usage guides live in [`docs/`](./docs/README.md): start with
-[getting started](./docs/getting-started.md), the [React guide](./docs/react.md)
-for `@linky-fit/linkstr-react`, then the guide for the vertical you need (chat,
-reactions, profiles, …). This README holds the design rules; the guides show
-how to call the package.
-
-## Verticals
-
-Gift-wrapped (NIP-17/NIP-59, kind 1059 on the wire):
-
-- `chat/` — text, image, and Cashu-token messages plus edits (kinds 14/15)
-- `reactions/` — kind 7 + kind 5 retractions; the reference vertical
-- `paymentNotices/` — kind 24133
-- `paymentTelemetry/` — kind 24134
-- `bankOffers/` — kind 24135
-
-Plain events (signed, published unwrapped):
-
-- `profiles/` — kind 0 metadata + kind 30315 status; `ProfileWatch` is the
-  long-lived subscription counterpart
-- `relayLists/` — kinds 10002 + 10050, published as one operation
-- `muteList/` — kind 10000
-
-HTTP auth (`httpAuth/`) — pure codecs for signed events used as HTTP
-credentials, never published to relays: Blossom upload auth (kind 24242),
-push-server ownership proofs, and NIP-98 `Authorization` headers (kind 27235).
-
-Key codecs (`identity/codec.ts`) — pure nip19/derivation helpers returning the
-branded types (`decodeNsec`, `parsePubkey`, `identityFromNsec`, …), so
-consumers never import `nostr-tools` even for key encoding. `parsePubkey` and
-friends enforce the `Pubkey` brand's on-curve check at parse time.
-
-Shared machinery: `inbox/WrapInbox` (the single kind-1059 subscription),
-`push/PushInbox` (identity-free outer-wrap routing for push infrastructure),
-`outbox/Outbox` (durable send queue with retry/backoff over a pluggable
-`OutboxStore`), `relayHealth/` (traffic-derived per-relay status, always on),
-and `inspector/` (optional dev diagnostics bus).
-
-## Shape of a vertical
-
-- `reactions/domain.ts` — drafts and receipts (`ReactionDraft`, `ReactionReceipt`)
-- `reactions/events.ts` — inbound facts (`ReactionAdded`, `OwnReactionConfirmed`,
-  `ReactionRetracted`) plus `WrapDropped` with a typed reason
-- `reactions/codec.ts` — the only place the wire format (kinds, tags) exists;
-  encode and decode roundtrip by construction
-- `reactions/Reactions.ts` — the operation service (`react`, `retract`)
-- `inbox/decodeWrapEvent.ts` — pure pipeline for one incoming kind-1059 wrap,
-  routing the decoded rumor to the owning vertical's codec
-
-## Inbound subscription
-
-`WrapInbox` owns the single kind-1059 subscription. `inbox.open({ since })` is
-a scoped resource: it subscribes on every `RelayPolicy.readRelays` entry with
-its own resubscribe loop and returns a single-consumer `Stream` of typed inbox
-facts (`ReactionAdded`, `ChatMessageReceived`, `WrapDropped`, …). The backfill
-cursor is loaded from and checkpointed to the `InboxCursorStore` port
-(platform code supplies the layer, e.g. `fromStringStorage(localStorage, key)`;
-the default is in-memory); `since` only seeds a first session whose store is
-empty, and the machine widens the cursor by the NIP-59 two-day backdate margin
-itself. Rumor kinds without a vertical surface as
-`WrapDropped("unsupported-kind")` — the dispatch point in `WrapInbox` is where
-future verticals plug in. Closing the scope tears down all relay
-subscriptions and ends the stream.
-
-`PushInbox` is the non-decrypting sibling for the push server. Each relay
-subscription uses only `kinds: [1059]` plus `since`; the codec enforces the
-`["linky", "push"]` marker client-side because multi-letter tag filters are
-nonstandard. It verifies outer signatures, extracts the one recipient and
-relay hints, marks each delivery as backfill or live, dedupes live emissions
-across relays, and re-emits every backfill copy. `watchPushInbox` supplies the
-long-lived Promise-facing composition without requiring a `LinkstrIdentity`.
-
-`inbox.fetchWrapEvent(wrapId, { extraRelays })` is the one-shot counterpart
-for notification opens. It unions relay hints with configured read relays and
-returns the same decoded `WrapInboxEvent`, or `null` when no matching wrap is
-found, without adding subscription delivery metadata.
+- **Gift-wrapped verticals** (NIP-17/NIP-59, kind 1059 on the wire): `Chat` (kinds 14/15), `Reactions` (7/5), `SeenReceipts` (24136), `PaymentNotices` (24133), `PaymentTelemetry` (24134), `BankOffers` (24135).
+- **Plain events** (signed, published as-is): `Profiles` and `ProfileWatch` (kinds 0/30315), `RelayLists` (10002/10050), `MuteList` (10000).
+- **HTTP auth codecs**: Blossom upload auth (24242), NIP-98 headers and push ownership proofs (27235). Signed, never published.
+- **Shared machinery**: `WrapInbox` (the one kind-1059 subscription, plus one-shot `fetchWrapEvent`), `Outbox` (durable send queue with retries), `PushInbox` (identity-free wrap routing for push servers), `RelayHealth`, `Inspector`, and the key codecs (`decodeNsec`, `parsePubkey`, …).
 
 ## Rules
 
-- **Environment-agnostic.** No React, no Evolu, no `window`. Capabilities come
-  in as services: `LinkstrIdentity`, `NostrTransport`, `RelayPolicy`.
-- **Honest delivery.** A NIP-17 send publishes the same rumor wrapped to self
-  and to the peer. Success means the _recipient's_ copy was accepted by at
-  least one relay; "only my self copy landed" is the `RecipientNotReached`
-  error, never a silent success.
-- **No hidden retries in the transport.** `NostrTransport.publish` reports
-  per-relay outcomes; retry/backoff policy lives in the `Outbox`.
-- **Authenticated inbound.** Incoming wraps are unwrapped by hand, not with
-  nostr-tools' `unwrapEvent` (which verifies nothing): the seal signature must
-  verify, the rumor author must equal the seal author (and not the ephemeral
-  wrap key), and the rumor id must be the hash of the rumor. Anything else is
-  a `WrapDropped` with a typed reason.
-- **Serializable errors.** All errors are `Schema.TaggedError`, so failures can
-  be persisted (e.g. on outbox rows) without ad-hoc stringification.
+- **Environment-agnostic.** No React, no DOM, no storage of its own. Capabilities enter as services: `LinkstrIdentity`, `NostrTransport`, `RelayPolicy`, and the `OutboxStore` / `InboxCursorStore` ports.
+- **Honest delivery.** A private send publishes the same rumor wrapped to you and to the peer. It succeeds only when a relay accepted the _peer's_ copy; "only my copy landed" is the `RecipientNotReached` error, never a silent success.
+- **No hidden retries in the transport.** `NostrTransport.publish` reports per-relay outcomes; retry and backoff live in the `Outbox`.
+- **Authenticated inbound.** Every gift wrap is unwrapped by hand: outer and seal signatures must verify, the rumor author must equal the seal author and differ from the ephemeral wrap key, and the rumor id must be the rumor's hash. Anything else is a `WrapDropped` fact with a typed reason.
+- **Serializable errors.** Every failure is a `Schema.TaggedError`, so it can be persisted (the outbox stores them on job rows) without ad-hoc stringification.
 
-## Usage
+## Documentation
 
-Service assembly has one home: `linkstrServices(config)` layers every vertical
-over the base services. Inside this monorepo, React apps use the private `@linky-fit/linkstr-react`
-workspace. External React apps can manage a runtime over `linkstrServices`;
-`@linky-fit/linkstr-react` is not part of the npm release.
-Non-React environments (the service worker) use the headless one-shot runner:
-
-```ts
-import { Effect } from "effect";
-import { Reactions, runLinkstr } from "@linky-fit/linkstr";
-
-const receipt = await runLinkstr(
-  { secretKey, readRelays, writeRelays },
-  Effect.gen(function* () {
-    const reactions = yield* Reactions;
-    return yield* reactions.react(draft); // ReactionReceipt | RecipientNotReached | NoRelayReachable
-  }),
-);
-```
+The guides in [`docs/`](./docs/README.md) are the manual. Start with [getting started](./docs/getting-started.md) (configuration, `runLinkstr` vs `linkstrServices`, a first send and receive), keep [concepts](./docs/concepts.md) open for vocabulary, wire conventions and the error table, then read the guide for the vertical you need.

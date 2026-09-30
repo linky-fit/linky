@@ -1,135 +1,58 @@
 # React
 
-`@linky-fit/linkstr-react` is the effect-atom binding: one config atom, one runtime atom built from it, and a fn atom per operation. Use it for every linkstr call made from a component or hook in the web app; never build layers by hand there.
+`@linky-fit/linkstr-react` is the effect-atom binding: one config atom, one runtime atom built from it, and a fn atom per direct operation. It re-exports the `@effect-atom/atom-react` surface (`useAtomSet`, `useAtomValue`, `useAtomMount`, `Registry`, `Result`, …), so app code never depends on effect-atom itself. It is a private workspace package, not part of the npm release.
 
 ## Configure
 
-`linkstrConfigAtom` holds a `LinkstrConfig | null`. Set it when an identity is available; set it to `null` on logout. While it is null, every fn atom fails with `LinkstrNotConfigured`. The minimum is a key and relays:
+`linkstrConfigAtom` holds a `LinkstrConfig | null`. Set it when an identity is available; set it to `null` on logout. While it is null, every fn atom fails with `LinkstrNotConfigured`.
 
-```tsx
-import { identityFromNsec, RelayUrl } from "@linky-fit/linkstr";
-import {
-  linkstrConfigAtom,
-  useAtomSet,
-  type LinkstrConfig,
-} from "@linky-fit/linkstr-react";
-import { Schema } from "effect";
-import React from "react";
+| Field                                    | Meaning                                                                                                  |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `secretKey`, `readRelays`, `writeRelays` | as in `linkstrServices`                                                                                  |
+| `allowInsecureLocalhost`                 | let the default transport open loopback `ws://` relays; default false                                    |
+| `outboxStore`                            | `OutboxStore.fromStringStorage(localStorage, "<key>")`; default in-memory                                |
+| `inboxCursorStore`                       | `InboxCursorStore.fromStringStorage(localStorage, "<key>.<pubkey>")`, keyed by pubkey; default in-memory |
+| `inspector`                              | `true` streams diagnostics through `inspectorEventsAtom`                                                 |
+| `transport`                              | test seam; leave unset in the app                                                                        |
 
-const isRelayUrl = Schema.is(RelayUrl);
-
-const buildConfig = (
-  nsec: string | null,
-  relayUrls: readonly string[],
-): LinkstrConfig | null => {
-  const identity = nsec === null ? null : identityFromNsec(nsec.trim());
-  if (identity === null) return null;
-  const relays = relayUrls.filter(isRelayUrl);
-  return {
-    secretKey: identity.secretKey,
-    readRelays: relays,
-    writeRelays: relays,
-  };
-};
-
-/** Mount once near the root; `nsec` is null while logged out. */
-export const useLinkstrConfigSync = (
-  nsec: string | null,
-  relayUrls: readonly string[],
-) => {
-  const setConfig = useAtomSet(linkstrConfigAtom);
-  React.useEffect(() => {
-    setConfig(buildConfig(nsec, relayUrls));
-  }, [nsec, relayUrls, setConfig]);
-};
-```
-
-`LinkstrConfig.allowInsecureLocalhost` defaults to false. Enable it only for local development or tests that use `ws://localhost`, `ws://127.0.0.1` or `ws://[::1]`; production relay connections require WSS.
-
-## Call an operation
-
-Every operation is a `linkstrRuntimeAtom.fn` atom. `useAtomSet(atom, { mode: "promiseExit" })` returns a function that resolves with an `Exit`; call it from a handler. The web app sends reactions through the outbox, so that is the first button:
-
-```tsx
-import {
-  Emoji,
-  OutboxRef,
-  ReactionDraft,
-  type Pubkey,
-  type RumorId,
-} from "@linky-fit/linkstr";
-import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
-import { Cause, Exit } from "effect";
-
-interface ReactButtonProps {
-  peer: Pubkey;
-  messageId: RumorId;
-}
-
-export const ReactButton = ({ peer, messageId }: ReactButtonProps) => {
-  const enqueue = useAtomSet(enqueueOutboxAtom, { mode: "promiseExit" });
-
-  const onClick = async () => {
-    const draft = new ReactionDraft({
-      to: peer,
-      target: messageId,
-      targetKind: "text",
-      targetAuthor: peer,
-      emoji: Emoji.make("🔥"),
-    });
-    const exit = await enqueue({
-      op: { _tag: "reaction", draft },
-      ref: OutboxRef.make(`reaction:${messageId}`),
-    });
-    if (Exit.isFailure(exit)) {
-      console.warn(Cause.pretty(exit.cause)); // LinkstrNotConfigured while logged out
-      return;
-    }
-    console.log("queued rumor", exit.value.rumorId);
-  };
-
-  return <button onClick={() => void onClick()}>🔥</button>;
-};
-```
-
-`enqueue` resolves as soon as the job is stored; delivery happens in the background and reports through the outbox results ([Outbox](#outbox) below). With the minimal config the queue lives in memory and is lost on reload; the next section adds storage.
-
-`mode: "promise"` resolves with the value and rejects on failure; the default mode returns `void` and you read the atom's `Result` with `useAtomValue`. Prefer `promiseExit` in event handlers: failures are typed values, not thrown.
-
-| Atom                                               | Input                                         | Success value                            |
-| -------------------------------------------------- | --------------------------------------------- | ---------------------------------------- |
-| `enqueueOutboxAtom`                                | `{ op: RumorFixedOperation, ref: OutboxRef }` | `EnqueueReceipt`                         |
-| `enqueuePaymentTelemetryAtom`                      | `{ draft, recipient, ref }`                   | `OutboxJobId`                            |
-| `retractReactionAtom`                              | `RetractionDraft`                             | `RetractionReceipt`                      |
-| `sendSeenReceiptAtom`                              | `SeenReceiptDraft`                            | `SeenReceiptSendReceipt`                 |
-| `sendPaymentNoticeAtom`                            | `PaymentNoticeDraft`                          | `PaymentNoticeReceipt`                   |
-| `sendBankOfferAtom`                                | `BankOfferDraft`                              | `BankOfferReceipt`                       |
-| `publishProfileAtom`, `publishStatusAtom`          | `ProfileMetadata`, `StatusDraft`              | `PlainEventReceipt`                      |
-| `fetchProfileAtom`, `fetchProfilesAtom`            | `Pubkey`, `ReadonlyArray<Pubkey>`             | `ProfileFetchResult`, entries            |
-| `discoverActiveProfilesAtom`, `searchProfilesAtom` | options, `{ query, options? }`                | discovered profiles                      |
-| `publishRelayListsAtom`, `fetchOwnRelayListsAtom`  | `RelayListsDraft`, `void`                     | `RelayListsReceipt`, `FetchedRelayLists` |
-| `publishMuteListAtom`                              | `ReadonlyArray<Pubkey>`                       | `PlainEventReceipt`                      |
-| `fetchWrapEventAtom`                               | `{ wrapId, extraRelays? }`                    | `WrapInboxEvent \| null`                 |
-
-Chat sends and reaction adds go through `enqueueOutboxAtom` ([outbox.md](./outbox.md)); there is no `sendTextAtom`.
-
-## Persistence and inspector
-
-Once the first button works, add three optional fields to the config so the queue and the inbox cursor survive reloads and the diagnostics feed can be switched on:
-
-- `outboxStore: OutboxStore.fromStringStorage(localStorage, "linky.outbox")`
-- ``inboxCursorStore: InboxCursorStore.fromStringStorage(localStorage, `linky.inbox_cursor.${pubkey}`)``, keyed by pubkey so switching accounts never reuses a cursor
-- `inspector: boolean`, from the Advanced → Inspector toggle ([inspector.md](./inspector.md#consuming-in-react))
-
-`apps/web-app/src/app/hooks/useLinkstrConfigSync.ts` is the app's version of `buildConfig` with all three. `transport` is a test seam and stays unset in the app.
+Build the config from `identityFromNsec(nsec)` and relay strings filtered through `Schema.is(RelayUrl)`, and set it from one effect mounted near the root: `useAtomSet(linkstrConfigAtom)(config)`.
 
 ## Identity switches
 
-`linkstrRuntimeAtom` is built from `linkstrConfigAtom`. Any config change (new key, new relay list, inspector toggled) closes the previous runtime with its relay pool and subscriptions, then starts new ones. Treat it as a full restart of linkstr; stream atoms restart with it.
+`linkstrRuntimeAtom` is built from `linkstrConfigAtom`. Any config change (new key, new relay list, inspector toggled) closes the previous runtime with its relay pool and subscriptions, then starts new ones. Treat it as a full restart of linkstr; stream atoms restart with it. The runtime taps the transport with `observeTransport` and `inspectTransport` and provides `RelayHealth.live` and `Inspector.live` or `.disabled` ([diagnostics.md](./diagnostics.md)).
+
+## Call an operation
+
+Every operation is a `linkstrRuntimeAtom.fn` atom. `useAtomSet(atom, { mode: "promiseExit" })` returns a function that resolves with an `Exit`; call it from a handler. `mode: "promise"` resolves with the value and rejects on failure; the default mode returns `void` and you read the atom's `Result` with `useAtomValue`. Prefer `promiseExit` in event handlers: failures are typed values, not thrown.
+
+```tsx
+const retract = useAtomSet(retractReactionAtom, { mode: "promiseExit" });
+const exit = await retract(
+  new RetractionDraft({ to: peer, reactionIds: [id] }),
+);
+if (Exit.isFailure(exit)) console.warn(Cause.pretty(exit.cause)); // e.g. LinkstrNotConfigured
+```
+
+| Atom                                               | Input                                         | Success value                               |
+| -------------------------------------------------- | --------------------------------------------- | ------------------------------------------- |
+| `enqueueOutboxAtom`                                | `{ op: RumorFixedOperation, ref: OutboxRef }` | `EnqueueReceipt`                            |
+| `enqueuePaymentTelemetryAtom`                      | `{ draft, recipient, ref }`                   | `OutboxJobId`                               |
+| `retractReactionAtom`                              | `RetractionDraft`                             | `RetractionReceipt`                         |
+| `sendSeenReceiptAtom`                              | `SeenReceiptDraft`                            | `SeenReceiptSendReceipt`                    |
+| `sendPaymentNoticeAtom`                            | `PaymentNoticeDraft`                          | `PaymentNoticeReceipt`                      |
+| `sendBankOfferAtom`                                | `BankOfferDraft`                              | `BankOfferReceipt`                          |
+| `publishProfileAtom`, `publishStatusAtom`          | `ProfileMetadata`, `StatusDraft`              | `PlainEventReceipt`                         |
+| `fetchProfileAtom`, `fetchProfilesAtom`            | `Pubkey`, `ReadonlyArray<Pubkey>`             | `ProfileFetchResult`, `ProfileFetchEntry[]` |
+| `discoverActiveProfilesAtom`, `searchProfilesAtom` | options, `{ query, options? }`                | `DiscoveredProfile[]`, `ProfileSearchHit[]` |
+| `publishRelayListsAtom`, `fetchOwnRelayListsAtom`  | `RelayListsDraft`, `void`                     | `RelayListsReceipt`, `FetchedRelayLists`    |
+| `publishMuteListAtom`                              | `ReadonlyArray<Pubkey>`                       | `PlainEventReceipt`                         |
+| `fetchWrapEventAtom`                               | `{ wrapId, extraRelays? }`                    | `WrapInboxEvent \| null`                    |
+
+Chat sends and reaction adds go through `enqueueOutboxAtom` ([outbox.md](./outbox.md)); there is no `sendTextAtom`.
 
 ## Inbox
 
-Register a handler, then keep `wrapInboxAtom` mounted. The inbox opens when both a runtime and a handler exist and closes when either goes away.
+Register a handler, then keep `wrapInboxAtom` mounted. The inbox opens when both a runtime and a handler exist and closes when either goes away. Every new handler object reopens the relay subscriptions, so register once per identity session and reach per-render state through a ref:
 
 ```tsx
 import {
@@ -168,54 +91,23 @@ export const useInboxSync = (
 };
 ```
 
-Rules that follow from the atom design:
-
-- Run **one** sync loop per app. The feed is single-consumer; fan out inside your handler (the web app's `useLinkstrInboxSync` switches on `_tag`).
-- Every new handler object reopens the relay subscriptions. Register once per identity session and reach per-render state through refs, as above.
+- Run **one** sync loop per app. The feed is single-consumer; fan out inside your handler by `_tag`.
 - `onEvent` may return a promise; the next event waits for it.
 - `since` only matters on a first session with an empty cursor store ([inbox.md](./inbox.md#the-cursor-and-inboxcursorstore)).
-
-`fetchWrapEventAtom` is the one-shot counterpart for notification opens.
+- `fetchWrapEventAtom` is the one-shot counterpart for notification opens.
 
 ## Outbox
 
-`useOutboxResults(handler)` mounts the results stream for the component's lifetime. A job is acked only after your handler resolves; a rejection leaves it to be re-delivered on the next runtime build. Mount it once, high in the tree, inside a hook that owns the app callbacks:
-
-```tsx
-import type { OutboxRef, RumorId } from "@linky-fit/linkstr";
-import { useOutboxResults } from "@linky-fit/linkstr-react";
-
-interface OutboxSyncCallbacks {
-  /** App callback: mark the local row named by `ref` as sent. */
-  markSent: (ref: OutboxRef, rumorId: RumorId) => Promise<void>;
-  /** App callback: record the permanent failure on the row. */
-  logFailure: (ref: OutboxRef, reason: string, detail: string) => Promise<void>;
-}
-
-export const useOutboxSync = ({
-  markSent,
-  logFailure,
-}: OutboxSyncCallbacks) => {
-  useOutboxResults(async (result) => {
-    if (result._tag === "OutboxJobSucceeded") {
-      await markSent(result.ref, result.receipt.rumorId);
-      return;
-    }
-    await logFailure(result.ref, result.reason, result.detail);
-  });
-};
-```
-
-The web app's version is `applyOutboxResult` in `apps/web-app/src/app/hooks/messages/outboxResults.ts`; [outbox.md](./outbox.md) explains results and acks.
+`enqueueOutboxAtom` resolves as soon as the job is stored; delivery happens in the background and reports through `useOutboxResults(handler)`, which mounts the results stream for the component's lifetime and reads the handler through a ref, so a new closure on every render is fine. A job is acked only after your `async` handler resolves; a rejection skips the ack, so the result is re-delivered on the next runtime build. Mount it once, high in the tree, and switch on `result._tag` (`OutboxJobSucceeded` with `receipt.rumorId`, or `OutboxJobFailed` with `reason` and `detail`) as [outbox.md](./outbox.md#results) describes.
 
 ## Profile watch
 
-`watchedProfilesAtom` (the pubkey set), `profileWatchHandlerAtom`, and `profileWatchAtom` follow the inbox pattern; changing the set resubscribes without rebuilding the runtime. See [profiles.md](./profiles.md) and `apps/web-app/src/app/hooks/useLinkstrProfileSync.ts`.
+`watchedProfilesAtom` (the pubkey set), `profileWatchHandlerAtom` (`{ onEvent }`) and `profileWatchAtom` follow the inbox pattern: set the handler once (through a ref, as above), mount `profileWatchAtom`, and set `watchedProfilesAtom` whenever the set changes; that resubscribes without rebuilding the runtime. Swapping the handler object also reopens the subscriptions. Facts are in [plain-events.md](./plain-events.md#watching).
 
 ## Relay health and inspector
 
-- `relayHealthAtom`: `Result<ReadonlyMap<string, RelayHealthState>>`, read with `useAtomValue` and `Result.isSuccess` ([relay-health.md](./relay-health.md#reading-it-in-react)).
-- `inspectorHandlerAtom` + `inspectorEventsAtom`: set `{ onEvent }` and mount the atom; it streams only when `config.inspector` is true ([inspector.md](./inspector.md#consuming-in-react)).
+- `relayHealthAtom`: `Result<ReadonlyMap<string, RelayHealthState>>`, keyed by plain string so UI code can look up its own relay list; read with `useAtomValue` and `Result.isSuccess`, treat a missing entry as "checking". It resets when the runtime is rebuilt.
+- `inspectorHandlerAtom` + `inspectorEventsAtom`: set `{ onEvent }` and mount the atom; it streams only while `config.inspector` is true. Wrap `onEvent` in a `try` if a mapping bug must not kill the feed.
 
 ## Testing
 
@@ -223,6 +115,5 @@ The web app's version is `applyOutboxResult` in `apps/web-app/src/app/hooks/mess
 
 ## Related
 
-- [getting-started.md](./getting-started.md)
-- [inbox.md](./inbox.md), [outbox.md](./outbox.md)
-- [testing.md](./testing.md)
+- [getting-started.md](./getting-started.md#two-ways-to-run)
+- [inbox.md](./inbox.md), [outbox.md](./outbox.md), [diagnostics.md](./diagnostics.md)

@@ -9,9 +9,7 @@ Capacitor-based native shell for shipping the existing web app as:
 
 The shell consumes the bundled output from `apps/web-app/dist` and keeps the product UI in the web app package.
 
-Java 17 is required for the Android Gradle plugin. On macOS, `scripts/with-java17.sh` resolves an installed JDK 17 before running Capacitor or Gradle.
-
-Capacitor 7 generates Android compile options targeting Java 21, and some installed plugin Android modules do the same. `scripts/patch-android-java.sh` rewrites both back to Java 17 after `android:add` and `android:sync`.
+Android builds need Java 17: `scripts/with-java17.sh` picks an installed JDK 17 before every Capacitor or Gradle command, and `scripts/patch-android-java.sh` rewrites the Java 21 compile options Capacitor 7 and some plugins generate back to 17 after `android:add` and `android:sync`.
 
 ## First-time setup
 
@@ -56,12 +54,12 @@ apps/native-shell/android/app/build/outputs/apk/release/app-release.apk
 GitHub Releases publish the downloadable asset as `linky.apk`, so the public stable URL is:
 
 ```bash
-https://github.com/hynek-jina/linky/releases/latest/download/linky.apk
+https://github.com/linky-fit/linky/releases/latest/download/linky.apk
 ```
 
 ## Android release AAB
 
-Release builds derive Android `versionName` from the workspace version in the root `package.json` and `versionCode` from its components as `major * 10000 + minor * 100 + patch`.
+Release builds derive Android `versionName` from the workspace version in the root `package.json` and, locally, `versionCode` from its components as `major * 10000 + minor * 100 + patch`. CI overrides it with `200000000 + github.run_number` (`LINKY_ANDROID_VERSION_CODE`).
 
 Override either value for a specific build with:
 

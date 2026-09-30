@@ -43,6 +43,8 @@ services:
       timeout: 2s
       retries: 25
 
+  # Isolated relay for the Evolu quota-recovery E2E test, capped at 16 KiB of
+  # encrypted history per owner. The normal :4001 relay stays unlimited.
   evolu-relay-quota:
     profiles: [e2e, quota]
     image: linky-evolu-relay
@@ -67,10 +69,15 @@ services:
       MINT_LISTEN_PORT: "3338"
       MINT_PRIVATE_KEY: LOCAL_DEV_ONLY_PRIVATE_KEY
       MINT_DATABASE: data/mint
+      # Nutshell's default MINT_INPUT_FEE_PPK is 100, so this mint is not
+      # fee-free: every swap costs ceil(inputs / 10) sat and a receiver nets a
+      # little less than the amount sent. Tests assert with that fee, keep it.
       # Test suites hit this mint in bursts; upstream defaults (60 requests
       # per minute globally, 20 per minute for transactions) reject them
       # with 429 while a real user would never come close.
       MINT_RATE_LIMIT: "FALSE"
+      # Nutshell 0.20.3's limit_websocket ignores MINT_RATE_LIMIT, so NUT-17
+      # subscriptions from several browsers need their own high limit.
       MINT_TRANSACTION_RATE_LIMIT_PER_MINUTE: "1000000"
       # FakeWallet simulation knobs for payment-timing tests (defaults shown).
       # FAKEWALLET_BRR: "true"                  # auto-settle created invoices

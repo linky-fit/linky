@@ -1,10 +1,10 @@
 # Restore
 
-`Restore` recovers proofs from the seed (NUT-09) across mints and keysets. Use it on a fresh device, after a crash that lost the inventory, or whenever the balance looks lower than it should. It also owns `wipeSeedBoundState`, which you must call when the seed changes.
+`Restore` recovers proofs from the seed (NUT-09) across mints and keysets. Use it on a fresh device, after a lost inventory, or whenever the balance looks lower than it should. It also owns `wipeSeedBoundState`, which you must run when the seed changes.
 
-## Quick example
+## Example
 
-Prerequisites: a runtime built from the wallet's **original seed** ([getting-started.md](./getting-started.md)) — NUT-09 only finds proofs that seed derived. On a fresh device the stores are empty and know no mints, so pass every mint the wallet may have used.
+The runtime must be built from the wallet's original seed; NUT-09 only finds proofs that seed derived. On a fresh device the stores know no mints, so pass every mint the wallet may have used.
 
 ```ts
 import { Effect } from "effect";
@@ -25,99 +25,55 @@ const restoreFrom = (mints: ReadonlyArray<MintUrl>) =>
   });
 ```
 
-Omit `mints` to scan every mint the package knows (`Mints.knownMints`). Linky passes its own list (`useRestoreMissingTokens.ts`) because the app knows more candidates than the stores — the mint list, the default and main mints. Pass what you know.
+Omit `mints` to scan every mint the package knows (`Mints.knownMints`).
 
 ## How it works
 
-First load the wallets and keyset lists for all candidate mints (failure → `unavailableMints`) to establish a fixed scan total. Then every `sat` keyset the mint lists now, plus every keyset it has shown this wallet before, is scanned under the counter lock:
+Every candidate mint's wallet and keyset list is loaded first (failure → `unavailableMints`) to fix the scan total. Then every `sat` keyset the mint lists now, plus every keyset it has shown this wallet before, is scanned under the counter lock:
 
-1. The secrets of every stored proof (any state, `spent` included) are read, so nothing is imported twice — a spent proof restored again would be balance the mint will not honor.
+1. The secrets of every stored proof (any state, `spent` included) are read, so nothing is imported twice.
 2. The positions just behind the counter are scanned first. If that finds nothing and the wallet has scanned this keyset before, the whole derivation tree is rescanned from zero.
 3. Only proofs that are not stored and that the mint explicitly reports `UNSPENT` are kept. A failed state check imports nothing.
-4. The proofs are stored `available` (`restore`), **then** the restore cursor and the deterministic counter advance past the last signature. A crash between the two costs a rescan, never the funds.
+4. The proofs are stored `available`, then the restore cursor and the deterministic counter advance past the last signature. A crash between the two costs a rescan, never the funds.
 
-A mint is either fully scanned (`scannedMints`) or reported as not scanned (`unavailableMints`) — one unreachable keyset puts the mint in the second list even if other keysets restored proofs. A report can therefore carry both `restoredProofs` and `unavailableMints`; the proofs are kept, scan the listed mints again later.
+A mint is either fully scanned (`scannedMints`) or reported as not scanned (`unavailableMints`); one unreachable keyset puts the mint in the second list even if other keysets restored proofs. A report can carry both `restoredProofs` and `unavailableMints`: the proofs are kept, scan the listed mints again later.
 
 Restore knows nothing about operations: proofs it finds land as balance with no `operationId`, even if a pending melt or send once held them. Run the resumers and `Validation.checkIssued` afterwards when that matters.
 
-### Recover into fresh proofs
+A seed-only recovery has no cursor, so it walks the full derivation tree of every keyset. Expect the first scan to take noticeably longer than later ones.
 
-`restoreAndReclaim(draft)` scans with the same rules, then swaps only the proofs inserted by that scan through the reclaim flow. It returns `{ restore: RestoreReport, reclaim: ReclaimReport }`. Use `reclaim.reclaimedAmount` for the amount refreshed after fees, and check both `restore.unavailableMints` and `reclaim.unresolvedProofs` for incomplete recovery.
+### `restoreAndReclaim`
 
-Known proofs in any state are excluded from both the scan and the swap. The scan tracks the exact inserted ids, so unrelated proofs arriving during recovery cannot become swap inputs. The swap runs after the scan releases its counter locks, stores fresh proofs before marking originals spent, and emits the existing `restore.restore` and `tokens.reclaim` inspector rows.
+`restoreAndReclaim(draft, onProgress?)` scans with the same rules, then swaps only the proofs that scan inserted through `Tokens.reclaim`, so older copies of them die at the mint. It returns `{ restore: RestoreReport, reclaim: ReclaimReport }`; `reclaim.reclaimedAmount` is the amount refreshed after fees, and `restore.unavailableMints` plus `reclaim.unresolvedProofs` show what is incomplete. If the swap fails after discovery, the discovered proofs stay stored and a later scan skips them as known; retry their swap with `Tokens.reclaim`.
 
-If the swap fails or recovery is interrupted after discovery, the discovered proofs remain stored. A later missing-proof scan skips them because they are now known; use `Tokens.reclaim` with their ids, or Linky's full recovery action, to retry their swap. Linky's “Look for missing tokens” uses this method; the CLI's ordinary restore still restores proofs as-is.
+### Progress
 
-### What a fresh-device scan costs
-
-A seed-only recovery has no cursor, so it walks the full derivation tree of every keyset. Expect it to take noticeably longer than later restores, and to happen once; afterwards the cursor keeps later scans short.
-
-### How progress is reported
-
-Both `restore(draft, onProgress?)` and `restoreAndReclaim(draft, onProgress?)` accept an optional synchronous callback with `RestoreProgress`: `phase` (`preparing`, `scanning`, or `refreshing`), `completedKeysets`, `totalKeysets`, and `totalMints`. Callbacks must not throw. Progress is scoped to that invocation and works with the inspector disabled.
-
-`preparing` loads every candidate mint's keyset list. `scanning` starts with a fixed total and zero completed keysets, then reports after each keyset attempt, including failed attempts. Mints whose keysets cannot be loaded remain in `unavailableMints` and contribute no keysets to the denominator. `totalMints` counts all distinct candidate mints. Each keyset counts equally, so the fraction measures completed scan attempts, not elapsed or remaining time. There is no determinate fraction when `totalKeysets` is zero.
-
-`restoreAndReclaim` reports `refreshing` before swapping the newly discovered proofs. The callback does not report a swap percentage. The returned reports remain the authority on success and failures; callers clear progress when the operation settles. Existing `ProofsChanged`, `CounterAdvanced`, `restore.restore`, and `tokens.reclaim` inspector rows continue to describe the underlying work.
+Both `restore(draft, onProgress?)` and `restoreAndReclaim` accept a synchronous callback receiving `RestoreProgress`: `phase` (`preparing`, `scanning`, `refreshing`), `completedKeysets`, `totalKeysets`, `totalMints`. `scanning` starts with a fixed total and reports after each keyset attempt, failed ones included; each keyset counts equally, so the fraction measures attempts, not time. `refreshing` precedes the reclaim swap and has no percentage. The callback must not throw.
 
 ### The seed-bound wipe
 
-Counters and cursors describe positions only the current seed can reproduce. Reusing them under a new seed would collide at the mint, so replacing or clearing the seed goes in this order: stop the old runtime, wipe over the **same durable `KeyValueStore`**, then start the new one.
+Counters and cursors describe positions only the current seed can reproduce; reusing them under a new seed would collide at the mint. Replacing the seed goes in this order: dispose the old runtime, wipe over the same durable `KeyValueStore`, start the new one.
 
 ```ts
-import { Effect, Layer, ManagedRuntime } from "effect";
-import {
-  Inspector,
-  linkshuServices,
-  Restore,
-  runLinkshu,
-} from "@linky-fit/linkshu";
-import type { Bip39Seed, LinkshuServicesConfig } from "@linky-fit/linkshu";
+import { Effect } from "effect";
+import { Restore, runLinkshu } from "@linky-fit/linkshu";
 
-const switchSeed = async (
-  current: { dispose: () => Promise<void> },
-  nextSeed: Bip39Seed,
-  stores: Omit<LinkshuServicesConfig, "bip39Seed">,
-) => {
-  await current.dispose();
-  await runLinkshu(
-    { bip39Seed: nextSeed, keyValueStore: stores.keyValueStore },
-    Effect.flatMap(Restore, (restore) => restore.wipeSeedBoundState),
-  );
-  return ManagedRuntime.make(
-    linkshuServices({ bip39Seed: nextSeed, ...stores }).pipe(
-      Layer.provideMerge(Inspector.disabled),
-    ),
-  );
-};
+await oldRuntime.dispose();
+await runLinkshu(
+  { bip39Seed: nextSeed, keyValueStore },
+  Effect.flatMap(Restore, (restore) => restore.wipeSeedBoundState),
+);
+// then build the new runtime over the same stores
 ```
 
-The wipe removes the deterministic counters, their leases, and the restore cursors. It leaves proofs, operations (pending topup/autoswap/melt included), seen mints/keysets, and the fee-probe cache alone. Linky runs it from `platform/linkshu/wipeLinkshuSeedBoundState.ts` whenever the cashu mnemonic changes.
-
-## Inputs and outputs
-
-`RestoreDraft` (`restore/domain.ts`):
-
-| Field   | Type                                     | Notes                        |
-| ------- | ---------------------------------------- | ---------------------------- |
-| `mints` | `Schema.optional(Schema.Array(MintUrl))` | defaults to every known mint |
-
-`RestoreReport`:
-
-| Field              | Type                    | Notes                      |
-| ------------------ | ----------------------- | -------------------------- |
-| `restoredAmount`   | `NonNegativeAmount`     | sum over the new proofs    |
-| `restoredProofs`   | `Schema.Int`            | `available` proofs created |
-| `scannedMints`     | `Schema.Array(MintUrl)` | every keyset scanned       |
-| `unavailableMints` | `Schema.Array(MintUrl)` | scan again later           |
+The wipe removes the deterministic counters, their leases, and the restore cursors. It leaves proofs, operations (pending ones included), seen mints and keysets, and the fee-probe cache alone.
 
 ## Errors
 
-`restore` and `wipeSeedBoundState` never fail. Unreachable mints, lock timeouts, and rejected scans all land in `unavailableMints`.
+`restore`, `restoreAndReclaim`, and `wipeSeedBoundState` never fail. Unreachable mints, lock timeouts, and rejected scans land in `unavailableMints`; a failed reclaim swap in `unresolvedProofs`.
 
 ## Related
 
-- [topup.md](./topup.md) — interrupted claims reclaim through the same NUT-09 call
-- [validation.md](./validation.md)
-- [ports.md](./ports.md) — the `KeyValueStore` the wipe runs over
-- [../README.md](../README.md) — "Counters are sacred"
+- [tokens.md](./tokens.md#reclaim): the swap `restoreAndReclaim` runs
+- [topup.md](./topup.md): interrupted claims reclaim through the same NUT-09 call
+- [concepts.md](./concepts.md#deterministic-counters-and-the-lease): why the wipe is mandatory

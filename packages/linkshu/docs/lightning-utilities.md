@@ -1,10 +1,8 @@
 # Lightning utilities
 
-Helpers that need no wallet runtime: preview a bolt11 invoice, size retry amounts, resolve LNURL-pay and lightning addresses, and fetch fiat rates. None of them use Effect; the network ones return Promises and throw plain `Error`s.
+Helpers that need no wallet runtime: preview a bolt11 invoice, size retry amounts, resolve LNURL-pay/withdraw/auth and lightning addresses, and fetch fiat rates. None of them use Effect; the network ones return Promises and throw plain `Error`s.
 
-## Quick example
-
-Prerequisites: none beyond network access; the result feeds [`Melt`](./melt.md), which needs a configured runtime.
+## Example
 
 ```ts
 import {
@@ -19,7 +17,7 @@ const invoiceFor = async (target: string, amountSat: number) => {
   const { pr, successAction } = await fetchLnurlInvoiceForTarget(
     target,
     amountSat,
-    "from linky",
+    "thanks",
   );
   const preview = getLightningInvoicePreview(pr);
   return {
@@ -30,25 +28,22 @@ const invoiceFor = async (target: string, amountSat: number) => {
 };
 ```
 
-`Bolt11Invoice.make` throws on text that does not start with `ln`; decode with `Schema.decodeUnknownOption(Bolt11Invoice)` when the text is untrusted.
+`Bolt11Invoice.make` throws on text that does not start with `ln`; decode with `Schema.decodeUnknownOption(Bolt11Invoice)` when the text is untrusted. The result feeds [`Melt`](./melt.md).
 
-## Invoice preview (`invoice/preview.ts`)
+## Invoice preview
 
-| Export                                           | Returns                           | Notes                                                                                                                                                      |
-| ------------------------------------------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `getLightningInvoicePreview(raw)`                | `LightningInvoicePreview \| null` | `{ amountSat, description, expiresAtSec, invoice }`; null unless the text starts with `lnbc`/`lntb`/`lnbcrt`. Missing expiry tag → 1 h after the timestamp |
-| `parseBolt11AmountMsat(invoice)`                 | `number \| null`                  | amount from the human-readable part, rounded up to whole msat                                                                                              |
-| `getLightningInvoiceDescriptionHashHex(invoice)` | `string \| null`                  | the `h` tag as hex; used to verify LNURL metadata                                                                                                          |
+| Export                                           | Returns                           | Notes                                                                                                                                                  |
+| ------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `getLightningInvoicePreview(raw)`                | `LightningInvoicePreview \| null` | `{ amountSat, description, expiresAtSec, invoice }`; null unless the text starts with `lnbc`/`lntb`/`lnbcrt`. Missing expiry → 1 h after the timestamp |
+| `getPayableLightningInvoice(raw)`                | `PayableLightningInvoice \| null` | checksum-checked decode; requires a positive amount, payment hash, and signature; `amountSat` and `expiresAtSec` non-null                              |
+| `parseBolt11AmountMsat(invoice)`                 | `number \| null`                  | amount from the human-readable part                                                                                                                    |
+| `getLightningInvoiceDescriptionHashHex(invoice)` | `string \| null`                  | the `h` tag as hex, to verify LNURL metadata                                                                                                           |
 
-These are permissive by design: they decode fields for display and never verify the signature or authorize a payment.
+The preview decodes fields for display and never verifies the signature. `getPayableLightningInvoice` bounds input to 5 000 characters and rounds `amountSat` up from msat; the caller still compares `expiresAtSec` with the clock, and the mint validates the rest.
 
-## Fixed-amount invoice decoding
+## Amount fallback
 
-`getPayableLightningInvoice(raw)` returns `PayableLightningInvoice | null`. It uses `light-bolt11-decoder` for checksum-checked decoding, rejects missing or non-positive amounts, requires a payment hash and a correctly sized signature field, and bounds input to 5,000 characters. `amountSat` is rounded up from whole millisatoshis; `expiresAtSec` includes the default one-hour expiry. Both fields are non-null. The caller must compare expiry with the current time and check balance immediately before payment. This decodes invoice fields; the mint still validates the signature and payment feasibility.
-
-## Amount fallback (`invoice/paymentAmountFallback.ts`)
-
-For LNURL targets, the app can re-fetch the invoice at a lower amount when the requested amount plus fees does not fit the balance. The package supplies the ladder; the retry loop stays app-side (`useLightningPaymentsDomain.ts`).
+When a requested amount plus fees does not fit the balance, an LNURL target can be re-fetched at a lower amount. The package supplies the ladder; the retry loop is yours.
 
 | Export                                                          | Use                                                                                                                                     |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -57,9 +52,9 @@ For LNURL targets, the app can re-fetch the invoice at a lower amount when the r
 | `isRetryablePaymentAmountFailure(errorMessage)`                 | matches "insufficient funds", "not enough funds", "amount out of lnurl range", …                                                        |
 | `getPaymentAmountShortage(errorMessage)`                        | parses `provided: X, needed: Y`, `need X, have Y`, or `fee: N`                                                                          |
 
-These work on error _messages_. `Melt` itself fails with a typed `InsufficientFunds` carrying `required`/`available`; render that (Linky's `describeTaggedCashuError` produces `need X, have Y`) before feeding it here.
+These work on error messages. `Melt` itself fails with a typed `InsufficientFunds` carrying `required`/`available`; render that as `need X, have Y` before feeding it here.
 
-## LNURL-pay and withdraw (`lnurl/lnurlPay.ts`)
+## LNURL-pay and withdraw
 
 | Export                                                                      | Use                                                                                                                    |
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -72,13 +67,13 @@ These work on error _messages_. `Melt` itself fails with a typed `InsufficientFu
 | `isLnurlWithdrawTarget`, `fetchLnurlWithdrawPreview`, `redeemLnurlWithdraw` | LUD-03 withdraw; recipe below                                                                                          |
 | `LnurlTagMismatchError`                                                     | thrown when the server's `tag` is not the expected one                                                                 |
 
-`fallback: LnurlFallback = (url) => Promise<Response>` is tried when the direct fetch fails — Linky routes through its `/api/lnurlp` proxy for CORS-blocked servers (`apps/web-app/src/lnurlPay.ts`). Fixed-amount LNURLs that re-quote in fiat are followed within 2 % drift.
+`fallback: LnurlFallback = (url) => Promise<Response>` is tried when the direct fetch fails, for example a CORS proxy. Fixed-amount LNURLs that re-quote in fiat are followed within 2 % drift.
 
-All LNURL targets and pay/withdraw/auth callbacks require HTTPS, including bech32-encoded URLs. `lnurlp://`, `lnurlw://`, and `keyauth://` resolve to HTTPS. HTTP loopback URLs are rejected too; local LNURL providers need HTTPS. Redirects are followed manually, up to three hops, with HTTPS checked before each request. Browsers hide redirect destinations, so those requests use the optional fallback. Fallback adapters must enforce HTTPS on every upstream redirect as well, and should return the upstream response rather than throwing on a non-2xx status: the package reads a `status: "ERROR"` body under any HTTP status and reports its `reason` instead of a bare `HTTP <status>`. Invalid schemes fail before the fallback is called, and an insecure auth preview fails before signing.
+Every LNURL target and callback must be HTTPS, bech32-encoded and `lnurlp://`/`lnurlw://`/`keyauth://` ones included; loopback HTTP is rejected. Redirects are followed manually, up to three hops, HTTPS checked before each. Browsers hide redirect destinations, so those requests go through the fallback, which must enforce HTTPS itself and should return a non-2xx response rather than throw: the package reads a `status: "ERROR"` body under any HTTP status and reports its `reason`.
 
 ### LNURL-withdraw
 
-The withdrawing service pays an invoice you give it, so the invoice comes from a [topup](./topup.md): preview the offer, open a topup for an amount inside its range, hand the topup's invoice to the callback, and let the topup handle complete on its own.
+The withdrawing service pays an invoice you give it, so the invoice comes from a [topup](./topup.md):
 
 ```ts
 import {
@@ -87,7 +82,7 @@ import {
 } from "@linky-fit/linkshu";
 import type { TopupHandle } from "@linky-fit/linkshu";
 
-/** `startTopup` runs `Topup.start` on your runtime (see topup.md). */
+/** `startTopup` runs `Topup.start` on your runtime. */
 const withdraw = async (
   target: string,
   startTopup: (amountSat: number) => Promise<TopupHandle>,
@@ -105,13 +100,9 @@ const withdraw = async (
 
 `LnurlWithdrawPreview` also carries `minAmountSat`/`maxAmountSat` and `description` for an amount picker. `redeemLnurlWithdraw` resolves when the service accepted the request, not when the payment arrived; that is the topup's result.
 
-## LNURL-auth (`lnurl/lnurlAuth.ts`)
+## LNURL-auth
 
-LUD-04 logs the user into a third-party site. The whole request is in the scanned URL — `tag=login` plus the `k1` challenge — so `parseLnurlAuthTarget` recognizes a login without a network call, which is what lets a caller tell it apart from a pay or withdraw target before probing them.
-
-The linking key is the user's, so this package never derives or holds it: `submitLnurlAuth` asks the caller's `sign` for a signature over the challenge and appends `sig`/`key` to the LNURL's own query.
-
-The callback consumes the challenge, so it is sent exactly once. When a fallback is given it goes **first** — the pay/withdraw order (direct, then fallback) would let a browser deliver a direct request whose response CORS then hides, and the retry through the fallback would land on a used `k1` after the site had already logged the user in. The direct request runs only when the fallback throws, i.e. the proxy itself could not be reached; a failure the fallback relayed is final.
+LUD-04 logs the user into a third-party site. The whole request is in the scanned URL (`tag=login` plus the `k1` challenge), so `parseLnurlAuthTarget` recognizes a login without a network call. The linking key is the user's, so the package never holds it: `submitLnurlAuth` asks your `sign` for a signature over the challenge and appends `sig`/`key` to the LNURL's own query.
 
 ```ts
 import { parseLnurlAuthTarget, submitLnurlAuth } from "@linky-fit/linkshu";
@@ -119,7 +110,6 @@ import { parseLnurlAuthTarget, submitLnurlAuth } from "@linky-fit/linkshu";
 const login = async (scanned: string) => {
   const preview = parseLnurlAuthTarget(scanned);
   if (!preview) return null; // not a login target
-
   // Show `preview.domain` and `preview.action` and get consent before signing.
   await submitLnurlAuth({
     preview,
@@ -129,21 +119,19 @@ const login = async (scanned: string) => {
 };
 ```
 
-| Export                             | Returns                    | Notes                                                                                                                                              |
-| ---------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `parseLnurlAuthTarget(text)`       | `LnurlAuthPreview \| null` | accepts `lnurl1…`, `keyauth://`, and plain https; `{ action, domain, k1, requestUrl }`, no network                                                 |
-| `isLnurlAuthTarget(text)`          | `boolean`                  | the same check without the preview                                                                                                                 |
-| `submitLnurlAuth(args, fallback?)` | `Promise<void>`            | sends the callback once, through `fallback` first; resolves only on an explicit `status: "OK"`; throws the service's `reason` on `status: "ERROR"` |
+| Export                             | Returns                    | Notes                                                                                                                    |
+| ---------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `parseLnurlAuthTarget(text)`       | `LnurlAuthPreview \| null` | accepts `lnurl1…`, `keyauth://`, and plain https; `{ action, domain, k1, requestUrl }`, no network                       |
+| `isLnurlAuthTarget(text)`          | `boolean`                  | the same check without the preview                                                                                       |
+| `submitLnurlAuth(args, fallback?)` | `Promise<void>`            | sends the callback once; resolves only on an explicit `status: "OK"`, throws the service's `reason` on `status: "ERROR"` |
 
-`action` is the site's own word for what the login does (`login`, `register`, `link`, `auth`) and defaults to `login`; show it, because the user is consenting to it. An unconfirmed callback is an error rather than a silent success — a site that never confirmed has not logged the user in.
+The callback consumes the challenge, so it is sent exactly once, and a given `fallback` goes first (a direct browser request can succeed while CORS hides the response, and a retry would land on a used `k1`); the direct request runs only when the fallback could not be reached. `action` (`login`, `register`, `link`, `auth`; default `login`) is the site's own word for what the login does; show it. `LnurlAuthSigner` returns `{ publicKeyHex, signatureHex }`: the compressed secp256k1 linking key and a DER-encoded ECDSA signature.
 
-## Lightning address helpers (`lnurl/lightningAddress.ts`)
+## Lightning address helpers
 
-`isLightningAddress`, `splitLightningAddress` → `{ user, domain } | null`, `stripLightningPrefix`, `getLightningAddressRequestUrl` (lowercases user and domain; LUD-16 servers reject mixed case). All four are on the main entry.
+`isLightningAddress`, `splitLightningAddress` → `{ user, domain } | null`, `stripLightningPrefix`, and `getLightningAddressRequestUrl` (lowercases user and domain; LUD-16 servers reject mixed case). All four are on the main entry, and the same module is exported as `@linky-fit/linkshu/lightning-address` for bundles that must not pull in cashu-ts or Effect.
 
-The same file is also exported as **`@linky-fit/linkshu/lightning-address`**. Use the subpath when the importing code must not pull cashu-ts or Effect into its bundle — the web app's `utils/lightningAddress.ts` and the site's serverless functions.
-
-## Fiat rates (`fiatRates.ts`)
+## Fiat rates
 
 | Export                         | Use                                                                            |
 | ------------------------------ | ------------------------------------------------------------------------------ |
@@ -153,18 +141,15 @@ The same file is also exported as **`@linky-fit/linkshu/lightning-address`**. Us
 | `isFiatRatesStale(rates)`      | older than `FIAT_RATES_TTL_MS` (10 min) or null                                |
 | `FIAT_RATES_CACHE_STORAGE_KEY` | storage key for the cached JSON                                                |
 
-`useFiatRates.ts` shows the loop: read cache → if stale, fetch → write cache → repeat every TTL.
-
 ## Errors
 
 | Source                   | Failure shape                                                                               | What to do                                 |
 | ------------------------ | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| preview / amount helpers | `null` or an empty array                                                                    | treat as "unknown"; never throw            |
+| preview / amount helpers | `null` or an empty array                                                                    | treat as "unknown"; they never throw       |
 | LNURL fetchers           | thrown `Error` (message from the server's `reason` when present) or `LnurlTagMismatchError` | show the message; try the `fallback` proxy |
 | `fetchFiatRates`         | `null`, or a rejected promise on abort/network                                              | keep the last cached value                 |
 
 ## Related
 
-- [melt.md](./melt.md)
-- [topup.md](./topup.md) — LNURL-withdraw redeems against a topup invoice
-- [errors.md](./errors.md) — why these are not tagged errors
+- [melt.md](./melt.md), [topup.md](./topup.md)
+- [errors.md](./errors.md): why these are not tagged errors

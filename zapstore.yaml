@@ -1,4 +1,4 @@
-repository: https://github.com/hynek-jina/linky
+repository: https://github.com/linky-fit/linky
 release_source: ./apps/native-shell/android/app/build/outputs/apk/release/app-release.apk
 release_notes: ./CHANGELOG.md
 description: |

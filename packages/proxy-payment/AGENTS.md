@@ -1,13 +1,10 @@
 # @linky-fit/proxy-payment
 
-Usage guides for this package live in `docs/` (index: `docs/README.md`). Read the guide before changing the offer rules; it states the authorization order, the merge precedence and the selector contracts the app's effects rely on.
+Read [`docs/offers.md`](./docs/offers.md) before changing the offer rules; it states the authorization order, the merge precedence and the selector contracts a consumer's effects rely on. Design rules are in the [README](./README.md).
 
-## Keep the docs in sync
+## Rules that are easy to break
 
-Changing the public surface — anything exported from `src/index.ts` (the offer model, the reducer, selectors, drafts, stagger records, bank QR parsing) — or the behavior a guide describes, is done only when the matching `docs/*.md` file is updated in the same commit. Done means: every snippet in the touched guide still typechecks against the new surface and every table row still names a real field or status.
-
-## Rules
-
-- No React, no Evolu, no `window`/`localStorage`, no i18n. Device state (lease locks, stored bank QR payloads, stagger queues) and user-facing labels stay in the app; the package receives `nowSec` as an argument and never reads a clock.
-- Offers are keyed by peer pubkey and offer id, never by contact id or chat row. The app maps pubkeys to contacts at its edge.
-- `@linky-fit/linkstr` is a dependency for the snapshot facts, drafts and receipts only; the package never touches relays. The wire text templates live here because every outgoing draft needs them.
+- Every function that compares against "now" takes `nowSec`; nothing in the package reads a clock.
+- `applyBankPaymentOfferReceipt` trusts the receipt's content but applies the same staleness rules as `applyBankPaymentOfferSnapshot` (`isStaleFor`); a new rule goes into both paths.
+- The offerer's `accepted_by_other` overriding a pending `accepted` regardless of timestamp is deliberate; do not restore plain timestamp order.
+- When upgrading `bysquare`, keep the bounds from `patches/bysquare@4.0.0.patch` and run `src/bankQr/bysquareSafety.test.ts`.

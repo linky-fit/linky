@@ -56,7 +56,7 @@ For an `app.log` row call `reportAppLog` (`devtools/inspector/appLog.ts`); it st
 - **NEVER put key material in any field** — nsec, seed words, derived private keys,
   mint secrets, VAPID keys. An encoded cashu **token** (`cashuA`/`cashuB`) counts:
   its proofs carry the mint secrets that let any holder spend it, so log the token
-  *id*, amount, and mint, never the token text. Decrypted message *content* is
+  _id_, amount, and mint, never the token text. Decrypted message _content_ is
   acceptable by design (the settings copy discloses it); keys are not, in any form,
   including inside payloads. `redactInspectorSecrets` enforces both at the emit
   chokepoint.
@@ -75,8 +75,8 @@ For an `app.log` row call `reportAppLog` (`devtools/inspector/appLog.ts`); it st
 1. Pick channel (existing domain if possible) and a stable tag.
 2. Attach all correlating ids to `links`, location metadata to `context`.
 3. Gate emission behind `getInspectorEmissionEnabled()`.
-4. Add a glossary entry (`inspectorPage/inspectorGlossary.ts`) saying what the event
-   means and when it fires.
+4. Add a glossary entry (`apps/web-app/src/devtools/inspectorPage/inspectorGlossary.ts`)
+   saying what the event means and when it fires.
 5. Unit-test any schema touch with an export → import round-trip
    (`serializeInspectorLogsNdjson` → `parseInspectorNdjson`).
 6. Verify in the viewer (`#advanced/inspector` or dev `inspector.html`) that the new

@@ -1,25 +1,11 @@
 # Testing
 
-Two helper sets give you throwaway identities, transport stubs, an in-memory relay, and a polling helper, so a vertical test runs in milliseconds with no network:
+Two helper sets give you throwaway identities, transport stubs, an in-memory relay and a polling helper, so a test runs in milliseconds with no network:
 
-- `@linky-fit/linkstr/testing`, a public subpath of the linkstr package, for tests in any workspace.
-- `@linky-fit/linkstr-react/testing`, the same for linkstr-react: `configWith`, `settle`, `fakeTransport`, and a re-export of `makeIdentity`.
+- `@linky-fit/linkstr/testing`, a public subpath of the linkstr package. It requires Vitest 4 as an optional peer (`bun add --dev vitest`); the main entry does not.
+- `@linky-fit/linkstr-react/testing`, the same for linkstr-react: `configWith`, `settle`, `fakeTransport`, `fakeTransportLayer`, `relayA`, `relayB`, and a re-export of `makeIdentity`.
 
-Never import either from production code.
-
-The published `@linky-fit/linkstr/testing` entry requires Vitest 4 as an optional peer.
-Install it in a test project with `bun add --dev vitest`; use these helpers inside
-a Vitest run. The main `@linky-fit/linkstr` entry does not require Vitest.
-
-## Running tests
-
-Tests are Vitest, live next to their subject as `*.test.ts`, and use globals: `describe`, `it`, `expect`, and `assert` need no import (`vitest.config.ts` sets `globals: true`; `tsconfig.test.json` adds the types).
-
-```bash
-bun run --filter @linky-fit/linkstr test                 # one package
-cd packages/linkstr && bunx vitest run reactions     # files matching a name
-bun run test                                         # every workspace
-```
+Never import either from production code. Build inbound fixtures through the public send API where you can, as below.
 
 ## `@linky-fit/linkstr/testing`
 
@@ -259,14 +245,7 @@ it("retracts through the configured transport", async () => {
 
 For stream atoms (`wrapInboxAtom`, `outboxResultsAtom`, `relayHealthAtom`), set the handler atom, then `registry.mount(atom)` and `expect.poll` on what the handler collected; unmount at the end.
 
-## Rules
-
-- Never import `@linky-fit/linkstr/testing` or `@linky-fit/linkstr-react/testing` from production code. Both packages exclude their `testing` directory from the app build.
-- Extend these helpers instead of redeclaring fixtures per test file.
-- Build inbound fixtures through the public send API where you can, as above; tests that need an independent implementation may use `nostr-tools` directly (it is a devDependency for that reason).
-
 ## Related
 
-- [getting-started.md](./getting-started.md)
 - [inbox.md](./inbox.md), [outbox.md](./outbox.md) — what the fakes are driving
 - [react.md](./react.md)

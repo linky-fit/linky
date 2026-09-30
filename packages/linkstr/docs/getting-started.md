@@ -1,16 +1,6 @@
 # Getting started
 
-`@linky-fit/linkstr` is Linky's Nostr protocol as a typed library: hand in a draft, get a receipt back, and consume everything inbound as one tagged union. Raw Nostr events never cross the package boundary. This page takes you from two keys to a delivered message and its inbox echo, in one file you run.
-
-## Core concepts
-
-- **Services per vertical.** Each protocol feature is an Effect service (`Chat`, `Reactions`, `Profiles`, `WrapInbox`, …): `yield* Chat`, then call a method.
-- **Drafts in, receipts out, facts back.** A send takes a draft (`TextMessageDraft`, `ReactionDraft`, …) and returns a receipt. Inbound arrives as `WrapInboxEvent`, a union you switch on by `_tag`.
-- **Gift-wrapped vs plain.** Private verticals (chat, reactions, receipts, notices, offers) travel encrypted inside kind-1059 gift wraps and are read through one `WrapInbox` subscription. Public verticals (profiles, relay lists, mute list) are plain signed events with their own fetch and watch calls.
-- **Honest delivery.** A private send publishes one copy to you and one to the peer, and succeeds only when a relay accepted the peer's copy; otherwise you get `RecipientNotReached` or `NoRelayReachable`. The [outbox](./outbox.md) adds retries when you want a queue.
-- **Branded types, typed errors.** Keys, pubkeys, relay urls, and ids are branded (`NostrSecretKey`, `Pubkey`, `RelayUrl`, `RumorId`) and built with exported codecs. Every failure is a tagged error you match on.
-
-[concepts.md](./concepts.md) defines the vocabulary (rumor, gift wrap, own echo, EOSE) and goes deeper on each point.
+Hand in a draft, get a receipt back, consume everything inbound as one tagged union. This page takes you from two keys to a delivered message and its inbox echo, and explains the two ways to run the package.
 
 ## Install
 
@@ -18,16 +8,12 @@
 bun add @linky-fit/linkstr effect
 ```
 
-The package ships ESM and TypeScript declarations for Node 22.14+ and modern browser bundlers. Inside the Linky monorepo, keep using `"@linky-fit/linkstr": "workspace:*"`. The `linkstr-react` entries below are private workspace packages and are not included in the npm release.
-
-## Import paths
-
-| Path                               | What you get                                                                                                   |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `@linky-fit/linkstr`               | services, drafts, receipts, facts, key codecs, `runLinkstr`, `linkstrServices`                                 |
-| `@linky-fit/linkstr/testing`       | `makeIdentity`, publish stubs, `FakeRelay`, `stubStorage`; tests only ([testing.md](./testing.md))             |
-| `@linky-fit/linkstr-react`         | effect-atom bindings for the web app ([react.md](./react.md))                                                  |
-| `@linky-fit/linkstr-react/testing` | `configWith`, `settle`, `fakeTransport`; tests only ([testing.md](./testing.md#linky-fitlinkstr-reacttesting)) |
+| Import path                        | What you get                                                                                       |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `@linky-fit/linkstr`               | services, drafts, receipts, facts, key codecs, `runLinkstr`, `linkstrServices`                     |
+| `@linky-fit/linkstr/testing`       | `makeIdentity`, publish stubs, `FakeRelay`, `stubStorage`; tests only ([testing.md](./testing.md)) |
+| `@linky-fit/linkstr-react`         | effect-atom bindings for React ([react.md](./react.md)); a private workspace, not on npm           |
+| `@linky-fit/linkstr-react/testing` | `configWith`, `settle`, `fakeTransport`; tests only                                                |
 
 Never import `nostr-tools` in consumer code; the codecs in [identity-and-keys.md](./identity-and-keys.md) cover keys and ids.
 
@@ -35,19 +21,56 @@ Never import `nostr-tools` in consumer code; the codecs in [identity-and-keys.md
 
 1. Your `NostrSecretKey`: `decodeNsec("nsec1…")`.
 2. The peer's `Pubkey`: `parsePubkey(str)` accepts `npub1…` or 64-hex.
-3. `RelayUrl`s: `Schema.is(RelayUrl)` narrows a string; `RelayUrl.make(str)` throws on a bad one.
+3. `RelayUrl`s: `Schema.is(RelayUrl)` narrows a string; `RelayUrl.make(str)` throws on a bad one. `wss://` only, except loopback `ws://` for local development ([concepts.md](./concepts.md#branded-primitives)).
 
-The two decoders return `null` on bad input instead of throwing. Check for it before you build a config; the script below stops on the first bad input.
+Both decoders return `null` on bad input instead of throwing; check before building a config.
+
+## Two ways to run
+
+Both take `secretKey`, `readRelays` and `writeRelays` (arrays of `RelayUrl`) and both accept optional `outboxStore` and `inboxCursorStore` layers (default: in-memory, so nothing survives a restart) and a `transport` layer (a test seam).
+
+**`runLinkstr(config, effect)`** is the one-shot Promise runner: it builds every service over the config, runs the effect, and closes the relay pool. Use it in scripts, service workers and tests. Two calls mean two pools. `writeRelays` defaults to `[]` for read-only consumers; `allowInsecureLocalhost: true` lets the default transport open loopback `ws://` relays.
+
+**`linkstrServices(config)`** is the same composition as a `Layer`, for a runtime that outlives one call (a long-running process, a React app). `writeRelays` and `transport` are required; the usual transport is `NostrTransportSimplePool`, or `makeNostrTransportSimplePool({ allowInsecureLocalhost: true })` for a local relay. Decorate the transport first when you want observability ([diagnostics.md](./diagnostics.md)):
+
+```ts
+import { Effect, ManagedRuntime } from "effect";
+import {
+  Chat,
+  linkstrServices,
+  NostrTransportSimplePool,
+  type NostrSecretKey,
+  type RelayUrl,
+} from "@linky-fit/linkstr";
+
+export const makeRuntime = (
+  secretKey: NostrSecretKey,
+  relays: ReadonlyArray<RelayUrl>,
+) =>
+  ManagedRuntime.make(
+    linkstrServices({
+      secretKey,
+      readRelays: relays,
+      writeRelays: relays,
+      transport: NostrTransportSimplePool,
+    }),
+  );
+
+// runtime.runPromise(Effect.flatMap(Chat, (chat) => chat.sendText(draft)))
+// runtime.dispose() closes the pool and every subscription.
+```
+
+In React neither is called by hand: `@linky-fit/linkstr-react` builds the layer from `linkstrConfigAtom` and rebuilds it on every config change ([react.md](./react.md)).
 
 ## First run
 
-You need two keys: yours and the peer's. Generate throwaway keys in the project where you installed the package.
+Generate two throwaway keys:
 
 ```bash
 bun -e 'import { NostrSecretKey, derivePubkey, encodeNpub, encodeNsec } from "@linky-fit/linkstr"; const secretKey = NostrSecretKey.make(crypto.getRandomValues(new Uint8Array(32))); console.log(encodeNsec(secretKey), encodeNpub(derivePubkey(secretKey)));'
 ```
 
-Run it twice. Keep the first `nsec` as `NSEC` and the second `npub` as `PEER`. Save this as `firstRun.ts` in the project where you installed the package:
+Run it twice; keep the first `nsec` as `NSEC` and the second `npub` as `PEER`. Save this as `firstRun.ts`:
 
 ```ts
 import { Effect, Option, Schema, Stream } from "effect";
@@ -100,7 +123,7 @@ const sendHello = () =>
       Effect.catchTags({
         RecipientNotReached: (error) =>
           Effect.succeed(
-            `peer copy rejected by ${error.recipientCopy.rejectedBy.length} relay(s); nothing to retry automatically`,
+            `peer copy rejected by ${error.recipientCopy.rejectedBy.length} relay(s)`,
           ),
         NoRelayReachable: () =>
           Effect.succeed("no relay accepted anything; is RELAY up?"),
@@ -143,14 +166,11 @@ console.log(await sendHello());
 console.log(await printFirstInboxEvent());
 ```
 
-Start the local relay from the repo root and run the file:
-
 ```bash
-docker compose -f docker-compose.dev.yml up -d --wait nostr-relay
-NSEC=nsec1… PEER=npub1… RELAY=ws://localhost:7777 bun run packages/linkstr/firstRun.ts
+NSEC=nsec1… PEER=npub1… RELAY=wss://relay.example bun run firstRun.ts
 ```
 
-Expected output (ids shortened here; yours are 64 hex chars and match on both lines):
+Expected output (ids shortened; yours are 64 hex chars and match on both lines):
 
 ```
 sent 9049fbe8…: peer copy accepted by 1 relay(s)
@@ -159,30 +179,11 @@ backfill OwnChatMessageConfirmed 9049fbe8…
 
 What happened:
 
-- `runLinkstr` built every service over the key and relays, ran the effect, and closed the relay pool. Two calls, two pools.
-- `Chat.sendText` wrapped the message twice, once to the peer and once to you, and the receipt reports both copies. `catchTags` turns the two delivery failures into strings; any other failure rejects the promise.
-- `WrapInbox.open` subscribed to kind 1059 for your pubkey. A `Scope` owns the subscription; leaving `Effect.scoped` closes it. The first event is your own copy coming back, an **own echo** tagged `OwnChatMessageConfirmed`, with the same rumor id the receipt gave you. `backfill` means the relay served it from storage, before its EOSE marker. See [inbox.md](./inbox.md).
+- `Chat.sendText` wrapped the message twice, once to the peer and once to you, and the receipt reports both copies. `catchTags` turns the two delivery failures into strings; anything else rejects the promise.
+- `WrapInbox.open` subscribed to kind 1059 for your pubkey inside a `Scope`; leaving `Effect.scoped` closes it. The first event is your own copy coming back, an **own echo** tagged `OwnChatMessageConfirmed`, with the rumor id the receipt gave you. `backfill` means the relay served it from storage ([inbox.md](./inbox.md)).
 
-Point `RELAY` at a closed port and the lines become `no relay accepted anything; is RELAY up?` and `nothing arrived in 20 s`. A bad `NSEC` stops before any network call: `error: NSEC is not a valid nsec`.
-
-Delete `firstRun.ts` when you are done; it is not part of the package.
-
-The example opts into loopback WS for the local relay. Leave `allowInsecureLocalhost` unset in production. `makeNostrTransportSimplePool({ allowInsecureLocalhost: true })` provides the equivalent layer for direct composition; `NostrTransportSimplePool` requires WSS. Custom transports are responsible for their own connection policy.
-
-## Two ways to run
-
-Both take `secretKey`, `readRelays`, and `writeRelays` (arrays of `RelayUrl`).
-
-- **`runLinkstr(config, effect)`**: one-shot, as above. Builds the services, runs the effect, tears down the pool. Use it in the service worker, scripts, and tests. `writeRelays` defaults to `[]` for read-only consumers; optional `outboxStore`, `inboxCursorStore`, and `transport` (test seam). Both stores default to memory, so a runner that opens the inbox and wants to resume from its last checkpoint passes an `InboxCursorStore` ([inbox.md](./inbox.md#the-cursor-and-inboxcursorstore)).
-- **`linkstrServices(config)`**: the same composition as a `Layer`, for a runtime that outlives one call. `writeRelays` and `transport` (normally `NostrTransportSimplePool`) are required; `outboxStore` and `inboxCursorStore` are optional and default to memory. In React do not use it by hand: `@linky-fit/linkstr-react` builds this layer from `linkstrConfigAtom` and rebuilds it on identity change ([react.md](./react.md)).
+Point `RELAY` at a closed port and the lines become `no relay accepted anything; is RELAY up?` and `nothing arrived in 20 s`. A bad `NSEC` stops before any network call. `allowInsecureLocalhost` is only needed for a `ws://localhost` relay; leave it unset in production.
 
 ## Next
 
-Pick the guide for the vertical you need from the [guide index](./README.md). Each opens with a working example and ends with its error table.
-
-## Related
-
-- [concepts.md](./concepts.md) — vocabulary, the mental model, and a minimal Effect primer
-- [react.md](./react.md) — the atoms you use inside the web app
-- [testing.md](./testing.md) — stubs and fakes for unit tests
-- [../README.md](../README.md) — design rules and their rationale
+Pick the guide for the vertical you need from the [index](./README.md). [concepts.md](./concepts.md) defines the vocabulary used everywhere and holds the shared error table.

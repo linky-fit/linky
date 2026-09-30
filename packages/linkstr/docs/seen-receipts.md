@@ -4,8 +4,6 @@
 
 ## Quick example
 
-Headless:
-
 ```ts
 import { Effect } from "effect";
 import {
@@ -13,71 +11,52 @@ import {
   SeenReceipts,
   UnixSeconds,
   runLinkstr,
+  type NostrSecretKey,
+  type Pubkey,
+  type RelayUrl,
 } from "@linky-fit/linkstr";
 
-await runLinkstr(
-  { secretKey, readRelays, writeRelays },
-  Effect.gen(function* () {
-    const receipts = yield* SeenReceipts;
-    return yield* receipts.send(
-      new SeenReceiptDraft({
-        to: peer,
-        sinceSec: UnixSeconds.make(receiptsEnabledAtSec),
-        seenUpToSec: UnixSeconds.make(newestSeenMessageSec),
-      }),
-    );
-  }),
-);
+const reportSeen = (
+  secretKey: NostrSecretKey,
+  relays: ReadonlyArray<RelayUrl>,
+  peer: Pubkey,
+  receiptsEnabledAtSec: number,
+  newestSeenMessageSec: number,
+) =>
+  runLinkstr(
+    { secretKey, readRelays: relays, writeRelays: relays },
+    Effect.flatMap(SeenReceipts, (receipts) =>
+      receipts.send(
+        new SeenReceiptDraft({
+          to: peer,
+          sinceSec: UnixSeconds.make(receiptsEnabledAtSec),
+          seenUpToSec: UnixSeconds.make(newestSeenMessageSec),
+        }),
+      ),
+    ),
+  );
 ```
 
-React:
-
-```ts
-import { SeenReceiptDraft, UnixSeconds } from "@linky-fit/linkstr";
-import { sendSeenReceiptAtom, useAtomSet } from "@linky-fit/linkstr-react";
-import { Exit } from "effect";
-
-const sendSeenReceipt = useAtomSet(sendSeenReceiptAtom, {
-  mode: "promiseExit",
-});
-
-const exit = await sendSeenReceipt(
-  new SeenReceiptDraft({
-    to: peer,
-    sinceSec: UnixSeconds.make(receiptsEnabledAtSec),
-    seenUpToSec: UnixSeconds.make(newestSeenMessageSec),
-  }),
-);
-if (Exit.isFailure(exit)) rollBackSentCursor(peer); // the next trigger resends a superseding receipt
-```
+In React use `sendSeenReceiptAtom` ([react.md](./react.md)). When a send fails, roll your local "sent up to" value back; the next trigger resends a superseding receipt.
 
 ## The cursor model
 
 - `seenUpToSec` — the newest `sentAt` you have seen from this peer. It travels as the rumor content.
 - `sinceSec` — your receipts-enabled baseline, sent as the `since` tag. Messages older than it stay unmarked on the peer's side, so turning the feature on never retroactively marks history as read.
-- The decoder rejects `sinceSec >= seenUpToSec`.
+- The codec rejects `sinceSec >= seenUpToSec` on both ends.
 - Every receipt supersedes all earlier ones for that peer. Keep an "already reported up to" value per peer and only send when the cursor moves forward; seed that value from `OwnSeenReceiptConfirmed` so a second device or a fresh session does not resend what the peer already has.
 
 ## Sending
 
-| Draft              | Fields                                                                                                           |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `SeenReceiptDraft` | `to: Pubkey`, `sinceSec: UnixSeconds`, `seenUpToSec: UnixSeconds`, `clientId?: ClientId`, `sentAt?: UnixSeconds` |
+`SeenReceiptDraft`: `to: Pubkey`, `sinceSec: UnixSeconds`, `seenUpToSec: UnixSeconds`, `clientId?: ClientId`, `sentAt?: UnixSeconds`. `send` returns a `SeenReceiptSendReceipt` (`rumorId`, `clientId`, `sentAt`, `selfCopy`, `recipientCopy`).
 
-| Receipt                  | Fields                                                                                   |
-| ------------------------ | ---------------------------------------------------------------------------------------- |
-| `SeenReceiptSendReceipt` | `rumorId`, `clientId`, `sentAt`, `selfCopy: WrapDelivery`, `recipientCopy: WrapDelivery` |
-
-Direct only, and silent by design:
-
-- Not through the outbox. A retried receipt would republish a cursor that a later receipt already superseded. A lost send self-heals on the next trigger (new message, tab refocus, route re-entry) because that receipt carries the newer cursor anyway.
-- No `["linky", "push"]` marker on either wrap, so a receipt never produces a notification.
+Direct only, and silent by design: not an outbox operation, because a retried receipt would republish a cursor that a later receipt already superseded, and a lost send self-heals on the next trigger. No `["linky", "push"]` marker on either wrap, so a receipt never produces a notification.
 
 ## Wire format
 
-Codec: `seenReceipts/codec.ts`. Two gift wraps, self and peer, never push-marked ([wire conventions](./concepts.md#wire-conventions)).
+Two gift wraps, self and peer, never push-marked ([wire conventions](./concepts.md#wire-conventions)).
 
-Kind 24136. Tags, in order: `p` to, `p` author, `client`, `["linky", "seen_receipt"]`, `["since", sinceSec]`. Content: `seenUpToSec` as a decimal string. Both numbers must be positive integers of at most eleven digits with `since` below the content, or the wrap is dropped as `invalid-seen-receipt`.
+Kind 24136. Tags, in order: `p` to, `p` author, `client`, `["linky", "seen_receipt"]`, `["since", sinceSec]`. Content: `seenUpToSec` as a decimal string. Both numbers must be positive integers of at most eleven digits with `since` below the content.
 
 ## Receiving
 
@@ -86,40 +65,15 @@ Kind 24136. Tags, in order: `p` to, `p` author, `client`, `["linky", "seen_recei
 | `SeenReceiptReceived`     | `receiptId: RumorId`, `from: Pubkey`, `sinceSec: UnixSeconds`, `seenUpToSec: UnixSeconds`, `sentAt` | the peer has seen your messages in `(sinceSec, seenUpToSec]` |
 | `OwnSeenReceiptConfirmed` | `receiptId`, `to: Pubkey`, `sinceSec`, `seenUpToSec`, `clientId: ClientId \| null`, `sentAt`        | your own receipt echoed; `to` is the peer it was sent to     |
 
-```ts
-import type { WrapInboxEvent } from "@linky-fit/linkstr";
+Apply `SeenReceiptReceived` monotonically (ignore anything that does not move the peer's cursor forward) and treat `seenUpToSec` as untrusted input: clamp it to shortly after "now" so a far-future cursor cannot mark everything seen forever. Record `OwnSeenReceiptConfirmed.seenUpToSec` as "already reported up to" for `to`.
 
-const onEvent = (event: WrapInboxEvent): void => {
-  switch (event._tag) {
-    case "SeenReceiptReceived":
-      // Monotonic: ignore anything that does not move the peer's cursor forward.
-      return advancePeerSeen(event.from, {
-        sinceSec: event.sinceSec,
-        seenUpToSec: event.seenUpToSec,
-      });
-    case "OwnSeenReceiptConfirmed":
-      return recordSentSeenReceipt(event.to, event.seenUpToSec);
-    default:
-      return;
-  }
-};
-```
-
-Treat `seenUpToSec` from a peer as untrusted input: the app clamps it to shortly after "now" so a far-future cursor cannot mark everything seen forever.
-
-Drop reasons: `invalid-seen-receipt` (missing `linky` tag, unparsable seconds, `since >= seenUpTo`, or own copy without a peer p-tag) and `not-addressed-to-me`.
+Drop reasons this codec adds ([the full table](./inbox.md#authentication-and-drop-reasons)): `invalid-seen-receipt` (missing `linky` tag, unparsable seconds, `since >= seenUpTo`, or own copy without a peer `p` tag) and `not-addressed-to-me` (a peer's receipt that does not tag you).
 
 ## Errors
 
-| Tag                    | When                                  | What to do                                                       |
-| ---------------------- | ------------------------------------- | ---------------------------------------------------------------- |
-| `RecipientNotReached`  | self copy landed, peer's copy did not | roll the local "sent up to" value back; the next trigger resends |
-| `NoRelayReachable`     | nothing accepted                      | same                                                             |
-| `LinkstrNotConfigured` | React only, logged out                | do not send                                                      |
+`RecipientNotReached` or `NoRelayReachable`; see [the error table](./concepts.md#errors). In both cases roll the local "sent up to" value back.
 
 ## Related
 
 - [chat.md](./chat.md) — the messages the cursor covers
 - [inbox.md](./inbox.md) — delivery of the facts above
-- [reactions.md](./reactions.md) — the own-echo split this codec mirrors
-- `docs/architecture.md` — "Linkstr protocol package", seen-receipts paragraph, for the design rationale

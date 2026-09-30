@@ -17,6 +17,6 @@ const shards = useVisibleShards(store, "transactions"); // [{ index, owner }, ..
 
 A `LiveSource` is anything with an `all` effect and a `subscribe(listener)` that returns an unsubscribe: every repository is one, and a store query paired with the matching subscription makes another. Pass a stable source (a memoized repository, or `useMemo` around an ad hoc pair); a new object every render re-subscribes every render. Reads are sequenced, so a slow earlier read cannot overwrite a later one.
 
-The hooks do not suspend. The app resolves the store once before its shell mounts and reads it with `React.use`; the first render of a hook then shows the empty value for one round trip to the database.
+The hooks do not suspend; the first render shows the initial value for one round trip to the database.
 
 Scope subscriptions also notify repository readers after pointer changes and explicit forgetting, so a mounted chat drops forgotten history without a reload.

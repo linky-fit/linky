@@ -1,12 +1,8 @@
 # Reactions
 
-`Reactions` adds an emoji to a chat message and takes it back. A reaction is a NIP-25 kind 7 rumor; a retraction is a NIP-09 kind 5 rumor listing the reaction ids. Both are gift-wrapped (kind 1059) to the peer and to yourself. In the app, `react` goes through the outbox and `retract` sends direct.
+`Reactions` adds an emoji to a chat message and takes it back. A reaction is a NIP-25 kind 7 rumor; a retraction is a NIP-09 kind 5 rumor listing the reaction ids. Both are gift-wrapped (kind 1059) to the peer and to yourself. `react` is also an outbox operation (`reaction`); `retract` is direct only.
 
 ## Quick example
-
-Prerequisites: a `NostrSecretKey`, relay urls, the peer's `Pubkey`, and the `RumorId` of a message you received — see [getting-started.md](./getting-started.md) and [chat.md](./chat.md).
-
-Headless:
 
 ```ts
 import { Effect } from "effect";
@@ -14,6 +10,7 @@ import {
   Emoji,
   ReactionDraft,
   Reactions,
+  RetractionDraft,
   runLinkstr,
   type NostrSecretKey,
   type Pubkey,
@@ -21,7 +18,7 @@ import {
   type RumorId,
 } from "@linky-fit/linkstr";
 
-const react = (
+const reactThenRetract = (
   secretKey: NostrSecretKey,
   relays: ReadonlyArray<RelayUrl>,
   peer: Pubkey,
@@ -31,7 +28,7 @@ const react = (
     { secretKey, readRelays: relays, writeRelays: relays },
     Effect.gen(function* () {
       const reactions = yield* Reactions;
-      return yield* reactions.react(
+      const reaction = yield* reactions.react(
         new ReactionDraft({
           to: peer,
           target: messageId,
@@ -40,100 +37,38 @@ const react = (
           emoji: Emoji.make("👍"),
         }),
       );
+      return yield* reactions.retract(
+        new RetractionDraft({ to: peer, reactionIds: [reaction.rumorId] }),
+      );
     }),
   );
 ```
 
-The promise resolves with a `ReactionReceipt` once a relay accepted the peer's copy; `receipt.rumorId` is the reaction id a retraction refers to.
-
-React — the app's split: react through the outbox, retract directly. `ReactionStore` stands in for your own persistence; the rumor id saved after enqueue is what you read back to retract:
-
-```ts
-import {
-  ClientId,
-  OutboxRef,
-  ReactionDraft,
-  RetractionDraft,
-  type Emoji,
-  type Pubkey,
-  type RumorId,
-} from "@linky-fit/linkstr";
-import {
-  enqueueOutboxAtom,
-  retractReactionAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
-import { Exit } from "effect";
-
-interface ReactionStore {
-  // Placeholders for your persistence layer, keyed by your local row id.
-  insertPending: (target: RumorId, emoji: Emoji, clientId: ClientId) => string;
-  saveRumorId: (localRowId: string, rumorId: RumorId) => void;
-  takeRumorId: (localRowId: string) => RumorId | null; // reads it back and removes the row
-}
-
-export const useReactions = (store: ReactionStore) => {
-  const enqueueOutbox = useAtomSet(enqueueOutboxAtom, { mode: "promiseExit" });
-  const retract = useAtomSet(retractReactionAtom, { mode: "promiseExit" });
-
-  const react = async (peer: Pubkey, target: RumorId, emoji: Emoji) => {
-    const clientId = ClientId.make(crypto.randomUUID());
-    const localRowId = store.insertPending(target, emoji, clientId);
-    const draft = new ReactionDraft({
-      to: peer,
-      target,
-      targetKind: "text",
-      targetAuthor: peer,
-      emoji,
-      clientId,
-    });
-    const enqueued = await enqueueOutbox({
-      op: { _tag: "reaction", draft },
-      ref: OutboxRef.make(`reaction:${localRowId}`),
-    });
-    if (Exit.isSuccess(enqueued))
-      store.saveRumorId(localRowId, enqueued.value.rumorId);
-  };
-
-  const unreact = async (peer: Pubkey, localRowId: string) => {
-    const reactionId = store.takeRumorId(localRowId);
-    if (reactionId === null) return false;
-    const retracted = await retract(
-      new RetractionDraft({ to: peer, reactionIds: [reactionId] }),
-    );
-    // A failed direct send queues nothing: offer a retry, or the peer keeps the reaction.
-    return Exit.isSuccess(retracted);
-  };
-
-  return { react, unreact };
-};
-```
-
-Enqueue success only means the job is persisted and `rumorId` is fixed. Relay acceptance arrives later on the outbox results stream as a `ReactionReceipt` keyed by your `ref` ([outbox.md](./outbox.md)).
+`react` resolves with a `ReactionReceipt` once a relay accepted the peer's copy; `receipt.rumorId` is the reaction id a retraction refers to. To queue a reaction instead, enqueue `{ _tag: "reaction", draft }` ([outbox.md](./outbox.md)) and read the rumor id from the `EnqueueReceipt`.
 
 ## Sending
 
-`ReactionDraft` takes `to`, `target`, `targetKind` (`"text"` | `"image"`), `targetAuthor`, `emoji`, and optional `clientId` / `sentAt`. `RetractionDraft` takes `to`, `reactionIds` (non-empty), and optional `clientId`.
+`ReactionDraft` takes `to`, `target`, `targetKind` (`"text"` | `"image"`), `targetAuthor`, `emoji`, and optional `clientId` / `sentAt`. `RetractionDraft` takes `to`, `reactionIds` (non-empty) and optional `clientId`.
 
 - `target` is the message's rumor id (`ChatMessageReceived.messageId` or the `rumorId` from your own send). `targetKind` becomes the `k` tag (`14` or `15`).
 - `to` is always the conversation peer. `targetAuthor` is p-tagged so foreign clients attribute the reaction: the peer for their message, your own pubkey for yours.
 - `Emoji` is a non-empty trimmed string of at most 32 characters.
-- One reaction per user per message is app policy, not linkstr's: the app retracts its previous reaction before sending a new one.
+- One reaction per user per message is your policy, not linkstr's: retract the previous reaction before sending a new one if that is what you want.
 
-`ReactionReceipt` and `RetractionReceipt` both carry `rumorId`, `clientId`, `sentAt`, `selfCopy: WrapDelivery`, and `recipientCopy: WrapDelivery`. Neither wrap is push-marked: reactions never wake the push server.
+`ReactionReceipt` and `RetractionReceipt` both carry `rumorId`, `clientId`, `sentAt`, `selfCopy` and `recipientCopy`. Neither wrap is push-marked: reactions never wake a push server.
 
-Direct vs outbox: `Reactions.react` is available directly, but the app enqueues it (`{ _tag: "reaction", draft }`) so a reaction tapped offline is delivered later. Retractions stay direct: the app removes the local row immediately, and when the send fails nothing is queued — the user's next tap sends a fresh retraction.
+Retractions are direct because a failed undo is cheap to repeat: remove the local row at once, and if the send fails the next tap sends a fresh retraction.
 
 ## Wire format
 
-Codec: `reactions/codec.ts`. Two gift wraps, self and peer, never push-marked ([wire conventions](./concepts.md#wire-conventions)).
+Two gift wraps, self and peer, never push-marked ([wire conventions](./concepts.md#wire-conventions)).
 
 | Send       | Kind | Tags, in order                                                               | Content   |
 | ---------- | ---- | ---------------------------------------------------------------------------- | --------- |
 | reaction   | 7    | `p` targetAuthor, `p` to, `p` author, `e` target, `k` `14` or `15`, `client` | the emoji |
 | retraction | 5    | `p` to, `p` author, one `e` per retracted reaction id, `client`              | empty     |
 
-The reaction's `e` tag is the target message's rumor id, the same id in both users' inboxes. Decoding requires an `e` tag holding a rumor id, an `Emoji` content, and a `k` tag that is absent, `14`, or `15`. A retraction keeps the `e` values that are rumor ids and needs at least one.
+The reaction's `e` tag is the target message's rumor id, the same id in both users' inboxes. Decoding requires an `e` tag holding a rumor id, an `Emoji` content, and a `k` tag that is absent, `14` or `15`. A retraction keeps the `e` values that are rumor ids and needs at least one.
 
 ## Receiving
 
@@ -177,22 +112,16 @@ export const reactionHandler =
   };
 ```
 
-Two things the app handles that linkstr leaves to you: a reaction may arrive before its target message (the app defers it and retries when messages change), and a retraction only applies to reactions authored by the retractor — `ReactionRetracted.from` is the authorship scope.
+Two things linkstr leaves to you: a reaction may arrive before its target message (defer it and retry when messages change), and a retraction only applies to reactions authored by the retractor — `ReactionRetracted.from` is the authorship scope.
 
-Drop reasons: `invalid-reaction` (no `e` tag, a `k` tag other than `14`/`15`, or an invalid emoji) and `invalid-retraction` (no `e` tag that is a rumor id). A kind 5 with a mix of rumor ids and foreign ids keeps the rumor ids.
+Drop reasons this codec adds ([the full table](./inbox.md#authentication-and-drop-reasons)): `invalid-reaction` (no `e` tag, a `k` tag other than `14` / `15`, or an invalid emoji) and `invalid-retraction` (no `e` tag that is a rumor id).
 
 ## Errors
 
-| Tag                    | When                                                 | What to do                                     |
-| ---------------------- | ---------------------------------------------------- | ---------------------------------------------- |
-| `RecipientNotReached`  | self copy accepted, peer's copy accepted by no relay | retry; through the outbox this happens for you |
-| `NoRelayReachable`     | no relay accepted anything                           | offline; retry later                           |
-| `OutboxJobFailed`      | `identity-changed` or `unexpected-error` terminal    | mark the local row failed                      |
-| `LinkstrNotConfigured` | React only, logged out                               | do not send                                    |
+Direct sends fail with `RecipientNotReached` or `NoRelayReachable`; a queued reaction surfaces only `OutboxJobFailed` on the results stream. See [the error table](./concepts.md#errors).
 
 ## Related
 
 - [chat.md](./chat.md) — the messages you react to
-- [outbox.md](./outbox.md) — `enqueueOutboxAtom`, results, refs
+- [outbox.md](./outbox.md) — queuing reactions
 - [inbox.md](./inbox.md) — where the facts come from
-- [adding-a-vertical.md](./adding-a-vertical.md) — this is the reference vertical the template is based on

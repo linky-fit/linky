@@ -8,6 +8,8 @@ export const contentSecurityPolicyMeta = (): Plugin => {
     name: "csp-meta",
     apply: "build",
     configResolved(config) {
+      // The only way a production build's CSP admits local http/ws services;
+      // the E2E image sets it and keeps CSP active, production never does.
       allowLocalhost = config.env.VITE_ALLOW_INSECURE_LOCALHOST_RELAYS === "1";
     },
     transformIndexHtml: {

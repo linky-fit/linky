@@ -1,10 +1,8 @@
 # Topup
 
-`Topup` receives over Lightning: it creates a mint quote, hands you the invoice to display, waits for it to be paid, and mints the proofs into the balance. Use it for "receive via Lightning", LNURL-withdraw, and (via `adopt`) invoices a lightning-address server paid on the wallet's behalf.
+`Topup` receives over Lightning: it creates a mint quote, hands you the invoice to display, waits for it to be paid, and mints the proofs into the balance. `adopt` mints a quote some other party created and paid on the wallet's behalf.
 
-## Quick example
-
-Prerequisites: a seed ([getting-started.md](./getting-started.md)) and the dev mint, which auto-pays its own invoices: `docker compose -f docker-compose.dev.yml up -d --wait cashu-mint`. Against a real mint, pay the printed invoice from another wallet.
+## Example
 
 ```ts
 import { Effect } from "effect";
@@ -17,17 +15,14 @@ import {
 } from "@linky-fit/linkshu";
 import type { Bip39Seed } from "@linky-fit/linkshu";
 
-const topupOnce = (bip39Seed: Bip39Seed) =>
+const topupOnce = (bip39Seed: Bip39Seed, mint: MintUrl) =>
   runLinkshu(
     { bip39Seed },
     Effect.scoped(
       Effect.gen(function* () {
         const topup = yield* Topup;
         const handle = yield* topup.start(
-          new TopupDraft({
-            mint: MintUrl.make("http://localhost:3338"),
-            amount: Amount.make(1000),
-          }),
+          new TopupDraft({ mint, amount: Amount.make(1000) }),
         );
         console.log("pay this:", handle.quote.invoice);
         const receipt = yield* handle.result; // resolves once paid and minted
@@ -37,20 +32,20 @@ const topupOnce = (bip39Seed: Bip39Seed) =>
   );
 ```
 
-`start` needs a `Scope`: the poll and any websocket subscription run as fibers in that scope. Close the scope and both stop; the persisted `topup` operation stays claimable through `resumePending`.
+`start` needs a `Scope`: the poll and any websocket subscription run as fibers in it. Close the scope and both stop; the persisted `topup` operation stays claimable through `resumePending`. `TopupHandle` is `{ quote: TopupQuote, result: Effect<TopupReceipt, TopupError> }`; the receipt's `tokenText` encodes the minted proofs, which are stored `available`.
 
 ## How it works
 
-1. **Quote.** `start` requests a bolt11 mint quote and persists it as a `pending` `topup` operation **before** returning the handle. Any invoice you can show is one the package can finish or resume.
-2. **Watch.** The quote is polled until the mint reports it paid. Transient failures are tolerated (the device may be offline); a long run of them ends the poll with `MintUnreachable`, and an unknown quote (`MintRejected`) ends it at once. When the mint advertises NUT-17 websockets for the quote's method and unit, a subscription runs alongside and usually reports the settlement first. Established socket closes are observed separately from subscription-request errors. A dropped socket is re-subscribed with backoff, which also recovers the settlement it missed: the mint replays the quote's current state on subscribe. The poll keeps its full speed regardless, because the subscription is a shortcut and never a dependency — a socket may be blocked outright by a proxy or CSP even where the mint advertises one. A push never mints on its own either; the claim re-checks the quote over HTTP under the counter lock. If that check still says `UNPAID`, the topup releases the lock and resumes watching after five seconds; a settlement notification can arrive before the mint's HTTP state catches up.
-3. **Mint under the counter lock.** The reserved counter slot is written to the operation's `counter` (synced) and the deterministic counter advanced before the outputs are derived, so a resumed attempt — on this device or another — re-derives the same outputs instead of burning a second block. If the mint says the quote was already issued (a lost response), the proofs are reclaimed via NUT-09 from that slot instead of minted twice; proofs already stored are not imported again.
-4. **Persist.** The proofs are stored `available` (`topup`), then the operation closes `done`. A crash in between costs one reclaim scan on resume, never funds.
+1. Quote. `start` requests a bolt11 mint quote and persists it as a `pending` `topup` operation before returning the handle. Any invoice you can show is one the package can finish or resume.
+2. Watch. The quote is polled every 5 s until the mint reports it paid. Transient failures keep the poll alive (the device may be offline); a long run of them ends it with `MintUnreachable`, and an unknown quote (`MintRejected`) ends it at once. When the mint advertises NUT-17 websockets, a subscription runs alongside as a shortcut (re-subscribed with backoff when dropped) but the poll never depends on it, and a push never mints on its own: the claim re-checks the quote over HTTP under the counter lock.
+3. Mint under the counter lock. The reserved counter slot is written to the operation's `counter` (synced) and the counter advanced before the outputs are derived, so a resumed attempt re-derives the same outputs. If the mint says the quote was already issued (a lost response), the proofs are reclaimed via NUT-09 from that slot instead of minted twice.
+4. Persist. The proofs are stored `available`, then the operation closes `done`.
 
-Expiry is decided only by the mint: a quote the mint still reports `UNPAID` after `expiresAt` (or 24 h after creation when the mint sets none) fails with `QuoteExpired`. The operation closes `failed` unless minting had already reserved a slot. Poll errors reach `result` and cancel any active subscription; a silent or retrying subscription cannot delay them.
+Expiry is decided only by the mint: a quote it still reports `UNPAID` after `expiresAt` (or 24 h after creation when it sets none) fails with `QuoteExpired` and the operation closes `failed`, unless minting had already reserved a slot.
 
-### `resumePending` — run it at startup
+### `resumePending`
 
-Pending topups outlive the process. Nothing polls them until you call `resumePending()`, which returns a handle for every `pending` topup, even those past their deadline. Call it once when your runtime comes up and again whenever connectivity returns; duplicate handles for the same quote are safe.
+Pending topups outlive the process. `resumePending()` returns a handle for every `pending` topup, even those past their deadline; the shared rules are in [concepts.md](./concepts.md#resuming-interrupted-operations).
 
 ```ts
 import { Effect, Either } from "effect";
@@ -62,105 +57,38 @@ const resumeTopups = Effect.scoped(
     for (const handle of yield* topup.resumePending()) {
       const outcome = yield* Effect.either(handle.result);
       if (Either.isRight(outcome)) {
-        console.log(
-          "minted",
-          outcome.right.amount,
-          "sat",
-          handle.quote.quoteId,
-        );
+        console.log("minted", outcome.right.amount, handle.quote.quoteId);
       } else if (outcome.left._tag === "QuoteExpired") {
         console.log("expired", handle.quote.quoteId);
       } else {
-        // MintUnreachable, MintRejected, CounterLockTimeout: the operation
-        // stays pending; the next resume picks it up.
-        console.log("not finished", handle.quote.quoteId, outcome.left._tag);
+        // MintUnreachable, MintRejected, CounterLockTimeout: still pending,
+        // the next resume picks it up.
       }
     }
   }),
 );
 ```
 
-This waits for every handle inside one scope, which suits a CLI (`apps/linkshu-cli/src/commands.ts`, `topup` with no amount). In a long-lived app, extend the handles into a scope that outlives the call (`Scope.extend`) so polling survives UI unmounts, and close that scope before disposing the runtime; Linky does this in `useLinkshuComposition.ts`. Pass `{ lockingKey }` when the wallet adopts locked quotes (below).
+This waits for every handle inside one scope, which suits a script. In a long-lived app, `Scope.extend` the handles into a scope that outlives the call so polling survives UI changes, and close that scope before disposing the runtime. Pass `{ lockingKey }` when the wallet adopts locked quotes (below).
 
-Topup records written by releases before the inventory (`linkshu.pendingTopup.*` keys in the `KeyValueStore`) are carried over into `pending` topup operations the first time `resumePending` (or `adopt`) reads them, and the keys are removed.
+### `adopt`: a quote someone else paid
 
-### `adopt` — a quote someone else paid
+A lightning-address server can create a mint quote for the wallet and pay its invoice. `adopt(draft: PaidQuoteDraft, options?)` mints such a quote without polling: the mint is asked once.
 
-A lightning-address server can create a mint quote for the wallet and pay its invoice. `adopt` mints such a quote from the server's paid-quote record, without polling: the mint is asked once.
-
-```ts
-import { Effect, Schema } from "effect";
-import { PaidQuoteDraft, QuoteLockingKey, Topup } from "@linky-fit/linkshu";
-
-const decodePaidQuote = Schema.decodeUnknown(PaidQuoteDraft);
-
-/** `paid` is the server's record; `lockingKeyHex` unlocks a NUT-20 locked quote. */
-const adoptPaidQuote = (
-  paid: {
-    quoteId: string;
-    mint: string;
-    amount: number;
-    invoice: string;
-    expiresAt: number | null;
-    locked: boolean;
-  },
-  lockingKeyHex: string | null,
-) =>
-  Effect.gen(function* () {
-    const draft = yield* decodePaidQuote(paid);
-    const topup = yield* Topup;
-    return yield* topup.adopt(
-      draft,
-      lockingKeyHex === null
-        ? {}
-        : { lockingKey: QuoteLockingKey.make(lockingKeyHex) },
-    );
-  });
-```
-
-`locked` quotes (NUT-20) can only be minted with the secp256k1 secret they were locked to; the server tells you which key it used (Linky's npub.cash flow locks to the user's nostr key, so the nsec's hex form is the `lockingKey`). The key is passed to the mint call only, never persisted. A pending topup already recorded for the quote is minted through the same claim; otherwise `UNPAID` → `MintRejected`, and already issued without a local record → `QuoteAlreadyIssued` (another wallet minted it).
-
-## Inputs and outputs
-
-`TopupDraft` (`topup/domain.ts`): `mint: MintUrl`, `amount: Amount`.
-
-`TopupHandle`: `quote: TopupQuote`, `result: Effect<TopupReceipt, TopupError>`.
-
-`TopupQuote`:
-
-| Field       | Type                         |
-| ----------- | ---------------------------- |
-| `quoteId`   | `QuoteId`                    |
-| `mint`      | `MintUrl`                    |
-| `amount`    | `Amount`                     |
-| `invoice`   | `Bolt11Invoice`              |
-| `expiresAt` | `Schema.NullOr(UnixSeconds)` |
-
-`PaidQuoteDraft` (for `adopt`): `quoteId`, `mint`, `amount`, `invoice`, `expiresAt`, `locked: boolean`. `TopupLockingOptions`: `{ lockingKey?: QuoteLockingKey }`.
-
-`TopupReceipt`:
-
-| Field         | Type          | Notes                                             |
-| ------------- | ------------- | ------------------------------------------------- |
-| `operationId` | `OperationId` | the `topup` operation, now `done`                 |
-| `tokenText`   | `TokenText`   | the minted proofs, encoded; stored as `available` |
-| `mint`        | `MintUrl`     |                                                   |
-| `amount`      | `Amount`      |                                                   |
-| `quoteId`     | `QuoteId`     |                                                   |
+`locked` quotes (NUT-20) can only be minted with the secp256k1 secret they were locked to (`QuoteLockingKey`, 64 hex chars); the key is passed to the mint call only, never persisted. A pending topup already recorded for the quote is minted through the same claim. Otherwise the mint's `UNPAID` answer is a `MintRejected`, and already issued without a local record is `QuoteAlreadyIssued` (another wallet minted it).
 
 ## Errors
 
-| Tag                  | Raised by                  | When                                                                          | What to do                                                                                              |
-| -------------------- | -------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `MintUnreachable`    | `start`, `result`, `adopt` | mint down at quote time, or repeated poll failures                            | for `result`: keep showing the invoice, the operation stays pending; re-run `resumePending` when online |
-| `MintRejected`       | `start`, `result`, `adopt` | unknown quote, unpaid adopted quote, locked quote without key, mint rejection | surface `detail`; a locked pending topup stays pending for a resume that brings the key                 |
-| `QuoteExpired`       | `result`                   | mint confirms `UNPAID` past the deadline                                      | offer a new topup                                                                                       |
-| `QuoteAlreadyIssued` | `adopt`                    | mint already issued the quote and no local operation claims it                | nothing to mint here                                                                                    |
-| `CounterLockTimeout` | `result`, `adopt`          | counter lease held elsewhere                                                  | the operation stays pending; resume later                                                               |
+| Tag                  | Raised by                  | When                                                                          | Operation                                                        |
+| -------------------- | -------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `QuoteExpired`       | `result`                   | mint confirms `UNPAID` past the deadline                                      | `failed`; offer a new topup                                      |
+| `QuoteAlreadyIssued` | `adopt`                    | mint already issued the quote and no local operation claims it                | none; nothing to mint here                                       |
+| `MintRejected`       | `start`, `result`, `adopt` | unknown quote, unpaid adopted quote, locked quote without key, mint rejection | a locked pending topup stays `pending` for a resume with the key |
+
+`MintUnreachable` (from `result`: keep showing the invoice, the operation stays `pending`) and `CounterLockTimeout` (stays `pending`; resume later) are in [errors.md](./errors.md).
 
 ## Related
 
-- [autoswap.md](./autoswap.md) — same claim machinery, invoice paid by your own melt
-- [restore.md](./restore.md) — recovers proofs when the operation was lost entirely
-- [lightning-utilities.md](./lightning-utilities.md) — LNURL-withdraw against a topup invoice
-- [inspector.md](./inspector.md) — `QuoteStateChanged` rows show the poll
+- [autoswap.md](./autoswap.md): same claim machinery, invoice paid by your own melt
+- [lightning-utilities.md](./lightning-utilities.md): LNURL-withdraw against a topup invoice
+- [inspector.md](./inspector.md): `QuoteStateChanged` rows show the poll

@@ -1,322 +1,42 @@
 # Linky Push Service
 
-Bun HTTP service for Web Push and Android FCM delivery on top of outer NIP-17 inbox events (`kind: 1059`).
+Bun HTTP service that delivers Web Push and Android FCM notifications for new outer NIP-17 inbox events (`kind: 1059`).
 
-## What it does
-
-- Issues short-lived ownership challenges per recipient pubkey
-- Verifies signed Nostr proof events through Linkstr's shared ownership codec before storing subscriptions
-- Persists web subscriptions, native Android tokens, and challenges in SQLite
-- Watches configured Nostr relays through Linkstr's identity-free `PushInbox` for new push-marked outer `1059` events
-- Sends a generic Web Push or Android FCM notification for every matching subscribed recipient pubkey
-- Removes permanently invalid subscriptions when push delivery returns `404` or `410`, or when the push provider reports a VAPID public key mismatch
-- Removes permanently invalid Android registration tokens when Firebase reports them as invalid or unregistered
-
-The service does **not** decrypt inbox events and does **not** inspect wrapped inner content.
-
-## Endpoints
-
-### `POST /auth/challenge`
-
-Request:
-
-```json
-{
-  "pubkey": "<hex-pubkey>",
-  "action": "subscribe"
-}
-```
-
-`action` is optional and defaults to `"subscribe"`.
-
-Response:
-
-```json
-{
-  "pubkey": "<hex-pubkey>",
-  "action": "subscribe",
-  "challenge": "<nonce>",
-  "expiresAt": 1760000000000
-}
-```
-
-### `POST /subscribe`
-
-Request:
-
-```json
-{
-  "installationId": "<stable-installation-id>",
-  "cleanupLegacySubscriptions": true,
-  "subscription": {
-    "endpoint": "https://example.push/service",
-    "expirationTime": null,
-    "keys": {
-      "p256dh": "<base64>",
-      "auth": "<base64>"
-    }
-  },
-  "recipientPubkeys": ["<hex-pubkey-1>", "<hex-pubkey-2>"],
-  "proofs": [
-    {
-      "pubkey": "<hex-pubkey-1>",
-      "event": {
-        "id": "<event-id>",
-        "pubkey": "<hex-pubkey-1>",
-        "created_at": 1760000000,
-        "kind": 27235,
-        "content": "linky-push-subscribe",
-        "tags": [
-          ["challenge", "<nonce>"],
-          ["action", "subscribe"],
-          ["pubkey", "<hex-pubkey-1>"]
-        ],
-        "sig": "<signature>"
-      }
-    }
-  ]
-}
-```
-
-Every pubkey listed in `recipientPubkeys` needs its own proof.
-
-`installationId` and `cleanupLegacySubscriptions` are optional. A stable `installationId` lets a device replace its previous endpoint or token in place; `cleanupLegacySubscriptions: true` additionally drops older subscriptions for the same pubkeys that were registered without an installation id.
-
-### `POST /native/subscribe`
-
-Request:
-
-```json
-{
-  "installationId": "<stable-installation-id>",
-  "device": {
-    "platform": "android",
-    "token": "<fcm-token>"
-  },
-  "recipientPubkeys": ["<hex-pubkey-1>"],
-  "proofs": [
-    {
-      "pubkey": "<hex-pubkey-1>",
-      "event": {
-        "id": "<event-id>",
-        "pubkey": "<hex-pubkey-1>",
-        "created_at": 1760000000,
-        "kind": 27235,
-        "content": "linky-push-subscribe",
-        "tags": [
-          ["challenge", "<nonce>"],
-          ["action", "subscribe"],
-          ["pubkey", "<hex-pubkey-1>"]
-        ],
-        "sig": "<signature>"
-      }
-    }
-  ]
-}
-```
-
-The server returns `503 native_push_unavailable` until `PUSH_FIREBASE_SERVICE_ACCOUNT_JSON` is configured.
-
-### `POST /unsubscribe`
-
-Remove selected pubkeys from a subscription with ownership proofs. If you remove the subscription's last remaining pubkey, the whole subscription row is deleted:
-
-```json
-{
-  "endpoint": "https://example.push/service",
-  "recipientPubkeys": ["<hex-pubkey>"],
-  "proofs": [
-    {
-      "pubkey": "<hex-pubkey>",
-      "event": {
-        "id": "<event-id>",
-        "pubkey": "<hex-pubkey>",
-        "created_at": 1760000000,
-        "kind": 27235,
-        "content": "linky-push-unsubscribe",
-        "tags": [
-          ["challenge", "<nonce>"],
-          ["action", "unsubscribe"],
-          ["pubkey", "<hex-pubkey>"]
-        ],
-        "sig": "<signature>"
-      }
-    }
-  ]
-}
-```
-
-Every pubkey listed in `recipientPubkeys` needs its own unsubscribe proof. Full subscription removal requires proving ownership for the subscription's current pubkeys.
-
-### `POST /native/unsubscribe`
-
-```json
-{
-  "token": "<fcm-token>",
-  "recipientPubkeys": ["<hex-pubkey>"],
-  "proofs": [
-    {
-      "pubkey": "<hex-pubkey>",
-      "event": {
-        "id": "<event-id>",
-        "pubkey": "<hex-pubkey>",
-        "created_at": 1760000000,
-        "kind": 27235,
-        "content": "linky-push-unsubscribe",
-        "tags": [
-          ["challenge", "<nonce>"],
-          ["action", "unsubscribe"],
-          ["pubkey", "<hex-pubkey>"]
-        ],
-        "sig": "<signature>"
-      }
-    }
-  ]
-}
-```
-
-### `GET /vapid-public-key`
-
-Returns `{ "vapidPublicKey": "<base64url>" }` so web clients can subscribe with the server's VAPID key.
-
-### `GET /health`
-
-Simple health check.
-
-### `GET /`
-
-Returns the build commit SHA as plain text.
-
-- Docker/GitHub Actions builds inject it automatically.
-- Local `bun run` execution returns `unknown` unless `BUILD_COMMIT_SHA` is set in the environment.
-
-## Push payload
-
-Every delivered Web Push message contains:
-
-```json
-{
-  "title": "Linky - npub1abcd...wxyz",
-  "body": "Nová aktivita v Linky",
-  "data": {
-    "type": "nostr_inbox",
-    "outerEventId": "<outer-event-id>",
-    "recipientPubkey": "<hex-pubkey>",
-    "recipientNpub": "<npub>",
-    "createdAt": 1760000000
-  }
-}
-```
-
-The title carries a shortened recipient npub so a device subscribed for several identities can tell them apart; the body is a fixed generic text because the service never sees message content.
-
-Android FCM deliveries carry `title`, `body`, and the same data fields in the FCM data payload, with `createdAt` as a string. Sender-provided relay hints are omitted; clients fetch wraps only from their configured relays.
+A client proves it owns a recipient pubkey by signing a short-lived challenge (`POST /auth/challenge`, then `POST /subscribe` or `POST /native/subscribe` with one proof per pubkey; `/unsubscribe` and `/native/unsubscribe` remove pubkeys the same way). Subscriptions, native tokens and challenges live in SQLite. The service watches the configured relays through linkstr's identity-free `PushInbox` and sends a generic notification to every subscribed recipient of a push-marked `1059` event; the title carries a shortened npub so a device subscribed for several identities can tell them apart, the body is fixed text. It never decrypts inbox events. Subscriptions that a provider reports as gone (`404`, `410`, VAPID mismatch, unregistered FCM token) are deleted. `GET /vapid-public-key`, `GET /health` and `GET /` (build commit SHA, from `BUILD_COMMIT_SHA`) complete the surface; request and response shapes are in `src/`.
 
 ## Environment
 
-Copy `.env.example` and set the required values:
+Copy `.env.example`. Required:
 
-- `PUSH_VAPID_SUBJECT`
-- `PUSH_VAPID_PUBLIC_KEY`
-- `PUSH_VAPID_PRIVATE_KEY`
-- `PUSH_FIREBASE_SERVICE_ACCOUNT_JSON` for Android native push delivery
+- `PUSH_VAPID_SUBJECT`, `PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY` (generate with `bunx web-push generate-vapid-keys`)
+- `PUSH_FIREBASE_SERVICE_ACCOUNT_JSON` for Android: a single-line service account JSON with `project_id`, `client_email` and `private_key`; without it native subscribe answers `503 native_push_unavailable`
 
-Optional values cover the port, storage path, relay list, challenge TTL, proof age window, rate limits, and subscription caps.
+Optional: `PUSH_PORT`, `PUSH_STORAGE_PATH`, `PUSH_DEFAULT_RELAYS`, `PUSH_CORS_ORIGIN` (`*` or a comma-separated origin list), challenge TTL, proof age window, rate limits and subscription caps; `.env.example` lists them.
 
-Request bodies are limited to 64 KiB, including chunked bodies. Web Push endpoints must use HTTPS on port 443 with a public DNS hostname and no credentials or fragment. Delivery resolves and checks every address, pins the connection to those addresses, keeps TLS hostname verification, refuses redirects, caps provider responses at 16 KiB, and has a 12-second deadline. Chrome/FCM, Firefox, Safari, and other providers meeting these rules work without a provider allowlist. Existing subscriptions are checked again at delivery. Provider response bodies are not logged.
+`PUSH_TRUSTED_PROXY_IPS` is a comma-separated list of the exact peer IPs of proxies you control, empty by default. For a trusted peer the server walks `X-Forwarded-For` from right to left and stops at the first untrusted address, so the proxy must append or replace the header. Without it, every client behind a proxy shares the proxy's rate-limit bucket. Behind a host proxy forwarding into Docker, the peer the container sees may be the bridge gateway, not `127.0.0.1`.
 
-Rate limits use the socket peer unless its exact IP appears in `PUSH_TRUSTED_PROXY_IPS`, a comma-separated list that defaults to empty. For trusted proxies, the server walks `X-Forwarded-For` from right to left and stops at the first untrusted address. Configure only proxies you control, and ensure they append the actual connecting address or replace the header. Never configure arbitrary clients as trusted. For a host proxy forwarding into Docker, configure the peer address actually seen inside the container, which may be its bridge gateway rather than `127.0.0.1`. Without this setting, clients behind a proxy share its rate-limit bucket. HTTP logs omit client IPs; challenge logs omit pubkeys too.
+Delivery only accepts HTTPS endpoints on port 443 with a public DNS hostname; it resolves and checks every address, pins the connection to them, refuses redirects, caps provider responses at 16 KiB and gives up after 12 seconds. Request bodies are capped at 64 KiB. Logs omit client IPs, pubkeys and provider response bodies.
 
-`PUSH_CORS_ORIGIN` accepts either `*` or a comma-separated list of allowed web app origins, for example:
-
-```bash
-PUSH_CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5174
-```
-
-Generate VAPID keys locally with:
-
-```bash
-bunx web-push generate-vapid-keys
-```
-
-`PUSH_FIREBASE_SERVICE_ACCOUNT_JSON` should contain a single-line Firebase service account JSON blob with `project_id`, `client_email`, and `private_key`.
-
-## Local run
-
-Install dependencies from the repo root:
+## Run
 
 ```bash
 bun install
-```
-
-Start the service in watch mode:
-
-```bash
-bun run --filter @linky-fit/push dev
-```
-
-Run once:
-
-```bash
-bun run --filter @linky-fit/push start
-```
-
-Type-check just this workspace:
-
-```bash
+bun run --filter @linky-fit/push dev        # watch mode
+bun run --filter @linky-fit/push start      # once
 bun run --filter @linky-fit/push typecheck
-```
-
-Run the repo-wide checks after changes:
-
-```bash
-bun run check-code
 ```
 
 ## Docker
 
-Build the image from the repo root:
-
 ```bash
-docker build -f apps/push/Dockerfile -t linky-push .
+docker build -f apps/push/Dockerfile --build-arg GIT_COMMIT_SHA="$(git rev-parse HEAD)" -t linky-push .
+cp apps/push/.env.production.example apps/push/.env.production   # fill in the values
+docker run --rm -p 8787:8787 --env-file apps/push/.env.production \
+  -e PUSH_STORAGE_PATH=/data/linky-push.sqlite -v linky_push_data:/data linky-push
 ```
 
-To embed the current git revision in a local image build:
+`docker-compose.example.yml` is the same setup as a compose service with `/data` mounted so SQLite survives upgrades.
 
-```bash
-docker build \
-  -f apps/push/Dockerfile \
-  --build-arg GIT_COMMIT_SHA="$(git rev-parse HEAD)" \
-  -t linky-push .
-```
+## Image and deploy
 
-Run it with a persistent SQLite volume:
-
-```bash
-docker run --rm \
-  -p 8787:8787 \
-  -e PUSH_VAPID_SUBJECT=mailto:alerts@example.com \
-  -e PUSH_VAPID_PUBLIC_KEY=replace-me \
-  -e PUSH_VAPID_PRIVATE_KEY=replace-me \
-  -e PUSH_FIREBASE_SERVICE_ACCOUNT_JSON='{"project_id":"...","client_email":"...","private_key":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n"}' \
-  -e PUSH_STORAGE_PATH=/data/linky-push.sqlite \
-  -v linky_push_data:/data \
-  linky-push
-```
-
-Production-oriented examples are included in:
-
-- `apps/push/docker-compose.example.yml`
-- `apps/push/.env.production.example`
-
-Copy `.env.production.example` to `.env.production` before starting the compose stack.
-
-The compose example mounts `/data` so SQLite survives container restarts and image upgrades.
-
-## GitHub Container Registry
-
-The workflow at `.github/workflows/push-image.yml` builds and publishes `ghcr.io/<owner>/linky-push`.
-
-- Pushes to `main` publish `:latest` and a `sha-...` tag.
-- Tags matching `push-v*` publish the matching tag as well.
-- Publishing uses the repository `GITHUB_TOKEN`, so package write permission must stay enabled for the workflow.
+`.github/workflows/push-image.yml` publishes `ghcr.io/<owner>/linky-push`: pushes to `main` produce `:latest` and a `sha-...` tag, `push-v*` tags produce the matching tag. It uses the repository `GITHUB_TOKEN`, so the workflow needs package write permission. `.github/workflows/push-deploy.yml`, run by hand, pulls and restarts the `push` compose service on `push.linky.fit` over SSH.

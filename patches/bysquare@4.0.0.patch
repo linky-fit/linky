@@ -1,3 +1,10 @@
+Hardening of bysquare's PAY by square decoder. Both entry points must stay
+patched when upgrading: src/pay/decode.ts (Bun) and lib/pay/decode.js
+(browser). The fixes bound the input and the decoded text, reject zero or short
+LZMA output lengths, and bound the payment and account loops by the fields
+actually present. Verify with packages/proxy-payment/src/bankQr/
+bysquareSafety.test.ts and bankPayment.test.ts.
+
 diff --git a/lib/pay/decode.js b/lib/pay/decode.js
 index 401525fb3453732d1fd558a89548cef8465a293b..e6917379c5e1615ee8f8bbf66b730d8c26f770e8 100644
 --- a/lib/pay/decode.js

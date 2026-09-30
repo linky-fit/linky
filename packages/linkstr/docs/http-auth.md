@@ -1,12 +1,19 @@
 # HTTP auth
 
-`httpAuth` turns your nostr key into HTTP credentials. Three pure codecs sign an event and hand you a header or an event object; none of them touches a relay or needs the runtime. Use them when a server wants proof of key ownership: Blossom uploads (kind 24242), NIP-98 `Authorization` headers (kind 27235), and the push server's subscribe/unsubscribe challenge proof (also kind 27235). These events are never published — they are only ever sent to the server that asked for them.
+Three pure codecs turn your Nostr key into HTTP credentials: they sign an event and hand you a header value or an event object, and none of them touches a relay or needs the runtime. Use them when a server wants proof of key ownership: Blossom uploads (kind 24242), NIP-98 `Authorization` headers (kind 27235), and a push server's subscribe/unsubscribe challenge proof (also kind 27235). These events are never published; they only go to the server that asked for them.
 
-## Quick example
+## Codecs
 
-Prerequisites: a `NostrSecretKey` — see [getting-started.md](./getting-started.md). Every encoder takes `now` explicitly; the caller owns the clock.
+Every encoder takes `now: UnixSeconds` explicitly; the caller owns the clock. `secretKey` is a `NostrSecretKey` ([identity-and-keys.md](./identity-and-keys.md)); the helpers never log or return it.
 
-Blossom — upload already-encrypted bytes. `sha256` is the hash of the ciphertext you upload, `serverDomain` is the hostname only:
+| Function                                             | Draft                                                                         | Returns                                                         |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `makeBlossomUploadAuthHeader(draft, secretKey, now)` | `BlossomUploadAuthDraft { sha256, serverDomain }`                             | `Authorization` header value; valid for 600 s                   |
+| `makeNip98AuthHeader(draft, secretKey, now)`         | `Nip98AuthDraft { url, method, payload?: Record<string, string> }`            | `Authorization` header value bound to that url and method       |
+| `makePushOwnershipProof(draft, secretKey, now)`      | `PushOwnershipProofDraft { action: "subscribe" \| "unsubscribe", challenge }` | `SignedPlainEvent` bound to the challenge and action            |
+| `verifyPushOwnershipProof(input)`                    | `unknown` (the parsed JSON)                                                   | `Either<VerifiedPushOwnershipProof, PushOwnershipProofFailure>` |
+
+Blossom — upload already-encrypted bytes. `sha256` is the hash of the ciphertext you upload and must match the body, `serverDomain` is the hostname only:
 
 ```ts
 import {
@@ -40,87 +47,35 @@ export const uploadToBlossom = async (
 };
 ```
 
-NIP-98 — sign the exact url and method you will request; add `payload` when the body is JSON:
+NIP-98 works the same way with `makeNip98AuthHeader({ url, method, payload? }, secretKey, now())`: sign the exact url and method you will request (the server compares them) and pass `payload` when the body is JSON, so its hash is bound to the header.
 
-```ts
-import {
-  UnixSeconds,
-  makeNip98AuthHeader,
-  type NostrSecretKey,
-} from "@linky-fit/linkstr";
-
-export const putMintPreference = async (
-  secretKey: NostrSecretKey,
-  mintUrl: string,
-): Promise<void> => {
-  const url = "https://npub.linky.fit/api/v1/info/mint";
-  const payload = { mintUrl };
-  const response = await fetch(url, {
-    method: "PUT",
-    headers: {
-      Authorization: makeNip98AuthHeader(
-        { url, method: "PUT", payload },
-        secretKey,
-        UnixSeconds.make(Math.floor(Date.now() / 1000)),
-      ),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) throw new Error(`rejected: ${response.status}`);
-};
-```
-
-Push ownership — an event, not a header. First ask the push server for a challenge (`POST /auth/challenge` with `{ action, pubkey }`), then send the proof in the JSON body of the subscribe or unsubscribe request:
+Push ownership — an event, not a header. The client asks the push server for a challenge, signs it with the action, and sends the event in the body of its subscribe or unsubscribe request:
 
 ```ts
 import {
   UnixSeconds,
   makePushOwnershipProof,
   type NostrSecretKey,
-  type Pubkey,
 } from "@linky-fit/linkstr";
 
-export const proveSubscribe = async (
-  pushServerUrl: string,
-  secretKey: NostrSecretKey,
-  pubkey: Pubkey,
-) => {
-  const challengeResponse = await fetch(`${pushServerUrl}/auth/challenge`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "subscribe", pubkey }),
-  });
-  if (!challengeResponse.ok) throw new Error("challenge refused");
-  const { challenge } = (await challengeResponse.json()) as {
-    challenge: string;
-  };
-  return makePushOwnershipProof(
-    { action: "subscribe", challenge },
-    secretKey,
-    UnixSeconds.make(Math.floor(Date.now() / 1000)),
-  );
-};
+declare const secretKey: NostrSecretKey;
+declare const challenge: string; // from the server's challenge endpoint
+
+const proof = makePushOwnershipProof(
+  { action: "subscribe", challenge },
+  secretKey,
+  UnixSeconds.make(Math.floor(Date.now() / 1000)),
+);
+// body: JSON.stringify({ event: proof, … })
 ```
 
-The app's version, with response decoding and the surrounding subscription flow, is `apps/web-app/src/utils/pushNotifications.ts`. No React atom exists for any of these: they are synchronous functions, so call them inside whatever hook already holds the secret key.
+The server calls `verifyPushOwnershipProof(body.event)`. It checks the signature, the kind, that `challenge`, `action` and `pubkey` each appear exactly once, that the `pubkey` tag equals the event author, and the content string, and returns `{ event, action, challenge }`. What is left is the server's own request binding: that `event.pubkey` is the pubkey the client claims, that `action` matches the endpoint, a freshness window on `event.created_at`, and consuming the challenge nonce on first use. `PushOwnershipProofFailure` is one of `malformed-event`, `invalid-signature`, `wrong-kind`, `invalid-challenge`, `invalid-action`, `invalid-pubkey-tag`, `invalid-pubkey`, `wrong-content`; `invalid-signature` and `invalid-pubkey` mean a forged or foreign proof, the rest a malformed request.
 
-## Codecs
-
-| Function                                             | Draft                                                                         | Returns                                                         |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `makeBlossomUploadAuthHeader(draft, secretKey, now)` | `BlossomUploadAuthDraft { sha256, serverDomain }`                             | `Authorization` header value; valid for 600 s                   |
-| `makeNip98AuthHeader(draft, secretKey, now)`         | `Nip98AuthDraft { url, method, payload?: Record<string, string> }`            | `Authorization` header value bound to that url and method       |
-| `makePushOwnershipProof(draft, secretKey, now)`      | `PushOwnershipProofDraft { action: "subscribe" \| "unsubscribe", challenge }` | `SignedPlainEvent` bound to the challenge and action            |
-| `verifyPushOwnershipProof(input)`                    | `unknown` (the parsed JSON)                                                   | `Either<VerifiedPushOwnershipProof, PushOwnershipProofFailure>` |
-
-- `secretKey` is a `NostrSecretKey`; get one with `decodeNsec` ([identity-and-keys.md](./identity-and-keys.md)). The helpers never log or return it.
-- NIP-98: the server compares the signed url with the request url, so sign what you actually send. The app signs the bare path and leaves query strings out where the server does (`npubCashUpstreamQuotes.ts`).
-- Blossom: the `sha256` in the header must match the uploaded bytes, or the server rejects the upload.
+There are no React atoms for any of these: they are synchronous functions, so call them wherever you already hold the secret key.
 
 ## Wire format
 
-`httpAuth/codec.ts`. Each proof is a signed event serialized as JSON and never published.
+Each proof is a signed event serialized as JSON and never published.
 
 | Proof                   | Kind  | Tags, in order                                                                               | Content               | Sent as                                             |
 | ----------------------- | ----- | -------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------- |
@@ -128,60 +83,12 @@ The app's version, with response decoding and the surrounding subscription flow,
 | NIP-98                  | 27235 | `["u", url]`, `["method", method]`, `["payload", sha256(JSON body)]` when a payload is given | empty                 | `Authorization: Nostr <base64(event)>`              |
 | Push ownership proof    | 27235 | `["challenge", challenge]`, `["action", "subscribe" \| "unsubscribe"]`, `["pubkey", author]` | `linky-push-<action>` | the `event` field of the subscribe/unsubscribe body |
 
-## Server-side verification
-
-`verifyPushOwnershipProof` checks signature, kind, the exactly-once `challenge` / `action` / `pubkey` tags, that the `pubkey` tag equals the event author, and the content string. Everything about _your_ request is still yours to check. `apps/push/src/ownership.ts` does it like this:
-
-```ts
-import { verifyPushOwnershipProof } from "@linky-fit/linkstr";
-import type { PushOwnershipProofFailure } from "@linky-fit/linkstr";
-
-const failureStatus: Record<PushOwnershipProofFailure, number> = {
-  "malformed-event": 400,
-  "invalid-signature": 401,
-  "wrong-kind": 400,
-  "invalid-challenge": 400,
-  "invalid-action": 400,
-  "invalid-pubkey-tag": 400,
-  "invalid-pubkey": 401,
-  "wrong-content": 400,
-};
-
-interface ProofRequest {
-  body: { event: unknown }; // the parsed JSON body
-  pubkey: string; // the pubkey the client claims
-  action: "subscribe" | "unsubscribe"; // what this endpoint does
-  nowSeconds: number;
-  proofMaxAgeSeconds: number;
-  /** Placeholder: returns false unless the nonce was issued to this pubkey and is unused. */
-  consumeChallenge: (challenge: string, pubkey: string) => boolean;
-}
-
-/** Returns the HTTP status to reject with, or null when the proof is good. */
-export const checkProof = (request: ProofRequest): number | null => {
-  const decoded = verifyPushOwnershipProof(request.body.event);
-  if (decoded._tag === "Left") return failureStatus[decoded.left];
-  const { event, action, challenge } = decoded.right;
-
-  if (event.pubkey !== request.pubkey) return 401;
-  if (action !== request.action) return 401;
-  if (
-    Math.abs(request.nowSeconds - event.created_at) > request.proofMaxAgeSeconds
-  )
-    return 401;
-  if (!request.consumeChallenge(challenge, request.pubkey)) return 401;
-  return null;
-};
-```
-
-The four follow-up checks are what make the proof single-use and bound to this request: the pubkey the client claims, the action the endpoint performs, a freshness window, and a stored challenge nonce that is consumed on first use.
-
 ## Errors
 
-The encoders do not fail; an invalid key cannot reach them because `NostrSecretKey` is validated at decode time. The verifier returns a `PushOwnershipProofFailure` string. `invalid-signature` and `invalid-pubkey` (the `pubkey` tag differs from the event author) mean a forged or foreign proof, so answer 401; every other value is a malformed request, so answer 400 — the table in the snippet above maps them.
+The encoders do not fail; an invalid key cannot reach them because `NostrSecretKey` is validated at decode time. The verifier returns a `PushOwnershipProofFailure` string instead of a tagged error.
 
 ## Related
 
 - [identity-and-keys.md](./identity-and-keys.md) — `decodeNsec`, `NostrSecretKey`
-- [chat.md](./chat.md) — the image upload that uses the Blossom header
+- [chat.md](./chat.md#images-and-files) — the upload that uses the Blossom header
 - [push-inbox.md](./push-inbox.md) — the push server these proofs authorize

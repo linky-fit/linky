@@ -1,3 +1,14 @@
+/**
+ * Copies the legacy per-scope owner lanes into the linksync shards on the first
+ * launch after the update and, for the 180-day grace period, re-copies rows an
+ * older app version wrote to a lane. It is the only code allowed to read the
+ * legacy tables (`cashuToken`, `nostrMessage`, `nostrReaction`, `ownerMeta`,
+ * the legacy chat columns on `contact`) and the only code that writes back to a
+ * lane: it mirrors terminal `cashuProof.state = spent` to existing legacy proof
+ * rows so older clients stop counting spent funds. Never copy new proofs or
+ * spendable states back. Remove with the lane migration (see the removal gate
+ * in docs/architecture.md).
+ */
 import {
   linkshuServices,
   Tokens,

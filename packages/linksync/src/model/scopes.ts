@@ -4,8 +4,8 @@ import { appScope, shardScope, type RotationRule } from "../core";
  * Rotation is byte-aware and count-aware, whichever fires first. The byte
  * threshold is a quarter of the official Evolu relay's 1 MB per-owner quota,
  * because the relay stores encrypted history with per-row overhead that the
- * local value bytes do not show. The mutation counts are the pre-package
- * thresholds, kept until real numbers say otherwise.
+ * local value bytes do not show. Both numbers are meant to be tuned with
+ * real data.
  */
 export const SHARD_MAX_BYTES = 256 * 1024;
 export const SHARD_ROTATION_COOLDOWN_MS = 60_000;
@@ -16,7 +16,11 @@ const rotation = (maxMutations: number): RotationRule => ({
   cooldownMs: SHARD_ROTATION_COOLDOWN_MS,
 });
 
-/** The scope table; `docs/concepts.md` is its prose twin and must match it. */
+/**
+ * The scope registry: the source of truth for owner types, rotation rules and
+ * forget policies. `docs/concepts.md` renders it as a table; `scopes.test.ts`
+ * fails when the two drift.
+ */
 export const linkyScopes = {
   meta: appScope(["shardPointer", "setting"]),
   identity: shardScope({
