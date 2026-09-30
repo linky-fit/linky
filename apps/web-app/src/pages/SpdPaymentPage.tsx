@@ -1,6 +1,7 @@
 import type { ContactRowLike } from "../app/types/appTypes";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { canLockAcrossTabs } from "../app/lib/bankPaymentOfferStorage";
 import { useFiatRates } from "../app/hooks/useFiatRates";
 import {
   BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
@@ -36,6 +37,7 @@ interface SpdPaymentPageProps {
     amountSat: number | null;
     amountText: string;
     contacts: ContactRowLike[];
+    singleTabRiskAccepted: boolean;
     spdPayload: string;
     staggerDelaySec: number;
   }) => Promise<{ chatId: string; offerId: string } | null>;
@@ -249,6 +251,8 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
   const fiatRates = useFiatRates();
   const [isRequestingOffer, setIsRequestingOffer] = React.useState(false);
   const [offerStatus, setOfferStatus] = React.useState<string | null>(null);
+  const [isSingleTabWarningShown, setIsSingleTabWarningShown] =
+    React.useState(false);
   const [hasEditedOfferContacts, setHasEditedOfferContacts] =
     React.useState(false);
   const previousSpdPayloadRef = React.useRef(spdPayload);
@@ -389,7 +393,7 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
             String(offerContactsCount),
           );
 
-  const requestReimbursement = async () => {
+  const requestReimbursement = async (singleTabRiskAccepted: boolean) => {
     if (
       !activePayment ||
       selectedOfferContacts.length === 0 ||
@@ -399,7 +403,12 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
     ) {
       return;
     }
+    if (!singleTabRiskAccepted && !canLockAcrossTabs()) {
+      setIsSingleTabWarningShown(true);
+      return;
+    }
 
+    setIsSingleTabWarningShown(false);
     setIsRequestingOffer(true);
     setOfferStatus(null);
     try {
@@ -407,6 +416,7 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
         amountSat,
         amountText,
         contacts: selectedOfferContacts,
+        singleTabRiskAccepted,
         spdPayload: activePayment.payload,
         staggerDelaySec: offerDelaySec,
       });
@@ -539,6 +549,44 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
         ))}
       </div>
 
+      {isSingleTabWarningShown ? (
+        <div
+          className="wallet-warning bank-payment-single-tab-warning"
+          role="alert"
+        >
+          <button
+            type="button"
+            className="wallet-warning-close"
+            onClick={() => setIsSingleTabWarningShown(false)}
+            aria-label={t("close")}
+            title={t("close")}
+          >
+            ×
+          </button>
+          <span className="wallet-warning-icon" aria-hidden="true">
+            !
+          </span>
+          <div className="wallet-warning-text">
+            <span className="wallet-warning-title">
+              {t("spdPaymentSingleTabWarningTitle")}
+            </span>
+            <span className="wallet-warning-body">
+              {t("spdPaymentSingleTabWarningBody")}
+            </span>
+            <button
+              type="button"
+              className="btn-wide secondary"
+              disabled={isRequestingOffer}
+              onClick={() => {
+                void requestReimbursement(true);
+              }}
+            >
+              {t("spdPaymentSingleTabContinue")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <button
         type="button"
         className="btn-wide bank-payment-request"
@@ -551,7 +599,7 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
         }
         title={!hasEnoughCashuForProxy ? t("payInsufficient") : undefined}
         onClick={() => {
-          void requestReimbursement();
+          void requestReimbursement(false);
         }}
       >
         {isRequestingOffer

@@ -56,6 +56,7 @@ import {
 import {
   BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX,
   BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX,
+  canLockAcrossTabs,
   forgetBankPaymentOfferSpdPayload,
   forgetBankPaymentOfferStaggerQueue,
   markBankPaymentOfferBankDetailsSent,
@@ -234,7 +235,11 @@ export const useBankPaymentOffers = ({
                   pubkey: offer.peer,
                   client: draft.clientId ?? "",
                 },
-                payload: { offerId: offer.offerId, peer: offer.peer },
+                payload: {
+                  crossTabLock: canLockAcrossTabs(),
+                  offerId: offer.offerId,
+                  peer: offer.peer,
+                },
               },
             ]);
           }
@@ -335,6 +340,7 @@ export const useBankPaymentOffers = ({
       amountSat?: unknown;
       amountText: string;
       contacts: readonly ContactRowLike[];
+      singleTabRiskAccepted?: boolean;
       spdPayload?: unknown;
       staggerDelaySec?: unknown;
     }): Promise<{ chatId: string; offerId: string } | null> => {
@@ -379,6 +385,7 @@ export const useBankPaymentOffers = ({
           rememberBankPaymentOfferSpdPayload({
             offerId,
             ownerPubkey: myPubHex,
+            singleTabRiskAccepted: args.singleTabRiskAccepted === true,
             spdPayload,
           });
         }

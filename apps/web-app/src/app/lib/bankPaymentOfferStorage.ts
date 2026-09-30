@@ -56,6 +56,7 @@ const BankPaymentOfferSpdRecord = Schema.Struct({
   ownerPubkey: Schema.String,
   sentCandidateKeys: Schema.Array(Schema.String),
   detailsSent: Schema.optional(Schema.Boolean),
+  singleTabRiskAccepted: Schema.optional(Schema.Literal(true)),
   spdPayload: NonBlankString,
 });
 type BankPaymentOfferSpdRecord = typeof BankPaymentOfferSpdRecord.Type;
@@ -97,6 +98,7 @@ const pruneExpiredSpdRecords = (nowSec: number): void => {
 export const rememberBankPaymentOfferSpdPayload = (args: {
   offerId: string;
   ownerPubkey: string;
+  singleTabRiskAccepted?: boolean;
   spdPayload: string;
 }): void => {
   const offerId = args.offerId.trim();
@@ -109,6 +111,7 @@ export const rememberBankPaymentOfferSpdPayload = (args: {
     createdAtSec: nowSec,
     ownerPubkey: args.ownerPubkey,
     sentCandidateKeys: [],
+    ...(args.singleTabRiskAccepted ? { singleTabRiskAccepted: true } : {}),
     spdPayload,
   });
 };
@@ -128,35 +131,44 @@ export const readBankPaymentOfferSpdRecord = (args: {
   return record.ownerPubkey === args.ownerPubkey ? record : null;
 };
 
+// The boot compatibility shim has no query method and cannot lock across tabs.
+export const canLockAcrossTabs = (): boolean =>
+  typeof navigator.locks?.query === "function";
+
 export const reserveBankPaymentOfferBankDetails = async (args: {
   candidateKey: string;
   offerId: string;
   ownerPubkey: string;
 }): Promise<boolean> => {
-  // The boot compatibility shim has no query method and cannot lock across tabs.
-  if (!navigator.locks?.query) return false;
-  return navigator.locks.request(
-    `${BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.recipient.${args.offerId}`,
-    () => {
-      const record = readBankPaymentOfferSpdRecord(args);
-      if (!record) return false;
-      if (record.sentCandidateKeys.length > 0) {
-        return (
-          record.sentCandidateKeys.length === 1 &&
-          record.sentCandidateKeys[0] === args.candidateKey
-        );
-      }
-      writeSpdRecord(args.offerId, {
-        ...record,
-        sentCandidateKeys: [args.candidateKey],
-        detailsSent: false,
-      });
-      const saved = readBankPaymentOfferSpdRecord(args);
+  const reserve = (): boolean => {
+    const record = readBankPaymentOfferSpdRecord(args);
+    if (!record) return false;
+    if (record.sentCandidateKeys.length > 0) {
       return (
-        saved?.sentCandidateKeys.length === 1 &&
-        saved.sentCandidateKeys[0] === args.candidateKey
+        record.sentCandidateKeys.length === 1 &&
+        record.sentCandidateKeys[0] === args.candidateKey
       );
-    },
+    }
+    writeSpdRecord(args.offerId, {
+      ...record,
+      sentCandidateKeys: [args.candidateKey],
+      detailsSent: false,
+    });
+    const saved = readBankPaymentOfferSpdRecord(args);
+    return (
+      saved?.sentCandidateKeys.length === 1 &&
+      saved.sentCandidateKeys[0] === args.candidateKey
+    );
+  };
+  if (canLockAcrossTabs()) {
+    return navigator.locks.request(
+      `${BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.recipient.${args.offerId}`,
+      reserve,
+    );
+  }
+  return (
+    readBankPaymentOfferSpdRecord(args)?.singleTabRiskAccepted === true &&
+    reserve()
   );
 };
 

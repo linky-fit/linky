@@ -642,6 +642,10 @@ export const cs = {
   spdPaymentOfferSending: "Odesílám nabídku…",
   spdPaymentOfferFailed: "Nabídku se nepodařilo odeslat.",
   spdPaymentOfferMissingAmount: "Chybí částka nabídky.",
+  spdPaymentSingleTabWarningTitle: "Zavřete ostatní panely Linky",
+  spdPaymentSingleTabWarningBody:
+    "Tento prohlížeč nedokáže zabránit tomu, aby bankovní údaje poslal dalšímu kontaktu i jiný otevřený panel Linky. Zavřete ostatní panely Linky nebo aktualizujte prohlížeč.",
+  spdPaymentSingleTabContinue: "Přesto pokračovat",
   spdPaymentNoOfferContact: "Není komu nabídku poslat",
   spdPaymentLastResponseTime: "Minule {time}",
   bankPaymentOfferTitle: "Nabídka platby",

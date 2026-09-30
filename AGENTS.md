@@ -109,7 +109,7 @@ The compose image is built with `VITE_E2E=1`, which makes `main.tsx` install `wi
 
 ## Gotchas
 
-- Proxy-payment bank-detail handoff requires real cross-tab Web Locks and a readable persisted recipient reservation. The single-tab boot lock shim cannot authorize it; jsdom hook tests must supply a lock stub.
+- Proxy-payment bank-detail handoff requires a readable persisted recipient reservation and real cross-tab Web Locks, unless the offer's SPD record has `singleTabRiskAccepted` (the user continued past the SPD page's warning). The boot lock shim has no `query`, so it counts as missing; jsdom tests must stub `navigator.locks` with `query`.
 - Evolu requires a Worker polyfill in test environments (jsdom + polyfill live in `vitest.setup.ts`)
 - Vitest excludes `tests/**` — that directory holds only the Playwright suites plus `tests/helpers` and `tests/fixtures`; unit tests live next to their subject under `src/`
 - linkstr test helpers (`makeIdentity`, publish stubs, `FakeRelay`, `eventually`, `stubStorage`) live in `packages/linkstr/src/testing`, exported as `@linky-fit/linkstr/testing` and excluded from the app build; `@linky-fit/linkstr-react/testing` adds `settle`/`configWith`/`fakeTransport` the same way. Extend them instead of redeclaring fixtures per test file, and never import them from production code

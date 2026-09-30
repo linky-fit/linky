@@ -3904,7 +3904,8 @@ button.danger {
   transform: none;
 }
 
-.cashu-emit-mint-warning {
+.cashu-emit-mint-warning,
+.bank-payment-single-tab-warning {
   margin-top: 0;
   margin-bottom: 0;
 }
@@ -3913,11 +3914,13 @@ button.danger {
   margin-top: 10px;
 }
 
-.cashu-emit-mint-warning .wallet-warning-text {
+.cashu-emit-mint-warning .wallet-warning-text,
+.bank-payment-single-tab-warning .wallet-warning-text {
   width: 100%;
 }
 
-.cashu-emit-mint-warning .btn-wide {
+.cashu-emit-mint-warning .btn-wide,
+.bank-payment-single-tab-warning .btn-wide {
   margin-top: 4px;
 }
 

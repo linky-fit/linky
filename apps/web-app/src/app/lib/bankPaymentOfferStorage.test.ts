@@ -182,6 +182,31 @@ describe("bank payment offer SPD payload storage", () => {
     ).toBe(false);
   });
 
+  it("reserves without cross-tab locks only after the user accepted the risk", async () => {
+    rememberBankPaymentOfferSpdPayload({
+      offerId: "offer-1",
+      ownerPubkey: "owner-a",
+      singleTabRiskAccepted: true,
+      spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399",
+    });
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: undefined,
+    });
+    const args = {
+      offerId: "offer-1",
+      ownerPubkey: "owner-a",
+      candidateKey: "offer-1:peer",
+    };
+    expect(await reserveBankPaymentOfferBankDetails(args)).toBe(true);
+    expect(
+      await reserveBankPaymentOfferBankDetails({
+        ...args,
+        candidateKey: "offer-1:other",
+      }),
+    ).toBe(false);
+  });
+
   it("survives corrupted storage content", () => {
     localStorage.setItem(
       "linky.bank_payment_offer_spd.v1.offer-1",

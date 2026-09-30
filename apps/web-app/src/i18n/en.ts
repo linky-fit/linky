@@ -634,6 +634,10 @@ export const en = {
   spdPaymentOfferSending: "Sending offer…",
   spdPaymentOfferFailed: "Failed to send the offer.",
   spdPaymentOfferMissingAmount: "Offer amount is missing.",
+  spdPaymentSingleTabWarningTitle: "Close other Linky tabs",
+  spdPaymentSingleTabWarningBody:
+    "This browser can't stop another open Linky tab from also sending the bank details to a second contact. Close other Linky tabs or update your browser.",
+  spdPaymentSingleTabContinue: "Continue anyway",
   spdPaymentNoOfferContact: "No contact to offer this to",
   spdPaymentLastResponseTime: "Last time {time}",
   bankPaymentOfferTitle: "Payment offer",

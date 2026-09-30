@@ -639,6 +639,10 @@ export const de = {
   spdPaymentOfferSending: "Angebot wird gesendet…",
   spdPaymentOfferFailed: "Angebot konnte nicht gesendet werden.",
   spdPaymentOfferMissingAmount: "Der Angebotsbetrag fehlt.",
+  spdPaymentSingleTabWarningTitle: "Andere Linky-Tabs schließen",
+  spdPaymentSingleTabWarningBody:
+    "Dieser Browser kann nicht verhindern, dass ein anderer offener Linky-Tab die Bankdaten zusätzlich an einen zweiten Kontakt sendet. Schließe andere Linky-Tabs oder aktualisiere deinen Browser.",
+  spdPaymentSingleTabContinue: "Trotzdem fortfahren",
   spdPaymentNoOfferContact: "Kein Kontakt für dieses Angebot",
   spdPaymentLastResponseTime: "Letztes Mal {time}",
   bankPaymentOfferTitle: "Zahlungsangebot",

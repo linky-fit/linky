@@ -1,5 +1,5 @@
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { SpdPaymentPage } from "./SpdPaymentPage";
 
@@ -52,7 +52,14 @@ const translate = (key: string): string => {
   return key;
 };
 
+const stubLocks = (value: object | undefined) =>
+  Object.defineProperty(navigator, "locks", { configurable: true, value });
+
 describe("SpdPaymentPage offer recipients", () => {
+  beforeEach(() => {
+    stubLocks({ query: async () => ({ held: [], pending: [] }) });
+  });
+
   afterEach(() => {
     document.body.innerHTML = "";
   });
@@ -210,6 +217,42 @@ describe("SpdPaymentPage offer recipients", () => {
       chatId: "contact-a",
       offerId: "offer-1",
     });
+  });
+
+  it("sends without cross-tab locks only after the user accepts the risk", async () => {
+    stubLocks(undefined);
+    const onRequestReimbursement = vi.fn(async () => null);
+
+    const { container } = await renderIntoDocument(
+      <SpdPaymentPage
+        cashuBalanceAfterMelt={100_000}
+        initialOfferContactCount={1}
+        initialOfferDelaySec={0}
+        isEditing={false}
+        isManualEntry={false}
+        offerContacts={[{ id: "contact-a", name: "Alice", npub: "npub1alice" }]}
+        onRequestReimbursement={onRequestReimbursement}
+        spdPayload="SPD*1.0*ACC:CZ5855000000001265098001*AM:480*CC:CZK"
+      />,
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(".bank-payment-request")
+        ?.click();
+    });
+    expect(onRequestReimbursement).not.toHaveBeenCalled();
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          ".bank-payment-single-tab-warning .btn-wide",
+        )
+        ?.click();
+    });
+    expect(onRequestReimbursement).toHaveBeenCalledWith(
+      expect.objectContaining({ singleTabRiskAccepted: true }),
+    );
   });
 
   it("shows each candidate's last payment response in minutes and seconds", async () => {
