@@ -6,6 +6,8 @@ Always run `bun run check-code` after changes (typecheck, then eslint and pretti
 
 Architectural constraints live in `docs/architecture.md`; read the relevant section before changing app structure, data flow, persistence or protocols. Record architectural constraints there in the same commit: the constraint, not the change; history belongs in git. This file holds commands, conventions and gotchas. Keep it and `README.md` current and brief.
 
+Domain vocabulary lives in `GLOSSARY.md`; read it before discussing domain concepts. When the user uses a term listed under _Avoid_ or in a sense that conflicts with its definition, point it out and propose the glossary term; when their meaning stays unclear, ask. Record newly settled terms there.
+
 `packages/*/docs/` are the usage guides for linkshu, linkstr (with linkstr-react), linksync and proxy-payment. Read the guide before using or changing a package and follow the package's `AGENTS.md`. A change to an exported surface or documented behavior updates that package's docs in the same commit.
 
 Emit an inspector event for every meaningful operation (user actions, relay/mint/sync/push traffic, notable state transitions); follow the `adding-inspector-events` skill.
