@@ -13,7 +13,7 @@ import {
   requestNotificationPermission,
   unregisterPushNotifications,
 } from "../utils/pushNotifications";
-import { safeLocalStorageGet } from "../utils/storage";
+import { safeLocalStorageGet, safeLocalStorageKeys } from "../utils/storage";
 
 interface PushDebugMessage {
   receivedAtIso: string;
@@ -75,7 +75,7 @@ async function loadPushDebugReport(): Promise<PushDebugReport> {
     ...INITIAL_REPORT,
     hasPushManager: "PushManager" in window,
     hasServiceWorker: "serviceWorker" in navigator,
-    localStorageKeys: Object.keys(localStorage).sort(),
+    localStorageKeys: safeLocalStorageKeys().sort(),
     notificationPermission:
       "Notification" in window ? Notification.permission : "unsupported",
     serviceWorkerController: Boolean(navigator.serviceWorker?.controller),

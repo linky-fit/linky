@@ -17,11 +17,11 @@ type NativeNotificationPermissionState =
   | "prompt"
   | "unsupported";
 
-type NativeScanResult = {
+interface NativeScanResult {
   cancelled: boolean;
   message?: string;
   value: string | null;
-};
+}
 
 interface NativeBridgeRequestOptions<Result> {
   eventName: string;
@@ -233,6 +233,8 @@ const requestNativeBridgeEvent = <Result>({
   });
 };
 
+// Android WebView rejects @JavascriptInterface calls made through a detached
+// reference, so callers must invoke these objects as `bridge.method()`.
 const getAndroidSecretStorageBridge = (): AndroidSecretStorageBridge | null => {
   const value = Reflect.get(globalThis, "LinkyNativeSecretStorage");
   return isRecord(value) ? value : null;

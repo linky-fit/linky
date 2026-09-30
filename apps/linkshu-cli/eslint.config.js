@@ -1,3 +1,3 @@
-import eslintConfig from "@linky-fit/config/eslint";
+import { platformIndependentEslintConfig } from "@linky-fit/config/eslint";
 
-export default eslintConfig;
+export default platformIndependentEslintConfig;

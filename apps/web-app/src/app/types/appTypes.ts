@@ -10,7 +10,7 @@ import type { JsonValue } from "../../types/json";
 
 export type PaymentTelemetryStatus = "declined" | "error" | "ok";
 
-export type LocalPaymentEvent = {
+export interface LocalPaymentEvent {
   amount: number | null;
   contactId: string | null;
   createdAtSec: number;
@@ -23,7 +23,7 @@ export type LocalPaymentEvent = {
   phase?: PaymentTelemetryPhase | null;
   status: PaymentTelemetryStatus;
   unit: string | null;
-};
+}
 
 export type PaymentTelemetryMethod =
   | "cashu_chat"
@@ -43,7 +43,7 @@ export type PaymentTelemetryPhase =
   | "swap"
   | "unknown";
 
-export type LoggedPaymentEventParams = {
+export interface LoggedPaymentEventParams {
   amount?: number | null;
   contactId?: ContactId | string | null;
   details?: JsonValue | null;
@@ -56,9 +56,9 @@ export type LoggedPaymentEventParams = {
   phase?: PaymentTelemetryPhase | null;
   status: PaymentTelemetryStatus;
   unit?: string | null;
-};
+}
 
-export type LocalPaymentTelemetryEvent = {
+export interface LocalPaymentTelemetryEvent {
   amountBucket: string | null;
   appHost?: string | null;
   appRuntime?: PaymentTelemetryAppRuntime | null;
@@ -74,9 +74,9 @@ export type LocalPaymentTelemetryEvent = {
   mint: string | null;
   phase: PaymentTelemetryPhase;
   status: PaymentTelemetryStatus;
-};
+}
 
-export type LocalNostrMessage = {
+export interface LocalNostrMessage {
   clientId?: string;
   contactId: string;
   content: string;
@@ -95,9 +95,9 @@ export type LocalNostrMessage = {
   rumorId: string | null;
   status?: "sent" | "pending";
   wrapId: string;
-};
+}
 
-export type LocalNostrReaction = {
+export interface LocalNostrReaction {
   clientId?: string;
   createdAtSec: number;
   emoji: string;
@@ -106,16 +106,16 @@ export type LocalNostrReaction = {
   reactorPubkey: string;
   status?: "sent" | "pending";
   wrapId: string;
-};
+}
 
-export type LocalPendingPayment = {
+export interface LocalPendingPayment {
   recipientPubkey?: Pubkey;
   amountSat: number;
   contactId: string;
   createdAtSec: number;
   id: string;
   messageId?: string;
-};
+}
 
 export type OptionalBooleanTextNumber =
   | boolean
@@ -151,15 +151,15 @@ export type ContactPayRowLike = Pick<
   "id" | "lnAddress" | "name"
 >;
 
-export type RouteWithOptionalId = {
+export interface RouteWithOptionalId {
   id?: ContactIdLike;
   kind: string;
   offerId?: string;
-};
+}
 
 type MintSupportsMppValue = OptionalBooleanTextNumber;
 
-export type LocalMintInfoRow = {
+export interface LocalMintInfoRow {
   feesJson?: string | null | undefined;
   firstSeenAtSec?: number | null | undefined;
   id: string;
@@ -169,7 +169,7 @@ export type LocalMintInfoRow = {
   lastSeenAtSec?: number | null | undefined;
   supportsMpp?: MintSupportsMppValue;
   url: string;
-};
+}
 
 export type ContactsGuideKey =
   | "add_contact"
@@ -178,27 +178,27 @@ export type ContactsGuideKey =
   | "message"
   | "backup_keys";
 
-export type ContactsGuideStep = {
+export interface ContactsGuideStep {
   bodyKey: I18nKey;
   ensure?: () => void;
   id: string;
   selector: string;
   titleKey: I18nKey;
-};
+}
 
-export type ContactFormState = {
+export interface ContactFormState {
   groups: string[];
   lnAddress: string;
   name: string;
   npub: string;
-};
+}
 
-export type TopbarButton = {
+export interface TopbarButton {
   icon: string;
   isActive?: boolean;
   label: string;
   onClick: () => void;
-};
+}
 
 export type NewLocalNostrMessage = Omit<LocalNostrMessage, "id" | "status"> & {
   status?: "sent" | "pending";
@@ -245,8 +245,8 @@ export type UpdateLocalNostrReaction = (
   updates: Partial<UpdateLocalNostrReactionFields>,
 ) => void;
 
-export type ChatReactionChip = {
+export interface ChatReactionChip {
   count: number;
   emoji: string;
   reactedByMe: boolean;
-};
+}

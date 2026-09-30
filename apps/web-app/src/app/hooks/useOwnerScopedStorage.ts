@@ -62,7 +62,7 @@ const columnOrOmit = <Input, Value>(
   return result.ok ? result.value : undefined;
 };
 
-type TransactionEventLike = {
+interface TransactionEventLike {
   amount?: number | null;
   contactId?: string | null;
   createdAtSec?: number | null;
@@ -76,7 +76,7 @@ type TransactionEventLike = {
   phase?: string | null;
   status: string;
   unit?: string | null;
-};
+}
 
 const LEGACY_PAYMENT_EVENTS_MIGRATED_SUFFIX = ".migratedToEvolu.v2";
 

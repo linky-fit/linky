@@ -5,6 +5,42 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+export const restrictedSyntax = [
+  {
+    selector: "TSAsExpression > TSAnyKeyword",
+    message:
+      "Do not use `as any`. Keep the value typed and narrow with runtime guards.",
+  },
+  {
+    selector: "TSTypeAssertion > TSAnyKeyword",
+    message:
+      "Do not use `<any>` assertions. Keep the value typed and narrow with runtime guards.",
+  },
+  {
+    selector: "TSArrayType > TSUnknownKeyword",
+    message:
+      "Do not use `unknown[]` placeholders in app logic. Use a concrete element type or narrow individual `unknown` values with guard functions.",
+  },
+  {
+    selector:
+      "TSTypeReference[typeName.name='Array'] > TSTypeParameterInstantiation > TSUnknownKeyword",
+    message:
+      "Do not use `Array<unknown>` placeholders in app logic. Use a concrete element type or narrow individual `unknown` values with guard functions.",
+  },
+  {
+    selector:
+      "TSTypeReference[typeName.name='ReadonlyArray'] > TSTypeParameterInstantiation > TSUnknownKeyword",
+    message:
+      "Do not use `ReadonlyArray<unknown>` placeholders in app logic. Use a concrete element type or narrow individual `unknown` values with guard functions.",
+  },
+  {
+    selector:
+      "TSTypeReference[typeName.name='Promise'] > TSTypeParameterInstantiation > TSUnknownKeyword",
+    message:
+      "Do not use `Promise<unknown>` placeholders in app logic. Use a concrete resolved type (for example `Promise<void>`) and keep `unknown` only at true parse/input boundaries before guard narrowing.",
+  },
+];
+
 export const webAppEslintConfig = defineConfig([
   globalIgnores(["dist", "dev-dist"]),
   {
@@ -33,41 +69,45 @@ export const webAppEslintConfig = defineConfig([
           ignoreRestArgs: false,
         },
       ],
-      "no-restricted-syntax": [
+      "no-restricted-syntax": ["error", ...restrictedSyntax],
+    },
+  },
+]);
+
+const platformIndependentMessage =
+  "This package is platform-independent: no React, no Evolu, no browser globals. The app supplies these through the package's ports.";
+
+/** For packages that must run under plain Bun as well as in the browser. */
+export const platformIndependentEslintConfig = defineConfig([
+  ...webAppEslintConfig,
+  {
+    files: ["src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
         "error",
         {
-          selector: "TSAsExpression > TSAnyKeyword",
-          message:
-            "Do not use `as any`. Keep the value typed and narrow with runtime guards.",
+          patterns: [
+            {
+              group: [
+                "react",
+                "react/*",
+                "react-dom",
+                "react-dom/*",
+                "@evolu/*",
+                "@linky-fit/linksync",
+                "@linky-fit/linksync/*",
+              ],
+              message: platformIndependentMessage,
+            },
+          ],
         },
-        {
-          selector: "TSTypeAssertion > TSAnyKeyword",
-          message:
-            "Do not use `<any>` assertions. Keep the value typed and narrow with runtime guards.",
-        },
-        {
-          selector: "TSArrayType > TSUnknownKeyword",
-          message:
-            "Do not use `unknown[]` placeholders in app logic. Use a concrete element type or narrow individual `unknown` values with guard functions.",
-        },
-        {
-          selector:
-            "TSTypeReference[typeName.name='Array'] > TSTypeParameterInstantiation > TSUnknownKeyword",
-          message:
-            "Do not use `Array<unknown>` placeholders in app logic. Use a concrete element type or narrow individual `unknown` values with guard functions.",
-        },
-        {
-          selector:
-            "TSTypeReference[typeName.name='ReadonlyArray'] > TSTypeParameterInstantiation > TSUnknownKeyword",
-          message:
-            "Do not use `ReadonlyArray<unknown>` placeholders in app logic. Use a concrete element type or narrow individual `unknown` values with guard functions.",
-        },
-        {
-          selector:
-            "TSTypeReference[typeName.name='Promise'] > TSTypeParameterInstantiation > TSUnknownKeyword",
-          message:
-            "Do not use `Promise<unknown>` placeholders in app logic. Use a concrete resolved type (for example `Promise<void>`) and keep `unknown` only at true parse/input boundaries before guard narrowing.",
-        },
+      ],
+      "no-restricted-globals": [
+        "error",
+        ...["window", "document", "localStorage", "sessionStorage"].map(
+          (name) => ({ name, message: platformIndependentMessage }),
+        ),
       ],
     },
   },

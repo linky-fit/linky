@@ -1,3 +1,4 @@
+import { navigateTo } from "../../hooks/useRouting";
 import {
   appOwnerFromMnemonic,
   NonEmptyString100,
@@ -88,12 +89,12 @@ export interface ReturningOnboardingStep {
   kind: "returning";
 }
 
-type PreparingOnboardingStep = {
+interface PreparingOnboardingStep {
   derivedName: string | null;
   error: string | null;
   kind: "preparing";
   step: 1 | 2;
-};
+}
 
 export type OnboardingStep =
   | PreparingOnboardingStep
@@ -510,11 +511,7 @@ export const useProfileAuthDomain = ({
       setSlip39Seed(normalizedSlip39);
       setCashuSeedMnemonic(derivedCashuMnemonic);
 
-      try {
-        window.location.hash = "#";
-      } catch {
-        // ignore
-      }
+      navigateTo({ route: "contacts" });
       // The next boot creates the Evolu instance from the app mnemonic saved
       // above. Resetting the currently open instance here is both unnecessary
       // and unsafe: Evolu's restore promise stays pending when its DB reset
@@ -1017,11 +1014,7 @@ export const useProfileAuthDomain = ({
       setSlip39Seed(null);
       clearLegacyLaneStorage();
 
-      try {
-        window.location.hash = "#";
-      } catch {
-        // ignore
-      }
+      navigateTo({ route: "contacts" });
       globalThis.location.reload();
     })();
   }, [logoutArmed, pushToast, t]);

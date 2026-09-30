@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import type { CashuOperationId, ContactId } from "../evolu";
 import {
+  safeSessionStorageGet,
+  safeSessionStorageRemove,
+  safeSessionStorageSet,
+} from "../utils/storage";
+import {
   BANK_PAYMENT_EDIT_SUFFIX,
   parseRouteFromHash,
   type Route,
@@ -21,31 +26,19 @@ const rememberBankPaymentOfferReturnHash = (): void => {
     return;
   }
 
-  try {
-    const returnHash =
-      currentRoute.kind === "wallet"
-        ? "#wallet"
-        : currentRoute.kind === "contacts"
-          ? "#contacts"
-          : window.location.hash;
-    window.sessionStorage.setItem(
-      BANK_PAYMENT_OFFER_RETURN_HASH_KEY,
-      returnHash,
-    );
-  } catch {
-    // Session storage can be unavailable in privacy-restricted browsers.
-  }
+  const returnHash =
+    currentRoute.kind === "wallet"
+      ? "#wallet"
+      : currentRoute.kind === "contacts"
+        ? "#contacts"
+        : window.location.hash;
+  safeSessionStorageSet(BANK_PAYMENT_OFFER_RETURN_HASH_KEY, returnHash);
 };
 
 export const returnFromBankPaymentOffer = (fallbackChatId: string): void => {
-  let returnHash = "";
-  try {
-    returnHash =
-      window.sessionStorage.getItem(BANK_PAYMENT_OFFER_RETURN_HASH_KEY) ?? "";
-    window.sessionStorage.removeItem(BANK_PAYMENT_OFFER_RETURN_HASH_KEY);
-  } catch {
-    // Fall back to the related chat when session storage is unavailable.
-  }
+  const returnHash =
+    safeSessionStorageGet(BANK_PAYMENT_OFFER_RETURN_HASH_KEY) ?? "";
+  safeSessionStorageRemove(BANK_PAYMENT_OFFER_RETURN_HASH_KEY);
 
   const normalizedReturnHash = returnHash.trim();
   if (

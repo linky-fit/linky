@@ -58,6 +58,30 @@ export const safeLocalStorageRemove = (key: string): void => {
   }
 };
 
+export const safeSessionStorageGet = (key: string): string | null => {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+export const safeSessionStorageSet = (key: string, value: string): void => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // Storage can be unavailable or full in privacy-restricted browsers.
+  }
+};
+
+export const safeSessionStorageRemove = (key: string): void => {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Storage can be unavailable in privacy-restricted browsers.
+  }
+};
+
 export const safeLocalStorageKeys = (): string[] => {
   try {
     const keys: string[] = [];

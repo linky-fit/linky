@@ -29,6 +29,11 @@ import {
 } from "./utils/bootDiagnostics";
 import { appendPushDebugLog } from "./utils/pushDebugLog";
 import {
+  safeSessionStorageGet,
+  safeSessionStorageRemove,
+  safeSessionStorageSet,
+} from "./utils/storage";
+import {
   handlePwaUpdateAvailable,
   isApplyingPwaUpdate,
   recordPwaControllerChange,
@@ -308,38 +313,22 @@ const RELOAD_RETRY_WINDOW_MS = 30_000;
 // instead of looping.
 const createReloadGuard = (key: string, maxAttempts: number) => {
   const readAttempts = (): number => {
-    try {
-      const [attempts, firstAt] = (
-        window.sessionStorage.getItem(key) ?? ""
-      ).split(":");
-      const recent = Date.now() - Number(firstAt) < RELOAD_RETRY_WINDOW_MS;
-      return recent ? Number(attempts) || 0 : 0;
-    } catch {
-      return 0;
-    }
+    const [attempts, firstAt] = (safeSessionStorageGet(key) ?? "").split(":");
+    const recent = Date.now() - Number(firstAt) < RELOAD_RETRY_WINDOW_MS;
+    return recent ? Number(attempts) || 0 : 0;
   };
   return {
     attempts: readAttempts,
     canRetry: (): boolean => readAttempts() < maxAttempts,
     markRetry: (): void => {
-      try {
-        const attempts = readAttempts();
-        const firstAt =
-          attempts === 0
-            ? Date.now()
-            : Number(window.sessionStorage.getItem(key)?.split(":")[1]);
-        window.sessionStorage.setItem(key, `${attempts + 1}:${firstAt}`);
-      } catch {
-        // ignore storage failures; the reload is still worth a try
-      }
+      const attempts = readAttempts();
+      const firstAt =
+        attempts === 0
+          ? Date.now()
+          : Number(safeSessionStorageGet(key)?.split(":")[1]);
+      safeSessionStorageSet(key, `${attempts + 1}:${firstAt}`);
     },
-    clear: (): void => {
-      try {
-        window.sessionStorage.removeItem(key);
-      } catch {
-        // ignore
-      }
-    },
+    clear: (): void => safeSessionStorageRemove(key),
   };
 };
 
@@ -752,7 +741,7 @@ const bootstrap = async () => {
     console.log("[linky][boot] app modules loaded");
 
     setStage("import-evolu");
-    const { evolu } = await import("./evolu.ts");
+    const { evolu, probeLocalDatabase } = await import("./evolu.ts");
     console.log("[linky][boot] evolu loaded");
     if (import.meta.env.DEV || import.meta.env.VITE_E2E === "1") {
       const { installLinkyE2eHooks } =
@@ -792,10 +781,7 @@ const bootstrap = async () => {
     // store until the database answers, and a boundary above the app would
     // swap the mounted tree for a fallback. The probe tells a database that
     // never answers apart from a render that never commits.
-    const localDataProbe = evolu.createQuery((db) =>
-      db.selectFrom("ownerMeta").select("id").limit(1),
-    );
-    void evolu.loadQuery(localDataProbe).then(() => {
+    void probeLocalDatabase().then(() => {
       if (!appCommitRecorded) setStage("await-render-commit");
     });
     // A reload can start the new database worker while the previous page's

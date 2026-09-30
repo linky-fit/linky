@@ -148,14 +148,14 @@ export async function hasNativePushRegistrationForIdentity(
   }
 }
 
-type PushSubscriptionData = {
+interface PushSubscriptionData {
   endpoint: string;
   expirationTime: number | null;
   keys: {
     p256dh: string;
     auth: string;
   };
-};
+}
 
 const ChallengeResponse = Schema.Struct({
   action: Schema.Literal("subscribe", "unsubscribe"),
@@ -169,10 +169,10 @@ const decodeVapidPublicKeyResponse = Schema.decodeUnknownOption(
   Schema.Struct({ vapidPublicKey: Schema.String }),
 );
 
-type OwnershipProof = {
+interface OwnershipProof {
   event: SignedPlainEvent;
   pubkey: string;
-};
+}
 
 function describeSubscription(subscription: PushSubscription | null): {
   applicationServerKey: string | null;

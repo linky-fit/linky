@@ -54,12 +54,12 @@ const EVOLU_SERVERS_DISABLED_STORAGE_KEY = "linky.evoluServers.disabled.v1";
 export type EvoluServerStatus = "checking" | "connected" | "disconnected";
 export type EvoluErrorType = Evolu.EvoluError["type"];
 
-type EvoluDatabaseInfo = {
+interface EvoluDatabaseInfo {
   bytes: number | null;
   tableCounts: Record<string, number | null>;
   historyCount: number | null;
   updatedAtMs: number | null;
-};
+}
 
 const envEvoluServerUrls = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
   .split(",")
@@ -619,6 +619,16 @@ export const forgetChatShards = async () => {
   }
   return forgotten;
 };
+
+/** Resolves once the local database has answered a query. */
+export const probeLocalDatabase = (): Promise<void> =>
+  evolu
+    .loadQuery(
+      evolu.createQuery((db) =>
+        db.selectFrom("ownerMeta").select("id").limit(1),
+      ),
+    )
+    .then(() => undefined);
 
 /**
  * The shard store over this Evolu instance. Resolves once the app owner is

@@ -1,3 +1,7 @@
+import {
+  safeSessionStorageGet,
+  safeSessionStorageSet,
+} from "../../utils/storage";
 import type { JsonRecord, JsonValue } from "../../types/json";
 import { clientInspectorStore } from "./clientInspectorStore";
 import {
@@ -24,20 +28,10 @@ let cachedClientId: string | null = null;
 // tabs apart.
 const getClientId = (): string => {
   if (cachedClientId !== null) return cachedClientId;
-  try {
-    const existing = sessionStorage.getItem("linky.inspector_client_id");
-    if (existing) {
-      cachedClientId = existing;
-      return existing;
-    }
-    const id = crypto.randomUUID();
-    sessionStorage.setItem("linky.inspector_client_id", id);
-    cachedClientId = id;
-    return id;
-  } catch {
-    cachedClientId = crypto.randomUUID();
-    return cachedClientId;
-  }
+  cachedClientId =
+    safeSessionStorageGet("linky.inspector_client_id") ?? crypto.randomUUID();
+  safeSessionStorageSet("linky.inspector_client_id", cachedClientId);
+  return cachedClientId;
 };
 
 // Payloads come from arbitrary linkstr events; collapse whatever

@@ -113,9 +113,9 @@ test("restores an account from SLIP-39 without getting stuck", async ({
   const reloadFinished = page.waitForEvent("load");
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Restore intentionally resets the route to the legacy contacts root.
+  // Restore intentionally resets the route to contacts.
   await reloadFinished;
-  await page.waitForURL(/#$/, { timeout: 30_000 });
+  await page.waitForURL(/#contacts$/, { timeout: 30_000 });
   await page.goto("/#wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible({
     timeout: 30_000,
@@ -142,7 +142,7 @@ test("restores an account when private browsing disables OPFS", async ({
   // The consent is remembered in sessionStorage, so the post-restore reload
   // must boot straight into the in-memory session without re-prompting.
   await reloadFinished;
-  await page.waitForURL(/#$/, { timeout: 30_000 });
+  await page.waitForURL(/#contacts$/, { timeout: 30_000 });
   await page.goto("/#wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible({
     timeout: 30_000,

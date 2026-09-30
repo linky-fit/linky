@@ -24,7 +24,7 @@ import { SelfieCaptureModal } from "./SelfieCaptureModal";
 
 import type { Translate } from "../i18n";
 
-type UnauthenticatedLayoutProps = {
+interface UnauthenticatedLayoutProps {
   confirmPendingOnboardingProfile: () => Promise<void>;
   createNewAccount: () => Promise<void>;
   cyclePendingOnboardingAvatarControl: (
@@ -48,7 +48,7 @@ type UnauthenticatedLayoutProps = {
   setPendingOnboardingName: (value: string) => void;
   submitReturningSlip39: (inputOverride?: string) => Promise<void>;
   t: Translate;
-};
+}
 
 const formatTemplate = (template: string, vars: Record<string, string>) =>
   template.replace(/\{(\w+)\}/g, (_match, key: string) => vars[key] ?? "");

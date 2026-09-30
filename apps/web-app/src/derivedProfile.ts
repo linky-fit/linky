@@ -1,11 +1,11 @@
 import { CZECH_FIRST_NAMES, ENGLISH_FIRST_NAMES } from "./firstNames";
 import type { Lang } from "./i18n";
 
-export type DerivedProfileDefaults = {
+export interface DerivedProfileDefaults {
   lnAddress: string;
   name: string;
   pictureUrl: string;
-};
+}
 
 export const DEFAULT_LIGHTNING_ADDRESS_DOMAIN = "linky.fit";
 
@@ -41,35 +41,35 @@ export interface DerivedGeneratedAvatar {
   selection: DerivedAvatarSelection;
 }
 
-type AccessoriesPreset = {
+interface AccessoriesPreset {
   accessories: string;
   accessoriesColor: string;
   accessoriesProbability: number;
-};
+}
 
-type FacePreset = {
+interface FacePreset {
   eyebrows: string;
   eyes: string;
-};
+}
 
-type MouthPreset = {
+interface MouthPreset {
   mouth: string;
-};
+}
 
-type FacialHairPreset = {
+interface FacialHairPreset {
   facialHair: string;
   facialHairProbability: number;
-};
+}
 
-type SkinPreset = {
+interface SkinPreset {
   skinColor: string;
-};
+}
 
-type ClothingPreset = {
+interface ClothingPreset {
   clothesColor: string;
   clothing: string;
   clothingGraphic: string;
-};
+}
 
 type NonEmptyReadonlyArray<T> = readonly [T, ...T[]];
 

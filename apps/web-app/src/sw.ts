@@ -47,20 +47,20 @@ const WRAP_FETCH_TIMEOUT_MS = 5000;
 const isRelayUrl = Schema.is(RelayUrl);
 const isWrapId = Schema.is(WrapId);
 
-type PushNotificationData = {
+interface PushNotificationData {
   createdAt?: number;
   outerEventId?: string;
   recipientNpub?: string;
   recipientPubkey?: string;
   senderPubkey?: string;
   type?: string;
-};
+}
 
-type PushNotificationEnvelope = {
+interface PushNotificationEnvelope {
   body?: string;
   data?: PushNotificationData;
   title?: string;
-};
+}
 
 interface DecryptedPushMessage {
   body: string;

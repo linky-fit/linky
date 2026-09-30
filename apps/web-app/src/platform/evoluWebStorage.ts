@@ -1,3 +1,5 @@
+import { safeSessionStorageGet, safeSessionStorageSet } from "../utils/storage";
+
 const OPFS_PROBE_STALL_MS = 3_000;
 const IN_MEMORY_SESSION_STORAGE_KEY = "linky.in_memory_session.v1";
 
@@ -28,21 +30,12 @@ const probeOpfs = async (): Promise<boolean> => {
   }
 };
 
-const isInMemorySessionRemembered = (): boolean => {
-  try {
-    return sessionStorage.getItem(IN_MEMORY_SESSION_STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
+const isInMemorySessionRemembered = (): boolean =>
+  safeSessionStorageGet(IN_MEMORY_SESSION_STORAGE_KEY) === "1";
 
-const rememberInMemorySession = (): void => {
-  try {
-    sessionStorage.setItem(IN_MEMORY_SESSION_STORAGE_KEY, "1");
-  } catch {
-    // Without sessionStorage the choice only lasts until the next reload.
-  }
-};
+// Without sessionStorage the choice only lasts until the next reload.
+const rememberInMemorySession = (): void =>
+  safeSessionStorageSet(IN_MEMORY_SESSION_STORAGE_KEY, "1");
 
 export const enableInMemoryEvoluStorageForSession = (): void => {
   useInMemoryStorage = true;

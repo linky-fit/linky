@@ -1,4 +1,5 @@
 import { getDefaultLang } from "../utils/browserPreferences";
+import { safeLocalStorageGet, safeLocalStorageSet } from "../utils/storage";
 import { cs } from "./cs";
 import { de } from "./de";
 import { en } from "./en";
@@ -11,16 +12,11 @@ export type Translate = (key: I18nKey) => string;
 const STORAGE_KEY = "linky.lang";
 
 export const getInitialLang = (): Lang => {
-  if (typeof localStorage === "undefined") return getDefaultLang();
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = safeLocalStorageGet(STORAGE_KEY);
   if (stored === "cs" || stored === "de" || stored === "en") return stored;
   return getDefaultLang();
 };
 
 export const persistLang = (lang: Lang) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, lang);
-  } catch {
-    // ignore
-  }
+  safeLocalStorageSet(STORAGE_KEY, lang);
 };

@@ -9,6 +9,9 @@ import {
   safeLocalStorageKeys,
   safeLocalStorageRemove,
   safeLocalStorageSetJson,
+  safeSessionStorageGet,
+  safeSessionStorageRemove,
+  safeSessionStorageSet,
 } from "../../utils/storage";
 import { nowSeconds } from "../../utils/time";
 
@@ -27,26 +30,16 @@ const minimizedKey = (chatId: string, offerId: string): string =>
 export const isBankPaymentOfferMinimized = (
   chatId: string,
   offerId: string,
-): boolean => {
-  try {
-    return window.sessionStorage.getItem(minimizedKey(chatId, offerId)) === "1";
-  } catch {
-    return false;
-  }
-};
+): boolean => safeSessionStorageGet(minimizedKey(chatId, offerId)) === "1";
 
 export const setBankPaymentOfferMinimized = (
   chatId: string,
   offerId: string,
   minimized: boolean,
 ): void => {
-  try {
-    const key = minimizedKey(chatId, offerId);
-    if (minimized) window.sessionStorage.setItem(key, "1");
-    else window.sessionStorage.removeItem(key);
-  } catch {
-    // Session storage can be unavailable in privacy-restricted browsers.
-  }
+  const key = minimizedKey(chatId, offerId);
+  if (minimized) safeSessionStorageSet(key, "1");
+  else safeSessionStorageRemove(key);
 };
 
 /** The bank QR of an offer this device created, kept until the auto-responder
