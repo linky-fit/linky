@@ -8,9 +8,16 @@ Architectural constraints live in `docs/architecture.md`; read the relevant sect
 
 Domain vocabulary lives in `GLOSSARY.md`; read it before discussing domain concepts. When the user uses a term listed under _Avoid_ or in a sense that conflicts with its definition, point it out and propose the glossary term; when their meaning stays unclear, ask. Record newly settled terms there.
 
-`packages/*/docs/` are the usage guides for linkshu, linkstr (with linkstr-react), linksync and proxy-payment. Read the guide before using or changing a package and follow the package's `AGENTS.md`. A change to an exported surface or documented behavior updates that package's docs in the same commit.
-
 Emit an inspector event for every meaningful operation (user actions, relay/mint/sync/push traffic, notable state transitions); follow the `adding-inspector-events` skill.
+
+## Documentation
+
+`packages/*/docs/` are the usage guides for linkshu, linkstr (with linkstr-react), linksync and proxy-payment. Read the guide before using or changing a package and follow the package's `AGENTS.md`, which defines when the guides count as in sync. A change to an exported surface or documented behavior updates that package's docs in the same commit; most other changes need none.
+
+- Guides are written for a consumer of the package: what to call, in which order, what each call guarantees, which errors to expect and how to recover. Before adding a paragraph, ask what a consumer would get wrong without it.
+- The exported types and their doc comments are the reference. Guides link to exported symbols and leave field lists, method catalogs, internal control flow, `src/` paths and change history to the code and git.
+- An explanation that concerns one function belongs in a comment beside it; a guide covers what crosses functions: lifecycles, guarantees, how operations combine.
+- When documented behavior changes, rewrite or remove the affected text so the guide describes only the current behavior. A new guide needs a distinct operation or integration concern and a link from the package's guide index (`docs/README.md`, else `README.md`); anything smaller is a section in an existing guide.
 
 ## Conventions
 
