@@ -45,6 +45,10 @@ Further reading:
 - [`tools/nostr-error-tracker/README.md`](./tools/nostr-error-tracker/README.md): error dashboard
 - [`docker/evolu-relay/README.md`](./docker/evolu-relay/README.md): relay image and per-owner quota
 
+## Contributing
+
+Open an issue before a PR for anything beyond a plain bug fix. See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
 ## License
 
 Zero-Clause BSD (`0BSD`), see [`LICENSE`](./LICENSE).
