@@ -24,6 +24,8 @@
     sans-serif;
   line-height: 1.6;
   font-weight: 400;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   color: #e2e8f0;
   background-color: var(--app-flat-bg);
   text-rendering: optimizeLegibility;
