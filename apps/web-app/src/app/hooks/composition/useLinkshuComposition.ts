@@ -66,7 +66,7 @@ import type {
   ValidationReport,
 } from "@linky-fit/linkshu";
 import { Effect, Exit, Layer, ManagedRuntime, Schema, Scope } from "effect";
-import type { Either } from "effect";
+import type { Result } from "effect";
 import React from "react";
 import { linkshuAppInspector } from "../../../devtools/inspector/linkshuInspector";
 import {
@@ -112,7 +112,7 @@ const sameSeed = (a: Bip39Seed, b: Bip39Seed): boolean =>
 /** linkshu Receive; resolves with the typed outcome, only defects reject. */
 export type ReceiveCashuToken = (
   text: string,
-) => Promise<Either.Either<ReceiveReceipt, ReceiveError>>;
+) => Promise<Result.Result<ReceiveReceipt, ReceiveError>>;
 
 interface SendCashuTokenArgs {
   readonly amountSat: number;
@@ -124,7 +124,7 @@ interface SendCashuTokenArgs {
 /** linkshu Send; invalid mint/amount input and defects reject. */
 export type SendCashuToken = (
   args: SendCashuTokenArgs,
-) => Promise<Either.Either<SendReceipt, SendError>>;
+) => Promise<Result.Result<SendReceipt, SendError>>;
 
 interface MeltCashuInvoiceArgs {
   readonly invoice: string;
@@ -134,7 +134,7 @@ interface MeltCashuInvoiceArgs {
 /** linkshu Melt; invalid mint/invoice input and defects reject. */
 export type MeltCashuInvoice = (
   args: MeltCashuInvoiceArgs,
-) => Promise<Either.Either<MeltReceipt, MeltError>>;
+) => Promise<Result.Result<MeltReceipt, MeltError>>;
 
 /** Settles persisted unsettled melts (linkshu `Melt.resumePending`). */
 export type ResumePendingCashuMelts = () => Promise<
@@ -150,7 +150,7 @@ interface ProbeLightningFeeArgs {
 /** linkshu FeeProbe; invalid mint input and defects reject. */
 export type ProbeLightningFee = (
   args: ProbeLightningFeeArgs,
-) => Promise<Either.Either<LightningFeeProbeResult, FeeProbeError>>;
+) => Promise<Result.Result<LightningFeeProbeResult, FeeProbeError>>;
 
 interface StartCashuTopupArgs {
   readonly amountSat: number;
@@ -165,13 +165,13 @@ interface StartCashuTopupArgs {
  */
 export interface CashuTopupHandle {
   readonly quote: TopupQuote;
-  readonly completion: Promise<Either.Either<TopupReceipt, TopupError>>;
+  readonly completion: Promise<Result.Result<TopupReceipt, TopupError>>;
 }
 
 /** linkshu Topup start; invalid mint/amount input and defects reject. */
 export type StartCashuTopup = (
   args: StartCashuTopupArgs,
-) => Promise<Either.Either<CashuTopupHandle, MintUnreachable | MintRejected>>;
+) => Promise<Result.Result<CashuTopupHandle, MintUnreachable | MintRejected>>;
 
 /** Re-attaches every persisted pending topup (linkshu `Topup.resumePending`). */
 export type ResumePendingCashuTopups = () => Promise<
@@ -193,7 +193,7 @@ export interface AdoptPaidCashuQuoteArgs {
  */
 export type AdoptPaidCashuQuote = (
   args: AdoptPaidCashuQuoteArgs,
-) => Promise<Either.Either<TopupReceipt, TopupAdoptError>>;
+) => Promise<Result.Result<TopupReceipt, TopupAdoptError>>;
 
 interface AutoswapCashuArgs {
   readonly sourceMint: string;
@@ -205,7 +205,7 @@ interface AutoswapCashuArgs {
 /** linkshu Autoswap claim; invalid mint/amount input and defects reject. */
 export type AutoswapCashu = (
   args: AutoswapCashuArgs,
-) => Promise<Either.Either<AutoswapReceipt, AutoswapError>>;
+) => Promise<Result.Result<AutoswapReceipt, AutoswapError>>;
 
 /**
  * linkshu Autoswap estimate; pays nothing. Without `amountSat` it prices the
@@ -213,7 +213,7 @@ export type AutoswapCashu = (
  */
 export type EstimateAutoswapCashu = (
   args: AutoswapCashuArgs,
-) => Promise<Either.Either<AutoswapEstimate, AutoswapEstimateError>>;
+) => Promise<Result.Result<AutoswapEstimate, AutoswapEstimateError>>;
 
 /** Drains persisted pending claims (linkshu `Autoswap.resumePendingClaims`). */
 type ResumePendingCashuAutoswapClaims = () => Promise<
@@ -231,7 +231,7 @@ export type CheckAllCashuTokens = () => Promise<ValidationReport>;
 /** NUT-07 check of one transfer (linkshu `Validation.checkTransfer`). */
 export type CheckCashuTransfer = (
   operationId: string,
-) => Promise<Either.Either<TransferCheckResult, OperationNotFound>>;
+) => Promise<Result.Result<TransferCheckResult, OperationNotFound>>;
 
 /** Scan the given mints and swap only newly discovered proofs. */
 export type RestoreCashuTokens = (
@@ -262,7 +262,7 @@ export interface CashuTransferLifecycle {
    */
   readonly forget: (
     operationId: string,
-  ) => Promise<Either.Either<void, TransferTransitionError>>;
+  ) => Promise<Result.Result<void, TransferTransitionError>>;
   /** Restores backup proofs as-is; returns how many were new. */
   readonly importProofs: (
     drafts: ReadonlyArray<ImportProofDraft>,
@@ -275,15 +275,15 @@ export interface CashuTransferLifecycle {
   ) => Promise<LegacyIngestReport>;
   readonly markExternalized: (
     operationId: string,
-  ) => Promise<Either.Either<void, TransferTransitionError>>;
+  ) => Promise<Result.Result<void, TransferTransitionError>>;
   readonly markIssued: (
     operationId: string,
-  ) => Promise<Either.Either<void, TransferTransitionError>>;
+  ) => Promise<Result.Result<void, TransferTransitionError>>;
   /** Re-receives a handed-out token, or retries a failed receive. */
   readonly returnToWallet: (
     operationId: string,
   ) => Promise<
-    Either.Either<ReceiveReceipt, ReceiveError | TransferTransitionError>
+    Result.Result<ReceiveReceipt, ReceiveError | TransferTransitionError>
   >;
 }
 
@@ -413,20 +413,20 @@ export const useLinkshuComposition = ({
   const operations = React.useMemo(() => {
     if (linkshuRuntime === null || topupScope === null) return null;
     const runtime = linkshuRuntime;
-    type Env = ManagedRuntime.ManagedRuntime.Context<typeof runtime>;
+    type Env = ManagedRuntime.ManagedRuntime.Services<typeof runtime>;
 
     const lockingKey = quoteLockingKeyOf(currentNsec);
     const lockingOptions = lockingKey === null ? {} : { lockingKey };
 
     const run = <A, E>(effect: Effect.Effect<A, E, Env>): Promise<A> =>
       runtime.runPromise(effect);
-    const runEither = <A, E>(
+    const runResult = <A, E>(
       effect: Effect.Effect<A, E, Env>,
-    ): Promise<Either.Either<A, E>> => run(Effect.either(effect));
+    ): Promise<Result.Result<A, E>> => run(Effect.result(effect));
     const operationId = (id: string) => OperationId.make(id);
 
     const toHandle = (handle: TopupHandle): CashuTopupHandle => {
-      const completion = runEither(handle.result);
+      const completion = runResult(handle.result);
       // Rejection means the runtime shut down mid-poll; an unwatched handle
       // must not surface that as an unhandled rejection.
       completion.catch(() => {});
@@ -434,14 +434,14 @@ export const useLinkshuComposition = ({
     };
 
     const receiveCashuToken: ReceiveCashuToken = (text) =>
-      runEither(
+      runResult(
         Effect.flatMap(Receive, (receive) =>
           receive.receive(new ReceiveDraft({ text })),
         ),
       );
 
     const sendCashuToken: SendCashuToken = ({ amountSat, mint, produceAs }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeSendDraft({ amount: amountSat, mint, produceAs });
           return Effect.flatMap(Send, (send) => send.send(draft));
@@ -449,7 +449,7 @@ export const useLinkshuComposition = ({
       );
 
     const meltCashuInvoice: MeltCashuInvoice = ({ invoice, mint }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeMeltDraft({ invoice, mint });
           return Effect.flatMap(Melt, (melt) => melt.melt(draft));
@@ -460,11 +460,11 @@ export const useLinkshuComposition = ({
       run(Effect.flatMap(Melt, (melt) => melt.resumePending));
 
     const startCashuTopup: StartCashuTopup = ({ amountSat, mint }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeTopupDraft({ mint, amount: amountSat });
           return Effect.flatMap(Topup, (topup) =>
-            Scope.extend(topup.start(draft), topupScope),
+            Scope.provide(topup.start(draft), topupScope),
           );
         }).pipe(Effect.map(toHandle)),
       );
@@ -472,7 +472,7 @@ export const useLinkshuComposition = ({
     const resumePendingCashuTopups: ResumePendingCashuTopups = () =>
       run(
         Effect.flatMap(Topup, (topup) =>
-          Scope.extend(topup.resumePending(lockingOptions), topupScope),
+          Scope.provide(topup.resumePending(lockingOptions), topupScope),
         ).pipe(Effect.map((handles) => handles.map(toHandle))),
       );
 
@@ -484,7 +484,7 @@ export const useLinkshuComposition = ({
       expiresAt,
       locked,
     }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodePaidQuoteDraft({
             mint,
@@ -505,7 +505,7 @@ export const useLinkshuComposition = ({
       targetMint,
       amountSat,
     }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeAutoswapDraft({
             sourceMint,
@@ -521,7 +521,7 @@ export const useLinkshuComposition = ({
       targetMint,
       amountSat,
     }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeAutoswapDraft({
             sourceMint,
@@ -541,7 +541,7 @@ export const useLinkshuComposition = ({
         );
 
     const probeLightningFee: ProbeLightningFee = ({ mint, probeMint }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeFeeProbeDraft({ mint, probeMint });
           return Effect.flatMap(FeeProbe, (feeProbe) =>
@@ -562,7 +562,7 @@ export const useLinkshuComposition = ({
       run(Effect.flatMap(Validation, (validation) => validation.checkAll));
 
     const checkCashuTransfer: CheckCashuTransfer = (id) =>
-      runEither(
+      runResult(
         Effect.flatMap(Validation, (validation) =>
           validation.checkTransfer(operationId(id)),
         ),
@@ -620,7 +620,7 @@ export const useLinkshuComposition = ({
       checkIssuedClaims: () =>
         run(Effect.flatMap(Validation, (validation) => validation.checkIssued)),
       forget: (id) =>
-        runEither(
+        runResult(
           Effect.flatMap(Tokens, (tokens) => tokens.forget(operationId(id))),
         ),
       importProofs: (drafts) =>
@@ -630,19 +630,19 @@ export const useLinkshuComposition = ({
       importLegacyRows: (rows) =>
         run(Effect.flatMap(Tokens, (tokens) => tokens.ingestLegacyRows(rows))),
       markExternalized: (id) =>
-        runEither(
+        runResult(
           Effect.flatMap(Tokens, (tokens) =>
             tokens.markExternalized(operationId(id)),
           ),
         ),
       markIssued: (id) =>
-        runEither(
+        runResult(
           Effect.flatMap(Tokens, (tokens) =>
             tokens.markIssued(operationId(id)),
           ),
         ),
       returnToWallet: (id) =>
-        runEither(
+        runResult(
           Effect.flatMap(Tokens, (tokens) =>
             tokens.returnToWallet(operationId(id)),
           ),

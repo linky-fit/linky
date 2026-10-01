@@ -35,7 +35,9 @@ export interface TransactionItem {
 
 const parseJsonValue = (value: string | null): JsonValue | null => {
   if (!value) return null;
-  const result = Schema.decodeUnknownOption(Schema.parseJson(JsonValue))(value);
+  const result = Schema.decodeUnknownOption(Schema.fromJsonString(JsonValue))(
+    value,
+  );
   return Option.getOrNull(result);
 };
 

@@ -9,18 +9,18 @@ import { finalizeEvent, nip19 } from "nostr-tools";
 const LOCAL_RELAY_URL = "ws://localhost:7777";
 
 const decodeSubscriptionFrame = Schema.decodeUnknownOption(
-  Schema.parseJson(
-    Schema.Union(
-      Schema.Tuple(
+  Schema.fromJsonString(
+    Schema.Union([
+      Schema.Tuple([
         Schema.Literal("REQ"),
         Schema.String,
         Schema.Struct({
           kinds: Schema.Array(Schema.Number),
           "#p": Schema.Array(Schema.String),
         }),
-      ),
-      Schema.Tuple(Schema.Literal("EOSE", "CLOSE"), Schema.String),
-    ),
+      ]),
+      Schema.Tuple([Schema.Literals(["EOSE", "CLOSE"]), Schema.String]),
+    ]),
   ),
 );
 

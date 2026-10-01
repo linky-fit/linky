@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import { parseTokenText } from "@linky-fit/linkshu";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -151,8 +151,8 @@ export const useSaveCashuFromText = ({
         try {
           const outcome = await receiveCashuToken(tokenRaw);
 
-          if (Either.isLeft(outcome)) {
-            const error = outcome.left;
+          if (Result.isFailure(outcome)) {
+            const error = outcome.failure;
             // A token linkshu already holds, one whose proofs are spent, or an
             // undecodable one can never succeed on retry; a mint that was
             // unreachable or lock contention can. The caller uses this to stop
@@ -173,7 +173,7 @@ export const useSaveCashuFromText = ({
             return;
           }
 
-          const receipt = outcome.right;
+          const receipt = outcome.success;
           rememberCashuTokenKnown(tokenRaw, receipt.tokenText);
           options?.onResolved?.("terminal");
 

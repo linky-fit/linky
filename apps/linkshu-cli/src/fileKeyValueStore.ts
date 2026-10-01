@@ -8,11 +8,11 @@ import { makeJsonFile } from "./jsonFile";
  * so acquiring a lease and writing under it touch the same locked file.
  */
 const KeyValueFile = Schema.Struct({
-  values: Schema.Record({ key: Schema.String, value: Schema.String }),
-  leases: Schema.Record({
-    key: Schema.String,
-    value: Schema.Struct({ lease: LeaseId, expiresAt: Schema.Number }),
-  }),
+  values: Schema.Record(Schema.String, Schema.String),
+  leases: Schema.Record(
+    Schema.String,
+    Schema.Struct({ lease: LeaseId, expiresAt: Schema.Number }),
+  ),
 });
 type KeyValueFile = typeof KeyValueFile.Type;
 

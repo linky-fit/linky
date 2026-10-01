@@ -1,5 +1,5 @@
 import { sqliteTrue } from "@linky-fit/linksync";
-import { Option, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { JsonValue } from "../../../types/json";
 import { findMintInfoIconValue } from "@linky-fit/linkshu";
 import type { StoredProof } from "@linky-fit/linkshu";
@@ -159,7 +159,9 @@ const toJson = (value: unknown): string | null => {
   }
 };
 
-const parseJsonText = Schema.decodeUnknownOption(Schema.parseJson(JsonValue));
+const parseJsonText = Schema.decodeUnknownOption(
+  Schema.fromJsonString(JsonValue),
+);
 
 const isBrokenJsonText = (value: string | null | undefined): boolean =>
   hasJsonText(value) && Option.isNone(parseJsonText(value));
@@ -255,9 +257,9 @@ export const extractActiveKeysetPpk = (
   const keysetSchema = Schema.Struct({
     active: Schema.Boolean,
     unit: Schema.String,
-    input_fee_ppk: Schema.optionalWith(Schema.Int.pipe(Schema.nonNegative()), {
-      default: () => 0,
-    }),
+    input_fee_ppk: Schema.Natural.pipe(
+      Schema.withDecodingDefaultType(Effect.succeed(0)),
+    ),
   });
   const fees = decoded.value.keysets.flatMap((value) => {
     const keyset = Schema.decodeUnknownOption(keysetSchema)(value);
@@ -279,7 +281,7 @@ export const parseMintInfoPayload = (
   supportsMpp: string | null;
 } => {
   const decodeRecord = Schema.decodeUnknownOption(
-    Schema.Record({ key: Schema.String, value: JsonValue }),
+    Schema.Record(Schema.String, JsonValue),
   );
   const payload = Option.getOrNull(decodeRecord(info));
   const nuts = Option.getOrNull(decodeRecord(payload?.nuts ?? payload?.NUTS));

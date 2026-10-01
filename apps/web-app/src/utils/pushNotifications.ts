@@ -158,7 +158,7 @@ interface PushSubscriptionData {
 }
 
 const ChallengeResponse = Schema.Struct({
-  action: Schema.Literal("subscribe", "unsubscribe"),
+  action: Schema.Literals(["subscribe", "unsubscribe"]),
   challenge: NonBlankString,
   expiresAt: Schema.Finite,
   pubkey: NonBlankString,

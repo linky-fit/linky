@@ -144,12 +144,14 @@ const readPreviousAttempt = (): unknown => {
   try {
     const stored = safeSessionStorageGet(PREVIOUS_BOOT_DIAGNOSTICS_KEY);
     if (stored === null) return null;
-    const parsed = Schema.decodeUnknownSync(Schema.parseJson(JsonValue))(
+    const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(JsonValue))(
       stored,
     );
     const sanitized = stringifyDiagnosticValue(parsed);
     safeSessionStorageSet(PREVIOUS_BOOT_DIAGNOSTICS_KEY, sanitized);
-    return Schema.decodeUnknownSync(Schema.parseJson(JsonValue))(sanitized);
+    return Schema.decodeUnknownSync(Schema.fromJsonString(JsonValue))(
+      sanitized,
+    );
   } catch {
     safeSessionStorageRemove(PREVIOUS_BOOT_DIAGNOSTICS_KEY);
     return null;

@@ -1,7 +1,7 @@
 import type { RelayHealthState } from "@linky-fit/linkstr";
 import {
   relayHealthAtom,
-  Result,
+  AsyncResult,
   useAtomValue,
 } from "@linky-fit/linkstr-react";
 
@@ -12,7 +12,7 @@ const EMPTY_HEALTH: ReadonlyMap<string, RelayHealthState> = new Map();
 /** Traffic-derived relay health from linkstr; empty while logged out. */
 export const useRelayHealth = (): ReadonlyMap<string, RelayHealthState> => {
   const result = useAtomValue(relayHealthAtom);
-  return Result.isSuccess(result) ? result.value : EMPTY_HEALTH;
+  return AsyncResult.isSuccess(result) ? result.value : EMPTY_HEALTH;
 };
 
 export const relayDotState = (

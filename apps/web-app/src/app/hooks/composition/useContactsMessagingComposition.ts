@@ -1365,7 +1365,7 @@ export const useContactsMessagingComposition = ({
       const archivedAtSec = PositiveInt.orThrow(Math.ceil(Date.now() / 1e3));
       const result = await runWrite(
         Effect.flatMap(conversationsRepository.ensureDirect(id), (chat) =>
-          Effect.zipRight(
+          Effect.andThen(
             conversationsRepository.archive(chat.id, archivedAtSec),
             conversationsRepository.markSeen(chat.id, archivedAtSec),
           ),

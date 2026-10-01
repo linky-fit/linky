@@ -28,7 +28,7 @@ import {
   WrapDelivery,
   WrapId,
 } from "@linky-fit/linkstr";
-import { Either, Exit } from "effect";
+import { Result, Exit } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -146,7 +146,7 @@ const setup = async (options: SetupOptions = {}) => {
   const forget =
     options.forget ??
     vi.fn<CashuTransferLifecycle["forget"]>(async () =>
-      Either.right(undefined),
+      Result.succeed(undefined),
     );
   const logPaymentEvent =
     options.logPaymentEvent ?? vi.fn<PayParams["logPaymentEvent"]>();
@@ -158,12 +158,12 @@ const setup = async (options: SetupOptions = {}) => {
     options.updateLocalNostrMessage ??
     vi.fn<PayParams["updateLocalNostrMessage"]>();
   const sendCashuToken =
-    options.sendCashuToken ?? vi.fn(async () => Either.right(sendReceipt));
+    options.sendCashuToken ?? vi.fn(async () => Result.succeed(sendReceipt));
 
   const returnToWallet =
     options.returnToWallet ??
     vi.fn<CashuTransferLifecycle["returnToWallet"]>(async () =>
-      Either.right(
+      Result.succeed(
         new ReceiveReceipt({
           operationId: sendReceipt.operationId,
           tokenText: sendReceipt.tokenText,
@@ -353,7 +353,7 @@ describe("usePayContactWithCashuMessage", () => {
           isEdited: true,
           content: "changed while mint was responding",
         };
-        return Either.right(sendReceipt);
+        return Result.succeed(sendReceipt);
       }),
     });
     expect(await payAlice(harness, review.isCurrent)).toMatchObject({
@@ -378,7 +378,7 @@ describe("usePayContactWithCashuMessage", () => {
     const harness = await setup({
       sendCashuToken: vi.fn(async () => {
         currentPubkey = getPublicKey(createSecretKey(3));
-        return Either.right(sendReceipt);
+        return Result.succeed(sendReceipt);
       }),
     });
     expect(
@@ -398,7 +398,7 @@ describe("usePayContactWithCashuMessage", () => {
     const harness = await setup({
       sendCashuToken: vi.fn(async () => {
         current = false;
-        return Either.right(sendReceipt);
+        return Result.succeed(sendReceipt);
       }),
       returnToWallet: vi.fn(async () => {
         throw new Error("mint unavailable");
@@ -440,7 +440,7 @@ describe("usePayContactWithCashuMessage", () => {
     const operations: string[] = [];
     const sendCashuToken = vi.fn<SendCashuToken>(async (args) => {
       operations.push(`send:${args.mint}:${args.amountSat}:${args.produceAs}`);
-      return Either.right(sendReceipt);
+      return Result.succeed(sendReceipt);
     });
     enqueueOutboxMock.mockImplementation(async (input) => {
       operations.push("enqueue");
@@ -453,7 +453,7 @@ describe("usePayContactWithCashuMessage", () => {
     );
     const forget = vi.fn(async (operationId: string) => {
       operations.push(`forget:${operationId}`);
-      return Either.right(undefined);
+      return Result.succeed(undefined);
     });
     const logPaymentEvent = vi.fn(() => {
       operations.push("transaction");
@@ -525,7 +525,7 @@ describe("usePayContactWithCashuMessage", () => {
 
   it("reports insufficient funds without publishing when the send fails", async () => {
     const sendCashuToken = vi.fn<SendCashuToken>(async () =>
-      Either.left(
+      Result.fail(
         new InsufficientFunds({
           mint: MintUrl.make(MINT_URL),
           required: Amount.make(600),

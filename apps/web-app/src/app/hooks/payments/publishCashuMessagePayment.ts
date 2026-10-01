@@ -14,7 +14,7 @@ import type {
   PaymentNoticeReceipt,
 } from "@linky-fit/linkstr";
 import type { EnqueueOutboxInput } from "@linky-fit/linkstr-react";
-import { Cause, Either, Exit, Option, Schema } from "effect";
+import { Cause, Result, Exit, Option, Schema } from "effect";
 import type { ContactId } from "../../../evolu";
 import { previewTokenText } from "../../../utils/formatting";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
@@ -65,7 +65,7 @@ interface PublishCashuMessagePaymentArgs {
 }
 
 const isRumorId = Schema.is(RumorId);
-const decodeCashuTokenText = Schema.decodeUnknownEither(CashuTokenText);
+const decodeCashuTokenText = Schema.decodeUnknownResult(CashuTokenText);
 
 const decodeRequiredNpub = (npub: string): Pubkey => {
   const pubkey = decodeNpub(npub);
@@ -76,7 +76,7 @@ const decodeRequiredNpub = (npub: string): Pubkey => {
 const failureMessage = (
   cause: Cause.Cause<{ readonly _tag: string }>,
 ): string =>
-  Option.match(Cause.failureOption(cause), {
+  Option.match(Cause.findErrorOption(cause), {
     onNone: () => Cause.pretty(cause),
     onSome: (failure) => failure._tag,
   });
@@ -141,7 +141,7 @@ export const publishCashuMessagePayment = async ({
     let sendError: string | null = null;
     try {
       const token = decodeCashuTokenText(messageText);
-      if (Either.isLeft(token)) {
+      if (Result.isFailure(token)) {
         sendError = "invalid cashu token";
       } else {
         if (canReusePendingMessage && !reusedPendingMessage) {
@@ -181,7 +181,7 @@ export const publishCashuMessagePayment = async ({
 
         const draft = new TokenMessageDraft({
           to: contactPublicKey,
-          token: token.right,
+          token: token.success,
           clientId,
           ...(replyTo === undefined ? {} : { replyTo }),
           ...(root === undefined ? {} : { root }),

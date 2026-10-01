@@ -3,8 +3,8 @@ import { useMemo, useSyncExternalStore } from "react";
 import { getDateRange } from "./dateRange";
 import type { ReportFilters } from "./reports";
 
-const Period = Schema.Literal("all", "1", "7", "30", "90", "custom");
-const Sort = Schema.Literal("recent", "frequent");
+const Period = Schema.Literals(["all", "1", "7", "30", "90", "custom"]);
+const Sort = Schema.Literals(["recent", "frequent"]);
 export const isPeriod = Schema.is(Period);
 export const isSort = Schema.is(Sort);
 

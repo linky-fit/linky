@@ -10,7 +10,7 @@ import {
   sendPaymentNoticeAtom,
   useAtomSet,
 } from "@linky-fit/linkstr-react";
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import { ContactId } from "@linky-fit/linksync";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -288,7 +288,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         });
       };
 
-      let sendOutcome: Either.Either<SendReceipt, SendError>;
+      let sendOutcome: Result.Result<SendReceipt, SendError>;
       try {
         sendOutcome = await sendCashuToken({
           amountSat,
@@ -302,8 +302,8 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         return { error: message, ok: false, queued: false };
       }
 
-      if (Either.isLeft(sendOutcome)) {
-        const sendError = sendOutcome.left;
+      if (Result.isFailure(sendOutcome)) {
+        const sendError = sendOutcome.failure;
         const message = describeSendError(sendError);
         logFailure(message, mint, "swap");
         if (notify) {
@@ -316,7 +316,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         return { error: message, ok: false, queued: false };
       }
 
-      const receipt = sendOutcome.right;
+      const receipt = sendOutcome.success;
       if (isPaymentAuthorized && !isPaymentAuthorized()) {
         reportAppLog({
           tag: "paymentRequest.authorizationLost",
@@ -329,8 +329,8 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
           const restored = await cashuTransferLifecycle.returnToWallet(
             receipt.operationId,
           );
-          if (Either.isLeft(restored))
-            logFailure(restored.left._tag, receipt.mint, "swap");
+          if (Result.isFailure(restored))
+            logFailure(restored.failure._tag, receipt.mint, "swap");
         } catch (error) {
           logFailure(
             getUnknownErrorMessage(error, "return-to-wallet failed"),

@@ -9,7 +9,7 @@ import {
   QuoteId,
   OperationId,
 } from "@linky-fit/linkshu";
-import { Either } from "effect";
+import { Result } from "effect";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
@@ -45,7 +45,7 @@ const meltReceipt = (paidAmount: number): MeltReceipt =>
   });
 
 const paymentPending = (amount: number) =>
-  Either.left(
+  Result.fail(
     new PaymentPending({
       mint: MintUrl.make(MINT_URL),
       quoteId: QuoteId.make("quote-1"),
@@ -55,7 +55,7 @@ const paymentPending = (amount: number) =>
   );
 
 const insufficientFunds = (required: number, available: number) =>
-  Either.left(
+  Result.fail(
     new InsufficientFunds({
       mint: MintUrl.make(MINT_URL),
       required: Amount.make(required),
@@ -127,7 +127,7 @@ afterEach(() => {
 describe("payLightningInvoiceWithCashu", () => {
   it("pays through linkshu Melt and records the receipt", async () => {
     const melt = vi.fn<MeltCashuInvoice>(async () =>
-      Either.right(meltReceipt(40)),
+      Result.succeed(meltReceipt(40)),
     );
     const harness = await setup({ meltCashuInvoice: melt });
 
@@ -155,7 +155,7 @@ describe("payLightningInvoiceWithCashu", () => {
 
   it("reports a typed melt failure and leaves no success side effects", async () => {
     const melt = vi.fn<MeltCashuInvoice>(async () =>
-      Either.left(
+      Result.fail(
         new MintRejected({
           mint: MintUrl.make(MINT_URL),
           code: null,
@@ -261,7 +261,7 @@ describe("payLightningAddressWithCashu", () => {
       const amount = Number(invoice.replace("lnbc-mock-", ""));
       return amount + 3 > 100
         ? insufficientFunds(amount + 3, 100)
-        : Either.right(meltReceipt(amount));
+        : Result.succeed(meltReceipt(amount));
     });
     const harness = await setup({ meltCashuInvoice: melt });
 
@@ -296,7 +296,7 @@ describe("payLightningAddressWithCashu", () => {
       }),
     );
     const melt = vi.fn<MeltCashuInvoice>(async () =>
-      Either.left(
+      Result.fail(
         new MintRejected({
           mint: MintUrl.make(MINT_URL),
           code: null,

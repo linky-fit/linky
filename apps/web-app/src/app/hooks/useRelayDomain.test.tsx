@@ -5,7 +5,7 @@ import {
 } from "@linky-fit/linkstr";
 import type { NostrTransportService } from "@linky-fit/linkstr";
 import {
-  Registry,
+  AtomRegistry,
   RegistryContext,
   linkstrConfigAtom,
 } from "@linky-fit/linkstr-react";
@@ -39,7 +39,7 @@ const inbox = "wss://inbox.example.com";
 const now = Math.floor(Date.now() / 1000);
 const published: PublishedEvent[] = [];
 const views: Array<Awaited<ReturnType<typeof renderIntoDocument>>> = [];
-const registries: Array<Registry.Registry> = [];
+const registries: Array<AtomRegistry.AtomRegistry> = [];
 const setStatus = vi.fn();
 let state: ReturnType<typeof useRelayDomain> | undefined;
 
@@ -68,7 +68,7 @@ const mount = async (
   transport: NostrTransportService,
   networkEnabled = true,
 ) => {
-  const registry = Registry.make();
+  const registry = AtomRegistry.make();
   registries.push(registry);
   const layer = Layer.succeed(NostrTransport, transport);
   registry.set(linkstrConfigAtom, configWith(identity, layer));

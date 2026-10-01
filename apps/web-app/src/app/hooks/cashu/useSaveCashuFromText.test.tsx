@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { MintUrl, TokenAlreadySpent } from "@linky-fit/linkshu";
@@ -55,7 +55,7 @@ const setup = async (
 describe("useSaveCashuFromText", () => {
   it("resolves terminally when the mint reports the token already spent", async () => {
     const save = await setup(async () =>
-      Either.left(
+      Result.fail(
         new TokenAlreadySpent({ mint: MintUrl.make("https://x.cz") }),
       ),
     );

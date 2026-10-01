@@ -2,8 +2,8 @@ import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
 import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import {
+  AtomRegistry,
   linkstrConfigAtom,
-  Registry,
   retractReactionAtom,
 } from "@linky-fit/linkstr-react";
 import {
@@ -18,7 +18,7 @@ import { expect, it } from "vitest";
 it("drives a linkstr-react atom with helpers imported through @linky-fit/linkstr-react/testing", async () => {
   const alice = makeIdentity();
   const bob = makeIdentity();
-  const registry = Registry.make();
+  const registry = AtomRegistry.make();
   const published: Array<SignedWrapEvent> = [];
   registry.set(
     linkstrConfigAtom,

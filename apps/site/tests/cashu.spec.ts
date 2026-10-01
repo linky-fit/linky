@@ -27,9 +27,7 @@ test("an unlisted mint advertising simulated Lightning cannot consume a token", 
     });
     if (url.pathname === "/v1/info") {
       const info = Schema.decodeUnknownSync(
-        Schema.parseJson(
-          Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-        ),
+        Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
       )(await response.text());
       return route.fulfill({
         response,

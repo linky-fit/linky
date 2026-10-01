@@ -170,7 +170,7 @@ describe("encrypted error inbox", () => {
       Effect.provide(
         IdentityProvider,
         Layer.provide(
-          IdentityProvider.Live,
+          IdentityProvider.layer,
           MasterSecretProvider.fromSlip39Share(share),
         ),
       ),

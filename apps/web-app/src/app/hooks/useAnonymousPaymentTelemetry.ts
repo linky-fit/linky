@@ -36,17 +36,17 @@ const isUnixSeconds = Schema.is(UnixSeconds);
 const LocalPaymentTelemetryEventSchema = Schema.Struct({
   id: Schema.String,
   createdAtSec: Schema.Number,
-  direction: Schema.Literal("in", "out"),
-  status: Schema.Literal("declined", "error", "ok"),
-  method: Schema.Literal(
+  direction: Schema.Literals(["in", "out"]),
+  status: Schema.Literals(["declined", "error", "ok"]),
+  method: Schema.Literals([
     "cashu_chat",
     "cashu_receive",
     "cashu_restore",
     "lightning_address",
     "lightning_invoice",
     "unknown",
-  ),
-  phase: Schema.Literal(
+  ]),
+  phase: Schema.Literals([
     "complete",
     "invoice_fetch",
     "melt",
@@ -55,15 +55,15 @@ const LocalPaymentTelemetryEventSchema = Schema.Struct({
     "restore",
     "swap",
     "unknown",
-  ),
+  ]),
   appVersion: Schema.String,
   appHost: Schema.optional(Schema.NullOr(Schema.String)),
   appRuntime: Schema.optional(
-    Schema.NullOr(Schema.Literal("native", "pwa", "web")),
+    Schema.NullOr(Schema.Literals(["native", "pwa", "web"])),
   ),
   devicePlatform: Schema.optional(
     Schema.NullOr(
-      Schema.Literal(
+      Schema.Literals([
         "android",
         "iphone",
         "ipad",
@@ -71,7 +71,7 @@ const LocalPaymentTelemetryEventSchema = Schema.Struct({
         "mac",
         "windows",
         "unknown",
-      ),
+      ]),
     ),
   ),
   mint: Schema.NullOr(Schema.String),
