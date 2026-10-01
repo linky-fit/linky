@@ -25,6 +25,7 @@ const LOCAL_STACK_SPECS = [
   "**/security-policy.spec.ts",
   "**/seed-restore-chat-tokens.spec.ts",
   "**/receive-deferred.spec.ts",
+  "**/receive-deferred-actions.spec.ts",
 ];
 
 export default defineConfig({

@@ -52,6 +52,7 @@ import {
 import {
   getLightningInvoicePreview,
   type LightningInvoicePreview,
+  type OperationId,
 } from "@linky-fit/linkshu";
 import {
   CashuOperationId as CashuOperationIdType,
@@ -1860,6 +1861,33 @@ export const useCashuWalletComposition = ({
     [cashuTransferLifecycle, setStatus, t],
   );
 
+  /** Gives up on a token waiting for its mint; lost unless its text was kept. */
+  const discardCashuDeferredReceive = React.useCallback(
+    async (id: OperationId): Promise<void> => {
+      if (cashuTransferLifecycle === null) {
+        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
+        return;
+      }
+      try {
+        const outcome = await cashuTransferLifecycle.forget(id);
+        if (Either.isLeft(outcome)) {
+          setStatus(
+            // A retry pass handed the token to its receive first.
+            outcome.left._tag === "InvalidTransferTransition"
+              ? t("cashuDeferredAlreadyReceiving")
+              : `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.left) ?? outcome.left._tag}`,
+          );
+          return;
+        }
+      } catch (error) {
+        setStatus(`${t("errorPrefix")}: ${String(error)}`);
+        return;
+      }
+      setStatus(t("cashuDeferredReceiveDiscarded"));
+    },
+    [cashuTransferLifecycle, setStatus, t],
+  );
+
   const startSendCashuTokenToContact = React.useCallback(
     async (id: CashuOperationId) => {
       setPendingCashuTokenContactPickId(id);
@@ -2553,6 +2581,7 @@ export const useCashuWalletComposition = ({
     cashuMeltToMainMintButtonLabel,
     cashuOpenTransfers,
     cashuDeferredReceives: walletDeferredReceives,
+    discardCashuDeferredReceive,
     cashuProofs: walletProofs,
     cashuOperations: walletOperations,
     cashuTokensHydratedRef,

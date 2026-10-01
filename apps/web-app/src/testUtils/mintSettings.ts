@@ -34,6 +34,7 @@ export const createMintSettings = (
   cashuMeltToMainMintButtonLabel: "Melt foreign balance",
   cashuProofs: [],
   defaultMintUrl: "https://cashu.cz",
+  discardCashuDeferredReceive: vi.fn(async () => undefined),
   estimateMintMove: vi.fn(async () => null),
   getMintIconUrl: () => ({
     failed: false,

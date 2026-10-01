@@ -131,7 +131,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "mints.addKnownMint":
     "linkshu recorded a mint in its known-mint set without contacting it. The payload names the mint; repeating the operation leaves one entry.",
   "mints.removeKnownMint":
-    "linkshu tried to forget a known mint. MintInUse means unspent proofs still name it; proofCount reports how many. Success removes the seen entry without contacting the mint.",
+    "linkshu tried to forget a known mint. MintInUse means unspent proofs or pending deferred receives still name it; proofCount and deferredReceiveCount report how many. Success removes the seen entry without contacting the mint.",
   "validation.inspectProofStates":
     "Read-only mint status check for the token list or detail. Reports the mint's answer (unspent, pending, spent, unknown) per stored proof without exposing secrets.",
   "validation.checkTransfer":
@@ -143,7 +143,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "tokens.ingestLegacyRows":
     "Rows of the legacy cashuToken table were carried into the proof inventory: accepted → available, reserved → held, issued/externalized → a send transfer with handed-out proofs, error → spent only when the recorded error says so. Rows whose proofs are already stored are skipped.",
   "tokens.forget":
-    "A transfer was closed by the app because nothing is left to do about it (a delivered messenger send, a dismissed failed receive). Handed-out proofs stay handed out until the mint reports them spent.",
+    "A transfer was closed by the app because nothing is left to do about it (a delivered messenger send, a dismissed failed receive, a deferred receive the user discarded). Handed-out proofs stay handed out until the mint reports them spent; a discarded deferral's token is gone unless the user kept its text. Discarding a deferral a resume pass already handed to its receive fails with InvalidTransferTransition.",
   "restore.restore":
     "Seed scan for proofs not already in the inventory. Missing-token recovery follows this with tokens.reclaim for only the newly discovered proofs; ordinary restore keeps them as-is.",
   "tokens.reclaim":

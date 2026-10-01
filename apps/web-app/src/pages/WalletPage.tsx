@@ -3,6 +3,7 @@ import { useAppShellActions } from "../app/context/AppShellContexts";
 import { BottomTabBar } from "../components/BottomTabBar";
 import { WalletActionButton } from "../components/WalletActionButton";
 import { WalletBalance } from "../components/WalletBalance";
+import { WalletPendingReceives } from "../components/WalletPendingReceives";
 import { WalletWarning } from "../components/WalletWarning";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
@@ -40,10 +41,13 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
         />
         <div className="panel-header">
           <div className="wallet-hero">
-            <WalletBalance
-              balance={cashuTotalBalance}
-              ariaLabel={t("cashuBalance")}
-            />
+            <div className="wallet-balance-block">
+              <WalletBalance
+                balance={cashuTotalBalance}
+                ariaLabel={t("cashuBalance")}
+              />
+              <WalletPendingReceives />
+            </div>
             <div className="wallet-actions">
               <WalletActionButton
                 icon="topup"

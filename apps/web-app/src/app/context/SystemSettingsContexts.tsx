@@ -4,6 +4,7 @@ import type { ReceiveMethod } from "../../utils/receiveMethod";
 import type { LinkyScope } from "@linky-fit/linksync";
 import type {
   AutoswapEstimate,
+  OperationId,
   StoredOperation,
   StoredProof,
 } from "@linky-fit/linkshu";
@@ -87,6 +88,8 @@ export interface MintSettingsContextValue {
   cashuProofs: readonly StoredProof[];
   /** The effective default mint: a hidden test mint falls back to production. */
   defaultMintUrl: string | null;
+  /** Closes a pending deferred receive; its token is lost unless copied first. */
+  discardCashuDeferredReceive: (id: OperationId) => Promise<void>;
   estimateMintMove: (move: MintMove) => Promise<AutoswapEstimate | null>;
   getMintIconUrl: (mint: string | null | undefined) => MintIcon;
   getMintRuntime: (

@@ -9,6 +9,7 @@ let mintSettings: MintSettingsContextValue;
 let mintUrl = "https://cashu.cz";
 
 vi.mock("../app/context/AppShellContexts", () => ({
+  useAppShellActions: () => ({ copyText: vi.fn() }),
   useAppShellCore: () => ({
     formatDisplayedAmountText: (amount: number) => `${amount} sat`,
     lang: "en",

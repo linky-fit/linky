@@ -172,6 +172,10 @@ _Avoid_: claim, redeem, accept
 A token kept because its mint could not be reached, loaded or asked when it arrived; any device receives it once the mint answers.
 _Avoid_: parked token, queued claim
 
+**Discard**:
+Giving up a deferred receive at the user's request; nothing is received, so the token's value is gone unless the user kept its text.
+_Avoid_: forget, cancel, delete
+
 **Operation**:
 A recorded wallet action (topup, melt, autoswap, send, receive or deferred receive) and its progress; operations are never deleted.
 _Avoid_: job, task

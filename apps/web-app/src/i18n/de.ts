@@ -787,6 +787,15 @@ export const de = {
   cashuReceiveDeferred:
     "Die Mint ist nicht erreichbar. Der Token ist gespeichert und wird empfangen, sobald die Mint wieder erreichbar ist.",
   mintPendingAmount: "{amount} ausstehend",
+  mintPendingTitle: "Wartet auf die Mint",
+  cashuDeferredCopyToken: "Token kopieren",
+  cashuDeferredDiscard: "Verwerfen",
+  cashuDeferredDiscardTitle: "Diesen Token verwerfen?",
+  cashuDeferredDiscardBody:
+    "{amount} wurde nie empfangen. Nach dem Verwerfen ist das Geld verloren, außer du behältst eine Kopie des Tokens und fügst sie später wieder ein.",
+  cashuDeferredReceiveDiscarded: "Token verworfen.",
+  cashuDeferredAlreadyReceiving:
+    "Dieser Token wird bereits empfangen und kann nicht mehr verworfen werden.",
   cashuCheckToken: "Token prüfen",
   cashuCheckAllTokens: "Alle prüfen",
   cashuCheckIssuedTokens: "Eingelöste prüfen",

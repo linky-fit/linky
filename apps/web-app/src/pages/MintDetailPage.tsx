@@ -6,6 +6,7 @@ import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
 import { MintBadge } from "../components/MintBadge";
+import { MintDeferredReceives } from "../components/MintDeferredReceives";
 import { MintFees } from "../components/MintFees";
 import { MintIcon } from "../components/MintIcon";
 import { MintMoveFundsForm } from "../components/MintMoveFundsForm";
@@ -167,6 +168,8 @@ export function MintDetailPage() {
           value={formatDisplayedAmountText(holding.balance)}
         />
       </div>
+
+      <MintDeferredReceives mint={cleaned} />
 
       {holding.balance > 0 ? (
         <div className="settings-section">

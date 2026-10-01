@@ -91,6 +91,7 @@ const mintSettings: MintSettingsContextValue = {
   cashuMeltToMainMintButtonLabel: null,
   cashuProofs: [],
   defaultMintUrl: null,
+  discardCashuDeferredReceive: async () => undefined,
   estimateMintMove: () => Promise.resolve(null),
   getMintIconUrl: () => ({
     failed: false,

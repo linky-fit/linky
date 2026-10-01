@@ -776,6 +776,15 @@ export const en = {
   cashuReceiveDeferred:
     "The mint is unreachable. The token is saved and will be received once the mint is back.",
   mintPendingAmount: "{amount} pending",
+  mintPendingTitle: "Waiting for the mint",
+  cashuDeferredCopyToken: "Copy token",
+  cashuDeferredDiscard: "Discard",
+  cashuDeferredDiscardTitle: "Discard this token?",
+  cashuDeferredDiscardBody:
+    "{amount} was never received. Once discarded, the money is lost unless you keep a copy of the token and paste it again later.",
+  cashuDeferredReceiveDiscarded: "Token discarded.",
+  cashuDeferredAlreadyReceiving:
+    "This token is already being received, so it can no longer be discarded.",
   cashuCheckToken: "Check token",
   cashuCheckAllTokens: "Check all",
   cashuCheckIssuedTokens: "Check claimed",

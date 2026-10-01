@@ -3418,6 +3418,40 @@ button.mint-choice.is-selected:hover {
   height: 14px;
 }
 
+.wallet-balance-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+button.wallet-pending {
+  min-height: 44px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+}
+
+button.wallet-pending:hover {
+  transform: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.mint-deferred-receive {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mint-deferred-receive-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+}
+
 .mint-choice-share {
   height: 4px;
   border-radius: 999px;

@@ -784,6 +784,15 @@ export const cs = {
   cashuReceiveDeferred:
     "Mint je nedostupný. Token je uložený a přijme se, jakmile bude mint zase dostupný.",
   mintPendingAmount: "{amount} čeká",
+  mintPendingTitle: "Čeká na mint",
+  cashuDeferredCopyToken: "Kopírovat token",
+  cashuDeferredDiscard: "Zahodit",
+  cashuDeferredDiscardTitle: "Zahodit tento token?",
+  cashuDeferredDiscardBody:
+    "Částka {amount} nebyla nikdy přijata. Po zahození o peníze přijdete, pokud si nenecháte kopii tokenu a později ho znovu nevložíte.",
+  cashuDeferredReceiveDiscarded: "Token zahozen.",
+  cashuDeferredAlreadyReceiving:
+    "Tento token se už přijímá, takže ho nelze zahodit.",
   cashuCheckToken: "Zkontrolovat token",
   cashuCheckAllTokens: "Zkontrolovat vše",
   cashuCheckIssuedTokens: "Zkontrolovat využité",
