@@ -238,8 +238,12 @@ export const useMessagesDomain = ({
     );
   }, [contactByConversation, messageRows]);
 
+  const overlayMessagesRef = useLatest(overlayMessages);
+
   const persistOverlayMessages = React.useCallback(
     (nextMessages: LocalNostrMessage[]) => {
+      // Messages arriving in one burst read the ref before React re-renders.
+      overlayMessagesRef.current = nextMessages;
       setOverlayMessages(nextMessages);
       const ownerId = appOwnerIdRef.current;
       if (!ownerId) return;
@@ -248,7 +252,7 @@ export const useMessagesDomain = ({
         nextMessages,
       );
     },
-    [appOwnerIdRef],
+    [appOwnerIdRef, overlayMessagesRef],
   );
 
   React.useEffect(() => {
@@ -268,8 +272,6 @@ export const useMessagesDomain = ({
 
     setOverlayMessages(dedupeNostrMessagesByPriority(normalized));
   }, [appOwnerId, appOwnerIdRef]);
-
-  const overlayMessagesRef = useLatest(overlayMessages);
 
   const nostrMessagesLocal = React.useMemo(() => {
     const combined = dedupeNostrMessagesByPriority([
