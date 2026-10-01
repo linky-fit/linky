@@ -5,6 +5,7 @@ import {
 import { Schema } from "effect";
 import { NonBlankString, PositiveFiniteNumber } from "../../utils/schema";
 import {
+  canLockAcrossTabs,
   safeLocalStorageGetJson,
   safeLocalStorageKeys,
   safeLocalStorageRemove,
@@ -123,10 +124,6 @@ export const readBankPaymentOfferSpdRecord = (args: {
   }
   return record.ownerPubkey === args.ownerPubkey ? record : null;
 };
-
-// The boot compatibility shim has no query method and cannot lock across tabs.
-export const canLockAcrossTabs = (): boolean =>
-  typeof navigator.locks?.query === "function";
 
 export const reserveBankPaymentOfferBankDetails = async (args: {
   candidateKey: string;

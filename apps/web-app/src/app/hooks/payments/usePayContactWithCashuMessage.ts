@@ -156,7 +156,12 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
 
       if (!currentNsec || !currentNpub) {
         if (notify) setStatus(t("profileMissingNpub"));
-        return { error: "missing nsec", ok: false, queued: false };
+        return {
+          error: "missing nsec",
+          ok: false,
+          queued: false,
+          retryable: true,
+        };
       }
 
       const contactNpub = (contact.npub ?? "").trim();
@@ -239,7 +244,12 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       if (sendCashuToken === null || cashuTransferLifecycle === null) {
         if (notify)
           setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-        return { error: "cashu storage not ready", ok: false, queued: false };
+        return {
+          error: "cashu storage not ready",
+          ok: false,
+          queued: false,
+          retryable: true,
+        };
       }
 
       const mint = selectSendMintForAmount(
@@ -249,7 +259,12 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       );
       if (mint === null) {
         if (notify) setStatus(t("payInsufficient"));
-        return { error: "insufficient", ok: false, queued: false };
+        return {
+          error: "insufficient",
+          ok: false,
+          queued: false,
+          retryable: true,
+        };
       }
       logPayStep("mint-selected", { amountSat, mint });
 

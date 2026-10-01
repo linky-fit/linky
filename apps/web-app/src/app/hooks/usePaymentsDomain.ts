@@ -8,15 +8,19 @@ import type {
   UpdateLocalNostrMessage,
 } from "../types/appTypes";
 import type { Translate } from "../../i18n";
-
-interface PayResult {
-  error?: string;
-  ok: boolean;
-  queued: boolean;
-}
+import { getUnknownErrorMessage } from "../../utils/unknown";
+import {
+  appendStoredPendingPayment,
+  claimStoredPendingPayment,
+  readPendingPayments,
+  withPendingPaymentsFlushLock,
+} from "../lib/pendingPayments";
+import type { CashuMessagePaymentHookResult } from "./payments/cashuMessagePaymentTypes";
 
 interface UsePaymentsDomainParams<TContact extends ContactIdentityRowLike> {
+  cashuBalance: number;
   cashuIsBusy: boolean;
+  cashuReady: boolean;
   contacts: readonly TContact[];
   currentNpub: string | null;
   currentNsec: string | null;
@@ -26,142 +30,176 @@ interface UsePaymentsDomainParams<TContact extends ContactIdentityRowLike> {
     fromQueue?: boolean;
     isPaymentAuthorized?: () => boolean;
     pendingMessageId?: string;
-  }) => Promise<PayResult>;
-  pendingPayments: LocalPendingPayment[];
+  }) => Promise<CashuMessagePaymentHookResult>;
+  pendingPaymentsKey: string | null;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
   pushToast: (message: string) => void;
-  removePendingPayment: (id: string) => void;
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   t: Translate;
 }
 
+const paymentLinks = (pending: LocalPendingPayment) => ({
+  payment: pending.id,
+  ...(pending.messageId ? { message: pending.messageId } : {}),
+});
+
+/**
+ * Each queued payment is claimed (removed from storage) under a cross-tab
+ * lock before it is sent: a crash after the claim loses the queue entry but
+ * never sends it twice.
+ */
 export const usePaymentsDomain = <TContact extends ContactIdentityRowLike>({
+  cashuBalance,
   cashuIsBusy,
+  cashuReady,
   contacts,
   currentNpub,
   currentNsec,
   payContactWithCashuMessage,
-  pendingPayments,
+  pendingPaymentsKey,
   updateLocalNostrMessage,
   pushToast,
-  removePendingPayment,
   setCashuIsBusy,
   t,
 }: UsePaymentsDomainParams<TContact>) => {
   const contactsLatestRef = useLatest(contacts);
   const pendingPaymentsFlushRef = React.useRef<Promise<void> | null>(null);
 
+  const cancelPendingPayment = React.useCallback(
+    (pending: LocalPendingPayment, notice: string) => {
+      if (pending.messageId)
+        updateLocalNostrMessage(pending.messageId, {
+          content: notice,
+          status: "sent",
+          localOnly: true,
+        });
+      pushToast(notice);
+    },
+    [pushToast, updateLocalNostrMessage],
+  );
+
+  const sendClaimedPayment = React.useCallback(
+    async (key: string, pending: LocalPendingPayment) => {
+      const approvedPubkey = pending.recipientPubkey;
+      const findContact = () =>
+        contactsLatestRef.current.find(
+          (candidate) => candidate.id === pending.contactId,
+        );
+      const isPaymentAuthorized = () =>
+        Boolean(approvedPubkey) &&
+        decodeNpub(findContact()?.npub ?? "") === approvedPubkey;
+      const contact = findContact();
+      if (!contact || !approvedPubkey || !isPaymentAuthorized()) {
+        reportAppLog({
+          tag: "payment.queuedApprovalRejected",
+          summary: "Queued payment requires new recipient approval",
+          links: paymentLinks(pending),
+          payload: {
+            reason: approvedPubkey
+              ? "recipient-changed"
+              : "legacy-unbound-recipient",
+          },
+        });
+        cancelPendingPayment(pending, t("payApprovalChanged"));
+        return;
+      }
+
+      let result: CashuMessagePaymentHookResult;
+      setCashuIsBusy(true);
+      try {
+        result = await payContactWithCashuMessage({
+          contact: { ...contact, npub: encodeNpub(approvedPubkey) },
+          amountSat: pending.amountSat,
+          isPaymentAuthorized,
+          fromQueue: true,
+          ...(pending.messageId ? { pendingMessageId: pending.messageId } : {}),
+        });
+      } catch (error) {
+        result = {
+          error: getUnknownErrorMessage(error, "unknown"),
+          ok: false,
+          queued: false,
+        };
+      } finally {
+        setCashuIsBusy(false);
+      }
+
+      if (result.ok) return;
+      if (result.retryable) {
+        appendStoredPendingPayment(key, pending);
+        return;
+      }
+      const error = result.error ?? "unknown";
+      reportAppLog({
+        tag: "payment.queuedFailed",
+        summary: `Queued payment failed and was dropped: ${error}`,
+        links: paymentLinks(pending),
+        payload: { amountSat: pending.amountSat, error },
+      });
+      cancelPendingPayment(pending, `${t("payFailed")}: ${error}`);
+    },
+    [
+      cancelPendingPayment,
+      contactsLatestRef,
+      payContactWithCashuMessage,
+      setCashuIsBusy,
+      t,
+    ],
+  );
+
   const flushPendingPayments = React.useCallback(async () => {
     if (pendingPaymentsFlushRef.current) return;
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
     if (!currentNsec || !currentNpub) return;
-    if (cashuIsBusy) return;
-    if (pendingPayments.length === 0) return;
+    if (cashuIsBusy || !cashuReady || !pendingPaymentsKey) return;
+    const key = pendingPaymentsKey;
 
-    const run = Promise.resolve().then(async () => {
-      try {
-        for (const pending of pendingPayments) {
-          const contact = contactsLatestRef.current.find(
-            (candidate) => (candidate.id ?? "") === pending.contactId,
-          );
-
-          const approvedPubkey = pending.recipientPubkey;
-          const isPaymentAuthorized = () =>
-            Boolean(approvedPubkey) &&
-            decodeNpub(
-              contactsLatestRef.current.find(
-                (candidate) => candidate.id === pending.contactId,
-              )?.npub ?? "",
-            ) === approvedPubkey;
-          if (!contact || !approvedPubkey || !isPaymentAuthorized()) {
-            reportAppLog({
-              tag: "payment.queuedApprovalRejected",
-              summary: "Queued payment requires new recipient approval",
-              links: {
-                payment: pending.id,
-                ...(pending.messageId ? { message: pending.messageId } : {}),
-              },
-              payload: {
-                reason: approvedPubkey
-                  ? "recipient-changed"
-                  : "legacy-unbound-recipient",
-              },
-            });
-            removePendingPayment(pending.id);
-            if (pending.messageId)
-              updateLocalNostrMessage(pending.messageId, {
-                content: t("payApprovalChanged"),
-                status: "sent",
-                localOnly: true,
-              });
-            pushToast(t("payApprovalChanged"));
-            continue;
+    const run = Promise.resolve()
+      .then(() =>
+        withPendingPaymentsFlushLock(async () => {
+          for (const { id } of readPendingPayments(key)) {
+            const pending = claimStoredPendingPayment(key, id);
+            if (pending) await sendClaimedPayment(key, pending);
           }
-
-          const amountSat = pending.amountSat || 0;
-          if (amountSat <= 0) {
-            removePendingPayment(pending.id);
-            continue;
-          }
-
-          if (cashuIsBusy) break;
-
-          setCashuIsBusy(true);
-          try {
-            const result = await payContactWithCashuMessage({
-              contact: { ...contact, npub: encodeNpub(approvedPubkey) },
-              amountSat,
-              isPaymentAuthorized,
-              fromQueue: true,
-              ...(pending.messageId
-                ? { pendingMessageId: pending.messageId }
-                : {}),
-            });
-
-            if (result.ok) {
-              removePendingPayment(pending.id);
-            } else if (result.error) {
-              pushToast(`${t("payFailed")}: ${result.error}`);
-            }
-          } catch {
-            // Keep pending payment for retry.
-          } finally {
-            setCashuIsBusy(false);
-          }
-        }
-      } finally {
+        }),
+      )
+      .finally(() => {
         pendingPaymentsFlushRef.current = null;
-      }
-    });
+      });
 
     pendingPaymentsFlushRef.current = run;
     await run;
   }, [
     cashuIsBusy,
-    contactsLatestRef,
-    updateLocalNostrMessage,
+    cashuReady,
     currentNpub,
     currentNsec,
-    payContactWithCashuMessage,
-    pendingPayments,
-    pushToast,
-    removePendingPayment,
-    setCashuIsBusy,
-    t,
+    pendingPaymentsKey,
+    sendClaimedPayment,
   ]);
+  const flushLatestRef = useLatest(flushPendingPayments);
 
   React.useEffect(() => {
     const handleOnline = () => {
-      void flushPendingPayments();
+      void flushLatestRef.current();
     };
 
     window.addEventListener("online", handleOnline);
     return () => {
       window.removeEventListener("online", handleOnline);
     };
-  }, [flushPendingPayments]);
+  }, [flushLatestRef]);
 
+  // Not keyed on busy state or the pay callback: every attempt changes them,
+  // which would retry a payment waiting for funds in a loop.
   React.useEffect(() => {
-    void flushPendingPayments();
-  }, [currentNsec, contacts, pendingPayments.length, flushPendingPayments]);
+    void flushLatestRef.current();
+  }, [
+    cashuBalance,
+    cashuReady,
+    contacts,
+    currentNsec,
+    flushLatestRef,
+    pendingPaymentsKey,
+  ]);
 };

@@ -41,6 +41,7 @@ import type { useRouting } from "../../hooks/useRouting";
 import type { Translate } from "../../i18n";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import {
+  canLockAcrossTabs,
   getInitialBankPaymentOfferRecipientCount,
   getInitialBankPaymentOfferStaggerDelaySec,
   withLocalStorageLeaseLock,
@@ -56,7 +57,6 @@ import {
 import {
   BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX,
   BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX,
-  canLockAcrossTabs,
   forgetBankPaymentOfferSpdPayload,
   forgetBankPaymentOfferStaggerQueue,
   markBankPaymentOfferBankDetailsSent,

@@ -78,6 +78,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A staggered proxy payment offer reached its next queued recipient: the configured delay elapsed without a winner, so the offer was extended while keeping the original expiry.",
   "payment.queuedApprovalRejected":
     "An offline payment had no pinned recipient identity or that identity changed. Its unfunded approval was canceled and its chat placeholder asks for a new approval.",
+  "payment.queuedFailed":
+    "An offline payment was sent after reconnecting and failed after it may have created a token. It is not retried, so it can never be paid twice; its chat placeholder shows the error.",
   "paymentRequest.authorizationLost":
     "The reviewed request or approved recipient changed during token creation. Delivery was stopped and the app attempted to return the pending transfer to the wallet; a failed return leaves it recoverable.",
   "paymentRequest.editRejected":

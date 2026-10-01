@@ -23,4 +23,6 @@ export interface CashuMessagePaymentHookResult {
   error?: string;
   ok: boolean;
   queued: boolean;
+  /** The attempt stopped before any token was created, so it can run again. */
+  retryable?: true;
 }

@@ -1,7 +1,7 @@
 import type { ContactRowLike } from "../app/types/appTypes";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import { canLockAcrossTabs } from "../app/lib/bankPaymentOfferStorage";
+import { canLockAcrossTabs } from "../utils/storage";
 import { useFiatRates } from "../app/hooks/useFiatRates";
 import {
   BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,

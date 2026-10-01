@@ -63,6 +63,7 @@ export const LOCAL_NOSTR_MESSAGES_STORAGE_KEY_PREFIX =
 export const LOCAL_MINT_INFO_STORAGE_KEY_PREFIX = "linky.local.mintInfo.v1";
 export const LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX =
   "linky.local.pendingPayments.v1";
+export const LOCAL_PENDING_PAYMENTS_LOCK = "linky.local.pendingPaymentsLock.v1";
 export const LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX =
   "linky.local.pendingPaymentTelemetry.v1";
 export const LOCAL_PENDING_PAYMENT_TELEMETRY_LOCK_STORAGE_KEY_PREFIX =

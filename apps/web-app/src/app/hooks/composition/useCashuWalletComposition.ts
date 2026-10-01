@@ -173,8 +173,7 @@ interface UseCashuWalletCompositionParams {
     | "nostrMessagesRecent"
     | "nostrPictureByNpub"
     | "openScannedContactPendingNpubRef"
-    | "pendingPayments"
-    | "removePendingPayment"
+    | "pendingPaymentsKey"
     | "respondToBankPaymentOfferWithGroupState"
     | "selectedChatContact"
     | "selectedContact"
@@ -267,8 +266,7 @@ export const useCashuWalletComposition = ({
     nostrMessagesRecent,
     nostrPictureByNpub,
     openScannedContactPendingNpubRef,
-    pendingPayments,
-    removePendingPayment,
+    pendingPaymentsKey,
     respondToBankPaymentOfferWithGroupState,
     selectedChatContact,
     selectedContact,
@@ -943,15 +941,16 @@ export const useCashuWalletComposition = ({
   );
 
   usePaymentsDomain({
+    cashuBalance,
     cashuIsBusy,
+    cashuReady: sendCashuToken !== null && cashuTransferLifecycle !== null,
     contacts,
     currentNpub,
     currentNsec,
     payContactWithCashuMessage,
-    pendingPayments,
+    pendingPaymentsKey,
     updateLocalNostrMessage,
     pushToast,
-    removePendingPayment,
     setCashuIsBusy,
     t,
   });

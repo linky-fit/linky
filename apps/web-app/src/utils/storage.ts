@@ -203,6 +203,10 @@ export const withLocalStorageLeaseLock = async <T>(args: {
   }
 };
 
+// The boot compatibility shim has no query method and cannot lock across tabs.
+export const canLockAcrossTabs = (): boolean =>
+  typeof navigator.locks?.query === "function";
+
 const readStoredInt = (key: string): number | null => {
   const parsed = Number.parseInt(trimString(safeLocalStorageGet(key)), 10);
   return Number.isFinite(parsed) ? parsed : null;

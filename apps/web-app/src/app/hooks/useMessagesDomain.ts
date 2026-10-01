@@ -1,5 +1,5 @@
 import type { Pubkey } from "@linky-fit/linkstr";
-import { readPendingPayments } from "../lib/pendingPayments";
+import { enqueueStoredPendingPayment } from "../lib/pendingPayments";
 import {
   ContactId,
   createId,
@@ -35,7 +35,6 @@ import { runWrite } from "../lib/storeWrite";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,
-  LocalPendingPayment,
   NewLocalNostrMessage,
   NewLocalNostrReaction,
   UpdateLocalNostrMessage,
@@ -370,10 +369,6 @@ export const useMessagesDomain = ({
     },
     [conversations, write],
   );
-
-  const [pendingPayments, setPendingPayments] = React.useState<
-    LocalPendingPayment[]
-  >(() => []);
 
   const legacyImportDoneRef = React.useRef(false);
 
@@ -880,19 +875,9 @@ export const useMessagesDomain = ({
     };
   }, []);
 
-  React.useEffect(() => {
-    const ownerId = appOwnerIdRef.current;
-    if (!ownerId) {
-      setPendingPayments([]);
-      return;
-    }
-
-    const normalized = readPendingPayments(
-      `${LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX}.${ownerId}`,
-    );
-
-    setPendingPayments(normalized);
-  }, [appOwnerId, appOwnerIdRef]);
+  const pendingPaymentsKey = appOwnerId
+    ? `${LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX}.${appOwnerId}`
+    : null;
 
   const enqueuePendingPayment = React.useCallback(
     (payload: {
@@ -901,56 +886,22 @@ export const useMessagesDomain = ({
       contactId: ContactId;
       messageId?: string;
     }) => {
-      const ownerId = appOwnerIdRef.current;
-      if (!ownerId) return;
-
       const amountSat =
         Number.isFinite(payload.amountSat) && payload.amountSat > 0
           ? Math.trunc(payload.amountSat)
           : 0;
-      if (amountSat <= 0) return;
+      if (!pendingPaymentsKey || amountSat <= 0) return;
 
-      const entry: LocalPendingPayment = {
+      void enqueueStoredPendingPayment(pendingPaymentsKey, {
         id: makeLocalId(),
         contactId: toText(payload.contactId),
         amountSat,
         recipientPubkey: payload.recipientPubkey,
         createdAtSec: nowSeconds(),
         ...(payload.messageId ? { messageId: payload.messageId } : {}),
-      };
-
-      setPendingPayments((prev) => {
-        const next = [...prev, entry].slice(-200);
-        safeLocalStorageSetJson(
-          `${LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX}.${ownerId}`,
-          next,
-        );
-        return next;
       });
     },
-    [appOwnerIdRef],
-  );
-
-  const removePendingPayment = React.useCallback(
-    (id: string) => {
-      const ownerId = appOwnerIdRef.current;
-      const normalizedId = trimString(id);
-      if (!ownerId || !normalizedId) return;
-
-      setPendingPayments((prev) => {
-        const next = prev.filter(
-          (pendingPayment) => trimString(pendingPayment.id) !== normalizedId,
-        );
-
-        safeLocalStorageSetJson(
-          `${LOCAL_PENDING_PAYMENTS_STORAGE_KEY_PREFIX}.${ownerId}`,
-          next,
-        );
-
-        return next;
-      });
-    },
-    [appOwnerIdRef],
+    [pendingPaymentsKey],
   );
 
   const chatContactId = activeChatRouteId;
@@ -1016,11 +967,10 @@ export const useMessagesDomain = ({
     nostrMessagesRecent,
     nostrReactionWrapIdsRef,
     nostrReactionsLocal,
-    pendingPayments,
+    pendingPaymentsKey,
     reactionsByMessageId,
     reassignLocalNostrMessagesContactId,
     removeLocalNostrMessagesByContactId,
-    removePendingPayment,
     softDeleteLocalNostrReaction,
     softDeleteLocalNostrReactionsByWrapIds,
     updateLocalNostrMessage,
