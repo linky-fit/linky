@@ -1,5 +1,5 @@
 import { LightningFeeProbeResult } from "@linky-fit/linkshu";
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import React from "react";
 import { vi } from "vitest";
 import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
@@ -10,7 +10,7 @@ export const decodeProbeResult = Schema.decodeUnknownSync(
 );
 export const probeLightningFee = vi.fn<ProbeLightningFee>(
   async ({ mint, probeMint }) =>
-    Either.right(
+    Result.succeed(
       decodeProbeResult({
         mint,
         probeMint,

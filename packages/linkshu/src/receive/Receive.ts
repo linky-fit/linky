@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { Inspector } from "../inspector/Inspector";
 import { inspectOperationWith, redactReceipt } from "../internal/operations";
 import { WalletInstances } from "../mint/internal/WalletInstances";
@@ -16,9 +16,8 @@ import type { ReceiveContext } from "./internal/acceptFlow";
  * deterministic re-signing with counter-collision recovery, and transfer
  * bookkeeping.
  */
-export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Receive extends Context.Service<Receive>()("linkshu/Receive", {
+  make: Effect.gen(function* () {
     const ctx: ReceiveContext = {
       kv: yield* KeyValueStore,
       proofStore: yield* ProofStore,
@@ -42,4 +41,9 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
 
     return { receive } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

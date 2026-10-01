@@ -122,12 +122,12 @@ const makeWallet = (args: FakeWalletArgs) => {
 
 const makeHarness = (wallet: LoadedWallet) => {
   const inspector = recordingInspector();
-  const layer = Send.DefaultWithoutDependencies.pipe(
+  const layer = Send.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({ get: () => Effect.succeed(wallet) }),
+          WalletInstances.of({ get: () => Effect.succeed(wallet) }),
         ),
         inMemoryKeyValueStore,
         inMemoryProofStore,
@@ -159,7 +159,7 @@ const sendAndInspect = (
     yield* Effect.forEach(seeds, (seed) => seedProofs(seed.mint, seed.proofs));
     const send = yield* Send;
     const kv = yield* KeyValueStore;
-    const receipt = yield* Effect.either(send.send(draft));
+    const receipt = yield* Effect.result(send.send(draft));
     return {
       receipt,
       proofs: yield* (yield* ProofStore).loadAll,
@@ -200,14 +200,14 @@ describe("Send.send", () => {
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations, counter } = exit.value;
 
-    assert(receipt._tag === "Right");
-    expect(receipt.right.mint).toBe(mint);
-    expect(receipt.right.unit).toBe("sat");
-    expect(receipt.right.amount).toBe(5);
-    expect(receipt.right.changeAmount).toBe(8);
+    assert(receipt._tag === "Success");
+    expect(receipt.success.mint).toBe(mint);
+    expect(receipt.success.unit).toBe("sat");
+    expect(receipt.success.amount).toBe(5);
+    expect(receipt.success.changeAmount).toBe(8);
     // 14 offered - 5 sent - 8 kept.
-    expect(receipt.right.feePaid).toBe(1);
-    expect(parseTokenText(receipt.right.tokenText)?.amount).toBe(5);
+    expect(receipt.success.feePaid).toBe(1);
+    expect(parseTokenText(receipt.success.tokenText)?.amount).toBe(5);
 
     expect(sendCalls).toEqual([
       {
@@ -231,17 +231,17 @@ describe("Send.send", () => {
     const handedOut = proofsIn(proofs, "handedOut");
     expect(secretsOf(handedOut)).toEqual(["s1", "s2"]);
     expect(
-      handedOut.every((p) => p.operationId === receipt.right.operationId),
+      handedOut.every((p) => p.operationId === receipt.success.operationId),
     ).toBe(true);
 
     expect(operations).toHaveLength(1);
     expect(operations[0]).toMatchObject({
-      id: receipt.right.operationId,
+      id: receipt.success.operationId,
       kind: "send",
       status: "issued",
       mint,
       amount: 5,
-      tokenText: receipt.right.tokenText,
+      tokenText: receipt.success.tokenText,
       error: null,
     });
 
@@ -265,7 +265,7 @@ describe("Send.send", () => {
       to: "handedOut",
       count: 2,
       amount: 5,
-      operationId: receipt.right.operationId,
+      operationId: receipt.success.operationId,
       reason: "send",
     });
     expect(events[3]).toMatchObject({
@@ -311,8 +311,8 @@ describe("Send.send", () => {
       ]),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
-    expect(exit.value.receipt.right).toMatchObject({
+    assert(exit.value.receipt._tag === "Success");
+    expect(exit.value.receipt.success).toMatchObject({
       amount: 5,
       feePaid: 1,
       changeAmount: 8,
@@ -332,7 +332,7 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(5)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
+    assert(exit.value.receipt._tag === "Failure");
     expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-b1"]);
     expect(allAvailable(exit.value.proofs)).toBe(true);
     expect(exit.value.operations).toEqual([]);
@@ -351,7 +351,7 @@ describe("Send.send", () => {
       ]),
     );
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     // Exact spend: no change, every input spent, the sent proofs handed out.
     expect(exit.value.operations.map((op) => op.status)).toEqual(["pending"]);
     expect(proofsIn(exit.value.proofs, "available")).toEqual([]);
@@ -379,16 +379,16 @@ describe("Send.send", () => {
     const exit = await run(sendAndInspect(draft(6, "pending")));
     assert(Exit.isSuccess(exit));
     const { receipt } = exit.value;
-    assert(receipt._tag === "Right");
+    assert(receipt._tag === "Success");
 
-    expect(receipt.right.proofs).toMatchObject([
+    expect(receipt.success.proofs).toMatchObject([
       { id: v2KeysetId, amount: 4, secret: "s1" },
       { id: v2KeysetId, amount: 2, secret: "s2" },
     ]);
-    expect(decodeTokenText(receipt.right.tokenText)).toBeNull();
+    expect(decodeTokenText(receipt.success.tokenText)).toBeNull();
     expect(
-      decodeTokenText(receipt.right.tokenText, [v2KeysetId])?.proofs,
-    ).toEqual(receipt.right.proofs);
+      decodeTokenText(receipt.success.tokenText, [v2KeysetId])?.proofs,
+    ).toEqual(receipt.success.proofs);
   });
 
   it("excludes NUT-07 spent proofs from the swap and marks them spent", async () => {
@@ -410,11 +410,11 @@ describe("Send.send", () => {
     assert(Exit.isSuccess(exit));
     const { receipt, proofs } = exit.value;
 
-    assert(receipt._tag === "Right");
+    assert(receipt._tag === "Success");
     // Only the unspent a1 proof was offered; available was 4, fee 4-3-0.
     expect(sendCalls[0]?.secrets).toEqual(["src-a1"]);
-    expect(receipt.right.feePaid).toBe(1);
-    expect(receipt.right.changeAmount).toBe(0);
+    expect(receipt.success.feePaid).toBe(1);
+    expect(receipt.success.changeAmount).toBe(0);
 
     expect(secretsOf(proofsIn(proofs, "spent"))).toEqual([
       "src-a1",
@@ -440,8 +440,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(5)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintUnreachable");
     expect(stateOf(exit.value.proofs, "src-b1")).toBe("spent");
     expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toEqual([
       "src-a1",
@@ -455,8 +455,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(15)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "InsufficientFunds",
       required: 15,
       available: 14,
@@ -474,8 +474,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(1)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "AmountConsumedByFee",
       mint,
       amount: 1,
@@ -496,8 +496,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(3)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintRejected");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintRejected");
     expect(sendCalls.map((call) => call.amount)).toEqual([3]);
   });
 
@@ -510,8 +510,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(3)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "AmountConsumedByFee",
       amount: 3,
       fee: 3,
@@ -528,8 +528,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(14)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "InsufficientFunds",
       required: 14,
       available: 14,
@@ -545,8 +545,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(5)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintUnreachable");
     expect(allAvailable(exit.value.proofs)).toBe(true);
     expect(exit.value.operations).toEqual([]);
     expect(events.map((event) => event._tag)).toEqual(["OperationFailed"]);
@@ -560,8 +560,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(5)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintUnreachable");
     expect(sendCalls).toEqual([]);
   });
 
@@ -574,8 +574,8 @@ describe("Send.send", () => {
 
     const exit = await run(sendAndInspect(draft(5)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "MintRejected",
       code: 20003,
     });
@@ -604,7 +604,7 @@ describe("Send.send", () => {
 
       const exit = await run(sendAndInspect(draft(4)));
       assert(Exit.isSuccess(exit));
-      expect(exit.value.receipt._tag).toBe("Right");
+      expect(exit.value.receipt._tag).toBe("Success");
       expect(sendCalls.map((call) => call.sendCounter)).toEqual([1, 40]);
       expect(sendCalls[1]?.keepCounter).toBe(104);
       expect(restoreCalls).toEqual([{ start: 1, count: 100 }]);
@@ -633,8 +633,8 @@ describe("Send.send", () => {
     const { run } = makeHarness(wallet);
     const exit = await run(sendAndInspect(draft(4)));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "MintRejected",
       code: 11008,
     });

@@ -369,7 +369,7 @@ export const useProfileAuthDomain = ({
       setLinkstrConfig(config);
       const publishExit = await publishProfile(metadata);
       if (Exit.isFailure(publishExit)) {
-        const failure = Cause.failureOption(publishExit.cause);
+        const failure = Cause.findErrorOption(publishExit.cause);
         throw new Error("nostr publish failed", {
           cause: Option.isSome(failure) ? failure.value : publishExit.cause,
         });

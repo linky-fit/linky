@@ -16,14 +16,14 @@ import {
 } from "@linky-fit/linkshu";
 import { Effect, Layer, Schema } from "effect";
 
-const SeedJson = Schema.parseJson(
-  Schema.Array(Schema.Int.pipe(Schema.between(0, 255))).pipe(
-    Schema.itemsCount(64),
-  ),
+const SeedJson = Schema.fromJsonString(
+  Schema.Array(
+    Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 255 })),
+  ).check(Schema.isBetweenLength(64, 64)),
 );
-const ProofsJson = Schema.parseJson(Schema.Array(StoredProof));
-const OperationsJson = Schema.parseJson(Schema.Array(StoredOperation));
-const LeaseJson = Schema.parseJson(
+const ProofsJson = Schema.fromJsonString(Schema.Array(StoredProof));
+const OperationsJson = Schema.fromJsonString(Schema.Array(StoredOperation));
+const LeaseJson = Schema.fromJsonString(
   Schema.Struct({ lease: LeaseId, expiresAtMs: Schema.Number }),
 );
 

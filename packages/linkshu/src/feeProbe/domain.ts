@@ -24,5 +24,5 @@ export class LightningFeeProbeResult extends Schema.Class<LightningFeeProbeResul
   percent: Schema.Number,
 }) {}
 
-export const FeeProbeError = Schema.Union(MintUnreachable, MintRejected);
+export const FeeProbeError = Schema.Union([MintUnreachable, MintRejected]);
 export type FeeProbeError = typeof FeeProbeError.Type;

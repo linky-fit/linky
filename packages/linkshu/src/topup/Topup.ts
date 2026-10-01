@@ -1,5 +1,5 @@
 import type { MintProofsConfig } from "@cashu/cashu-ts";
-import { Duration, Effect, Either, Fiber } from "effect";
+import { Context, Duration, Effect, Fiber, Layer, Result } from "effect";
 import type { Scope } from "effect";
 import {
   MintRejected,
@@ -96,9 +96,8 @@ const mintConfigFor = (
  * same claim a quote some other party created and paid on the owner's
  * behalf.
  */
-export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Topup extends Context.Service<Topup>()("linkshu/Topup", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const proofStore = yield* ProofStore;
     const operationStore = yield* OperationStore;
@@ -121,9 +120,9 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
         let lastState: string | null = null;
         let consecutiveFailures = 0;
         for (;;) {
-          const outcome = yield* Effect.either(checkMintQuote(wallet, pending));
-          if (Either.isLeft(outcome)) {
-            const error = outcome.left;
+          const outcome = yield* Effect.result(checkMintQuote(wallet, pending));
+          if (Result.isFailure(outcome)) {
+            const error = outcome.failure;
             consecutiveFailures += 1;
             if (
               error._tag === "MintRejected" ||
@@ -133,7 +132,7 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
             }
           } else {
             consecutiveFailures = 0;
-            const state = outcome.right.state;
+            const state = outcome.success.state;
             if (state !== lastState) {
               lastState = state;
               emitQuoteState(inspector, "topup", pending, state);
@@ -175,7 +174,7 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
         }),
         // The subscription retries its socket forever; if it ever gives up,
         // it falls silent and the poll decides.
-        Effect.orElse(() => Effect.never),
+        Effect.catch(() => Effect.never),
       );
       return Effect.raceFirst(pollUntilSettled(wallet, pending), subscribed);
     };
@@ -220,12 +219,12 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
         const wallet = yield* instances.get(pending.mint, pending.unit);
         for (;;) {
           yield* awaitSettled(wallet, pending);
-          const outcome = yield* Effect.either(
+          const outcome = yield* Effect.result(
             mintUnderLock(wallet, pending, mintConfig),
           );
-          if (Either.isRight(outcome)) return outcome.right;
-          if (!(outcome.left instanceof UnpaidMintQuote)) {
-            return yield* Effect.fail(outcome.left);
+          if (Result.isSuccess(outcome)) return outcome.success;
+          if (!(outcome.failure instanceof UnpaidMintQuote)) {
+            return yield* Effect.fail(outcome.failure);
           }
           emitQuoteState(inspector, "topup", pending, QUOTE_UNPAID);
           yield* Effect.sleep(POLL_INTERVAL);
@@ -408,4 +407,9 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
 
     return { start, adopt, resumePending } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

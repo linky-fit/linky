@@ -22,7 +22,7 @@ const runWith = <A, E>(
   Effect.runPromiseExit(
     program.pipe(
       Effect.provide(
-        MuteList.Default.pipe(
+        MuteList.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
               LinkstrIdentity.fromSecretKey(alice.secretKey),

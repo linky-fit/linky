@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { MintRejected } from "../domain/errors";
 import { KeysetId, NonNegativeAmount } from "../domain/primitives";
 import type { MintUrl, ProofId } from "../domain/primitives";
@@ -79,9 +79,8 @@ const mergeRestored = (left: Restored, right: Restored): Restored => ({
  * deterministic counter past the last signature found. Unreachable mints
  * are reported, not failed on.
  */
-export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Restore extends Context.Service<Restore>()("linkshu/Restore", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const proofStore = yield* ProofStore;
     const operationStore = yield* OperationStore;
@@ -190,7 +189,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
             amount: totalAmount(scan.proofs),
           };
         }),
-      ).pipe(Effect.catchAll(() => Effect.succeed(null)));
+      ).pipe(Effect.catch(() => Effect.succeed(null)));
     };
 
     const prepareMint = (mint: MintUrl) =>
@@ -198,7 +197,7 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
         const wallet = yield* instances.get(mint, sat);
         const keysetIds = yield* keysetsToScan(wallet, mint);
         return { mint, wallet, keysetIds };
-      }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+      }).pipe(Effect.catch(() => Effect.succeed(null)));
 
     const restoreWithProofIds = (
       draft: RestoreDraft,
@@ -321,4 +320,9 @@ export class Restore extends Effect.Service<Restore>()("linkshu/Restore", {
 
     return { restore, restoreAndReclaim, wipeSeedBoundState } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

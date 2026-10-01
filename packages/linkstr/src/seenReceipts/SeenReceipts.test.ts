@@ -1,4 +1,4 @@
-import { Effect, Either, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Result } from "effect";
 import { ClientId, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { unwrapToRumor } from "../internal/giftWrap";
 import { firstTagValue, tagValues } from "../internal/nostrEvent";
@@ -37,7 +37,7 @@ const runWith = <A, E>(
   );
   return Effect.runPromiseExit(
     program.pipe(
-      Effect.provide(SeenReceipts.Default.pipe(Layer.provide(dependencies))),
+      Effect.provide(SeenReceipts.layer.pipe(Layer.provide(dependencies))),
     ),
   );
 };
@@ -69,7 +69,7 @@ describe("SeenReceipts.send", () => {
     for (const wrap of published) {
       const key =
         recipientOf(wrap) === alice.pubkey ? alice.secretKey : bob.secretKey;
-      const rumor = Either.getOrThrow(unwrapToRumor(wrap, key));
+      const rumor = Result.getOrThrow(unwrapToRumor(wrap, key));
       expect(rumor.id).toBe(receipt.rumorId);
       expect(rumor.kind).toBe(24136);
       expect(rumor.content).toBe(String(draft.seenUpToSec));

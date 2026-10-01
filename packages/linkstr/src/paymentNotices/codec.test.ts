@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import { getEventHash } from "nostr-tools";
 import { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import { Rumor } from "../internal/nostrEvent";
@@ -82,7 +82,7 @@ describe("payment notice rumor decoding", () => {
 
   it("decodes a valid notice with nullable defaults", () => {
     expect(decodePaymentNoticeRumor(validRumor, alice)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           _tag: "PaymentNoticeReceived",
           noticeId: validRumor.id,
@@ -111,7 +111,7 @@ describe("payment notice rumor decoding", () => {
     });
 
     expect(decodePaymentNoticeRumor(rumor, alice)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({ context: null, offerId: "offer-1" }),
       ),
     );
@@ -153,7 +153,7 @@ describe("payment notice rumor decoding", () => {
     },
   ])("drops a notice that is $name", ({ rumor }) => {
     expect(decodePaymentNoticeRumor(rumor, alice)).toEqual(
-      Either.left("invalid-notice"),
+      Result.fail("invalid-notice"),
     );
   });
 });

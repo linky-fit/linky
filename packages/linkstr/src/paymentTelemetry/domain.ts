@@ -2,23 +2,27 @@ import { Schema } from "effect";
 import { WrapDelivery } from "../domain/delivery";
 import { ClientId, RumorId, UnixSeconds } from "../domain/primitives";
 
-export const PaymentTelemetryDirection = Schema.Literal("in", "out");
+export const PaymentTelemetryDirection = Schema.Literals(["in", "out"]);
 export type PaymentTelemetryDirection = typeof PaymentTelemetryDirection.Type;
 
-export const PaymentTelemetryStatus = Schema.Literal("ok", "declined", "error");
+export const PaymentTelemetryStatus = Schema.Literals([
+  "ok",
+  "declined",
+  "error",
+]);
 export type PaymentTelemetryStatus = typeof PaymentTelemetryStatus.Type;
 
-export const PaymentTelemetryMethod = Schema.Literal(
+export const PaymentTelemetryMethod = Schema.Literals([
   "cashu_chat",
   "cashu_receive",
   "cashu_restore",
   "lightning_address",
   "lightning_invoice",
   "unknown",
-);
+]);
 export type PaymentTelemetryMethod = typeof PaymentTelemetryMethod.Type;
 
-export const PaymentTelemetryPhase = Schema.Literal(
+export const PaymentTelemetryPhase = Schema.Literals([
   "complete",
   "invoice_fetch",
   "melt",
@@ -27,10 +31,10 @@ export const PaymentTelemetryPhase = Schema.Literal(
   "restore",
   "swap",
   "unknown",
-);
+]);
 export type PaymentTelemetryPhase = typeof PaymentTelemetryPhase.Type;
 
-export const PaymentTelemetryDevicePlatform = Schema.Literal(
+export const PaymentTelemetryDevicePlatform = Schema.Literals([
   "android",
   "iphone",
   "ipad",
@@ -38,15 +42,15 @@ export const PaymentTelemetryDevicePlatform = Schema.Literal(
   "mac",
   "windows",
   "unknown",
-);
+]);
 export type PaymentTelemetryDevicePlatform =
   typeof PaymentTelemetryDevicePlatform.Type;
 
-export const PaymentTelemetryAppRuntime = Schema.Literal(
+export const PaymentTelemetryAppRuntime = Schema.Literals([
   "native",
   "pwa",
   "web",
-);
+]);
 export type PaymentTelemetryAppRuntime = typeof PaymentTelemetryAppRuntime.Type;
 
 export class PaymentTelemetryDraft extends Schema.Class<PaymentTelemetryDraft>(

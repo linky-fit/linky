@@ -27,11 +27,11 @@ const tapWire = (
               event instanceof SignedWrapEvent
                 ? new WirePublished(
                     { wrapId: event.id, wrap: event, results },
-                    { disableValidation: true },
+                    { disableChecks: true },
                   )
                 : new WirePlainPublished(
                     { eventId: event.id, kind: event.kind, event, results },
-                    { disableValidation: true },
+                    { disableChecks: true },
                   ),
             ),
           ),
@@ -40,8 +40,7 @@ const tapWire = (
   subscribe: (relay, filter, onEvent, options) =>
     Effect.suspend(() => {
       inspector.emit(
-        () =>
-          new WireSubscribed({ relay, filter }, { disableValidation: true }),
+        () => new WireSubscribed({ relay, filter }, { disableChecks: true }),
       );
       return inner.subscribe(
         relay,
@@ -49,10 +48,7 @@ const tapWire = (
         (event) => {
           inspector.emit(
             () =>
-              new WireEventReceived(
-                { relay, event },
-                { disableValidation: true },
-              ),
+              new WireEventReceived({ relay, event }, { disableChecks: true }),
           );
           onEvent(event);
         },
@@ -65,7 +61,7 @@ const tapWire = (
             () =>
               new WireSubscriptionEnded(
                 { relay, detail: reason },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),
@@ -76,7 +72,7 @@ const tapWire = (
             () =>
               new WireSubscriptionEnded(
                 { relay, detail: error.detail },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),
@@ -90,7 +86,7 @@ const tapWire = (
             () =>
               new WireFetched(
                 { relay, filter, events, detail: null },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),
@@ -101,7 +97,7 @@ const tapWire = (
             () =>
               new WireFetched(
                 { relay, filter, events: [], detail: error.detail },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),

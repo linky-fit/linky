@@ -227,6 +227,7 @@ export default defineConfig({
       "buffer",
       "cbor-x",
       "effect",
+      "effect/reactivity",
       "jsqr",
       "nostr-tools",
       "nostr-tools/nip17",

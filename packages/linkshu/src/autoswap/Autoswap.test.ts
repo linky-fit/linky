@@ -143,7 +143,7 @@ const makeMelt = (
 ) => {
   const invoices: string[] = [];
   const quotedInvoices: string[] = [];
-  const service = Melt.make({
+  const service = Melt.of({
     status: () => Effect.succeed("UNPAID"),
     quote: (draft: MeltDraft) => {
       quotedInvoices.push(draft.invoice);
@@ -201,12 +201,12 @@ const makeHarness = (
 ) => {
   const inspector = recordingInspector();
   const wallets = makeWallets(walletArgs);
-  const layer = Autoswap.DefaultWithoutDependencies.pipe(
+  const layer = Autoswap.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({
+          WalletInstances.of({
             get: () => Effect.succeed(wallets.wallet()),
           }),
         ),
@@ -387,11 +387,11 @@ describe("Autoswap.claim", () => {
     const melt = makeMelt([() => short(100_000)]);
     const harness = makeHarness(storage, { states: ["PAID"] }, melt);
 
-    const exit = await harness.run(Effect.either(claimDraft));
+    const exit = await harness.run(Effect.result(claimDraft));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("InsufficientFunds");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("InsufficientFunds");
     expect(await pendingClaims(storage)).toEqual([]);
     expect(
       (await claimOperations(storage)).every(
@@ -414,11 +414,11 @@ describe("Autoswap.claim", () => {
       melt,
     );
 
-    const exit = await harness.run(Effect.either(claimDraft));
+    const exit = await harness.run(Effect.result(claimDraft));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("MintUnreachable");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("MintUnreachable");
     // The funds are at the target mint; the operation is what gets them out.
     expect(await pendingClaims(storage)).toMatchObject([{ counter: 1 }]);
     expect(await targetProofs(storage)).toEqual([]);
@@ -454,11 +454,11 @@ describe("Autoswap.claim with an explicit amount", () => {
       melt,
     );
 
-    const exit = await harness.run(Effect.either(claimAmount(98)));
+    const exit = await harness.run(Effect.result(claimAmount(98)));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left).toMatchObject({
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure).toMatchObject({
       _tag: "InsufficientFunds",
       required: 101,
       available: 100,
@@ -474,11 +474,11 @@ describe("Autoswap.claim with an explicit amount", () => {
     const melt = makeMelt([() => short(105)]);
     const harness = makeHarness(storage, { states: ["PAID"] }, melt);
 
-    const exit = await harness.run(Effect.either(claimAmount(100)));
+    const exit = await harness.run(Effect.result(claimAmount(100)));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left).toMatchObject({
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure).toMatchObject({
       _tag: "InsufficientFunds",
       required: 105,
     });
@@ -527,11 +527,11 @@ describe("Autoswap.estimate", () => {
     const melt = makeMelt([paidReceipt]);
     const harness = makeHarness(storage, {}, melt);
 
-    const exit = await harness.run(Effect.either(estimateAmount(101)));
+    const exit = await harness.run(Effect.result(estimateAmount(101)));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("InsufficientFunds");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("InsufficientFunds");
     expect(harness.quotedAmounts).toEqual([]);
     expect(melt.quotedInvoices).toEqual([]);
   });
@@ -551,7 +551,7 @@ describe("Autoswap.resumePendingClaims", () => {
       },
       makeMelt([paidReceipt]),
     );
-    assert(Exit.isSuccess(await first.run(Effect.either(claimDraft))));
+    assert(Exit.isSuccess(await first.run(Effect.result(claimDraft))));
     expect(first.mintCounters).toEqual([1]);
     expect(await pendingClaims(storage)).toHaveLength(1);
 

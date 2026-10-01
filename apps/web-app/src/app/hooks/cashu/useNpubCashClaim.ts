@@ -1,6 +1,6 @@
 import { useLatest } from "../../../hooks/useLatest";
 import { Schema } from "effect";
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import { parseTokenText } from "@linky-fit/linkshu";
 import { JsonValue } from "../../../types/json";
@@ -269,8 +269,8 @@ export const useNpubCashClaim = ({
           }
           const outcome = await receiveCashuToken(tokenRaw);
 
-          if (Either.isLeft(outcome)) {
-            const error = outcome.left;
+          if (Result.isFailure(outcome)) {
+            const error = outcome.failure;
             if (error._tag === "TokenAlreadyKnown") return;
             const message = describeTaggedCashuError(error) ?? error._tag;
             logFailure(message);
@@ -278,7 +278,7 @@ export const useNpubCashClaim = ({
             return;
           }
 
-          const receipt = outcome.right;
+          const receipt = outcome.success;
           rememberCashuTokenKnown(tokenRaw, receipt.tokenText);
           announceReceived({
             amount: receipt.amount,
@@ -348,8 +348,8 @@ export const useNpubCashClaim = ({
         }
       });
 
-      if (Either.isRight(outcome)) {
-        const receipt = outcome.right;
+      if (Result.isSuccess(outcome)) {
+        const receipt = outcome.success;
         rememberCashuTokenKnown(receipt.tokenText);
         announceReceived({
           amount: receipt.amount,
@@ -361,7 +361,7 @@ export const useNpubCashClaim = ({
         return true;
       }
 
-      const error = outcome.left;
+      const error = outcome.failure;
       if (error._tag === "QuoteAlreadyIssued") return true;
       const definitive = error._tag === "MintRejected";
       logPaymentEvent({

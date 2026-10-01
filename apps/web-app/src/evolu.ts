@@ -655,12 +655,7 @@ export const getLinkyStore = (): Promise<LinkyStore> => {
         get: (scope) =>
           safeLocalStorageGetJson(
             key(scope),
-            EffectSchema.NullOr(
-              EffectSchema.Number.pipe(
-                EffectSchema.int(),
-                EffectSchema.nonNegative(),
-              ),
-            ),
+            EffectSchema.NullOr(EffectSchema.Natural),
             null,
           ) ?? undefined,
         set: (scope, first) => safeLocalStorageSetJson(key(scope), first),

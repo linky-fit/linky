@@ -48,17 +48,17 @@ Expiry is decided only by the mint: a quote it still reports `UNPAID` after `exp
 Pending topups outlive the process. `resumePending()` returns a handle for every `pending` topup, even those past their deadline; the shared rules are in [concepts.md](./concepts.md#resuming-interrupted-operations).
 
 ```ts
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import { Topup } from "@linky-fit/linkshu";
 
 const resumeTopups = Effect.scoped(
   Effect.gen(function* () {
     const topup = yield* Topup;
     for (const handle of yield* topup.resumePending()) {
-      const outcome = yield* Effect.either(handle.result);
-      if (Either.isRight(outcome)) {
-        console.log("minted", outcome.right.amount, handle.quote.quoteId);
-      } else if (outcome.left._tag === "QuoteExpired") {
+      const outcome = yield* Effect.result(handle.result);
+      if (Result.isSuccess(outcome)) {
+        console.log("minted", outcome.success.amount, handle.quote.quoteId);
+      } else if (outcome.failure._tag === "QuoteExpired") {
         console.log("expired", handle.quote.quoteId);
       } else {
         // MintUnreachable, MintRejected, CounterLockTimeout: still pending,
@@ -69,7 +69,7 @@ const resumeTopups = Effect.scoped(
 );
 ```
 
-This waits for every handle inside one scope, which suits a script. In a long-lived app, `Scope.extend` the handles into a scope that outlives the call so polling survives UI changes, and close that scope before disposing the runtime. Pass `{ lockingKey }` when the wallet adopts locked quotes (below).
+This waits for every handle inside one scope, which suits a script. In a long-lived app, `Scope.provide` the handles into a scope that outlives the call so polling survives UI changes, and close that scope before disposing the runtime. Pass `{ lockingKey }` when the wallet adopts locked quotes (below).
 
 ### `adopt`: a quote someone else paid
 

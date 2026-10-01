@@ -92,7 +92,7 @@ describe("return outcomes", () => {
       .mockResolvedValue(report);
     const { invoke, pushToast, setCashuIsBusy, unmount } = await mount(reclaim);
     await act(async () => invoke());
-    expect(pushToast).toHaveBeenCalledWith("errorPrefix: Error: offline");
+    expect(pushToast).toHaveBeenCalledWith("errorPrefix: offline");
     expect(setCashuIsBusy).toHaveBeenLastCalledWith(false);
     await act(async () => invoke());
     expect(pushToast).toHaveBeenLastCalledWith("cashuReclaimDone");

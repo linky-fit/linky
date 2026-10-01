@@ -65,7 +65,7 @@ export const seedTransfer = (
           tokenText,
           error,
         },
-        { disableValidation: true },
+        { disableChecks: true },
       ),
     ),
   );

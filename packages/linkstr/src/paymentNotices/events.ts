@@ -8,10 +8,10 @@ export class PaymentNoticeReceived extends Schema.TaggedClass<PaymentNoticeRecei
     noticeId: RumorId,
     from: Pubkey,
     context: Schema.NullOr(PaymentNoticeContext),
-    offerId: Schema.NullOr(Schema.NonEmptyTrimmedString),
+    offerId: Schema.NullOr(Schema.Trimmed.check(Schema.isNonEmpty())),
     sentAt: UnixSeconds,
   },
 ) {}
 
-export const PaymentNoticeInboxEvent = Schema.Union(PaymentNoticeReceived);
+export const PaymentNoticeInboxEvent = Schema.Union([PaymentNoticeReceived]);
 export type PaymentNoticeInboxEvent = typeof PaymentNoticeInboxEvent.Type;

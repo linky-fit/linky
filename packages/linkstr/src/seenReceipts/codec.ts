@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import {
   isClientId,
   isPubkey,
@@ -49,8 +49,8 @@ const decodeSeconds = (value: string | null): UnixSeconds | null => {
 export const decodeSeenReceiptRumor = (
   rumor: Rumor,
   me: Pubkey,
-): Either.Either<SeenReceiptInboxEvent, DropReason> => {
-  if (rumor.kind !== SEEN_RECEIPT_KIND) return Either.left("unsupported-kind");
+): Result.Result<SeenReceiptInboxEvent, DropReason> => {
+  if (rumor.kind !== SEEN_RECEIPT_KIND) return Result.fail("unsupported-kind");
   const receiptId = rumor.id;
   if (
     !rumor.tags.some(
@@ -58,21 +58,21 @@ export const decodeSeenReceiptRumor = (
     ) ||
     !isRumorId(receiptId)
   ) {
-    return Either.left("invalid-seen-receipt");
+    return Result.fail("invalid-seen-receipt");
   }
   const seenUpToSec = decodeSeconds(rumor.content.trim());
   const sinceSec = decodeSeconds(firstTagValue(rumor.tags, "since"));
   if (seenUpToSec === null || sinceSec === null || sinceSec >= seenUpToSec) {
-    return Either.left("invalid-seen-receipt");
+    return Result.fail("invalid-seen-receipt");
   }
 
   if (rumor.pubkey === me) {
     const to = tagValues(rumor.tags, "p").find(
       (value): value is Pubkey => value !== me && isPubkey(value),
     );
-    if (to === undefined) return Either.left("invalid-seen-receipt");
+    if (to === undefined) return Result.fail("invalid-seen-receipt");
     const clientTag = firstTagValue(rumor.tags, "client");
-    return Either.right(
+    return Result.succeed(
       new OwnSeenReceiptConfirmed({
         receiptId,
         to,
@@ -86,9 +86,9 @@ export const decodeSeenReceiptRumor = (
   }
 
   if (!tagValues(rumor.tags, "p").includes(me)) {
-    return Either.left("not-addressed-to-me");
+    return Result.fail("not-addressed-to-me");
   }
-  return Either.right(
+  return Result.succeed(
     new SeenReceiptReceived({
       receiptId,
       from: rumor.pubkey,

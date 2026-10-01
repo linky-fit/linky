@@ -1,5 +1,5 @@
-// Registry comes through the package index to cover the atom-react re-export.
-import { Registry } from "./index";
+// AtomRegistry comes through the package index to cover the atom re-export.
+import { AtomRegistry } from "./index";
 import { BankOfferDraft, BankOfferId, ClientId } from "@linky-fit/linkstr";
 import { recipientOf, stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
@@ -13,7 +13,7 @@ const bob = makeIdentity();
 
 describe("sendBankOfferAtom", () => {
   it("delivers through the configured transport and returns a receipt", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const published: Array<SignedWrapEvent> = [];
     registry.set(
       linkstrConfigAtom,

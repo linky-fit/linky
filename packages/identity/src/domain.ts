@@ -4,11 +4,7 @@ import { Schema } from "effect";
 import { Slip39 } from "slip39-ts";
 
 const bytesOfLength = (expected: number) =>
-  Schema.Uint8ArrayFromSelf.pipe(
-    Schema.filter((bytes) => bytes.length === expected, {
-      description: `${expected} bytes`,
-    }),
-  );
+  Schema.Uint8Array.check(Schema.isBetweenLength(expected, expected));
 
 export const toWords = (value: string): ReadonlyArray<string> =>
   value.split(/\s+/).filter((word) => word.length > 0);
@@ -38,12 +34,9 @@ const isBip39MnemonicWithWordCount =
     return validateMnemonic(words.join(" "), wordlist);
   };
 
-export const MasterSecret = Schema.Uint8ArrayFromSelf.pipe(
-  Schema.filter((bytes) => bytes.length >= 16 && bytes.length <= 64, {
-    description: "16 to 64 bytes",
-  }),
-  Schema.brand("MasterSecret"),
-);
+export const MasterSecret = Schema.Uint8Array.check(
+  Schema.isBetweenLength(16, 64),
+).pipe(Schema.brand("MasterSecret"));
 export type MasterSecret = typeof MasterSecret.Type;
 
 export const CashuSeed = bytesOfLength(64).pipe(Schema.brand("CashuSeed"));
@@ -52,8 +45,8 @@ export type CashuSeed = typeof CashuSeed.Type;
 export const OwnerKey = bytesOfLength(16).pipe(Schema.brand("OwnerKey"));
 export type OwnerKey = typeof OwnerKey.Type;
 
-export const Slip39Share = Schema.String.pipe(
-  Schema.filter(isSlip39Share),
+export const Slip39Share = Schema.String.check(
+  Schema.makeFilter(isSlip39Share),
 ).pipe(Schema.brand("Slip39Share"));
 export type Slip39Share = typeof Slip39Share.Type;
 
@@ -62,24 +55,22 @@ export const Slip39Passphrase = Schema.String.pipe(
 );
 export type Slip39Passphrase = typeof Slip39Passphrase.Type;
 
-export const OwnerLaneIndex = Schema.NonNegativeInt.pipe(
+export const OwnerLaneIndex = Schema.Natural.pipe(
   Schema.brand("OwnerLaneIndex"),
 );
 export type OwnerLaneIndex = typeof OwnerLaneIndex.Type;
 
-export const Bip39Mnemonic12 = Schema.String.pipe(
-  Schema.filter(isBip39MnemonicWithWordCount(12)),
-  Schema.brand("Bip39Mnemonic12"),
-);
+export const Bip39Mnemonic12 = Schema.String.check(
+  Schema.makeFilter(isBip39MnemonicWithWordCount(12)),
+).pipe(Schema.brand("Bip39Mnemonic12"));
 export type Bip39Mnemonic12 = typeof Bip39Mnemonic12.Type;
 
-export const Bip39Mnemonic24 = Schema.String.pipe(
-  Schema.filter(isBip39MnemonicWithWordCount(24)),
-  Schema.brand("Bip39Mnemonic24"),
-);
+export const Bip39Mnemonic24 = Schema.String.check(
+  Schema.makeFilter(isBip39MnemonicWithWordCount(24)),
+).pipe(Schema.brand("Bip39Mnemonic24"));
 export type Bip39Mnemonic24 = typeof Bip39Mnemonic24.Type;
 
-export const OwnerRole = Schema.Literal(
+export const OwnerRole = Schema.Literals([
   "meta",
   "identity",
   "errorTracker",
@@ -87,5 +78,5 @@ export const OwnerRole = Schema.Literal(
   "cashu",
   "transactions",
   "messages",
-);
+]);
 export type OwnerRole = typeof OwnerRole.Type;

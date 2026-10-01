@@ -9,7 +9,7 @@ import {
   TextMessageDraft,
 } from "@linky-fit/linkstr";
 import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
-import { Cause, Either, Exit, Schema } from "effect";
+import { Cause, Result, Exit, Schema } from "effect";
 import React from "react";
 import { appendPushDebugLog } from "../../../utils/pushDebugLog";
 import { makeLocalId } from "../../../utils/validation";
@@ -31,8 +31,8 @@ type AppendLocalNostrMessage = (message: NewLocalNostrMessage) => string;
 
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
-const decodeMessageText = Schema.decodeUnknownEither(MessageText);
-const decodePrivateImage = Schema.decodeUnknownEither(PrivateImage);
+const decodeMessageText = Schema.decodeUnknownResult(MessageText);
+const decodePrivateImage = Schema.decodeUnknownResult(PrivateImage);
 
 export interface ReplyContext {
   rootMessageId: string | null;
@@ -168,24 +168,24 @@ export const useSendChatMessage = <
         let draft: TextMessageDraft | ImageMessageDraft;
         if (imageFile) {
           const image = decodePrivateImage(mediaInfo);
-          if (Either.isLeft(image)) {
+          if (Result.isFailure(image)) {
             throw new Error("invalid private image");
           }
           draft = new ImageMessageDraft({
             to: contactPubHex,
-            image: image.right,
+            image: image.success,
             clientId,
             ...(replyTo === undefined ? {} : { replyTo }),
             ...(root === undefined ? {} : { root }),
           });
         } else {
           const content = decodeMessageText(text);
-          if (Either.isLeft(content)) {
+          if (Result.isFailure(content)) {
             throw new Error("invalid message text");
           }
           draft = new TextMessageDraft({
             to: contactPubHex,
-            content: content.right,
+            content: content.success,
             clientId,
             ...(replyTo === undefined ? {} : { replyTo }),
             ...(root === undefined ? {} : { root }),

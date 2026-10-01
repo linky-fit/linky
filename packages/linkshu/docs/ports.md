@@ -4,7 +4,7 @@ How to implement the platform ports so linkshu can run on your storage.
 
 ## Overview
 
-A port is an Effect `Context.Tag`; you satisfy it with a `Layer` that builds the service object. Ports are dumb on purpose: they persist what they are given and decide nothing.
+A port is an Effect `Context.Service`; you satisfy it with a `Layer` that builds the service object. Ports are dumb on purpose: they persist what they are given and decide nothing.
 
 | Port             | Layer                              | In-memory default        |
 | ---------------- | ---------------------------------- | ------------------------ |

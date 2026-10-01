@@ -19,13 +19,13 @@ import {
  * handed-out token back. Inputs are never stored on the operation: they are
  * the proof rows whose `operationId` points here.
  */
-export const OperationKind = Schema.Literal(
+export const OperationKind = Schema.Literals([
   "melt",
   "topup",
   "autoswap",
   "send",
   "receive",
-);
+]);
 export type OperationKind = typeof OperationKind.Type;
 
 /**
@@ -35,7 +35,7 @@ export type OperationKind = typeof OperationKind.Type;
  *   delivered) | `returned` (taken back into the wallet)
  * - `receive`: `pending` → `done` | `failed`
  */
-export const OperationStatus = Schema.Literal(
+export const OperationStatus = Schema.Literals([
   "pending",
   "paid",
   "unpaid",
@@ -44,7 +44,7 @@ export const OperationStatus = Schema.Literal(
   "issued",
   "externalized",
   "returned",
-);
+]);
 export type OperationStatus = typeof OperationStatus.Type;
 
 const operationFields = {
@@ -69,7 +69,7 @@ const operationFields = {
    * (mint outputs, or NUT-08 blanks). Synced, so any device re-derives the
    * same blinded outputs on resume.
    */
-  counter: Schema.NullOr(Schema.Int.pipe(Schema.nonNegative())),
+  counter: Schema.NullOr(Schema.Natural),
   /** `topup`: NUT-20 locked quote, minting needs the owner's key. */
   locked: Schema.NullOr(Schema.Boolean),
   /** Mint-stated quote expiry. */
@@ -127,7 +127,7 @@ export interface OperationStoreService {
   readonly loadAll: Effect.Effect<ReadonlyArray<StoredOperation>>;
 }
 
-export class OperationStore extends Context.Tag("linkshu/OperationStore")<
+export class OperationStore extends Context.Service<
   OperationStore,
   OperationStoreService
->() {}
+>()("linkshu/OperationStore") {}

@@ -49,10 +49,10 @@ export class OwnRetractionConfirmed extends Schema.TaggedClass<OwnRetractionConf
   },
 ) {}
 
-export const ReactionInboxEvent = Schema.Union(
+export const ReactionInboxEvent = Schema.Union([
   ReactionAdded,
   OwnReactionConfirmed,
   ReactionRetracted,
   OwnRetractionConfirmed,
-);
+]);
 export type ReactionInboxEvent = typeof ReactionInboxEvent.Type;

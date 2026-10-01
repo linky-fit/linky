@@ -1,4 +1,4 @@
-import { Registry } from "./index";
+import { AtomRegistry } from "./index";
 import {
   ClientId,
   NIP59_BACKDATE_MARGIN_SECONDS,
@@ -40,7 +40,7 @@ const firstReaction = RumorId.make("ab".repeat(32));
 describe("fetchWrapEventAtom", () => {
   it("returns a typed inbox event", async () => {
     const wrap = await wrapFromBob(firstReaction);
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     registry.set(linkstrConfigAtom, twoRelayConfig(alice, [], [], [wrap]));
     registry.set(fetchWrapEventAtom, { wrapId: WrapId.make(wrap.id) });
 
@@ -70,7 +70,7 @@ const twoRelayConfig = (
 
 /** A real inbound wrap for alice, produced through the public send API. */
 const wrapFromBob = async (reactionId: RumorId): Promise<NostrToolsEvent> => {
-  const registry = Registry.make();
+  const registry = AtomRegistry.make();
   const published: Array<PublishedEvent> = [];
   registry.set(linkstrConfigAtom, twoRelayConfig(bob, published, []));
   registry.set(
@@ -94,7 +94,7 @@ const wrapFromBob = async (reactionId: RumorId): Promise<NostrToolsEvent> => {
 describe("wrapInboxAtom", () => {
   it("feeds inbound wraps through the handler", async () => {
     const wrap = await wrapFromBob(firstReaction);
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const subscriptions: Array<FakeSubscription> = [];
     const handled: Array<WrapInboxEvent> = [];
 
@@ -126,7 +126,7 @@ describe("wrapInboxAtom", () => {
   });
 
   it("backfills from the handler's since cursor", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const subscriptions: Array<FakeSubscription> = [];
     const since = UnixSeconds.make(1_755_000_000);
 
@@ -143,7 +143,7 @@ describe("wrapInboxAtom", () => {
   });
 
   it("stays closed without a handler and closes subscriptions on unmount", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const subscriptions: Array<FakeSubscription> = [];
 
     registry.set(linkstrConfigAtom, twoRelayConfig(alice, [], subscriptions));

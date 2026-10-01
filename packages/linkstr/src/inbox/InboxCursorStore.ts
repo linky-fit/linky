@@ -39,10 +39,10 @@ const makeStringStorage = (
 };
 
 /** Storage port of the wrap inbox: the one persisted backfill cursor. */
-export class InboxCursorStore extends Context.Tag("linkstr/InboxCursorStore")<
+export class InboxCursorStore extends Context.Service<
   InboxCursorStore,
   InboxCursorStoreService
->() {
+>()("linkstr/InboxCursorStore") {
   /** Non-durable; for tests and as the platform-agnostic default. */
   static readonly inMemory: Layer.Layer<InboxCursorStore> = Layer.sync(
     InboxCursorStore,

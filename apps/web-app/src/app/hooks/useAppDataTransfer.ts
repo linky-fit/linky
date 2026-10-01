@@ -78,7 +78,7 @@ const buildExportFile = ({
       operationId: proof.operationId,
     })),
     cashuOperations: cashuOperations.map((operation) =>
-      Struct.omit(operation, "id"),
+      Struct.omit(operation, ["id"]),
     ),
   };
 
@@ -168,7 +168,9 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
 
       let parsed: JsonValue;
       try {
-        parsed = Schema.decodeUnknownSync(Schema.parseJson(JsonValue))(text);
+        parsed = Schema.decodeUnknownSync(Schema.fromJsonString(JsonValue))(
+          text,
+        );
       } catch {
         pushToast(t("importInvalid"));
         return;

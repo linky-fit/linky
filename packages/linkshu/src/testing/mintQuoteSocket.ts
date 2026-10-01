@@ -4,8 +4,8 @@ import { WebSocketServer } from "ws";
 import { MintUrl } from "../domain/primitives";
 
 const decodeRequest = Schema.decodeUnknownSync(
-  Schema.parseJson(
-    Schema.Union(
+  Schema.fromJsonString(
+    Schema.Union([
       Schema.Struct({
         id: Schema.Number,
         method: Schema.Literal("subscribe"),
@@ -20,7 +20,7 @@ const decodeRequest = Schema.decodeUnknownSync(
         method: Schema.Literal("unsubscribe"),
         params: Schema.Struct({ subId: Schema.String }),
       }),
-    ),
+    ]),
   ),
 );
 

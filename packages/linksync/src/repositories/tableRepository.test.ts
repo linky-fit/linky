@@ -1,4 +1,4 @@
-import { Effect, Logger, LogLevel } from "effect";
+import { Effect, References } from "effect";
 import { makeInMemoryShardDb, ShardDbError, type ShardDb } from "../core";
 import { createId } from "../model/ids";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
@@ -29,7 +29,7 @@ describe("tableRepository", () => {
             id: createId<"Contact">(),
             name: NonEmptyString1000.orThrow(`c${i}`),
           })
-          .pipe(Logger.withMinimumLogLevel(LogLevel.None)),
+          .pipe(Effect.provideService(References.MinimumLogLevel, "None")),
       );
     expect(runNow(contacts.all)).toHaveLength(230);
     expect(runNow(store.activeIndex("contacts"))).toBe(0);

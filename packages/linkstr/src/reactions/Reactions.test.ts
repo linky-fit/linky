@@ -1,4 +1,4 @@
-import { Effect, Either, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Result } from "effect";
 import { ClientId, RelayUrl, RumorId, UnixSeconds } from "../domain/primitives";
 import { unwrapToRumor } from "../internal/giftWrap";
 import { firstTagValue, tagValues } from "../internal/nostrEvent";
@@ -39,7 +39,7 @@ const runWith = <A, E>(
   );
   return Effect.runPromiseExit(
     program.pipe(
-      Effect.provide(Reactions.Default.pipe(Layer.provide(dependencies))),
+      Effect.provide(Reactions.layer.pipe(Layer.provide(dependencies))),
     ),
   );
 };
@@ -71,7 +71,7 @@ describe("Reactions.react", () => {
     for (const wrap of published) {
       const key =
         recipientOf(wrap) === alice.pubkey ? alice.secretKey : bob.secretKey;
-      const rumor = Either.getOrThrow(unwrapToRumor(wrap, key));
+      const rumor = Result.getOrThrow(unwrapToRumor(wrap, key));
       expect(rumor.id).toBe(receipt.rumorId);
       expect(rumor.kind).toBe(7);
       expect(rumor.content).toBe("🔥");
@@ -102,7 +102,7 @@ describe("Reactions.react", () => {
       (wrap) => recipientOf(wrap) === bob.pubkey,
     );
     assert(recipient !== undefined);
-    const rumor = Either.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
+    const rumor = Result.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
     expect(rumor.created_at).toBe(sentAt);
     expect(rumor.id).toBe(exit.value.rumorId);
   });
@@ -131,7 +131,7 @@ describe("Reactions.retract", () => {
       (wrap) => recipientOf(wrap) === alice.pubkey,
     );
     assert(selfPublished !== undefined);
-    const rumor = Either.getOrThrow(
+    const rumor = Result.getOrThrow(
       unwrapToRumor(selfPublished, alice.secretKey),
     );
     expect(rumor.kind).toBe(5);

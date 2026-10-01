@@ -72,12 +72,12 @@ const makeHarness = (
 ) => {
   const inspector = recordingInspector();
   const { calls, wallet } = makeWallets(args);
-  const layer = FeeProbe.DefaultWithoutDependencies.pipe(
+  const layer = FeeProbe.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({ get: (url) => Effect.succeed(wallet(url)) }),
+          WalletInstances.of({ get: (url) => Effect.succeed(wallet(url)) }),
         ),
         Layer.succeed(KeyValueStore, kv),
         inspector.layer,
@@ -183,11 +183,11 @@ describe("FeeProbe", () => {
       createMeltQuote: () => Promise.resolve(meltQuote({ quote: "" })),
     });
 
-    const exit = await run(Effect.either(probe()));
+    const exit = await run(Effect.result(probe()));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("MintRejected");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("MintRejected");
     // A failed probe caches nothing.
     expect(await Effect.runPromise(kv.listKeys("linkshu.feeProbe."))).toEqual(
       [],
@@ -199,11 +199,11 @@ describe("FeeProbe", () => {
       createMintQuote: () => Promise.reject(new TypeError("Failed to fetch")),
     });
 
-    const exit = await run(Effect.either(probe()));
+    const exit = await run(Effect.result(probe()));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left).toMatchObject({
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure).toMatchObject({
       _tag: "MintUnreachable",
       mint: probeMint,
     });

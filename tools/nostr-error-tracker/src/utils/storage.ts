@@ -28,11 +28,11 @@ export const safeLocalStorageRemove = (key: string): boolean => {
 
 export const safeLocalStorageGetJson = <A, I>(
   key: string,
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Codec<A, I>,
   fallback: A,
 ): A => {
   const raw = safeLocalStorageGet(key);
   if (raw === null) return fallback;
-  const result = Schema.decodeUnknownOption(Schema.parseJson(schema))(raw);
+  const result = Schema.decodeUnknownOption(Schema.fromJsonString(schema))(raw);
   return result._tag === "Some" ? result.value : fallback;
 };

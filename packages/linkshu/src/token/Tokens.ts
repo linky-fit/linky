@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { decodeTokenText, parseTokenText } from "./codec";
 import {
   InvalidTransferTransition,
@@ -93,9 +93,8 @@ const isTokenAlreadySpentError = (error: string | null): boolean => {
  * allowed to make. Every state change outside the operation verticals goes
  * through here — platforms never write states themselves.
  */
-export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const proofStore = yield* ProofStore;
     const operationStore = yield* OperationStore;
@@ -490,4 +489,9 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
       ingestLegacyRows,
     } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

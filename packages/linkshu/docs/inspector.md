@@ -4,7 +4,7 @@ The optional diagnostics bus: how to switch it on, what it emits, and how to con
 
 ## What it is
 
-`Inspector` is a `Context.Tag` with two members: `emit(build: () => LinkshuInspectorEvent): void`, sync and total (the builder runs lazily; a throwing builder is logged and dropped, never a defect), and `events: Stream<LinkshuInspectorEvent>`, single-consumer. Services resolve it with `Inspector.orNoop`, so a runtime without the layer pays one no-op call per event.
+`Inspector` is a `Context.Service` with two members: `emit(build: () => LinkshuInspectorEvent): void`, sync and total (the builder runs lazily; a throwing builder is logged and dropped, never a defect), and `events: Stream<LinkshuInspectorEvent>`, single-consumer. Services resolve it with `Inspector.orNoop`, so a runtime without the layer pays one no-op call per event.
 
 ## Providing it
 

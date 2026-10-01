@@ -21,7 +21,7 @@
     "@cashu/cashu-ts": "^4.0.0",
     "@noble/curves": "^1.4.1",
     "@noble/hashes": "^2.0.1",
-    "effect": "^3.19.19",
+    "effect": "^4.0.0",
     "nostr-tools": "^2.25.2"
   },
   "devDependencies": {

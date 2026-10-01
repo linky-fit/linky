@@ -54,7 +54,7 @@ export const watchPushInbox = (
   }).pipe(
     Effect.scoped,
     Effect.provide(
-      PushInbox.Default.pipe(
+      PushInbox.layer.pipe(
         Layer.provide(
           Layer.mergeAll(
             RelayPolicy.fixed({
@@ -72,7 +72,7 @@ export const watchPushInbox = (
   );
   const fiber = Effect.runFork(program);
   fiber.addObserver((exit) => {
-    if (Exit.isFailure(exit) && !Cause.isInterruptedOnly(exit.cause)) {
+    if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) {
       config.onFatal?.(Cause.pretty(exit.cause));
     }
   });

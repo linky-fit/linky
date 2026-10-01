@@ -1,6 +1,6 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { Either } from "effect";
+import { Result } from "effect";
 import { getPublicKey } from "nostr-tools";
 import type { NostrSecretKey, UnixSeconds } from "../domain/primitives";
 import { singleTagValue } from "../internal/nostrEvent";
@@ -97,33 +97,33 @@ export const makePushOwnershipProof = (
 /** Verifies the complete kind-27235 wire contract shared by client and server. */
 export const verifyPushOwnershipProof = (
   input: unknown,
-): Either.Either<VerifiedPushOwnershipProof, PushOwnershipProofFailure> =>
-  Either.gen(function* () {
+): Result.Result<VerifiedPushOwnershipProof, PushOwnershipProofFailure> =>
+  Result.gen(function* () {
     const event = yield* decodeVerifiedPlainEvent(input).pipe(
-      Either.mapLeft((failure): PushOwnershipProofFailure => failure),
+      Result.mapError((failure): PushOwnershipProofFailure => failure),
     );
     if (event.kind !== HTTP_AUTH_KIND) {
-      return yield* Either.left<PushOwnershipProofFailure>("wrong-kind");
+      return yield* Result.fail<PushOwnershipProofFailure>("wrong-kind");
     }
     const challenge = singleTagValue(event.tags, "challenge");
     if (challenge === null || challenge.length === 0) {
-      return yield* Either.left<PushOwnershipProofFailure>("invalid-challenge");
+      return yield* Result.fail<PushOwnershipProofFailure>("invalid-challenge");
     }
     const action = singleTagValue(event.tags, "action");
     if (action !== "subscribe" && action !== "unsubscribe") {
-      return yield* Either.left<PushOwnershipProofFailure>("invalid-action");
+      return yield* Result.fail<PushOwnershipProofFailure>("invalid-action");
     }
     const pubkey = singleTagValue(event.tags, "pubkey");
     if (pubkey === null) {
-      return yield* Either.left<PushOwnershipProofFailure>(
+      return yield* Result.fail<PushOwnershipProofFailure>(
         "invalid-pubkey-tag",
       );
     }
     if (pubkey !== event.pubkey) {
-      return yield* Either.left<PushOwnershipProofFailure>("invalid-pubkey");
+      return yield* Result.fail<PushOwnershipProofFailure>("invalid-pubkey");
     }
     if (event.content !== `linky-push-${action}`) {
-      return yield* Either.left<PushOwnershipProofFailure>("wrong-content");
+      return yield* Result.fail<PushOwnershipProofFailure>("wrong-content");
     }
     return { event, action, challenge };
   });

@@ -50,7 +50,7 @@ For a message that must survive going offline, enqueue `{ _tag: "chat.text", dra
 
 - `clientId` is generated when omitted. Pass your own when an optimistic local row already exists; the echo (`OwnChatMessageConfirmed.clientId`) and the outbox result carry it back.
 - `replyTo` alone marks a reply to a top-level message; add `root` when replying inside a thread. Edits carry no reply context.
-- `MessageText` and `CashuTokenText` throw from `.make` on bad input; decode user input with `Schema.decodeUnknownEither` instead.
+- `MessageText` and `CashuTokenText` throw from `.make` on bad input; decode user input with `Schema.decodeUnknownResult` instead.
 
 A receipt (`ChatMessageReceipt`, or `MessageEditReceipt` for edits) only exists when the recipient copy was accepted.
 

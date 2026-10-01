@@ -8,7 +8,7 @@ export const NostrTags = Schema.mutable(
 );
 export type NostrTags = typeof NostrTags.Type;
 
-const NostrSignature = Schema.String.pipe(Schema.pattern(/^[0-9a-f]{128}$/));
+const NostrSignature = Schema.String.check(Schema.isPattern(/^[0-9a-f]{128}$/));
 
 /** A signed event as it travels over the wire (here always a kind-1059 wrap). */
 export class SignedWrapEvent extends Schema.Class<SignedWrapEvent>(

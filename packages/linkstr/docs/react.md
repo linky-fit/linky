@@ -1,6 +1,6 @@
 # React
 
-`@linky-fit/linkstr-react` is the effect-atom binding: one config atom, one runtime atom built from it, and a fn atom per direct operation. It re-exports the `@effect-atom/atom-react` surface (`useAtomSet`, `useAtomValue`, `useAtomMount`, `Registry`, `Result`, …), so app code never depends on effect-atom itself. It is a private workspace package, not part of the npm release.
+`@linky-fit/linkstr-react` is the Effect atom binding: one config atom, one runtime atom built from it, and a fn atom per direct operation. It re-exports the `@effect/atom-react` hooks and the `effect/reactivity` modules (`useAtomSet`, `useAtomValue`, `useAtomMount`, `RegistryContext`, `Atom`, `AtomRegistry`, `AsyncResult`, …), so app code never imports the atom modules itself. It is a private workspace package, not part of the npm release.
 
 ## Configure
 
@@ -14,7 +14,7 @@ Build the config from `identityFromNsec(nsec)` and relay strings filtered throug
 
 ## Call an operation
 
-Every operation is a `linkstrRuntimeAtom.fn` atom. `useAtomSet(atom, { mode: "promiseExit" })` returns a function that resolves with an `Exit`; call it from a handler. `mode: "promise"` resolves with the value and rejects on failure; the default mode returns `void` and you read the atom's `Result` with `useAtomValue`. Prefer `promiseExit` in event handlers: failures are typed values, not thrown.
+Every operation is a `linkstrRuntimeAtom.fn` atom. `useAtomSet(atom, { mode: "promiseExit" })` returns a function that resolves with an `Exit`; call it from a handler. `mode: "promise"` resolves with the value and rejects on failure; the default mode returns `void` and you read the atom's `AsyncResult` with `useAtomValue`. Prefer `promiseExit` in event handlers: failures are typed values, not thrown.
 
 ```tsx
 const retract = useAtomSet(retractReactionAtom, { mode: "promiseExit" });
@@ -100,9 +100,9 @@ For manual registration, set `outboxResultsHandlerAtom` to `{ onResult }` and mo
 
 ## Relay health and inspector
 
-- `relayHealthAtom`: `Result<ReadonlyMap<string, RelayHealthState>>`, keyed by plain string so UI code can look up its own relay list; read with `useAtomValue` and `Result.isSuccess`, treat a missing entry as "checking". It resets when the runtime is rebuilt.
+- `relayHealthAtom`: `AsyncResult<ReadonlyMap<string, RelayHealthState>>`, keyed by plain string so UI code can look up its own relay list; read with `useAtomValue` and `AsyncResult.isSuccess`, treat a missing entry as "checking". It resets when the runtime is rebuilt.
 - `inspectorHandlerAtom` + `inspectorEventsAtom`: set `{ onEvent }` and mount the atom; it streams only while `config.inspector` is true. Wrap `onEvent` in a `try` if a mapping bug must not kill the feed.
 
 ## Testing
 
-Tests drive atoms with a bare `Registry.make()` instead of rendering; helpers and an example are in [testing.md](./testing.md#linky-fitlinkstr-reacttesting).
+Tests drive atoms with a bare `AtomRegistry.make()` instead of rendering; helpers and an example are in [testing.md](./testing.md#linky-fitlinkstr-reacttesting).

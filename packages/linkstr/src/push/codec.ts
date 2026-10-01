@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { verifyEvent } from "nostr-tools";
 import { Pubkey, WrapId } from "../domain/primitives";
 import {
@@ -25,8 +25,8 @@ const PushWrapEvent = Schema.Struct({
   kind: Schema.Int,
 });
 
-const decodeWrap = Schema.decodeUnknownEither(PushWrapEvent);
-const decodePubkey = Schema.decodeUnknownEither(Pubkey);
+const decodeWrap = Schema.decodeUnknownResult(PushWrapEvent);
+const decodePubkey = Schema.decodeUnknownResult(Pubkey);
 
 const unique = <A>(values: ReadonlyArray<A>): Array<A> => [...new Set(values)];
 
@@ -49,32 +49,32 @@ const hasPushMarker = (raw: unknown): boolean =>
  */
 export const decodePushWrap = (
   input: unknown,
-): Either.Either<PushWrap, PushWrapFailure> =>
-  Either.gen(function* () {
+): Result.Result<PushWrap, PushWrapFailure> =>
+  Result.gen(function* () {
     if (!hasPushMarker(input)) {
-      return yield* Either.left<PushWrapFailure>("missing-push-marker");
+      return yield* Result.fail<PushWrapFailure>("missing-push-marker");
     }
     const wrap = yield* decodeWrap(input).pipe(
-      Either.mapLeft((): PushWrapFailure => "malformed-event"),
+      Result.mapError((): PushWrapFailure => "malformed-event"),
     );
     if (wrap.kind !== 1059) {
-      return yield* Either.left<PushWrapFailure>("wrong-kind");
+      return yield* Result.fail<PushWrapFailure>("wrong-kind");
     }
     if (!verifyEvent(wrap)) {
-      return yield* Either.left<PushWrapFailure>("invalid-signature");
+      return yield* Result.fail<PushWrapFailure>("invalid-signature");
     }
 
     const recipients = unique(
       tagValues(wrap.tags, "p").flatMap((value) =>
-        Either.match(decodePubkey(value), {
-          onLeft: () => [],
-          onRight: (pubkey) => [pubkey],
+        Result.match(decodePubkey(value), {
+          onFailure: () => [],
+          onSuccess: (pubkey) => [pubkey],
         }),
       ),
     );
     const recipient = recipients[0];
     if (recipients.length !== 1 || recipient === undefined) {
-      return yield* Either.left<PushWrapFailure>("unexpected-recipient-count");
+      return yield* Result.fail<PushWrapFailure>("unexpected-recipient-count");
     }
 
     return {

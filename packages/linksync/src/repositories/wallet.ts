@@ -279,7 +279,7 @@ export const makeWalletRepository = (store: LinkyStore): WalletRepository => {
             : store.update("cashu", "cashuProof", id, columns);
           const persisted = previous ?? (yield* proofTable.byId(id));
           if (persisted === null)
-            return yield* Effect.dieMessage("proof vanished after insert");
+            return yield* Effect.die(new Error("proof vanished after insert"));
           stored.push(
             new StoredProof({
               ...proof,

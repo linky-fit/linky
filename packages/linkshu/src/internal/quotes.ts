@@ -53,7 +53,7 @@ export const emitQuoteState = (
     () =>
       new QuoteStateChanged(
         { flow, quoteId: quote.quoteId, mint: quote.mint, state, via },
-        { disableValidation: true },
+        { disableChecks: true },
       ),
   );
 };

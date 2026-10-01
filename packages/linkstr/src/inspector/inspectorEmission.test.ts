@@ -22,7 +22,7 @@ import { observeTransport } from "../relayHealth/observeTransport";
 import { RelayHealth } from "../relayHealth/RelayHealth";
 import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
-import { makeIdentity } from "../testing";
+import { eventually, makeIdentity } from "../testing";
 import type { InspectorEvent } from "./events";
 import { Inspector } from "./Inspector";
 import { inspectTransport } from "./inspectTransport";
@@ -92,7 +92,7 @@ const collectSendEmissions = (
       Effect.sync(() => {
         collected.push(event);
       }),
-    ).pipe(Effect.fork);
+    ).pipe(Effect.forkChild);
 
     const outbox = yield* Outbox;
     yield* outbox.enqueue(
@@ -104,17 +104,13 @@ const collectSendEmissions = (
     );
     // The worker delivers asynchronously; poll until the terminal job event
     // lands instead of guessing a fixed delay.
-    yield* Effect.iterate(0, {
-      while: (tries) =>
-        tries < 100 &&
-        !collected.some((event) =>
-          eventLabel(event).startsWith("PlainOperationSucceeded:outbox.job"),
-        ) &&
-        !collected.some((event) =>
+    yield* eventually(() =>
+      collected.some(
+        (event) =>
+          eventLabel(event).startsWith("PlainOperationSucceeded:outbox.job") ||
           eventLabel(event).startsWith("OperationFailed:outbox.job"),
-        ),
-      body: (tries) => Effect.as(Effect.sleep("20 millis"), tries + 1),
-    });
+      ),
+    );
     yield* Fiber.interrupt(consumer);
     return collected;
   });
@@ -184,7 +180,7 @@ const collectImageEmissions = (): Promise<InspectorEvent[]> => {
       Effect.sync(() => {
         collected.push(event);
       }),
-    ).pipe(Effect.fork);
+    ).pipe(Effect.forkChild);
 
     const outbox = yield* Outbox;
     yield* outbox.enqueue(
@@ -195,12 +191,12 @@ const collectImageEmissions = (): Promise<InspectorEvent[]> => {
     const feed = yield* inbox.open({});
     yield* Stream.runHead(feed.events);
     yield* inbox.fetchWrapEvent(incomingImageWrap.id);
-    yield* Effect.iterate(0, {
-      while: (tries) =>
-        tries < 100 &&
-        !collected.some((event) => eventLabel(event).includes("outbox.job")),
-      body: (tries) => Effect.as(Effect.sleep("20 millis"), tries + 1),
-    });
+    // The fetch is the last emission, so once it lands the inbox rows have too.
+    yield* eventually(() =>
+      ["outbox.job", "inbox.fetchWrapEvent"].every((name) =>
+        collected.some((event) => eventLabel(event).includes(name)),
+      ),
+    );
     yield* Fiber.interrupt(consumer);
     return collected;
   });
@@ -268,7 +264,7 @@ const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
       Effect.sync(() => {
         collected.push(event);
       }),
-    ).pipe(Effect.fork);
+    ).pipe(Effect.forkChild);
 
     const outbox = yield* Outbox;
     yield* outbox.enqueue(
@@ -285,12 +281,12 @@ const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
     const feed = yield* inbox.open({});
     yield* Stream.runHead(feed.events);
     yield* inbox.fetchWrapEvent(incomingTokenWrap.id);
-    yield* Effect.iterate(0, {
-      while: (tries) =>
-        tries < 100 &&
-        !collected.some((event) => eventLabel(event).includes("outbox.job")),
-      body: (tries) => Effect.as(Effect.sleep("20 millis"), tries + 1),
-    });
+    // The fetch is the last emission, so once it lands the inbox rows have too.
+    yield* eventually(() =>
+      ["outbox.job", "inbox.fetchWrapEvent"].every((name) =>
+        collected.some((event) => eventLabel(event).includes(name)),
+      ),
+    );
     yield* Fiber.interrupt(consumer);
     return collected;
   });

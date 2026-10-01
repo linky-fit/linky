@@ -26,7 +26,7 @@ export class TransferCheckResult extends Schema.Class<TransferCheckResult>(
 )({
   operationId: OperationId,
   /** `unavailable` = mint unreachable or unanswered; never treated as spent. */
-  status: Schema.Literal("live", "spent", "unavailable"),
+  status: Schema.Literals(["live", "spent", "unavailable"]),
 }) {}
 
 export class ClaimedTransferReport extends Schema.Class<ClaimedTransferReport>(
@@ -48,5 +48,5 @@ export class ProofStateSnapshot extends Schema.Class<ProofStateSnapshot>(
   "ProofStateSnapshot",
 )({
   proofId: ProofId,
-  state: Schema.Literal("unspent", "pending", "spent", "unknown"),
+  state: Schema.Literals(["unspent", "pending", "spent", "unknown"]),
 }) {}

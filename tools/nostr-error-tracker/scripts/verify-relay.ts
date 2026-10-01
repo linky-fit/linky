@@ -45,8 +45,8 @@ const events: Event[] = Array.from({ length: 501 }, (_, index) =>
   ),
 );
 events.push(reportWrap);
-const Request = Schema.parseJson(
-  Schema.Tuple(
+const Request = Schema.fromJsonString(
+  Schema.Tuple([
     Schema.Literal("REQ"),
     Schema.String,
     Schema.Struct({
@@ -54,7 +54,7 @@ const Request = Schema.parseJson(
       until: Schema.optional(Schema.Number),
       limit: Schema.optional(Schema.Number),
     }),
-  ),
+  ]),
 );
 let queries = 0;
 let publishes = 0;

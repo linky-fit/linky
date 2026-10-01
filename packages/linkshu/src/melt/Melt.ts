@@ -3,7 +3,7 @@ import type {
   MeltQuoteBolt11Response,
   Proof as CashuProof,
 } from "@cashu/cashu-ts";
-import { Duration, Effect, Either, Schema } from "effect";
+import { Context, Duration, Effect, Layer, Result, Schema } from "effect";
 import {
   InsufficientFunds,
   MintRejected,
@@ -77,14 +77,14 @@ const decodeAmount = Schema.decodeUnknownOption(Amount);
 const decodeReserve = Schema.decodeUnknownOption(NonNegativeAmount);
 const decodeExpiry = Schema.decodeUnknownOption(UnixSeconds);
 const decodeQuoteState = Schema.decodeUnknownOption(
-  Schema.Literal("UNPAID", "PENDING", "PAID"),
+  Schema.Literals(["UNPAID", "PENDING", "PAID"]),
 );
 
 type QuoteState = "UNPAID" | "PENDING" | "PAID" | null;
 
 /** Serialized onto a melt record the mint rejected. */
 const encodeMeltError = Schema.encodeSync(
-  Schema.parseJson(Schema.Union(MintRejected, MintUnreachable)),
+  Schema.fromJsonString(Schema.Union([MintRejected, MintUnreachable])),
 );
 
 const toMeltQuote = (
@@ -159,9 +159,8 @@ interface MeltExecution {
  * after the swap loses no funds. A melt the mint has not settled leaves a
  * `melt` operation `held` over its inputs, and `resumePending` finishes it.
  */
-export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Melt extends Context.Service<Melt>()("linkshu/Melt", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const proofStore = yield* ProofStore;
     const operationStore = yield* OperationStore;
@@ -342,10 +341,10 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         let lastState: QuoteState = "PENDING";
         // A missed poll is no information; the bounded poll decides.
         const pollState = Effect.map(
-          Effect.either(checkQuote(exec.wallet, exec.pending)),
-          Either.match({
-            onLeft: (): QuoteState => null,
-            onRight: (checked) => {
+          Effect.result(checkQuote(exec.wallet, exec.pending)),
+          Result.match({
+            onFailure: (): QuoteState => null,
+            onSuccess: (checked) => {
               const state = quoteStateOf(checked);
               if (state !== null && state !== lastState) {
                 lastState = state;
@@ -399,11 +398,11 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
       exec: MeltExecution,
     ): Effect.Effect<MeltReceipt, MeltError> =>
       Effect.gen(function* () {
-        const checked = yield* Effect.either(
+        const checked = yield* Effect.result(
           checkQuote(exec.wallet, exec.pending),
         );
-        const state = Either.isRight(checked)
-          ? quoteStateOf(checked.right)
+        const state = Result.isSuccess(checked)
+          ? quoteStateOf(checked.success)
           : null;
         if (state !== null)
           emitQuoteState(inspector, "melt", exec.pending, state);
@@ -444,7 +443,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
               counter + blanks,
               "used",
             );
-            const outcome = yield* Effect.either(
+            const outcome = yield* Effect.result(
               Effect.tryPromise({
                 try: () =>
                   exec.wallet.meltProofsBolt11(
@@ -456,10 +455,10 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
                 catch: (error): unknown => error,
               }),
             );
-            if (Either.isRight(outcome)) {
-              return yield* settleMeltResponse(exec, outcome.right);
+            if (Result.isSuccess(outcome)) {
+              return yield* settleMeltResponse(exec, outcome.success);
             }
-            const raw = outcome.left;
+            const raw = outcome.failure;
             if (isRecoverableOutputCollision(raw)) {
               lastCollision = raw;
               yield* recoverFromCollision(
@@ -687,19 +686,19 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         const wallet = yield* instances.get(pending.mint, pending.unit);
         const state = quoteStateOf(yield* checkQuote(wallet, pending));
         if (state !== null) emitQuoteState(inspector, "melt", pending, state);
-        const settled = yield* Effect.either(
+        const settled = yield* Effect.result(
           settleQuoteState(wallet, pending, state),
         );
-        if (Either.isRight(settled)) {
-          return resultOf(pending, "paid", settled.right);
+        if (Result.isSuccess(settled)) {
+          return resultOf(pending, "paid", settled.success);
         }
-        switch (settled.left._tag) {
+        switch (settled.failure._tag) {
           case "PaymentFailed":
             return resultOf(pending, "unpaid", null);
           case "PaymentPending":
             return resultOf(pending, "pending", null);
           default:
-            return yield* Effect.fail(settled.left);
+            return yield* Effect.fail(settled.failure);
         }
       }).pipe(
         inspectOperationWith(
@@ -712,7 +711,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           },
           (result) => result,
         ),
-        Effect.catchAll(() =>
+        Effect.catch(() =>
           Effect.succeed(resultOf(pending, "unresolved", null)),
         ),
       );
@@ -735,4 +734,9 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
 
     return { quote, melt, status, resumePending } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

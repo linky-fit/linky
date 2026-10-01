@@ -3,6 +3,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   InsufficientFunds,
   MintRejected,
+  PaymentFailed,
   Bolt11Invoice,
   buildPaymentAmountAttempts,
   buildPaymentFailureAmountAttempts,
@@ -48,21 +49,35 @@ export class RedeemError extends Error {
     this.phase = phase;
   }
 }
-export const getErrorMessage = (error: unknown, fallback: string): string =>
-  error instanceof Error
-    ? error.message
-    : typeof error === "string"
-      ? error
-      : fallback;
+export const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error === "string") return error || fallback;
+  if (!(error instanceof Error)) return fallback;
+  if (error.message !== "") return error.message;
+  const fields = JSON.stringify(error, (key: string, value: unknown) =>
+    key === "_tag" ? undefined : value,
+  );
+  return fields === undefined || fields === "{}"
+    ? error.name
+    : `${error.name} ${fields}`;
+};
 
-const PendingPayment = Schema.parseJson(
+export const describeMeltFailure = (error: unknown): string =>
+  error instanceof InsufficientFunds
+    ? `Insufficient funds: required ${error.required}, available ${error.available}`
+    : error instanceof MintRejected
+      ? error.detail
+      : error instanceof PaymentFailed
+        ? `Lightning payment failed: ${error.detail ?? "no detail from the mint"}`
+        : getErrorMessage(error, "Redeem failed");
+
+const PendingPayment = Schema.fromJsonString(
   Schema.Struct({
     quote: MeltQuote,
     invoice: Bolt11Invoice,
     address: Schema.String,
   }),
 );
-const CompletedPayment = Schema.parseJson(
+const CompletedPayment = Schema.fromJsonString(
   Schema.Struct({
     amountSent: Schema.Number,
     changeAmount: Schema.Number,
@@ -92,9 +107,9 @@ const withWallet = async <A>(
     const run = async <V, E>(
       effect: Effect.Effect<V, E, LinkshuServices>,
     ): Promise<V> => {
-      const result = await runLinkshu(config, Effect.either(effect));
-      if (result._tag === "Left") throw result.left;
-      return result.right;
+      const result = await runLinkshu(config, Effect.result(effect));
+      if (result._tag === "Failure") throw result.failure;
+      return result.success;
     };
     // The pasted token's proofs are trusted as-is: the site never re-signs
     // them, it only spends them.
@@ -315,12 +330,7 @@ export const redeemToken = (
         return finish(receipt.paidAmount, receipt.feePaid, lightningAddress);
       } catch (error) {
         lastError = error;
-        const message =
-          error instanceof InsufficientFunds
-            ? `Insufficient funds: required ${error.required}, available ${error.available}`
-            : error instanceof MintRejected
-              ? error.detail
-              : getErrorMessage(error, "Redeem failed");
+        const message = describeMeltFailure(error);
         if (error instanceof InsufficientFunds)
           localStorage.removeItem(`${key}.payment`);
         else if (error instanceof MintRejected) await releaseUnpaidAttempt();
@@ -340,5 +350,5 @@ export const redeemToken = (
         }
       }
     }
-    throw new RedeemError(getErrorMessage(lastError, "Redeem failed"), "melt");
+    throw new RedeemError(describeMeltFailure(lastError), "melt");
   });

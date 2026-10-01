@@ -9,9 +9,9 @@ const linkstrRestrictedSyntax = [
   ...restrictedSyntax,
   {
     selector:
-      ":matches(CallExpression[callee.property.name='emit'] > ArrowFunctionExpression, CallExpression[callee.property.name='emit'] > ArrowFunctionExpression > ConditionalExpression) > NewExpression:not(:has(ObjectExpression.arguments:nth-child(2) > Property[key.name='disableValidation'][value.value=true]))",
+      ":matches(CallExpression[callee.property.name='emit'] > ArrowFunctionExpression, CallExpression[callee.property.name='emit'] > ArrowFunctionExpression > ConditionalExpression) > NewExpression:not(:has(ObjectExpression.arguments:nth-child(2) > Property[key.name='disableChecks'][value.value=true]))",
     message:
-      "Build inspector events with `{ disableValidation: true }` so a bad field surfaces in the consumer, not as a failed operation.",
+      "Build inspector events with `{ disableChecks: true }` so an off-brand field still reaches the feed.",
   },
 ];
 

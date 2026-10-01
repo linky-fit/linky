@@ -3,7 +3,7 @@ import type { RelayHealthState } from "@linky-fit/linkstr";
 import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
 import { linkstrConfigAtom } from "./config";
-import { Registry, Result } from "./index";
+import { AsyncResult, AtomRegistry } from "./index";
 import { retractReactionAtom } from "./reactions";
 import { relayHealthAtom } from "./relayHealth";
 import { configWith, makeIdentity, relayA, settle } from "./testing";
@@ -18,21 +18,21 @@ const draft = new RetractionDraft({
 });
 
 const healthOf = (
-  registry: Registry.Registry,
+  registry: AtomRegistry.AtomRegistry,
   relay: string,
 ): RelayHealthState | undefined => {
   const result = registry.get(relayHealthAtom);
-  return Result.isSuccess(result) ? result.value.get(relay) : undefined;
+  return AsyncResult.isSuccess(result) ? result.value.get(relay) : undefined;
 };
 
 describe("relayHealthAtom", () => {
   it("reflects traffic-derived relay health after a publish", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     registry.set(linkstrConfigAtom, configWith(alice, stubWrapTransport([])));
     const unmount = registry.mount(relayHealthAtom);
 
     await expect
-      .poll(() => Result.isSuccess(registry.get(relayHealthAtom)))
+      .poll(() => AsyncResult.isSuccess(registry.get(relayHealthAtom)))
       .toBe(true);
     expect(healthOf(registry, relayA)).toBeUndefined();
 

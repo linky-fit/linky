@@ -15,11 +15,10 @@ const isOnCurve = (hex: string): boolean => {
   }
 };
 
-export const Pubkey = Schema.String.pipe(
-  Schema.pattern(HEX_64),
-  Schema.filter(isOnCurve, { description: "a secp256k1 x-only public key" }),
-  Schema.brand("Pubkey"),
-);
+export const Pubkey = Schema.String.check(
+  Schema.isPattern(HEX_64),
+  Schema.makeFilter(isOnCurve, { expected: "a secp256k1 x-only public key" }),
+).pipe(Schema.brand("Pubkey"));
 export type Pubkey = typeof Pubkey.Type;
 export const isPubkey = Schema.is(Pubkey);
 
@@ -28,23 +27,20 @@ export const isPubkey = Schema.is(Pubkey);
  * reaction. Distinct from WrapId: gift wraps are regenerated on every publish,
  * rumor ids are not.
  */
-export const RumorId = Schema.String.pipe(
-  Schema.pattern(HEX_64),
+export const RumorId = Schema.String.check(Schema.isPattern(HEX_64)).pipe(
   Schema.brand("RumorId"),
 );
 export type RumorId = typeof RumorId.Type;
 export const isRumorId = Schema.is(RumorId);
 
 /** Id of a signed outer gift-wrap event — transport-level identity only. */
-export const WrapId = Schema.String.pipe(
-  Schema.pattern(HEX_64),
+export const WrapId = Schema.String.check(Schema.isPattern(HEX_64)).pipe(
   Schema.brand("WrapId"),
 );
 export type WrapId = typeof WrapId.Type;
 
 /** Id of a signed plain (non-gift-wrapped) event: profile, status, relay lists, … */
-export const EventId = Schema.String.pipe(
-  Schema.pattern(HEX_64),
+export const EventId = Schema.String.check(Schema.isPattern(HEX_64)).pipe(
   Schema.brand("EventId"),
 );
 export type EventId = typeof EventId.Type;
@@ -53,7 +49,7 @@ export type EventId = typeof EventId.Type;
  * Locally generated id travelling in the ["client", …] tag; the key used to
  * reconcile an optimistic local row with its relay echo.
  */
-export const ClientId = Schema.NonEmptyTrimmedString.pipe(
+export const ClientId = Schema.Trimmed.check(Schema.isNonEmpty()).pipe(
   Schema.brand("ClientId"),
 );
 export type ClientId = typeof ClientId.Type;
@@ -76,17 +72,16 @@ const isRelayUrl = (value: string): boolean => {
   }
 };
 
-export const RelayUrl = Schema.NonEmptyTrimmedString.pipe(
-  Schema.filter(isRelayUrl, {
-    description:
+export const RelayUrl = Schema.Trimmed.check(
+  Schema.isNonEmpty(),
+  Schema.makeFilter(isRelayUrl, {
+    expected:
       "a wss:// URL, or a loopback ws:// URL for explicitly enabled local development",
   }),
-  Schema.brand("RelayUrl"),
-);
+).pipe(Schema.brand("RelayUrl"));
 export type RelayUrl = typeof RelayUrl.Type;
 
-export const UnixSeconds = Schema.Int.pipe(
-  Schema.positive(),
+export const UnixSeconds = Schema.Int.check(Schema.isGreaterThan(0)).pipe(
   Schema.brand("UnixSeconds"),
 );
 export type UnixSeconds = typeof UnixSeconds.Type;
@@ -102,10 +97,9 @@ const isUsableSecretKey = (bytes: Uint8Array): boolean => {
   }
 };
 
-export const NostrSecretKey = Schema.Uint8ArrayFromSelf.pipe(
-  Schema.filter(isUsableSecretKey, {
-    description: "a 32-byte secp256k1 secret key in curve order",
+export const NostrSecretKey = Schema.Uint8Array.check(
+  Schema.makeFilter(isUsableSecretKey, {
+    expected: "a 32-byte secp256k1 secret key in curve order",
   }),
-  Schema.brand("NostrSecretKey"),
-);
+).pipe(Schema.brand("NostrSecretKey"));
 export type NostrSecretKey = typeof NostrSecretKey.Type;

@@ -36,19 +36,19 @@ export interface InboxResult {
 }
 
 const EventFields = {
-  id: Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/)),
-  pubkey: Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/)),
-  created_at: Schema.NonNegativeInt,
-  kind: Schema.NonNegativeInt,
+  id: Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/)),
+  pubkey: Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/)),
+  created_at: Schema.Natural,
+  kind: Schema.Natural,
   tags: Schema.mutable(
     Schema.Array(Schema.mutable(Schema.Array(Schema.String))),
   ),
   content: Schema.String,
 };
-const SignedEventJson = Schema.parseJson(
+const SignedEventJson = Schema.fromJsonString(
   Schema.Struct({ ...EventFields, sig: Schema.String }),
 );
-const RumorJson = Schema.parseJson(Schema.Struct(EventFields));
+const RumorJson = Schema.fromJsonString(Schema.Struct(EventFields));
 
 const isAddressedTo = (tags: string[][], pubkey: string) =>
   tags.some((tag) => tag[0] === "p" && tag[1] === pubkey);

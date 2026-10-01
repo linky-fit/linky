@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { parseMintUrl, runLinkshu } from "@linky-fit/linkshu";
 import type { MintUrl } from "@linky-fit/linkshu";
-import { Effect, Either } from "effect";
+import { Effect, Result, SchemaIssue } from "effect";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -87,20 +87,27 @@ const main = async (): Promise<void> => {
       operationStore: fileOperationStore(path.join(dataDir, "operations.json")),
       ...(verbose ? { inspector: stderrInspector } : {}),
     },
-    Effect.either(buildCommand(args.command, args.operands, mint)),
+    Effect.result(buildCommand(args.command, args.operands, mint)),
   );
 
-  if (Either.isLeft(outcome)) {
-    console.error(`error: ${describe(outcome.left)}`);
+  if (Result.isFailure(outcome)) {
+    console.error(`error: ${describe(outcome.failure)}`);
     process.exitCode = 1;
   }
+};
+
+const describeError = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error);
+  return SchemaIssue.isIssue(error.cause)
+    ? `${error.message}: ${SchemaIssue.makeFormatterDefault()(error.cause)}`
+    : error.message;
 };
 
 main().catch((error: unknown) => {
   if (error instanceof UsageError) {
     console.error(`error: ${error.message}\n\n${USAGE}`);
   } else {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(describeError(error));
   }
   process.exitCode = 1;
 });

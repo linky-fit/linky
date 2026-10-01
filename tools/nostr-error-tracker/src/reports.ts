@@ -50,14 +50,14 @@ export interface ReportFilters {
 }
 
 const optionalText = Schema.optional(Schema.NullOr(Schema.String));
-const nonemptyText = Schema.String.pipe(
-  Schema.filter((value) => value.trim().length > 0),
+const nonemptyText = Schema.String.check(
+  Schema.makeFilter((value) => value.trim().length > 0),
 );
 const reportSchema = Schema.Struct({
   v: Schema.optional(Schema.Literal(1)),
   id: nonemptyText,
-  createdAtSec: Schema.Number.pipe(Schema.finite(), Schema.positive()),
-  direction: Schema.Literal("in", "out"),
+  createdAtSec: Schema.Finite.check(Schema.isGreaterThan(0)),
+  direction: Schema.Literals(["in", "out"]),
   status: Schema.Literal("error"),
   method: nonemptyText,
   phase: nonemptyText,
@@ -72,7 +72,9 @@ const reportSchema = Schema.Struct({
   appRuntime: optionalText,
   platform: optionalText,
 });
-const decodeReport = Schema.decodeUnknownOption(Schema.parseJson(reportSchema));
+const decodeReport = Schema.decodeUnknownOption(
+  Schema.fromJsonString(reportSchema),
+);
 const textOrNull = (value: string | null | undefined): string | null =>
   value?.trim() || null;
 

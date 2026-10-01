@@ -1,4 +1,4 @@
-import { Effect, Exit } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 import { NoRelayReachable } from "../domain/errors";
 import { ClientId, RelayUrl, UnixSeconds } from "../domain/primitives";
 import type { NostrTransportService } from "../services/NostrTransport";
@@ -84,8 +84,9 @@ describe("deliverRumorToPeer with order recipientFirst", () => {
     );
 
     expect(publishedRecipients).toEqual([bob.pubkey]);
-    assert(Exit.isFailure(exit) && exit.cause._tag === "Fail");
-    const failure = exit.cause.error;
+    assert(Exit.isFailure(exit));
+    expect(exit.cause.reasons).toHaveLength(1);
+    const failure = Option.getOrThrow(Cause.findErrorOption(exit.cause));
     expect(failure).toBeInstanceOf(NoRelayReachable);
     expect(failure.selfCopy.acceptedBy).toEqual([]);
     expect(failure.selfCopy.rejectedBy).toEqual([]);

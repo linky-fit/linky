@@ -2,12 +2,12 @@ import { Schema } from "effect";
 import { WrapDelivery } from "../domain/delivery";
 import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
 
-export const BankOfferId = Schema.NonEmptyTrimmedString.pipe(
+export const BankOfferId = Schema.Trimmed.check(Schema.isNonEmpty()).pipe(
   Schema.brand("BankOfferId"),
 );
 export type BankOfferId = typeof BankOfferId.Type;
 
-export const BankOfferStatus = Schema.Literal(
+export const BankOfferStatus = Schema.Literals([
   "offered",
   "accepted",
   "accepted_by_other",
@@ -16,10 +16,10 @@ export const BankOfferStatus = Schema.Literal(
   "canceled",
   "declined",
   "settled",
-);
+]);
 export type BankOfferStatus = typeof BankOfferStatus.Type;
 
-const PositiveInt = Schema.Int.pipe(Schema.positive());
+const PositiveInt = Schema.Int.check(Schema.isGreaterThan(0));
 
 export class BankOfferDraft extends Schema.Class<BankOfferDraft>(
   "BankOfferDraft",
@@ -28,14 +28,14 @@ export class BankOfferDraft extends Schema.Class<BankOfferDraft>(
   offerId: BankOfferId,
   offerer: Pubkey,
   status: BankOfferStatus,
-  amountText: Schema.NonEmptyTrimmedString,
-  text: Schema.NonEmptyTrimmedString,
+  amountText: Schema.Trimmed.check(Schema.isNonEmpty()),
+  text: Schema.Trimmed.check(Schema.isNonEmpty()),
   amountSat: Schema.optional(PositiveInt),
   initiatedAtSec: Schema.optional(UnixSeconds),
   bankPaidAtSec: Schema.optional(UnixSeconds),
   expiresAtSec: Schema.optional(UnixSeconds),
   extensionSec: Schema.optional(PositiveInt),
-  spdPayload: Schema.optional(Schema.NonEmptyTrimmedString),
+  spdPayload: Schema.optional(Schema.Trimmed.check(Schema.isNonEmpty())),
   pushMark: Schema.optional(Schema.Boolean),
   clientId: Schema.optional(ClientId),
 }) {}

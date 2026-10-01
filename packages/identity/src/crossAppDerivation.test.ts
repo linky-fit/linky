@@ -202,7 +202,7 @@ describe("@linky-fit/identity API matches the cross-app vectors", () => {
       Effect.provide(
         IdentityProvider,
         Layer.provideMerge(
-          IdentityProvider.Live,
+          IdentityProvider.layer,
           MasterSecretProvider.fromSlip39Share(share),
         ),
       ),
