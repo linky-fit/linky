@@ -131,6 +131,7 @@ const compactTransactionDetails = (
   };
 
   copyString("requestId");
+  copyString("lightningAddress");
   copyString("lightningInvoice");
   copyString("lightningPreimage");
   copyString("meltQuoteId");
