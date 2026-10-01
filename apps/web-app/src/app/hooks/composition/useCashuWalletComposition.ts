@@ -1,3 +1,7 @@
+import {
+  transactionIdForOperation,
+  transactionIdForRequest,
+} from "@linky-fit/linksync";
 import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthorization";
 import type { ReceiveMethod } from "../../../utils/receiveMethod";
 import type { RestoreProgress } from "@linky-fit/linkshu";
@@ -1259,6 +1263,7 @@ export const useCashuWalletComposition = ({
         logPaymentEvent({
           direction: "out",
           status: "ok",
+          transactionId: transactionIdForOperation(receipt.operationId),
           amount: receipt.amount,
           details: {
             issuedToken: receipt.tokenText,
@@ -1891,6 +1896,7 @@ export const useCashuWalletComposition = ({
           note: transactionNote,
           phase,
           status: "ok",
+          transactionId: transactionIdForOperation(tokenId),
           unit: tokenMeta.unit,
         });
       };
@@ -2140,6 +2146,7 @@ export const useCashuWalletComposition = ({
       logPaymentEvent({
         direction: "out",
         status: "ok",
+        transactionId: transactionIdForOperation(receipt.operationId),
         amount: receipt.amount,
         details: {
           issuedToken: receipt.tokenText,
@@ -2347,6 +2354,7 @@ export const useCashuWalletComposition = ({
       mint: preferredMint,
       note: t("requestPaymentLabel"),
       status: "ok",
+      transactionId: transactionIdForRequest(requestId),
       unit: "sat",
     });
 

@@ -1,8 +1,9 @@
+import { transactionIdForOperation } from "@linky-fit/linksync";
 import { useLatest } from "../../../hooks/useLatest";
 import { Schema } from "effect";
 import { Either } from "effect";
 import React from "react";
-import { parseTokenText } from "@linky-fit/linkshu";
+import { parseTokenText, type OperationId } from "@linky-fit/linkshu";
 import { JsonValue } from "../../../types/json";
 import {
   LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX,
@@ -101,6 +102,7 @@ const readLastClaimAttemptMs = (key: string): number => {
 interface ReceivedPayment {
   readonly amount: number;
   readonly mint: string;
+  readonly operationId: OperationId;
   readonly unit: string | null;
   readonly method: PaymentTelemetryMethod;
   readonly details?: JsonValue;
@@ -172,7 +174,7 @@ export const useNpubCashClaim = ({
   touchMintInfo,
 }: UseNpubCashClaimParams) => {
   const announceReceived = React.useCallback(
-    ({ amount, mint, unit, method, details }: ReceivedPayment) => {
+    ({ amount, details, method, mint, operationId, unit }: ReceivedPayment) => {
       const cleanedMint = mint.trim().replace(/\/+$/, "");
       if (cleanedMint && !isMintDeleted(cleanedMint)) {
         const nowSec = nowSeconds();
@@ -186,6 +188,7 @@ export const useNpubCashClaim = ({
       logPaymentEvent({
         direction: "in",
         status: "ok",
+        transactionId: transactionIdForOperation(operationId),
         amount,
         fee: null,
         mint,
@@ -283,6 +286,7 @@ export const useNpubCashClaim = ({
           announceReceived({
             amount: receipt.amount,
             mint: receipt.mint,
+            operationId: receipt.operationId,
             unit: receipt.unit,
             method: "cashu_receive",
           });
@@ -354,6 +358,7 @@ export const useNpubCashClaim = ({
         announceReceived({
           amount: receipt.amount,
           mint: receipt.mint,
+          operationId: receipt.operationId,
           unit: "sat",
           method: "lightning_address",
           details: { lightningInvoice: quote.invoice, quoteId: quote.quoteId },

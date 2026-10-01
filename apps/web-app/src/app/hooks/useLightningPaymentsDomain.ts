@@ -1,3 +1,7 @@
+import {
+  transactionIdForOperation,
+  transactionIdForQuote,
+} from "@linky-fit/linksync";
 import type {
   MeltError,
   MeltReceipt,
@@ -130,6 +134,7 @@ export const useLightningPaymentsDomain = ({
       logPaymentEvent({
         direction: "out",
         status: "ok",
+        transactionId: transactionIdForOperation(pending.operationId),
         amount: pending.amount,
         details: { ...details, meltQuoteId: pending.quoteId },
         fee: null,
@@ -216,6 +221,11 @@ export const useLightningPaymentsDomain = ({
         logPaymentEvent({
           direction: "out",
           status: "ok",
+          transactionId: transactionIdForQuote(
+            "melt",
+            receipt.mint,
+            receipt.quoteId,
+          ),
           amount: receipt.paidAmount,
           details: invoiceDetails,
           fee: receipt.feePaid,
@@ -402,6 +412,11 @@ export const useLightningPaymentsDomain = ({
           logPaymentEvent({
             direction: "out",
             status: "ok",
+            transactionId: transactionIdForQuote(
+              "melt",
+              receipt.mint,
+              receipt.quoteId,
+            ),
             amount: receipt.paidAmount,
             details: {
               lightningAddress: paidLightningAddress,

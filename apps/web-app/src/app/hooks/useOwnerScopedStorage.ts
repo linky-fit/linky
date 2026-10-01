@@ -6,13 +6,16 @@ import {
   NonEmptyString1000,
   PositiveInt,
   type LinkyDbSchema,
+  type Patch,
+  type TransactionId,
+  type TransactionRow,
   type TransactionsRepository,
   type WriteRow,
 } from "@linky-fit/linksync";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import React from "react";
 import { isLocalPaymentTelemetryEvent } from "./useAnonymousPaymentTelemetry";
-import type { JsonValue } from "../../types/json";
+import { JsonValue } from "../../types/json";
 import {
   LOCAL_PAYMENT_EVENTS_STORAGE_KEY_PREFIX,
   LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX,
@@ -250,9 +253,36 @@ export const buildTransactionInsertPayload = (args: {
   return payload;
 };
 
+const decodeDetails = Schema.decodeUnknownOption(
+  Schema.parseJson(Schema.Record({ key: Schema.String, value: JsonValue })),
+);
+
+const readDetails = (json: string | null | undefined) =>
+  json ? Option.getOrElse(decodeDetails(json), () => ({})) : {};
+
+/** A later write of one event adds what it knows; it never moves the event time or takes back a confirmed status. */
+export const mergeTransactionWrite = (
+  existing: TransactionRow,
+  payload: TransactionInsertPayload,
+): Patch<LinkyDbSchema["transaction"]> => {
+  const { detailsJson, status, ...columns } = payload;
+  const details = {
+    ...readDetails(existing.detailsJson),
+    ...readDetails(detailsJson),
+  };
+  return {
+    ...columns,
+    createdAtSec: existing.createdAtSec ?? columns.createdAtSec,
+    ...(existing.status === "ok" ? {} : { status }),
+    ...(detailsJson === undefined
+      ? {}
+      : { detailsJson: NonEmptyString.orThrow(JSON.stringify(details)) }),
+  };
+};
+
 interface UseOwnerScopedStorageParams {
   appOwnerIdRef: React.MutableRefObject<string | null>;
-  transactions: Pick<TransactionsRepository, "insert">;
+  transactions: Pick<TransactionsRepository, "byId" | "insert" | "update">;
 }
 
 interface UseOwnerScopedStorageResult {
@@ -271,10 +301,13 @@ export const useOwnerScopedStorage = ({
 
   // Transaction history must never break payment receive/send flows.
   const insertTransaction = React.useCallback(
-    (payload: TransactionInsertPayload): void => {
-      void Effect.runPromise(
-        transactions.insert({ id: createId<"Transaction">(), ...payload }),
-      ).catch((error: unknown) => {
+    (id: TransactionId, payload: TransactionInsertPayload): void => {
+      const write = Effect.flatMap(transactions.byId(id), (existing) =>
+        existing === null
+          ? transactions.insert({ id, ...payload })
+          : transactions.update(id, mergeTransactionWrite(existing, payload)),
+      );
+      void Effect.runPromise(write).catch((error: unknown) => {
         console.warn("[linky][transactions] insert failed", error);
       });
     },
@@ -320,25 +353,28 @@ export const useOwnerScopedStorage = ({
       if (!appOwnerIdRef.current) return;
 
       const nowSec = nowSeconds();
-      const transactionPayload = buildTransactionInsertPayload({
-        createdAtSec: nowSec,
-        event: {
-          amount: event.amount ?? null,
-          contactId: event.contactId ? event.contactId : null,
-          details: event.details ?? null,
-          direction: event.direction,
-          error: event.error ?? null,
-          fee: event.fee ?? null,
-          method: event.method ?? null,
-          mint: event.mint ?? null,
-          note: event.note ?? null,
-          phase: event.phase ?? null,
-          status: event.status,
-          unit: event.unit ?? null,
-        },
-      });
-
-      insertTransaction(transactionPayload);
+      if (event.status === "ok") {
+        insertTransaction(
+          event.transactionId,
+          buildTransactionInsertPayload({
+            createdAtSec: nowSec,
+            event: {
+              amount: event.amount ?? null,
+              contactId: event.contactId ? event.contactId : null,
+              details: event.details ?? null,
+              direction: event.direction,
+              error: event.error ?? null,
+              fee: event.fee ?? null,
+              method: event.method ?? null,
+              mint: event.mint ?? null,
+              note: event.note ?? null,
+              phase: event.phase ?? null,
+              status: event.status,
+              unit: event.unit ?? null,
+            },
+          }),
+        );
+      }
 
       const telemetryEntry = createLocalPaymentTelemetryEvent(event, nowSec);
       const telemetryQueue = safeLocalStorageGetJson(
@@ -384,6 +420,7 @@ export const useOwnerScopedStorage = ({
       for (const legacyItem of legacyItems) {
         if (!isLegacyPaymentEvent(legacyItem)) continue;
         insertTransaction(
+          createId<"Transaction">(),
           buildTransactionInsertPayload({
             createdAtSec: Math.trunc(legacyItem.createdAtSec),
             event: legacyItem,

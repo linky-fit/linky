@@ -1,3 +1,4 @@
+import { transactionIdForOperation } from "@linky-fit/linksync";
 import { Either } from "effect";
 import React from "react";
 import { parseTokenText } from "@linky-fit/linkshu";
@@ -190,6 +191,7 @@ export const useSaveCashuFromText = ({
           logPaymentEvent({
             direction: "in",
             status: "ok",
+            transactionId: transactionIdForOperation(receipt.operationId),
             amount: receipt.amount,
             contactId: paymentContactId,
             details: {

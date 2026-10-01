@@ -1,3 +1,4 @@
+import { transactionIdForQuote } from "@linky-fit/linksync";
 import type { TopupError, TopupQuote } from "@linky-fit/linkshu";
 import { Either } from "effect";
 import React from "react";
@@ -114,6 +115,11 @@ export const useTopupFlow = ({
         method: "lightning_invoice",
         mint: quote.mint,
         status: "ok",
+        transactionId: transactionIdForQuote(
+          "topup",
+          quote.mint,
+          quote.quoteId,
+        ),
         unit: "sat",
       });
 

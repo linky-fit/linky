@@ -1,3 +1,4 @@
+import { transactionIdForRestore } from "@linky-fit/linksync";
 import { parseMintUrl } from "@linky-fit/linkshu";
 import type { MintUrl, RestoreProgress } from "@linky-fit/linkshu";
 import React from "react";
@@ -147,6 +148,7 @@ export const useRestoreMissingTokens = ({
               logPaymentEvent({
                 direction: "in",
                 status: "ok",
+                transactionId: transactionIdForRestore(reclaim.reclaimedProofs),
                 amount: reclaim.reclaimedAmount,
                 fee: null,
                 mint: null,

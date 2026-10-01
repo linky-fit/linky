@@ -1,3 +1,4 @@
+import { transactionIdForOperation } from "@linky-fit/linksync";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import {
   decodeNpub,
@@ -419,6 +420,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
           mint: receipt.mint,
           phase: publishing.hasPendingMessages ? "publish" : "complete",
           status: "ok",
+          transactionId: transactionIdForOperation(receipt.operationId),
           unit: "sat",
         });
       }

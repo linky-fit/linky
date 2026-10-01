@@ -1,4 +1,11 @@
-import { OwnerId } from "@linky-fit/linksync";
+import {
+  NonEmptyString,
+  NonEmptyString100,
+  OwnerId,
+  PositiveInt,
+  transactionIdForRequest,
+  type TransactionRow,
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React, { act } from "react";
 import type { Root } from "react-dom/client";
@@ -19,23 +26,22 @@ beforeAll(() => {
 });
 
 type OwnerScopedStorage = ReturnType<typeof useOwnerScopedStorage>;
-type TransactionInsert = Parameters<
-  typeof useOwnerScopedStorage
->[0]["transactions"]["insert"];
+type Transactions = Parameters<typeof useOwnerScopedStorage>[0]["transactions"];
+type TransactionInsert = Transactions["insert"];
 
 interface HookHarnessProps {
   appOwnerId: OwnerId;
-  insert: TransactionInsert;
+  transactions: Transactions;
   onRender: (storage: OwnerScopedStorage) => void;
 }
 
 const HookHarness = ({
   appOwnerId,
-  insert,
+  transactions,
   onRender,
 }: HookHarnessProps): React.ReactElement | null => {
   const appOwnerIdRef = React.useRef<OwnerId | null>(appOwnerId);
-  onRender(useOwnerScopedStorage({ appOwnerIdRef, transactions: { insert } }));
+  onRender(useOwnerScopedStorage({ appOwnerIdRef, transactions }));
   return null;
 };
 
@@ -52,12 +58,18 @@ const parseOwnerId = (value: string): OwnerId => {
 const renderStorageHook = async (
   appOwnerId: OwnerId,
   insert: TransactionInsert,
+  overrides: Partial<Transactions> = {},
 ): Promise<OwnerScopedStorage> => {
   const resultRef: { current: OwnerScopedStorage | null } = { current: null };
   const { root } = await renderIntoDocument(
     React.createElement(HookHarness, {
       appOwnerId,
-      insert,
+      transactions: {
+        byId: () => Effect.succeed(null),
+        insert,
+        update: () => Effect.void,
+        ...overrides,
+      },
       onRender: (storage) => {
         resultRef.current = storage;
       },
@@ -197,22 +209,97 @@ describe("useOwnerScopedStorage", () => {
     const insert = vi.fn<TransactionInsert>(() => Effect.void);
     const storage = await renderStorageHook(appOwnerId, insert);
 
+    const transactionId = transactionIdForRequest("request-1");
     storage.logPaymentEvent({
       amount: 42,
       direction: "out",
       method: "cashu_chat",
       status: "ok",
+      transactionId,
     });
 
     expect(insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: expect.any(String),
+        id: transactionId,
         amount: 42,
         direction: "out",
         method: "cashu_chat",
         status: "ok",
       }),
     );
+    expect(
+      localStorage.getItem(
+        `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${appOwnerId}`,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("merges a repeated write into the existing row", async () => {
+    const insert = vi.fn<TransactionInsert>(() => Effect.void);
+    const update = vi.fn<Transactions["update"]>(() => Effect.void);
+    const transactionId = transactionIdForRequest("request-1");
+    const existing: TransactionRow = {
+      id: transactionId,
+      ownerId: appOwnerId,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      isDeleted: null,
+      createdAtSec: PositiveInt.orThrow(100),
+      direction: NonEmptyString100.orThrow("out"),
+      status: NonEmptyString100.orThrow("ok"),
+      amount: null,
+      fee: null,
+      method: null,
+      note: null,
+      detailsJson: NonEmptyString.orThrow(JSON.stringify({ requestId: "r" })),
+      iconKind: null,
+      contactId: null,
+      mint: null,
+      unit: null,
+      error: null,
+      pendingLabel: null,
+    };
+    const storage = await renderStorageHook(appOwnerId, insert, {
+      byId: () => Effect.succeed(existing),
+      update,
+    });
+
+    storage.logPaymentEvent({
+      direction: "out",
+      details: { lightningInvoice: "lnbc1" },
+      method: "cashu_chat",
+      phase: "publish",
+      status: "ok",
+      transactionId,
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(insert).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith(transactionId, {
+      createdAtSec: 100,
+      direction: "out",
+      method: "cashu_chat",
+      detailsJson: JSON.stringify({
+        requestId: "r",
+        lightningInvoice: "lnbc1",
+      }),
+    });
+  });
+
+  it("records no transaction for a failure, only telemetry", async () => {
+    const insert = vi.fn<TransactionInsert>(() => Effect.void);
+    const storage = await renderStorageHook(appOwnerId, insert);
+
+    storage.logPaymentEvent({
+      direction: "in",
+      error: "Token already spent",
+      method: "cashu_receive",
+      status: "error",
+    });
+
+    expect(insert).not.toHaveBeenCalled();
     expect(
       localStorage.getItem(
         `${LOCAL_PENDING_PAYMENT_TELEMETRY_STORAGE_KEY_PREFIX}.${appOwnerId}`,
@@ -232,6 +319,7 @@ describe("useOwnerScopedStorage", () => {
         direction: "in",
         method: "cashu_receive",
         status: "ok",
+        transactionId: transactionIdForRequest("request-1"),
       });
     }).not.toThrow();
     await act(async () => {

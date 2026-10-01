@@ -1,3 +1,4 @@
+import type { TransactionId } from "@linky-fit/linksync";
 import type { ContactId } from "../../evolu";
 import type { ContactWithChatState } from "../lib/contactChatState";
 import type { I18nKey } from "../../i18n";
@@ -43,7 +44,7 @@ export type PaymentTelemetryPhase =
   | "swap"
   | "unknown";
 
-export interface LoggedPaymentEventParams {
+interface PaymentEventFields {
   amount?: number | null;
   contactId?: ContactId | string | null;
   details?: JsonValue | null;
@@ -54,9 +55,15 @@ export interface LoggedPaymentEventParams {
   mint?: string | null;
   note?: string | null;
   phase?: PaymentTelemetryPhase | null;
-  status: PaymentTelemetryStatus;
   unit?: string | null;
 }
+
+/** A payment that happened or is in flight is recorded under its event's id; a failure only reaches telemetry. */
+export type LoggedPaymentEventParams = PaymentEventFields &
+  (
+    | { status: "ok"; transactionId: TransactionId }
+    | { status: "declined" | "error"; transactionId?: never }
+  );
 
 export interface LocalPaymentTelemetryEvent {
   amountBucket: string | null;
