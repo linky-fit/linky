@@ -16,7 +16,9 @@ import {
   type MessageRow,
   type NostrIdentityRow,
   type ReactionRow,
+  type SettingKey,
   type SettingsRepository,
+  type SettingValues,
   type TransactionRecord,
   type TransactionsRepository,
   type WalletRepository,
@@ -75,13 +77,15 @@ export const useSettingsRepository = (): SettingsRepository => {
 };
 
 /** One synced setting value, kept current; `null` until read or when absent. */
-export const useSetting = (key: string): string | null => {
+export const useSetting = <K extends SettingKey>(
+  key: K,
+): SettingValues[K] | null => {
   const settings = useSettingsRepository();
   const source = React.useMemo(
     () => ({ all: settings.get(key), subscribe: settings.subscribe }),
     [key, settings],
   );
-  return useLiveValue<string | null>(source, null);
+  return useLiveValue<SettingValues[K] | null>(source, null);
 };
 
 export const useTransactionsRepository = (): TransactionsRepository => {

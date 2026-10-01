@@ -75,4 +75,6 @@ A row's id says which event it records, so writing the same event again (a retry
 
 ## Settings
 
-`makeSettingsRepository(store)`: small synced key/value state in the app owner, one row per key (`settingIdFor(key)`). `get` returns the value or `null`; `set` takes 1 to 1000 characters and dies on an empty value; `remove` is a no-op when absent. Shard pointers share the scope but have their own table; never write them through settings.
+`makeSettingsRepository(store)`: small synced values in the app owner, one row per key (`settingIdFor(key)`). Only keys registered in `LinkySettings` compile; each key's schema maps its typed value to the stored text. `get` returns the decoded value, or `null` when the row is absent or holds text the schema rejects; `set` encodes the value and dies when the text is empty or over 1000 characters; `remove` is a no-op when absent. Shard pointers share the scope but have their own table; never write them through settings.
+
+A new setting is a new `LinkySettings` entry. Keys and encodings are synced data that older app versions on other devices read, so never rename a key or change its encoding; add a new key instead.

@@ -1,20 +1,14 @@
 import { NonNegativeAmount, WalletBalances } from "@linky-fit/linkshu";
 import { isHiddenTestMint } from "../../utils/mint";
 
-/** Synced `setting` key; the value is "1" or "0", absent means the build default. */
-export const ALLOW_TEST_MINTS_SETTING_KEY = "allowTestMints";
-
 /** Dev and E2E builds run against a local FakeWallet mint, so they allow test mints. */
 const allowTestMintsBuildDefault =
   import.meta.env.DEV || import.meta.env.VITE_E2E === "1";
 
-export const encodeAllowTestMints = (allow: boolean): string =>
-  allow ? "1" : "0";
-
 export const resolveAllowTestMints = (
-  stored: string | null,
+  stored: boolean | null,
   buildDefault: boolean = allowTestMintsBuildDefault,
-): boolean => (stored === null ? buildDefault : stored === "1");
+): boolean => stored ?? buildDefault;
 
 export const withoutHiddenTestMints = <T extends { readonly mint: string }>(
   items: ReadonlyArray<T>,

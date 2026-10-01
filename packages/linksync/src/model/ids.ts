@@ -4,6 +4,7 @@ import {
   createRandomBytes,
   id,
 } from "@evolu/common";
+import type { SettingKey } from "./settings";
 
 export const ContactId = id("Contact");
 export type ContactId = typeof ContactId.Type;
@@ -49,7 +50,7 @@ export const cashuOperationIdFor = (operationKey: string): CashuOperationId =>
 export const directConversationIdFor = (contactId: ContactId): ConversationId =>
   createIdFromString<"Conversation">(`conversation/direct/${contactId}`);
 
-export const settingIdFor = (key: string): SettingId =>
+export const settingIdFor = (key: SettingKey): SettingId =>
   createIdFromString<"Setting">(`setting/${key}`);
 
 /** One row mirrors the active identity; older clients wrote random ids. */

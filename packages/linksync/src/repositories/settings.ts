@@ -1,31 +1,46 @@
 import { NonEmptyString100, NonEmptyString1000 } from "@evolu/common";
-import { Effect } from "effect";
+import { Effect, Option, Schema } from "effect";
 import type { ShardDbError } from "../core";
 import { settingIdFor } from "../model/ids";
+import {
+  LinkySettings,
+  type SettingKey,
+  type SettingValues,
+} from "../model/settings";
 import type { LinkyStore } from "../model/store";
 import { tableRepository } from "./tableRepository";
 
 export interface SettingsRepository {
-  readonly get: (key: string) => Effect.Effect<string | null>;
-  readonly set: (
-    key: string,
-    value: string,
+  readonly get: <K extends SettingKey>(
+    key: K,
+  ) => Effect.Effect<SettingValues[K] | null>;
+  readonly set: <K extends SettingKey>(
+    key: K,
+    value: SettingValues[K],
   ) => Effect.Effect<void, ShardDbError>;
-  readonly remove: (key: string) => Effect.Effect<void, ShardDbError>;
+  readonly remove: (key: SettingKey) => Effect.Effect<void, ShardDbError>;
   readonly subscribe: (listener: () => void) => () => void;
 }
 
-/** Small synced flags in the app owner; replaces the ad hoc `ownerMeta` scopes. */
+/** Small synced values in the app owner, one row per `LinkySettings` key. */
 export const makeSettingsRepository = (
   store: LinkyStore,
 ): SettingsRepository => {
   const table = tableRepository(store, "meta", "setting");
   return {
     get: (key) =>
-      Effect.map(table.byId(settingIdFor(key)), (row) => row?.value ?? null),
+      Effect.map(table.byId(settingIdFor(key)), (row) =>
+        row?.value == null
+          ? null
+          : Option.getOrNull(
+              Schema.decodeUnknownOption(LinkySettings[key])(row.value),
+            ),
+      ),
     set: (key, value) =>
       Effect.flatMap(table.byId(settingIdFor(key)), (existing) => {
-        const column = NonEmptyString1000.orThrow(value);
+        const column = NonEmptyString1000.orThrow(
+          Schema.encodeSync(LinkySettings[key])(value),
+        );
         return existing === null
           ? table.insert({
               id: settingIdFor(key),

@@ -61,15 +61,8 @@ import { toLegacyTokenRow } from "./legacyTokenRow";
 import { readRowOwnerId } from "../lib/rowOwnerId";
 
 export const LANE_MIGRATION_DONE_STORAGE_KEY = "linky.laneMigration.done.v1";
-/** First writer wins through the `setting` table so every device agrees on the cutoff. */
-export const LANE_MIGRATION_CUTOFF_SETTING_KEY = "laneMigration.cutoffMs";
 /** Extending is safe; shortening strands rows on devices that have not migrated yet. */
 export const LANE_MIGRATION_GRACE_PERIOD_MS = 180 * 24 * 60 * 60 * 1000;
-
-const ONBOARDING_TUTORIAL_SETTING_KEY = "onboardingTutorial";
-const ONBOARDING_TUTORIAL_DISMISSED = "dismissed";
-/** The default mint used to be an `ownerMeta` row; it is the `defaultMint` setting now. */
-export const DEFAULT_MINT_SETTING_KEY = "defaultMint";
 
 export const LEGACY_LANE_SCOPES = [
   "contacts",
@@ -113,15 +106,7 @@ export const isLaneGracePeriodActive = (
 export const readLaneMigrationCutoffMs = (
   store: LinkyStore,
 ): Effect.Effect<number | null> =>
-  Effect.map(
-    makeSettingsRepository(store).get(LANE_MIGRATION_CUTOFF_SETTING_KEY),
-    (value) => {
-      const parsed = Number(value);
-      return value !== null && Number.isFinite(parsed) && parsed > 0
-        ? parsed
-        : null;
-    },
-  );
+  makeSettingsRepository(store).get("laneMigration.cutoffMs");
 
 /**
  * The old pointer value: JSON `{ index, ... }` from later versions, or the
@@ -553,11 +538,10 @@ export const runLaneToShardMigration = ({
       const ownerMeta = visibleRows(snapshot.ownerMeta, legacyOwnerIds);
       const dismissedTutorial = ownerMeta.find(
         (row) =>
-          row.scope === ONBOARDING_TUTORIAL_SETTING_KEY &&
-          row.value === ONBOARDING_TUTORIAL_DISMISSED,
+          row.scope === "onboardingTutorial" && row.value === "dismissed",
       );
       const defaultMint = ownerMeta.find(
-        (row) => row.scope === DEFAULT_MINT_SETTING_KEY && row.value !== null,
+        (row) => row.scope === "defaultMint" && row.value !== null,
       );
       yield* ingest("meta", "setting", [
         ...(dismissedTutorial === undefined
@@ -565,9 +549,9 @@ export const runLaneToShardMigration = ({
           : [
               toShardRow("setting", {
                 ...dismissedTutorial,
-                id: settingIdFor(ONBOARDING_TUTORIAL_SETTING_KEY),
-                key: ONBOARDING_TUTORIAL_SETTING_KEY,
-                value: ONBOARDING_TUTORIAL_DISMISSED,
+                id: settingIdFor("onboardingTutorial"),
+                key: "onboardingTutorial",
+                value: "dismissed",
               }),
             ]),
         ...(defaultMint === undefined
@@ -575,8 +559,8 @@ export const runLaneToShardMigration = ({
           : [
               toShardRow("setting", {
                 ...defaultMint,
-                id: settingIdFor(DEFAULT_MINT_SETTING_KEY),
-                key: DEFAULT_MINT_SETTING_KEY,
+                id: settingIdFor("defaultMint"),
+                key: "defaultMint",
               }),
             ]),
       ]);
@@ -598,7 +582,7 @@ export const runLaneToShardMigration = ({
       const settings = makeSettingsRepository(store);
       const existingCutoff = yield* readLaneMigrationCutoffMs(store);
       if (existingCutoff === null)
-        yield* settings.set(LANE_MIGRATION_CUTOFF_SETTING_KEY, String(nowMs));
+        yield* settings.set("laneMigration.cutoffMs", nowMs);
 
       return { counts, cutoffMs: existingCutoff ?? nowMs, pointersWritten };
     }),

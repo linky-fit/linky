@@ -29,8 +29,8 @@ const balances = new WalletBalances({
 
 describe("resolveAllowTestMints", () => {
   it("follows the stored value and falls back to the build default", () => {
-    expect(resolveAllowTestMints("1", false)).toBe(true);
-    expect(resolveAllowTestMints("0", true)).toBe(false);
+    expect(resolveAllowTestMints(true, false)).toBe(true);
+    expect(resolveAllowTestMints(false, true)).toBe(false);
     expect(resolveAllowTestMints(null, true)).toBe(true);
     expect(resolveAllowTestMints(null, false)).toBe(false);
   });

@@ -96,10 +96,6 @@ import {
   buildIdentityChangeMessageContent,
   buildIdentityChangeMessageWrapId,
 } from "./lib/identityChangeMessage";
-import {
-  ONBOARDING_TUTORIAL_DISMISSED,
-  ONBOARDING_TUTORIAL_SETTING_KEY,
-} from "./lib/onboardingTutorial";
 import { runWrite } from "./lib/storeWrite";
 import { parsePrivateImageMessage } from "./lib/privateImageMessage";
 import { showPwaNotification } from "./lib/pwaNotifications";
@@ -412,16 +408,10 @@ export const useAppShellComposition = ({
   >("pay");
   const [payAmount, setPayAmount] = useState<string>("");
   const contactsOnboardingDismissedSynced =
-    useSetting(ONBOARDING_TUTORIAL_SETTING_KEY) ===
-    ONBOARDING_TUTORIAL_DISMISSED;
+    useSetting("onboardingTutorial") === "dismissed";
   const persistContactsOnboardingDismissed = React.useCallback(() => {
     if (contactsOnboardingDismissedSynced) return;
-    void runWrite(
-      settingsRepository.set(
-        ONBOARDING_TUTORIAL_SETTING_KEY,
-        ONBOARDING_TUTORIAL_DISMISSED,
-      ),
-    );
+    void runWrite(settingsRepository.set("onboardingTutorial", "dismissed"));
   }, [contactsOnboardingDismissedSynced, settingsRepository]);
 
   useStoragePersistRequestEffect({ refreshKey: t });

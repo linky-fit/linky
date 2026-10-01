@@ -21,5 +21,7 @@ export {
   SHARD_ROTATION_COOLDOWN_MS,
 } from "./scopes";
 export type { LinkyScope, LinkyScopes } from "./scopes";
+export { LinkySettings } from "./settings";
+export type { SettingKey, SettingValues } from "./settings";
 export { createLinkyStore } from "./store";
 export type { LinkyStore } from "./store";

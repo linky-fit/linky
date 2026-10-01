@@ -128,7 +128,6 @@ import {
   useWalletRepository,
 } from "../useLinksync";
 import { runWrite } from "../../lib/storeWrite";
-import { DEFAULT_MINT_SETTING_KEY } from "../../migrations/laneToShardMigration";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
@@ -425,7 +424,7 @@ export const useCashuWalletComposition = ({
 
   // Default mint cross-tab + cross-device sync through the synced
   // `defaultMint` setting (the per-owner localStorage override is tab-local).
-  const syncedDefaultMintValue = useSetting(DEFAULT_MINT_SETTING_KEY);
+  const syncedDefaultMintValue = useSetting("defaultMint");
   const ownerMetaDefaultMintValue = React.useMemo(
     () => normalizeMintUrl(syncedDefaultMintValue ?? "") || null,
     [syncedDefaultMintValue],
@@ -468,7 +467,7 @@ export const useCashuWalletComposition = ({
       const cleaned = normalizeMintUrl(mintUrl ?? "");
       if (!cleaned) return;
       if (cleaned === ownerMetaDefaultMintValue) return;
-      void runWrite(settingsRepository.set(DEFAULT_MINT_SETTING_KEY, cleaned));
+      void runWrite(settingsRepository.set("defaultMint", cleaned));
     },
     [ownerMetaDefaultMintValue, settingsRepository],
   );

@@ -23,9 +23,7 @@ import type {
 } from "../../evolu";
 import {
   clearLegacyLaneStorage,
-  DEFAULT_MINT_SETTING_KEY,
   isLaneGracePeriodActive,
-  LANE_MIGRATION_CUTOFF_SETTING_KEY,
   LANE_MIGRATION_GRACE_PERIOD_MS,
   legacyPointerIndex,
   legacySnapshotKey,
@@ -415,9 +413,7 @@ describe("runLaneToShardMigration", () => {
       ownerMeta: [ownerMeta(appOwner, "defaultMint", "https://mint.example")],
     });
     expect(
-      Effect.runSync(
-        makeSettingsRepository(store).get(DEFAULT_MINT_SETTING_KEY),
-      ),
+      Effect.runSync(makeSettingsRepository(store).get("defaultMint")),
     ).toBe("https://mint.example");
   });
 
@@ -436,9 +432,9 @@ describe("runLaneToShardMigration", () => {
     ).toBe(0);
     expect(
       Effect.runSync(
-        makeSettingsRepository(store).get(LANE_MIGRATION_CUTOFF_SETTING_KEY),
+        makeSettingsRepository(store).get("laneMigration.cutoffMs"),
       ),
-    ).toBe("5000");
+    ).toBe(5_000);
     expect(Effect.runSync(store.rows("meta", "shardPointer"))).toHaveLength(4);
   });
 
