@@ -334,7 +334,7 @@ describe("Profiles.fetchProfiles", () => {
     ]);
   });
 
-  it("dedupes input and issues one multi-author filter per relay", async () => {
+  it("dedupes input and issues one multi-author filter per kind and relay", async () => {
     const fetchLog: Array<Filter> = [];
     const exit = await runWith(
       stubTransport([], { fetchLog }),
@@ -345,10 +345,33 @@ describe("Profiles.fetchProfiles", () => {
 
     assert(Exit.isSuccess(exit));
     expect(exit.value).toHaveLength(2);
-    expect(fetchLog).toEqual([
-      { kinds: [0, 30315], authors: [bob.pubkey, carol.pubkey] },
-      { kinds: [0, 30315], authors: [bob.pubkey, carol.pubkey] },
-    ]);
+    const authors = [bob.pubkey, carol.pubkey];
+    expect(fetchLog).toEqual(
+      expect.arrayContaining([
+        { kinds: [0], authors },
+        { kinds: [0], authors },
+        { kinds: [30315], authors },
+        { kinds: [30315], authors },
+      ]),
+    );
+    expect(fetchLog).toHaveLength(4);
+  });
+
+  it("still returns profiles from a relay that rejects the status kind", async () => {
+    const profile = profileEvent(bob, JSON.stringify({ name: "bob" }), base);
+    // A relay that disallows a kind closes the whole REQ without events.
+    const rejectsStatus = stubPlainTransport([], () => true, {
+      fetch: (_relay, filter) =>
+        Effect.succeed(filter.kinds?.includes(30315) === true ? [] : [profile]),
+    });
+
+    const exit = await runWith(
+      rejectsStatus,
+      Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(bob.pubkey)),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.profile?.metadata.name).toBe("bob");
   });
 
   it("splits authors into filter chunks at the author cap", async () => {
@@ -366,13 +389,17 @@ describe("Profiles.fetchProfiles", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value).toHaveLength(pubkeys.length);
 
-    // Two chunks, each queried on both relays.
+    // Two chunks, each queried per kind on both relays.
     const authorCounts = fetchLog
       .map((filter) => filter.authors?.length ?? 0)
       .sort((a, b) => a - b);
     expect(authorCounts).toEqual([
       1,
       1,
+      1,
+      1,
+      AUTHOR_FILTER_LIMIT,
+      AUTHOR_FILTER_LIMIT,
       AUTHOR_FILTER_LIMIT,
       AUTHOR_FILTER_LIMIT,
     ]);

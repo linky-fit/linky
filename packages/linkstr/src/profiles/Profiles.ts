@@ -28,6 +28,7 @@ import {
 import { ProfileMetadata } from "./domain";
 import type { StatusDraft } from "./domain";
 import { ProfileUpdated, StatusUpdated } from "./events";
+import { profileFilters } from "./filters";
 import { createProfileSearchCollector, prefixSearchQuery } from "./search";
 import type { ProfileSearchHit } from "./search";
 
@@ -162,22 +163,25 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
         const authors = [...new Set(pubkeys)];
         if (authors.length === 0) return { result: [], eventIds: [] };
 
-        const eventsPerChunk = yield* Effect.forEach(
-          chunkAuthors(authors),
-          (chunk) =>
-            fetchPlainEvents(context.transport, relays, {
-              kinds: [PROFILE_KIND, STATUS_KIND],
-              authors: chunk,
-            }),
-          // Bounded: each chunk already fans out to every read relay.
+        const outcomes = yield* Effect.forEach(
+          profileFilters(authors),
+          (filter) =>
+            Effect.either(fetchPlainEvents(context.transport, relays, filter)),
+          // Bounded: each filter already fans out to every read relay.
           { concurrency: 4 },
         );
+        const eventsPerFilter = outcomes.filter(Either.isRight);
+        const firstFailure = outcomes.find(Either.isLeft);
+        if (eventsPerFilter.length === 0 && firstFailure !== undefined) {
+          return yield* Effect.fail(firstFailure.left);
+        }
         const now: UnixSeconds = yield* nowSeconds;
 
-        // Chunks hold disjoint authors, so concatenation keeps each author's
-        // events newest-first (fetchPlainEvents sorts within a chunk).
+        // Filters hold disjoint (author, kind) pairs, so concatenation keeps
+        // each author's events of one kind newest-first (fetchPlainEvents
+        // sorts within a filter), which is all pickNewest needs.
         const eventsByAuthor = new Map<Pubkey, Array<SignedPlainEvent>>();
-        for (const event of eventsPerChunk.flat()) {
+        for (const event of eventsPerFilter.flatMap(({ right }) => right)) {
           const ofAuthor = eventsByAuthor.get(event.pubkey);
           if (ofAuthor === undefined) eventsByAuthor.set(event.pubkey, [event]);
           else ofAuthor.push(event);

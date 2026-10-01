@@ -39,7 +39,7 @@ Decoding kind 0 is tolerant: unknown fields are ignored, non-string values dropp
 
 ### Fetching
 
-`fetchProfile(pubkey)` and `fetchProfiles(pubkeys)` return the newest kind 0 and `d=general` status per pubkey, expired statuses excluded, as the same `ProfileUpdated` / `StatusUpdated` facts the watch emits. `discoverActiveProfiles(options?)` scans recent activity (kinds 0, 1, 6, 7, 9735 and 30315 within 45 days, 64 authors, unless overridden) and returns the authors' metadata. `searchProfiles(query, options?)` sends a NIP-50 `search` filter to `searchRelays` (the read relays when none are given) and streams ranked hits through `onHits` each time a relay answers, until `deadline` cuts off the slow tail; the returned value is the final ranking.
+`fetchProfile(pubkey)` and `fetchProfiles(pubkeys)` return the newest kind 0 and `d=general` status per pubkey, expired statuses excluded, as the same `ProfileUpdated` / `StatusUpdated` facts the watch emits. Fetches and the watch request kind 0 and kind 30315 in separate filters, so a relay that rejects one kind still serves the other. `discoverActiveProfiles(options?)` scans recent activity (kinds 0, 1, 6, 7, 9735 and 30315 within 45 days, 64 authors, unless overridden) and returns the authors' metadata. `searchProfiles(query, options?)` sends a NIP-50 `search` filter to `searchRelays` (the read relays when none are given) and streams ranked hits through `onHits` each time a relay answers, until `deadline` cuts off the slow tail; the returned value is the final ranking.
 
 ### Watching
 

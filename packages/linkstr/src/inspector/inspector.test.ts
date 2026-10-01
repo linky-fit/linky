@@ -364,7 +364,7 @@ describe("Inspector", () => {
       subscribe: () => Effect.die("subscribe not under test"),
       fetch: (relay, filter) =>
         Effect.suspend(() => {
-          expect(filter).toEqual({ kinds: [0, 30315], authors: [bob.pubkey] });
+          expect(filter.authors).toEqual([bob.pubkey]);
           return relay === relayA
             ? Effect.succeed([])
             : Effect.die("only relayA configured");

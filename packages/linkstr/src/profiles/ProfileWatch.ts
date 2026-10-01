@@ -5,7 +5,6 @@ import { NoReadRelaysConfigured } from "../domain/errors";
 import type { Pubkey, RelayUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { ProfileWatchRouted } from "../inspector/events";
-import { chunkAuthors } from "../internal/authorChunks";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { firstTagValue } from "../internal/nostrEvent";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
@@ -22,6 +21,7 @@ import {
 } from "./codec";
 import { ProfileEventDropped } from "./events";
 import type { ProfileDropReason, ProfileWatchEvent } from "./events";
+import { profileFilters } from "./filters";
 
 export interface ProfileWatchOptions {
   /** Base delay of the per-relay resubscribe backoff. */
@@ -31,8 +31,8 @@ export interface ProfileWatchOptions {
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
 
 /**
- * Long-lived profile subscription: `{ kinds: [0, 30315], authors }` filters
- * on every read relay for a fixed pubkey set, authors split at
+ * Long-lived profile subscription: one kind 0 and one kind 30315 filter per
+ * author chunk on every read relay for a fixed pubkey set, authors split at
  * `AUTHOR_FILTER_LIMIT` so no filter exceeds what relays accept. Newest-wins
  * per (pubkey, kind) — in-session only, so a lagging relay can never
  * downgrade what a faster one already delivered; kind 30315 tracks the
@@ -63,13 +63,8 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
           const resubscribeDelay =
             options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY;
 
-          const watched = new Set<string>(pubkeys);
-          const filters: Array<Filter> = chunkAuthors([...watched]).map(
-            (authors) => ({
-              kinds: [PROFILE_KIND, STATUS_KIND],
-              authors,
-            }),
-          );
+          const watched = new Set<Pubkey>(pubkeys);
+          const filters = profileFilters([...watched]);
           const rawEvents = yield* Effect.acquireRelease(
             Queue.unbounded<unknown>(),
             Queue.shutdown,

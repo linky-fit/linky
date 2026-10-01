@@ -89,7 +89,7 @@ const withWatch = <A>(
       Stream.runForEach(stream, (fact) => Effect.sync(() => facts.push(fact))),
     );
     const expectedSubscriptions =
-      Math.ceil(new Set(pubkeys).size / AUTHOR_FILTER_LIMIT) * 2;
+      Math.ceil(new Set(pubkeys).size / AUTHOR_FILTER_LIMIT) * 2 * 2;
     yield* eventually(() => subscriptions.length === expectedSubscriptions);
     return yield* body({ subscriptions, facts, inspected });
   }).pipe(
@@ -124,14 +124,14 @@ describe("ProfileWatch", () => {
   it("subscribes per relay and routes profile events newest-wins", () =>
     withWatch([alice.pubkey], ({ facts, inspected, subscriptions }) =>
       Effect.gen(function* () {
-        expect(subscriptions.map((s) => s.relay).sort()).toEqual([
-          relayA,
-          relayB,
-        ]);
-        expect(subscriptions[0]?.filter).toEqual({
-          kinds: [0, 30315],
-          authors: [alice.pubkey],
-        });
+        expect(
+          subscriptions.map(({ relay, filter }) => ({ relay, filter })),
+        ).toEqual(
+          [relayA, relayB].flatMap((relay) => [
+            { relay, filter: { kinds: [0], authors: [alice.pubkey] } },
+            { relay, filter: { kinds: [30315], authors: [alice.pubkey] } },
+          ]),
+        );
 
         const first = profileEvent(
           alice,
@@ -185,13 +185,18 @@ describe("ProfileWatch", () => {
       [alice.pubkey, ...extras.map((identity) => identity.pubkey)],
       ({ facts, subscriptions }) =>
         Effect.gen(function* () {
-          expect(subscriptions).toHaveLength(4);
+          expect(subscriptions).toHaveLength(8);
           for (const relay of [relayA, relayB]) {
             const authorCounts = subscriptions
               .filter((subscription) => subscription.relay === relay)
               .map((subscription) => subscription.filter.authors?.length ?? 0)
               .sort((a, b) => a - b);
-            expect(authorCounts).toEqual([1, AUTHOR_FILTER_LIMIT]);
+            expect(authorCounts).toEqual([
+              1,
+              1,
+              AUTHOR_FILTER_LIMIT,
+              AUTHOR_FILTER_LIMIT,
+            ]);
           }
 
           // An author from the overflow chunk still routes to a fact.

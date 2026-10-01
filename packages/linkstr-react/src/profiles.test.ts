@@ -63,11 +63,11 @@ describe("profileWatchAtom", () => {
     expect(subscriptions).toHaveLength(0);
 
     registry.set(watchedProfilesAtom, [bob.pubkey]);
-    await expect.poll(() => subscriptions.length).toBe(1);
-    expect(subscriptions[0]?.filter).toEqual({
-      kinds: [0, 30315],
-      authors: [bob.pubkey],
-    });
+    await expect.poll(() => subscriptions.length).toBe(2);
+    expect(subscriptions.map(({ filter }) => filter)).toEqual([
+      { kinds: [0], authors: [bob.pubkey] },
+      { kinds: [30315], authors: [bob.pubkey] },
+    ]);
 
     subscriptions[0]?.onEvent(
       profileEvent(bob, JSON.stringify({ name: "bob" }), base + 1),
@@ -84,9 +84,11 @@ describe("profileWatchAtom", () => {
     // Growing the set replaces the subscription without a runtime rebuild.
     registry.set(watchedProfilesAtom, [bob.pubkey, carol.pubkey]);
     await expect
-      .poll(() => subscriptions[0]?.filter.authors)
-      .toEqual([bob.pubkey, carol.pubkey]);
-    expect(subscriptions).toHaveLength(1);
+      .poll(() => subscriptions.map(({ filter }) => filter.authors))
+      .toEqual([
+        [bob.pubkey, carol.pubkey],
+        [bob.pubkey, carol.pubkey],
+      ]);
 
     unmount();
     await expect.poll(() => subscriptions.length).toBe(0);
