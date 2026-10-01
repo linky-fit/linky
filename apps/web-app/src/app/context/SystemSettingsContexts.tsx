@@ -2,7 +2,11 @@ import type { MintIcon } from "../../utils/mint";
 import type { ReceiveMethod } from "../../utils/receiveMethod";
 /* eslint-disable react-refresh/only-export-components */
 import type { LinkyScope } from "@linky-fit/linksync";
-import type { AutoswapEstimate, StoredProof } from "@linky-fit/linkshu";
+import type {
+  AutoswapEstimate,
+  StoredOperation,
+  StoredProof,
+} from "@linky-fit/linkshu";
 import React from "react";
 import type { EvoluErrorType, EvoluServerStatus } from "../../evolu";
 import type { ShardSummary } from "../hooks/useLinksync";
@@ -76,6 +80,8 @@ export interface MintSettingsContextValue {
   appOwnerIdRef: React.RefObject<string | null>;
   applyDefaultMintSelection: (mint: string) => Promise<boolean>;
   cashuIsBusy: boolean;
+  /** Pending `deferredReceive` operations without hidden test mints. */
+  cashuDeferredReceives: readonly StoredOperation[];
   cashuMeltToMainMintButtonLabel: string | null;
   /** Stored proofs without hidden test mints. */
   cashuProofs: readonly StoredProof[];

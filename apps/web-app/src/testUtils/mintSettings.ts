@@ -30,6 +30,7 @@ export const createMintSettings = (
   appOwnerIdRef,
   applyDefaultMintSelection: vi.fn(async () => true),
   cashuIsBusy: false,
+  cashuDeferredReceives: [],
   cashuMeltToMainMintButtonLabel: "Melt foreign balance",
   cashuProofs: [],
   defaultMintUrl: "https://cashu.cz",

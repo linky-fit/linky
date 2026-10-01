@@ -778,6 +778,9 @@ export const cs = {
   cashuAccepting: "Přijímám token…",
   cashuAccepted: "Token přijat.",
   cashuAcceptFailed: "Nepodařilo se přijmout token",
+  cashuReceiveDeferred:
+    "Mint je nedostupný. Token je uložený a přijme se, jakmile bude mint zase dostupný.",
+  mintPendingAmount: "{amount} čeká",
   cashuCheckToken: "Zkontrolovat token",
   cashuCheckAllTokens: "Zkontrolovat vše",
   cashuCheckIssuedTokens: "Zkontrolovat využité",

@@ -4,11 +4,14 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import {
+  Amount,
   CounterLockTimeout,
   CurrencyUnit,
   KeysetId,
   MintRejected,
   MintUrl,
+  OperationId,
+  ReceiveDeferred,
   ReceiveReceipt,
   TokenAlreadySpent,
   TokenParseFailed,
@@ -99,6 +102,15 @@ const draftAfterUpdates = (
   setCashuDraft.mock.calls.reduce(
     (draft, [next]) => (typeof next === "function" ? next(draft) : next),
     typed,
+  );
+
+const deferred: ReceiveCashuToken = async () =>
+  Either.left(
+    new ReceiveDeferred({
+      mint,
+      operationId: OperationId.make("AQEBAQEBAQEBAQEBAQEBAQ"),
+      amount: Amount.make(21),
+    }),
   );
 
 describe("useSaveCashuFromText", () => {
@@ -268,5 +280,20 @@ describe("useSaveCashuFromText", () => {
 
     expect(setStatus).not.toHaveBeenCalled();
     expect(logPaymentEvent).toHaveBeenCalledOnce();
+  });
+
+  it("tells the user a pasted token is kept while its mint is unreachable", async () => {
+    const { save, setStatus, setCashuDraft, logPaymentEvent } =
+      await setup(deferred);
+    const onResolved = vi.fn();
+
+    await save("cashuBdeferred", { onResolved });
+
+    // Left open: if linkshu's retry fails at the swap, the message's next
+    // auto-accept resumes the failed receive.
+    expect(onResolved).toHaveBeenCalledWith("transient");
+    expect(setStatus).toHaveBeenLastCalledWith("cashuReceiveDeferred");
+    expect(logPaymentEvent).not.toHaveBeenCalled();
+    expect(draftAfterUpdates(setCashuDraft, "cashuBdeferred")).toBe("");
   });
 });

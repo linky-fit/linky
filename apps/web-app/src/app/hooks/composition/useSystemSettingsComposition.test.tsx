@@ -87,6 +87,7 @@ const mintSettings: MintSettingsContextValue = {
   appOwnerIdRef,
   applyDefaultMintSelection: async () => true,
   cashuIsBusy: false,
+  cashuDeferredReceives: [],
   cashuMeltToMainMintButtonLabel: null,
   cashuProofs: [],
   defaultMintUrl: null,

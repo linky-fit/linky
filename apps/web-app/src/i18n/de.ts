@@ -781,6 +781,9 @@ export const de = {
   cashuAccepting: "Token wird angenommen…",
   cashuAccepted: "Token angenommen.",
   cashuAcceptFailed: "Token konnte nicht angenommen werden",
+  cashuReceiveDeferred:
+    "Die Mint ist nicht erreichbar. Der Token ist gespeichert und wird empfangen, sobald die Mint wieder erreichbar ist.",
+  mintPendingAmount: "{amount} ausstehend",
   cashuCheckToken: "Token prüfen",
   cashuCheckAllTokens: "Alle prüfen",
   cashuCheckIssuedTokens: "Eingelöste prüfen",

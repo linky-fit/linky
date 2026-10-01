@@ -3399,6 +3399,25 @@ button.mint-choice.is-selected:hover {
   font-size: 13px;
 }
 
+.mint-choice-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.mint-choice-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #fbbf24;
+}
+
+.mint-choice-pending svg {
+  width: 14px;
+  height: 14px;
+}
+
 .mint-choice-share {
   height: 4px;
   border-radius: 999px;

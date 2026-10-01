@@ -44,7 +44,7 @@ import type {
   PaymentTelemetryMethod,
 } from "../../types/appTypes";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
-import { nowSeconds } from "../../../utils/time";
+import { touchReceivingMint } from "../../lib/receivingMint";
 import { isHiddenTestMint } from "../../../utils/mint";
 import type { Translate } from "../../../i18n";
 import type {
@@ -176,15 +176,12 @@ export const useNpubCashClaim = ({
 }: UseNpubCashClaimParams) => {
   const announceReceived = React.useCallback(
     ({ amount, details, method, mint, operationId, unit }: ReceivedPayment) => {
-      const cleanedMint = mint.trim().replace(/\/+$/, "");
-      if (cleanedMint && !isMintDeleted(cleanedMint)) {
-        const nowSec = nowSeconds();
-        const existing = mintInfoByUrl.get(cleanedMint);
-        touchMintInfo(cleanedMint, nowSec);
-
-        const lastChecked = (existing?.lastCheckedAtSec ?? 0) || 0;
-        if (existing && !lastChecked) void refreshMintInfo(cleanedMint);
-      }
+      touchReceivingMint(mint, {
+        isMintDeleted,
+        mintInfoByUrl,
+        refreshMintInfo,
+        touchMintInfo,
+      });
 
       logPaymentEvent({
         direction: "in",
@@ -276,7 +273,12 @@ export const useNpubCashClaim = ({
 
           if (Either.isLeft(outcome)) {
             const error = outcome.left;
-            if (error._tag === "TokenAlreadyKnown") return;
+            // A deferred token is kept by linkshu and received on a later retry.
+            if (
+              error._tag === "TokenAlreadyKnown" ||
+              error._tag === "ReceiveDeferred"
+            )
+              return;
             const message = describeTaggedCashuError(error) ?? error._tag;
             logFailure(message);
             setStatus(`${t("cashuAcceptFailed")}: ${message}`);

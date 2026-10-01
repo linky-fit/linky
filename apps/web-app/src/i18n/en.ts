@@ -770,6 +770,9 @@ export const en = {
   cashuAccepting: "Accepting token…",
   cashuAccepted: "Token accepted.",
   cashuAcceptFailed: "Failed to accept token",
+  cashuReceiveDeferred:
+    "The mint is unreachable. The token is saved and will be received once the mint is back.",
+  mintPendingAmount: "{amount} pending",
   cashuCheckToken: "Check token",
   cashuCheckAllTokens: "Check all",
   cashuCheckIssuedTokens: "Check claimed",

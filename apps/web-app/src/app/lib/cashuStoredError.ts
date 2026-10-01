@@ -52,6 +52,8 @@ export const describeTaggedCashuError = (error: unknown): string | null => {
       return "Token already spent";
     case "MintUnreachable":
       return withDetail("Mint unreachable", detail);
+    case "ReceiveDeferred":
+      return "Mint unreachable, the token is kept for a retry";
     case "MintRejected":
       return withDetail("Mint rejected the token", detail);
     case "CounterLockTimeout":

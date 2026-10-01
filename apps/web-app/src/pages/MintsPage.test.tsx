@@ -1,7 +1,10 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
-import { createStoredProofFixture } from "../testUtils/cashuInventory";
+import {
+  createStoredProofFixture,
+  createTransferFixture,
+} from "../testUtils/cashuInventory";
 import { createMintSettings } from "../testUtils/mintSettings";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { MintsPage } from "./MintsPage";
@@ -116,6 +119,45 @@ describe("MintsPage", () => {
       { text: "75 sat", share: "75%" },
       { text: "25 sat", share: "25%" },
     ]);
+    await unmount();
+  });
+
+  it("lists a token waiting for its mint as pending, apart from the balance", async () => {
+    mintSettings = createMintSettings({
+      cashuProofs: [
+        createStoredProofFixture({ mint: "https://cashu.cz", amount: 40 }),
+      ],
+      cashuDeferredReceives: [
+        createTransferFixture({
+          kind: "deferredReceive",
+          status: "pending",
+          mint: "https://cashu.cz",
+          amount: 21,
+        }),
+        createTransferFixture({
+          id: "AgICAgICAgICAgICAgICAg",
+          kind: "deferredReceive",
+          status: "pending",
+          mint: "https://offline.example",
+          amount: 5,
+        }),
+      ],
+    });
+
+    const { container, unmount } = await renderIntoDocument(<MintsPage />);
+    const holdingOf = (mint: string) =>
+      Array.from(container.querySelectorAll(".mint-choice-item"))
+        .find((item) => item.textContent?.includes(mint))
+        ?.querySelector(".mint-choice-holding");
+
+    const funded = holdingOf("cashu.cz");
+    expect(funded?.querySelector(".muted")?.textContent).toBe("40 sat");
+    expect(funded?.querySelector(".mint-choice-pending")?.textContent).toBe(
+      "mintPendingAmount",
+    );
+    const offline = holdingOf("offline.example");
+    expect(offline?.querySelector(".mint-choice-share")).toBeNull();
+    expect(offline?.querySelector(".mint-choice-pending")).not.toBeNull();
     await unmount();
   });
 

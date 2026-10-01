@@ -153,7 +153,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   ProofsChanged:
     "A batch of stored proofs moved to a new state inside linkshu (e.g. available → spent, (new) → handedOut); the reason names the operation that caused it, the operation link points at the melt or send holding them. Amounts and counts only — the proofs themselves never travel.",
   OperationChanged:
-    "A stored operation (melt, topup, autoswap, send, receive) changed status; the reason names what caused it. Follow the operation link to the proofs it holds and the operation rows around it.",
+    "A stored operation (melt, topup, autoswap, send, receive, deferredReceive) changed status; the reason names what caused it. Follow the operation link to the proofs it holds and the operation rows around it.",
   CounterAdvanced:
     "linkshu moved a deterministic derivation counter (NUT-13) for one mint/unit/keyset — the audit trail for output derivation and collision recovery.",
   QuoteStateChanged:
@@ -174,6 +174,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "linkshu asked the mint about one persisted unsettled melt (a payment that stayed PENDING or whose response was lost). The result says what happened: paid (change reclaimed, reserved inputs dropped), unpaid (inputs back in balance), pending (left alone), or a failure when the mint gave no usable answer. Row and quote links tie it to the original melt.melt and its lifecycle rows.",
   "melt.resumePending":
     "One pass over every persisted unsettled melt, run when the wallet runtime comes up and when the browser comes back online; the payload lists each record's outcome.",
+  "receive.resume":
+    "linkshu retried one token kept because its mint could not be loaded or asked (a deferredReceive). A result with status received means it landed in the balance; status pending means the mint still cannot be used: nothing was written and the token stays kept. TokenAlreadyKnown, a TokenAlreadySpent from the state check, AmountConsumedByFee or TokenParseFailed close the deferral. A MintUnreachable, MintRejected or TokenAlreadySpent from the swap means the receive was already written: the deferral closed and the failed receive carries the token from here, retried quietly at the next launch when the failure was transient.",
+  "receive.resumeDeferred":
+    "One pass over every kept token whose mint could not be used, run when the wallet runtime comes up, when the browser comes back online, and on a backoff while tokens wait; the payload lists each deferral's outcome (received, closed, failed when its swap failed and a failed receive took it over, pending when the mint still cannot be used).",
+  "receive.resumeDeferredRejected":
+    "A receive.resumeDeferred pass ended with an error instead of a result, usually because the wallet runtime shut down mid-pass. Nothing about the kept tokens changed beyond what earlier rows show; the next pass retries them.",
   "melt.historyResolved":
     "The app updated a pending Lightning payment in the transaction history after melt.resume settled it — to paid (amount and fee) or failed. The quote link connects it to the melt rows.",
   "send.rowForgotten":

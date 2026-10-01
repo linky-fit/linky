@@ -80,6 +80,7 @@ import { useCashuTokenChecks } from "../cashu/useCashuTokenChecks";
 import { useNpubCashClaim } from "../cashu/useNpubCashClaim";
 import { useRestoreMissingTokens } from "../cashu/useRestoreMissingTokens";
 import { useSaveCashuFromText } from "../cashu/useSaveCashuFromText";
+import { useDeferredReceiveRetry } from "../cashu/useDeferredReceiveRetry";
 import { normalizePubkeyHex } from "../messages/contactIdentity";
 import { useNpubCashMintSelection } from "../mint/useNpubCashMintSelection";
 import { useCashuPaymentRequestConfirmation } from "../payments/useCashuPaymentRequestConfirmation";
@@ -100,9 +101,10 @@ import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
 import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import {
-  isInterruptedReceive,
   isIssuedTransfer,
   isOpenTransfer,
+  isPendingDeferredReceive,
+  takenTokenTexts,
 } from "../../lib/cashuTransfers";
 import {
   canOfferPaymentMintMelt,
@@ -520,12 +522,14 @@ export const useCashuWalletComposition = ({
     receiveCashuToken,
     restoreCashuTokens,
     reclaimCashuTokens,
+    resumeDeferredCashuReceives,
     resumePendingCashuAutoswapClaims,
     resumePendingCashuMelts,
     resumePendingCashuTopups,
     sendCashuToken,
     startCashuTopup,
     walletBalances,
+    walletDeferredReceives,
     walletLoaded,
     walletOperations,
     walletProofs,
@@ -2325,6 +2329,22 @@ export const useCashuWalletComposition = ({
     transactions,
   });
 
+  useDeferredReceiveRetry({
+    // Hidden test-mint deferrals are retried too, so they keep the backoff running.
+    deferredCount: walletOperations.filter(isPendingDeferredReceive).length,
+    enqueueCashuOp,
+    formatDisplayedAmountParts,
+    isMintDeleted,
+    logPaymentEvent,
+    mintInfoByUrl,
+    refreshMintInfo,
+    rememberCashuTokenKnown,
+    resumeDeferredCashuReceives,
+    showPaidOverlay,
+    t,
+    touchMintInfo,
+  });
+
   const requestSelectedContact = React.useCallback(async () => {
     if (route.kind !== "contactPay") return;
     if (!selectedContact) return;
@@ -2466,13 +2486,8 @@ export const useCashuWalletComposition = ({
   );
 
   const knownTransferTexts = React.useMemo(
-    () =>
-      new Set(
-        walletTransfers
-          .filter((transfer) => !isInterruptedReceive(transfer))
-          .map((transfer) => transfer.tokenText),
-      ),
-    [walletTransfers],
+    () => takenTokenTexts(walletTransfers, walletOperations),
+    [walletOperations, walletTransfers],
   );
   const getCashuTokenMessageInfo = React.useCallback(
     (text: string) =>
@@ -2532,6 +2547,7 @@ export const useCashuWalletComposition = ({
     cashuIsBusy,
     cashuMeltToMainMintButtonLabel,
     cashuOpenTransfers,
+    cashuDeferredReceives: walletDeferredReceives,
     cashuProofs: walletProofs,
     cashuOperations: walletOperations,
     cashuTokensHydratedRef,

@@ -32,13 +32,14 @@ interface StoredOperationInput {
   amount?: number;
   error?: string | null;
   id?: string;
-  kind?: "send" | "receive";
+  kind?: "send" | "receive" | "deferredReceive";
   mint?: string;
   status?: StoredOperation["status"];
   tokenText?: string;
+  unit?: string;
 }
 
-/** A `send` or `receive` transfer operation. */
+/** A `send` or `receive` transfer, or a `deferredReceive`. */
 export const createTransferFixture = (
   input: StoredOperationInput = {},
 ): StoredOperation =>
@@ -47,7 +48,7 @@ export const createTransferFixture = (
     kind: input.kind ?? "send",
     status: input.status ?? "issued",
     mint: input.mint ?? "https://mint.example",
-    unit: "sat",
+    unit: input.unit ?? "sat",
     keysetId: null,
     amount: input.amount ?? 100,
     feeReserve: null,

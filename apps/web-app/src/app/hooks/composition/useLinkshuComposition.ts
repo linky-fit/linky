@@ -32,6 +32,7 @@ import type {
   AutoswapEstimateError,
   AutoswapReceipt,
   Bip39Seed,
+  DeferredReceiveResult,
   FeeProbeError,
   ImportProofDraft,
   InvalidTransferTransition,
@@ -69,6 +70,7 @@ import { Effect, Exit, Layer, ManagedRuntime, Schema, Scope } from "effect";
 import type { Either } from "effect";
 import React from "react";
 import { linkshuAppInspector } from "../../../devtools/inspector/linkshuInspector";
+import { isShownDeferredReceive } from "../../lib/cashuTransfers";
 import {
   visibleWalletBalances,
   withoutHiddenTestMints,
@@ -135,6 +137,11 @@ interface MeltCashuInvoiceArgs {
 export type MeltCashuInvoice = (
   args: MeltCashuInvoiceArgs,
 ) => Promise<Either.Either<MeltReceipt, MeltError>>;
+
+/** Retries tokens kept for an unreachable mint (linkshu `Receive.resumeDeferred`). */
+export type ResumeDeferredCashuReceives = () => Promise<
+  ReadonlyArray<DeferredReceiveResult>
+>;
 
 /** Settles persisted unsettled melts (linkshu `Melt.resumePending`). */
 export type ResumePendingCashuMelts = () => Promise<
@@ -440,6 +447,9 @@ export const useLinkshuComposition = ({
         ),
       );
 
+    const resumeDeferredCashuReceives: ResumeDeferredCashuReceives = () =>
+      run(Effect.flatMap(Receive, (receive) => receive.resumeDeferred));
+
     const sendCashuToken: SendCashuToken = ({ amountSat, mint, produceAs }) =>
       runEither(
         Effect.suspend(() => {
@@ -662,6 +672,7 @@ export const useLinkshuComposition = ({
       receiveCashuToken,
       restoreCashuTokens,
       reclaimCashuTokens,
+      resumeDeferredCashuReceives,
       resumePendingCashuAutoswapClaims,
       resumePendingCashuMelts,
       resumePendingCashuTopups,
@@ -677,6 +688,14 @@ export const useLinkshuComposition = ({
   const walletProofs = React.useMemo(
     () => withoutHiddenTestMints(readModel.model.proofs, allowTestMints),
     [allowTestMints, readModel.model.proofs],
+  );
+  const walletDeferredReceives = React.useMemo(
+    () =>
+      withoutHiddenTestMints(
+        readModel.model.operations.filter(isShownDeferredReceive),
+        allowTestMints,
+      ),
+    [allowTestMints, readModel.model.operations],
   );
 
   return {
@@ -694,6 +713,8 @@ export const useLinkshuComposition = ({
     receiveCashuToken: operations?.receiveCashuToken ?? null,
     restoreCashuTokens: operations?.restoreCashuTokens ?? null,
     reclaimCashuTokens: operations?.reclaimCashuTokens ?? null,
+    resumeDeferredCashuReceives:
+      operations?.resumeDeferredCashuReceives ?? null,
     resumePendingCashuAutoswapClaims:
       operations?.resumePendingCashuAutoswapClaims ?? null,
     resumePendingCashuMelts: operations?.resumePendingCashuMelts ?? null,
@@ -701,6 +722,8 @@ export const useLinkshuComposition = ({
     sendCashuToken: operations?.sendCashuToken ?? null,
     startCashuTopup: operations?.startCashuTopup ?? null,
     walletBalances,
+    /** Sat tokens kept for an unreachable mint, without hidden test mints. */
+    walletDeferredReceives,
     /** True once the first inventory read answered; false shows as an empty wallet. */
     walletLoaded: readModel.loaded,
     walletOperations: readModel.model.operations,

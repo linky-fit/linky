@@ -1,4 +1,4 @@
-import { CirclePlus } from "lucide-react";
+import { CirclePlus, Clock } from "lucide-react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
@@ -16,18 +16,23 @@ import {
 } from "../utils/mint";
 
 export function MintsPage() {
-  const { allowTestMints, cashuProofs, defaultMintUrl, getMintIconUrl } =
-    useMintSettingsContext();
+  const {
+    allowTestMints,
+    cashuDeferredReceives,
+    cashuProofs,
+    defaultMintUrl,
+    getMintIconUrl,
+  } = useMintSettingsContext();
   const { formatDisplayedAmountText, t } = useAppShellCore();
   const selectedMint =
     normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) || MAIN_MINT_URL;
 
-  const holdings = mintHoldings(cashuProofs);
+  const holdings = mintHoldings(cashuProofs, cashuDeferredReceives);
   const buttonMints = (() => {
     const set = new Set<string>(PRESET_MINTS.map(normalizeMintUrl));
     if (selectedMint) set.add(selectedMint);
     for (const [mint, holding] of holdings) {
-      if (holding.balance > 0) set.add(mint);
+      if (holding.balance > 0 || holding.pending > 0) set.add(mint);
     }
     return Array.from(set.values()).filter(
       (mint) => !isHiddenTestMint(mint, allowTestMints),
@@ -41,17 +46,32 @@ export function MintsPage() {
   );
 
   const renderHolding = (mint: string) => {
-    const { balance } = holdingOf(holdings, mint);
-    if (balance <= 0) return null;
+    const { balance, pending } = holdingOf(holdings, mint);
+    if (balance <= 0 && pending <= 0) return null;
     return (
       <div className="mint-choice-holding">
-        <span className="muted">{formatDisplayedAmountText(balance)}</span>
-        <div className="mint-choice-share" aria-hidden="true">
-          <span
-            className="mint-choice-share-fill"
-            style={{ width: `${(balance / listedBalance) * 100}%` }}
-          />
+        <div className="mint-choice-amounts">
+          {balance > 0 ? (
+            <span className="muted">{formatDisplayedAmountText(balance)}</span>
+          ) : null}
+          {pending > 0 ? (
+            <span className="mint-choice-pending">
+              <Clock aria-hidden="true" />
+              {t("mintPendingAmount").replace(
+                "{amount}",
+                formatDisplayedAmountText(pending),
+              )}
+            </span>
+          ) : null}
         </div>
+        {balance > 0 ? (
+          <div className="mint-choice-share" aria-hidden="true">
+            <span
+              className="mint-choice-share-fill"
+              style={{ width: `${(balance / listedBalance) * 100}%` }}
+            />
+          </div>
+        ) : null}
       </div>
     );
   };

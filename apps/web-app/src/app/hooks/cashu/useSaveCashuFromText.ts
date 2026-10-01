@@ -16,7 +16,7 @@ import {
 } from "../../lib/cashuStoredError";
 import { isUnknownContactId } from "../messages/contactIdentity";
 import type { ReceiveCashuToken } from "../composition/useLinkshuComposition";
-import { nowSeconds } from "../../../utils/time";
+import { touchReceivingMint } from "../../lib/receivingMint";
 import { isHiddenTestMint } from "../../../utils/mint";
 import type { Translate } from "../../../i18n";
 
@@ -178,12 +178,20 @@ export const useSaveCashuFromText = ({
           if (Either.isLeft(outcome)) {
             const error = outcome.left;
             // The caller uses this to stop (or keep) auto-retrying the message
-            // that carried the token.
-            const isTerminal = !isTransientCashuErrorTag(error._tag);
+            // that carried the token. A deferred token stays open: when
+            // linkshu's retry fails at the swap, receiving the text again
+            // resumes that receive.
+            const isTerminal =
+              error._tag !== "ReceiveDeferred" &&
+              !isTransientCashuErrorTag(error._tag);
             options?.onResolved?.(isTerminal ? "terminal" : "transient");
             if (error._tag === "TokenAlreadyKnown") {
               report(t("cashuExists"));
               navigateAfterSave(options);
+              return;
+            }
+            if (error._tag === "ReceiveDeferred") {
+              report(t("cashuReceiveDeferred"));
               return;
             }
             if (!isTerminal) restoreDraftForRetry();
@@ -199,15 +207,12 @@ export const useSaveCashuFromText = ({
           rememberCashuTokenKnown(tokenRaw, receipt.tokenText);
           options?.onResolved?.("terminal");
 
-          const cleanedMint = receipt.mint.trim().replace(/\/+$/, "");
-          if (cleanedMint && !isMintDeleted(cleanedMint)) {
-            const nowSec = nowSeconds();
-            const existing = mintInfoByUrl.get(cleanedMint);
-            touchMintInfo(cleanedMint, nowSec);
-
-            const lastChecked = (existing?.lastCheckedAtSec ?? 0) || 0;
-            if (existing && !lastChecked) void refreshMintInfo(cleanedMint);
-          }
+          touchReceivingMint(receipt.mint, {
+            isMintDeleted,
+            mintInfoByUrl,
+            refreshMintInfo,
+            touchMintInfo,
+          });
 
           logPaymentEvent({
             direction: "in",
