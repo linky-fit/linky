@@ -126,6 +126,7 @@ export interface AppShellCoreContextValue {
   scanIsOpen: boolean;
   scanVideoRef: React.RefObject<HTMLVideoElement | null>;
   shareOptionsText: string | null;
+  showHiddenTransactions: boolean;
   showProfileQrOnTiltEnabled: boolean;
   t: Translate;
   topbar: TopbarButton | null;

@@ -312,7 +312,7 @@ export const de = {
   transactionFailed: "fehlgeschlagen",
   transactionDuplicate: "Duplikat",
   transactionReturned: "zurückgeholt",
-  transactionsShowHidden: "Ausgeblendete Transaktionen anzeigen ({count})",
+  transactionsShowHidden: "Ausgeblendete Transaktionen anzeigen",
   transactionsHideHidden:
     "Fehlgeschlagene und doppelte Transaktionen ausblenden",
   transactionReceivedFromContact: "Von Kontakt erhalten",

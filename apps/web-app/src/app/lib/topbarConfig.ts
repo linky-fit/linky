@@ -19,12 +19,14 @@ interface BuildTopbarArgs extends BackActionContext {
 interface BuildTopbarRightArgs {
   chatEditContactId: ContactId | null;
   contactsFilterIsActive: boolean;
+  hiddenTransactionsShown: boolean;
   isProfileEditing: boolean;
   openReceiveScan: () => void;
   openScan: () => void;
   route: Route;
   t: Translate;
   toggleContactsFilter: () => void;
+  toggleHiddenTransactions: () => void;
   toggleMenu: () => void;
 }
 
@@ -242,12 +244,14 @@ const SHOWS_MENU_BUTTON: Record<
 export const buildTopbarRight = ({
   chatEditContactId,
   contactsFilterIsActive,
+  hiddenTransactionsShown,
   isProfileEditing,
   openReceiveScan,
   openScan,
   route,
   t,
   toggleContactsFilter,
+  toggleHiddenTransactions,
   toggleMenu,
 }: BuildTopbarRightArgs): TopbarButton | null => {
   if (route.kind === "contacts") {
@@ -256,6 +260,19 @@ export const buildTopbarRight = ({
       isActive: contactsFilterIsActive,
       label: t("contactsFilterToggle"),
       onClick: toggleContactsFilter,
+    };
+  }
+
+  if (route.kind === "transactions") {
+    return {
+      icon: "hidden",
+      isActive: hiddenTransactionsShown,
+      label: t(
+        hiddenTransactionsShown
+          ? "transactionsHideHidden"
+          : "transactionsShowHidden",
+      ),
+      onClick: toggleHiddenTransactions,
     };
   }
 

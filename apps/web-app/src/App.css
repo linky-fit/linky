@@ -3618,27 +3618,6 @@ button.danger {
   color: rgba(203, 213, 225, 0.92);
 }
 
-.transactions-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 4px;
-}
-
-.transactions-hidden-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border: none;
-  background: transparent;
-  color: rgba(148, 163, 184, 0.84);
-  font-size: 12px;
-}
-
-.transactions-hidden-toggle.is-active {
-  color: #99f6e4;
-}
-
 .transactions-list {
   display: flex;
   flex-direction: column;

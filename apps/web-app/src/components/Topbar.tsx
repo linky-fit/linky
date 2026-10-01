@@ -1,4 +1,6 @@
 import {
+  Eye,
+  EyeOff,
   Filter as FilterIcon,
   Pencil as EditIcon,
   ScanLine,
@@ -127,6 +129,12 @@ export function Topbar({
                 <ScanLine size={20} />
               ) : topbarRight.icon === "filter" ? (
                 <FilterIcon size={20} />
+              ) : topbarRight.icon === "hidden" ? (
+                topbarRight.isActive ? (
+                  <Eye size={20} />
+                ) : (
+                  <EyeOff size={20} />
+                )
               ) : (
                 topbarRight.icon
               )}

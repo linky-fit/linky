@@ -1222,17 +1222,24 @@ export const useAppShellComposition = ({
       : null;
   const contactsFilterIsActive =
     contactsSearch.trim() !== "" || activeGroup !== null;
+  const [showHiddenTransactions, setShowHiddenTransactions] =
+    React.useState(false);
+  const toggleHiddenTransactions = React.useCallback(() => {
+    setShowHiddenTransactions((shown) => !shown);
+  }, []);
   const topbarRight = React.useMemo(
     () =>
       buildTopbarRight({
         chatEditContactId,
         contactsFilterIsActive,
+        hiddenTransactionsShown: showHiddenTransactions,
         isProfileEditing,
         openReceiveScan,
         openScan,
         route,
         t,
         toggleContactsFilter,
+        toggleHiddenTransactions,
         toggleMenu,
       }),
     [
@@ -1242,8 +1249,10 @@ export const useAppShellComposition = ({
       openReceiveScan,
       openScan,
       route,
+      showHiddenTransactions,
       t,
       toggleContactsFilter,
+      toggleHiddenTransactions,
       toggleMenu,
     ],
   );
@@ -1741,6 +1750,7 @@ export const useAppShellComposition = ({
       scanImageInputRef,
       scanIsOpen,
       shareOptionsText,
+      showHiddenTransactions,
       showProfileQrOnTiltEnabled,
       scanVideoRef,
       t,
@@ -1817,6 +1827,7 @@ export const useAppShellComposition = ({
       scanVideoRef,
       selectedProfileStatusCurrencies,
       shareOptionsText,
+      showHiddenTransactions,
       showProfileQrOnTiltEnabled,
       profileShareOverlayIsOpen,
       t,

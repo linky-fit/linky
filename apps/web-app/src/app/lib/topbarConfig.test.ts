@@ -166,11 +166,13 @@ describe("buildTopbarRight", () => {
     const args = {
       chatEditContactId: null,
       contactsFilterIsActive: false,
+      hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
       openScan: vi.fn(),
       t: (key: string) => key,
       toggleContactsFilter: vi.fn(),
+      toggleHiddenTransactions: vi.fn(),
       toggleMenu: vi.fn(),
     };
     const button = buildTopbarRight({
@@ -198,12 +200,14 @@ describe("buildTopbarRight", () => {
     const button = buildTopbarRight({
       chatEditContactId: null,
       contactsFilterIsActive: false,
+      hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan,
       openScan: vi.fn(),
       route: { kind: "topup" },
       t: (key) => key,
       toggleContactsFilter: vi.fn(),
+      toggleHiddenTransactions: vi.fn(),
       toggleMenu: vi.fn(),
     });
 
@@ -218,12 +222,14 @@ describe("buildTopbarRight", () => {
     const button = buildTopbarRight({
       chatEditContactId: null,
       contactsFilterIsActive: true,
+      hiddenTransactionsShown: false,
       isProfileEditing: false,
       openReceiveScan: vi.fn(),
       openScan: vi.fn(),
       route: { kind: "contacts" },
       t: (key) => key,
       toggleContactsFilter,
+      toggleHiddenTransactions: vi.fn(),
       toggleMenu: vi.fn(),
     });
 
@@ -232,6 +238,32 @@ describe("buildTopbarRight", () => {
     expect(button?.icon).toBe("filter");
     expect(button?.isActive).toBe(true);
     expect(toggleContactsFilter).toHaveBeenCalledOnce();
+  });
+
+  it("toggles hidden rows from the transactions page", () => {
+    const toggleHiddenTransactions = vi.fn();
+    const button = buildTopbarRight({
+      chatEditContactId: null,
+      contactsFilterIsActive: false,
+      hiddenTransactionsShown: true,
+      isProfileEditing: false,
+      openReceiveScan: vi.fn(),
+      openScan: vi.fn(),
+      route: { kind: "transactions" },
+      t: (key) => key,
+      toggleContactsFilter: vi.fn(),
+      toggleHiddenTransactions,
+      toggleMenu: vi.fn(),
+    });
+
+    button?.onClick();
+
+    expect(button).toMatchObject({
+      icon: "hidden",
+      isActive: true,
+      label: "transactionsHideHidden",
+    });
+    expect(toggleHiddenTransactions).toHaveBeenCalledOnce();
   });
 });
 

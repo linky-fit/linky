@@ -7,7 +7,7 @@ import {
   buildTransactionHistory,
   deriveDeclinedRequestIds,
 } from "../app/lib/transactionHistory";
-import { Copy as CompactCopyIcon, Eye, EyeOff } from "lucide-react";
+import { Copy as CompactCopyIcon } from "lucide-react";
 import React from "react";
 import {
   useAppShellActions,
@@ -303,8 +303,13 @@ const TransactionCardView = ({
 const TransactionCard = React.memo(TransactionCardView);
 
 export function TransactionsPage(): React.ReactElement {
-  const { formatDisplayedAmountText, lang, nostrPictureByNpub, t } =
-    useAppShellCore();
+  const {
+    formatDisplayedAmountText,
+    lang,
+    nostrPictureByNpub,
+    showHiddenTransactions,
+    t,
+  } = useAppShellCore();
   const { copyText } = useAppShellActions();
   const [expandedById, setExpandedById] = React.useState<
     Record<string, boolean>
@@ -348,21 +353,16 @@ export function TransactionsPage(): React.ReactElement {
     return byId;
   }, [contactRows]);
 
-  const [showHidden, setShowHidden] = React.useState(false);
   const { fulfilledRequestIds, transactions: allTransactions } = React.useMemo(
     () => buildTransactionHistory(transactionRecords, cashuOperations),
     [cashuOperations, transactionRecords],
   );
-  const hiddenCount = React.useMemo(
-    () => allTransactions.filter((item) => item.hiddenReason !== null).length,
-    [allTransactions],
-  );
   const transactions = React.useMemo(
     () =>
-      showHidden
+      showHiddenTransactions
         ? allTransactions
         : allTransactions.filter((item) => item.hiddenReason === null),
-    [allTransactions, showHidden],
+    [allTransactions, showHiddenTransactions],
   );
 
   const declinedRequestIds = React.useMemo(
@@ -663,27 +663,8 @@ export function TransactionsPage(): React.ReactElement {
     }));
   }, []);
 
-  const hiddenToggleLabel = showHidden
-    ? t("transactionsHideHidden")
-    : t("transactionsShowHidden").replace("{count}", String(hiddenCount));
-
   return (
     <section className="panel panel-plain transactions-page">
-      {hiddenCount > 0 ? (
-        <div className="transactions-toolbar">
-          <button
-            type="button"
-            className={`transactions-hidden-toggle${showHidden ? " is-active" : ""}`}
-            onClick={() => setShowHidden((value) => !value)}
-            aria-label={hiddenToggleLabel}
-            aria-pressed={showHidden}
-            title={hiddenToggleLabel}
-          >
-            {showHidden ? <Eye size={16} /> : <EyeOff size={16} />}
-            <span>{hiddenCount}</span>
-          </button>
-        </div>
-      ) : null}
       {transactions.length === 0 ? (
         <p className="muted">{t("paymentsHistoryEmpty")}</p>
       ) : (
