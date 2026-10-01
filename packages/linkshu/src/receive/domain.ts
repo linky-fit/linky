@@ -23,6 +23,14 @@ export class ReceiveDraft extends Schema.Class<ReceiveDraft>("ReceiveDraft")({
    * cashu: schemes, URLs, and legacy JSON before receiving it.
    */
   text: Schema.NonEmptyString,
+  /**
+   * True when nobody asked for this receive (a message replayed on a
+   * device, a token found while syncing): a text whose deferred receive was
+   * closed (received, discarded with `Tokens.forget`, or failed) is then
+   * `TokenAlreadyKnown`, so a discarded token stays discarded on every
+   * device that has synced it. An explicit receive takes it in again.
+   */
+  automatic: Schema.optionalWith(Schema.Boolean, { default: () => false }),
 }) {}
 
 export class ReceiveReceipt extends Schema.Class<ReceiveReceipt>(

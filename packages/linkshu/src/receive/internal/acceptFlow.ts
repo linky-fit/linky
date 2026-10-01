@@ -70,6 +70,7 @@ import {
   toDomainProofs,
 } from "../../token/internal/cashuProofs";
 import { ReceiveError, ReceiveReceipt } from "../domain";
+import type { ReceiveDraft } from "../domain";
 
 const MAX_SWAP_ATTEMPTS = 5;
 /** Fallback bump (one output block) when restore cannot locate the collision. */
@@ -578,7 +579,9 @@ const isFailedReceive = (operation: StoredOperation): boolean =>
  * Dedup: the text is known when a transfer carries it, or when any of its
  * proofs is already in the inventory — a token whose proofs the wallet
  * holds must not be swapped a second time, or the stored copies die. A
- * failed receive holds nothing, so its text is free to be tried again.
+ * failed receive holds nothing, so its text is free to be tried again. To
+ * an automatic receive that resumes nothing, a text whose deferral was
+ * closed is known too.
  */
 const findKnown = (
   operations: ReadonlyArray<StoredOperation>,
@@ -587,7 +590,20 @@ const findKnown = (
   replaced: StoredOperation | null,
   /** The token's proofs, when the text decodes. */
   decoded: DecodedToken | null,
+  automatic: boolean,
 ): TokenAlreadyKnown | null => {
+  const closedDeferral =
+    automatic && replaced === null
+      ? operations.find(
+          (operation) =>
+            operation.kind === "deferredReceive" &&
+            operation.tokenText === tokenText &&
+            operation.status !== "pending",
+        )
+      : undefined;
+  if (closedDeferral !== undefined) {
+    return new TokenAlreadyKnown({ operationId: closedDeferral.id });
+  }
   const transfer = operations.find(
     (operation) =>
       isTransfer(operation) &&
@@ -733,12 +749,12 @@ export const closeDeferral = (
 
 /**
  * Where a received text comes from: pasted or carried by a message
- * (`fresh`), a transfer being taken back or retried (`replaced`), or a
- * deferral being retried (`deferred`), whose `recorded` turns true once its
- * receive is written.
+ * (`fresh`, `automatic` when nobody asked for it), a transfer being taken
+ * back or retried (`replaced`), or a deferral being retried (`deferred`),
+ * whose `recorded` turns true once its receive is written.
  */
 type Origin =
-  | { readonly _tag: "fresh" }
+  | { readonly _tag: "fresh"; readonly automatic: boolean }
   | { readonly _tag: "replaced"; readonly replaced: ReplacedTransfer }
   | {
       readonly _tag: "deferred";
@@ -748,6 +764,9 @@ type Origin =
 
 const replacedOf = (origin: Origin): ReplacedTransfer | null =>
   origin._tag === "replaced" ? origin.replaced : null;
+
+const isAutomatic = (origin: Origin): boolean =>
+  origin._tag === "fresh" && origin.automatic;
 
 /**
  * Keeps a fresh token whose mint cannot be used under a `deferredReceive`,
@@ -760,6 +779,7 @@ const deferReceive = (
   ctx: ReceiveContext,
   parsed: ReceivableToken,
   error: MintUnreachable | MintRejected,
+  automatic: boolean,
 ): Effect.Effect<
   never,
   ReceiveDeferred | TokenAlreadyKnown | MintUnreachable | MintRejected
@@ -775,6 +795,7 @@ const deferReceive = (
       parsed.tokenText,
       null,
       decodeTokenText(parsed.tokenText),
+      automatic,
     );
     if (known !== null) return yield* known;
     const deferral =
@@ -805,7 +826,7 @@ const whenMintUnusable =
   > => {
     switch (origin._tag) {
       case "fresh":
-        return deferReceive(ctx, parsed, error);
+        return deferReceive(ctx, parsed, error, origin.automatic);
       case "deferred":
         return new ReceiveDeferred({
           mint: parsed.mint,
@@ -888,6 +909,7 @@ const dedup = (
       parsed.tokenText,
       reopened,
       decoded,
+      isAutomatic(origin),
     );
     if (known !== null) return yield* known;
     return { reopened, proofs };
@@ -1156,17 +1178,20 @@ const receiveFrom = (
     receiveParsed(ctx, parsed, origin).pipe(withReceiveLock(ctx.kv, parsed)),
   );
 
-/** Receives pasted or message-borne text, or takes back `replaced`. */
-export const receiveTokenText = (
+/** Receives pasted or message-borne text. */
+export const receiveDraft = (
+  ctx: ReceiveContext,
+  draft: ReceiveDraft,
+): Effect.Effect<ReceiveReceipt, ReceiveError> =>
+  receiveFrom(ctx, draft.text, { _tag: "fresh", automatic: draft.automatic });
+
+/** Takes back or retries `replaced` by receiving its text again. */
+export const receiveReplaced = (
   ctx: ReceiveContext,
   text: string,
-  replaced: ReplacedTransfer | null,
+  replaced: ReplacedTransfer,
 ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
-  receiveFrom(
-    ctx,
-    text,
-    replaced === null ? { _tag: "fresh" } : { _tag: "replaced", replaced },
-  );
+  receiveFrom(ctx, text, { _tag: "replaced", replaced });
 
 /**
  * Receives a pending deferral's text; `recorded` turns true once its

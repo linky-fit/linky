@@ -304,7 +304,9 @@ export const useNpubCashClaim = ({
         try {
           // Left in the inbox: turning test mints back on receives it.
           if (isHiddenTestMint(parsedMint, allowTestMints)) return false;
-          const outcome = await receiveCashuToken(tokenRaw);
+          const outcome = await receiveCashuToken(tokenRaw, {
+            automatic: true,
+          });
 
           if (Either.isLeft(outcome)) {
             const error = outcome.left;

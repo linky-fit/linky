@@ -112,9 +112,13 @@ const emptyReadModel: LinkshuReadModel = {
 const sameSeed = (a: Bip39Seed, b: Bip39Seed): boolean =>
   a.length === b.length && a.every((byte, index) => byte === b[index]);
 
-/** linkshu Receive; resolves with the typed outcome, only defects reject. */
+/**
+ * linkshu Receive; resolves with the typed outcome, only defects reject.
+ * `automatic` when the app, not the user, started it.
+ */
 export type ReceiveCashuToken = (
   text: string,
+  options?: { readonly automatic?: boolean },
 ) => Promise<Either.Either<ReceiveReceipt, ReceiveError>>;
 
 interface SendCashuTokenArgs {
@@ -443,10 +447,12 @@ export const useLinkshuComposition = ({
       return { quote: handle.quote, completion };
     };
 
-    const receiveCashuToken: ReceiveCashuToken = (text) =>
+    const receiveCashuToken: ReceiveCashuToken = (text, options) =>
       runEither(
         Effect.flatMap(Receive, (receive) =>
-          receive.receive(new ReceiveDraft({ text })),
+          receive.receive(
+            new ReceiveDraft({ text, automatic: options?.automatic === true }),
+          ),
         ),
       );
 

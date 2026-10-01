@@ -13,7 +13,7 @@ import {
   closeDeferral,
   isPendingDeferral,
   receiveDeferred,
-  receiveTokenText,
+  receiveDraft,
 } from "./internal/acceptFlow";
 import type { DeferredOperation, ReceiveContext } from "./internal/acceptFlow";
 
@@ -59,7 +59,7 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
     const receive = (
       draft: ReceiveDraft,
     ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
-      receiveTokenText(ctx, draft.text, null).pipe(
+      receiveDraft(ctx, draft).pipe(
         // Params stay empty: the only input is token text (proof secrets).
         inspectOperationWith(
           ctx.inspector,

@@ -13,6 +13,7 @@ import {
   OperationId,
   ReceiveDeferred,
   ReceiveReceipt,
+  TokenAlreadyKnown,
   TokenAlreadySpent,
   TokenParseFailed,
   TokenTransfer,
@@ -153,7 +154,9 @@ describe("useSaveCashuFromText", () => {
 
     await save(transfer.tokenText);
 
-    expect(receive).toHaveBeenCalledWith(transfer.tokenText);
+    expect(receive).toHaveBeenCalledWith(transfer.tokenText, {
+      automatic: false,
+    });
     expect(logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         status: "ok",
@@ -228,6 +231,26 @@ describe("useSaveCashuFromText", () => {
 
     expect(draftAfterUpdates(setCashuDraft, "cashuBrejected")).toBe("");
     expect(onResolved).toHaveBeenCalledWith("terminal");
+  });
+
+  it("asks linkshu for an automatic receive, so a discarded token stays discarded", async () => {
+    const receive = vi.fn<ReceiveCashuToken>(async () =>
+      Either.left(
+        new TokenAlreadyKnown({
+          operationId: OperationId.make("AQEBAQEBAQEBAQEBAQEBAQ"),
+        }),
+      ),
+    );
+    const { save, setStatus } = await setup(receive);
+    const onResolved = vi.fn();
+
+    await save("cashuBdiscarded", { automatic: true, onResolved });
+
+    expect(receive).toHaveBeenCalledWith("cashuBdiscarded", {
+      automatic: true,
+    });
+    expect(onResolved).toHaveBeenCalledWith("terminal");
+    expect(setStatus).not.toHaveBeenCalled();
   });
 
   it("keeps the paste draft for an automatic receive", async () => {

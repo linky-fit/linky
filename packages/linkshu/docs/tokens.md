@@ -41,7 +41,7 @@ Each is `(operationId) => Effect<void, OperationNotFound | InvalidTransferTransi
 
 `forget` closes a transfer the caller has nothing left to do about: a send whose token verifiably reached its recipient, or a `receive` in `pending`/`failed` that will never be retried. It is not a refund; the handed-out proofs stay `handedOut` and are still reported `spent` once the recipient claims them.
 
-`forget` also closes a `pending` `deferredReceive` (`done`) whose mint the user gives up on; any other status fails with `InvalidTransferTransition`, as does a deferral a resume pass has just handed to its `receive` (the two take turns, see [receive.md](./receive.md#deferred-receives)). Nothing was received, so the token's value is gone unless the caller keeps its `tokenText` first. Receiving that text again later keeps it as a `pending` deferral once more, or receives it if the mint answers ([receive.md](./receive.md#deferred-receives)).
+`forget` also discards a `pending` `deferredReceive` (`done`) whose mint the user gives up on; any other status fails with `InvalidTransferTransition`, as does a deferral a resume pass has just handed to its `receive` (the two take turns, see [receive.md](./receive.md#deferred-receives)). Nothing was received, so the token's value is gone unless the caller keeps its `tokenText` first. Receiving that text again later keeps it as a `pending` deferral once more, or receives it if the mint answers; an `automatic` receive of it fails with `TokenAlreadyKnown` and leaves it closed ([receive.md](./receive.md#deferred-receives)).
 
 ### `returnToWallet`
 

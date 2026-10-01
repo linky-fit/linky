@@ -15,7 +15,7 @@ const transfer = (
   );
 
 describe("takenTokenTexts", () => {
-  it("counts a deferred token as taken and leaves an interrupted receive to resume", () => {
+  it("counts a deferred token as taken, discarded or not, and leaves an interrupted receive to resume", () => {
     const taken = takenTokenTexts(
       [
         transfer("AQEBAQEBAQEBAQEBAQEBAQ", "send", "issued"),
@@ -43,8 +43,39 @@ describe("takenTokenTexts", () => {
         "cashuBAQEBAQEBAQEBAQEBAQEBAQ",
         "cashuBAgICAgICAgICAgICAgICAg",
         "cashuBdeferred",
+        "cashuBdiscarded",
       ].sort(),
     );
+  });
+
+  it("leaves a text open whose deferral a retry handed over to a receive that failed transiently", () => {
+    const tokenText = "cashuBhandedover";
+    const handedOver = createTransferFixture({
+      id: "BAQEBAQEBAQEBAQEBAQEBA",
+      kind: "deferredReceive",
+      status: "done",
+      tokenText,
+    });
+    const receive = (error: string) =>
+      Schema.decodeUnknownSync(TokenTransfer)(
+        createTransferFixture({
+          id: "BQUFBQUFBQUFBQUFBQUFBQ",
+          kind: "receive",
+          status: "failed",
+          tokenText,
+          error,
+        }),
+      );
+
+    const unreachable = receive(
+      JSON.stringify({ _tag: "MintUnreachable", detail: "fetch failed" }),
+    );
+    const spent = receive(JSON.stringify({ _tag: "TokenAlreadySpent" }));
+
+    expect(takenTokenTexts([unreachable], [handedOver]).has(tokenText)).toBe(
+      false,
+    );
+    expect(takenTokenTexts([spent], [handedOver]).has(tokenText)).toBe(true);
   });
 });
 

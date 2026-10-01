@@ -29,8 +29,9 @@ interface CashuTokenMetaRow {
 export interface SaveCashuFromTextOptions {
   /**
    * Started by the app, not the user: no statuses (the inspector records the
-   * attempt), and no payment-history failure for a token already received
-   * here or on another device, or for a transient failure the caller retries.
+   * attempt), no payment-history failure for a token already received here
+   * or on another device, or for a transient failure the caller retries, and
+   * a token whose deferred receive was closed (discarded) stays closed.
    */
   automatic?: boolean;
   contactId?: string;
@@ -173,7 +174,7 @@ export const useSaveCashuFromText = ({
       await enqueueCashuOp(async () => {
         setCashuIsBusy(true);
         try {
-          const outcome = await receiveCashuToken(tokenRaw);
+          const outcome = await receiveCashuToken(tokenRaw, { automatic });
 
           if (Either.isLeft(outcome)) {
             const error = outcome.left;

@@ -38,7 +38,7 @@ import { ReceiveReceipt } from "../receive/domain";
 import type { ReceiveError } from "../receive/domain";
 import {
   parseReceivable,
-  receiveTokenText,
+  receiveReplaced,
   withReceiveLock,
 } from "../receive/internal/acceptFlow";
 import type { ReceiveContext } from "../receive/internal/acceptFlow";
@@ -276,7 +276,7 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
     /**
      * Bring a transfer's funds back: a handed-out `send` is re-received so
      * the encoding somebody else may hold dies at the mint; a failed or
-     * interrupted `receive` is retried. See `receiveTokenText`.
+     * interrupted `receive` is retried. See `receiveReplaced`.
      */
     const returnToWallet = (
       operationId: OperationId,
@@ -300,7 +300,7 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
             to: transfer.kind === "send" ? "returned" : "done",
           });
         }
-        return yield* receiveTokenText(receiveContext, transfer.tokenText, {
+        return yield* receiveReplaced(receiveContext, transfer.tokenText, {
           operation: transfer,
           reason: "returnToWallet",
         });

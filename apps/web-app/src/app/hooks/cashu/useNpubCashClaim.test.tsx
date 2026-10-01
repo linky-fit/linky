@@ -251,7 +251,7 @@ describe("useNpubCashClaim", () => {
 
     await poll();
 
-    expect(receive).toHaveBeenCalledWith(claimed);
+    expect(receive).toHaveBeenCalledWith(claimed, { automatic: true });
     expect(inbox()).toEqual([]);
     await unmount();
   });

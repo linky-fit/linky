@@ -35,7 +35,10 @@ import {
 import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
-import type { OperationStoreService } from "../ports/OperationStore";
+import type {
+  OperationStoreService,
+  StoredOperation,
+} from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import {
   answerProofStates,
@@ -53,7 +56,11 @@ import { parseTokenText } from "../token/codec";
 import { ReceiveDraft } from "./domain";
 import { Inspector } from "../inspector/Inspector";
 import { Receive } from "./Receive";
-import { receiveTokenText, withReceiveLock } from "./internal/acceptFlow";
+import {
+  receiveDraft,
+  receiveReplaced,
+  withReceiveLock,
+} from "./internal/acceptFlow";
 
 const mint = MintUrl.make("https://mint.example");
 const counterKey = deterministicCounterKey({
@@ -1323,15 +1330,14 @@ describe("Receive.receive", () => {
         };
         const receiveIn = (wallet: LoadedWallet) =>
           Effect.either(
-            receiveTokenText(
+            receiveDraft(
               {
                 ...stores,
                 instances: WalletInstances.make({
                   get: () => Effect.succeed(wallet),
                 }),
               },
-              sourceToken,
-              null,
+              new ReceiveDraft({ text: sourceToken }),
             ),
           );
         const receipts = yield* runOnTestClock(
@@ -1721,7 +1727,7 @@ describe("Receive.receive of an unfinished receive", () => {
           inspector: yield* Inspector.orNoop,
         };
         const result = yield* Effect.either(
-          receiveTokenText(ctx, sourceToken, {
+          receiveReplaced(ctx, sourceToken, {
             operation: stale,
             reason: "returnToWallet",
           }),
@@ -2204,5 +2210,130 @@ describe("Receive.resumeDeferred", () => {
     const { run } = makeHarness(wallet);
 
     expect(await run(resumeDeferred)).toEqual(Exit.succeed([]));
+  });
+});
+
+describe("Receive.receive of a text whose deferral was closed", () => {
+  const receiveAutomatically = (text: string) =>
+    Effect.flatMap(Receive, (receive) =>
+      receive.receive(new ReceiveDraft({ text, automatic: true })),
+    );
+
+  /** A mint whose wallet load fails as unreachable until `up.now` is set. */
+  const mintComingBack = () => {
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    const up = { now: false };
+    const harness = makeHarness(wallet, {
+      load: () =>
+        up.now
+          ? Effect.succeed(wallet)
+          : Effect.fail(new MintUnreachable({ mint, detail: "fetch failed" })),
+    });
+    return { ...harness, up, receiveCounters };
+  };
+
+  const kindsAndStatuses = (operations: ReadonlyArray<StoredOperation>) =>
+    operations.map((operation) => [operation.kind, operation.status]);
+
+  it.each(["done", "failed"] as const)(
+    "never lets a replayed message take back a token whose deferral another device closed %s",
+    async (status) => {
+      const { run, up, receiveCounters } = mintComingBack();
+
+      const exit = await run(
+        Effect.gen(function* () {
+          // The other device's discard has synced in.
+          const closed = yield* seedTransfer(
+            "deferredReceive",
+            status,
+            mint,
+            sourceToken,
+            6,
+          );
+          const whileDown = yield* Effect.flip(
+            receiveAutomatically(sourceToken),
+          );
+          up.now = true;
+          const whileUp = yield* Effect.flip(receiveAutomatically(sourceToken));
+          return { closed, whileDown, whileUp, ...(yield* inventory) };
+        }),
+      );
+      assert(Exit.isSuccess(exit));
+      const { closed, whileDown, whileUp, operations, proofs } = exit.value;
+      for (const error of [whileDown, whileUp]) {
+        expect(error).toMatchObject({
+          _tag: "TokenAlreadyKnown",
+          operationId: closed.id,
+        });
+      }
+      expect(kindsAndStatuses(operations)).toEqual([
+        ["deferredReceive", status],
+      ]);
+      expect(proofs).toEqual([]);
+      expect(receiveCounters).toEqual([]);
+    },
+  );
+
+  it("takes a discarded token in again when the user receives it", async () => {
+    const { run, up } = mintComingBack();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const closed = yield* seedTransfer(
+          "deferredReceive",
+          "done",
+          mint,
+          sourceToken,
+          6,
+        );
+        const whileDown = yield* Effect.flip(receiveText(sourceToken));
+        const reopened = kindsAndStatuses((yield* inventory).operations);
+        up.now = true;
+        const receipt = yield* receiveText(sourceToken);
+        return { closed, whileDown, reopened, receipt, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    const { closed, whileDown, reopened, receipt, operations, proofs } =
+      exit.value;
+    expect(whileDown).toMatchObject({
+      _tag: "ReceiveDeferred",
+      operationId: closed.id,
+    });
+    expect(reopened).toEqual([["deferredReceive", "pending"]]);
+    expect(receipt.amount).toBe(5);
+    expect(kindsAndStatuses(operations)).toEqual([
+      ["deferredReceive", "done"],
+      ["receive", "done"],
+    ]);
+    expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
+  });
+
+  it("still resumes an unfinished receive the closed deferral was handed to", async () => {
+    const { run, up } = mintComingBack();
+    up.now = true;
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedTransfer("deferredReceive", "done", mint, sourceToken, 6);
+        const interrupted = yield* seedTransfer(
+          "receive",
+          "pending",
+          mint,
+          sourceToken,
+          6,
+        );
+        const receipt = yield* receiveAutomatically(sourceToken);
+        return { interrupted, receipt, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.receipt.operationId).toBe(exit.value.interrupted.id);
+    expect(kindsAndStatuses(exit.value.operations)).toEqual([
+      ["deferredReceive", "done"],
+      ["receive", "done"],
+    ]);
   });
 });

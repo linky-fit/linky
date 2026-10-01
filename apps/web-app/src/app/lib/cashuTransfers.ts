@@ -35,20 +35,27 @@ export const isInterruptedReceive = (transfer: TokenTransfer): boolean =>
       isStoredCashuErrorTransient(transfer.error)));
 
 /**
- * Token texts a chat message shows as taken: those of transfers, except a
- * receive still to be resumed, and of tokens linkshu keeps for a retry.
+ * Token texts a chat message shows as taken, which auto-accept skips: those
+ * of transfers and of deferred receives, pending or closed, unless a receive
+ * of the text is still to be resumed.
  */
 export const takenTokenTexts = (
   transfers: ReadonlyArray<TokenTransfer>,
   operations: ReadonlyArray<StoredOperation>,
-): ReadonlySet<string> =>
-  new Set([
-    ...transfers
-      .filter((transfer) => !isInterruptedReceive(transfer))
+): ReadonlySet<string> => {
+  const resumable = new Set(
+    transfers
+      .filter(isInterruptedReceive)
       .map((transfer) => transfer.tokenText),
-    ...operations
-      .filter(isPendingDeferredReceive)
-      .flatMap((operation) =>
-        operation.tokenText === null ? [] : [operation.tokenText],
-      ),
-  ]);
+  );
+  return new Set(
+    [
+      ...transfers.map((transfer) => transfer.tokenText),
+      ...operations
+        .filter((operation) => operation.kind === "deferredReceive")
+        .flatMap((operation) =>
+          operation.tokenText === null ? [] : [operation.tokenText],
+        ),
+    ].filter((text) => !resumable.has(text)),
+  );
+};
