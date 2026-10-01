@@ -1,5 +1,8 @@
 import type { MeltResumeResult } from "@linky-fit/linkshu";
-import type { TransactionsRepository } from "@linky-fit/linksync";
+import {
+  transactionIdForOperation,
+  type TransactionsRepository,
+} from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React from "react";
 import type { Translate } from "../../../i18n";
@@ -44,7 +47,11 @@ export const useMeltRecovery = ({
       for (const row of records) {
         if (row.status !== "pending") continue;
         const quoteId = readMeltQuoteIdFromDetailsJson(row.detailsJson);
-        const match = settled.find((entry) => entry.result.quoteId === quoteId);
+        const match = settled.find(
+          ({ result }) =>
+            row.id === transactionIdForOperation(result.operationId) ||
+            (result.quoteId === quoteId && String(result.mint) === row.mint),
+        );
         if (match === undefined) continue;
         await Effect.runPromise(transactions.update(row.id, match.patch));
         reportMeltHistoryResolved({

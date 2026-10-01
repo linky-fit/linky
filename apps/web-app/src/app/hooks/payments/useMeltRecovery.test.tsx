@@ -10,6 +10,7 @@ import {
 } from "@linky-fit/linkshu";
 import {
   NonEmptyString100,
+  NonEmptyString1000,
   PositiveInt,
   TransactionId,
   type TransactionRecord,
@@ -80,7 +81,7 @@ const pendingRow = (
       : NonEmptyString100.orThrow(JSON.stringify({ meltQuoteId: quoteId })),
   iconKind: null,
   contactId: null,
-  mint: null,
+  mint: NonEmptyString1000.orThrow("https://mint.example"),
   unit: null,
   error: null,
   pendingLabel: null,
@@ -126,6 +127,19 @@ describe("useMeltRecovery", () => {
       fee: 1,
     });
     expect(view.params.pushToast).toHaveBeenCalledWith("payPendingPaid");
+    await act(async () => view.root.unmount());
+  });
+
+  it("leaves a pending row of the same quote at another mint alone", async () => {
+    allMock.mockReturnValue([
+      {
+        ...pendingRow("tx-1", "quote-1"),
+        mint: NonEmptyString1000.orThrow("https://other.example"),
+      },
+    ]);
+    const view = await mount([result("paid")]);
+
+    expect(updateMock).not.toHaveBeenCalled();
     await act(async () => view.root.unmount());
   });
 
