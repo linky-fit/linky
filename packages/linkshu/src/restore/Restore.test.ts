@@ -92,12 +92,12 @@ const makeHarness = (args: HarnessArgs) => {
       },
     });
 
-  const layer = Restore.DefaultWithoutDependencies.pipe(
+  const layer = Restore.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({
+          WalletInstances.of({
             get: (requested) =>
               args.walletUnreachable === true ||
               args.unreachableMints?.includes(requested)

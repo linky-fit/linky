@@ -1,4 +1,4 @@
-import { Effect, Either, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import {
   finalizeEvent,
   generateSecretKey,
@@ -21,8 +21,8 @@ export type UnwrapFailure =
   | "forged-rumor-id";
 
 const decodeWrap = Schema.decodeUnknownSync(SignedWrapEvent);
-const decodeSealEither = Schema.decodeUnknownEither(SignedSealEvent);
-const decodeRumorEither = Schema.decodeUnknownEither(Rumor);
+const decodeSealResult = Schema.decodeUnknownResult(SignedSealEvent);
+const decodeRumorResult = Schema.decodeUnknownResult(Rumor);
 
 const TWO_DAYS_SECONDS = 2 * 24 * 60 * 60;
 const MAX_FUTURE_RUMOR_SKEW_SECONDS = 5 * 60;
@@ -77,15 +77,15 @@ const decryptJson = (
   payload: string,
   recipientSecretKey: NostrSecretKey,
   senderPubkey: Pubkey,
-): Either.Either<unknown, UnwrapFailure> => {
+): Result.Result<unknown, UnwrapFailure> => {
   try {
-    return Either.right(
+    return Result.succeed(
       JSON.parse(
         decrypt(payload, getConversationKey(recipientSecretKey, senderPubkey)),
       ),
     );
   } catch {
-    return Either.left("unwrap-failed");
+    return Result.fail("unwrap-failed");
   }
 };
 
@@ -102,21 +102,21 @@ const decryptJson = (
 export const unwrapToRumor = (
   wrap: SignedWrapEvent,
   recipientSecretKey: NostrSecretKey,
-): Either.Either<Rumor, UnwrapFailure> =>
-  Either.gen(function* () {
+): Result.Result<Rumor, UnwrapFailure> =>
+  Result.gen(function* () {
     if (!verifyEvent(wrap)) {
-      return yield* Either.left<UnwrapFailure>("invalid-wrap");
+      return yield* Result.fail<UnwrapFailure>("invalid-wrap");
     }
     const sealJson = yield* decryptJson(
       wrap.content,
       recipientSecretKey,
       wrap.pubkey,
     );
-    const seal = yield* decodeSealEither(sealJson).pipe(
-      Either.mapLeft((): UnwrapFailure => "invalid-seal"),
+    const seal = yield* decodeSealResult(sealJson).pipe(
+      Result.mapError((): UnwrapFailure => "invalid-seal"),
     );
     if (!verifyEvent(seal)) {
-      return yield* Either.left<UnwrapFailure>("invalid-seal");
+      return yield* Result.fail<UnwrapFailure>("invalid-seal");
     }
 
     const rumorJson = yield* decryptJson(
@@ -124,20 +124,20 @@ export const unwrapToRumor = (
       recipientSecretKey,
       seal.pubkey,
     );
-    const rumor = yield* decodeRumorEither(rumorJson).pipe(
-      Either.mapLeft((): UnwrapFailure => "malformed-rumor"),
+    const rumor = yield* decodeRumorResult(rumorJson).pipe(
+      Result.mapError((): UnwrapFailure => "malformed-rumor"),
     );
     if (
       rumor.created_at >
       Effect.runSync(nowSeconds) + MAX_FUTURE_RUMOR_SKEW_SECONDS
     ) {
-      return yield* Either.left<UnwrapFailure>("invalid-rumor-timestamp");
+      return yield* Result.fail<UnwrapFailure>("invalid-rumor-timestamp");
     }
     if (rumor.pubkey !== seal.pubkey || rumor.pubkey === wrap.pubkey) {
-      return yield* Either.left<UnwrapFailure>("sender-forged");
+      return yield* Result.fail<UnwrapFailure>("sender-forged");
     }
     if (rumor.id !== getEventHash(rumor)) {
-      return yield* Either.left<UnwrapFailure>("forged-rumor-id");
+      return yield* Result.fail<UnwrapFailure>("forged-rumor-id");
     }
     return rumor;
   });

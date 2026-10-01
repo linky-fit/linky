@@ -65,24 +65,24 @@ export class AutoswapClaimResult extends Schema.Class<AutoswapClaimResult>(
    * unpaid, kept for the next pass; `dropped` — deterministic recovery
    * exhausted, claim closed to avoid retrying forever.
    */
-  status: Schema.Literal("claimed", "not-claimable-yet", "dropped"),
+  status: Schema.Literals(["claimed", "not-claimable-yet", "dropped"]),
   operationId: OperationId,
   amount: Schema.NullOr(Amount),
 }) {}
 
-export const AutoswapError = Schema.Union(
+export const AutoswapError = Schema.Union([
   InsufficientFunds,
   MintUnreachable,
   MintRejected,
   PaymentFailed,
   PaymentPending,
   CounterLockTimeout,
-);
+]);
 export type AutoswapError = typeof AutoswapError.Type;
 
-export const AutoswapEstimateError = Schema.Union(
+export const AutoswapEstimateError = Schema.Union([
   InsufficientFunds,
   MintUnreachable,
   MintRejected,
-);
+]);
 export type AutoswapEstimateError = typeof AutoswapEstimateError.Type;

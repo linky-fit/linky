@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
 import { Pubkey } from "../domain/primitives";
@@ -29,7 +29,7 @@ const pushWrap = (
 
 const expectFailure = (input: unknown, failure: PushWrapFailure): void => {
   expect(decodePushWrap(input)).toEqual(
-    expect.objectContaining({ _tag: "Left", left: failure }),
+    expect.objectContaining({ _tag: "Failure", failure: failure }),
   );
 };
 
@@ -37,7 +37,7 @@ describe("decodePushWrap", () => {
   it("decodes a valid push-marked gift wrap without exposing sender relay hints", () => {
     const wrap = pushWrap();
 
-    expect(Either.getOrThrow(decodePushWrap(wrap))).toEqual({
+    expect(Result.getOrThrow(decodePushWrap(wrap))).toEqual({
       wrapId: wrap.id,
       recipient,
       createdAt,

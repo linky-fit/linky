@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { isClientId, isRumorId } from "../domain/primitives";
 import type { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import {
@@ -73,24 +73,24 @@ export const encodeRetractionRumor = (
 const decodeAddedOrConfirmed = (
   rumor: Rumor,
   me: Pubkey,
-): Either.Either<ReactionInboxEvent, DropReason> => {
+): Result.Result<ReactionInboxEvent, DropReason> => {
   const target = firstTagValue(rumor.tags, "e");
   if (target === null || !isRumorId(target)) {
-    return Either.left("invalid-reaction");
+    return Result.fail("invalid-reaction");
   }
   // Reactions to anything but chat messages are foreign to Linky.
   const kindTag = firstTagValue(rumor.tags, "k");
   if (kindTag !== null && kindTag !== "14" && kindTag !== "15") {
-    return Either.left("invalid-reaction");
+    return Result.fail("invalid-reaction");
   }
   const reactionId = rumor.id;
-  if (!isRumorId(reactionId)) return Either.left("invalid-reaction");
+  if (!isRumorId(reactionId)) return Result.fail("invalid-reaction");
   const emoji = rumor.content.trim();
-  if (!isEmoji(emoji)) return Either.left("invalid-reaction");
+  if (!isEmoji(emoji)) return Result.fail("invalid-reaction");
 
   if (rumor.pubkey === me) {
     const clientTag = firstTagValue(rumor.tags, "client");
-    return Either.right(
+    return Result.succeed(
       new OwnReactionConfirmed({
         reactionId,
         target,
@@ -102,7 +102,7 @@ const decodeAddedOrConfirmed = (
     );
   }
 
-  return Either.right(
+  return Result.succeed(
     new ReactionAdded({
       reactionId,
       target,
@@ -116,18 +116,18 @@ const decodeAddedOrConfirmed = (
 const decodeRetracted = (
   rumor: Rumor,
   me: Pubkey,
-): Either.Either<ReactionInboxEvent, DropReason> => {
+): Result.Result<ReactionInboxEvent, DropReason> => {
   // Foreign clients may reference non-rumor ids in a deletion; retract what we
   // can identify instead of rejecting the whole rumor (matches NIP-09 usage).
   const [head, ...tail] = tagValues(rumor.tags, "e").filter(isRumorId);
-  if (head === undefined) return Either.left("invalid-retraction");
+  if (head === undefined) return Result.fail("invalid-retraction");
   const reactionIds: [typeof head, ...typeof tail] = [head, ...tail];
 
   if (rumor.pubkey === me) {
     const retractionId = rumor.id;
-    if (!isRumorId(retractionId)) return Either.left("invalid-retraction");
+    if (!isRumorId(retractionId)) return Result.fail("invalid-retraction");
     const clientTag = firstTagValue(rumor.tags, "client");
-    return Either.right(
+    return Result.succeed(
       new OwnRetractionConfirmed({
         retractionId,
         reactionIds,
@@ -138,7 +138,7 @@ const decodeRetracted = (
     );
   }
 
-  return Either.right(
+  return Result.succeed(
     new ReactionRetracted({
       reactionIds,
       from: rumor.pubkey,
@@ -150,13 +150,13 @@ const decodeRetracted = (
 export const decodeReactionRumor = (
   rumor: Rumor,
   me: Pubkey,
-): Either.Either<ReactionInboxEvent, DropReason> => {
+): Result.Result<ReactionInboxEvent, DropReason> => {
   switch (rumor.kind) {
     case REACTION_KIND:
       return decodeAddedOrConfirmed(rumor, me);
     case RETRACTION_KIND:
       return decodeRetracted(rumor, me);
     default:
-      return Either.left("unsupported-kind");
+      return Result.fail("unsupported-kind");
   }
 };

@@ -1,4 +1,5 @@
 import { Context, Effect, Layer, Option, Queue, Stream } from "effect";
+import type { Cause } from "effect";
 import type { LinkshuInspectorEvent } from "./events";
 
 // Sliding, because inspection must never stall or leak memory when nobody is
@@ -24,22 +25,22 @@ const noop: InspectorService = { emit: () => {}, events: Stream.empty };
  * `Inspector.orNoop`, so providing no layer costs nothing; a composition
  * root that wants the feed provides `Inspector.live` and consumes `events`.
  */
-export class Inspector extends Context.Tag("linkshu/Inspector")<
-  Inspector,
-  InspectorService
->() {
+export class Inspector extends Context.Service<Inspector, InspectorService>()(
+  "linkshu/Inspector",
+) {
   /** Sliding in-memory buffer; old diagnostics are droppable by design. */
-  static readonly live: Layer.Layer<Inspector> = Layer.scoped(
+  static readonly live: Layer.Layer<Inspector> = Layer.effect(
     Inspector,
     Effect.map(
       Effect.acquireRelease(
-        Queue.sliding<LinkshuInspectorEvent>(BUFFER_CAPACITY),
-        Queue.shutdown,
+        Queue.sliding<LinkshuInspectorEvent, Cause.Done>(BUFFER_CAPACITY),
+        // Ending first completes `events`; a bare shutdown interrupts it.
+        (queue) => Effect.andThen(Queue.end(queue), Queue.shutdown(queue)),
       ),
       (queue) => ({
         emit: (build) => {
           try {
-            Queue.unsafeOffer(queue, build());
+            Queue.offerUnsafe(queue, build());
           } catch (error) {
             console.warn("linkshu inspector emission failed", error);
           }

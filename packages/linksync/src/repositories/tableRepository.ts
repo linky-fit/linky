@@ -55,7 +55,7 @@ export const tableRepository = <
     Effect.asVoid,
   );
   const rotateAfter = <E>(write: Effect.Effect<void, E>) =>
-    Effect.zipRight(write, maybeRotate);
+    Effect.andThen(write, maybeRotate);
   return {
     all,
     byId: (id) =>

@@ -1,7 +1,8 @@
 import { Context, Effect, Schema } from "effect";
 
 /** Opaque proof of lease ownership; only its issuer can release the lease. */
-export const LeaseId = Schema.NonEmptyTrimmedString.pipe(
+export const LeaseId = Schema.Trimmed.pipe(
+  Schema.check(Schema.isNonEmpty()),
   Schema.brand("LeaseId"),
 );
 export type LeaseId = typeof LeaseId.Type;
@@ -37,7 +38,7 @@ export interface KeyValueStoreService {
   readonly releaseLease: (key: string, lease: LeaseId) => Effect.Effect<void>;
 }
 
-export class KeyValueStore extends Context.Tag("linkshu/KeyValueStore")<
+export class KeyValueStore extends Context.Service<
   KeyValueStore,
   KeyValueStoreService
->() {}
+>()("linkshu/KeyValueStore") {}

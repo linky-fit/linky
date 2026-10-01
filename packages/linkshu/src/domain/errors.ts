@@ -25,13 +25,13 @@ import {
 export class TokenParseFailed extends Schema.TaggedError<TokenParseFailed>()(
   "TokenParseFailed",
   {
-    reason: Schema.Literal(
+    reason: Schema.Literals([
       "empty",
       "no-token-found",
       "undecodable",
       "no-proofs",
       "multiple-mints",
-    ),
+    ]),
     detail: Schema.NullOr(Schema.String),
   },
 ) {}
@@ -162,7 +162,7 @@ export class CounterLockTimeout extends Schema.TaggedError<CounterLockTimeout>()
 /** Unspent proofs still name the mint; it cannot be forgotten. */
 export class MintInUse extends Schema.TaggedError<MintInUse>()("MintInUse", {
   mint: MintUrl,
-  proofCount: Schema.Int.pipe(Schema.positive()),
+  proofCount: Schema.Int.check(Schema.isGreaterThan(0)),
 }) {}
 
 export class OperationNotFound extends Schema.TaggedError<OperationNotFound>()(

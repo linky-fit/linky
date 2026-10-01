@@ -25,7 +25,7 @@ export class SendDraft extends Schema.Class<SendDraft>("SendDraft")({
    * someone (QR/share, watched until claimed), `pending` for a token
    * travelling out through a messenger the caller confirms separately.
    */
-  produceAs: Schema.Literal("issued", "pending"),
+  produceAs: Schema.Literals(["issued", "pending"]),
 }) {}
 
 export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({
@@ -46,11 +46,11 @@ export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({
   feePaid: NonNegativeAmount,
 }) {}
 
-export const SendError = Schema.Union(
+export const SendError = Schema.Union([
   InsufficientFunds,
   AmountConsumedByFee,
   MintUnreachable,
   MintRejected,
   CounterLockTimeout,
-);
+]);
 export type SendError = typeof SendError.Type;

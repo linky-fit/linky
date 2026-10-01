@@ -36,7 +36,7 @@ export class ReceiveReceipt extends Schema.Class<ReceiveReceipt>(
   amount: Amount,
 }) {}
 
-export const ReceiveError = Schema.Union(
+export const ReceiveError = Schema.Union([
   TokenParseFailed,
   TokenAlreadyKnown,
   AmountConsumedByFee,
@@ -44,5 +44,5 @@ export const ReceiveError = Schema.Union(
   MintUnreachable,
   MintRejected,
   CounterLockTimeout,
-);
+]);
 export type ReceiveError = typeof ReceiveError.Type;

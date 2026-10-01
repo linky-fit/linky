@@ -59,12 +59,12 @@ export class MeltResumeResult extends Schema.Class<MeltResumeResult>(
    * payment in flight, record kept; `unresolved` — no usable mint answer,
    * record kept for the next pass.
    */
-  status: Schema.Literal("paid", "unpaid", "pending", "unresolved"),
+  status: Schema.Literals(["paid", "unpaid", "pending", "unresolved"]),
   /** Set only for `paid`. */
   receipt: Schema.NullOr(MeltReceipt),
 }) {}
 
-export const MeltError = Schema.Union(
+export const MeltError = Schema.Union([
   InsufficientFunds,
   MintUnreachable,
   MintRejected,
@@ -72,5 +72,5 @@ export const MeltError = Schema.Union(
   PaymentPending,
   QuoteExpired,
   CounterLockTimeout,
-);
+]);
 export type MeltError = typeof MeltError.Type;

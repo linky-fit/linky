@@ -1,4 +1,4 @@
-import { Registry } from "./index";
+import { AtomRegistry } from "./index";
 import { ClientId, SeenReceiptDraft, UnixSeconds } from "@linky-fit/linkstr";
 import { recipientOf, stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
@@ -19,7 +19,7 @@ const draft = new SeenReceiptDraft({
 
 describe("sendSeenReceiptAtom", () => {
   it("delivers via the configured transport and returns a receipt", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const published: Array<SignedWrapEvent> = [];
     registry.set(
       linkstrConfigAtom,
@@ -40,7 +40,7 @@ describe("sendSeenReceiptAtom", () => {
   });
 
   it("fails with LinkstrNotConfigured while logged out", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
 
     registry.set(sendSeenReceiptAtom, draft);
     const exit = await settle(registry, sendSeenReceiptAtom);

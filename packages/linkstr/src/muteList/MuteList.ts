@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { PlainEventReceipt } from "../domain/delivery";
 import type { NoRelayAcceptedEvent } from "../domain/errors";
 import type { Pubkey } from "../domain/primitives";
@@ -11,8 +11,8 @@ import { RelayPolicy } from "../services/RelayPolicy";
 
 const MUTE_LIST_KIND = 10000;
 
-export class MuteList extends Effect.Service<MuteList>()("linkstr/MuteList", {
-  effect: Effect.gen(function* () {
+export class MuteList extends Context.Service<MuteList>()("linkstr/MuteList", {
+  make: Effect.gen(function* () {
     const context = {
       identity: yield* LinkstrIdentity,
       transport: yield* NostrTransport,
@@ -37,4 +37,6 @@ export class MuteList extends Effect.Service<MuteList>()("linkstr/MuteList", {
 
     return { publishMuteList } as const;
   }),
-}) {}
+}) {
+  static readonly layer = Layer.effect(this, this.make);
+}

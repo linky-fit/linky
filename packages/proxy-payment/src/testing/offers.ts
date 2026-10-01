@@ -24,9 +24,10 @@ let sequence = 0;
 export const nextRumorId = (): RumorId =>
   RumorId.make((++sequence).toString(16).padStart(64, "0"));
 
-type SnapshotFields = ConstructorParameters<
-  typeof BankOfferSnapshotReceived
->[0];
+type SnapshotFields = Omit<
+  ConstructorParameters<typeof BankOfferSnapshotReceived>[0],
+  "_tag"
+>;
 
 /** A snapshot of `offer-1` offered by `me`; `self` marks my own echoed copy. */
 export const snapshot = (

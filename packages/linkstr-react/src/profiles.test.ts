@@ -1,4 +1,4 @@
-import { Registry } from "./index";
+import { AtomRegistry } from "./index";
 import { ProfileMetadata, StatusDraft, UnixSeconds } from "@linky-fit/linkstr";
 import type {
   LinkstrIdentityService,
@@ -43,7 +43,7 @@ const profileEvent = (
 
 describe("profileWatchAtom", () => {
   it("feeds facts through the handler and resubscribes when the set changes", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const subscriptions: Array<FakeSubscription> = [];
     const handled: Array<ProfileWatchEvent> = [];
 
@@ -95,7 +95,7 @@ describe("profileWatchAtom", () => {
 
 describe("fetchProfileAtom", () => {
   it("returns the typed fetch result", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     registry.set(
       linkstrConfigAtom,
       configWith(
@@ -126,7 +126,7 @@ describe("fetchProfileAtom", () => {
 
 describe("discoverActiveProfilesAtom", () => {
   it("returns recently active authors with decoded profiles", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     registry.set(
       linkstrConfigAtom,
       configWith(
@@ -161,7 +161,7 @@ describe("discoverActiveProfilesAtom", () => {
 
 describe("publishProfileAtom / publishStatusAtom", () => {
   it("publishes through the configured transport and returns receipts", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const published: Array<PublishedEvent> = [];
     registry.set(
       linkstrConfigAtom,

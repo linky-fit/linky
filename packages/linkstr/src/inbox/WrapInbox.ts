@@ -1,10 +1,13 @@
 import {
+  Cause,
+  Context,
   Duration,
   Effect,
-  Either,
+  Layer,
   Option,
   Queue,
   Ref,
+  Result,
   Schema,
   Stream,
 } from "effect";
@@ -38,6 +41,7 @@ import { decodeWrapEvent } from "./decodeWrapEvent";
 import { InboxCursorStore } from "./InboxCursorStore";
 import { WrapDropped } from "./events";
 import type { InboxDelivery } from "./events";
+import { acquireStreamQueue } from "../internal/streamQueue";
 
 export type WrapInboxEvent =
   | BankOfferInboxEvent
@@ -72,7 +76,7 @@ export interface WrapFetchOptions {
    * failing. For callers on an external deadline (push events), since a
    * reachable-but-silent relay can hold the fetch for ~11s otherwise.
    */
-  readonly timeout?: Duration.DurationInput;
+  readonly timeout?: Duration.Input;
 }
 
 export interface WrapInboxFeed {
@@ -92,14 +96,14 @@ export const NIP59_BACKDATE_MARGIN_SECONDS = 2 * 24 * 60 * 60;
 
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
 
-const decodeWrapIdField = Schema.decodeUnknownEither(
+const decodeWrapIdField = Schema.decodeUnknownResult(
   Schema.Struct({ id: WrapId }),
 );
 
 const wrapIdOf = (raw: unknown): WrapId | null =>
-  Either.match(decodeWrapIdField(raw), {
-    onLeft: () => null,
-    onRight: ({ id }) => id,
+  Result.match(decodeWrapIdField(raw), {
+    onFailure: () => null,
+    onSuccess: ({ id }) => id,
   });
 
 /**
@@ -112,10 +116,10 @@ const wrapIdOf = (raw: unknown): WrapId | null =>
  * checkpointing safe, since the next session refetches everything the
  * current one could still deliver.
  */
-export class WrapInbox extends Effect.Service<WrapInbox>()(
+export class WrapInbox extends Context.Service<WrapInbox>()(
   "linkstr/WrapInbox",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const identity = yield* LinkstrIdentity;
       const transport = yield* NostrTransport;
       const relayPolicy = yield* RelayPolicy;
@@ -159,13 +163,13 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
         const bounded =
           options?.timeout === undefined
             ? fetched
-            : Effect.timeoutTo(fetched, {
+            : Effect.timeoutOrElse(fetched, {
                 duration: options.timeout,
-                onTimeout: (): InspectedPlainResult<WrapInboxEvent | null> => ({
-                  result: null,
-                  eventIds: [],
-                }),
-                onSuccess: (value) => value,
+                orElse: () =>
+                  Effect.succeed<InspectedPlainResult<WrapInboxEvent | null>>({
+                    result: null,
+                    eventIds: [],
+                  }),
               });
         return bounded.pipe(
           inspectPlainOperation(inspector, "inbox.fetchWrapEvent", {
@@ -187,9 +191,8 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
           const cursor = yield* Ref.make<UnixSeconds | null>(
             (yield* cursorStore.load) ?? options?.since ?? null,
           );
-          const rawWraps = yield* Effect.acquireRelease(
-            Queue.unbounded<RawArrival>(),
-            Queue.shutdown,
+          const rawWraps = yield* acquireStreamQueue(
+            Queue.unbounded<RawArrival, Cause.Done>(),
           );
           const seenWrapIds = makeSeenWrapIds(DEFAULT_SEEN_WRAP_IDS_CAPACITY);
 
@@ -214,7 +217,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                 relay,
                 filter,
                 (event) => {
-                  Queue.unsafeOffer(rawWraps, {
+                  Queue.offerUnsafe(rawWraps, {
                     delivery: eoseSeen ? "live" : "backfill",
                     raw: event,
                   });
@@ -258,10 +261,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                 return Effect.sync(() => {
                   inspector.emit(
                     () =>
-                      new InboxWrapDeduped(
-                        { wrapId },
-                        { disableValidation: true },
-                      ),
+                      new InboxWrapDeduped({ wrapId }, { disableChecks: true }),
                   );
                   return Option.none<DeliveredInboxEvent>();
                 });
@@ -278,7 +278,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                           delivery,
                           event: redactInspectorSecrets(decoded.event),
                         },
-                        { disableValidation: true },
+                        { disableChecks: true },
                       ),
                   );
                   return Option.some<DeliveredInboxEvent>({
@@ -300,7 +300,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                           delivery,
                           event: redactInspectorSecrets(decoded.event),
                         },
-                        { disableValidation: true },
+                        { disableChecks: true },
                       ),
                   );
                   return Option.some<DeliveredInboxEvent>({
@@ -313,7 +313,8 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
 
           const events = Stream.fromQueue(rawWraps).pipe(
             Stream.mapEffect(processRaw),
-            Stream.filterMap((event) => event),
+            Stream.filter(Option.isSome),
+            Stream.map(({ value }) => value),
           );
 
           return { events };
@@ -322,4 +323,6 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
       return { fetchWrapEvent, open } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

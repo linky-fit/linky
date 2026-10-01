@@ -1,4 +1,4 @@
-import { Atom } from "@effect-atom/atom-react";
+import { Atom } from "effect/reactivity";
 import { WrapInbox } from "@linky-fit/linkstr";
 import type {
   DeliveredInboxEvent,
@@ -54,7 +54,7 @@ export const fetchWrapEventAtom = linkstrRuntimeAtom.fn<FetchWrapEventParams>()(
 export const wrapInboxAtom = linkstrRuntimeAtom.atom((get) => {
   const handler = get(wrapInboxHandlerAtom);
   if (handler === null) return Stream.empty;
-  return Stream.unwrapScoped(
+  return Stream.unwrap(
     Effect.gen(function* () {
       const inbox = yield* WrapInbox;
       const feed = yield* inbox.open(

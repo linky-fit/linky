@@ -1,4 +1,4 @@
-import { Context, Effect, Either, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Result, Schema } from "effect";
 import { stringStorageSlot } from "../internal/stringStorage";
 import type { StringStorage } from "../internal/stringStorage";
 import { PersistedOutboxJob } from "./domain";
@@ -12,8 +12,8 @@ export interface OutboxStoreService {
   readonly loadAll: Effect.Effect<ReadonlyArray<StoredOutboxJob>>;
 }
 
-const StoredJobsJson = Schema.parseJson(Schema.Array(PersistedOutboxJob));
-const decodeJobs = Schema.decodeUnknownEither(StoredJobsJson);
+const StoredJobsJson = Schema.fromJsonString(Schema.Array(PersistedOutboxJob));
+const decodeJobs = Schema.decodeUnknownResult(StoredJobsJson);
 const encodeJobs = Schema.encodeSync(StoredJobsJson);
 
 const makeInMemory = (): OutboxStoreService => {
@@ -38,7 +38,7 @@ const makeStringStorage = (
   key: string,
 ): OutboxStoreService => {
   const slot = stringStorageSlot<ReadonlyArray<StoredOutboxJob>>(storage, key, {
-    decode: (raw) => Either.getOrElse(decodeJobs(raw), () => []),
+    decode: (raw) => Result.getOrElse(decodeJobs(raw), () => []),
     encode: encodeJobs,
   });
   const load = (): ReadonlyArray<StoredOutboxJob> => slot.read() ?? [];
@@ -60,10 +60,10 @@ const makeStringStorage = (
 };
 
 /** Storage port of the outbox: one durable, insertion-ordered job list. */
-export class OutboxStore extends Context.Tag("linkstr/OutboxStore")<
+export class OutboxStore extends Context.Service<
   OutboxStore,
   OutboxStoreService
->() {
+>()("linkstr/OutboxStore") {
   /** Non-durable; for tests and as the platform-agnostic default. */
   static readonly inMemory: Layer.Layer<OutboxStore> = Layer.sync(
     OutboxStore,

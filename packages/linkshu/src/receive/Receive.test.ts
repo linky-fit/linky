@@ -75,12 +75,12 @@ const makeWallet = (args: FakeWalletArgs) => {
 
 const makeHarness = (wallet: LoadedWallet) => {
   const inspector = recordingInspector();
-  const layer = Receive.DefaultWithoutDependencies.pipe(
+  const layer = Receive.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({ get: () => Effect.succeed(wallet) }),
+          WalletInstances.of({ get: () => Effect.succeed(wallet) }),
         ),
         inMemoryKeyValueStore,
         inMemoryProofStore,
@@ -114,7 +114,7 @@ const receiveText = (text: string) =>
 const receiveAndInspect = (text: string) =>
   Effect.gen(function* () {
     const kv = yield* KeyValueStore;
-    const receipt = yield* Effect.either(receiveText(text));
+    const receipt = yield* Effect.result(receiveText(text));
     return {
       receipt,
       ...(yield* inventory),
@@ -133,12 +133,12 @@ describe("Receive.receive", () => {
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations, counter } = exit.value;
 
-    assert(receipt._tag === "Right");
-    expect(receipt.right.mint).toBe(mint);
-    expect(receipt.right.unit).toBe("sat");
-    expect(receipt.right.amount).toBe(5);
-    expect(receipt.right.tokenText).not.toBe(sourceToken);
-    expect(parseTokenText(receipt.right.tokenText)?.amount).toBe(5);
+    assert(receipt._tag === "Success");
+    expect(receipt.success.mint).toBe(mint);
+    expect(receipt.success.unit).toBe("sat");
+    expect(receipt.success.amount).toBe(5);
+    expect(receipt.success.tokenText).not.toBe(sourceToken);
+    expect(parseTokenText(receipt.success.tokenText)?.amount).toBe(5);
 
     expect(operations).toHaveLength(1);
     const transfer = operations[0];
@@ -151,7 +151,7 @@ describe("Receive.receive", () => {
       tokenText: sourceToken,
       error: null,
     });
-    expect(receipt.right.operationId).toBe(transfer?.id);
+    expect(receipt.success.operationId).toBe(transfer?.id);
 
     // The fresh proofs are balance owned by nobody: the receive is closed.
     expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
@@ -211,7 +211,7 @@ describe("Receive.receive", () => {
       receiveAndInspect(`here you go: cashu:${sourceToken} enjoy!`),
     );
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(exit.value.operations[0]?.tokenText).toBe(sourceToken);
   });
 
@@ -257,8 +257,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(dust));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "AmountConsumedByFee",
       mint,
       amount: 1,
@@ -284,8 +284,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(token));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
-    expect(exit.value.receipt.right.amount).toBe(1);
+    assert(exit.value.receipt._tag === "Success");
+    expect(exit.value.receipt.success.amount).toBe(1);
     expect(receiveCounters).toHaveLength(1);
   });
 
@@ -369,8 +369,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintUnreachable");
     expect(exit.value.proofs).toEqual([]);
     expect(exit.value.operations).toHaveLength(1);
     expect(exit.value.operations[0]).toMatchObject({
@@ -398,8 +398,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "MintRejected",
       code: 20003,
     });
@@ -420,8 +420,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "TokenAlreadySpent",
       mint,
     });
@@ -487,7 +487,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(receiveCounters).toEqual([1, 40]);
     expect(restoreCalls).toEqual([{ start: 1, count: 100 }]);
     expect(exit.value.counter).toBe("42");
@@ -517,7 +517,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(receiveCounters).toEqual([1, 65]);
     expect(restoreCalls).toHaveLength(1);
     expect(exit.value.counter).toBe("67");
@@ -534,7 +534,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(receiveCounters).toEqual([1, 65]);
     expect(restoreCalls).toEqual([]);
   });
@@ -566,8 +566,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintRejected");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintRejected");
     expect(receiveCounters).toHaveLength(5);
     expect(exit.value.operations[0]?.status).toBe("failed");
   });

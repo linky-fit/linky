@@ -40,12 +40,12 @@ export class TopupReceipt extends Schema.Class<TopupReceipt>("TopupReceipt")({
   quoteId: QuoteId,
 }) {}
 
-export const TopupError = Schema.Union(
+export const TopupError = Schema.Union([
   MintUnreachable,
   MintRejected,
   QuoteExpired,
   CounterLockTimeout,
-);
+]);
 export type TopupError = typeof TopupError.Type;
 
 /**
@@ -66,7 +66,7 @@ export class PaidQuoteDraft extends Schema.Class<PaidQuoteDraft>(
 
 /** Hex secp256k1 secret a NUT-20 locked quote is bound to; never persisted. */
 export const QuoteLockingKey = Schema.String.pipe(
-  Schema.pattern(/^[0-9a-f]{64}$/),
+  Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
   Schema.brand("QuoteLockingKey"),
 );
 export type QuoteLockingKey = typeof QuoteLockingKey.Type;
@@ -76,12 +76,12 @@ export interface TopupLockingOptions {
   readonly lockingKey?: QuoteLockingKey | undefined;
 }
 
-export const TopupAdoptError = Schema.Union(
+export const TopupAdoptError = Schema.Union([
   MintUnreachable,
   MintRejected,
   QuoteAlreadyIssued,
   CounterLockTimeout,
-);
+]);
 export type TopupAdoptError = typeof TopupAdoptError.Type;
 
 /**

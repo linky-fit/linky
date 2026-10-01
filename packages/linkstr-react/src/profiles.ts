@@ -1,4 +1,4 @@
-import { Atom } from "@effect-atom/atom-react";
+import { Atom } from "effect/reactivity";
 import { Profiles, ProfileWatch } from "@linky-fit/linkstr";
 import type {
   DiscoverActiveProfilesOptions,
@@ -33,7 +33,7 @@ export const profileWatchAtom = linkstrRuntimeAtom.atom((get) => {
   const handler = get(profileWatchHandlerAtom);
   const pubkeys = get(watchedProfilesAtom);
   if (handler === null || pubkeys.length === 0) return Stream.empty;
-  return Stream.unwrapScoped(
+  return Stream.unwrap(
     Effect.gen(function* () {
       const profileWatch = yield* ProfileWatch;
       const facts = yield* profileWatch.watch(pubkeys);

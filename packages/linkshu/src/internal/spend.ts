@@ -1,5 +1,5 @@
 import type { SendResponse } from "@cashu/cashu-ts";
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import { InsufficientFunds } from "../domain/errors";
 import type { MintRejected, MintUnreachable } from "../domain/errors";
 import { NonNegativeAmount } from "../domain/primitives";
@@ -134,7 +134,7 @@ export const swapProofsForAmount = (
       let counter = yield* readCounter(ctx.kv, ctx.scope);
       let lastCollision: unknown = null;
       for (let attempt = 0; attempt < MAX_SWAP_ATTEMPTS; attempt += 1) {
-        const outcome = yield* Effect.either(
+        const outcome = yield* Effect.result(
           Effect.tryPromise({
             try: () =>
               ctx.wallet.send(
@@ -154,8 +154,8 @@ export const swapProofsForAmount = (
             catch: (error): unknown => error,
           }),
         );
-        if (Either.isRight(outcome)) {
-          const swapped = outcome.right;
+        if (Result.isSuccess(outcome)) {
+          const swapped = outcome.success;
           // Keep mixes fresh change with passthrough inputs; only the
           // fresh ones consumed keep-block counters.
           const freshKeepCount = swapped.keep.filter(
@@ -170,7 +170,7 @@ export const swapProofsForAmount = (
           );
           return swapped;
         }
-        const raw = outcome.left;
+        const raw = outcome.failure;
         if (isInsufficientBalanceError(raw)) {
           return yield* new InsufficientFunds({
             mint: ctx.scope.mint,

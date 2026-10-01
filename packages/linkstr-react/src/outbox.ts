@@ -1,4 +1,5 @@
-import { Atom, useAtomMount, useAtomSet } from "@effect-atom/atom-react";
+import { useAtomMount, useAtomSet } from "@effect/atom-react";
+import { Atom } from "effect/reactivity";
 import { Outbox } from "@linky-fit/linkstr";
 import type {
   OutboxRef,
@@ -44,7 +45,7 @@ export const outboxResultsAtom = linkstrRuntimeAtom.atom((get) => {
       Stream.mapEffect(outbox.results, (result) =>
         Effect.tryPromise(() => handler.onResult(result)).pipe(
           Effect.andThen(outbox.ack(result.jobId)),
-          Effect.catchAll(() => Effect.void),
+          Effect.catch(() => Effect.void),
           Effect.as(result),
         ),
       ),

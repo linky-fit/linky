@@ -9,7 +9,8 @@ import {
   MintInfo as CashuMintInfo,
   MintOperationError,
 } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
+import { Effect, Exit, Layer } from "effect";
+import { TestClock } from "effect/testing";
 import type { Scope } from "effect";
 import {
   Amount,
@@ -123,12 +124,12 @@ const makeWallet = (args: FakeWalletArgs) => {
 /** One runtime over the given storage — a second one models a restart. */
 const makeHarness = (wallet: LoadedWallet, storage: Storage) => {
   const inspector = recordingInspector();
-  const layer = Topup.DefaultWithoutDependencies.pipe(
+  const layer = Topup.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({ get: () => Effect.succeed(wallet) }),
+          WalletInstances.of({ get: () => Effect.succeed(wallet) }),
         ),
         Layer.succeed(KeyValueStore, storage.kv),
         Layer.succeed(ProofStore, storage.proofs),
@@ -246,7 +247,7 @@ describe("Topup", () => {
       Effect.gen(function* () {
         yield* TestClock.adjust("1000 seconds");
         return yield* runOnTestClock(startAndAwait, "5 seconds");
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     assert(Exit.isSuccess(exit));
@@ -362,11 +363,11 @@ describe("Topup", () => {
       mintProofs: () => Promise.reject(new TypeError("Failed to fetch")),
     });
     const crashed = await makeHarness(interrupting.wallet, storage).run(
-      Effect.either(startAndAwait),
+      Effect.result(startAndAwait),
     );
     assert(Exit.isSuccess(crashed));
-    assert(crashed.value._tag === "Left");
-    expect(crashed.value.left._tag).toBe("MintUnreachable");
+    assert(crashed.value._tag === "Failure");
+    expect(crashed.value.failure._tag).toBe("MintUnreachable");
 
     // The reserved slot survived the crash, so the resume re-derives exactly
     // the outputs the mint signed.
@@ -433,11 +434,11 @@ describe("Topup", () => {
     });
     const { run } = makeHarness(wallet, storage);
 
-    const exit = await run(Effect.either(startAndAwait));
+    const exit = await run(Effect.result(startAndAwait));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("QuoteExpired");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("QuoteExpired");
     expect(await storedProofs(storage)).toEqual([]);
     expect((await onlyTopup(storage)).status).toBe("failed");
   });
@@ -456,15 +457,15 @@ describe("Topup", () => {
     const exit = await run(
       Effect.gen(function* () {
         yield* TestClock.adjust("1000 seconds");
-        return yield* runOnTestClock(Effect.either(startAndAwait), "5 seconds");
-      }).pipe(Effect.provide(TestContext.TestContext)),
+        return yield* runOnTestClock(Effect.result(startAndAwait), "5 seconds");
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
+    assert(exit.value._tag === "Failure");
     // Unreachable, not expired: only the mint's own UNPAID answer may expire
     // a quote — it might have been paid while we could not check.
-    expect(exit.value.left._tag).toBe("MintUnreachable");
+    expect(exit.value.failure._tag).toBe("MintUnreachable");
     expect(await pendingTopups(storage)).toHaveLength(1);
   });
 
@@ -506,13 +507,13 @@ describe("Topup", () => {
       Effect.gen(function* () {
         const handles = yield* (yield* Topup).resumePending();
         const first = handles[0];
-        return first === undefined ? null : yield* Effect.either(first.result);
+        return first === undefined ? null : yield* Effect.result(first.result);
       }),
     );
 
     assert(Exit.isSuccess(resumed));
-    assert(resumed.value?._tag === "Left");
-    expect(resumed.value.left._tag).toBe("QuoteExpired");
+    assert(resumed.value?._tag === "Failure");
+    expect(resumed.value.failure._tag).toBe("QuoteExpired");
     expect((await onlyTopup(storage)).status).toBe("failed");
   });
 
@@ -556,11 +557,11 @@ describe("Topup", () => {
     });
     const { run } = makeHarness(wallet, storage);
 
-    const exit = await run(Effect.either(startAndAwait));
+    const exit = await run(Effect.result(startAndAwait));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("MintRejected");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("MintRejected");
     // A reserved counter means the invoice was paid: the operation must
     // outlive the failure so the funds stay reclaimable.
     expect(await pendingTopups(storage)).toMatchObject([{ counter: 1 }]);
@@ -614,20 +615,23 @@ describe("Topup", () => {
           yield* TestClock.adjust("1000 seconds");
           return yield* runOnTestClock(
             Effect.gen(function* () {
-              const outcome = yield* Effect.either(startAndAwait);
+              const outcome = yield* Effect.result(startAndAwait);
+              // A subscription that lands after the race interrupted it
+              // cancels itself once its promise settles.
+              yield* Effect.promise(() => Promise.resolve());
               // Capture cleanup before the outer scope closes.
               return { outcome, cancelled, disconnects };
             }).pipe(Effect.timeoutOption("60 seconds")),
             "5 seconds",
           );
-        }).pipe(Effect.provide(TestContext.TestContext)),
+        }).pipe(Effect.provide(TestClock.layer())),
       );
 
       assert(Exit.isSuccess(exit));
       assert(exit.value._tag === "Some");
       const result = exit.value.value;
-      assert(result.outcome._tag === "Left");
-      expect(result.outcome.left._tag).toBe(errorTag);
+      assert(result.outcome._tag === "Failure");
+      expect(result.outcome.failure._tag).toBe(errorTag);
       expect(result.cancelled).toBe(1);
       expect(result.disconnects).toBe(1);
       expect(checks).toBe(errorTag === "MintUnreachable" ? 10 : 1);
@@ -684,7 +688,7 @@ describe("Topup", () => {
           "1 second",
         );
         yield* TestClock.adjust("60 seconds");
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     assert(Exit.isSuccess(exit));
@@ -764,7 +768,7 @@ describe("Topup", () => {
         // The TestClock starts at 0, which is not a UnixSeconds.
         yield* TestClock.adjust("1000 seconds");
         return yield* runOnTestClock(startAndAwait, "5 seconds");
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     assert(Exit.isSuccess(exit));
@@ -816,7 +820,7 @@ describe("Topup", () => {
         // Short enough that the poll never reaches its own next tick before
         // the backoff lets the second subscription through.
         return yield* runOnTestClock(startAndAwait, "1 second");
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     assert(Exit.isSuccess(exit));
@@ -907,7 +911,7 @@ const paidQuote = (locked: boolean) =>
 const adoptAndAwait = (draft: PaidQuoteDraft, key?: QuoteLockingKey) =>
   Effect.gen(function* () {
     const topup = yield* Topup;
-    return yield* Effect.either(
+    return yield* Effect.result(
       topup.adopt(draft, key === undefined ? {} : { lockingKey: key }),
     );
   });
@@ -923,15 +927,15 @@ describe("Topup.adopt", () => {
     const exit = await run(adoptAndAwait(paidQuote(false)));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Right");
-    expect(exit.value.right.amount).toBe(16);
-    expect(exit.value.right.quoteId).toBe(quoteId);
+    assert(exit.value._tag === "Success");
+    expect(exit.value.success.amount).toBe(16);
+    expect(exit.value.success.quoteId).toBe(quoteId);
     expect(mintCounters).toEqual([1]);
     expect(mintConfigs).toEqual([undefined]);
 
     expect(proofsIn(await storedProofs(storage), "available")).toHaveLength(2);
     expect(await onlyTopup(storage)).toMatchObject({
-      id: exit.value.right.operationId,
+      id: exit.value.success.operationId,
       status: "done",
       locked: false,
     });
@@ -953,7 +957,7 @@ describe("Topup.adopt", () => {
     const exit = await run(adoptAndAwait(paidQuote(true), lockingKey));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Right");
+    assert(exit.value._tag === "Success");
     expect(mintConfigs).toEqual([{ privkey: lockingKey }]);
     expect((await onlyTopup(storage)).locked).toBe(true);
     // The key must never leave through the inspector or the store.
@@ -973,8 +977,8 @@ describe("Topup.adopt", () => {
     const exit = await run(adoptAndAwait(paidQuote(true)));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("MintRejected");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("MintRejected");
     expect(mintCounters).toEqual([]);
     expect(await topupOperations(storage)).toEqual([]);
   });
@@ -989,8 +993,8 @@ describe("Topup.adopt", () => {
     const exit = await run(adoptAndAwait(paidQuote(false)));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("QuoteAlreadyIssued");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("QuoteAlreadyIssued");
     expect(mintCounters).toEqual([]);
     expect(restoreCalls).toEqual([]);
     expect(await topupOperations(storage)).toEqual([]);
@@ -1007,8 +1011,8 @@ describe("Topup.adopt", () => {
     const exit = await run(adoptAndAwait(paidQuote(false)));
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left._tag).toBe("MintRejected");
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure._tag).toBe("MintRejected");
     expect(mintCounters).toEqual([]);
     expect(await topupOperations(storage)).toEqual([]);
   });
@@ -1023,8 +1027,8 @@ describe("Topup.adopt", () => {
       adoptAndAwait(paidQuote(true), lockingKey),
     );
     assert(Exit.isSuccess(crashed));
-    assert(crashed.value._tag === "Left");
-    expect(crashed.value.left._tag).toBe("MintUnreachable");
+    assert(crashed.value._tag === "Failure");
+    expect(crashed.value.failure._tag).toBe("MintUnreachable");
     expect(await pendingTopups(storage)).toMatchObject([
       { locked: true, counter: 1 },
     ]);
@@ -1036,12 +1040,12 @@ describe("Topup.adopt", () => {
       Effect.gen(function* () {
         const handles = yield* (yield* Topup).resumePending();
         const first = handles[0];
-        return first === undefined ? null : yield* Effect.either(first.result);
+        return first === undefined ? null : yield* Effect.result(first.result);
       }),
     );
     assert(Exit.isSuccess(stuck));
-    assert(stuck.value?._tag === "Left");
-    expect(stuck.value.left._tag).toBe("MintRejected");
+    assert(stuck.value?._tag === "Failure");
+    expect(stuck.value.failure._tag).toBe("MintRejected");
     expect(keyless.mintCounters).toEqual([]);
     expect(await pendingTopups(storage)).toHaveLength(1);
 

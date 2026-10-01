@@ -1,4 +1,4 @@
-import { Registry } from "./index";
+import { AtomRegistry } from "./index";
 import {
   ClientId,
   NostrTransport,
@@ -31,7 +31,7 @@ const disposableTransport = (
   published: Array<SignedWrapEvent>,
   onDispose: () => void,
 ): Layer.Layer<NostrTransport> =>
-  Layer.scoped(
+  Layer.effect(
     NostrTransport,
     Effect.acquireRelease(
       Effect.sync(() => stubWrapTransportService(published)),
@@ -44,14 +44,17 @@ const twoRelays = {
   writeRelays: [relayA, relayB],
 };
 
-const retract = (registry: Registry.Registry, retraction: RetractionDraft) => {
+const retract = (
+  registry: AtomRegistry.AtomRegistry,
+  retraction: RetractionDraft,
+) => {
   registry.set(retractReactionAtom, retraction);
   return settle(registry, retractReactionAtom);
 };
 
 describe("retractReactionAtom", () => {
   it("delivers via the configured transport and returns a receipt", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const published: Array<SignedWrapEvent> = [];
     registry.set(
       linkstrConfigAtom,
@@ -71,7 +74,7 @@ describe("retractReactionAtom", () => {
   });
 
   it("fails with LinkstrNotConfigured while logged out", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
 
     const exit = await retract(registry, draft);
 
@@ -81,7 +84,7 @@ describe("retractReactionAtom", () => {
   });
 
   it("rebuilds the runtime on config change and disposes the old one", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const unmount = registry.mount(retractReactionAtom);
     const disposed: Array<string> = [];
     const publishedAsAlice: Array<SignedWrapEvent> = [];

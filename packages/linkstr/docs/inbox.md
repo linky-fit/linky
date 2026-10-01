@@ -108,7 +108,7 @@ const decodePushed = (wrapId: WrapId) =>
     { secretKey, readRelays },
     Effect.flatMap(WrapInbox, (inbox) =>
       inbox.fetchWrapEvent(wrapId, { timeout: "8 seconds" }),
-    ).pipe(Effect.catchAll(() => Effect.succeed(null))),
+    ).pipe(Effect.catch(() => Effect.succeed(null))),
   );
 ```
 

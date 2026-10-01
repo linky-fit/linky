@@ -1,6 +1,11 @@
-// Re-export the effect-atom react surface so app code consumes the atoms
-// below via useAtomSet/useAtomValue without depending on the 0.x library.
-export * from "@effect-atom/atom-react";
+// Re-export the atom surface so app code consumes the atoms below via
+// useAtomSet/useAtomValue without depending on the unstable atom modules.
+export * from "@effect/atom-react/Hooks";
+export * from "@effect/atom-react/ReactHydration";
+export * from "@effect/atom-react/RegistryContext";
+// Namespaced: the package barrel flattens ScopedAtom's `make` into the root.
+export * as ScopedAtom from "@effect/atom-react/ScopedAtom";
+export * from "effect/reactivity";
 
 export * from "./bankOffers";
 export * from "./config";

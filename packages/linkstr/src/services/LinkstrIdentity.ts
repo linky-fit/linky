@@ -7,10 +7,10 @@ export interface LinkstrIdentityService {
   readonly secretKey: NostrSecretKey;
 }
 
-export class LinkstrIdentity extends Context.Tag("linkstr/LinkstrIdentity")<
+export class LinkstrIdentity extends Context.Service<
   LinkstrIdentity,
   LinkstrIdentityService
->() {
+>()("linkstr/LinkstrIdentity") {
   static fromSecretKey(
     secretKey: NostrSecretKey,
   ): Layer.Layer<LinkstrIdentity> {

@@ -1,5 +1,5 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { Effect, Either, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import {
   AmountConsumedByFee,
   MintRejected,
@@ -66,7 +66,9 @@ const isTransient = (error: AcceptFailure): boolean =>
   error._tag === "MintUnreachable" || error._tag === "CounterLockTimeout";
 
 /** Serialized onto failed transfers; every member is a tagged Schema error. */
-const encodeStoredError = Schema.encodeSync(Schema.parseJson(ReceiveError));
+const encodeStoredError = Schema.encodeSync(
+  Schema.fromJsonString(ReceiveError),
+);
 
 /** A token found in arbitrary text, decoded to what accepting it needs. */
 export interface ReceivableToken {
@@ -112,7 +114,7 @@ export interface ReceiveContext {
   readonly kv: KeyValueStoreService;
   readonly proofStore: ProofStoreService;
   readonly operationStore: OperationStoreService;
-  readonly instances: WalletInstances;
+  readonly instances: WalletInstances["Service"];
   readonly inspector: InspectorService;
 }
 
@@ -142,7 +144,7 @@ const swapAtMint = (
       let counter = yield* readCounter(ctx.kv, scope);
       let lastCollision: unknown = null;
       for (let attempt = 0; attempt < MAX_SWAP_ATTEMPTS; attempt += 1) {
-        const outcome = yield* Effect.either(
+        const outcome = yield* Effect.result(
           Effect.tryPromise({
             try: () =>
               wallet.receive(tokenText, undefined, {
@@ -152,8 +154,8 @@ const swapAtMint = (
             catch: (error): unknown => error,
           }),
         );
-        if (Either.isRight(outcome)) {
-          const proofs = outcome.right;
+        if (Result.isSuccess(outcome)) {
+          const proofs = outcome.success;
           yield* advanceCounterTo(
             ctx.kv,
             ctx.inspector,
@@ -163,7 +165,7 @@ const swapAtMint = (
           );
           return proofs;
         }
-        const raw = outcome.left;
+        const raw = outcome.failure;
         if (isTokenAlreadySpentError(raw)) {
           return yield* new TokenAlreadySpent({ mint: scope.mint });
         }
@@ -383,11 +385,11 @@ export const receiveTokenText = (
           )
         : yield* reopen(ctx, replaced.operation, reason);
 
-    const accepted = yield* Effect.either(
+    const accepted = yield* Effect.result(
       acceptAtMint(ctx, wallet, parsed, reason),
     );
-    if (Either.isLeft(accepted)) {
-      const error = accepted.left;
+    if (Result.isFailure(accepted)) {
+      const error = accepted.failure;
       if (transfer.kind === "receive") {
         yield* patchOperation(
           ctx,
@@ -438,9 +440,9 @@ export const receiveTokenText = (
     }
     return new ReceiveReceipt({
       operationId: transfer.id,
-      tokenText: accepted.right.tokenText,
+      tokenText: accepted.success.tokenText,
       mint: parsed.mint,
       unit: parsed.unit,
-      amount: accepted.right.amount,
+      amount: accepted.success.amount,
     });
   });

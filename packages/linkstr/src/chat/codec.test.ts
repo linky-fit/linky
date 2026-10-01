@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import { getEventHash } from "nostr-tools";
 import { encrypt, getConversationKey } from "nostr-tools/nip44";
 import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
@@ -235,7 +235,7 @@ describe("chat rumor encoding", () => {
     expect(rumor.tags).not.toContainEqual(["dim", expect.anything()]);
     expect(rumor.tags).toContainEqual(["name", "invoice.pdf"]);
     expect(decodeChatRumor(rumor, bob, wrapAuthor.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           body: expect.objectContaining({ _tag: "ImageBody", image: pdf }),
         }),
@@ -279,7 +279,7 @@ describe("chat rumor decoding", () => {
     );
 
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           _tag: "OwnChatMessageConfirmed",
           messageId: rumor.id,
@@ -307,7 +307,7 @@ describe("chat rumor decoding", () => {
     );
 
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           _tag: "ChatMessageReceived",
           from: bob.pubkey,
@@ -327,7 +327,7 @@ describe("chat rumor decoding", () => {
     const decoded = decodeChatRumor(rumor, alice, wrapAuthor.pubkey);
 
     expect(decoded).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           body: expect.objectContaining({ _tag: "ImageBody", image }),
         }),
@@ -348,7 +348,7 @@ describe("chat rumor decoding", () => {
     });
 
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           body: expect.objectContaining({
             _tag: "TokenBody",
@@ -370,7 +370,7 @@ describe("chat rumor decoding", () => {
     });
 
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           body: expect.objectContaining({ _tag: "TextBody", text: content }),
         }),
@@ -391,7 +391,7 @@ describe("chat rumor decoding", () => {
     );
 
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           editOf: editId,
           body: expect.objectContaining({
@@ -420,7 +420,7 @@ describe("chat rumor decoding", () => {
     });
 
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({ editOf: editId, replyTo: null, root: null }),
       ),
     );
@@ -467,7 +467,7 @@ describe("chat rumor decoding", () => {
     });
 
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.right(expect.objectContaining({ root, replyTo })),
+      Result.succeed(expect.objectContaining({ root, replyTo })),
     );
   });
 
@@ -553,7 +553,7 @@ describe("chat rumor decoding", () => {
     },
   ])("drops $name", ({ rumor, reason }) => {
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.left(reason),
+      Result.fail(reason),
     );
   });
 
@@ -571,7 +571,7 @@ describe("chat rumor decoding", () => {
     });
 
     expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
-      Either.left("nested-payload"),
+      Result.fail("nested-payload"),
     );
   });
 });

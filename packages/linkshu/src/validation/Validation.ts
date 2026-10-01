@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { OperationNotFound } from "../domain/errors";
 import type { CurrencyUnit, MintUrl, OperationId } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
@@ -73,11 +73,10 @@ const answerAt = (
  * answer is never a guess. Mint unavailability is data in the reports,
  * never a failure of the operation.
  */
-export class Validation extends Effect.Service<Validation>()(
+export class Validation extends Context.Service<Validation>()(
   "linkshu/Validation",
   {
-    dependencies: [WalletInstances.Default],
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const proofStore = yield* ProofStore;
       const operationStore = yield* OperationStore;
       const instances = yield* WalletInstances;
@@ -99,7 +98,7 @@ export class Validation extends Effect.Service<Validation>()(
             group.mint,
             group.proofs.map(toDomainProof),
           );
-        }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+        }).pipe(Effect.catch(() => Effect.succeed(null)));
 
       /** Persists what one mint answer settles; returns the spent proofs. */
       const applyAnswer = (
@@ -374,4 +373,9 @@ export class Validation extends Effect.Service<Validation>()(
       } as const;
     }),
   },
-) {}
+) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

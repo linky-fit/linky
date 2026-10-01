@@ -214,17 +214,17 @@ describe("adopting externally paid quotes against the local mint", () => {
     const adoptOnce = () =>
       runLinkshu(
         { bip39Seed: seed, ...layers },
-        Effect.flatMap(Topup, (topup) => Effect.either(topup.adopt(draft))),
+        Effect.flatMap(Topup, (topup) => Effect.result(topup.adopt(draft))),
       );
 
     const first = await adoptOnce();
-    assert(first._tag === "Right");
-    expect(first.right.amount).toBe(24);
-    expect(first.right.quoteId).toBe(quote.quote);
+    assert(first._tag === "Success");
+    expect(first.success.amount).toBe(24);
+    expect(first.success.quoteId).toBe(quote.quote);
 
     const second = await adoptOnce();
-    assert(second._tag === "Left");
-    expect(second.left._tag).toBe("QuoteAlreadyIssued");
+    assert(second._tag === "Failure");
+    expect(second.failure._tag).toBe("QuoteAlreadyIssued");
 
     expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(24);
     expect(await pendingOperations(operations, "topup")).toEqual([]);
@@ -240,19 +240,19 @@ describe("adopting externally paid quotes against the local mint", () => {
 
     const withoutKey = await runLinkshu(
       { bip39Seed: seed, ...layers },
-      Effect.flatMap(Topup, (topup) => Effect.either(topup.adopt(draft))),
+      Effect.flatMap(Topup, (topup) => Effect.result(topup.adopt(draft))),
     );
-    assert(withoutKey._tag === "Left");
-    expect(withoutKey.left._tag).toBe("MintRejected");
+    assert(withoutKey._tag === "Failure");
+    expect(withoutKey.failure._tag).toBe("MintRejected");
 
     const withKey = await runLinkshu(
       { bip39Seed: seed, ...layers },
       Effect.flatMap(Topup, (topup) =>
-        Effect.either(topup.adopt(draft, { lockingKey: privkey })),
+        Effect.result(topup.adopt(draft, { lockingKey: privkey })),
       ),
     );
-    assert(withKey._tag === "Right");
-    expect(withKey.right.amount).toBe(40);
+    assert(withKey._tag === "Success");
+    expect(withKey.success.amount).toBe(40);
 
     const stored = await Effect.runPromise(proofs.loadAll);
     expect(stored.every((proof) => proof.state === "available")).toBe(true);

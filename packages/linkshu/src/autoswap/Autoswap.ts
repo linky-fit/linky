@@ -1,4 +1,4 @@
-import { Duration, Effect, Either } from "effect";
+import { Context, Duration, Effect, Layer, Result } from "effect";
 import { InsufficientFunds, PaymentFailed } from "../domain/errors";
 import type { MintRejected, MintUnreachable } from "../domain/errors";
 import { Amount, NonNegativeAmount, UnixSeconds } from "../domain/primitives";
@@ -72,9 +72,8 @@ const asAutoswapError = (error: MeltError): AutoswapError =>
  * counter slots so an interrupted claim never mints twice. When to trigger a
  * swap (thresholds, debounce, opt-in) stays caller policy.
  */
-export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
-  dependencies: [WalletInstances.Default, Melt.Default],
-  effect: Effect.gen(function* () {
+export class Autoswap extends Context.Service<Autoswap>()("linkshu/Autoswap", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const proofStore = yield* ProofStore;
     const operationStore = yield* OperationStore;
@@ -157,7 +156,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
       keysetId: PendingAutoswapClaim["keysetId"],
       amount: number,
     ): Effect.Effect<
-      Either.Either<AutoswapReceipt, InsufficientFunds>,
+      Result.Result<AutoswapReceipt, InsufficientFunds>,
       AutoswapError
     > =>
       Effect.gen(function* () {
@@ -181,26 +180,26 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
         });
         emitQuoteState(inspector, "autoswap", record, quote.state);
 
-        const paid = yield* Effect.either(
+        const paid = yield* Effect.result(
           melt.melt(
             new MeltDraft({ mint: draft.sourceMint, invoice: quote.invoice }),
           ),
         );
-        if (Either.isLeft(paid)) {
-          if (paid.left._tag !== "InsufficientFunds") {
-            return yield* Effect.fail(asAutoswapError(paid.left));
+        if (Result.isFailure(paid)) {
+          if (paid.failure._tag !== "InsufficientFunds") {
+            return yield* Effect.fail(asAutoswapError(paid.failure));
           }
           yield* records.settle(record, "failed");
-          return Either.left(paid.left);
+          return Result.fail(paid.failure);
         }
 
         const claimed = yield* awaitClaimable(target, record);
-        return Either.right(
+        return Result.succeed(
           new AutoswapReceipt({
             sourceMint: draft.sourceMint,
             targetMint: draft.targetMint,
             movedAmount: claimed.amount,
-            feePaid: paid.right.feePaid,
+            feePaid: paid.success.feePaid,
             operationId: claimed.operationId,
           }),
         );
@@ -224,7 +223,7 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
           });
         }
         const outcome = yield* swapAmount(draft, target, keysetId, amount);
-        return yield* outcome;
+        return yield* Effect.fromResult(outcome);
       });
 
     /** Move the whole balance, stepping down until the fees fit. */
@@ -241,15 +240,15 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
         for (let attempt = 0; attempt < MAX_AMOUNT_ATTEMPTS; attempt += 1) {
           if (amount <= 0) break;
           const outcome = yield* swapAmount(draft, target, keysetId, amount);
-          if (Either.isRight(outcome)) return outcome.right;
-          shortfall = outcome.left;
+          if (Result.isSuccess(outcome)) return outcome.success;
+          shortfall = outcome.failure;
           // The shortage prices this attempt's Lightning fee reserve
           // (`required - amount`); the next attempt gives that up along with
           // the input-fee margin. `amount - 1` only guards a mint reporting a
           // shortage the arithmetic cannot see, so the loop always shrinks.
           amount = Math.min(
-            outcome.left.available -
-              (outcome.left.required - amount) -
+            outcome.failure.available -
+              (outcome.failure.required - amount) -
               inputFee,
             amount - 1,
           );
@@ -428,14 +427,14 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
         if (state === QUOTE_UNPAID) return yield* expireOrKeep(pending);
         return yield* claimMintQuote(claimContext(wallet), pending).pipe(
           Effect.map((claimed) => resultOf(pending, "claimed", claimed)),
-          Effect.catchAll((error) =>
+          Effect.catch((error) =>
             error._tag === "MintRejected"
               ? expireOrKeep(pending)
               : Effect.succeed(resultOf(pending, "not-claimable-yet", null)),
           ),
         );
       }).pipe(
-        Effect.catchAll(() =>
+        Effect.catch(() =>
           Effect.succeed(resultOf(pending, "not-claimable-yet", null)),
         ),
       );
@@ -459,4 +458,9 @@ export class Autoswap extends Effect.Service<Autoswap>()("linkshu/Autoswap", {
 
     return { claim, estimate, resumePendingClaims } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide([WalletInstances.layer, Melt.layer]),
+  );
+}

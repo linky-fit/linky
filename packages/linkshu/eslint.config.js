@@ -35,9 +35,9 @@ export default defineConfig([
         ...restrictedSyntax,
         {
           selector:
-            "CallExpression[callee.property.name='emit'] > ArrowFunctionExpression > NewExpression:not(:has(ObjectExpression.arguments:nth-child(2) > Property[key.name='disableValidation'][value.value=true]))",
+            "CallExpression[callee.property.name='emit'] > ArrowFunctionExpression > NewExpression:not(:has(ObjectExpression.arguments:nth-child(2) > Property[key.name='disableChecks'][value.value=true]))",
           message:
-            "Build inspector events with `{ disableValidation: true }` so a bad field surfaces in the consumer, not as a failed wallet operation.",
+            "Build inspector events with `{ disableChecks: true }` so an off-brand field still reaches the feed.",
         },
       ],
     },

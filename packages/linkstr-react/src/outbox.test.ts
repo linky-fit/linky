@@ -1,4 +1,4 @@
-import { Registry } from "./index";
+import { AtomRegistry } from "./index";
 import {
   ClientId,
   MessageText,
@@ -31,7 +31,7 @@ const configOver = (published: Array<SignedWrapEvent>, storage: StubStorage) =>
   });
 
 const decodeStoredJobs = Schema.decodeUnknownSync(
-  Schema.parseJson(Schema.Array(StoredOutboxJob)),
+  Schema.fromJsonString(Schema.Array(StoredOutboxJob)),
 );
 
 const textInput = (ref: string) => ({
@@ -49,7 +49,7 @@ const textInput = (ref: string) => ({
 describe("outbox atoms", () => {
   it("enqueues, delivers, and acks only after the handler resolves", async () => {
     const storage = stubStorage();
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const published: Array<SignedWrapEvent> = [];
     registry.set(linkstrConfigAtom, configOver(published, storage));
 
@@ -88,7 +88,7 @@ describe("outbox atoms", () => {
 
   it("does not ack when the handler rejects", async () => {
     const storage = stubStorage();
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     registry.set(linkstrConfigAtom, configOver([], storage));
 
     let calls = 0;

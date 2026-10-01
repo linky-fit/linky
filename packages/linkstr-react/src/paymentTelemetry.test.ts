@@ -1,4 +1,4 @@
-import { Registry } from "./index";
+import { AtomRegistry } from "./index";
 import {
   ClientId,
   OutboxRef,
@@ -39,7 +39,7 @@ const draft = new PaymentTelemetryDraft({
 describe("enqueuePaymentTelemetryAtom", () => {
   it("delivers through the outbox and reports a telemetry receipt", async () => {
     const published: Array<SignedWrapEvent> = [];
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     registry.set(
       linkstrConfigAtom,
       configWith(alice, stubWrapTransport(published)),

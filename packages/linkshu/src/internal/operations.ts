@@ -35,7 +35,7 @@ export const inspectOperationWith =
             () =>
               new OperationSucceeded(
                 { name, params, result: redactResult(result) },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),
@@ -53,7 +53,7 @@ export const inspectFailureWith =
           () =>
             new OperationFailed(
               { name, params, error },
-              { disableValidation: true },
+              { disableChecks: true },
             ),
         ),
       ),
@@ -78,7 +78,7 @@ export const redactReceipt = <
   },
 >(
   receipt: R,
-) => Struct.omit(receipt, "tokenText", "proofs");
+) => Struct.omit(receipt, ["tokenText", "proofs"]);
 
 export interface OperationContext {
   readonly operationStore: OperationStoreService;
@@ -103,7 +103,7 @@ export const insertOperation = (
               to: stored.status,
               reason,
             },
-            { disableValidation: true },
+            { disableChecks: true },
           ),
       ),
     ),
@@ -131,7 +131,7 @@ export const patchOperation = (
               to,
               reason,
             },
-            { disableValidation: true },
+            { disableChecks: true },
           ),
       );
     }),

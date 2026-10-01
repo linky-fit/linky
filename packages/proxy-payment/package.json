@@ -18,7 +18,7 @@
   "dependencies": {
     "@linky-fit/linkstr": "workspace:*",
     "bysquare": "^4.0.0",
-    "effect": "^3.19.19"
+    "effect": "^4.0.0"
   },
   "devDependencies": {
     "@linky-fit/config": "workspace:*",

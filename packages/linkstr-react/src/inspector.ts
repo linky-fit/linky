@@ -1,4 +1,4 @@
-import { Atom } from "@effect-atom/atom-react";
+import { Atom } from "effect/reactivity";
 import { Inspector } from "@linky-fit/linkstr";
 import type { InspectorEvent } from "@linky-fit/linkstr";
 import { Effect, Stream } from "effect";

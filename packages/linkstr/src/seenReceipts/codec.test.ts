@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import { ClientId, UnixSeconds } from "../domain/primitives";
 import { decodeWrapEvent } from "../inbox/decodeWrapEvent";
 import { wrapRumorFor } from "../internal/giftWrap";
@@ -87,7 +87,7 @@ describe("decodeSeenReceiptRumor validation", () => {
       tags: validRumor.tags.filter((tag) => tag[0] !== "linky"),
     });
     expect(decodeSeenReceiptRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-seen-receipt"),
+      Result.fail("invalid-seen-receipt"),
     );
   });
 
@@ -96,7 +96,7 @@ describe("decodeSeenReceiptRumor validation", () => {
     (content) => {
       const rumor = rumorWith({ content });
       expect(decodeSeenReceiptRumor(rumor, bob.pubkey)).toEqual(
-        Either.left("invalid-seen-receipt"),
+        Result.fail("invalid-seen-receipt"),
       );
     },
   );
@@ -106,21 +106,21 @@ describe("decodeSeenReceiptRumor validation", () => {
       tags: validRumor.tags.filter((tag) => tag[0] !== "since"),
     });
     expect(decodeSeenReceiptRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-seen-receipt"),
+      Result.fail("invalid-seen-receipt"),
     );
   });
 
   it("rejects an empty window (since >= seenUpTo)", () => {
     const rumor = rumorWith({ content: String(sinceSec) });
     expect(decodeSeenReceiptRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-seen-receipt"),
+      Result.fail("invalid-seen-receipt"),
     );
   });
 
   it("rejects a receipt not addressed to me", () => {
     const mallory = makeIdentity();
     expect(decodeSeenReceiptRumor(validRumor, mallory.pubkey)).toEqual(
-      Either.left("not-addressed-to-me"),
+      Result.fail("not-addressed-to-me"),
     );
   });
 
@@ -131,14 +131,14 @@ describe("decodeSeenReceiptRumor validation", () => {
       ),
     });
     expect(decodeSeenReceiptRumor(rumor, alice.pubkey)).toEqual(
-      Either.left("invalid-seen-receipt"),
+      Result.fail("invalid-seen-receipt"),
     );
   });
 
   it("rejects unsupported kinds", () => {
     const rumor = rumorWith({ kind: 1 });
     expect(decodeSeenReceiptRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("unsupported-kind"),
+      Result.fail("unsupported-kind"),
     );
   });
 });

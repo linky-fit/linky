@@ -14,7 +14,7 @@ export class TokenBody extends Schema.TaggedClass<TokenBody>()("TokenBody", {
   token: CashuTokenText,
 }) {}
 
-export const MessageBody = Schema.Union(TextBody, ImageBody, TokenBody);
+export const MessageBody = Schema.Union([TextBody, ImageBody, TokenBody]);
 export type MessageBody = typeof MessageBody.Type;
 
 export class ChatMessageReceived extends Schema.TaggedClass<ChatMessageReceived>()(
@@ -49,8 +49,8 @@ export class OwnChatMessageConfirmed extends Schema.TaggedClass<OwnChatMessageCo
   },
 ) {}
 
-export const ChatInboxEvent = Schema.Union(
+export const ChatInboxEvent = Schema.Union([
   ChatMessageReceived,
   OwnChatMessageConfirmed,
-);
+]);
 export type ChatInboxEvent = typeof ChatInboxEvent.Type;

@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
-import { describe, expect, it } from "vitest";
+import { Slip39 } from "slip39-ts";
+import { describe, expect, it, vi } from "vitest";
 import { IdentityProvider } from "./IdentityProvider";
 import { MasterSecretProvider } from "./MasterSecretProvider";
 import {
@@ -16,7 +17,7 @@ const runIdentity = <E>(
   Effect.runPromise(
     Effect.provide(
       IdentityProvider,
-      Layer.provideMerge(IdentityProvider.Live, masterSecretLayer),
+      Layer.provideMerge(IdentityProvider.layer, masterSecretLayer),
     ),
   );
 
@@ -52,6 +53,21 @@ describe("SLIP-39", () => {
     await expect(
       Effect.runPromise(recoverMasterSecretFromSlip39Shares([])),
     ).rejects.toThrow();
+  });
+
+  it("rejects a recovered secret holding non-byte values", async () => {
+    const share = await Effect.runPromise(createSlip39Share());
+    const parsed = await Effect.runPromise(parseSlip39Share(share));
+    const recoverSecret = vi
+      .spyOn(Slip39, "recoverSecret")
+      .mockResolvedValue([256, ...Array<number>(15).fill(0)]);
+    try {
+      await expect(
+        Effect.runPromise(recoverMasterSecretFromSlip39Share(parsed)),
+      ).rejects.toThrow("Recovered SLIP-39 secret has invalid byte shape");
+    } finally {
+      recoverSecret.mockRestore();
+    }
   });
 
   it("derives the same identity from a share pasted with case and spacing noise", async () => {

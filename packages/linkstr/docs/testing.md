@@ -42,7 +42,7 @@ const relay = RelayUrl.make("wss://relay.test");
 
 const wrapFromBob = async (): Promise<SignedWrapEvent> => {
   const published: Array<SignedWrapEvent> = [];
-  const asBob = Reactions.Default.pipe(
+  const asBob = Reactions.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
         LinkstrIdentity.fromSecretKey(bob.secretKey),
@@ -72,7 +72,7 @@ const wrapFromBob = async (): Promise<SignedWrapEvent> => {
 it("routes a wrap into a typed fact", async () => {
   const wrap = await wrapFromBob();
   const fake = new FakeRelay();
-  const layer = WrapInbox.Default.pipe(
+  const layer = WrapInbox.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
         LinkstrIdentity.fromSecretKey(alice.secretKey),
@@ -112,15 +112,15 @@ The `asBob` layer is also the shape of a plain send test: run the operation agai
 
 ## `@linky-fit/linkstr-react/testing`
 
-`configWith(identity, transport, overrides?)` builds a `LinkstrConfig` on one relay (`relayA`) over the given transport layer; `settle(registry, fnAtom)` awaits the fn atom's `Result` as an `Exit`; `fakeTransport(published, subscriptions, stored?, fetchedFilters?)` (and `fakeTransportLayer`) accepts every publish, records subscriptions and serves `stored` to fetches. `relayA`, `relayB` and `makeIdentity` are re-exported. Drive atoms with a bare `Registry` instead of rendering:
+`configWith(identity, transport, overrides?)` builds a `LinkstrConfig` on one relay (`relayA`) over the given transport layer; `settle(registry, fnAtom)` awaits the fn atom's `AsyncResult` as an `Exit`; `fakeTransport(published, subscriptions, stored?, fetchedFilters?)` (and `fakeTransportLayer`) accepts every publish, records subscriptions and serves `stored` to fetches. `relayA`, `relayB` and `makeIdentity` are re-exported. Drive atoms with a bare `AtomRegistry` instead of rendering:
 
 ```ts
 import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
 import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import {
+  AtomRegistry,
   linkstrConfigAtom,
-  Registry,
   retractReactionAtom,
 } from "@linky-fit/linkstr-react";
 import {
@@ -133,7 +133,7 @@ import { Exit } from "effect";
 it("retracts through the configured transport", async () => {
   const alice = makeIdentity();
   const bob = makeIdentity();
-  const registry = Registry.make();
+  const registry = AtomRegistry.make();
   const published: Array<SignedWrapEvent> = [];
   registry.set(
     linkstrConfigAtom,

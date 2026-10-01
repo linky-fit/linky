@@ -67,7 +67,7 @@ Per-relay reconnects are automatic and never reach `onFatal`. `onFatal` means th
 
 ## The push codec
 
-`decodePushWrap(raw)` returns `Either<PushWrap, PushWrapFailure>`:
+`decodePushWrap(raw)` returns `Result<PushWrap, PushWrapFailure>`:
 
 | Failure                      | Cause                                                       |
 | ---------------------------- | ----------------------------------------------------------- |

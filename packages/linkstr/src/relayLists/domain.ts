@@ -7,7 +7,7 @@ export class RelayListEntry extends Schema.Class<RelayListEntry>(
   "RelayListEntry",
 )({
   relay: RelayUrl,
-  marker: Schema.NullOr(Schema.Literal("read", "write")),
+  marker: Schema.NullOr(Schema.Literals(["read", "write"])),
 }) {}
 
 export class RelayListsDraft extends Schema.Class<RelayListsDraft>(

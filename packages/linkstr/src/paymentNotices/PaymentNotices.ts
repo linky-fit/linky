@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { WrapNotDelivered } from "../domain/errors";
 import { freshClientId } from "../internal/operations";
 import { nowSeconds } from "../internal/time";
@@ -6,10 +6,10 @@ import { makeWrapSendContext, sendToRecipient } from "../internal/wrapSend";
 import { encodePaymentNoticeRumor } from "./codec";
 import { PaymentNoticeReceipt, type PaymentNoticeDraft } from "./domain";
 
-export class PaymentNotices extends Effect.Service<PaymentNotices>()(
+export class PaymentNotices extends Context.Service<PaymentNotices>()(
   "linkstr/PaymentNotices",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const context = yield* makeWrapSendContext;
 
       const send = (
@@ -36,4 +36,6 @@ export class PaymentNotices extends Effect.Service<PaymentNotices>()(
       return { send } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

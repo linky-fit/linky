@@ -18,9 +18,9 @@ class CachedFeeProbe extends Schema.Class<CachedFeeProbe>("CachedFeeProbe")({
   at: UnixSeconds,
 }) {}
 
-const encodeCached = Schema.encodeSync(Schema.parseJson(CachedFeeProbe));
+const encodeCached = Schema.encodeSync(Schema.fromJsonString(CachedFeeProbe));
 const decodeCached = Schema.decodeUnknownOption(
-  Schema.parseJson(CachedFeeProbe),
+  Schema.fromJsonString(CachedFeeProbe),
 );
 
 export const feeProbeCacheKey = (mint: MintUrl): string =>

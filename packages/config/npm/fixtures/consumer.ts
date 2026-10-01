@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import {
   Bip39Seed,
   Receive,
@@ -23,10 +23,13 @@ export async function checkConsumer() {
       const balances = yield* tokens.balances;
       if (balances.total !== 0) throw new Error("Fresh wallet has a balance");
       const receive = yield* Receive;
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         receive.receive(new ReceiveDraft({ text: "not a cashu token" })),
       );
-      if (!Either.isLeft(result) || result.left._tag !== "TokenParseFailed") {
+      if (
+        !Result.isFailure(result) ||
+        result.failure._tag !== "TokenParseFailed"
+      ) {
         throw new Error("Invalid token did not return the public typed error");
       }
     }),

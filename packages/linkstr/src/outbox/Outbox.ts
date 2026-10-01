@@ -1,4 +1,14 @@
-import { Cause, Duration, Effect, Exit, Option, Queue, Stream } from "effect";
+import {
+  Cause,
+  Context,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Queue,
+  Stream,
+} from "effect";
 import { Chat } from "../chat/Chat";
 import {
   encodeEditRumor,
@@ -46,6 +56,7 @@ import type {
   RumorFixedOperation,
 } from "./domain";
 import { OutboxStore } from "./OutboxStore";
+import { acquireStreamQueue } from "../internal/streamQueue";
 
 const INITIAL_BACKOFF = Duration.seconds(1);
 const MAX_BACKOFF = Duration.seconds(60);
@@ -143,8 +154,8 @@ const isOnlineEventTarget = (value: unknown): value is OnlineEventTarget =>
  * than the current one fail with "identity-changed" at startup; runtime
  * identity changes rebuild the whole runtime, so no live watching is needed.
  */
-export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
-  scoped: Effect.gen(function* () {
+export class Outbox extends Context.Service<Outbox>()("linkstr/Outbox", {
+  make: Effect.gen(function* () {
     const store = yield* OutboxStore;
     const chat = yield* Chat;
     const reactions = yield* Reactions;
@@ -152,9 +163,8 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
     const identity = yield* LinkstrIdentity;
     const inspector = yield* Inspector.orNoop;
 
-    const terminals = yield* Effect.acquireRelease(
-      Queue.unbounded<OutboxResult>(),
-      Queue.shutdown,
+    const terminals = yield* acquireStreamQueue(
+      Queue.unbounded<OutboxResult, Cause.Done>(),
     );
     const wakes: Record<OutboxLane, Queue.Queue<void>> = {
       foreground: yield* Effect.acquireRelease(
@@ -170,7 +180,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
     const target: unknown = globalThis;
     if (isOnlineEventTarget(target)) {
       const flush = (): void => {
-        for (const lane of LANES) Queue.unsafeOffer(wakes[lane], undefined);
+        for (const lane of LANES) Queue.offerUnsafe(wakes[lane], undefined);
       };
       yield* Effect.acquireRelease(
         Effect.sync(() => target.addEventListener("online", flush)),
@@ -224,7 +234,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
                   eventIds: [EventId.make(result.receipt.rumorId)],
                   result,
                 },
-                { disableValidation: true },
+                { disableChecks: true },
               )
             : new OperationFailed(
                 {
@@ -232,7 +242,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
                   params: { jobId: job.jobId, ref: job.ref },
                   error: result,
                 },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
         );
       });
@@ -255,10 +265,10 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
               }),
             );
           }
-          if (Cause.isInterruptedOnly(attempt.cause)) {
+          if (Cause.hasInterruptsOnly(attempt.cause)) {
             return yield* Effect.interrupt;
           }
-          if (Option.isNone(Cause.failureOption(attempt.cause))) {
+          if (Option.isNone(Cause.findErrorOption(attempt.cause))) {
             return yield* settle(
               job,
               new OutboxJobFailed({
@@ -365,7 +375,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
                 eventIds: [EventId.make(rumor.id)],
                 result: receipt,
               },
-              { disableValidation: true },
+              { disableChecks: true },
             ),
         );
         return receipt;
@@ -397,7 +407,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
                 eventIds: [],
                 result: { jobId: job.jobId },
               },
-              { disableValidation: true },
+              { disableChecks: true },
             ),
         );
         return job.jobId;
@@ -414,4 +424,6 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
       ack,
     } as const;
   }),
-}) {}
+}) {
+  static readonly layer = Layer.effect(this, this.make);
+}

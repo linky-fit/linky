@@ -80,7 +80,7 @@ const OfferContent = Schema.Struct({
   type: Schema.Literal("linky.bank_payment_offer"),
 });
 const decodeOfferContent = Schema.decodeUnknownOption(
-  Schema.parseJson(OfferContent),
+  Schema.fromJsonString(OfferContent),
 );
 
 const readPositiveSeconds = (value: unknown): number | null =>

@@ -43,8 +43,8 @@ export class OwnBankOfferSnapshotConfirmed extends Schema.TaggedClass<OwnBankOff
   },
 ) {}
 
-export const BankOfferInboxEvent = Schema.Union(
+export const BankOfferInboxEvent = Schema.Union([
   BankOfferSnapshotReceived,
   OwnBankOfferSnapshotConfirmed,
-);
+]);
 export type BankOfferInboxEvent = typeof BankOfferInboxEvent.Type;

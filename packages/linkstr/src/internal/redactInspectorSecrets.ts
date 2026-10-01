@@ -13,7 +13,7 @@ const isCashuTokenField = (field: string, value: unknown): boolean =>
   field === "token" && typeof value === "string" && value.startsWith("cashu");
 
 const redactRecord = (value: Record<string, unknown>): unknown => {
-  if (isAttachment(value)) return Struct.omit(value, "key", "nonce");
+  if (isAttachment(value)) return Struct.omit(value, ["key", "nonce"]);
   let changed = false;
   const redacted: Record<string, unknown> = {};
   for (const [field, nested] of Object.entries(value)) {
@@ -36,6 +36,6 @@ export const redactInspectorSecrets = (value: unknown): unknown => {
       ? value
       : redacted;
   }
-  if (Predicate.isRecord(value)) return redactRecord(value);
+  if (Predicate.isObject(value)) return redactRecord(value);
   return value;
 };

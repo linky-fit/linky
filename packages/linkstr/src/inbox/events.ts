@@ -7,11 +7,11 @@ import { WrapId } from "../domain/primitives";
  * EOSE conservatively stays in backfill (a missed interruption, never a
  * spurious one).
  */
-export const InboxDelivery = Schema.Literal("backfill", "live");
+export const InboxDelivery = Schema.Literals(["backfill", "live"]);
 export type InboxDelivery = typeof InboxDelivery.Type;
 
 // Each new vertical adds its own reason so drops never masquerade as another vertical's failure.
-export const DropReason = Schema.Literal(
+export const DropReason = Schema.Literals([
   "malformed-wrap",
   "invalid-wrap",
   "invalid-rumor-timestamp",
@@ -32,7 +32,7 @@ export const DropReason = Schema.Literal(
   "invalid-notice",
   "invalid-bank-offer",
   "invalid-seen-receipt",
-);
+]);
 export type DropReason = typeof DropReason.Type;
 
 /** A wrap we chose not to surface, with a typed, observable reason. */
