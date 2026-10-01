@@ -3,9 +3,13 @@ import { Either, Schema } from "effect";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
+  CounterLockTimeout,
+  CurrencyUnit,
+  KeysetId,
   MintUrl,
   ReceiveReceipt,
   TokenAlreadySpent,
+  TokenParseFailed,
   TokenTransfer,
 } from "@linky-fit/linkshu";
 import { createTransferFixture } from "../../../testUtils/cashuInventory";
@@ -24,8 +28,9 @@ const setup = async (
   cashuTransfers: readonly TokenTransfer[] = [],
 ) => {
   const ref: { current: SaveCashuFromText | null } = { current: null };
-  const logPaymentEvent = vi.fn();
   const setStatus = vi.fn();
+  const setCashuDraft = vi.fn();
+  const logPaymentEvent = vi.fn();
 
   const Probe = (): null => {
     const cashu = useCashuDomain({ cashuTransfers, walletLoaded: true });
@@ -46,7 +51,7 @@ const setup = async (
       receiveCashuToken,
       refreshMintInfo: async () => undefined,
       rememberCashuTokenKnown: cashu.rememberCashuTokenKnown,
-      setCashuDraft: () => undefined,
+      setCashuDraft,
       setCashuIsBusy: () => undefined,
       setStatus,
       showPaidOverlay: () => undefined,
@@ -61,7 +66,7 @@ const setup = async (
 
   await renderIntoDocument(<Probe />);
   if (!ref.current) throw new Error("hook did not render");
-  return { save: ref.current, logPaymentEvent, setStatus };
+  return { save: ref.current, setStatus, setCashuDraft, logPaymentEvent };
 };
 
 const receiveTransfer = (status: "pending" | "done") =>
@@ -69,13 +74,14 @@ const receiveTransfer = (status: "pending" | "done") =>
     createTransferFixture({ kind: "receive", status }),
   );
 
+const mint = MintUrl.make("https://x.cz");
+
+const alreadySpent: ReceiveCashuToken = async () =>
+  Either.left(new TokenAlreadySpent({ mint }));
+
 describe("useSaveCashuFromText", () => {
   it("resolves terminally when the mint reports the token already spent", async () => {
-    const { save } = await setup(async () =>
-      Either.left(
-        new TokenAlreadySpent({ mint: MintUrl.make("https://x.cz") }),
-      ),
-    );
+    const { save } = await setup(alreadySpent);
     const onResolved = vi.fn();
 
     await save("cashuBspenttoken", { onResolved });
@@ -133,5 +139,80 @@ describe("useSaveCashuFromText", () => {
     expect(setStatus).toHaveBeenCalledWith("cashuExists");
     expect(receive).not.toHaveBeenCalled();
     expect(onResolved).toHaveBeenCalledWith("terminal");
+  });
+
+  it("reports a spent token the user pasted", async () => {
+    const { save, setStatus, logPaymentEvent } = await setup(alreadySpent);
+
+    await save("cashuBspenttoken");
+
+    expect(setStatus).toHaveBeenCalledWith("cashuAccepting");
+    expect(setStatus).toHaveBeenLastCalledWith(
+      expect.stringContaining("cashuAcceptFailed"),
+    );
+    expect(logPaymentEvent).toHaveBeenCalledOnce();
+  });
+
+  it("stays silent on a spent token an automatic receive found in history", async () => {
+    const { save, setStatus, logPaymentEvent } = await setup(alreadySpent);
+    const onResolved = vi.fn();
+
+    await save("cashuBspenttoken", { automatic: true, onResolved });
+
+    expect(onResolved).toHaveBeenCalledWith("terminal");
+    expect(setStatus).not.toHaveBeenCalled();
+    expect(logPaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps the paste draft for an automatic receive", async () => {
+    const { save, setCashuDraft } = await setup(alreadySpent);
+
+    await save("cashuBspenttoken", { automatic: true });
+
+    expect(setCashuDraft).not.toHaveBeenCalled();
+  });
+
+  it("stays silent on an automatic receive that throws", async () => {
+    const { save, setStatus, logPaymentEvent } = await setup(async () => {
+      throw new Error("mint unreachable");
+    });
+    const onResolved = vi.fn();
+
+    await save("cashuBtransient", { automatic: true, onResolved });
+
+    expect(onResolved).toHaveBeenCalledWith("transient");
+    expect(setStatus).not.toHaveBeenCalled();
+    expect(logPaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it("logs no history failure for an automatic receive that will be retried", async () => {
+    const { save, logPaymentEvent } = await setup(async () =>
+      Either.left(
+        new CounterLockTimeout({
+          mint,
+          unit: CurrencyUnit.make("sat"),
+          keysetId: KeysetId.make("009a1f293253e41e"),
+        }),
+      ),
+    );
+    const onResolved = vi.fn();
+
+    await save("cashuBlocked", { automatic: true, onResolved });
+
+    expect(onResolved).toHaveBeenCalledWith("transient");
+    expect(logPaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it("logs a terminal failure of an automatic receive", async () => {
+    const { save, setStatus, logPaymentEvent } = await setup(async () =>
+      Either.left(
+        new TokenParseFailed({ reason: "undecodable", detail: null }),
+      ),
+    );
+
+    await save("cashuBbroken", { automatic: true });
+
+    expect(setStatus).not.toHaveBeenCalled();
+    expect(logPaymentEvent).toHaveBeenCalledOnce();
   });
 });

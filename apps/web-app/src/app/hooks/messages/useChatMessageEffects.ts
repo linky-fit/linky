@@ -8,6 +8,7 @@ import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import { parsePrivateImageMessage } from "../../lib/privateImageMessage";
 import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
+import type { SaveCashuFromTextOptions } from "../cashu/useSaveCashuFromText";
 
 interface UseChatMessageEffectsParams<TContact extends ContactRowLike> {
   autoAcceptedChatMessageIdsRef: React.MutableRefObject<Set<string>>;
@@ -27,19 +28,13 @@ interface UseChatMessageEffectsParams<TContact extends ContactRowLike> {
   } | null;
   isCashuTokenKnownAny: (tokenRaw: string) => boolean;
   isCashuTokenStored: (tokenRaw: string) => boolean;
-  /** The initial sync settled, so a token another device already received is known here. */
+  /** A bounded wait that usually, not always, lets synced wallet history land first. */
   nostrBootstrapReady: boolean;
   nostrMessagesRecent: readonly LocalNostrMessage[];
   route: Route;
   saveCashuFromText: (
     text: string,
-    options?: {
-      contactId?: string;
-      navigateToTokens?: boolean;
-      navigateToWallet?: boolean;
-      requestId?: string;
-      onResolved?: (resolution: "terminal" | "transient") => void;
-    },
+    options?: SaveCashuFromTextOptions,
   ) => Promise<void>;
   selectedContact: TContact | null;
 }
@@ -126,6 +121,7 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
         const requestId = getRequestIdForPaymentReply(message);
         const contactId = message.contactId.trim();
         void saveCashuFromText(info.tokenRaw, {
+          automatic: true,
           ...(contactId ? { contactId } : {}),
           ...(requestId ? { requestId } : {}),
           onResolved: (resolution) => {

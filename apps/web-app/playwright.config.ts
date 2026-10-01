@@ -23,6 +23,7 @@ const LOCAL_STACK_SPECS = [
   "**/profile-tilt-permission.spec.ts",
   "**/spayd-response.spec.ts",
   "**/security-policy.spec.ts",
+  "**/seed-restore-chat-tokens.spec.ts",
 ];
 
 export default defineConfig({

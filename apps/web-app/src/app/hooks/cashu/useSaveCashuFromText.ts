@@ -23,7 +23,13 @@ interface CashuTokenMetaRow {
   lastCheckedAtSec?: number | null | undefined;
 }
 
-interface SaveCashuFromTextOptions {
+export interface SaveCashuFromTextOptions {
+  /**
+   * Started by the app, not the user: no statuses (the inspector records the
+   * attempt), and no payment-history failure for a token already received
+   * here or on another device, or for a transient failure the caller retries.
+   */
+  automatic?: boolean;
   contactId?: string;
   navigateToTokens?: boolean;
   navigateToWallet?: boolean;
@@ -94,19 +100,23 @@ export const useSaveCashuFromText = ({
 }: UseSaveCashuFromTextParams) => {
   return React.useCallback(
     async (tokenText: string, options?: SaveCashuFromTextOptions) => {
+      const automatic = options?.automatic === true;
+      const report = (status: string): void => {
+        if (!automatic) setStatus(status);
+      };
       const tokenRaw = tokenText.trim();
       if (!tokenRaw) {
-        setStatus(t("pasteEmpty"));
+        report(t("pasteEmpty"));
         return;
       }
       if (isCashuTokenStored(tokenRaw)) {
-        setStatus(t("cashuExists"));
+        report(t("cashuExists"));
         options?.onResolved?.("terminal");
         navigateAfterSave(options);
         return;
       }
       if (receiveCashuToken === null) {
-        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
+        report(`${t("errorPrefix")}: Cashu storage is not ready`);
         options?.onResolved?.("transient");
         return;
       }
@@ -145,14 +155,14 @@ export const useSaveCashuFromText = ({
 
       if (isHiddenTestMint(parsedMint, allowTestMints)) {
         const message = t("cashuTestMintRejected");
-        setStatus(message);
+        report(message);
         logFailure(message);
         options?.onResolved?.("terminal");
         return;
       }
 
-      setCashuDraft("");
-      setStatus(t("cashuAccepting"));
+      if (!automatic) setCashuDraft("");
+      report(t("cashuAccepting"));
 
       await enqueueCashuOp(async () => {
         setCashuIsBusy(true);
@@ -173,13 +183,15 @@ export const useSaveCashuFromText = ({
               error._tag === "TokenParseFailed";
             options?.onResolved?.(isTerminal ? "terminal" : "transient");
             if (error._tag === "TokenAlreadyKnown") {
-              setStatus(t("cashuExists"));
+              report(t("cashuExists"));
               navigateAfterSave(options);
               return;
             }
             const message = describeTaggedCashuError(error) ?? error._tag;
-            logFailure(message);
-            setStatus(`${t("cashuAcceptFailed")}: ${message}`);
+            const isLogged =
+              !automatic || (isTerminal && error._tag !== "TokenAlreadySpent");
+            if (isLogged) logFailure(message);
+            report(`${t("cashuAcceptFailed")}: ${message}`);
             return;
           }
 
@@ -241,8 +253,8 @@ export const useSaveCashuFromText = ({
           navigateAfterSave(options);
         } catch (error) {
           const message = getUnknownErrorMessage(error, "Accept failed");
-          logFailure(message);
-          setStatus(`${t("cashuAcceptFailed")}: ${message}`);
+          if (!automatic) logFailure(message);
+          report(`${t("cashuAcceptFailed")}: ${message}`);
           options?.onResolved?.("transient");
         } finally {
           setCashuIsBusy(false);

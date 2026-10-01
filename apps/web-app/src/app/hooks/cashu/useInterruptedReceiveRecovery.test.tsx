@@ -70,7 +70,7 @@ const cashuTransfers = [
 ];
 
 describe("useInterruptedReceiveRecovery", () => {
-  it("resumes interrupted receives once ready, leaving message-borne tokens to chat", async () => {
+  it("quietly resumes interrupted receives once ready, leaving message-borne tokens to chat", async () => {
     const saveCashuFromText = vi.fn(async () => undefined);
     const Probe = ({ ready }: { ready: boolean }): null => {
       useInterruptedReceiveRecovery({
@@ -89,8 +89,8 @@ describe("useInterruptedReceiveRecovery", () => {
     await rendered.rerender(<Probe ready />);
 
     expect(saveCashuFromText.mock.calls).toEqual([
-      [interrupted.tokenText],
-      [unreachable.tokenText],
+      [interrupted.tokenText, { automatic: true }],
+      [unreachable.tokenText, { automatic: true }],
     ]);
   });
 });
