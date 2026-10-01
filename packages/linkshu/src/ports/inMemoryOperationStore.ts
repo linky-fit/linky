@@ -15,6 +15,7 @@ export const applyOperationPatch = (
   new StoredOperation({
     ...operation,
     ...(patch.status !== undefined ? { status: patch.status } : {}),
+    ...(patch.keysetId !== undefined ? { keysetId: patch.keysetId } : {}),
     ...(patch.counter !== undefined ? { counter: patch.counter } : {}),
     ...(patch.error !== undefined ? { error: patch.error } : {}),
   });

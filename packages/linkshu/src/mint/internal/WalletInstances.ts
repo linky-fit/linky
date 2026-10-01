@@ -21,6 +21,7 @@ import {
   type RestoreConfig,
   type SendConfig,
   type SendResponse,
+  type SwapPreview,
   type WSConnection,
 } from "@cashu/cashu-ts";
 import { Effect, Schema } from "effect";
@@ -49,11 +50,12 @@ export interface LoadedWallet {
   readonly keysetId: string;
   readonly keyChain: Pick<KeyChain, "getKeysets">;
   getMintInfo(): CashuMintInfo;
-  receive(
+  prepareSwapToReceive(
     token: string,
     config?: ReceiveConfig,
     outputType?: OutputType,
-  ): Promise<Proof[]>;
+  ): Promise<SwapPreview>;
+  completeSwap(swapPreview: SwapPreview): Promise<SendResponse>;
   send(
     amount: AmountLike,
     proofs: ProofLike[],

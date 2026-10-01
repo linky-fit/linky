@@ -1,4 +1,10 @@
-import type { Proof, ProofLike, ProofState } from "@cashu/cashu-ts";
+import type {
+  OutputDataLike,
+  Proof,
+  ProofLike,
+  ProofState,
+  SwapPreview,
+} from "@cashu/cashu-ts";
 import { Amount as CashuAmount } from "@cashu/cashu-ts";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 
@@ -22,7 +28,8 @@ export const fakeWallet = (
   getMintInfo: () => {
     throw new Error("not under test");
   },
-  receive: notUnderTest,
+  prepareSwapToReceive: notUnderTest,
+  completeSwap: notUnderTest,
   send: notUnderTest,
   checkProofsStates: notUnderTest,
   mint: {
@@ -54,3 +61,51 @@ export const answerProofStates =
         witness: null,
       })),
     );
+
+const placeholderOutput = (): OutputDataLike => ({
+  blindedMessage: { amount: CashuAmount.from(1), id: KEYSET_HEX, B_: "" },
+  blindingFactor: 0n,
+  secret: new Uint8Array(),
+  toProof: () => {
+    throw new Error("not under test");
+  },
+});
+
+/**
+ * The receive swap of a fake wallet: each preview reserves `outputs` slots,
+ * and completing it answers with `sign(token, counter)`.
+ */
+export const fakeReceiveSwap = (
+  sign: (token: string, counter: number) => Promise<Proof[]>,
+  outputs = 2,
+): Pick<LoadedWallet, "prepareSwapToReceive" | "completeSwap"> => {
+  const requests = new WeakMap<
+    SwapPreview,
+    { readonly token: string; readonly counter: number }
+  >();
+  return {
+    prepareSwapToReceive: (token, _config, outputType) => {
+      const preview: SwapPreview = {
+        amount: CashuAmount.from(0),
+        fees: CashuAmount.from(0),
+        keysetId: KEYSET_HEX,
+        inputs: [],
+        keepOutputs: Array.from({ length: outputs }, placeholderOutput),
+      };
+      requests.set(preview, {
+        token,
+        counter: outputType?.type === "deterministic" ? outputType.counter : -1,
+      });
+      return Promise.resolve(preview);
+    },
+    completeSwap: (preview) => {
+      const request = requests.get(preview);
+      return request === undefined
+        ? notUnderTest()
+        : sign(request.token, request.counter).then((keep) => ({
+            keep,
+            send: [],
+          }));
+    },
+  };
+};

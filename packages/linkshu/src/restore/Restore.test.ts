@@ -11,7 +11,12 @@ import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { ProofState } from "../ports/ProofStore";
-import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import {
+  fakeReceiveSwap,
+  fakeWallet,
+  KEYSET_HEX,
+  proof,
+} from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { amountIn, secretsOf, seedProofs } from "../testing/inventory";
 import type { RestoreProgress } from "./domain";
@@ -57,7 +62,7 @@ const makeHarness = (args: HarnessArgs) => {
 
   const wallet = (requested: MintUrl) =>
     fakeWallet({
-      ...(args.receive === undefined ? {} : { receive: args.receive }),
+      ...(args.receive === undefined ? {} : fakeReceiveSwap(args.receive)),
       keysetId: keysetHex,
       keyChain: {
         getKeysets: () => [

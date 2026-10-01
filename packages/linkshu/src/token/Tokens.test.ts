@@ -24,6 +24,7 @@ import { ProofStore } from "../ports/ProofStore";
 import type { ProofState, StoredProof } from "../ports/ProofStore";
 import {
   answerProofStates,
+  fakeReceiveSwap,
   fakeWallet,
   KEYSET_HEX,
   proof,
@@ -71,12 +72,12 @@ const makeHarness = (args: HarnessArgs = {}) => {
     keysetId: KEYSET_HEX,
     keyChain: { getKeysets: () => args.keysets ?? [] },
     checkProofsStates: args.checkProofsStates ?? answerProofStates(),
-    receive: (text) => {
+    ...fakeReceiveSwap((text) => {
       receiveCalls += 1;
       return (
         args.receive?.(text) ?? Promise.reject(new Error("not under test"))
       );
-    },
+    }),
   });
 
   const layer = Tokens.DefaultWithoutDependencies.pipe(

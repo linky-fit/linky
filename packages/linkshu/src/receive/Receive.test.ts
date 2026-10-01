@@ -16,12 +16,21 @@ import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
-import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import {
+  answerProofStates,
+  fakeReceiveSwap,
+  fakeWallet,
+  KEYSET_HEX,
+  proof,
+} from "../testing/fakeWallet";
+import type { ProofStateName } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { secretsOf, seedProofs, seedTransfer } from "../testing/inventory";
 import { parseTokenText } from "../token/codec";
 import { ReceiveDraft } from "./domain";
+import { Inspector } from "../inspector/Inspector";
 import { Receive } from "./Receive";
+import { receiveTokenText } from "./internal/acceptFlow";
 
 const mint = MintUrl.make("https://mint.example");
 const counterKey = deterministicCounterKey({
@@ -49,6 +58,8 @@ interface FakeWalletArgs {
     proofs: Proof[];
     lastCounterWithSignature?: number;
   }>;
+  /** The mint's NUT-07 answer; everything unspent by default. */
+  stateOf?: (secret: string) => ProofStateName;
 }
 
 const makeWallet = (args: FakeWalletArgs) => {
@@ -57,12 +68,11 @@ const makeWallet = (args: FakeWalletArgs) => {
   const wallet = fakeWallet({
     keysetId: args.keysetId ?? KEYSET_HEX,
     keyChain: { getKeysets: () => args.keysets ?? [] },
-    receive: (_token, _config, outputType) => {
-      const counter =
-        outputType?.type === "deterministic" ? outputType.counter : -1;
+    checkProofsStates: answerProofStates(args.stateOf),
+    ...fakeReceiveSwap((_token, counter) => {
       receiveCounters.push(counter);
       return args.receive(counter);
-    },
+    }),
     restore: (start, count) => {
       restoreCalls.push({ start, count });
       return args.restore
@@ -376,17 +386,21 @@ describe("Receive.receive", () => {
     expect(exit.value.operations[0]).toMatchObject({
       status: "failed",
       tokenText: sourceToken,
+      keysetId: KEYSET_HEX,
+      counter: 1,
     });
     expect(JSON.parse(exit.value.operations[0]?.error ?? "")).toMatchObject({
       _tag: "MintUnreachable",
       mint,
     });
+    // The attempt's slots are burned before the request leaves.
     expect(events.map((event) => event._tag)).toEqual([
       "OperationChanged",
+      "CounterAdvanced",
       "OperationChanged",
       "OperationFailed",
     ]);
-    expect(events[1]).toMatchObject({ from: "pending", to: "failed" });
+    expect(events[2]).toMatchObject({ from: "pending", to: "failed" });
   });
 
   it("fails the receive with the serialized error on definitive rejection", async () => {
@@ -461,7 +475,8 @@ describe("Receive.receive", () => {
       error: null,
     });
     expect(secretsOf(exit.value.proofs)).toEqual(["rcv-a", "rcv-b"]);
-    expect(receiveCounters).toEqual([1, 1]);
+    // The failed attempt's slots stay burned; the retry swaps past them.
+    expect(receiveCounters).toEqual([1, 3]);
     expect(
       events
         .filter((event) => event._tag === "OperationChanged")
@@ -469,7 +484,7 @@ describe("Receive.receive", () => {
     ).toEqual([
       [null, "pending"],
       ["pending", "failed"],
-      [null, "pending"],
+      ["failed", "pending"],
       ["pending", "done"],
     ]);
   });
@@ -496,8 +511,9 @@ describe("Receive.receive", () => {
       (event) => event._tag === "CounterAdvanced",
     );
     expect(counterEvents).toEqual([
+      expect.objectContaining({ from: 1, to: 3, reason: "used" }),
       expect.objectContaining({
-        from: 1,
+        from: 3,
         to: 40,
         reason: "collision-recovery",
       }),
@@ -570,5 +586,212 @@ describe("Receive.receive", () => {
     expect(exit.value.receipt.left._tag).toBe("MintRejected");
     expect(receiveCounters).toHaveLength(5);
     expect(exit.value.operations[0]?.status).toBe("failed");
+  });
+});
+
+/** A receive a reload cut short after its swap attempt at slot 1 left. */
+const seedInterruptedReceive = Effect.gen(function* () {
+  const transfer = yield* seedTransfer(
+    "receive",
+    "pending",
+    mint,
+    sourceToken,
+    6,
+  );
+  yield* (yield* OperationStore).update(transfer.id, {
+    keysetId: KeysetId.make(KEYSET_HEX),
+    counter: 1,
+  });
+  yield* (yield* KeyValueStore).set(counterKey, "3");
+  return transfer;
+});
+
+/** The mint after it swapped the source token. */
+const sourceSpent = (secret: string): ProofStateName =>
+  secret.startsWith("src-") ? "SPENT" : "UNSPENT";
+
+describe("Receive.receive of an unfinished receive", () => {
+  it("finishes a pending receive from the outputs the mint already signed", async () => {
+    const { wallet, receiveCounters, restoreCalls } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+      restore: () => Promise.resolve({ proofs: receivedProofs }),
+      stateOf: sourceSpent,
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const transfer = yield* seedInterruptedReceive;
+        return { transfer, ...(yield* receiveAndInspect(sourceToken)) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    const { transfer, receipt, proofs, operations, counter } = exit.value;
+    assert(receipt._tag === "Right");
+    expect(receipt.right).toMatchObject({
+      operationId: transfer.id,
+      amount: 5,
+    });
+    expect(restoreCalls).toEqual([{ start: 1, count: 2 }]);
+    expect(receiveCounters).toEqual([]);
+    expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
+    expect(operations).toEqual([
+      expect.objectContaining({ id: transfer.id, status: "done" }),
+    ]);
+    expect(counter).toBe("3");
+  });
+
+  it("closes the receive without storing twice when the proofs were already stored", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+      restore: () => Promise.resolve({ proofs: receivedProofs }),
+      stateOf: sourceSpent,
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedInterruptedReceive;
+        yield* seedProofs(mint, receivedProofs);
+        return yield* receiveAndInspect(sourceToken);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    expect(exit.value.receipt.right.amount).toBe(5);
+    expect(secretsOf(exit.value.proofs)).toEqual(["rcv-a", "rcv-b"]);
+    expect(exit.value.operations[0]?.status).toBe("done");
+  });
+
+  it("swaps past the burned slots when the interrupted attempt never reached the mint", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.resolve(receivedProofs),
+      restore: () => Promise.resolve({ proofs: [] }),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedInterruptedReceive;
+        return yield* receiveAndInspect(sourceToken);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    expect(receiveCounters).toEqual([3]);
+    expect(exit.value.operations[0]).toMatchObject({
+      status: "done",
+      counter: 3,
+    });
+  });
+
+  it("recovers a swap whose response was lost on the next receive of the text", async () => {
+    const { wallet, receiveCounters, restoreCalls } = makeWallet({
+      receive: () => Promise.reject(new TypeError("fetch failed")),
+      restore: () => Promise.resolve({ proofs: receivedProofs }),
+      stateOf: sourceSpent,
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const lost = yield* Effect.flip(receiveText(sourceToken));
+        return { lost, ...(yield* receiveAndInspect(sourceToken)) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.lost._tag).toBe("MintUnreachable");
+    assert(exit.value.receipt._tag === "Right");
+    expect(exit.value.receipt.right.amount).toBe(5);
+    expect(receiveCounters).toEqual([1]);
+    expect(restoreCalls).toEqual([{ start: 1, count: 2 }]);
+    expect(exit.value.operations[0]?.status).toBe("done");
+  });
+
+  it("swaps again when the recorded slot holds another token's outputs", async () => {
+    const otherOutputs = [proof(4, "other-a"), proof(1, "other-b")];
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.resolve(receivedProofs),
+      restore: () => Promise.resolve({ proofs: otherOutputs }),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedInterruptedReceive;
+        return yield* receiveAndInspect(sourceToken);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    expect(receiveCounters).toEqual([3]);
+    expect(secretsOf(exit.value.proofs)).toEqual(["rcv-a", "rcv-b"]);
+  });
+
+  it("stays resumable with its slot when the mint leaves a proof state unanswered", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+      restore: () => Promise.resolve({ proofs: receivedProofs }),
+      stateOf: (secret) =>
+        secret === "rcv-b" ? "PENDING" : sourceSpent(secret),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedInterruptedReceive;
+        return yield* receiveAndInspect(sourceToken);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+    expect(receiveCounters).toEqual([]);
+    expect(exit.value.proofs).toEqual([]);
+    expect(exit.value.operations[0]).toMatchObject({
+      status: "failed",
+      counter: 1,
+    });
+  });
+
+  it("leaves a replaced transfer another context finished meanwhile untouched", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const stale = yield* seedTransfer(
+          "receive",
+          "failed",
+          mint,
+          sourceToken,
+          6,
+        );
+        yield* (yield* OperationStore).update(stale.id, { status: "done" });
+        const ctx = {
+          kv: yield* KeyValueStore,
+          proofStore: yield* ProofStore,
+          operationStore: yield* OperationStore,
+          instances: yield* WalletInstances,
+          inspector: yield* Inspector.orNoop,
+        };
+        const result = yield* Effect.either(
+          receiveTokenText(ctx, sourceToken, {
+            operation: stale,
+            reason: "returnToWallet",
+          }),
+        );
+        return { stale, result };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.result._tag === "Left");
+    expect(exit.value.result.left).toMatchObject({
+      _tag: "TokenAlreadyKnown",
+      operationId: exit.value.stale.id,
+    });
+    expect(receiveCounters).toEqual([]);
   });
 });

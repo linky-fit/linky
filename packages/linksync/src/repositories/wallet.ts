@@ -229,6 +229,9 @@ const toOperationPatch = (
   ...(patch.status !== undefined
     ? { status: NonEmptyString100.orThrow(patch.status) }
     : {}),
+  ...(patch.keysetId !== undefined
+    ? { keysetId: NonEmptyString100.orThrow(patch.keysetId) }
+    : {}),
   ...(patch.counter !== undefined
     ? { counter: NonNegativeInt.orThrow(patch.counter) }
     : {}),

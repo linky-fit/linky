@@ -53,7 +53,7 @@ const operationFields = {
   /** The target mint for `autoswap`. */
   mint: MintUrl,
   unit: CurrencyUnit,
-  /** Quote kinds: the keyset the deterministic outputs derive from. */
+  /** Quote kinds and transfers: the keyset the deterministic outputs derive from. */
   keysetId: Schema.NullOr(KeysetId),
   amount: Amount,
   /** `melt` only. */
@@ -66,8 +66,9 @@ const operationFields = {
   sourceMint: Schema.NullOr(MintUrl),
   /**
    * Quote kinds: first deterministic output slot of the latest attempt
-   * (mint outputs, or NUT-08 blanks). Synced, so any device re-derives the
-   * same blinded outputs on resume.
+   * (mint outputs, or NUT-08 blanks); transfers: of the latest swap that
+   * received their token. Synced, so any device re-derives the same blinded
+   * outputs on resume.
    */
   counter: Schema.NullOr(Schema.Int.pipe(Schema.nonNegative())),
   /** `topup`: NUT-20 locked quote, minting needs the owner's key. */
@@ -95,6 +96,7 @@ export class NewOperation extends Schema.Class<NewOperation>("NewOperation")(
 
 export interface OperationPatch {
   readonly status?: OperationStatus;
+  readonly keysetId?: KeysetId;
   readonly counter?: number;
   readonly error?: string | null;
 }
