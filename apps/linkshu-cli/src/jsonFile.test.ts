@@ -88,9 +88,11 @@ describe("makeJsonFile across processes", () => {
   it("does not lose updates when separate processes write at once", async () => {
     const filePath = temporaryFile("counters.json");
     const workerPath = path.join(path.dirname(filePath), "worker.ts");
+    // The worker sits outside the workspace, where a bare "effect" import
+    // makes Bun auto-install the latest major instead of the workspace's.
     fs.writeFileSync(
       workerPath,
-      `import { Effect, Schema } from "effect";
+      `import { Effect, Schema } from ${JSON.stringify(Bun.resolveSync("effect", import.meta.dir))};
        import { makeJsonFile } from ${JSON.stringify(path.join(import.meta.dir, "jsonFile.ts"))};
        const file = makeJsonFile(
          ${JSON.stringify(filePath)},
