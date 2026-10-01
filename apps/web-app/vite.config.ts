@@ -330,6 +330,8 @@ export default defineConfig({
           if (id.includes("pdfjs-dist")) return "pdfjs";
           // Keep `buffer` and its deps together to avoid an ESM circular init:
           // polyfills -> vendor (base64-js/ieee754) and vendor -> polyfills.
+          // core-js must load before vendor: Evolu calls
+          // `Set.prototype.difference` at module init.
           if (
             id.includes("/node_modules/core-js/") ||
             id.includes("/node_modules/buffer/") ||

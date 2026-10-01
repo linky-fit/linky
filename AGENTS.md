@@ -4,7 +4,7 @@ Mobile-first PWA for contacts, Nostr messaging and Lightning/Cashu payments, loc
 
 Always run `bun run check-code` after changes (typecheck, then eslint and prettier with autofix); fix what remains and re-run until it passes.
 
-Architectural constraints live in `docs/architecture.md`; read the relevant section before changing app structure, data flow, persistence or protocols. Record architectural constraints there in the same commit: the constraint, not the change; history belongs in git. This file holds commands, conventions and gotchas. Keep it and `README.md` current and brief.
+Architectural constraints sit at the narrowest place that covers them: cross-cutting invariants below, app policy in `apps/web-app/AGENTS.md`, package rules in each package's `AGENTS.md`, a single-file constraint in a comment beside that code. Record a new one there in the same commit: the constraint, not the change; history belongs in git. This file holds commands, conventions and gotchas. Keep it and `README.md` current and brief.
 
 Domain vocabulary lives in `GLOSSARY.md`; read it before discussing domain concepts. When the user uses a term listed under _Avoid_ or in a sense that conflicts with its definition, point it out and propose the glossary term; when their meaning stays unclear, ask. Record newly settled terms there.
 
@@ -19,11 +19,22 @@ Emit an inspector event for every meaningful operation (user actions, relay/mint
 - An explanation that concerns one function belongs in a comment beside it; a guide covers what crosses functions: lifecycles, guarantees, how operations combine.
 - When documented behavior changes, rewrite or remove the affected text so the guide describes only the current behavior. A new guide needs a distinct operation or integration concern and a link from the package's guide index (`docs/README.md`, else `README.md`); anything smaller is a section in an existing guide.
 
+## Invariants
+
+- Owner ids, table names and shard indexes belong in `@linky-fit/linksync`, Nostr wire shapes in `@linky-fit/linkstr`, cashu state transitions in `@linky-fit/linkshu`
+- Funds move between mints only on an explicit user action; changing the default mint moves nothing, and one payment uses one mint
+- Quote ids and proofs go straight from the wallet to the mint, never through Linky infrastructure
+- The recovery seed stays out of every HTTP request, and secrets stay out of every log
+- Local Evolu data is cleared only by the user; quota errors are recovered by adding relay capacity. Degraded storage asks the user instead of falling back silently
+- Relay URLs are WSS only; loopback WS needs `VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=1` (app) or `PUSH_ALLOW_INSECURE_LOCALHOST_RELAYS=1` (push). Fetches use configured relays only, ignoring sender-controlled relay hints
+- Inspector rows stay on the device in production: the sinks hold decrypted plaintext
+- Env vars set only fresh-origin defaults; relay and Evolu server lists are user settings
+
 ## Conventions
 
 - Branded ids from `@linky-fit/linksync` (`ContactId`, `MintId`, ...), never plain strings; use a library's exported types instead of redefining them
 - Validate stored and wire JSON with effect `Schema` (shared pieces in `utils/schema.ts`); `nowSeconds()` and `sleep()` come from `utils/time.ts`
-- New browser storage names use the `linky.` prefix; the exceptions in `docs/architecture.md` keep their names for upgrades
+- New browser storage names use the `linky.` prefix. `linky_use_btc_symbol`, `linky_debug_evolu_sql`, `linky_nostr_profile_v2:`, `linky_nostr_status_v2:`, `linky_nostr_avatar_cache_v1`, `linky-push-debug-v1`, `linky-push-secrets-v1` and `linky-push-contact-names-v1` keep their names: renaming one needs a page and service-worker migration
 - Sparse Evolu mutation payloads: omit empty optional fields instead of writing `null`
 - Contacts, conversations, messages, reactions, identity, transactions and the cashu wallet are written only through the `@linky-fit/linksync` repositories (`app/hooks/useLinksync.ts`); app code never picks an owner id and never writes `category` or `phase`. Only `app/migrations/useLaneToShardMigration.ts` reads the legacy lane tables; its header lists the exceptions
 - Translation keys are `I18nKey`, translators `Translate` (`src/i18n`); `cs.ts` is the reference locale, `en.ts`/`de.ts` `satisfies` its key set

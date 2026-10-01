@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- allowBackup stays false: WebView storage holds the seed and wallet. -->
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

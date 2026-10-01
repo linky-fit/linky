@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { transformWithEsbuild, type Plugin } from "vite";
 
+// Inlined into index.html so boot diagnostics stay redacted when the bundle fails to load.
 export const bootDiagnosticRedaction = (): Plugin => ({
   name: "boot-diagnostic-redaction",
   async transformIndexHtml() {

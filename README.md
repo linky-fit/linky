@@ -39,7 +39,6 @@ Packages:
 Further reading:
 
 - [`AGENTS.md`](./AGENTS.md): conventions, test recipes and gotchas
-- [`docs/architecture.md`](./docs/architecture.md): architectural constraints
 - [`apps/native-shell/README.md`](./apps/native-shell/README.md): Android and iOS builds, signing, push setup
 - [`apps/push/README.md`](./apps/push/README.md): push service configuration and deployment
 - [`apps/linkshu-cli/README.md`](./apps/linkshu-cli/README.md): terminal wallet

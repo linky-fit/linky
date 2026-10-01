@@ -168,6 +168,7 @@ function truncateNotificationBody(value: string): string {
   return `${normalized.slice(0, 140)}…`;
 }
 
+// The URL carries untrusted chat-derived text: it controls only the body.
 function createSpaydResponse(url: URL): Response {
   const payload = url.searchParams.get("data") || "";
 

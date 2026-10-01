@@ -525,7 +525,7 @@ export const useCashuWalletComposition = ({
     [walletTransfers],
   );
 
-  // Legacy migration; removal gate in docs/architecture.md
+  // Legacy migration; removal gate in app/migrations/AGENTS.md
   React.useEffect(() => {
     if (receiveCashuToken === null) return;
     void drainLegacyAcceptedCashuToken(receiveCashuToken);

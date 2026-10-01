@@ -1,4 +1,4 @@
-// Legacy migration; removal gate in docs/architecture.md
+// Legacy migration; removal gate in app/migrations/AGENTS.md
 //
 // Carries a device's legacy cashu localStorage state to the key formats
 // @linky-fit/linkshu reads through the localStorage KeyValueStore adapter (#307).
@@ -17,7 +17,7 @@
 // mints UI still owns them); linkshu's per-mint seen keys are seeded from
 // them.
 //
-// Removal requires the supported-upgrade evidence in docs/architecture.md.
+// Removal requires the supported-upgrade evidence in app/migrations/AGENTS.md.
 // Keep the seed-bound wipe itself after removing its migration prologue.
 
 import { parseMintUrl } from "@linky-fit/linkshu";

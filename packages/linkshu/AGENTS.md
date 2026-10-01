@@ -17,4 +17,4 @@ Wrap the public operation in `inspectOperationWith(inspector, name, params, reda
 
 ## Rules
 
-Environment-agnostic (no React, Evolu, `window`, `localStorage`; `apps/linkshu-cli` runs the package on plain Bun and keeps this honest), no raw cashu-ts types in the public API, no dependency edge to `@linky-fit/linkstr` in either direction.
+Environment-agnostic (no React, Evolu, `window`, `localStorage`; `apps/linkshu-cli` runs the package on plain Bun and keeps this honest), no raw cashu-ts types in the public API, no dependency edge to `@linky-fit/linkstr` in either direction. No key material is stored: NUT-20 locking keys are arguments to `adopt`/`resumePending`, and `submitLnurlAuth` takes a `sign` callback.

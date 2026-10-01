@@ -1,3 +1,5 @@
+// Cross-app contract with Payky: change a path only together with
+// crossAppDerivation.test.ts and its Payky mirror.
 import type { OwnerLaneIndex } from "./domain";
 
 export const NOSTR_PATH = "m/44'/1237'/0'/0/0";

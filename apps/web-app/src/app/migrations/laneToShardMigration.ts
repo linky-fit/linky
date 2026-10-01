@@ -1,4 +1,4 @@
-// Legacy migration; removal gate in docs/architecture.md
+// Legacy migration; removal gate in app/migrations/AGENTS.md
 //
 // Copies every visible row of the old Evolu owner lanes (one BIP-85 AppOwner
 // per scope and index, plus the app owner itself for nsec-only logins and

@@ -325,7 +325,7 @@ export const useLinkshuComposition = ({
   React.useEffect(() => {
     if (!currentNsec) return;
     // Migrate before seed resolution so the runtime sees the copied counters.
-    // Removal gate in docs/architecture.md.
+    // Removal gate in app/migrations/AGENTS.md.
     migrateLegacyCashuLocalState();
     let cancelled = false;
     void resolveLinkshuSeed()

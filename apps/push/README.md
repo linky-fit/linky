@@ -24,7 +24,7 @@ For a deployment, copy `.env.example` and set:
 
 `PUSH_TRUSTED_PROXY_IPS` is empty by default. Set it to the exact peer IPs of reverse proxies you control, otherwise every client behind the proxy shares one rate-limit bucket. For a trusted peer the server walks `X-Forwarded-For` from right to left and stops at the first untrusted address, so the proxy must append to or replace the header. Behind a host proxy forwarding into Docker, the peer the container sees may be the bridge gateway, not `127.0.0.1`.
 
-Delivery goes only to public HTTPS endpoints on port 443; a local or private push endpoint is refused. Logs omit client IPs, pubkeys and provider response bodies.
+Delivery goes only to public HTTPS endpoints on port 443 over pinned DNS, without following redirects, with a bounded body and deadline; a local or private push endpoint is refused. Logs omit client IPs, pubkeys and provider response bodies.
 
 ## Docker
 

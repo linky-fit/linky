@@ -1,4 +1,4 @@
-// Legacy migration; removal gate in docs/architecture.md
+// Legacy migration; removal gate in app/migrations/AGENTS.md
 //
 // Pre-cutover releases parked the last accepted token text in
 // `linky.lastAcceptedCashuToken.v1` as crash insurance: the Evolu row write

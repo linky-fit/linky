@@ -1,4 +1,4 @@
-// Legacy migration; removal gate in docs/architecture.md
+// Legacy migration; removal gate in app/migrations/AGENTS.md
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { migrateLegacyCashuLocalState } from "./linkshuStorageMigration";

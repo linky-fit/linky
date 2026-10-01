@@ -36,7 +36,7 @@ describe("wipeLinkshuSeedBoundState", () => {
     }
   });
 
-  // Legacy migration; removal gate in docs/architecture.md
+  // Legacy migration; removal gate in app/migrations/AGENTS.md
   it("kills not-yet-migrated legacy counter keys with the seed they were bound to", async () => {
     const legacyKey =
       "linky.cashu.detCounter.v1:https%3A%2F%2Fmint.example:sat:00ff";

@@ -48,7 +48,7 @@ LINKSHU_SEED=$SEED bun run linkshu --data-dir /tmp/wallet restore
 
 ## Port implementations
 
-`fileKeyValueStore.ts`, `fileProofStore.ts` and `fileOperationStore.ts` are reference ports for the next platform. All three sit on `jsonFile.ts`, which holds the durability: a lock file, a re-read under the lock and an atomic rename, so concurrent processes never lose an update or read a half-written file. The files are plain JSON, readable in any editor.
+`fileKeyValueStore.ts`, `fileProofStore.ts` and `fileOperationStore.ts` are reference ports for the next platform. All three sit on `jsonFile.ts`, which holds the durability: a lock file, a re-read under the lock and an atomic rename, so concurrent processes never lose an update or read a half-written file. The files are plain JSON, readable in any editor. An undecodable file is an error, never a reset: a silent reset is indistinguishable from losing every token.
 
 ## Tests
 

@@ -7,7 +7,7 @@
  * lane: it mirrors terminal `cashuProof.state = spent` to existing legacy proof
  * rows so older clients stop counting spent funds. Never copy new proofs or
  * spendable states back. Remove with the lane migration (see the removal gate
- * in docs/architecture.md).
+ * in app/migrations/AGENTS.md).
  */
 import {
   linkshuServices,
