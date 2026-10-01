@@ -57,6 +57,7 @@ interface UsePayContactWithCashuMessageParams {
   currentNpub: string | null;
   currentNsec: string | null;
   defaultMintUrl: string | null;
+  dismissPaymentSending: () => void;
   enqueuePendingPayment: (payload: {
     amountSat: number;
     contactId: ContactId;
@@ -74,6 +75,7 @@ interface UsePayContactWithCashuMessageParams {
   setContactsOnboardingHasPaid: React.Dispatch<React.SetStateAction<boolean>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   showPaidOverlay: (title: string, details?: PaidOverlayDetails) => void;
+  showPaymentSending: (details: PaidOverlayDetails) => void;
   t: Translate;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
   /** Per-mint spendable balances from the linkshu read model. */
@@ -98,6 +100,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
   currentNpub,
   currentNsec,
   defaultMintUrl,
+  dismissPaymentSending,
   enqueuePendingPayment,
   formatDisplayedAmountParts,
   logPayStep,
@@ -109,6 +112,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
   setContactsOnboardingHasPaid,
   setStatus,
   showPaidOverlay,
+  showPaymentSending,
   t,
   updateLocalNostrMessage,
   walletMintBalances,
@@ -277,189 +281,203 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         };
       }
       logPayStep("mint-selected", { amountSat, mint });
-
-      const logFailure = (
-        error: string,
-        mintUrl: string | null,
-        phase: "publish" | "swap",
-      ): void => {
-        if (logCompletedOnly) return;
-        logPaymentEvent({
-          amount: amountSat,
-          contactId,
-          direction: "out",
-          error,
-          fee: null,
-          method: "cashu_chat",
-          mint: mintUrl,
-          phase,
-          status: "error",
-          unit: "sat",
-        });
-      };
-
-      let sendOutcome: Either.Either<SendReceipt, SendError>;
-      try {
-        sendOutcome = await sendCashuToken({
-          amountSat,
-          mint,
-          produceAs: "pending",
-        });
-      } catch (error) {
-        const message = getUnknownErrorMessage(error, "unknown");
-        logFailure(message, mint, "swap");
-        if (notify) setStatus(`${t("payFailed")}: ${message}`);
-        return { error: message, ok: false, queued: false };
-      }
-
-      if (Either.isLeft(sendOutcome)) {
-        const sendError = sendOutcome.left;
-        const message = describeSendError(sendError);
-        logFailure(message, mint, "swap");
-        if (notify) {
-          setStatus(
-            sendError._tag === "InsufficientFunds"
-              ? t("payInsufficient")
-              : `${t("payFailed")}: ${message}`,
-          );
-        }
-        return { error: message, ok: false, queued: false };
-      }
-
-      const receipt = sendOutcome.right;
-      if (isPaymentAuthorized && !isPaymentAuthorized()) {
-        reportAppLog({
-          tag: "paymentRequest.authorizationLost",
-          summary:
-            "Payment authorization changed before token delivery; returning funds",
-          links: { operation: receipt.operationId },
-          payload: null,
-        });
-        try {
-          const restored = await cashuTransferLifecycle.returnToWallet(
-            receipt.operationId,
-          );
-          if (Either.isLeft(restored))
-            logFailure(restored.left._tag, receipt.mint, "swap");
-        } catch (error) {
-          logFailure(
-            getUnknownErrorMessage(error, "return-to-wallet failed"),
-            receipt.mint,
-            "swap",
-          );
-        }
-        setStatus(t("payApprovalChanged"));
-        return {
-          error: "payment authorization changed",
-          ok: false,
-          queued: false,
-        };
-      }
-      logPayStep("swap-ok", {
-        changeAmount: receipt.changeAmount,
-        feePaid: receipt.feePaid,
-        mint: receipt.mint,
-        sendAmount: receipt.amount,
-      });
-
-      let publishing;
-      try {
-        publishing = await publishCashuMessagePayment({
-          appendLocalNostrMessage,
-          batches: [
-            {
-              amount: receipt.amount,
-              mint: receipt.mint,
-              token: receipt.tokenText,
-              unit: receipt.unit,
-            },
-          ],
-          contactId,
-          contactNpub,
-          currentNpub,
-          enqueueOutbox,
-          logPayStep,
-          nostrMessagesLocal,
-          ...(paymentNoticeContext ? { paymentNoticeContext } : {}),
-          ...(paymentNoticeOfferId ? { paymentNoticeOfferId } : {}),
-          pendingMessageId: normalizedPendingMessageId,
-          ...(replyContext ? { replyContext } : {}),
-          sendPaymentNotice,
-          updateLocalNostrMessage,
-        });
-      } catch (error) {
-        // The send row stays `pending`: the outbox may still deliver the
-        // message, and the pending-row cleanup effect / return-to-wallet
-        // cover both outcomes.
-        const message = getUnknownErrorMessage(error, "unknown");
-        logFailure(message, receipt.mint, "publish");
-        if (notify) setStatus(`${t("payFailed")}: ${message}`);
-        return { error: message, ok: false, queued: false };
-      }
-
-      for (const publishError of publishing.publishErrors) {
-        if (notify) {
-          pushToast(`${t("payFailed")}: ${publishError.error}`);
-        }
-      }
-
-      if (!publishing.hasPendingMessages) {
-        // The message carrying the token is published; the funds are the
-        // contact's now, so the pending row has nothing left to guard.
-        await cashuTransferLifecycle.forget(receipt.operationId);
-        reportCashuSendForgotten({
-          mint: receipt.mint,
-          reason: "message-published",
-          operationId: receipt.operationId,
-        });
-      }
-
-      if (!logCompletedOnly || !publishing.hasPendingMessages) {
-        logPaymentEvent({
-          amount: receipt.amount,
-          contactId,
-          details: {
-            issuedToken: receipt.tokenText,
-            ...(paymentRequestId ? { requestId: paymentRequestId } : {}),
-          },
-          direction: "out",
-          error: null,
-          fee: null,
-          method: "cashu_chat",
-          mint: receipt.mint,
-          phase: publishing.hasPendingMessages ? "publish" : "complete",
-          status: "ok",
-          transactionId: transactionIdForOperation(receipt.operationId),
-          unit: "sat",
-        });
-      }
-
       if (notify) {
-        const displayName =
-          (contact.name ?? "").trim() ||
-          (contact.lnAddress ?? "").trim() ||
-          t("appTitle");
-        const displayAmount = formatDisplayedAmountParts(receipt.amount);
-        showPaidOverlay(
-          (publishing.hasPendingMessages ? t("paidQueuedTo") : t("paidSentTo"))
-            .replace(
-              "{amount}",
-              `${displayAmount.approxPrefix}${displayAmount.amountText}`,
-            )
-            .replace("{unit}", displayAmount.unitLabel)
-            .replace("{name}", displayName),
-          {
-            direction: "out",
-            amountSat: receipt.amount,
-            contact: paidOverlayContact(contact),
-          },
-        );
-        safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
-        setContactsOnboardingHasPaid(true);
-        navigateTo({ id: contactId, route: "chat" });
+        showPaymentSending({
+          direction: "out",
+          amountSat,
+          contact: paidOverlayContact(contact),
+        });
       }
 
-      return { ok: true, queued: publishing.hasPendingMessages };
+      try {
+        const logFailure = (
+          error: string,
+          mintUrl: string | null,
+          phase: "publish" | "swap",
+        ): void => {
+          if (logCompletedOnly) return;
+          logPaymentEvent({
+            amount: amountSat,
+            contactId,
+            direction: "out",
+            error,
+            fee: null,
+            method: "cashu_chat",
+            mint: mintUrl,
+            phase,
+            status: "error",
+            unit: "sat",
+          });
+        };
+
+        let sendOutcome: Either.Either<SendReceipt, SendError>;
+        try {
+          sendOutcome = await sendCashuToken({
+            amountSat,
+            mint,
+            produceAs: "pending",
+          });
+        } catch (error) {
+          const message = getUnknownErrorMessage(error, "unknown");
+          logFailure(message, mint, "swap");
+          if (notify) setStatus(`${t("payFailed")}: ${message}`);
+          return { error: message, ok: false, queued: false };
+        }
+
+        if (Either.isLeft(sendOutcome)) {
+          const sendError = sendOutcome.left;
+          const message = describeSendError(sendError);
+          logFailure(message, mint, "swap");
+          if (notify) {
+            setStatus(
+              sendError._tag === "InsufficientFunds"
+                ? t("payInsufficient")
+                : `${t("payFailed")}: ${message}`,
+            );
+          }
+          return { error: message, ok: false, queued: false };
+        }
+
+        const receipt = sendOutcome.right;
+        if (isPaymentAuthorized && !isPaymentAuthorized()) {
+          reportAppLog({
+            tag: "paymentRequest.authorizationLost",
+            summary:
+              "Payment authorization changed before token delivery; returning funds",
+            links: { operation: receipt.operationId },
+            payload: null,
+          });
+          try {
+            const restored = await cashuTransferLifecycle.returnToWallet(
+              receipt.operationId,
+            );
+            if (Either.isLeft(restored))
+              logFailure(restored.left._tag, receipt.mint, "swap");
+          } catch (error) {
+            logFailure(
+              getUnknownErrorMessage(error, "return-to-wallet failed"),
+              receipt.mint,
+              "swap",
+            );
+          }
+          setStatus(t("payApprovalChanged"));
+          return {
+            error: "payment authorization changed",
+            ok: false,
+            queued: false,
+          };
+        }
+        logPayStep("swap-ok", {
+          changeAmount: receipt.changeAmount,
+          feePaid: receipt.feePaid,
+          mint: receipt.mint,
+          sendAmount: receipt.amount,
+        });
+
+        let publishing;
+        try {
+          publishing = await publishCashuMessagePayment({
+            appendLocalNostrMessage,
+            batches: [
+              {
+                amount: receipt.amount,
+                mint: receipt.mint,
+                token: receipt.tokenText,
+                unit: receipt.unit,
+              },
+            ],
+            contactId,
+            contactNpub,
+            currentNpub,
+            enqueueOutbox,
+            logPayStep,
+            nostrMessagesLocal,
+            ...(paymentNoticeContext ? { paymentNoticeContext } : {}),
+            ...(paymentNoticeOfferId ? { paymentNoticeOfferId } : {}),
+            pendingMessageId: normalizedPendingMessageId,
+            ...(replyContext ? { replyContext } : {}),
+            sendPaymentNotice,
+            updateLocalNostrMessage,
+          });
+        } catch (error) {
+          // The send row stays `pending`: the outbox may still deliver the
+          // message, and the pending-row cleanup effect / return-to-wallet
+          // cover both outcomes.
+          const message = getUnknownErrorMessage(error, "unknown");
+          logFailure(message, receipt.mint, "publish");
+          if (notify) setStatus(`${t("payFailed")}: ${message}`);
+          return { error: message, ok: false, queued: false };
+        }
+
+        for (const publishError of publishing.publishErrors) {
+          if (notify) {
+            pushToast(`${t("payFailed")}: ${publishError.error}`);
+          }
+        }
+
+        if (!publishing.hasPendingMessages) {
+          // The message carrying the token is published; the funds are the
+          // contact's now, so the pending row has nothing left to guard.
+          await cashuTransferLifecycle.forget(receipt.operationId);
+          reportCashuSendForgotten({
+            mint: receipt.mint,
+            reason: "message-published",
+            operationId: receipt.operationId,
+          });
+        }
+
+        if (!logCompletedOnly || !publishing.hasPendingMessages) {
+          logPaymentEvent({
+            amount: receipt.amount,
+            contactId,
+            details: {
+              issuedToken: receipt.tokenText,
+              ...(paymentRequestId ? { requestId: paymentRequestId } : {}),
+            },
+            direction: "out",
+            error: null,
+            fee: null,
+            method: "cashu_chat",
+            mint: receipt.mint,
+            phase: publishing.hasPendingMessages ? "publish" : "complete",
+            status: "ok",
+            transactionId: transactionIdForOperation(receipt.operationId),
+            unit: "sat",
+          });
+        }
+
+        if (notify) {
+          const displayName =
+            (contact.name ?? "").trim() ||
+            (contact.lnAddress ?? "").trim() ||
+            t("appTitle");
+          const displayAmount = formatDisplayedAmountParts(receipt.amount);
+          showPaidOverlay(
+            (publishing.hasPendingMessages
+              ? t("paidQueuedTo")
+              : t("paidSentTo")
+            )
+              .replace(
+                "{amount}",
+                `${displayAmount.approxPrefix}${displayAmount.amountText}`,
+              )
+              .replace("{unit}", displayAmount.unitLabel)
+              .replace("{name}", displayName),
+            {
+              direction: "out",
+              amountSat: receipt.amount,
+              contact: paidOverlayContact(contact),
+            },
+          );
+          safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
+          setContactsOnboardingHasPaid(true);
+          navigateTo({ id: contactId, route: "chat" });
+        }
+
+        return { ok: true, queued: publishing.hasPendingMessages };
+      } finally {
+        if (notify) dismissPaymentSending();
+      }
     },
     [
       appendLocalNostrMessage,
@@ -468,6 +486,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       currentNpub,
       currentNsec,
       defaultMintUrl,
+      dismissPaymentSending,
       enqueueOutbox,
       enqueuePendingPayment,
       formatDisplayedAmountParts,
@@ -481,6 +500,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       setContactsOnboardingHasPaid,
       setStatus,
       showPaidOverlay,
+      showPaymentSending,
       t,
       updateLocalNostrMessage,
       walletMintBalances,

@@ -744,6 +744,7 @@ export const useAppShellComposition = ({
     onPayChatPaymentRequest,
     paidOverlayDetails,
     paidOverlayIsOpen,
+    paidOverlayPhase,
     paidOverlayTitle,
     payCashuPaymentRequest,
     payLightningAddressWithCashu,
@@ -1160,8 +1161,8 @@ export const useAppShellComposition = ({
     if (nfcWritePromptKind && shouldRenderNativeNfcWritePrompt()) {
       return cancelPendingNfcWrite;
     }
-    // The paid overlay hides every confirmation below it and clears itself on a
-    // timer, so there is nothing for back to dismiss while it is up.
+    // The paid overlay hides every confirmation below it and clears itself when
+    // the payment ends, so there is nothing for back to dismiss while it is up.
     if (paidOverlayIsOpen || lnurlAuthIsDone) return null;
     if (pendingPaymentMintMeltConfirmation) {
       return closePaymentMintMeltConfirmation;
@@ -1702,6 +1703,7 @@ export const useAppShellComposition = ({
       nostrPictureByNpub,
       paidOverlayDetails,
       paidOverlayIsOpen,
+      paidOverlayPhase,
       paidOverlayTitle,
       pendingPaymentMintMeltConfirmation,
       pendingLnurlAuthConfirmation,
@@ -1781,6 +1783,7 @@ export const useAppShellComposition = ({
       nostrPictureByNpub,
       paidOverlayDetails,
       paidOverlayIsOpen,
+      paidOverlayPhase,
       paidOverlayTitle,
       pendingLightningInvoiceConfirmation,
       pendingCashuPaymentRequestConfirmation,

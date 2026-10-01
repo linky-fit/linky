@@ -154,6 +154,8 @@ const setup = async (options: SetupOptions = {}) => {
   const setStatus = options.setStatus ?? vi.fn<PayParams["setStatus"]>();
   const showPaidOverlay =
     options.showPaidOverlay ?? vi.fn<PayParams["showPaidOverlay"]>();
+  const showPaymentSending = vi.fn<PayParams["showPaymentSending"]>();
+  const dismissPaymentSending = vi.fn<PayParams["dismissPaymentSending"]>();
   const updateLocalNostrMessage =
     options.updateLocalNostrMessage ??
     vi.fn<PayParams["updateLocalNostrMessage"]>();
@@ -194,6 +196,7 @@ const setup = async (options: SetupOptions = {}) => {
       currentNpub,
       currentNsec: "nsec-test",
       defaultMintUrl: MINT_URL,
+      dismissPaymentSending,
       enqueuePendingPayment,
       formatDisplayedAmountParts: (amountSat) => ({
         approxPrefix: "",
@@ -209,6 +212,7 @@ const setup = async (options: SetupOptions = {}) => {
       setContactsOnboardingHasPaid: vi.fn(),
       setStatus,
       showPaidOverlay,
+      showPaymentSending,
       t: (key) => key,
       updateLocalNostrMessage,
       walletMintBalances: [{ amount: 1_000, mint: MINT_URL }],
@@ -223,6 +227,7 @@ const setup = async (options: SetupOptions = {}) => {
   const { root } = await renderIntoDocument(<Harness />);
 
   return {
+    dismissPaymentSending,
     enqueuePendingPayment,
     forget,
     getPay: () => payContact,
@@ -233,6 +238,7 @@ const setup = async (options: SetupOptions = {}) => {
     sendCashuToken,
     setStatus,
     showPaidOverlay,
+    showPaymentSending,
     updateLocalNostrMessage,
   };
 };
@@ -473,6 +479,9 @@ describe("usePayContactWithCashuMessage", () => {
       expect.objectContaining({ phase: "complete", status: "ok" }),
     );
     expect(sendPaymentNoticeMock).toHaveBeenCalledOnce();
+    expect(harness.showPaymentSending).toHaveBeenCalledWith(
+      expect.objectContaining({ direction: "out", amountSat: 600 }),
+    );
     expect(navigateToMock).toHaveBeenCalledWith({
       id: CONTACT_ID,
       route: "chat",
@@ -549,6 +558,7 @@ describe("usePayContactWithCashuMessage", () => {
     expect(setStatus).toHaveBeenCalledWith("payInsufficient");
     expect(enqueueOutboxMock).not.toHaveBeenCalled();
     expect(harness.forget).not.toHaveBeenCalled();
+    expect(harness.dismissPaymentSending).toHaveBeenCalled();
 
     await act(async () => harness.root.unmount());
   });

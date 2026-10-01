@@ -1,6 +1,9 @@
 /** Which way the money went, so the paid overlay can show it at a glance. */
 export type PaidOverlayDirection = "in" | "out";
 
+/** `sending` while the payment is in flight, `done` once it settled. */
+export type PaidOverlayPhase = "sending" | "done";
+
 /** The other party, when known: their picture and name go on the overlay. */
 export interface PaidOverlayContact {
   name: string | null;

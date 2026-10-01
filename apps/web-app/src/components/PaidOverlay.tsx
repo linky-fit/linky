@@ -1,7 +1,10 @@
 import { ArrowDown, ArrowUp } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
-import type { PaidOverlayDetails } from "../app/lib/paidOverlay";
+import type {
+  PaidOverlayDetails,
+  PaidOverlayPhase,
+} from "../app/lib/paidOverlay";
 import { deriveDefaultProfile } from "../derivedProfile";
 import type { Translate } from "../i18n";
 import { getInitials } from "../utils/formatting";
@@ -10,6 +13,7 @@ import { Avatar } from "./Avatar";
 interface PaidOverlayProps {
   details: PaidOverlayDetails | null;
   paidOverlayTitle: string | null;
+  phase: PaidOverlayPhase;
   t: Translate;
 }
 
@@ -19,10 +23,13 @@ interface PaidOverlayProps {
  * face (or a check mark) with an animated arrow that says which way the money
  * went, their name in small print, then "Sent" or "Received" and the amount in
  * large print. Without a direction the caller's title is all there is.
+ * While the payment is still `sending`, a ring spins around the figure and the
+ * arrow badge waits for the payment to settle.
  */
 export function PaidOverlay({
   details,
   paidOverlayTitle,
+  phase,
   t,
 }: PaidOverlayProps): React.ReactElement {
   const { formatDisplayedAmountParts, nostrPictureByNpub } = useAppShellCore();
@@ -36,8 +43,10 @@ export function PaidOverlay({
     details?.amountSat != null && details.amountSat > 0
       ? formatDisplayedAmountParts(details.amountSat)
       : null;
-  const headline =
-    direction === null
+  const isSending = phase === "sending";
+  const headline = isSending
+    ? t("paidHeadlineSending")
+    : direction === null
       ? (paidOverlayTitle ?? t("paid"))
       : direction === "out"
         ? t("paidHeadlineSent")
@@ -45,6 +54,7 @@ export function PaidOverlay({
   const figureClassName = [
     "paid-figure",
     direction === null ? "" : `is-${direction}`,
+    isSending ? "is-sending" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -67,10 +77,17 @@ export function PaidOverlay({
                 loading="eager"
               />
             </div>
+          ) : isSending ? (
+            <div key="sending" className="paid-check is-sending">
+              <ArrowUp size={44} strokeWidth={3} />
+            </div>
           ) : (
-            <div className="paid-check">✓</div>
+            <div key="done" className="paid-check">
+              ✓
+            </div>
           )}
-          {direction !== null ? (
+          {isSending ? <span className="paid-sending-ring" /> : null}
+          {direction !== null && !isSending ? (
             <span className="paid-direction-badge">
               {direction === "out" ? (
                 <ArrowUp size={22} strokeWidth={3} />

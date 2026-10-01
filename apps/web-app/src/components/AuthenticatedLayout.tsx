@@ -138,6 +138,7 @@ export function AuthenticatedLayout({
       {state.paidOverlayIsOpen ? (
         <PaidOverlay
           details={state.paidOverlayDetails}
+          phase={state.paidOverlayPhase}
           paidOverlayTitle={state.paidOverlayTitle}
           t={state.t}
         />

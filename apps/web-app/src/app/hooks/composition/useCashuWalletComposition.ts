@@ -428,10 +428,13 @@ export const useCashuWalletComposition = ({
   const npubCashMintSyncRef = React.useRef<string | null>(null);
 
   const {
+    dismissPaymentSending,
     paidOverlayDetails,
     paidOverlayIsOpen,
+    paidOverlayPhase,
     paidOverlayTitle,
     showPaidOverlay,
+    showPaymentSending,
     topupPaidNavTimerRef,
   } = usePaidOverlayState({
     t,
@@ -893,6 +896,7 @@ export const useCashuWalletComposition = ({
       currentNpub,
       currentNsec,
       defaultMintUrl,
+      dismissPaymentSending,
       enqueuePendingPayment,
       formatDisplayedAmountParts,
       logPayStep,
@@ -904,6 +908,7 @@ export const useCashuWalletComposition = ({
       setContactsOnboardingHasPaid,
       setStatus,
       showPaidOverlay,
+      showPaymentSending,
       t,
       updateLocalNostrMessage,
       walletMintBalances: walletBalances.perMint,
@@ -1457,6 +1462,7 @@ export const useCashuWalletComposition = ({
     cashuIsBusy,
     contacts,
     defaultMintUrl,
+    dismissPaymentSending,
     formatDisplayedAmountParts,
     logPaymentEvent,
     meltCashuInvoice,
@@ -1465,6 +1471,7 @@ export const useCashuWalletComposition = ({
     setPostPaySaveContact,
     setStatus,
     showPaidOverlay,
+    showPaymentSending,
     t,
     walletMintBalances: walletBalances.perMint,
   });
@@ -2626,6 +2633,7 @@ export const useCashuWalletComposition = ({
     onPayChatPaymentRequest,
     paidOverlayDetails,
     paidOverlayIsOpen,
+    paidOverlayPhase,
     paidOverlayTitle,
     payCashuPaymentRequest,
     pendingCashuPaymentRequestConfirmation,

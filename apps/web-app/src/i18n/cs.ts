@@ -984,6 +984,7 @@ export const cs = {
   paidSentTo: "Odesláno {amount} {unit} → {name}.",
   paidQueuedTo: "Odesláno {amount} {unit} → {name} (čeká).",
   paidReceived: "Přijato {amount} {unit}.",
+  paidHeadlineSending: "Odesílám…",
   paidHeadlineSent: "Odesláno",
   paidHeadlineReceived: "Přijato",
   topupOverlay: "Dobito {amount} {unit}.",

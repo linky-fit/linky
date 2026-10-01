@@ -75,6 +75,8 @@ const setup = async ({ balance = 100, meltCashuInvoice }: SetupOptions) => {
   const logPaymentEvent = vi.fn();
   const setStatus = vi.fn();
   const showPaidOverlay = vi.fn();
+  const showPaymentSending = vi.fn();
+  const dismissPaymentSending = vi.fn();
   const setPostPaySaveContact = vi.fn();
 
   const Harness = () => {
@@ -84,6 +86,7 @@ const setup = async ({ balance = 100, meltCashuInvoice }: SetupOptions) => {
       cashuIsBusy: false,
       contacts: [],
       defaultMintUrl: null,
+      dismissPaymentSending,
       formatDisplayedAmountParts: (amountSat) => ({
         approxPrefix: "",
         amountText: String(amountSat),
@@ -96,6 +99,7 @@ const setup = async ({ balance = 100, meltCashuInvoice }: SetupOptions) => {
       setPostPaySaveContact,
       setStatus,
       showPaidOverlay,
+      showPaymentSending,
       t: (key) => key,
       walletMintBalances: [{ amount: balance, mint: MINT_URL }],
     });
@@ -111,12 +115,14 @@ const setup = async ({ balance = 100, meltCashuInvoice }: SetupOptions) => {
     throw new Error("payments hook did not mount");
   }
   return {
+    dismissPaymentSending,
     logPaymentEvent,
     payments: paymentsRef.current,
     root,
     setPostPaySaveContact,
     setStatus,
     showPaidOverlay,
+    showPaymentSending,
   };
 };
 
@@ -149,6 +155,10 @@ describe("payLightningInvoiceWithCashu", () => {
         status: "ok",
       }),
     );
+    expect(harness.showPaymentSending).toHaveBeenCalledWith({
+      direction: "out",
+      amountSat: null,
+    });
     expect(harness.showPaidOverlay).toHaveBeenCalled();
     await act(async () => harness.root.unmount());
   });
@@ -180,6 +190,7 @@ describe("payLightningInvoiceWithCashu", () => {
       }),
     );
     expect(harness.showPaidOverlay).not.toHaveBeenCalled();
+    expect(harness.dismissPaymentSending).toHaveBeenCalled();
     await act(async () => harness.root.unmount());
   });
 

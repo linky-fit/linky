@@ -58,6 +58,7 @@ interface UseLightningPaymentsDomainParams {
   cashuIsBusy: boolean;
   contacts: readonly ContactPayRowLike[];
   defaultMintUrl: string | null;
+  dismissPaymentSending: () => void;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
@@ -69,6 +70,7 @@ interface UseLightningPaymentsDomainParams {
   >;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
+  showPaymentSending: (details: PaidOverlayDetails) => void;
   t: Translate;
   /** Per-mint spendable balances from the linkshu read model. */
   walletMintBalances: readonly SendMintBalance[];
@@ -89,6 +91,7 @@ export const useLightningPaymentsDomain = ({
   cashuIsBusy,
   contacts,
   defaultMintUrl,
+  dismissPaymentSending,
   formatDisplayedAmountParts,
   logPaymentEvent,
   meltCashuInvoice,
@@ -97,6 +100,7 @@ export const useLightningPaymentsDomain = ({
   setPostPaySaveContact,
   setStatus,
   showPaidOverlay,
+  showPaymentSending,
   t,
   walletMintBalances,
 }: UseLightningPaymentsDomainParams) => {
@@ -104,6 +108,20 @@ export const useLightningPaymentsDomain = ({
     safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
     setContactsOnboardingHasPaid(true);
   }, [setContactsOnboardingHasPaid]);
+
+  const findContactByLightningAddress = React.useCallback(
+    (lightningAddress: string | null) => {
+      if (!lightningAddress) return null;
+      const normalized = lightningAddress.toLowerCase();
+      return (
+        contacts.find(
+          (contact) =>
+            (contact.lnAddress ?? "").trim().toLowerCase() === normalized,
+        ) ?? null
+      );
+    },
+    [contacts],
+  );
 
   const meltOnMint = React.useCallback(
     async (
@@ -186,6 +204,7 @@ export const useLightningPaymentsDomain = ({
           return false;
         }
 
+        showPaymentSending({ direction: "out", amountSat: invoiceAmountSat });
         const invoiceDetails = {
           lightningInvoice: normalized,
           ...(invoicePreview?.description
@@ -255,12 +274,14 @@ export const useLightningPaymentsDomain = ({
         return true;
       } finally {
         setCashuIsBusy(false);
+        dismissPaymentSending();
       }
     },
     [
       cashuBalance,
       cashuIsBusy,
       defaultMintUrl,
+      dismissPaymentSending,
       formatDisplayedAmountParts,
       logPaymentEvent,
       meltCashuInvoice,
@@ -270,6 +291,7 @@ export const useLightningPaymentsDomain = ({
       setCashuIsBusy,
       setStatus,
       showPaidOverlay,
+      showPaymentSending,
       t,
       walletMintBalances,
     ],
@@ -307,6 +329,13 @@ export const useLightningPaymentsDomain = ({
         }
         const mintBalance =
           walletMintBalances.find((entry) => entry.mint === mint)?.amount ?? 0;
+        showPaymentSending({
+          direction: "out",
+          amountSat,
+          contact: paidOverlayContact(
+            findContactByLightningAddress(resolvedLightningAddress),
+          ),
+        });
 
         // Paying the full balance leaves no headroom for fees; the ladder
         // degrades the requested LNURL amount until amount + fees fit.
@@ -370,13 +399,8 @@ export const useLightningPaymentsDomain = ({
           );
 
           const paidLightningAddress = resolvedLightningAddress;
-          const knownContact = paidLightningAddress
-            ? contacts.find(
-                (contact) =>
-                  (contact.lnAddress ?? "").trim().toLowerCase() ===
-                  paidLightningAddress.toLowerCase(),
-              )
-            : null;
+          const knownContact =
+            findContactByLightningAddress(paidLightningAddress);
 
           if (Either.isLeft(outcome)) {
             if (outcome.left.pending !== null) {
@@ -512,12 +536,7 @@ export const useLightningPaymentsDomain = ({
           unit: "sat",
           error: finalErrorMessage,
           contactId:
-            contacts.find(
-              (contact) =>
-                resolvedLightningAddress !== null &&
-                (contact.lnAddress ?? "").trim().toLowerCase() ===
-                  resolvedLightningAddress.toLowerCase(),
-            )?.id ?? null,
+            findContactByLightningAddress(resolvedLightningAddress)?.id ?? null,
           method: "lightning_address",
           phase: finalErrorMint ? "melt" : "invoice_fetch",
         });
@@ -525,13 +544,15 @@ export const useLightningPaymentsDomain = ({
         return false;
       } finally {
         setCashuIsBusy(false);
+        dismissPaymentSending();
       }
     },
     [
       canPayWithCashu,
       cashuIsBusy,
-      contacts,
       defaultMintUrl,
+      dismissPaymentSending,
+      findContactByLightningAddress,
       formatDisplayedAmountParts,
       logPaymentEvent,
       meltCashuInvoice,
@@ -542,6 +563,7 @@ export const useLightningPaymentsDomain = ({
       setPostPaySaveContact,
       setStatus,
       showPaidOverlay,
+      showPaymentSending,
       t,
       walletMintBalances,
     ],
