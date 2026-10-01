@@ -22,6 +22,7 @@ import {
   pickBip321PayableLeg,
 } from "@linky-fit/linkshu/payment-request";
 import { parseNativeDeepLinkUrl } from "../../utils/deepLinks";
+import { getUnknownErrorMessage } from "../../utils/unknown";
 import {
   getLightningInvoicePreview,
   type LightningInvoicePreview,
@@ -297,9 +298,9 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           return;
         } catch (error) {
           if (!(error instanceof LnurlTagMismatchError)) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            setStatus(`${t("errorPrefix")}: ${message}`);
+            setStatus(
+              `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
+            );
             closeScan();
             return;
           }

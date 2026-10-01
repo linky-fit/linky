@@ -3,6 +3,7 @@ import {
   safeSessionStorageSet,
 } from "../../utils/storage";
 import type { JsonRecord, JsonValue } from "../../types/json";
+import { getUnknownErrorMessage } from "../../utils/unknown";
 import { clientInspectorStore } from "./clientInspectorStore";
 import {
   getInspectorEnabled,
@@ -47,7 +48,7 @@ const toJsonSafe = (value: unknown, depth: number): JsonValue => {
   }
   if (value instanceof Uint8Array) return `Uint8Array(${value.length})`;
   if (value instanceof Error) {
-    return { name: value.name, message: value.message };
+    return { name: value.name, message: getUnknownErrorMessage(value, "") };
   }
   if (depth >= MAX_PAYLOAD_DEPTH) return "…(max depth)";
   if (Array.isArray(value)) {

@@ -1,6 +1,7 @@
 import { useCallback, useRef } from "react";
 import type { CashuOperationId } from "../../../evolu";
 import type { Translate } from "../../../i18n";
+import { getUnknownErrorMessage } from "../../../utils/unknown";
 import type { CashuTransferLifecycle } from "../composition/useLinkshuComposition";
 
 interface UseReclaimCashuTransferParams {
@@ -48,7 +49,9 @@ export const useReclaimCashuTransfer = ({
                 .replace("{proofs}", String(report.reclaimedProofs.length)),
             );
           } catch (error) {
-            pushToast(`${t("errorPrefix")}: ${String(error)}`);
+            pushToast(
+              `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
+            );
           } finally {
             setCashuIsBusy(false);
           }
