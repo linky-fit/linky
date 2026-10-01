@@ -67,15 +67,15 @@ To consume `Inspector.live` as a stream, fork `Stream.runForEach(inspector.event
 
 `LinkshuInspectorEvent` is the union of:
 
-| Tag                  | Fields                                                                               | Emitted when                                                                                                                      |
-| -------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `OperationSucceeded` | `name`, `params`, `result`                                                           | A public operation finished.                                                                                                      |
-| `OperationFailed`    | `name`, `params`, `error`                                                            | An operation or subscription attempt failed with a typed error (the tagged error object is `error`).                              |
-| `ProofsChanged`      | `mint`, `count`, `amount`, `from`, `to`, `operationId`, `reason`                     | A batch of proofs was stored (`from: null`) or moved between states; one row per batch and source state. Counts and amounts only. |
-| `OperationChanged`   | `operationId`, `kind`, `from`, `to`, `reason`                                        | An operation was inserted (`from: null`) or changed status.                                                                       |
-| `CounterAdvanced`    | `mint`, `unit`, `keysetId`, `from`, `to`, `reason`                                   | A deterministic counter moved; `reason` is `used`, `collision-recovery`, or `restore`.                                            |
-| `QuoteStateChanged`  | `flow`, `quoteId`, `mint`, `state`, `via`                                            | A mint/melt quote was observed in a new state by `topup`, `autoswap`, or `melt`; `via` is `poll` or the NUT-17 `subscription`.    |
-| `LightningFeeProbed` | `mint`, `probeMint`, `meltQuoteId`, `mintQuoteId`, `amount`, `feeReserve`, `percent` | A fee probe measured a mint's Lightning fee.                                                                                      |
+| Tag                  | Emitted when                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `OperationSucceeded` | A public operation finished.                                                                                                      |
+| `OperationFailed`    | An operation or subscription attempt failed with a typed error (the tagged error object is `error`).                              |
+| `ProofsChanged`      | A batch of proofs was stored (`from: null`) or moved between states; one row per batch and source state. Counts and amounts only. |
+| `OperationChanged`   | An operation was inserted (`from: null`) or changed status.                                                                       |
+| `CounterAdvanced`    | A deterministic counter moved; `reason` is `used`, `collision-recovery`, or `restore`.                                            |
+| `QuoteStateChanged`  | A mint/melt quote was observed in a new state by `topup`, `autoswap`, or `melt`; `via` is `poll` or the NUT-17 `subscription`.    |
+| `LightningFeeProbed` | A fee probe measured a mint's Lightning fee.                                                                                      |
 
 Operation `name` is `<vertical>.<method>` in camelCase, matching the service and method you called (`receive.receive`, `topup.resumePending`). One operation usually produces several rows; a `send.send` is bracketed by the `CounterAdvanced`, `OperationChanged`, and `ProofsChanged` rows it caused. Some operations emit per-item rows before their summary: `melt.resumePending` emits one `melt.resume` per pending melt (`OperationFailed` when the mint gave no usable answer), `tokens.reclaim` one `tokens.reclaimMint` per mint attempt with the proof and operation ids involved, and `topup.subscribe` records a subscription setup failure or socket close before a retry.
 

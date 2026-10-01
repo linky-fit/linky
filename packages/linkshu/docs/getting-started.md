@@ -2,24 +2,13 @@
 
 Wire `@linky-fit/linkshu` and make a first wallet call.
 
-## What it is
-
-Every wallet operation (receive, send, pay an invoice, top up, validate, restore, …) is an Effect service that takes a draft and returns a receipt. You supply the seed and three storage ports; the package owns the proof inventory, the operation records, and the deterministic counters. [concepts.md](./concepts.md) explains each of those.
-
-## Install and import
+## Install
 
 ```bash
 bun add @linky-fit/linkshu effect
 ```
 
-The package ships ESM and TypeScript declarations for Node 22.14+ and modern browser bundlers.
-
-```ts
-import { Receive, ReceiveDraft, runLinkshu } from "@linky-fit/linkshu";
-import { Effect } from "effect";
-```
-
-`@linky-fit/linkshu/lightning-address` is a second entry with only the lightning-address helpers ([lightning-utilities.md](./lightning-utilities.md)).
+The package ships ESM and TypeScript declarations for Node 22.14+ and modern browser bundlers. `@linky-fit/linkshu/lightning-address` is a second entry with only the lightning-address helpers ([lightning-utilities.md](./lightning-utilities.md)).
 
 ## First run
 
@@ -116,25 +105,4 @@ export const sendFromForm = (mint: string, amount: number) =>
 
 `Effect.suspend` keeps the throw inside the effect, so a bad form value rejects the promise like any other defect. Use `Schema.decodeUnknownOption` when you want to show the validation error instead.
 
-## The services
-
-| Service      | Methods                                                                                                                                                                                       | Guide                            |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| `Receive`    | `receive`                                                                                                                                                                                     | [receive.md](./receive.md)       |
-| `Send`       | `send`                                                                                                                                                                                        | [send.md](./send.md)             |
-| `Melt`       | `quote`, `melt`, `status`, `resumePending`                                                                                                                                                    | [melt.md](./melt.md)             |
-| `Topup`      | `start`, `adopt`, `resumePending`                                                                                                                                                             | [topup.md](./topup.md)           |
-| `Autoswap`   | `claim`, `estimate`, `resumePendingClaims`                                                                                                                                                    | [autoswap.md](./autoswap.md)     |
-| `Validation` | `checkAll`, `checkTransfer`, `checkIssued`, `inspectProofStates`                                                                                                                              | [validation.md](./validation.md) |
-| `Restore`    | `restore`, `restoreAndReclaim`, `wipeSeedBoundState`                                                                                                                                          | [restore.md](./restore.md)       |
-| `Tokens`     | `proofs`, `operations`, `transfers`, `balances`, `markIssued`, `markExternalized`, `forget`, `returnToWallet`, `reclaim`, `importProofs`, `importOperation`, `adoptToken`, `ingestLegacyRows` | [tokens.md](./tokens.md)         |
-| `Mints`      | `info`, `knownMints`, `addKnownMint`, `removeKnownMint`                                                                                                                                       | [mints.md](./mints.md)           |
-| `FeeProbe`   | `probeLightningFee`                                                                                                                                                                           | [mints.md](./mints.md)           |
-
-Helpers that need no runtime (token codec, invoice preview, LNURL) are in [tokens.md](./tokens.md) and [lightning-utilities.md](./lightning-utilities.md).
-
-## Related
-
-- [concepts.md](./concepts.md): primitives, proof states, operation statuses, counters, resuming, Effect primer
-- [ports.md](./ports.md): implementing the storage ports
-- [errors.md](./errors.md): every tagged error and how to handle it
+From here, [concepts.md](./concepts.md) explains what the calls do to proofs and operations, and [the guide index](./README.md) lists one guide per operation.

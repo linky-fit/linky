@@ -1,6 +1,6 @@
-# Android Upload Key
+# Android upload key
 
-The first step of a Google Play release is generating the upload key:
+Generate the upload key once, before the first Google Play release:
 
 ```bash
 mkdir -p "$HOME/.keys/linky" && keytool -genkeypair -v -keystore "$HOME/.keys/linky/linky-upload-key.jks" -alias linky-upload -keyalg RSA -keysize 4096 -validity 10000 -storetype JKS -dname "CN=Linky, OU=Mobile, O=Linky, L=Prague, S=Prague, C=CZ"
@@ -29,8 +29,4 @@ When the check passes, run the release build:
 bun run native:aab:release
 ```
 
-Notes:
-
-- `google-services.json` is not a signing key. It is the Firebase configuration for push notifications.
-- If `bun run native:android:release:check` fails on `keystore.properties`, first create the local `apps/native-shell/android/keystore.properties` from the template `apps/native-shell/android/keystore.properties.example`.
-- Back up the `.jks` file and the passwords outside the repository.
+Back up the `.jks` file and the passwords outside the repository; a lost upload key needs a reset through Play Console support. `google-services.json`, which the check also wants, is the Firebase push configuration, not a signing key.

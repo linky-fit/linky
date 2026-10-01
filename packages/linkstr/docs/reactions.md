@@ -44,20 +44,15 @@ const reactThenRetract = (
   );
 ```
 
-`react` resolves with a `ReactionReceipt` once a relay accepted the peer's copy; `receipt.rumorId` is the reaction id a retraction refers to. To queue a reaction instead, enqueue `{ _tag: "reaction", draft }` ([outbox.md](./outbox.md)) and read the rumor id from the `EnqueueReceipt`.
+`react` resolves with a `ReactionReceipt` once a relay accepted the peer's copy; `receipt.rumorId` is the reaction id a retraction refers to. To queue a reaction instead, enqueue `{ _tag: "reaction", draft }` ([outbox.md](./outbox.md)) and read the rumor id from the `EnqueueReceipt`. In React, `retractReactionAtom` is the direct operation ([react.md](./react.md)).
 
 ## Sending
 
-`ReactionDraft` takes `to`, `target`, `targetKind` (`"text"` | `"image"`), `targetAuthor`, `emoji`, and optional `clientId` / `sentAt`. `RetractionDraft` takes `to`, `reactionIds` (non-empty) and optional `clientId`.
-
 - `target` is the message's rumor id (`ChatMessageReceived.messageId` or the `rumorId` from your own send). `targetKind` becomes the `k` tag (`14` or `15`).
 - `to` is always the conversation peer. `targetAuthor` is p-tagged so foreign clients attribute the reaction: the peer for their message, your own pubkey for yours.
-- `Emoji` is a non-empty trimmed string of at most 32 characters.
 - One reaction per user per message is your policy, not linkstr's: retract the previous reaction before sending a new one if that is what you want.
 
-`ReactionReceipt` and `RetractionReceipt` both carry `rumorId`, `clientId`, `sentAt`, `selfCopy` and `recipientCopy`. Neither wrap is push-marked: reactions never wake a push server.
-
-Retractions are direct because a failed undo is cheap to repeat: remove the local row at once, and if the send fails the next tap sends a fresh retraction.
+Neither wrap is push-marked: reactions never wake a push server. Retractions are direct because a failed undo is cheap to repeat: remove the local row at once, and if the send fails the next tap sends a fresh retraction.
 
 ## Wire format
 
@@ -72,12 +67,7 @@ The reaction's `e` tag is the target message's rumor id, the same id in both use
 
 ## Receiving
 
-| Tag                      | Fields                                                                                          | Meaning                                          |
-| ------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `ReactionAdded`          | `reactionId: RumorId`, `target: RumorId`, `from: Pubkey`, `emoji: Emoji`, `sentAt: UnixSeconds` | a peer reacted to `target`                       |
-| `OwnReactionConfirmed`   | `reactionId`, `target`, `emoji`, `clientId: ClientId \| null`, `sentAt`                         | your reaction echoed (self copy or other device) |
-| `ReactionRetracted`      | `reactionIds: NonEmptyArray<RumorId>`, `from: Pubkey`, `sentAt`                                 | a peer removed those reactions                   |
-| `OwnRetractionConfirmed` | `retractionId: RumorId`, `reactionIds`, `clientId: ClientId \| null`, `sentAt`                  | your retraction echoed                           |
+Four facts arrive on the wrap inbox ([inbox.md](./inbox.md)): `ReactionAdded` and `ReactionRetracted` from a peer (`from` is the author), `OwnReactionConfirmed` and `OwnRetractionConfirmed` for your own sends echoed back (`clientId` is null when another of your devices sent them).
 
 ```ts
 import type { Pubkey, RumorId, WrapInboxEvent } from "@linky-fit/linkstr";
@@ -112,16 +102,10 @@ export const reactionHandler =
   };
 ```
 
-Two things linkstr leaves to you: a reaction may arrive before its target message (defer it and retry when messages change), and a retraction only applies to reactions authored by the retractor — `ReactionRetracted.from` is the authorship scope.
+Two things linkstr leaves to you: a reaction may arrive before its target message (defer it and retry when messages change), and a retraction only applies to reactions authored by the retractor, so `ReactionRetracted.from` is the authorship scope.
 
 Drop reasons this codec adds ([the full table](./inbox.md#authentication-and-drop-reasons)): `invalid-reaction` (no `e` tag, a `k` tag other than `14` / `15`, or an invalid emoji) and `invalid-retraction` (no `e` tag that is a rumor id).
 
 ## Errors
 
 Direct sends fail with `RecipientNotReached` or `NoRelayReachable`; a queued reaction surfaces only `OutboxJobFailed` on the results stream. See [the error table](./concepts.md#errors).
-
-## Related
-
-- [chat.md](./chat.md) — the messages you react to
-- [outbox.md](./outbox.md) — queuing reactions
-- [inbox.md](./inbox.md) — where the facts come from

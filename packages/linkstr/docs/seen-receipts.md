@@ -41,16 +41,14 @@ In React use `sendSeenReceiptAtom` ([react.md](./react.md)). When a send fails, 
 
 ## The cursor model
 
-- `seenUpToSec` — the newest `sentAt` you have seen from this peer. It travels as the rumor content.
-- `sinceSec` — your receipts-enabled baseline, sent as the `since` tag. Messages older than it stay unmarked on the peer's side, so turning the feature on never retroactively marks history as read.
+- `seenUpToSec` is the newest `sentAt` you have seen from this peer. It travels as the rumor content.
+- `sinceSec` is your receipts-enabled baseline, sent as the `since` tag. Messages older than it stay unmarked on the peer's side, so turning the feature on never retroactively marks history as read.
 - The codec rejects `sinceSec >= seenUpToSec` on both ends.
 - Every receipt supersedes all earlier ones for that peer. Keep an "already reported up to" value per peer and only send when the cursor moves forward; seed that value from `OwnSeenReceiptConfirmed` so a second device or a fresh session does not resend what the peer already has.
 
 ## Sending
 
-`SeenReceiptDraft`: `to: Pubkey`, `sinceSec: UnixSeconds`, `seenUpToSec: UnixSeconds`, `clientId?: ClientId`, `sentAt?: UnixSeconds`. `send` returns a `SeenReceiptSendReceipt` (`rumorId`, `clientId`, `sentAt`, `selfCopy`, `recipientCopy`).
-
-Direct only, and silent by design: not an outbox operation, because a retried receipt would republish a cursor that a later receipt already superseded, and a lost send self-heals on the next trigger. No `["linky", "push"]` marker on either wrap, so a receipt never produces a notification.
+`send(draft)` is direct only, and silent by design: not an outbox operation, because a retried receipt would republish a cursor that a later receipt already superseded, and a lost send self-heals on the next trigger. No `["linky", "push"]` marker on either wrap, so a receipt never produces a notification.
 
 ## Wire format
 
@@ -60,10 +58,7 @@ Kind 24136. Tags, in order: `p` to, `p` author, `client`, `["linky", "seen_recei
 
 ## Receiving
 
-| Tag                       | Fields                                                                                              | Meaning                                                      |
-| ------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `SeenReceiptReceived`     | `receiptId: RumorId`, `from: Pubkey`, `sinceSec: UnixSeconds`, `seenUpToSec: UnixSeconds`, `sentAt` | the peer has seen your messages in `(sinceSec, seenUpToSec]` |
-| `OwnSeenReceiptConfirmed` | `receiptId`, `to: Pubkey`, `sinceSec`, `seenUpToSec`, `clientId: ClientId \| null`, `sentAt`        | your own receipt echoed; `to` is the peer it was sent to     |
+`SeenReceiptReceived` means `from` has seen your messages in `(sinceSec, seenUpToSec]`; `OwnSeenReceiptConfirmed` is your own receipt echoed, with `to` naming the peer it was sent to.
 
 Apply `SeenReceiptReceived` monotonically (ignore anything that does not move the peer's cursor forward) and treat `seenUpToSec` as untrusted input: clamp it to shortly after "now" so a far-future cursor cannot mark everything seen forever. Record `OwnSeenReceiptConfirmed.seenUpToSec` as "already reported up to" for `to`.
 
@@ -72,8 +67,3 @@ Drop reasons this codec adds ([the full table](./inbox.md#authentication-and-dro
 ## Errors
 
 `RecipientNotReached` or `NoRelayReachable`; see [the error table](./concepts.md#errors). In both cases roll the local "sent up to" value back.
-
-## Related
-
-- [chat.md](./chat.md) — the messages the cursor covers
-- [inbox.md](./inbox.md) — delivery of the facts above

@@ -19,7 +19,7 @@ const issueToken = (mint: MintUrl, amount: Amount) =>
   });
 ```
 
-Pick `mint` from `Tokens.balances.perMint`; sends never cross mints. The receipt also carries `proofs` (the same proofs `tokenText` encodes, with full keyset ids, for NUT-18 POST payloads), `changeAmount`, and `feePaid`. Both `tokenText` and `proofs` are spendable secrets; keep them out of logs.
+Pick `mint` from `Tokens.balances.perMint`; sends never cross mints. Both `tokenText` and `proofs` on the receipt are spendable secrets; keep them out of logs.
 
 ## How it works
 

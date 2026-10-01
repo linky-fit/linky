@@ -4,16 +4,7 @@
 
 ## Configure
 
-`linkstrConfigAtom` holds a `LinkstrConfig | null`. Set it when an identity is available; set it to `null` on logout. While it is null, every fn atom fails with `LinkstrNotConfigured`.
-
-| Field                                    | Meaning                                                                                                  |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `secretKey`, `readRelays`, `writeRelays` | as in `linkstrServices`                                                                                  |
-| `allowInsecureLocalhost`                 | let the default transport open loopback `ws://` relays; default false                                    |
-| `outboxStore`                            | `OutboxStore.fromStringStorage(localStorage, "<key>")`; default in-memory                                |
-| `inboxCursorStore`                       | `InboxCursorStore.fromStringStorage(localStorage, "<key>.<pubkey>")`, keyed by pubkey; default in-memory |
-| `inspector`                              | `true` streams diagnostics through `inspectorEventsAtom`                                                 |
-| `transport`                              | test seam; leave unset in the app                                                                        |
+`linkstrConfigAtom` holds a `LinkstrConfig | null`. Set it when an identity is available; set it to `null` on logout. While it is null, every fn atom fails with `LinkstrNotConfigured`. The config is `linkstrServices`'s plus `allowInsecureLocalhost` and `inspector`; key the `inboxCursorStore` storage by pubkey so switching accounts never reuses a cursor.
 
 Build the config from `identityFromNsec(nsec)` and relay strings filtered through `Schema.is(RelayUrl)`, and set it from one effect mounted near the root: `useAtomSet(linkstrConfigAtom)(config)`.
 
@@ -33,20 +24,20 @@ const exit = await retract(
 if (Exit.isFailure(exit)) console.warn(Cause.pretty(exit.cause)); // e.g. LinkstrNotConfigured
 ```
 
-| Atom                                               | Input                                         | Success value                               |
-| -------------------------------------------------- | --------------------------------------------- | ------------------------------------------- |
-| `enqueueOutboxAtom`                                | `{ op: RumorFixedOperation, ref: OutboxRef }` | `EnqueueReceipt`                            |
-| `enqueuePaymentTelemetryAtom`                      | `{ draft, recipient, ref }`                   | `OutboxJobId`                               |
-| `retractReactionAtom`                              | `RetractionDraft`                             | `RetractionReceipt`                         |
-| `sendSeenReceiptAtom`                              | `SeenReceiptDraft`                            | `SeenReceiptSendReceipt`                    |
-| `sendPaymentNoticeAtom`                            | `PaymentNoticeDraft`                          | `PaymentNoticeReceipt`                      |
-| `sendBankOfferAtom`                                | `BankOfferDraft`                              | `BankOfferReceipt`                          |
-| `publishProfileAtom`, `publishStatusAtom`          | `ProfileMetadata`, `StatusDraft`              | `PlainEventReceipt`                         |
-| `fetchProfileAtom`, `fetchProfilesAtom`            | `Pubkey`, `ReadonlyArray<Pubkey>`             | `ProfileFetchResult`, `ProfileFetchEntry[]` |
-| `discoverActiveProfilesAtom`, `searchProfilesAtom` | options, `{ query, options? }`                | `DiscoveredProfile[]`, `ProfileSearchHit[]` |
-| `publishRelayListsAtom`, `fetchOwnRelayListsAtom`  | `RelayListsDraft`, `void`                     | `RelayListsReceipt`, `FetchedRelayLists`    |
-| `publishMuteListAtom`                              | `ReadonlyArray<Pubkey>`                       | `PlainEventReceipt`                         |
-| `fetchWrapEventAtom`                               | `{ wrapId, extraRelays? }`                    | `WrapInboxEvent \| null`                    |
+| Atom                                               | Operation                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `enqueueOutboxAtom`                                | `Outbox.enqueue` (`{ op, ref }`)                                                     |
+| `enqueuePaymentTelemetryAtom`                      | `Outbox.enqueueTelemetry` (`{ draft, recipient, ref }`)                              |
+| `retractReactionAtom`                              | `Reactions.retract`                                                                  |
+| `sendSeenReceiptAtom`                              | `SeenReceipts.send`                                                                  |
+| `sendPaymentNoticeAtom`                            | `PaymentNotices.send`                                                                |
+| `sendBankOfferAtom`                                | `BankOffers.send`                                                                    |
+| `publishProfileAtom`, `publishStatusAtom`          | `Profiles.publishProfile`, `Profiles.publishStatus`                                  |
+| `fetchProfileAtom`, `fetchProfilesAtom`            | `Profiles.fetchProfile`, `Profiles.fetchProfiles`                                    |
+| `discoverActiveProfilesAtom`, `searchProfilesAtom` | `Profiles.discoverActiveProfiles`, `Profiles.searchProfiles` (`{ query, options? }`) |
+| `publishRelayListsAtom`, `fetchOwnRelayListsAtom`  | `RelayLists.publishRelayLists`, `RelayLists.fetchOwnRelayLists`                      |
+| `publishMuteListAtom`                              | `MuteList.publishMuteList`                                                           |
+| `fetchWrapEventAtom`                               | `WrapInbox.fetchWrapEvent` (`{ wrapId, extraRelays? }`)                              |
 
 Chat sends and reaction adds go through `enqueueOutboxAtom` ([outbox.md](./outbox.md)); there is no `sendTextAtom`.
 
@@ -98,7 +89,7 @@ export const useInboxSync = (
 
 ## Outbox
 
-`enqueueOutboxAtom` resolves as soon as the job is stored; delivery happens in the background and reports through `useOutboxResults(handler)`, which mounts the results stream for the component's lifetime and reads the handler through a ref, so a new closure on every render is fine. A job is acked only after your `async` handler resolves; a rejection skips the ack, so the result is re-delivered on the next runtime build. Mount it once, high in the tree, and switch on `result._tag` (`OutboxJobSucceeded` with `receipt.rumorId`, or `OutboxJobFailed` with `reason` and `detail`) as [outbox.md](./outbox.md#results) describes.
+`enqueueOutboxAtom` resolves as soon as the job is stored; delivery happens in the background and reports through `useOutboxResults(handler)`, which mounts the results stream for the component's lifetime and reads the handler through a ref, so a new closure on every render is fine. A job is acked only after your `async` handler resolves; a rejection skips the ack, so the result is re-delivered on the next runtime build. Mount it once, high in the tree, and switch on `result._tag` as [outbox.md](./outbox.md#results) describes.
 
 ## Profile watch
 
@@ -111,9 +102,4 @@ export const useInboxSync = (
 
 ## Testing
 
-`@linky-fit/linkstr-react/testing` exports `configWith`, `settle`, `fakeTransport`, `fakeTransportLayer`, `relayA`, `relayB`, and re-exports `makeIdentity`. Tests use a bare `Registry.make()` instead of rendering; see [testing.md](./testing.md#linky-fitlinkstr-reacttesting).
-
-## Related
-
-- [getting-started.md](./getting-started.md#two-ways-to-run)
-- [inbox.md](./inbox.md), [outbox.md](./outbox.md), [diagnostics.md](./diagnostics.md)
+Tests drive atoms with a bare `Registry.make()` instead of rendering; helpers and an example are in [testing.md](./testing.md#linky-fitlinkstr-reacttesting).

@@ -1,6 +1,6 @@
 # Tokens
 
-`Tokens` is the read model over the inventory plus the transitions callers may make: `proofs`, `operations`, `transfers`, and `balances` to render the wallet; `markIssued`, `markExternalized`, and `forget` when a handed-out token changes hands; `returnToWallet` to take one back or retry a failed receive; `reclaim` to re-sign selected proofs; `importProofs`/`importOperation` for backups. The token codec exports are the pure functions behind all of it.
+`Tokens` is the read model over the inventory plus the transitions callers may make on transfers, the backup import, and the pure token codec behind all of it.
 
 ## Example
 
@@ -25,18 +25,9 @@ const walletView = Effect.gen(function* () {
 });
 ```
 
-Reads are pull-based: re-run them when the stores change.
+Reads are pull-based: re-run them when the stores change. `transfers` covers `send` and `receive` only; quote operations (`melt`, `topup`, `autoswap`) are read from `operations`. `balances` sums `available` proofs only. `TokenTransfer.tokenText` carries proof secrets; every other field is safe to display.
 
 ## How it works
-
-### Read model
-
-- `proofs`: every `StoredProof`, any state, newest first.
-- `operations`: every `StoredOperation`, any status, newest first.
-- `transfers`: the `send` and `receive` operations as `TokenTransfer`, newest first. Quote operations (`melt`, `topup`, `autoswap`) are not transfers; read them from `operations`.
-- `balances`: `WalletBalances` over `available` proofs only. `spendable` is the largest single-mint balance.
-
-`TokenTransfer.tokenText` carries proof secrets; every other field is safe to display.
 
 ### Send transitions
 
@@ -68,29 +59,13 @@ On a send, a transient failure (`MintUnreachable`, `CounterLockTimeout`) leaves 
 
 ### Backup import
 
-`importProofs(drafts: ImportProofDraft[])` restores proofs exactly as the backup states them and returns how many were added; secrets the inventory already holds are skipped, so importing twice adds nothing. There is no mint check: a proof comes back in the state it left with and the next validation reconciles it. `importOperation(draft: NewOperation)` restores one operation and returns its id; an existing operation with the same key is replaced. Import operations before proofs so the proofs' `operationId` links resolve. Neither fails.
+`importProofs` restores proofs exactly as the backup states them and skips secrets the inventory already holds, so importing twice adds nothing. There is no mint check: a proof comes back in the state it left with and the next validation reconciles it. `importOperation` restores one operation; an existing operation with the same key is replaced. Import operations before proofs so the proofs' `operationId` links resolve. Neither fails.
 
-### `adoptToken`
-
-`adoptToken(text)` stores a token's proofs as `available` without re-signing them at the mint and returns the amount added (secrets already stored are skipped). It fails only with `TokenParseFailed`. It is for a wallet that exists to spend one token it already trusts; anything received from someone else goes through `Receive`, because the sender keeps a spendable copy.
-
-### `ingestLegacyRows`
-
-`ingestLegacyRows(rows: LegacyTokenRow[])` is a migration-only entry that turns rows of a pre-inventory token-row model into proofs and operations; it is idempotent, contacts no mint, and never fails. New consumers do not need it.
+`adoptToken(text)` stores a token's proofs as `available` without re-signing them at the mint. It is for a wallet that exists to spend one token it already trusts; anything received from someone else goes through `Receive`, because the sender keeps a spendable copy. `ingestLegacyRows` is a migration-only entry for the pre-inventory token-row model; new consumers do not need it.
 
 ## Token codec
 
-Pure and total: malformed input yields `null`, never a throw.
-
-| Function                           | Use                                                                                                                    |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `extractTokenText(text)`           | find a token in arbitrary text (bare, `cashu:` schemes, URLs, embedded JSON) → `TokenText \| null`                     |
-| `normalizeTokenText(raw)`          | trim and normalize any supported encoding (legacy JSON becomes v3 text)                                                |
-| `parseTokenText(raw)`              | `ParsedToken` summary (`amount`, `mint`, `unit`, `memo`) without exposing proofs; for previews and dedup               |
-| `decodeTokenText(raw, keysetIds?)` | full `DecodedToken` (`mint`, `unit`, `memo`, `proofs`); pass the mint's keyset ids to expand short v2 ids in v4 tokens |
-| `encodeToken(decoded)`             | canonical v4 `TokenText`; round-trips with `decodeTokenText`                                                           |
-
-Supported formats: v3 (`cashuA`, base64url JSON), v4 (`cashuB`, base64url CBOR), and legacy cashu.me plain-JSON proof bundles. `mint`/`unit` on `ParsedToken` are `null` when the encoding does not state them unambiguously.
+`extractTokenText`, `normalizeTokenText`, `parseTokenText`, `decodeTokenText`, and `encodeToken` are pure and total: malformed input yields `null`, never a throw. Supported formats are v3 (`cashuA`, base64url JSON), v4 (`cashuB`, base64url CBOR), and legacy cashu.me plain-JSON proof bundles; `encodeToken` always produces v4. `parseTokenText` gives the summary for a preview without exposing proofs; `decodeTokenText` needs the mint's keyset ids only to expand short v2 ids in v4 tokens.
 
 ## Errors
 
@@ -99,6 +74,7 @@ Supported formats: v3 (`cashuA`, base64url JSON), v4 (`cashuB`, base64url CBOR),
 | `OperationNotFound`         | transitions, `forget`, `returnToWallet` | no transfer with that id (quote operations do not count) |
 | `InvalidTransferTransition` | transitions, `forget`, `returnToWallet` | the status forbids it (`from`, `to` in the error)        |
 | `ReceiveError` members      | `returnToWallet`                        | see [receive.md](./receive.md#errors)                    |
+| `TokenParseFailed`          | `adoptToken`                            | the text holds no decodable token                        |
 
 ## Related
 

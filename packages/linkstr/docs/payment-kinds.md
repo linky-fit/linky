@@ -4,7 +4,7 @@ Three gift-wrapped verticals around payments, each with its own Linky-invented k
 
 ## Payment notices
 
-`PaymentNotices.send(draft)` tells a peer "I just paid you" so their device can wake up and ingest the token that travelled in chat. The notice is a kind 24133 rumor wrapped **once**, to the recipient, and the wrap is push-marked, so a push server delivers a notification even though the token message itself was not push-marked ([chat.md](./chat.md#sending)). Send it after the token message was sent or enqueued; the token may still be in flight when the notice lands.
+`PaymentNotices.send(draft)` tells a peer "I just paid you" so their device can wake up and ingest the token that travelled in chat. The notice is a kind 24133 rumor wrapped **once**, to the recipient, and the wrap is push-marked, so a push server delivers a notification even though the token message itself was not push-marked ([chat.md](./chat.md#sending)). Send it after the token message was sent or enqueued; the token may still be in flight when the notice lands. In React use `sendPaymentNoticeAtom`.
 
 ```ts
 import { Effect } from "effect";
@@ -27,17 +27,21 @@ const notifyPaid = (peer: Pubkey, offerId?: string) =>
   );
 ```
 
-`PaymentNoticeDraft`: `to: Pubkey`, `context?: "bank_payment_offer"`, `offerId?: string` (non-empty, trimmed), `clientId?: ClientId`. There is no `sentAt`; a notice is always stamped now. `context` and `offerId` link the notice to a bank offer; leave both out for a plain contact payment.
+`context` and `offerId` link the notice to a bank offer; leave both out for a plain contact payment. The receipt has no `selfCopy`: a notice is a signal, not state your other devices need. Not an outbox operation; when the send fails only the wake-up is lost.
 
-`PaymentNoticeReceipt` carries `rumorId`, `clientId`, `sentAt` and `recipientCopy`. There is no `selfCopy`: a notice is a signal, not state your other devices need. Not an outbox operation; when the send fails only the wake-up is lost.
+### Wire format
 
-**Wire format.** Kind 24133. Tags, in order: `p` to, `p` author, `client`, `["linky", "payment_notice"]`, then `["context", context]` and `["offer", offerId]` when set. Content: the literal string `payment_notice`. One gift wrap to the recipient, always push-marked. A notice carries no value and is never ingested as a wallet event.
+Kind 24133. Tags, in order: `p` to, `p` author, `client`, `["linky", "payment_notice"]`, then `["context", context]` and `["offer", offerId]` when set. Content: the literal string `payment_notice`. One gift wrap to the recipient, always push-marked. A notice carries no value and is never ingested as a wallet event.
 
-**Receiving.** `PaymentNoticeReceived { noticeId: RumorId, from: Pubkey, context: "bank_payment_offer" | null, offerId: string | null, sentAt }`: `from` paid you. The token arrives on the same inbox as a `ChatMessageReceived` with a `TokenBody`, and that handler is where you ingest it. Treat the notice as a wake-up: make sure the inbox is open, and show a notification for a `live` notice unless a matching token message is already stored. A push-opened process can get the same fact from `fetchWrapEvent` ([inbox.md](./inbox.md#fetchwrapevent-for-notification-opens)).
+### Receiving
 
-Drop reason: `invalid-notice` — wrong `linky` tag, not p-tagged to you, or authored by you (there is no own echo).
+`PaymentNoticeReceived` means `from` paid you. The token arrives on the same inbox as a `ChatMessageReceived` with a `TokenBody`, and that handler is where you ingest it. Treat the notice as a wake-up: make sure the inbox is open, and show a notification for a `live` notice unless a matching token message is already stored. A push-opened process can get the same fact from `fetchWrapEvent` ([inbox.md](./inbox.md#fetchwrapevent-for-notification-opens)).
 
-**Errors.** `WrapNotDelivered` (no relay accepted the single wrap; carries `rumorId`, `clientId`, `sentAt`, `recipientCopy`).
+Drop reason: `invalid-notice` (wrong `linky` tag, not p-tagged to you, or authored by you; there is no own echo).
+
+### Errors
+
+`WrapNotDelivered`: no relay accepted the single wrap.
 
 ## Payment telemetry
 
@@ -80,15 +84,15 @@ const publishOnce = Effect.flatMap(PaymentTelemetry, (telemetry) =>
 );
 ```
 
-For durable delivery use `Outbox.enqueueTelemetry(draft, recipient, ref)`: it retries with backoff on the outbox's background lane, so a failing report never delays chat sends, and returns an `OutboxJobId` rather than an `EnqueueReceipt`, because each attempt mints a new author and so a new rumor id ([outbox.md](./outbox.md)).
+For durable delivery use `Outbox.enqueueTelemetry(draft, recipient, ref)` (`enqueuePaymentTelemetryAtom` in React): it retries with backoff on the outbox's background lane, so a failing report never delays chat sends, and returns an `OutboxJobId` rather than an `EnqueueReceipt`, because each attempt mints a new author and so a new rumor id ([outbox.md](./outbox.md)).
 
-`PaymentTelemetryDraft` fields: `id: ClientId` (random; also the `client` tag and the id retries share), `createdAtSec` (when the payment event happened, not when it was sent), `direction` (`in` | `out`), `status` (`ok` | `declined` | `error`), `method`, `phase`, `devicePlatform`, `appRuntime` (union literals on the exported types), and nullable strings `mint`, `amountBucket`, `feeBucket`, `errorCode`, `errorDetail`, `appHost`, plus `appVersion: string`. `PaymentTelemetryReceipt` carries `rumorId`, `clientId`, `sentAt`, `recipientCopy`.
+`createdAtSec` is when the payment event happened, not when it was sent. `classifyPaymentErrorCode(message)` maps a raw error string to a stable `errorCode`; `detectTelemetryEnvironment(facts)` is pure and turns browser facts into `{ devicePlatform, appRuntime }`; `PAYMENT_ANALYTICS_RECIPIENT_NPUB` is Linky's collector.
 
-Helpers: `classifyPaymentErrorCode(message)` maps a raw error string to a stable code (`offline`, `timeout`, `insufficient`, …, `unknown`, or `null` for empty input); `detectTelemetryEnvironment(facts)` is pure and turns `TelemetryEnvironmentFacts` (`userAgent`, `maxTouchPoints`, `displayModeStandalone`, `navigatorStandalone`, `nativePlatform`) into `{ devicePlatform, appRuntime }`; `PAYMENT_ANALYTICS_RECIPIENT_NPUB` is Linky's collector; `PAYMENT_TELEMETRY_KIND` / `PAYMENT_TELEMETRY_VALUE` are exported for tests and inspectors.
+Linkstr guarantees the transport side of anonymity (ephemeral author, no self copy, no push marker, addressed to the collector only). The draft is the only channel left: keep `id` random, report buckets rather than amounts, keep identifiers and invoice or token text out of `errorDetail`, and do not add fields; the wire is `v: 1`.
 
-Linkstr guarantees the transport side of anonymity (ephemeral author, no self copy, no push marker, addressed to the collector only). The draft is the only channel left: keep `id` random, report buckets rather than amounts, keep identifiers and invoice or token text out of `errorDetail`, and do not add fields — the wire is `v: 1`.
+### Wire format
 
-**Wire format.** Kind 24134. Tags, in order: `p` collector, `client` (the draft `id`), `["linky", "payment_telemetry"]`. Content is JSON with these keys in this order; nullable fields are written as `null`, never omitted:
+Kind 24134. Tags, in order: `p` collector, `client` (the draft `id`), `["linky", "payment_telemetry"]`. Content is JSON with these keys in this order; nullable fields are written as `null`, never omitted:
 
 ```json
 {
@@ -111,13 +115,17 @@ Linkstr guarantees the transport side of anonymity (ephemeral author, no self co
 }
 ```
 
-**Receiving.** Nothing. `WrapInbox` has no decoder for kind 24134 and drops it as `WrapDropped("unsupported-kind")`; the collector reads reports with its own tooling.
+### Receiving
 
-**Errors.** `WrapNotDelivered` on a direct send; `OutboxJobFailed` on the results stream when queued.
+Nothing. `WrapInbox` has no decoder for kind 24134 and drops it as `WrapDropped("unsupported-kind")`; the collector reads reports with its own tooling.
+
+### Errors
+
+`WrapNotDelivered` on a direct send; `OutboxJobFailed` on the results stream when queued.
 
 ## Bank offers
 
-`BankOffers.send(draft)` carries the proxy-payment flow: someone scanned a bank QR and offers contacts to pay it in exchange for sats. Every step is a **snapshot** of the whole offer — a kind 24135 rumor tagged `["linky", "bank_payment_offer"]`, gift-wrapped to the counterparty and to yourself. Linkstr encodes and decodes snapshots and binds each status to the authenticated author; the state machine, authorization against known offers and the response rules live in `@linky-fit/proxy-payment` (its `docs/offers.md`), which is the reducer to use with these facts.
+`BankOffers.send(draft)` (`sendBankOfferAtom` in React) carries the proxy-payment flow: someone scanned a bank QR and offers contacts to pay it in exchange for sats. Every step is a **snapshot** of the whole offer, a kind 24135 rumor tagged `["linky", "bank_payment_offer"]`, gift-wrapped to the counterparty and to yourself. Linkstr encodes and decodes snapshots and binds each status to the authenticated author; the state machine, authorization against known offers and the response rules live in `@linky-fit/proxy-payment` (its `docs/offers.md`), which is the reducer to use with these facts.
 
 ```ts
 const receipt =
@@ -135,9 +143,11 @@ const receipt =
   );
 ```
 
-The receipt's `content` is the encoded snapshot JSON; persist it as the offer's local state so the local view and the wire agree byte for byte. To advance an offer you received, build the next draft from the stored snapshot and change only `status` and `text`; every snapshot repeats every field.
+The receipt's `content` is the encoded snapshot JSON; persist it as the offer's local state so the local view and the wire agree byte for byte. To advance an offer you received, build the next draft from the stored snapshot and change only `status` and `text`; every snapshot repeats every field. `encodeBankOfferContent` produces the same JSON without sending, for a local placeholder row.
 
-**Roles and statuses.** Two roles: the **offerer** (who needs the bank payment made) and the counterparty. `offerer` is a field on every snapshot, independent of who authored it, because an offer goes to several contacts at once and both sides send statuses. The decoder drops a status authored by the wrong role.
+### Roles and statuses
+
+Two roles: the **offerer** (who needs the bank payment made) and the counterparty. `offerer` is a field on every snapshot, independent of who authored it, because an offer goes to several contacts at once and both sides send statuses. The decoder drops a status authored by the wrong role.
 
 | `BankOfferStatus`   | Sent by      | Meaning                                               | Push-marked |
 | ------------------- | ------------ | ----------------------------------------------------- | ----------- |
@@ -152,13 +162,15 @@ The receipt's `content` is the encoded snapshot JSON; persist it as the offer's 
 
 `shouldPushBankOfferStatus(status)` encodes the last column; `pushMark` on the draft overrides it.
 
-**Sending.** `BankOfferDraft`: `to`, `offerId: BankOfferId` (branded non-empty string, the same for every snapshot of one offer), `offerer: Pubkey`, `status`, `amountText` (display amount, e.g. `"250 CZK"`), `text` (display copy), optional `amountSat`, `initiatedAtSec`, `bankPaidAtSec`, `expiresAtSec`, `extensionSec`, `spdPayload` (the bank QR payload), `pushMark`, `clientId`. `initiatedAtSec` defaults to `sentAt` when `status` is `offered`; `bankPaidAtSec` defaults to `sentAt` when `status` is `bank_paid`; `statusUpdatedAtSec` is always the send time.
+### Sending
 
-`BankOfferReceipt` carries `rumorId`, `offerId`, `status`, `content`, `clientId`, `sentAt`, `selfCopy`, `recipientCopy`. `encodeBankOfferContent` produces the same JSON without sending, for a local placeholder row; pass every field, `null` for absent ones.
+`offerId` stays the same for every snapshot of one offer. `initiatedAtSec` defaults to `sentAt` when `status` is `offered`, `bankPaidAtSec` defaults to `sentAt` when `status` is `bank_paid`, and `statusUpdatedAtSec` is always the send time.
 
 Delivery is **recipient first**: the self copy is published only after a relay accepted the counterparty's copy, so your other devices never sync a status the peer did not get. Not an outbox operation; a snapshot that fails is resent by the user or your own timers.
 
-**Wire format.** Kind 24135. Tags, in order: `p` to, `p` author, `client`, `["offer", offerId]`, `["offerer", offerer]`, `["linky", "bank_payment_offer"]`, `["status", status]`. Content is the snapshot JSON; key order is part of the format and `null` fields are omitted:
+### Wire format
+
+Kind 24135. Tags, in order: `p` to, `p` author, `client`, `["offer", offerId]`, `["offerer", offerer]`, `["linky", "bank_payment_offer"]`, `["status", status]`. Content is the snapshot JSON; key order is part of the format and `null` fields are omitted:
 
 ```json
 {
@@ -181,17 +193,14 @@ Delivery is **recipient first**: the self copy is published only after a relay a
 
 Decoding requires the marker, the reader among the `p` tags, and `type`, `offerId`, `amountText` plus a known `status` in the content. `offererPublicKey` falls back to the `offerer` tag. Every other field is optional and dropped when malformed rather than failing the snapshot.
 
-**Receiving.** Both facts carry the draft fields as nullable values (`text`, `amountSat`, the timestamps, `extensionSec`, `spdPayload`, `clientId`) plus `snapshotId: RumorId`, `offerId`, `offerer`, `status`, `amountText`, `statusUpdatedAtSec` and `sentAt`. They differ only in who authored the wrap: `BankOfferSnapshotReceived` adds `from: Pubkey` (a counterparty's snapshot), `OwnBankOfferSnapshotConfirmed` adds `to: Pubkey` (your own snapshot echoed; `to` is the peer). `BankOfferInboxEvent` is their union.
+### Receiving
 
-The codec establishes who authored a snapshot and that the role matches the status; it cannot know whether the offer exists or whether the terms changed. Feed every snapshot, live or backfill, idempotently into a reducer that keeps the authorized thread per peer and offer id — `applyBankPaymentOfferSnapshot` from `@linky-fit/proxy-payment` does this, including buffering payer snapshots that arrive before the offerer's during backfill.
+`BankOfferSnapshotReceived` is a counterparty's snapshot (`from` authored it); `OwnBankOfferSnapshotConfirmed` is your own snapshot echoed (`to` is the peer). `BankOfferInboxEvent` is their union.
 
-Drop reason: `invalid-bank-offer` — wrong `linky` tag, not p-tagged to you, unparsable content, unknown `status`, no valid offerer pubkey, offerer absent from the participants, a status authored by the wrong role, or an own copy without a peer `p` tag.
+The codec establishes who authored a snapshot and that the role matches the status; it cannot know whether the offer exists or whether the terms changed. Feed every snapshot, live or backfill, idempotently into a reducer that keeps the authorized thread per peer and offer id. `applyBankPaymentOfferSnapshot` from `@linky-fit/proxy-payment` does this, including buffering payer snapshots that arrive before the offerer's during backfill.
 
-**Errors.** `NoRelayReachable` when no relay accepted the counterparty's copy; the self copy was never attempted, so `selfCopy` has empty relay lists. `RecipientNotReached` is in the signature but not produced by recipient-first delivery. Keep the previous local status and retry.
+Drop reason: `invalid-bank-offer` (wrong `linky` tag, not p-tagged to you, unparsable content, unknown `status`, no valid offerer pubkey, offerer absent from the participants, a status authored by the wrong role, or an own copy without a peer `p` tag).
 
-## Related
+### Errors
 
-- [chat.md](./chat.md) — the token message a notice announces and that settles an offer
-- [outbox.md](./outbox.md) — `enqueueTelemetry` and the results stream
-- [push-inbox.md](./push-inbox.md) — how the push marker is consumed
-- [inbox.md](./inbox.md) — delivery phases and the drop-reason table
+`NoRelayReachable` when no relay accepted the counterparty's copy; the self copy was never attempted, so `selfCopy` has empty relay lists. `RecipientNotReached` is in the signature but not produced by recipient-first delivery. Keep the previous local status and retry.

@@ -1,6 +1,6 @@
 # Offers
 
-A proxy payment is one **offer** (`offerId`) sent to several peers. Every snapshot linkstr delivers (`BankOfferSnapshotReceived`, `OwnBankOfferSnapshotConfirmed`) and every receipt for this device's own sends land in one `BankPaymentOfferState`: **threads** (`BankPaymentOffer`, one per peer pubkey and offer id, at its latest authorized status) plus `pending` payer snapshots waiting for their offerer's snapshot.
+A proxy payment is one offer (`offerId`) sent to several peers. Every snapshot linkstr delivers (`BankOfferSnapshotReceived`, `OwnBankOfferSnapshotConfirmed`) and every receipt for this device's own sends land in one `BankPaymentOfferState`: threads (`BankPaymentOffer`, one per peer pubkey and offer id, at its latest authorized status) plus `pending` payer snapshots waiting for their offerer's snapshot.
 
 ```ts
 import {
@@ -26,7 +26,7 @@ for (const { offer, event: snapshot } of accepted) notify(offer, snapshot);
 state = applyBankPaymentOfferReceipt(state, peerPubkey, receipt).state;
 ```
 
-`BankPaymentOffer` extends the decoded content (`BankPaymentOfferInfo`: status, amounts, timestamps, `spdPayload`, `text`) with `peer`, `offererPublicKey`, `createdAtSec` (the first snapshot's send time), `snapshotId` and the encoded `content` as the wire carried it. `decodeBankPaymentOffer(content)` reads that JSON back, lenient about every optional field.
+A thread is the decoded content (`BankPaymentOfferInfo`) plus its identity on the wire; `decodeBankPaymentOffer(content)` reads the content JSON back, lenient about every optional field.
 
 ## Authorization
 
@@ -36,6 +36,7 @@ state = applyBankPaymentOfferReceipt(state, peerPubkey, receipt).state;
 - the offerer is neither the peer nor me, or differs from the offerer of any known thread of the offer;
 - a known thread has a different `amountSat`, `amountText` or `initiatedAtSec`;
 - the snapshot is older than the known thread (`sentAt`, then `bankPaymentOfferStatusRank` on ties) or the thread already ended for everyone (`canceled`/`settled`);
+- a payer snapshot other than `bank_paid` arrives once the thread has left `offered`: a payer's first answer is final;
 - the status is not terminal and either the offer already ended for another peer or the phase has expired (`isBankPaymentOfferExpired`).
 
 A payer snapshot with no known thread, or `bank_paid` before `bank_details_sent`, waits in `pending` (at most 256, oldest dropped) and is replayed in `sentAt` order once the offerer's snapshot for that peer is accepted. Payer copies never change `expiresAtSec`, `extensionSec` or `spdPayload`; those stay as the offerer sent them, and `bankPaidAtSec` is stamped from the payer's `sentAt`.
@@ -46,28 +47,21 @@ The offerer's `accepted_by_other` overrides a pending `accepted` regardless of t
 
 ## Rules
 
-| Function                                                                      | Meaning                                                                                                           |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `isTerminalBankPaymentOfferStatus`                                            | ends one peer's thread (`accepted_by_other`, `canceled`, `declined`, `settled`)                                   |
-| `isWholeOfferTerminalStatus`                                                  | ends the offer for everyone (`canceled`, `settled`)                                                               |
-| `bankPaymentOfferStatusRank`                                                  | merge precedence between same-second snapshots, not the lifecycle order                                           |
-| `hasBankPaymentOfferTimedPhase`                                               | statuses with a countdown (`offered`, `accepted`, `bank_details_sent`, `bank_paid`)                               |
-| `bankPaymentOfferExpiresAtSec`                                                | explicit `expiresAtSec`, else the phase start plus `BANK_PAYMENT_OFFER_PHASE_TTL_SEC` (5 min); null when terminal |
-| `bankPaymentOfferResponseDurationSec`                                         | seconds from initiation to the bank payment                                                                       |
-| `clampBankPaymentOfferRecipientCount`, `clampBankPaymentOfferStaggerDelaySec` | round to an integer and clamp to 1–10 recipients and 0–30 s; a non-finite value becomes the default (2, 0)        |
+`isTerminalBankPaymentOfferStatus` ends one peer's thread (`accepted_by_other`, `canceled`, `declined`, `settled`); `isWholeOfferTerminalStatus` ends the offer for everyone (`canceled`, `settled`). `bankPaymentOfferStatusRank` is merge precedence between same-second snapshots, not the lifecycle order.
 
-`BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC` (5) is exported for a slider's step; the clamp does not snap to it.
+`bankPaymentOfferExpiresAtSec` is the explicit `expiresAtSec`, else the phase start plus `BANK_PAYMENT_OFFER_PHASE_TTL_SEC` (5 min), and `null` once terminal; `hasBankPaymentOfferTimedPhase` names the statuses with a countdown.
+
+`clampBankPaymentOfferRecipientCount` and `clampBankPaymentOfferStaggerDelaySec` round to an integer and clamp to 1 to 10 recipients and 0 to 30 s; a non-finite value becomes the default (2, 0). `BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC` (5) is for a slider's step; the clamp does not snap to it.
 
 ## Selectors
 
-All selectors take `state.offers` and are pure.
+All selectors take `state.offers` and are pure; the consumer's effects run on them.
 
-- `activeBankPaymentOffers(offers, nowSec)` — peers with a live thread of an offer that has not ended, plus the next expiry to re-render at.
-- `bankPaymentOfferResponderSteps(offers, me)` — per own offer: `ended`, the `winner` who already holds the bank details, else the earliest `candidate` acceptance (ties by peer), and the `losers` still offered or accepted. The consumer sends `bank_details_sent` to the candidate and, once delivered, `accepted_by_other` to the losers. `hasPendingBankPaymentOfferResponderWork(offers, me, nowSec)` says whether an unexpired acceptance still waits for bank details.
-- `ownBankPaymentOfferExpiries(offers, me, nowSec)` — per own offer, the deadline of its most advanced phase (`bank_paid` > `bank_details_sent` > `accepted` > `offered`); the consumer cancels the whole group then.
-- `bankPaymentOfferGroupResponses(offers, offerId, "canceled" | "settled")` — the threads a whole-offer status must reach (never canceling a settled thread) and the single peer that gets the push for a cancellation (most advanced, then earliest).
-- `lastBankPaymentOfferResponseSecByPeer(offers, me)` — how long each peer took on my most recent offer they paid.
-- `isBankPaymentOfferCanceled(offers, offerId)`, `findBankPaymentOffer(offers, peer, offerId)`, `bankPaymentOffersOf(offers, offerId)`.
+- `activeBankPaymentOffers(offers, nowSec)`: peers with a live thread of an offer that has not ended, plus the next expiry to re-render at.
+- `bankPaymentOfferResponderSteps(offers, me)`: per own offer, the `winner` who already holds the bank details, else the earliest `candidate` acceptance (ties by peer), and the `losers` still offered or accepted. The consumer sends `bank_details_sent` to the candidate and, once delivered, `accepted_by_other` to the losers. `hasPendingBankPaymentOfferResponderWork(offers, me, nowSec)` says whether an unexpired acceptance still waits for bank details.
+- `ownBankPaymentOfferExpiries(offers, me, nowSec)`: per own offer, the deadline of its most advanced phase; the consumer cancels the whole group then.
+- `bankPaymentOfferGroupResponses(offers, offerId, "canceled" | "settled")`: the threads a whole-offer status must still reach (never canceling a settled thread) and the single peer that gets the push for a cancellation.
+- `lastBankPaymentOfferResponseSecByPeer(offers, me)`: how long each peer took on my most recent offer they paid.
 
 ## Drafts
 

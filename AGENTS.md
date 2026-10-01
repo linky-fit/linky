@@ -35,7 +35,7 @@ Emit an inspector event for every meaningful operation (user actions, relay/mint
 
 App releases use CalVer `YY.M.MICRO` (`26.10.1`; the counter resets monthly), independent of the libraries.
 
-`@linky-fit/linkshu` and `@linky-fit/linkstr` are the only npm packages. They share one SemVer version, set in both manifests and released by a matching `packages-vX.Y.Z` tag on `main`; the tag publishes both even when only one changed. Bumping is a release step (`docs/npm-releases.md`, also the `check:npm` requirements): a change to an exported surface or documented behavior leaves `version` alone and states its SemVer effect in the PR description. While the version is 0.x, a breaking change to an export or documented behavior is a minor bump and anything else a patch; from 1.0.0, breaking is major, a new export or option minor, a fix patch. Every other workspace is private and its `version` field is inert.
+`@linky-fit/linkshu` and `@linky-fit/linkstr` are the only npm packages; they share one SemVer version, released per `docs/npm-releases.md`. A change to an exported surface or documented behavior leaves `version` alone and states its SemVer effect in the PR description. While the version is 0.x, a breaking change to an export or documented behavior is a minor bump and anything else a patch. Every other workspace is private and its `version` field is inert.
 
 ## Local dev
 
@@ -66,6 +66,5 @@ cd apps/web-app && bunx playwright test --project=local-stack               # --
 - Vitest excludes `tests/**` (Playwright only); unit tests sit next to their subject under `src/`. Evolu needs the Worker polyfill in `vitest.setup.ts`
 - jsdom tests of the proxy-payment handoff stub `navigator.locks` with `query`; the boot lock shim lacks it and counts as missing
 - linkstr test helpers: `@linky-fit/linkstr/testing` and `@linky-fit/linkstr-react/testing`; extend them, never import them from production code
-- Push behind a reverse proxy needs `PUSH_TRUSTED_PROXY_IPS` (exact peer IPs), otherwise proxied clients share one rate-limit bucket
 - Debug APKs install as `fit.linky.app.debug` and need that client in `google-services.json` for native push; Play bundles need release signing; Android builds need Java 17 via `apps/native-shell/scripts/with-java17.sh` (`apps/native-shell/README.md`)
 - Bumping `@evolu/*`: the pins in `docker/evolu-relay/package.json` must stay protocol-compatible

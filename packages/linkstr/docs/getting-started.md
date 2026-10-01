@@ -1,6 +1,6 @@
 # Getting started
 
-Hand in a draft, get a receipt back, consume everything inbound as one tagged union. This page takes you from two keys to a delivered message and its inbox echo, and explains the two ways to run the package.
+From two keys to a delivered message and its inbox echo, plus the two ways to run the package.
 
 ## Install
 
@@ -8,12 +8,12 @@ Hand in a draft, get a receipt back, consume everything inbound as one tagged un
 bun add @linky-fit/linkstr effect
 ```
 
-| Import path                        | What you get                                                                                       |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `@linky-fit/linkstr`               | services, drafts, receipts, facts, key codecs, `runLinkstr`, `linkstrServices`                     |
-| `@linky-fit/linkstr/testing`       | `makeIdentity`, publish stubs, `FakeRelay`, `stubStorage`; tests only ([testing.md](./testing.md)) |
-| `@linky-fit/linkstr-react`         | effect-atom bindings for React ([react.md](./react.md)); a private workspace, not on npm           |
-| `@linky-fit/linkstr-react/testing` | `configWith`, `settle`, `fakeTransport`; tests only                                                |
+| Import path                        | What you get                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `@linky-fit/linkstr`               | services, drafts, receipts, facts, key codecs, `runLinkstr`, `linkstrServices`                   |
+| `@linky-fit/linkstr/testing`       | test helpers ([testing.md](./testing.md)); needs Vitest 4, the main entry does not               |
+| `@linky-fit/linkstr-react`         | effect-atom bindings for React ([react.md](./react.md)); a private workspace package, not on npm |
+| `@linky-fit/linkstr-react/testing` | its test helpers                                                                                 |
 
 Never import `nostr-tools` in consumer code; the codecs in [identity-and-keys.md](./identity-and-keys.md) cover keys and ids.
 
@@ -177,13 +177,6 @@ sent 9049fbe8…: peer copy accepted by 1 relay(s)
 backfill OwnChatMessageConfirmed 9049fbe8…
 ```
 
-What happened:
-
-- `Chat.sendText` wrapped the message twice, once to the peer and once to you, and the receipt reports both copies. `catchTags` turns the two delivery failures into strings; anything else rejects the promise.
-- `WrapInbox.open` subscribed to kind 1059 for your pubkey inside a `Scope`; leaving `Effect.scoped` closes it. The first event is your own copy coming back, an **own echo** tagged `OwnChatMessageConfirmed`, with the rumor id the receipt gave you. `backfill` means the relay served it from storage ([inbox.md](./inbox.md)).
+`Chat.sendText` wrapped the message twice, to the peer and to you, and the receipt reports both copies; `catchTags` turns the two delivery failures into strings, anything else rejects the promise. `WrapInbox.open` subscribed to kind 1059 for your pubkey inside a `Scope`; leaving `Effect.scoped` closes it. The first event is your own copy coming back, the own echo `OwnChatMessageConfirmed`, with the rumor id the receipt gave you. `backfill` means the relay served it from storage ([inbox.md](./inbox.md)).
 
 Point `RELAY` at a closed port and the lines become `no relay accepted anything; is RELAY up?` and `nothing arrived in 20 s`. A bad `NSEC` stops before any network call. `allowInsecureLocalhost` is only needed for a `ws://localhost` relay; leave it unset in production.
-
-## Next
-
-Pick the guide for the vertical you need from the [index](./README.md). [concepts.md](./concepts.md) defines the vocabulary used everywhere and holds the shared error table.

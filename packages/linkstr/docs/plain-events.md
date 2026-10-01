@@ -1,6 +1,6 @@
 # Plain events
 
-Three verticals publish plain signed events, not gift wraps: anyone can read them, they replace the previous event of their kind on relays, and they are fetched or watched rather than received through the inbox. All publishes sign with the configured identity, go to every write relay concurrently, and return a `PlainEventReceipt` (`eventId`, `kind`, `sentAt`, `results: RelayPublishResult[]` with `relay`, `accepted`, `detail`, and `.accepted` when at least one relay took it). Errors are in [the shared table](./concepts.md#errors).
+Three verticals publish plain signed events, not gift wraps: anyone can read them, they replace the previous event of their kind on relays, and they are fetched or watched rather than received through the inbox. Every publish signs with the configured identity, goes to every write relay concurrently, and returns a `PlainEventReceipt` with one `RelayPublishResult` per relay. Errors are in [the shared table](./concepts.md#errors).
 
 ## Profiles and status
 
@@ -26,16 +26,7 @@ const publishThenFetch = (peer: Pubkey) =>
   });
 ```
 
-The result is a `ProfileFetchResult`: `result.profile?.metadata.displayName`, `result.status?.content`, each `null` when the peer has none.
-
-### Sending
-
-| Draft             | Fields                                                                                       | Method           |
-| ----------------- | -------------------------------------------------------------------------------------------- | ---------------- |
-| `ProfileMetadata` | all optional strings: `name`, `displayName`, `picture`, `lud16`, `lud06`, `nip05`, `about`   | `publishProfile` |
-| `StatusDraft`     | `content: string` (empty string clears), `expiresAt?: UnixSeconds` (NIP-40 `expiration` tag) | `publishStatus`  |
-
-Status content is opaque to linkstr.
+The result is a `ProfileFetchResult`: `result.profile?.metadata.displayName`, `result.status?.content`, each `null` when the peer has none. Status content is opaque to linkstr; an empty string clears it.
 
 ### Wire format
 
@@ -48,23 +39,11 @@ Decoding kind 0 is tolerant: unknown fields are ignored, non-string values dropp
 
 ### Fetching
 
-| Method                             | Returns                                                      | Options                                                                                                               |
-| ---------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `fetchProfile(pubkey)`             | `ProfileFetchResult { profile, status }` (each nullable)     |                                                                                                                       |
-| `fetchProfiles(pubkeys)`           | `ProfileFetchEntry[]` — `{ pubkey, profile, status }`        | authors are chunked 50 per relay filter                                                                               |
-| `discoverActiveProfiles(options?)` | `DiscoveredProfile[]` — `{ pubkey, lastActiveAt, metadata }` | `activityKinds` (default 0, 1, 6, 7, 9735, 30315), `activeWindowSeconds` (45 days), `authorScanLimit` (64)            |
-| `searchProfiles(query, options?)`  | `ProfileSearchHit[]` — `{ pubkey, metadata, updatedAt }`     | `limit` (6), `searchRelays` (NIP-50 relays; read relays when empty), `deadline` (2.5 s), `preferredDomains`, `onHits` |
-
-`profile` and `status` are the same `ProfileUpdated` / `StatusUpdated` facts the watch emits: newest event per kind, expired statuses excluded. Search sends the query as typed and, for a last word of three or more characters, once more with a trailing `*` for relays whose full-text index matches whole words; it streams ranked matches through `onHits` each time a relay answers, until the deadline, then interrupts the slow tail. Matching is accent- and case-insensitive on every query word; `preferredDomains` ranks profiles whose `nip05` or `lud16` ends in one of those domains first.
+`fetchProfile(pubkey)` and `fetchProfiles(pubkeys)` return the newest kind 0 and `d=general` status per pubkey, expired statuses excluded, as the same `ProfileUpdated` / `StatusUpdated` facts the watch emits. `discoverActiveProfiles(options?)` scans recent activity (kinds 0, 1, 6, 7, 9735 and 30315 within 45 days, 64 authors, unless overridden) and returns the authors' metadata. `searchProfiles(query, options?)` sends a NIP-50 `search` filter to `searchRelays` (the read relays when none are given) and streams ranked hits through `onHits` each time a relay answers, until `deadline` cuts off the slow tail; the returned value is the final ranking.
 
 ### Watching
 
-`ProfileWatch.watch(pubkeys, options?)` returns a scoped `Stream<ProfileWatchEvent>` (`options.resubscribeDelay`, default 5 s); closing the scope tears down the relay subscriptions. One subscription per relay and 50-author chunk. Newest wins per `(pubkey, kind)` within the session; older or expired events are dropped and only visible to the inspector as `ProfileEventDropped` ([diagnostics.md](./diagnostics.md)).
-
-| Tag              | Fields                                                                                       | Meaning                               |
-| ---------------- | -------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `ProfileUpdated` | `pubkey: Pubkey`, `metadata: ProfileMetadata`, `updatedAt: UnixSeconds`                      | a newer kind 0 than seen this session |
-| `StatusUpdated`  | `pubkey`, `content: string` (empty = cleared), `expiresAt: UnixSeconds \| null`, `updatedAt` | a newer `d=general` kind 30315        |
+`ProfileWatch.watch(pubkeys, options?)` returns a scoped `Stream<ProfileWatchEvent>` of `ProfileUpdated` and `StatusUpdated` facts; closing the scope tears down the relay subscriptions. Newest wins per `(pubkey, kind)` within the session; older or expired events are dropped and only visible to the inspector as `ProfileEventDropped` ([diagnostics.md](./diagnostics.md)).
 
 ```ts
 import { Effect, Stream } from "effect";
@@ -121,33 +100,13 @@ const publishThenFetch = Effect.gen(function* () {
 });
 ```
 
-When adopting fetched lists, prefer kind 10002 and fall back to 10050, and keep the `relaysUpdatedAt` you applied so a relay serving a stale event cannot roll your configuration back.
+Both publishes always run to completion; if either was accepted by no relay the operation fails with that event's `NoRelayAcceptedEvent`, and the other may still have landed.
 
-### Sending
-
-| Draft             | Fields                                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------ |
-| `RelayListsDraft` | `relays: RelayListEntry[]` (kind 10002), `dmRelays: RelayUrl[]` (kind 10050)                                 |
-| `RelayListEntry`  | `relay: RelayUrl`, `marker: "read" \| "write" \| null` — `null` means both, and is written as a bare `r` tag |
-
-`publishRelayLists` returns `RelayListsReceipt { relayList: PlainEventReceipt, dmRelayList: PlainEventReceipt }`. Both publishes always run to completion; if either was accepted by no relay the operation fails with that event's `NoRelayAcceptedEvent`, and the other may still have landed.
+`fetchOwnRelayLists()` queries every read relay and returns `FetchedRelayLists`; a `null` list means no event of that kind was found anywhere. There is no watch: relay lists are read on demand. When adopting fetched lists, prefer kind 10002 and fall back to 10050, and keep the `relaysUpdatedAt` you applied so a relay serving a stale event cannot roll your configuration back.
 
 ### Wire format
 
 Two plain replaceable events with empty content: kind 10002 (NIP-65) with one `["r", url]` per relay, or `["r", url, "read" | "write"]` for a one-directional entry, and kind 10050 (NIP-17) with one `["relay", url]` per inbox relay. Decoding drops entries that are not relay urls and turns an unknown marker into `null`.
-
-### Fetching
-
-`fetchOwnRelayLists()` queries every read relay for your kinds 10002 and 10050 (8 s per relay) and returns `FetchedRelayLists`:
-
-| Field               | Type                       | Note                                  |
-| ------------------- | -------------------------- | ------------------------------------- |
-| `relays`            | `RelayListEntry[] \| null` | `null` = no kind 10002 found anywhere |
-| `relaysUpdatedAt`   | `UnixSeconds \| null`      | `created_at` of that event            |
-| `dmRelays`          | `RelayUrl[] \| null`       | `null` = no kind 10050 found          |
-| `dmRelaysUpdatedAt` | `UnixSeconds \| null`      |                                       |
-
-There is no watch: relay lists are read on demand.
 
 ### Errors
 
@@ -174,9 +133,3 @@ Kind 10000, plain and replaceable: one `["p", pubkey]` per muted contact, empty 
 ### Errors
 
 `NoRelayAcceptedEvent`; the local block still applies, republish later.
-
-## Related
-
-- [inbox.md](./inbox.md) — where to apply a block
-- [identity-and-keys.md](./identity-and-keys.md) — `decodeNpub`, `parsePubkey`
-- [diagnostics.md](./diagnostics.md) — relay health for the relays you configured

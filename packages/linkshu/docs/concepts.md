@@ -74,22 +74,6 @@ Rules shared by all three:
 
 Each operation guide states what its resumer does per mint answer.
 
-## Effect primer
+## Effect specifics
 
-An `Effect<A, E, R>` describes a computation that succeeds with `A`, fails with a typed `E`, and needs services `R`. Nothing runs until a runtime executes it. `Effect.gen` writes sequential code; `yield*` unwraps an effect or fails the generator with its error:
-
-```ts
-const total = Effect.gen(function* () {
-  const tokens = yield* Tokens; // the service instance
-  const balances = yield* tokens.balances; // an Effect<WalletBalances>
-  return balances.total;
-});
-```
-
-Services are classes you `yield*` (`Receive`, `Tokens`, `KeyValueStore`, …). `linkshuServices(config)` is the one Layer you need. Run with `runLinkshu` (one-shot) or `ManagedRuntime.runPromise` (long-lived). Typed failures are handled with `Effect.either`, `Effect.catchTag`, and `Effect.catchTags`; bugs (a throw inside `Effect.sync`, `Amount.make(-1)`) are defects that reject the promise and are not in `E`. Effects that need `Scope.Scope` (`Topup.start`, `Topup.resumePending`) run under `Effect.scoped`, or `Scope.extend` into a scope you own so polling outlives the call.
-
-## Related
-
-- [getting-started.md](./getting-started.md): wiring and first call
-- [ports.md](./ports.md): what the stores must guarantee
-- [errors.md](./errors.md): the tagged error catalogue
+Services are classes you `yield*` (`Receive`, `Tokens`, `KeyValueStore`, ...). `linkshuServices(config)` is the one Layer you need. Run with `runLinkshu` (one-shot) or `ManagedRuntime.runPromise` (long-lived). Typed failures are handled with `Effect.either`, `Effect.catchTag`, and `Effect.catchTags`; bugs (a throw inside `Effect.sync`, `Amount.make(-1)`) are defects that reject the promise and are not in `E`. Effects that need `Scope.Scope` (`Topup.start`, `Topup.resumePending`) run under `Effect.scoped`, or `Scope.extend` into a scope you own so polling outlives the call.

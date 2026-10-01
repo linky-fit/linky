@@ -1,6 +1,6 @@
 # Chat
 
-`Chat` sends one-to-one messages: text, an encrypted image or file, a cashu token, and edits of an earlier text message. Text, token and edit messages are NIP-17 kind 14 rumors; file messages are kind 15. Every message is gift-wrapped (kind 1059) twice — one wrap to the peer, one to yourself — so your other devices see the echo.
+`Chat` sends one-to-one messages: text, an encrypted image or file, a cashu token, and edits of an earlier text message. Text, token and edit messages are NIP-17 kind 14 rumors; file messages are kind 15. Every message is gift-wrapped (kind 1059) twice, once to the peer and once to yourself, so your other devices see the echo.
 
 ## Quick example
 
@@ -41,28 +41,28 @@ For a message that must survive going offline, enqueue `{ _tag: "chat.text", dra
 
 ## Sending
 
-| Draft               | Fields                                                                                                                     | Method      | Outbox op    |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------ |
-| `TextMessageDraft`  | `to: Pubkey`, `content: MessageText`, `replyTo?: RumorId`, `root?: RumorId`, `clientId?: ClientId`, `sentAt?: UnixSeconds` | `sendText`  | `chat.text`  |
-| `TokenMessageDraft` | `to`, `token: CashuTokenText`, `replyTo?`, `root?`, `clientId?`, `sentAt?`                                                 | `sendToken` | `chat.token` |
-| `ImageMessageDraft` | `to`, `image: PrivateImage`, `replyTo?`, `root?`, `clientId?`, `sentAt?`                                                   | `sendImage` | `chat.image` |
-| `EditMessageDraft`  | `to`, `editOf: RumorId`, `content: MessageText`, `clientId?`, `sentAt?`                                                    | `edit`      | `chat.edit`  |
+| Draft               | Method      | Outbox op    |
+| ------------------- | ----------- | ------------ |
+| `TextMessageDraft`  | `sendText`  | `chat.text`  |
+| `TokenMessageDraft` | `sendToken` | `chat.token` |
+| `ImageMessageDraft` | `sendImage` | `chat.image` |
+| `EditMessageDraft`  | `edit`      | `chat.edit`  |
 
 - `clientId` is generated when omitted. Pass your own when an optimistic local row already exists; the echo (`OwnChatMessageConfirmed.clientId`) and the outbox result carry it back.
 - `replyTo` alone marks a reply to a top-level message; add `root` when replying inside a thread. Edits carry no reply context.
-- `MessageText` is a non-empty trimmed string; `CashuTokenText` must parse with `parseCashuToken`. Both throw from `.make` on bad input, so decode user input with `Schema.decodeUnknownEither` instead.
+- `MessageText` and `CashuTokenText` throw from `.make` on bad input; decode user input with `Schema.decodeUnknownEither` instead.
 
-`ChatMessageReceipt` carries `rumorId`, `clientId`, `sentAt`, `selfCopy` and `recipientCopy`; `MessageEditReceipt` adds `editOf`. A receipt only exists when the recipient copy was accepted.
+A receipt (`ChatMessageReceipt`, or `MessageEditReceipt` for edits) only exists when the recipient copy was accepted.
 
 Push: `sendText` and `sendImage` tag the recipient's wrap with `["linky", "push"]` so a push server can notify. `sendToken` and `edit` do not; follow a token send with a push-marked [payment notice](./payment-kinds.md#payment-notices) when the recipient should be woken up.
 
 ### Images and files
 
-Linkstr neither encrypts nor uploads. Before building an `ImageMessageDraft`, encrypt the file with AES-GCM, upload the ciphertext to a Blossom server using `makeBlossomUploadAuthHeader` ([http-auth.md](./http-auth.md)), and record both hashes. `PrivateImage` holds the ciphertext `url`, MIME `fileType`, `encryptionAlgorithm: "aes-gcm"`, `key` (64 lowercase hex) and `nonce` (24 lowercase hex), `encryptedSha256` of the stored bytes and `originalSha256` of the plaintext, `encryptedSize`, `storageEncoding` (`"base64"` or `"raw"`), and optional `fileName` plus `width` / `height` (both or neither: images yes, PDFs no).
+Linkstr neither encrypts nor uploads. Before building an `ImageMessageDraft`, encrypt the file with AES-GCM, upload the ciphertext to a Blossom server using `makeBlossomUploadAuthHeader` ([http-auth.md](./http-auth.md)), and fill `PrivateImage` with the ciphertext url, the key and nonce, and the hashes of both the stored bytes and the plaintext. `width` and `height` come together or not at all: images yes, PDFs no.
 
 ### Cashu tokens
 
-`parseCashuToken(raw)` returns `{ amount, mint, unit }` for a standard `cashuA` / `cashuB` token, else `null`; `extractWholeCashuToken(text)` strips a `cashu:` / `web+cashu://` prefix and returns the token when the whole input is one token, else `null`. On the wire a token message is a plain kind 14 whose content is the token; the decoder classifies it as `TokenBody`.
+A token message is a plain kind 14 whose content is the token; the receiver classifies it as `TokenBody`. `parseCashuToken` and `extractWholeCashuToken` (which strips a `cashu:` / `web+cashu://` prefix) validate user input before you build the draft.
 
 ## Wire format
 
@@ -81,14 +81,7 @@ Every send is a NIP-17 rumor delivered as two gift wraps, self and peer, publish
 
 ## Receiving
 
-Chat facts arrive on the wrap inbox ([inbox.md](./inbox.md)). Edits are not a separate event: both facts carry `editOf`.
-
-| Tag                       | Fields                                                                                                                                              | Meaning                                                   |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `ChatMessageReceived`     | `messageId: RumorId`, `from: Pubkey`, `body: MessageBody`, `replyTo: RumorId \| null`, `root: RumorId \| null`, `editOf: RumorId \| null`, `sentAt` | a peer's message; `editOf` set = a new version of that id |
-| `OwnChatMessageConfirmed` | `messageId`, `to: Pubkey`, `body`, `replyTo`, `root`, `editOf`, `clientId: ClientId \| null`, `sentAt`                                              | your own message seen on a relay (echo or another device) |
-
-`MessageBody` is `TextBody { text }`, `ImageBody { image: PrivateImage }` or `TokenBody { token: CashuTokenText }`.
+Chat facts arrive on the wrap inbox ([inbox.md](./inbox.md)): `ChatMessageReceived` is a peer's message, `OwnChatMessageConfirmed` your own message seen on a relay (echo or another device). Edits are not a separate event: both facts carry `editOf`, and a set `editOf` means a new version of that id. `body` is a `MessageBody`: `TextBody`, `ImageBody` or `TokenBody`.
 
 ```ts
 import type {
@@ -129,10 +122,3 @@ Drop reasons this codec adds ([the full table](./inbox.md#authentication-and-dro
 ## Errors
 
 Direct sends fail with `RecipientNotReached` or `NoRelayReachable`; queued sends surface only `OutboxJobFailed` on the results stream. See [the error table](./concepts.md#errors).
-
-## Related
-
-- [outbox.md](./outbox.md) — enqueue, results stream, `OutboxRef`
-- [reactions.md](./reactions.md) — reacting to a `messageId`
-- [seen-receipts.md](./seen-receipts.md) — read cursors for a conversation
-- [http-auth.md](./http-auth.md) — Blossom upload auth for attachments

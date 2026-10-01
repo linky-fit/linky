@@ -1,6 +1,6 @@
 # React
 
-`@linky-fit/linksync/react` (`src/react/index.ts`) binds a component to the store. React is a peer dependency of this entry only; the main entry stays framework-free.
+`@linky-fit/linksync/react` binds a component to the store. React is a peer dependency of this entry only; the main entry stays framework-free.
 
 ```ts
 import { useRepositoryRows, useVisibleShards } from "@linky-fit/linksync/react";
@@ -9,14 +9,6 @@ const records = useRepositoryRows(transactions); // ReadonlyArray<TransactionRec
 const shards = useVisibleShards(store, "transactions"); // [{ index, owner }, ...]
 ```
 
-| Hook                             | Returns                                                                                                        |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `useRepositoryRows(repository)`  | The repository's `all`, re-read after every change it reports; `[]` until the first answer.                    |
-| `useVisibleShards(store, scope)` | `store.visibleShards(scope)`, re-read on every pointer change or explicit forget; `[]` until the first answer. |
-| `useLiveValue(source, initial)`  | The general form: any `{ all, subscribe }` pair.                                                               |
+`useLiveValue(source, initial)` is the general form: a `LiveSource` is anything with an `all` effect and a `subscribe(listener)` that returns an unsubscribe. Every repository is one, and a store query paired with the matching subscription makes another. Pass a stable source (a memoized repository, or `useMemo` around an ad hoc pair); a new object every render re-subscribes every render.
 
-A `LiveSource` is anything with an `all` effect and a `subscribe(listener)` that returns an unsubscribe: every repository is one, and a store query paired with the matching subscription makes another. Pass a stable source (a memoized repository, or `useMemo` around an ad hoc pair); a new object every render re-subscribes every render. Reads are sequenced, so a slow earlier read cannot overwrite a later one.
-
-The hooks do not suspend; the first render shows the initial value for one round trip to the database.
-
-Scope subscriptions also notify repository readers after pointer changes and explicit forgetting, so a mounted chat drops forgotten history without a reload.
+The hooks do not suspend: the first render shows `initial` (`[]` for the two row hooks) for one round trip to the database. Reads are sequenced, so a slow earlier read cannot overwrite a later one. Scope subscriptions also fire after pointer changes and explicit forgetting, so a mounted chat drops forgotten history without a reload.

@@ -1,15 +1,13 @@
 # @linky-fit/native-shell
 
-Capacitor-based native shell for shipping the existing web app as:
+Capacitor shell that bundles `apps/web-app/dist` and ships it as:
 
-- Android debug APK (side-by-side `fit.linky.app.debug`, "Linky Dev")
+- Android debug APK (`fit.linky.app.debug`, "Linky Dev", installs next to the production app)
 - Android release APK, published as `linky.apk` on GitHub Releases
-- Android AAB, uploaded to Google Play internal and open testing with each versioned release by `.github/workflows/android-apk-release.yml`, see [Play setup](../../docs/android-play-console.md)
+- Android AAB, uploaded to Google Play internal and open testing by `.github/workflows/android-apk-release.yml` (see [Play setup](../../docs/android-play-console.md))
 - iOS project (no App Store release pipeline yet)
 
-The shell consumes the bundled output from `apps/web-app/dist` and keeps the product UI in the web app package.
-
-Android builds need Java 17: `scripts/with-java17.sh` picks an installed JDK 17 before every Capacitor or Gradle command, and `scripts/patch-android-java.sh` rewrites the Java 21 compile options Capacitor 7 and some plugins generate back to 17 after `android:add` and `android:sync`.
+Android builds need JDK 17. The `native:*` scripts select it through `scripts/with-java17.sh` and run `scripts/patch-android-java.sh`, which rewrites the Java 21 compile options Capacitor 7 generates back to 17.
 
 ## First-time setup
 
@@ -23,52 +21,32 @@ bun run native:ios:add
 
 ```bash
 bun run native:apk:debug
+# apps/native-shell/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-This builds `@linky-fit/web-app`, syncs the Capacitor Android project (`android:prepare`), and runs `assembleDebug`.
-
-The debug APK installs alongside the production app as the separate package `fit.linky.app.debug` and appears in the launcher as `Linky Dev`. Native FCM push works in it only when `android/app/google-services.json` contains a client for `fit.linky.app.debug`; otherwise the Google Services plugin is skipped for debug-only builds and push stays disabled.
-
-The APK loads the bundled `apps/web-app/dist` files from inside the app. It does **not** use the Vite dev server unless you opt into live reload with `LINKY_CAP_SERVER_URL` (or `CAP_SERVER_URL`).
-
-Output:
-
-```bash
-apps/native-shell/android/app/build/outputs/apk/debug/app-debug.apk
-```
+Native push works in the debug APK only when `android/app/google-services.json` has a client for `fit.linky.app.debug`. Otherwise the build skips the Google Services plugin and push stays disabled.
 
 ## Android release APK
 
-Release APK builds use the same signing setup as the Play bundle build.
+Uses the signing setup from the AAB section below.
 
 ```bash
 bun run native:apk:release
+# apps/native-shell/android/app/build/outputs/apk/release/app-release.apk
 ```
 
-Output:
-
-```bash
-apps/native-shell/android/app/build/outputs/apk/release/app-release.apk
-```
-
-GitHub Releases publish the downloadable asset as `linky.apk`, so the public stable URL is:
-
-```bash
-https://github.com/linky-fit/linky/releases/latest/download/linky.apk
-```
+GitHub Releases publish it at `https://github.com/linky-fit/linky/releases/latest/download/linky.apk`.
 
 ## Android release AAB
 
-Release builds derive Android `versionName` from the workspace version in the root `package.json` and, locally, `versionCode` from its components as `major * 10000 + minor * 100 + patch`. CI overrides it with `200000000 + github.run_number` (`LINKY_ANDROID_VERSION_CODE`).
-
-Override either value for a specific build with:
+`versionName` is the workspace version from the root `package.json`. `versionCode` is `major * 10000 + minor * 100 + patch` locally; CI sets `LINKY_ANDROID_VERSION_CODE` to `200000000 + run_number`. Override either for one build:
 
 ```bash
 export LINKY_ANDROID_VERSION_NAME=26.1.0
 export LINKY_ANDROID_VERSION_CODE=260100
 ```
 
-Release signing comes from `apps/native-shell/android/keystore.properties` (copy `keystore.properties.example` next to it and fill it in; see `docs/android-upload-key.md`) or from the equivalent environment variables:
+Signing comes from `android/keystore.properties` (copy `keystore.properties.example`, see [`docs/android-upload-key.md`](../../docs/android-upload-key.md)) or from these variables:
 
 ```bash
 export LINKY_UPLOAD_STORE_FILE=/absolute/path/to/linky-upload-key.jks
@@ -77,16 +55,11 @@ export LINKY_UPLOAD_KEY_ALIAS=...
 export LINKY_UPLOAD_KEY_PASSWORD=...
 ```
 
-`bun run native:android:release:check` verifies the signing config, `google-services.json`, and `keytool`. Then build the Play upload bundle:
+`bun run native:android:release:check` verifies the signing config, `google-services.json` and `keytool`. Then:
 
 ```bash
 bun run native:aab:release
-```
-
-Output:
-
-```bash
-apps/native-shell/android/app/build/outputs/bundle/release/app-release.aab
+# apps/native-shell/android/app/build/outputs/bundle/release/app-release.aab
 ```
 
 ## Common commands
@@ -94,14 +67,13 @@ apps/native-shell/android/app/build/outputs/bundle/release/app-release.aab
 ```bash
 bun run native:android:sync
 bun run native:android:open
-bun run native:aab:release
 bun run native:ios:sync
 bun run native:ios:open
 ```
 
-## Optional live reload
+## Live reload
 
-For local native debugging against a running Vite server, set one of these environment variables before `cap sync` / `cap open`:
+To load a running Vite server instead of the bundled assets, set one of these before `sync` or `open`:
 
 ```bash
 export LINKY_CAP_SERVER_URL=http://127.0.0.1:5174
@@ -109,17 +81,15 @@ export LINKY_CAP_SERVER_URL=http://127.0.0.1:5174
 export CAP_SERVER_URL=http://127.0.0.1:5174
 ```
 
-If neither variable is set, the native shells use the bundled web assets.
-
 ## Native integrations
 
 Android:
 
-- Push: Capacitor Push Notifications + FCM with data-only messages rendered by `LinkyFirebaseMessagingService`, so closed-app notifications still show through the native shell. Requires `android/app/google-services.json`; without it the app skips push registration and notifications stay disabled.
+- Push: Capacitor Push Notifications + FCM. Data-only messages are rendered by `LinkyFirebaseMessagingService`, so notifications show while the app is closed. Needs `android/app/google-services.json`.
 - Encrypted secret storage for identity material (`LinkySecretStorageBridge`).
 - Native QR scanning when WebKit camera APIs are unavailable.
-- `nostr://` and `cashu://` URL handling forwarded to the web app, which resolves `nostr://npub...` into the saved contact (creating it when needed) and imports `cashu://cashu...` tokens into the wallet.
-- NFC: reads NDEF URI and `text/plain` records carrying those schemes, and writes `cashu://cashu...` from token detail and `nostr://npub...` from the profile.
-- File export (data backup, chat images and PDFs) writes to the app cache through `@capacitor/filesystem` and opens the `@capacitor/share` sheet, because the WebView ignores anchor downloads of `blob:` URLs.
+- `nostr://` and `cashu://` URLs are forwarded to the web app: `nostr://npub...` opens or creates the contact, `cashu://cashu...` imports the token.
+- NFC: reads NDEF URI and `text/plain` records with those schemes; writes `cashu://cashu...` from token detail and `nostr://npub...` from the profile.
+- File export (data backup, chat images and PDFs) writes to the app cache and opens the share sheet.
 
-iOS: local Capacitor plugins for Keychain-backed secret storage, native QR scanning, and CoreNFC NDEF writing for the same payloads. Native notifications and deep links are not wired on iOS yet.
+iOS: Keychain-backed secret storage, native QR scanning and CoreNFC NDEF writing for the same payloads. Notifications and deep links are not wired on iOS yet.

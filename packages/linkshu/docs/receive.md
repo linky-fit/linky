@@ -22,7 +22,7 @@ const receiveText = (
   );
 ```
 
-The receipt carries `amount`, `unit`, `mint`, the `operationId` of the `receive` (now `done`), and `tokenText`: the re-signed encoding of the proofs now in the wallet, never the input text. A failure rejects the promise with a `ReceiveError`; wrap the effect in `Effect.either` to get it as a value.
+The receipt's `tokenText` is the re-signed encoding of the proofs now in the wallet, never the input text. A failure rejects the promise with a `ReceiveError`; wrap the effect in `Effect.either` to get it as a value.
 
 ## How it works
 

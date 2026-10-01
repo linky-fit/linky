@@ -1,94 +1,14 @@
 # Testing
 
-Two helper sets give you throwaway identities, transport stubs, an in-memory relay and a polling helper, so a test runs in milliseconds with no network:
-
-- `@linky-fit/linkstr/testing`, a public subpath of the linkstr package. It requires Vitest 4 as an optional peer (`bun add --dev vitest`); the main entry does not.
-- `@linky-fit/linkstr-react/testing`, the same for linkstr-react: `configWith`, `settle`, `fakeTransport`, `fakeTransportLayer`, `relayA`, `relayB`, and a re-export of `makeIdentity`.
-
-Never import either from production code. Build inbound fixtures through the public send API where you can, as below.
+Two helper sets give you throwaway identities, transport stubs, an in-memory relay and a polling helper, so a test runs in milliseconds with no network. `@linky-fit/linkstr/testing` is a public subpath of the linkstr package and needs Vitest 4 as an optional peer (`bun add --dev vitest`); `@linky-fit/linkstr-react/testing` is the same for linkstr-react. Never import either from production code. Build inbound fixtures through the public send API where you can, as below.
 
 ## `@linky-fit/linkstr/testing`
 
-| Helper                                             | Use                                                                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `makeIdentity()`                                   | fresh `{ pubkey, secretKey }`                                                                          |
-| `stubWrapTransport(published, accept?, options?)`  | `Layer<NostrTransport>` recording every wrap into `published`; `accept(wrap, relay)` decides per relay |
-| `stubWrapTransportService(...)`                    | the same as a service value, for custom layers                                                         |
-| `stubPlainTransport(published, accept?, options?)` | the plain-event twin (profiles, relay lists, mute list)                                                |
-| `recipientOf(event)`                               | first `p` tag of a wrap                                                                                |
-| `hasPushMarker(wrap)`                              | whether the `["linky","push"]` tag is present                                                          |
-| `FakeRelay`, `poolFor(fakes)`                      | in-memory relay behind `makeRelayPoolTransport`; you call `emit`, `eose`, `closeFromRelay`             |
-| `eventually(predicate)`                            | `expect.poll` inside an Effect                                                                         |
-| `stubStorage()`                                    | `StringStorage` over a `Map`, for `OutboxStore` / `InboxCursorStore`                                   |
-| `SignedWrapEvent`, `SignedPlainEvent` (types)      | for typing `published` arrays                                                                          |
+`makeIdentity()` gives a fresh `{ pubkey, secretKey }`. `stubWrapTransport(published, accept?, options?)` and `stubPlainTransport(...)` are `Layer<NostrTransport>`s that record every published event and let `accept(event, relay)` decide the outcome per relay; `recipientOf(event)` and `hasPushMarker(wrap)` read the recorded wraps. Stub transports `die` on `subscribe` and `fetch` unless you pass them in `options`; when a test needs subscriptions, put a `FakeRelay` behind `makeRelayPoolTransport(poolFor(fakes))` and drive it by hand with `emit`, `eose` and `closeFromRelay`. `eventually(predicate)` is `expect.poll` inside an Effect, and `stubStorage()` is a `StringStorage` over a `Map` for `OutboxStore` / `InboxCursorStore`.
 
-Stub transports `die` on `subscribe` and `fetch` unless you pass them in `options`; use `FakeRelay` when a test needs subscriptions.
+## A send and an inbound test
 
-## A send test
-
-```ts
-import { Effect, Exit, Layer } from "effect";
-import {
-  ClientId,
-  Emoji,
-  LinkstrIdentity,
-  ReactionDraft,
-  Reactions,
-  RelayPolicy,
-  RelayUrl,
-  RumorId,
-} from "@linky-fit/linkstr";
-import {
-  makeIdentity,
-  recipientOf,
-  stubWrapTransport,
-} from "@linky-fit/linkstr/testing";
-import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
-
-const alice = makeIdentity();
-const bob = makeIdentity();
-const relay = RelayUrl.make("wss://relay.test");
-
-it("wraps the reaction to self and to the peer", async () => {
-  const published: Array<SignedWrapEvent> = [];
-  const layer = Reactions.Default.pipe(
-    Layer.provide(
-      Layer.mergeAll(
-        LinkstrIdentity.fromSecretKey(alice.secretKey),
-        RelayPolicy.fixed({ readRelays: [relay], writeRelays: [relay] }),
-        stubWrapTransport(published),
-      ),
-    ),
-  );
-
-  const exit = await Effect.runPromiseExit(
-    Effect.flatMap(Reactions, (reactions) =>
-      reactions.react(
-        new ReactionDraft({
-          to: bob.pubkey,
-          target: RumorId.make("ab".repeat(32)),
-          targetKind: "text",
-          targetAuthor: bob.pubkey,
-          emoji: Emoji.make("🔥"),
-          clientId: ClientId.make("client-42"),
-        }),
-      ),
-    ).pipe(Effect.provide(layer)),
-  );
-
-  assert(Exit.isSuccess(exit));
-  expect(exit.value.clientId).toBe("client-42");
-  expect(published.map(recipientOf)).toEqual(
-    expect.arrayContaining([alice.pubkey, bob.pubkey]),
-  );
-});
-```
-
-To test the failure path, pass an `accept` function: `stubWrapTransport(published, (wrap) => recipientOf(wrap) === alice.pubkey)` accepts only the self copy, so `react` fails with `RecipientNotReached`.
-
-## An inbound test
-
-Build a real wrap with the public API: send from bob to alice through a recording stub and keep the copy addressed to alice. Then feed it to alice's inbox through a `FakeRelay`.
+Send from bob to alice through a recording stub, keep the copy addressed to alice, then feed it to alice's inbox through a `FakeRelay`:
 
 ```ts
 import { Duration, Effect, Layer, Stream } from "effect";
@@ -186,20 +106,13 @@ it("routes a wrap into a typed fact", async () => {
 });
 ```
 
+The `asBob` layer is also the shape of a plain send test: run the operation against it and assert on `published` (`published.map(recipientOf)` holds both copies of a two-copy send). To test the failure path, pass an `accept` function: `stubWrapTransport(published, (wrap) => recipientOf(wrap) === alice.pubkey)` accepts only the self copy, so `react` fails with `RecipientNotReached`.
+
 `fake.emit` before `fake.eose()` yields `delivery: "backfill"`; after it, `"live"`. `fake.closeFromRelay("reason")` ends the subscription so you can watch the resubscribe loop; set `fake.down = true` to make `ensureRelay` reject.
 
 ## `@linky-fit/linkstr-react/testing`
 
-| Helper                                                              | Use                                                                      |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `configWith(identity, transport, overrides?)`                       | a `LinkstrConfig` on one relay (`relayA`) over the given transport layer |
-| `settle(registry, fnAtom)`                                          | awaits the fn atom's `Result` as an `Exit`                               |
-| `fakeTransport(published, subscriptions, stored?, fetchedFilters?)` | accepts every publish, records subscriptions, serves `stored` to fetches |
-| `fakeTransportLayer(...)`                                           | the same as a `Layer<NostrTransport>`                                    |
-| `relayA`, `relayB`                                                  | `wss://relay-a.test`, `wss://relay-b.test`                               |
-| `makeIdentity`                                                      | re-exported                                                              |
-
-Drive atoms with a bare `Registry` instead of rendering:
+`configWith(identity, transport, overrides?)` builds a `LinkstrConfig` on one relay (`relayA`) over the given transport layer; `settle(registry, fnAtom)` awaits the fn atom's `Result` as an `Exit`; `fakeTransport(published, subscriptions, stored?, fetchedFilters?)` (and `fakeTransportLayer`) accepts every publish, records subscriptions and serves `stored` to fetches. `relayA`, `relayB` and `makeIdentity` are re-exported. Drive atoms with a bare `Registry` instead of rendering:
 
 ```ts
 import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
@@ -244,8 +157,3 @@ it("retracts through the configured transport", async () => {
 ```
 
 For stream atoms (`wrapInboxAtom`, `outboxResultsAtom`, `relayHealthAtom`), set the handler atom, then `registry.mount(atom)` and `expect.poll` on what the handler collected; unmount at the end.
-
-## Related
-
-- [inbox.md](./inbox.md), [outbox.md](./outbox.md) — what the fakes are driving
-- [react.md](./react.md)

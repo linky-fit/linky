@@ -1,20 +1,22 @@
 # Evolu relay image
 
-The image runs `@evolu/nodejs` with the protocol-compatible versions pinned in `package.json`.
+Runs `@evolu/nodejs` with the protocol-compatible versions pinned in `package.json`.
 
-Each owner can store **100 MiB of encrypted history** by default. Set `EVOLU_OWNER_QUOTA_BYTES` to a non-negative decimal integer to override the limit; `0` explicitly disables it. Empty, fractional, negative, non-decimal, and unsafe integer values abort startup. The quota counts encrypted changes, not total SQLite file size or total server disk usage. Operators still need disk monitoring and network-level abuse controls because an open relay can receive many different owners.
+Each owner can store 100 MiB of encrypted history by default. `EVOLU_OWNER_QUOTA_BYTES` overrides it (decimal bytes, `0` means unlimited); any other value aborts startup. The quota counts encrypted changes, not SQLite file size, so disk monitoring and abuse controls are still the operator's job.
 
-Before deploying this default over an existing unlimited database, check owner usage and set a higher explicit limit if needed. Existing history is preserved, and owners already above the limit can read it, but their new writes fail until capacity increases. This image does not delete data or rotate owners.
+Deploying the default over an existing unlimited database keeps all history. Owners already above the limit can still read, but their writes fail until the limit is raised. The image never deletes data.
 
-`docker-compose.dev.yml` explicitly keeps the normal development relay unlimited and the isolated quota-test relay at 16 KiB. Production deployments should omit the override or set their finite capacity deliberately.
+`docker-compose.dev.yml` keeps the development relay unlimited and the quota-test relay at 16 KiB.
 
-Routine Evolu traffic logging is disabled. Startup reports the port and configured quota; shutdown and fixed error categories remain visible. Logs omit owner IDs, protocol payloads, and raw upstream error objects.
+Routine traffic logging is off. Startup logs the port and quota, shutdown and error categories stay visible, and logs omit owner ids and payloads.
 
-Build and run the protocol-level regression tests from the repository root:
+## Tests
+
+From the repository root:
 
 ```sh
 docker build -t linky-evolu-relay docker/evolu-relay
 docker run --rm -v "$PWD/docker/evolu-relay/relay.test.js:/app/relay.test.js:ro" linky-evolu-relay npm test
 ```
 
-The tests start real relay processes with isolated databases, exercise cumulative per-owner quota errors over WebSocket, check default/unlimited/invalid configuration, and verify log privacy. CI runs them using the same image as the local-stack E2E tests.
+The tests start real relay processes and cover per-owner quota errors over WebSocket, quota configuration and log privacy. CI runs them on the same image the E2E tests use.

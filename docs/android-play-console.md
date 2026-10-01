@@ -2,7 +2,7 @@
 
 Versioned Android releases (a version change in `package.json` on `main`, a manually pushed `v*` tag or a manual run of the `Android APK Release` workflow) upload the signed AAB to Google Play on the `internal` and `beta` (Open testing) tracks and the APK to GitHub Releases. An ordinary push to `main` does not publish a Play build. The workflow lives in [.github/workflows/android-apk-release.yml](../.github/workflows/android-apk-release.yml); CI sets `versionCode = 200000000 + github.run_number` in [android-release-setup](../.github/actions/android-release-setup/action.yml). Keep the release workflow's file name so the counter continues.
 
-## 1. Prepare Google Play Console
+## Prepare Google Play Console
 
 1. create the app `fit.linky.app` if it does not exist yet
 2. set up `Testing` -> `Open testing`, the available countries and the internal track testers
@@ -11,7 +11,7 @@ Versioned Android releases (a version change in `package.json` on `main`, a manu
 
 Without the basic setup finished, the Play API can return errors even when the AAB is valid.
 
-## 2. Create a service account for the Play API
+## Create a service account for the Play API
 
 In the Google Cloud project linked to the Play Console:
 
@@ -23,7 +23,7 @@ In the Google Cloud project linked to the Play Console:
 
 Store the JSON key contents in the GitHub secret `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` as plain JSON text.
 
-## 3. Prepare the upload key secrets
+## Add the upload key secrets
 
 Generate the upload key per [docs/android-upload-key.md](./android-upload-key.md), then base64-encode it:
 
@@ -33,7 +33,7 @@ base64 -i "$HOME/.keys/linky/linky-upload-key.jks" | pbcopy
 
 Add `ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_UPLOAD_STORE_PASSWORD`, `ANDROID_UPLOAD_KEY_ALIAS` and `ANDROID_UPLOAD_KEY_PASSWORD` to the GitHub repository secrets.
 
-## 4. Add the Firebase config secret
+## Add the Firebase config secret
 
 The Android build uses the FCM push configuration, so also add the base64 contents of `google-services.json` to the GitHub secrets as `ANDROID_GOOGLE_SERVICES_JSON_BASE64`:
 
@@ -41,7 +41,7 @@ The Android build uses the FCM push configuration, so also add the base64 conten
 base64 -i apps/native-shell/android/app/google-services.json | pbcopy
 ```
 
-## 5. Verify the first run
+## Verify the first run
 
 1. release a new version by changing `package.json` and extending `CHANGELOG.md`
 2. in GitHub Actions wait for the `Publish to Google Play open testing` job

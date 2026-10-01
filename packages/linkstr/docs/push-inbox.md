@@ -82,8 +82,3 @@ The outer signature authenticates the id, tags and ciphertext for routing and de
 ## Proving ownership of a subscription
 
 Subscribing a pubkey to push should require a signed kind-27235 proof. The client builds it with `makePushOwnershipProof({ action, challenge }, secretKey, now)`; the server checks it with `verifyPushOwnershipProof(event)`. Details in [http-auth.md](./http-auth.md).
-
-## Related
-
-- [inbox.md](./inbox.md) — the decrypting sibling
-- [testing.md](./testing.md) — `FakeRelay` drives the push inbox in tests

@@ -1,4 +1,4 @@
-# Zapstore Publishing
+# Zapstore publishing
 
 The `zapstore` job in `.github/workflows/android-apk-release.yml` publishes the same signed `linky.apk` the release workflow uploads to GitHub Releases: a clean runner downloads it, verifies the pinned `zsp` binary checksum and runs `zsp publish zapstore.yaml`. The job needs the `ZAPSTORE_NSEC` environment secret and fails, without printing anything, when the secret is missing or is not an `nsec`.
 
@@ -19,12 +19,8 @@ The `zapstore` job in `.github/workflows/android-apk-release.yml` publishes the 
 
    `read -s` keeps the `nsec` out of shell history.
 
-## Key handling rules
+## Key handling
 
-- A bunker with signing restrictions is preferable; an environment secret is an acceptable fallback, but an `nsec` is a long-lived unrestricted signing key.
-- Use a dedicated Zapstore publisher identity, never a personal key or one that controls funds or other high-value identities.
-- Never put an `nsec`, bunker URL, keystore password or keystore file in the repository, workflow logs, shell history, release notes or screenshots.
-- The `pubkey` in `zapstore.yaml` is public and must match the signer key.
-- Publish with the same Android release signing key that produces the distributed APK.
-- The secret reaches only the final `zsp publish` step, on a runner separate from the application build and its third-party dependencies.
+- The `nsec` is a long-lived unrestricted signing key. A bunker with signing restrictions is preferable; the environment secret is the fallback. Never use a personal key or one that controls funds.
+- Keep the secret confined to the final `zsp publish` step, on a runner separate from the app build and its third-party dependencies.
 - Before advertising Zapstore as an update path from Google Play, verify that the Play-distributed app and the direct APK share the same signing certificate.

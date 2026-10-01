@@ -1,12 +1,12 @@
 # @linky-fit/linkshu guides
 
-Usage guides for the package. The exported types are the reference; these pages say how to call them and what each call guarantees.
+The exported types are the reference; these guides say what to call and what each call guarantees.
 
 ## Reading order
 
 1. [Getting started](./getting-started.md): wire the seed and ports, make a first call.
-2. [Concepts](./concepts.md): proof states, operation statuses, counters, error classification, resuming interrupted operations. Other guides link here instead of repeating it.
-3. The guide for the operation you need: one example, "How it works", then its guide-specific errors.
+2. [Concepts](./concepts.md): proof states, operation statuses, counters, error classification, resuming interrupted operations.
+3. The guide for the operation you need.
 
 ## Wallet operations
 
@@ -17,13 +17,13 @@ Usage guides for the package. The exported types are the reference; these pages 
 - [Autoswap](./autoswap.md): move a balance from one mint to another
 - [Validation](./validation.md): NUT-07 proof-state checks
 - [Restore](./restore.md): NUT-09 seed recovery and the seed-bound wipe
-- [Tokens](./tokens.md): read model, balances, transfer transitions, `returnToWallet`, `reclaim`, backup import, token codec
+- [Tokens](./tokens.md): balances, send transitions, `returnToWallet`, `reclaim`, backup import, token codec
 - [Mints](./mints.md): mint info, the known-mint set, icons, Lightning fee probe
 - [Lightning utilities](./lightning-utilities.md): invoice preview, LNURL-pay/withdraw/auth, lightning addresses, fiat rates
 
 ## Integrating the package
 
-- [Ports](./ports.md): implementing `KeyValueStore`, `ProofStore`, `OperationStore`, and `CashuSeed`
+- [Ports](./ports.md): implementing `KeyValueStore`, `ProofStore`, `OperationStore` and `CashuSeed`
 - [Errors](./errors.md): every tagged error, when it happens, what to do
 - [Inspector](./inspector.md): diagnostics events and how to consume them
 - [Testing](./testing.md): testing code that uses the package

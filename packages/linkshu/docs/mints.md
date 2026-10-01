@@ -35,7 +35,7 @@ Always go through `parseMintUrl` (or `MintUrl.make` on already-normalized input)
 
 ### `info`
 
-`info(mint)` loads the mint's published info (NUT-06), keysets, and keys, and returns a `MintInfo`. `inputFeePpk` is the cashu input fee of the keyset the wallet spends from (the lowest-fee active `sat` keyset), in parts per thousand per proof spent: spending 10 proofs at 100 ppk costs 1 sat; `null` when unpublished. `supportsMpp` says the mint accepts multi-part Lightning payments (NUT-15). `isFakeLightning` is true for a known test URL (`localhost`, `127.0.0.1`, `testnut.cashu.space`) or info text advertising a FakeWallet. `iconUrl` is an icon URL found in the published info, resolved against the mint URL.
+`info(mint)` loads the mint's published info (NUT-06), keysets, and keys, and returns a `MintInfo`. `inputFeePpk` is the fee of the keyset the wallet spends from (the lowest-fee active `sat` keyset). `isFakeLightning` is true for `localhost`, `127.0.0.1`, `testnut.cashu.space`, or info text advertising a FakeWallet.
 
 Successful wallet loads are cached for the runtime's lifetime; a failed load is evicted so the next call retries. Keyset verification failures surface as `MintRejected`; there is no fallback that accepts rejected keys. A mint with only inactive keysets can still load for restore.
 
@@ -47,7 +47,7 @@ Successful wallet loads are cached for the runtime's lifetime; a failed load is 
 
 ### Icons
 
-Pure helpers, no runtime needed: `GENERIC_MINT_ICON_DATA_URL` (inline SVG fallback), `getMintIconOverride(host)` (hand-picked icon URLs for a few well-known mints, by host), `findMintInfoIconValue(value, new Set())` (deep search of a NUT-06 info object for an icon-ish string), `isTestMintUrl(mint)`.
+`GENERIC_MINT_ICON_DATA_URL`, `getMintIconOverride(host)`, `findMintInfoIconValue(value, new Set())`, and `isTestMintUrl(mint)` are pure helpers that need no runtime; `MintInfo.iconUrl` is what `info` found with them, resolved against the mint URL.
 
 ## Lightning fee probe
 

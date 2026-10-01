@@ -6,7 +6,7 @@
 
 Two things decide whether the queue is actually durable:
 
-- **The store.** The job list lives behind the `OutboxStore` port. The default, `OutboxStore.inMemory`, is lost on restart; pass `OutboxStore.fromStringStorage(storage, key)` (one JSON array under `key`, `storage` is any `{ getItem, setItem }`) through `linkstrServices({ outboxStore })`, `runLinkstr` or `LinkstrConfig.outboxStore`. An unreadable stored value decodes as an empty list. Receipts persisted by older package versions (without a `_tag`, some keyed by `messageId` / `reactionId` / `telemetryId` instead of `rumorId`) still decode, so upgrading never drops queued jobs.
+- **The store.** The job list lives behind the `OutboxStore` port. The default, `OutboxStore.inMemory`, is lost on restart; pass `OutboxStore.fromStringStorage(storage, key)` (one JSON array under `key`, `storage` is any `{ getItem, setItem }`) through `linkstrServices({ outboxStore })`, `runLinkstr` or `LinkstrConfig.outboxStore`. An unreadable stored value decodes as an empty list.
 - **The runtime.** The delivery worker is scoped to the `Outbox` service. When the runtime that built it closes, the worker stops; queued jobs stay in the store and resume when the next runtime builds the service. A `runLinkstr` call that enqueues and returns therefore delivers nothing by itself.
 
 ## Enqueue, deliver, observe
@@ -81,7 +81,7 @@ export const startOutbox = (
 
 In React the runtime is `linkstrRuntimeAtom`, the consumer is `useOutboxResults`, and enqueueing is `enqueueOutboxAtom` ([react.md](./react.md#outbox)).
 
-`enqueue(operation, ref)` returns an `EnqueueReceipt` at once: `{ jobId, ref, rumorId, clientId, sentAt }`. The rumor is encoded at enqueue time, so `rumorId` is the exact id every retry publishes; write it to your local row now. Enqueue success means the job is stored, not that any relay accepted it.
+`enqueue(operation, ref)` returns an `EnqueueReceipt` at once. The rumor is encoded at enqueue time, so its `rumorId` is the exact id every retry publishes; write it to your local row now. Enqueue success means the job is stored, not that any relay accepted it.
 
 | Operation `_tag`   | `draft`                               | Delivered by                               |
 | ------------------ | ------------------------------------- | ------------------------------------------ |
@@ -108,16 +108,6 @@ Everything else (retractions, seen receipts, payment notices, bank offers, plain
 
 ## Results
 
-`outbox.results` is a single-consumer `Stream<OutboxResult>` of completed jobs only:
-
-| Result               | Fields                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `OutboxJobSucceeded` | `jobId`, `ref`, `receipt` (`ChatMessageReceipt` \| `MessageEditReceipt` \| `ReactionReceipt` \| `PaymentTelemetryReceipt`) |
-| `OutboxJobFailed`    | `jobId`, `ref`, `reason` (`identity-changed` \| `unexpected-error`), `detail`                                              |
+`outbox.results` is a single-consumer `Stream<OutboxResult>` of completed jobs only: `OutboxJobSucceeded` with the vertical's receipt, or `OutboxJobFailed` with `reason` and `detail`; both carry `jobId` and your `ref`.
 
 Persist the outcome, then ack. `OutboxJobSucceeded` means a relay accepted the recipient copy ([honest delivery](./concepts.md#honest-delivery)); the peer's own inbox still has to receive it. Match the row by `ref`, mark it sent with `receipt.rumorId` (or `receipt.editOf` for edits) and, if you track wraps, `receipt.selfCopy.wrapId`.
-
-## Related
-
-- [react.md](./react.md#outbox) — `enqueueOutboxAtom`, `useOutboxResults`
-- [chat.md](./chat.md), [reactions.md](./reactions.md), [payment-kinds.md](./payment-kinds.md#payment-telemetry) — the verticals that go through the queue

@@ -1,6 +1,6 @@
 # Concepts
 
-The mental model behind every linkstr API: the words, what goes in, what comes out, how delivery is judged, and what every failure means. Read it once before the vertical guides; come back when a type in a signature surprises you.
+The words every linkstr API uses, what goes in and comes out, how delivery is judged, and what every failure means.
 
 ## Vocabulary
 

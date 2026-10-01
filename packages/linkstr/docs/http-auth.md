@@ -4,16 +4,9 @@ Three pure codecs turn your Nostr key into HTTP credentials: they sign an event 
 
 ## Codecs
 
-Every encoder takes `now: UnixSeconds` explicitly; the caller owns the clock. `secretKey` is a `NostrSecretKey` ([identity-and-keys.md](./identity-and-keys.md)); the helpers never log or return it.
+Every encoder takes `now: UnixSeconds` explicitly; the caller owns the clock. `secretKey` is a `NostrSecretKey` ([identity-and-keys.md](./identity-and-keys.md)); the helpers never log or return it. There are no React atoms for any of these: they are synchronous functions, so call them wherever you already hold the secret key.
 
-| Function                                             | Draft                                                                         | Returns                                                         |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `makeBlossomUploadAuthHeader(draft, secretKey, now)` | `BlossomUploadAuthDraft { sha256, serverDomain }`                             | `Authorization` header value; valid for 600 s                   |
-| `makeNip98AuthHeader(draft, secretKey, now)`         | `Nip98AuthDraft { url, method, payload?: Record<string, string> }`            | `Authorization` header value bound to that url and method       |
-| `makePushOwnershipProof(draft, secretKey, now)`      | `PushOwnershipProofDraft { action: "subscribe" \| "unsubscribe", challenge }` | `SignedPlainEvent` bound to the challenge and action            |
-| `verifyPushOwnershipProof(input)`                    | `unknown` (the parsed JSON)                                                   | `Either<VerifiedPushOwnershipProof, PushOwnershipProofFailure>` |
-
-Blossom — upload already-encrypted bytes. `sha256` is the hash of the ciphertext you upload and must match the body, `serverDomain` is the hostname only:
+`makeBlossomUploadAuthHeader` signs the hash of the already-encrypted bytes you upload; `sha256` must match the body and `serverDomain` is the hostname only:
 
 ```ts
 import {
@@ -47,9 +40,9 @@ export const uploadToBlossom = async (
 };
 ```
 
-NIP-98 works the same way with `makeNip98AuthHeader({ url, method, payload? }, secretKey, now())`: sign the exact url and method you will request (the server compares them) and pass `payload` when the body is JSON, so its hash is bound to the header.
+`makeNip98AuthHeader({ url, method, payload? }, secretKey, now())` works the same way: sign the exact url and method you will request (the server compares them) and pass `payload` when the body is JSON, so its hash is bound to the header.
 
-Push ownership — an event, not a header. The client asks the push server for a challenge, signs it with the action, and sends the event in the body of its subscribe or unsubscribe request:
+A push ownership proof is an event, not a header. The client asks the push server for a challenge, signs it with the action, and sends the event in the body of its subscribe or unsubscribe request:
 
 ```ts
 import {
@@ -69,9 +62,7 @@ const proof = makePushOwnershipProof(
 // body: JSON.stringify({ event: proof, … })
 ```
 
-The server calls `verifyPushOwnershipProof(body.event)`. It checks the signature, the kind, that `challenge`, `action` and `pubkey` each appear exactly once, that the `pubkey` tag equals the event author, and the content string, and returns `{ event, action, challenge }`. What is left is the server's own request binding: that `event.pubkey` is the pubkey the client claims, that `action` matches the endpoint, a freshness window on `event.created_at`, and consuming the challenge nonce on first use. `PushOwnershipProofFailure` is one of `malformed-event`, `invalid-signature`, `wrong-kind`, `invalid-challenge`, `invalid-action`, `invalid-pubkey-tag`, `invalid-pubkey`, `wrong-content`; `invalid-signature` and `invalid-pubkey` mean a forged or foreign proof, the rest a malformed request.
-
-There are no React atoms for any of these: they are synchronous functions, so call them wherever you already hold the secret key.
+The server calls `verifyPushOwnershipProof(body.event)` on the parsed JSON. It checks the signature, the kind, that `challenge`, `action` and `pubkey` each appear exactly once, that the `pubkey` tag equals the event author, and the content string, and returns `{ event, action, challenge }`. What is left is the server's own request binding: that `event.pubkey` is the pubkey the client claims, that `action` matches the endpoint, a freshness window on `event.created_at`, and consuming the challenge nonce on first use. Of the `PushOwnershipProofFailure` values, `invalid-signature` and `invalid-pubkey` mean a forged or foreign proof; the rest mean a malformed request.
 
 ## Wire format
 
@@ -86,9 +77,3 @@ Each proof is a signed event serialized as JSON and never published.
 ## Errors
 
 The encoders do not fail; an invalid key cannot reach them because `NostrSecretKey` is validated at decode time. The verifier returns a `PushOwnershipProofFailure` string instead of a tagged error.
-
-## Related
-
-- [identity-and-keys.md](./identity-and-keys.md) — `decodeNsec`, `NostrSecretKey`
-- [chat.md](./chat.md#images-and-files) — the upload that uses the Blossom header
-- [push-inbox.md](./push-inbox.md) — the push server these proofs authorize

@@ -32,14 +32,7 @@ const invoiceFor = async (target: string, amountSat: number) => {
 
 ## Invoice preview
 
-| Export                                           | Returns                           | Notes                                                                                                                                                  |
-| ------------------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `getLightningInvoicePreview(raw)`                | `LightningInvoicePreview \| null` | `{ amountSat, description, expiresAtSec, invoice }`; null unless the text starts with `lnbc`/`lntb`/`lnbcrt`. Missing expiry → 1 h after the timestamp |
-| `getPayableLightningInvoice(raw)`                | `PayableLightningInvoice \| null` | checksum-checked decode; requires a positive amount, payment hash, and signature; `amountSat` and `expiresAtSec` non-null                              |
-| `parseBolt11AmountMsat(invoice)`                 | `number \| null`                  | amount from the human-readable part                                                                                                                    |
-| `getLightningInvoiceDescriptionHashHex(invoice)` | `string \| null`                  | the `h` tag as hex, to verify LNURL metadata                                                                                                           |
-
-The preview decodes fields for display and never verifies the signature. `getPayableLightningInvoice` bounds input to 5 000 characters and rounds `amountSat` up from msat; the caller still compares `expiresAtSec` with the clock, and the mint validates the rest.
+`getLightningInvoicePreview` decodes fields for display and never verifies the signature; it returns `null` unless the text starts with `lnbc`/`lntb`/`lnbcrt`, and an invoice without an expiry tag is shown as expiring one hour after its timestamp. `getPayableLightningInvoice` is the checksum-checked decode to use before paying: it requires a positive amount, payment hash, and signature, bounds input to 5 000 characters, and rounds `amountSat` up from msat. The caller still compares `expiresAtSec` with the clock, and the mint validates the rest. `getLightningInvoiceDescriptionHashHex` returns the `h` tag for verifying LNURL metadata.
 
 ## Amount fallback
 
@@ -49,25 +42,16 @@ When a requested amount plus fees does not fit the balance, an LNURL target can 
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `buildPaymentAmountAttempts(requestedSat, availableSat)`        | `[requested]` normally; when the request equals the whole balance, a descending list leaving `0, 1, 2, 3, 5, 8, 13, 21` sat as fee room |
 | `buildPaymentFailureAmountAttempts(requestedSat, errorMessage)` | lower amounts to try after a retryable failure: first the parsed shortage, then the fee ladder                                          |
-| `isRetryablePaymentAmountFailure(errorMessage)`                 | matches "insufficient funds", "not enough funds", "amount out of lnurl range", …                                                        |
+| `isRetryablePaymentAmountFailure(errorMessage)`                 | matches "insufficient funds", "not enough funds", "amount out of lnurl range", ...                                                      |
 | `getPaymentAmountShortage(errorMessage)`                        | parses `provided: X, needed: Y`, `need X, have Y`, or `fee: N`                                                                          |
 
 These work on error messages. `Melt` itself fails with a typed `InsufficientFunds` carrying `required`/`available`; render that as `need X, have Y` before feeding it here.
 
 ## LNURL-pay and withdraw
 
-| Export                                                                      | Use                                                                                                                    |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `isLnurlPayTarget(value)`                                                   | lightning address, bech32 `lnurl1…`, `lnurlp://`, or https URL                                                         |
-| `resolveLnurlPayRequestUrl(value)`                                          | the LUD-06 request URL; throws on invalid input                                                                        |
-| `getLnurlPayDisplayText(value)`                                             | short label for UI                                                                                                     |
-| `inferLightningAddressFromLnurlTarget(value)`                               | `user@host` when derivable                                                                                             |
-| `fetchLnurlPayPreview(target, fallback?)`                                   | `LnurlPayPreview`: `callback`, min/max sat and msat, `description`, `commentAllowed`, `metadataRaw`                    |
-| `fetchLnurlInvoiceForTarget(target, amountSat, comment?, fallback?)`        | `LnurlPayInvoiceResult { pr, lightningAddress, successAction }`; verifies the metadata hash and amount (LUD-06 step 7) |
-| `isLnurlWithdrawTarget`, `fetchLnurlWithdrawPreview`, `redeemLnurlWithdraw` | LUD-03 withdraw; recipe below                                                                                          |
-| `LnurlTagMismatchError`                                                     | thrown when the server's `tag` is not the expected one                                                                 |
+`isLnurlPayTarget` accepts a lightning address, bech32 `lnurl1...`, `lnurlp://`, or an https URL; `resolveLnurlPayRequestUrl` gives the LUD-06 request URL and throws on anything else. `fetchLnurlPayPreview` returns the `LnurlPayPreview` (callback, min/max, `commentAllowed`, raw metadata) and `fetchLnurlInvoiceForTarget` the `LnurlPayInvoiceResult`, after verifying the metadata hash and amount (LUD-06 step 7). Fixed-amount LNURLs that re-quote in fiat are followed within 2 % drift. `LnurlTagMismatchError` is thrown when the server's `tag` is not the expected one.
 
-`fallback: LnurlFallback = (url) => Promise<Response>` is tried when the direct fetch fails, for example a CORS proxy. Fixed-amount LNURLs that re-quote in fiat are followed within 2 % drift.
+Every fetcher takes an optional `fallback: LnurlFallback = (url) => Promise<Response>`, tried when the direct fetch fails, for example a CORS proxy.
 
 Every LNURL target and callback must be HTTPS, bech32-encoded and `lnurlp://`/`lnurlw://`/`keyauth://` ones included; loopback HTTP is rejected. Redirects are followed manually, up to three hops, HTTPS checked before each. Browsers hide redirect destinations, so those requests go through the fallback, which must enforce HTTPS itself and should return a non-2xx response rather than throw: the package reads a `status: "ERROR"` body under any HTTP status and reports its `reason`.
 
@@ -98,7 +82,7 @@ const withdraw = async (
 };
 ```
 
-`LnurlWithdrawPreview` also carries `minAmountSat`/`maxAmountSat` and `description` for an amount picker. `redeemLnurlWithdraw` resolves when the service accepted the request, not when the payment arrived; that is the topup's result.
+`LnurlWithdrawPreview` also carries `minAmountSat`/`maxAmountSat` for an amount picker. `redeemLnurlWithdraw` resolves when the service accepted the request, not when the payment arrived; that is the topup's result.
 
 ## LNURL-auth
 
@@ -119,27 +103,15 @@ const login = async (scanned: string) => {
 };
 ```
 
-| Export                             | Returns                    | Notes                                                                                                                    |
-| ---------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `parseLnurlAuthTarget(text)`       | `LnurlAuthPreview \| null` | accepts `lnurl1…`, `keyauth://`, and plain https; `{ action, domain, k1, requestUrl }`, no network                       |
-| `isLnurlAuthTarget(text)`          | `boolean`                  | the same check without the preview                                                                                       |
-| `submitLnurlAuth(args, fallback?)` | `Promise<void>`            | sends the callback once; resolves only on an explicit `status: "OK"`, throws the service's `reason` on `status: "ERROR"` |
-
-The callback consumes the challenge, so it is sent exactly once, and a given `fallback` goes first (a direct browser request can succeed while CORS hides the response, and a retry would land on a used `k1`); the direct request runs only when the fallback could not be reached. `action` (`login`, `register`, `link`, `auth`; default `login`) is the site's own word for what the login does; show it. `LnurlAuthSigner` returns `{ publicKeyHex, signatureHex }`: the compressed secp256k1 linking key and a DER-encoded ECDSA signature.
+`submitLnurlAuth` resolves only on an explicit `status: "OK"` and throws the service's `reason` on `status: "ERROR"`. The callback consumes the challenge, so it is sent exactly once, and a given `fallback` goes first (a direct browser request can succeed while CORS hides the response, and a retry would land on a used `k1`); the direct request runs only when the fallback could not be reached. `action` (`login`, `register`, `link`, `auth`; default `login`) is the site's own word for what the login does; show it. `LnurlAuthSigner` returns the compressed secp256k1 linking key and a DER-encoded ECDSA signature, both hex.
 
 ## Lightning address helpers
 
-`isLightningAddress`, `splitLightningAddress` → `{ user, domain } | null`, `stripLightningPrefix`, and `getLightningAddressRequestUrl` (lowercases user and domain; LUD-16 servers reject mixed case). All four are on the main entry, and the same module is exported as `@linky-fit/linkshu/lightning-address` for bundles that must not pull in cashu-ts or Effect.
+`isLightningAddress`, `splitLightningAddress`, `stripLightningPrefix`, and `getLightningAddressRequestUrl` (lowercases user and domain; LUD-16 servers reject mixed case). All four are on the main entry, and the same module is exported as `@linky-fit/linkshu/lightning-address` for bundles that must not pull in cashu-ts or Effect.
 
 ## Fiat rates
 
-| Export                         | Use                                                                            |
-| ------------------------------ | ------------------------------------------------------------------------------ |
-| `FiatRates`                    | Schema/type: `chfPerBtc`, `czkPerBtc`, `eurPerBtc`, `usdPerBtc`, `fetchedAtMs` |
-| `fetchFiatRates(signal)`       | Coinbase BTC rates → `FiatRates \| null` (null on HTTP or shape errors)        |
-| `decodeFiatRates(raw)`         | parse a cached JSON string                                                     |
-| `isFiatRatesStale(rates)`      | older than `FIAT_RATES_TTL_MS` (10 min) or null                                |
-| `FIAT_RATES_CACHE_STORAGE_KEY` | storage key for the cached JSON                                                |
+`fetchFiatRates(signal)` fetches Coinbase BTC rates as `FiatRates` (CHF, CZK, EUR, USD per BTC plus `fetchedAtMs`) and returns `null` on HTTP or shape errors. Cache the JSON under `FIAT_RATES_CACHE_STORAGE_KEY`, read it back with `decodeFiatRates`, and refresh when `isFiatRatesStale` says so (older than `FIAT_RATES_TTL_MS`, 10 minutes).
 
 ## Errors
 
@@ -152,4 +124,3 @@ The callback consumes the challenge, so it is sent exactly once, and a given `fa
 ## Related
 
 - [melt.md](./melt.md), [topup.md](./topup.md)
-- [errors.md](./errors.md): why these are not tagged errors

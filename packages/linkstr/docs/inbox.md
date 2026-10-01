@@ -1,6 +1,6 @@
 # Inbox
 
-`WrapInbox` is the one kind-1059 subscription: it backfills from a persisted cursor, authenticates every gift wrap, and hands you typed facts on a single stream. You need it whenever your process should receive messages, reactions, notices, offers or receipts, and for one-shot decoding when a push notification names a wrap. Rumor, own echo and EOSE are defined in [concepts.md](./concepts.md#vocabulary).
+`WrapInbox` is the one kind-1059 subscription: it backfills from a persisted cursor, authenticates every gift wrap, and hands you typed facts on a single stream. It is also the one-shot decoder for a wrap a push notification names. Rumor, own echo and EOSE are defined in [concepts.md](./concepts.md#vocabulary); in React the same feed runs behind `wrapInboxAtom` ([react.md](./react.md#inbox)).
 
 ## Open the feed
 
@@ -39,7 +39,7 @@ const consume = Effect.scoped(
 | --------------- | ------------------------------------ | ------------------------------------------------ |
 | Chat            | `ChatMessageReceived`                | `OwnChatMessageConfirmed`                        |
 | Reactions       | `ReactionAdded`, `ReactionRetracted` | `OwnReactionConfirmed`, `OwnRetractionConfirmed` |
-| Payment notices | `PaymentNoticeReceived`              | —                                                |
+| Payment notices | `PaymentNoticeReceived`              | none                                             |
 | Bank offers     | `BankOfferSnapshotReceived`          | `OwnBankOfferSnapshotConfirmed`                  |
 | Seen receipts   | `SeenReceiptReceived`                | `OwnSeenReceiptConfirmed`                        |
 | (any)           | `WrapDropped`                        |                                                  |
@@ -117,8 +117,4 @@ const decodePushed = (wrapId: WrapId) =>
 - `timeout` bounds the whole fan-out and resolves `null` instead of failing; pass one when the caller has its own deadline, as a push event does.
 - Fails with `AllRelaysUnreachable` or `NoReadRelaysConfigured`. On `null` or a failure, show a generic notification; the running app receives the real fact through its inbox once it opens.
 
-## Related
-
-- [react.md](./react.md#inbox) — mounting the inbox in a React app
-- [push-inbox.md](./push-inbox.md) — the identity-free sibling for a push server
-- [testing.md](./testing.md) — driving the inbox with `FakeRelay`
+[testing.md](./testing.md) drives this inbox with a `FakeRelay`; [push-inbox.md](./push-inbox.md) is the identity-free sibling for a push server.
