@@ -6,6 +6,7 @@ import { isCurrentChatPaymentRequest } from "../../lib/chatPaymentRequestAuthori
 import type { ReceiveMethod } from "../../../utils/receiveMethod";
 import type { RestoreProgress } from "@linky-fit/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
+import { paidOverlayContact } from "../../lib/paidOverlay";
 import { useLatest } from "../../../hooks/useLatest";
 import { useExclusiveRun } from "../../../hooks/useExclusiveRun";
 import {
@@ -421,6 +422,7 @@ export const useCashuWalletComposition = ({
   const npubCashMintSyncRef = React.useRef<string | null>(null);
 
   const {
+    paidOverlayDetails,
     paidOverlayIsOpen,
     paidOverlayTitle,
     showPaidOverlay,
@@ -1299,6 +1301,7 @@ export const useCashuWalletComposition = ({
               "{name}",
               requestInfo.description || postUrl.hostname || t("appTitle"),
             ),
+          { direction: "out", amountSat: receipt.amount },
         );
         safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
         setContactsOnboardingHasPaid(true);
@@ -1585,9 +1588,17 @@ export const useCashuWalletComposition = ({
     setWalletWarningDismissed(true);
   }, []);
 
+  const findPaidOverlayContact = React.useCallback(
+    (contactId: string) =>
+      paidOverlayContact(
+        contacts.find((contact) => (contact.id ?? "") === contactId),
+      ),
+    [contacts],
+  );
   const saveCashuFromText = useSaveCashuFromText({
     allowTestMints,
     enqueueCashuOp,
+    findContact: findPaidOverlayContact,
     formatDisplayedAmountParts,
     isCashuTokenStored,
     isMintDeleted,
@@ -2560,6 +2571,7 @@ export const useCashuWalletComposition = ({
     closeCashuPaymentRequestConfirmation,
     confirmCashuPaymentRequest,
     onPayChatPaymentRequest,
+    paidOverlayDetails,
     paidOverlayIsOpen,
     paidOverlayTitle,
     payCashuPaymentRequest,

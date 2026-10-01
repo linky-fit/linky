@@ -958,6 +958,8 @@ export const en = {
   paidSentTo: "Sent {amount} {unit} to {name}.",
   paidQueuedTo: "Queued {amount} {unit} → {name}.",
   paidReceived: "Received {amount} {unit}.",
+  paidHeadlineSent: "Sent",
+  paidHeadlineReceived: "Received",
   topupOverlay: "Topped up {amount} {unit}.",
 
   saveContactPromptTitle: "Save as contact?",

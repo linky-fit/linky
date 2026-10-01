@@ -969,6 +969,8 @@ export const de = {
   paidSentTo: "{amount} {unit} an {name} gesendet.",
   paidQueuedTo: "{amount} {unit} → {name} vorgemerkt.",
   paidReceived: "{amount} {unit} erhalten.",
+  paidHeadlineSent: "Gesendet",
+  paidHeadlineReceived: "Empfangen",
   topupOverlay: "{amount} {unit} aufgeladen.",
   saveContactPromptTitle: "Als Kontakt speichern?",
   saveContactPromptBody:

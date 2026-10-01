@@ -518,7 +518,10 @@ describe("usePayContactWithCashuMessage", () => {
     expect(harness.forget).not.toHaveBeenCalled();
     expect(sendPaymentNoticeMock).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith("payFailed: LinkstrNotConfigured");
-    expect(showPaidOverlay).toHaveBeenCalledWith("paidQueuedTo");
+    expect(showPaidOverlay).toHaveBeenCalledWith(
+      "paidQueuedTo",
+      expect.objectContaining({ direction: "out" }),
+    );
 
     await act(async () => harness.root.unmount());
   });

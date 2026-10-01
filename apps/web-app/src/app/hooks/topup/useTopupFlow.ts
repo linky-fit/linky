@@ -1,5 +1,6 @@
 import { transactionIdForQuote } from "@linky-fit/linksync";
 import type { TopupError, TopupQuote } from "@linky-fit/linkshu";
+import type { PaidOverlayDetails } from "../../lib/paidOverlay";
 import { Either } from "effect";
 import React from "react";
 import { useLatest } from "../../../hooks/useLatest";
@@ -38,7 +39,7 @@ interface UseTopupFlowParams {
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   resumePendingCashuTopups: ResumePendingCashuTopups | null;
   routeKind: Route["kind"];
-  showPaidOverlay: (title?: string) => void;
+  showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   startCashuTopup: StartCashuTopup | null;
   t: Translate;
@@ -131,6 +132,7 @@ export const useTopupFlow = ({
             `${displayAmount.approxPrefix}${displayAmount.amountText}`,
           )
           .replace("{unit}", displayAmount.unitLabel),
+        { direction: "in", amountSat: quote.amount },
       );
 
       const active = activeTopupRef.current;

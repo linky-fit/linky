@@ -136,7 +136,11 @@ export function AuthenticatedLayout({
       ) : null}
 
       {state.paidOverlayIsOpen ? (
-        <PaidOverlay paidOverlayTitle={state.paidOverlayTitle} t={state.t} />
+        <PaidOverlay
+          details={state.paidOverlayDetails}
+          paidOverlayTitle={state.paidOverlayTitle}
+          t={state.t}
+        />
       ) : null}
 
       {state.nfcWritePromptKind && shouldRenderNativeNfcWritePrompt() ? (

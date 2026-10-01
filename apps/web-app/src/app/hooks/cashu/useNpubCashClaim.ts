@@ -1,4 +1,5 @@
 import { transactionIdForOperation } from "@linky-fit/linksync";
+import type { PaidOverlayDetails } from "../../lib/paidOverlay";
 import { useLatest } from "../../../hooks/useLatest";
 import { Schema } from "effect";
 import { Either } from "effect";
@@ -82,7 +83,7 @@ interface UseNpubCashClaimParams {
   routeKind: Route["kind"];
   setCashuIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
-  showPaidOverlay: (title?: string) => void;
+  showPaidOverlay: (title?: string, details?: PaidOverlayDetails) => void;
   t: Translate;
   touchMintInfo: (mintUrl: string, nowSec: number) => void;
 }
@@ -213,6 +214,7 @@ export const useNpubCashClaim = ({
                   `${displayAmount.approxPrefix}${displayAmount.amountText}`,
                 )
                 .replace("{unit}", displayAmount.unitLabel),
+          { direction: "in", amountSat: amount > 0 ? amount : null },
         );
       }
 

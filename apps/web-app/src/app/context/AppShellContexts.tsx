@@ -23,6 +23,7 @@ import type {
   PeopleRoutesProps,
 } from "../routes/AppRouteContent";
 import type { ContactsGuideStep, TopbarButton } from "../types/appTypes";
+import type { PaidOverlayDetails } from "../lib/paidOverlay";
 import {
   SystemSettingsContextsProvider,
   type AdvancedSettingsContextValue,
@@ -86,6 +87,7 @@ export interface AppShellCoreContextValue {
   nostrPictureByNpub: Record<string, string | null>;
   paidOverlayIsOpen: boolean;
   paidOverlayTitle: string | null;
+  paidOverlayDetails: PaidOverlayDetails | null;
   pendingPaymentMintMeltConfirmation: {
     fromMint: string;
     toMint: string;
