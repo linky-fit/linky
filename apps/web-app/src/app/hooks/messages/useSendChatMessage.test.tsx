@@ -22,7 +22,7 @@ import type {
   NewLocalNostrMessage,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
-import type { ReplyContext } from "./useSendChatMessage";
+import type { ChatSendOutcome, ReplyContext } from "./useSendChatMessage";
 
 type EnqueueOutbox = (
   input: EnqueueOutboxInput,
@@ -83,7 +83,7 @@ interface SendOptions {
   text?: string;
 }
 
-type SendChatMessage = (options?: SendOptions) => Promise<boolean>;
+type SendChatMessage = (options?: SendOptions) => Promise<ChatSendOutcome>;
 
 interface SetupOptions {
   chatDraft?: string;
@@ -263,7 +263,7 @@ describe("useSendChatMessage", () => {
     });
     const file = new File(["image"], "photo.jpg", { type: "image/jpeg" });
 
-    let sent: boolean | undefined;
+    let sent: ChatSendOutcome | undefined;
     await act(async () => {
       sent = await harness.getSend()?.({
         clearDraft: false,
@@ -272,7 +272,7 @@ describe("useSendChatMessage", () => {
       });
     });
 
-    expect(sent).toBe(true);
+    expect(sent).toBe("enqueued");
     const input = enqueueOutboxMock.mock.calls[0]?.[0];
     expect(input).toMatchObject({
       op: { _tag: "chat.image" },
@@ -314,12 +314,12 @@ describe("useSendChatMessage", () => {
     );
     const harness = await setup();
 
-    let sent: boolean | undefined;
+    let sent: ChatSendOutcome | undefined;
     await act(async () => {
       sent = await harness.getSend()?.();
     });
 
-    expect(sent).toBe(true);
+    expect(sent).toBe("stored");
     expect(harness.appendLocalNostrMessage).toHaveBeenCalledOnce();
     expect(harness.updateLocalNostrMessage).not.toHaveBeenCalled();
     expect(harness.setStatus).toHaveBeenCalledWith(

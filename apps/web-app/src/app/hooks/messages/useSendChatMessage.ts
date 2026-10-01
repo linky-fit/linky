@@ -69,6 +69,9 @@ interface UseSendChatMessageParams<
   updateLocalNostrMessage: UpdateLocalNostrMessage;
 }
 
+/** `stored`: the message is in the conversation but the outbox did not take it, so it is not on its way. */
+export type ChatSendOutcome = "enqueued" | "failed" | "stored";
+
 export const useSendChatMessage = <
   TRoute extends { kind: string },
   TContact extends ContactIdentityRowLike,
@@ -94,32 +97,32 @@ export const useSendChatMessage = <
   });
 
   return React.useCallback(
-    async (options?: SendChatMessageOptions): Promise<boolean> => {
+    async (options?: SendChatMessageOptions): Promise<ChatSendOutcome> => {
       if (
         route.kind !== "chat" &&
         route.kind !== "contactPay" &&
         route.kind !== "bankPaymentOffer"
       )
-        return false;
-      if (!selectedContact) return false;
+        return "failed";
+      if (!selectedContact) return "failed";
 
       const imageFile = options?.imageFile ?? null;
       const text = (options?.text ?? chatDraft).trim();
-      if (!text && !imageFile) return false;
+      if (!text && !imageFile) return "failed";
 
       if (!currentNsec) {
         setStatus(t("profileMissingNpub"));
-        return false;
+        return "failed";
       }
 
-      if (chatSendIsBusy) return false;
+      if (chatSendIsBusy) return "failed";
 
       const rejectionKey = imageFile
         ? getChatAttachmentRejection(imageFile)
         : null;
       if (rejectionKey) {
         setStatus(t(rejectionKey));
-        return false;
+        return "failed";
       }
 
       setChatSendIsBusy(true);
@@ -131,7 +134,7 @@ export const useSendChatMessage = <
         );
         if (!identity || !isPubkey(identity.contactPubHex)) {
           setStatus(t("chatMissingContactNpub"));
-          return false;
+          return "failed";
         }
         const { contactPubHex, myPubHex, privBytes } = identity;
 
@@ -229,7 +232,7 @@ export const useSendChatMessage = <
         });
         if (Exit.isFailure(exit)) {
           setStatus(`${t("errorPrefix")}: ${Cause.pretty(exit.cause)}`);
-          return true;
+          return "stored";
         }
 
         updateLocalNostrMessage(pendingId, {
@@ -245,7 +248,7 @@ export const useSendChatMessage = <
         if (typeof navigator !== "undefined" && navigator.onLine === false) {
           setStatus(t("chatQueued"));
         }
-        return true;
+        return "enqueued";
       } catch (e) {
         const attachmentErrorKey = chatAttachmentErrorKey(e);
         setStatus(
@@ -253,7 +256,7 @@ export const useSendChatMessage = <
             ? t(attachmentErrorKey)
             : `${t("errorPrefix")}: ${String(e ?? "unknown")}`,
         );
-        return false;
+        return "failed";
       } finally {
         setChatSendIsBusy(false);
       }

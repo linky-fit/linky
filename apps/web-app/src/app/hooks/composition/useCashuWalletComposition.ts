@@ -2335,10 +2335,11 @@ export const useCashuWalletComposition = ({
       requestId,
     });
 
-    await sendChatMessage({
+    const outcome = await sendChatMessage({
       clearDraft: false,
       text: requestText,
     });
+    if (outcome !== "enqueued") return;
 
     logPaymentEvent({
       amount: amountSat,

@@ -1890,7 +1890,7 @@ export const useContactsMessagingComposition = ({
     async (file: File, replyToMessage?: LocalNostrMessage) => {
       if (editContext) return false;
       const replyToId = (replyToMessage?.rumorId ?? "").trim();
-      return sendChatMessage({
+      const outcome = await sendChatMessage({
         clearDraft: false,
         clearReplyContext: true,
         imageFile: file,
@@ -1905,6 +1905,7 @@ export const useContactsMessagingComposition = ({
             }
           : {}),
       });
+      return outcome !== "failed";
     },
     [editContext, sendChatMessage],
   );
