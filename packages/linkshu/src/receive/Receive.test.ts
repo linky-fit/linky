@@ -5,11 +5,23 @@ import {
   Keyset,
   MintOperationError,
 } from "@cashu/cashu-ts";
-import { Clock, Effect, Exit, Layer, TestClock, TestContext } from "effect";
+import {
+  Clock,
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  TestClock,
+  TestContext,
+} from "effect";
+import { MintRejected, MintUnreachable } from "../domain/errors";
 import {
   CurrencyUnit,
   KeysetId,
   MintUrl,
+  OperationId,
   TokenText,
 } from "../domain/primitives";
 import { deterministicCounterKey } from "../internal/counters";
@@ -34,7 +46,7 @@ import {
   proof,
 } from "../testing/fakeWallet";
 import type { ProofStateName } from "../testing/fakeWallet";
-import { runOnTestClock } from "../testing/clock";
+import { runOnTestClock, settlePromises } from "../testing/clock";
 import { recordingInspector } from "../testing/inspector";
 import { secretsOf, seedProofs, seedTransfer } from "../testing/inventory";
 import { parseTokenText } from "../token/codec";
@@ -103,10 +115,18 @@ const makeWallet = (args: FakeWalletArgs) => {
   return { wallet, receiveCounters, restoreCalls };
 };
 
+interface HarnessOptions {
+  /** The mint's wallet load; succeeds with the wallet by default. */
+  load?: (
+    mint: MintUrl,
+  ) => Effect.Effect<LoadedWallet, MintUnreachable | MintRejected>;
+  /** Shared with the test when its fake mint must change stored operations. */
+  operationStore?: OperationStoreService;
+}
+
 const makeHarness = (
   wallet: LoadedWallet,
-  /** Shared with the test when its fake mint must change stored operations. */
-  operationStore?: OperationStoreService,
+  { load, operationStore }: HarnessOptions = {},
 ) => {
   const inspector = recordingInspector();
   const layer = Receive.DefaultWithoutDependencies.pipe(
@@ -114,7 +134,9 @@ const makeHarness = (
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({ get: () => Effect.succeed(wallet) }),
+          WalletInstances.make({
+            get: load ?? (() => Effect.succeed(wallet)),
+          }),
         ),
         inMemoryKeyValueStore,
         inMemoryProofStore,
@@ -472,30 +494,23 @@ describe("Receive.receive", () => {
   });
 
   it.each([
-    [
-      "cannot be reached",
-      () => Promise.reject(new TypeError("fetch failed")),
-      "MintUnreachable",
-    ],
+    ["cannot be reached", () => Promise.reject(new TypeError("fetch failed"))],
     [
       "rate-limits it",
       () => Promise.reject(new HttpResponseError("Too Many Requests", 429)),
-      "MintRejected",
     ],
     [
       "answers PENDING",
       answerProofStates((secret) => (secret === "src-a" ? "PENDING" : "SPENT")),
-      "MintUnreachable",
     ],
     [
       "answers for only some proofs",
       (proofs: Parameters<LoadedWallet["checkProofsStates"]>[0]) =>
         answerProofStates(() => "SPENT")(proofs.slice(1)),
-      "MintUnreachable",
     ],
   ] as const)(
-    "writes nothing under the id of another device's unsynced done receive when the mint %s",
-    async (_, checkProofsStates, tag) => {
+    "defers, writing nothing under the id of another device's unsynced done receive, when the mint %s",
+    async (_, checkProofsStates) => {
       // The restored device has not synced the other device's receive yet;
       // a row it wrote for the text would take the same id and sync over it.
       const elsewhere = await Effect.runPromise(
@@ -513,15 +528,30 @@ describe("Receive.receive", () => {
       const exit = await run(receiveAndInspect(sourceToken));
       assert(Exit.isSuccess(exit));
       assert(exit.value.receipt._tag === "Left");
-      expect(exit.value.receipt.left._tag).toBe(tag);
-      expect(
-        exit.value.operations.map((operation) => operation.id),
-      ).not.toContain(elsewhere.id);
-      expect(exit.value.operations).toEqual([]);
+      const deferred = exit.value.receipt.left;
+      assert(deferred._tag === "ReceiveDeferred");
+      expect(deferred).toMatchObject({ mint, amount: 6 });
+      expect(deferred.operationId).not.toBe(elsewhere.id);
+      expect(exit.value.operations).toEqual([
+        expect.objectContaining({
+          id: deferred.operationId,
+          kind: "deferredReceive",
+          status: "pending",
+          tokenText: sourceToken,
+          amount: 6,
+        }),
+      ]);
       expect(receiveCounters).toEqual([]);
       expect(
         events.filter((event) => event._tag === "OperationChanged"),
-      ).toEqual([]);
+      ).toEqual([
+        expect.objectContaining({
+          kind: "deferredReceive",
+          from: null,
+          to: "pending",
+          reason: "deferred-receive",
+        }),
+      ]);
     },
   );
 
@@ -577,17 +607,101 @@ describe("Receive.receive", () => {
       ).toEqual([]);
     });
 
-    it("fails as unreachable, writing nothing, when the refresh does not reach the mint", async () => {
+    const resumeDeferred = Effect.flatMap(
+      Receive,
+      (receive) => receive.resumeDeferred,
+    );
+
+    it("keeps the deferral while a refresh does not reach the mint, and receives it once one resolves it", async () => {
+      const keysets: Keyset[] = [];
+      const reachable = { now: false };
+      let stateChecks = 0;
       const { wallet, receiveCounters } = makeWallet({
+        keysets,
+        loadMint: () => {
+          if (!reachable.now) return Promise.reject(new TypeError("offline"));
+          if (keysets.length === 0) {
+            keysets.push(new Keyset(v2KeysetId, "sat", true, 0));
+          }
+          return Promise.resolve();
+        },
+        checkProofsStates: (proofs) => {
+          stateChecks += 1;
+          return answerProofStates()(proofs);
+        },
+        receive: () => Promise.resolve(receivedProofs),
+      });
+      const { run } = makeHarness(wallet);
+
+      const exit = await run(
+        Effect.gen(function* () {
+          const deferred = yield* Effect.flip(receiveText(v2Token));
+          const whileUnreachable = yield* resumeDeferred;
+          const operationsWhileUnreachable = (yield* inventory).operations;
+          reachable.now = true;
+          return {
+            deferred,
+            whileUnreachable,
+            operationsWhileUnreachable,
+            once: yield* resumeDeferred,
+          };
+        }),
+      );
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.deferred._tag).toBe("ReceiveDeferred");
+      expect(
+        exit.value.whileUnreachable.map((result) => result.status),
+      ).toEqual(["pending"]);
+      expect(exit.value.operationsWhileUnreachable).toMatchObject([
+        { kind: "deferredReceive", status: "pending" },
+      ]);
+      expect(exit.value.once.map((result) => result.status)).toEqual([
+        "received",
+      ]);
+      expect(stateChecks).toBe(1);
+      expect(receiveCounters).toEqual([1]);
+    });
+
+    it("closes the deferral as failed once a refresh that reached the mint does not resolve it", async () => {
+      const reachable = { now: false };
+      let refreshes = 0;
+      const { wallet, receiveCounters } = makeWallet({
+        loadMint: () => {
+          refreshes += 1;
+          return reachable.now
+            ? Promise.resolve()
+            : Promise.reject(new TypeError("offline"));
+        },
         receive: () => Promise.reject(new Error("must not be called")),
       });
       const { run } = makeHarness(wallet);
 
-      const exit = await run(receiveAndInspect(v2Token));
+      const exit = await run(
+        Effect.gen(function* () {
+          const deferred = yield* Effect.flip(receiveText(v2Token));
+          reachable.now = true;
+          return {
+            deferred,
+            once: yield* resumeDeferred,
+            again: yield* resumeDeferred,
+            ...(yield* inventory),
+          };
+        }),
+      );
       assert(Exit.isSuccess(exit));
-      assert(exit.value.receipt._tag === "Left");
-      expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
-      expect(exit.value.operations).toEqual([]);
+      expect(exit.value.deferred._tag).toBe("ReceiveDeferred");
+      expect(exit.value.once.map((result) => result.status)).toEqual([
+        "closed",
+      ]);
+      expect(exit.value.again).toEqual([]);
+      expect(exit.value.operations).toEqual([
+        expect.objectContaining({
+          kind: "deferredReceive",
+          status: "failed",
+          error: expect.stringContaining("TokenParseFailed"),
+        }),
+      ]);
+      expect(refreshes).toBe(2);
       expect(receiveCounters).toEqual([]);
     });
 
@@ -616,7 +730,7 @@ describe("Receive.receive", () => {
     });
   });
 
-  it("fails as unreachable, recording nothing, when the mint never answers the state check", async () => {
+  it("defers the token when the mint never answers the state check", async () => {
     const { wallet, receiveCounters } = makeWallet({
       checkProofsStates: () => new Promise(() => undefined),
       receive: () => Promise.reject(new Error("must not be called")),
@@ -632,8 +746,10 @@ describe("Receive.receive", () => {
     assert(Exit.isSuccess(exit));
     const [{ receipt, operations }, elapsed] = exit.value;
     assert(receipt._tag === "Left");
-    expect(receipt.left._tag).toBe("MintUnreachable");
-    expect(operations).toEqual([]);
+    expect(receipt.left._tag).toBe("ReceiveDeferred");
+    expect(operations.map((operation) => operation.kind)).toEqual([
+      "deferredReceive",
+    ]);
     expect(receiveCounters).toEqual([]);
     expect(elapsed).toBe(15_000);
   });
@@ -669,7 +785,7 @@ describe("Receive.receive", () => {
         ),
       receive: () => Promise.reject(new Error("must not be called")),
     });
-    const { run, events } = makeHarness(wallet, operationStore);
+    const { run, events } = makeHarness(wallet, { operationStore });
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
@@ -686,6 +802,245 @@ describe("Receive.receive", () => {
     expect(events.filter((event) => event._tag === "OperationChanged")).toEqual(
       [],
     );
+  });
+
+  it("defers a token whose mint will not load", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet, {
+      load: () =>
+        Effect.fail(new MintUnreachable({ mint, detail: "fetch failed" })),
+    });
+
+    const exit = await run(receiveAndInspect(sourceToken));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("ReceiveDeferred");
+    expect(exit.value.operations.map((operation) => operation.kind)).toEqual([
+      "deferredReceive",
+    ]);
+  });
+
+  it("defers a token whose mint refuses to load, as a rate limit or a captive portal does", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet, {
+      load: () =>
+        Effect.fail(
+          new MintRejected({ mint, code: null, detail: "Too Many Requests" }),
+        ),
+    });
+
+    const exit = await run(receiveAndInspect(sourceToken));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("ReceiveDeferred");
+    expect(exit.value.operations.map((operation) => operation.kind)).toEqual([
+      "deferredReceive",
+    ]);
+  });
+
+  it("defers a token whose mint binds the wallet to a keyset it cannot derive from", async () => {
+    const { wallet } = makeWallet({
+      keysetId: "not-hex",
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(receiveAndInspect(sourceToken));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("ReceiveDeferred");
+    expect(exit.value.operations.map((operation) => operation.kind)).toEqual([
+      "deferredReceive",
+    ]);
+  });
+
+  it("defers a token whose mint never finishes loading, once the answer budget runs out", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet, { load: () => Effect.never });
+
+    const exit = await run(
+      runOnTestClock(
+        Effect.zip(receiveAndInspect(sourceToken), Clock.currentTimeMillis),
+        "1 second",
+      ).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    const [{ receipt, operations }, elapsed] = exit.value;
+    assert(receipt._tag === "Left");
+    expect(receipt.left._tag).toBe("ReceiveDeferred");
+    expect(operations.map((operation) => operation.kind)).toEqual([
+      "deferredReceive",
+    ]);
+    expect(elapsed).toBe(15_000);
+  });
+
+  it("receives at another mint while one mint stalls", async () => {
+    const otherMint = MintUrl.make("https://other.example");
+    const otherToken = TokenText.make(
+      getEncodedToken({
+        mint: otherMint,
+        unit: "sat",
+        proofs: [proof(8, "other")],
+      }),
+    );
+    const { wallet } = makeWallet({
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    const { run } = makeHarness(wallet, {
+      load: (loading) =>
+        loading === mint ? Effect.never : Effect.succeed(wallet),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(1_700_000_000_000);
+        const stalled = yield* Effect.fork(
+          Effect.flip(receiveText(sourceToken)),
+        );
+        yield* settlePromises;
+        const received = yield* receiveText(otherToken);
+        const stalledMeanwhile = Option.isNone(yield* Fiber.poll(stalled));
+        yield* TestClock.adjust("15 seconds");
+        const deferred = yield* Fiber.join(stalled);
+        return { received, stalledMeanwhile, deferred, ...(yield* inventory) };
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.received.mint).toBe(otherMint);
+    expect(exit.value.stalledMeanwhile).toBe(true);
+    expect(exit.value.deferred._tag).toBe("ReceiveDeferred");
+    expect(
+      exit.value.operations.map((operation) => [
+        operation.kind,
+        operation.mint,
+        operation.status,
+      ]),
+    ).toEqual([
+      ["receive", otherMint, "done"],
+      ["deferredReceive", mint, "pending"],
+    ]);
+  });
+
+  it("reuses a pending deferral when the same text arrives again", async () => {
+    const { wallet } = makeWallet({
+      checkProofsStates: () => Promise.reject(new TypeError("fetch failed")),
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const first = yield* Effect.flip(receiveText(sourceToken));
+        const second = yield* Effect.flip(receiveText(sourceToken));
+        return { first, second, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.first._tag === "ReceiveDeferred");
+    assert(exit.value.second._tag === "ReceiveDeferred");
+    expect(exit.value.second.operationId).toBe(exit.value.first.operationId);
+    expect(exit.value.operations).toHaveLength(1);
+    expect(
+      events.filter((event) => event._tag === "OperationChanged"),
+    ).toHaveLength(1);
+  });
+
+  it("does not defer a text another transfer already carries", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet, {
+      load: () => Effect.fail(new MintUnreachable({ mint, detail: null })),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const done = yield* seedTransfer(
+          "receive",
+          "done",
+          mint,
+          sourceToken,
+          6,
+        );
+        const error = yield* Effect.flip(receiveText(sourceToken));
+        return { done, error, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.error).toMatchObject({
+      _tag: "TokenAlreadyKnown",
+      operationId: exit.value.done.id,
+    });
+    expect(exit.value.operations).toHaveLength(1);
+  });
+
+  it("leaves an unfinished receive to its own resume when its mint will not load", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet, {
+      load: () => Effect.fail(new MintUnreachable({ mint, detail: null })),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const interrupted = yield* seedTransfer(
+          "receive",
+          "pending",
+          mint,
+          sourceToken,
+          6,
+        );
+        const error = yield* Effect.flip(receiveText(sourceToken));
+        return { interrupted, error, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.error._tag).toBe("MintUnreachable");
+    expect(exit.value.operations).toEqual([
+      expect.objectContaining({
+        id: exit.value.interrupted.id,
+        status: "pending",
+      }),
+    ]);
+  });
+
+  it("hands a deferral over to the receive of a later paste that lands", async () => {
+    const reachable = { now: false };
+    const { wallet } = makeWallet({
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    const { run } = makeHarness(wallet, {
+      load: () =>
+        reachable.now
+          ? Effect.succeed(wallet)
+          : Effect.fail(new MintUnreachable({ mint, detail: null })),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.flip(receiveText(sourceToken));
+        reachable.now = true;
+        yield* receiveText(sourceToken);
+        return yield* inventory;
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(
+      exit.value.operations.map((operation) => [
+        operation.kind,
+        operation.status,
+      ]),
+    ).toEqual([
+      ["deferredReceive", "done"],
+      ["receive", "done"],
+    ]);
   });
 
   it("records a swap the mint rejects as spent after an unspent check as failed", async () => {
@@ -1323,5 +1678,473 @@ describe("Receive.receive of an unfinished receive", () => {
       operationId: exit.value.stale.id,
     });
     expect(receiveCounters).toEqual([]);
+  });
+});
+
+describe("Receive.resumeDeferred", () => {
+  const resumeDeferred = Effect.flatMap(
+    Receive,
+    (receive) => receive.resumeDeferred,
+  );
+
+  /** A mint whose state check fails until `reachable.now` is set. */
+  const flakyMint = (stateOf?: (secret: string) => ProofStateName) => {
+    const reachable = { now: false };
+    let stateChecks = 0;
+    const answer = answerProofStates(stateOf);
+    const harness = makeWallet({
+      checkProofsStates: (proofs) => {
+        stateChecks += 1;
+        return reachable.now
+          ? answer(proofs)
+          : Promise.reject(new TypeError("fetch failed"));
+      },
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    return { ...harness, reachable, stateChecks: () => stateChecks };
+  };
+
+  /** A wallet load that fails as unreachable until `up.now` is set. */
+  const loadWhenUp = (wallet: LoadedWallet) => {
+    const up = { now: false };
+    const load = () =>
+      up.now
+        ? Effect.succeed(wallet)
+        : Effect.fail(new MintUnreachable({ mint, detail: "fetch failed" }));
+    return { up, load };
+  };
+
+  const closeStored = (id: OperationId) =>
+    Effect.flatMap(OperationStore, (store) =>
+      store.update(id, { status: "done" }),
+    );
+
+  it("receives a deferred token once its mint answers, and closes the deferral", async () => {
+    const { wallet, reachable } = flakyMint();
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const deferred = yield* Effect.flip(receiveText(sourceToken));
+        reachable.now = true;
+        return {
+          deferred,
+          results: yield* resumeDeferred,
+          ...(yield* inventory),
+        };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    const { deferred, results, operations, proofs } = exit.value;
+    assert(deferred._tag === "ReceiveDeferred");
+    expect(results).toHaveLength(1);
+    const [result] = results;
+    expect(result).toMatchObject({
+      operationId: deferred.operationId,
+      status: "received",
+      amount: 6,
+    });
+    const receive = operations.find(
+      (operation) => operation.kind === "receive",
+    );
+    expect(result?.receipt).toMatchObject({
+      operationId: receive?.id,
+      amount: 5,
+    });
+    expect(receive).toMatchObject({ status: "done", tokenText: sourceToken });
+    expect(
+      operations.find((operation) => operation.id === deferred.operationId),
+    ).toMatchObject({ kind: "deferredReceive", status: "done" });
+    expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
+
+    const summary = events.at(-1);
+    assert(summary?._tag === "OperationSucceeded");
+    expect(summary.name).toBe("receive.resumeDeferred");
+    // Inspector rows never carry token text.
+    expect(JSON.stringify(events)).not.toContain(sourceToken);
+    expect(
+      events
+        .filter((event) => event._tag === "OperationChanged")
+        .map((event) => [event.kind, event.from, event.to]),
+    ).toEqual([
+      ["deferredReceive", null, "pending"],
+      ["receive", null, "pending"],
+      ["deferredReceive", "pending", "done"],
+      ["receive", "pending", "done"],
+    ]);
+  });
+
+  it("keeps the deferral while the mint stays unreachable, asking it once per pass", async () => {
+    const { wallet, stateChecks } = flakyMint();
+    const { run, events } = makeHarness(wallet);
+    const otherToken = TokenText.make(
+      getEncodedToken({ mint, unit: "sat", proofs: [proof(8, "other")] }),
+    );
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.flip(receiveText(sourceToken));
+        yield* Effect.flip(receiveText(otherToken));
+        return { results: yield* resumeDeferred, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "pending",
+      "pending",
+    ]);
+    expect(stateChecks()).toBe(3);
+    expect(
+      exit.value.operations.map((operation) => [
+        operation.kind,
+        operation.status,
+      ]),
+    ).toEqual([
+      ["deferredReceive", "pending"],
+      ["deferredReceive", "pending"],
+    ]);
+    expect(
+      events.filter((event) => event._tag === "OperationChanged"),
+    ).toHaveLength(2);
+    // Waiting on a mint that is still down is reported, not failed.
+    expect(
+      events.flatMap((event) =>
+        "name" in event && event.name === "receive.resume"
+          ? [[event._tag, event._tag === "OperationSucceeded" && event.result]]
+          : [],
+      ),
+    ).toMatchObject([["OperationSucceeded", { status: "pending" }]]);
+  });
+
+  it("closes a deferral whose token the mint reports spent, without a receive", async () => {
+    const { wallet, reachable } = flakyMint(() => "SPENT");
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.flip(receiveText(sourceToken));
+        reachable.now = true;
+        return { results: yield* resumeDeferred, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "closed",
+    ]);
+    expect(exit.value.operations).toHaveLength(1);
+    const [closed] = exit.value.operations;
+    expect(closed).toMatchObject({ kind: "deferredReceive", status: "failed" });
+    expect(JSON.parse(closed?.error ?? "")).toMatchObject({
+      _tag: "TokenAlreadySpent",
+    });
+    expect(exit.value.proofs).toEqual([]);
+  });
+
+  it("closes a deferral another device already received, leaving its receive alone", async () => {
+    const { wallet } = flakyMint();
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.flip(receiveText(sourceToken));
+        // The other device's `done` receive arrives through sync.
+        yield* seedTransfer("receive", "done", mint, sourceToken, 6);
+        return { results: yield* resumeDeferred, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "closed",
+    ]);
+    expect(
+      exit.value.operations.map((operation) => [
+        operation.kind,
+        operation.status,
+      ]),
+    ).toEqual([
+      ["deferredReceive", "done"],
+      ["receive", "done"],
+    ]);
+  });
+
+  it("records the token once when two passes run at the same time", async () => {
+    const { wallet, reachable, receiveCounters } = flakyMint();
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.flip(receiveText(sourceToken));
+        reachable.now = true;
+        const passes = yield* Effect.all([resumeDeferred, resumeDeferred], {
+          concurrency: "unbounded",
+        });
+        return { passes, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.passes.flat().map((result) => result.status)).toEqual(
+      expect.arrayContaining(["received", "closed"]),
+    );
+    expect(receiveCounters).toEqual([1]);
+    expect(
+      exit.value.operations.map((operation) => [
+        operation.kind,
+        operation.status,
+      ]),
+    ).toEqual([
+      ["deferredReceive", "done"],
+      ["receive", "done"],
+    ]);
+  });
+
+  it("never brings back a deferral closed while the pass waited for the mint to load", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const loading = Effect.runSync(
+      Deferred.make<LoadedWallet, MintUnreachable>(),
+    );
+    const stalls = { now: false };
+    const { run, events } = makeHarness(wallet, {
+      load: () =>
+        stalls.now
+          ? Deferred.await(loading)
+          : Effect.fail(new MintUnreachable({ mint, detail: null })),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const deferred = yield* Effect.flip(receiveText(sourceToken));
+        assert(deferred._tag === "ReceiveDeferred");
+        stalls.now = true;
+        const pass = yield* Effect.fork(resumeDeferred);
+        yield* settlePromises;
+        yield* closeStored(deferred.operationId);
+        yield* Deferred.fail(
+          loading,
+          new MintUnreachable({ mint, detail: "fetch failed" }),
+        );
+        return { results: yield* Fiber.join(pass), ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "pending",
+    ]);
+    expect(exit.value.operations).toEqual([
+      expect.objectContaining({ kind: "deferredReceive", status: "done" }),
+    ]);
+    expect(receiveCounters).toEqual([]);
+    expect(
+      events
+        .filter((event) => event._tag === "OperationChanged")
+        .map((event) => [event.from, event.to]),
+    ).toEqual([[null, "pending"]]);
+  });
+
+  it("receives nothing when the deferral is closed while the mint answers the state check", async () => {
+    const operationStore = makeInMemoryOperationStore();
+    const closing = { now: false };
+    const { wallet, receiveCounters } = makeWallet({
+      checkProofsStates: (proofs) =>
+        closing.now
+          ? Effect.runPromise(
+              Effect.flatMap(operationStore.loadAll, (operations) =>
+                Effect.forEach(operations, (operation) =>
+                  operationStore.update(operation.id, { status: "done" }),
+                ),
+              ),
+            ).then(() => answerProofStates()(proofs))
+          : Promise.reject(new TypeError("fetch failed")),
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    const { run } = makeHarness(wallet, { operationStore });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.flip(receiveText(sourceToken));
+        closing.now = true;
+        return { results: yield* resumeDeferred, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "closed",
+    ]);
+    expect(exit.value.operations).toEqual([
+      expect.objectContaining({ kind: "deferredReceive", status: "done" }),
+    ]);
+    expect(receiveCounters).toEqual([]);
+  });
+
+  it("keeps the deferral while the mint refuses to load", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet, {
+      load: () =>
+        Effect.fail(
+          new MintRejected({ mint, code: null, detail: "Too Many Requests" }),
+        ),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.flip(receiveText(sourceToken));
+        return { results: yield* resumeDeferred, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "pending",
+    ]);
+    expect(exit.value.operations).toMatchObject([
+      { kind: "deferredReceive", status: "pending", error: null },
+    ]);
+    expect(receiveCounters).toEqual([]);
+  });
+
+  it("keeps the deferral when the mint never finishes loading, once the answer budget runs out", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const stalls = { now: false };
+    const { run } = makeHarness(wallet, {
+      load: () =>
+        stalls.now
+          ? Effect.never
+          : Effect.fail(new MintUnreachable({ mint, detail: null })),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(1_700_000_000_000);
+        yield* Effect.flip(receiveText(sourceToken));
+        stalls.now = true;
+        const start = yield* Clock.currentTimeMillis;
+        const results = yield* runOnTestClock(resumeDeferred, "1 second");
+        const elapsed = (yield* Clock.currentTimeMillis) - start;
+        return { results, elapsed, ...(yield* inventory) };
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "pending",
+    ]);
+    expect(exit.value.elapsed).toBe(15_000);
+    expect(exit.value.operations).toMatchObject([
+      { kind: "deferredReceive", status: "pending" },
+    ]);
+  });
+
+  it("closes a deferral the mint's input fee would consume as failed", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      keysets: [new Keyset(KEYSET_HEX, "sat", true, 100)],
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { up, load } = loadWhenUp(wallet);
+    const { run } = makeHarness(wallet, { load });
+    const dust = getEncodedToken({
+      mint,
+      unit: "sat",
+      proofs: [proof(1, "dust")],
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.flip(receiveText(dust));
+        up.now = true;
+        return { results: yield* resumeDeferred, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "closed",
+    ]);
+    expect(exit.value.operations).toHaveLength(1);
+    const [closed] = exit.value.operations;
+    expect(closed).toMatchObject({ kind: "deferredReceive", status: "failed" });
+    expect(JSON.parse(closed?.error ?? "")).toMatchObject({
+      _tag: "AmountConsumedByFee",
+    });
+    expect(receiveCounters).toEqual([]);
+  });
+
+  it("closes a deferral whose text does not decode as failed", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedTransfer(
+          "deferredReceive",
+          "pending",
+          mint,
+          TokenText.make("cashuBnot-a-token"),
+          6,
+        );
+        return { results: yield* resumeDeferred, ...(yield* inventory) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.results.map((result) => result.status)).toEqual([
+      "closed",
+    ]);
+    const [closed] = exit.value.operations;
+    expect(closed?.status).toBe("failed");
+    expect(JSON.parse(closed?.error ?? "")).toMatchObject({
+      _tag: "TokenParseFailed",
+    });
+  });
+
+  it.each([
+    ["MintUnreachable", new TypeError("fetch failed")],
+    ["MintRejected", new MintOperationError(20003, "keyset inactive")],
+    [
+      "TokenAlreadySpent",
+      new MintOperationError(11001, "Token already spent."),
+    ],
+  ])(
+    "hands a deferral whose swap fails (%s) over to its failed receive",
+    async (tag, swapError) => {
+      const { wallet } = makeWallet({
+        receive: () => Promise.reject(swapError),
+      });
+      const { up, load } = loadWhenUp(wallet);
+      const { run } = makeHarness(wallet, { load });
+
+      const exit = await run(
+        Effect.gen(function* () {
+          yield* Effect.flip(receiveText(sourceToken));
+          up.now = true;
+          return { results: yield* resumeDeferred, ...(yield* inventory) };
+        }),
+      );
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.results).toMatchObject([
+        { status: "failed", receipt: null },
+      ]);
+      const deferral = exit.value.operations.find(
+        (operation) => operation.kind === "deferredReceive",
+      );
+      const receive = exit.value.operations.find(
+        (operation) => operation.kind === "receive",
+      );
+      expect(deferral).toMatchObject({ status: "done", error: null });
+      expect(receive).toMatchObject({
+        status: "failed",
+        tokenText: sourceToken,
+      });
+      expect(JSON.parse(receive?.error ?? "")).toMatchObject({ _tag: tag });
+    },
+  );
+
+  it("returns nothing when no token is deferred", async () => {
+    const { wallet } = flakyMint();
+    const { run } = makeHarness(wallet);
+
+    expect(await run(resumeDeferred)).toEqual(Exit.succeed([]));
   });
 });

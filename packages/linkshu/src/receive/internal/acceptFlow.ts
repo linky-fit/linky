@@ -1,10 +1,11 @@
 import type { Proof as CashuProof, SwapPreview } from "@cashu/cashu-ts";
-import { Duration, Effect, Either, Schema } from "effect";
+import { Duration, Effect, Either, Ref, Schema } from "effect";
 import {
   AmountConsumedByFee,
   CounterLockTimeout,
   MintRejected,
   MintUnreachable,
+  ReceiveDeferred,
   TokenAlreadyKnown,
   TokenAlreadySpent,
   TokenParseFailed,
@@ -53,7 +54,10 @@ import type {
 } from "../../mint/internal/WalletInstances";
 import type { KeyValueStoreService } from "../../ports/KeyValueStore";
 import { NewOperation, StoredOperation } from "../../ports/OperationStore";
-import type { OperationStoreService } from "../../ports/OperationStore";
+import type {
+  OperationPatch,
+  OperationStoreService,
+} from "../../ports/OperationStore";
 import type { ProofStoreService, StoredProof } from "../../ports/ProofStore";
 import {
   decodeTokenText,
@@ -581,7 +585,8 @@ const findKnown = (
   proofs: ReadonlyArray<StoredProof>,
   tokenText: TokenText,
   replaced: StoredOperation | null,
-  decoded: DecodedToken,
+  /** The token's proofs, when the text decodes. */
+  decoded: DecodedToken | null,
 ): TokenAlreadyKnown | null => {
   const transfer = operations.find(
     (operation) =>
@@ -593,6 +598,7 @@ const findKnown = (
   if (transfer !== undefined) {
     return new TokenAlreadyKnown({ operationId: transfer.id });
   }
+  if (decoded === null) return null;
   const secrets = new Set(decoded.proofs.map((proof) => proof.secret));
   const stored = proofs.find(
     (proof) =>
@@ -622,12 +628,13 @@ const reopen = (
   );
 };
 
-const pendingReceive = (
+const newTokenOperation = (
+  kind: "receive" | "deferredReceive",
   parsed: ReceivableToken,
   createdAt: UnixSeconds,
 ): NewOperation =>
   new NewOperation({
-    kind: "receive",
+    kind,
     status: "pending",
     mint: parsed.mint,
     unit: parsed.unit,
@@ -645,6 +652,20 @@ const pendingReceive = (
     tokenText: parsed.tokenText,
     error: null,
   });
+
+const insertNew = (
+  ctx: ReceiveContext,
+  kind: "receive" | "deferredReceive",
+  parsed: ReceivableToken,
+  reason: string,
+): Effect.Effect<StoredOperation> =>
+  Effect.flatMap(nowSeconds, (now) =>
+    insertOperation(
+      ctx,
+      newTokenOperation(kind, parsed, UnixSeconds.make(now)),
+      reason,
+    ),
+  );
 
 /**
  * A transfer still waiting on this flow: a `send` not yet claimed or taken
@@ -676,6 +697,137 @@ const findReopened = (
       : operation.id === replaced.operation.id && isUnfinished(operation),
   );
 
+/** A `deferredReceive` still waiting for its mint. */
+export type DeferredOperation = StoredOperation & {
+  readonly tokenText: TokenText;
+};
+
+export const isPendingDeferral = (
+  operation: StoredOperation,
+): operation is DeferredOperation =>
+  operation.kind === "deferredReceive" &&
+  operation.status === "pending" &&
+  operation.tokenText !== null;
+
+const DEFERRAL_REASON = "deferred-receive";
+
+/**
+ * Patches the deferral only while it is still `pending`, as stored now: a
+ * deferral another pass or device closed stays as they left it.
+ */
+export const closeDeferral = (
+  ctx: ReceiveContext,
+  deferral: StoredOperation,
+  patch: OperationPatch,
+): Effect.Effect<void> =>
+  Effect.flatMap(ctx.operationStore.loadAll, (operations) => {
+    const current = operations.find(
+      (operation) =>
+        operation.id === deferral.id && isPendingDeferral(operation),
+    );
+    return current === undefined
+      ? Effect.void
+      : patchOperation(ctx, current, patch, DEFERRAL_REASON);
+  });
+
+/**
+ * Where a received text comes from: pasted or carried by a message
+ * (`fresh`), a transfer being taken back or retried (`replaced`), or a
+ * deferral being retried (`deferred`), whose `recorded` turns true once its
+ * receive is written.
+ */
+type Origin =
+  | { readonly _tag: "fresh" }
+  | { readonly _tag: "replaced"; readonly replaced: ReplacedTransfer }
+  | {
+      readonly _tag: "deferred";
+      readonly deferral: DeferredOperation;
+      readonly recorded: Ref.Ref<boolean>;
+    };
+
+const replacedOf = (origin: Origin): ReplacedTransfer | null =>
+  origin._tag === "replaced" ? origin.replaced : null;
+
+/**
+ * Keeps a fresh token whose mint cannot be used under a `deferredReceive`,
+ * whose id never matches the token's `receive`. Without the mint's keysets
+ * dedup is by text and by the secrets of a token that decodes on its own. A
+ * pending deferral of the text is reused; an unfinished receive of it fails
+ * with the mint's error, left for its own resume.
+ */
+const deferReceive = (
+  ctx: ReceiveContext,
+  parsed: ReceivableToken,
+  error: MintUnreachable | MintRejected,
+): Effect.Effect<
+  never,
+  ReceiveDeferred | TokenAlreadyKnown | MintUnreachable | MintRejected
+> =>
+  Effect.gen(function* () {
+    const operations = yield* ctx.operationStore.loadAll;
+    if (findReopened(operations, parsed.tokenText, null) !== undefined) {
+      return yield* Effect.fail(error);
+    }
+    const known = findKnown(
+      operations,
+      yield* ctx.proofStore.loadAll,
+      parsed.tokenText,
+      null,
+      decodeTokenText(parsed.tokenText),
+    );
+    if (known !== null) return yield* known;
+    const deferral =
+      operations.find(
+        (operation) =>
+          isPendingDeferral(operation) &&
+          operation.tokenText === parsed.tokenText,
+      ) ?? (yield* insertNew(ctx, "deferredReceive", parsed, DEFERRAL_REASON));
+    return yield* new ReceiveDeferred({
+      mint: parsed.mint,
+      operationId: deferral.id,
+      amount: parsed.amount,
+    });
+  });
+
+/**
+ * What a mint that cannot be loaded, refreshed or asked means before
+ * anything is written: a fresh token is deferred, a retried deferral stays
+ * as it is, and a retried transfer fails with the mint's error.
+ */
+const whenMintUnusable =
+  (ctx: ReceiveContext, parsed: ReceivableToken, origin: Origin) =>
+  (
+    error: MintUnreachable | MintRejected,
+  ): Effect.Effect<
+    never,
+    ReceiveDeferred | TokenAlreadyKnown | MintUnreachable | MintRejected
+  > => {
+    switch (origin._tag) {
+      case "fresh":
+        return deferReceive(ctx, parsed, error);
+      case "deferred":
+        return new ReceiveDeferred({
+          mint: parsed.mint,
+          operationId: origin.deferral.id,
+          amount: parsed.amount,
+        });
+      case "replaced":
+        return Effect.fail(error);
+    }
+  };
+
+/**
+ * Timing out interrupts the load, which evicts it from `WalletInstances`, so
+ * the next receive at the mint starts a fresh load.
+ */
+const loadReceivingWallet = (
+  ctx: ReceiveContext,
+  parsed: ReceivableToken,
+): Effect.Effect<LoadedWallet, MintUnreachable | MintRejected> =>
+  ctx.instances
+    .get(parsed.mint, parsed.unit)
+    .pipe(answerWithin(parsed.mint, "loading the mint"));
+
 const receiptOf = (
   transfer: StoredOperation,
   parsed: ReceivableToken,
@@ -693,13 +845,13 @@ const receiptOf = (
  * The unfinished receive this one continues, from freshly loaded rows, and
  * the proofs as stored now. Fails `TokenAlreadyKnown` when a transfer or a
  * stored proof already accounts for the text, or when another context
- * finished the replaced transfer.
+ * finished the replaced transfer or closed the retried deferral.
  */
 const dedup = (
   ctx: ReceiveContext,
   parsed: ReceivableToken,
   decoded: DecodedToken,
-  replaced: ReplacedTransfer | null,
+  origin: Origin,
 ): Effect.Effect<
   {
     readonly reopened: StoredOperation | null;
@@ -710,6 +862,18 @@ const dedup = (
   Effect.gen(function* () {
     const operations = yield* ctx.operationStore.loadAll;
     const proofs = yield* ctx.proofStore.loadAll;
+    if (
+      origin._tag === "deferred" &&
+      !operations.some(
+        (operation) =>
+          operation.id === origin.deferral.id && isPendingDeferral(operation),
+      )
+    ) {
+      return yield* new TokenAlreadyKnown({
+        operationId: origin.deferral.id,
+      });
+    }
+    const replaced = replacedOf(origin);
     const reopened =
       findReopened(operations, parsed.tokenText, replaced) ?? null;
     if (replaced !== null && reopened === null) {
@@ -726,6 +890,52 @@ const dedup = (
     );
     if (known !== null) return yield* known;
     return { reopened, proofs };
+  });
+
+/** A receive of the text now carries it: its pending deferral is `done`. */
+const closeDeferralsOf = (
+  ctx: ReceiveContext,
+  tokenText: TokenText,
+): Effect.Effect<void> =>
+  Effect.flatMap(ctx.operationStore.loadAll, (operations) =>
+    Effect.forEach(
+      operations.filter(
+        (operation) =>
+          isPendingDeferral(operation) && operation.tokenText === tokenText,
+      ),
+      (deferral) =>
+        patchOperation(ctx, deferral, { status: "done" }, DEFERRAL_REASON),
+      { discard: true },
+    ),
+  );
+
+/**
+ * Writes the receive after a last dedup, since a receive of the text may
+ * have synced in while the mint answered: inserts it, or reopens the
+ * unfinished one, and hands the text's pending deferral over to it.
+ */
+const recordReceive = (
+  ctx: ReceiveContext,
+  parsed: ReceivableToken,
+  decoded: DecodedToken,
+  origin: Origin,
+  reason: string,
+): Effect.Effect<
+  {
+    readonly transfer: StoredOperation;
+    readonly proofs: ReadonlyArray<StoredProof>;
+  },
+  TokenAlreadyKnown
+> =>
+  Effect.gen(function* () {
+    const { reopened, proofs } = yield* dedup(ctx, parsed, decoded, origin);
+    const transfer =
+      reopened === null
+        ? yield* insertNew(ctx, "receive", parsed, reason)
+        : yield* reopen(ctx, reopened, reason);
+    yield* closeDeferralsOf(ctx, parsed.tokenText);
+    if (origin._tag === "deferred") yield* Ref.set(origin.recorded, true);
+    return { transfer, proofs };
   });
 
 const RECEIVE_LOCK_KEY_PREFIX = "linkshu.receiveLock.";
@@ -767,8 +977,9 @@ export const withReceiveLock =
  *
  * Everything after parsing runs under the mint's receive lock, so two
  * contexts receiving one token see each other's outcome whatever keyset
- * their wallets bind; dedup, writes and the swap run under the counter lock
- * as well. Each swap attempt persists its output slot on the transfer before it reaches the
+ * their wallets bind, and a mint's deferrals are read and written in turn;
+ * dedup, writes and the swap run under the counter lock as well. Each swap
+ * attempt persists its output slot on the transfer before it reaches the
  * mint: receiving the text of an unfinished receive resumes it, taking the
  * outputs from NUT-09 when the mint already signed them.
  *
@@ -776,7 +987,9 @@ export const withReceiveLock =
  * synced another device's `done` receive of the token would write over it.
  * Nothing is written until the mint has answered for every input: a spent
  * token fails `TokenAlreadySpent` unless the receive's own recorded attempt
- * spent it, and a mint that cannot answer fails the receive as it stood.
+ * spent it, a mint that cannot be loaded, refreshed or asked defers a fresh
+ * token and leaves anything retried as it stood, and a token whose proofs
+ * name no keyset of the mint fails `TokenParseFailed`. Writing the receive closes the text's pending deferral.
  *
  * Re-receiving (`replaced`) follows the same path over the replaced transfer
  * instead of a fresh one: a failed `receive` is retried in place; a `send`'s
@@ -787,21 +1000,29 @@ export const withReceiveLock =
 const receiveParsed = (
   ctx: ReceiveContext,
   parsed: ReceivableToken,
-  replaced: ReplacedTransfer | null,
+  origin: Origin,
 ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
   Effect.gen(function* () {
+    const replaced = replacedOf(origin);
     const reason = replaced?.reason ?? "receive";
+    const unusable = whenMintUnusable(ctx, parsed, origin);
     // The mint's keysets decide dedup (short v2 ids in v4 text) and the fee,
-    // so a mint that will not load ends the receive before anything is recorded.
-    const wallet = yield* ctx.instances.get(parsed.mint, parsed.unit);
-    const decoded = yield* decodeInputs(wallet, parsed);
-    const scope = yield* counterScopeFor(wallet, parsed);
+    // so a mint that will not load ends the receive before the swap.
+    const wallet = yield* loadReceivingWallet(ctx, parsed).pipe(
+      Effect.catchAll(unusable),
+    );
+    const decoded = yield* decodeInputs(wallet, parsed).pipe(
+      Effect.catchTags({ MintUnreachable: unusable, MintRejected: unusable }),
+    );
+    const scope = yield* counterScopeFor(wallet, parsed).pipe(
+      Effect.catchAll(unusable),
+    );
     return yield* withCounterLock(
       ctx.kv,
       scope,
     )(
       Effect.gen(function* () {
-        yield* dedup(ctx, parsed, decoded, replaced);
+        yield* dedup(ctx, parsed, decoded, origin);
         // A swap signs what is left after the mint's input fee. A token worth
         // no more than that fee has nothing to sign, and no wallet can redeem
         // it on its own, so it is refused before anything is recorded.
@@ -816,16 +1037,12 @@ const receiveParsed = (
         const states =
           replaced?.operation.kind === "send"
             ? null
-            : yield* inputStates(wallet, parsed.mint, decoded);
-        // While the mint answered, a receive of this text may have synced in.
-        const { reopened, proofs } = yield* dedup(
-          ctx,
-          parsed,
-          decoded,
-          replaced,
-        );
-
+            : yield* inputStates(wallet, parsed.mint, decoded).pipe(
+                Effect.catchAll(unusable),
+              );
         if (states !== null && states.spent.size > 0) {
+          // While the mint answered, a receive of this text may have synced in.
+          const { reopened } = yield* dedup(ctx, parsed, decoded, origin);
           const finished = yield* finishFromRestore(
             ctx,
             wallet,
@@ -843,17 +1060,17 @@ const receiveParsed = (
             { status: "done", error: null },
             reason,
           );
+          yield* closeDeferralsOf(ctx, parsed.tokenText);
           return receiptOf(reopened, parsed, finished);
         }
 
-        const transfer =
-          reopened === null
-            ? yield* insertOperation(
-                ctx,
-                pendingReceive(parsed, UnixSeconds.make(yield* nowSeconds)),
-                reason,
-              )
-            : yield* reopen(ctx, reopened, reason);
+        const { transfer, proofs } = yield* recordReceive(
+          ctx,
+          parsed,
+          decoded,
+          origin,
+          reason,
+        );
 
         const accepted = yield* Effect.either(
           states === null
@@ -929,12 +1146,40 @@ const receiveParsed = (
     );
   });
 
+const receiveFrom = (
+  ctx: ReceiveContext,
+  text: string,
+  origin: Origin,
+): Effect.Effect<ReceiveReceipt, ReceiveError> =>
+  Effect.flatMap(parseReceivable(text), (parsed) =>
+    receiveParsed(ctx, parsed, origin).pipe(withReceiveLock(ctx.kv, parsed)),
+  );
+
 /** Receives pasted or message-borne text, or takes back `replaced`. */
 export const receiveTokenText = (
   ctx: ReceiveContext,
   text: string,
   replaced: ReplacedTransfer | null,
 ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
-  Effect.flatMap(parseReceivable(text), (parsed) =>
-    receiveParsed(ctx, parsed, replaced).pipe(withReceiveLock(ctx.kv, parsed)),
+  receiveFrom(
+    ctx,
+    text,
+    replaced === null ? { _tag: "fresh" } : { _tag: "replaced", replaced },
   );
+
+/**
+ * Receives a pending deferral's text; `recorded` turns true once its
+ * `receive` is written and the deferral handed over to it. Writes nothing
+ * while the mint still cannot be used, and never inserts or reopens the
+ * deferral.
+ */
+export const receiveDeferred = (
+  ctx: ReceiveContext,
+  deferral: DeferredOperation,
+  recorded: Ref.Ref<boolean>,
+): Effect.Effect<ReceiveReceipt, ReceiveError> =>
+  receiveFrom(ctx, deferral.tokenText, {
+    _tag: "deferred",
+    deferral,
+    recorded,
+  });

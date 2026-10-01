@@ -8,6 +8,7 @@ import {
 } from "../../src";
 import {
   availableTotalOf,
+  durableStorage,
   fundProofs,
   fundToken,
   inputFee,
@@ -159,5 +160,49 @@ describe("receive vertical against the local mint", () => {
     expect(error).toMatchObject({ _tag: "TokenAlreadySpent", mint: mintUrl });
     expect(transfers).toEqual([]);
     expect(proofs).toEqual([]);
+  });
+
+  it("defers a token while its mint is unreachable and receives it on resume", async () => {
+    const token = await fundToken(4);
+    const storage = durableStorage();
+    const config = { bip39Seed: randomSeed(), ...storage.layers };
+    const receiveToken = Effect.flatMap(Receive, (receive) =>
+      receive.receive(new ReceiveDraft({ text: token })),
+    );
+
+    const realFetch = globalThis.fetch;
+    const offline = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation((input, init) =>
+        String(input instanceof Request ? input.url : input).startsWith(mintUrl)
+          ? Promise.reject(new TypeError("fetch failed"))
+          : realFetch(input, init),
+      );
+    const deferred = await runLinkshu(config, Effect.flip(receiveToken));
+    offline.mockRestore();
+
+    expect(deferred).toMatchObject({
+      _tag: "ReceiveDeferred",
+      mint: mintUrl,
+      amount: 4,
+    });
+    const results = await runLinkshu(
+      config,
+      Effect.flatMap(Receive, (receive) => receive.resumeDeferred),
+    );
+    const operations = await Effect.runPromise(storage.operations.loadAll);
+    const proofs = await Effect.runPromise(storage.proofs.loadAll);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ status: "received", amount: 4 });
+    expect(availableTotalOf(proofs)).toBe(results[0]?.receipt?.amount);
+    expect(
+      operations.map((operation) => [operation.kind, operation.status]),
+    ).toEqual(
+      expect.arrayContaining([
+        ["deferredReceive", "done"],
+        ["receive", "done"],
+      ]),
+    );
   });
 });

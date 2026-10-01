@@ -24,7 +24,7 @@ import {
   type SwapPreview,
   type WSConnection,
 } from "@cashu/cashu-ts";
-import { Effect, Schema } from "effect";
+import { Effect, Exit, Schema } from "effect";
 import { MintRejected, MintUnreachable } from "../../domain/errors";
 import { KeysetId } from "../../domain/primitives";
 import type { CurrencyUnit, MintUrl } from "../../domain/primitives";
@@ -178,7 +178,9 @@ export type WalletLoader = (
  * Single-flight per mint+unit: the in-flight Promise is stored before the
  * first await, so concurrent callers share one load and the same mint/unit
  * is never loaded twice concurrently. Successful loads stay cached for the
- * runtime's lifetime; failures evict so the next call retries.
+ * runtime's lifetime; a failure, or a caller giving up (interrupted, e.g. by
+ * its timeout), evicts the load so the next call starts a fresh one instead
+ * of awaiting a stalled request.
  */
 export const makeWalletInstances = (
   kv: KeyValueStoreService,
@@ -195,12 +197,14 @@ export const makeWalletInstances = (
       try: () => loading,
       catch: (error) => classifyMintError(mint, error),
     }).pipe(
-      Effect.tapError(() =>
-        Effect.sync(() => {
-          // Evict only our own failed promise: a retry may already have
-          // installed a fresh in-flight load under the same key.
-          if (inFlight.get(key) === loading) inFlight.delete(key);
-        }),
+      Effect.onExit((exit) =>
+        Exit.isSuccess(exit)
+          ? Effect.void
+          : Effect.sync(() => {
+              // Evict only our own promise: a retry may already have
+              // installed a fresh in-flight load under the same key.
+              if (inFlight.get(key) === loading) inFlight.delete(key);
+            }),
       ),
     );
 

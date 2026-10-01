@@ -65,6 +65,21 @@ export class MintUnreachable extends Schema.TaggedError<MintUnreachable>()(
   },
 ) {}
 
+/**
+ * A fresh receive could not reach the token's mint before recording anything:
+ * the text is kept under the `deferredReceive` operation `operationId`, which
+ * `Receive.resumeDeferred` receives once the mint answers. Deferred, not
+ * failed.
+ */
+export class ReceiveDeferred extends Schema.TaggedError<ReceiveDeferred>()(
+  "ReceiveDeferred",
+  {
+    mint: MintUrl,
+    operationId: OperationId,
+    amount: Amount,
+  },
+) {}
+
 /** Definitive protocol rejection by the mint (NUT error code when known). */
 export class MintRejected extends Schema.TaggedError<MintRejected>()(
   "MintRejected",

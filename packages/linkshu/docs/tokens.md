@@ -25,7 +25,7 @@ const walletView = Effect.gen(function* () {
 });
 ```
 
-Reads are pull-based: re-run them when the stores change. `transfers` covers `send` and `receive` only; quote operations (`melt`, `topup`, `autoswap`) are read from `operations`. `balances` sums `available` proofs only. `TokenTransfer.tokenText` carries proof secrets; every other field is safe to display.
+Reads are pull-based: re-run them when the stores change. `transfers` covers `send` and `receive` only; quote operations (`melt`, `topup`, `autoswap`) and deferred receives (`deferredReceive`) are read from `operations`. `balances` sums `available` proofs only. `TokenTransfer.tokenText` carries proof secrets; every other field is safe to display.
 
 ## How it works
 

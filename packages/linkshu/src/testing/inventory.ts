@@ -34,9 +34,9 @@ export const seedProofs = (
     return store.insert(rows);
   });
 
-/** Stores a `send` or `receive` transfer carrying `tokenText`. */
+/** Stores a `send`, `receive` or `deferredReceive` carrying `tokenText`. */
 export const seedTransfer = (
-  kind: "send" | "receive",
+  kind: "send" | "receive" | "deferredReceive",
   status: OperationStatus,
   mint: string,
   tokenText: TokenText,

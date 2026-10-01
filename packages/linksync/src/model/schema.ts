@@ -152,7 +152,7 @@ export const LinkySchema = {
   /** Cashu scope: durable links between inputs and outputs (melts, topups, sends, ...). */
   cashuOperation: {
     id: CashuOperationId,
-    // "melt" | "topup" | "autoswap" | "send" | "receive"
+    // "melt" | "topup" | "autoswap" | "send" | "receive" | "deferredReceive"
     kind: NonEmptyString100,
     status: NonEmptyString100,
     mint: NonEmptyString1000,

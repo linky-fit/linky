@@ -16,8 +16,10 @@ import {
  * Every durable link between inputs and outputs. Quote kinds (`melt`,
  * `topup`, `autoswap`) are what a resumer finishes after a crash; transfer
  * kinds (`send`, `receive`) remember token text for dedup and for taking a
- * handed-out token back. Inputs are never stored on the operation: they are
- * the proof rows whose `operationId` points here.
+ * handed-out token back; a `deferredReceive` keeps the text of a token whose
+ * mint could not be reached until `Receive.resumeDeferred` receives it.
+ * Inputs are never stored on the operation: they are the proof rows whose
+ * `operationId` points here.
  */
 export const OperationKind = Schema.Literal(
   "melt",
@@ -25,6 +27,7 @@ export const OperationKind = Schema.Literal(
   "autoswap",
   "send",
   "receive",
+  "deferredReceive",
 );
 export type OperationKind = typeof OperationKind.Type;
 
@@ -34,6 +37,9 @@ export type OperationKind = typeof OperationKind.Type;
  * - `send`: `issued` | `pending` | `externalized` → `done` (claimed or
  *   delivered) | `returned` (taken back into the wallet)
  * - `receive`: `pending` → `done` | `failed`
+ * - `deferredReceive`: `pending` → `done` (received, here or on another
+ *   device, or handed to its `receive`) | `failed` (spent, eaten by the
+ *   mint's fee or undecodable, see `error`)
  */
 export const OperationStatus = Schema.Literal(
   "pending",
@@ -77,7 +83,10 @@ const operationFields = {
   expiresAt: Schema.NullOr(UnixSeconds),
   /** Event time, set by the package; distinct from storage timestamps. */
   createdAt: UnixSeconds,
-  /** Transfer kinds: the original text, kept for dedup and `returnToWallet`. */
+  /**
+   * Transfer kinds and `deferredReceive`: the original text, kept for dedup,
+   * `returnToWallet` and the deferred retry.
+   */
   tokenText: Schema.NullOr(TokenText),
   /** Serialized tagged error of the last failure. */
   error: Schema.NullOr(Schema.String),
@@ -102,8 +111,10 @@ export interface OperationPatch {
 }
 
 /**
- * The natural key an operation id derives from: a transfer is identified by
- * its kind and token text, a quote operation by kind, mint, and quote id.
+ * The natural key an operation id derives from: an operation with token text
+ * is identified by its kind and that text, a quote operation by kind, mint,
+ * and quote id. A `deferredReceive` therefore never shares a row with the
+ * `receive` of the same text.
  * Adapters hash it into their own id format (`deriveStoreId` for stores
  * without one).
  */

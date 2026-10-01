@@ -4,6 +4,7 @@ import {
   CounterLockTimeout,
   MintRejected,
   MintUnreachable,
+  ReceiveDeferred,
   TokenAlreadyKnown,
   TokenAlreadySpent,
   TokenParseFailed,
@@ -42,7 +43,35 @@ export const ReceiveError = Schema.Union(
   AmountConsumedByFee,
   TokenAlreadySpent,
   MintUnreachable,
+  ReceiveDeferred,
   MintRejected,
   CounterLockTimeout,
 );
 export type ReceiveError = typeof ReceiveError.Type;
+
+/** What `resumeDeferred` did with one `deferredReceive` operation. */
+export class DeferredReceiveResult extends Schema.Class<DeferredReceiveResult>(
+  "DeferredReceiveResult",
+)({
+  /** The `deferredReceive` operation. */
+  operationId: OperationId,
+  mint: MintUrl,
+  unit: CurrencyUnit,
+  /** The token's face value, before the mint's input fee. */
+  amount: Amount,
+  /**
+   * `received` — the proofs are in the wallet and the deferral is `done`;
+   * `closed` — no `receive` recorded and no proofs received: the deferral
+   * closes `done` when the token was already received here or on another
+   * device, `failed` when it is spent, eaten by the fee or undecodable, and
+   * stays as it was when another pass closed it first;
+   * `failed` — the swap failed after its `receive` was recorded: that
+   * receive is `failed` with the error and carries the retry, the deferral
+   * is `done`;
+   * `pending` — the mint still cannot be loaded, refreshed or asked;
+   * nothing was written and the deferral waits for the next pass.
+   */
+  status: Schema.Literal("received", "closed", "failed", "pending"),
+  /** Set only for `received`. */
+  receipt: Schema.NullOr(ReceiveReceipt),
+}) {}

@@ -37,7 +37,7 @@ Always go through `parseMintUrl` (or `MintUrl.make` on already-normalized input)
 
 `info(mint)` loads the mint's published info (NUT-06), keysets, and keys, and returns a `MintInfo`. `inputFeePpk` is the fee of the keyset the wallet spends from (the lowest-fee active `sat` keyset). `isFakeLightning` is true for `localhost`, `127.0.0.1`, `testnut.cashu.space`, or info text advertising a FakeWallet.
 
-Successful wallet loads are cached for the runtime's lifetime; a failed load is evicted so the next call retries. Keyset verification failures surface as `MintRejected`; there is no fallback that accepts rejected keys. A mint with only inactive keysets can still load for restore.
+Successful wallet loads are cached for the runtime's lifetime; a failed load is evicted so the next call retries, and so is one its caller stopped waiting for (`Receive` waits 15 s), so the next call starts a fresh load instead of awaiting a stalled one. Keyset verification failures surface as `MintRejected`; there is no fallback that accepts rejected keys. A mint with only inactive keysets can still load for restore.
 
 ### The known-mint set
 

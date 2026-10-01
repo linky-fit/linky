@@ -4,7 +4,7 @@ import {
   MintInfo as CashuMintInfo,
   MintOperationError,
 } from "@cashu/cashu-ts";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Fiber, Option } from "effect";
 import { CurrencyUnit, MintUrl } from "../../domain/primitives";
 import type { KeyValueStoreService } from "../../ports/KeyValueStore";
 import { fakeWallet as stubWallet } from "../../testing/fakeWallet";
@@ -119,6 +119,35 @@ describe("makeWalletInstances", () => {
     const retried = await Effect.runPromise(instances.get(mint, sat));
     expect(calls).toBe(2);
     expect(retried).toBe(wallet);
+  });
+  it("starts a fresh load once a caller gives up on a stalled one", async () => {
+    const wallet = fakeWallet("01aaaa");
+    let calls = 0;
+    const load: WalletLoader = () => {
+      calls += 1;
+      return calls === 1
+        ? new Promise(() => undefined)
+        : Promise.resolve(wallet);
+    };
+    const instances = makeWalletInstances(stubKv([]), load);
+
+    const exit = await Effect.runPromiseExit(
+      Effect.gen(function* () {
+        const stalled = yield* Effect.fork(instances.get(mint, sat));
+        const waiting = yield* Effect.fork(instances.get(mint, sat));
+        yield* Effect.yieldNow();
+        expect(calls).toBe(1);
+        yield* Fiber.interrupt(stalled);
+        const fresh = yield* instances.get(mint, sat);
+        // The caller that did not give up still awaits the stalled load.
+        expect(Option.isNone(yield* Fiber.poll(waiting))).toBe(true);
+        yield* Fiber.interrupt(waiting);
+        return fresh;
+      }),
+    );
+
+    expect(exit).toEqual(Exit.succeed(wallet));
+    expect(calls).toBe(2);
   });
 });
 

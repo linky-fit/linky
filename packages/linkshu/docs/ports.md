@@ -81,7 +81,7 @@ The platform never decides states. Do not default, normalize, or "fix" a state o
 
 The same shape for operations, with the same read-after-write requirement on `loadAll`.
 
-`operationKeyOf` is the natural key: a transfer is `kind|tokenText`, a quote operation is `kind|mint|quoteId`. Hash it with `deriveStoreId` (or your own scheme); the key contains token text, so it must not become the id as is. Inserting an existing key replaces every field of that row. Inputs are never stored on the operation: they are the proofs whose `operationId` points at it. `StoredOperation.tokenText` carries proof secrets.
+`operationKeyOf` is the natural key: an operation with token text (a transfer or a `deferredReceive`) is `kind|tokenText`, a quote operation is `kind|mint|quoteId`. Hash it with `deriveStoreId` (or your own scheme); the key contains token text, so it must not become the id as is. Inserting an existing key replaces every field of that row. Inputs are never stored on the operation: they are the proofs whose `operationId` points at it. `StoredOperation.tokenText` carries proof secrets.
 
 `applyOperationPatch` is exported for `update`.
 

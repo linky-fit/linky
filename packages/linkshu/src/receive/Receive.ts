@@ -1,13 +1,41 @@
-import { Effect } from "effect";
+import { Effect, Either, Ref, Schema } from "effect";
+import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { inspectOperationWith, redactReceipt } from "../internal/operations";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
-import type { ReceiveDraft, ReceiveError, ReceiveReceipt } from "./domain";
-import { receiveTokenText } from "./internal/acceptFlow";
-import type { ReceiveContext } from "./internal/acceptFlow";
+import { DeferredReceiveResult, ReceiveError } from "./domain";
+import type { ReceiveDraft, ReceiveReceipt } from "./domain";
+import {
+  closeDeferral,
+  isPendingDeferral,
+  receiveDeferred,
+  receiveTokenText,
+} from "./internal/acceptFlow";
+import type { DeferredOperation, ReceiveContext } from "./internal/acceptFlow";
+
+const encodeStoredError = Schema.encodeSync(Schema.parseJson(ReceiveError));
+
+const deferredResult = (
+  deferred: DeferredOperation,
+  status: DeferredReceiveResult["status"],
+  receipt: ReceiveReceipt | null = null,
+) =>
+  new DeferredReceiveResult({
+    operationId: deferred.id,
+    mint: deferred.mint,
+    unit: deferred.unit,
+    amount: deferred.amount,
+    status,
+    receipt,
+  });
+
+const redactDeferredResult = (result: DeferredReceiveResult) => ({
+  ...result,
+  receipt: result.receipt === null ? null : redactReceipt(result.receipt),
+});
 
 /**
  * Receiving a token is one call over the shared accept flow (see
@@ -40,6 +68,79 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
         ),
       );
 
-    return { receive } as const;
+    const resumeOne = (
+      deferred: DeferredOperation,
+    ): Effect.Effect<DeferredReceiveResult> =>
+      Effect.gen(function* () {
+        const recorded = yield* Ref.make(false);
+        const outcome = yield* Effect.either(
+          receiveDeferred(ctx, deferred, recorded).pipe(
+            Effect.map((receipt) =>
+              deferredResult(deferred, "received", receipt),
+            ),
+            // A mint still unusable is the expected wait, not a failure.
+            Effect.catchTag("ReceiveDeferred", () =>
+              Effect.succeed(deferredResult(deferred, "pending")),
+            ),
+            inspectOperationWith(
+              ctx.inspector,
+              "receive.resume",
+              { mint: deferred.mint, operationId: deferred.id },
+              redactDeferredResult,
+            ),
+          ),
+        );
+        if (Either.isRight(outcome)) return outcome.right;
+        if (yield* Ref.get(recorded)) return deferredResult(deferred, "failed");
+        const error = outcome.left;
+        switch (error._tag) {
+          case "TokenAlreadyKnown":
+            yield* closeDeferral(ctx, deferred, { status: "done" });
+            return deferredResult(deferred, "closed");
+          case "TokenAlreadySpent":
+          case "AmountConsumedByFee":
+          case "TokenParseFailed":
+            yield* closeDeferral(ctx, deferred, {
+              status: "failed",
+              error: encodeStoredError(error),
+            });
+            return deferredResult(deferred, "closed");
+          case "MintUnreachable":
+          case "MintRejected":
+          case "CounterLockTimeout":
+            return deferredResult(deferred, "pending");
+        }
+      });
+
+    /**
+     * Retries every pending `deferredReceive`. A mint still unusable keeps
+     * the rest of its deferrals for the next pass instead of waiting out its
+     * timeout once per token.
+     */
+    const resumeDeferred: Effect.Effect<ReadonlyArray<DeferredReceiveResult>> =
+      Effect.gen(function* () {
+        const deferrals = (yield* ctx.operationStore.loadAll).filter(
+          isPendingDeferral,
+        );
+        const unusable = new Set<MintUrl>();
+        const results: DeferredReceiveResult[] = [];
+        for (const deferred of deferrals) {
+          const result = unusable.has(deferred.mint)
+            ? deferredResult(deferred, "pending")
+            : yield* resumeOne(deferred);
+          if (result.status === "pending") unusable.add(deferred.mint);
+          results.push(result);
+        }
+        return results;
+      }).pipe(
+        inspectOperationWith(
+          ctx.inspector,
+          "receive.resumeDeferred",
+          {},
+          (results) => results.map(redactDeferredResult),
+        ),
+      );
+
+    return { receive, resumeDeferred } as const;
   }),
 }) {}

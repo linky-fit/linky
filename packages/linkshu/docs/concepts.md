@@ -30,18 +30,19 @@ The wallet is an inventory. The `ProofStore` holds one `StoredProof` per proof; 
 
 ### Operation kinds and statuses
 
-| Kind                | Statuses                                                         | What it records                                                                                                       |
-| ------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `melt`              | `pending` → `paid` \| `unpaid` \| `failed`                       | Quote, invoice, `feeReserve`, `inputsTotal`, blank-output `counter`; its inputs are the proofs `held` under it        |
-| `topup`, `autoswap` | `pending` → `done` \| `failed`                                   | Quote, invoice, reserved `counter`; `locked` for NUT-20 topups, `sourceMint` for autoswaps                            |
-| `send`              | `issued` \| `pending` \| `externalized` → `done` \| `returned`   | `tokenText` of the handed-out token; its proofs are `handedOut`/`externalized` under it                               |
-| `receive`           | `pending` → `done` \| `failed` (a retry reopens it as `pending`) | `tokenText` of the accepted text, for dedup; the latest swap's `keysetId` and `counter`; a failure's serialized error |
+| Kind                | Statuses                                                         | What it records                                                                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `melt`              | `pending` → `paid` \| `unpaid` \| `failed`                       | Quote, invoice, `feeReserve`, `inputsTotal`, blank-output `counter`; its inputs are the proofs `held` under it                                                                                                             |
+| `topup`, `autoswap` | `pending` → `done` \| `failed`                                   | Quote, invoice, reserved `counter`; `locked` for NUT-20 topups, `sourceMint` for autoswaps                                                                                                                                 |
+| `send`              | `issued` \| `pending` \| `externalized` → `done` \| `returned`   | `tokenText` of the handed-out token; its proofs are `handedOut`/`externalized` under it                                                                                                                                    |
+| `receive`           | `pending` → `done` \| `failed` (a retry reopens it as `pending`) | `tokenText` of the accepted text, for dedup; the latest swap's `keysetId` and `counter`; a failure's serialized error                                                                                                      |
+| `deferredReceive`   | `pending` → `done` \| `failed`                                   | `tokenText` of a fresh token whose mint could not be loaded, refreshed or asked; `done` once received here or elsewhere or handed to its `receive`; `failed` (with the error) when spent, eaten by the fee, or undecodable |
 
-`Tokens.transfers` is the `send`/`receive` view (`TokenTransfer`). The quote kinds are what the resumers finish after a crash (below).
+`Tokens.transfers` is the `send`/`receive` view (`TokenTransfer`). The quote kinds are what the resumers finish after a crash (below); `deferredReceive` is what `Receive.resumeDeferred` retries.
 
 ### Who moves what
 
-`Receive` first asks the mint (NUT-07) whether the token's proofs are spent and writes nothing if one is, then inserts a `pending` receive, records the swap's output slot on it, swaps at the mint, stores the fresh proofs `available`, and closes the receive `done` or `failed` (with the serialized error, so the same text can be retried). Receiving the text of an unfinished receive resumes it from that slot. `Send` stores the send proofs `handedOut` under a `send`, the change `available`, then marks the consumed inputs `spent`. `Melt` stores its inputs `held` under a `pending` melt and settles them from the mint's answer. `Topup`, `Autoswap`, and `Restore` store `available` proofs. Every spend first asks the mint (NUT-07) about the `available` proofs at that mint, marks the `SPENT` ones `spent`, and offers only the confirmed `UNSPENT` ones. `Tokens` holds the transfer transitions you call from UI actions (`markIssued`, `markExternalized`, `forget`, `returnToWallet`); `Validation` marks spent proofs, releases proofs held by an unknown operation, and closes claimed sends.
+`Receive` first asks the mint (NUT-07) whether the token's proofs are spent and writes nothing if one is; a fresh token whose mint does not load or answer is kept as a `deferredReceive` instead. Otherwise it inserts a `pending` receive, records the swap's output slot on it, swaps at the mint, stores the fresh proofs `available`, and closes the receive `done` or `failed` (with the serialized error, so the same text can be retried). Receiving the text of an unfinished receive resumes it from that slot. `Send` stores the send proofs `handedOut` under a `send`, the change `available`, then marks the consumed inputs `spent`. `Melt` stores its inputs `held` under a `pending` melt and settles them from the mint's answer. `Topup`, `Autoswap`, and `Restore` store `available` proofs. Every spend first asks the mint (NUT-07) about the `available` proofs at that mint, marks the `SPENT` ones `spent`, and offers only the confirmed `UNSPENT` ones. `Tokens` holds the transfer transitions you call from UI actions (`markIssued`, `markExternalized`, `forget`, `returnToWallet`); `Validation` marks spent proofs, releases proofs held by an unknown operation, and closes claimed sends.
 
 ## Deterministic counters and the lease
 
@@ -75,6 +76,8 @@ Rules shared by all three:
 - Resumed minting reuses the counter slot recorded on the operation, so an interrupted claim never mints twice; a quote the mint already issued is reclaimed via NUT-09.
 
 Each operation guide states what its resumer does per mint answer.
+
+`Receive.resumeDeferred` follows the first two rules for tokens kept because their mint could not be used ([receive.md](./receive.md#deferred-receives)): one `DeferredReceiveResult` per deferral, which stays `pending` until the mint answers.
 
 ## Effect specifics
 

@@ -1,7 +1,8 @@
 import { Effect, Fiber, Option, TestClock } from "effect";
 import type { Duration } from "effect";
 
-const settlePromises = Effect.promise(
+/** Lets every promise the program is waiting on settle. */
+export const settlePromises = Effect.promise(
   () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
 );
 
