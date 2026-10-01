@@ -1,0 +1,732 @@
+[
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "time": 1790841324365
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connected.",
+    "time": 1790841324380
+  },
+  {
+    "label": "sender-A",
+    "type": "info",
+    "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "time": 1790841324866
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] start",
+    "time": 1790841324948
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] polyfills done",
+    "time": 1790841324948
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] storage compatibility checked {inMemory: false}",
+    "time": 1790841324957
+  },
+  {
+    "label": "sender-A",
+    "type": "warning",
+    "text": "Service Worker registration blocked by Playwright",
+    "time": 1790841324957
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] app modules loaded",
+    "time": 1790841325466
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] evolu loaded",
+    "time": 1790841325525
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] render scheduled",
+    "time": 1790841325551
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "time": 1790841326332
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connected.",
+    "time": 1790841326332
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841326835
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/info",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841326883
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/keysets",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841326892
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841326976
+  },
+  {
+    "label": "receiver",
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "time": 1790841327148
+  },
+  {
+    "label": "receiver",
+    "type": "debug",
+    "text": "[vite] connected.",
+    "time": 1790841327154
+  },
+  {
+    "label": "receiver",
+    "type": "info",
+    "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "time": 1790841327437
+  },
+  {
+    "label": "receiver",
+    "type": "log",
+    "text": "[linky][boot] start",
+    "time": 1790841327523
+  },
+  {
+    "label": "receiver",
+    "type": "log",
+    "text": "[linky][boot] polyfills done",
+    "time": 1790841327523
+  },
+  {
+    "label": "receiver",
+    "type": "log",
+    "text": "[linky][boot] storage compatibility checked {inMemory: false}",
+    "time": 1790841327530
+  },
+  {
+    "label": "receiver",
+    "type": "warning",
+    "text": "Service Worker registration blocked by Playwright",
+    "time": 1790841327531
+  },
+  {
+    "label": "receiver",
+    "type": "log",
+    "text": "[linky][boot] app modules loaded",
+    "time": 1790841328018
+  },
+  {
+    "label": "receiver",
+    "type": "log",
+    "text": "[linky][boot] evolu loaded",
+    "time": 1790841328082
+  },
+  {
+    "label": "receiver",
+    "type": "log",
+    "text": "[linky][boot] render scheduled",
+    "time": 1790841328111
+  },
+  {
+    "label": "receiver",
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "time": 1790841328299
+  },
+  {
+    "label": "receiver",
+    "type": "debug",
+    "text": "[vite] connected.",
+    "time": 1790841328310
+  },
+  {
+    "label": "receiver",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841328715
+  },
+  {
+    "label": "receiver",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/info",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841328842
+  },
+  {
+    "label": "receiver",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/keysets",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841328847
+  },
+  {
+    "label": "receiver",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841328968
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/info",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841329049
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/keysets",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841329053
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/keys",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841329053
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/mint/quote/bolt11",
+    "status": 200,
+    "method": "POST",
+    "time": 1790841329077
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/mint/quote/bolt11/01a0f676-15a8-7c20-a172-d394bbf7d839",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841329135
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/mint/quote/bolt11/01a0f676-15a8-7c20-a172-d394bbf7d839",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841329147
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/mint/bolt11",
+    "status": 200,
+    "method": "POST",
+    "time": 1790841329224
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841329360
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841331805
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841332057
+  },
+  {
+    "label": "receiver",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841332649
+  },
+  {
+    "label": "receiver",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841332874
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841335481
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_INTERNET_DISCONNECTED"
+    },
+    "time": 1790841336068
+  },
+  {
+    "label": "sender-A",
+    "type": "error",
+    "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+    "time": 1790841336068
+  },
+  {
+    "label": "receiver",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841337456
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/checkstate",
+    "status": 200,
+    "method": "POST",
+    "time": 1790841338616
+  },
+  {
+    "label": "sender-A",
+    "type": "lost-swap-response",
+    "status": 200,
+    "body": "{\"signatures\":[{\"id\":\"011417bae666d15738b116371d3b7e6726d7ed8c8e301ec9b0657bcd96e81a664f\",\"amount\":1,\"C_\":\"028e775b807672d9253d25fe2893e7bd372295aad54255a542a15f9459e47408a3\",\"dleq\":{\"e\":\"ac7cd80555bfa2a1b2dac4b12de70bdc722e64715af0dcdaaebbfd14e5d54bda\",\"s\":\"5a3556d91518fb0299b92b5a0b7522c8000cc166a20d58678b2e49ff7193e9a0\"}},{\"id\":\"011417bae666d15738b116371d3b7e6726d7ed8c8e301ec9b0657bcd96e81a664f\",\"amount\":2,\"C_\":\"03870813da4543455175a4b574bc569b6f999298cd50a2395a191e8b1a559d5869\",\"dleq\":{\"e\":\"ca2327a4457ca793159e8257438655bd776be2d9b5fa9eed1a14c27b7ec4747e\",\"s\":\"6c7a388bd9721b410c645152287e2c190c154e3a83a71fe269273cfb1d759435\"}},{\"id\":\"011417bae666d15738b116371d3b7e6726d7ed8c8e301ec9b0657bcd96e81a664f\",\"amount\":4,\"C_\":\"0203986641cb04b0b21ebb9168cb16fd198d3f358fec83b5679871e0e9ef94a16a\",\"dleq\":{\"e\":\"fdaab7d0b901a60bd48b616f72596b9d9537c62923b01fd9f20e0e63670f9b2e\",\"s\":\"b24886d08b92c1b08d01cd516fb5620aa1c2da5a33fb4fe5ad61a66fe331f527\"}},{\"id\":\"011417bae666d15738b116371d3b7e6726d7ed8c8e301ec9b0657bcd96e81a664f\",\"amount\":8,\"C_\":\"03adcab992b0839528b759a650b7576ffb911563397d32a3f5d2abf9edfe81afe7\",\"dleq\":{\"e\":\"7893c9ba6e7eeb02b871f386ec1cc401a77ac645bf16f24cb238e7bea03ee6ce\",\"s\":\"03e68bf30a5a41602649020fe3d37f99f49551dd97bd4b1f73d85fc2f6763b7f\"}},{\"id\":\"011417bae666d15738b116371d3b7e6726d7ed8c8e301ec9b0657bcd96e81a664f\",\"amount\":16,\"C_\":\"030f3a1cda6cc13b4d8a772c674fb8de223a3d345346eda223e71187edfabe7810\",\"dleq\":{\"e\":\"d67617ea2a931e7484b1a645f245a4cf0e7f8635656a5944566b4f203e5361c2\",\"s\":\"7db1e18f37e699dbb4ebcb581b607f75d6edf51bdcfadc3c6e23f1a220e1175b\"}},{\"id\":\"011417bae666d15738b116371d3b7e6726d7ed8c8e301ec9b0657bcd96e81a664f\",\"amount\":32,\"C_\":\"02d1a5c7dab0dfd6e2542af20fdf5f559475f07eb25b40a78ed3b3fdf1a7e77259\",\"dleq\":{\"e\":\"ec47567088d31b826291f7b0e4815c94c397ec8fc412285197c8e63b5370fefa\",\"s\":\"8bf41f6f2d7c0cd953a4b3e67cba1d4dbc0771f01f178ab27c48f72919d85cc6\"}}]}",
+    "time": 1790841338816
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://localhost:3338/v1/swap",
+    "error": {
+      "errorText": "net::ERR_FAILED"
+    },
+    "time": 1790841338823
+  },
+  {
+    "label": "sender-A",
+    "type": "error",
+    "text": "Failed to load resource: net::ERR_FAILED",
+    "time": 1790841338823
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841341245
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841360795
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841363313
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "time": 1790841368675
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connected.",
+    "time": 1790841368699
+  },
+  {
+    "label": "sender-A",
+    "type": "info",
+    "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "time": 1790841369004
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] start",
+    "time": 1790841369043
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] polyfills done",
+    "time": 1790841369043
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] storage compatibility checked {inMemory: false}",
+    "time": 1790841369043
+  },
+  {
+    "label": "sender-A",
+    "type": "warning",
+    "text": "Service Worker registration blocked by Playwright",
+    "time": 1790841369050
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] app modules loaded",
+    "time": 1790841369426
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] evolu loaded",
+    "time": 1790841369490
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] render scheduled",
+    "time": 1790841369528
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "time": 1790841369936
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connected.",
+    "time": 1790841369949
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841370342
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841378863
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "time": 1790841391103
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connected.",
+    "time": 1790841391109
+  },
+  {
+    "label": "sender-A",
+    "type": "info",
+    "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "time": 1790841391216
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] start",
+    "time": 1790841391243
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] polyfills done",
+    "time": 1790841391243
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] storage compatibility checked {inMemory: false}",
+    "time": 1790841391247
+  },
+  {
+    "label": "sender-A",
+    "type": "warning",
+    "text": "Service Worker registration blocked by Playwright",
+    "time": 1790841391247
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] app modules loaded",
+    "time": 1790841391500
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] evolu loaded",
+    "time": 1790841391538
+  },
+  {
+    "label": "sender-A",
+    "type": "log",
+    "text": "[linky][boot] render scheduled",
+    "time": 1790841391552
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connecting...",
+    "time": 1790841391743
+  },
+  {
+    "label": "sender-A",
+    "type": "debug",
+    "text": "[vite] connected.",
+    "time": 1790841391748
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841392123
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841400652
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/info",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841407445
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/keysets",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841407445
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/keys",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841407448
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/checkstate",
+    "status": 200,
+    "method": "POST",
+    "time": 1790841407458
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/swap",
+    "status": 400,
+    "method": "POST",
+    "time": 1790841407493
+  },
+  {
+    "label": "sender-A",
+    "type": "error",
+    "text": "Failed to load resource: the server responded with a status of 400 (Bad Request)",
+    "time": 1790841407493
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/restore",
+    "status": 200,
+    "method": "POST",
+    "time": 1790841407604
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841407675
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/swap",
+    "status": 200,
+    "method": "POST",
+    "time": 1790841407711
+  },
+  {
+    "label": "sender-A",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/checkstate",
+    "status": 200,
+    "method": "POST",
+    "time": 1790841407830
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841408038
+  },
+  {
+    "label": "receiver",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/info",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841408048
+  },
+  {
+    "label": "receiver",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/keysets",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841408048
+  },
+  {
+    "label": "receiver",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/keys",
+    "status": 200,
+    "method": "GET",
+    "time": 1790841408049
+  },
+  {
+    "label": "receiver",
+    "type": "mint",
+    "url": "http://localhost:3338/v1/swap",
+    "status": 200,
+    "method": "POST",
+    "time": 1790841408106
+  },
+  {
+    "label": "receiver",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841408197
+  },
+  {
+    "label": "receiver",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841418930
+  },
+  {
+    "label": "sender-A",
+    "type": "requestfailed",
+    "url": "http://127.0.0.1:5296/__inspector/report",
+    "error": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "time": 1790841437149
+  }
+]
