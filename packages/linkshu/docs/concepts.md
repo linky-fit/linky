@@ -45,7 +45,7 @@ The wallet is an inventory. The `ProofStore` holds one `StoredProof` per proof; 
 
 ## Deterministic counters and the lease
 
-Proof secrets derive from the seed and a per-(mint, unit, keyset) counter (NUT-13). Two contexts (tabs, a service worker, two CLI processes) advancing one counter at once would derive the same secrets and collide at the mint. So every context on a device that uses the seed shares one durable `KeyValueStore`; the package serializes counter use through a lease in that store and recovers from collisions itself. If it cannot get the lease in time, the operation fails with `CounterLockTimeout` before deriving anything.
+Proof secrets derive from the seed and a per-(mint, unit, keyset) counter (NUT-13). Two contexts (tabs, a service worker, two CLI processes) advancing one counter at once would derive the same secrets and collide at the mint. So every context on a device that uses the seed shares one durable `KeyValueStore`; the package serializes counter use through a lease in that store, renewed for as long as the operation holding it runs, and recovers from collisions itself. If it cannot get the lease in time, the operation fails with `CounterLockTimeout` before deriving anything.
 
 Counters never move backwards and over-advance on ambiguity (blank outputs, collisions): a gap costs a restore scan, a reuse costs a mint rejection loop. The counter slot a quote attempt reserved is also written onto the operation (`counter`), which syncs, so a resume on another device re-derives the same outputs instead of burning a second block.
 

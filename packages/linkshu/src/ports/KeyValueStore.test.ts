@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, TestClock, TestContext } from "effect";
 import { inMemoryKeyValueStore } from "./inMemoryKeyValueStore";
 import { KeyValueStore } from "./KeyValueStore";
 
@@ -62,6 +62,26 @@ describe("inMemoryKeyValueStore", () => {
         yield* Effect.sleep(10);
         expect(yield* kv.tryAcquireLease("k", 60_000)).not.toBeNull();
       }),
+    );
+  });
+
+  it("keeps a renewed lease past its first ttl, and only for its holder", async () => {
+    await run(
+      Effect.gen(function* () {
+        const kv = yield* KeyValueStore;
+        const lease = yield* kv.tryAcquireLease("k", 1_000);
+        const foreign = yield* kv.tryAcquireLease("other", 1_000);
+        if (lease === null || foreign === null) {
+          throw new Error("expected a lease");
+        }
+        yield* TestClock.adjust("800 millis");
+        yield* kv.renewLease("k", foreign, 60_000);
+        yield* kv.renewLease("k", lease, 1_000);
+        yield* TestClock.adjust("800 millis");
+        expect(yield* kv.tryAcquireLease("k", 1_000)).toBeNull();
+        yield* TestClock.adjust("201 millis");
+        expect(yield* kv.tryAcquireLease("k", 1_000)).not.toBeNull();
+      }).pipe(Effect.provide(TestContext.TestContext)),
     );
   });
 });

@@ -21,14 +21,14 @@ Every port method returns an `Effect` that must not fail; throw only for genuine
 
 ## `KeyValueStore`
 
-Durable string storage plus two lease primitives. `listKeys(prefix)` drives the seed-bound wipe and the known-mint set, so if your storage is shared with other data, namespace it on your side and let `listKeys` see only this store's own entries.
+Durable string storage plus three lease primitives. `listKeys(prefix)` drives the seed-bound wipe and the known-mint set, so if your storage is shared with other data, namespace it on your side and let `listKeys` see only this store's own entries.
 
-| Port guarantees                                                 | Package handles                                                |
-| --------------------------------------------------------------- | -------------------------------------------------------------- |
-| One `tryAcquireLease` wins when several race the same key       | Retrying acquisition and timing out                            |
-| A lease past its TTL is claimable                               | Choosing TTLs, which keys to lock, releasing on exit/interrupt |
-| A foreign `LeaseId` cannot release a lease                      | Mapping a timeout to `CounterLockTimeout`                      |
-| Values survive a restart (unless you are the in-memory default) | Key naming and value encoding                                  |
+| Port guarantees                                                 | Package handles                                                             |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| One `tryAcquireLease` wins when several race the same key       | Retrying acquisition, timing out, mapping a timeout to `CounterLockTimeout` |
+| A lease is claimable once its TTL passes without a `renewLease` | Renewing a held lease every third of its TTL until it releases it           |
+| A foreign `LeaseId` cannot renew or release a lease             | Choosing TTLs, which keys to lock, releasing on exit/interrupt              |
+| Values survive a restart (unless you are the in-memory default) | Key naming and value encoding                                               |
 
 The atomic claim is the hard part. With a locked read-modify-write over your state (here `modify(change)` gives `change` the freshest state and applies its `[nextState, result]` with no other writer in between), the lease primitives are:
 
@@ -46,6 +46,15 @@ tryAcquireLease: (key, ttlMs) =>
     }),
   ),
 
+renewLease: (key, lease, ttlMs) =>
+  Effect.flatMap(Clock.currentTimeMillis, (now) =>
+    modify((state) =>
+      state.leases[key]?.lease === lease
+        ? [{ ...state, leases: { ...state.leases, [key]: { lease, expiresAt: now + ttlMs } } }, undefined]
+        : [state, undefined],
+    ),
+  ),
+
 releaseLease: (key, lease) =>
   modify((state) =>
     state.leases[key]?.lease === lease
@@ -54,9 +63,9 @@ releaseLease: (key, lease) =>
   ),
 ```
 
-Read the clock through Effect's `Clock`, not `Date.now()`, so tests can drive time.
+Read the clock through Effect's `Clock`, not `Date.now()`, so tests can drive time. The package renews a lease for as long as its holder works, however long a mint takes to answer, so the TTL only bounds how long a holder that died (a killed process) keeps the key.
 
-In a browser, `localStorage` has neither a compare-and-swap nor a locked read-modify-write: another tab can read a key before your write reaches it, so writing a lease record and re-reading it lets two tabs both win. Hold each lease as a Web Lock instead: `navigator.locks.request(name, { ifAvailable: true }, callback)` grants it to one context of the origin, a `null` lock means it is held, and the callback's promise keeps it until `releaseLease` or the TTL settles it. A closed tab frees its locks. Resolve `releaseLease` only once the lock request settles, so the next claim sees the lease free.
+In a browser, `localStorage` has neither a compare-and-swap nor a locked read-modify-write: another tab can read a key before your write reaches it, so writing a lease record and re-reading it lets two tabs both win. Hold each lease as a Web Lock instead: `navigator.locks.request(name, { ifAvailable: true }, callback)` grants it to one context of the origin, a `null` lock means it is held, and the callback's promise keeps it until `releaseLease` settles it. A closed tab frees its locks, so a Web Lock lease can ignore the TTL and make `renewLease` a no-op. Resolve `releaseLease` only once the lock request settles, so the next claim sees the lease free.
 
 ## `ProofStore`
 

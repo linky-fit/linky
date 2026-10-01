@@ -79,18 +79,21 @@ describe.each([
     expect(await run(store.listKeys(""))).toHaveLength(0);
   });
 
-  it("holds a lease for its ttl and frees it on expiry", async () => {
+  it("keeps a renewed lease from another tab past its first ttl", async () => {
     vi.useFakeTimers();
-    const store = makeLocalStorageKeyValueStore(makeLocks());
+    const locks = makeLocks();
+    const [holder, other] = [
+      makeLocalStorageKeyValueStore(locks),
+      makeLocalStorageKeyValueStore(locks),
+    ];
 
-    const first = await run(store.tryAcquireLease("linkshu.lock", 60_000));
-    expect(first).not.toBeNull();
-    expect(await run(store.tryAcquireLease("linkshu.lock", 60_000))).toBeNull();
+    const lease = await run(holder.tryAcquireLease("linkshu.lock", 1_000));
+    if (lease === null) throw new Error("lease not acquired");
+    await vi.advanceTimersByTimeAsync(800);
+    await run(holder.renewLease("linkshu.lock", lease, 1_000));
+    await vi.advanceTimersByTimeAsync(800);
 
-    await vi.advanceTimersByTimeAsync(60_001);
-    const second = await run(store.tryAcquireLease("linkshu.lock", 60_000));
-    expect(second).not.toBeNull();
-    expect(second).not.toBe(first);
+    expect(await run(other.tryAcquireLease("linkshu.lock", 1_000))).toBeNull();
   });
 
   it("releases only when the caller holds the live lease", async () => {
@@ -121,8 +124,43 @@ describe.each([
   });
 });
 
-describe("leases over refused Web Locks", () => {
-  it("reports the key as held instead of waiting forever", async () => {
+describe("leases over the localStorage fallback", () => {
+  it("frees a lease nobody renews once its ttl passes", async () => {
+    vi.useFakeTimers();
+    const store = makeLocalStorageKeyValueStore(null);
+
+    const first = await run(store.tryAcquireLease("linkshu.lock", 1_000));
+    expect(first).not.toBeNull();
+    expect(await run(store.tryAcquireLease("linkshu.lock", 1_000))).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(1_001);
+    const second = await run(store.tryAcquireLease("linkshu.lock", 1_000));
+    expect(second).not.toBeNull();
+    expect(second).not.toBe(first);
+  });
+});
+
+describe("leases over Web Locks", () => {
+  it("holds a lease past its ttl until the holder releases it", async () => {
+    vi.useFakeTimers();
+    const locks = fakeWebLocks();
+    const [holder, other] = [
+      makeLocalStorageKeyValueStore(locks),
+      makeLocalStorageKeyValueStore(locks),
+    ];
+
+    const lease = await run(holder.tryAcquireLease("linkshu.lock", 1_000));
+    if (lease === null) throw new Error("lease not acquired");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await run(other.tryAcquireLease("linkshu.lock", 1_000))).toBeNull();
+
+    await run(holder.releaseLease("linkshu.lock", lease));
+    expect(
+      await run(other.tryAcquireLease("linkshu.lock", 1_000)),
+    ).not.toBeNull();
+  });
+
+  it("reports the key as held when the browser refuses the request", async () => {
     const store = makeLocalStorageKeyValueStore({
       request: () =>
         Promise.reject(

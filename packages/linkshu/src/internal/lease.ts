@@ -1,4 +1,4 @@
-import { Data, Effect, Schedule } from "effect";
+import { Data, Duration, Effect, Schedule } from "effect";
 import type { KeyValueStoreService, LeaseId } from "../ports/KeyValueStore";
 
 /** Internal; the counter vertical maps it to the public `CounterLockTimeout`. */
@@ -29,24 +29,39 @@ const acquireLease = (
     Effect.retry(Schedule.spaced(pollMs).pipe(Schedule.upTo(acquireTimeoutMs))),
   );
 
+const keepRenewed = (
+  kv: KeyValueStoreService,
+  key: string,
+  lease: LeaseId,
+  ttlMs: number,
+): Effect.Effect<never> =>
+  kv
+    .renewLease(key, lease, ttlMs)
+    .pipe(Effect.delay(Duration.millis(ttlMs / 3)), Effect.forever);
+
 /**
- * Mutual exclusion on a `KeyValueStore` key, built on the port's two lease
- * primitives (retries, timeouts, and release-on-exit are package semantics).
- * The lease is always released — on success, failure, and interrupt.
+ * Mutual exclusion on a `KeyValueStore` key, built on the port's lease
+ * primitives (retries, timeouts, renewal, and release-on-exit are package
+ * semantics). The lease is renewed every third of its TTL while `effect`
+ * runs, so it never lapses under a running holder however long the holder
+ * takes, and outlives a holder that died by at most the TTL. It is always
+ * released — on success, failure, and interrupt.
  */
 export const withKeyLease =
   (kv: KeyValueStoreService, key: string, options?: KeyLeaseOptions) =>
   <A, E, R>(
     effect: Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | LeaseLockTimeout, R> =>
-    Effect.acquireUseRelease(
+  ): Effect.Effect<A, E | LeaseLockTimeout, R> => {
+    const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
+    return Effect.acquireUseRelease(
       acquireLease(
         kv,
         key,
-        options?.ttlMs ?? DEFAULT_TTL_MS,
+        ttlMs,
         options?.acquireTimeoutMs ?? DEFAULT_ACQUIRE_TIMEOUT_MS,
         options?.pollMs ?? DEFAULT_POLL_MS,
       ),
-      () => effect,
+      (lease) => Effect.raceFirst(effect, keepRenewed(kv, key, lease, ttlMs)),
       (lease) => kv.releaseLease(key, lease),
     );
+  };

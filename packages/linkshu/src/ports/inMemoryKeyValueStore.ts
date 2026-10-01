@@ -32,6 +32,12 @@ export const makeInMemoryKeyValueStore = (): KeyValueStoreService => {
         leases.set(key, { lease, expiresAt: now + ttlMs });
         return lease;
       }),
+    renewLease: (key, lease, ttlMs) =>
+      Effect.map(Clock.currentTimeMillis, (now) => {
+        if (leases.get(key)?.lease === lease) {
+          leases.set(key, { lease, expiresAt: now + ttlMs });
+        }
+      }),
     releaseLease: (key, lease) =>
       Effect.sync(() => {
         if (leases.get(key)?.lease === lease) leases.delete(key);

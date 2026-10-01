@@ -3,11 +3,12 @@
  *
  * The lease guards the deterministic counters and a mint's receives across
  * tabs. Both tabs claim the same key at the same instant, many times over;
- * exactly one may win each round.
+ * exactly one may win each round. A held lease stays held past its TTL until
+ * its holder releases it, however long the holder works.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 
 declare global {
@@ -33,17 +34,42 @@ const claimAt = (page: Page, key: string, at: number) =>
     { key, at },
   );
 
-test("two tabs racing for one wallet lease never both hold it", async ({
-  browser,
-}) => {
+const openTabs = async (browser: Browser) => {
   const context = await browser.newContext({ serviceWorkers: "block" });
-  const tabs = [await context.newPage(), await context.newPage()];
+  const tabs: [Page, Page] = [await context.newPage(), await context.newPage()];
   for (const tab of tabs) {
     await tab.goto("/");
     await expect
       .poll(() => tab.evaluate(() => window.__linkyE2E !== undefined))
       .toBe(true);
   }
+  return { context, tabs };
+};
+
+const claim = (page: Page, key: string, ttlMs: number) =>
+  page.evaluate(
+    ({ key, ttlMs }) => {
+      const hooks = window.__linkyE2E;
+      if (!hooks) throw new Error("test hooks missing");
+      return hooks.tryAcquireLease(key, ttlMs);
+    },
+    { key, ttlMs },
+  );
+
+const release = (page: Page, key: string, lease: string) =>
+  page.evaluate(
+    ({ key, lease }) => {
+      const hooks = window.__linkyE2E;
+      if (!hooks) throw new Error("test hooks missing");
+      return hooks.releaseLease(key, lease);
+    },
+    { key, lease },
+  );
+
+test("two tabs racing for one wallet lease never both hold it", async ({
+  browser,
+}) => {
+  const { context, tabs } = await openTabs(browser);
 
   const doubleClaims: number[] = [];
   for (let round = 0; round < ROUNDS; round += 1) {
@@ -55,6 +81,26 @@ test("two tabs racing for one wallet lease never both hold it", async ({
     if (winners > 1) doubleClaims.push(round);
   }
   expect(doubleClaims, "rounds both tabs won").toEqual([]);
+
+  await context.close();
+});
+
+test("a tab keeps a wallet lease past its TTL until it releases it", async ({
+  browser,
+}) => {
+  const {
+    context,
+    tabs: [holder, other],
+  } = await openTabs(browser);
+  const key = "linkshu.e2e.held";
+
+  const lease = await claim(holder, key, 200);
+  if (lease === null) throw new Error("lease not acquired");
+  await holder.waitForTimeout(1_000);
+  expect(await claim(other, key, 200)).toBeNull();
+
+  await release(holder, key, lease);
+  expect(await claim(other, key, 200)).not.toBeNull();
 
   await context.close();
 });

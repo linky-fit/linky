@@ -75,6 +75,7 @@ const stubKv = (entries: Record<string, string>): Layer.Layer<KeyValueStore> =>
         Object.keys(entries).filter((key) => key.startsWith(prefix)),
       ),
     tryAcquireLease: () => Effect.die("not under test"),
+    renewLease: () => Effect.die("not under test"),
     releaseLease: () => Effect.die("not under test"),
   });
 
@@ -95,6 +96,7 @@ const recordingKv = (entries: Record<string, string>) => {
     listKeys: (prefix) =>
       Effect.succeed([...store.keys()].filter((key) => key.startsWith(prefix))),
     tryAcquireLease: () => Effect.die("not under test"),
+    renewLease: () => Effect.die("not under test"),
     releaseLease: () => Effect.die("not under test"),
   });
   return { layer, store, removed };

@@ -42,6 +42,7 @@ const stubKv = (sets: Array<[string, string]>): KeyValueStoreService => ({
   remove: () => Effect.die("not under test"),
   listKeys: () => Effect.die("not under test"),
   tryAcquireLease: () => Effect.die("not under test"),
+  renewLease: () => Effect.die("not under test"),
   releaseLease: () => Effect.die("not under test"),
 });
 

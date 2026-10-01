@@ -59,6 +59,14 @@ export const walletStorage = (prefix: string) => {
     const raw = localStorage.getItem(`${prefix}.lease.${key}`);
     return raw === null ? null : Schema.decodeUnknownSync(LeaseJson)(raw);
   };
+  const writeLease = (key: string, lease: LeaseId, ttlMs: number) =>
+    localStorage.setItem(
+      `${prefix}.lease.${key}`,
+      Schema.encodeSync(LeaseJson)({
+        lease,
+        expiresAtMs: Date.now() + ttlMs,
+      }),
+    );
   return {
     bip39Seed: Bip39Seed.make(Uint8Array.from(seed)),
     proofStore: Layer.succeed(ProofStore, {
@@ -128,14 +136,12 @@ export const walletStorage = (prefix: string) => {
         Effect.sync(() => {
           if ((readLease(key)?.expiresAtMs ?? 0) > Date.now()) return null;
           const lease = LeaseId.make(crypto.randomUUID());
-          localStorage.setItem(
-            `${prefix}.lease.${key}`,
-            Schema.encodeSync(LeaseJson)({
-              lease,
-              expiresAtMs: Date.now() + ttlMs,
-            }),
-          );
+          writeLease(key, lease, ttlMs);
           return readLease(key)?.lease === lease ? lease : null;
+        }),
+      renewLease: (key, lease, ttlMs) =>
+        Effect.sync(() => {
+          if (readLease(key)?.lease === lease) writeLease(key, lease, ttlMs);
         }),
       releaseLease: (key, lease) =>
         Effect.sync(() => {

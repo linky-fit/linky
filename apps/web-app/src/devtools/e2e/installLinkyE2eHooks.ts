@@ -10,6 +10,7 @@ import {
   type LinkyScope,
   type LinkyTable,
 } from "@linky-fit/linksync";
+import { LeaseId } from "@linky-fit/linkshu";
 import { createEvoluShardDb } from "@linky-fit/linksync/evolu";
 import { Effect } from "effect";
 import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
@@ -64,6 +65,7 @@ export interface LinkyE2eHooks {
     key: string,
     ttlMs: number,
   ) => Promise<string | null>;
+  readonly releaseLease: (key: string, lease: string) => Promise<void>;
 }
 
 declare global {
@@ -166,5 +168,7 @@ export const installLinkyE2eHooks = (): void => {
     activeNostrIdentityId,
     tryAcquireLease: (key, ttlMs) =>
       Effect.runPromise(walletStore.tryAcquireLease(key, ttlMs)),
+    releaseLease: (key, lease) =>
+      Effect.runPromise(walletStore.releaseLease(key, LeaseId.make(lease))),
   };
 };

@@ -23,7 +23,7 @@ The in-memory layers give every runtime an empty wallet, so keep the store insta
 
 ## Adapters are tested against the port contract
 
-Not against wallet flows. Cover durability across a reopen, lease ownership (one winner when several race a key, expired leases claimable, a foreign `LeaseId` cannot release), immediate read-after-write visibility in `loadAll`, and the id derivation (inserting a stored secret or operation key lands on the same row). A multi-process lock race is worth a test of its own when your storage is shared between processes.
+Not against wallet flows. Cover durability across a reopen, lease ownership (one winner when several race a key, expired leases claimable, a renewed lease held past its first TTL, a foreign `LeaseId` cannot renew or release), immediate read-after-write visibility in `loadAll`, and the id derivation (inserting a stored secret or operation key lands on the same row). A multi-process lock race is worth a test of its own when your storage is shared between processes.
 
 ## Real flows need a real mint
 

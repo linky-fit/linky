@@ -69,6 +69,24 @@ export const makeFileKeyValueStore = (
         }),
       ),
 
+    renewLease: (key, lease, ttlMs) =>
+      Effect.flatMap(Clock.currentTimeMillis, (now) =>
+        file.modify((state) =>
+          state.leases[key]?.lease === lease
+            ? [
+                {
+                  ...state,
+                  leases: {
+                    ...state.leases,
+                    [key]: { lease, expiresAt: now + ttlMs },
+                  },
+                },
+                undefined,
+              ]
+            : [state, undefined],
+        ),
+      ),
+
     releaseLease: (key, lease) =>
       file.modify((state) =>
         state.leases[key]?.lease === lease

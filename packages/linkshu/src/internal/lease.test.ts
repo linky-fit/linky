@@ -1,4 +1,4 @@
-import { Effect, Exit } from "effect";
+import { Deferred, Effect, Exit, Fiber, TestClock, TestContext } from "effect";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
@@ -32,6 +32,31 @@ describe("withKeyLease", () => {
       }),
     );
     expect(final).toBe("25");
+  });
+
+  it("keeps a second holder out while the first works past the lease's ttl", async () => {
+    const { pastTtl, released } = await Effect.runPromise(
+      withStore((kv) =>
+        Effect.gen(function* () {
+          const entered = yield* Deferred.make<void>();
+          const finish = yield* Deferred.make<void>();
+          const holder = yield* Deferred.succeed(entered, undefined).pipe(
+            Effect.andThen(Deferred.await(finish)),
+            withKeyLease(kv, "k", { ttlMs: 1_000 }),
+            Effect.fork,
+          );
+          yield* Deferred.await(entered);
+          yield* TestClock.adjust("1500 millis");
+          const pastTtl = yield* kv.tryAcquireLease("k", 1_000);
+          yield* Deferred.succeed(finish, undefined);
+          yield* Fiber.join(holder);
+          const released = yield* kv.tryAcquireLease("k", 1_000);
+          return { pastTtl, released };
+        }).pipe(Effect.provide(TestContext.TestContext)),
+      ),
+    );
+    expect(pastTtl).toBeNull();
+    expect(released).not.toBeNull();
   });
 
   it("fails with LeaseLockTimeout when the lock stays held past the acquire deadline", async () => {

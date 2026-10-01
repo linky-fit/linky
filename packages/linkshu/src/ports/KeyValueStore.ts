@@ -12,14 +12,17 @@ export type LeaseId = typeof LeaseId.Type;
  * Plain get/set is not enough: deterministic counters must be advanced under
  * mutual exclusion across every context sharing the storage (browser tabs, a
  * service worker, CLI processes), or two concurrent operations derive the
- * same outputs and collide at the mint. The port stays dumb on purpose — two
- * lease primitives, no policy: acquisition retries, queueing, and timeouts
- * are package semantics built on top, identical on every platform.
+ * same outputs and collide at the mint. The port stays dumb on purpose —
+ * three lease primitives, no policy: acquisition retries, renewal, queueing,
+ * and timeouts are package semantics built on top, identical on every
+ * platform.
  *
- * `tryAcquireLease` atomically claims `key` for `ttlMs` milliseconds and
- * returns a lease id, or `null` when a live lease is already held. Expired
- * leases are claimable. `releaseLease` is a no-op unless the lease is still
- * the live one.
+ * `tryAcquireLease` atomically claims `key` and returns a lease id, or
+ * `null` when a live lease is already held. A lease lives until
+ * `releaseLease`, or until `ttlMs` passes without a `renewLease`; then it is
+ * claimable. A store whose leases end with their holder (a Web Lock ends
+ * with its tab) may keep one until release instead. `renewLease` and
+ * `releaseLease` are no-ops unless the lease is still the live one.
  *
  * Keys are namespaced by the package (`linkshu.` prefix); values never
  * contain seed material.
@@ -34,6 +37,12 @@ export interface KeyValueStoreService {
     key: string,
     ttlMs: number,
   ) => Effect.Effect<LeaseId | null>;
+  /** Extends a live lease to `ttlMs` from now. */
+  readonly renewLease: (
+    key: string,
+    lease: LeaseId,
+    ttlMs: number,
+  ) => Effect.Effect<void>;
   readonly releaseLease: (key: string, lease: LeaseId) => Effect.Effect<void>;
 }
 

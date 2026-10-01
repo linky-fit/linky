@@ -1,6 +1,6 @@
 import type { Proof } from "@cashu/cashu-ts";
 import { getEncodedToken, Keyset, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
 import {
   CurrencyUnit,
   KeysetId,
@@ -24,6 +24,7 @@ import {
   proof,
 } from "../testing/fakeWallet";
 import type { ProofStateName } from "../testing/fakeWallet";
+import { runOnTestClock } from "../testing/clock";
 import { recordingInspector } from "../testing/inspector";
 import { secretsOf, seedProofs, seedTransfer } from "../testing/inventory";
 import { parseTokenText } from "../token/codec";
@@ -586,6 +587,56 @@ describe("Receive.receive", () => {
     expect(exit.value.receipt.left._tag).toBe("MintRejected");
     expect(receiveCounters).toHaveLength(5);
     expect(exit.value.operations[0]?.status).toBe("failed");
+  });
+
+  it("keeps a second receive of the text out while a slow swap outlasts the counter lease", async () => {
+    let spent = false;
+    let answerFirstSwap = () => {};
+    const firstSwapAnswered = new Promise<void>((resolve) => {
+      answerFirstSwap = resolve;
+    });
+    const { wallet, receiveCounters } = makeWallet({
+      receive: async () => {
+        if (receiveCounters.length === 1) await firstSwapAnswered;
+        if (spent) throw new MintOperationError(11001, "Token already spent.");
+        spent = true;
+        return receivedProofs;
+      },
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(1_700_000_000_000);
+        const receipts = yield* runOnTestClock(
+          Effect.all(
+            [
+              Effect.either(receiveText(sourceToken)),
+              Effect.delay(
+                Effect.either(receiveText(sourceToken)),
+                "16 seconds",
+              ),
+              Effect.delay(Effect.sync(answerFirstSwap), "17 seconds"),
+            ],
+            { concurrency: "unbounded" },
+          ),
+          "1 second",
+        );
+        return { receipts, ...(yield* inventory) };
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    const {
+      receipts: [first, second],
+      operations,
+    } = exit.value;
+    expect(first._tag).toBe("Right");
+    assert(second._tag === "Left");
+    expect(second.left._tag).toBe("TokenAlreadyKnown");
+    expect(receiveCounters).toHaveLength(1);
+    expect(operations).toEqual([
+      expect.objectContaining({ kind: "receive", status: "done" }),
+    ]);
   });
 });
 

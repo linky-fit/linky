@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Effect } from "effect";
+import { Effect, TestClock, TestContext } from "effect";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -113,6 +113,23 @@ describe("fileKeyValueStore leases", () => {
     expect(
       await Effect.runPromise(store.tryAcquireLease("counter", 5_000)),
     ).not.toBeNull();
+  });
+
+  it("keeps a renewed lease from another process past its first ttl", async () => {
+    const { open } = wallet();
+    const reacquired = await Effect.runPromise(
+      Effect.gen(function* () {
+        const lease = yield* open().tryAcquireLease("counter", 1_000);
+        if (lease === null)
+          throw new Error("expected the first acquisition to win");
+        yield* TestClock.adjust("800 millis");
+        yield* open().renewLease("counter", lease, 1_000);
+        yield* TestClock.adjust("800 millis");
+        return yield* open().tryAcquireLease("counter", 1_000);
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+
+    expect(reacquired).toBeNull();
   });
 
   it("keeps values and leases in the same file", async () => {
