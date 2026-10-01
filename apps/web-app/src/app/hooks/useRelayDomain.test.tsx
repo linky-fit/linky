@@ -38,7 +38,6 @@ const custom = "wss://custom.example.com";
 const inbox = "wss://inbox.example.com";
 const retired = "wss://retired.example.com";
 const recommended = [
-  "wss://relay.damus.io",
   "wss://nos.lol",
   "wss://nostr.linky.fit",
   "wss://nostr.eu.freedomrelay.dev",
