@@ -1614,7 +1614,9 @@ export const useCashuWalletComposition = ({
         mint: mintUrl,
       });
       if (Result.isFailure(started)) {
-        setStatus(`${t("errorPrefix")}: ${started.failure}`);
+        setStatus(
+          `${t("errorPrefix")}: ${getUnknownErrorMessage(started.failure, "unknown")}`,
+        );
         return;
       }
       await redeemLnurlWithdraw({
@@ -1904,7 +1906,9 @@ export const useCashuWalletComposition = ({
           return false;
         }
       } catch (error) {
-        setStatus(`${t("errorPrefix")}: ${String(error)}`);
+        setStatus(
+          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
+        );
         return false;
       }
       return true;

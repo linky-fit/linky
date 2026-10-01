@@ -9,6 +9,7 @@ import type {
   CheckCashuTransfer,
 } from "../composition/useLinkshuComposition";
 import type { Translate } from "../../../i18n";
+import { getUnknownErrorMessage } from "../../../utils/unknown";
 
 interface UseCashuTokenChecksParams {
   cashuBulkCheckIsBusy: boolean;
@@ -59,7 +60,9 @@ export const useCashuTokenChecks = ({
           return;
         }
       } catch (error) {
-        setStatus(`${t("errorPrefix")}: ${String(error)}`);
+        setStatus(
+          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
+        );
         return;
       }
       setStatus(t("cashuDeleted"));

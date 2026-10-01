@@ -764,12 +764,11 @@ const bootstrap = async () => {
     window.clearTimeout(stuckTimer);
     console.error(`Boot failed at stage ${stage}:`, error);
     if (await recoverFromLocalDynamicImportFetch(stage, error)) return;
+    const message = `[stage: ${stage}] ${getUnknownErrorMessage(error, "unknown")}`;
     const wrapped =
       error instanceof Error
-        ? Object.assign(error, {
-            message: `[stage: ${stage}] ${error.message}`,
-          })
-        : new Error(`[stage: ${stage}] ${String(error)}`);
+        ? Object.assign(error, { message })
+        : new Error(message);
     renderBootError(wrapped, "bootstrap-catch");
   }
 };
