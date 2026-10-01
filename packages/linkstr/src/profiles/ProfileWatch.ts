@@ -1,5 +1,14 @@
-import { Duration, Effect, Either, Option, Queue, Stream } from "effect";
-import type { Scope } from "effect";
+import {
+  Context,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Queue,
+  Result,
+  Stream,
+} from "effect";
+import type { Cause, Scope } from "effect";
 import type { Filter } from "nostr-tools";
 import { NoReadRelaysConfigured } from "../domain/errors";
 import type { Pubkey, RelayUrl } from "../domain/primitives";
@@ -9,6 +18,7 @@ import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { firstTagValue } from "../internal/nostrEvent";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
 import { resubscribeForever } from "../internal/resubscribe";
+import { acquireStreamQueue } from "../internal/streamQueue";
 import { nowSeconds } from "../internal/time";
 import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
@@ -40,10 +50,10 @@ const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
  * set means closing the scope and calling it again (the react boundary does
  * exactly that).
  */
-export class ProfileWatch extends Effect.Service<ProfileWatch>()(
+export class ProfileWatch extends Context.Service<ProfileWatch>()(
   "linkstr/ProfileWatch",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const transport = yield* NostrTransport;
       const relayPolicy = yield* RelayPolicy;
       const inspector = yield* Inspector.orNoop;
@@ -65,15 +75,14 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
 
           const watched = new Set<Pubkey>(pubkeys);
           const filters = profileFilters([...watched]);
-          const rawEvents = yield* Effect.acquireRelease(
-            Queue.unbounded<unknown>(),
-            Queue.shutdown,
+          const rawEvents = yield* acquireStreamQueue(
+            Queue.unbounded<unknown, Cause.Done>(),
           );
 
           const keepSubscribed = (relay: RelayUrl, filter: Filter) =>
             resubscribeForever(
               transport.subscribe(relay, filter, (event) => {
-                Queue.unsafeOffer(rawEvents, event);
+                Queue.offerUnsafe(rawEvents, event);
               }),
               resubscribeDelay,
             );
@@ -92,34 +101,34 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
           const route = (
             event: SignedPlainEvent,
           ): Effect.Effect<
-            Either.Either<ProfileWatchEvent, ProfileDropReason>
+            Result.Result<ProfileWatchEvent, ProfileDropReason>
           > =>
             Effect.gen(function* () {
               if (!watched.has(event.pubkey)) {
-                return Either.left("unwatched-author");
+                return Result.fail("unwatched-author");
               }
               switch (event.kind) {
                 case PROFILE_KIND:
                   return isStale(event)
-                    ? Either.left("stale")
+                    ? Result.fail("stale")
                     : decodeProfileEvent(event);
                 case STATUS_KIND: {
                   if (firstTagValue(event.tags, "d") !== STATUS_D_GENERAL) {
-                    return Either.left("other-d-tag");
+                    return Result.fail("other-d-tag");
                   }
-                  if (isStale(event)) return Either.left("stale");
+                  if (isStale(event)) return Result.fail("stale");
                   return decodeStatusEvent(event, yield* nowSeconds);
                 }
                 default:
-                  return Either.left("unsupported-kind");
+                  return Result.fail("unsupported-kind");
               }
             });
 
           const processRaw = (
             raw: unknown,
           ): Effect.Effect<Option.Option<ProfileWatchEvent>> =>
-            Either.match(decodeVerifiedPlainEvent(raw), {
-              onLeft: (reason) =>
+            Result.match(decodeVerifiedPlainEvent(raw), {
+              onFailure: (reason) =>
                 Effect.sync(() => {
                   inspector.emit(
                     () =>
@@ -132,15 +141,15 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
                             reason,
                           }),
                         },
-                        { disableValidation: true },
+                        { disableChecks: true },
                       ),
                   );
                   return Option.none<ProfileWatchEvent>();
                 }),
-              onRight: (event) =>
+              onSuccess: (event) =>
                 Effect.map(route(event), (routed) =>
-                  Either.match(routed, {
-                    onLeft: (reason) => {
+                  Result.match(routed, {
+                    onFailure: (reason) => {
                       inspector.emit(
                         () =>
                           new ProfileWatchRouted(
@@ -152,12 +161,12 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
                                 reason,
                               }),
                             },
-                            { disableValidation: true },
+                            { disableChecks: true },
                           ),
                       );
                       return Option.none<ProfileWatchEvent>();
                     },
-                    onRight: (fact) => {
+                    onSuccess: (fact) => {
                       newestSeen.set(
                         `${event.pubkey}:${event.kind}`,
                         event.created_at,
@@ -170,7 +179,7 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
                               kind: event.kind,
                               event: fact,
                             },
-                            { disableValidation: true },
+                            { disableChecks: true },
                           ),
                       );
                       return Option.some(fact);
@@ -181,11 +190,14 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
 
           return Stream.fromQueue(rawEvents).pipe(
             Stream.mapEffect(processRaw),
-            Stream.filterMap((event) => event),
+            Stream.filter(Option.isSome),
+            Stream.map(({ value }) => value),
           );
         });
 
       return { watch } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

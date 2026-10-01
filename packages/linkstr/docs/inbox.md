@@ -18,9 +18,7 @@ const consume = Effect.scoped(
       since: UnixSeconds.make(Math.floor(Date.now() / 1000) - LOOKBACK_SECONDS),
     });
     yield* Stream.runForEach(feed.events, ({ delivery, event, ack }) =>
-      Effect.sync(() => console.log(delivery, event)).pipe(
-        Effect.zipRight(ack),
-      ),
+      Effect.sync(() => console.log(delivery, event)).pipe(Effect.andThen(ack)),
     );
   }),
 );
@@ -122,7 +120,7 @@ const decodePushed = (wrapId: WrapId) =>
     { secretKey, readRelays },
     Effect.flatMap(WrapInbox, (inbox) =>
       inbox.fetchWrapEvent(wrapId, { timeout: "8 seconds" }),
-    ).pipe(Effect.catchAll(() => Effect.succeed(null))),
+    ).pipe(Effect.catch(() => Effect.succeed(null))),
   );
 ```
 

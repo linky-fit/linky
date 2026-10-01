@@ -29,7 +29,7 @@
     "@linky-fit/linkstr": "workspace:*",
     "@linky-fit/proxy-payment": "workspace:*",
     "@linky-fit/ui": "workspace:*",
-    "effect": "^3.19.19",
+    "effect": "^4.0.0",
     "@noble/hashes": "^2.0.1",
     "nostr-tools": "^2.25.2"
   },

@@ -1,4 +1,4 @@
-import { Atom } from "@effect-atom/atom-react";
+import { Atom } from "effect/reactivity";
 import type {
   InboxCursorStore,
   NostrSecretKey,

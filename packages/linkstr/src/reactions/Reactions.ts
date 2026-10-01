@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { NoRelayReachable, RecipientNotReached } from "../domain/errors";
 import { makeWrapSendContext, sendToPeer } from "../internal/wrapSend";
 import { encodeReactionRumor, encodeRetractionRumor } from "./codec";
@@ -9,10 +9,10 @@ import {
   type RetractionDraft,
 } from "./domain";
 
-export class Reactions extends Effect.Service<Reactions>()(
+export class Reactions extends Context.Service<Reactions>()(
   "linkstr/Reactions",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const context = yield* makeWrapSendContext;
 
       const react = (
@@ -40,4 +40,6 @@ export class Reactions extends Effect.Service<Reactions>()(
       return { react, retract } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

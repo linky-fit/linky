@@ -101,7 +101,7 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 - Pairing is `insert`. Pairing an origin again after `remove`, or again after a rebrand, overwrites its row; write `privateFeedsJson` as `null` when the new pairing has no private feed, so the earlier pairing's feeds do not come back.
 - Changing channels, private feeds or the acknowledged identity is `update`, and only a user action changes them. A refresh writes back only `trustJson`, and only trust it has just verified from the network.
 
-The JSON columns hold the Keryx protocol package's Schemas, encoded with `Schema.parseJson`: `trustJson` a `CompanyTrust`, `identityJson` the acknowledged `CompanyIdentity`, `channelsJson` the subscribed public channel names and `privateFeedsJson` the private feeds' capability URLs. A feed's sync state (version, closed) is per device and not stored here, so a device refreshing from an old copy of the row cannot drop a feed another device added. This package stores the columns as given; decoding and verification belong to the Keryx package. `privateFeedsJson` holds capability URLs; keep it out of logs.
+The JSON columns hold the Keryx protocol package's Schemas, encoded with `Schema.fromJsonString`: `trustJson` a `CompanyTrust`, `identityJson` the acknowledged `CompanyIdentity`, `channelsJson` the subscribed public channel names and `privateFeedsJson` the private feeds' capability URLs. A feed's sync state (version, closed) is per device and not stored here, so a device refreshing from an old copy of the row cannot drop a feed another device added. This package stores the columns as given; decoding and verification belong to the Keryx package. `privateFeedsJson` holds capability URLs; keep it out of logs.
 
 ## Identity
 

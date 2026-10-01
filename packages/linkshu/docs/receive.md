@@ -22,7 +22,7 @@ const receiveText = (
   );
 ```
 
-The receipt's `tokenText` is the re-signed encoding of the proofs now in the wallet, never the input text. A failure rejects the promise with a `ReceiveError`; wrap the effect in `Effect.either` to get it as a value.
+The receipt's `tokenText` is the re-signed encoding of the proofs now in the wallet, never the input text. A failure rejects the promise with a `ReceiveError`; wrap the effect in `Effect.result` to get it as a value.
 
 Set `automatic: true` on the draft when nobody asked for this receive, such as a token in a message replayed on a device. An automatic receive treats a text whose deferred receive is closed (received, discarded with `Tokens.forget`, or failed) as `TokenAlreadyKnown` and writes nothing, so a token given up on one device stays given up on every device that has synced it. It still resumes an unfinished receive of the text. A receive the user starts takes the text in again ([deferred receives](#deferred-receives)).
 

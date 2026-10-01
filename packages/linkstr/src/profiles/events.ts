@@ -27,10 +27,10 @@ export class StatusUpdated extends Schema.TaggedClass<StatusUpdated>()(
   },
 ) {}
 
-export const ProfileWatchEvent = Schema.Union(ProfileUpdated, StatusUpdated);
+export const ProfileWatchEvent = Schema.Union([ProfileUpdated, StatusUpdated]);
 export type ProfileWatchEvent = typeof ProfileWatchEvent.Type;
 
-export const ProfileDropReason = Schema.Literal(
+export const ProfileDropReason = Schema.Literals([
   "malformed-event",
   "invalid-signature",
   "unwatched-author",
@@ -39,7 +39,7 @@ export const ProfileDropReason = Schema.Literal(
   "other-d-tag",
   "expired",
   "stale",
-);
+]);
 export type ProfileDropReason = typeof ProfileDropReason.Type;
 
 /**

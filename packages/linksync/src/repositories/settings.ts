@@ -29,7 +29,7 @@ type SettingTable = TableRepository<LinkyDbSchema["setting"]>;
 export const readSetting = <A, I extends string>(
   table: SettingTable,
   id: SettingId,
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Codec<A, I>,
 ): Effect.Effect<A | null> =>
   Effect.map(table.byId(id), (row) =>
     row?.value == null
@@ -41,7 +41,7 @@ export const writeSetting = <A, I extends string>(
   table: SettingTable,
   id: SettingId,
   key: string,
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Codec<A, I>,
   value: A,
 ): Effect.Effect<void, ShardDbError> =>
   Effect.flatMap(table.byId(id), (existing) => {

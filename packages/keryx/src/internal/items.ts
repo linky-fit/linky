@@ -1,4 +1,4 @@
-import { Either, ParseResult, Schema } from "effect";
+import { Result, Schema } from "effect";
 import type { Announcement, Attachment } from "../domain";
 import { canonicalJsonBytes } from "./canonicalJson";
 import { base64UrlToBytesOrNull, isSha256Hex } from "./crypto";
@@ -13,14 +13,14 @@ const isDataUrl = (value: string): boolean =>
 
 const attachmentOf = (
   attachment: ItemFields["attachments"][number],
-): Either.Either<Attachment, string> => {
+): Result.Result<Attachment, string> => {
   if (parseKeryxUrl(attachment.url) === null) {
-    return Either.left("attachment url is not HTTPS");
+    return Result.fail("attachment url is not HTTPS");
   }
   if (attachment.sha256 !== undefined && !isSha256Hex(attachment.sha256)) {
-    return Either.left("attachment sha256 is not lowercase hex");
+    return Result.fail("attachment sha256 is not lowercase hex");
   }
-  return Either.right({
+  return Result.succeed({
     url: attachment.url,
     ...(attachment.name === undefined ? {} : { name: attachment.name }),
     ...(attachment.mime_type === undefined
@@ -35,27 +35,27 @@ const attachmentOf = (
 
 const imageOf = (
   fields: ItemFields,
-): Either.Either<Pick<Announcement, "image" | "imageSha256">, string> => {
+): Result.Result<Pick<Announcement, "image" | "imageSha256">, string> => {
   const { image, image_sha256: sha256 } = fields;
   if (image === undefined || isDataUrl(image)) {
-    return Either.right(image === undefined ? {} : { image });
+    return Result.succeed(image === undefined ? {} : { image });
   }
   if (parseKeryxUrl(image) === null) {
-    return Either.left("image is neither a data URL nor HTTPS");
+    return Result.fail("image is neither a data URL nor HTTPS");
   }
   return sha256 !== undefined && isSha256Hex(sha256)
-    ? Either.right({ image, imageSha256: sha256 })
-    : Either.left("linked image without image_sha256");
+    ? Result.succeed({ image, imageSha256: sha256 })
+    : Result.fail("linked image without image_sha256");
 };
 
 /** Item fields as an announcement, or why the item breaks the schema. */
 export const announcementOf = (
   fields: ItemFields,
   source: Pick<Announcement, "channel" | "privateFeedUrl" | "itemFile">,
-): Either.Either<Announcement, string> =>
-  Either.gen(function* () {
+): Result.Result<Announcement, string> =>
+  Result.gen(function* () {
     const image = yield* imageOf(fields);
-    const attachments = yield* Either.all(fields.attachments.map(attachmentOf));
+    const attachments = yield* Result.all(fields.attachments.map(attachmentOf));
     return {
       ...source,
       id: fields.id,
@@ -72,12 +72,12 @@ export const announcementOf = (
     };
   });
 
-export const decodeWith = <A, I>(
-  schema: Schema.Schema<A, I>,
+export const decodeWith = <A>(
+  schema: Schema.Decoder<A>,
   value: unknown,
-): Either.Either<A, string> =>
-  Schema.decodeUnknownEither(schema)(value).pipe(
-    Either.mapLeft(ParseResult.TreeFormatter.formatErrorSync),
+): Result.Result<A, string> =>
+  Schema.decodeUnknownResult(schema)(value).pipe(
+    Result.mapError((error) => error.message),
   );
 
 /**
@@ -88,23 +88,23 @@ export const checkDocumentSignatures = (
   document: Readonly<Record<string, unknown>>,
   signatures: ReadonlyArray<SignatureEntry>,
   authority: Authority,
-): Either.Either<void, string> => {
+): Result.Result<void, string> => {
   const message = canonicalJsonBytes(
     Object.fromEntries(
       Object.entries(document).filter(([key]) => key !== "sig"),
     ),
   );
-  if (message === null) return Either.left("not canonical JSON");
+  if (message === null) return Result.fail("not canonical JSON");
   const result = checkSignatures(
     authority,
     signatures,
     message,
     base64UrlToBytesOrNull,
   );
-  if (result.authorizedInvalid) return Either.left("bad signature");
+  if (result.authorizedInvalid) return Result.fail("bad signature");
   return result.valid >= authority.threshold
-    ? Either.void
-    : Either.left("signature threshold not met");
+    ? Result.void
+    : Result.fail("signature threshold not met");
 };
 
 const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
@@ -112,8 +112,8 @@ const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
 
 export const asObject = (
   value: unknown,
-): Either.Either<Readonly<Record<string, unknown>>, string> =>
-  isObject(value) ? Either.right(value) : Either.left("not a JSON object");
+): Result.Result<Readonly<Record<string, unknown>>, string> =>
+  isObject(value) ? Result.succeed(value) : Result.fail("not a JSON object");
 
 /** A downloaded channel item file, verified against the channel's item-signing authority. */
 export const verifyChannelItem = (options: {
@@ -121,14 +121,14 @@ export const verifyChannelItem = (options: {
   readonly channel: string;
   readonly id: string;
   readonly authority: Authority;
-}): Either.Either<Announcement, string> =>
-  Either.gen(function* () {
+}): Result.Result<Announcement, string> =>
+  Result.gen(function* () {
     const itemFile = decodeUtf8(options.bytes);
-    if (itemFile === null) return yield* Either.left("not UTF-8");
+    if (itemFile === null) return yield* Result.fail("not UTF-8");
     const raw = yield* asObject(parseJsonBytes(options.bytes));
     const item = yield* decodeWith(SignedItem, raw);
     if (item.id !== options.id) {
-      return yield* Either.left("id does not match the target path");
+      return yield* Result.fail("id does not match the target path");
     }
     yield* checkDocumentSignatures(raw, item.sig, options.authority);
     return yield* announcementOf(item, { channel: options.channel, itemFile });

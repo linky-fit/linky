@@ -1,4 +1,4 @@
-import { Either, Option, Schema } from "effect";
+import { Option, Result, Schema, SchemaTransformation } from "effect";
 import { isUnixSeconds } from "../domain/primitives";
 import type { UnixSeconds } from "../domain/primitives";
 import { firstTagValue } from "../internal/nostrEvent";
@@ -12,14 +12,14 @@ export const STATUS_KIND = 30315;
 export const STATUS_D_GENERAL = "general";
 
 /** Non-string wire values are dropped, not rejected: kind-0 content in the wild is sloppy. */
-const LenientString = Schema.transform(
-  Schema.Unknown,
-  Schema.UndefinedOr(Schema.String),
-  {
-    strict: true,
-    decode: (value) => (typeof value === "string" ? value : undefined),
-    encode: (value) => value,
-  },
+const LenientString = Schema.Unknown.pipe(
+  Schema.decodeTo(
+    Schema.UndefinedOr(Schema.String),
+    SchemaTransformation.transform({
+      decode: (value) => (typeof value === "string" ? value : undefined),
+      encode: (value) => value,
+    }),
+  ),
 );
 
 const wireFields = {
@@ -34,10 +34,9 @@ const wireFields = {
   about: Schema.optional(LenientString),
 };
 
-const WireProfile = Schema.Struct(
-  wireFields,
-  Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-);
+const WireProfile = Schema.StructWithRest(Schema.Struct(wireFields), [
+  Schema.Record(Schema.String, Schema.Unknown),
+]);
 
 const extraFieldsOf = (
   wire: Readonly<Record<string, unknown>>,
@@ -55,30 +54,37 @@ const nonEmpty = (value: string | undefined): string | undefined =>
  * `displayName` spelling and falls back from a missing `picture` to the
  * legacy `image`; encoding emits standard names only and omits empty fields.
  */
-const ProfileContent = Schema.parseJson(
-  Schema.transform(WireProfile, ProfileMetadata, {
-    strict: true,
-    decode: (wire) => ({
-      name: wire.name,
-      displayName: wire.display_name ?? wire.displayName,
-      picture: wire.picture ?? wire.image,
-      lud16: wire.lud16,
-      lud06: wire.lud06,
-      nip05: wire.nip05,
-      about: wire.about,
-      ...extraFieldsOf(wire),
-    }),
-    encode: (metadata) => ({
-      ...metadata.extraFields,
-      name: nonEmpty(metadata.name),
-      display_name: nonEmpty(metadata.displayName),
-      picture: nonEmpty(metadata.picture),
-      lud16: nonEmpty(metadata.lud16),
-      lud06: nonEmpty(metadata.lud06),
-      nip05: nonEmpty(metadata.nip05),
-      about: nonEmpty(metadata.about),
-    }),
-  }),
+const ProfileContent = Schema.fromJsonString(
+  WireProfile.pipe(
+    Schema.decodeTo(
+      ProfileMetadata,
+      SchemaTransformation.transform<
+        typeof ProfileMetadata.Encoded,
+        typeof WireProfile.Type
+      >({
+        decode: (wire) => ({
+          name: wire.name,
+          displayName: wire.display_name ?? wire.displayName,
+          picture: wire.picture ?? wire.image,
+          lud16: wire.lud16,
+          lud06: wire.lud06,
+          nip05: wire.nip05,
+          about: wire.about,
+          ...extraFieldsOf(wire),
+        }),
+        encode: (metadata) => ({
+          ...metadata.extraFields,
+          name: nonEmpty(metadata.name),
+          display_name: nonEmpty(metadata.displayName),
+          picture: nonEmpty(metadata.picture),
+          lud16: nonEmpty(metadata.lud16),
+          lud06: nonEmpty(metadata.lud06),
+          nip05: nonEmpty(metadata.nip05),
+          about: nonEmpty(metadata.about),
+        }),
+      }),
+    ),
+  ),
 );
 
 export const decodeProfileMetadata: (
@@ -91,11 +97,11 @@ export const encodeProfileContent: (metadata: ProfileMetadata) => string =
 
 export const decodeProfileEvent = (
   event: SignedPlainEvent,
-): Either.Either<ProfileUpdated, ProfileDropReason> =>
+): Result.Result<ProfileUpdated, ProfileDropReason> =>
   Option.match(decodeProfileMetadata(event.content), {
-    onNone: () => Either.left("malformed-profile"),
+    onNone: () => Result.fail("malformed-profile"),
     onSome: (metadata) =>
-      Either.right(
+      Result.succeed(
         new ProfileUpdated({
           pubkey: event.pubkey,
           metadata,
@@ -115,13 +121,13 @@ const expirationOf = (event: SignedPlainEvent): UnixSeconds | null => {
 export const decodeStatusEvent = (
   event: SignedPlainEvent,
   now: UnixSeconds,
-): Either.Either<StatusUpdated, ProfileDropReason> => {
+): Result.Result<StatusUpdated, ProfileDropReason> => {
   if (firstTagValue(event.tags, "d") !== STATUS_D_GENERAL) {
-    return Either.left("other-d-tag");
+    return Result.fail("other-d-tag");
   }
   const expiresAt = expirationOf(event);
-  if (expiresAt !== null && expiresAt <= now) return Either.left("expired");
-  return Either.right(
+  if (expiresAt !== null && expiresAt <= now) return Result.fail("expired");
+  return Result.succeed(
     new StatusUpdated({
       pubkey: event.pubkey,
       content: event.content,

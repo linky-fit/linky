@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import {
   CounterLockTimeout,
   InsufficientFunds,
@@ -53,9 +53,10 @@ export class MeltReceipt extends Schema.Class<MeltReceipt>("MeltReceipt")({
    * on top of `feePaid`. Zero for a melt `resumePending` settled: the swap
    * is not recorded.
    */
-  swapFee: Schema.optionalWith(NonNegativeAmount, {
-    default: () => NonNegativeAmount.make(0),
-  }),
+  swapFee: NonNegativeAmount.pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(NonNegativeAmount.make(0))),
+    Schema.withConstructorDefault(Effect.succeed(NonNegativeAmount.make(0))),
+  ),
 }) {}
 
 /**
@@ -86,12 +87,12 @@ export class MeltResumeResult extends Schema.Class<MeltResumeResult>(
    * payment in flight, record kept; `unresolved` — no usable mint answer,
    * record kept for the next pass.
    */
-  status: Schema.Literal("paid", "unpaid", "pending", "unresolved"),
+  status: Schema.Literals(["paid", "unpaid", "pending", "unresolved"]),
   /** Set only for `paid`. */
   receipt: Schema.NullOr(MeltReceipt),
 }) {}
 
-export const MeltError = Schema.Union(
+export const MeltError = Schema.Union([
   InsufficientFunds,
   MintUnreachable,
   MintRejected,
@@ -99,5 +100,5 @@ export const MeltError = Schema.Union(
   PaymentPending,
   QuoteExpired,
   CounterLockTimeout,
-);
+]);
 export type MeltError = typeof MeltError.Type;

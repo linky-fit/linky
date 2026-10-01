@@ -1,4 +1,4 @@
-import { Effect, Either, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Result } from "effect";
 import { ClientId, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { unwrapToRumor } from "../internal/giftWrap";
 import type { SignedWrapEvent } from "../internal/nostrEvent";
@@ -47,9 +47,7 @@ const runWith = <A, E>(
   );
   return Effect.runPromiseExit(
     program.pipe(
-      Effect.provide(
-        PaymentTelemetry.Default.pipe(Layer.provide(dependencies)),
-      ),
+      Effect.provide(PaymentTelemetry.layer.pipe(Layer.provide(dependencies))),
     ),
   );
 };
@@ -86,10 +84,10 @@ describe("PaymentTelemetry.publishPaymentTelemetry", () => {
     expect(hasPushMarker(firstWrap)).toBe(false);
     expect(hasPushMarker(secondWrap)).toBe(false);
 
-    const firstRumor = Either.getOrThrow(
+    const firstRumor = Result.getOrThrow(
       unwrapToRumor(firstWrap, collector.secretKey),
     );
-    const secondRumor = Either.getOrThrow(
+    const secondRumor = Result.getOrThrow(
       unwrapToRumor(secondWrap, collector.secretKey),
     );
     expect(firstRumor.pubkey).not.toBe(secondRumor.pubkey);

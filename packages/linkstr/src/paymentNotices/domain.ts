@@ -10,7 +10,7 @@ export class PaymentNoticeDraft extends Schema.Class<PaymentNoticeDraft>(
 )({
   to: Pubkey,
   context: Schema.optional(PaymentNoticeContext),
-  offerId: Schema.optional(Schema.NonEmptyTrimmedString),
+  offerId: Schema.optional(Schema.Trimmed.check(Schema.isNonEmpty())),
   clientId: Schema.optional(ClientId),
 }) {}
 

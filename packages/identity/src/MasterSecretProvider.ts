@@ -5,10 +5,10 @@ import {
   recoverMasterSecretFromSlip39Share,
 } from "./slip39";
 
-export class MasterSecretProvider extends Context.Tag("MasterSecretProvider")<
+export class MasterSecretProvider extends Context.Service<
   MasterSecretProvider,
   MasterSecret
->() {
+>()("MasterSecretProvider") {
   static fromSlip39Share(
     share: Slip39Share,
     passphrase?: Slip39Passphrase,

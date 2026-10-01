@@ -16,8 +16,9 @@ import { RelayPublishResult } from "../services/NostrTransport";
  * optional `Inspector` service is provided. `Schema.Unknown` fields carry full
  * raw values for display; nothing in the package reads them back.
  *
- * Emission sites construct these with `{ disableValidation: true }`: an
- * off-brand field is more useful in the diagnostic feed than dropped.
+ * Emission sites construct these with `{ disableChecks: true }` so an
+ * off-brand field still reaches the feed; a field of the wrong type throws,
+ * and `emit` logs and drops that event.
  */
 
 /** A vertical finished sending, e.g. `name: "reactions.react"`. */
@@ -55,7 +56,7 @@ export class PlainOperationSucceeded extends Schema.TaggedClass<PlainOperationSu
   {
     name: Schema.String,
     params: Schema.Unknown,
-    eventIds: Schema.Array(Schema.Union(EventId, WrapId)),
+    eventIds: Schema.Array(Schema.Union([EventId, WrapId])),
     result: Schema.Unknown,
   },
 ) {}

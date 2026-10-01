@@ -1,4 +1,4 @@
-import { Effect, Either, Order, Schema } from "effect";
+import { Effect, Order, Result, Schema } from "effect";
 import type {
   Announcement,
   CompanySnapshot,
@@ -25,18 +25,18 @@ import {
 import { parseKeryxUrl } from "./internal/urls";
 import { TargetsCustom } from "./internal/wire";
 
-const decodeCustom = Schema.decodeUnknownEither(TargetsCustom);
+const decodeCustom = Schema.decodeUnknownResult(TargetsCustom);
 
 const companyMetadata = (repository: Repository) =>
   decodeCustom(repository.targets.custom ?? {}).pipe(
-    Either.mapLeft(
+    Result.mapError(
       () =>
         new KeryxMetadataInvalid({
           role: "targets",
           reason: "custom.company_name is missing",
         }),
     ),
-    Either.map((custom) => ({
+    Result.map((custom) => ({
       identity: identityFromCustom(custom),
       catalog: catalogOf(repository.targets, custom.channels ?? {}),
       patterns: authorizedPatterns(custom),
@@ -77,7 +77,9 @@ export const pairCompany = (options: {
       now: options.now,
       root: walk.root,
     });
-    const { identity, catalog, patterns } = yield* companyMetadata(repository);
+    const { identity, catalog, patterns } = yield* Effect.fromResult(
+      companyMetadata(repository),
+    );
     return {
       origin,
       trust: repository.trust,
@@ -90,8 +92,8 @@ export const pairCompany = (options: {
     };
   });
 
-const newestFirst = Order.reverse(
-  Order.mapInput(Order.number, (announcement: Announcement) =>
+const newestFirst = Order.flip(
+  Order.mapInput(Order.Number, (announcement: Announcement) =>
     Date.parse(announcement.datePublished),
   ),
 );
@@ -112,7 +114,9 @@ export const refreshCompany = (options: {
   Effect.gen(function* () {
     const { subscription, fetch, now } = options;
     const known = options.known ?? [];
-    const pinned = yield* parseTrustedRoot(subscription.trust.rootJson);
+    const pinned = yield* Effect.fromResult(
+      parseTrustedRoot(subscription.trust.rootJson),
+    );
     const walk = yield* walkRootChain({
       fetch,
       origin: subscription.origin,
@@ -126,7 +130,9 @@ export const refreshCompany = (options: {
       root: walk.root,
       previous: { root: pinned, trust: subscription.trust },
     });
-    const { identity, catalog, patterns } = yield* companyMetadata(repository);
+    const { identity, catalog, patterns } = yield* Effect.fromResult(
+      companyMetadata(repository),
+    );
     const change = identityChange(subscription.identity, identity);
     if (change === "rebrand") {
       return {

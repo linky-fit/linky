@@ -17,7 +17,7 @@ const isAppMessage = (value: Record<string, unknown>): boolean =>
   typeof value["app"] === "string" && typeof value["content"] === "string";
 
 const redactRecord = (value: Record<string, unknown>): unknown => {
-  if (isAttachment(value)) return Struct.omit(value, "key", "nonce");
+  if (isAttachment(value)) return Struct.omit(value, ["key", "nonce"]);
   if (isAppMessage(value)) {
     return { ...value, content: "[redacted app message]" };
   }
@@ -43,6 +43,6 @@ export const redactInspectorSecrets = (value: unknown): unknown => {
       ? value
       : redacted;
   }
-  if (Predicate.isRecord(value)) return redactRecord(value);
+  if (Predicate.isObject(value)) return redactRecord(value);
   return value;
 };

@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { wrapEvent } from "nostr-tools/nip59";
 import { makeIdentity } from "../testing";
 import { SignedWrapEvent } from "./nostrEvent";
@@ -24,9 +24,9 @@ describe("authenticated wrap boundaries", () => {
     const wrap = makeWrap(Math.floor(Date.now() / 1000));
     const forged = new SignedWrapEvent({ ...wrap, sig: "00".repeat(64) });
     expect(unwrapToRumor(forged, bob.secretKey)).toEqual(
-      Either.left("invalid-wrap"),
+      Result.fail("invalid-wrap"),
     );
-    expect(Either.isRight(unwrapToRumor(wrap, bob.secretKey))).toBe(true);
+    expect(Result.isSuccess(unwrapToRumor(wrap, bob.secretKey))).toBe(true);
   });
 
   it("rejects tampered outer tags before decrypting", () => {
@@ -36,7 +36,7 @@ describe("authenticated wrap boundaries", () => {
       tags: [...wrap.tags, ["p", alice.pubkey]],
     });
     expect(unwrapToRumor(forged, bob.secretKey)).toEqual(
-      Either.left("invalid-wrap"),
+      Result.fail("invalid-wrap"),
     );
   });
 
@@ -44,14 +44,14 @@ describe("authenticated wrap boundaries", () => {
     "keeps old history at timestamp %s",
     (timestamp) => {
       expect(
-        Either.isRight(unwrapToRumor(makeWrap(timestamp), bob.secretKey)),
+        Result.isSuccess(unwrapToRumor(makeWrap(timestamp), bob.secretKey)),
       ).toBe(true);
     },
   );
 
   it("allows five minutes of sender clock skew", () => {
     expect(
-      Either.isRight(
+      Result.isSuccess(
         unwrapToRumor(
           makeWrap(Math.floor(Date.now() / 1000) + 300),
           bob.secretKey,
@@ -64,7 +64,7 @@ describe("authenticated wrap boundaries", () => {
     "rejects unbounded rumor timestamp %s",
     (timestamp) => {
       expect(unwrapToRumor(makeWrap(timestamp), bob.secretKey)).toEqual(
-        Either.left("invalid-rumor-timestamp"),
+        Result.fail("invalid-rumor-timestamp"),
       );
     },
   );
@@ -73,7 +73,7 @@ describe("authenticated wrap boundaries", () => {
     "rejects malformed timestamp %s",
     (timestamp) => {
       expect(unwrapToRumor(makeWrap(timestamp), bob.secretKey)).toEqual(
-        Either.left("malformed-rumor"),
+        Result.fail("malformed-rumor"),
       );
     },
   );

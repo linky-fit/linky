@@ -21,7 +21,7 @@
     "@noble/hashes": "^2.0.1",
     "@scure/bip32": "^2.0.1",
     "@scure/bip39": "^2.0.1",
-    "effect": "^3.19.19",
+    "effect": "^4.0.0",
     "slip39-ts": "^0.1.13"
   },
   "devDependencies": {

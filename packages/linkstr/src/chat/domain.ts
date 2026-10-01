@@ -6,40 +6,41 @@ import { parseCashuToken } from "./cashuToken";
 const LOWERCASE_HEX_64 = /^[0-9a-f]{64}$/;
 const LOWERCASE_HEX_24 = /^[0-9a-f]{24}$/;
 
-export const MessageText = Schema.NonEmptyTrimmedString.pipe(
+export const MessageText = Schema.Trimmed.check(Schema.isNonEmpty()).pipe(
   Schema.brand("MessageText"),
 );
 export type MessageText = typeof MessageText.Type;
 
-export const CashuTokenText = Schema.NonEmptyTrimmedString.pipe(
-  Schema.filter((value) => parseCashuToken(value) !== null, {
-    description: "a parseable cashu token",
+export const CashuTokenText = Schema.Trimmed.check(
+  Schema.isNonEmpty(),
+  Schema.makeFilter((value) => parseCashuToken(value) !== null, {
+    expected: "a parseable cashu token",
   }),
-  Schema.brand("CashuTokenText"),
-);
+).pipe(Schema.brand("CashuTokenText"));
 export type CashuTokenText = typeof CashuTokenText.Type;
 
 const PrivateImageFields = {
-  url: Schema.NonEmptyTrimmedString,
-  fileType: Schema.NonEmptyTrimmedString,
+  url: Schema.Trimmed.check(Schema.isNonEmpty()),
+  fileType: Schema.Trimmed.check(Schema.isNonEmpty()),
   encryptionAlgorithm: Schema.Literal("aes-gcm"),
-  key: Schema.String.pipe(Schema.pattern(LOWERCASE_HEX_64)),
-  nonce: Schema.String.pipe(Schema.pattern(LOWERCASE_HEX_24)),
-  encryptedSha256: Schema.String.pipe(Schema.pattern(LOWERCASE_HEX_64)),
-  originalSha256: Schema.String.pipe(Schema.pattern(LOWERCASE_HEX_64)),
-  encryptedSize: Schema.Int.pipe(Schema.positive()),
-  width: Schema.optional(Schema.Int.pipe(Schema.positive())),
-  height: Schema.optional(Schema.Int.pipe(Schema.positive())),
-  fileName: Schema.optional(Schema.NonEmptyTrimmedString),
-  storageEncoding: Schema.Literal("base64", "raw"),
+  key: Schema.String.check(Schema.isPattern(LOWERCASE_HEX_64)),
+  nonce: Schema.String.check(Schema.isPattern(LOWERCASE_HEX_24)),
+  encryptedSha256: Schema.String.check(Schema.isPattern(LOWERCASE_HEX_64)),
+  originalSha256: Schema.String.check(Schema.isPattern(LOWERCASE_HEX_64)),
+  encryptedSize: Schema.Int.check(Schema.isGreaterThan(0)),
+  width: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
+  height: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
+  fileName: Schema.optional(Schema.Trimmed.check(Schema.isNonEmpty())),
+  storageEncoding: Schema.Literals(["base64", "raw"]),
 };
 
 // Images carry both dimensions, PDFs neither; a lone dimension is invalid.
 export class PrivateImage extends Schema.Class<PrivateImage>("PrivateImage")(
-  Schema.Struct(PrivateImageFields).pipe(
-    Schema.filter(
-      (image) => (image.width === undefined) === (image.height === undefined),
-      { message: () => "width and height must be given together" },
+  Schema.Struct(PrivateImageFields).check(
+    Schema.makeFilter(
+      (image) =>
+        (image.width === undefined) === (image.height === undefined) ||
+        "width and height must be given together",
     ),
   ),
 ) {}

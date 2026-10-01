@@ -1,5 +1,5 @@
 import type { MeltQuoteBolt11Response } from "@cashu/cashu-ts";
-import { Duration, Effect, Schema } from "effect";
+import { Context, Duration, Effect, Layer, Schema } from "effect";
 import { MintRejected, MintUnreachable } from "../domain/errors";
 import { Amount, NonNegativeAmount } from "../domain/primitives";
 import type { MintUrl, QuoteId } from "../domain/primitives";
@@ -40,9 +40,8 @@ const decodeReserve = Schema.decodeUnknownOption(NonNegativeAmount);
  * cached in storage per mint with a day-scale TTL. Cashu-side input fees
  * (`input_fee_ppk`) are a separate figure, exposed on `MintInfo`.
  */
-export class FeeProbe extends Effect.Service<FeeProbe>()("linkshu/FeeProbe", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class FeeProbe extends Context.Service<FeeProbe>()("linkshu/FeeProbe", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const instances = yield* WalletInstances;
     const inspector = yield* Inspector.orNoop;
@@ -127,18 +126,20 @@ export class FeeProbe extends Effect.Service<FeeProbe>()("linkshu/FeeProbe", {
                 feeReserve: result.feeReserve,
                 percent: result.percent,
               },
-              { disableValidation: true },
+              { disableChecks: true },
             ),
         );
         return result;
       }).pipe(
-        Effect.timeoutFail({
+        Effect.timeoutOrElse({
           duration: PROBE_TIMEOUT,
-          onTimeout: () =>
-            new MintUnreachable({
-              mint: draft.mint,
-              detail: "the fee probe did not finish in time",
-            }),
+          orElse: () =>
+            Effect.fail(
+              new MintUnreachable({
+                mint: draft.mint,
+                detail: "the fee probe did not finish in time",
+              }),
+            ),
         }),
       );
 
@@ -164,4 +165,9 @@ export class FeeProbe extends Effect.Service<FeeProbe>()("linkshu/FeeProbe", {
 
     return { probeLightningFee } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

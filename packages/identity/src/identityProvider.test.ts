@@ -43,7 +43,7 @@ const EXPECTED = {
 } as const;
 
 const testLayer = Layer.provideMerge(
-  IdentityProvider.Live,
+  IdentityProvider.layer,
   Layer.succeed(MasterSecretProvider, TEST_SEED),
 );
 

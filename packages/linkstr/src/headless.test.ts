@@ -52,7 +52,7 @@ const scopedTransportOf = (
   service: NostrTransportService,
   lifecycle: Array<string>,
 ): Layer.Layer<NostrTransport> =>
-  Layer.scoped(
+  Layer.effect(
     NostrTransport,
     Effect.acquireRelease(
       Effect.sync(() => {

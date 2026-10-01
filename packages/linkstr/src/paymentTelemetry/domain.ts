@@ -1,24 +1,28 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { WrapDelivery } from "../domain/delivery";
 import { ClientId, RumorId, UnixSeconds } from "../domain/primitives";
 
-export const PaymentTelemetryDirection = Schema.Literal("in", "out");
+export const PaymentTelemetryDirection = Schema.Literals(["in", "out"]);
 export type PaymentTelemetryDirection = typeof PaymentTelemetryDirection.Type;
 
-export const PaymentTelemetryStatus = Schema.Literal("ok", "declined", "error");
+export const PaymentTelemetryStatus = Schema.Literals([
+  "ok",
+  "declined",
+  "error",
+]);
 export type PaymentTelemetryStatus = typeof PaymentTelemetryStatus.Type;
 
-export const PaymentTelemetryMethod = Schema.Literal(
+export const PaymentTelemetryMethod = Schema.Literals([
   "cashu_chat",
   "cashu_receive",
   "cashu_restore",
   "lightning_address",
   "lightning_invoice",
   "unknown",
-);
+]);
 export type PaymentTelemetryMethod = typeof PaymentTelemetryMethod.Type;
 
-export const PaymentTelemetryPhase = Schema.Literal(
+export const PaymentTelemetryPhase = Schema.Literals([
   "complete",
   "invoice_fetch",
   "melt",
@@ -27,7 +31,7 @@ export const PaymentTelemetryPhase = Schema.Literal(
   "restore",
   "swap",
   "unknown",
-);
+]);
 export type PaymentTelemetryPhase = typeof PaymentTelemetryPhase.Type;
 
 /**
@@ -35,17 +39,17 @@ export type PaymentTelemetryPhase = typeof PaymentTelemetryPhase.Type;
  * address outside a contact, the sats of a proxy payment, a run of a
  * recurring payment, or a paid payment request. Receives have none.
  */
-export const PaymentTelemetryPaymentType = Schema.Literal(
+export const PaymentTelemetryPaymentType = Schema.Literals([
   "contact",
   "lightning",
   "proxy",
   "recurring",
   "request",
-);
+]);
 export type PaymentTelemetryPaymentType =
   typeof PaymentTelemetryPaymentType.Type;
 
-export const PaymentTelemetryDevicePlatform = Schema.Literal(
+export const PaymentTelemetryDevicePlatform = Schema.Literals([
   "android",
   "iphone",
   "ipad",
@@ -53,15 +57,15 @@ export const PaymentTelemetryDevicePlatform = Schema.Literal(
   "mac",
   "windows",
   "unknown",
-);
+]);
 export type PaymentTelemetryDevicePlatform =
   typeof PaymentTelemetryDevicePlatform.Type;
 
-export const PaymentTelemetryAppRuntime = Schema.Literal(
+export const PaymentTelemetryAppRuntime = Schema.Literals([
   "native",
   "pwa",
   "web",
-);
+]);
 export type PaymentTelemetryAppRuntime = typeof PaymentTelemetryAppRuntime.Type;
 
 export class PaymentTelemetryDraft extends Schema.Class<PaymentTelemetryDraft>(
@@ -74,9 +78,10 @@ export class PaymentTelemetryDraft extends Schema.Class<PaymentTelemetryDraft>(
   method: PaymentTelemetryMethod,
   phase: PaymentTelemetryPhase,
   // Optional on the wire so outbox jobs persisted before the field decode.
-  paymentType: Schema.optionalWith(Schema.NullOr(PaymentTelemetryPaymentType), {
-    default: () => null,
-  }),
+  paymentType: Schema.NullOr(PaymentTelemetryPaymentType).pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(null)),
+    Schema.withConstructorDefault(Effect.succeed(null)),
+  ),
   mint: Schema.NullOr(Schema.String),
   amountBucket: Schema.NullOr(Schema.String),
   feeBucket: Schema.NullOr(Schema.String),

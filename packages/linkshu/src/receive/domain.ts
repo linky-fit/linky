@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import {
   AmountConsumedByFee,
   CounterLockTimeout,
@@ -32,7 +32,10 @@ export class ReceiveDraft extends Schema.Class<ReceiveDraft>("ReceiveDraft")({
    * `TokenAlreadyKnown`, so a discarded token stays discarded on every
    * device that has synced it. An explicit receive takes it in again.
    */
-  automatic: Schema.optionalWith(Schema.Boolean, { default: () => false }),
+  automatic: Schema.Boolean.pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(false)),
+    Schema.withConstructorDefault(Effect.succeed(false)),
+  ),
 }) {}
 
 export class ReceiveReceipt extends Schema.Class<ReceiveReceipt>(
@@ -55,7 +58,7 @@ export interface ReceiveUnlockOptions {
   readonly unlockingKey?: P2pkUnlockingKey | undefined;
 }
 
-export const ReceiveError = Schema.Union(
+export const ReceiveError = Schema.Union([
   TokenParseFailed,
   TokenLocked,
   TokenAlreadyKnown,
@@ -65,7 +68,7 @@ export const ReceiveError = Schema.Union(
   ReceiveDeferred,
   MintRejected,
   CounterLockTimeout,
-);
+]);
 export type ReceiveError = typeof ReceiveError.Type;
 
 /** What `resumeDeferred` did with one `deferredReceive` operation. */
@@ -91,7 +94,7 @@ export class DeferredReceiveResult extends Schema.Class<DeferredReceiveResult>(
    * another context held the mint's receive lease for 30 s; nothing was
    * written and the deferral waits for the next pass.
    */
-  status: Schema.Literal("received", "closed", "failed", "pending"),
+  status: Schema.Literals(["received", "closed", "failed", "pending"]),
   /** Set only for `received`. */
   receipt: Schema.NullOr(ReceiveReceipt),
 }) {}

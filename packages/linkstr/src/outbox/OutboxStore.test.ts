@@ -162,9 +162,9 @@ describe("OutboxStore.fromStringStorage", () => {
     );
     for (const job of stored) {
       if (
-        Predicate.isRecord(job) &&
-        Predicate.isRecord(job.operation) &&
-        Predicate.isRecord(job.operation.draft)
+        Predicate.isObject(job) &&
+        Predicate.isObject(job.operation) &&
+        Predicate.isObject(job.operation.draft)
       ) {
         delete job.operation.draft.paymentType;
       }

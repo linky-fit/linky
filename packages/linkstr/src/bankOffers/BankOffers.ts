@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { NoRelayReachable, RecipientNotReached } from "../domain/errors";
 import { makeWrapSendContext, sendToPeer } from "../internal/wrapSend";
 import { encodeBankOfferRumor } from "./codec";
@@ -8,10 +8,10 @@ import {
   type BankOfferDraft,
 } from "./domain";
 
-export class BankOffers extends Effect.Service<BankOffers>()(
+export class BankOffers extends Context.Service<BankOffers>()(
   "linkstr/BankOffers",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const context = yield* makeWrapSendContext;
 
       const send = (
@@ -41,4 +41,6 @@ export class BankOffers extends Effect.Service<BankOffers>()(
       return { send } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

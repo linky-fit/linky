@@ -1,4 +1,4 @@
-import { identity, Predicate, Schema } from "effect";
+import { Predicate, Schema, SchemaGetter } from "effect";
 import { AppMessageDraft, AppMessageReceipt } from "../appMessages/domain";
 import {
   ChatMessageReceipt,
@@ -15,13 +15,13 @@ import {
 } from "../paymentTelemetry/domain";
 import { ReactionDraft, ReactionReceipt } from "../reactions/domain";
 
-export const OutboxJobId = Schema.NonEmptyTrimmedString.pipe(
+export const OutboxJobId = Schema.Trimmed.check(Schema.isNonEmpty()).pipe(
   Schema.brand("OutboxJobId"),
 );
 export type OutboxJobId = typeof OutboxJobId.Type;
 
 /** Opaque app correlation id (e.g. the app's DB row id), echoed on results. */
-export const OutboxRef = Schema.NonEmptyTrimmedString.pipe(
+export const OutboxRef = Schema.Trimmed.check(Schema.isNonEmpty()).pipe(
   Schema.brand("OutboxRef"),
 );
 export type OutboxRef = typeof OutboxRef.Type;
@@ -65,8 +65,8 @@ export const AppMessageOperation = Schema.TaggedStruct("appMessage", {
 });
 export type AppMessageOperation = typeof AppMessageOperation.Type;
 
-// A new durable send needs its service in composition.ts's Outbox.Default provide list; layer inputs are inferred.
-export const OutboxOperation = Schema.Union(
+// A new durable send needs its service in composition.ts's Outbox.layer provide list; layer inputs are inferred.
+export const OutboxOperation = Schema.Union([
   ChatTextOperation,
   ChatTokenOperation,
   ChatImageOperation,
@@ -74,7 +74,7 @@ export const OutboxOperation = Schema.Union(
   ReactionOperation,
   PaymentTelemetryOperation,
   AppMessageOperation,
-);
+]);
 export type OutboxOperation = typeof OutboxOperation.Type;
 
 /**
@@ -99,19 +99,19 @@ export class EnqueueReceipt extends Schema.TaggedClass<EnqueueReceipt>()(
   },
 ) {}
 
-export const OutboxReceipt = Schema.Union(
+export const OutboxReceipt = Schema.Union([
   ChatMessageReceipt,
   MessageEditReceipt,
   ReactionReceipt,
   PaymentTelemetryReceipt,
   AppMessageReceipt,
-);
+]);
 export type OutboxReceipt = typeof OutboxReceipt.Type;
 
-export const OutboxFailureReason = Schema.Literal(
+export const OutboxFailureReason = Schema.Literals([
   "identity-changed",
   "unexpected-error",
-);
+]);
 export type OutboxFailureReason = typeof OutboxFailureReason.Type;
 
 export class OutboxJobSucceeded extends Schema.TaggedClass<OutboxJobSucceeded>()(
@@ -133,13 +133,13 @@ export class OutboxJobFailed extends Schema.TaggedClass<OutboxJobFailed>()(
   },
 ) {}
 
-export const OutboxResult = Schema.Union(OutboxJobSucceeded, OutboxJobFailed);
+export const OutboxResult = Schema.Union([OutboxJobSucceeded, OutboxJobFailed]);
 export type OutboxResult = typeof OutboxResult.Type;
 
-export const OutboxJobState = Schema.Union(
+export const OutboxJobState = Schema.Union([
   Schema.TaggedStruct("queued", {}),
   Schema.TaggedStruct("awaiting-ack", { result: OutboxResult }),
-);
+]);
 export type OutboxJobState = typeof OutboxJobState.Type;
 
 export class StoredOutboxJob extends Schema.Class<StoredOutboxJob>(
@@ -175,7 +175,11 @@ const receiptTagOf = (
 };
 
 const hasOutboxOperationTag = Schema.is(
-  OutboxOperation.pipe(Schema.pick("_tag")),
+  Schema.Struct({
+    _tag: Schema.Literals(
+      OutboxOperation.pipe(Schema.toTaggedUnion("_tag")).discriminants,
+    ),
+  }),
 );
 
 const LEGACY_RUMOR_ID_KEYS = ["messageId", "reactionId", "telemetryId"];
@@ -199,12 +203,12 @@ const upgradeLegacyReceipt = (
   job: Record<string, unknown>,
 ): Record<string, unknown> => {
   const { operation, state } = job;
-  if (!hasOutboxOperationTag(operation) || !Predicate.isRecord(state))
+  if (!hasOutboxOperationTag(operation) || !Predicate.isObject(state))
     return job;
   const { result } = state;
-  if (!Predicate.isRecord(result)) return job;
+  if (!Predicate.isObject(result)) return job;
   const { receipt } = result;
-  if (!Predicate.isRecord(receipt) || "_tag" in receipt) return job;
+  if (!Predicate.isObject(receipt) || "_tag" in receipt) return job;
   const _tag = receiptTagOf(operation._tag);
   return {
     ...job,
@@ -215,18 +219,14 @@ const upgradeLegacyReceipt = (
   };
 };
 
-const UnknownRecord = Schema.Record({
-  key: Schema.String,
-  value: Schema.Unknown,
-});
-
 /** `StoredOutboxJob` as read from storage, upgrading legacy receipts first. */
-export const PersistedOutboxJob = Schema.compose(
-  Schema.transform(UnknownRecord, UnknownRecord, {
-    strict: true,
-    decode: upgradeLegacyReceipt,
-    encode: identity,
+export const PersistedOutboxJob = Schema.Record(
+  Schema.String,
+  Schema.Unknown,
+).pipe(
+  Schema.decode({
+    decode: SchemaGetter.transform(upgradeLegacyReceipt),
+    encode: SchemaGetter.passthrough(),
   }),
-  StoredOutboxJob,
-  { strict: false },
+  Schema.decodeTo(StoredOutboxJob),
 );

@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import {
   AmountConsumedByFee,
   InsufficientFunds,
@@ -42,9 +42,8 @@ import type { SendDraft, SendError } from "./domain";
  * `spent`. Funds are never outside the store even when the caller crashes
  * mid-flow.
  */
-export class Send extends Effect.Service<Send>()("linkshu/Send", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Send extends Context.Service<Send>()("linkshu/Send", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const proofStore = yield* ProofStore;
     const operationStore = yield* OperationStore;
@@ -179,4 +178,9 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
 
     return { send } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

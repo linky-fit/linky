@@ -1,4 +1,4 @@
-import { Effect, Exit, Layer, Option } from "effect";
+import { Context, Effect, Exit, Layer, Option } from "effect";
 import { finalizeEvent, verifyEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
@@ -84,7 +84,7 @@ const runWith = <A, E>(
   Effect.runPromiseExit(
     program.pipe(
       Effect.provide(
-        Profiles.Default.pipe(
+        Profiles.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
               LinkstrIdentity.fromSecretKey(alice.secretKey),
@@ -1035,7 +1035,7 @@ describe("Profiles read guards", () => {
   const reads: ReadonlyArray<{
     readonly name: string;
     readonly read: (
-      profiles: Profiles,
+      profiles: Context.Service.Shape<typeof Profiles>,
     ) => Effect.Effect<unknown, { readonly _tag: string }>;
   }> = [
     { name: "fetchProfile", read: (p) => p.fetchProfile(bob.pubkey) },

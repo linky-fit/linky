@@ -53,7 +53,7 @@ export class EnvelopeOpened extends Schema.Class<EnvelopeOpened>(
    * funded by another device or tab, or by an earlier call here (one whose
    * answer was lost included).
    */
-  outcome: Schema.Literal("created", "adopted"),
+  outcome: Schema.Literals(["created", "adopted"]),
   /** The `envelope` operation holding the proofs. */
   operationId: OperationId,
   /** What the envelope holds; an adopted one keeps its creator's amount. */
@@ -65,13 +65,13 @@ export class EnvelopeOpened extends Schema.Class<EnvelopeOpened>(
  * `pending` (an input of an unsettled melt), `spent` (melted or redeemed),
  * or `mixed` (some proofs spent, some not).
  */
-export const EnvelopeStatus = Schema.Literal(
+export const EnvelopeStatus = Schema.Literals([
   "absent",
   "unspent",
   "pending",
   "spent",
   "mixed",
-);
+]);
 export type EnvelopeStatus = typeof EnvelopeStatus.Type;
 
 export class EnvelopeState extends Schema.Class<EnvelopeState>("EnvelopeState")(
@@ -110,34 +110,34 @@ export class EnvelopeMeltDraft extends Schema.Class<EnvelopeMeltDraft>(
   quoteId: Schema.optional(QuoteId),
 }) {}
 
-export const EnvelopeOpenError = Schema.Union(
+export const EnvelopeOpenError = Schema.Union([
   InsufficientFunds,
   AmountConsumedByFee,
   MintUnreachable,
   MintRejected,
   CounterLockTimeout,
   EnvelopeBusy,
-);
+]);
 export type EnvelopeOpenError = typeof EnvelopeOpenError.Type;
 
-export const EnvelopeSendError = Schema.Union(EnvelopeNotFound, EnvelopeBusy);
+export const EnvelopeSendError = Schema.Union([EnvelopeNotFound, EnvelopeBusy]);
 export type EnvelopeSendError = typeof EnvelopeSendError.Type;
 
-export const EnvelopeStateError = Schema.Union(MintUnreachable, MintRejected);
+export const EnvelopeStateError = Schema.Union([MintUnreachable, MintRejected]);
 export type EnvelopeStateError = typeof EnvelopeStateError.Type;
 
-export const EnvelopeReleaseError = Schema.Union(
+export const EnvelopeReleaseError = Schema.Union([
   MintUnreachable,
   MintRejected,
   TokenAlreadySpent,
   CounterLockTimeout,
   EnvelopeBusy,
-);
+]);
 export type EnvelopeReleaseError = typeof EnvelopeReleaseError.Type;
 
-export const EnvelopeMeltError = Schema.Union(
+export const EnvelopeMeltError = Schema.Union([
   MeltError,
   EnvelopeNotFound,
   EnvelopeBusy,
-);
+]);
 export type EnvelopeMeltError = typeof EnvelopeMeltError.Type;

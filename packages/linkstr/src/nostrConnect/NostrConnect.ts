@@ -1,5 +1,14 @@
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
-import { Clock, Deferred, Duration, Effect, Option, Queue } from "effect";
+import {
+  Clock,
+  Context,
+  Deferred,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Queue,
+} from "effect";
 import { RelayRejection } from "../domain/delivery";
 import type { EventId, Pubkey, UnixSeconds } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
@@ -35,10 +44,10 @@ const ALL_SUBSCRIPTIONS_ENDED = Symbol("allSubscriptionsEnded");
  * One NIP-46 `nostrconnect://` login: Linky acts as the remote signer for a
  * single handshake, then closes every subscription. Nothing is stored.
  */
-export class NostrConnect extends Effect.Service<NostrConnect>()(
+export class NostrConnect extends Context.Service<NostrConnect>()(
   "linkstr/NostrConnect",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const identity = yield* LinkstrIdentity;
       const transport = yield* NostrTransport;
       const inspector = yield* Inspector.orNoop;
@@ -64,8 +73,8 @@ export class NostrConnect extends Effect.Service<NostrConnect>()(
                 .subscribe(
                   relay,
                   filter,
-                  (event) => Queue.unsafeOffer(incoming, event),
-                  { onEose: () => Deferred.unsafeDone(live, Effect.void) },
+                  (event) => Queue.offerUnsafe(incoming, event),
+                  { onEose: () => Deferred.doneUnsafe(live, Effect.void) },
                 )
                 .pipe(
                   Effect.match({
@@ -76,7 +85,7 @@ export class NostrConnect extends Effect.Service<NostrConnect>()(
                     Effect.sync(() => {
                       ended.push(new RelayRejection({ relay, detail }));
                       if (ended.length === request.relays.length) {
-                        Queue.unsafeOffer(incoming, ALL_SUBSCRIPTIONS_ENDED);
+                        Queue.offerUnsafe(incoming, ALL_SUBSCRIPTIONS_ENDED);
                       }
                     }),
                   ),
@@ -203,4 +212,6 @@ export class NostrConnect extends Effect.Service<NostrConnect>()(
       return { login } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

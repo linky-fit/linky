@@ -15,16 +15,18 @@ export class IdentityDerivationError extends Schema.TaggedError<IdentityDerivati
 ) {}
 
 export const decodeUnknown = <A, I>(
-  schema: Schema.Schema<A, I, never>,
+  schema: Schema.Codec<A, I>,
   input: unknown,
   message: string,
 ): Effect.Effect<A, IdentityDerivationError> =>
-  Schema.decodeUnknown(schema)(input).pipe(
+  Schema.decodeUnknownEffect(schema)(input).pipe(
     Effect.mapError((cause) => new IdentityDerivationError({ cause, message })),
   );
 
 /** slip39-ts hands the recovered secret back as a plain byte array. */
-const MasterSecretFromBytes = Schema.compose(Schema.Uint8Array, MasterSecret);
+const RecoveredBytes = Schema.Array(
+  Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 255 })),
+);
 
 const normalizeSlip39Share = (rawText: string): string =>
   toWords(rawText.toLowerCase()).join(" ");
@@ -71,10 +73,12 @@ export const recoverMasterSecretFromSlip39Shares = (
           message: "Failed to recover master secret from SLIP-39 shares",
         }),
     });
+    const invalidShape = "Recovered SLIP-39 secret has invalid byte shape";
+    const bytes = yield* decodeUnknown(RecoveredBytes, recovered, invalidShape);
     return yield* decodeUnknown(
-      MasterSecretFromBytes,
-      recovered,
-      "Recovered SLIP-39 secret has invalid byte shape",
+      MasterSecret,
+      Uint8Array.from(bytes),
+      invalidShape,
     );
   });
 

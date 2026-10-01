@@ -32,7 +32,7 @@ export class Proof extends Schema.Class<Proof>("Proof")({
   amount: Amount,
   secret: Schema.NonEmptyString,
   /** Hex-encoded signature point; byte-hex so v4 encoding is total. */
-  C: Schema.String.pipe(Schema.pattern(/^(?:[0-9a-f]{2})+$/i)),
+  C: Schema.String.check(Schema.isPattern(/^(?:[0-9a-f]{2})+$/i)),
 }) {}
 
 /** Fully decoded single-mint token; the input/output of the canonical codec. */
@@ -63,7 +63,7 @@ export class ParsedToken extends Schema.Class<ParsedToken>("ParsedToken")({
 export class TokenTransfer extends Schema.Class<TokenTransfer>("TokenTransfer")(
   {
     id: OperationId,
-    kind: Schema.Literal("send", "receive"),
+    kind: Schema.Literals(["send", "receive"]),
     status: OperationStatus,
     tokenText: TokenText,
     mint: MintUrl,
@@ -102,7 +102,7 @@ export class ImportProofDraft extends Schema.Class<ImportProofDraft>(
   keysetId: KeysetId,
   amount: Amount,
   secret: Schema.NonEmptyString,
-  C: Schema.String.pipe(Schema.pattern(/^(?:[0-9a-f]{2})+$/i)),
+  C: Schema.String.check(Schema.isPattern(/^(?:[0-9a-f]{2})+$/i)),
   dleq: Schema.NullOr(Schema.String),
   state: ProofState,
   operationId: Schema.NullOr(OperationId),
@@ -125,17 +125,17 @@ export class ReclaimReport extends Schema.Class<ReclaimReport>("ReclaimReport")(
 export class LegacyTokenRow extends Schema.Class<LegacyTokenRow>(
   "LegacyTokenRow",
 )({
-  id: Schema.NonEmptyTrimmedString,
+  id: Schema.Trimmed.check(Schema.isNonEmpty()),
   originalTokenText: TokenText,
   tokenText: TokenText,
-  state: Schema.Literal(
+  state: Schema.Literals([
     "pending",
     "accepted",
     "reserved",
     "issued",
     "externalized",
     "error",
-  ),
+  ]),
   error: Schema.NullOr(Schema.String),
   createdAt: UnixSeconds,
 }) {}

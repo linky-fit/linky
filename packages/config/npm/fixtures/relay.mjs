@@ -8,16 +8,16 @@ import {
   makeNostrTransportSimplePool,
 } from "@linky-fit/linkstr";
 
-const requestSchema = Schema.Tuple(
+const requestSchema = Schema.Tuple([
   Schema.Literal("REQ"),
   Schema.String,
   Schema.Struct({
     ids: Schema.optional(Schema.Array(Schema.String)),
     limit: Schema.optional(Schema.Number),
   }),
-);
+]);
 const decodeRequest = Schema.decodeUnknownOption(
-  Schema.parseJson(requestSchema),
+  Schema.fromJsonString(requestSchema),
 );
 const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
 await once(server, "listening");

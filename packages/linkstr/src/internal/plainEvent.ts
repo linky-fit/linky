@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { finalizeEvent, verifyEvent } from "nostr-tools";
 import type { NostrSecretKey, UnixSeconds } from "../domain/primitives";
 import { SignedPlainEvent } from "./nostrEvent";
@@ -11,7 +11,7 @@ export interface PlainEventTemplate {
 }
 
 const decodeSigned = Schema.decodeUnknownSync(SignedPlainEvent);
-const decodeSignedEither = Schema.decodeUnknownEither(SignedPlainEvent);
+const decodeSignedResult = Schema.decodeUnknownResult(SignedPlainEvent);
 
 export const signPlainEvent = (
   template: PlainEventTemplate,
@@ -38,13 +38,13 @@ export type PlainEventFailure = "malformed-event" | "invalid-signature";
  */
 export const decodeVerifiedPlainEvent = (
   raw: unknown,
-): Either.Either<SignedPlainEvent, PlainEventFailure> =>
-  Either.gen(function* () {
-    const event = yield* decodeSignedEither(raw).pipe(
-      Either.mapLeft((): PlainEventFailure => "malformed-event"),
+): Result.Result<SignedPlainEvent, PlainEventFailure> =>
+  Result.gen(function* () {
+    const event = yield* decodeSignedResult(raw).pipe(
+      Result.mapError((): PlainEventFailure => "malformed-event"),
     );
     if (!verifyEvent(event)) {
-      return yield* Either.left<PlainEventFailure>("invalid-signature");
+      return yield* Result.fail<PlainEventFailure>("invalid-signature");
     }
     return event;
   });

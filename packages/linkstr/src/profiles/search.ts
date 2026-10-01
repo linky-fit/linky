@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import type { Event as NostrToolsEvent } from "nostr-tools";
 import type { EventId, RelayUrl } from "../domain/primitives";
 import { Pubkey, UnixSeconds } from "../domain/primitives";
@@ -148,7 +148,7 @@ const relevanceScore = (
 
 const decodeMetadata = (event: SignedPlainEvent): ProfileMetadata | null => {
   const decoded = decodeProfileEvent(event);
-  return Either.isLeft(decoded) ? null : decoded.right.metadata;
+  return Result.isFailure(decoded) ? null : decoded.success.metadata;
 };
 
 /**
@@ -169,8 +169,8 @@ export const createProfileSearchCollector = (
     const positionByAuthor = new Map<Pubkey, number>();
     for (const raw of rawEvents) {
       const decoded = decodeVerifiedPlainEvent(raw);
-      if (Either.isLeft(decoded)) continue;
-      const event = decoded.right;
+      if (Result.isFailure(decoded)) continue;
+      const event = decoded.success;
       const position =
         positionByAuthor.get(event.pubkey) ?? positionByAuthor.size;
       positionByAuthor.set(event.pubkey, position);

@@ -37,7 +37,7 @@ const runWith = <A, E>(
   Effect.runPromiseExit(
     program.pipe(
       Effect.provide(
-        RelayLists.Default.pipe(
+        RelayLists.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
               LinkstrIdentity.fromSecretKey(alice.secretKey),

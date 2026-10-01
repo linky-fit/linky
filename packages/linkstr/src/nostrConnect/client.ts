@@ -13,11 +13,11 @@ export class NostrConnectClientDraft extends Schema.Class<NostrConnectClientDraf
   /** The signer answers on these relays only. */
   relays: Schema.NonEmptyArray(RelayUrl),
   /** NIP-46 permissions, e.g. `DEVICE_AUTHORIZATION_PERMISSION`. */
-  perms: Schema.Array(Schema.NonEmptyTrimmedString),
+  perms: Schema.Array(Schema.Trimmed.check(Schema.isNonEmpty())),
   /** Shown to the user by the signer; a device authorization repeats it. */
-  name: Schema.optional(Schema.NonEmptyTrimmedString),
-  url: Schema.optional(Schema.NonEmptyTrimmedString),
-  image: Schema.optional(Schema.NonEmptyTrimmedString),
+  name: Schema.optional(Schema.Trimmed.check(Schema.isNonEmpty())),
+  url: Schema.optional(Schema.Trimmed.check(Schema.isNonEmpty())),
+  image: Schema.optional(Schema.Trimmed.check(Schema.isNonEmpty())),
 }) {}
 
 /** The signer answered a request with an error, or with an event other than the one asked for. */
@@ -35,7 +35,7 @@ export class NostrConnectRequestNotDelivered extends Schema.TaggedError<NostrCon
 /** The signer did not connect, or did not reply, in time. */
 export class NostrConnectSignerTimedOut extends Schema.TaggedError<NostrConnectSignerTimedOut>()(
   "NostrConnectSignerTimedOut",
-  { waitingFor: Schema.Literal("connect", "reply") },
+  { waitingFor: Schema.Literals(["connect", "reply"]) },
 ) {}
 
 export type NostrConnectSignError =
@@ -69,9 +69,9 @@ export interface NostrConnectSession {
 
 export interface NostrConnectClientOptions {
   /** How long `connected` waits for the user to approve; 5 minutes by default. */
-  readonly connectTimeout?: Duration.DurationInput;
+  readonly connectTimeout?: Duration.Input;
   /** How long one request waits for its reply; 60 s by default. */
-  readonly replyTimeout?: Duration.DurationInput;
+  readonly replyTimeout?: Duration.Input;
 }
 
 /** The `nostrconnect://` text for a client key, secret and draft. */

@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import type { WrapNotDelivered } from "../domain/errors";
 import type { ClientId, Pubkey } from "../domain/primitives";
 import { freshClientId } from "../internal/operations";
@@ -14,10 +14,10 @@ import type { AppMessageReceived } from "./events";
  * to the recipient only (no self copy), tagged with the app's namespace.
  * Received through `WrapInbox` as `AppMessageReceived`.
  */
-export class AppMessages extends Effect.Service<AppMessages>()(
+export class AppMessages extends Context.Service<AppMessages>()(
   "linkstr/AppMessages",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const context = yield* makeWrapSendContext;
 
       const send = (
@@ -49,7 +49,9 @@ export class AppMessages extends Effect.Service<AppMessages>()(
       return { send } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}
 
 /** One app's typed message codec over `AppMessages` and `WrapInbox`. */
 export interface AppMessageChannel<A> {
@@ -66,9 +68,9 @@ export interface AppMessageChannel<A> {
 
 export const appMessageChannel = <A, I>(
   app: AppNamespace,
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Codec<A, I>,
 ): AppMessageChannel<A> => {
-  const json = Schema.parseJson(schema);
+  const json = Schema.fromJsonString(schema);
   const encode = Schema.encodeSync(json);
   const decode = Schema.decodeUnknownOption(json);
   return {

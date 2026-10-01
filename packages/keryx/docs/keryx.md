@@ -4,25 +4,28 @@ Keryx is a signed one-way broadcast from a company to its customers: HTTPS, a QR
 
 ## Pairing
 
-1. Parse what the user scanned with `parseJoinUrl(text)`. It returns `Either.right(JoinRequest)` or a `KeryxJoinUrlInvalid` / `KeryxJoinVersionUnsupported` left. Nothing is fetched yet.
+1. Parse what the user scanned with `parseJoinUrl(text)`. It returns `Result.succeed(JoinRequest)` or a `KeryxJoinUrlInvalid` / `KeryxJoinVersionUnsupported` failure. Nothing is fetched yet.
 2. Show `request.origin` and ask the user to confirm it. Show nothing else on that screen: no name, no logo. The origin is ASCII, with punycode for IDNs.
 3. After confirmation call `pairCompany({ origin, privateFeeds, fetch, now })`. It pins the root served at `<origin>/.well-known/keryx/root.json` (trust on first use), walks any newer `N.root.json` from the same place, and verifies timestamp, snapshot and targets.
 4. Show the consent summary from the `CompanySnapshot`: `identity` (company name and logo, always next to the origin, never badged as verified), `catalog` (every public channel with its display name), `request.channels` preselected, and `privateFeeds`. A private feed whose `info` is `null` matches no master-signed pattern: drop it.
 5. When the user subscribes, persist `origin`, `trust`, `identity`, the chosen channels and each authorized private feed as `{ url, closed: false }`, then call `refreshCompany` to load content.
 
 ```ts
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import { pairCompany, parseJoinUrl } from "@linky-fit/keryx";
 
 declare const scanned: string;
 declare const confirmOrigin: (origin: string) => Promise<boolean>;
 
 const request = parseJoinUrl(scanned);
-if (Either.isRight(request) && (await confirmOrigin(request.right.origin))) {
+if (
+  Result.isSuccess(request) &&
+  (await confirmOrigin(request.success.origin))
+) {
   const snapshot = await Effect.runPromise(
     pairCompany({
-      origin: request.right.origin,
-      privateFeeds: request.right.privateFeeds,
+      origin: request.success.origin,
+      privateFeeds: request.success.privateFeeds,
       fetch: globalThis.fetch,
       now: new Date(),
     }),
@@ -83,7 +86,7 @@ A linked logo, an item `image` with `imageSha256`, or an attachment with `sha256
 
 ## Persisted state
 
-`CompanyTrust`, `CompanyIdentity`, `PrivateFeedState`, `Channel` and `Announcement` are effect Schemas; store them with `Schema.parseJson(...)`. `trust` holds the pinned root exactly as served plus the metadata versions this device has seen, and it is what makes rollback detectable, so always store the one from the latest `Refreshed`.
+`CompanyTrust`, `CompanyIdentity`, `PrivateFeedState`, `Channel` and `Announcement` are effect Schemas; store them with `Schema.fromJsonString(...)`. `trust` holds the pinned root exactly as served plus the metadata versions this device has seen, and it is what makes rollback detectable, so always store the one from the latest `Refreshed`.
 
 ## Not supported
 

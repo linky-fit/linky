@@ -14,7 +14,7 @@ export interface InboxCursorsRepository {
   ) => Effect.Effect<void, ShardDbError>;
 }
 
-const StoredCursor = Schema.compose(Schema.NumberFromString, UnixSeconds);
+const StoredCursor = Schema.NumberFromString.pipe(Schema.decodeTo(UnixSeconds));
 
 /** The synced Nostr inbox cursor of each identity, as setting rows in the app owner. */
 export const makeInboxCursorsRepository = (

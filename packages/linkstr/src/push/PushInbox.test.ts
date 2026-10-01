@@ -1,11 +1,5 @@
-import {
-  Duration,
-  Effect,
-  Layer,
-  Stream,
-  TestClock,
-  TestContext,
-} from "effect";
+import { Duration, Effect, Layer, Stream } from "effect";
+import { TestClock } from "effect/testing";
 import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { Pubkey, RelayUrl } from "../domain/primitives";
@@ -88,7 +82,7 @@ describe("PushInbox", () => {
         [relayB, fakeB],
       ]),
     );
-    const layer = PushInbox.Default.pipe(
+    const layer = PushInbox.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
           RelayPolicy.fixed({ readRelays: [relayA, relayB], writeRelays: [] }),
@@ -176,7 +170,7 @@ describe("PushInbox", () => {
         [relayB, fakeB],
       ]),
     );
-    const layer = PushInbox.Default.pipe(
+    const layer = PushInbox.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
           RelayPolicy.fixed({ readRelays: [relayA, relayB], writeRelays: [] }),
@@ -219,7 +213,7 @@ describe("PushInbox", () => {
     const relay = RelayUrl.make("wss://refresh-relay.test");
     const fake = strictRelay();
     const pool = poolFor(new Map([[relay, fake]]));
-    const layer = PushInbox.Default.pipe(
+    const layer = PushInbox.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
           RelayPolicy.fixed({ readRelays: [relay], writeRelays: [] }),
@@ -239,23 +233,23 @@ describe("PushInbox", () => {
         resubscribeDelay: Duration.millis(10),
       });
       yield* Effect.forkScoped(Stream.runDrain(events));
-      yield* Effect.yieldNow();
+      yield* Effect.yieldNow;
       yield* Effect.promise(() => Promise.resolve());
-      yield* Effect.yieldNow();
+      yield* Effect.yieldNow;
       expect(fake.subscriptions).toHaveLength(1);
 
       yield* TestClock.adjust(refreshInterval);
       expect(fake.subscriptions[0]?.closed).toBe(true);
       yield* TestClock.adjust(Duration.millis(20));
-      yield* Effect.yieldNow();
+      yield* Effect.yieldNow;
       yield* Effect.promise(() => Promise.resolve());
-      yield* Effect.yieldNow();
+      yield* Effect.yieldNow;
 
       expect(fake.subscriptions).toHaveLength(2);
     }).pipe(
       Effect.scoped,
       Effect.provide(layer),
-      Effect.provide(TestContext.TestContext),
+      Effect.provide(TestClock.layer()),
       Effect.runPromise,
     );
   });
@@ -264,7 +258,7 @@ describe("PushInbox", () => {
     const relay = RelayUrl.make("wss://reporting-relay.test");
     const fake = strictRelay();
     const pool = poolFor(new Map([[relay, fake]]));
-    const layer = PushInbox.Default.pipe(
+    const layer = PushInbox.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
           RelayPolicy.fixed({ readRelays: [relay], writeRelays: [] }),

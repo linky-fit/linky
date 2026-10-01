@@ -159,6 +159,8 @@ export const quoteRecordStore = <R extends QuoteRecord>(
 
 /** Decodes a legacy key-value record; anything that does not parse is dropped. */
 export const legacyDecoder =
-  <A, I>(schema: Schema.Schema<A, I, never>) =>
+  <A, I>(schema: Schema.Codec<A, I>) =>
   (raw: string): A | null =>
-    Option.getOrNull(Schema.decodeUnknownOption(Schema.parseJson(schema))(raw));
+    Option.getOrNull(
+      Schema.decodeUnknownOption(Schema.fromJsonString(schema))(raw),
+    );

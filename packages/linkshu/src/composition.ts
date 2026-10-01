@@ -37,17 +37,17 @@ export interface LinkshuServicesConfig {
  */
 export const linkshuServices = (config: LinkshuServicesConfig) =>
   Layer.mergeAll(
-    Tokens.Default,
-    Receive.Default,
-    Send.Default,
-    Melt.Default,
-    Validation.Default,
-    Restore.Default,
-    Topup.Default,
-    Autoswap.Default,
-    Envelope.Default,
-    FeeProbe.Default,
-    Mints.Default,
+    Tokens.layer,
+    Receive.layer,
+    Send.layer,
+    Melt.layer,
+    Validation.layer,
+    Restore.layer,
+    Topup.layer,
+    Autoswap.layer,
+    Envelope.layer,
+    FeeProbe.layer,
+    Mints.layer,
   ).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -60,6 +60,4 @@ export const linkshuServices = (config: LinkshuServicesConfig) =>
   );
 
 /** Everything `linkshuServices` provides. */
-export type LinkshuServices = Layer.Layer.Success<
-  ReturnType<typeof linkshuServices>
->;
+export type LinkshuServices = Layer.Success<ReturnType<typeof linkshuServices>>;

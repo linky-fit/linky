@@ -114,15 +114,15 @@ describe("HTTP auth encoding", () => {
     );
     const verified = verifyPushOwnershipProof(event);
 
-    expect(verified._tag).toBe("Right");
-    if (verified._tag === "Right") {
-      expect(verified.right).toEqual(
+    expect(verified._tag).toBe("Success");
+    if (verified._tag === "Success") {
+      expect(verified.success).toEqual(
         expect.objectContaining({
           action: "subscribe",
           challenge: "challenge-1",
         }),
       );
-      expect(verified.right.event.id).toBe(event.id);
+      expect(verified.success.event.id).toBe(event.id);
     }
   });
 
@@ -152,10 +152,13 @@ describe("HTTP auth encoding", () => {
     );
 
     expect(verifyPushOwnershipProof(wrongContent)).toEqual(
-      expect.objectContaining({ _tag: "Left", left: "wrong-content" }),
+      expect.objectContaining({ _tag: "Failure", failure: "wrong-content" }),
     );
     expect(verifyPushOwnershipProof(duplicateChallenge)).toEqual(
-      expect.objectContaining({ _tag: "Left", left: "invalid-challenge" }),
+      expect.objectContaining({
+        _tag: "Failure",
+        failure: "invalid-challenge",
+      }),
     );
   });
 
@@ -167,7 +170,7 @@ describe("HTTP auth encoding", () => {
     );
 
     expect(verifyPushOwnershipProof({ ...event, sig: "not-hex" })).toEqual(
-      expect.objectContaining({ _tag: "Left", left: "malformed-event" }),
+      expect.objectContaining({ _tag: "Failure", failure: "malformed-event" }),
     );
   });
 
@@ -181,7 +184,10 @@ describe("HTTP auth encoding", () => {
     expect(
       verifyPushOwnershipProof({ ...event, sig: "00".repeat(64) }),
     ).toEqual(
-      expect.objectContaining({ _tag: "Left", left: "invalid-signature" }),
+      expect.objectContaining({
+        _tag: "Failure",
+        failure: "invalid-signature",
+      }),
     );
   });
 
@@ -239,13 +245,13 @@ describe("HTTP auth encoding", () => {
     ]) {
       expect(verifyPushOwnershipProof(malformedTagEvent)).toEqual(
         expect.objectContaining({
-          _tag: "Left",
-          left: "invalid-pubkey-tag",
+          _tag: "Failure",
+          failure: "invalid-pubkey-tag",
         }),
       );
     }
     expect(verifyPushOwnershipProof(mismatchedPubkey)).toEqual(
-      expect.objectContaining({ _tag: "Left", left: "invalid-pubkey" }),
+      expect.objectContaining({ _tag: "Failure", failure: "invalid-pubkey" }),
     );
   });
 

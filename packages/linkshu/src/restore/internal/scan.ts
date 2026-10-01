@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import type { MintRejected, MintUnreachable } from "../../domain/errors";
 import { unspentProofs } from "../../internal/proofStates";
 import type { ProofStateEntry } from "../../internal/proofStates";
@@ -93,13 +93,13 @@ export const scanKeyset = (input: KeysetScanInput): Effect.Effect<KeysetScan> =>
 
     if (proofs.length === 0 && start > 0) {
       // A failed deep pass keeps the windowed result rather than losing it.
-      const deep = yield* Effect.either(input.restoreFrom(0));
-      if (Either.isRight(deep)) {
+      const deep = yield* Effect.result(input.restoreFrom(0));
+      if (Result.isSuccess(deep)) {
         nextCursor = nextCursorFrom(
           windowed.lastCounterWithSignature,
-          deep.right.lastCounterWithSignature,
+          deep.success.lastCounterWithSignature,
         );
-        proofs = yield* spendableProofs(input, deep.right.proofs);
+        proofs = yield* spendableProofs(input, deep.success.proofs);
       }
     }
 

@@ -1,5 +1,5 @@
 import { getDecodedToken } from "@cashu/cashu-ts";
-import { Deferred, Effect, Either, Fiber, Layer, ManagedRuntime } from "effect";
+import { Deferred, Effect, Fiber, Layer, ManagedRuntime, Result } from "effect";
 import {
   linkshuServices,
   OperationStore,
@@ -39,7 +39,7 @@ const interruptReceive = async (
 ) => {
   const reached = Effect.runSync(Deferred.make<void>());
   const pause = Deferred.succeed(reached, undefined).pipe(
-    Effect.zipRight(Effect.never),
+    Effect.andThen(Effect.never),
   );
   const runtime = ManagedRuntime.make(
     linkshuServices({
@@ -56,9 +56,9 @@ const interruptReceive = async (
           const update = storage.operations.update(id, patch);
           if (patch.status !== "done") return update;
           if (stop === "before closing operation")
-            return pause.pipe(Effect.zipRight(update));
+            return pause.pipe(Effect.andThen(update));
           if (stop === "before returning receipt")
-            return update.pipe(Effect.zipRight(pause));
+            return update.pipe(Effect.andThen(pause));
           return update;
         },
       }),
@@ -66,7 +66,7 @@ const interruptReceive = async (
         ...storage.proofs,
         insert: (proofs) =>
           stop === "before storing proofs"
-            ? pause.pipe(Effect.zipRight(storage.proofs.insert(proofs)))
+            ? pause.pipe(Effect.andThen(storage.proofs.insert(proofs)))
             : storage.proofs.insert(proofs),
       }),
     }),
@@ -99,7 +99,7 @@ describe("receive interrupted by a reload, against the local mint", () => {
         config,
         Effect.gen(function* () {
           const tokens = yield* Tokens;
-          const retry = yield* Effect.either(receiveText(text));
+          const retry = yield* Effect.result(receiveText(text));
           return {
             retry,
             transfers: yield* tokens.transfers,
@@ -111,9 +111,9 @@ describe("receive interrupted by a reload, against the local mint", () => {
       assert(transfer !== undefined);
       expect(restarted.transfers).toHaveLength(1);
       expect(transfer.status).toBe("done");
-      assert(Either.isRight(restarted.retry));
+      assert(Result.isSuccess(restarted.retry));
       // 32 sat in, the mint keeps a 1 sat input fee.
-      expect(restarted.retry.right).toMatchObject({
+      expect(restarted.retry.success).toMatchObject({
         operationId: transfer.id,
         amount: 31,
       });
@@ -137,7 +137,7 @@ describe("receive interrupted by a reload, against the local mint", () => {
       config,
       Effect.gen(function* () {
         const tokens = yield* Tokens;
-        const retry = yield* Effect.either(receiveText(text));
+        const retry = yield* Effect.result(receiveText(text));
         return {
           retry,
           transfers: yield* tokens.transfers,
@@ -148,8 +148,8 @@ describe("receive interrupted by a reload, against the local mint", () => {
     const [transfer] = restarted.transfers;
     assert(transfer !== undefined);
     expect(transfer.status).toBe("done");
-    assert(Either.isLeft(restarted.retry));
-    expect(restarted.retry.left).toMatchObject({
+    assert(Result.isFailure(restarted.retry));
+    expect(restarted.retry.failure).toMatchObject({
       _tag: "TokenAlreadyKnown",
       operationId: transfer.id,
     });

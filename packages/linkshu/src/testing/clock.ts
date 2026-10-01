@@ -1,4 +1,5 @@
-import { Effect, Fiber, Option, TestClock } from "effect";
+import { Effect, Fiber } from "effect";
+import { TestClock } from "effect/testing";
 import type { Duration } from "effect";
 
 /** Lets every promise the program is waiting on settle. */
@@ -9,15 +10,15 @@ export const settlePromises = Effect.promise(
 /**
  * Forks `program` and keeps advancing the `TestClock` by `step` — letting
  * pending promises settle first, so a poll reaches its next sleep before the
- * clock moves — until the program finishes. Needs `TestContext`.
+ * clock moves — until the program finishes. Needs `TestClock.layer()`.
  */
 export const runOnTestClock = <A, E, R>(
   program: Effect.Effect<A, E, R>,
-  step: Duration.DurationInput,
+  step: Duration.Input,
 ): Effect.Effect<A, E, R> =>
   Effect.gen(function* () {
-    const fiber = yield* Effect.fork(program);
-    while (Option.isNone(yield* Fiber.poll(fiber))) {
+    const fiber = yield* Effect.forkChild(program);
+    while (fiber.pollUnsafe() === undefined) {
       yield* settlePromises;
       yield* TestClock.adjust(step);
     }

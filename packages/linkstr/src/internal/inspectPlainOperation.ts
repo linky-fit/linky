@@ -28,7 +28,7 @@ export const inspectPlainOperation =
                   eventIds,
                   result: redactInspectorSecrets(result),
                 },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),
@@ -40,7 +40,7 @@ export const inspectPlainOperation =
             () =>
               new OperationFailed(
                 { name, params: redactInspectorSecrets(params), error },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),

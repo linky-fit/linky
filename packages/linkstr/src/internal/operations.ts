@@ -37,7 +37,7 @@ export const inspectOperation =
                   params: redactInspectorSecrets(params),
                   ...summarize(receipt),
                 },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),
@@ -48,7 +48,7 @@ export const inspectOperation =
             () =>
               new OperationFailed(
                 { name, params: redactInspectorSecrets(params), error },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           ),
         ),

@@ -1,4 +1,4 @@
-import { Effect, Either, ParseResult, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import type { Fetch } from "../domain";
 import { KeryxMetadataExpired, KeryxMetadataInvalid } from "../errors";
 import type { KeryxFetchFailed } from "../errors";
@@ -58,38 +58,34 @@ export interface ParsedEnvelope {
   readonly message: Uint8Array;
 }
 
-const decodeEnvelope = Schema.decodeUnknownEither(Envelope);
+const decodeEnvelope = Schema.decodeUnknownResult(Envelope);
 
 export const parseEnvelope = (
   role: string,
   bytes: Uint8Array,
-): Either.Either<ParsedEnvelope, KeryxMetadataInvalid> => {
+): Result.Result<ParsedEnvelope, KeryxMetadataInvalid> => {
   const envelope = decodeEnvelope(parseJsonBytes(bytes));
-  if (Either.isLeft(envelope)) {
-    return Either.left(
+  if (Result.isFailure(envelope)) {
+    return Result.fail(
       new KeryxMetadataInvalid({ role, reason: "not a signed metadata file" }),
     );
   }
-  const message = canonicalJsonBytes(envelope.right.signed);
+  const message = canonicalJsonBytes(envelope.success.signed);
   return message === null
-    ? Either.left(
+    ? Result.fail(
         new KeryxMetadataInvalid({ role, reason: "not canonical JSON" }),
       )
-    : Either.right({ ...envelope.right, message });
+    : Result.succeed({ ...envelope.success, message });
 };
 
-export const decodeSigned = <A, I>(
+export const decodeSigned = <A>(
   role: string,
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Decoder<A>,
   signed: unknown,
-): Either.Either<A, KeryxMetadataInvalid> =>
-  Schema.decodeUnknownEither(schema)(signed).pipe(
-    Either.mapLeft(
-      (error) =>
-        new KeryxMetadataInvalid({
-          role,
-          reason: ParseResult.TreeFormatter.formatErrorSync(error),
-        }),
+): Result.Result<A, KeryxMetadataInvalid> =>
+  Schema.decodeUnknownResult(schema)(signed).pipe(
+    Result.mapError(
+      (error) => new KeryxMetadataInvalid({ role, reason: error.message }),
     ),
   );
 
@@ -100,9 +96,9 @@ export const checkPinned = (
   role: string,
   bytes: Uint8Array,
   pinned: MetaFile | undefined,
-): Either.Either<void, KeryxMetadataInvalid> => {
+): Result.Result<void, KeryxMetadataInvalid> => {
   if (pinned?.length !== undefined && bytes.length !== pinned.length) {
-    return Either.left(
+    return Result.fail(
       new KeryxMetadataInvalid({
         role,
         reason: "length differs from snapshot",
@@ -111,32 +107,31 @@ export const checkPinned = (
   }
   const expected = pinned?.hashes?.["sha256"];
   return expected !== undefined && sha256Hex(bytes) !== expected
-    ? Either.left(
+    ? Result.fail(
         new KeryxMetadataInvalid({
           role,
           reason: "hash differs from snapshot",
         }),
       )
-    : Either.void;
+    : Result.void;
 };
 
-export interface LoadMetadata<A, I> {
+export interface LoadMetadata<A> {
   readonly fetch: Fetch;
   readonly now: Date;
   readonly role: string;
   readonly url: URL;
   readonly maxBytes: number;
   readonly pinned?: MetaFile;
-  readonly schema: Schema.Schema<A, I>;
+  readonly schema: Schema.Decoder<A>;
   readonly authority: Authority;
 }
 
 /** Fetch one non-root metadata file and verify it: pin, threshold, type, pinned version, expiry. */
 export const loadMetadata = <
   A extends { readonly version: number; readonly expires: string },
-  I,
 >(
-  options: LoadMetadata<A, I>,
+  options: LoadMetadata<A>,
 ): Effect.Effect<
   A,
   KeryxFetchFailed | KeryxMetadataInvalid | KeryxMetadataExpired
@@ -148,8 +143,8 @@ export const loadMetadata = <
       options.url,
       pinned?.length ?? options.maxBytes,
     );
-    yield* checkPinned(role, bytes, pinned);
-    const envelope = yield* parseEnvelope(role, bytes);
+    yield* Effect.fromResult(checkPinned(role, bytes, pinned));
+    const envelope = yield* Effect.fromResult(parseEnvelope(role, bytes));
     if (
       !meetsThreshold(options.authority, envelope.signatures, envelope.message)
     ) {
@@ -158,7 +153,9 @@ export const loadMetadata = <
         reason: "signature threshold not met",
       });
     }
-    const signed = yield* decodeSigned(role, options.schema, envelope.signed);
+    const signed = yield* Effect.fromResult(
+      decodeSigned(role, options.schema, envelope.signed),
+    );
     if (pinned !== undefined && signed.version !== pinned.version) {
       return yield* new KeryxMetadataInvalid({
         role,

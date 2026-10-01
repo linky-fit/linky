@@ -1,11 +1,11 @@
-import { Either, Option } from "effect";
+import { Option, Result } from "effect";
 import { parseJoinUrl } from "./index";
 
 const payload = (value: unknown) =>
   Buffer.from(JSON.stringify(value)).toString("base64url");
 
 const left = (url: string) =>
-  Option.getOrNull(Either.getLeft(parseJoinUrl(url)));
+  Option.getOrNull(Result.getFailure(parseJoinUrl(url)));
 
 describe("parseJoinUrl", () => {
   it("decodes a v1 payload and ignores unknown members", () => {
@@ -16,7 +16,7 @@ describe("parseJoinUrl", () => {
       company_name: "Not shown",
     });
     expect(parseJoinUrl(`https://Company.Example/join?p=${p}`)).toEqual(
-      Either.right({
+      Result.succeed({
         origin: "https://company.example",
         channels: ["news"],
         privateFeeds: ["https://shop.example/channels/tracking/t/feed.json"],
@@ -26,7 +26,7 @@ describe("parseJoinUrl", () => {
 
   it("returns the origin as punycode", () => {
     expect(
-      Either.getOrThrow(parseJoinUrl("https://bücher.example/join")).origin,
+      Result.getOrThrow(parseJoinUrl("https://bücher.example/join")).origin,
     ).toBe("https://xn--bcher-kva.example");
   });
 
@@ -37,7 +37,7 @@ describe("parseJoinUrl", () => {
     "https://acme.example/join/",
   ])("accepts a payload-less join at %s", (url) => {
     expect(parseJoinUrl(url)).toEqual(
-      Either.right({
+      Result.succeed({
         origin: "https://acme.example",
         channels: [],
         privateFeeds: [],
@@ -90,9 +90,9 @@ describe("parseJoinUrl", () => {
   });
 
   it("accepts plain http only on loopback", () => {
-    expect(Either.isRight(parseJoinUrl("http://localhost:8080/join"))).toBe(
+    expect(Result.isSuccess(parseJoinUrl("http://localhost:8080/join"))).toBe(
       true,
     );
-    expect(Either.isRight(parseJoinUrl("http://127.0.0.1/join"))).toBe(true);
+    expect(Result.isSuccess(parseJoinUrl("http://127.0.0.1/join"))).toBe(true);
   });
 });

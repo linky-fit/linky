@@ -1,5 +1,15 @@
-import { Duration, Effect, Either, Option, Queue, Stream } from "effect";
-import type { Scope } from "effect";
+import {
+  Context,
+  Duration,
+  Effect,
+  Filter,
+  Layer,
+  Option,
+  Queue,
+  Result,
+  Stream,
+} from "effect";
+import type { Cause, Scope } from "effect";
 import type { PlainEventReceipt } from "../domain/delivery";
 import type {
   AllRelaysUnreachable,
@@ -13,6 +23,7 @@ import { deliverPlainEvent } from "../internal/plainDelivery";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
 import { fetchRawEvents, toPlainEvents } from "../internal/plainFetch";
 import { resubscribeForever } from "../internal/resubscribe";
+import { acquireStreamQueue } from "../internal/streamQueue";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
@@ -39,8 +50,8 @@ export interface AppDataWatchOptions {
  * public and signature-verified; per author and `d` tag only the newest
  * counts, so a lagging relay never replaces a newer one.
  */
-export class AppData extends Effect.Service<AppData>()("linkstr/AppData", {
-  effect: Effect.gen(function* () {
+export class AppData extends Context.Service<AppData>()("linkstr/AppData", {
+  make: Effect.gen(function* () {
     const context = {
       identity: yield* LinkstrIdentity,
       transport: yield* NostrTransport,
@@ -116,15 +127,14 @@ export class AppData extends Effect.Service<AppData>()("linkstr/AppData", {
       Effect.gen(function* () {
         const relays = yield* readRelays;
         const filter = appDataFilter(query);
-        const raw = yield* Effect.acquireRelease(
-          Queue.unbounded<unknown>(),
-          Queue.shutdown,
+        const raw = yield* acquireStreamQueue(
+          Queue.unbounded<unknown, Cause.Done>(),
         );
         yield* Effect.forEach(relays, (relay) =>
           Effect.forkScoped(
             resubscribeForever(
               context.transport.subscribe(relay, filter, (event) => {
-                Queue.unsafeOffer(raw, event);
+                Queue.offerUnsafe(raw, event);
               }),
               options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY,
             ),
@@ -138,12 +148,14 @@ export class AppData extends Effect.Service<AppData>()("linkstr/AppData", {
           return true;
         };
         return Stream.fromQueue(raw).pipe(
-          Stream.filterMap((event) =>
-            Either.match(decodeVerifiedPlainEvent(event), {
-              onLeft: () => Option.none<AppDataEvent>(),
-              onRight: (verified) =>
-                Option.fromNullable(decodeAppDataEvent(verified)),
-            }),
+          Stream.filterMap(
+            Filter.fromPredicateOption((event) =>
+              Result.match(decodeVerifiedPlainEvent(event), {
+                onFailure: () => Option.none<AppDataEvent>(),
+                onSuccess: (verified) =>
+                  Option.fromNullishOr(decodeAppDataEvent(verified)),
+              }),
+            ),
           ),
           Stream.filter(
             (event) => matchesQuery(event, query) && isNewer(event),
@@ -153,4 +165,6 @@ export class AppData extends Effect.Service<AppData>()("linkstr/AppData", {
 
     return { publish, fetch, watch } as const;
   }),
-}) {}
+}) {
+  static readonly layer = Layer.effect(this, this.make);
+}

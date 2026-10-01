@@ -1,15 +1,5 @@
-import {
-  Chunk,
-  Duration,
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  Option,
-  Schema,
-  TestClock,
-  TestContext,
-} from "effect";
+import { Duration, Effect, Exit, Fiber, Layer, Schema } from "effect";
+import { TestClock } from "effect/testing";
 import { authTemplate, createNonce } from "@linky-fit/linkauth";
 import { finalizeEvent, verifyEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
@@ -33,7 +23,7 @@ const relays = [
 ] as const;
 const START_MILLIS = 1_760_000_000_000;
 
-const SignerReply = Schema.parseJson(
+const SignerReply = Schema.fromJsonString(
   Schema.Struct({
     id: Schema.String,
     result: Schema.optional(Schema.String),
@@ -43,7 +33,7 @@ const SignerReply = Schema.parseJson(
 type SignerReply = typeof SignerReply.Type;
 const decodeReply = Schema.decodeUnknownSync(SignerReply);
 const decodeSignedEvent = Schema.decodeUnknownSync(
-  Schema.parseJson(SignedPlainEvent),
+  Schema.fromJsonString(SignedPlainEvent),
 );
 
 /** The website's side of the handshake, speaking through a fake transport. */
@@ -121,7 +111,7 @@ class FakeSite {
     subscribe: (relay, filter, onEvent, options) =>
       this.unreachable.includes(relay)
         ? Effect.fail(new RelayUnreachable({ relay, detail: "503" }))
-        : Effect.async<string>((resume) => {
+        : Effect.callback<string>((resume) => {
             const subscription = {
               filter,
               closed: false,
@@ -155,22 +145,19 @@ const isAck = (reply: SignerReply) => reply.result === "s3cret";
 const forkLogin = (site: FakeSite, request = site.request()) =>
   Effect.flatMap(NostrConnect, (connect) => connect.login(request)).pipe(
     Effect.provide(
-      NostrConnect.Default.pipe(
+      NostrConnect.layer.pipe(
         Layer.provide(
           Layer.merge(LinkstrIdentity.fromSecretKey(me.secretKey), site.layer),
         ),
       ),
     ),
-    Effect.fork,
+    Effect.forkChild,
   );
 
 /** Lets the login fiber reach its timed wait for the next request before the clock moves. */
 const untilWaiting = (site: FakeSite, replies: number) =>
-  TestClock.sleeps().pipe(
-    Effect.repeat({
-      until: (sleeps) =>
-        site.replies.length === replies && Chunk.isNonEmpty(sleeps),
-    }),
+  Effect.yieldNow.pipe(
+    Effect.repeat({ until: () => site.replies.length === replies }),
   );
 
 const runTest = <A, E>(program: Effect.Effect<A, E>) =>
@@ -178,7 +165,7 @@ const runTest = <A, E>(program: Effect.Effect<A, E>) =>
     Effect.gen(function* () {
       yield* TestClock.setTime(START_MILLIS);
       return yield* program;
-    }).pipe(Effect.provide(TestContext.TestContext)),
+    }).pipe(Effect.provide(TestClock.layer())),
   );
 
 describe("NostrConnect.login", () => {
@@ -239,7 +226,7 @@ describe("NostrConnect.login", () => {
         expect(site.replies[1]).toEqual({ id: "pk", result: me.pubkey });
 
         yield* TestClock.adjust(Duration.seconds(9));
-        expect(Option.isNone(yield* Fiber.poll(fiber))).toBe(true);
+        expect(fiber.pollUnsafe()).toBeUndefined();
         yield* TestClock.adjust(Duration.seconds(1));
         expect(yield* Fiber.join(fiber)).toMatchObject({ signedKind: null });
         expect(site.subscriptions.every(({ closed }) => closed)).toBe(true);

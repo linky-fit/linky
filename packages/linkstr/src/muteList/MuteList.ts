@@ -1,4 +1,4 @@
-import { Duration, Effect, Schema } from "effect";
+import { Context, Duration, Effect, Layer, Schema } from "effect";
 import type { PlainEventReceipt } from "../domain/delivery";
 import type {
   AllRelaysUnreachable,
@@ -29,8 +29,8 @@ export class FetchedMuteList extends Schema.Class<FetchedMuteList>(
   createdAt: UnixSeconds,
 }) {}
 
-export class MuteList extends Effect.Service<MuteList>()("linkstr/MuteList", {
-  effect: Effect.gen(function* () {
+export class MuteList extends Context.Service<MuteList>()("linkstr/MuteList", {
+  make: Effect.gen(function* () {
     const context = {
       identity: yield* LinkstrIdentity,
       transport: yield* NostrTransport,
@@ -92,4 +92,6 @@ export class MuteList extends Effect.Service<MuteList>()("linkstr/MuteList", {
 
     return { publishMuteList, fetchOwnMuteList } as const;
   }),
-}) {}
+}) {
+  static readonly layer = Layer.effect(this, this.make);
+}

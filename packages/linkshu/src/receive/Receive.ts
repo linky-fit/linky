@@ -1,4 +1,4 @@
-import { Effect, Either, Ref, Schema } from "effect";
+import { Context, Effect, Layer, Ref, Result, Schema } from "effect";
 import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { inspectOperationWith, redactReceipt } from "../internal/operations";
@@ -21,7 +21,9 @@ import {
 } from "./internal/acceptFlow";
 import type { DeferredOperation, ReceiveContext } from "./internal/acceptFlow";
 
-const encodeStoredError = Schema.encodeSync(Schema.parseJson(ReceiveError));
+const encodeStoredError = Schema.encodeSync(
+  Schema.fromJsonString(ReceiveError),
+);
 
 const deferredResult = (
   deferred: DeferredOperation,
@@ -49,9 +51,8 @@ const redactDeferredResult = (result: DeferredReceiveResult) => ({
  * deterministic re-signing with counter-collision recovery, and transfer
  * bookkeeping.
  */
-export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Receive extends Context.Service<Receive>()("linkshu/Receive", {
+  make: Effect.gen(function* () {
     const ctx: ReceiveContext = {
       kv: yield* KeyValueStore,
       proofStore: yield* ProofStore,
@@ -94,7 +95,7 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
     ): Effect.Effect<DeferredReceiveResult> =>
       Effect.gen(function* () {
         const recorded = yield* Ref.make(false);
-        const outcome = yield* Effect.either(
+        const outcome = yield* Effect.result(
           receiveDeferred(ctx, deferred, recorded).pipe(
             Effect.map((receipt) =>
               deferredResult(deferred, "received", receipt),
@@ -111,9 +112,9 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
             ),
           ),
         );
-        if (Either.isRight(outcome)) return outcome.right;
+        if (Result.isSuccess(outcome)) return outcome.success;
         if (yield* Ref.get(recorded)) return deferredResult(deferred, "failed");
-        const error = outcome.left;
+        const error = outcome.failure;
         switch (error._tag) {
           case "TokenAlreadyKnown":
             return yield* closeAs(deferred, { status: "done" });
@@ -163,4 +164,9 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
 
     return { receive, resumeDeferred } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

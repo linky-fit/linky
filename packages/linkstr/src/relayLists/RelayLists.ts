@@ -1,4 +1,4 @@
-import { Duration, Effect, Either, Schema } from "effect";
+import { Context, Duration, Effect, Layer, Result, Schema } from "effect";
 import type {
   AllRelaysUnreachable,
   NoRelayAcceptedEvent,
@@ -65,10 +65,10 @@ const decodeDmRelays = (event: SignedPlainEvent): Array<RelayUrl> =>
       : [],
   );
 
-export class RelayLists extends Effect.Service<RelayLists>()(
+export class RelayLists extends Context.Service<RelayLists>()(
   "linkstr/RelayLists",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const context = {
         identity: yield* LinkstrIdentity,
         transport: yield* NostrTransport,
@@ -84,14 +84,14 @@ export class RelayLists extends Effect.Service<RelayLists>()(
           // interrupt the other mid-publish.
           const [relayList, dmRelayList] = yield* Effect.all(
             [
-              Effect.either(
+              Effect.result(
                 deliverPlainEvent(context, {
                   kind: RELAY_LIST_KIND,
                   tags: encodeRelayListTags(draft.relays),
                   content: "",
                 }),
               ),
-              Effect.either(
+              Effect.result(
                 deliverPlainEvent(context, {
                   kind: DM_RELAY_LIST_KIND,
                   tags: encodeDmRelayTags(draft.dmRelays),
@@ -101,11 +101,11 @@ export class RelayLists extends Effect.Service<RelayLists>()(
             ],
             { concurrency: "unbounded" },
           );
-          if (Either.isLeft(relayList)) return yield* relayList.left;
-          if (Either.isLeft(dmRelayList)) return yield* dmRelayList.left;
+          if (Result.isFailure(relayList)) return yield* relayList.failure;
+          if (Result.isFailure(dmRelayList)) return yield* dmRelayList.failure;
           const receipt = new RelayListsReceipt({
-            relayList: relayList.right,
-            dmRelayList: dmRelayList.right,
+            relayList: relayList.success,
+            dmRelayList: dmRelayList.success,
           });
           return {
             result: receipt,
@@ -154,4 +154,6 @@ export class RelayLists extends Effect.Service<RelayLists>()(
       return { publishRelayLists, fetchOwnRelayLists } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

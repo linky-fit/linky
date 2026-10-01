@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { decrypt, getConversationKey } from "nostr-tools/nip44";
 import {
   ClientId,
@@ -41,7 +41,7 @@ import type { ChatInboxEvent, MessageBody } from "./events";
 export const CHAT_TEXT_KIND = 14;
 export const CHAT_IMAGE_KIND = 15;
 
-const decodePrivateImage = Schema.decodeUnknownEither(PrivateImage);
+const decodePrivateImage = Schema.decodeUnknownResult(PrivateImage);
 const isCashuTokenText = Schema.is(CashuTokenText);
 
 const replyTags = (
@@ -159,7 +159,7 @@ export const encodeEditRumor = (
 const resolvePeer = (
   rumor: Rumor,
   me: Pubkey,
-): Either.Either<Pubkey, DropReason> => {
+): Result.Result<Pubkey, DropReason> => {
   const recipients = tagValues(rumor.tags, "p");
   if (rumor.pubkey === me) {
     const peer = recipients.find(
@@ -167,23 +167,23 @@ const resolvePeer = (
         candidate !== me && isPubkey(candidate),
     );
     return peer === undefined
-      ? Either.left("invalid-message")
-      : Either.right(peer);
+      ? Result.fail("invalid-message")
+      : Result.succeed(peer);
   }
   return recipients.includes(me)
-    ? Either.right(rumor.pubkey)
-    : Either.left("invalid-message");
+    ? Result.succeed(rumor.pubkey)
+    : Result.fail("invalid-message");
 };
 
 const extractEditOf = (
   tags: NostrTags,
-): Either.Either<RumorId | null, DropReason> => {
+): Result.Result<RumorId | null, DropReason> => {
   const editTag = tagsNamed(tags, "edited_from")[0];
-  if (editTag === undefined) return Either.right(null);
+  if (editTag === undefined) return Result.succeed(null);
   const value = editTag[1]?.trim();
   return value !== undefined && isRumorId(value)
-    ? Either.right(value)
-    : Either.left("invalid-edit");
+    ? Result.succeed(value)
+    : Result.fail("invalid-edit");
 };
 
 const extractReplyContext = (
@@ -238,18 +238,18 @@ const decodeTextBody = (
   identity: LinkstrIdentityService,
   peer: Pubkey,
   wrapPubkey: Pubkey,
-): Either.Either<MessageBody, DropReason> => {
-  if (rumor.content.trim() === "") return Either.left("empty-message");
+): Result.Result<MessageBody, DropReason> => {
+  if (rumor.content.trim() === "") return Result.fail("empty-message");
   if (
     isNestedPayload(rumor.content, identity, [rumor.pubkey, peer, wrapPubkey])
   ) {
-    return Either.left("nested-payload");
+    return Result.fail("nested-payload");
   }
   const candidate = extractWholeCashuToken(rumor.content);
   if (candidate !== null && isCashuTokenText(candidate)) {
-    return Either.right(new TokenBody({ token: candidate }));
+    return Result.succeed(new TokenBody({ token: candidate }));
   }
-  return Either.right(new TextBody({ text: rumor.content }));
+  return Result.succeed(new TextBody({ text: rumor.content }));
 };
 
 const parseDimensions = (
@@ -265,7 +265,7 @@ const parseDimensions = (
 
 const decodeImageBody = (
   rumor: Rumor,
-): Either.Either<MessageBody, DropReason> => {
+): Result.Result<MessageBody, DropReason> => {
   const url = rumor.content.trim();
   const fileType = firstTrimmedTagValue(rumor.tags, "file-type");
   const encryptionAlgorithm = firstTrimmedTagValue(
@@ -298,10 +298,10 @@ const decodeImageBody = (
     encryptedSize <= 0 ||
     (dimensionText !== null && dimensions === null)
   ) {
-    return Either.left("invalid-image");
+    return Result.fail("invalid-image");
   }
 
-  return Either.match(
+  return Result.match(
     decodePrivateImage({
       url,
       fileType,
@@ -316,8 +316,8 @@ const decodeImageBody = (
       storageEncoding,
     }),
     {
-      onLeft: () => Either.left("invalid-image"),
-      onRight: (image) => Either.right(new ImageBody({ image })),
+      onFailure: () => Result.fail("invalid-image"),
+      onSuccess: (image) => Result.succeed(new ImageBody({ image })),
     },
   );
 };
@@ -326,8 +326,8 @@ export const decodeChatRumor = (
   rumor: Rumor,
   identity: LinkstrIdentityService,
   wrapPubkey: Pubkey,
-): Either.Either<ChatInboxEvent, DropReason> =>
-  Either.gen(function* () {
+): Result.Result<ChatInboxEvent, DropReason> =>
+  Result.gen(function* () {
     const peer = yield* resolvePeer(rumor, identity.pubkey);
     const editOf = yield* extractEditOf(rumor.tags);
     const { replyTo, root } =
@@ -341,12 +341,12 @@ export const decodeChatRumor = (
         case CHAT_IMAGE_KIND:
           return decodeImageBody(rumor);
         default:
-          return Either.left<DropReason>("unsupported-kind");
+          return Result.fail<DropReason>("unsupported-kind");
       }
     })();
     const messageId = rumor.id;
     if (!isRumorId(messageId)) {
-      return yield* Either.left<DropReason>("invalid-message");
+      return yield* Result.fail<DropReason>("invalid-message");
     }
 
     const clientTag = firstTagValue(rumor.tags, "client");

@@ -1,10 +1,14 @@
-import { Schema } from "effect";
+import { Schema, SchemaTransformation } from "effect";
 
-const Flag = Schema.transform(Schema.Literal("1", "0"), Schema.Boolean, {
-  strict: true,
-  decode: (flag) => flag === "1",
-  encode: (on) => (on ? "1" : "0"),
-});
+const Flag = Schema.Literals(["1", "0"]).pipe(
+  Schema.decodeTo(
+    Schema.Boolean,
+    SchemaTransformation.transform({
+      decode: (flag) => flag === "1",
+      encode: (on) => (on ? "1" : "0"),
+    }),
+  ),
+);
 
 const settingSchemas = {
   /** The contacts onboarding the user dismissed; absent while it still shows. */
@@ -16,7 +20,7 @@ const settingSchemas = {
   /** Whether experimental features are shown; absent means off. */
   experimentalFeatures: Flag,
   /** The display currencies the user enabled; the app drops ones it does not know. */
-  displayCurrencies: Schema.parseJson(Schema.Array(Schema.String)),
+  displayCurrencies: Schema.fromJsonString(Schema.Array(Schema.String)),
 };
 
 export type SettingKey = keyof typeof settingSchemas;
@@ -30,8 +34,8 @@ export type SettingValues = {
  * Keys and encodings are synced data: add keys, never rename one or change its encoding.
  */
 export const LinkySettings: {
-  readonly [K in SettingKey]: Schema.Schema<
+  readonly [K in SettingKey]: Schema.Codec<
     SettingValues[K],
-    Schema.Schema.Encoded<(typeof settingSchemas)[K]>
+    Schema.Codec.Encoded<(typeof settingSchemas)[K]>
   >;
 } = settingSchemas;

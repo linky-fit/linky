@@ -1,4 +1,4 @@
-import { Atom } from "@effect-atom/atom-react";
+import { Atom } from "effect/reactivity";
 import {
   InboxEventUnconfirmed,
   Inspector,
@@ -61,7 +61,7 @@ export const fetchWrapEventAtom = linkstrRuntimeAtom.fn<FetchWrapEventParams>()(
 export const wrapInboxAtom = linkstrRuntimeAtom.atom((get) => {
   const handler = get(wrapInboxHandlerAtom);
   if (handler === null) return Stream.empty;
-  return Stream.unwrapScoped(
+  return Stream.unwrap(
     Effect.gen(function* () {
       const inbox = yield* WrapInbox;
       const inspector = yield* Inspector.orNoop;
@@ -80,7 +80,7 @@ export const wrapInboxAtom = linkstrRuntimeAtom.atom((get) => {
                   eventTag: event._tag,
                   error: error instanceof Error ? error.message : String(error),
                 },
-                { disableValidation: true },
+                { disableChecks: true },
               ),
           );
       const handle = (delivered: DeliveredInboxEvent) =>

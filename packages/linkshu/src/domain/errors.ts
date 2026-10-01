@@ -26,13 +26,13 @@ import {
 export class TokenParseFailed extends Schema.TaggedError<TokenParseFailed>()(
   "TokenParseFailed",
   {
-    reason: Schema.Literal(
+    reason: Schema.Literals([
       "empty",
       "no-token-found",
       "undecodable",
       "no-proofs",
       "multiple-mints",
-    ),
+    ]),
     detail: Schema.NullOr(Schema.String),
   },
 ) {}
@@ -204,8 +204,8 @@ export class CounterLockTimeout extends Schema.TaggedError<CounterLockTimeout>()
  */
 export class MintInUse extends Schema.TaggedError<MintInUse>()("MintInUse", {
   mint: MintUrl,
-  proofCount: Schema.Int.pipe(Schema.nonNegative()),
-  deferredReceiveCount: Schema.Int.pipe(Schema.nonNegative()),
+  proofCount: Schema.Natural,
+  deferredReceiveCount: Schema.Natural,
 }) {}
 
 /**

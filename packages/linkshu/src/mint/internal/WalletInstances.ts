@@ -26,7 +26,7 @@ import {
   type SwapPreview,
   type WSConnection,
 } from "@cashu/cashu-ts";
-import { Effect, Exit, Schema } from "effect";
+import { Context, Effect, Exit, Layer, Schema } from "effect";
 import { MintRejected, MintUnreachable } from "../../domain/errors";
 import { KeysetId } from "../../domain/primitives";
 import type { CurrencyUnit, MintUrl } from "../../domain/primitives";
@@ -249,12 +249,12 @@ export const makeWalletInstances = (
 /**
  * The single unified wallet-instance cache (one loaded cashu-ts wallet per
  * mint+unit) shared by every vertical through layer memoization of
- * `WalletInstances.Default`. Internal: not exported from the package index.
+ * `WalletInstances.layer`. Internal: not exported from the package index.
  */
-export class WalletInstances extends Effect.Service<WalletInstances>()(
+export class WalletInstances extends Context.Service<WalletInstances>()(
   "linkshu/internal/WalletInstances",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const { bip39Seed } = yield* CashuSeed;
       const kv = yield* KeyValueStore;
       return makeWalletInstances(kv, (mint, unit) =>
@@ -262,4 +262,6 @@ export class WalletInstances extends Effect.Service<WalletInstances>()(
       );
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

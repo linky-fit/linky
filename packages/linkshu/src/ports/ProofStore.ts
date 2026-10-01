@@ -23,13 +23,13 @@ import {
  * - `externalized` — handed off outside the app entirely
  * - `spent`        — terminal; kept so re-ingest and restore dedup against it
  */
-export const ProofState = Schema.Literal(
+export const ProofState = Schema.Literals([
   "available",
   "held",
   "handedOut",
   "externalized",
   "spent",
-);
+]);
 export type ProofState = typeof ProofState.Type;
 
 const proofFields = {
@@ -39,7 +39,7 @@ const proofFields = {
   amount: Amount,
   secret: Schema.NonEmptyString,
   /** Hex-encoded signature point; the NUT-00 `C` field. */
-  C: Schema.String.pipe(Schema.pattern(/^(?:[0-9a-f]{2})+$/i)),
+  C: Schema.String.check(Schema.isPattern(/^(?:[0-9a-f]{2})+$/i)),
   /** JSON of the NUT-12 DLEQ proof when the mint supplied one. */
   dleq: Schema.NullOr(Schema.String),
   state: ProofState,
@@ -80,7 +80,7 @@ export interface ProofStoreService {
   readonly loadAll: Effect.Effect<ReadonlyArray<StoredProof>>;
 }
 
-export class ProofStore extends Context.Tag("linkshu/ProofStore")<
+export class ProofStore extends Context.Service<
   ProofStore,
   ProofStoreService
->() {}
+>()("linkshu/ProofStore") {}

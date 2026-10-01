@@ -75,7 +75,7 @@ const subscribingTransport = (
 ): NostrTransportService => ({
   publish: () => Effect.die("publish not under test"),
   subscribe: (_relay, _filter, onEvent, options) =>
-    Effect.async<string, RelayUnreachable>((resume) => {
+    Effect.callback<string, RelayUnreachable>((resume) => {
       subscriptions.push({
         onEvent,
         options,
@@ -149,7 +149,7 @@ describe("observeTransport", () => {
           { kinds: [1059] },
           () => {},
         );
-        const fiber = yield* Effect.fork(subscribeOnce);
+        const fiber = yield* Effect.forkChild(subscribeOnce);
         yield* eventually(() => subscriptions.length === 1);
         subscriptions[0]?.options?.onEose?.();
 

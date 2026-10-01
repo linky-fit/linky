@@ -4,7 +4,7 @@ import {
   LINKAUTH_PERMISSION,
   normalizeAudience,
 } from "@linky-fit/linkauth/signer";
-import { Either, Option, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
 import { isPubkey, RelayUrl } from "../domain/primitives";
 import type { EventId, Pubkey, UnixSeconds } from "../domain/primitives";
@@ -95,7 +95,7 @@ const parseJsonOrRaw = (raw: unknown): unknown => {
 export const verifyDeviceAuthorization = (
   raw: unknown,
 ): DeviceAuthorization | null => {
-  const event = Either.getOrNull(decodeVerifiedPlainEvent(parseJsonOrRaw(raw)));
+  const event = Result.getOrNull(decodeVerifiedPlainEvent(parseJsonOrRaw(raw)));
   if (event === null) return null;
   const authorization = authorizationOf(event);
   if (authorization === null) return null;
@@ -148,13 +148,13 @@ export const parseNostrConnectUri = (
   );
 };
 
-const RpcRequest = Schema.parseJson(
+const RpcRequest = Schema.fromJsonString(
   Schema.Struct({
     id: Schema.String,
     method: Schema.String,
-    params: Schema.optionalWith(Schema.Array(Schema.String), {
-      default: () => [],
-    }),
+    params: Schema.Array(Schema.String).pipe(
+      Schema.withDecodingDefaultType(Effect.succeed([])),
+    ),
   }),
 );
 export type NostrConnectRpcRequest = typeof RpcRequest.Type;
@@ -203,7 +203,7 @@ export const decodeNostrConnectRequest = (
   readonly eventId: EventId;
   readonly rpc: NostrConnectRpcRequest;
 } | null => {
-  const event = Either.getOrNull(decodeVerifiedPlainEvent(raw));
+  const event = Result.getOrNull(decodeVerifiedPlainEvent(raw));
   if (
     event === null ||
     event.kind !== NOSTR_CONNECT_KIND ||
@@ -223,55 +223,55 @@ export const decodeNostrConnectRequest = (
   });
 };
 
-const SignTemplate = Schema.parseJson(
+const SignTemplate = Schema.fromJsonString(
   Schema.Struct({ kind: Schema.Int, content: Schema.String, tags: NostrTags }),
 );
-const decodeSignTemplate = Schema.decodeUnknownEither(SignTemplate);
+const decodeSignTemplate = Schema.decodeUnknownResult(SignTemplate);
 
 const deviceAuthorizationPolicy = (
   request: NostrConnectRequest,
   template: PlainEventTemplate,
-): Either.Either<PlainEventTemplate, string> => {
+): Result.Result<PlainEventTemplate, string> => {
   // A blanket `sign_event` (or no perms) never covers it: the approval
   // screen announces the device link only for the explicit permission.
   if (!requestsDeviceAuthorization(request)) {
-    return Either.left(`${DEVICE_AUTHORIZATION_PERMISSION} was not requested`);
+    return Result.fail(`${DEVICE_AUTHORIZATION_PERMISSION} was not requested`);
   }
   if (request.name === null) {
-    return Either.left("a device authorization needs the app's name");
+    return Result.fail("a device authorization needs the app's name");
   }
   const authorization = authorizationOf(template);
   if (authorization === null) {
-    return Either.left("invalid device authorization");
+    return Result.fail("invalid device authorization");
   }
   return authorization.app === request.name
-    ? Either.right(template)
-    : Either.left("app tag does not match the approved name");
+    ? Result.succeed(template)
+    : Result.fail("app tag does not match the approved name");
 };
 
 const linkauthPolicy = (
   request: NostrConnectRequest,
   template: PlainEventTemplate,
-): Either.Either<PlainEventTemplate, string> => {
+): Result.Result<PlainEventTemplate, string> => {
   // A blanket `sign_event` (or no perms) never covers it, as for device authorizations.
   if (!request.perms.includes(LINKAUTH_PERMISSION)) {
-    return Either.left(`${LINKAUTH_PERMISSION} was not requested`);
+    return Result.fail(`${LINKAUTH_PERMISSION} was not requested`);
   }
   if (request.url === null || normalizeAudience(request.url) === null) {
-    return Either.left("a login needs the site's url");
+    return Result.fail("a login needs the site's url");
   }
   return isCanonicalAuthTemplate(template, request.url)
-    ? Either.right(template)
-    : Either.left("invalid login template");
+    ? Result.succeed(template)
+    : Result.fail("invalid login template");
 };
 
 const signableTemplate = (
   request: NostrConnectRequest,
   param: string | undefined,
-): Either.Either<PlainEventTemplate, string> =>
-  Either.gen(function* () {
+): Result.Result<PlainEventTemplate, string> =>
+  Result.gen(function* () {
     const template = yield* decodeSignTemplate(param).pipe(
-      Either.mapLeft(() => "invalid event template"),
+      Result.mapError(() => "invalid event template"),
     );
     switch (template.kind) {
       case DEVICE_AUTHORIZATION_KIND:
@@ -279,7 +279,7 @@ const signableTemplate = (
       case LINKAUTH_KIND:
         return yield* linkauthPolicy(request, template);
       default:
-        return yield* Either.left(`kind ${template.kind} is not allowed`);
+        return yield* Result.fail(`kind ${template.kind} is not allowed`);
     }
   });
 
@@ -324,12 +324,12 @@ export const answerNostrConnectRequest = (
     case "connect":
       return answer("ack", { _tag: "Answered" });
     case "sign_event":
-      return Either.match(signableTemplate(request, rpc.params[0]), {
-        onLeft: (reason) => ({
+      return Result.match(signableTemplate(request, rpc.params[0]), {
+        onFailure: (reason) => ({
           response: { id: rpc.id, error: reason },
           outcome: { _tag: "Refused", reason },
         }),
-        onRight: (template) => {
+        onSuccess: (template) => {
           const event = signPlainEvent(template, now, identity.secretKey);
           return answer(JSON.stringify(event), {
             _tag: "Signed",

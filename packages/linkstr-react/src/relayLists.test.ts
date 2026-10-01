@@ -1,4 +1,4 @@
-import { Registry } from "./index";
+import { AtomRegistry } from "./index";
 import { RelayListEntry, RelayListsDraft, RelayUrl } from "@linky-fit/linkstr";
 import type { SignedPlainEvent } from "@linky-fit/linkstr";
 import { stubPlainTransport } from "@linky-fit/linkstr/testing";
@@ -17,7 +17,7 @@ const relayDm = RelayUrl.make("wss://dm.test");
 
 describe("publishRelayListsAtom", () => {
   it("publishes both list kinds and returns the paired receipt", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const published: Array<SignedPlainEvent> = [];
     registry.set(
       linkstrConfigAtom,
@@ -42,7 +42,7 @@ describe("publishRelayListsAtom", () => {
 
 describe("fetchOwnRelayListsAtom", () => {
   it("fetches the configured identity's lists", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const stored = [
       finalizeEvent(
         {
@@ -77,7 +77,7 @@ describe("fetchOwnRelayListsAtom", () => {
 
 describe("publishMuteListAtom", () => {
   it("publishes the mute list for the configured identity", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const published: Array<SignedPlainEvent> = [];
     registry.set(
       linkstrConfigAtom,

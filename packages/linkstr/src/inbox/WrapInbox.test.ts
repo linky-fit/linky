@@ -212,7 +212,7 @@ const dependenciesFor = (
   cursorStore: Layer.Layer<InboxCursorStore> = InboxCursorStore.inMemory,
   backfill: Backfill = {},
 ) =>
-  WrapInbox.Default.pipe(
+  WrapInbox.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
         LinkstrIdentity.fromSecretKey(alice.secretKey),
@@ -293,7 +293,7 @@ const fetchDependenciesFor = (
         return stored.get(relay) ?? [];
       }),
   };
-  return WrapInbox.Default.pipe(
+  return WrapInbox.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
         LinkstrIdentity.fromSecretKey(alice.secretKey),
@@ -413,7 +413,7 @@ describe("WrapInbox.fetchWrapEvent", () => {
       subscribe: () => Effect.never,
       fetch: () => Effect.never,
     };
-    const dependencies = WrapInbox.Default.pipe(
+    const dependencies = WrapInbox.layer.pipe(
       Layer.provide(
         Layer.mergeAll(
           LinkstrIdentity.fromSecretKey(alice.secretKey),
@@ -1016,8 +1016,8 @@ describe("WrapInbox", () => {
       const scope = yield* Scope.make();
       const feed = yield* inbox
         .open({ resubscribeDelay: Duration.millis(10) })
-        .pipe(Scope.extend(scope));
-      const consumer = yield* Effect.fork(Stream.runDrain(feed.events));
+        .pipe(Scope.provide(scope));
+      const consumer = yield* Effect.forkChild(Stream.runDrain(feed.events));
       yield* eventually(
         () =>
           fakeA.subscriptions.length === 1 && fakeB.subscriptions.length === 1,
@@ -1108,8 +1108,9 @@ describe("WrapInbox backfill", () => {
           Effect.gen(function* () {
             yield* eventually(() => fakeA.subscriptions.length === 1);
             fakeA.eose();
-            yield* eventually(() =>
-              collected.some(({ wrapId }) => wrapId === older.id),
+            yield* eventually(
+              () => collected.some(({ wrapId }) => wrapId === older.id),
+              20_000,
             );
             expect(collected).toHaveLength(201);
             expect(

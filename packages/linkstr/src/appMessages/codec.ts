@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { isClientId, isRumorId } from "../domain/primitives";
 import type { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import type { DropReason } from "../inbox/events";
@@ -42,7 +42,7 @@ export const encodeAppMessageRumor = (
 export const decodeAppMessageRumor = (
   rumor: Rumor,
   identity: LinkstrIdentityService,
-): Either.Either<AppMessageInboxEvent, DropReason> => {
+): Result.Result<AppMessageInboxEvent, DropReason> => {
   const app = firstTagValue(rumor.tags, "app");
   const clientId = firstTagValue(rumor.tags, "client");
   if (
@@ -56,9 +56,9 @@ export const decodeAppMessageRumor = (
     !tagValues(rumor.tags, "p").includes(identity.pubkey) ||
     !isRumorId(rumor.id)
   ) {
-    return Either.left("invalid-app-message");
+    return Result.fail("invalid-app-message");
   }
-  return Either.right(
+  return Result.succeed(
     new AppMessageReceived({
       messageId: rumor.id,
       from: rumor.pubkey,

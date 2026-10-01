@@ -1,6 +1,17 @@
-import { Duration, Effect, Either, Option, Queue, Stream } from "effect";
+import {
+  Cause,
+  Context,
+  Duration,
+  Effect,
+  Filter,
+  Layer,
+  Option,
+  Queue,
+  Result,
+  Stream,
+} from "effect";
 import type { Scope } from "effect";
-import type { Filter } from "nostr-tools";
+import type { Filter as NostrFilter } from "nostr-tools";
 import { NoReadRelaysConfigured } from "../domain/errors";
 import type { RelayUrl } from "../domain/primitives";
 import type { InboxDelivery } from "../inbox/events";
@@ -14,6 +25,7 @@ import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import { decodePushWrap } from "./codec";
 import type { PushWrap, PushWrapFailure } from "./codec";
+import { acquireStreamQueue } from "../internal/streamQueue";
 
 export type { PushWrapFailure } from "./codec";
 
@@ -56,10 +68,10 @@ const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
  * outer events, and dedupes authenticated live wraps across relays. Backfill
  * arrivals are re-emitted per copy for the consumer to suppress.
  */
-export class PushInbox extends Effect.Service<PushInbox>()(
+export class PushInbox extends Context.Service<PushInbox>()(
   "linkstr/PushInbox",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const transport = yield* NostrTransport;
       const relayPolicy = yield* RelayPolicy;
 
@@ -73,9 +85,8 @@ export class PushInbox extends Effect.Service<PushInbox>()(
         Effect.gen(function* () {
           const relays = relayPolicy.readRelays;
           if (relays.length === 0) return yield* new NoReadRelaysConfigured();
-          const rawWraps = yield* Effect.acquireRelease(
-            Queue.unbounded<RawArrival>(),
-            Queue.shutdown,
+          const rawWraps = yield* acquireStreamQueue(
+            Queue.unbounded<RawArrival, Cause.Done>(),
           );
           const seenWrapIds = makeSeenWrapIds(DEFAULT_SEEN_WRAP_IDS_CAPACITY);
           const refreshInterval =
@@ -88,7 +99,7 @@ export class PushInbox extends Effect.Service<PushInbox>()(
               const lookbackSeconds = Math.floor(
                 Duration.toMillis(options.lookback) / 1000,
               );
-              const filter: Filter = {
+              const filter: NostrFilter = {
                 kinds: [GIFT_WRAP_KIND],
                 since: Math.max((yield* nowSeconds) - lookbackSeconds, 0),
               };
@@ -108,7 +119,7 @@ export class PushInbox extends Effect.Service<PushInbox>()(
                   relay,
                   filter,
                   (raw) => {
-                    Queue.unsafeOffer(rawWraps, {
+                    Queue.offerUnsafe(rawWraps, {
                       delivery: eoseSeen ? "live" : "backfill",
                       raw,
                     });
@@ -127,10 +138,10 @@ export class PushInbox extends Effect.Service<PushInbox>()(
                   Effect.tapError((failure) =>
                     reportAttemptEnded(failure.detail ?? "relay unreachable"),
                   ),
-                  Effect.timeoutTo({
+                  Effect.asVoid,
+                  Effect.timeoutOrElse({
                     duration: refreshInterval,
-                    onSuccess: () => undefined,
-                    onTimeout: () => undefined,
+                    orElse: () => Effect.void,
                   }),
                 );
             });
@@ -155,14 +166,14 @@ export class PushInbox extends Effect.Service<PushInbox>()(
               return Option.none();
             }
 
-            return Either.match(decodePushWrap(raw), {
-              onLeft: (failure) => {
+            return Result.match(decodePushWrap(raw), {
+              onFailure: (failure) => {
                 if (failure !== "missing-push-marker") {
                   options.onInvalidWrap?.(failure);
                 }
                 return Option.none();
               },
-              onRight: (wrap) => {
+              onSuccess: (wrap) => {
                 // Only authenticated wraps emitted live are recorded; a tampered
                 // copy must not mark its id as seen.
                 if (delivery === "live") {
@@ -174,10 +185,14 @@ export class PushInbox extends Effect.Service<PushInbox>()(
             });
           };
 
-          return Stream.fromQueue(rawWraps).pipe(Stream.filterMap(processRaw));
+          return Stream.fromQueue(rawWraps).pipe(
+            Stream.filterMap(Filter.fromPredicateOption(processRaw)),
+          );
         });
 
       return { open } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

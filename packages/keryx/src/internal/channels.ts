@@ -1,4 +1,4 @@
-import { Effect, Either, Option, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import type {
   Announcement,
   Channel,
@@ -167,7 +167,7 @@ export const syncChannel = (options: {
         authority: itemAuthority,
       });
     const cachedAnnouncements = [...known].flatMap(([id, cached]) =>
-      Either.getRight(reverify(id, cached)).pipe(Option.toArray),
+      Result.getSuccess(reverify(id, cached)).pipe(Option.toArray),
     );
 
     const roleFile = `${roles.role.name}.json`;
@@ -183,7 +183,7 @@ export const syncChannel = (options: {
         announcements: cachedAnnouncements,
       } satisfies ChannelResult;
     }
-    const index = yield* Effect.either(
+    const index = yield* Effect.result(
       loadMetadata({
         fetch: options.fetch,
         now: options.now,
@@ -195,12 +195,12 @@ export const syncChannel = (options: {
         authority: authorityOf(roles.role, targets),
       }),
     );
-    if (Either.isLeft(index)) {
+    if (Result.isFailure(index)) {
       return {
         sync: {
           channel,
           status: "unavailable",
-          reason: describeError(index.left),
+          reason: describeError(index.failure),
           problems: [],
         },
         announcements: cachedAnnouncements,
@@ -212,10 +212,10 @@ export const syncChannel = (options: {
         const dropped = (reason: string): ItemOutcome => ({
           problem: { path, reason, keptCachedCopy: false },
         });
-        const verified = (result: Either.Either<Announcement, string>) =>
-          Either.match(result, {
-            onLeft: dropped,
-            onRight: (announcement): ItemOutcome => ({ announcement }),
+        const verified = (result: Result.Result<Announcement, string>) =>
+          Result.match(result, {
+            onFailure: dropped,
+            onSuccess: (announcement): ItemOutcome => ({ announcement }),
           });
         const id = path.match(/^channels\/[^/]+\/([^/]+)\.json$/)?.[1];
         if (
@@ -236,7 +236,7 @@ export const syncChannel = (options: {
           const kept =
             cached === undefined
               ? Option.none()
-              : Either.getRight(reverify(id, cached));
+              : Result.getSuccess(reverify(id, cached));
           return Option.match(kept, {
             onNone: () => dropped(reason),
             onSome: (announcement) => ({
@@ -248,23 +248,23 @@ export const syncChannel = (options: {
         if (file.length > MAX_DOCUMENT_BYTES) {
           return dropped("larger than the item size limit");
         }
-        const bytes = yield* Effect.either(
+        const bytes = yield* Effect.result(
           fetchBytes(
             options.fetch,
             targetUrl(repository, path, file.hashes.sha256),
             file.length,
           ),
         );
-        if (Either.isLeft(bytes)) return keepCached(bytes.left.reason);
+        if (Result.isFailure(bytes)) return keepCached(bytes.failure.reason);
         if (
-          bytes.right.length !== file.length ||
-          sha256Hex(bytes.right) !== file.hashes.sha256
+          bytes.success.length !== file.length ||
+          sha256Hex(bytes.success) !== file.hashes.sha256
         ) {
           return keepCached("bytes differ from the pinned hash or length");
         }
         return verified(
           verifyChannelItem({
-            bytes: bytes.right,
+            bytes: bytes.success,
             channel,
             id,
             authority: itemAuthority,
@@ -273,7 +273,7 @@ export const syncChannel = (options: {
       });
 
     const outcomes = yield* Effect.forEach(
-      Object.entries(index.right.targets),
+      Object.entries(index.success.targets),
       ([path, file]) => syncItem(path, file),
       { concurrency: 4 },
     );

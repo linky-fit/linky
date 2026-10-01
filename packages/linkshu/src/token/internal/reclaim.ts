@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import { MintRejected } from "../../domain/errors";
 import { NonNegativeAmount } from "../../domain/primitives";
 import type { ProofId } from "../../domain/primitives";
@@ -38,7 +38,7 @@ export const reclaimProofs = (
     for (const group of groups.values()) {
       const first = group[0];
       if (first === undefined) continue;
-      const outcome = yield* Effect.either(
+      const outcome = yield* Effect.result(
         Effect.gen(function* () {
           const wallet = yield* ctx.instances.get(first.mint, first.unit);
           const proofs = group.map(toDomainProof);
@@ -89,7 +89,7 @@ export const reclaimProofs = (
           }),
         ),
       );
-      if (Either.isRight(outcome)) amount += outcome.right;
+      if (Result.isSuccess(outcome)) amount += outcome.success;
     }
     const proofs = yield* ctx.proofStore.loadAll;
     for (const operation of yield* ctx.operationStore.loadAll) {
