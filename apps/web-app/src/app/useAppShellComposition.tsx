@@ -1282,6 +1282,7 @@ export const useAppShellComposition = ({
     getCashuTokenMessageInfo,
     isCashuTokenKnownAny,
     isCashuTokenStored,
+    nostrBootstrapReady,
     nostrMessagesRecent,
     route,
     saveCashuFromText,

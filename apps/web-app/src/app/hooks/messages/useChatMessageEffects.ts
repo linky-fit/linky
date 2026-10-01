@@ -27,6 +27,8 @@ interface UseChatMessageEffectsParams<TContact extends ContactRowLike> {
   } | null;
   isCashuTokenKnownAny: (tokenRaw: string) => boolean;
   isCashuTokenStored: (tokenRaw: string) => boolean;
+  /** The initial sync settled, so a token another device already received is known here. */
+  nostrBootstrapReady: boolean;
   nostrMessagesRecent: readonly LocalNostrMessage[];
   route: Route;
   saveCashuFromText: (
@@ -56,6 +58,7 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
   getCashuTokenMessageInfo,
   isCashuTokenKnownAny,
   isCashuTokenStored,
+  nostrBootstrapReady,
   nostrMessagesRecent,
   route,
   saveCashuFromText,
@@ -146,12 +149,13 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
     // Auto-accept Cashu tokens received from others into the wallet.
     if (route.kind !== "chat") return;
     if (cashuIsBusy) return;
-    if (!cashuTokensHydratedRef.current) return;
+    if (!cashuTokensHydratedRef.current || !nostrBootstrapReady) return;
     autoAcceptCashuTokenFromMessages(chatMessages, true);
   }, [
     autoAcceptCashuTokenFromMessages,
     cashuIsBusy,
     chatMessages,
+    nostrBootstrapReady,
     route.kind,
     cashuTokensHydratedRef,
   ]);
@@ -159,11 +163,12 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
   React.useEffect(() => {
     // Auto-accept Cashu tokens from incoming messages even when chat isn't open.
     if (cashuIsBusy) return;
-    if (!cashuTokensHydratedRef.current) return;
+    if (!cashuTokensHydratedRef.current || !nostrBootstrapReady) return;
     autoAcceptCashuTokenFromMessages(nostrMessagesRecent, false);
   }, [
     autoAcceptCashuTokenFromMessages,
     cashuIsBusy,
+    nostrBootstrapReady,
     nostrMessagesRecent,
     cashuTokensHydratedRef,
   ]);

@@ -154,13 +154,15 @@ export const useSaveCashuFromText = ({
 
           if (Either.isLeft(outcome)) {
             const error = outcome.left;
-            // A token linkshu already holds, one whose proofs are spent, or an
-            // undecodable one can never succeed on retry; a mint that was
-            // unreachable or lock contention can. The caller uses this to stop
-            // (or keep) auto-retrying the message that carried the token.
+            // A token linkshu already holds, one whose proofs are spent, one
+            // the mint fee eats whole, or an undecodable one can never succeed
+            // on retry; a mint that was unreachable or lock contention can.
+            // The caller uses this to stop (or keep) auto-retrying the message
+            // that carried the token.
             const isTerminal =
               error._tag === "TokenAlreadyKnown" ||
               error._tag === "TokenAlreadySpent" ||
+              error._tag === "AmountConsumedByFee" ||
               error._tag === "TokenParseFailed";
             options?.onResolved?.(isTerminal ? "terminal" : "transient");
             if (error._tag === "TokenAlreadyKnown") {
