@@ -1,20 +1,39 @@
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeLocalStorageKeyValueStore } from "./localStorageKeyValueStore";
+import type { LeaseLocks } from "./localStorageKeyValueStore";
 
 const run = Effect.runPromise;
 
+/** Web Locks shared by every store built on them, like the tabs of one origin. */
+const fakeWebLocks = (): LeaseLocks => {
+  const held = new Set<string>();
+  return {
+    request: async (name, _options, callback) => {
+      // Browsers grant asynchronously, so racing requests interleave here.
+      await Promise.resolve();
+      if (held.has(name)) return callback(null);
+      held.add(name);
+      try {
+        await callback({ name, mode: "exclusive" });
+      } finally {
+        held.delete(name);
+      }
+    },
+  };
+};
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("makeLocalStorageKeyValueStore", () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it("round-trips values through set, get, and remove", async () => {
-    const store = makeLocalStorageKeyValueStore();
+    const store = makeLocalStorageKeyValueStore(null);
 
     expect(await run(store.get("linkshu.counter"))).toBeNull();
 
@@ -29,7 +48,7 @@ describe("makeLocalStorageKeyValueStore", () => {
   });
 
   it("lists only this store's keys matching the prefix", async () => {
-    const store = makeLocalStorageKeyValueStore();
+    const store = makeLocalStorageKeyValueStore(null);
     await run(store.set("linkshu.counter.a", "1"));
     await run(store.set("linkshu.counter.b", "2"));
     await run(store.set("linkshu.cursor.a", "3"));
@@ -45,9 +64,14 @@ describe("makeLocalStorageKeyValueStore", () => {
     ]);
     expect(await run(store.listKeys(""))).toHaveLength(3);
   });
+});
 
+describe.each([
+  ["Web Locks", fakeWebLocks],
+  ["the localStorage fallback", () => null],
+])("leases over %s", (_name, makeLocks) => {
   it("keeps leases invisible to get and listKeys", async () => {
-    const store = makeLocalStorageKeyValueStore();
+    const store = makeLocalStorageKeyValueStore(makeLocks());
     const lease = await run(store.tryAcquireLease("linkshu.lock", 60_000));
 
     expect(lease).not.toBeNull();
@@ -57,20 +81,20 @@ describe("makeLocalStorageKeyValueStore", () => {
 
   it("holds a lease for its ttl and frees it on expiry", async () => {
     vi.useFakeTimers();
-    const store = makeLocalStorageKeyValueStore();
+    const store = makeLocalStorageKeyValueStore(makeLocks());
 
     const first = await run(store.tryAcquireLease("linkshu.lock", 60_000));
     expect(first).not.toBeNull();
     expect(await run(store.tryAcquireLease("linkshu.lock", 60_000))).toBeNull();
 
-    vi.advanceTimersByTime(60_001);
+    await vi.advanceTimersByTimeAsync(60_001);
     const second = await run(store.tryAcquireLease("linkshu.lock", 60_000));
     expect(second).not.toBeNull();
     expect(second).not.toBe(first);
   });
 
   it("releases only when the caller holds the live lease", async () => {
-    const store = makeLocalStorageKeyValueStore();
+    const store = makeLocalStorageKeyValueStore(makeLocks());
     const other = await run(store.tryAcquireLease("linkshu.other", 60_000));
     const held = await run(store.tryAcquireLease("linkshu.lock", 60_000));
     if (other === null || held === null) throw new Error("lease not acquired");
@@ -85,7 +109,7 @@ describe("makeLocalStorageKeyValueStore", () => {
   });
 
   it("leases and values on the same key do not collide", async () => {
-    const store = makeLocalStorageKeyValueStore();
+    const store = makeLocalStorageKeyValueStore(makeLocks());
     await run(store.set("linkshu.lock", "value"));
     const lease = await run(store.tryAcquireLease("linkshu.lock", 60_000));
 
@@ -94,5 +118,56 @@ describe("makeLocalStorageKeyValueStore", () => {
 
     await run(store.remove("linkshu.lock"));
     expect(await run(store.tryAcquireLease("linkshu.lock", 60_000))).toBeNull();
+  });
+});
+
+describe("leases over refused Web Locks", () => {
+  it("reports the key as held instead of waiting forever", async () => {
+    const store = makeLocalStorageKeyValueStore({
+      request: () =>
+        Promise.reject(
+          new DOMException("not fully active", "InvalidStateError"),
+        ),
+    });
+
+    expect(await run(store.tryAcquireLease("linkshu.lock", 60_000))).toBeNull();
+  });
+});
+
+describe("leases across tabs", () => {
+  it("lets exactly one of two tabs racing for a key hold it", async () => {
+    const locks = fakeWebLocks();
+    const tabs = [
+      makeLocalStorageKeyValueStore(locks),
+      makeLocalStorageKeyValueStore(locks),
+    ];
+
+    for (let round = 0; round < 20; round += 1) {
+      const key = `linkshu.lock.${round}`;
+      const leases = await Promise.all(
+        tabs.map((tab) => run(tab.tryAcquireLease(key, 60_000))),
+      );
+      expect(leases.filter((lease) => lease !== null)).toHaveLength(1);
+    }
+  });
+
+  it("frees the key for the other tab only when the holder releases it", async () => {
+    const locks = fakeWebLocks();
+    const [first, second] = [
+      makeLocalStorageKeyValueStore(locks),
+      makeLocalStorageKeyValueStore(locks),
+    ];
+
+    const lease = await run(first.tryAcquireLease("linkshu.lock", 60_000));
+    if (lease === null) throw new Error("lease not acquired");
+    await run(second.releaseLease("linkshu.lock", lease));
+    expect(
+      await run(second.tryAcquireLease("linkshu.lock", 60_000)),
+    ).toBeNull();
+
+    await run(first.releaseLease("linkshu.lock", lease));
+    expect(
+      await run(second.tryAcquireLease("linkshu.lock", 60_000)),
+    ).not.toBeNull();
   });
 });

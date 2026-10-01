@@ -6,6 +6,7 @@ const LOCAL_STACK_SPECS = [
   "**/sqlite-crash-recovery.spec.ts",
   "**/appshell-parity.spec.ts",
   "**/shards.spec.ts",
+  "**/wallet-lease.spec.ts",
   "**/lane-migration.spec.ts",
   "**/private-attachments.spec.ts",
   "**/chat-payment-request.spec.ts",

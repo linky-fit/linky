@@ -54,7 +54,9 @@ releaseLease: (key, lease) =>
   ),
 ```
 
-Read the clock through Effect's `Clock`, not `Date.now()`, so tests can drive time. When your storage has no compare-and-swap (`localStorage`), write then re-read and confirm your id won.
+Read the clock through Effect's `Clock`, not `Date.now()`, so tests can drive time.
+
+In a browser, `localStorage` has neither a compare-and-swap nor a locked read-modify-write: another tab can read a key before your write reaches it, so writing a lease record and re-reading it lets two tabs both win. Hold each lease as a Web Lock instead: `navigator.locks.request(name, { ifAvailable: true }, callback)` grants it to one context of the origin, a `null` lock means it is held, and the callback's promise keeps it until `releaseLease` or the TTL settles it. A closed tab frees its locks. Resolve `releaseLease` only once the lock request settles, so the next claim sees the lease free.
 
 ## `ProofStore`
 

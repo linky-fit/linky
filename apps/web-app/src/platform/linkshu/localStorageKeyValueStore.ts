@@ -1,16 +1,78 @@
 import { KeyValueStore, LeaseId } from "@linky-fit/linkshu";
 import type { KeyValueStoreService } from "@linky-fit/linkshu";
 import { Clock, Effect, Layer } from "effect";
+import { canLockAcrossTabs } from "../../utils/storage";
 
 /**
  * Linkshu's `KeyValueStore` port over localStorage — device-local state that
  * is never Evolu-synced. Values and lease records live under separate
  * adapter prefixes so leasing a key cannot collide with its value and
  * `listKeys` only ever sees this store's own entries.
+ *
+ * A lease is a Web Lock held until `releaseLease`, its TTL, or the tab
+ * closing, so two tabs or workers of the origin never both hold one.
+ * Without Web Locks (insecure origins, browsers before 2022) it falls back
+ * to a localStorage record, which two tabs can both claim: localStorage has
+ * no compare-and-swap, and its writes reach other tabs late.
  */
 
 const VALUE_KEY_PREFIX = "linky.linkshu.value.";
 const LEASE_KEY_PREFIX = "linky.linkshu.lease.";
+
+/** The part of the Web Locks API (`navigator.locks`) a lease needs. */
+export interface LeaseLocks {
+  readonly request: (
+    name: string,
+    options: { readonly ifAvailable: true },
+    callback: (lock: Lock | null) => Promise<void> | undefined,
+  ) => Promise<void>;
+}
+
+type Leases = Pick<KeyValueStoreService, "tryAcquireLease" | "releaseLease">;
+
+const webLockLeases = (locks: LeaseLocks): Leases => {
+  const held = new Map<
+    LeaseId,
+    { key: string; release: () => void; released: Promise<void> }
+  >();
+  return {
+    tryAcquireLease: (key, ttlMs) =>
+      Effect.async<LeaseId | null>((resume) => {
+        const lease = LeaseId.make(crypto.randomUUID());
+        const request = locks.request(
+          LEASE_KEY_PREFIX + key,
+          { ifAvailable: true },
+          (lock) => {
+            if (lock === null) {
+              resume(Effect.succeed(null));
+              return undefined;
+            }
+            // The lock is held until this promise settles.
+            return new Promise<void>((release) => {
+              held.set(lease, { key, release, released: request });
+              setTimeout(release, ttlMs);
+              resume(Effect.succeed(lease));
+            });
+          },
+        );
+        const forget = () => held.delete(lease);
+        request.then(forget, () => {
+          forget();
+          // A refused request (a document that is not fully active) grants nothing.
+          resume(Effect.succeed(null));
+        });
+      }),
+
+    // Resolves once the lock is free, so the next claim in this tab wins.
+    releaseLease: (key, lease) =>
+      Effect.suspend(() => {
+        const entry = held.get(lease);
+        if (entry?.key !== key) return Effect.void;
+        entry.release();
+        return Effect.promise(() => entry.released);
+      }),
+  };
+};
 
 interface LeaseRecord {
   readonly expiresAtMs: number;
@@ -36,7 +98,36 @@ const readLeaseRecord = (storageKey: string): LeaseRecord | null => {
   }
 };
 
-export const makeLocalStorageKeyValueStore = (): KeyValueStoreService => ({
+const localStorageLeases: Leases = {
+  tryAcquireLease: (key, ttlMs) =>
+    Effect.map(Clock.currentTimeMillis, (now) => {
+      const storageKey = LEASE_KEY_PREFIX + key;
+      const held = readLeaseRecord(storageKey);
+      if (held !== null && held.expiresAtMs > now) return null;
+      const lease = LeaseId.make(crypto.randomUUID());
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ expiresAtMs: now + ttlMs, lease }),
+      );
+      // Re-reading catches some, not all, tabs claiming the key at once.
+      return readLeaseRecord(storageKey)?.lease === lease ? lease : null;
+    }),
+
+  releaseLease: (key, lease) =>
+    Effect.sync(() => {
+      const storageKey = LEASE_KEY_PREFIX + key;
+      if (readLeaseRecord(storageKey)?.lease === lease) {
+        localStorage.removeItem(storageKey);
+      }
+    }),
+};
+
+const browserLocks = (): LeaseLocks | null =>
+  canLockAcrossTabs() ? navigator.locks : null;
+
+export const makeLocalStorageKeyValueStore = (
+  locks: LeaseLocks | null = browserLocks(),
+): KeyValueStoreService => ({
   get: (key) => Effect.sync(() => localStorage.getItem(VALUE_KEY_PREFIX + key)),
 
   set: (key, value) =>
@@ -62,31 +153,10 @@ export const makeLocalStorageKeyValueStore = (): KeyValueStoreService => ({
       return keys;
     }),
 
-  tryAcquireLease: (key, ttlMs) =>
-    Effect.map(Clock.currentTimeMillis, (now) => {
-      const storageKey = LEASE_KEY_PREFIX + key;
-      const held = readLeaseRecord(storageKey);
-      if (held !== null && held.expiresAtMs > now) return null;
-      const lease = LeaseId.make(crypto.randomUUID());
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({ expiresAtMs: now + ttlMs, lease }),
-      );
-      // localStorage has no compare-and-swap; re-reading detects another tab
-      // winning the same acquisition between the read and the write.
-      return readLeaseRecord(storageKey)?.lease === lease ? lease : null;
-    }),
-
-  releaseLease: (key, lease) =>
-    Effect.sync(() => {
-      const storageKey = LEASE_KEY_PREFIX + key;
-      if (readLeaseRecord(storageKey)?.lease === lease) {
-        localStorage.removeItem(storageKey);
-      }
-    }),
+  ...(locks === null ? localStorageLeases : webLockLeases(locks)),
 });
 
 export const localStorageKeyValueStore: Layer.Layer<KeyValueStore> = Layer.sync(
   KeyValueStore,
-  makeLocalStorageKeyValueStore,
+  () => makeLocalStorageKeyValueStore(),
 );

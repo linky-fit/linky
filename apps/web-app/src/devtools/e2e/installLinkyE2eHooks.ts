@@ -12,6 +12,7 @@ import {
 } from "@linky-fit/linksync";
 import { createEvoluShardDb } from "@linky-fit/linksync/evolu";
 import { Effect } from "effect";
+import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
 import {
   evolu,
   getLinkyStore,
@@ -58,6 +59,11 @@ export interface LinkyE2eHooks {
   readonly createId: () => string;
   readonly directConversationIdFor: (contactId: string) => string;
   readonly activeNostrIdentityId: string;
+  /** Claims a lease through the wallet's KeyValueStore; null while another tab holds it. */
+  readonly tryAcquireLease: (
+    key: string,
+    ttlMs: number,
+  ) => Promise<string | null>;
 }
 
 declare global {
@@ -103,6 +109,7 @@ const upsert: LinkyE2eHooks["upsert"] = (table, row, ownerId) =>
 
 export const installLinkyE2eHooks = (): void => {
   const db = createEvoluShardDb(evolu);
+  const walletStore = makeLocalStorageKeyValueStore();
   window.__linkyE2E = {
     setMessagesRotation: setE2eMessagesRotation,
     appOwnerId: () => evolu.appOwner.then((owner) => owner.id),
@@ -157,5 +164,7 @@ export const installLinkyE2eHooks = (): void => {
       return decoded.ok ? directConversationIdFor(decoded.value) : "";
     },
     activeNostrIdentityId,
+    tryAcquireLease: (key, ttlMs) =>
+      Effect.runPromise(walletStore.tryAcquireLease(key, ttlMs)),
   };
 };
