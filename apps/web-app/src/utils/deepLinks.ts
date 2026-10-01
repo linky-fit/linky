@@ -34,6 +34,7 @@ export const buildCashuDeepLink = (rawToken: string): string | null => {
   return `cashu://${token}`;
 };
 
+// Use the hash, never the query string, to keep tokens out of server logs and Referer headers.
 export const buildCashuShareUrl = (rawToken: string): string | null => {
   const token = normalizeStrictCashuToken(rawToken);
   if (!token) return null;

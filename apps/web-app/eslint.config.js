@@ -1,4 +1,8 @@
-import webAppEslintConfig, { restrictedSyntax } from "@linky-fit/config/eslint";
+import webAppEslintConfig, {
+  restrictedSyntax,
+  testHelperImportPatterns,
+  testHelperImportIgnores,
+} from "@linky-fit/config/eslint";
 import { defineConfig } from "eslint/config";
 
 const storageMessage =
@@ -27,22 +31,44 @@ const navigationSyntax = [
   },
 ];
 
+const backSyntax = [
+  {
+    selector:
+      "CallExpression[callee.property.name=/^(back|go)$/]:matches([callee.object.name='history'], [callee.object.object.name='window'][callee.object.property.name='history'])",
+    message:
+      "Back is resolveBackAction() (hooks/useRouting.ts / topbar) because hash navigation only grows history and a cold-start deep link has nothing to return to.",
+  },
+];
+const evoluImportPatterns = [
+  {
+    group: ["@evolu/*"],
+    message:
+      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts and src/app/migrations import @evolu/* directly.",
+  },
+];
+const wipeImportPatterns = [
+  {
+    group: ["**/evolu", "**/evolu.ts"],
+    importNames: ["wipeEvoluStorage"],
+    message:
+      "The WASM-OOM recovery is the only automatic wipe; local data is otherwise cleared only by the user.",
+  },
+];
+
 export default defineConfig([
   ...webAppEslintConfig,
   {
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["**/*.test.{ts,tsx}", "src/testUtils/**"],
+    ignores: testHelperImportIgnores,
     rules: {
       "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
       "no-restricted-imports": [
         "error",
         {
           patterns: [
-            {
-              group: ["@evolu/*"],
-              message:
-                "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts and src/app/migrations import @evolu/* directly.",
-            },
+            ...testHelperImportPatterns,
+            ...evoluImportPatterns,
+            ...wipeImportPatterns,
           ],
         },
       ],
@@ -71,6 +97,7 @@ export default defineConfig([
       "no-restricted-syntax": [
         "error",
         ...restrictedSyntax,
+        ...backSyntax,
         ...storageSyntax,
         ...navigationSyntax,
       ],
@@ -78,9 +105,22 @@ export default defineConfig([
   },
   {
     files: ["src/evolu.ts", "src/app/migrations/**"],
+    ignores: testHelperImportIgnores,
     rules: {
-      "no-restricted-imports": "off",
+      "no-restricted-imports": [
+        "error",
+        { patterns: [...testHelperImportPatterns, ...wipeImportPatterns] },
+      ],
       "no-restricted-properties": "off",
+    },
+  },
+  {
+    files: ["src/app/useAppShellComposition.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [...testHelperImportPatterns, ...evoluImportPatterns] },
+      ],
     },
   },
   {
@@ -99,6 +139,7 @@ export default defineConfig([
       "no-restricted-syntax": [
         "error",
         ...restrictedSyntax,
+        ...backSyntax,
         ...navigationSyntax,
       ],
     },
@@ -106,7 +147,12 @@ export default defineConfig([
   {
     files: ["src/hooks/useRouting.ts", "src/utils/spdPayment.ts"],
     rules: {
-      "no-restricted-syntax": ["error", ...restrictedSyntax, ...storageSyntax],
+      "no-restricted-syntax": [
+        "error",
+        ...restrictedSyntax,
+        ...backSyntax,
+        ...storageSyntax,
+      ],
     },
   },
 ]);

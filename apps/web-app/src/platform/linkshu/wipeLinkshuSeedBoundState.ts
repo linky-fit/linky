@@ -18,7 +18,7 @@ export const wipeLinkshuSeedBoundState = async (
   mnemonic: string,
 ): Promise<void> => {
   // Migrate first so the wipe also clears counters bound to the old seed.
-  // Removal gate for this prologue is in app/migrations/AGENTS.md.
+  // Only this prologue has a removal gate in app/migrations/AGENTS.md; the wipe function stays.
   migrateLegacyCashuLocalState();
   try {
     await runLinkshu(

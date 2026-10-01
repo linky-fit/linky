@@ -31,6 +31,8 @@ export function AuthenticatedLayout({
   const state = useAppShellCore();
   const isDesktopSplitView = useDesktopSplitView();
 
+  // New modals must join dismissTopModal in useAppShellComposition.tsx,
+  // or Android back navigates under the open dialog.
   return (
     <>
       <Topbar className="mobile-app-topbar" />

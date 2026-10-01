@@ -303,6 +303,7 @@ const getTokenFromUrl = (): {
   return { source: null, token: "" };
 };
 
+// Keep generated token URLs in the hash to avoid server logs and Referer headers.
 const replaceHashToken = (token: string): void => {
   const url = new URL(window.location.href);
   url.search = "";
@@ -564,6 +565,8 @@ export function useCashuPage() {
       );
       const nextToken = result.changeToken?.trim() ?? "";
 
+      // Leftover value belongs with the collector; only a failed forward
+      // hands the token back to the user.
       if (nextToken && result.changeAmount > 0) {
         try {
           await forwardCashuTokenPrivately({

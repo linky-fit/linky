@@ -14,6 +14,8 @@ export const normalizePubkeyHex = (
   return parsePubkey(normalized);
 };
 
+// Unknown senders stay out of contacts until the user adds them;
+// their `unknown:<pubkeyHex>` conversations belong in the local overlay.
 export const buildUnknownContactId = (
   pubkeyHex: string | null | undefined,
 ): string | null => {

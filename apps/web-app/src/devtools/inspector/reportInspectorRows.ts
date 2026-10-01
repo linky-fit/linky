@@ -121,6 +121,7 @@ export const reportInspectorRows = (rows: InspectorRow[]): void => {
       .catch(() => undefined);
   }
 
+  // Rows hold decrypted plaintext, so they may leave the device only in dev.
   if (!import.meta.env.DEV) return;
 
   pendingRows.push(...preparedRows);

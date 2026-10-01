@@ -140,8 +140,10 @@ const reportUpstreamQuotesListed = (
  * that resolve the same npub and regardless of which `lud16` the profile
  * publishes: Linky's own server hands proofs over as tokens (accepted through
  * linkshu `Receive`, like a pasted token), upstream npub.cash only lists paid
- * mint quotes, which linkshu `Topup.adopt` mints. Only the polling, its
- * lock/interval/cursor bookkeeping, and the app-side notifications live here.
+ * mint quotes, which linkshu `Topup.adopt` mints on upstream's chosen mint.
+ * `<npub>@npub.cash` funds must not auto-swap to the default mint.
+ * Only polling, lock/interval/cursor bookkeeping, and app-side notifications
+ * live here.
  * Transient failures persist nothing; the next poll simply retries.
  */
 export const useNpubCashClaim = ({

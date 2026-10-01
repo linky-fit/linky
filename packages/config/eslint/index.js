@@ -5,6 +5,25 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+export const testHelperImportPatterns = [
+  {
+    group: [
+      "@linky-fit/*/testing",
+      "@linky-fit/*/testing/*",
+      "**/testing",
+      "**/testing/*",
+    ],
+    message: "Production code never imports test helpers.",
+  },
+];
+
+export const testHelperImportIgnores = [
+  "**/*.test.{ts,tsx}",
+  "**/testing/**",
+  "src/testUtils/**",
+  "tests/**",
+];
+
 export const restrictedSyntax = [
   {
     selector: "TSAsExpression > TSAnyKeyword",
@@ -44,6 +63,16 @@ export const restrictedSyntax = [
 export const webAppEslintConfig = defineConfig([
   globalIgnores(["dist", "dev-dist"]),
   {
+    files: ["**/*.{js,mjs,cjs,ts,tsx}"],
+    ignores: testHelperImportIgnores,
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: testHelperImportPatterns },
+      ],
+    },
+  },
+  {
     files: ["**/*.{ts,tsx}"],
     extends: [
       js.configs.recommended,
@@ -77,29 +106,34 @@ export const webAppEslintConfig = defineConfig([
 const platformIndependentMessage =
   "This package is platform-independent: no React, no Evolu, no browser globals. The app supplies these through the package's ports.";
 
+export const platformIndependentImportPatterns = [
+  {
+    group: [
+      "react",
+      "react/*",
+      "react-dom",
+      "react-dom/*",
+      "@evolu/*",
+      "@linky-fit/linksync",
+      "@linky-fit/linksync/*",
+    ],
+    message: platformIndependentMessage,
+  },
+];
+
 /** For packages that must run under plain Bun as well as in the browser. */
 export const platformIndependentEslintConfig = defineConfig([
   ...webAppEslintConfig,
   {
     files: ["src/**/*.ts"],
-    ignores: ["**/*.test.ts"],
+    ignores: testHelperImportIgnores,
     rules: {
       "no-restricted-imports": [
         "error",
         {
           patterns: [
-            {
-              group: [
-                "react",
-                "react/*",
-                "react-dom",
-                "react-dom/*",
-                "@evolu/*",
-                "@linky-fit/linksync",
-                "@linky-fit/linksync/*",
-              ],
-              message: platformIndependentMessage,
-            },
+            ...testHelperImportPatterns,
+            ...platformIndependentImportPatterns,
           ],
         },
       ],

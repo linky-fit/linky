@@ -1,4 +1,8 @@
-import coreEslintConfig, { restrictedSyntax } from "@linky-fit/config/eslint";
+import coreEslintConfig, {
+  restrictedSyntax,
+  testHelperImportPatterns,
+  testHelperImportIgnores,
+} from "@linky-fit/config/eslint";
 import { defineConfig } from "eslint/config";
 
 const runtimeMessage =
@@ -8,12 +12,13 @@ export default defineConfig([
   ...coreEslintConfig,
   {
     files: ["src/**/*.ts"],
-    ignores: ["src/evolu/evoluShardDb.ts", "**/*.test.ts"],
+    ignores: ["src/evolu/evoluShardDb.ts", ...testHelperImportIgnores],
     rules: {
       "no-restricted-imports": [
         "error",
         {
           patterns: [
+            ...testHelperImportPatterns,
             {
               group: ["@evolu/*", "!@evolu/common"],
               message: runtimeMessage,

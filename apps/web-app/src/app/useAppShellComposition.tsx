@@ -344,7 +344,7 @@ export const useAppShellComposition = ({
     const alreadyTried = (safeLocalStorageGet(key) ?? "").trim() === "1";
     if (alreadyTried) return;
     safeLocalStorageSet(key, "1");
-    // Last-resort recovery: wipe local Evolu storage and reload.
+    // One-shot WASM-OOM recovery is the only automatic wipe of local Evolu data.
     try {
       wipeEvoluStorageImpl();
     } catch {
@@ -389,6 +389,8 @@ export const useAppShellComposition = ({
     useState<boolean>(false);
 
   const wipeEvoluStorage = React.useCallback(async () => {
+    // Evolu keeps quota errors after another relay converges; successful probes
+    // and dismissed warnings are not proof of recovery.
     if (evoluLastError?.type === "ProtocolQuotaError") {
       pushToast(t("evoluQuotaRecoveryHint"));
       return;

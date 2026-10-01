@@ -7,7 +7,7 @@
  * list from before the token existed, so every pick failed with "Token is
  * invalid or already spent".
  *
- * Needs the docker stack up — see "E2E tests" in AGENTS.md.
+ * Needs the docker stack up — see playwright.config.ts.
  */
 import {
   expect,

@@ -38,6 +38,7 @@ export default defineConfig({
       // production build on :5176. Deliberately no webServer — compose owns
       // the app; start it with:
       //   docker compose -f docker-compose.dev.yml --profile e2e up -d --build --wait
+      // Rebuild the e2e image after source changes; VITE_* is inlined at build.
       name: "local-stack",
       testMatch: LOCAL_STACK_SPECS,
       // Three cold app boots plus a full offer state machine.
@@ -47,6 +48,8 @@ export default defineConfig({
       // expire inside that quiet window.
       expect: { timeout: 20_000 },
       use: {
+        // No slow-motion knob: per-action delays miss topup quote and offer phase deadlines.
+        // Prefer --ui or the trace over --headed.
         baseURL: "http://localhost:5176",
         trace: "on",
         screenshot: "only-on-failure",

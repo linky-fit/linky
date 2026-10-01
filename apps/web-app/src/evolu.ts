@@ -408,6 +408,7 @@ type OwnerMetaId = typeof OwnerMetaId.Type;
  * (chat state on `contact`, `category` and `phase` on `transaction`), all of
  * which only the lane migration reads. The package's branded ids are the
  * source of truth; only the legacy tables keep ids of their own.
+ * Legacy schema removal gate in app/migrations/AGENTS.md.
  */
 export const Schema = {
   ...LinkySchema,
@@ -429,9 +430,9 @@ export const Schema = {
     direction: Evolu.NonEmptyString100,
     // Decrypted plaintext message.
     content: Evolu.NonEmptyString,
-    // Gift-wrapped event id (kind 1059) used for de-duplication.
+    // Incoming rows use the rumor id here as their de-duplication key.
     wrapId: Evolu.NonEmptyString1000,
-    // Inner (rumor) event id (kind 14, unsigned) if available.
+    // Edits keep the original message's rumor id so reactions and replies resolve.
     rumorId: Evolu.nullOr(Evolu.NonEmptyString1000),
     // Sender pubkey hex (64 chars) of the inner message.
     // Can be null for local-only queued placeholders.

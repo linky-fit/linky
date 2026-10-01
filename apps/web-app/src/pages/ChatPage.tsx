@@ -686,6 +686,7 @@ const ChatComposer = memo(function ChatComposer({
     return document.activeElement === input;
   }, [composeInputRef]);
 
+  // Attachments have no caption field, so text must follow the files as a separate message.
   const requestSend = useCallback(async () => {
     if (!canSendChat) return;
     if (hasAttachmentsToSend) {

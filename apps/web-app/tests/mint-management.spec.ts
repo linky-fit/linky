@@ -4,7 +4,7 @@
  * balance, an explicit amount moves from :3338 to :3339 after its fee
  * estimate is shown, and the add button makes a typed mint the default.
  *
- * Needs the docker stack up — see "E2E tests" in AGENTS.md.
+ * Needs the docker stack up — see playwright.config.ts.
  */
 import { expect, test, type Page } from "@playwright/test";
 import {

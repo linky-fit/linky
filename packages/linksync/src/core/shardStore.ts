@@ -187,6 +187,7 @@ export interface ShardStore<
   ) => () => void;
 }
 
+/** Retention state is device-local and must never sync. */
 export interface ShardRetention {
   readonly get: (scope: string) => number | undefined;
   readonly set: (scope: string, firstIndex: number) => void;

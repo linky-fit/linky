@@ -1,3 +1,6 @@
+// Must keep covering: rotation of every scope, the pointer on a second device,
+// copy-on-write of an edited old-shard row, sends and top-ups across a
+// rotation, and a fresh device seeing only the newest 4 message shards.
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 import {
@@ -119,6 +122,8 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
       await expect(
         follower.page.locator(".chat-bubble").filter({ hasText: text }),
       ).toBeVisible();
+    // Wait for status = sent and non-pending wrapId on both devices before rotation,
+    // or a late publish receipt can copy the fixture into the new shard.
     await test.step("both messages finish publishing in shard 0 before rotation", async () => {
       for (const device of devices) {
         const ownerId = await hooks.shardOwnerId(device.page, "messages", 0);

@@ -42,6 +42,8 @@ export const stubFiatRates = async (page: Page): Promise<void> => {
  * Keep third-party asset hosts off the network. fulfill(), never abort():
  * every contact gets a dicebear pictureUrl by default, and an abort logs a
  * console error per avatar per page.
+ * Use serviceWorkers: "block": Playwright cannot intercept SW requests,
+ * and src/sw.ts caches images with CacheFirst.
  */
 export const stubThirdPartyAssets = async (page: Page): Promise<void> => {
   await page.route("**/api.dicebear.com/**", (route) =>

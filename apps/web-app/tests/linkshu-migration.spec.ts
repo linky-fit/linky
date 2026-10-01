@@ -17,7 +17,7 @@
  * proves the migrated state and balance survive a relaunch without
  * re-running the migration.
  *
- * Needs the docker stack up — see "E2E tests" in AGENTS.md.
+ * Needs the docker stack up — see playwright.config.ts.
  *
  * Pre-existing Evolu `cashuToken` rows cannot be seeded before launch —
  * the legacy writers that produced them are deleted, and Evolu's SQLite

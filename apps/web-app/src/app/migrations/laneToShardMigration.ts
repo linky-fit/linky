@@ -61,8 +61,9 @@ import { toLegacyTokenRow } from "./legacyTokenRow";
 import { readRowOwnerId } from "../lib/rowOwnerId";
 
 export const LANE_MIGRATION_DONE_STORAGE_KEY = "linky.laneMigration.done.v1";
-/** Synced through the `setting` table so every device agrees on the cutoff. */
+/** First writer wins through the `setting` table so every device agrees on the cutoff. */
 export const LANE_MIGRATION_CUTOFF_SETTING_KEY = "laneMigration.cutoffMs";
+/** Extending is safe; shortening strands rows on devices that have not migrated yet. */
 export const LANE_MIGRATION_GRACE_PERIOD_MS = 180 * 24 * 60 * 60 * 1000;
 
 const ONBOARDING_TUTORIAL_SETTING_KEY = "onboardingTutorial";

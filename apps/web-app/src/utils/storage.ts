@@ -256,6 +256,7 @@ export const getInitialDecimalAmountInputEnabled = (): boolean =>
 // installs and updated ones start sending receipts with a baseline of first
 // launch — history older than the feature is still never reported. "0" is the
 // explicit off state.
+// Only an explicit "0" disables seen receipts; removing the key re-enables them.
 export const getInitialSeenReceiptsEnabledAtSec = (): number | null => {
   const raw = trimString(
     safeLocalStorageGet(SEEN_RECEIPTS_ENABLED_AT_SEC_STORAGE_KEY),

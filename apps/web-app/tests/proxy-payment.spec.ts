@@ -8,7 +8,7 @@
  *
  * Also covers C accepting after A chose B but before C receives that decision.
  *
- * Needs the docker stack up — see "E2E tests" in AGENTS.md.
+ * Needs the docker stack up — see playwright.config.ts.
  *
  * Two recipients, not one, is deliberate: with a single recipient the lease
  * lock and the sentCandidateKeys guard are dead code, so broadcasting the bank

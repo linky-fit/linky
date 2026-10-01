@@ -69,6 +69,7 @@ const withPending = (
   ].slice(-MAX_PENDING_SNAPSHOTS),
 });
 
+// Snapshot and receipt paths share this check; new staleness rules belong here.
 const isStaleFor = (
   known: BankPaymentOffer,
   event: Pick<BankOfferInboxEvent, "sentAt" | "status">,
@@ -79,6 +80,8 @@ const isStaleFor = (
     event.status === "accepted_by_other" &&
     known.status === "accepted"
   ) {
+    // The offerer's choice overrides a pending acceptance regardless of time.
+    // Do not restore timestamp order here; a late acceptance must not hide it.
     return false;
   }
   const knownUpdatedAt = offerUpdatedAtSec(known);

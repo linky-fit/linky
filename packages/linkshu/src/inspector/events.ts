@@ -17,6 +17,8 @@ import { ProofState } from "../ports/ProofStore";
  * optional `Inspector` service is provided. `Schema.Unknown` fields carry
  * raw values for display; nothing in the package reads them back, and no
  * event ever carries seed material or proof secrets.
+ * Emission sites use `{ disableValidation: true }` so a bad field surfaces
+ * in the consumer, not as a failed wallet operation.
  */
 
 /** A wallet operation finished, e.g. `name: "receive.receive"`. */

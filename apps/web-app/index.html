@@ -16,7 +16,8 @@
          62px short at the bottom (paint- and tap-clipped dead band under
          bottom-fixed elements). Without the meta, the viewport sits below
          the status bar and bottom-anchored UI lands on the real screen
-         bottom. -->
+         bottom. iOS caches this chrome mode per origin across reinstall and
+         data clears, so viewport experiments need a fresh origin. -->
 
     <title>Linky</title>
   </head>

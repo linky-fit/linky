@@ -78,6 +78,7 @@ interface TransactionEventLike {
   unit?: string | null;
 }
 
+// removal gate in app/migrations/AGENTS.md
 const LEGACY_PAYMENT_EVENTS_MIGRATED_SUFFIX = ".migratedToEvolu.v2";
 
 const serializeJsonValue = (

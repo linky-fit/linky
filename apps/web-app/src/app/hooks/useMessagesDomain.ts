@@ -77,6 +77,7 @@ interface UseMessagesDomainParams {
   route: Route;
 }
 
+// removal gate in app/migrations/AGENTS.md
 const MESSAGE_MIGRATION_VERSION = 1;
 const MESSAGE_RETENTION_PER_CONTACT = 500;
 const MESSAGE_RETENTION_GLOBAL = 3000;

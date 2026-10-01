@@ -2466,6 +2466,8 @@ export const useCashuWalletComposition = ({
   return {
     reclaimCashuTransfer,
     cashuTransferLifecycle,
+    // Backup export and the Nostr bootstrap snapshot need every proof,
+    // including hidden test-mint proofs; keep this unfiltered.
     allCashuProofs: allWalletProofs,
     allowTestMints,
     applyDefaultMintSelection,

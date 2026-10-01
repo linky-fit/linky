@@ -78,6 +78,7 @@ const isMutationResult = (
   value !== null &&
   typeof Reflect.get(value, "ok") === "boolean";
 
+// removal gate in app/migrations/AGENTS.md
 const upsert: LinkyE2eHooks["upsert"] = (table, row, ownerId) =>
   new Promise((resolve, reject) => {
     if (!isSchemaTable(table)) {
