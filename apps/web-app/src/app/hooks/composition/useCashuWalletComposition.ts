@@ -3,6 +3,7 @@ import type { ReceiveMethod } from "../../../utils/receiveMethod";
 import type { RestoreProgress } from "@linky-fit/linkshu";
 import { useReclaimCashuTransfer } from "../cashu/useReclaimCashuTransfer";
 import { useLatest } from "../../../hooks/useLatest";
+import { useExclusiveRun } from "../../../hooks/useExclusiveRun";
 import {
   CashuTokenText,
   ClientId,
@@ -356,6 +357,7 @@ export const useCashuWalletComposition = ({
   const cashuDraftRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [cashuEmitAmount, setCashuEmitAmount] = useState("");
   const [cashuIsBusy, setCashuIsBusy] = useState(false);
+  const runPaymentRequestExclusively = useExclusiveRun();
   const [cashuBulkCheckIsBusy, setCashuBulkCheckIsBusy] = useState(false);
   const [tokensRestoreIsBusy, setTokensRestoreIsBusy] = useState(false);
   const [tokensRestoreProgress, setTokensRestoreProgress] =
@@ -1317,87 +1319,93 @@ export const useCashuWalletComposition = ({
   );
 
   const runCashuPaymentRequest = React.useCallback(
-    async (requestInfo: CashuPaymentRequestMessageInfo) => {
-      if (cashuIsBusy) return;
+    (requestInfo: CashuPaymentRequestMessageInfo) =>
+      runPaymentRequestExclusively(async () => {
+        if (cashuIsBusy) return;
 
-      // A request addressed to our own key is already satisfied by the funds in
-      // this wallet. Complete it locally as a success instead of gift-wrapping a
-      // cashu token to ourselves over nostr, which the inbox treats as an
-      // own-echo and never auto-claims — that is what stranded the token as an
-      // unclaimable "awaiting claim" transfer.
-      const ownPubkeyHex = normalizePubkeyHex(decodeNpub(currentNpub ?? ""));
-      const targetPubkeyHex = normalizePubkeyHex(
-        requestInfo.transportPubkeyHex,
-      );
-      if (ownPubkeyHex && targetPubkeyHex && ownPubkeyHex === targetPubkeyHex) {
-        const displayAmount = formatDisplayedAmountParts(requestInfo.amount);
-        showPaidOverlay(
-          t("paymentRequestSelfPayment")
-            .replace(
-              "{amount}",
-              `${displayAmount.approxPrefix}${displayAmount.amountText}`,
-            )
-            .replace("{unit}", displayAmount.unitLabel),
+        // A request addressed to our own key is already satisfied by the funds in
+        // this wallet. Complete it locally as a success instead of gift-wrapping a
+        // cashu token to ourselves over nostr, which the inbox treats as an
+        // own-echo and never auto-claims — that is what stranded the token as an
+        // unclaimable "awaiting claim" transfer.
+        const ownPubkeyHex = normalizePubkeyHex(decodeNpub(currentNpub ?? ""));
+        const targetPubkeyHex = normalizePubkeyHex(
+          requestInfo.transportPubkeyHex,
         );
-        return;
-      }
-
-      if (requestInfo.amount > cashuBalance) {
-        const requestedMints = requestInfo.mintUrls.flatMap((mintUrl) => {
-          const normalizedMint = normalizeMintUrl(mintUrl);
-          return normalizedMint ? [normalizedMint] : [];
-        });
-        const targetMainMint = paymentMintMeltPlan?.toMint ?? "";
-        const mainMintIsAccepted =
-          requestedMints.length === 0 ||
-          (Boolean(targetMainMint) && requestedMints.includes(targetMainMint));
         if (
-          !mainMintIsAccepted ||
-          !requestPaymentMintMelt(requestInfo.amount)
+          ownPubkeyHex &&
+          targetPubkeyHex &&
+          ownPubkeyHex === targetPubkeyHex
         ) {
-          setStatus(t("payInsufficient"));
+          const displayAmount = formatDisplayedAmountParts(requestInfo.amount);
+          showPaidOverlay(
+            t("paymentRequestSelfPayment")
+              .replace(
+                "{amount}",
+                `${displayAmount.approxPrefix}${displayAmount.amountText}`,
+              )
+              .replace("{unit}", displayAmount.unitLabel),
+          );
+          return;
         }
-        return;
-      }
 
-      const contact = ensureContactForCashuPaymentRequest(requestInfo);
-      if (!contact?.id) {
-        if (await payCashuPaymentRequestViaPost(requestInfo)) return;
-        setStatus(t("paymentRequestUnknownContact"));
-        return;
-      }
+        if (requestInfo.amount > cashuBalance) {
+          const requestedMints = requestInfo.mintUrls.flatMap((mintUrl) => {
+            const normalizedMint = normalizeMintUrl(mintUrl);
+            return normalizedMint ? [normalizedMint] : [];
+          });
+          const targetMainMint = paymentMintMeltPlan?.toMint ?? "";
+          const mainMintIsAccepted =
+            requestedMints.length === 0 ||
+            (Boolean(targetMainMint) &&
+              requestedMints.includes(targetMainMint));
+          if (
+            !mainMintIsAccepted ||
+            !requestPaymentMintMelt(requestInfo.amount)
+          ) {
+            setStatus(t("payInsufficient"));
+          }
+          return;
+        }
 
-      setCashuIsBusy(true);
-      try {
-        const previousRequestMessage = findPreviousCashuPaymentRequestMessage(
-          requestInfo,
-          contact.id,
-        );
-        const previousRequestRumorId = (
-          previousRequestMessage?.rumorId ?? ""
-        ).trim();
+        const contact = ensureContactForCashuPaymentRequest(requestInfo);
+        if (!contact?.id) {
+          if (await payCashuPaymentRequestViaPost(requestInfo)) return;
+          setStatus(t("paymentRequestUnknownContact"));
+          return;
+        }
 
-        await payContactWithCashuMessage({
-          contact,
-          amountSat: requestInfo.amount,
-          paymentRequestId: requestInfo.requestId,
-          ...(previousRequestRumorId
-            ? {
-                replyContext: {
-                  replyToId: previousRequestRumorId,
-                  rootMessageId:
-                    (previousRequestMessage?.rootMessageId ?? "").trim() ||
-                    previousRequestRumorId,
-                  replyToContent:
-                    (previousRequestMessage?.content ?? "").trim() || null,
-                },
-              }
-            : {}),
-        });
-      } finally {
-        setCashuIsBusy(false);
-      }
-    },
+        setCashuIsBusy(true);
+        try {
+          const previousRequestMessage = findPreviousCashuPaymentRequestMessage(
+            requestInfo,
+            contact.id,
+          );
+          const previousRequestRumorId = (
+            previousRequestMessage?.rumorId ?? ""
+          ).trim();
+
+          await payContactWithCashuMessage({
+            contact,
+            amountSat: requestInfo.amount,
+            paymentRequestId: requestInfo.requestId,
+            ...(previousRequestRumorId
+              ? {
+                  replyContext: {
+                    replyToId: previousRequestRumorId,
+                    rootMessageId:
+                      (previousRequestMessage?.rootMessageId ?? "").trim() ||
+                      previousRequestRumorId,
+                    replyToContent:
+                      (previousRequestMessage?.content ?? "").trim() || null,
+                  },
+                }
+              : {}),
+          });
+        } finally {
+          setCashuIsBusy(false);
+        }
+      }),
     [
       cashuIsBusy,
       cashuBalance,
@@ -1409,6 +1417,7 @@ export const useCashuWalletComposition = ({
       payContactWithCashuMessage,
       paymentMintMeltPlan?.toMint,
       requestPaymentMintMelt,
+      runPaymentRequestExclusively,
       setCashuIsBusy,
       setStatus,
       showPaidOverlay,
@@ -2363,54 +2372,54 @@ export const useCashuWalletComposition = ({
 
   const paymentRequestContactsRef = useLatest(contacts);
   const onPayChatPaymentRequest = React.useCallback(
-    async (
-      message: LocalNostrMessage,
-      requestInfo: CashuPaymentRequestMessageInfo,
-    ) => {
-      if (cashuIsBusy) return;
-      if (!selectedChatContact || selectedChatContact.isUnknownContact) return;
-      if (!selectedContact) return;
+    (message: LocalNostrMessage, requestInfo: CashuPaymentRequestMessageInfo) =>
+      runPaymentRequestExclusively(async () => {
+        if (cashuIsBusy) return;
+        if (!selectedChatContact || selectedChatContact.isUnknownContact)
+          return;
+        if (!selectedContact) return;
 
-      const reviewedMessage = { ...message };
-      const reviewedRequest = { ...requestInfo };
-      const reviewedRecipient = { ...selectedContact };
-      const isPaymentAuthorized = () =>
-        isCurrentChatPaymentRequest(
-          reviewedMessage,
-          reviewedRequest,
-          reviewedRecipient,
-          nostrMessagesLatestRef.current,
-          paymentRequestContactsRef.current.find(
-            (contact) => contact.id === reviewedRecipient.id,
-          ) ?? null,
-        );
-      if (!isPaymentAuthorized()) {
-        setStatus(t("paymentRequestChanged"));
-        return;
-      }
-      const requestRumorId = (reviewedMessage.rumorId ?? "").trim();
+        const reviewedMessage = { ...message };
+        const reviewedRequest = { ...requestInfo };
+        const reviewedRecipient = { ...selectedContact };
+        const isPaymentAuthorized = () =>
+          isCurrentChatPaymentRequest(
+            reviewedMessage,
+            reviewedRequest,
+            reviewedRecipient,
+            nostrMessagesLatestRef.current,
+            paymentRequestContactsRef.current.find(
+              (contact) => contact.id === reviewedRecipient.id,
+            ) ?? null,
+          );
+        if (!isPaymentAuthorized()) {
+          setStatus(t("paymentRequestChanged"));
+          return;
+        }
+        const requestRumorId = (reviewedMessage.rumorId ?? "").trim();
 
-      setCashuIsBusy(true);
-      try {
-        await payContactWithCashuMessage({
-          contact: reviewedRecipient,
-          amountSat: reviewedRequest.amount,
-          paymentRequestId: reviewedRequest.requestId,
-          isPaymentAuthorized,
-          replyContext: {
-            replyToId: requestRumorId,
-            rootMessageId:
-              (reviewedMessage.rootMessageId ?? "").trim() || requestRumorId,
-            replyToContent: reviewedMessage.content.trim() || null,
-          },
-        });
-      } finally {
-        setCashuIsBusy(false);
-      }
-    },
+        setCashuIsBusy(true);
+        try {
+          await payContactWithCashuMessage({
+            contact: reviewedRecipient,
+            amountSat: reviewedRequest.amount,
+            paymentRequestId: reviewedRequest.requestId,
+            isPaymentAuthorized,
+            replyContext: {
+              replyToId: requestRumorId,
+              rootMessageId:
+                (reviewedMessage.rootMessageId ?? "").trim() || requestRumorId,
+              replyToContent: reviewedMessage.content.trim() || null,
+            },
+          });
+        } finally {
+          setCashuIsBusy(false);
+        }
+      }),
     [
       cashuIsBusy,
       payContactWithCashuMessage,
+      runPaymentRequestExclusively,
       selectedChatContact,
       selectedContact,
       setCashuIsBusy,
