@@ -1486,6 +1486,7 @@ button.settings-option.is-selected .settings-label {
 }
 
 .status-dot {
+  flex-shrink: 0;
   width: 10px;
   height: 10px;
   border-radius: 999px;
