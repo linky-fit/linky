@@ -310,6 +310,11 @@ export const de = {
 
   transactionPending: "ausstehend",
   transactionFailed: "fehlgeschlagen",
+  transactionDuplicate: "Duplikat",
+  transactionReturned: "zurückgeholt",
+  transactionsShowHidden: "Ausgeblendete Transaktionen anzeigen ({count})",
+  transactionsHideHidden:
+    "Fehlgeschlagene und doppelte Transaktionen ausblenden",
   transactionReceivedFromContact: "Von Kontakt erhalten",
   transactionSentToContact: "An Kontakt gesendet",
   transactionTopupInvoice: "Aufladung per Rechnung",
