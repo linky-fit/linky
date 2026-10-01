@@ -75,6 +75,10 @@ export const publishProfileAtom = linkstrRuntimeAtom.fn<ProfileMetadata>()(
     Effect.flatMap(Profiles, (profiles) => profiles.publishProfile(metadata)),
 );
 
+export const republishOwnProfileAtom = linkstrRuntimeAtom.fn<void>()(() =>
+  Effect.flatMap(Profiles, (profiles) => profiles.republishOwnProfile()),
+);
+
 export const publishStatusAtom = linkstrRuntimeAtom.fn<StatusDraft>()((draft) =>
   Effect.flatMap(Profiles, (profiles) => profiles.publishStatus(draft)),
 );

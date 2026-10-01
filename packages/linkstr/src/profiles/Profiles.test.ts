@@ -79,6 +79,7 @@ const runWith = <A, E>(
   transport: Layer.Layer<NostrTransport>,
   program: Effect.Effect<A, E, Profiles>,
   relays: ReadonlyArray<RelayUrl> = [relayA, relayB],
+  writeRelays: ReadonlyArray<RelayUrl> = relays,
 ): Promise<Exit.Exit<A, E>> =>
   Effect.runPromiseExit(
     program.pipe(
@@ -87,7 +88,7 @@ const runWith = <A, E>(
           Layer.provide(
             Layer.mergeAll(
               LinkstrIdentity.fromSecretKey(alice.secretKey),
-              RelayPolicy.fixed({ readRelays: relays, writeRelays: relays }),
+              RelayPolicy.fixed({ readRelays: relays, writeRelays }),
               transport,
             ),
           ),
@@ -275,6 +276,74 @@ describe("Profiles.fetchProfile", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.profile).toBeNull();
     expect(exit.value.status).toBeNull();
+  });
+});
+
+describe("Profiles.republishOwnProfile", () => {
+  const relayC = RelayUrl.make("wss://relay-c.test");
+  const relayD = RelayUrl.make("wss://relay-d.test");
+
+  it("copies the newest own profile, unchanged, to write relays without it", async () => {
+    const older = profileEvent(alice, JSON.stringify({ name: "old" }), base);
+    const newest = profileEvent(
+      alice,
+      JSON.stringify({ name: "alice" }),
+      base + 10,
+    );
+    const published: Array<SignedPlainEvent> = [];
+    const stored = new Map<RelayUrl, ReadonlyArray<NostrToolsEvent>>([
+      // Read-only relay: the only one holding the newest profile.
+      [relayA, [newest]],
+      [relayB, [older]],
+      [relayC, [newest]],
+    ]);
+
+    const exit = await runWith(
+      stubTransport(published, { stored, unreachable: [relayD] }),
+      Effect.flatMap(Profiles, (profiles) => profiles.republishOwnProfile()),
+      [relayA],
+      [relayB, relayC, relayD],
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.map(({ relay }) => relay)).toEqual([relayB]);
+    expect(published).toHaveLength(1);
+    const [copy] = published;
+    assert(copy !== undefined);
+    expect(copy.id).toBe(newest.id);
+    expect(verifyEvent(copy)).toBe(true);
+  });
+
+  it("publishes nothing when every write relay holds the newest profile", async () => {
+    const newest = profileEvent(alice, JSON.stringify({ name: "a" }), base);
+    const published: Array<SignedPlainEvent> = [];
+    const stored = new Map<RelayUrl, ReadonlyArray<NostrToolsEvent>>([
+      [relayA, [newest]],
+      [relayB, [newest]],
+    ]);
+
+    const exit = await runWith(
+      stubTransport(published, { stored }),
+      Effect.flatMap(Profiles, (profiles) => profiles.republishOwnProfile()),
+    );
+
+    expect(exit).toEqual(Exit.succeed([]));
+    expect(published).toHaveLength(0);
+  });
+
+  it("publishes nothing when no relay holds an own profile", async () => {
+    const published: Array<SignedPlainEvent> = [];
+    const stored = new Map<RelayUrl, ReadonlyArray<NostrToolsEvent>>([
+      [relayA, [profileEvent(bob, JSON.stringify({ name: "bob" }), base)]],
+    ]);
+
+    const exit = await runWith(
+      stubTransport(published, { stored }),
+      Effect.flatMap(Profiles, (profiles) => profiles.republishOwnProfile()),
+    );
+
+    expect(exit).toEqual(Exit.succeed([]));
+    expect(published).toHaveLength(0);
   });
 });
 

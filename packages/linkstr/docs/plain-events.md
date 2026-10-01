@@ -28,6 +28,8 @@ const publishThenFetch = (peer: Pubkey) =>
 
 The result is a `ProfileFetchResult`: `result.profile?.metadata.displayName`, `result.status?.content`, each `null` when the peer has none. Status content is opaque to linkstr; an empty string clears it.
 
+`publishProfile` reaches only the write relays configured at the time. After the relay set changes, `republishOwnProfile()` finds the newest own kind 0 on any read or write relay and publishes that signed event, unchanged, to every write relay that answered without it or with an older one. It returns one `RelayPublishResult` per relay it published to, an empty list when nothing was missing, and never fails: a relay that does not answer is neither a source nor a target.
+
 ### Wire format
 
 | Event   | Kind  | Tags                                                     | Content                                                                                          |

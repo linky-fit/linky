@@ -14,10 +14,13 @@ import type {
 import { decodeNpub, encodeNpub, Pubkey } from "@linky-fit/linkstr";
 import type { ContactId, ContactsRepository } from "@linky-fit/linksync";
 import {
+  linkstrConfigAtom,
   profileWatchAtom,
   profileWatchHandlerAtom,
+  republishOwnProfileAtom,
   useAtomMount,
   useAtomSet,
+  useAtomValue,
   watchedProfilesAtom,
 } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
@@ -262,7 +265,18 @@ export const useLinkstrProfileSync = ({
 }: UseLinkstrProfileSyncParams) => {
   const setWatchedProfiles = useAtomSet(watchedProfilesAtom);
   const setProfileWatchHandler = useAtomSet(profileWatchHandlerAtom);
+  const republishOwnProfile = useAtomSet(republishOwnProfileAtom, {
+    mode: "promiseExit",
+  });
+  const writeRelaysKey =
+    useAtomValue(linkstrConfigAtom)?.writeRelays.join(" ") ?? "";
   useAtomMount(profileWatchAtom);
+
+  // Relays added since the last profile publish lack it until it is copied.
+  React.useEffect(() => {
+    if (!enabled || !writeRelaysKey) return;
+    void republishOwnProfile();
+  }, [enabled, republishOwnProfile, writeRelaysKey]);
 
   const { contacts } = context;
   const {

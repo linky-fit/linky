@@ -1,4 +1,4 @@
-import { Effect, Either, Schema } from "effect";
+import { Effect, Either, Option, Schema } from "effect";
 import type { Duration } from "effect";
 import type { Filter } from "nostr-tools";
 import type { PlainEventReceipt } from "../domain/delivery";
@@ -16,6 +16,7 @@ import { fetchPlainEvents } from "../internal/plainFetch";
 import { nowSeconds } from "../internal/time";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import { NostrTransport } from "../services/NostrTransport";
+import type { RelayPublishResult } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import {
   decodeProfileEvent,
@@ -126,6 +127,64 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
           eventIds: [receipt.eventId],
         })),
         inspectPlainOperation(inspector, "profiles.publishProfile", metadata),
+      );
+
+    const newestOwnProfileOn = (relay: RelayUrl) =>
+      fetchPlainEvents(context.transport, [relay], {
+        kinds: [PROFILE_KIND],
+        authors: [context.identity.pubkey],
+      }).pipe(
+        Effect.map((events) => ({
+          relay,
+          held:
+            events.find(
+              (event) =>
+                event.kind === PROFILE_KIND &&
+                event.pubkey === context.identity.pubkey,
+            ) ?? null,
+        })),
+        Effect.option,
+      );
+
+    /**
+     * Copies the newest own kind 0 found on any read or write relay, signed
+     * event unchanged, to the write relays that miss it or hold an older one.
+     */
+    const republishOwnProfile = (): Effect.Effect<
+      ReadonlyArray<RelayPublishResult>
+    > =>
+      Effect.gen(function* () {
+        const { readRelays, writeRelays } = context.relayPolicy;
+        const answers = (yield* Effect.forEach(
+          [...new Set([...readRelays, ...writeRelays])],
+          newestOwnProfileOn,
+          { concurrency: "unbounded" },
+        )).flatMap(Option.toArray);
+
+        const newest = answers.reduce<SignedPlainEvent | null>(
+          (best, { held }) =>
+            held !== null &&
+            (best === null || held.created_at > best.created_at)
+              ? held
+              : best,
+          null,
+        );
+        if (newest === null) return { result: [], eventIds: [] };
+
+        const lacking = answers
+          .filter(
+            ({ relay, held }) =>
+              writeRelays.includes(relay) &&
+              (held === null || held.created_at < newest.created_at),
+          )
+          .map(({ relay }) => relay);
+        const results =
+          lacking.length === 0
+            ? []
+            : yield* context.transport.publish(lacking, newest);
+        return { result: results, eventIds: [newest.id] };
+      }).pipe(
+        inspectPlainOperation(inspector, "profiles.republishOwnProfile", null),
       );
 
     const statusTags = (draft: StatusDraft): NostrTags => {
@@ -396,6 +455,7 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
 
     return {
       publishProfile,
+      republishOwnProfile,
       publishStatus,
       fetchProfile,
       fetchProfiles,

@@ -35,6 +35,7 @@ if (Exit.isFailure(exit)) console.warn(Cause.pretty(exit.cause)); // e.g. Linkst
 | `sendBankOfferAtom`                                | `BankOffers.send`                                                                    |
 | `publishProfileAtom`, `publishStatusAtom`          | `Profiles.publishProfile`, `Profiles.publishStatus`                                  |
 | `fetchProfileAtom`, `fetchProfilesAtom`            | `Profiles.fetchProfile`, `Profiles.fetchProfiles`                                    |
+| `republishOwnProfileAtom`                          | `Profiles.republishOwnProfile`                                                       |
 | `discoverActiveProfilesAtom`, `searchProfilesAtom` | `Profiles.discoverActiveProfiles`, `Profiles.searchProfiles` (`{ query, options? }`) |
 | `publishRelayListsAtom`, `fetchOwnRelayListsAtom`  | `RelayLists.publishRelayLists`, `RelayLists.fetchOwnRelayLists`                      |
 | `publishMuteListAtom`                              | `MuteList.publishMuteList`                                                           |
