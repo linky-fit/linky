@@ -12,6 +12,10 @@ export {
   deriveTransactionCategory,
   makeTransactionsRepository,
   normalizeTransaction,
+  transactionIdForOperation,
+  transactionIdForQuote,
+  transactionIdForRequest,
+  transactionIdForRestore,
 } from "./transactions";
 export type {
   TransactionCategory,

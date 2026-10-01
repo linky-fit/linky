@@ -67,6 +67,8 @@ Ids are `cashuProofIdFor(secret)` and `cashuOperationIdFor(operationKeyOf(op))`,
 
 `makeTransactionsRepository(store)` over `transaction` in the `transactions` scope, which keeps the newest 4 shards. `all` returns `TransactionRecord`s, not raw rows: `createdAtSec` present, `direction` and `status` narrowed, and `category` derived from `method` by `deriveTransactionCategory`. A row whose event time, direction or status does not validate is skipped until sync completes it (`normalizeTransaction`). There is no `category` or `phase` column to write; sorting and pairing is the consumer's.
 
+A row's id says which event it records, so writing the same event again (a retry, a second tab, another device resuming the same operation) upserts one row instead of adding a duplicate. Build ids with `transactionIdForOperation(operationId)` for anything a linkshu operation carries, `transactionIdForQuote(kind, mint, quoteId)` for a melt or topup known only by its quote (the same id as its operation), `transactionIdForRequest(requestId)` for a payment request, and `transactionIdForRestore(proofIds)` for a restore. The consumer can join a row to its operation by comparing `transactionIdForOperation(operation.id)` with the row id.
+
 ## Identity
 
 `makeIdentityRepository(store)` mirrors the active Nostr key in the `identity` scope (one fixed shard, never forgotten) so another device can adopt it. `set` upserts the one row `activeNostrIdentityId`; `current` is the newest row by `updatedAt`, or `null`. `switchedAtSec` is the cutoff after which older incoming events are ignored following a custom override. The row carries the `nsec`; keep it out of logs.
