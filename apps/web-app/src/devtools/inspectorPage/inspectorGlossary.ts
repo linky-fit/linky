@@ -156,6 +156,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "linkshu priced moving an amount between mints: a mint quote at the target and a melt quote for its invoice at the source, plus the source's input fee allowance. Nothing is paid; both quotes expire unused. A following autoswap.claim with the same mints performs the move.",
   "settings.allowTestMints":
     'The user switched the synced "Allow test mints" setting. Off hides test-mint balances, mint lists and chat tokens and refuses new test-mint tokens; stored test-mint proofs stay untouched.',
+  "settings.displayCurrencies":
+    "The user enabled or disabled a display currency in Settings. The list is a synced setting, so other devices follow it; which enabled currency is shown stays per device.",
   LightningFeeProbed:
     "linkshu measured a mint's Lightning fee by pricing another mint's unpaid invoice as a melt quote. Nothing is paid; links carry both quote ids.",
   "npubCash.upstreamQuotesListed":
