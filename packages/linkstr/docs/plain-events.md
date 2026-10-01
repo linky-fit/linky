@@ -116,6 +116,8 @@ Two plain replaceable events with empty content: kind 10002 (NIP-65) with one `[
 
 `MuteList.publishMuteList(pubkeys)` publishes your NIP-51 mute list: a kind 10000 event with one `p` tag per blocked pubkey, replacing the previous list on relays. There is no draft class; pass the complete list every time, since the newest event is the list. Publish whenever the local block list changes so other clients on the same key honour it.
 
+In React, call `publishMuteListAtom` with the complete pubkey list whenever it changes; it returns the same `PlainEventReceipt`.
+
 ```ts
 import { Effect } from "effect";
 import { MuteList, type Pubkey } from "@linky-fit/linkstr";

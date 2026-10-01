@@ -1,5 +1,6 @@
 import { Effect, Fiber, Layer, Stream } from "effect";
 import { generateSecretKey, getPublicKey } from "nostr-tools";
+import { nsecEncode } from "nostr-tools/nip19";
 import {
   encodeImageMessageRumor,
   encodeTokenMessageRumor,
@@ -12,13 +13,7 @@ import {
   TokenMessageDraft,
 } from "../chat/domain";
 import { linkstrServices } from "../composition";
-import {
-  ClientId,
-  NostrSecretKey,
-  Pubkey,
-  RelayUrl,
-  UnixSeconds,
-} from "../domain/primitives";
+import { ClientId, Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { WrapInbox } from "../inbox/WrapInbox";
 import { wrapRumorFor } from "../internal/giftWrap";
 import { OutboxRef } from "../outbox/domain";
@@ -32,7 +27,36 @@ import type { InspectorEvent } from "./events";
 import { Inspector } from "./Inspector";
 import { inspectTransport } from "./inspectTransport";
 
-const secretKey = NostrSecretKey.make(generateSecretKey());
+const me = makeIdentity();
+const sender = makeIdentity();
+// Extra credential fields catch accidental emission of the consumer's config.
+const identityConfig = {
+  ...me,
+  nsec: nsecEncode(me.secretKey),
+  seedWords:
+    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+};
+
+const expectNoIdentitySecrets = (
+  events: ReadonlyArray<InspectorEvent>,
+): void => {
+  const secrets = [
+    identityConfig.seedWords,
+    ...[me, sender].flatMap(({ secretKey }) => [
+      Buffer.from(secretKey).toString("hex"),
+      nsecEncode(secretKey),
+      JSON.stringify(secretKey),
+      JSON.stringify(Array.from(secretKey)),
+    ]),
+  ];
+  expect(events.length).toBeGreaterThan(0);
+  for (const event of events) {
+    const serialized = JSON.stringify(event);
+    for (const secret of secrets) {
+      expect(serialized, eventLabel(event)).not.toContain(secret);
+    }
+  }
+};
 const peer = Pubkey.make(getPublicKey(generateSecretKey()));
 const relay = RelayUrl.make("wss://relay.test");
 
@@ -41,18 +65,18 @@ const eventLabel = (event: { _tag: string }): string =>
 
 /**
  * Composes the runtime exactly like linkstr-react/src/runtime.ts and runs one
- * chat send through the outbox, returning every inspector event label seen.
+ * chat send through the outbox, returning every inspector event seen.
  */
 const collectSendEmissions = (
   publish: NostrTransportService["publish"],
-): Promise<string[]> => {
+): Promise<InspectorEvent[]> => {
   const transport = Layer.succeed(NostrTransport, {
     publish,
     subscribe: () => Effect.never,
     fetch: () => Effect.succeed([]),
   });
   const layer = linkstrServices({
-    secretKey,
+    ...identityConfig,
     readRelays: [relay],
     writeRelays: [relay],
     transport: inspectTransport(observeTransport(transport)),
@@ -63,10 +87,10 @@ const collectSendEmissions = (
 
   const program = Effect.gen(function* () {
     const inspector = yield* Inspector;
-    const collected: string[] = [];
+    const collected: InspectorEvent[] = [];
     const consumer = yield* Stream.runForEach(inspector.events, (event) =>
       Effect.sync(() => {
-        collected.push(eventLabel(event));
+        collected.push(event);
       }),
     ).pipe(Effect.fork);
 
@@ -83,11 +107,11 @@ const collectSendEmissions = (
     yield* Effect.iterate(0, {
       while: (tries) =>
         tries < 100 &&
-        !collected.some((label) =>
-          label.startsWith("PlainOperationSucceeded:outbox.job"),
+        !collected.some((event) =>
+          eventLabel(event).startsWith("PlainOperationSucceeded:outbox.job"),
         ) &&
-        !collected.some((label) =>
-          label.startsWith("OperationFailed:outbox.job"),
+        !collected.some((event) =>
+          eventLabel(event).startsWith("OperationFailed:outbox.job"),
         ),
       body: (tries) => Effect.as(Effect.sleep("20 millis"), tries + 1),
     });
@@ -98,8 +122,6 @@ const collectSendEmissions = (
   return Effect.runPromise(Effect.scoped(Effect.provide(program, layer)));
 };
 
-const me = makeIdentity();
-const sender = makeIdentity();
 const attachmentKey = "01".repeat(32);
 const attachmentNonce = "02".repeat(12);
 const image = new PrivateImage({
@@ -146,7 +168,7 @@ const collectImageEmissions = (): Promise<InspectorEvent[]> => {
     fetch: () => Effect.succeed([incomingImageWrap]),
   });
   const layer = linkstrServices({
-    secretKey: me.secretKey,
+    ...identityConfig,
     readRelays: [relay],
     writeRelays: [relay],
     transport: inspectTransport(observeTransport(transport)),
@@ -230,7 +252,7 @@ const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
     fetch: () => Effect.succeed([incomingTokenWrap]),
   });
   const layer = linkstrServices({
-    secretKey: me.secretKey,
+    ...identityConfig,
     readRelays: [relay],
     writeRelays: [relay],
     transport: inspectTransport(observeTransport(transport)),
@@ -279,6 +301,7 @@ const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
 describe("inspector emission never carries cashu tokens", () => {
   it("redacts the token on every send, outbox, and inbox row", async () => {
     const collected = await collectTokenEmissions();
+    expectNoIdentitySecrets(collected);
     const labels = collected.map(eventLabel);
 
     expect(labels).toContain("OperationSucceeded:chat.sendToken");
@@ -294,6 +317,7 @@ describe("inspector emission never carries cashu tokens", () => {
 describe("inspector emission never carries attachment keys", () => {
   it("redacts image key and nonce on every send, outbox, and inbox row", async () => {
     const collected = await collectImageEmissions();
+    expectNoIdentitySecrets(collected);
     const labels = collected.map(eventLabel);
 
     expect(labels).toContain("PlainOperationSucceeded:outbox.enqueue");
@@ -336,12 +360,12 @@ describe("inspector emission through the outbox send path", () => {
       ),
     );
 
-    expect(collected).toContain("PlainOperationSucceeded:outbox.enqueue");
-    expect(collected).toContain("OperationSucceeded:chat.sendText");
-    expect(collected).toContain("PlainOperationSucceeded:outbox.job");
-    expect(collected.filter((label) => label === "WirePublished")).toHaveLength(
-      2,
-    );
+    expectNoIdentitySecrets(collected);
+    const labels = collected.map(eventLabel);
+    expect(labels).toContain("PlainOperationSucceeded:outbox.enqueue");
+    expect(labels).toContain("OperationSucceeded:chat.sendText");
+    expect(labels).toContain("PlainOperationSucceeded:outbox.job");
+    expect(labels.filter((label) => label === "WirePublished")).toHaveLength(2);
   });
 
   it("still emits and still delivers when the transport returns off-schema results", async () => {
@@ -358,10 +382,10 @@ describe("inspector emission through the outbox send path", () => {
       ),
     );
 
-    expect(collected).toContain("PlainOperationSucceeded:outbox.job");
-    expect(collected).toContain("OperationSucceeded:chat.sendText");
-    expect(collected.filter((label) => label === "WirePublished")).toHaveLength(
-      2,
-    );
+    expectNoIdentitySecrets(collected);
+    const labels = collected.map(eventLabel);
+    expect(labels).toContain("PlainOperationSucceeded:outbox.job");
+    expect(labels).toContain("OperationSucceeded:chat.sendText");
+    expect(labels.filter((label) => label === "WirePublished")).toHaveLength(2);
   });
 });

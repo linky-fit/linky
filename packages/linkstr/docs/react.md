@@ -28,6 +28,7 @@ if (Exit.isFailure(exit)) console.warn(Cause.pretty(exit.cause)); // e.g. Linkst
 | -------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `enqueueOutboxAtom`                                | `Outbox.enqueue` (`{ op, ref }`)                                                     |
 | `enqueuePaymentTelemetryAtom`                      | `Outbox.enqueueTelemetry` (`{ draft, recipient, ref }`)                              |
+| `outboxResultsHandlerAtom`, `outboxResultsAtom`    | Register `{ onResult }`, then mount to consume and ack completed outbox jobs         |
 | `retractReactionAtom`                              | `Reactions.retract`                                                                  |
 | `sendSeenReceiptAtom`                              | `SeenReceipts.send`                                                                  |
 | `sendPaymentNoticeAtom`                            | `PaymentNotices.send`                                                                |
@@ -90,6 +91,8 @@ export const useInboxSync = (
 ## Outbox
 
 `enqueueOutboxAtom` resolves as soon as the job is stored; delivery happens in the background and reports through `useOutboxResults(handler)`, which mounts the results stream for the component's lifetime and reads the handler through a ref, so a new closure on every render is fine. A job is acked only after your `async` handler resolves; a rejection skips the ack, so the result is re-delivered on the next runtime build. Mount it once, high in the tree, and switch on `result._tag` as [outbox.md](./outbox.md#results) describes.
+
+For manual registration, set `outboxResultsHandlerAtom` to `{ onResult }` and mount `outboxResultsAtom` once. Set the handler to `null` on cleanup; a null handler leaves results unconsumed. Use either this pair or `useOutboxResults`, with the same ack guarantees.
 
 ## Profile watch
 

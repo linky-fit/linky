@@ -85,6 +85,10 @@ export const tagValues = (tags: NostrTags, name: string): Array<string> =>
     tag[0] === name && tag[1] !== undefined ? [tag[1]] : [],
   );
 
+/** Preserve positional markers and valueless tags for codecs that need them. */
+export const tagsNamed = (tags: NostrTags, name: string): NostrTags =>
+  tags.filter((tag) => tag[0] === name);
+
 /** First `name` tag whose value is non-blank, trimmed. */
 export const firstTrimmedTagValue = (
   tags: NostrTags,

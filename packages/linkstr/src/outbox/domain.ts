@@ -59,6 +59,7 @@ export const PaymentTelemetryOperation = Schema.TaggedStruct(
 );
 export type PaymentTelemetryOperation = typeof PaymentTelemetryOperation.Type;
 
+// A new durable send needs its service in composition.ts's Outbox.Default provide list; layer inputs are inferred.
 export const OutboxOperation = Schema.Union(
   ChatTextOperation,
   ChatTokenOperation,
@@ -147,8 +148,8 @@ export class StoredOutboxJob extends Schema.Class<StoredOutboxJob>(
 }) {}
 
 const receiptTagOf = (
-  operationTag: unknown,
-): OutboxReceipt["_tag"] | undefined => {
+  operationTag: OutboxOperation["_tag"],
+): OutboxReceipt["_tag"] => {
   switch (operationTag) {
     case "chat.text":
     case "chat.token":
@@ -160,10 +161,12 @@ const receiptTagOf = (
       return "ReactionReceipt";
     case "paymentTelemetry":
       return "PaymentTelemetryReceipt";
-    default:
-      return undefined;
   }
 };
+
+const hasOutboxOperationTag = Schema.is(
+  OutboxOperation.pipe(Schema.pick("_tag")),
+);
 
 const LEGACY_RUMOR_ID_KEYS = ["messageId", "reactionId", "telemetryId"];
 
@@ -186,13 +189,13 @@ const upgradeLegacyReceipt = (
   job: Record<string, unknown>,
 ): Record<string, unknown> => {
   const { operation, state } = job;
-  if (!Predicate.isRecord(operation) || !Predicate.isRecord(state)) return job;
+  if (!hasOutboxOperationTag(operation) || !Predicate.isRecord(state))
+    return job;
   const { result } = state;
   if (!Predicate.isRecord(result)) return job;
   const { receipt } = result;
   if (!Predicate.isRecord(receipt) || "_tag" in receipt) return job;
   const _tag = receiptTagOf(operation._tag);
-  if (_tag === undefined) return job;
   return {
     ...job,
     state: {

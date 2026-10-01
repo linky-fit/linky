@@ -15,6 +15,7 @@ import {
   firstTrimmedTagValue,
   Rumor,
   rumorWithHash,
+  tagsNamed,
   tagValues,
 } from "../internal/nostrEvent";
 import type { NostrTags } from "../internal/nostrEvent";
@@ -177,7 +178,7 @@ const resolvePeer = (
 const extractEditOf = (
   tags: NostrTags,
 ): Either.Either<RumorId | null, DropReason> => {
-  const editTag = tags.find((tag) => tag[0] === "edited_from");
+  const editTag = tagsNamed(tags, "edited_from")[0];
   if (editTag === undefined) return Either.right(null);
   const value = editTag[1]?.trim();
   return value !== undefined && isRumorId(value)
@@ -188,7 +189,7 @@ const extractEditOf = (
 const extractReplyContext = (
   tags: NostrTags,
 ): { readonly replyTo: RumorId | null; readonly root: RumorId | null } => {
-  const eventTags = tags.filter((tag) => tag[0] === "e");
+  const eventTags = tagsNamed(tags, "e");
   let root: RumorId | null = null;
   let replyTo: RumorId | null = null;
   let first: RumorId | null = null;

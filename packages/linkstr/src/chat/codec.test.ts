@@ -446,6 +446,12 @@ describe("chat rumor decoding", () => {
       replyTo: replyId,
     },
     {
+      name: "a valueless tag and one unmarked tag",
+      tags: [["e"], ["e", rootId]],
+      root: rootId,
+      replyTo: rootId,
+    },
+    {
       name: "one unmarked tag",
       tags: [["e", rootId]],
       root: rootId,
@@ -487,6 +493,17 @@ describe("chat rumor decoding", () => {
         content: "   ",
       }),
       reason: "empty-message",
+    },
+    {
+      name: "a valueless edit before a valid edit reference",
+      rumor: withHash({
+        pubkey: bob.pubkey,
+        created_at: sentAt,
+        kind: 14,
+        tags: [["p", alice.pubkey], ["edited_from"], ["edited_from", editId]],
+        content: "edited",
+      }),
+      reason: "invalid-edit",
     },
     {
       name: "invalid edit reference",

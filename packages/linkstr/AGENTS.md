@@ -11,9 +11,8 @@ A change to the public surface (`src/index.ts`, `src/testing/index.ts` and their
 Copy the closest template: `reactions/` (peer copy plus own echo), `paymentNotices/` (single copy with an inbox fact), `paymentTelemetry/` (single copy, no fact), `muteList/` (plain event). Send through the shared skeletons (`internal/wrapSend.ts`, `deliverPlainEvent` / `fetchPlainEvents`); they handle delivery, receipts and inspector emission.
 
 - Add the kind to `routeRumor` (`src/inbox/decodeWrapEvent.ts`) and a `WrapInbox.test.ts` case routing a real wrap: an unrouted kind is silently dropped as `unsupported-kind`.
-- Register the service in `linkstrServices` (`src/composition.ts`). A durable send also extends `OutboxOperation`; the compiler flags the outbox switches but not `receiptTagOf` or the `Outbox.Default` provide list.
-- Receipts name the delivered rumor `rumorId`. Read tags with `firstTagValue` / `tagValues` and build rumors with `rumorWithHash` (`internal/nostrEvent.ts`).
-- A new drop reason extends `DropReason` (`inbox/events.ts`) instead of reusing a foreign one.
+- Register the service in `linkstrServices` (`src/composition.ts`); a durable send also extends `OutboxOperation`.
+- Receipts name the delivered rumor `rumorId`; codecs build rumors with `rumorWithHash`.
 - A Linky-invented kind takes the next free number above 24136 and carries a `["linky", <value>]` tag.
 - linkstr-react gets one fn atom per direct operation; outbox operations go through `enqueueOutboxAtom` instead.
 

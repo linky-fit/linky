@@ -10,6 +10,7 @@ import { WrapId } from "../domain/primitives";
 export const InboxDelivery = Schema.Literal("backfill", "live");
 export type InboxDelivery = typeof InboxDelivery.Type;
 
+// Each new vertical adds its own reason so drops never masquerade as another vertical's failure.
 export const DropReason = Schema.Literal(
   "malformed-wrap",
   "invalid-wrap",

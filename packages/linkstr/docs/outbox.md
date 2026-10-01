@@ -110,4 +110,6 @@ Everything else (retractions, seen receipts, payment notices, bank offers, plain
 
 `outbox.results` is a single-consumer `Stream<OutboxResult>` of completed jobs only: `OutboxJobSucceeded` with the vertical's receipt, or `OutboxJobFailed` with `reason` and `detail`; both carry `jobId` and your `ref`.
 
+In React, use `useOutboxResults(handler)`, or set `outboxResultsHandlerAtom` to `{ onResult }` and mount `outboxResultsAtom` once. Both ack only after the async handler resolves; a rejection leaves the result for the next runtime build. Clear a manually registered handler to `null` on cleanup.
+
 Persist the outcome, then ack. `OutboxJobSucceeded` means a relay accepted the recipient copy ([honest delivery](./concepts.md#honest-delivery)); the peer's own inbox still has to receive it. Match the row by `ref`, mark it sent with `receipt.rumorId` (or `receipt.editOf` for edits) and, if you track wraps, `receipt.selfCopy.wrapId`.
