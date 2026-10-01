@@ -1,6 +1,11 @@
 import type { Proof } from "@cashu/cashu-ts";
-import { getEncodedToken, Keyset, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
+import {
+  getEncodedToken,
+  HttpResponseError,
+  Keyset,
+  MintOperationError,
+} from "@cashu/cashu-ts";
+import { Clock, Effect, Exit, Layer, TestClock, TestContext } from "effect";
 import {
   CurrencyUnit,
   KeysetId,
@@ -11,13 +16,18 @@ import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { inMemoryOperationStore } from "../ports/inMemoryOperationStore";
+import {
+  inMemoryOperationStore,
+  makeInMemoryOperationStore,
+} from "../ports/inMemoryOperationStore";
 import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
+import type { OperationStoreService } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import {
   answerProofStates,
+  fakeMintInfo,
   fakeReceiveSwap,
   fakeWallet,
   KEYSET_HEX,
@@ -54,6 +64,8 @@ interface FakeWalletArgs {
   keysetId?: string;
   /** The mint's keysets as the wallet knows them; none (fee-free) by default. */
   keysets?: Keyset[];
+  /** Refreshes `keysets` from the mint; fails by default. */
+  loadMint?: LoadedWallet["loadMint"];
   receive: (counter: number) => Promise<Proof[]>;
   restore?: () => Promise<{
     proofs: Proof[];
@@ -61,6 +73,10 @@ interface FakeWalletArgs {
   }>;
   /** The mint's NUT-07 answer; everything unspent by default. */
   stateOf?: (secret: string) => ProofStateName;
+  /** Replaces the NUT-07 answer `stateOf` gives. */
+  checkProofsStates?: LoadedWallet["checkProofsStates"];
+  /** Whether the mint's info lists NUT-07; it does by default. */
+  advertisesStateCheck?: boolean;
 }
 
 const makeWallet = (args: FakeWalletArgs) => {
@@ -69,7 +85,10 @@ const makeWallet = (args: FakeWalletArgs) => {
   const wallet = fakeWallet({
     keysetId: args.keysetId ?? KEYSET_HEX,
     keyChain: { getKeysets: () => args.keysets ?? [] },
-    checkProofsStates: answerProofStates(args.stateOf),
+    getMintInfo: () => fakeMintInfo(args.advertisesStateCheck ?? true),
+    loadMint: args.loadMint ?? (() => Promise.reject(new TypeError("offline"))),
+    checkProofsStates:
+      args.checkProofsStates ?? answerProofStates(args.stateOf),
     ...fakeReceiveSwap((_token, counter) => {
       receiveCounters.push(counter);
       return args.receive(counter);
@@ -84,7 +103,11 @@ const makeWallet = (args: FakeWalletArgs) => {
   return { wallet, receiveCounters, restoreCalls };
 };
 
-const makeHarness = (wallet: LoadedWallet) => {
+const makeHarness = (
+  wallet: LoadedWallet,
+  /** Shared with the test when its fake mint must change stored operations. */
+  operationStore?: OperationStoreService,
+) => {
   const inspector = recordingInspector();
   const layer = Receive.DefaultWithoutDependencies.pipe(
     Layer.provideMerge(
@@ -95,7 +118,9 @@ const makeHarness = (wallet: LoadedWallet) => {
         ),
         inMemoryKeyValueStore,
         inMemoryProofStore,
-        inMemoryOperationStore,
+        operationStore === undefined
+          ? inMemoryOperationStore
+          : Layer.succeed(OperationStore, operationStore),
         inspector.layer,
       ),
     ),
@@ -426,7 +451,244 @@ describe("Receive.receive", () => {
     });
   });
 
-  it("classifies spent inputs as TokenAlreadySpent and records it", async () => {
+  it("refuses a token the mint already reports spent and records nothing", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      stateOf: (secret) => (secret === "src-a" ? "SPENT" : "UNSPENT"),
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(receiveAndInspect(sourceToken));
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "TokenAlreadySpent",
+      mint,
+    });
+    expect(exit.value.operations).toEqual([]);
+    expect(exit.value.proofs).toEqual([]);
+    expect(receiveCounters).toEqual([]);
+    expect(events.map((event) => event._tag)).toEqual(["OperationFailed"]);
+  });
+
+  it.each([
+    [
+      "cannot be reached",
+      () => Promise.reject(new TypeError("fetch failed")),
+      "MintUnreachable",
+    ],
+    [
+      "rate-limits it",
+      () => Promise.reject(new HttpResponseError("Too Many Requests", 429)),
+      "MintRejected",
+    ],
+    [
+      "answers PENDING",
+      answerProofStates((secret) => (secret === "src-a" ? "PENDING" : "SPENT")),
+      "MintUnreachable",
+    ],
+    [
+      "answers for only some proofs",
+      (proofs: Parameters<LoadedWallet["checkProofsStates"]>[0]) =>
+        answerProofStates(() => "SPENT")(proofs.slice(1)),
+      "MintUnreachable",
+    ],
+  ] as const)(
+    "writes nothing under the id of another device's unsynced done receive when the mint %s",
+    async (_, checkProofsStates, tag) => {
+      // The restored device has not synced the other device's receive yet;
+      // a row it wrote for the text would take the same id and sync over it.
+      const elsewhere = await Effect.runPromise(
+        seedTransfer("receive", "done", mint, sourceToken, 6).pipe(
+          Effect.provideService(OperationStore, makeInMemoryOperationStore()),
+        ),
+      );
+      const { wallet, receiveCounters } = makeWallet({
+        checkProofsStates,
+        receive: () =>
+          Promise.reject(new MintOperationError(11001, "Token already spent.")),
+      });
+      const { run, events } = makeHarness(wallet);
+
+      const exit = await run(receiveAndInspect(sourceToken));
+      assert(Exit.isSuccess(exit));
+      assert(exit.value.receipt._tag === "Left");
+      expect(exit.value.receipt.left._tag).toBe(tag);
+      expect(
+        exit.value.operations.map((operation) => operation.id),
+      ).not.toContain(elsewhere.id);
+      expect(exit.value.operations).toEqual([]);
+      expect(receiveCounters).toEqual([]);
+      expect(
+        events.filter((event) => event._tag === "OperationChanged"),
+      ).toEqual([]);
+    },
+  );
+
+  describe("a v4 token whose short v2 keyset id the cached keysets lack", () => {
+    const v2KeysetId =
+      "01ba87f253ad005f869fbd4828d14bb912c907c266202d34ff4cab9e761ce39104";
+    const v2Token = TokenText.make(
+      getEncodedToken({
+        mint,
+        unit: "sat",
+        proofs: sourceProofs.map((source) => ({ ...source, id: v2KeysetId })),
+      }),
+    );
+
+    it("fails TokenParseFailed, writing nothing over another device's unsynced done receive, when the refreshed keysets do not resolve it", async () => {
+      const elsewhere = await Effect.runPromise(
+        seedTransfer("receive", "done", mint, v2Token, 6).pipe(
+          Effect.provideService(OperationStore, makeInMemoryOperationStore()),
+        ),
+      );
+      let refreshes = 0;
+      let stateChecks = 0;
+      const { wallet, receiveCounters } = makeWallet({
+        loadMint: () => {
+          refreshes += 1;
+          return Promise.resolve();
+        },
+        checkProofsStates: (proofs) => {
+          stateChecks += 1;
+          return answerProofStates(() => "SPENT")(proofs);
+        },
+        receive: () =>
+          Promise.reject(new MintOperationError(11001, "Token already spent.")),
+      });
+      const { run, events } = makeHarness(wallet);
+
+      const exit = await run(receiveAndInspect(v2Token));
+      assert(Exit.isSuccess(exit));
+      assert(exit.value.receipt._tag === "Left");
+      expect(exit.value.receipt.left).toMatchObject({
+        _tag: "TokenParseFailed",
+        reason: "undecodable",
+      });
+      expect(
+        exit.value.operations.map((operation) => operation.id),
+      ).not.toContain(elsewhere.id);
+      expect(exit.value.operations).toEqual([]);
+      expect(refreshes).toBe(1);
+      expect(stateChecks).toBe(0);
+      expect(receiveCounters).toEqual([]);
+      expect(
+        events.filter((event) => event._tag === "OperationChanged"),
+      ).toEqual([]);
+    });
+
+    it("fails as unreachable, writing nothing, when the refresh does not reach the mint", async () => {
+      const { wallet, receiveCounters } = makeWallet({
+        receive: () => Promise.reject(new Error("must not be called")),
+      });
+      const { run } = makeHarness(wallet);
+
+      const exit = await run(receiveAndInspect(v2Token));
+      assert(Exit.isSuccess(exit));
+      assert(exit.value.receipt._tag === "Left");
+      expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+      expect(exit.value.operations).toEqual([]);
+      expect(receiveCounters).toEqual([]);
+    });
+
+    it("refreshes the mint's keysets, then asks the mint before it swaps", async () => {
+      const keysets: Keyset[] = [];
+      let stateChecks = 0;
+      const { wallet, receiveCounters } = makeWallet({
+        keysets,
+        loadMint: () => {
+          keysets.push(new Keyset(v2KeysetId, "sat", true, 0));
+          return Promise.resolve();
+        },
+        checkProofsStates: (proofs) => {
+          stateChecks += 1;
+          return answerProofStates()(proofs);
+        },
+        receive: () => Promise.resolve(receivedProofs),
+      });
+      const { run } = makeHarness(wallet);
+
+      const exit = await run(receiveAndInspect(v2Token));
+      assert(Exit.isSuccess(exit));
+      expect(exit.value.receipt._tag).toBe("Right");
+      expect(stateChecks).toBe(1);
+      expect(receiveCounters).toEqual([1]);
+    });
+  });
+
+  it("fails as unreachable, recording nothing, when the mint never answers the state check", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      checkProofsStates: () => new Promise(() => undefined),
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      runOnTestClock(
+        Effect.zip(receiveAndInspect(sourceToken), Clock.currentTimeMillis),
+        "1 second",
+      ).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    const [{ receipt, operations }, elapsed] = exit.value;
+    assert(receipt._tag === "Left");
+    expect(receipt.left._tag).toBe("MintUnreachable");
+    expect(operations).toEqual([]);
+    expect(receiveCounters).toEqual([]);
+    expect(elapsed).toBe(15_000);
+  });
+
+  it("swaps without asking a mint that does not advertise NUT-07", async () => {
+    let stateChecks = 0;
+    const { wallet, receiveCounters } = makeWallet({
+      advertisesStateCheck: false,
+      checkProofsStates: () => {
+        stateChecks += 1;
+        return Promise.reject(new HttpResponseError("Not Found", 404));
+      },
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(receiveAndInspect(sourceToken));
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.receipt._tag).toBe("Right");
+    expect(stateChecks).toBe(0);
+    expect(receiveCounters).toEqual([1]);
+  });
+
+  it("stops when another device's receive of the text synced in while the mint answered", async () => {
+    const operationStore = makeInMemoryOperationStore();
+    const { wallet, receiveCounters } = makeWallet({
+      checkProofsStates: (proofs) =>
+        Effect.runPromise(
+          seedTransfer("receive", "done", mint, sourceToken, 6).pipe(
+            Effect.provideService(OperationStore, operationStore),
+            Effect.andThen(() => answerProofStates()(proofs)),
+          ),
+        ),
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run, events } = makeHarness(wallet, operationStore);
+
+    const exit = await run(receiveAndInspect(sourceToken));
+    assert(Exit.isSuccess(exit));
+    const { receipt, operations } = exit.value;
+    assert(receipt._tag === "Left");
+    expect(operations).toEqual([
+      expect.objectContaining({ status: "done", error: null }),
+    ]);
+    expect(receipt.left).toMatchObject({
+      _tag: "TokenAlreadyKnown",
+      operationId: operations[0]?.id,
+    });
+    expect(receiveCounters).toEqual([]);
+    expect(events.filter((event) => event._tag === "OperationChanged")).toEqual(
+      [],
+    );
+  });
+
+  it("records a swap the mint rejects as spent after an unspent check as failed", async () => {
     const { wallet } = makeWallet({
       receive: () =>
         Promise.reject(new MintOperationError(11001, "Token already spent.")),
@@ -662,11 +924,15 @@ const sourceSpent = (secret: string): ProofStateName =>
   secret.startsWith("src-") ? "SPENT" : "UNSPENT";
 
 describe("Receive.receive of an unfinished receive", () => {
-  it("finishes a pending receive from the outputs the mint already signed", async () => {
+  it("finishes a pending receive from the outputs the mint already signed, asking about its inputs once", async () => {
+    const checked: string[][] = [];
     const { wallet, receiveCounters, restoreCalls } = makeWallet({
       receive: () => Promise.reject(new Error("must not be called")),
       restore: () => Promise.resolve({ proofs: receivedProofs }),
-      stateOf: sourceSpent,
+      checkProofsStates: (proofs) => {
+        checked.push(proofs.map((entry) => entry.secret ?? ""));
+        return answerProofStates(sourceSpent)(proofs);
+      },
     });
     const { run } = makeHarness(wallet);
 
@@ -685,6 +951,10 @@ describe("Receive.receive of an unfinished receive", () => {
     });
     expect(restoreCalls).toEqual([{ start: 1, count: 2 }]);
     expect(receiveCounters).toEqual([]);
+    expect(checked).toEqual([
+      ["src-a", "src-b"],
+      ["rcv-a", "rcv-b"],
+    ]);
     expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
     expect(operations).toEqual([
       expect.objectContaining({ id: transfer.id, status: "done" }),
@@ -714,10 +984,15 @@ describe("Receive.receive of an unfinished receive", () => {
     expect(exit.value.operations[0]?.status).toBe("done");
   });
 
-  it("swaps past the burned slots when the interrupted attempt never reached the mint", async () => {
-    const { wallet, receiveCounters } = makeWallet({
+  it("swaps past the burned slots, asking about its inputs once, when the interrupted attempt never reached the mint", async () => {
+    let checks = 0;
+    const { wallet, receiveCounters, restoreCalls } = makeWallet({
       receive: () => Promise.resolve(receivedProofs),
       restore: () => Promise.resolve({ proofs: [] }),
+      checkProofsStates: (proofs) => {
+        checks += 1;
+        return answerProofStates()(proofs);
+      },
     });
     const { run } = makeHarness(wallet);
 
@@ -729,6 +1004,8 @@ describe("Receive.receive of an unfinished receive", () => {
     );
     assert(Exit.isSuccess(exit));
     assert(exit.value.receipt._tag === "Right");
+    expect(checks).toBe(1);
+    expect(restoreCalls).toEqual([]);
     expect(receiveCounters).toEqual([3]);
     expect(exit.value.operations[0]).toMatchObject({
       status: "done",
@@ -737,10 +1014,14 @@ describe("Receive.receive of an unfinished receive", () => {
   });
 
   it("recovers a swap whose response was lost on the next receive of the text", async () => {
+    let swapped = false;
     const { wallet, receiveCounters, restoreCalls } = makeWallet({
-      receive: () => Promise.reject(new TypeError("fetch failed")),
+      receive: () => {
+        swapped = true;
+        return Promise.reject(new TypeError("fetch failed"));
+      },
       restore: () => Promise.resolve({ proofs: receivedProofs }),
-      stateOf: sourceSpent,
+      stateOf: (secret) => (swapped ? sourceSpent(secret) : "UNSPENT"),
     });
     const { run } = makeHarness(wallet);
 
@@ -757,6 +1038,67 @@ describe("Receive.receive of an unfinished receive", () => {
     expect(receiveCounters).toEqual([1]);
     expect(restoreCalls).toEqual([{ start: 1, count: 2 }]);
     expect(exit.value.operations[0]?.status).toBe("done");
+  });
+
+  it("leaves an interrupted receive as it stood when its slot holds nothing and the token is spent", async () => {
+    // Another device received the token at a slot this row never recorded.
+    const { wallet, receiveCounters, restoreCalls } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+      restore: () => Promise.resolve({ proofs: [] }),
+      stateOf: sourceSpent,
+    });
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedInterruptedReceive;
+        return yield* receiveAndInspect(sourceToken);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("TokenAlreadySpent");
+    expect(restoreCalls).toEqual([{ start: 1, count: 2 }]);
+    expect(receiveCounters).toEqual([]);
+    expect(exit.value.operations).toEqual([
+      expect.objectContaining({ status: "pending", error: null, counter: 1 }),
+    ]);
+    expect(events.filter((event) => event._tag === "OperationChanged")).toEqual(
+      [],
+    );
+  });
+
+  it("leaves a failed receive as it stood when the mint reports its token spent", async () => {
+    const unreachable = JSON.stringify({ _tag: "MintUnreachable", mint });
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+      stateOf: sourceSpent,
+    });
+    const { run, events } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedTransfer(
+          "receive",
+          "failed",
+          mint,
+          sourceToken,
+          6,
+          unreachable,
+        );
+        return yield* receiveAndInspect(sourceToken);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("TokenAlreadySpent");
+    expect(receiveCounters).toEqual([]);
+    expect(exit.value.operations).toEqual([
+      expect.objectContaining({ status: "failed", error: unreachable }),
+    ]);
+    expect(events.filter((event) => event._tag === "OperationChanged")).toEqual(
+      [],
+    );
   });
 
   it("swaps again when the recorded slot holds another token's outputs", async () => {
@@ -779,7 +1121,37 @@ describe("Receive.receive of an unfinished receive", () => {
     expect(secretsOf(exit.value.proofs)).toEqual(["rcv-a", "rcv-b"]);
   });
 
-  it("stays resumable with its slot when the mint leaves a proof state unanswered", async () => {
+  it("swaps again without asking about its slot or inputs on a mint that does not advertise NUT-07", async () => {
+    let stateChecks = 0;
+    const { wallet, receiveCounters, restoreCalls } = makeWallet({
+      advertisesStateCheck: false,
+      checkProofsStates: () => {
+        stateChecks += 1;
+        return Promise.reject(new HttpResponseError("Not Found", 404));
+      },
+      receive: () => Promise.resolve(receivedProofs),
+      restore: () => Promise.resolve({ proofs: receivedProofs }),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* seedInterruptedReceive;
+        return yield* receiveAndInspect(sourceToken);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    expect(stateChecks).toBe(0);
+    expect(restoreCalls).toEqual([]);
+    expect(receiveCounters).toEqual([3]);
+    expect(exit.value.operations[0]).toMatchObject({
+      status: "done",
+      counter: 3,
+    });
+  });
+
+  it("leaves the receive as it stood when the mint leaves a restored proof's state unanswered", async () => {
     const { wallet, receiveCounters } = makeWallet({
       receive: () => Promise.reject(new Error("must not be called")),
       restore: () => Promise.resolve({ proofs: receivedProofs }),
@@ -800,7 +1172,7 @@ describe("Receive.receive of an unfinished receive", () => {
     expect(receiveCounters).toEqual([]);
     expect(exit.value.proofs).toEqual([]);
     expect(exit.value.operations[0]).toMatchObject({
-      status: "failed",
+      status: "pending",
       counter: 1,
     });
   });

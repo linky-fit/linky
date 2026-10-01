@@ -16,10 +16,17 @@ import {
 } from "../domain/primitives";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
-import { inMemoryOperationStore } from "../ports/inMemoryOperationStore";
+import {
+  inMemoryOperationStore,
+  makeInMemoryOperationStore,
+} from "../ports/inMemoryOperationStore";
 import { inMemoryProofStore } from "../ports/inMemoryProofStore";
 import { NewOperation, OperationStore } from "../ports/OperationStore";
-import type { OperationStatus, StoredOperation } from "../ports/OperationStore";
+import type {
+  OperationStatus,
+  OperationStoreService,
+  StoredOperation,
+} from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { ProofState, StoredProof } from "../ports/ProofStore";
 import {
@@ -63,6 +70,8 @@ interface HarnessArgs {
   keysets?: Keyset[];
   receive?: (text: string) => Promise<CashuProof[]>;
   checkProofsStates?: import("../mint/internal/WalletInstances").LoadedWallet["checkProofsStates"];
+  /** Shared with the test when its fake mint must change stored operations. */
+  operationStore?: OperationStoreService;
 }
 
 const makeHarness = (args: HarnessArgs = {}) => {
@@ -89,7 +98,9 @@ const makeHarness = (args: HarnessArgs = {}) => {
         ),
         inMemoryKeyValueStore,
         inMemoryProofStore,
-        inMemoryOperationStore,
+        args.operationStore === undefined
+          ? inMemoryOperationStore
+          : Layer.succeed(OperationStore, args.operationStore),
         inspector.layer,
       ),
     ),
@@ -785,6 +796,92 @@ describe("Tokens.returnToWallet", () => {
       _tag: "MintRejected",
       code: 20003,
     });
+  });
+
+  it.each([
+    [
+      "reports its proofs spent",
+      answerProofStates(() => "SPENT"),
+      "TokenAlreadySpent",
+    ],
+    [
+      "cannot answer the state check",
+      () => Promise.reject(new TypeError("fetch failed")),
+      "MintUnreachable",
+    ],
+  ] as const)(
+    "leaves a retried receive as it was when the mint %s",
+    async (_, checkProofsStates, tag) => {
+      const { run, events, receiveCalls } = makeHarness({ checkProofsStates });
+
+      const exit = await run(
+        returnSeeded({ kind: "receive", status: "failed", error: rejected }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      const { result, proofs, stored } = exit.value;
+      assert(result._tag === "Left");
+      expect(result.left._tag).toBe(tag);
+      expect(stored).toMatchObject({ status: "failed", error: rejected });
+      expect(proofs).toEqual([]);
+      expect(receiveCalls()).toBe(0);
+      expect(
+        events.filter((event) => event._tag === "OperationChanged"),
+      ).toEqual([]);
+    },
+  );
+
+  it("refuses to reopen a retried receive another device closed while the mint answered", async () => {
+    const operationStore = makeInMemoryOperationStore();
+    const { run, events, receiveCalls } = makeHarness({
+      operationStore,
+      checkProofsStates: (proofs) =>
+        Effect.runPromise(
+          seedTransfer("receive", "done", mint, tokenA, 6).pipe(
+            Effect.provideService(OperationStore, operationStore),
+            Effect.andThen(() => answerProofStates()(proofs)),
+          ),
+        ),
+    });
+
+    const exit = await run(
+      returnSeeded({ kind: "receive", status: "failed", error: rejected }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { transfer, result, stored } = exit.value;
+    assert(result._tag === "Left");
+    expect(result.left).toMatchObject({
+      _tag: "TokenAlreadyKnown",
+      operationId: transfer.id,
+    });
+    expect(stored).toMatchObject({ status: "done", error: null });
+    expect(receiveCalls()).toBe(0);
+    expect(events.filter((event) => event._tag === "OperationChanged")).toEqual(
+      [],
+    );
+  });
+
+  it("takes a send back without a state check, closing it claimed when the swap finds it spent", async () => {
+    let stateChecks = 0;
+    const { run } = makeHarness({
+      checkProofsStates: (proofs) => {
+        stateChecks += 1;
+        return answerProofStates(() => "SPENT")(proofs);
+      },
+      receive: () =>
+        Promise.reject(new MintOperationError(11001, "Token already spent.")),
+    });
+
+    const exit = await run(returnSeeded({ kind: "send", status: "issued" }));
+
+    assert(Exit.isSuccess(exit));
+    const { result, proofs, stored } = exit.value;
+    assert(result._tag === "Left");
+    expect(result.left._tag).toBe("TokenAlreadySpent");
+    expect(stateChecks).toBe(0);
+    expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["sec-a1", "sec-a2"]);
+    expect(stored?.status).toBe("done");
   });
 
   it("fails a retried receive again with the new error", async () => {

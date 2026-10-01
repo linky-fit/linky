@@ -51,6 +51,8 @@ Each is `(operationId) => Effect<void, OperationNotFound | InvalidTransferTransi
 | `receive` in `pending` or `failed`               | resumed in place, as receiving its text again does ([receive.md](./receive.md#resuming-an-unfinished-receive)): ends `done` with the proofs stored, or `failed` again          |
 | anything else                                    | `InvalidTransferTransition` (`OperationNotFound` for a non-transfer id)                                                                                                        |
 
+A resumed receive is left exactly as it was when the proof state check stops it: `TokenAlreadySpent` if the mint reports the proofs spent and its recorded slot holds nothing, `MintUnreachable` or `MintRejected` if the mint cannot answer, and `TokenAlreadyKnown` naming it if another device's `done` synced in while the mint answered. A send is taken back without the check.
+
 On a send, a transient failure (`MintUnreachable`, `CounterLockTimeout`) leaves it exactly as it was. `TokenAlreadySpent` means the recipient claimed it: the proofs are marked `spent`, the send closes `done`, and the error is still returned; treat it as "already claimed", not as a loss. Any other rejection is recorded in `error` without changing the status. A melt's `held` inputs are not a transfer and belong to [`Melt.resumePending`](./melt.md#resumepending).
 
 ### `reclaim`

@@ -41,7 +41,7 @@ The wallet is an inventory. The `ProofStore` holds one `StoredProof` per proof; 
 
 ### Who moves what
 
-`Receive` inserts a `pending` receive, records the swap's output slot on it, swaps at the mint, stores the fresh proofs `available`, and closes the receive `done` or `failed` (with the serialized error, so the same text can be retried). Receiving the text of an unfinished receive resumes it from that slot. `Send` stores the send proofs `handedOut` under a `send`, the change `available`, then marks the consumed inputs `spent`. `Melt` stores its inputs `held` under a `pending` melt and settles them from the mint's answer. `Topup`, `Autoswap`, and `Restore` store `available` proofs. Every spend first asks the mint (NUT-07) about the `available` proofs at that mint, marks the `SPENT` ones `spent`, and offers only the confirmed `UNSPENT` ones. `Tokens` holds the transfer transitions you call from UI actions (`markIssued`, `markExternalized`, `forget`, `returnToWallet`); `Validation` marks spent proofs, releases proofs held by an unknown operation, and closes claimed sends.
+`Receive` first asks the mint (NUT-07) whether the token's proofs are spent and writes nothing if one is, then inserts a `pending` receive, records the swap's output slot on it, swaps at the mint, stores the fresh proofs `available`, and closes the receive `done` or `failed` (with the serialized error, so the same text can be retried). Receiving the text of an unfinished receive resumes it from that slot. `Send` stores the send proofs `handedOut` under a `send`, the change `available`, then marks the consumed inputs `spent`. `Melt` stores its inputs `held` under a `pending` melt and settles them from the mint's answer. `Topup`, `Autoswap`, and `Restore` store `available` proofs. Every spend first asks the mint (NUT-07) about the `available` proofs at that mint, marks the `SPENT` ones `spent`, and offers only the confirmed `UNSPENT` ones. `Tokens` holds the transfer transitions you call from UI actions (`markIssued`, `markExternalized`, `forget`, `returnToWallet`); `Validation` marks spent proofs, releases proofs held by an unknown operation, and closes claimed sends.
 
 ## Deterministic counters and the lease
 
@@ -51,7 +51,7 @@ Counters never move backwards and over-advance on ambiguity (blank outputs, coll
 
 ## Error classification
 
-One rule everywhere: a proof is marked `spent` only on the mint's definitive word (NUT-07, or code 11001), and an operation is closed `failed` only on a definitive rejection. A transient failure never changes a proof's state.
+One rule everywhere: a proof is marked `spent` only on the mint's definitive word (NUT-07, or code 11001), and an operation is closed `failed` only on a definitive rejection. A receive is the exception: any failed swap closes it `failed`, a transient one included, so that receiving its text again retries it. A transient failure never changes a proof's state.
 
 | Raw failure                                    | Classified as        | Kind       |
 | ---------------------------------------------- | -------------------- | ---------- |

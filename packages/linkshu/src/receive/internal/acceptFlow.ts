@@ -1,14 +1,14 @@
 import type { Proof as CashuProof, SwapPreview } from "@cashu/cashu-ts";
-import { Effect, Either, Schema } from "effect";
+import { Duration, Effect, Either, Schema } from "effect";
 import {
   AmountConsumedByFee,
+  type CounterLockTimeout,
   MintRejected,
   MintUnreachable,
   TokenAlreadyKnown,
   TokenAlreadySpent,
   TokenParseFailed,
 } from "../../domain/errors";
-import type { CounterLockTimeout } from "../../domain/errors";
 import { Amount, CurrencyUnit, UnixSeconds } from "../../domain/primitives";
 import { sat } from "../../internal/units";
 import type { KeysetId, MintUrl, TokenText } from "../../domain/primitives";
@@ -326,14 +326,12 @@ const unstoredUnspent = (
 const isTokenSpent = (
   wallet: LoadedWallet,
   mint: MintUrl,
-  inputs: ReadonlyArray<Proof> | null,
+  inputs: ReadonlyArray<Proof>,
 ): Effect.Effect<boolean, MintUnreachable | MintRejected> =>
-  inputs === null
-    ? Effect.succeed(true)
-    : Effect.map(
-        answeredStates(wallet, mint, inputs),
-        ({ spent }) => spent.size === inputs.length,
-      );
+  Effect.map(
+    answeredStates(wallet, mint, inputs),
+    ({ spent }) => spent.size === inputs.length,
+  );
 
 /** Stores `fresh` as balance; the receipt encodes everything the mint signed. */
 const keepSigned = (
@@ -370,20 +368,18 @@ interface AcceptedToken {
 }
 
 /**
- * Accepts under the caller's counter lock. A transfer whose earlier attempt
- * the mint already signed is finished from the restored outputs; otherwise
- * the token is swapped, each attempt's slot persisted on the transfer.
+ * Finishes `transfer` from the outputs of its recorded attempt when the mint
+ * signed them and spent the token; null otherwise.
  */
-const acceptUnderLock = (
+const finishFromRestore = (
   ctx: ReceiveContext,
   wallet: LoadedWallet,
-  scope: CounterScope,
   parsed: ReceivableToken,
-  /** The token's proofs, when the text decodes. */
-  inputs: ReadonlyArray<Proof> | null,
+  /** Asked only once the slot restored something. */
+  tokenSpent: Effect.Effect<boolean, MintUnreachable | MintRejected>,
   transfer: StoredOperation | null,
   reason: string,
-): Effect.Effect<AcceptedToken, AcceptFailure> =>
+): Effect.Effect<AcceptedToken | null, MintUnreachable | MintRejected> =>
   Effect.gen(function* () {
     const restored =
       transfer === null
@@ -392,13 +388,24 @@ const acceptUnderLock = (
             // A mint that will not restore leaves nothing to recover from.
             Effect.catchTag("MintRejected", () => Effect.succeed([])),
           );
-    if (
-      restored.length > 0 &&
-      (yield* isTokenSpent(wallet, parsed.mint, inputs))
-    ) {
-      const fresh = yield* unstoredUnspent(ctx, wallet, parsed.mint, restored);
-      return yield* keepSigned(ctx, parsed, restored, fresh, reason);
-    }
+    if (restored.length === 0 || !(yield* tokenSpent)) return null;
+    const fresh = yield* unstoredUnspent(ctx, wallet, parsed.mint, restored);
+    return yield* keepSigned(ctx, parsed, restored, fresh, reason);
+  });
+
+/**
+ * Swaps the token under the caller's counter lock, each attempt's slot
+ * persisted on `transfer`, and stores what the mint signed.
+ */
+const swapAndKeep = (
+  ctx: ReceiveContext,
+  wallet: LoadedWallet,
+  scope: CounterScope,
+  parsed: ReceivableToken,
+  transfer: StoredOperation | null,
+  reason: string,
+): Effect.Effect<AcceptedToken, AcceptFailure> =>
+  Effect.gen(function* () {
     const swapped = yield* swapAtMint(
       ctx,
       wallet,
@@ -415,6 +422,41 @@ const acceptUnderLock = (
             ),
     );
     return yield* keepSigned(ctx, parsed, swapped, swapped, reason);
+  });
+
+const advertisesStateCheck = (wallet: LoadedWallet): boolean =>
+  wallet.getMintInfo().isSupported(7).supported;
+
+/**
+ * Accepts a token the mint was not asked about, under the caller's counter
+ * lock: a transfer whose earlier attempt the mint already signed is finished
+ * from the restored outputs; otherwise the token is swapped. Without NUT-07
+ * nothing proves restored outputs are this transfer's, so it always swaps.
+ */
+const acceptUnchecked = (
+  ctx: ReceiveContext,
+  wallet: LoadedWallet,
+  scope: CounterScope,
+  parsed: ReceivableToken,
+  inputs: ReadonlyArray<Proof>,
+  transfer: StoredOperation,
+  reason: string,
+): Effect.Effect<AcceptedToken, AcceptFailure> =>
+  Effect.gen(function* () {
+    const restored = advertisesStateCheck(wallet)
+      ? yield* finishFromRestore(
+          ctx,
+          wallet,
+          parsed,
+          isTokenSpent(wallet, parsed.mint, inputs),
+          transfer,
+          reason,
+        )
+      : null;
+    return (
+      restored ??
+      (yield* swapAndKeep(ctx, wallet, scope, parsed, transfer, reason))
+    );
   });
 
 const counterScopeFor = (
@@ -438,8 +480,77 @@ export const acceptAtMint = (
     withCounterLock(
       ctx.kv,
       scope,
-    )(acceptUnderLock(ctx, wallet, scope, parsed, null, null, reason)),
+    )(swapAndKeep(ctx, wallet, scope, parsed, null, reason)),
   );
+
+/** cashu-ts sets no HTTP timeout; a mint that never answers is unreachable after this. */
+const MINT_ANSWER_TIMEOUT = Duration.seconds(15);
+
+const answerWithin =
+  (mint: MintUrl, step: string) =>
+  <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E | MintUnreachable> =>
+    Effect.timeoutFail(effect, {
+      duration: MINT_ANSWER_TIMEOUT,
+      onTimeout: () =>
+        new MintUnreachable({ mint, detail: `${step} did not finish in time` }),
+    });
+
+const decodeAgainst = (
+  wallet: LoadedWallet,
+  tokenText: TokenText,
+): DecodedToken | null =>
+  decodeTokenText(
+    tokenText,
+    wallet.keyChain.getKeysets().map((keyset) => keyset.id),
+  ) ?? decodeTokenText(tokenText);
+
+/**
+ * The token's proofs, its short v2 keyset ids (v4 text) expanded against the
+ * mint's keysets, refreshed once when they do not resolve. Without its
+ * proofs a receive could not ask the mint about them, so it writes nothing.
+ * Ids that the refreshed keysets still do not resolve name no keyset of the
+ * mint, so the token is undecodable for good.
+ */
+const decodeInputs = (
+  wallet: LoadedWallet,
+  parsed: ReceivableToken,
+): Effect.Effect<
+  DecodedToken,
+  MintUnreachable | MintRejected | TokenParseFailed
+> =>
+  Effect.gen(function* () {
+    const cached = decodeAgainst(wallet, parsed.tokenText);
+    if (cached !== null) return cached;
+    yield* Effect.tryPromise({
+      try: () => wallet.loadMint(true),
+      catch: (error) => classifyMintError(parsed.mint, error),
+    }).pipe(answerWithin(parsed.mint, "refreshing the mint's keysets"));
+    const refreshed = decodeAgainst(wallet, parsed.tokenText);
+    if (refreshed !== null) return refreshed;
+    return yield* new TokenParseFailed({
+      reason: "undecodable",
+      detail: "token proofs name no keyset of the mint",
+    });
+  });
+
+/**
+ * The mint's NUT-07 answer for every input, asked before a receive writes
+ * anything. Null for a mint that does not advertise the check, which would
+ * refuse every receive if its answer were required.
+ */
+const inputStates = (
+  wallet: LoadedWallet,
+  mint: MintUrl,
+  decoded: DecodedToken,
+): Effect.Effect<
+  { readonly spent: ReadonlySet<string> } | null,
+  MintUnreachable | MintRejected
+> =>
+  !advertisesStateCheck(wallet)
+    ? Effect.succeed(null)
+    : answeredStates(wallet, mint, decoded.proofs).pipe(
+        answerWithin(mint, "the proof state check"),
+      );
 
 /** Proofs a transfer handed out and still accounts for. */
 const proofsOf = (
@@ -469,8 +580,7 @@ const findKnown = (
   proofs: ReadonlyArray<StoredProof>,
   tokenText: TokenText,
   replaced: StoredOperation | null,
-  /** The token's proofs, when the text decodes. */
-  decoded: DecodedToken | null,
+  decoded: DecodedToken,
 ): TokenAlreadyKnown | null => {
   const transfer = operations.find(
     (operation) =>
@@ -482,7 +592,6 @@ const findKnown = (
   if (transfer !== undefined) {
     return new TokenAlreadyKnown({ operationId: transfer.id });
   }
-  if (decoded === null) return null;
   const secrets = new Set(decoded.proofs.map((proof) => proof.secret));
   const stored = proofs.find(
     (proof) =>
@@ -566,13 +675,66 @@ const findReopened = (
       : operation.id === replaced.operation.id && isUnfinished(operation),
   );
 
+const receiptOf = (
+  transfer: StoredOperation,
+  parsed: ReceivableToken,
+  accepted: AcceptedToken,
+): ReceiveReceipt =>
+  new ReceiveReceipt({
+    operationId: transfer.id,
+    tokenText: accepted.tokenText,
+    mint: parsed.mint,
+    unit: parsed.unit,
+    amount: accepted.amount,
+  });
+
+/**
+ * The unfinished receive this one continues, from freshly loaded rows, and
+ * the proofs as stored now. Fails `TokenAlreadyKnown` when a transfer or a
+ * stored proof already accounts for the text, or when another context
+ * finished the replaced transfer.
+ */
+const dedup = (
+  ctx: ReceiveContext,
+  parsed: ReceivableToken,
+  decoded: DecodedToken,
+  replaced: ReplacedTransfer | null,
+): Effect.Effect<
+  {
+    readonly reopened: StoredOperation | null;
+    readonly proofs: ReadonlyArray<StoredProof>;
+  },
+  TokenAlreadyKnown
+> =>
+  Effect.gen(function* () {
+    const operations = yield* ctx.operationStore.loadAll;
+    const proofs = yield* ctx.proofStore.loadAll;
+    const reopened =
+      findReopened(operations, parsed.tokenText, replaced) ?? null;
+    if (replaced !== null && reopened === null) {
+      return yield* new TokenAlreadyKnown({
+        operationId: replaced.operation.id,
+      });
+    }
+    const known = findKnown(
+      operations,
+      proofs,
+      parsed.tokenText,
+      reopened,
+      decoded,
+    );
+    if (known !== null) return yield* known;
+    return { reopened, proofs };
+  });
+
 /**
  * Receiving a token is one call: extract and decode the text, dedup against
- * stored transfers and proofs, persist a `pending` receive, re-sign the
- * proofs at the mint with deterministic outputs (recovering counter
- * collisions via targeted NUT-09 lookups), store them as `available`, and
- * close the receive as `done` — or `failed`, carrying the serialized error,
- * so that pasting the text again retries it.
+ * stored transfers and proofs, ask the mint whether the proofs are spent,
+ * persist a `pending` receive, re-sign the proofs at the mint with
+ * deterministic outputs (recovering counter collisions via targeted NUT-09
+ * lookups), store them as `available`, and close the receive as `done` — or
+ * `failed`, carrying the serialized error, so that pasting the text again
+ * retries it.
  *
  * Everything after the mint's keysets load runs under the counter lock, so
  * two contexts receiving one token see each other's outcome. Each swap
@@ -580,10 +742,17 @@ const findReopened = (
  * mint: receiving the text of an unfinished receive resumes it, taking the
  * outputs from NUT-09 when the mint already signed them.
  *
+ * A receive's id derives from its token text, so a device that has not
+ * synced another device's `done` receive of the token would write over it.
+ * Nothing is written until the mint has answered for every input: a spent
+ * token fails `TokenAlreadySpent` unless the receive's own recorded attempt
+ * spent it, and a mint that cannot answer fails the receive as it stood.
+ *
  * Re-receiving (`replaced`) follows the same path over the replaced transfer
  * instead of a fresh one: a failed `receive` is retried in place; a `send`'s
- * handed-out proofs are marked `spent` and the send `returned` only once the
- * fresh proofs are stored, so funds are never outside the store.
+ * handed-out proofs, ours to take back without asking, are marked `spent`
+ * and the send `returned` only once the fresh proofs are stored, so funds are
+ * never outside the store.
  */
 export const receiveTokenText = (
   ctx: ReceiveContext,
@@ -596,47 +765,56 @@ export const receiveTokenText = (
     // The mint's keysets decide dedup (short v2 ids in v4 text) and the fee,
     // so a mint that will not load ends the receive before anything is recorded.
     const wallet = yield* ctx.instances.get(parsed.mint, parsed.unit);
+    const decoded = yield* decodeInputs(wallet, parsed);
     const scope = yield* counterScopeFor(wallet, parsed);
     return yield* withCounterLock(
       ctx.kv,
       scope,
     )(
       Effect.gen(function* () {
-        const operations = yield* ctx.operationStore.loadAll;
-        const proofs = yield* ctx.proofStore.loadAll;
-        const keysetIds = wallet.keyChain
-          .getKeysets()
-          .map((keyset) => keyset.id);
-        const decoded =
-          decodeTokenText(parsed.tokenText, keysetIds) ??
-          decodeTokenText(parsed.tokenText);
-        const reopened =
-          findReopened(operations, parsed.tokenText, replaced) ?? null;
-        // Another context finished the replaced transfer while this one
-        // waited for the lock.
-        if (replaced !== null && reopened === null) {
-          return yield* new TokenAlreadyKnown({
-            operationId: replaced.operation.id,
-          });
-        }
-        const known = findKnown(
-          operations,
-          proofs,
-          parsed.tokenText,
-          reopened,
-          decoded,
-        );
-        if (known !== null) return yield* known;
+        yield* dedup(ctx, parsed, decoded, replaced);
         // A swap signs what is left after the mint's input fee. A token worth
         // no more than that fee has nothing to sign, and no wallet can redeem
         // it on its own, so it is refused before anything is recorded.
-        const fee = inputFeeForProofs(wallet, decoded?.proofs ?? []);
+        const fee = inputFeeForProofs(wallet, decoded.proofs);
         if (parsed.amount <= fee) {
           return yield* new AmountConsumedByFee({
             mint: parsed.mint,
             amount: parsed.amount,
             fee: Amount.make(fee),
           });
+        }
+        const states =
+          replaced?.operation.kind === "send"
+            ? null
+            : yield* inputStates(wallet, parsed.mint, decoded);
+        // While the mint answered, a receive of this text may have synced in.
+        const { reopened, proofs } = yield* dedup(
+          ctx,
+          parsed,
+          decoded,
+          replaced,
+        );
+
+        if (states !== null && states.spent.size > 0) {
+          const finished = yield* finishFromRestore(
+            ctx,
+            wallet,
+            parsed,
+            Effect.succeed(states.spent.size === decoded.proofs.length),
+            reopened,
+            reason,
+          );
+          if (finished === null || reopened === null) {
+            return yield* new TokenAlreadySpent({ mint: parsed.mint });
+          }
+          yield* patchOperation(
+            ctx,
+            reopened,
+            { status: "done", error: null },
+            reason,
+          );
+          return receiptOf(reopened, parsed, finished);
         }
 
         const transfer =
@@ -649,15 +827,18 @@ export const receiveTokenText = (
             : yield* reopen(ctx, reopened, reason);
 
         const accepted = yield* Effect.either(
-          acceptUnderLock(
-            ctx,
-            wallet,
-            scope,
-            parsed,
-            decoded?.proofs ?? null,
-            transfer,
-            reason,
-          ),
+          states === null
+            ? acceptUnchecked(
+                ctx,
+                wallet,
+                scope,
+                parsed,
+                decoded.proofs,
+                transfer,
+                reason,
+              )
+            : // Unspent at the mint, so no earlier attempt of this receive reached it.
+              swapAndKeep(ctx, wallet, scope, parsed, transfer, reason),
         );
         if (Either.isLeft(accepted)) {
           const error = accepted.left;
@@ -714,13 +895,7 @@ export const receiveTokenText = (
             reason,
           );
         }
-        return new ReceiveReceipt({
-          operationId: transfer.id,
-          tokenText: accepted.right.tokenText,
-          mint: parsed.mint,
-          unit: parsed.unit,
-          amount: accepted.right.amount,
-        });
+        return receiptOf(transfer, parsed, accepted.right);
       }),
     );
   });

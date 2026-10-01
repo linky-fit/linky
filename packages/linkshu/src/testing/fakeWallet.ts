@@ -5,7 +5,7 @@ import type {
   ProofState,
   SwapPreview,
 } from "@cashu/cashu-ts";
-import { Amount as CashuAmount } from "@cashu/cashu-ts";
+import { Amount as CashuAmount, MintInfo } from "@cashu/cashu-ts";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 
 export const KEYSET_HEX = "009a1f293253e41e";
@@ -19,15 +19,28 @@ export const proof = (amount: number, secret: string): Proof => ({
 
 const notUnderTest = () => Promise.reject(new Error("not under test"));
 
+/** Published info of a mint that advertises NUT-07 proof state checks. */
+export const fakeMintInfo = (stateCheck = true): MintInfo =>
+  new MintInfo({
+    name: "Fake mint",
+    pubkey: "02" + "ab".repeat(32),
+    version: "Nutshell/0.16.0",
+    contact: [],
+    nuts: {
+      "4": { methods: [], disabled: false },
+      "5": { methods: [], disabled: false },
+      "7": { supported: stateCheck },
+    },
+  });
+
 /** A wallet whose every call fails; tests override only what they exercise. */
 export const fakeWallet = (
   overrides: Partial<LoadedWallet> = {},
 ): LoadedWallet => ({
   keysetId: KEYSET_HEX,
   keyChain: { getKeysets: () => [] },
-  getMintInfo: () => {
-    throw new Error("not under test");
-  },
+  getMintInfo: () => fakeMintInfo(),
+  loadMint: notUnderTest,
   prepareSwapToReceive: notUnderTest,
   completeSwap: notUnderTest,
   send: notUnderTest,

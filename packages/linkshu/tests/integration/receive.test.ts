@@ -134,12 +134,12 @@ describe("receive vertical against the local mint", () => {
     expect(states.map((state) => state.state)).toEqual(["UNSPENT"]);
   });
 
-  it("persists a spent token as a failed receive transfer", async () => {
+  it("refuses a token another wallet already received and records nothing", async () => {
     const token = await fundToken(4);
     await receiveOnce(randomSeed(), token);
 
-    // A different wallet re-receiving the original text: its inputs are now
-    // spent, a definitive rejection that must persist on the transfer.
+    // A different wallet re-receiving the original text: the mint reports its
+    // inputs spent before any swap, so no transfer is written.
     const { error, transfers, proofs } = await runLinkshu(
       { bip39Seed: randomSeed() },
       Effect.gen(function* () {
@@ -157,15 +157,7 @@ describe("receive vertical against the local mint", () => {
     );
 
     expect(error).toMatchObject({ _tag: "TokenAlreadySpent", mint: mintUrl });
-    expect(transfers).toHaveLength(1);
-    expect(transfers[0]).toMatchObject({
-      kind: "receive",
-      status: "failed",
-      tokenText: token,
-    });
-    expect(JSON.parse(transfers[0]?.error ?? "")).toMatchObject({
-      _tag: "TokenAlreadySpent",
-    });
+    expect(transfers).toEqual([]);
     expect(proofs).toEqual([]);
   });
 });

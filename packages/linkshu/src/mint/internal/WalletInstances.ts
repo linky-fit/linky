@@ -50,6 +50,8 @@ export interface LoadedWallet {
   readonly keysetId: string;
   readonly keyChain: Pick<KeyChain, "getKeysets">;
   getMintInfo(): CashuMintInfo;
+  /** `forceRefresh` re-fetches the mint's info and keysets in place. */
+  loadMint(forceRefresh?: boolean): Promise<void>;
   prepareSwapToReceive(
     token: string,
     config?: ReceiveConfig,
