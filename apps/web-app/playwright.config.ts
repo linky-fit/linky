@@ -24,6 +24,7 @@ const LOCAL_STACK_SPECS = [
   "**/spayd-response.spec.ts",
   "**/security-policy.spec.ts",
   "**/seed-restore-chat-tokens.spec.ts",
+  "**/receive-deferred.spec.ts",
 ];
 
 export default defineConfig({

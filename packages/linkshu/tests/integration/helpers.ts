@@ -64,8 +64,11 @@ export const loadMintWallet = async (mint = mintUrl): Promise<Wallet> => {
 };
 
 /** Mints fresh sats via a bolt11 quote the FakeWallet backend auto-settles. */
-export const fundProofs = async (amountSat: number): Promise<Proof[]> => {
-  const wallet = await loadMintWallet();
+export const fundProofs = async (
+  amountSat: number,
+  mint = mintUrl,
+): Promise<Proof[]> => {
+  const wallet = await loadMintWallet(mint);
   const quote = await wallet.createMintQuoteBolt11(amountSat);
   return wallet.mintProofsBolt11(amountSat, quote, undefined, {
     type: "random",
@@ -75,8 +78,10 @@ export const fundProofs = async (amountSat: number): Promise<Proof[]> => {
 export const tokenOf = (proofs: Proof[], mint: MintUrl = mintUrl): string =>
   getEncodedToken({ mint, unit: "sat", proofs });
 
-export const fundToken = async (amountSat: number): Promise<string> =>
-  tokenOf(await fundProofs(amountSat));
+export const fundToken = async (
+  amountSat: number,
+  mint = mintUrl,
+): Promise<string> => tokenOf(await fundProofs(amountSat, mint), mint);
 
 /** A different mint's invoice avoids Nutshell's internal self-payment path. */
 export const invoiceFor = async (amountSat: number): Promise<Bolt11Invoice> => {

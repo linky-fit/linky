@@ -5,7 +5,8 @@
  * with the same seed in a fresh browser, and the Nostr inbox replays the old
  * tokens before Evolu brings back the wallet history that says they were
  * received. The restored device must stay quiet: no receive status and no
- * swap at the mint.
+ * swap at the mint. With the mint unreachable it keeps the tokens only as
+ * deferred receives, which close once the mint reports them spent.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
@@ -91,7 +92,7 @@ const watchReceiveStatuses = (page: Page) =>
     new MutationObserver(() => {
       for (const line of (document.body?.innerText ?? "").split("\n")) {
         if (
-          /Accepting token|Failed to accept token|already have this Cashu token/.test(
+          /Accepting token|Failed to accept token|already have this Cashu token|mint is unreachable/.test(
             line,
           )
         ) {
@@ -105,14 +106,78 @@ const watchReceiveStatuses = (page: Page) =>
     });
   });
 
-const receiveStatuses = (page: Page): Promise<string[]> =>
+/**
+ * B in a fresh browser with the Evolu history held back until `releaseEvolu`;
+ * meanwhile the old chat tokens come back only through the Nostr inbox
+ * backfill. Records the mint paths the page calls and the receive answers
+ * it gets back.
+ */
+const bootRestored = async (
+  browser: Browser,
+  label: string,
+  identity: SeedIdentity,
+) => {
+  const device = await bootDevice(browser, label, identity);
+  await watchReceiveStatuses(device.page);
+  await device.page.addInitScript(() => {
+    if (sessionStorage.getItem("e2e.evolu-released") === "1") return;
+    localStorage.setItem(
+      "linky.evoluServers.disabled.v1",
+      JSON.stringify(["ws://localhost:4001"]),
+    );
+  });
+  const mintCalls: string[] = [];
+  device.page.on("request", (request) => {
+    mintCalls.push(new URL(request.url()).pathname);
+  });
+  const mintAnswers: string[] = [];
+  device.page.on("response", (response) => {
+    const path = new URL(response.url()).pathname;
+    if (RECEIVE_MINT_PATHS.includes(path)) mintAnswers.push(path);
+  });
+  const releaseEvolu = async () => {
+    await device.page.evaluate(() => {
+      sessionStorage.setItem("e2e.evolu-released", "1");
+      localStorage.removeItem("linky.evoluServers.disabled.v1");
+    });
+    await device.page.reload();
+    await waitForNetworkReady(device.page);
+  };
+  return { ...device, mintAnswers, mintCalls, releaseEvolu };
+};
+
+const openReplayedChat = async (page: Page): Promise<void> => {
+  await page.goto("/#wallet");
+  await waitForNetworkReady(page);
+  await page.goto("/#contacts");
+  await expect(page.locator("[data-guide='contact-card']")).toHaveCount(1, {
+    timeout: 60_000,
+  });
+};
+
+const receiveStatuses = (page: Page) =>
+  page.evaluate(() => window.__receiveStatuses ?? []);
+
+const operationRows = (page: Page) =>
   page.evaluate(async () => {
     if (!window.__linkyE2E) throw new Error("test hooks missing");
     const rows = await window.__linkyE2E.shardRows("cashu", "cashuOperation");
-    return rows
-      .filter((row) => row.kind === "receive")
-      .map((row) => row.status);
+    return rows.map((row) => [row.kind, row.status]);
   });
+
+const expectOldReceivesIntact = async (
+  page: Page,
+  balance: number,
+): Promise<void> => {
+  await expect
+    .poll(() => readBalanceSat(page), { timeout: 60_000 })
+    .toBe(balance);
+  await expect
+    .poll(async () =>
+      (await operationRows(page)).filter(([kind]) => kind === "receive"),
+    )
+    .toEqual(TOKEN_SATS.map(() => ["receive", "done"]));
+};
 
 test("a seed restore does not re-accept chat tokens the old device received", async ({
   browser,
@@ -145,62 +210,67 @@ test("a seed restore does not re-accept chat tokens the old device received", as
     await b.context.close();
   });
 
+  await test.step("B restores the seed while its mint is unreachable", async () => {
+    const restored = await bootRestored(browser, "B mint down", bIdentity);
+    const mintRoute = "http://localhost:3338/**";
+    await restored.context.route(mintRoute, (route) =>
+      route.abort("connectionrefused"),
+    );
+    await openReplayedChat(restored.page);
+    // Each replayed token is kept under its own deferral, never a receive
+    // row that could sync over the old device's `done` receive.
+    await expect
+      .poll(() => operationRows(restored.page), { timeout: 60_000 })
+      .toEqual(TOKEN_SATS.map(() => ["deferredReceive", "pending"]));
+
+    await restored.context.unroute(mintRoute);
+    await restored.page.evaluate(() =>
+      window.dispatchEvent(new Event("online")),
+    );
+    // The mint reports the token spent, so the deferral closes silently.
+    await expect
+      .poll(() => operationRows(restored.page), { timeout: 60_000 })
+      .toEqual(TOKEN_SATS.map(() => ["deferredReceive", "failed"]));
+    expect(
+      await receiveStatuses(restored.page),
+      "restored device reported receive statuses",
+    ).toEqual([]);
+    expect(
+      restored.mintCalls.filter((path) => path === "/v1/swap"),
+      "restored device swapped a received token again",
+    ).toEqual([]);
+
+    await restored.releaseEvolu();
+    await expectOldReceivesIntact(restored.page, bBalance);
+    await expectNoBootErrorPanel(restored.page, "B mint down");
+    await restored.context.close();
+  });
+
   await test.step("B restores the seed before its Evolu history arrives", async () => {
-    const restored = await bootDevice(browser, "B restored", bIdentity);
-    await watchReceiveStatuses(restored.page);
-    // Holds the Evolu history back until the last check; meanwhile the old
-    // chat tokens come back only through the Nostr inbox backfill.
-    await restored.page.addInitScript(() => {
-      if (sessionStorage.getItem("e2e.evolu-released") === "1") return;
-      localStorage.setItem(
-        "linky.evoluServers.disabled.v1",
-        JSON.stringify(["ws://localhost:4001"]),
-      );
-    });
-    const mintAnswers: string[] = [];
-    restored.page.on("response", (response) => {
-      const path = new URL(response.url()).pathname;
-      if (RECEIVE_MINT_PATHS.includes(path)) mintAnswers.push(path);
-    });
-    await restored.page.goto("/#wallet");
-    await waitForNetworkReady(restored.page);
-    await restored.page.goto("/#contacts");
-    await expect(
-      restored.page.locator("[data-guide='contact-card']"),
-    ).toHaveCount(1, { timeout: 60_000 });
+    const restored = await bootRestored(browser, "B restored", bIdentity);
+    await openReplayedChat(restored.page);
     // Every replayed token's receive ends on a mint answer.
     await expect
-      .poll(() => mintAnswers.length, { timeout: 60_000 })
+      .poll(() => restored.mintAnswers.length, { timeout: 60_000 })
       .toBeGreaterThanOrEqual(TOKEN_SATS.length);
     await restored.page.waitForTimeout(SETTLE_MS);
 
-    const statuses = await restored.page.evaluate(
-      () => window.__receiveStatuses ?? [],
-    );
-    expect(statuses, "restored device reported receive statuses").toEqual([]);
     expect(
-      mintAnswers.filter((path) => path === "/v1/swap"),
+      await receiveStatuses(restored.page),
+      "restored device reported receive statuses",
+    ).toEqual([]);
+    expect(
+      restored.mintCalls.filter((path) => path === "/v1/swap"),
       "restored device swapped a received token again",
     ).toEqual([]);
-    const operations = await restored.page.evaluate(async () => {
-      if (!window.__linkyE2E) throw new Error("test hooks missing");
-      return window.__linkyE2E.shardRows("cashu", "cashuOperation");
-    });
-    expect(operations, "restored device recorded a receive").toEqual([]);
+    expect(
+      await operationRows(restored.page),
+      "restored device recorded a receive",
+    ).toEqual([]);
 
     // Once the history arrives, the old device's receives are intact.
-    await restored.page.evaluate(() => {
-      sessionStorage.setItem("e2e.evolu-released", "1");
-      localStorage.removeItem("linky.evoluServers.disabled.v1");
-    });
-    await restored.page.reload();
-    await waitForNetworkReady(restored.page);
-    await expect
-      .poll(() => readBalanceSat(restored.page), { timeout: 60_000 })
-      .toBe(bBalance);
-    await expect
-      .poll(() => receiveStatuses(restored.page))
-      .toEqual(TOKEN_SATS.map(() => "done"));
+    await restored.releaseEvolu();
+    await expectOldReceivesIntact(restored.page, bBalance);
     await expectNoBootErrorPanel(restored.page, "B restored");
     await restored.context.close();
   });
