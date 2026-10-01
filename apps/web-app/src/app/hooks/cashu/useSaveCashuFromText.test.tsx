@@ -1,10 +1,18 @@
-import { Either } from "effect";
+import { transactionIdForOperation } from "@linky-fit/linksync";
+import { Either, Schema } from "effect";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { MintUrl, TokenAlreadySpent } from "@linky-fit/linkshu";
+import {
+  MintUrl,
+  ReceiveReceipt,
+  TokenAlreadySpent,
+  TokenTransfer,
+} from "@linky-fit/linkshu";
+import { createTransferFixture } from "../../../testUtils/cashuInventory";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type { Translate } from "../../../i18n";
 import type { ReceiveCashuToken } from "../composition/useLinkshuComposition";
+import { useCashuDomain } from "../useCashuDomain";
 import { useSaveCashuFromText } from "./useSaveCashuFromText";
 
 type SaveCashuFromText = ReturnType<typeof useSaveCashuFromText>;
@@ -13,10 +21,14 @@ const translateToKey: Translate = (key) => key;
 
 const setup = async (
   receiveCashuToken: ReceiveCashuToken,
-): Promise<SaveCashuFromText> => {
+  cashuTransfers: readonly TokenTransfer[] = [],
+) => {
   const ref: { current: SaveCashuFromText | null } = { current: null };
+  const logPaymentEvent = vi.fn();
+  const setStatus = vi.fn();
 
   const Probe = (): null => {
+    const cashu = useCashuDomain({ cashuTransfers, walletLoaded: true });
     const save = useSaveCashuFromText({
       allowTestMints: true,
       enqueueCashuOp: async (op) => {
@@ -27,16 +39,16 @@ const setup = async (
         approxPrefix: "",
         unitLabel: "sat",
       }),
-      isCashuTokenStored: () => false,
+      isCashuTokenStored: cashu.isCashuTokenStored,
       isMintDeleted: () => false,
-      logPaymentEvent: vi.fn(),
+      logPaymentEvent,
       mintInfoByUrl: new Map(),
       receiveCashuToken,
       refreshMintInfo: async () => undefined,
-      rememberCashuTokenKnown: vi.fn(),
+      rememberCashuTokenKnown: cashu.rememberCashuTokenKnown,
       setCashuDraft: () => undefined,
       setCashuIsBusy: () => undefined,
-      setStatus: () => undefined,
+      setStatus,
       showPaidOverlay: () => undefined,
       t: translateToKey,
       touchMintInfo: () => undefined,
@@ -49,12 +61,17 @@ const setup = async (
 
   await renderIntoDocument(<Probe />);
   if (!ref.current) throw new Error("hook did not render");
-  return ref.current;
+  return { save: ref.current, logPaymentEvent, setStatus };
 };
+
+const receiveTransfer = (status: "pending" | "done") =>
+  Schema.decodeUnknownSync(TokenTransfer)(
+    createTransferFixture({ kind: "receive", status }),
+  );
 
 describe("useSaveCashuFromText", () => {
   it("resolves terminally when the mint reports the token already spent", async () => {
-    const save = await setup(async () =>
+    const { save } = await setup(async () =>
       Either.left(
         new TokenAlreadySpent({ mint: MintUrl.make("https://x.cz") }),
       ),
@@ -69,7 +86,7 @@ describe("useSaveCashuFromText", () => {
   });
 
   it("resolves transiently on an unexpected receive failure", async () => {
-    const save = await setup(async () => {
+    const { save } = await setup(async () => {
       throw new Error("mint unreachable");
     });
     const onResolved = vi.fn();
@@ -77,5 +94,44 @@ describe("useSaveCashuFromText", () => {
     await save("cashuBtransient", { onResolved });
 
     expect(onResolved).toHaveBeenCalledWith("transient");
+  });
+
+  it("resumes a receive a reload left pending and records it in history", async () => {
+    const transfer = receiveTransfer("pending");
+    const receive = vi.fn<ReceiveCashuToken>(async () =>
+      Either.right(
+        new ReceiveReceipt({
+          operationId: transfer.id,
+          tokenText: transfer.tokenText,
+          mint: transfer.mint,
+          unit: transfer.unit,
+          amount: transfer.amount,
+        }),
+      ),
+    );
+    const { save, logPaymentEvent } = await setup(receive, [transfer]);
+
+    await save(transfer.tokenText);
+
+    expect(receive).toHaveBeenCalledWith(transfer.tokenText);
+    expect(logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "ok",
+        transactionId: transactionIdForOperation(transfer.id),
+      }),
+    );
+  });
+
+  it("reports a finished receive as already saved without receiving again", async () => {
+    const transfer = receiveTransfer("done");
+    const receive = vi.fn<ReceiveCashuToken>();
+    const { save, setStatus } = await setup(receive, [transfer]);
+    const onResolved = vi.fn();
+
+    await save(transfer.tokenText, { onResolved });
+
+    expect(setStatus).toHaveBeenCalledWith("cashuExists");
+    expect(receive).not.toHaveBeenCalled();
+    expect(onResolved).toHaveBeenCalledWith("terminal");
   });
 });

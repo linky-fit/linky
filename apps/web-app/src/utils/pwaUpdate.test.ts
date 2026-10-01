@@ -43,6 +43,37 @@ describe("pwaUpdate", () => {
     expect(values).toEqual([false, true, false]);
   });
 
+  it("holds the update back until all deferred wallet work, including work queued meanwhile, settles", async () => {
+    const pwaUpdate = await loadPwaUpdate();
+    const updateSW = vi.fn(() => Promise.resolve());
+    pwaUpdate.recordPwaRegistered(updateSW);
+    let finishReceive = (): void => undefined;
+    pwaUpdate.deferPwaUpdateWhile(
+      new Promise<void>((resolve) => {
+        finishReceive = resolve;
+      }),
+    );
+
+    const applied = pwaUpdate.applyPwaUpdate();
+    await Promise.resolve();
+    expect(updateSW).not.toHaveBeenCalled();
+
+    let finishQueued = (): void => undefined;
+    pwaUpdate.deferPwaUpdateWhile(
+      new Promise<void>((resolve) => {
+        finishQueued = resolve;
+      }),
+    );
+    finishReceive();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(updateSW).not.toHaveBeenCalled();
+
+    finishQueued();
+    await applied;
+    expect(updateSW).toHaveBeenCalledWith(true);
+  });
+
   const stubSwController = (clientCount: number) => {
     vi.stubGlobal("navigator", {
       serviceWorker: {

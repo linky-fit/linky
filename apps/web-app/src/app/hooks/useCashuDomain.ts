@@ -1,4 +1,5 @@
 import { useLatest } from "../../hooks/useLatest";
+import { isInterruptedReceive } from "../lib/cashuTransfers";
 import type { TokenTransfer } from "@linky-fit/linkshu";
 import React from "react";
 
@@ -53,13 +54,14 @@ export const useCashuDomain = ({
     cashuTokensHydratedRef.current = walletLoaded;
   }, [walletLoaded]);
 
-  // A failed receive does not count as stored: pasting the text again retries.
+  // An unfinished receive does not count as stored: receiving the text again
+  // retries a failed one and resumes an interrupted one.
   const isTransferStored = React.useCallback(
     (raw: string): boolean =>
       cashuTransfersRef.current.some(
         (transfer) =>
           transfer.tokenText === raw &&
-          !(transfer.kind === "receive" && transfer.status === "failed"),
+          (transfer.kind === "send" || transfer.status === "done"),
       ),
     [cashuTransfersRef],
   );
@@ -83,7 +85,10 @@ export const useCashuDomain = ({
       if (!raw) return false;
       return (
         isOptimisticallyKnownCashuToken(raw) ||
-        cashuTransfersRef.current.some((transfer) => transfer.tokenText === raw)
+        cashuTransfersRef.current.some(
+          (transfer) =>
+            transfer.tokenText === raw && !isInterruptedReceive(transfer),
+        )
       );
     },
     [

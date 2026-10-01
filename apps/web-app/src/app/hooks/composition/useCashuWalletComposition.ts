@@ -73,6 +73,7 @@ import {
   safeLocalStorageSet,
 } from "../../../utils/storage";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
+import { deferPwaUpdateWhile } from "../../../utils/pwaUpdate";
 import { makeLocalId } from "../../../utils/validation";
 import { useCashuTokenChecks } from "../cashu/useCashuTokenChecks";
 import { useNpubCashClaim } from "../cashu/useNpubCashClaim";
@@ -97,7 +98,11 @@ import { usePaymentsDomain } from "../usePaymentsDomain";
 import { useProfileNpubCashEffects } from "../useProfileNpubCashEffects";
 import { reportCashuSendForgotten } from "../../lib/cashuSendInspector";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
-import { isIssuedTransfer, isOpenTransfer } from "../../lib/cashuTransfers";
+import {
+  isInterruptedReceive,
+  isIssuedTransfer,
+  isOpenTransfer,
+} from "../../lib/cashuTransfers";
 import {
   canOfferPaymentMintMelt,
   getPaymentMintMeltPlan,
@@ -129,6 +134,7 @@ import {
 } from "../useLinksync";
 import { runWrite } from "../../lib/storeWrite";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
+import { useInterruptedReceiveRecovery } from "../cashu/useInterruptedReceiveRecovery";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
 import type { Translate } from "../../../i18n";
@@ -372,6 +378,7 @@ export const useCashuWalletComposition = ({
         () => undefined,
         () => undefined,
       );
+      deferPwaUpdateWhile(cashuOpQueueRef.current);
       return next;
     },
     [],
@@ -1597,6 +1604,13 @@ export const useCashuWalletComposition = ({
     touchMintInfo,
   });
 
+  useInterruptedReceiveRecovery({
+    cashuTransfers: walletTransfers,
+    messages: nostrMessagesRecent,
+    ready: walletLoaded && nostrBootstrapReady && receiveCashuToken !== null,
+    saveCashuFromText,
+  });
+
   const {
     checkAllCashuTokensAndDeleteInvalid,
     checkAndRefreshCashuToken,
@@ -2438,7 +2452,12 @@ export const useCashuWalletComposition = ({
   );
 
   const knownTransferTexts = React.useMemo(
-    () => new Set(walletTransfers.map((transfer) => transfer.tokenText)),
+    () =>
+      new Set(
+        walletTransfers
+          .filter((transfer) => !isInterruptedReceive(transfer))
+          .map((transfer) => transfer.tokenText),
+      ),
     [walletTransfers],
   );
   const getCashuTokenMessageInfo = React.useCallback(

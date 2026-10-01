@@ -4,6 +4,7 @@ const STARTUP_AUTO_UPDATE_WINDOW_MS = 5_000;
 const CLIENT_COUNT_TIMEOUT_MS = 1_000;
 
 const listeners = new Set<Listener>();
+const walletWork = new Set<Promise<void>>();
 let needRefresh = false;
 let applyingUpdate = false;
 let updateSW: ((reloadPage?: boolean) => Promise<void>) | null = null;
@@ -65,6 +66,15 @@ export const subscribePwaNeedRefresh = (listener: Listener) => {
 
 export const isApplyingPwaUpdate = () => applyingUpdate;
 
+/** Holds the update's reload back until `work` settles, so it cannot cut a wallet operation short. */
+export const deferPwaUpdateWhile = (work: Promise<void>): void => {
+  walletWork.add(work);
+  const release = () => {
+    walletWork.delete(work);
+  };
+  void work.then(release, release);
+};
+
 const readClientCount = (data: unknown): number | null => {
   if (typeof data === "object" && data !== null && "count" in data) {
     const { count } = data;
@@ -121,6 +131,7 @@ export const applyPwaUpdate = async () => {
   if (applyingUpdate) return;
   applyingUpdate = true;
   markPwaNeedRefresh(false);
+  while (walletWork.size > 0) await Promise.allSettled(walletWork);
   if (!updateSW) {
     reloadPage();
     return;

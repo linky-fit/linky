@@ -109,9 +109,18 @@ export const formatStoredCashuError = (stored: unknown): string | null => {
   return (tagged !== null ? describeTaggedCashuError(tagged) : null) ?? text;
 };
 
-/** True when a stored error is linkshu's definitive already-spent failure. */
-export const isStoredCashuErrorTokenSpent = (stored: unknown): boolean => {
-  if (typeof stored !== "string") return false;
+const storedErrorTag = (stored: unknown): unknown => {
+  if (typeof stored !== "string") return null;
   const tagged = parseTaggedErrorJson(stored.trim());
-  return tagged !== null && Reflect.get(tagged, "_tag") === "TokenAlreadySpent";
+  return tagged === null ? null : Reflect.get(tagged, "_tag");
+};
+
+/** True when a stored error is linkshu's definitive already-spent failure. */
+export const isStoredCashuErrorTokenSpent = (stored: unknown): boolean =>
+  storedErrorTag(stored) === "TokenAlreadySpent";
+
+/** True when a stored error says the mint was not reached or the wallet was busy, so trying again may succeed. */
+export const isStoredCashuErrorTransient = (stored: unknown): boolean => {
+  const tag = storedErrorTag(stored);
+  return tag === "MintUnreachable" || tag === "CounterLockTimeout";
 };
