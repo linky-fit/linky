@@ -9,7 +9,7 @@ import {
   TopupQuote,
   TopupReceipt,
 } from "@linky-fit/linkshu";
-import { Either } from "effect";
+import { Result } from "effect";
 import { nip19 } from "nostr-tools";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -177,7 +177,7 @@ describe("useTopupFlow", () => {
     const quote = topupQuote();
     const deferred = deferredHandle(quote);
     const start = vi.fn<StartCashuTopup>(async () =>
-      Either.right(deferred.handle),
+      Result.succeed(deferred.handle),
     );
     const harness = await setup({ startCashuTopup: start });
 
@@ -192,7 +192,7 @@ describe("useTopupFlow", () => {
       expect(harness.flow().topupInvoiceQrPayload).toBe(INVOICE);
     });
 
-    await deferred.settle(Either.right(topupReceipt(quote)));
+    await deferred.settle(Result.succeed(topupReceipt(quote)));
 
     expect(harness.logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -220,7 +220,7 @@ describe("useTopupFlow", () => {
     const quote = topupQuote();
     const harness = await setup({
       startCashuTopup: vi.fn<StartCashuTopup>(async () =>
-        Either.right(deferredHandle(quote).handle),
+        Result.succeed(deferredHandle(quote).handle),
       ),
       topupRecipientNprofile: RECIPIENT_NPROFILE,
     });
@@ -243,7 +243,7 @@ describe("useTopupFlow", () => {
     const quote = topupQuote();
     const deferred = deferredHandle(quote);
     const start = vi.fn<StartCashuTopup>(async () =>
-      Either.right(deferred.handle),
+      Result.succeed(deferred.handle),
     );
     const harness = await setup({ startCashuTopup: start });
 
@@ -260,7 +260,7 @@ describe("useTopupFlow", () => {
       });
     });
 
-    await deferred.settle(Either.right(topupReceipt(quote)));
+    await deferred.settle(Result.succeed(topupReceipt(quote)));
 
     expect(harness.logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({ note: "rent", status: "ok" }),
@@ -272,7 +272,7 @@ describe("useTopupFlow", () => {
   it("does not start twice for one amount and mint", async () => {
     const deferred = deferredHandle(topupQuote());
     const start = vi.fn<StartCashuTopup>(async () =>
-      Either.right(deferred.handle),
+      Result.succeed(deferred.handle),
     );
     const harness = await setup({ startCashuTopup: start });
 
@@ -292,7 +292,7 @@ describe("useTopupFlow", () => {
 
   it("shows the typed error when the quote cannot be created", async () => {
     const start = vi.fn<StartCashuTopup>(async () =>
-      Either.left(
+      Result.fail(
         new MintUnreachable({ mint: MintUrl.make(MINT_URL), detail: "down" }),
       ),
     );
@@ -324,7 +324,7 @@ describe("useTopupFlow", () => {
 
     expect(resume).toHaveBeenCalledTimes(1);
 
-    await deferred.settle(Either.right(topupReceipt(quote)));
+    await deferred.settle(Result.succeed(topupReceipt(quote)));
 
     expect(harness.showPaidOverlay).toHaveBeenCalledWith(
       "topupOverlay",
@@ -345,13 +345,13 @@ describe("useTopupFlow paid navigation timer", () => {
     const deferred = deferredHandle(quote);
     const harness = await setup({
       startCashuTopup: vi.fn<StartCashuTopup>(async () =>
-        Either.right(deferred.handle),
+        Result.succeed(deferred.handle),
       ),
     });
     await act(async () => {
       harness.flow().setTopupAmount("21");
     });
-    await deferred.settle(Either.right(topupReceipt(quote)));
+    await deferred.settle(Result.succeed(topupReceipt(quote)));
     return harness;
   };
 

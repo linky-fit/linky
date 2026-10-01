@@ -28,7 +28,7 @@ import { Effect, Schema, Stream } from "effect";
 export { PAYMENT_ANALYTICS_RECIPIENT_NPUB } from "@linky-fit/linkstr";
 
 const key = "linky.site.nostr.secret";
-const secretHex = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));
+const secretHex = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/));
 const config = () => {
   const stored = localStorage.getItem(key);
   const secretKey = NostrSecretKey.make(
@@ -96,18 +96,17 @@ const bucketPositiveNumber = (
 const bufferKey = "linky.site.pendingPaymentTelemetry.v1";
 const BufferedDraft = Schema.Struct({
   ...PaymentTelemetryDraft.fields,
-  appHost: Schema.optionalWith(PaymentTelemetryDraft.fields.appHost, {
-    default: () => null,
-  }),
-  devicePlatform: Schema.optionalWith(
-    PaymentTelemetryDraft.fields.devicePlatform,
-    { default: () => null },
+  appHost: PaymentTelemetryDraft.fields.appHost.pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(null)),
   ),
-  appRuntime: Schema.optionalWith(PaymentTelemetryDraft.fields.appRuntime, {
-    default: () => null,
-  }),
+  devicePlatform: PaymentTelemetryDraft.fields.devicePlatform.pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(null)),
+  ),
+  appRuntime: PaymentTelemetryDraft.fields.appRuntime.pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(null)),
+  ),
 });
-const DraftsJson = Schema.parseJson(Schema.Array(BufferedDraft));
+const DraftsJson = Schema.fromJsonString(Schema.Array(BufferedDraft));
 const readBuffer = () => {
   const raw = localStorage.getItem(bufferKey);
   if (!raw) return [];

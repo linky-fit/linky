@@ -4,7 +4,7 @@ import {
   type CompanySnapshot,
 } from "@linky-fit/keryx";
 import type { KeryxSubscriptionsRepository } from "@linky-fit/linksync";
-import { Effect, Either, Struct } from "effect";
+import { Effect, Result, Struct } from "effect";
 import React from "react";
 import {
   emptyCacheEntry,
@@ -133,7 +133,7 @@ const refreshKeryxCompany = async (
     const subscription = withFeedStates(company.subscription, previous);
     const now = new Date();
     const outcome = await Effect.runPromise(
-      Effect.either(
+      Effect.result(
         refreshCompany({
           subscription,
           known: previous.announcements,
@@ -145,14 +145,14 @@ const refreshKeryxCompany = async (
     reportKeryx(() => keryxRefreshRows(subscription, outcome));
     // `remove` drops the entry; the refresh must not write it back.
     if (!state.entries.has(origin)) return;
-    if (Either.isLeft(outcome)) {
-      update((draft) => draft.errors.set(origin, outcome.left._tag));
+    if (Result.isFailure(outcome)) {
+      update((draft) => draft.errors.set(origin, outcome.failure._tag));
       return;
     }
     update((draft) => draft.errors.delete(origin));
-    await saveEntry(origin, nextCacheEntry(previous, outcome.right, now));
-    if (outcome.right._tag === "Refreshed") {
-      const patch = trustWriteback(company, outcome.right);
+    await saveEntry(origin, nextCacheEntry(previous, outcome.success, now));
+    if (outcome.success._tag === "Refreshed") {
+      const patch = trustWriteback(company, outcome.success);
       if (patch) await runWrite(repository.update(company.id, patch));
     }
   } catch {
@@ -253,7 +253,7 @@ export const useKeryx = () => {
         if (!outcome.ok) return outcome;
         await saveEntry(
           origin,
-          Struct.omit(await loadEntry(origin), "pendingIdentity"),
+          Struct.omit(await loadEntry(origin), ["pendingIdentity"]),
         );
         reportKeryx(() => [keryxIdentityAcknowledgedRow(origin, identity)]);
         return outcome;

@@ -50,7 +50,7 @@ export const syncedInboxCursorStore = ({
             payload: { cursor, previous: synced },
           });
         }).pipe(
-          Effect.catchAll((error) =>
+          Effect.catch((error) =>
             Effect.sync(() =>
               reportAppLog({
                 tag: "inbox.syncedCursorWriteFailed",

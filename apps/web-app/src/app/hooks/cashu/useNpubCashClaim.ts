@@ -2,7 +2,7 @@ import { transactionIdForOperation } from "@linky-fit/linksync";
 import type { PaidOverlayDetails } from "../../lib/paidOverlay";
 import { useLatest } from "../../../hooks/useLatest";
 import { Schema } from "effect";
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import { parseTokenText, type OperationId } from "@linky-fit/linkshu";
 import { JsonValue } from "../../../types/json";
@@ -319,8 +319,8 @@ export const useNpubCashClaim = ({
             automatic: true,
           });
 
-          if (Either.isLeft(outcome)) {
-            const error = outcome.left;
+          if (Result.isFailure(outcome)) {
+            const error = outcome.failure;
             // A receive that waited out another one's turn wrote nothing.
             if (error._tag === "CounterLockTimeout") return false;
             // A deferred token is kept by linkshu and received on a later retry.
@@ -335,7 +335,7 @@ export const useNpubCashClaim = ({
             return true;
           }
 
-          const receipt = outcome.right;
+          const receipt = outcome.success;
           rememberCashuTokenKnown(tokenRaw, receipt.tokenText);
           announceReceived({
             amount: receipt.amount,
@@ -465,8 +465,8 @@ export const useNpubCashClaim = ({
         }
       });
 
-      if (Either.isRight(outcome)) {
-        const receipt = outcome.right;
+      if (Result.isSuccess(outcome)) {
+        const receipt = outcome.success;
         rememberCashuTokenKnown(receipt.tokenText);
         announceReceived({
           amount: receipt.amount,
@@ -479,7 +479,7 @@ export const useNpubCashClaim = ({
         return true;
       }
 
-      const error = outcome.left;
+      const error = outcome.failure;
       if (error._tag === "QuoteAlreadyIssued") return true;
       const definitive = error._tag === "MintRejected";
       logPaymentEvent({

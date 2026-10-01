@@ -289,15 +289,14 @@ export const useProfileEditor = ({
 
         const nextMetadata = new ProfileMetadata({
           ...(prev
-            ? Struct.omit(
-                prev,
+            ? Struct.omit(prev, [
                 "name",
                 "displayName",
                 "lud16",
                 "lud06",
                 "nip05",
                 "picture",
-              )
+              ])
             : {}),
           ...(trimmedName
             ? { name: trimmedName, displayName: trimmedName }

@@ -1,7 +1,7 @@
 import { transactionIdForQuote } from "@linky-fit/linksync";
 import type { TopupError, TopupQuote } from "@linky-fit/linkshu";
 import type { PaidOverlayDetails } from "../../lib/paidOverlay";
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import { useLatest } from "../../../hooks/useLatest";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -201,10 +201,10 @@ export const useTopupFlow = ({
       watchedQuoteIdsRef.current.add(quoteId);
       void handle.completion
         .then((result) => {
-          if (Either.isRight(result)) {
-            completeTopupRef.current(handle.quote, result.right.tokenText);
+          if (Result.isSuccess(result)) {
+            completeTopupRef.current(handle.quote, result.success.tokenText);
           } else {
-            failTopupRef.current(handle.quote, result.left);
+            failTopupRef.current(handle.quote, result.failure);
           }
         })
         .catch(() => {
@@ -273,19 +273,24 @@ export const useTopupFlow = ({
       ...(note ? { description: note } : {}),
     }).then(
       (outcome) => {
-        if (Either.isRight(outcome)) {
+        if (Result.isSuccess(outcome)) {
           if (note)
-            noteByQuoteIdRef.current.set(outcome.right.quote.quoteId, note);
-          watchTopup(outcome.right);
+            noteByQuoteIdRef.current.set(outcome.success.quote.quoteId, note);
+          watchTopup(outcome.success);
         }
         // A newer request supersedes this one; the quote stays watched.
         if (startedKeyRef.current !== requestKey) return;
-        if (Either.isRight(outcome)) {
+        if (Result.isSuccess(outcome)) {
           startBalanceRef.current = null;
-          setActiveTopup({ amountSat, mint, note, quote: outcome.right.quote });
+          setActiveTopup({
+            amountSat,
+            mint,
+            note,
+            quote: outcome.success.quote,
+          });
         } else {
           setTopupInvoiceError(
-            `${tRef.current("topupInvoiceFailed")}: ${describeTopupError(outcome.left)}`,
+            `${tRef.current("topupInvoiceFailed")}: ${describeTopupError(outcome.failure)}`,
           );
         }
         setTopupInvoiceIsBusy(false);
@@ -368,16 +373,16 @@ export const useTopupFlow = ({
     async (args: {
       amountSat: number;
       mint: string;
-    }): Promise<Either.Either<TopupQuote, string>> => {
+    }): Promise<Result.Result<TopupQuote, string>> => {
       if (startCashuTopup === null) {
-        return Either.left(t("topupInvoiceFailed"));
+        return Result.fail(t("topupInvoiceFailed"));
       }
       const outcome = await startCashuTopup(args);
-      if (Either.isLeft(outcome)) {
-        return Either.left(describeTopupError(outcome.left));
+      if (Result.isFailure(outcome)) {
+        return Result.fail(describeTopupError(outcome.failure));
       }
-      watchTopup(outcome.right);
-      return Either.right(outcome.right.quote);
+      watchTopup(outcome.success);
+      return Result.succeed(outcome.success.quote);
     },
     [startCashuTopup, t, watchTopup],
   );

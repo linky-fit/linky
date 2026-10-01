@@ -11,7 +11,7 @@ import {
   paidOverlayContact,
   type PaidOverlayDetails,
 } from "../lib/paidOverlay";
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import {
   fetchLnurlInvoiceForTarget,
@@ -113,16 +113,17 @@ export const useLightningPaymentsDomain = ({
       melt: MeltCashuInvoice,
       invoice: string,
       mint: string,
-    ): Promise<Either.Either<MeltReceipt, MeltFailure>> => {
+    ): Promise<Result.Result<MeltReceipt, MeltFailure>> => {
       try {
         const outcome = await melt({ invoice, mint });
-        if (Either.isRight(outcome)) return Either.right(outcome.right);
-        return Either.left({
-          message: describeMeltError(outcome.left),
-          pending: outcome.left._tag === "PaymentPending" ? outcome.left : null,
+        if (Result.isSuccess(outcome)) return Result.succeed(outcome.success);
+        return Result.fail({
+          message: describeMeltError(outcome.failure),
+          pending:
+            outcome.failure._tag === "PaymentPending" ? outcome.failure : null,
         });
       } catch (error) {
-        return Either.left({
+        return Result.fail({
           message: getUnknownErrorMessage(error, "unknown"),
           pending: null,
         });
@@ -198,10 +199,10 @@ export const useLightningPaymentsDomain = ({
         const note = invoicePreview?.description ?? null;
         const outcome = await meltOnMint(meltCashuInvoice, normalized, mint);
 
-        if (Either.isLeft(outcome)) {
-          if (outcome.left.pending !== null) {
+        if (Result.isFailure(outcome)) {
+          if (outcome.failure.pending !== null) {
             recordPendingMelt(
-              outcome.left.pending,
+              outcome.failure.pending,
               "lightning_invoice",
               "lightning",
               invoiceDetails,
@@ -218,17 +219,17 @@ export const useLightningPaymentsDomain = ({
             fee: null,
             mint,
             unit: "sat",
-            error: outcome.left.message,
+            error: outcome.failure.message,
             contactId: null,
             method: "lightning_invoice",
             paymentType: "lightning",
             phase: "melt",
           });
-          setStatus(`${t("payFailed")}: ${outcome.left.message}`);
+          setStatus(`${t("payFailed")}: ${outcome.failure.message}`);
           return false;
         }
 
-        const receipt = outcome.right;
+        const receipt = outcome.success;
         logPaymentEvent({
           direction: "out",
           status: "ok",
@@ -398,10 +399,10 @@ export const useLightningPaymentsDomain = ({
 
           const paidLightningAddress = resolvedLightningAddress;
 
-          if (Either.isLeft(outcome)) {
-            if (outcome.left.pending !== null) {
+          if (Result.isFailure(outcome)) {
+            if (outcome.failure.pending !== null) {
               recordPendingMelt(
-                outcome.left.pending,
+                outcome.failure.pending,
                 "lightning_address",
                 paymentType,
                 {
@@ -413,13 +414,13 @@ export const useLightningPaymentsDomain = ({
               );
               return true;
             }
-            if (canRetryLower(outcome.left.message)) continue;
-            finalErrorMessage = outcome.left.message;
+            if (canRetryLower(outcome.failure.message)) continue;
+            finalErrorMessage = outcome.failure.message;
             finalErrorMint = mint;
             break;
           }
 
-          const receipt = outcome.right;
+          const receipt = outcome.success;
           const successActionMessage =
             attemptSuccessAction?.tag === "message"
               ? attemptSuccessAction.message

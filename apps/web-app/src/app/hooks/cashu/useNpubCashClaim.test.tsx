@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -34,7 +34,7 @@ const mint = MintUrl.make("https://mint.example");
 const claimed = "cashuBclaimedonce";
 const operationId = OperationId.make("AQEBAQEBAQEBAQEBAQEBAQ");
 
-const received = Either.right(
+const received = Result.succeed(
   new ReceiveReceipt({
     operationId,
     tokenText: TokenText.make("cashuBresigned"),
@@ -44,7 +44,7 @@ const received = Either.right(
   }),
 );
 
-const waitedOutTheLock = Either.left(
+const waitedOutTheLock = Result.fail(
   new CounterLockTimeout({
     mint,
     unit: CurrencyUnit.make("sat"),
@@ -283,7 +283,7 @@ describe("useNpubCashClaim", () => {
     const receive = vi
       .fn<ReceiveCashuToken>()
       .mockResolvedValue(
-        Either.left(
+        Result.fail(
           new ReceiveDeferred({ mint, operationId, amount: Amount.make(21) }),
         ),
       );

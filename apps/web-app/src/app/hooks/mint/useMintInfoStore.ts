@@ -30,7 +30,7 @@ import { makeLocalId } from "../../../utils/validation";
 import { nowSeconds } from "../../../utils/time";
 
 const OptionalStoredValue = Schema.optional(
-  Schema.NullOr(Schema.Union(Schema.String, Schema.Number, Schema.Boolean)),
+  Schema.NullOr(Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
 );
 
 const StoredMintInfoRow = Schema.Struct({

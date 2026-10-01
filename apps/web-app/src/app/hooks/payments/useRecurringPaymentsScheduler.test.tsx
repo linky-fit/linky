@@ -34,7 +34,7 @@ import {
   recurringProgressColumn,
   type RecurringRail,
 } from "@linky-fit/recurring-payment";
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
@@ -123,7 +123,7 @@ const makeEnvelopes = (
   open: vi.fn<CashuEnvelopes["open"]>(async ({ key, amountSat }) => {
     const funded = mint.has(key);
     if (!funded) mint.set(key, "unspent");
-    return Either.right(
+    return Result.succeed(
       new EnvelopeOpened({
         outcome: funded ? "adopted" : "created",
         operationId: ENVELOPE_OPERATION,
@@ -132,10 +132,10 @@ const makeEnvelopes = (
     );
   }),
   state: vi.fn<CashuEnvelopes["state"]>(async ({ key }) =>
-    Either.right(stateOf(mint.get(key) ?? "absent")),
+    Result.succeed(stateOf(mint.get(key) ?? "absent")),
   ),
   send: vi.fn<CashuEnvelopes["send"]>(async () =>
-    Either.right(
+    Result.succeed(
       new EnvelopeToken({
         operationId: ENVELOPE_OPERATION,
         tokenText: TOKEN,
@@ -144,7 +144,7 @@ const makeEnvelopes = (
     ),
   ),
   melt: vi.fn<CashuEnvelopes["melt"]>(async () =>
-    Either.right(
+    Result.succeed(
       new MeltReceipt({
         mint: MintUrl.make(MINT),
         quoteId: QuoteId.make("quote-1"),
@@ -156,7 +156,9 @@ const makeEnvelopes = (
     ),
   ),
   release: vi.fn<CashuEnvelopes["release"]>(async () =>
-    Either.right(new EnvelopeReleased({ amount: NonNegativeAmount.make(99) })),
+    Result.succeed(
+      new EnvelopeReleased({ amount: NonNegativeAmount.make(99) }),
+    ),
   ),
   ...overrides,
 });
@@ -167,7 +169,7 @@ const envelopeKeyOf = (runIndex: number) => EnvelopeKey.make(keyOf(runIndex));
 const heldEnvelopes = () =>
   makeEnvelopes(fakeMint(), {
     open: vi.fn(async () =>
-      Either.left(
+      Result.fail(
         new EnvelopeBusy({ mint: MintUrl.make(MINT), key: envelopeKeyOf(0) }),
       ),
     ),
@@ -584,7 +586,7 @@ describe("useRecurringPaymentsScheduler", () => {
       {
         envelopes: makeEnvelopes(fakeMint(), {
           melt: vi.fn(async () =>
-            Either.left(
+            Result.fail(
               new PaymentPending({
                 mint: MintUrl.make(MINT),
                 quoteId: QuoteId.make("quote-1"),
@@ -683,7 +685,7 @@ describe("useRecurringPaymentsScheduler", () => {
       {
         envelopes: makeEnvelopes(fakeMint(), {
           send: vi.fn(async () =>
-            Either.left(
+            Result.fail(
               new EnvelopeNotFound({
                 mint: MintUrl.make(MINT),
                 key: envelopeKeyOf(0),
@@ -714,7 +716,7 @@ describe("useRecurringPaymentsScheduler", () => {
         },
         envelopes: makeEnvelopes(fakeMint(), {
           melt: vi.fn(async () =>
-            Either.left(
+            Result.fail(
               new EnvelopeNotFound({
                 mint: MintUrl.make(MINT),
                 key: envelopeKeyOf(0),
@@ -780,7 +782,7 @@ describe("useRecurringPaymentsScheduler", () => {
       {
         envelopes: makeEnvelopes(fakeMint(), {
           open: vi.fn(async () =>
-            Either.left(
+            Result.fail(
               new InsufficientFunds({
                 mint: MintUrl.make(MINT),
                 required: Amount.make(100),
@@ -812,7 +814,7 @@ describe("useRecurringPaymentsScheduler", () => {
       {
         envelopes: makeEnvelopes(fakeMint(), {
           melt: vi.fn(async () =>
-            Either.left(
+            Result.fail(
               new InsufficientFunds({
                 mint: MintUrl.make(MINT),
                 required: Amount.make(2),
@@ -1271,7 +1273,7 @@ describe("useRecurringPaymentsScheduler", () => {
         },
         envelopes: makeEnvelopes(fakeMint(), {
           state: vi.fn(async () =>
-            Either.left(
+            Result.fail(
               new MintUnreachable({ mint: MintUrl.make(MINT), detail: null }),
             ),
           ),

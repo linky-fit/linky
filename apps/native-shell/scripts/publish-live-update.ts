@@ -31,10 +31,10 @@ if (liveUpdatePublicKey(signingKey) !== LIVE_UPDATE_PUBLIC_KEY) {
 const repoDir = path.resolve(import.meta.dirname, "../../..");
 const distDir = path.join(repoDir, "apps/web-app/dist");
 const { runtime } = Schema.decodeUnknownSync(
-  Schema.parseJson(NativeRuntimeFile),
+  Schema.fromJsonString(NativeRuntimeFile),
 )(readFileSync(path.join(distDir, "native-runtime.json"), "utf8"));
 const { version } = Schema.decodeUnknownSync(
-  Schema.parseJson(Schema.Struct({ version: Schema.NonEmptyString })),
+  Schema.fromJsonString(Schema.Struct({ version: Schema.NonEmptyString })),
 )(readFileSync(path.join(repoDir, "package.json"), "utf8"));
 
 const files = readdirSync(distDir, { recursive: true, withFileTypes: true })

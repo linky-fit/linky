@@ -104,7 +104,7 @@ export const profileForIdentitySwitch = ({
   const nip05 = getProfileNip05(lightningAddress, nostrProfile?.nip05);
 
   return new ProfileMetadata({
-    ...Struct.omit(shown, "extraFields", "lud06", "lud16", "nip05"),
+    ...Struct.omit(shown, ["extraFields", "lud06", "lud16", "nip05"]),
     lud16: lightningAddress,
     ...(nip05 ? { nip05 } : {}),
     ...(extraFields ? { extraFields } : {}),

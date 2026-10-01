@@ -33,8 +33,8 @@ export interface CollectedInspectorRow extends InspectorRow {
   client: string;
 }
 
-const InspectorChannel = Schema.String.pipe(
-  Schema.pattern(/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/),
+const InspectorChannel = Schema.String.check(
+  Schema.isPattern(/^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/),
 );
 
 export const isInspectorChannel = Schema.is(InspectorChannel);

@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MintSettingsContextValue } from "../app/context/SystemSettingsContexts";
 import {
@@ -66,7 +66,7 @@ describe("MintFees", () => {
 
   it("keeps the Lightning fee's tenths above ten percent", async () => {
     probeLightningFee.mockResolvedValueOnce(
-      Either.right(
+      Result.succeed(
         decodeProbeResult({
           mint: "https://kashu.me",
           probeMint: "https://cashu.cz",

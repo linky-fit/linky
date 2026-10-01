@@ -55,14 +55,14 @@ export const getErrorMessage = (error: unknown, fallback: string): string =>
       ? error
       : fallback;
 
-const PendingPayment = Schema.parseJson(
+const PendingPayment = Schema.fromJsonString(
   Schema.Struct({
     quote: MeltQuote,
     invoice: Bolt11Invoice,
     address: Schema.String,
   }),
 );
-const CompletedPayment = Schema.parseJson(
+const CompletedPayment = Schema.fromJsonString(
   Schema.Struct({
     amountSent: Schema.Number,
     changeAmount: Schema.Number,
@@ -92,9 +92,9 @@ const withWallet = async <A>(
     const run = async <V, E>(
       effect: Effect.Effect<V, E, LinkshuServices>,
     ): Promise<V> => {
-      const result = await runLinkshu(config, Effect.either(effect));
-      if (result._tag === "Left") throw result.left;
-      return result.right;
+      const result = await runLinkshu(config, Effect.result(effect));
+      if (result._tag === "Failure") throw result.failure;
+      return result.success;
     };
     // The pasted token's proofs are trusted as-is: the site never re-signs
     // them, it only spends them.

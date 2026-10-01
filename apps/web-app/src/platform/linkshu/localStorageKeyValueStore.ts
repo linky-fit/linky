@@ -41,7 +41,7 @@ const webLockLeases = (locks: LeaseLocks): Leases => {
   >();
   return {
     tryAcquireLease: (key) =>
-      Effect.async<LeaseId | null>((resume) => {
+      Effect.callback<LeaseId | null>((resume) => {
         const lease = LeaseId.make(crypto.randomUUID());
         const request = locks.request(
           LEASE_KEY_PREFIX + key,

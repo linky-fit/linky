@@ -41,12 +41,14 @@ const decodeRuntimeFile = (json: string | null): string | null =>
   json === null
     ? null
     : (Option.getOrNull(
-        Schema.decodeUnknownOption(Schema.parseJson(NativeRuntimeFile))(json),
+        Schema.decodeUnknownOption(Schema.fromJsonString(NativeRuntimeFile))(
+          json,
+        ),
       )?.runtime ?? null);
 
 // GitHub serves release assets as octet-stream, which CapacitorHttp returns as text.
 const decodeManifest = Schema.decodeUnknownSync(
-  Schema.Union(LiveUpdateManifest, Schema.parseJson(LiveUpdateManifest)),
+  Schema.Union([LiveUpdateManifest, Schema.fromJsonString(LiveUpdateManifest)]),
 );
 
 const bundleDir = (version: string): string => `${BUNDLES_DIR}/${version}`;

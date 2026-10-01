@@ -16,8 +16,8 @@ const UPLOAD_URL = "https://blossom.primal.net/upload";
 const decodeUpload = Schema.decodeUnknownSync(
   Schema.Struct({
     sha256: Schema.String,
-    url: Schema.String.pipe(
-      Schema.filter((url) => url.startsWith("https://") && isHttpUrl(url)),
+    url: Schema.String.check(
+      Schema.makeFilter((url) => url.startsWith("https://") && isHttpUrl(url)),
     ),
   }),
 );

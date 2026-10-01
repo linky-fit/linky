@@ -7,7 +7,7 @@ import { Schema } from "effect";
 export const LIVE_UPDATE_PUBLIC_KEY =
   "306540c49962995cbe207e9b14bfb345bd0f783292c32f500283d727cdb9b342";
 
-const Sha256Hex = Schema.String.pipe(Schema.pattern(/^[0-9a-f]{64}$/));
+const Sha256Hex = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/));
 
 /** The native runtime a web build was made for, shipped as `native-runtime.json` next to its `index.html`. */
 export const NativeRuntimeFile = Schema.Struct({

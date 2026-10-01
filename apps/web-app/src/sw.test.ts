@@ -13,7 +13,7 @@ vi.mock("@linky-fit/linkstr", async (importOriginal) => {
   interface Inbox {
     fetchWrapEvent: typeof state.fetchWrapEvent;
   }
-  const inbox = Context.GenericTag<Inbox>("test/notification-inbox");
+  const inbox = Context.Service<Inbox>("test/notification-inbox");
   return {
     ...original,
     WrapInbox: inbox,

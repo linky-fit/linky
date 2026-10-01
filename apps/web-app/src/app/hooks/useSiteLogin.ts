@@ -269,7 +269,7 @@ export const useSiteLogin = ({
       });
     };
     const failed = (cause: Cause.Cause<{ _tag: string }>) => {
-      const failure = Option.getOrNull(Cause.failureOption(cause));
+      const failure = Option.getOrNull(Cause.findErrorOption(cause));
       const message = t(
         (failure && FAILURE_KEY_BY_TAG[failure._tag]) ?? "siteLoginFailed",
       );

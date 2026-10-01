@@ -5,7 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { makeJsonFile } from "./jsonFile";
 
-const Counters = Schema.Record({ key: Schema.String, value: Schema.Number });
+const Counters = Schema.Record(Schema.String, Schema.Number);
 
 const temporaryFile = (name: string): string =>
   path.join(fs.mkdtempSync(path.join(os.tmpdir(), "linkshu-cli-")), name);
@@ -96,7 +96,7 @@ describe("makeJsonFile across processes", () => {
        import { makeJsonFile } from ${JSON.stringify(path.join(import.meta.dir, "jsonFile.ts"))};
        const file = makeJsonFile(
          ${JSON.stringify(filePath)},
-         Schema.Record({ key: Schema.String, value: Schema.Number }),
+         Schema.Record(Schema.String, Schema.Number),
          {},
        );
        for (let i = 0; i < 20; i += 1)

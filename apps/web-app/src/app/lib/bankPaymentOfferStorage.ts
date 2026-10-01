@@ -68,7 +68,7 @@ type BankPaymentOfferSpdRecord = typeof BankPaymentOfferSpdRecord.Type;
 const decodeSpdRecord = Schema.decodeUnknownOption(BankPaymentOfferSpdRecord);
 
 /** What the release before IndexedDB kept in localStorage, one key per offer. */
-const LegacySpdRecord = Schema.parseJson(
+const LegacySpdRecord = Schema.fromJsonString(
   Schema.Struct({
     createdAtSec: PositiveFiniteNumber,
     ownerPubkey: Schema.String,

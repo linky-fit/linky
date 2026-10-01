@@ -7,7 +7,7 @@ import {
   RumorId,
 } from "@linky-fit/linkstr";
 import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
-import { Cause, Either, Exit, Schema } from "effect";
+import { Cause, Result, Exit, Schema } from "effect";
 import React from "react";
 import { makeLocalId } from "../../../utils/validation";
 import type {
@@ -19,7 +19,7 @@ import type { Translate } from "../../../i18n";
 
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
-const decodeMessageText = Schema.decodeUnknownEither(MessageText);
+const decodeMessageText = Schema.decodeUnknownResult(MessageText);
 
 export interface EditChatContext {
   messageId: string;
@@ -96,7 +96,7 @@ export const useEditChatMessage = <
       }
       const { contactPubHex, myPubHex } = identity;
       const content = decodeMessageText(text);
-      if (Either.isLeft(content)) {
+      if (Result.isFailure(content)) {
         throw new Error("invalid message text");
       }
 
@@ -123,7 +123,7 @@ export const useEditChatMessage = <
       const draft = new EditMessageDraft({
         to: contactPubHex,
         editOf: editedFromId,
-        content: content.right,
+        content: content.success,
         clientId,
       });
       const exit = await enqueueOutbox({

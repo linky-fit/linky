@@ -7,7 +7,7 @@ export type ReceiveMethod = (typeof RECEIVE_METHODS)[number];
 
 export const DEFAULT_RECEIVE_METHOD: ReceiveMethod = "universal";
 
-const ReceiveMethodSchema = Schema.Literal(...RECEIVE_METHODS);
+const ReceiveMethodSchema = Schema.Literals(RECEIVE_METHODS);
 
 export const parseReceiveMethod = (
   value: string | null | undefined,

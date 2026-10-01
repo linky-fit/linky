@@ -18,10 +18,10 @@ import {
 } from "@linky-fit/linksync";
 import { Option, Schema } from "effect";
 
-const TrustJson = Schema.parseJson(CompanyTrust);
-const IdentityJson = Schema.parseJson(CompanyIdentity);
-const ChannelsJson = Schema.parseJson(Schema.Array(Schema.String));
-const PrivateFeedsJson = Schema.parseJson(Schema.Array(Schema.String));
+const TrustJson = Schema.fromJsonString(CompanyTrust);
+const IdentityJson = Schema.fromJsonString(CompanyIdentity);
+const ChannelsJson = Schema.fromJsonString(Schema.Array(Schema.String));
+const PrivateFeedsJson = Schema.fromJsonString(Schema.Array(Schema.String));
 
 const StoredSubscription = Schema.Struct({
   trustJson: TrustJson,
@@ -65,7 +65,7 @@ export const readKeryxCompany = (
     })),
   );
 
-const json = <A>(schema: Schema.Schema<A, string>, value: A) =>
+const json = <A>(schema: Schema.Codec<A, string>, value: A) =>
   NonEmptyString.orThrow(Schema.encodeSync(schema)(value));
 
 export const channelsColumn = (channels: ReadonlyArray<string>) =>

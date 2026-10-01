@@ -44,7 +44,7 @@ const makeRow = (
 });
 
 const operation = (
-  overrides: Partial<Schema.Schema.Encoded<typeof StoredOperation>> = {},
+  overrides: Partial<typeof StoredOperation.Encoded> = {},
 ): StoredOperation =>
   Schema.decodeUnknownSync(StoredOperation)({
     id: "op-1",

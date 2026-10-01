@@ -12,7 +12,7 @@ import {
 } from "@linky-fit/recurring-payment";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
-import { Either } from "effect";
+import { Result } from "effect";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { fetchLnurlInvoiceForTarget } from "../../../lnurlPay";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
@@ -142,8 +142,8 @@ const sendToken = async (
     ...runEnvelopeRef(run),
     memo: run.order.note,
   });
-  if (Either.isLeft(token)) return errorResult(token.left, null);
-  const { amount, operationId, tokenText } = token.right;
+  if (Result.isFailure(token)) return errorResult(token.failure, null);
+  const { amount, operationId, tokenText } = token.success;
   const delivery = await deps.sendTokenMessage({
     amount,
     clientId: runClientId(run),
@@ -200,8 +200,8 @@ const meltToAddress = async (
     ...runDetails(run),
   };
   const melted = await deps.envelopes.melt({ ...runEnvelopeRef(run), invoice });
-  if (Either.isLeft(melted)) {
-    const error = melted.left;
+  if (Result.isFailure(melted)) {
+    const error = melted.failure;
     if (error._tag !== "PaymentPending") return errorResult(error, operationId);
     deps.logPaymentEvent({
       amount: error.amount,
@@ -220,7 +220,7 @@ const meltToAddress = async (
     });
     return { kind: "waiting", operationId };
   }
-  const receipt = melted.right;
+  const receipt = melted.success;
   deps.logPaymentEvent({
     amount: receipt.paidAmount,
     contactId: run.order.contactId,
@@ -260,20 +260,20 @@ export const payRecurringRun = async (
   const ref = runEnvelopeRef(run);
   if (recipient === null) {
     const state = await deps.envelopes.state(ref);
-    if (Either.isLeft(state)) return errorResult(state.left, null);
-    return settledByMint(state.right) ?? { kind: "noRecipient" };
+    if (Result.isFailure(state)) return errorResult(state.failure, null);
+    return settledByMint(state.success) ?? { kind: "noRecipient" };
   }
   const opened = await deps.envelopes.open({
     ...ref,
     amountSat: run.amountSat,
   });
-  if (Either.isLeft(opened)) return errorResult(opened.left, null);
-  const { amount, operationId } = opened.right;
+  if (Result.isFailure(opened)) return errorResult(opened.failure, null);
+  const { amount, operationId } = opened.success;
   const state = await deps.envelopes.state(ref);
-  if (Either.isLeft(state)) return errorResult(state.left, operationId);
-  const settled = settledByMint(state.right);
+  if (Result.isFailure(state)) return errorResult(state.failure, operationId);
+  const settled = settledByMint(state.success);
   if (settled !== null) return settled;
-  if (state.right.status === "absent")
+  if (state.success.status === "absent")
     return failed("the mint does not know the envelope", operationId);
   return run.order.rail === "cashu"
     ? sendToken(deps, run, recipient)
@@ -289,7 +289,7 @@ const releaseEnvelope = async (
   const released = await deps.envelopes.release(ref);
   reportAppLog({
     tag: "recurring.envelopeReleased",
-    summary: Either.isRight(released)
+    summary: Result.isSuccess(released)
       ? "envelope of a deleted recurring payment released"
       : "envelope of a deleted recurring payment could not be released",
     links: {
@@ -298,12 +298,12 @@ const releaseEnvelope = async (
     },
     payload: {
       ...ref,
-      ...(Either.isRight(released)
-        ? { amount: released.right.amount }
-        : { error: released.left._tag }),
+      ...(Result.isSuccess(released)
+        ? { amount: released.success.amount }
+        : { error: released.failure._tag }),
     },
   });
-  return Either.isRight(released);
+  return Result.isSuccess(released);
 };
 
 /**

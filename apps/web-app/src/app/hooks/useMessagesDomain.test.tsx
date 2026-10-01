@@ -285,9 +285,9 @@ describe("useMessagesDomain", () => {
       status: NonEmptyString100.orThrow("sent"),
     };
     await Effect.runPromise(
-      Effect.zipRight(
+      Effect.andThen(
         conversations.ensureDirect(contactId),
-        Effect.zipRight(
+        Effect.andThen(
           conversations.messages.insert({ ...row, id: createId<"Message">() }),
           conversations.messages.insert({
             ...row,

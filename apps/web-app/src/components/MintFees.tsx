@@ -1,6 +1,6 @@
 import type { LightningFeeProbeResult } from "@linky-fit/linkshu";
 import { Stack, ListRow } from "@linky-fit/ui";
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
@@ -92,8 +92,8 @@ const useLightningFeeProbe = (
     setByMint((prev) => ({ ...prev, [mintUrl]: "pending" }));
     void probeLightningFee({ mint: mintUrl, probeMint })
       .then((outcome) => {
-        if (Either.isRight(outcome)) {
-          setByMint((prev) => ({ ...prev, [mintUrl]: outcome.right }));
+        if (Result.isSuccess(outcome)) {
+          setByMint((prev) => ({ ...prev, [mintUrl]: outcome.success }));
           return;
         }
         failedProbeAtByMint.set(mintUrl, Date.now());

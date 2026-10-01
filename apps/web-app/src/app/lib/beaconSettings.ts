@@ -9,10 +9,10 @@ const ENABLED_STORAGE_KEY = "linky.beacon.enabled.v1";
 const TRADE_STORAGE_KEY = "linky.beacon.trade.v1";
 const INTRO_SEEN_STORAGE_KEY = "linky.beacon.introSeen.v1";
 
-export const BeaconTrade = Schema.Literal("buy", "sell", "none");
+export const BeaconTrade = Schema.Literals(["buy", "sell", "none"]);
 export type BeaconTrade = typeof BeaconTrade.Type;
 
-const StoredTrade = Schema.Literal("buy", "sell");
+const StoredTrade = Schema.Literals(["buy", "sell"]);
 const StoredFlag = Schema.Literal("true");
 
 const readFlag = (key: string): boolean =>
