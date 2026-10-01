@@ -7113,7 +7113,7 @@ dd {
 }
 
 .paid-figure.is-in .paid-direction-badge {
-  background: #22c55e;
+  background: #2dd4bf;
   animation: paid-fly-in 1.1s cubic-bezier(0.2, 0.8, 0.4, 1) 200ms both;
 }
 
