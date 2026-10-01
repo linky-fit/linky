@@ -1,5 +1,5 @@
 import { transactionIdForOperation } from "@linky-fit/linksync";
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
@@ -84,10 +84,10 @@ const receiveTransfer = (status: "pending" | "done") =>
 const mint = MintUrl.make("https://x.cz");
 
 const alreadySpent: ReceiveCashuToken = async () =>
-  Either.left(new TokenAlreadySpent({ mint }));
+  Result.fail(new TokenAlreadySpent({ mint }));
 
 const mintBusy: ReceiveCashuToken = async () =>
-  Either.left(
+  Result.fail(
     new CounterLockTimeout({
       mint,
       unit: CurrencyUnit.make("sat"),
@@ -106,7 +106,7 @@ const draftAfterUpdates = (
   );
 
 const deferred: ReceiveCashuToken = async () =>
-  Either.left(
+  Result.fail(
     new ReceiveDeferred({
       mint,
       operationId: OperationId.make("AQEBAQEBAQEBAQEBAQEBAQ"),
@@ -140,7 +140,7 @@ describe("useSaveCashuFromText", () => {
   it("resumes a receive a reload left pending and records it in history", async () => {
     const transfer = receiveTransfer("pending");
     const receive = vi.fn<ReceiveCashuToken>(async () =>
-      Either.right(
+      Result.succeed(
         new ReceiveReceipt({
           operationId: transfer.id,
           tokenText: transfer.tokenText,
@@ -221,7 +221,7 @@ describe("useSaveCashuFromText", () => {
 
   it("clears the draft and resolves terminally after the mint rejected the token", async () => {
     const { save, setCashuDraft } = await setup(async () =>
-      Either.left(
+      Result.fail(
         new MintRejected({ mint, code: 11001, detail: "invalid proofs" }),
       ),
     );
@@ -235,7 +235,7 @@ describe("useSaveCashuFromText", () => {
 
   it("asks linkshu for an automatic receive, so a discarded token stays discarded", async () => {
     const receive = vi.fn<ReceiveCashuToken>(async () =>
-      Either.left(
+      Result.fail(
         new TokenAlreadyKnown({
           operationId: OperationId.make("AQEBAQEBAQEBAQEBAQEBAQ"),
         }),
@@ -276,7 +276,7 @@ describe("useSaveCashuFromText", () => {
 
   it("logs no history failure for an automatic receive that will be retried", async () => {
     const { save, logPaymentEvent } = await setup(async () =>
-      Either.left(
+      Result.fail(
         new CounterLockTimeout({
           mint,
           unit: CurrencyUnit.make("sat"),
@@ -294,7 +294,7 @@ describe("useSaveCashuFromText", () => {
 
   it("logs a terminal failure of an automatic receive", async () => {
     const { save, setStatus, logPaymentEvent } = await setup(async () =>
-      Either.left(
+      Result.fail(
         new TokenParseFailed({ reason: "undecodable", detail: null }),
       ),
     );

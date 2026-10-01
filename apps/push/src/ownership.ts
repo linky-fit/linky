@@ -101,15 +101,15 @@ export class OwnershipVerifier {
       }
 
       const decoded = verifyPushOwnershipProof(proof.event);
-      if (decoded._tag === "Left") {
-        const response = failureResponses[decoded.left];
+      if (decoded._tag === "Failure") {
+        const response = failureResponses[decoded.failure];
         throw new RequestError(
           response.status,
           "invalid_proof",
           response.message,
         );
       }
-      const verified = decoded.right;
+      const verified = decoded.success;
 
       if (verified.event.pubkey !== pubkey) {
         throw new RequestError(

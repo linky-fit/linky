@@ -16,7 +16,7 @@ class LegacyError extends Schema.TaggedError<LegacyError>()("LegacyError", {
   detail: Schema.String,
 }) {}
 
-const encodeLegacyError = Schema.encodeSync(Schema.parseJson(LegacyError));
+const encodeLegacyError = Schema.encodeSync(Schema.fromJsonString(LegacyError));
 const decodeTokenText = Schema.decodeUnknownOption(TokenText);
 
 const parseTokenText = (value: string | null): TokenText | null => {

@@ -13,7 +13,7 @@
 // Removal condition: delete this file and its marked call site in
 // useCashuWalletComposition together with linkshuStorageMigration.ts.
 
-import { Either } from "effect";
+import { Result } from "effect";
 import {
   safeLocalStorageGet,
   safeLocalStorageRemove,
@@ -40,9 +40,9 @@ export const drainLegacyAcceptedCashuToken = async (
 
     const outcome = await receiveCashuToken(remembered);
     const transient =
-      Either.isLeft(outcome) &&
-      (outcome.left._tag === "MintUnreachable" ||
-        outcome.left._tag === "CounterLockTimeout");
+      Result.isFailure(outcome) &&
+      (outcome.failure._tag === "MintUnreachable" ||
+        outcome.failure._tag === "CounterLockTimeout");
     if (!transient) safeLocalStorageRemove(LEGACY_KEY);
   } catch {
     // Runtime shut down mid-receive: retry next launch.

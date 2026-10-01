@@ -39,7 +39,7 @@ import {
   safeLocalStorageGetJson,
   safeLocalStorageSetJson,
 } from "./utils/storage";
-import { isRecord } from "./utils/unknown";
+import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import { getInspectorEmissionEnabled } from "./devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
 import { reportAppLog } from "./devtools/inspector/appLog";
@@ -694,7 +694,7 @@ const repairShardPointers = (store: LinkyStore): void => {
       reportAppLog({
         tag: "evolu.shardPointerRepairFailed",
         summary: "Moving reset shard pointers back up failed",
-        payload: { error: String(error) },
+        payload: { error: getUnknownErrorMessage(error, "unknown") },
       }),
   );
 };
@@ -784,12 +784,7 @@ export const getLinkyStore = (): Promise<LinkyStore> => {
           get: (scope) =>
             safeLocalStorageGetJson(
               key(scope),
-              EffectSchema.NullOr(
-                EffectSchema.Number.pipe(
-                  EffectSchema.int(),
-                  EffectSchema.nonNegative(),
-                ),
-              ),
+              EffectSchema.NullOr(EffectSchema.Natural),
               null,
             ) ?? undefined,
           set: (scope, first) => safeLocalStorageSetJson(key(scope), first),

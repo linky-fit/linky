@@ -24,8 +24,8 @@ export interface TrackerSession {
 }
 
 export const SESSION_SEED_KEY = "linky.errorTracker.seed";
-const StoredSeed = Schema.String.pipe(
-  Schema.filter(
+const StoredSeed = Schema.String.check(
+  Schema.makeFilter(
     (input) => Effect.runSyncExit(parseSlip39Share(input))._tag === "Success",
   ),
 );
@@ -75,7 +75,7 @@ export const loginWithSecret = async (
         Effect.provide(
           IdentityProvider,
           Layer.provide(
-            IdentityProvider.Live,
+            IdentityProvider.layer,
             Layer.succeed(MasterSecretProvider, masterSecret),
           ),
         ),

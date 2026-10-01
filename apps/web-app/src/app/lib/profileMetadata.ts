@@ -13,7 +13,7 @@ export const applyLightningAddressToProfileMetadata = (
   const nip05 = getProfileNip05(trimmedLightningAddress, previous.nip05);
 
   const metadata = new ProfileMetadata({
-    ...Struct.omit(previous, "lud16", "lud06", "nip05"),
+    ...Struct.omit(previous, ["lud16", "lud06", "nip05"]),
     ...(trimmedLightningAddress
       ? {
           lud16: trimmedLightningAddress,
@@ -34,5 +34,5 @@ export const dropNpubNip05 = (
   metadata: ProfileMetadata,
 ): ProfileMetadata | null =>
   metadata.nip05 && isNpubDefaultNip05(metadata.nip05)
-    ? new ProfileMetadata(Struct.omit(metadata, "nip05"))
+    ? new ProfileMetadata(Struct.omit(metadata, ["nip05"]))
     : null;

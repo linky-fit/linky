@@ -21,9 +21,7 @@ import { nowSeconds } from "../src/utils/time";
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
 
 const decodeProfileContent = Schema.decodeUnknownSync(
-  Schema.parseJson(
-    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-  ),
+  Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
 );
 
 const pickPhoto = async (page: Page, color: string): Promise<void> => {
@@ -140,7 +138,7 @@ test("profile edits save after switching to a custom identity", async ({
     });
     const newest = events.sort((a, b) => b.created_at - a.created_at)[0];
     const metadata = Schema.decodeUnknownSync(
-      Schema.parseJson(
+      Schema.fromJsonString(
         Schema.Struct({
           name: Schema.String,
           lud16: Schema.String,

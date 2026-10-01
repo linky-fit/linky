@@ -13,14 +13,14 @@ import { Schema } from "effect";
 
 /** What this device last learned about a paired company; device-local and re-fetchable. */
 export const KeryxCacheEntry = Schema.Struct({
-  status: Schema.Literal("active", "suspended", "rebranded"),
+  status: Schema.Literals(["active", "suspended", "rebranded"]),
   /** Newest first, as the last refresh returned them. */
   announcements: Schema.Array(Announcement),
   catalog: Schema.Array(Channel),
   /** Display names of private feeds, by capability URL. */
-  feedNames: Schema.Record({ key: Schema.String, value: Schema.String }),
+  feedNames: Schema.Record(Schema.String, Schema.String),
   /** Private feed sync state by capability URL; the synced row holds only the URLs. */
-  feedStates: Schema.Record({ key: Schema.String, value: PrivateFeedState }),
+  feedStates: Schema.Record(Schema.String, PrivateFeedState),
   /** A new logo awaiting acknowledgement, or the new identity of a rebrand. */
   pendingIdentity: Schema.optional(CompanyIdentity),
   refreshedAt: Schema.optional(Schema.String),

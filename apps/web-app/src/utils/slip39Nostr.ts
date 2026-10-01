@@ -43,7 +43,7 @@ export const deriveNostrKeysFromSlip39 = async (
   try {
     const share = await parseShare(rawText);
     const identityLayer = Layer.provideMerge(
-      IdentityProvider.Live,
+      IdentityProvider.layer,
       MasterSecretProvider.fromSlip39Share(share),
     );
     const identity = await Effect.runPromise(

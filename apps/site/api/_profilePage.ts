@@ -23,13 +23,13 @@ const FALLBACK_IMAGE_URL = "https://app.linky.fit/pwa-512x512.png";
 const DATA_IMAGE =
   /^data:(image\/(?:jpeg|png|webp|gif));base64,([a-z0-9+/]+=*)$/i;
 
-const Nip05Names = Schema.parseJson(
+const Nip05Names = Schema.fromJsonString(
   Schema.Struct({
-    names: Schema.Record({ key: Schema.String, value: Schema.String }),
+    names: Schema.Record(Schema.String, Schema.String),
   }),
 );
 
-const ProfileContent = Schema.parseJson(
+const ProfileContent = Schema.fromJsonString(
   Schema.Struct({
     name: Schema.optional(Schema.Unknown),
     display_name: Schema.optional(Schema.Unknown),

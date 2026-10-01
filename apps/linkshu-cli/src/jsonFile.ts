@@ -23,9 +23,7 @@ export interface JsonFile<A> {
 /** A lock file older than this belongs to a process that died holding it. */
 const LOCK_STALE_MS = 30_000;
 
-const LOCK_RETRY = Schedule.spaced("20 millis").pipe(
-  Schedule.compose(Schedule.recurs(500)),
-);
+const LOCK_RETRY = { schedule: Schedule.spaced("20 millis"), times: 500 };
 
 class LockContended extends Data.TaggedError("LockContended")<{
   readonly lockPath: string;
@@ -93,10 +91,10 @@ const writeAtomically = (filePath: string, contents: string): void => {
  */
 export const makeJsonFile = <A, I>(
   filePath: string,
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Codec<A, I>,
   empty: A,
 ): JsonFile<A> => {
-  const json = Schema.parseJson(schema, { space: 2 });
+  const json = Schema.fromJsonString(schema, { space: 2 });
   const decode = Schema.decodeUnknownSync(json);
   const encode = Schema.encodeSync(json);
   const lockPath = `${filePath}.lock`;

@@ -15,10 +15,10 @@ import {
 
 export const BEACON_KEYS_STORAGE_KEY = "linky.beacon.keys.v1";
 
-const Hex64 = Schema.String.pipe(Schema.pattern(/^[0-9a-f]{64}$/));
+const Hex64 = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/));
 const BeaconKeyCache = Schema.Struct({
   owner: Hex64,
-  keys: Schema.Record({ key: Hex64, value: Hex64 }),
+  keys: Schema.Record(Hex64, Hex64),
 });
 
 /** The pairwise key both sides of a contact pair derive alike, as hex. */

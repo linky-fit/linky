@@ -6,7 +6,7 @@ import {
   ReceiveReceipt,
   TokenAlreadyKnown,
 } from "@linky-fit/linkshu";
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { beforeEach, describe, expect, it } from "vitest";
 import { drainLegacyAcceptedCashuToken } from "./legacyAcceptedTokenDrain";
 
@@ -36,7 +36,7 @@ describe("drainLegacyAcceptedCashuToken", () => {
 
     await drainLegacyAcceptedCashuToken((text) => {
       received.push(text);
-      return Promise.resolve(Either.right(receipt));
+      return Promise.resolve(Result.succeed(receipt));
     });
 
     expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
@@ -48,7 +48,7 @@ describe("drainLegacyAcceptedCashuToken", () => {
 
     await drainLegacyAcceptedCashuToken((text) => {
       received.push(text);
-      return Promise.resolve(Either.right(receipt));
+      return Promise.resolve(Result.succeed(receipt));
     });
 
     expect(received).toEqual(["cashuBremembered"]);
@@ -60,7 +60,7 @@ describe("drainLegacyAcceptedCashuToken", () => {
 
     await drainLegacyAcceptedCashuToken(() =>
       Promise.resolve(
-        Either.left(new TokenAlreadyKnown({ operationId: null })),
+        Result.fail(new TokenAlreadyKnown({ operationId: null })),
       ),
     );
 
@@ -71,7 +71,7 @@ describe("drainLegacyAcceptedCashuToken", () => {
     localStorage.setItem(LEGACY_KEY, "cashuBretry");
 
     await drainLegacyAcceptedCashuToken(() =>
-      Promise.resolve(Either.left(new MintUnreachable({ detail: null, mint }))),
+      Promise.resolve(Result.fail(new MintUnreachable({ detail: null, mint }))),
     );
 
     expect(localStorage.getItem(LEGACY_KEY)).toBe("cashuBretry");

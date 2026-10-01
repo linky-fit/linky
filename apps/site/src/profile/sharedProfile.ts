@@ -1,7 +1,7 @@
 import { Option, Schema } from "effect";
 import { linkyWebAppUrl } from "../linkyWebApp";
 
-const SharedProfile = Schema.parseJson(
+const SharedProfile = Schema.fromJsonString(
   Schema.NullOr(
     Schema.Struct({
       npub: Schema.String,

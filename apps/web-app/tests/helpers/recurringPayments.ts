@@ -177,7 +177,7 @@ const OrderState = Schema.Struct({
   amount: Schema.Number,
   unit: Schema.String,
   rail: Schema.String,
-  progress: Schema.parseJson(
+  progress: Schema.fromJsonString(
     Schema.Struct({ runCount: Schema.Number, nextDueAtSec: Schema.Number }),
   ),
   lastRunStatus: Schema.NullOr(Schema.String),

@@ -1,5 +1,5 @@
 import { KeryxMetadataInvalid } from "@linky-fit/keryx";
-import { Either } from "effect";
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { FEED_URL, ORIGIN, refreshed, trust } from "../../testUtils/keryx";
 import { keryxRefreshRows } from "./keryxInspector";
@@ -16,7 +16,7 @@ describe("keryx inspector rows", () => {
   it("reports a refresh with counts and its verification problems", () => {
     const rows = keryxRefreshRows(
       subscription,
-      Either.right(
+      Result.succeed(
         refreshed({
           privateFeeds: [
             {
@@ -49,7 +49,7 @@ describe("keryx inspector rows", () => {
   it("reports a metadata failure as a verification failure", () => {
     const rows = keryxRefreshRows(
       subscription,
-      Either.left(new KeryxMetadataInvalid({ role: "targets", reason: "sig" })),
+      Result.fail(new KeryxMetadataInvalid({ role: "targets", reason: "sig" })),
     );
     expect(rows.map((row) => row.tag)).toEqual([
       "keryx.refreshFailed",
@@ -61,13 +61,13 @@ describe("keryx inspector rows", () => {
     expect(
       keryxRefreshRows(
         subscription,
-        Either.right({ _tag: "Suspended", rootVersion: 4, reason: "x" }),
+        Result.succeed({ _tag: "Suspended", rootVersion: 4, reason: "x" }),
       ).map((row) => row.tag),
     ).toEqual(["keryx.suspended"]);
     expect(
       keryxRefreshRows(
         subscription,
-        Either.right({
+        Result.succeed({
           _tag: "Rebranded",
           previousIdentity: { companyName: "Acme" },
           identity: { companyName: "Evil" },

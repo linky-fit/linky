@@ -3,7 +3,7 @@ import type {
   PaidOverlayContact,
   PaidOverlayDetails,
 } from "../../lib/paidOverlay";
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import { parseTokenText } from "@linky-fit/linkshu";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -177,8 +177,8 @@ export const useSaveCashuFromText = ({
         try {
           const outcome = await receiveCashuToken(tokenRaw, { automatic });
 
-          if (Either.isLeft(outcome)) {
-            const error = outcome.left;
+          if (Result.isFailure(outcome)) {
+            const error = outcome.failure;
             // The caller uses this to stop (or keep) auto-retrying the message
             // that carried the token. A deferred token stays open: when
             // linkshu's retry fails at the swap, receiving the text again
@@ -205,7 +205,7 @@ export const useSaveCashuFromText = ({
             return;
           }
 
-          const receipt = outcome.right;
+          const receipt = outcome.success;
           rememberCashuTokenKnown(tokenRaw, receipt.tokenText);
           options?.onResolved?.("terminal");
 

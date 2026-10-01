@@ -636,7 +636,7 @@ export const getNativePushTransport = (): NativePushTransport =>
     ? "unifiedpush"
     : "fcm";
 
-const UnifiedPushRegistration = Schema.Union(
+const UnifiedPushRegistration = Schema.Union([
   Schema.Struct({
     status: Schema.Literal("endpoint"),
     endpoint: NonBlankString,
@@ -647,7 +647,7 @@ const UnifiedPushRegistration = Schema.Union(
     status: Schema.Literal("failed"),
     reason: Schema.String,
   }),
-);
+]);
 export type UnifiedPushRegistration = typeof UnifiedPushRegistration.Type;
 const decodeUnifiedPushRegistration = Schema.decodeUnknownOption(
   UnifiedPushRegistration,
@@ -892,12 +892,12 @@ export const consumePendingIosNativeDeepLinkUrl = async (): Promise<
   }
 };
 
-export const BeaconPermissionState = Schema.Literal(
+export const BeaconPermissionState = Schema.Literals([
   "granted",
   "denied",
   "prompt",
   "unsupported",
-);
+]);
 export type BeaconPermissionState = typeof BeaconPermissionState.Type;
 
 export type NativeBeaconTrade = "buy" | "sell" | "none";
@@ -912,7 +912,7 @@ export type NativeBeaconStatus = typeof NativeBeaconStatus.Type;
 
 const NativeBeaconSighting = Schema.Struct({
   pubkey: Pubkey,
-  state: Schema.Literal("nearby", "buy", "sell"),
+  state: Schema.Literals(["nearby", "buy", "sell"]),
   lastSeenMs: Schema.Number,
 });
 export type NativeBeaconSighting = typeof NativeBeaconSighting.Type;
@@ -1116,11 +1116,11 @@ export const stopNativeBeaconIdentityScan = (): boolean =>
 /** Listens to a native beacon event whose `detail` is a JSON string or the object itself. */
 const onNativeBeaconEvent = <A, I>(
   eventName: string,
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Codec<A, I>,
   listener: (value: A) => void,
 ): (() => void) => {
   const decode = Schema.decodeUnknownOption(
-    Schema.Union(Schema.parseJson(schema), schema),
+    Schema.Union([Schema.fromJsonString(schema), schema]),
   );
   const onEvent: EventListener = (event) => {
     if (!(event instanceof CustomEvent)) return;

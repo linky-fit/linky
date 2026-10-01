@@ -5,7 +5,7 @@ import type {
   KeryxError,
   RefreshResult,
 } from "@linky-fit/keryx";
-import { Either } from "effect";
+import { Result } from "effect";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
 import type { InspectorRow } from "../../devtools/inspector/inspectorRows";
 import { reportInspectorRows } from "../../devtools/inspector/reportInspectorRows";
@@ -73,32 +73,32 @@ const verificationProblems = (
 
 export const keryxRefreshRows = (
   subscription: CompanySubscription,
-  outcome: Either.Either<RefreshResult, KeryxError>,
+  outcome: Result.Result<RefreshResult, KeryxError>,
 ): ReadonlyArray<KeryxRow> => {
   const { origin } = subscription;
   const feedUrls = subscription.privateFeeds.map((feed) => feed.url);
-  if (Either.isLeft(outcome)) {
-    const error = redacted(outcome.left, feedUrls);
+  if (Result.isFailure(outcome)) {
+    const error = redacted(outcome.failure, feedUrls);
     const failed = row(
       "keryx.refreshFailed",
       origin,
-      `refresh failed: ${outcome.left._tag}`,
+      `refresh failed: ${outcome.failure._tag}`,
       error,
     );
-    return outcome.left._tag === "KeryxMetadataInvalid" ||
-      outcome.left._tag === "KeryxRollbackDetected"
+    return outcome.failure._tag === "KeryxMetadataInvalid" ||
+      outcome.failure._tag === "KeryxRollbackDetected"
       ? [
           failed,
           row(
             "keryx.verificationFailed",
             origin,
-            `metadata did not verify: ${outcome.left._tag}`,
+            `metadata did not verify: ${outcome.failure._tag}`,
             error,
           ),
         ]
       : [failed];
   }
-  const result = outcome.right;
+  const result = outcome.success;
   switch (result._tag) {
     case "Suspended":
       return [

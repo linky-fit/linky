@@ -14,9 +14,9 @@ import { safeFetch, type SafeFetchResult } from "./_safeFetch.js";
 
 const RELAY_LIST_TIMEOUT_MS = 2500;
 
-const NostrJson = Schema.parseJson(
+const NostrJson = Schema.fromJsonString(
   Schema.Struct({
-    names: Schema.Record({ key: Schema.String, value: Schema.String }),
+    names: Schema.Record(Schema.String, Schema.String),
   }),
 );
 

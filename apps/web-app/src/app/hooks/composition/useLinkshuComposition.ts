@@ -82,7 +82,7 @@ import type {
   ValidationReport,
 } from "@linky-fit/linkshu";
 import { Effect, Exit, Layer, ManagedRuntime, Schema, Scope } from "effect";
-import type { Either } from "effect";
+import type { Result } from "effect";
 import React from "react";
 import { linkshuAppInspector } from "../../../devtools/inspector/linkshuInspector";
 import { isShownDeferredReceive } from "../../lib/cashuTransfers";
@@ -133,7 +133,7 @@ const sameSeed = (a: Bip39Seed, b: Bip39Seed): boolean =>
 export type ReceiveCashuToken = (
   text: string,
   options?: { readonly automatic?: boolean },
-) => Promise<Either.Either<ReceiveReceipt, ReceiveError>>;
+) => Promise<Result.Result<ReceiveReceipt, ReceiveError>>;
 
 interface SendCashuTokenArgs {
   readonly amountSat: number;
@@ -147,7 +147,7 @@ interface SendCashuTokenArgs {
 /** linkshu Send; invalid mint/amount input and defects reject. */
 export type SendCashuToken = (
   args: SendCashuTokenArgs,
-) => Promise<Either.Either<SendReceipt, SendError>>;
+) => Promise<Result.Result<SendReceipt, SendError>>;
 
 interface MeltCashuInvoiceArgs {
   readonly invoice: string;
@@ -157,7 +157,7 @@ interface MeltCashuInvoiceArgs {
 /** linkshu Melt; invalid mint/invoice input and defects reject. */
 export type MeltCashuInvoice = (
   args: MeltCashuInvoiceArgs,
-) => Promise<Either.Either<MeltReceipt, MeltError>>;
+) => Promise<Result.Result<MeltReceipt, MeltError>>;
 
 export interface CashuEnvelopeRef {
   readonly mint: string;
@@ -171,19 +171,19 @@ export interface CashuEnvelopeRef {
 export interface CashuEnvelopes {
   readonly open: (
     args: CashuEnvelopeRef & { readonly amountSat: number },
-  ) => Promise<Either.Either<EnvelopeOpened, EnvelopeOpenError>>;
+  ) => Promise<Result.Result<EnvelopeOpened, EnvelopeOpenError>>;
   readonly state: (
     ref: CashuEnvelopeRef,
-  ) => Promise<Either.Either<EnvelopeState, EnvelopeStateError>>;
+  ) => Promise<Result.Result<EnvelopeState, EnvelopeStateError>>;
   readonly send: (
     args: CashuEnvelopeRef & { readonly memo: string | null },
-  ) => Promise<Either.Either<EnvelopeToken, EnvelopeSendError>>;
+  ) => Promise<Result.Result<EnvelopeToken, EnvelopeSendError>>;
   readonly melt: (
     args: CashuEnvelopeRef & { readonly invoice: string },
-  ) => Promise<Either.Either<MeltReceipt, EnvelopeMeltError>>;
+  ) => Promise<Result.Result<MeltReceipt, EnvelopeMeltError>>;
   readonly release: (
     ref: CashuEnvelopeRef,
-  ) => Promise<Either.Either<EnvelopeReleased, EnvelopeReleaseError>>;
+  ) => Promise<Result.Result<EnvelopeReleased, EnvelopeReleaseError>>;
 }
 
 /** Retries tokens kept for an unreachable mint (linkshu `Receive.resumeDeferred`). */
@@ -205,7 +205,7 @@ interface ProbeLightningFeeArgs {
 /** linkshu FeeProbe; invalid mint input and defects reject. */
 export type ProbeLightningFee = (
   args: ProbeLightningFeeArgs,
-) => Promise<Either.Either<LightningFeeProbeResult, FeeProbeError>>;
+) => Promise<Result.Result<LightningFeeProbeResult, FeeProbeError>>;
 
 interface StartCashuTopupArgs {
   readonly amountSat: number;
@@ -222,13 +222,13 @@ interface StartCashuTopupArgs {
  */
 export interface CashuTopupHandle {
   readonly quote: TopupQuote;
-  readonly completion: Promise<Either.Either<TopupReceipt, TopupError>>;
+  readonly completion: Promise<Result.Result<TopupReceipt, TopupError>>;
 }
 
 /** linkshu Topup start; invalid mint/amount input and defects reject. */
 export type StartCashuTopup = (
   args: StartCashuTopupArgs,
-) => Promise<Either.Either<CashuTopupHandle, MintUnreachable | MintRejected>>;
+) => Promise<Result.Result<CashuTopupHandle, MintUnreachable | MintRejected>>;
 
 /** Re-attaches every persisted pending topup (linkshu `Topup.resumePending`). */
 export type ResumePendingCashuTopups = () => Promise<
@@ -250,7 +250,7 @@ export interface AdoptPaidCashuQuoteArgs {
  */
 export type AdoptPaidCashuQuote = (
   args: AdoptPaidCashuQuoteArgs,
-) => Promise<Either.Either<TopupReceipt, TopupAdoptError>>;
+) => Promise<Result.Result<TopupReceipt, TopupAdoptError>>;
 
 interface AutoswapCashuArgs {
   readonly sourceMint: string;
@@ -262,7 +262,7 @@ interface AutoswapCashuArgs {
 /** linkshu Autoswap claim; invalid mint/amount input and defects reject. */
 export type AutoswapCashu = (
   args: AutoswapCashuArgs,
-) => Promise<Either.Either<AutoswapReceipt, AutoswapError>>;
+) => Promise<Result.Result<AutoswapReceipt, AutoswapError>>;
 
 /**
  * linkshu Autoswap estimate; pays nothing. Without `amountSat` it prices the
@@ -270,7 +270,7 @@ export type AutoswapCashu = (
  */
 export type EstimateAutoswapCashu = (
   args: AutoswapCashuArgs,
-) => Promise<Either.Either<AutoswapEstimate, AutoswapEstimateError>>;
+) => Promise<Result.Result<AutoswapEstimate, AutoswapEstimateError>>;
 
 /** Drains persisted pending claims (linkshu `Autoswap.resumePendingClaims`). */
 type ResumePendingCashuAutoswapClaims = () => Promise<
@@ -288,7 +288,7 @@ export type CheckAllCashuTokens = () => Promise<ValidationReport>;
 /** NUT-07 check of one transfer (linkshu `Validation.checkTransfer`). */
 export type CheckCashuTransfer = (
   operationId: string,
-) => Promise<Either.Either<TransferCheckResult, OperationNotFound>>;
+) => Promise<Result.Result<TransferCheckResult, OperationNotFound>>;
 
 /** Scan the given mints and swap only newly discovered proofs. */
 export type RestoreCashuTokens = (
@@ -320,7 +320,7 @@ export interface CashuTransferLifecycle {
   readonly forget: (
     operationId: string,
   ) => Promise<
-    Either.Either<void, TransferTransitionError | CounterLockTimeout>
+    Result.Result<void, TransferTransitionError | CounterLockTimeout>
   >;
   /** Restores backup proofs as-is; returns how many were new. */
   readonly importProofs: (
@@ -334,15 +334,15 @@ export interface CashuTransferLifecycle {
   ) => Promise<LegacyIngestReport>;
   readonly markExternalized: (
     operationId: string,
-  ) => Promise<Either.Either<void, TransferTransitionError>>;
+  ) => Promise<Result.Result<void, TransferTransitionError>>;
   readonly markIssued: (
     operationId: string,
-  ) => Promise<Either.Either<void, TransferTransitionError>>;
+  ) => Promise<Result.Result<void, TransferTransitionError>>;
   /** Re-receives a handed-out token, or retries a failed receive. */
   readonly returnToWallet: (
     operationId: string,
   ) => Promise<
-    Either.Either<ReceiveReceipt, ReceiveError | TransferTransitionError>
+    Result.Result<ReceiveReceipt, ReceiveError | TransferTransitionError>
   >;
 }
 
@@ -477,20 +477,20 @@ export const useLinkshuComposition = ({
   const operations = React.useMemo(() => {
     if (linkshuRuntime === null || topupScope === null) return null;
     const runtime = linkshuRuntime;
-    type Env = ManagedRuntime.ManagedRuntime.Context<typeof runtime>;
+    type Env = ManagedRuntime.ManagedRuntime.Services<typeof runtime>;
 
     const lockingKey = quoteLockingKeyOf(currentNsec);
     const lockingOptions = lockingKey === null ? {} : { lockingKey };
 
     const run = <A, E>(effect: Effect.Effect<A, E, Env>): Promise<A> =>
       runtime.runPromise(effect);
-    const runEither = <A, E>(
+    const runResult = <A, E>(
       effect: Effect.Effect<A, E, Env>,
-    ): Promise<Either.Either<A, E>> => run(Effect.either(effect));
+    ): Promise<Result.Result<A, E>> => run(Effect.result(effect));
     const operationId = (id: string) => OperationId.make(id);
 
     const toHandle = (handle: TopupHandle): CashuTopupHandle => {
-      const completion = runEither(handle.result);
+      const completion = runResult(handle.result);
       // Rejection means the runtime shut down mid-poll; an unwatched handle
       // must not surface that as an unhandled rejection.
       completion.catch(() => {});
@@ -498,7 +498,7 @@ export const useLinkshuComposition = ({
     };
 
     const receiveCashuToken: ReceiveCashuToken = (text, options) =>
-      runEither(
+      runResult(
         Effect.flatMap(Receive, (receive) =>
           receive.receive(
             new ReceiveDraft({ text, automatic: options?.automatic === true }),
@@ -515,7 +515,7 @@ export const useLinkshuComposition = ({
       mint,
       produceAs,
     }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeSendDraft({
             amount: amountSat,
@@ -528,7 +528,7 @@ export const useLinkshuComposition = ({
       );
 
     const meltCashuInvoice: MeltCashuInvoice = ({ invoice, mint }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeMeltDraft({ invoice, mint });
           return Effect.flatMap(Melt, (melt) => melt.melt(draft));
@@ -543,7 +543,7 @@ export const useLinkshuComposition = ({
       description,
       mint,
     }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeTopupDraft({
             mint,
@@ -551,7 +551,7 @@ export const useLinkshuComposition = ({
             ...(description ? { description } : {}),
           });
           return Effect.flatMap(Topup, (topup) =>
-            Scope.extend(topup.start(draft, lockingOptions), topupScope),
+            Scope.provide(topup.start(draft, lockingOptions), topupScope),
           );
         }).pipe(Effect.map(toHandle)),
       );
@@ -559,7 +559,7 @@ export const useLinkshuComposition = ({
     const resumePendingCashuTopups: ResumePendingCashuTopups = () =>
       run(
         Effect.flatMap(Topup, (topup) =>
-          Scope.extend(topup.resumePending(lockingOptions), topupScope),
+          Scope.provide(topup.resumePending(lockingOptions), topupScope),
         ).pipe(Effect.map((handles) => handles.map(toHandle))),
       );
 
@@ -571,7 +571,7 @@ export const useLinkshuComposition = ({
       expiresAt,
       locked,
     }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodePaidQuoteDraft({
             mint,
@@ -592,7 +592,7 @@ export const useLinkshuComposition = ({
       targetMint,
       amountSat,
     }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeAutoswapDraft({
             sourceMint,
@@ -608,7 +608,7 @@ export const useLinkshuComposition = ({
       targetMint,
       amountSat,
     }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeAutoswapDraft({
             sourceMint,
@@ -628,7 +628,7 @@ export const useLinkshuComposition = ({
         );
 
     const probeLightningFee: ProbeLightningFee = ({ mint, probeMint }) =>
-      runEither(
+      runResult(
         Effect.suspend(() => {
           const draft = decodeFeeProbeDraft({ mint, probeMint });
           return Effect.flatMap(FeeProbe, (feeProbe) =>
@@ -649,7 +649,7 @@ export const useLinkshuComposition = ({
       run(Effect.flatMap(Validation, (validation) => validation.checkAll));
 
     const checkCashuTransfer: CheckCashuTransfer = (id) =>
-      runEither(
+      runResult(
         Effect.flatMap(Validation, (validation) =>
           validation.checkTransfer(operationId(id)),
         ),
@@ -689,9 +689,12 @@ export const useLinkshuComposition = ({
 
     const withEnvelope = <A, E>(
       ref: CashuEnvelopeRef,
-      use: (envelope: Envelope, decoded: EnvelopeRef) => Effect.Effect<A, E>,
-    ): Promise<Either.Either<A, E>> =>
-      runEither(
+      use: (
+        envelope: Envelope["Service"],
+        decoded: EnvelopeRef,
+      ) => Effect.Effect<A, E>,
+    ): Promise<Result.Result<A, E>> =>
+      runResult(
         Effect.suspend(() => {
           const decoded = decodeEnvelopeRef(ref);
           return Effect.flatMap(Envelope, (envelope) => use(envelope, decoded));
@@ -700,7 +703,7 @@ export const useLinkshuComposition = ({
 
     const cashuEnvelopes: CashuEnvelopes = {
       open: ({ mint, key, amountSat }) =>
-        runEither(
+        runResult(
           Effect.suspend(() => {
             const draft = decodeEnvelopeOpenDraft({
               mint,
@@ -713,7 +716,7 @@ export const useLinkshuComposition = ({
       state: (ref) =>
         withEnvelope(ref, (envelope, decoded) => envelope.state(decoded)),
       send: ({ mint, key, memo }) =>
-        runEither(
+        runResult(
           Effect.suspend(() => {
             const draft = decodeEnvelopeSendDraft({
               mint,
@@ -724,7 +727,7 @@ export const useLinkshuComposition = ({
           }),
         ),
       melt: ({ mint, key, invoice }) =>
-        runEither(
+        runResult(
           Effect.suspend(() => {
             const draft = decodeEnvelopeMeltDraft({ mint, key, invoice });
             return Effect.flatMap(Melt, (melt) => melt.meltEnvelope(draft));
@@ -754,7 +757,7 @@ export const useLinkshuComposition = ({
       checkIssuedClaims: () =>
         run(Effect.flatMap(Validation, (validation) => validation.checkIssued)),
       forget: (id) =>
-        runEither(
+        runResult(
           Effect.flatMap(Tokens, (tokens) => tokens.forget(operationId(id))),
         ),
       importProofs: (drafts) =>
@@ -764,19 +767,19 @@ export const useLinkshuComposition = ({
       importLegacyRows: (rows) =>
         run(Effect.flatMap(Tokens, (tokens) => tokens.ingestLegacyRows(rows))),
       markExternalized: (id) =>
-        runEither(
+        runResult(
           Effect.flatMap(Tokens, (tokens) =>
             tokens.markExternalized(operationId(id)),
           ),
         ),
       markIssued: (id) =>
-        runEither(
+        runResult(
           Effect.flatMap(Tokens, (tokens) =>
             tokens.markIssued(operationId(id)),
           ),
         ),
       returnToWallet: (id) =>
-        runEither(
+        runResult(
           Effect.flatMap(Tokens, (tokens) =>
             tokens.returnToWallet(operationId(id)),
           ),

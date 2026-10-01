@@ -123,7 +123,7 @@ export const safeLocalStorageKeys = (): string[] => {
 
 export const safeLocalStorageGetJson = <A, I>(
   key: string,
-  schema: Schema.Schema<A, I>,
+  schema: Schema.Codec<A, I>,
   fallback: A,
 ): A => {
   const raw = safeLocalStorageGet(key);

@@ -26,7 +26,7 @@ import {
   type RecurringTickAction,
   type RecurringUnfundedAction,
 } from "@linky-fit/recurring-payment";
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { useLatest } from "../../../hooks/useLatest";
@@ -739,16 +739,16 @@ export const useRecurringPaymentsScheduler = ({
       for (let runIndex = order.schedule.runCount; ; runIndex += 1) {
         const run = { order, runIndex, dueAtSec: order.schedule.nextDueAtSec };
         const state = await envelopes.state(runEnvelopeRef(run));
-        if (Either.isLeft(state)) {
+        if (Result.isFailure(state)) {
           settled = false;
           break;
         }
-        const { status, amount } = state.right;
+        const { status, amount } = state.success;
         checked.push({ key: runKey(run), status });
         if (status === "absent") break;
         markFunded(run, amount);
         if (deleted) {
-          if (!(await settleDeleted(run, state.right))) settled = false;
+          if (!(await settleDeleted(run, state.success))) settled = false;
         } else if (status === "spent" && runIndex === order.schedule.runCount) {
           await executeRun(onDemand(run, amount));
           paid = true;
@@ -812,9 +812,10 @@ export const useRecurringPaymentsScheduler = ({
       if (!isCheckDue(envelopeChecksRef.current, key, now)) return null;
       envelopeChecksRef.current.set(key, now + RECURRING_RUN_RETRY_DELAY_SEC);
       const state = await envelopes.state(runEnvelopeRef(action.run));
-      if (Either.isLeft(state) || state.right.status === "absent") return null;
-      markFunded(action.run, state.right.amount);
-      return { ...action.run, amountSat: state.right.amount };
+      if (Result.isFailure(state) || state.success.status === "absent")
+        return null;
+      markFunded(action.run, state.success.amount);
+      return { ...action.run, amountSat: state.success.amount };
     },
     [latest, markFunded, nowSec],
   );
@@ -936,7 +937,7 @@ export const useRecurringPaymentsScheduler = ({
       const envelopes = latest.current.envelopes;
       if (envelopes === null) return false;
       const state = await envelopes.state(runEnvelopeRef(run));
-      return Either.isRight(state) && isPaymentOut(state.right.status);
+      return Result.isSuccess(state) && isPaymentOut(state.success.status);
     },
     [latest],
   );

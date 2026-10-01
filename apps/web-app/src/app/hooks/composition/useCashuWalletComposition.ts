@@ -29,7 +29,7 @@ import {
   sendPaymentNoticeAtom,
   useAtomSet,
 } from "@linky-fit/linkstr-react";
-import { Cause, Either, Exit, Option, Schema } from "effect";
+import { Cause, Result, Exit, Option, Schema } from "effect";
 import React, { type ComponentRef, useMemo, useState } from "react";
 import type { CashuOperationId, ContactId } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
@@ -159,7 +159,7 @@ import type { Translate } from "../../../i18n";
 
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 const isPubkey = Schema.is(Pubkey);
-const decodeCashuTokenText = Schema.decodeUnknownEither(CashuTokenText);
+const decodeCashuTokenText = Schema.decodeUnknownResult(CashuTokenText);
 
 export const logPayStep = (step: string, data?: PaymentLogData): void => {
   const clientId = data?.clientId;
@@ -1247,8 +1247,8 @@ export const useCashuWalletComposition = ({
           mint,
           produceAs: "pending",
         });
-        if (Either.isLeft(sendOutcome)) {
-          const sendError = sendOutcome.left;
+        if (Result.isFailure(sendOutcome)) {
+          const sendError = sendOutcome.failure;
           const errorMessage =
             describeTaggedCashuError(sendError) ?? sendError._tag;
           logFailure(errorMessage, mint, "swap");
@@ -1259,7 +1259,7 @@ export const useCashuWalletComposition = ({
           );
           return true;
         }
-        const receipt = sendOutcome.right;
+        const receipt = sendOutcome.success;
         sentMint = receipt.mint;
 
         try {
@@ -1292,9 +1292,9 @@ export const useCashuWalletComposition = ({
           const restored = await cashuTransferLifecycle.returnToWallet(
             receipt.operationId,
           );
-          if (Either.isLeft(restored)) {
+          if (Result.isFailure(restored)) {
             console.warn("[linky][payment-request] return-to-wallet failed", {
-              error: restored.left._tag,
+              error: restored.failure._tag,
             });
           }
           throw error;
@@ -1613,13 +1613,13 @@ export const useCashuWalletComposition = ({
         amountSat: pending.amountSat,
         mint: mintUrl,
       });
-      if (Either.isLeft(started)) {
-        setStatus(`${t("errorPrefix")}: ${started.left}`);
+      if (Result.isFailure(started)) {
+        setStatus(`${t("errorPrefix")}: ${started.failure}`);
         return;
       }
       await redeemLnurlWithdraw({
         callback: pending.callback,
-        invoice: started.right.invoice,
+        invoice: started.success.invoice,
         k1: pending.k1,
       });
       setPendingLnurlWithdrawConfirmation(null);
@@ -1819,9 +1819,9 @@ export const useCashuWalletComposition = ({
         return;
       }
       const outcome = await cashuTransferLifecycle.returnToWallet(id);
-      if (Either.isLeft(outcome)) {
+      if (Result.isFailure(outcome)) {
         const message =
-          describeTaggedCashuError(outcome.left) ?? outcome.left._tag;
+          describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag;
         setStatus(`${t("errorPrefix")}: ${message}`);
         return;
       }
@@ -1865,9 +1865,9 @@ export const useCashuWalletComposition = ({
         return false;
       }
       const outcome = await cashuTransferLifecycle[transition](id);
-      if (Either.isLeft(outcome)) {
+      if (Result.isFailure(outcome)) {
         const message =
-          describeTaggedCashuError(outcome.left) ?? outcome.left._tag;
+          describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag;
         setStatus(`${t("errorPrefix")}: ${message}`);
         return false;
       }
@@ -1897,9 +1897,9 @@ export const useCashuWalletComposition = ({
       }
       try {
         const outcome = await cashuTransferLifecycle.forget(id);
-        if (Either.isLeft(outcome)) {
+        if (Result.isFailure(outcome)) {
           setStatus(
-            `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.left) ?? outcome.left._tag}`,
+            `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag}`,
           );
           return false;
         }
@@ -1921,17 +1921,19 @@ export const useCashuWalletComposition = ({
       }
       try {
         const outcome = await cashuTransferLifecycle.forget(id);
-        if (Either.isLeft(outcome)) {
+        if (Result.isFailure(outcome)) {
           setStatus(
             // A retry pass handed the token to its receive first.
-            outcome.left._tag === "InvalidTransferTransition"
+            outcome.failure._tag === "InvalidTransferTransition"
               ? t("cashuDeferredAlreadyReceiving")
-              : `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.left) ?? outcome.left._tag}`,
+              : `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag}`,
           );
           return;
         }
       } catch (error) {
-        setStatus(`${t("errorPrefix")}: ${String(error)}`);
+        setStatus(
+          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
+        );
         return;
       }
       setStatus(t("cashuDeferredReceiveDiscarded"));
@@ -2018,7 +2020,7 @@ export const useCashuWalletComposition = ({
         if (!identity) throw new Error("invalid nsec");
         const myPubHex = identity.pubkey;
         const token = decodeCashuTokenText(tokenText);
-        if (Either.isLeft(token)) {
+        if (Result.isFailure(token)) {
           throw new Error("invalid cashu token");
         }
         const clientId = ClientId.make(makeLocalId());
@@ -2044,7 +2046,7 @@ export const useCashuWalletComposition = ({
 
         const draft = new TokenMessageDraft({
           to: contactPubHex,
-          token: token.right,
+          token: token.success,
           clientId,
         });
         const exit = await enqueueOutbox({
@@ -2079,7 +2081,7 @@ export const useCashuWalletComposition = ({
             }),
           );
           const failure = Exit.isFailure(noticeExit)
-            ? Cause.failureOption(noticeExit.cause)
+            ? Cause.findErrorOption(noticeExit.cause)
             : Option.none();
           logPayStep("payment-notice-publish", {
             anySuccess: Exit.isSuccess(noticeExit),
@@ -2268,8 +2270,8 @@ export const useCashuWalletComposition = ({
           mint,
           produceAs: "issued",
         });
-        if (Either.isLeft(outcome)) {
-          const sendError = outcome.left;
+        if (Result.isFailure(outcome)) {
+          const sendError = outcome.failure;
           const errorMessage =
             describeTaggedCashuError(sendError) ?? sendError._tag;
           logEmitFailure(errorMessage, mint);
@@ -2281,7 +2283,7 @@ export const useCashuWalletComposition = ({
           return;
         }
 
-        const receipt = outcome.right;
+        const receipt = outcome.success;
         logPaymentEvent({
           direction: "out",
           status: "ok",
@@ -2354,8 +2356,8 @@ export const useCashuWalletComposition = ({
         targetMint,
       });
 
-      if (Either.isRight(outcome)) {
-        const moved = formatDisplayedAmountParts(outcome.right.movedAmount);
+      if (Result.isSuccess(outcome)) {
+        const moved = formatDisplayedAmountParts(outcome.success.movedAmount);
         setStatus(
           t("cashuMeltToMainMintDone")
             .replace("{amount}", `${moved.approxPrefix}${moved.amountText}`)
@@ -2365,7 +2367,7 @@ export const useCashuWalletComposition = ({
         return;
       }
 
-      const error = outcome.left;
+      const error = outcome.failure;
       // PaymentFailed carrying the target mint means the melt already paid
       // the target's invoice but the claim did not finish; the persisted
       // pending claim completes it via resumePendingClaims.

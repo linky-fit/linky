@@ -47,7 +47,7 @@ export const deliverSiteLogin = ({
 }: SiteLoginDelivery) =>
   Effect.gen(function* () {
     const transport = yield* NostrTransport;
-    const wrap = yield* Schema.decodeUnknown(SignedPlainEvent)(
+    const wrap = yield* Schema.decodeUnknownEffect(SignedPlainEvent)(
       wrapAssertion(assertion, pubkey),
     );
     const results = yield* transport.publish(relays.filter(isRelayUrl), wrap);

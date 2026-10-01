@@ -1,5 +1,5 @@
 import type { AutoswapEstimate } from "@linky-fit/linkshu";
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import type { Translate } from "../../../i18n";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
@@ -59,9 +59,9 @@ export const useMoveMintFunds = ({
       }
       try {
         const outcome = await estimateAutoswapCashu(move);
-        if (Either.isRight(outcome)) return outcome.right;
+        if (Result.isSuccess(outcome)) return outcome.success;
         setStatus(
-          `${t("mintMoveEstimateFailed")}: ${describeError(outcome.left)}`,
+          `${t("mintMoveEstimateFailed")}: ${describeError(outcome.failure)}`,
         );
       } catch (error) {
         setStatus(`${t("mintMoveEstimateFailed")}: ${describeError(error)}`);
@@ -84,16 +84,16 @@ export const useMoveMintFunds = ({
       try {
         rememberSeenMint(move.targetMint);
         const outcome = await autoswapCashu(move);
-        if (Either.isRight(outcome)) {
+        if (Result.isSuccess(outcome)) {
           setStatus(
             t("mintMoveDone")
-              .replace("{amount}", formatAmount(outcome.right.movedAmount))
+              .replace("{amount}", formatAmount(outcome.success.movedAmount))
               .replace("{mint}", formatMintHost(move.targetMint))
-              .replace("{fee}", formatAmount(outcome.right.feePaid)),
+              .replace("{fee}", formatAmount(outcome.success.feePaid)),
           );
           return true;
         }
-        const error = outcome.left;
+        const error = outcome.failure;
         // The melt paid the target's invoice; the pending claim finishes it.
         if (
           error._tag === "PaymentFailed" &&

@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import React from "react";
 import type { CashuOperationId } from "../../../evolu";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -52,9 +52,9 @@ export const useCashuTokenChecks = ({
       }
       try {
         const outcome = await forgetCashuTransfer(id);
-        if (Either.isLeft(outcome)) {
+        if (Result.isFailure(outcome)) {
           setStatus(
-            `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.left) ?? outcome.left._tag}`,
+            `${t("errorPrefix")}: ${describeTaggedCashuError(outcome.failure) ?? outcome.failure._tag}`,
           );
           return;
         }
@@ -81,11 +81,11 @@ export const useCashuTokenChecks = ({
       setStatus(t("cashuChecking"));
       try {
         const outcome = await checkCashuTransfer(id);
-        if (Either.isLeft(outcome)) {
+        if (Result.isFailure(outcome)) {
           pushToast(t("errorPrefix"));
           return "skipped";
         }
-        switch (outcome.right.status) {
+        switch (outcome.success.status) {
           case "live":
             setStatus(null);
             pushToast(t("cashuCheckOk"));

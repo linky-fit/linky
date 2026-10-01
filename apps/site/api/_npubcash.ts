@@ -25,8 +25,8 @@ export const getFirstQueryValue = (
   return trimmed ? trimmed : null;
 };
 
-const JsonObject = Schema.parseJson(
-  Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+const JsonObject = Schema.fromJsonString(
+  Schema.Record(Schema.String, Schema.Unknown),
 );
 
 export const parseJsonObject = (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { Effect, TestClock, TestContext } from "effect";
+import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -126,7 +127,7 @@ describe("fileKeyValueStore leases", () => {
         yield* open().renewLease("counter", lease, 1_000);
         yield* TestClock.adjust("800 millis");
         return yield* open().tryAcquireLease("counter", 1_000);
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     expect(reacquired).toBeNull();

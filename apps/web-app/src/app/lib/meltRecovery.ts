@@ -26,7 +26,7 @@ export interface MeltTransactionPatch extends Patch<
 }
 
 const decodeMeltDetails = Schema.decodeUnknownOption(
-  Schema.parseJson(
+  Schema.fromJsonString(
     Schema.Struct({ meltQuoteId: Schema.optional(Schema.String) }),
   ),
 );

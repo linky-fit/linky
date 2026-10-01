@@ -271,7 +271,7 @@ export const buildTransactionInsertPayload = (args: {
 };
 
 const decodeDetails = Schema.decodeUnknownOption(
-  Schema.parseJson(Schema.Record({ key: Schema.String, value: JsonValue })),
+  Schema.fromJsonString(Schema.Record(Schema.String, JsonValue)),
 );
 
 const readDetails = (json: string | null | undefined) =>

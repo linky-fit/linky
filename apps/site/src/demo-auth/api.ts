@@ -1,9 +1,13 @@
 import { Option, Schema } from "effect";
 import type { LinkauthAssertion } from "@linky-fit/linkauth";
 
-const Challenge = Schema.parseJson(Schema.Struct({ nonce: Schema.String }));
-const Verified = Schema.parseJson(Schema.Struct({ pubkey: Schema.String }));
-const PubkeyHex = Schema.String.pipe(Schema.pattern(/^[0-9a-f]{64}$/u));
+const Challenge = Schema.fromJsonString(
+  Schema.Struct({ nonce: Schema.String }),
+);
+const Verified = Schema.fromJsonString(
+  Schema.Struct({ pubkey: Schema.String }),
+);
+const PubkeyHex = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/u));
 
 // A demo has no server session: the verified key lives in this tab only.
 const pubkeyStorageKey = "linky.demo_auth.pubkey";

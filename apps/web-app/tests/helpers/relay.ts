@@ -10,9 +10,9 @@ import { wrapEvent } from "nostr-tools/nip59";
 import { isNostrRelay, NOSTR_RELAY_URL } from "./stack";
 
 const decodeSubscriptionFrame = Schema.decodeUnknownOption(
-  Schema.parseJson(
-    Schema.Union(
-      Schema.Tuple(
+  Schema.fromJsonString(
+    Schema.Union([
+      Schema.Tuple([
         Schema.Literal("REQ"),
         Schema.String,
         Schema.Struct({
@@ -20,9 +20,9 @@ const decodeSubscriptionFrame = Schema.decodeUnknownOption(
           "#p": Schema.Array(Schema.String),
           limit: Schema.optional(Schema.Number),
         }),
-      ),
-      Schema.Tuple(Schema.Literal("EOSE", "CLOSE"), Schema.String),
-    ),
+      ]),
+      Schema.Tuple([Schema.Literals(["EOSE", "CLOSE"]), Schema.String]),
+    ]),
   ),
 );
 

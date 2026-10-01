@@ -1,6 +1,6 @@
 import { fetchVerifiedMedia, type Attachment } from "@linky-fit/keryx";
 import { base64 } from "@scure/base";
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import React from "react";
 import { saveFile } from "../../platform/fileExport";
 import { keryxMediaFailedRow, reportKeryx } from "../lib/keryxInspector";
@@ -16,7 +16,7 @@ const verifiedBytes = async (
   media: KeryxMedia & { readonly url: string; readonly sha256: string },
 ): Promise<Uint8Array<ArrayBuffer> | null> => {
   const result = await Effect.runPromise(
-    Effect.either(
+    Effect.result(
       fetchVerifiedMedia({
         url: media.url,
         sha256: media.sha256,
@@ -24,12 +24,12 @@ const verifiedBytes = async (
       }),
     ),
   );
-  if (Either.isRight(result)) return new Uint8Array(result.right);
+  if (Result.isSuccess(result)) return new Uint8Array(result.success);
   reportKeryx(() => [
     keryxMediaFailedRow(
       media.origin,
       media.url,
-      result.left.reason,
+      result.failure.reason,
       media.announcementId,
     ),
   ]);

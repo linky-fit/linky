@@ -45,8 +45,8 @@ const addReport = (id: string, createdAtSec: number) => {
   );
 };
 addReport("original", Math.floor(Date.now() / 1000) - 60);
-const Request = Schema.parseJson(
-  Schema.Tuple(
+const Request = Schema.fromJsonString(
+  Schema.Tuple([
     Schema.Literal("REQ"),
     Schema.String,
     Schema.Struct({
@@ -54,7 +54,7 @@ const Request = Schema.parseJson(
       until: Schema.optional(Schema.Number),
       limit: Schema.optional(Schema.Number),
     }),
-  ),
+  ]),
 );
 let publishes = 0;
 const errors: string[] = [];

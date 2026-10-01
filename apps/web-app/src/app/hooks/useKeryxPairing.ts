@@ -5,7 +5,7 @@ import {
   type JoinRequest,
 } from "@linky-fit/keryx";
 import { keryxSubscriptionIdFor } from "@linky-fit/linksync";
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
 import type { I18nKey } from "../../i18n";
@@ -57,12 +57,12 @@ export const useKeryxPairing = () => {
     async (text: string) => {
       setError(null);
       const parsed = parseJoinUrl(text);
-      if (Either.isLeft(parsed)) {
-        setError(joinErrorKey(parsed.left));
+      if (Result.isFailure(parsed)) {
+        setError(joinErrorKey(parsed.failure));
         return;
       }
-      if (await openPaired(parsed.right)) return;
-      setStep({ step: "confirm", request: parsed.right });
+      if (await openPaired(parsed.success)) return;
+      setStep({ step: "confirm", request: parsed.success });
     },
     [openPaired],
   );
@@ -84,7 +84,7 @@ export const useKeryxPairing = () => {
     if (await openPaired(request)) return;
     setBusy(true);
     const outcome = await Effect.runPromise(
-      Effect.either(
+      Effect.result(
         pairCompany({
           origin: request.origin,
           privateFeeds: request.privateFeeds,
@@ -94,16 +94,16 @@ export const useKeryxPairing = () => {
       ),
     );
     setBusy(false);
-    if (Either.isLeft(outcome)) {
-      reportKeryx(() => [keryxPairFailedRow(request.origin, outcome.left)]);
-      setError(pairErrorKey(outcome.left));
+    if (Result.isFailure(outcome)) {
+      reportKeryx(() => [keryxPairFailedRow(request.origin, outcome.failure)]);
+      setError(pairErrorKey(outcome.failure));
       return;
     }
     setStep({
       step: "consent",
       request,
-      snapshot: outcome.right,
-      channels: suggestedChannels(request, outcome.right),
+      snapshot: outcome.success,
+      channels: suggestedChannels(request, outcome.success),
     });
   };
 
