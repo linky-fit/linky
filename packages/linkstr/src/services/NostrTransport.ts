@@ -63,10 +63,10 @@ export interface NostrTransportService {
   ) => Effect.Effect<ReadonlyArray<NostrToolsEvent>, RelayUnreachable>;
 }
 
-export class NostrTransport extends Context.Tag("linkstr/NostrTransport")<
+export class NostrTransport extends Context.Service<
   NostrTransport,
   NostrTransportService
->() {}
+>()("linkstr/NostrTransport") {}
 
 export interface RelaySubscriptionParams {
   readonly onevent: (event: NostrToolsEvent) => void;
@@ -163,9 +163,9 @@ export const makeRelayPoolTransport = (
       try: () => sendOnce(relay, event),
       catch: (reason) => String(reason),
     }).pipe(
-      Effect.timeoutFail({
+      Effect.timeoutOrElse({
         duration: publishTimeout,
-        onTimeout: () => "publish timed out",
+        orElse: () => Effect.fail("publish timed out"),
       }),
       Effect.match({
         onSuccess: (detail) =>
@@ -185,7 +185,7 @@ export const makeRelayPoolTransport = (
     onEvent: (event: NostrToolsEvent) => void,
     options?: SubscribeOptions,
   ): Effect.Effect<string, RelayUnreachable> =>
-    Effect.async<string, RelayUnreachable>((resume) => {
+    Effect.callback<string, RelayUnreachable>((resume) => {
       let handle: RelaySubscriptionHandle | null = null;
       let interrupted = false;
       const alreadyHaveEvent = options?.alreadyHaveEvent;
@@ -201,7 +201,11 @@ export const makeRelayPoolTransport = (
           });
         },
         (reason) =>
-          resume(new RelayUnreachable({ relay, detail: String(reason) })),
+          resume(
+            Effect.fail(
+              new RelayUnreachable({ relay, detail: String(reason) }),
+            ),
+          ),
       );
       return Effect.sync(() => {
         interrupted = true;
@@ -209,58 +213,64 @@ export const makeRelayPoolTransport = (
       });
     });
 
-  // The EOSE timeout lives inside the async body (not Effect.timeout) so a
+  // The EOSE timeout lives inside the callback body (not Effect.timeout) so a
   // relay that never sends EOSE still yields the events collected so far.
   const fetchFromRelay = (
     relay: RelayUrl,
     filter: Filter,
   ): Effect.Effect<ReadonlyArray<NostrToolsEvent>, RelayUnreachable> =>
-    Effect.async<ReadonlyArray<NostrToolsEvent>, RelayUnreachable>((resume) => {
-      const events: Array<NostrToolsEvent> = [];
-      let handle: RelaySubscriptionHandle | null = null;
-      let timer: ReturnType<typeof setTimeout> | null = null;
-      let done = false;
-      const settle = (unanswered: string | null) => {
-        if (done) return;
-        done = true;
-        if (timer !== null) clearTimeout(timer);
-        handle?.close();
-        resume(
-          unanswered !== null && events.length === 0
-            ? new RelayUnreachable({ relay, detail: unanswered })
-            : Effect.succeed(events),
-        );
-      };
-      const eoseTimeoutMs = Duration.toMillis(fetchEoseTimeout);
-      ensureRelay(relay).then(
-        (connection) => {
-          if (done) return;
-          timer = setTimeout(
-            () => settle(`no EOSE within ${eoseTimeoutMs} ms`),
-            eoseTimeoutMs,
-          );
-          handle = connection.subscribe([filter], {
-            onevent: (event) => {
-              events.push(event);
-            },
-            oneose: () => settle(null),
-            onclose: (reason) => settle(`closed before EOSE: ${reason}`),
-            // Keeps nostr-tools from faking an EOSE before the timer above.
-            eoseTimeout: eoseTimeoutMs * 2,
-          });
-        },
-        (reason) => {
+    Effect.callback<ReadonlyArray<NostrToolsEvent>, RelayUnreachable>(
+      (resume) => {
+        const events: Array<NostrToolsEvent> = [];
+        let handle: RelaySubscriptionHandle | null = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let done = false;
+        const settle = (unanswered: string | null) => {
           if (done) return;
           done = true;
-          resume(new RelayUnreachable({ relay, detail: String(reason) }));
-        },
-      );
-      return Effect.sync(() => {
-        done = true;
-        if (timer !== null) clearTimeout(timer);
-        handle?.close();
-      });
-    });
+          if (timer !== null) clearTimeout(timer);
+          handle?.close();
+          resume(
+            unanswered !== null && events.length === 0
+              ? Effect.fail(new RelayUnreachable({ relay, detail: unanswered }))
+              : Effect.succeed(events),
+          );
+        };
+        const eoseTimeoutMs = Duration.toMillis(fetchEoseTimeout);
+        ensureRelay(relay).then(
+          (connection) => {
+            if (done) return;
+            timer = setTimeout(
+              () => settle(`no EOSE within ${eoseTimeoutMs} ms`),
+              eoseTimeoutMs,
+            );
+            handle = connection.subscribe([filter], {
+              onevent: (event) => {
+                events.push(event);
+              },
+              oneose: () => settle(null),
+              onclose: (reason) => settle(`closed before EOSE: ${reason}`),
+              // Keeps nostr-tools from faking an EOSE before the timer above.
+              eoseTimeout: eoseTimeoutMs * 2,
+            });
+          },
+          (reason) => {
+            if (done) return;
+            done = true;
+            resume(
+              Effect.fail(
+                new RelayUnreachable({ relay, detail: String(reason) }),
+              ),
+            );
+          },
+        );
+        return Effect.sync(() => {
+          done = true;
+          if (timer !== null) clearTimeout(timer);
+          handle?.close();
+        });
+      },
+    );
 
   return {
     publish: (relays, event) =>
@@ -275,7 +285,7 @@ export const makeRelayPoolTransport = (
 export const makeNostrTransportSimplePool = (options?: {
   allowInsecureLocalhost?: boolean | undefined;
 }): Layer.Layer<NostrTransport> =>
-  Layer.scoped(
+  Layer.effect(
     NostrTransport,
     Effect.map(
       Effect.acquireRelease(

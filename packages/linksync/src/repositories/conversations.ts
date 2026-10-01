@@ -130,7 +130,7 @@ export const makeConversationsRepository = (
           Effect.flatMap(() => conversations.byId(id)),
           Effect.flatMap((created) =>
             created === null
-              ? Effect.dieMessage("conversation vanished after insert")
+              ? Effect.die(new Error("conversation vanished after insert"))
               : Effect.succeed(created),
           ),
         );

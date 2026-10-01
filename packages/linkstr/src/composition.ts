@@ -45,32 +45,32 @@ export interface LinkstrServicesConfig {
  */
 export const linkstrServices = (config: LinkstrServicesConfig) =>
   Layer.mergeAll(
-    AppData.Default,
-    AppMessages.Default,
-    BankOffers.Default,
-    Chat.Default,
-    Outbox.Default.pipe(
+    AppData.layer,
+    AppMessages.layer,
+    BankOffers.layer,
+    Chat.layer,
+    Outbox.layer.pipe(
       Layer.provide([
-        Chat.Default,
-        Reactions.Default,
-        PaymentTelemetry.Default,
-        AppMessages.Default,
+        Chat.layer,
+        Reactions.layer,
+        PaymentTelemetry.layer,
+        AppMessages.layer,
         config.outboxStore ?? OutboxStore.inMemory,
       ]),
     ),
-    PaymentNotices.Default,
-    PaymentTelemetry.Default,
-    Reactions.Default,
-    SeenReceipts.Default,
-    WrapInbox.Default.pipe(
+    PaymentNotices.layer,
+    PaymentTelemetry.layer,
+    Reactions.layer,
+    SeenReceipts.layer,
+    WrapInbox.layer.pipe(
       Layer.provide(config.inboxCursorStore ?? InboxCursorStore.inMemory),
     ),
-    Profiles.Default,
-    ProfileWatch.Default,
-    RelayLists.Default,
-    MuteList.Default,
-    NostrConnect.Default,
-    NostrConnectClient.Default,
+    Profiles.layer,
+    ProfileWatch.layer,
+    RelayLists.layer,
+    MuteList.layer,
+    NostrConnect.layer,
+    NostrConnectClient.layer,
   ).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -85,6 +85,4 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
   );
 
 /** Everything `linkstrServices` provides. */
-export type LinkstrServices = Layer.Layer.Success<
-  ReturnType<typeof linkstrServices>
->;
+export type LinkstrServices = Layer.Success<ReturnType<typeof linkstrServices>>;

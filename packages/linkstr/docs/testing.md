@@ -4,7 +4,7 @@ Two helper sets give you throwaway identities, transport stubs, an in-memory rel
 
 ## `@linky-fit/linkstr/testing`
 
-`makeIdentity()` gives a fresh `{ pubkey, secretKey }`. `stubWrapTransport(published, accept?, options?)` and `stubPlainTransport(...)` are `Layer<NostrTransport>`s that record every published event and let `accept(event, relay)` decide the outcome per relay; `recipientOf(event)` and `hasPushMarker(wrap)` read the recorded wraps. Stub transports `die` on `subscribe` and `fetch` unless you pass them in `options`; when a test needs subscriptions, put a `FakeRelay` behind `makeRelayPoolTransport(poolFor(fakes))` and drive it by hand with `emit`, `eose` and `closeFromRelay`. `eventually(predicate)` is `expect.poll` inside an Effect, and `stubStorage()` is a `StringStorage` over a `Map` for `OutboxStore` / `InboxCursorStore`.
+`makeIdentity()` gives a fresh `{ pubkey, secretKey }`. `stubWrapTransport(published, accept?, options?)` and `stubPlainTransport(...)` are `Layer<NostrTransport>`s that record every published event and let `accept(event, relay)` decide the outcome per relay; `recipientOf(event)` and `hasPushMarker(wrap)` read the recorded wraps. Stub transports `die` on `subscribe` and `fetch` unless you pass them in `options`; when a test needs subscriptions, put a `FakeRelay` behind `makeRelayPoolTransport(poolFor(fakes))` and drive it by hand with `emit`, `eose` and `closeFromRelay`. `eventually(predicate, timeout?)` is `expect.poll` inside an Effect (2 s by default; give CPU-heavy waits more), and `stubStorage()` is a `StringStorage` over a `Map` for `OutboxStore` / `InboxCursorStore`.
 
 ## A send and an inbound test
 
@@ -42,7 +42,7 @@ const relay = RelayUrl.make("wss://relay.test");
 
 const wrapFromBob = async (): Promise<SignedWrapEvent> => {
   const published: Array<SignedWrapEvent> = [];
-  const asBob = Reactions.Default.pipe(
+  const asBob = Reactions.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
         LinkstrIdentity.fromSecretKey(bob.secretKey),
@@ -72,7 +72,7 @@ const wrapFromBob = async (): Promise<SignedWrapEvent> => {
 it("routes a wrap into a typed fact", async () => {
   const wrap = await wrapFromBob();
   const fake = new FakeRelay();
-  const layer = WrapInbox.Default.pipe(
+  const layer = WrapInbox.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
         LinkstrIdentity.fromSecretKey(alice.secretKey),
@@ -112,15 +112,15 @@ The `asBob` layer is also the shape of a plain send test: run the operation agai
 
 ## `@linky-fit/linkstr-react/testing`
 
-`configWith(identity, transport, overrides?)` builds a `LinkstrConfig` on one relay (`relayA`) over the given transport layer; `settle(registry, fnAtom)` awaits the fn atom's `Result` as an `Exit`; `fakeTransport(published, subscriptions, stored?, fetchedFilters?)` (and `fakeTransportLayer`) accepts every publish, records subscriptions (each with an `eose()` that ends its stored events) and serves `stored` to fetches. `relayA`, `relayB` and `makeIdentity` are re-exported. Drive atoms with a bare `Registry` instead of rendering:
+`configWith(identity, transport, overrides?)` builds a `LinkstrConfig` on one relay (`relayA`) over the given transport layer; `settle(registry, fnAtom)` awaits the fn atom's `AsyncResult` as an `Exit`; `fakeTransport(published, subscriptions, stored?, fetchedFilters?)` (and `fakeTransportLayer`) accepts every publish, records subscriptions (each with an `eose()` that ends its stored events) and serves `stored` to fetches. `relayA`, `relayB` and `makeIdentity` are re-exported. Drive atoms with a bare `AtomRegistry` instead of rendering:
 
 ```ts
 import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
 import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import {
+  AtomRegistry,
   linkstrConfigAtom,
-  Registry,
   retractReactionAtom,
 } from "@linky-fit/linkstr-react";
 import {
@@ -133,7 +133,7 @@ import { Exit } from "effect";
 it("retracts through the configured transport", async () => {
   const alice = makeIdentity();
   const bob = makeIdentity();
-  const registry = Registry.make();
+  const registry = AtomRegistry.make();
   const published: Array<SignedWrapEvent> = [];
   registry.set(
     linkstrConfigAtom,

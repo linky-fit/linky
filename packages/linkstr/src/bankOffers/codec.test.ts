@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import { getEventHash } from "nostr-tools";
 import { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import { Rumor } from "../internal/nostrEvent";
@@ -192,7 +192,7 @@ describe("bank offer rumor decoding", () => {
     );
 
     expect(decodeBankOfferRumor(rumor, alice.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           _tag: "BankOfferSnapshotReceived",
           snapshotId: rumor.id,
@@ -225,7 +225,7 @@ describe("bank offer rumor decoding", () => {
     );
 
     expect(decodeBankOfferRumor(rumor, alice.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           _tag: "OwnBankOfferSnapshotConfirmed",
           to: bob.pubkey,
@@ -239,7 +239,7 @@ describe("bank offer rumor decoding", () => {
     const rumor = legacyRumor();
 
     expect(decodeBankOfferRumor(rumor, bob.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           snapshotId: rumor.id,
           offerId: "offer-1",
@@ -271,7 +271,7 @@ describe("bank offer rumor decoding", () => {
     });
 
     expect(decodeBankOfferRumor(rumor, bob.pubkey)).toEqual(
-      Either.right(
+      Result.succeed(
         expect.objectContaining({
           offerer: alice.pubkey,
           amountText: "1 000 Kč",
@@ -357,7 +357,7 @@ describe("bank offer rumor decoding", () => {
     },
   ])("drops a snapshot with $name", ({ rumor }) => {
     expect(decodeBankOfferRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-bank-offer"),
+      Result.fail("invalid-bank-offer"),
     );
   });
 });
@@ -380,7 +380,7 @@ describe("bank offer author roles", () => {
         clientId,
       );
       expect(decodeBankOfferRumor(rumor, alice.pubkey)).toEqual(
-        Either.left("invalid-bank-offer"),
+        Result.fail("invalid-bank-offer"),
       );
     },
   );
@@ -394,7 +394,7 @@ describe("bank offer author roles", () => {
       clientId,
     );
     expect(decodeBankOfferRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-bank-offer"),
+      Result.fail("invalid-bank-offer"),
     );
   });
 });

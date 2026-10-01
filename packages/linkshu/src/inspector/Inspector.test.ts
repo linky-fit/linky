@@ -1,4 +1,4 @@
-import { Effect, Stream } from "effect";
+import { Context, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect";
 import { OperationSucceeded } from "./events";
 import { Inspector } from "./Inspector";
 
@@ -44,6 +44,22 @@ describe("Inspector.live", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it("completes events when the layer's scope closes", async () => {
+    const exit = await Effect.runPromise(
+      Effect.gen(function* () {
+        const scope = yield* Scope.make();
+        const context = yield* Layer.buildWithScope(Inspector.live, scope);
+        const fiber = yield* Effect.forkChild(
+          Stream.runDrain(Context.get(context, Inspector).events),
+        );
+        yield* Effect.yieldNow;
+        yield* Scope.close(scope, Exit.void);
+        return yield* Fiber.await(fiber);
+      }),
+    );
+    expect(Exit.isSuccess(exit)).toBe(true);
   });
 });
 

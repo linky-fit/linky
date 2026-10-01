@@ -133,7 +133,7 @@ const emitChanged = (
           operationId,
           reason,
         },
-        { disableValidation: true },
+        { disableChecks: true },
       ),
   );
 };

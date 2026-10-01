@@ -6,7 +6,8 @@ import type {
   SendResponse,
 } from "@cashu/cashu-ts";
 import { Amount, Keyset, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
+import { Effect, Exit, Layer } from "effect";
+import { TestClock } from "effect/testing";
 import {
   Amount as SatAmount,
   Bip39Seed,
@@ -205,12 +206,12 @@ const makeHarness = (
   storage: Storage = freshStorage(),
 ) => {
   const inspector = recordingInspector();
-  const layer = Melt.DefaultWithoutDependencies.pipe(
+  const layer = Melt.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({ get: () => Effect.succeed(wallet) }),
+          WalletInstances.of({ get: () => Effect.succeed(wallet) }),
         ),
         Layer.succeed(KeyValueStore, storage.kv),
         Layer.succeed(ProofStore, storage.proofs),
@@ -235,7 +236,7 @@ const meltAndInspect = (seeds: ReadonlyArray<ReadonlyArray<CashuProof>>) =>
     yield* Effect.forEach(seeds, (proofs) => seedProofs(mint, proofs));
     const melt = yield* Melt;
     const kv = yield* KeyValueStore;
-    const receipt = yield* Effect.either(melt.melt(draft));
+    const receipt = yield* Effect.result(melt.melt(draft));
     return {
       receipt,
       proofs: yield* (yield* ProofStore).loadAll,
@@ -296,8 +297,8 @@ const interruptMelt = async (storage: Storage) => {
     meltAndInspect([proofsA, proofsB]),
   );
   assert(Exit.isSuccess(exit));
-  assert(exit.value.receipt._tag === "Left");
-  expect(exit.value.receipt.left._tag).toBe("PaymentPending");
+  assert(exit.value.receipt._tag === "Failure");
+  expect(exit.value.receipt.failure._tag).toBe("PaymentPending");
   expect(meltCalls).toHaveLength(1);
   return exit.value;
 };
@@ -375,8 +376,8 @@ describe("Melt.melt", () => {
     const operation = onlyMelt(operations);
     expect(operation.status).toBe("paid");
 
-    assert(receipt._tag === "Right");
-    expect(receipt.right).toMatchObject({
+    assert(receipt._tag === "Success");
+    expect(receipt.success).toMatchObject({
       mint,
       quoteId: "quote-1",
       paidAmount: 10,
@@ -482,7 +483,7 @@ describe("Melt.melt", () => {
     const { run, events } = makeHarness(wallet);
     const exit = await run(meltAndInspect([mixed, proofsB]));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
+    assert(exit.value.receipt._tag === "Success");
     expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
     expect(availableAmounts(exit.value.proofs)).toEqual([1, 1, 32]);
     expect(secretsOf(proofsIn(exit.value.proofs, "available"))).toContain(
@@ -498,8 +499,8 @@ describe("Melt.melt", () => {
     const { run } = makeHarness(wallet);
     const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "InsufficientFunds",
       available: 10,
     });
@@ -519,8 +520,8 @@ describe("Melt.melt", () => {
 
     const exit = await run(meltAndInspect([proofsB]));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "InsufficientFunds",
       required: 12,
       available: 8,
@@ -540,8 +541,8 @@ describe("Melt.melt", () => {
 
     const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "QuoteExpired",
       quoteId: "quote-1",
       mint,
@@ -568,7 +569,7 @@ describe("Melt.melt", () => {
 
     const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(meltCalls.map((call) => call.counter)).toEqual([66, 100]);
     expect(restoreCalls).toEqual([{ start: 66, count: 100 }]);
     expect(exit.value.counter).toBe("102"); // 100 + 2 blank slots
@@ -590,8 +591,11 @@ describe("Melt.melt", () => {
     const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations } = exit.value;
-    assert(receipt._tag === "Left");
-    expect(receipt.left).toMatchObject({ _tag: "MintRejected", code: 20003 });
+    assert(receipt._tag === "Failure");
+    expect(receipt.failure).toMatchObject({
+      _tag: "MintRejected",
+      code: 20003,
+    });
 
     // Nothing lost: the swap remainder and the released inputs are balance.
     const available = proofsIn(proofs, "available");
@@ -615,8 +619,8 @@ describe("Melt.melt", () => {
 
     const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "PaymentFailed",
       quoteId: "quote-1",
     });
@@ -637,8 +641,8 @@ describe("Melt.melt", () => {
     const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations } = exit.value;
-    assert(receipt._tag === "Right");
-    expect(receipt.right).toMatchObject({ feePaid: 2, changeAmount: 1 });
+    assert(receipt._tag === "Success");
+    expect(receipt.success).toMatchObject({ feePaid: 2, changeAmount: 1 });
     // The change came from re-deriving the melt's own blank range.
     expect(restoreCalls).toEqual([{ start: 66, count: 2 }]);
     expect(proofsIn(proofs, "held")).toHaveLength(0);
@@ -662,10 +666,10 @@ describe("Melt.melt", () => {
           meltAndInspect([proofsA, proofsB]),
           "500 millis",
         );
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
+    assert(exit.value.receipt._tag === "Failure");
     // Neither balance nor destroyed: the operation lets `resumePending`
     // settle it.
     const operation = onlyMelt(exit.value.operations);
@@ -675,7 +679,7 @@ describe("Melt.melt", () => {
     expect(held.every((proof) => proof.operationId === operation.id)).toBe(
       true,
     );
-    expect(exit.value.receipt.left).toMatchObject({
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "PaymentPending",
       mint,
       quoteId: "quote-1",
@@ -696,8 +700,8 @@ describe("Melt.melt", () => {
     const exit = await run(meltAndInspect([proofsA, proofsB]));
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations } = exit.value;
-    assert(receipt._tag === "Right");
-    expect(receipt.right).toMatchObject({ paidAmount: 10, changeAmount: 1 });
+    assert(receipt._tag === "Success");
+    expect(receipt.success).toMatchObject({ paidAmount: 10, changeAmount: 1 });
     expect(restoreCalls).toEqual([{ start: 66, count: 2 }]);
     expect(proofsIn(proofs, "held")).toHaveLength(0);
     expect(onlyMelt(operations).status).toBe("paid");
@@ -721,8 +725,8 @@ describe("Melt.melt", () => {
       meltAndInspect([proofsA, proofsB]),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("PaymentFailed");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("PaymentFailed");
     expect(amountIn(exit.value.proofs, "available")).toBe(14);
     expect(await pendingMelts(storage)).toEqual([]);
     expect(onlyMelt(exit.value.operations).status).toBe("unpaid");
@@ -740,7 +744,7 @@ describe("Melt.melt", () => {
       meltAndInspect([proofsA, proofsB, [proof(3, "src-z1")]]),
     );
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(sendCalls[0]?.secrets).toEqual(["src-a1", "src-a2", "src-b1"]);
 
     const marked = exit.value.proofs.find((proof) => proof.secret === "src-z1");
@@ -804,7 +808,7 @@ describe("Melt.melt with a maximum total", () => {
       .run(
         Effect.gen(function* () {
           yield* seedProofs(mint, [...proofsA, ...proofsB]);
-          const receipt = yield* Effect.either(
+          const receipt = yield* Effect.result(
             (yield* Melt).melt(
               new MeltDraft({
                 mint,
@@ -822,8 +826,8 @@ describe("Melt.melt with a maximum total", () => {
   it("fails before swapping when the fees would exceed it", async () => {
     const { exit, sendCalls } = await meltWithin(13);
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("PaymentFailed");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("PaymentFailed");
     expect(sendCalls).toEqual([]);
     expect(proofsIn(exit.value.proofs, "available")).toHaveLength(3);
   });
@@ -831,9 +835,9 @@ describe("Melt.melt with a maximum total", () => {
   it("pays within it and reports the swap's fee next to the Lightning fee", async () => {
     const { exit } = await meltWithin(14);
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
+    assert(exit.value.receipt._tag === "Success");
     // 14 left the balance: 1 swap fee, 13 melt inputs for a 10 sat invoice.
-    expect(exit.value.receipt.right).toMatchObject({
+    expect(exit.value.receipt.success).toMatchObject({
       paidAmount: 10,
       feePaid: 3,
       swapFee: 1,
@@ -946,7 +950,7 @@ describe("Melt.resumePending", () => {
       Effect.gen(function* () {
         yield* TestClock.adjust("48 hours");
         return yield* resumeAndInspect;
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.results[0]).toMatchObject({ status: "unresolved" });

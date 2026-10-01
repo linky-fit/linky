@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { generateSecretKey, getPublicKey } from "nostr-tools";
 import type { WrapNotDelivered } from "../domain/errors";
 import { NostrSecretKey, Pubkey } from "../domain/primitives";
@@ -7,10 +7,10 @@ import { makeWrapSendContext, sendToRecipient } from "../internal/wrapSend";
 import { encodePaymentTelemetryRumor } from "./codec";
 import { PaymentTelemetryReceipt, type PaymentTelemetryDraft } from "./domain";
 
-export class PaymentTelemetry extends Effect.Service<PaymentTelemetry>()(
+export class PaymentTelemetry extends Context.Service<PaymentTelemetry>()(
   "linkstr/PaymentTelemetry",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const context = yield* makeWrapSendContext;
 
       /** Signed by a fresh ephemeral key per attempt, so nothing links sends. */
@@ -45,4 +45,6 @@ export class PaymentTelemetry extends Effect.Service<PaymentTelemetry>()(
       return { publishPaymentTelemetry } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

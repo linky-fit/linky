@@ -102,7 +102,7 @@ export const advanceCounterTo = (
               to: DeterministicCounter.make(next),
               reason,
             },
-            { disableValidation: true },
+            { disableChecks: true },
           ),
       );
     }

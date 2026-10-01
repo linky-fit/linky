@@ -1,13 +1,13 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { NoRelayReachable, RecipientNotReached } from "../domain/errors";
 import { makeWrapSendContext, sendToPeer } from "../internal/wrapSend";
 import { encodeSeenReceiptRumor } from "./codec";
 import { SeenReceiptSendReceipt, type SeenReceiptDraft } from "./domain";
 
-export class SeenReceipts extends Effect.Service<SeenReceipts>()(
+export class SeenReceipts extends Context.Service<SeenReceipts>()(
   "linkstr/SeenReceipts",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const context = yield* makeWrapSendContext;
 
       const send = (
@@ -24,4 +24,6 @@ export class SeenReceipts extends Effect.Service<SeenReceipts>()(
       return { send } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

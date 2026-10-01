@@ -1,6 +1,6 @@
 import type { AppOwner, OwnerId, ShardOwner, SyncOwner } from "@evolu/common";
 import { createIdFromString, deriveShardOwner } from "@evolu/common";
-import { Clock, Effect, Schema } from "effect";
+import { Clock, Effect, Schema, Semaphore } from "effect";
 import {
   forgottenIndexes,
   visibleIndexes,
@@ -625,7 +625,7 @@ export const createShardStore = <
     (done) =>
       done
         ? Effect.void
-        : Effect.async<void>((resume) => {
+        : Effect.callback<void>((resume) => {
             const stop = subscribeHydration(() => resume(Effect.void));
             return Effect.sync(stop);
           }),
@@ -640,7 +640,7 @@ export const createShardStore = <
   );
 
   // Every local pointer write reads the index it raises under this lock.
-  const pointerLock = Effect.unsafeMakeSemaphore(1);
+  const pointerLock = Semaphore.makeUnsafe(1);
 
   const movePointer = (
     scope: string,
@@ -675,7 +675,7 @@ export const createShardStore = <
     );
 
   const whenOwnerSynced = (ownerId: OwnerId): Effect.Effect<void> =>
-    Effect.async<void>((resume) => {
+    Effect.callback<void>((resume) => {
       const check = () => {
         if (!db.isOwnerSynced(ownerId)) return;
         stop();

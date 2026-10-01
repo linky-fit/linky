@@ -26,7 +26,11 @@ const acquireLease = (
   Effect.flatMap(kv.tryAcquireLease(key, ttlMs), (lease) =>
     lease === null ? new LeaseLockTimeout({ key }) : Effect.succeed(lease),
   ).pipe(
-    Effect.retry(Schedule.spaced(pollMs).pipe(Schedule.upTo(acquireTimeoutMs))),
+    Effect.retry(
+      Schedule.spaced(pollMs).pipe(
+        Schedule.upTo({ duration: acquireTimeoutMs }),
+      ),
+    ),
   );
 
 const keepRenewed = (

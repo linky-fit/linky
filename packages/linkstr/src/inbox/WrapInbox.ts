@@ -1,15 +1,17 @@
 import {
+  Context,
   Deferred,
   Duration,
   Effect,
-  Either,
   Exit,
+  Layer,
   Option,
   Queue,
+  Result,
   Schema,
   Stream,
 } from "effect";
-import type { Scope } from "effect";
+import type { Cause, Scope } from "effect";
 import type { Filter } from "nostr-tools";
 import type { BankOfferInboxEvent } from "../bankOffers/events";
 import type { ChatInboxEvent } from "../chat/events";
@@ -28,6 +30,7 @@ import { redactInspectorSecrets } from "../internal/redactInspectorSecrets";
 import type { InspectedPlainResult } from "../internal/inspectPlainOperation";
 import { fetchRawEvents } from "../internal/plainFetch";
 import { resubscribeForever } from "../internal/resubscribe";
+import { acquireStreamQueue } from "../internal/streamQueue";
 import { nowSeconds } from "../internal/time";
 import {
   DEFAULT_SEEN_WRAP_IDS_CAPACITY,
@@ -86,7 +89,7 @@ export interface WrapFetchOptions {
    * failing. For callers on an external deadline (push events), since a
    * reachable-but-silent relay can hold the fetch for ~11s otherwise.
    */
-  readonly timeout?: Duration.DurationInput;
+  readonly timeout?: Duration.Input;
 }
 
 export interface WrapInboxFeed {
@@ -114,14 +117,14 @@ const MAX_FAILED_WALK_ATTEMPTS = 3;
 
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
 
-const decodeWrapIdField = Schema.decodeUnknownEither(
+const decodeWrapIdField = Schema.decodeUnknownResult(
   Schema.Struct({ id: WrapId }),
 );
 
 const wrapIdOf = (raw: unknown): WrapId | null =>
-  Either.match(decodeWrapIdField(raw), {
-    onLeft: () => null,
-    onRight: ({ id }) => id,
+  Result.match(decodeWrapIdField(raw), {
+    onFailure: () => null,
+    onSuccess: ({ id }) => id,
   });
 
 /**
@@ -136,10 +139,10 @@ const wrapIdOf = (raw: unknown): WrapId | null =>
  * finish (or has failed too often) and the consumer has confirmed every
  * delivered wrap.
  */
-export class WrapInbox extends Effect.Service<WrapInbox>()(
+export class WrapInbox extends Context.Service<WrapInbox>()(
   "linkstr/WrapInbox",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const identity = yield* LinkstrIdentity;
       const transport = yield* NostrTransport;
       const relayPolicy = yield* RelayPolicy;
@@ -183,13 +186,13 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
         const bounded =
           options?.timeout === undefined
             ? fetched
-            : Effect.timeoutTo(fetched, {
+            : Effect.timeoutOrElse(fetched, {
                 duration: options.timeout,
-                onTimeout: (): InspectedPlainResult<WrapInboxEvent | null> => ({
-                  result: null,
-                  eventIds: [],
-                }),
-                onSuccess: (value) => value,
+                orElse: () =>
+                  Effect.succeed<InspectedPlainResult<WrapInboxEvent | null>>({
+                    result: null,
+                    eventIds: [],
+                  }),
               });
         return bounded.pipe(
           inspectPlainOperation(inspector, "inbox.fetchWrapEvent", {
@@ -228,14 +231,13 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
               closed = true;
             }),
           );
-          const rawWraps = yield* Effect.acquireRelease(
-            Queue.unbounded<RawArrival>(),
-            Queue.shutdown,
+          const rawWraps = yield* acquireStreamQueue(
+            Queue.unbounded<RawArrival, Cause.Done>(),
           );
           const seenWrapIds = makeSeenWrapIds(DEFAULT_SEEN_WRAP_IDS_CAPACITY);
 
           const arrive = (arrival: RawArrival): void => {
-            if (Queue.unsafeOffer(rawWraps, arrival)) outstanding++;
+            if (Queue.offerUnsafe(rawWraps, arrival)) outstanding++;
           };
 
           // Relays deliver out of order and walks newest first, so the cursor
@@ -362,13 +364,13 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                 {
                   onEose: () => {
                     eoseSeen = true;
-                    Deferred.unsafeDone(subscribed, Exit.void);
+                    Deferred.doneUnsafe(subscribed, Exit.void);
                   },
                 },
               );
               const backfill = Deferred.await(subscribed).pipe(
-                Effect.zipRight(walkBack(relay)),
-                Effect.zipRight(Effect.never),
+                Effect.andThen(walkBack(relay)),
+                Effect.andThen(Effect.never),
               );
               yield* Effect.raceFirst(live, backfill);
             });
@@ -387,13 +389,13 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                 () =>
                   new InboxWalkGivenUp(
                     { relay, failedAttempts },
-                    { disableValidation: true },
+                    { disableChecks: true },
                   ),
               );
               return advanceWhenSettled;
             });
             return resubscribeForever(
-              Effect.zipRight(
+              Effect.andThen(
                 Effect.exit(subscribeAndWalk(relay)),
                 afterAttempt,
               ),
@@ -421,7 +423,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                     delivery,
                     event: redactInspectorSecrets(event),
                   },
-                  { disableValidation: true },
+                  { disableChecks: true },
                 ),
             );
             return Option.some({ wrapId, delivery, event, ack });
@@ -436,10 +438,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
               if (wrapId !== null && seenWrapIds.has(wrapId)) {
                 inspector.emit(
                   () =>
-                    new InboxWrapDeduped(
-                      { wrapId },
-                      { disableValidation: true },
-                    ),
+                    new InboxWrapDeduped({ wrapId }, { disableChecks: true }),
                 );
                 return Effect.as(settle(null), Option.none());
               }
@@ -470,7 +469,8 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
 
           const events = Stream.fromQueue(rawWraps).pipe(
             Stream.mapEffect(processRaw),
-            Stream.filterMap((event) => event),
+            Stream.filter(Option.isSome),
+            Stream.map(({ value }) => value),
           );
 
           return { events };
@@ -479,4 +479,6 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
       return { fetchWrapEvent, open } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

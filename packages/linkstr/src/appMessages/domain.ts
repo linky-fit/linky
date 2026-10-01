@@ -6,10 +6,10 @@ import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
  * Names the app a message belongs to (`["app", <namespace>]`), so apps
  * sharing an identity and relays ignore each other's messages.
  */
-export const AppNamespace = Schema.NonEmptyTrimmedString.pipe(
-  Schema.maxLength(64),
-  Schema.brand("AppNamespace"),
-);
+export const AppNamespace = Schema.Trimmed.check(
+  Schema.isNonEmpty(),
+  Schema.isMaxLength(64),
+).pipe(Schema.brand("AppNamespace"));
 export type AppNamespace = typeof AppNamespace.Type;
 
 export class AppMessageDraft extends Schema.Class<AppMessageDraft>(

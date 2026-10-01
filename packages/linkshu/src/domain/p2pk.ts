@@ -18,15 +18,17 @@ const isCurvePoint = (hex: string): boolean => {
  * a lock to a non-point would burn the funds.
  */
 export const P2pkPubkey = Schema.String.pipe(
-  Schema.pattern(/^0[23][0-9a-f]{64}$/),
-  Schema.filter(isCurvePoint, { description: "a point on secp256k1" }),
+  Schema.check(
+    Schema.isPattern(/^0[23][0-9a-f]{64}$/),
+    Schema.makeFilter(isCurvePoint, { description: "a point on secp256k1" }),
+  ),
   Schema.brand("P2pkPubkey"),
 );
 export type P2pkPubkey = typeof P2pkPubkey.Type;
 
 /** Hex secp256k1 secret that signs for P2PK-locked proofs; never persisted. */
 export const P2pkUnlockingKey = Schema.String.pipe(
-  Schema.pattern(/^[0-9a-f]{64}$/),
+  Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
   Schema.brand("P2pkUnlockingKey"),
 );
 export type P2pkUnlockingKey = typeof P2pkUnlockingKey.Type;

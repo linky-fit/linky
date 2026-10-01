@@ -1,4 +1,4 @@
-import { Either, Option, Schema } from "effect";
+import { Option, Result, Schema } from "effect";
 import {
   ClientId,
   isClientId,
@@ -29,12 +29,12 @@ export const BANK_OFFER_VALUE = "bank_payment_offer";
 
 const isBankOfferId = Schema.is(BankOfferId);
 const isBankOfferStatus = Schema.is(BankOfferStatus);
-const isNonEmptyTrimmedString = Schema.is(Schema.NonEmptyTrimmedString);
-const isPositiveInt = Schema.is(Schema.Int.pipe(Schema.positive()));
+const isNonEmptyTrimmedString = Schema.is(
+  Schema.Trimmed.check(Schema.isNonEmpty()),
+);
+const isPositiveInt = Schema.is(Schema.Int.check(Schema.isGreaterThan(0)));
 const decodeJsonRecord = Schema.decodeUnknownOption(
-  Schema.parseJson(
-    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-  ),
+  Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
 );
 
 /** The offer-message payload; `null` fields are omitted from the JSON. `text`
@@ -174,7 +174,7 @@ const decodeContent = (content: string) =>
 export const decodeBankOfferRumor = (
   rumor: Rumor,
   me: Pubkey,
-): Either.Either<BankOfferInboxEvent, DropReason> => {
+): Result.Result<BankOfferInboxEvent, DropReason> => {
   const snapshotId = rumor.id;
   if (
     rumor.kind !== BANK_OFFER_KIND ||
@@ -184,16 +184,16 @@ export const decodeBankOfferRumor = (
     !tagValues(rumor.tags, "p").includes(me) ||
     !isRumorId(snapshotId)
   ) {
-    return Either.left("invalid-bank-offer");
+    return Result.fail("invalid-bank-offer");
   }
 
   return Option.match(decodeContent(rumor.content), {
-    onNone: () => Either.left<DropReason>("invalid-bank-offer"),
+    onNone: () => Result.fail<DropReason>("invalid-bank-offer"),
     onSome: ({ amountText, offerId, offererText, record, status }) => {
       const offerer =
         offererText ?? firstTrimmedTagValue(rumor.tags, "offerer");
       if (offerer === null || !isPubkey(offerer)) {
-        return Either.left<DropReason>("invalid-bank-offer");
+        return Result.fail<DropReason>("invalid-bank-offer");
       }
       const participants = tagValues(rumor.tags, "p");
       const isOffererStatus =
@@ -209,7 +209,7 @@ export const decodeBankOfferRumor = (
           : rumor.pubkey === offerer) ||
         (rumor.pubkey !== me && rumor.pubkey !== offerer && offerer !== me)
       ) {
-        return Either.left<DropReason>("invalid-bank-offer");
+        return Result.fail<DropReason>("invalid-bank-offer");
       }
       const snapshot = {
         snapshotId,
@@ -229,7 +229,7 @@ export const decodeBankOfferRumor = (
         sentAt: rumor.created_at,
       };
       if (rumor.pubkey !== me) {
-        return Either.right(
+        return Result.succeed(
           new BankOfferSnapshotReceived({ from: rumor.pubkey, ...snapshot }),
         );
       }
@@ -237,8 +237,8 @@ export const decodeBankOfferRumor = (
         tagValues(rumor.tags, "p")
           .filter((value) => value !== rumor.pubkey)
           .find(isPubkey) ?? null;
-      if (to === null) return Either.left<DropReason>("invalid-bank-offer");
-      return Either.right(
+      if (to === null) return Result.fail<DropReason>("invalid-bank-offer");
+      return Result.succeed(
         new OwnBankOfferSnapshotConfirmed({ to, ...snapshot }),
       );
     },

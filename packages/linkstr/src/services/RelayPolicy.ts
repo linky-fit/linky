@@ -10,10 +10,10 @@ export interface RelayPolicyService {
   readonly writeRelays: ReadonlyArray<RelayUrl>;
 }
 
-export class RelayPolicy extends Context.Tag("linkstr/RelayPolicy")<
+export class RelayPolicy extends Context.Service<
   RelayPolicy,
   RelayPolicyService
->() {
+>()("linkstr/RelayPolicy") {
   static fixed(relays: RelayPolicyService): Layer.Layer<RelayPolicy> {
     return Layer.succeed(RelayPolicy, relays);
   }

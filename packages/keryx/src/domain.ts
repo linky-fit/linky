@@ -19,7 +19,7 @@ export const CompanyTrust = Schema.Struct({
   timestampVersion: Schema.Int,
   snapshotVersion: Schema.Int,
   /** Versions of the metadata files the trusted snapshot pins, by file name. */
-  metaVersions: Schema.Record({ key: Schema.String, value: Schema.Int }),
+  metaVersions: Schema.Record(Schema.String, Schema.Int),
 });
 export type CompanyTrust = typeof CompanyTrust.Type;
 

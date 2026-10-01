@@ -12,7 +12,7 @@ bun add @linky-fit/linkstr effect
 | ---------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `@linky-fit/linkstr`               | services, drafts, receipts, facts, key codecs, `runLinkstr`, `linkstrServices`                   |
 | `@linky-fit/linkstr/testing`       | test helpers ([testing.md](./testing.md)); needs Vitest 4, the main entry does not               |
-| `@linky-fit/linkstr-react`         | effect-atom bindings for React ([react.md](./react.md)); a private workspace package, not on npm |
+| `@linky-fit/linkstr-react`         | Effect atom bindings for React ([react.md](./react.md)); a private workspace package, not on npm |
 | `@linky-fit/linkstr-react/testing` | its test helpers                                                                                 |
 
 Never import `nostr-tools` in consumer code; the codecs in [identity-and-keys.md](./identity-and-keys.md) cover keys and ids.

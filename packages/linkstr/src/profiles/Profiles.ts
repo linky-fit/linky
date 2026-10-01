@@ -1,4 +1,4 @@
-import { Effect, Either, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option, Result, Schema } from "effect";
 import type { Duration } from "effect";
 import type { Filter } from "nostr-tools";
 import type { PlainEventReceipt } from "../domain/delivery";
@@ -63,7 +63,7 @@ export interface DiscoverActiveProfilesOptions {
 export const PROFILE_SEARCH_DEFAULT_LIMIT = 6;
 /** Per relay: several kind-0 versions per author collapse into one hit. */
 export const PROFILE_SEARCH_OVERFETCH_FACTOR = 4;
-export const PROFILE_SEARCH_DEADLINE: Duration.DurationInput = "2500 millis";
+export const PROFILE_SEARCH_DEADLINE: Duration.Input = "2500 millis";
 
 export interface SearchProfilesOptions {
   readonly limit?: number;
@@ -74,7 +74,7 @@ export interface SearchProfilesOptions {
    */
   readonly searchRelays?: ReadonlyArray<RelayUrl>;
   /** Relays still silent when this elapses are dropped from the result. */
-  readonly deadline?: Duration.DurationInput;
+  readonly deadline?: Duration.Input;
   /** Profiles whose nip05/lud16 ends in `@<domain>` rank above all others. */
   readonly preferredDomains?: ReadonlyArray<string>;
   /** Ranked hits so far, each time another relay answers. */
@@ -93,20 +93,20 @@ export class DiscoveredProfile extends Schema.Class<DiscoveredProfile>(
 const pickNewest = <A>(
   events: ReadonlyArray<SignedPlainEvent>,
   kind: number,
-  decode: (event: SignedPlainEvent) => Either.Either<A, unknown>,
+  decode: (event: SignedPlainEvent) => Result.Result<A, unknown>,
 ): { fact: A; eventId: EventId } | null => {
   for (const event of events) {
     if (event.kind !== kind) continue;
     const decoded = decode(event);
-    if (Either.isRight(decoded)) {
-      return { fact: decoded.right, eventId: event.id };
+    if (Result.isSuccess(decoded)) {
+      return { fact: decoded.success, eventId: event.id };
     }
   }
   return null;
 };
 
-export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
-  effect: Effect.gen(function* () {
+export class Profiles extends Context.Service<Profiles>()("linkstr/Profiles", {
+  make: Effect.gen(function* () {
     const context = {
       identity: yield* LinkstrIdentity,
       transport: yield* NostrTransport,
@@ -228,19 +228,19 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
         const outcomes = yield* Effect.forEach(
           filters,
           (filter) =>
-            Effect.either(fetchPlainEvents(context.transport, relays, filter)),
+            Effect.result(fetchPlainEvents(context.transport, relays, filter)),
           // Bounded: each filter already fans out to every read relay.
           { concurrency: 4 },
         );
-        const eventsPerFilter = outcomes.filter(Either.isRight);
-        const firstFailure = outcomes.find(Either.isLeft);
+        const eventsPerFilter = outcomes.filter(Result.isSuccess);
+        const firstFailure = outcomes.find(Result.isFailure);
         if (eventsPerFilter.length === 0 && firstFailure !== undefined) {
-          return yield* Effect.fail(firstFailure.left);
+          return yield* Effect.fail(firstFailure.failure);
         }
         const [profileFailure] = outcomes.flatMap((outcome, index) =>
-          Either.isLeft(outcome) &&
+          Result.isFailure(outcome) &&
           filters[index]?.kinds?.includes(PROFILE_KIND) === true
-            ? [outcome.left]
+            ? [outcome.failure]
             : [],
         );
         if (requireProfileAnswer && profileFailure !== undefined) {
@@ -252,7 +252,7 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
         // each author's events of one kind newest-first (fetchPlainEvents
         // sorts within a filter), which is all pickNewest needs.
         const eventsByAuthor = new Map<Pubkey, Array<SignedPlainEvent>>();
-        for (const event of eventsPerFilter.flatMap(({ right }) => right)) {
+        for (const event of eventsPerFilter.flatMap(({ success }) => success)) {
           const ofAuthor = eventsByAuthor.get(event.pubkey);
           if (ofAuthor === undefined) eventsByAuthor.set(event.pubkey, [event]);
           else ofAuthor.push(event);
@@ -426,7 +426,7 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
                 options.onHits?.(collector.top(limit).map(({ hit }) => hit));
               }),
             ),
-            Effect.catchAll((failure) =>
+            Effect.catch((failure) =>
               Effect.sync(() => {
                 failures.push(
                   new RelayRejection({
@@ -475,4 +475,6 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
       searchProfiles,
     } as const;
   }),
-}) {}
+}) {
+  static readonly layer = Layer.effect(this, this.make);
+}

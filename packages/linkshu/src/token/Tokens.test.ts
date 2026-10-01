@@ -1,17 +1,7 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
 import { getEncodedToken, Keyset, MintOperationError } from "@cashu/cashu-ts";
-import {
-  Deferred,
-  Effect,
-  Either,
-  Exit,
-  Fiber,
-  Layer,
-  Option,
-  Schema,
-  TestClock,
-  TestContext,
-} from "effect";
+import { Deferred, Effect, Exit, Fiber, Layer, Result, Schema } from "effect";
+import { TestClock } from "effect/testing";
 import {
   MintRejected,
   MintUnreachable,
@@ -82,8 +72,8 @@ const tokenB = tokenOf(proof(8, "sec-b1"));
 /** What the mint hands back when a token is re-received (its input fee taken). */
 const swappedProofs = [proof(4, "fresh-1"), proof(1, "fresh-2")];
 
-const encodeSpent = Schema.encodeSync(Schema.parseJson(TokenAlreadySpent));
-const encodeRejected = Schema.encodeSync(Schema.parseJson(MintRejected));
+const encodeSpent = Schema.encodeSync(Schema.fromJsonString(TokenAlreadySpent));
+const encodeRejected = Schema.encodeSync(Schema.fromJsonString(MintRejected));
 const rejected = encodeRejected(
   new MintRejected({ mint, code: 20003, detail: "keyset inactive" }),
 );
@@ -112,12 +102,12 @@ const makeHarness = (args: HarnessArgs = {}) => {
     }),
   });
 
-  const layer = Tokens.DefaultWithoutDependencies.pipe(
+  const layer = Tokens.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({ get: () => Effect.succeed(wallet) }),
+          WalletInstances.of({ get: () => Effect.succeed(wallet) }),
         ),
         inMemoryKeyValueStore,
         inMemoryProofStore,
@@ -355,7 +345,7 @@ const handedOutStateFor = (status: OperationStatus): ProofState =>
  */
 const outcomesFromEverySendStatus = (
   operation: (
-    tokens: Tokens,
+    tokens: Tokens["Service"],
     operationId: OperationId,
   ) => Effect.Effect<void, { readonly _tag: string }>,
 ) =>
@@ -375,15 +365,15 @@ const outcomesFromEverySendStatus = (
         handedOutStateFor(from),
         transfer.id,
       );
-      const result = yield* Effect.either(
+      const result = yield* Effect.result(
         operation(yield* Tokens, transfer.id),
       );
       const { proofs, operations } = yield* inventory;
       return [
         from,
-        Either.isRight(result)
+        Result.isSuccess(result)
           ? operationById(operations, transfer.id)?.status
-          : result.left._tag,
+          : result.failure._tag,
         stateOf(proofs, secret),
       ] as const;
     }),
@@ -557,13 +547,13 @@ describe("Tokens.forget on a receive", () => {
     const exit = await run(
       Effect.gen(function* () {
         const transfer = yield* seedTransfer("receive", from, mint, tokenA, 6);
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           (yield* Tokens).forget(transfer.id),
         );
         const { operations } = yield* inventory;
-        return Either.isRight(result)
+        return Result.isSuccess(result)
           ? operationById(operations, transfer.id)?.status
-          : result.left._tag;
+          : result.failure._tag;
       }),
     );
 
@@ -589,13 +579,13 @@ describe("Tokens.forget on a deferred receive", () => {
           tokenA,
           6,
         );
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           (yield* Tokens).forget(deferral.id),
         );
         const { operations } = yield* inventory;
-        return Either.isRight(result)
+        return Result.isSuccess(result)
           ? operationById(operations, deferral.id)?.status
-          : result.left._tag;
+          : result.failure._tag;
       }),
     );
 
@@ -652,11 +642,11 @@ describe("Tokens.forget on a deferred receive", () => {
           tokenA,
           6,
         );
-        yield* Effect.fork(
+        yield* Effect.forkChild(
           Effect.never.pipe(withReceiveLock(yield* KeyValueStore, deferral)),
         );
         const result = yield* runOnTestClock(
-          Effect.either((yield* Tokens).forget(deferral.id)),
+          Effect.result((yield* Tokens).forget(deferral.id)),
           "1 second",
         );
         const { operations } = yield* inventory;
@@ -664,12 +654,12 @@ describe("Tokens.forget on a deferred receive", () => {
           result,
           status: operationById(operations, deferral.id)?.status,
         };
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value.result._tag === "Left");
-    expect(exit.value.result.left).toMatchObject({
+    assert(exit.value.result._tag === "Failure");
+    expect(exit.value.result.failure).toMatchObject({
       _tag: "CounterLockTimeout",
       mint,
       unit: sat,
@@ -683,12 +673,12 @@ describe("Tokens.forget on a deferred receive", () => {
     load: () => Effect.Effect<LoadedWallet, MintUnreachable>,
   ) => {
     const layer = Layer.mergeAll(
-      Tokens.DefaultWithoutDependencies,
-      Receive.DefaultWithoutDependencies,
+      Tokens.layerWithoutDependencies,
+      Receive.layerWithoutDependencies,
     ).pipe(
       Layer.provideMerge(
         Layer.mergeAll(
-          Layer.succeed(WalletInstances, WalletInstances.make({ get: load })),
+          Layer.succeed(WalletInstances, WalletInstances.of({ get: load })),
           inMemoryKeyValueStore,
           inMemoryProofStore,
           inMemoryOperationStore,
@@ -768,13 +758,13 @@ describe("Tokens.forget on a deferred receive", () => {
           const deferred = yield* deferTokenA;
           assert(deferred._tag === "ReceiveDeferred");
           stalls.now = true;
-          const pass = yield* Effect.fork(resumeDeferred);
+          const pass = yield* Effect.forkChild(resumeDeferred);
           yield* settlePromises;
-          const forget = yield* Effect.fork(
-            Effect.either((yield* Tokens).forget(deferred.operationId)),
+          const forget = yield* Effect.forkChild(
+            Effect.result((yield* Tokens).forget(deferred.operationId)),
           );
           yield* settlePromises;
-          const waited = Option.isNone(yield* Fiber.poll(forget));
+          const waited = forget.pollUnsafe() === undefined;
           yield* status === "pending"
             ? Deferred.fail(
                 loading,
@@ -787,7 +777,7 @@ describe("Tokens.forget on a deferred receive", () => {
             "500 millis",
           );
           return { waited, results, forgetResult, ...(yield* inventory) };
-        }).pipe(Effect.provide(TestContext.TestContext)),
+        }).pipe(Effect.provide(TestClock.layer())),
       );
 
       assert(Exit.isSuccess(exit));
@@ -795,7 +785,7 @@ describe("Tokens.forget on a deferred receive", () => {
       expect(waited).toBe(true);
       expect(statusesOf(results)).toEqual([status]);
       expect(
-        Either.isRight(forgetResult) ? "done" : forgetResult.left._tag,
+        Result.isSuccess(forgetResult) ? "done" : forgetResult.failure._tag,
       ).toBe(forgotten);
       expect(kindsAndStatuses(operations)).toEqual(
         status === "pending"
@@ -834,7 +824,7 @@ const returnSeeded = (seed: Seed) =>
         transfer.id,
       );
     }
-    const result = yield* Effect.either(
+    const result = yield* Effect.result(
       (yield* Tokens).returnToWallet(transfer.id),
     );
     const { proofs, operations } = yield* inventory;
@@ -858,14 +848,14 @@ describe("Tokens.returnToWallet", () => {
 
       assert(Exit.isSuccess(exit));
       const { transfer, result, proofs, stored } = exit.value;
-      assert(result._tag === "Right");
-      expect(result.right).toMatchObject({
+      assert(result._tag === "Success");
+      expect(result.success).toMatchObject({
         operationId: transfer.id,
         mint,
         unit: "sat",
         amount: 5,
       });
-      expect(result.right.tokenText).not.toBe(tokenA);
+      expect(result.success.tokenText).not.toBe(tokenA);
 
       expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
         "fresh-1",
@@ -922,7 +912,7 @@ describe("Tokens.returnToWallet", () => {
           null,
         );
         yield* seedProofs(mint, [dust], "handedOut", transfer.id);
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           (yield* Tokens).returnToWallet(transfer.id),
         );
         const { proofs, operations } = yield* inventory;
@@ -936,8 +926,8 @@ describe("Tokens.returnToWallet", () => {
 
     assert(Exit.isSuccess(exit));
     const { result, proofs, stored } = exit.value;
-    assert(result._tag === "Left");
-    expect(result.left).toMatchObject({
+    assert(result._tag === "Failure");
+    expect(result.failure).toMatchObject({
       _tag: "AmountConsumedByFee",
       mint,
       amount: 1,
@@ -959,8 +949,8 @@ describe("Tokens.returnToWallet", () => {
 
     assert(Exit.isSuccess(exit));
     const { transfer, result, proofs, stored } = exit.value;
-    assert(result._tag === "Right");
-    expect(result.right.operationId).toBe(transfer.id);
+    assert(result._tag === "Success");
+    expect(result.success.operationId).toBe(transfer.id);
     expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
       "fresh-1",
       "fresh-2",
@@ -988,8 +978,8 @@ describe("Tokens.returnToWallet", () => {
       const exit = await run(returnSeeded({ kind, status }));
 
       assert(Exit.isSuccess(exit));
-      assert(exit.value.result._tag === "Left");
-      expect(exit.value.result.left).toMatchObject({
+      assert(exit.value.result._tag === "Failure");
+      expect(exit.value.result.failure).toMatchObject({
         _tag: "InvalidTransferTransition",
         from: status,
         to,
@@ -1009,8 +999,8 @@ describe("Tokens.returnToWallet", () => {
 
     assert(Exit.isSuccess(exit));
     const { result, proofs, stored } = exit.value;
-    assert(result._tag === "Left");
-    expect(result.left).toMatchObject({ _tag: "TokenAlreadySpent", mint });
+    assert(result._tag === "Failure");
+    expect(result.failure).toMatchObject({ _tag: "TokenAlreadySpent", mint });
     expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["sec-a1", "sec-a2"]);
     expect(proofsIn(proofs, "available")).toEqual([]);
     expect(stored?.status).toBe("done");
@@ -1028,8 +1018,8 @@ describe("Tokens.returnToWallet", () => {
 
     assert(Exit.isSuccess(exit));
     const { result, proofs, stored } = exit.value;
-    assert(result._tag === "Left");
-    expect(result.left._tag).toBe("MintUnreachable");
+    assert(result._tag === "Failure");
+    expect(result.failure._tag).toBe("MintUnreachable");
     expect(secretsOf(proofsIn(proofs, "handedOut"))).toEqual([
       "sec-a1",
       "sec-a2",
@@ -1049,8 +1039,8 @@ describe("Tokens.returnToWallet", () => {
 
     assert(Exit.isSuccess(exit));
     const { result, proofs, stored } = exit.value;
-    assert(result._tag === "Left");
-    expect(result.left._tag).toBe("MintRejected");
+    assert(result._tag === "Failure");
+    expect(result.failure._tag).toBe("MintRejected");
     expect(secretsOf(proofsIn(proofs, "externalized"))).toEqual([
       "sec-a1",
       "sec-a2",
@@ -1084,8 +1074,8 @@ describe("Tokens.returnToWallet", () => {
 
       assert(Exit.isSuccess(exit));
       const { result, proofs, stored } = exit.value;
-      assert(result._tag === "Left");
-      expect(result.left._tag).toBe(tag);
+      assert(result._tag === "Failure");
+      expect(result.failure._tag).toBe(tag);
       expect(stored).toMatchObject({ status: "failed", error: rejected });
       expect(proofs).toEqual([]);
       expect(receiveCalls()).toBe(0);
@@ -1103,7 +1093,7 @@ describe("Tokens.returnToWallet", () => {
         Effect.runPromise(
           seedTransfer("receive", "done", mint, tokenA, 6).pipe(
             Effect.provideService(OperationStore, operationStore),
-            Effect.andThen(() => answerProofStates()(proofs)),
+            Effect.andThen(Effect.promise(() => answerProofStates()(proofs))),
           ),
         ),
     });
@@ -1114,8 +1104,8 @@ describe("Tokens.returnToWallet", () => {
 
     assert(Exit.isSuccess(exit));
     const { transfer, result, stored } = exit.value;
-    assert(result._tag === "Left");
-    expect(result.left).toMatchObject({
+    assert(result._tag === "Failure");
+    expect(result.failure).toMatchObject({
       _tag: "TokenAlreadyKnown",
       operationId: transfer.id,
     });
@@ -1141,8 +1131,8 @@ describe("Tokens.returnToWallet", () => {
 
     assert(Exit.isSuccess(exit));
     const { result, proofs, stored } = exit.value;
-    assert(result._tag === "Left");
-    expect(result.left._tag).toBe("TokenAlreadySpent");
+    assert(result._tag === "Failure");
+    expect(result.failure._tag).toBe("TokenAlreadySpent");
     expect(stateChecks).toBe(0);
     expect(secretsOf(proofsIn(proofs, "spent"))).toEqual(["sec-a1", "sec-a2"]);
     expect(stored?.status).toBe("done");
@@ -1159,8 +1149,8 @@ describe("Tokens.returnToWallet", () => {
 
     assert(Exit.isSuccess(exit));
     const { result, proofs, stored } = exit.value;
-    assert(result._tag === "Left");
-    expect(result.left._tag).toBe("MintUnreachable");
+    assert(result._tag === "Failure");
+    expect(result.failure._tag).toBe("MintUnreachable");
     expect(proofs).toEqual([]);
     expect(stored?.status).toBe("failed");
     expect(JSON.parse(stored?.error ?? "")).toMatchObject({

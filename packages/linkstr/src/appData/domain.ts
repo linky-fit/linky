@@ -1,9 +1,9 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { EventId, Pubkey, UnixSeconds } from "../domain/primitives";
 import { NostrTags, SignedPlainEvent } from "../internal/nostrEvent";
 
 /** The `d` tag naming one addressable NIP-78 slot of an author. */
-export const AppDataIdentifier = Schema.NonEmptyTrimmedString.pipe(
+export const AppDataIdentifier = Schema.Trimmed.check(Schema.isNonEmpty()).pipe(
   Schema.brand("AppDataIdentifier"),
 );
 export type AppDataIdentifier = typeof AppDataIdentifier.Type;
@@ -14,15 +14,15 @@ const isNotIdentifierTag = (tag: ReadonlyArray<string>): boolean =>
 export class AppDataDraft extends Schema.Class<AppDataDraft>("AppDataDraft")({
   identifier: AppDataIdentifier,
   /** Extra tags after the `d` tag, e.g. `["p", <pubkey>]` to make it findable by `#p`. */
-  tags: Schema.optionalWith(
-    Schema.Array(
-      Schema.Array(Schema.String).pipe(
-        Schema.filter(isNotIdentifierTag, {
-          description: "a tag other than d",
-        }),
-      ),
+  tags: Schema.Array(
+    Schema.Array(Schema.String).check(
+      Schema.makeFilter(isNotIdentifierTag, {
+        expected: "a tag other than d",
+      }),
     ),
-    { default: () => [] },
+  ).pipe(
+    Schema.withDecodingDefaultType(Effect.succeed([])),
+    Schema.withConstructorDefault(Effect.succeed([])),
   ),
   /** Public: anyone can read it. */
   content: Schema.String,

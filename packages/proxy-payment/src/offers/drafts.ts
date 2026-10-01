@@ -17,8 +17,10 @@ import { isOffererBankPaymentOfferStatus } from "./status";
 
 const isPubkey = Schema.is(Pubkey);
 const isBankOfferId = Schema.is(BankOfferId);
-const isNonEmptyTrimmedString = Schema.is(Schema.NonEmptyTrimmedString);
-const isPositiveInt = Schema.is(Schema.Int.pipe(Schema.positive()));
+const isNonEmptyTrimmedString = Schema.is(
+  Schema.Trimmed.check(Schema.isNonEmpty()),
+);
+const isPositiveInt = Schema.is(Schema.Int.check(Schema.isGreaterThan(0)));
 const isUnixSeconds = Schema.is(UnixSeconds);
 
 const positiveInt = (value: unknown): number | undefined => {

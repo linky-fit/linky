@@ -1,4 +1,4 @@
-import { Effect, Exit } from "effect";
+import { Cause, Effect, Exit, Option } from "effect";
 import { NoRelayReachable, RecipientNotReached } from "../domain/errors";
 import { ClientId, RelayUrl, UnixSeconds } from "../domain/primitives";
 import type { NostrTransportService } from "../services/NostrTransport";
@@ -81,8 +81,9 @@ describe("deliverRumorToPeer with order recipientFirst", () => {
     );
 
     expect(publishedRecipients).toEqual([bob.pubkey]);
-    assert(Exit.isFailure(exit) && exit.cause._tag === "Fail");
-    const failure = exit.cause.error;
+    assert(Exit.isFailure(exit));
+    expect(exit.cause.reasons).toHaveLength(1);
+    const failure = Option.getOrThrow(Cause.findErrorOption(exit.cause));
     expect(failure).toBeInstanceOf(NoRelayReachable);
     expect(failure.selfCopy.acceptedBy).toEqual([]);
     expect(failure.selfCopy.rejectedBy).toEqual([]);
@@ -131,8 +132,9 @@ describe("deliverRumorToPeer with order selfFirst", () => {
     );
 
     expect(publishedRecipients).toEqual([alice.pubkey]);
-    assert(Exit.isFailure(exit) && exit.cause._tag === "Fail");
-    const failure = exit.cause.error;
+    assert(Exit.isFailure(exit));
+    expect(exit.cause.reasons).toHaveLength(1);
+    const failure = Option.getOrThrow(Cause.findErrorOption(exit.cause));
     expect(failure).toBeInstanceOf(NoRelayReachable);
     expect(failure.selfCopy.accepted).toBe(false);
     expect(failure.recipientCopy.acceptedBy).toEqual([]);
@@ -145,10 +147,12 @@ describe("deliverRumorToPeer with order selfFirst", () => {
       "selfFirst",
     );
 
-    assert(Exit.isFailure(exit) && exit.cause._tag === "Fail");
-    expect(exit.cause.error).toBeInstanceOf(RecipientNotReached);
-    expect(exit.cause.error.selfCopy.accepted).toBe(true);
-    expect(exit.cause.error.recipientCopy.accepted).toBe(false);
+    assert(Exit.isFailure(exit));
+    expect(exit.cause.reasons).toHaveLength(1);
+    const failure = Option.getOrThrow(Cause.findErrorOption(exit.cause));
+    expect(failure).toBeInstanceOf(RecipientNotReached);
+    expect(failure.selfCopy.accepted).toBe(true);
+    expect(failure.recipientCopy.accepted).toBe(false);
   });
 });
 

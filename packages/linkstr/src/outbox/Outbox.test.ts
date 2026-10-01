@@ -1,4 +1,4 @@
-import { Chunk, Effect, Either, Layer, Option, Stream } from "effect";
+import { Effect, Layer, Option, Result, Stream } from "effect";
 import { Chat } from "../chat/Chat";
 import {
   ChatMessageReceipt,
@@ -51,12 +51,12 @@ const outboxLayer = (
   store: OutboxStoreService,
   transport: Layer.Layer<NostrTransport>,
 ): Layer.Layer<Outbox> =>
-  Outbox.Default.pipe(
+  Outbox.layer.pipe(
     Layer.provide([
-      Chat.Default,
-      Reactions.Default,
-      PaymentTelemetry.Default,
-      AppMessages.Default,
+      Chat.layer,
+      Reactions.layer,
+      PaymentTelemetry.layer,
+      AppMessages.layer,
       Layer.succeed(OutboxStore, store),
     ]),
     Layer.provide([
@@ -117,7 +117,7 @@ const telemetryDraft = (id: string): PaymentTelemetryDraft =>
 const rumorsForBob = (published: ReadonlyArray<SignedWrapEvent>) =>
   published
     .filter((wrap) => recipientOf(wrap) === bob.pubkey)
-    .map((wrap) => Either.getOrThrow(unwrapToRumor(wrap, bob.secretKey)));
+    .map((wrap) => Result.getOrThrow(unwrapToRumor(wrap, bob.secretKey)));
 
 describe("Outbox", () => {
   it("returns a deterministic rumorId equal to the delivered rumor id", async () => {
@@ -180,7 +180,6 @@ describe("Outbox", () => {
         const results = yield* outbox.results.pipe(
           Stream.take(2),
           Stream.runCollect,
-          Effect.map(Chunk.toReadonlyArray),
         );
         const stored = yield* store.loadAll;
         return { first, second, results, stored };
@@ -299,7 +298,6 @@ describe("Outbox", () => {
         const results = yield* outbox.results.pipe(
           Stream.take(3),
           Stream.runCollect,
-          Effect.map(Chunk.toReadonlyArray),
         );
         return { receipts, results };
       }),
@@ -424,11 +422,7 @@ describe("Outbox", () => {
           bob.pubkey,
           OutboxRef.make("telemetry:2"),
         );
-        return yield* outbox.results.pipe(
-          Stream.take(2),
-          Stream.runCollect,
-          Effect.map(Chunk.toReadonlyArray),
-        );
+        return yield* outbox.results.pipe(Stream.take(2), Stream.runCollect);
       }),
     );
 

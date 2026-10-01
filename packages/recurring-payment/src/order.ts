@@ -31,10 +31,10 @@ export interface RecurringProgress {
   nextDueAtSec: number;
 }
 
-const ProgressJson = Schema.parseJson(
+const ProgressJson = Schema.fromJsonString(
   Schema.Struct({
-    runCount: Schema.NonNegativeInt,
-    nextDueAtSec: Schema.Int.pipe(Schema.positive()),
+    runCount: Schema.Natural,
+    nextDueAtSec: Schema.Int.check(Schema.isGreaterThan(0)),
   }),
 );
 

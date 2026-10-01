@@ -36,62 +36,61 @@ interface Identities {
   readonly storageTransactionsOwnerKey: (index: OwnerLaneIndex) => OwnerKey;
 }
 
-export class IdentityProvider extends Context.Tag("IdentityProvider")<
+export class IdentityProvider extends Context.Service<
   IdentityProvider,
   Identities
->() {
-  static Live: Layer.Layer<
+>()("IdentityProvider", {
+  make: Effect.gen(function* () {
+    const masterSecret = yield* MasterSecretProvider;
+    const root = HDKey.fromMasterSeed(masterSecret);
+
+    const nostrNode = root.derive(NOSTR_PATH);
+    if (!nostrNode.privateKey) {
+      return yield* new IdentityProviderError({
+        message: "Nostr key derivation failed",
+      });
+    }
+    const nostrSigningKey = NostrSecretKey.make(nostrNode.privateKey);
+    const nostrPublicKey = derivePubkey(nostrSigningKey);
+
+    const cashuEntropy = deriveBip85Entropy(root, CASHU_SEED_PATH, 32);
+    const cashuMnemonic = entropyToMnemonic(cashuEntropy, wordlist);
+    const cashuWalletSeed = CashuSeed.make(mnemonicToSeedSync(cashuMnemonic));
+
+    const storageMetaOwnerKey = deriveOwnerKeyAtPath(root, META_OWNER_PATH);
+    const storageIdentityOwnerKey = deriveOwnerKeyAtPath(
+      root,
+      IDENTITY_OWNER_PATH,
+    );
+
+    return {
+      nostrSigningKey,
+      nostrPublicKey,
+      cashuWalletSeed,
+      storageMetaOwnerKey,
+      storageIdentityOwnerKey,
+      storageContactsOwnerKey: (index: OwnerLaneIndex) =>
+        deriveOwnerKeyAtPath(root, contactsOwnerPath(index)),
+      storageCashuOwnerKey: (index: OwnerLaneIndex) =>
+        deriveOwnerKeyAtPath(root, cashuOwnerPath(index)),
+      storageMessagesOwnerKey: (index: OwnerLaneIndex) =>
+        deriveOwnerKeyAtPath(root, messagesOwnerPath(index)),
+      storageTransactionsOwnerKey: (index: OwnerLaneIndex) =>
+        deriveOwnerKeyAtPath(root, transactionsOwnerPath(index)),
+    };
+  }).pipe(
+    Effect.catchDefect(
+      (defect) =>
+        new IdentityProviderError({
+          cause: defect,
+          message: `IdentityProvider initialization failed`,
+        }),
+    ),
+  ),
+}) {
+  static readonly layer: Layer.Layer<
     IdentityProvider,
     IdentityProviderError,
     MasterSecretProvider
-  > = Layer.effect(
-    IdentityProvider,
-    Effect.gen(function* () {
-      const masterSecret = yield* MasterSecretProvider;
-      const root = HDKey.fromMasterSeed(masterSecret);
-
-      const nostrNode = root.derive(NOSTR_PATH);
-      if (!nostrNode.privateKey) {
-        return yield* new IdentityProviderError({
-          message: "Nostr key derivation failed",
-        });
-      }
-      const nostrSigningKey = NostrSecretKey.make(nostrNode.privateKey);
-      const nostrPublicKey = derivePubkey(nostrSigningKey);
-
-      const cashuEntropy = deriveBip85Entropy(root, CASHU_SEED_PATH, 32);
-      const cashuMnemonic = entropyToMnemonic(cashuEntropy, wordlist);
-      const cashuWalletSeed = CashuSeed.make(mnemonicToSeedSync(cashuMnemonic));
-
-      const storageMetaOwnerKey = deriveOwnerKeyAtPath(root, META_OWNER_PATH);
-      const storageIdentityOwnerKey = deriveOwnerKeyAtPath(
-        root,
-        IDENTITY_OWNER_PATH,
-      );
-
-      return {
-        nostrSigningKey,
-        nostrPublicKey,
-        cashuWalletSeed,
-        storageMetaOwnerKey,
-        storageIdentityOwnerKey,
-        storageContactsOwnerKey: (index: OwnerLaneIndex) =>
-          deriveOwnerKeyAtPath(root, contactsOwnerPath(index)),
-        storageCashuOwnerKey: (index: OwnerLaneIndex) =>
-          deriveOwnerKeyAtPath(root, cashuOwnerPath(index)),
-        storageMessagesOwnerKey: (index: OwnerLaneIndex) =>
-          deriveOwnerKeyAtPath(root, messagesOwnerPath(index)),
-        storageTransactionsOwnerKey: (index: OwnerLaneIndex) =>
-          deriveOwnerKeyAtPath(root, transactionsOwnerPath(index)),
-      };
-    }).pipe(
-      Effect.catchAllDefect(
-        (defect) =>
-          new IdentityProviderError({
-            cause: defect,
-            message: `IdentityProvider initialization failed`,
-          }),
-      ),
-    ),
-  );
+  > = Layer.effect(this, this.make);
 }

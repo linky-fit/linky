@@ -131,7 +131,7 @@ export const decodePaymentRequest = (
   };
 };
 
-const PaymentPayload = Schema.parseJson(
+const PaymentPayload = Schema.fromJsonString(
   Schema.Struct({
     id: Schema.optional(Schema.String),
     memo: Schema.optional(Schema.String),

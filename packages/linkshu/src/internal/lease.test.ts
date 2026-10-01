@@ -1,4 +1,5 @@
-import { Deferred, Effect, Exit, Fiber, TestClock, TestContext } from "effect";
+import { Deferred, Effect, Exit, Fiber } from "effect";
+import { TestClock } from "effect/testing";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
 import type { KeyValueStoreService } from "../ports/KeyValueStore";
 import { KeyValueStore } from "../ports/KeyValueStore";
@@ -43,7 +44,7 @@ describe("withKeyLease", () => {
           const holder = yield* Deferred.succeed(entered, undefined).pipe(
             Effect.andThen(Deferred.await(finish)),
             withKeyLease(kv, "k", { ttlMs: 1_000 }),
-            Effect.fork,
+            Effect.forkChild,
           );
           yield* Deferred.await(entered);
           yield* TestClock.adjust("1500 millis");
@@ -52,7 +53,7 @@ describe("withKeyLease", () => {
           yield* Fiber.join(holder);
           const released = yield* kv.tryAcquireLease("k", 1_000);
           return { pastTtl, released };
-        }).pipe(Effect.provide(TestContext.TestContext)),
+        }).pipe(Effect.provide(TestClock.layer())),
       ),
     );
     expect(pastTtl).toBeNull();

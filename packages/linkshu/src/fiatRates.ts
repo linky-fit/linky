@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-const PositiveNumber = Schema.Number.pipe(Schema.finite(), Schema.positive());
+const PositiveNumber = Schema.Finite.check(Schema.isGreaterThan(0));
 export const FiatRates = Schema.Struct({
   brlPerBtc: PositiveNumber,
   chfPerBtc: PositiveNumber,
@@ -12,7 +12,9 @@ export type FiatRates = typeof FiatRates.Type;
 export const FIAT_RATES_CACHE_STORAGE_KEY = "linky.fiat_rates.v1";
 export const FIAT_RATES_TTL_MS = 10 * 60 * 1000;
 export const decodeFiatRates = (raw: string | null): FiatRates | null => {
-  const decoded = Schema.decodeUnknownOption(Schema.parseJson(FiatRates))(raw);
+  const decoded = Schema.decodeUnknownOption(Schema.fromJsonString(FiatRates))(
+    raw,
+  );
   return decoded._tag === "Some" ? decoded.value : null;
 };
 export const isFiatRatesStale = (rates: FiatRates | null): boolean =>

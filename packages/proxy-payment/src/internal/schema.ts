@@ -1,10 +1,12 @@
 import { Schema } from "effect";
 
-export const NonBlankString = Schema.String.pipe(
-  Schema.filter((value) => value.trim() !== ""),
+export const NonBlankString = Schema.String.check(
+  Schema.makeFilter((value) => value.trim() !== ""),
 );
 
-export const PositiveFiniteNumber = Schema.Finite.pipe(Schema.positive());
+export const PositiveFiniteNumber = Schema.Finite.check(
+  Schema.isGreaterThan(0),
+);
 export const isPositiveFiniteNumber = Schema.is(PositiveFiniteNumber);
 
 export const asNonEmptyString = (value: unknown): string | null =>

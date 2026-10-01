@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import { finalizeEvent } from "nostr-tools";
 import { encrypt, getConversationKey } from "nostr-tools/nip44";
 import { createWrap } from "nostr-tools/nip59";
@@ -233,14 +233,14 @@ describe("decodeReactionRumor validation", () => {
       tags: validRumor.tags.map((tag) => (tag[0] === "k" ? ["k", "1"] : tag)),
     });
     expect(decodeReactionRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-reaction"),
+      Result.fail("invalid-reaction"),
     );
   });
 
   it("rejects an empty emoji", () => {
     const rumor = rumorWith({ content: "   " });
     expect(decodeReactionRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-reaction"),
+      Result.fail("invalid-reaction"),
     );
   });
 
@@ -249,21 +249,21 @@ describe("decodeReactionRumor validation", () => {
       tags: validRumor.tags.filter((tag) => tag[0] !== "e"),
     });
     expect(decodeReactionRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-reaction"),
+      Result.fail("invalid-reaction"),
     );
   });
 
   it("rejects a retraction without valid references", () => {
     const rumor = rumorWith({ kind: 5, tags: [["e", "not-hex"]] });
     expect(decodeReactionRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("invalid-retraction"),
+      Result.fail("invalid-retraction"),
     );
   });
 
   it("rejects unsupported kinds", () => {
     const rumor = rumorWith({ kind: 1 });
     expect(decodeReactionRumor(rumor, bob.pubkey)).toEqual(
-      Either.left("unsupported-kind"),
+      Result.fail("unsupported-kind"),
     );
   });
 });

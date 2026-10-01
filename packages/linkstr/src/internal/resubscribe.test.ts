@@ -1,9 +1,10 @@
-import { Clock, Duration, Effect, Fiber, TestClock, TestContext } from "effect";
+import { Clock, Duration, Effect, Fiber } from "effect";
+import { TestClock } from "effect/testing";
 import { describe, expect, it } from "vitest";
 import { resubscribeForever } from "./resubscribe";
 
 const runWithTestClock = <A>(effect: Effect.Effect<A>): Promise<A> =>
-  Effect.runPromise(Effect.provide(effect, TestContext.TestContext));
+  Effect.runPromise(Effect.provide(effect, TestClock.layer()));
 
 const attemptGaps = (startedAt: ReadonlyArray<number>): Array<number> =>
   startedAt.slice(1).map((at, index) => at - (startedAt[index] ?? 0));
@@ -17,7 +18,7 @@ describe("resubscribeForever", () => {
           startedAt.push(yield* Clock.currentTimeMillis);
           return yield* Effect.fail("unreachable");
         });
-        const fiber = yield* Effect.fork(
+        const fiber = yield* Effect.forkChild(
           resubscribeForever(failingAttempt, Duration.millis(100)),
         );
         yield* TestClock.adjust(Duration.seconds(10));
@@ -44,7 +45,7 @@ describe("resubscribeForever", () => {
           startedAt.push(yield* Clock.currentTimeMillis);
           yield* Effect.sleep(healthyUptime);
         });
-        const fiber = yield* Effect.fork(
+        const fiber = yield* Effect.forkChild(
           resubscribeForever(longLivedAttempt, Duration.millis(100)),
         );
         yield* TestClock.adjust(Duration.seconds(10));

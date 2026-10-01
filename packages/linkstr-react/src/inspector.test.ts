@@ -3,7 +3,7 @@ import type { InspectorEvent } from "@linky-fit/linkstr";
 import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
 import { linkstrConfigAtom } from "./config";
-import { Registry } from "./index";
+import { AtomRegistry } from "./index";
 import { inspectorEventsAtom, inspectorHandlerAtom } from "./inspector";
 import { retractReactionAtom } from "./reactions";
 import { configWith, makeIdentity, settle } from "./testing";
@@ -17,7 +17,7 @@ const draft = new RetractionDraft({
   clientId: ClientId.make("client-inspector"),
 });
 
-const retract = async (registry: Registry.Registry) => {
+const retract = async (registry: AtomRegistry.AtomRegistry) => {
   registry.set(retractReactionAtom, draft);
   const exit = await settle(registry, retractReactionAtom);
   assert(Exit.isSuccess(exit));
@@ -25,7 +25,7 @@ const retract = async (registry: Registry.Registry) => {
 
 describe("inspectorEventsAtom", () => {
   it("streams operation and wire events to the sink, linked by wrap ids", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const seen: Array<InspectorEvent> = [];
 
     registry.set(
@@ -57,7 +57,7 @@ describe("inspectorEventsAtom", () => {
   });
 
   it("stays silent when the config does not enable the inspector", async () => {
-    const registry = Registry.make();
+    const registry = AtomRegistry.make();
     const seen: Array<InspectorEvent> = [];
 
     registry.set(

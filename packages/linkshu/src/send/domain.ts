@@ -27,7 +27,7 @@ export class SendDraft extends Schema.Class<SendDraft>("SendDraft")({
    * someone (QR/share, watched until claimed), `pending` for a token
    * travelling out through a messenger the caller confirms separately.
    */
-  produceAs: Schema.Literal("issued", "pending"),
+  produceAs: Schema.Literals(["issued", "pending"]),
   /**
    * Locks the sent proofs to this key (NUT-11 P2PK): only its secret's
    * holder can receive the token. Build it with `parseP2pkPubkey`.
@@ -55,12 +55,12 @@ export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({
   feePaid: NonNegativeAmount,
 }) {}
 
-export const SendError = Schema.Union(
+export const SendError = Schema.Union([
   InsufficientFunds,
   AmountConsumedByFee,
   LockingUnsupported,
   MintUnreachable,
   MintRejected,
   CounterLockTimeout,
-);
+]);
 export type SendError = typeof SendError.Type;

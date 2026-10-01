@@ -11,7 +11,7 @@
       "devDependencies": {
         "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
         "electron": "^44.5.1",
         "electron-builder": "^26.15.3",
         "eslint": "^9.39.1",
@@ -27,7 +27,7 @@
       },
       "dependencies": {
         "@linky-fit/linkshu": "workspace:*",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
       },
       "devDependencies": {
         "@linky-fit/config": "workspace:*",
@@ -54,7 +54,7 @@
         "@capacitor/ios": "^7.4.3",
         "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
         "eslint": "^9.39.1",
         "fflate": "^0.8.3",
         "prettier": "^3.4.2",
@@ -90,7 +90,7 @@
         "@linky-fit/proxy-payment": "workspace:*",
         "@linky-fit/ui": "workspace:*",
         "@noble/hashes": "^2.0.1",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
         "nostr-tools": "^2.25.2",
         "react": "^19.2.3",
         "react-dom": "^19.2.3",
@@ -174,7 +174,7 @@
         "cbor-x": "^1.6.0",
         "core-js": "^3.50.0",
         "dompurify": "^3.4.16",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
         "fflate": "^0.8.3",
         "jsqr": "^1.4.0",
         "nostr-tools": "^2.25.2",
@@ -251,7 +251,7 @@
         "@noble/hashes": "^2.0.1",
         "@scure/bip32": "^2.0.1",
         "@scure/bip39": "^2.0.1",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
         "slip39-ts": "^0.1.13",
       },
       "devDependencies": {
@@ -269,7 +269,7 @@
       "dependencies": {
         "@noble/curves": "^1.9.7",
         "@noble/hashes": "^2.0.1",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
       },
       "devDependencies": {
         "@linky-fit/config": "workspace:*",
@@ -305,7 +305,7 @@
         "@noble/hashes": "^2.0.1",
         "@scure/base": "^2.0.0",
         "cbor-x": "^1.6.0",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
         "light-bolt11-decoder": "^3.2.0",
       },
       "devDependencies": {
@@ -328,7 +328,7 @@
         "@linky-fit/linkauth": "workspace:*",
         "@noble/curves": "^1.4.1",
         "@noble/hashes": "^2.0.1",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
         "nostr-tools": "^2.25.2",
       },
       "devDependencies": {
@@ -351,9 +351,9 @@
       "name": "@linky-fit/linkstr-react",
       "version": "0.1.0",
       "dependencies": {
-        "@effect-atom/atom-react": "^0.5.0",
+        "@effect/atom-react": "4.0.2",
         "@linky-fit/linkstr": "workspace:*",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
       },
       "devDependencies": {
         "@linky-fit/config": "workspace:*",
@@ -378,7 +378,7 @@
         "@linky-fit/domain": "workspace:*",
         "@linky-fit/linkshu": "workspace:*",
         "@linky-fit/linkstr": "workspace:*",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
       },
       "devDependencies": {
         "@linky-fit/config": "workspace:*",
@@ -403,7 +403,7 @@
       "dependencies": {
         "@linky-fit/linkstr": "workspace:*",
         "bysquare": "^4.0.0",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
       },
       "devDependencies": {
         "@linky-fit/config": "workspace:*",
@@ -420,7 +420,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@linky-fit/domain": "workspace:*",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
       },
       "devDependencies": {
         "@linky-fit/config": "workspace:*",
@@ -480,7 +480,7 @@
         "@evolu/react-web": "2.4.0",
         "@linky-fit/identity": "workspace:*",
         "@noble/hashes": "^2.0.1",
-        "effect": "^3.19.19",
+        "effect": "^4.0.0",
         "nostr-tools": "^2.25.2",
         "react": "^19.2.3",
         "react-dom": "^19.2.3",
@@ -781,15 +781,7 @@
 
     "@csstools/css-tokenizer": ["@csstools/css-tokenizer@4.0.0", "", {}, "sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA=="],
 
-    "@effect-atom/atom": ["@effect-atom/atom@0.5.3", "", { "peerDependencies": { "@effect/experimental": "^0.58.0", "@effect/platform": "^0.94.2", "@effect/rpc": "^0.73.0", "effect": "^3.19.15" } }, "sha512-TRZv/i+YT3TtnN0oFORJqXdxSs1fc7lrJlH+1xZvDFyjC9hgoVnrcKbeZsDFmr6r0wYRqVo7U3IftxiQNjpNZA=="],
-
-    "@effect-atom/atom-react": ["@effect-atom/atom-react@0.5.0", "", { "dependencies": { "@effect-atom/atom": "^0.5.0" }, "peerDependencies": { "effect": "^3.19", "react": ">=18 <20", "scheduler": "*" } }, "sha512-aFfjWi4rEJCqfM12Oi36/EKaDm/W6n4/N6yM5vL0t/QozKhJhK05rQL/GY4XMxlH2eqkQ4ih8jBQa3Yyp0Fiqw=="],
-
-    "@effect/experimental": ["@effect/experimental@0.58.0", "", { "dependencies": { "uuid": "^11.0.3" }, "peerDependencies": { "@effect/platform": "^0.94.0", "effect": "^3.19.13", "ioredis": "^5", "lmdb": "^3" }, "optionalPeers": ["ioredis", "lmdb"] }, "sha512-IEP9sapjF6rFy5TkoqDPc86st/fnqUfjT7Xa3pWJrFGr1hzaMXHo+mWsYOZS9LAOVKnpHuVziDK97EP5qsCHVA=="],
-
-    "@effect/platform": ["@effect/platform@0.94.5", "", { "dependencies": { "find-my-way-ts": "^0.1.6", "msgpackr": "^1.11.4", "multipasta": "^0.2.7" }, "peerDependencies": { "effect": "^3.19.17" } }, "sha512-z05APUiDDPbodhTkH/RJqOLoCU11bU2IZLfcwLFrld03+ob1VeqRnELQlmueLIYm6NZifHAtjl32V+GRt34y4A=="],
-
-    "@effect/rpc": ["@effect/rpc@0.73.2", "", { "dependencies": { "msgpackr": "^1.11.4" }, "peerDependencies": { "@effect/platform": "^0.94.5", "effect": "^3.19.18" } }, "sha512-td7LHDgBOYKg+VgGWEelD8rSAmvjXz7am17vfxZROX5qIYuvH7drL/z4p5xQFadhHZ7DYdlFpqdO9ggc77OCIw=="],
+    "@effect/atom-react": ["@effect/atom-react@4.0.2", "", { "peerDependencies": { "effect": "^4.0.2", "react": ">=19.0.0 <20.0.0", "scheduler": ">=0.25.0 <0.28.0" } }, "sha512-rg9xnPHzjURhKhOm+bKnYitPPQC02m6R7ZmJLNdxtrNCgDQ9fSOPqZHN5W/GzUw+OsvplKSvaBe/JSQejeYKYA=="],
 
     "@electron-internal/extract-zip": ["@electron-internal/extract-zip@1.0.5", "", {}, "sha512-+bqFCP98pLI0Tt0XQo1TmlXtwjWchISndDOxCkEcIuUgXWpBnLyRI+2DU+mesvnMMX6L1XDqYNA0lXNDHd/yiA=="],
 
@@ -1995,7 +1987,7 @@
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
 
-    "effect": ["effect@3.19.19", "", { "dependencies": { "@standard-schema/spec": "^1.0.0", "fast-check": "^3.23.1" } }, "sha512-Yc8U/SVXo2dHnaP7zNBlAo83h/nzSJpi7vph6Hzyl4ulgMBIgPmz3UzOjb9sBgpFE00gC0iETR244sfXDNLHRg=="],
+    "effect": ["effect@4.0.2", "", {}, "sha512-YeYnLqSFrL4+tCOXRrfNP03w8FILoF/wDl+ukraJAGzXrjcS383W7LAAvGBbLatEyktmLxRq+9xJinx7QzXW5A=="],
 
     "ejs": ["ejs@3.1.10", "", { "dependencies": { "jake": "^10.8.5" }, "bin": { "ejs": "bin/cli.js" } }, "sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA=="],
 
@@ -2111,8 +2103,6 @@
 
     "farmhash-modern": ["farmhash-modern@1.1.0", "", {}, "sha512-6ypT4XfgqJk/F3Yuv4SX26I3doUjt0GTG4a+JgWxXQpxXzTBq8fPUeGHfcYMMDPHJHm3yPOSjaeBwBGAHWXCdA=="],
 
-    "fast-check": ["fast-check@3.23.2", "", { "dependencies": { "pure-rand": "^6.1.0" } }, "sha512-h5+1OzzfCC3Ef7VbtKdcv7zsstUQwUDlYpUTvjeUsJAssPgLn7QzbboPtL5ro04Mq0rPOsMzl7q5hIbRs2wD1A=="],
-
     "fast-deep-equal": ["fast-deep-equal@3.1.3", "", {}, "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q=="],
 
     "fast-json-stable-stringify": ["fast-json-stable-stringify@2.1.0", "", {}, "sha512-lhd/wF+Lk98HZoTCtlVraHtfh5XYijIjalXck7saUtuanSDyLMxnHhSXEDJqHxD7msR8D0uCmqlkwjCV8xvwHw=="],
@@ -2152,8 +2142,6 @@
     "fill-range": ["fill-range@7.1.1", "", { "dependencies": { "to-regex-range": "^5.0.1" } }, "sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg=="],
 
     "finalhandler": ["finalhandler@1.1.2", "", { "dependencies": { "debug": "2.6.9", "encodeurl": "~1.0.2", "escape-html": "~1.0.3", "on-finished": "~2.3.0", "parseurl": "~1.3.3", "statuses": "~1.5.0", "unpipe": "~1.0.0" } }, "sha512-aAWcW57uxVNrQZqFXjITpW3sIUQmHGG3qSb9mUah9MgMC4NeWhNOlNjXEYq3HjRAvL6arUviZGGJsBg6z0zsWA=="],
-
-    "find-my-way-ts": ["find-my-way-ts@0.1.6", "", {}, "sha512-a85L9ZoXtNAey3Y6Z+eBWW658kO/MwR7zIafkIUPUMf3isZG0NCs2pjW2wtjxAKuJPxMAsHUIP4ZPGv0o5gyTA=="],
 
     "find-up": ["find-up@5.0.0", "", { "dependencies": { "locate-path": "^6.0.0", "path-exists": "^4.0.0" } }, "sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng=="],
 
@@ -2603,8 +2591,6 @@
 
     "msgpackr-extract": ["msgpackr-extract@3.0.3", "", { "dependencies": { "node-gyp-build-optional-packages": "5.2.2" }, "optionalDependencies": { "@msgpackr-extract/msgpackr-extract-darwin-arm64": "3.0.3", "@msgpackr-extract/msgpackr-extract-darwin-x64": "3.0.3", "@msgpackr-extract/msgpackr-extract-linux-arm": "3.0.3", "@msgpackr-extract/msgpackr-extract-linux-arm64": "3.0.3", "@msgpackr-extract/msgpackr-extract-linux-x64": "3.0.3", "@msgpackr-extract/msgpackr-extract-win32-x64": "3.0.3" }, "bin": { "download-msgpackr-prebuilds": "bin/download-prebuilds.js" } }, "sha512-P0efT1C9jIdVRefqjzOQ9Xml57zpOXnIuS+csaB4MdZbTdmGDLo8XhzBG1N7aO11gKDDkJvBLULeFTo46wwreA=="],
 
-    "multipasta": ["multipasta@0.2.8", "", {}, "sha512-ZPWuMKyv0cSO29f7hozp+k6+crZbQijV8ipMvxNxRf2SwtYGTX1ZX89Kd20VV4H9Znonx+EQn+iy1wGQsJ+b+Q=="],
-
     "multitars": ["multitars@1.0.2", "", {}, "sha512-6GwVw5eLi9sThdtlS4PKwC7yRLaf45pYhIEzKBHdKxi+YOXGKFX8acIniH+Uh/+k9mS2lQOupTccjoe5r0/1IQ=="],
 
     "nanoid": ["nanoid@3.3.11", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w=="],
@@ -2768,8 +2754,6 @@
     "pump": ["pump@3.0.4", "", { "dependencies": { "end-of-stream": "^1.1.0", "once": "^1.3.1" } }, "sha512-VS7sjc6KR7e1ukRFhQSY5LM2uBWAUPiOPa/A3mkKmiMwSmRFUITt0xuj+/lesgnCv+dPIEYlkzrcyXgquIHMcA=="],
 
     "punycode": ["punycode@2.3.1", "", {}, "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="],
-
-    "pure-rand": ["pure-rand@6.1.0", "", {}, "sha512-bVWawvoZoBYpp6yIoQtQXHZjmz35RSVHnUOTefl8Vcjr8snTPY1wnpSPMWekcFwbxI6gtmT7rSYPFvz71ldiOA=="],
 
     "pvtsutils": ["pvtsutils@1.3.6", "", { "dependencies": { "tslib": "^2.8.1" } }, "sha512-PLgQXQ6H2FWCaeRak8vvk1GW462lMxB5s3Jm673N82zI4vqtVUPuZdffdZbPDFRoU8kAhItWFtPCWiPpp4/EDg=="],
 

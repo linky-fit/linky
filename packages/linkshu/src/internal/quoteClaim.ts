@@ -3,7 +3,7 @@ import type {
   MintQuoteBolt11Response,
   Proof as CashuProof,
 } from "@cashu/cashu-ts";
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import { MintRejected } from "../domain/errors";
 import type { CounterLockTimeout, MintUnreachable } from "../domain/errors";
 import type {
@@ -260,7 +260,7 @@ export const claimMintQuote = <R extends ClaimableQuote>(
           "used",
         );
 
-        const outcome = yield* Effect.either(
+        const outcome = yield* Effect.result(
           Effect.tryPromise({
             try: () =>
               ctx.wallet.mintProofsBolt11(
@@ -272,10 +272,10 @@ export const claimMintQuote = <R extends ClaimableQuote>(
             catch: (error): unknown => error,
           }),
         );
-        if (Either.isRight(outcome)) {
-          return yield* persistMinted(ctx, record, outcome.right);
+        if (Result.isSuccess(outcome)) {
+          return yield* persistMinted(ctx, record, outcome.success);
         }
-        const raw = outcome.left;
+        const raw = outcome.failure;
         if (!isRecoverableOutputCollision(raw)) {
           return yield* Effect.fail(classifyMintError(record.mint, raw));
         }

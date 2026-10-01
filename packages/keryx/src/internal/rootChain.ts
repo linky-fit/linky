@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import type { Fetch } from "../domain";
 import { KeryxMetadataInvalid } from "../errors";
 import type { KeryxFetchFailed } from "../errors";
@@ -32,8 +32,8 @@ interface DecodedRoot {
 
 const decodeRoot = (
   bytes: Uint8Array,
-): Either.Either<DecodedRoot, KeryxMetadataInvalid> =>
-  Either.gen(function* () {
+): Result.Result<DecodedRoot, KeryxMetadataInvalid> =>
+  Result.gen(function* () {
     const envelope = yield* parseEnvelope("root", bytes);
     const signed = yield* decodeSigned("root", RootSigned, envelope.signed);
     const root = {
@@ -57,16 +57,16 @@ const signedBy = (
 /** A root from storage: it was verified when it was pinned. */
 export const parseTrustedRoot = (
   json: string,
-): Either.Either<TrustedRoot, KeryxMetadataInvalid> =>
+): Result.Result<TrustedRoot, KeryxMetadataInvalid> =>
   decodeRoot(new TextEncoder().encode(json)).pipe(
-    Either.map(({ root }) => root),
+    Result.map(({ root }) => root),
   );
 
 const decodeSelfSignedRoot = (
   bytes: Uint8Array,
-): Either.Either<DecodedRoot, KeryxMetadataInvalid> =>
+): Result.Result<DecodedRoot, KeryxMetadataInvalid> =>
   decodeRoot(bytes).pipe(
-    Either.filterOrLeft(
+    Result.filterOrFail(
       (decoded) => signedBy(decoded.root, decoded),
       () =>
         new KeryxMetadataInvalid({
@@ -79,8 +79,8 @@ const decodeSelfSignedRoot = (
 /** TOFU: the anchor's root is trusted by location, but must still sign itself. */
 export const parseAnchorRoot = (
   bytes: Uint8Array,
-): Either.Either<TrustedRoot, KeryxMetadataInvalid> =>
-  decodeSelfSignedRoot(bytes).pipe(Either.map(({ root }) => root));
+): Result.Result<TrustedRoot, KeryxMetadataInvalid> =>
+  decodeSelfSignedRoot(bytes).pipe(Result.map(({ root }) => root));
 
 type RootStep =
   | { readonly _tag: "Chained"; readonly root: TrustedRoot }
@@ -90,8 +90,8 @@ type RootStep =
 const nextRoot = (
   trusted: TrustedRoot,
   bytes: Uint8Array,
-): Either.Either<RootStep, KeryxMetadataInvalid> =>
-  Either.gen(function* () {
+): Result.Result<RootStep, KeryxMetadataInvalid> =>
+  Result.gen(function* () {
     const decoded = yield* decodeSelfSignedRoot(bytes);
     const candidate = decoded.root;
     if (!signedBy(trusted, decoded)) {
@@ -102,7 +102,7 @@ const nextRoot = (
     }
     const expected = trusted.signed.version + 1;
     if (candidate.signed.version !== expected) {
-      return yield* Either.left(
+      return yield* Result.fail(
         new KeryxMetadataInvalid({
           role: "root",
           reason: `${expected}.root.json carries version ${candidate.signed.version}`,
@@ -146,24 +146,24 @@ export const walkRootChain = (options: {
     let missingLink: KeryxFetchFailed | undefined;
     for (let step = 0; step < MAX_ROOT_ROTATIONS; step++) {
       const next = `${root.signed.version + 1}.root.json`;
-      const fetched = yield* Effect.either(
+      const fetched = yield* Effect.result(
         fetchBytes(
           options.fetch,
           anchorUrl(options.origin, next),
           MAX_ROOT_BYTES,
         ),
       );
-      if (Either.isLeft(fetched)) {
-        if (isMissing(fetched.left)) missingLink = fetched.left;
+      if (Result.isFailure(fetched)) {
+        if (isMissing(fetched.failure)) missingLink = fetched.failure;
         if (missingLink !== undefined || !options.pairing) break;
-        return yield* fetched.left;
+        return yield* fetched.failure;
       }
-      const verified = nextRoot(root, fetched.right);
-      if (Either.isLeft(verified)) {
+      const verified = nextRoot(root, fetched.success);
+      if (Result.isFailure(verified)) {
         if (!options.pairing) break;
-        return yield* verified.left;
+        return yield* verified.failure;
       }
-      if (verified.right._tag === "Unchainable") {
+      if (verified.success._tag === "Unchainable") {
         if (options.pairing) {
           return yield* new KeryxMetadataInvalid({
             role: "root",
@@ -172,27 +172,27 @@ export const walkRootChain = (options: {
         }
         return {
           _tag: "Suspended",
-          rootVersion: verified.right.version,
+          rootVersion: verified.success.version,
           reason: `${next} is validly signed but not by the pinned root keys`,
         };
       }
-      root = verified.right.root;
+      root = verified.success.root;
     }
     if (options.pairing) return { _tag: "Trusted", root };
-    const anchor = yield* Effect.either(
+    const anchor = yield* Effect.result(
       fetchBytes(
         options.fetch,
         anchorUrl(options.origin, "root.json"),
         MAX_ROOT_BYTES,
       ),
     );
-    if (Either.isLeft(anchor)) return { _tag: "Trusted", root };
-    const current = parseAnchorRoot(anchor.right);
-    if (Either.isLeft(current)) return { _tag: "Trusted", root };
-    const version = current.right.signed.version;
+    if (Result.isFailure(anchor)) return { _tag: "Trusted", root };
+    const current = parseAnchorRoot(anchor.success);
+    if (Result.isFailure(current)) return { _tag: "Trusted", root };
+    const version = current.success.signed.version;
     if (
       version === root.signed.version &&
-      !sameBytes(current.right.message, root.message)
+      !sameBytes(current.success.message, root.message)
     ) {
       return {
         _tag: "Suspended",
@@ -206,10 +206,10 @@ export const walkRootChain = (options: {
     // A CDN may still serve a cached 404 for a published `N.root.json`, so a
     // newer root whose chain cannot be walked yet is unavailable, not unchainable.
     if (version > root.signed.version + 1) return yield* missingLink;
-    const step = nextRoot(root, anchor.right);
-    if (Either.isLeft(step)) return { _tag: "Trusted", root };
-    if (step.right._tag === "Chained") {
-      return { _tag: "Trusted", root: step.right.root };
+    const step = nextRoot(root, anchor.success);
+    if (Result.isFailure(step)) return { _tag: "Trusted", root };
+    if (step.success._tag === "Chained") {
+      return { _tag: "Trusted", root: step.success.root };
     }
     return {
       _tag: "Suspended",
@@ -223,5 +223,5 @@ export const fetchAnchorRoot = (
   origin: string,
 ): Effect.Effect<TrustedRoot, KeryxFetchFailed | KeryxMetadataInvalid> =>
   fetchBytes(fetch, anchorUrl(origin, "root.json"), MAX_ROOT_BYTES).pipe(
-    Effect.flatMap(parseAnchorRoot),
+    Effect.flatMap((bytes) => Effect.fromResult(parseAnchorRoot(bytes))),
   );

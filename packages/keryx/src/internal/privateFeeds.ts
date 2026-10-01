@@ -1,4 +1,4 @@
-import { Effect, Either, Option, Schema } from "effect";
+import { Effect, Option, Result, Schema } from "effect";
 import type {
   Announcement,
   Fetch,
@@ -119,15 +119,15 @@ const verifyDocument = (
   bytes: Uint8Array,
   url: string,
   pattern: AuthorizedPattern,
-): Either.Either<Verified, string> =>
-  Either.gen(function* () {
+): Result.Result<Verified, string> =>
+  Result.gen(function* () {
     const raw = yield* asObject(parseJsonBytes(bytes));
     if (raw["v"] !== 1)
-      return yield* Either.left(`unknown v ${String(raw["v"])}`);
+      return yield* Result.fail(`unknown v ${String(raw["v"])}`);
     const document = yield* decodeWith(PrivateFeedDocument, raw);
     yield* checkDocumentSignatures(raw, document.sig, pattern.authority);
     if (document.channel !== pattern.info.channel) {
-      return yield* Either.left("channel differs from the authorizing pattern");
+      return yield* Result.fail("channel differs from the authorizing pattern");
     }
     const bound = parseKeryxUrl(document.url);
     const fetched = new URL(url);
@@ -136,17 +136,17 @@ const verifyDocument = (
       bound.origin !== fetched.origin ||
       bound.pathname !== fetched.pathname
     ) {
-      return yield* Either.left("signed url differs from the fetched URL");
+      return yield* Result.fail("signed url differs from the fetched URL");
     }
     const items = document.items.map((item, index) =>
       decodeWith(ItemFields, item).pipe(
-        Either.flatMap((fields) =>
+        Result.flatMap((fields) =>
           announcementOf(fields, {
             channel: document.channel,
             privateFeedUrl: url,
           }),
         ),
-        Either.mapLeft(
+        Result.mapError(
           (reason): ItemProblem => ({
             path: `${url}#${index}`,
             reason,
@@ -158,10 +158,10 @@ const verifyDocument = (
     return {
       document,
       announcements: items.flatMap((item) =>
-        Either.getRight(item).pipe(Option.toArray),
+        Result.getSuccess(item).pipe(Option.toArray),
       ),
       problems: items.flatMap((item) =>
-        Either.getLeft(item).pipe(Option.toArray),
+        Result.getFailure(item).pipe(Option.toArray),
       ),
     };
   });
@@ -196,19 +196,19 @@ export const syncPrivateFeed = (options: {
       });
     }
     const info = pattern.info;
-    const fetched = yield* Effect.either(
+    const fetched = yield* Effect.result(
       fetchBytes(options.fetch, new URL(state.url), MAX_DOCUMENT_BYTES),
     );
-    if (Either.isLeft(fetched)) {
-      return isMissing(fetched.left)
+    if (Result.isFailure(fetched)) {
+      return isMissing(fetched.failure)
         ? keep({ status: "closed", info, state: { ...state, closed: true } })
-        : keep({ status: "unavailable", info, reason: fetched.left.reason });
+        : keep({ status: "unavailable", info, reason: fetched.failure.reason });
     }
-    const verified = verifyDocument(fetched.right, state.url, pattern);
-    if (Either.isLeft(verified)) {
-      return keep({ status: "unavailable", info, reason: verified.left });
+    const verified = verifyDocument(fetched.success, state.url, pattern);
+    if (Result.isFailure(verified)) {
+      return keep({ status: "unavailable", info, reason: verified.failure });
     }
-    const { document, announcements, problems } = verified.right;
+    const { document, announcements, problems } = verified.success;
     if (state.version !== undefined && document.version < state.version) {
       return keep({
         status: "unavailable",

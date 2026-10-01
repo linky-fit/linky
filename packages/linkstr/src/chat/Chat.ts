@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { NoRelayReachable, RecipientNotReached } from "../domain/errors";
 import { makeWrapSendContext, sendToPeer } from "../internal/wrapSend";
 import type { PeerSendOutcome } from "../internal/wrapSend";
@@ -20,8 +20,8 @@ import {
 const chatReceipt = (outcome: PeerSendOutcome): ChatMessageReceipt =>
   new ChatMessageReceipt(outcome);
 
-export class Chat extends Effect.Service<Chat>()("linkstr/Chat", {
-  effect: Effect.gen(function* () {
+export class Chat extends Context.Service<Chat>()("linkstr/Chat", {
+  make: Effect.gen(function* () {
     const context = yield* makeWrapSendContext;
 
     const sendText = (
@@ -74,4 +74,6 @@ export class Chat extends Effect.Service<Chat>()("linkstr/Chat", {
 
     return { sendText, sendImage, sendToken, edit } as const;
   }),
-}) {}
+}) {
+  static readonly layer = Layer.effect(this, this.make);
+}

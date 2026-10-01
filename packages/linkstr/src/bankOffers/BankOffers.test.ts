@@ -1,4 +1,4 @@
-import { Effect, Either, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Result } from "effect";
 import { ClientId, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { unwrapToRumor } from "../internal/giftWrap";
 import type { SignedWrapEvent } from "../internal/nostrEvent";
@@ -36,7 +36,7 @@ const runWith = <A, E>(
   );
   return Effect.runPromiseExit(
     program.pipe(
-      Effect.provide(BankOffers.Default.pipe(Layer.provide(dependencies))),
+      Effect.provide(BankOffers.layer.pipe(Layer.provide(dependencies))),
     ),
   );
 };
@@ -82,7 +82,7 @@ describe("BankOffers.send", () => {
     );
     const recipientWrap = published[0];
     assert(recipientWrap !== undefined);
-    const rumor = Either.getOrThrow(
+    const rumor = Result.getOrThrow(
       unwrapToRumor(recipientWrap, bob.secretKey),
     );
     expect(exit.value.rumorId).toBe(rumor.id);
@@ -116,7 +116,7 @@ describe("BankOffers.send", () => {
       (wrap) => recipientOf(wrap) === bob.pubkey,
     );
     assert(recipientWrap !== undefined);
-    const rumor = Either.getOrThrow(
+    const rumor = Result.getOrThrow(
       unwrapToRumor(recipientWrap, bob.secretKey),
     );
     expect(rumor.created_at).toBe(sentAt);

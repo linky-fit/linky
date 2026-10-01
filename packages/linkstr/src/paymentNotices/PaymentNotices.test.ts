@@ -1,4 +1,4 @@
-import { Effect, Either, Exit, Layer } from "effect";
+import { Effect, Exit, Layer, Result } from "effect";
 import { ClientId, RelayUrl } from "../domain/primitives";
 import {
   LINKY_PUSH_MARKER_TAG,
@@ -33,7 +33,7 @@ const runWith = <A, E>(
   );
   return Effect.runPromiseExit(
     program.pipe(
-      Effect.provide(PaymentNotices.Default.pipe(Layer.provide(dependencies))),
+      Effect.provide(PaymentNotices.layer.pipe(Layer.provide(dependencies))),
     ),
   );
 };
@@ -67,7 +67,7 @@ describe("PaymentNotices.send", () => {
     ]);
     expect(wrap.created_at).toBeLessThanOrEqual(Math.ceil(Date.now() / 1000));
 
-    const rumor = Either.getOrThrow(unwrapToRumor(wrap, bob.secretKey));
+    const rumor = Result.getOrThrow(unwrapToRumor(wrap, bob.secretKey));
     expect(rumor.kind).toBe(24133);
     expect(rumor.content).toBe("payment_notice");
     expect(rumor.tags).toEqual([

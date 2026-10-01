@@ -16,5 +16,5 @@ export class AppMessageReceived extends Schema.TaggedClass<AppMessageReceived>()
   },
 ) {}
 
-export const AppMessageInboxEvent = Schema.Union(AppMessageReceived);
+export const AppMessageInboxEvent = Schema.Union([AppMessageReceived]);
 export type AppMessageInboxEvent = typeof AppMessageInboxEvent.Type;

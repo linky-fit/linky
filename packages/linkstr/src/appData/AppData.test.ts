@@ -1,4 +1,4 @@
-import { Chunk, Effect, Exit, Layer, Stream } from "effect";
+import { Effect, Exit, Layer, Stream } from "effect";
 import type { Scope } from "effect";
 import { RelayUrl, UnixSeconds } from "../domain/primitives";
 import { signPlainEvent } from "../internal/plainEvent";
@@ -24,7 +24,7 @@ const runWith = <A, E>(
     Effect.scoped(
       program.pipe(
         Effect.provide(
-          AppData.Default.pipe(
+          AppData.layer.pipe(
             Layer.provide(
               Layer.mergeAll(
                 LinkstrIdentity.fromSecretKey(device.secretKey),
@@ -154,7 +154,7 @@ describe("AppData.watch", () => {
     );
 
     assert(Exit.isSuccess(exit));
-    expect(Chunk.toArray(exit.value).map((event) => event.content)).toEqual([
+    expect(exit.value.map((event) => event.content)).toEqual([
       "first",
       "second",
     ]);

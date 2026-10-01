@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import {
   Amount,
   Bolt11Invoice,
@@ -64,7 +64,9 @@ const LegacyPendingTopup = Schema.Struct({
   expiresAt: Schema.NullOr(UnixSeconds),
   createdAt: UnixSeconds,
   mintCounter: Schema.NullOr(Schema.Int),
-  locked: Schema.optionalWith(Schema.Boolean, { default: () => false }),
+  locked: Schema.Boolean.pipe(
+    Schema.withDecodingDefaultType(Effect.succeed(false)),
+  ),
 });
 const decodeLegacy = legacyDecoder(LegacyPendingTopup);
 

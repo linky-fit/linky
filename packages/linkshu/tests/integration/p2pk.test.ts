@@ -56,7 +56,7 @@ describe("P2PK-locked tokens against the local mint", () => {
       Effect.gen(function* () {
         const receive = yield* Receive;
         const draft = new ReceiveDraft({ text: sent.tokenText });
-        const withoutKey = yield* Effect.either(receive.receive(draft));
+        const withoutKey = yield* Effect.result(receive.receive(draft));
         const received = yield* receive.receive(draft, {
           unlockingKey: ownerKey,
         });
@@ -64,8 +64,8 @@ describe("P2PK-locked tokens against the local mint", () => {
       }),
     );
 
-    assert(outcome.withoutKey._tag === "Left");
-    expect(outcome.withoutKey.left._tag).toBe("TokenLocked");
+    assert(outcome.withoutKey._tag === "Failure");
+    expect(outcome.withoutKey.failure._tag).toBe("TokenLocked");
     expect(outcome.received.amount).toBe(8 - inputFee(sent.proofs.length));
   });
 });

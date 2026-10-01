@@ -1,4 +1,4 @@
-import { Effect, Either, Exit, Layer, Option, Schema } from "effect";
+import { Effect, Exit, Layer, Option, Result, Schema } from "effect";
 import { ClientId, RelayUrl, RumorId, UnixSeconds } from "../domain/primitives";
 import { decodeWrapEvent } from "../inbox/decodeWrapEvent";
 import {
@@ -37,7 +37,7 @@ const runWith = <A, E>(
   Effect.runPromiseExit(
     program.pipe(
       Effect.provide(
-        AppMessages.Default.pipe(
+        AppMessages.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
               LinkstrIdentity.fromSecretKey(alice.secretKey),
@@ -74,7 +74,7 @@ describe("AppMessages.send", () => {
     expect(recipientOf(wrap)).toBe(bob.pubkey);
     expect(hasPushMarker(wrap)).toBe(false);
 
-    const rumor = Either.getOrThrow(unwrapToRumor(wrap, bob.secretKey));
+    const rumor = Result.getOrThrow(unwrapToRumor(wrap, bob.secretKey));
     expect(rumor.id).toBe(exit.value.rumorId);
     expect(rumor.kind).toBe(24137);
     expect(rumor.tags).toEqual([

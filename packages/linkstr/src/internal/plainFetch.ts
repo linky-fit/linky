@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 import type { Duration } from "effect";
 import type { Filter } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
@@ -16,7 +16,7 @@ export interface PlainFetchOptions {
    * The transport's own worst case is the connection timeout plus the EOSE
    * timeout (~11s), so this trims the reachable-but-silent tail.
    */
-  readonly perRelayTimeout?: Duration.DurationInput;
+  readonly perRelayTimeout?: Duration.Input;
 }
 
 export interface RawAnswers {
@@ -42,27 +42,29 @@ export const fetchRawEvents = (
       perRelayTimeout === undefined
         ? transport.fetch(relay, filter)
         : transport.fetch(relay, filter).pipe(
-            Effect.timeoutFail({
+            Effect.timeoutOrElse({
               duration: perRelayTimeout,
-              onTimeout: () =>
-                new RelayUnreachable({ relay, detail: "fetch timed out" }),
+              orElse: () =>
+                Effect.fail(
+                  new RelayUnreachable({ relay, detail: "fetch timed out" }),
+                ),
             }),
           );
     const outcomes = yield* Effect.forEach(
       relays,
-      (relay) => Effect.either(fetchOne(relay)),
+      (relay) => Effect.result(fetchOne(relay)),
       { concurrency: "unbounded" },
     );
     const failures = outcomes
-      .filter(Either.isLeft)
+      .filter(Result.isFailure)
       .map(
-        ({ left }) =>
-          new RelayRejection({ relay: left.relay, detail: left.detail }),
+        ({ failure }) =>
+          new RelayRejection({ relay: failure.relay, detail: failure.detail }),
       );
-    const answered = outcomes.filter(Either.isRight);
+    const answered = outcomes.filter(Result.isSuccess);
     if (answered.length === 0)
       return yield* new AllRelaysUnreachable({ failures });
-    return { events: answered.flatMap(({ right }) => right), failures };
+    return { events: answered.flatMap(({ success }) => success), failures };
   });
 
 /** Malformed or forged events dropped, newest first so callers pick a winner with `find`. */
@@ -71,9 +73,9 @@ export const toPlainEvents = (
 ): Array<SignedPlainEvent> =>
   raws
     .flatMap((raw) =>
-      Either.match(decodeVerifiedPlainEvent(raw), {
-        onLeft: () => [],
-        onRight: (event) => [event],
+      Result.match(decodeVerifiedPlainEvent(raw), {
+        onFailure: () => [],
+        onSuccess: (event) => [event],
       }),
     )
     .sort((a, b) => b.created_at - a.created_at);

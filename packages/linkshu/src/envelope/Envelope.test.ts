@@ -14,7 +14,8 @@ import {
   pointFromHex,
   serializeMintKeys,
 } from "@cashu/cashu-ts";
-import { Effect, Layer, Struct, TestContext } from "effect";
+import { Effect, Layer, Struct } from "effect";
+import { TestClock } from "effect/testing";
 import { MintUnreachable } from "../domain/errors";
 import {
   Amount,
@@ -237,14 +238,14 @@ const makeDevice = (
   const { wallet, calls, network } = deviceWallet(fakeMint, args);
   const inspector = recordingInspector();
   const layer = Layer.mergeAll(
-    Envelope.DefaultWithoutDependencies,
-    Melt.DefaultWithoutDependencies,
+    Envelope.layerWithoutDependencies,
+    Melt.layerWithoutDependencies,
   ).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({
+          WalletInstances.of({
             get: (requested) =>
               requested === mint
                 ? Effect.succeed(wallet)
@@ -323,14 +324,14 @@ const syncInto = (
       yield* Effect.forEach(synced.operations ?? [], operations.insert);
       yield* (yield* ProofStore).insert(
         (synced.proofs ?? []).map(
-          (entry) => new NewProof(Struct.omit(entry, "id", "createdAt")),
+          (entry) => new NewProof(Struct.omit(entry, ["id", "createdAt"])),
         ),
       );
     }),
   );
 
 const asNew = (operation: StoredOperation) =>
-  new NewOperation(Struct.omit(operation, "id"));
+  new NewOperation(Struct.omit(operation, ["id"]));
 
 const stateOfSecret = (
   proofs: ReadonlyArray<{ secret: string; state: ProofState }>,
@@ -484,7 +485,7 @@ describe("Envelope.open", () => {
 
     const error = await device.run(
       Effect.gen(function* () {
-        yield* Effect.fork(
+        yield* Effect.forkChild(
           withEnvelopeLease(yield* KeyValueStore, ref)(Effect.never),
         );
         return yield* runOnTestClock(
@@ -497,7 +498,7 @@ describe("Envelope.open", () => {
           ),
           "5 seconds",
         );
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     expect(error).toMatchObject({ _tag: "EnvelopeBusy", mint, key });
@@ -668,7 +669,7 @@ describe("Envelope.send", () => {
 
     const error = await device.run(
       Effect.gen(function* () {
-        yield* Effect.fork(
+        yield* Effect.forkChild(
           withEnvelopeLease(yield* KeyValueStore, ref)(Effect.never),
         );
         return yield* runOnTestClock(
@@ -677,7 +678,7 @@ describe("Envelope.send", () => {
           ),
           "5 seconds",
         );
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
 
     expect(error).toMatchObject({ _tag: "EnvelopeBusy", mint, key });
@@ -741,14 +742,14 @@ describe("Envelope.release", () => {
 
     const [sent, released] = await Promise.all([
       device.run(
-        Effect.either(
+        Effect.result(
           Effect.flatMap(Envelope, (envelope) => envelope.send(ref)),
         ),
       ),
       device.release(),
     ]);
 
-    const tokenOut = sent._tag === "Right";
+    const tokenOut = sent._tag === "Success";
     expect(released.amount === 0).toBe(tokenOut);
     const { proofs } = await device.inventory();
     expect(amountIn(proofs, "handedOut")).toBe(tokenOut ? 16 : 0);
@@ -841,7 +842,7 @@ describe("Melt.meltEnvelope", () => {
     payee: Bolt11Invoice = invoice,
   ) =>
     device.run(
-      Effect.either(
+      Effect.result(
         Effect.flatMap(Melt, (melt) =>
           melt.meltEnvelope(
             new EnvelopeMeltDraft({ mint, key, invoice: payee }),
@@ -859,8 +860,8 @@ describe("Melt.meltEnvelope", () => {
 
     const paid = await meltOf(device);
 
-    assert(paid._tag === "Right");
-    expect(paid.right).toMatchObject({ paidAmount: 8, feePaid: 2 });
+    assert(paid._tag === "Success");
+    expect(paid.success).toMatchObject({ paidAmount: 8, feePaid: 2 });
     const { proofs, operations } = await device.inventory();
     expect(amountIn(proofs, "available")).toBe(32 - 8 - 2);
     expect(amountIn(proofs, "held")).toBe(0);
@@ -877,8 +878,8 @@ describe("Melt.meltEnvelope", () => {
 
     const unpaid = await meltOf(device);
 
-    assert(unpaid._tag === "Left");
-    expect(unpaid.left._tag).toBe("PaymentFailed");
+    assert(unpaid._tag === "Failure");
+    expect(unpaid.failure._tag).toBe("PaymentFailed");
     const { proofs, operations } = await device.inventory();
     expect(
       proofs
@@ -897,8 +898,8 @@ describe("Melt.meltEnvelope", () => {
 
     const mismatch = await meltOf(device);
 
-    assert(mismatch._tag === "Left");
-    expect(mismatch.left._tag).toBe("PaymentFailed");
+    assert(mismatch._tag === "Failure");
+    expect(mismatch.failure._tag).toBe("PaymentFailed");
     expect((await device.inventory()).proofs).toEqual(before.proofs);
   });
 
@@ -908,8 +909,8 @@ describe("Melt.meltEnvelope", () => {
     await first.fund(32);
     const opened = await first.open(8);
     const lost = await meltOf(first);
-    assert(lost._tag === "Left");
-    expect(lost.left._tag).toBe("PaymentPending");
+    assert(lost._tag === "Failure");
+    expect(lost.failure._tag).toBe("PaymentPending");
     const { proofs, operations } = await first.inventory();
     const melt = operations.find((operation) => operation.kind === "melt");
     assert(melt !== undefined);
@@ -1007,9 +1008,12 @@ describe("Melt.meltEnvelope", () => {
     const paid = await meltOf(winner);
     const rejected = await meltOf(loser, Bolt11Invoice.make("lnbc1other"));
 
-    assert(paid._tag === "Right");
-    assert(rejected._tag === "Left");
-    expect(rejected.left).toMatchObject({ _tag: "MintRejected", code: 11001 });
+    assert(paid._tag === "Success");
+    assert(rejected._tag === "Failure");
+    expect(rejected.failure).toMatchObject({
+      _tag: "MintRejected",
+      code: 11001,
+    });
     const { proofs } = await loser.inventory();
     expect(heldOf(proofs).map((entry) => entry.operationId)).toEqual([
       opened.operationId,
@@ -1037,7 +1041,7 @@ describe("Melt.meltEnvelope", () => {
 
     const sent = await meltOf(device);
 
-    assert(sent._tag === "Left");
-    expect(sent.left._tag).toBe("EnvelopeNotFound");
+    assert(sent._tag === "Failure");
+    expect(sent.failure._tag).toBe("EnvelopeNotFound");
   });
 });

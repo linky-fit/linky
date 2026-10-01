@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "effect": "^3.19.19",
+    "effect": "^4.0.0",
     "nostr-tools": "^2.25.2"
   }
 }

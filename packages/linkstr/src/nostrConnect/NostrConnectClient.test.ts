@@ -67,10 +67,10 @@ const runBoth = <A, E>(
 ): Promise<Exit.Exit<A, E>> => {
   const transport = Layer.succeed(NostrTransport, relayBus());
   const layer = Layer.mergeAll(
-    NostrConnect.Default.pipe(
+    NostrConnect.layer.pipe(
       Layer.provide(LinkstrIdentity.fromSecretKey(employee.secretKey)),
     ),
-    NostrConnectClient.Default,
+    NostrConnectClient.layer,
   ).pipe(Layer.provide(transport));
   return Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
 };
@@ -106,7 +106,7 @@ describe("NostrConnectClient", () => {
           const session = yield* (yield* NostrConnectClient).open(draft);
           const request = parseNostrConnectUri(session.uri);
           assert(request !== null);
-          const login = yield* Effect.fork(
+          const login = yield* Effect.forkChild(
             (yield* NostrConnect).login(request),
           );
           expect(yield* session.connected).toBe(employee.pubkey);
@@ -138,10 +138,10 @@ describe("NostrConnectClient", () => {
           const session = yield* (yield* NostrConnectClient).open(draft);
           const request = parseNostrConnectUri(session.uri);
           assert(request !== null);
-          yield* Effect.fork(
-            Effect.either((yield* NostrConnect).login(request)),
+          yield* Effect.forkChild(
+            Effect.result((yield* NostrConnect).login(request)),
           );
-          return yield* Effect.either(
+          return yield* Effect.result(
             session.signEvent(
               deviceAuthorizationTemplate({
                 device: device.pubkey,
@@ -154,8 +154,8 @@ describe("NostrConnectClient", () => {
     );
 
     assert(Exit.isSuccess(exit));
-    assert(exit.value._tag === "Left");
-    expect(exit.value.left).toMatchObject({
+    assert(exit.value._tag === "Failure");
+    expect(exit.value.failure).toMatchObject({
       _tag: "NostrConnectSignRefused",
       reason: "app tag does not match the approved name",
     });

@@ -30,8 +30,8 @@ export class OwnSeenReceiptConfirmed extends Schema.TaggedClass<OwnSeenReceiptCo
   },
 ) {}
 
-export const SeenReceiptInboxEvent = Schema.Union(
+export const SeenReceiptInboxEvent = Schema.Union([
   SeenReceiptReceived,
   OwnSeenReceiptConfirmed,
-);
+]);
 export type SeenReceiptInboxEvent = typeof SeenReceiptInboxEvent.Type;

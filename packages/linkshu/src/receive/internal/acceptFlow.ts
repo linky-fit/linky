@@ -1,5 +1,5 @@
 import type { Proof as CashuProof, SwapPreview } from "@cashu/cashu-ts";
-import { Duration, Effect, Either, Ref, Schema } from "effect";
+import { Duration, Effect, Ref, Result, Schema } from "effect";
 import {
   AmountConsumedByFee,
   CounterLockTimeout,
@@ -89,7 +89,9 @@ const isTransient = (error: AcceptFailure): boolean =>
   error._tag === "MintUnreachable" || error._tag === "CounterLockTimeout";
 
 /** Serialized onto failed transfers; every member is a tagged Schema error. */
-const encodeStoredError = Schema.encodeSync(Schema.parseJson(ReceiveError));
+const encodeStoredError = Schema.encodeSync(
+  Schema.fromJsonString(ReceiveError),
+);
 
 /** A token found in arbitrary text, decoded to what accepting it needs. */
 export interface ReceivableToken {
@@ -135,7 +137,7 @@ export interface ReceiveContext {
   readonly kv: KeyValueStoreService;
   readonly proofStore: ProofStoreService;
   readonly operationStore: OperationStoreService;
-  readonly instances: WalletInstances;
+  readonly instances: WalletInstances["Service"];
   readonly inspector: InspectorService;
   /** Signs for P2PK-locked inputs; set per call, never stored or logged. */
   readonly unlockingKey?: P2pkUnlockingKey | null;
@@ -206,15 +208,15 @@ const swapAtMint = (
         "used",
       );
       yield* onAttempt(counter);
-      const outcome = yield* Effect.either(
+      const outcome = yield* Effect.result(
         Effect.tryPromise({
           try: () =>
             wallet.completeSwap(preview, ctx.unlockingKey ?? undefined),
           catch: (error): unknown => error,
         }),
       );
-      if (Either.isRight(outcome)) return outcome.right.keep;
-      const raw = outcome.left;
+      if (Result.isSuccess(outcome)) return outcome.success.keep;
+      const raw = outcome.failure;
       if (isTokenAlreadySpentError(raw)) {
         return yield* new TokenAlreadySpent({ mint: scope.mint });
       }
@@ -494,10 +496,15 @@ const MINT_ANSWER_TIMEOUT = Duration.seconds(15);
 const answerWithin =
   (mint: MintUrl, step: string) =>
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E | MintUnreachable> =>
-    Effect.timeoutFail(effect, {
+    Effect.timeoutOrElse(effect, {
       duration: MINT_ANSWER_TIMEOUT,
-      onTimeout: () =>
-        new MintUnreachable({ mint, detail: `${step} did not finish in time` }),
+      orElse: () =>
+        Effect.fail(
+          new MintUnreachable({
+            mint,
+            detail: `${step} did not finish in time`,
+          }),
+        ),
     });
 
 const decodeAgainst = (
@@ -1031,13 +1038,13 @@ const receiveParsed = (
     // The mint's keysets decide dedup (short v2 ids in v4 text) and the fee,
     // so a mint that will not load ends the receive before the swap.
     const wallet = yield* loadReceivingWallet(ctx, parsed).pipe(
-      Effect.catchAll(unusable),
+      Effect.catch(unusable),
     );
     const decoded = yield* decodeInputs(wallet, parsed).pipe(
       Effect.catchTags({ MintUnreachable: unusable, MintRejected: unusable }),
     );
     const scope = yield* counterScopeFor(wallet, parsed).pipe(
-      Effect.catchAll(unusable),
+      Effect.catch(unusable),
     );
     return yield* withCounterLock(
       ctx.kv,
@@ -1060,7 +1067,7 @@ const receiveParsed = (
           replaced?.operation.kind === "send"
             ? null
             : yield* inputStates(wallet, parsed.mint, decoded).pipe(
-                Effect.catchAll(unusable),
+                Effect.catch(unusable),
               );
         if (states !== null && states.spent.size > 0) {
           // While the mint answered, a receive of this text may have synced in.
@@ -1094,7 +1101,7 @@ const receiveParsed = (
           reason,
         );
 
-        const accepted = yield* Effect.either(
+        const accepted = yield* Effect.result(
           states === null
             ? acceptUnchecked(
                 ctx,
@@ -1108,8 +1115,8 @@ const receiveParsed = (
             : // Unspent at the mint, so no earlier attempt of this receive reached it.
               swapAndKeep(ctx, wallet, scope, parsed, transfer, reason),
         );
-        if (Either.isLeft(accepted)) {
-          const error = accepted.left;
+        if (Result.isFailure(accepted)) {
+          const error = accepted.failure;
           if (transfer.kind === "receive") {
             yield* patchOperation(
               ctx,
@@ -1163,7 +1170,7 @@ const receiveParsed = (
             reason,
           );
         }
-        return receiptOf(transfer, parsed, accepted.right);
+        return receiptOf(transfer, parsed, accepted.success);
       }),
     );
   });

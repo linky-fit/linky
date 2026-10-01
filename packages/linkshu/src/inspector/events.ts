@@ -17,8 +17,9 @@ import { ProofState } from "../ports/ProofStore";
  * optional `Inspector` service is provided. `Schema.Unknown` fields carry
  * raw values for display; nothing in the package reads them back, and no
  * event ever carries seed material or proof secrets.
- * Emission sites use `{ disableValidation: true }` so a bad field surfaces
- * in the consumer, not as a failed wallet operation.
+ * Emission sites use `{ disableChecks: true }` so an off-brand field still
+ * reaches the feed; a field of the wrong type throws, and `emit` logs and
+ * drops that event instead of failing the wallet operation.
  */
 
 /** A wallet operation finished, e.g. `name: "receive.receive"`. */
@@ -78,7 +79,7 @@ export class CounterAdvanced extends Schema.TaggedClass<CounterAdvanced>()(
     keysetId: KeysetId,
     from: DeterministicCounter,
     to: DeterministicCounter,
-    reason: Schema.Literal("used", "collision-recovery", "restore"),
+    reason: Schema.Literals(["used", "collision-recovery", "restore"]),
   },
 ) {}
 
@@ -86,12 +87,12 @@ export class CounterAdvanced extends Schema.TaggedClass<CounterAdvanced>()(
 export class QuoteStateChanged extends Schema.TaggedClass<QuoteStateChanged>()(
   "QuoteStateChanged",
   {
-    flow: Schema.Literal("topup", "autoswap", "melt"),
+    flow: Schema.Literals(["topup", "autoswap", "melt"]),
     quoteId: QuoteId,
     mint: MintUrl,
     state: Schema.String,
     /** Which watcher saw it; absent in rows written before NUT-17. */
-    via: Schema.optional(Schema.Literal("poll", "subscription")),
+    via: Schema.optional(Schema.Literals(["poll", "subscription"])),
   },
 ) {}
 
@@ -114,7 +115,7 @@ export class LightningFeeProbed extends Schema.TaggedClass<LightningFeeProbed>()
   },
 ) {}
 
-export const LinkshuInspectorEvent = Schema.Union(
+export const LinkshuInspectorEvent = Schema.Union([
   OperationSucceeded,
   OperationFailed,
   ProofsChanged,
@@ -122,5 +123,5 @@ export const LinkshuInspectorEvent = Schema.Union(
   CounterAdvanced,
   QuoteStateChanged,
   LightningFeeProbed,
-);
+]);
 export type LinkshuInspectorEvent = typeof LinkshuInspectorEvent.Type;

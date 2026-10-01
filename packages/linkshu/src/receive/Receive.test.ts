@@ -6,17 +6,8 @@ import {
   Keyset,
   MintOperationError,
 } from "@cashu/cashu-ts";
-import {
-  Clock,
-  Deferred,
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  Option,
-  TestClock,
-  TestContext,
-} from "effect";
+import { Clock, Deferred, Effect, Exit, Fiber, Layer } from "effect";
+import { TestClock } from "effect/testing";
 import { MintRejected, MintUnreachable } from "../domain/errors";
 import { P2pkUnlockingKey, p2pkPubkeyOf } from "../domain/p2pk";
 import {
@@ -139,12 +130,12 @@ const makeHarness = (
   { load, operationStore }: HarnessOptions = {},
 ) => {
   const inspector = recordingInspector();
-  const layer = Receive.DefaultWithoutDependencies.pipe(
+  const layer = Receive.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({
+          WalletInstances.of({
             get: load ?? (() => Effect.succeed(wallet)),
           }),
         ),
@@ -182,7 +173,7 @@ const receiveText = (text: string) =>
 const receiveAndInspect = (text: string) =>
   Effect.gen(function* () {
     const kv = yield* KeyValueStore;
-    const receipt = yield* Effect.either(receiveText(text));
+    const receipt = yield* Effect.result(receiveText(text));
     return {
       receipt,
       ...(yield* inventory),
@@ -201,12 +192,12 @@ describe("Receive.receive", () => {
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations, counter } = exit.value;
 
-    assert(receipt._tag === "Right");
-    expect(receipt.right.mint).toBe(mint);
-    expect(receipt.right.unit).toBe("sat");
-    expect(receipt.right.amount).toBe(5);
-    expect(receipt.right.tokenText).not.toBe(sourceToken);
-    expect(parseTokenText(receipt.right.tokenText)?.amount).toBe(5);
+    assert(receipt._tag === "Success");
+    expect(receipt.success.mint).toBe(mint);
+    expect(receipt.success.unit).toBe("sat");
+    expect(receipt.success.amount).toBe(5);
+    expect(receipt.success.tokenText).not.toBe(sourceToken);
+    expect(parseTokenText(receipt.success.tokenText)?.amount).toBe(5);
 
     expect(operations).toHaveLength(1);
     const transfer = operations[0];
@@ -219,7 +210,7 @@ describe("Receive.receive", () => {
       tokenText: sourceToken,
       error: null,
     });
-    expect(receipt.right.operationId).toBe(transfer?.id);
+    expect(receipt.success.operationId).toBe(transfer?.id);
 
     // The fresh proofs are balance owned by nobody: the receive is closed.
     expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
@@ -279,7 +270,7 @@ describe("Receive.receive", () => {
       receiveAndInspect(`here you go: cashu:${sourceToken} enjoy!`),
     );
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(exit.value.operations[0]?.tokenText).toBe(sourceToken);
   });
 
@@ -325,8 +316,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(dust));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "AmountConsumedByFee",
       mint,
       amount: 1,
@@ -352,8 +343,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(token));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
-    expect(exit.value.receipt.right.amount).toBe(1);
+    assert(exit.value.receipt._tag === "Success");
+    expect(exit.value.receipt.success.amount).toBe(1);
     expect(receiveCounters).toHaveLength(1);
   });
 
@@ -437,8 +428,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintUnreachable");
     expect(exit.value.proofs).toEqual([]);
     expect(exit.value.operations).toHaveLength(1);
     expect(exit.value.operations[0]).toMatchObject({
@@ -470,8 +461,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "MintRejected",
       code: 20003,
     });
@@ -492,8 +483,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "TokenAlreadySpent",
       mint,
     });
@@ -537,8 +528,8 @@ describe("Receive.receive", () => {
 
       const exit = await run(receiveAndInspect(sourceToken));
       assert(Exit.isSuccess(exit));
-      assert(exit.value.receipt._tag === "Left");
-      const deferred = exit.value.receipt.left;
+      assert(exit.value.receipt._tag === "Failure");
+      const deferred = exit.value.receipt.failure;
       assert(deferred._tag === "ReceiveDeferred");
       expect(deferred).toMatchObject({ mint, amount: 6 });
       expect(deferred.operationId).not.toBe(elsewhere.id);
@@ -600,8 +591,8 @@ describe("Receive.receive", () => {
 
       const exit = await run(receiveAndInspect(v2Token));
       assert(Exit.isSuccess(exit));
-      assert(exit.value.receipt._tag === "Left");
-      expect(exit.value.receipt.left).toMatchObject({
+      assert(exit.value.receipt._tag === "Failure");
+      expect(exit.value.receipt.failure).toMatchObject({
         _tag: "TokenParseFailed",
         reason: "undecodable",
       });
@@ -734,7 +725,7 @@ describe("Receive.receive", () => {
 
       const exit = await run(receiveAndInspect(v2Token));
       assert(Exit.isSuccess(exit));
-      expect(exit.value.receipt._tag).toBe("Right");
+      expect(exit.value.receipt._tag).toBe("Success");
       expect(stateChecks).toBe(1);
       expect(receiveCounters).toEqual([1]);
     });
@@ -751,12 +742,12 @@ describe("Receive.receive", () => {
       runOnTestClock(
         Effect.zip(receiveAndInspect(sourceToken), Clock.currentTimeMillis),
         "1 second",
-      ).pipe(Effect.provide(TestContext.TestContext)),
+      ).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
     const [{ receipt, operations }, elapsed] = exit.value;
-    assert(receipt._tag === "Left");
-    expect(receipt.left._tag).toBe("ReceiveDeferred");
+    assert(receipt._tag === "Failure");
+    expect(receipt.failure._tag).toBe("ReceiveDeferred");
     expect(operations.map((operation) => operation.kind)).toEqual([
       "deferredReceive",
     ]);
@@ -778,7 +769,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(stateChecks).toBe(0);
     expect(receiveCounters).toEqual([1]);
   });
@@ -790,7 +781,7 @@ describe("Receive.receive", () => {
         Effect.runPromise(
           seedTransfer("receive", "done", mint, sourceToken, 6).pipe(
             Effect.provideService(OperationStore, operationStore),
-            Effect.andThen(() => answerProofStates()(proofs)),
+            Effect.andThen(Effect.promise(() => answerProofStates()(proofs))),
           ),
         ),
       receive: () => Promise.reject(new Error("must not be called")),
@@ -800,11 +791,11 @@ describe("Receive.receive", () => {
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
     const { receipt, operations } = exit.value;
-    assert(receipt._tag === "Left");
+    assert(receipt._tag === "Failure");
     expect(operations).toEqual([
       expect.objectContaining({ status: "done", error: null }),
     ]);
-    expect(receipt.left).toMatchObject({
+    expect(receipt.failure).toMatchObject({
       _tag: "TokenAlreadyKnown",
       operationId: operations[0]?.id,
     });
@@ -825,8 +816,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("ReceiveDeferred");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("ReceiveDeferred");
     expect(exit.value.operations.map((operation) => operation.kind)).toEqual([
       "deferredReceive",
     ]);
@@ -845,8 +836,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("ReceiveDeferred");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("ReceiveDeferred");
     expect(exit.value.operations.map((operation) => operation.kind)).toEqual([
       "deferredReceive",
     ]);
@@ -861,8 +852,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("ReceiveDeferred");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("ReceiveDeferred");
     expect(exit.value.operations.map((operation) => operation.kind)).toEqual([
       "deferredReceive",
     ]);
@@ -878,12 +869,12 @@ describe("Receive.receive", () => {
       runOnTestClock(
         Effect.zip(receiveAndInspect(sourceToken), Clock.currentTimeMillis),
         "1 second",
-      ).pipe(Effect.provide(TestContext.TestContext)),
+      ).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
     const [{ receipt, operations }, elapsed] = exit.value;
-    assert(receipt._tag === "Left");
-    expect(receipt.left._tag).toBe("ReceiveDeferred");
+    assert(receipt._tag === "Failure");
+    expect(receipt.failure._tag).toBe("ReceiveDeferred");
     expect(operations.map((operation) => operation.kind)).toEqual([
       "deferredReceive",
     ]);
@@ -910,16 +901,16 @@ describe("Receive.receive", () => {
     const exit = await run(
       Effect.gen(function* () {
         yield* TestClock.setTime(1_700_000_000_000);
-        const stalled = yield* Effect.fork(
+        const stalled = yield* Effect.forkChild(
           Effect.flip(receiveText(sourceToken)),
         );
         yield* settlePromises;
         const received = yield* receiveText(otherToken);
-        const stalledMeanwhile = Option.isNone(yield* Fiber.poll(stalled));
+        const stalledMeanwhile = stalled.pollUnsafe() === undefined;
         yield* TestClock.adjust("15 seconds");
         const deferred = yield* Fiber.join(stalled);
         return { received, stalledMeanwhile, deferred, ...(yield* inventory) };
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.received.mint).toBe(otherMint);
@@ -1062,8 +1053,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "TokenAlreadySpent",
       mint,
     });
@@ -1130,7 +1121,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(receiveCounters).toEqual([1, 40]);
     expect(restoreCalls).toEqual([{ start: 1, count: 100 }]);
     expect(exit.value.counter).toBe("42");
@@ -1161,7 +1152,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(receiveCounters).toEqual([1, 65]);
     expect(restoreCalls).toHaveLength(1);
     expect(exit.value.counter).toBe("67");
@@ -1178,7 +1169,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    expect(exit.value.receipt._tag).toBe("Right");
+    expect(exit.value.receipt._tag).toBe("Success");
     expect(receiveCounters).toEqual([1, 65]);
     expect(restoreCalls).toEqual([]);
   });
@@ -1210,8 +1201,8 @@ describe("Receive.receive", () => {
 
     const exit = await run(receiveAndInspect(sourceToken));
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintRejected");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintRejected");
     expect(receiveCounters).toHaveLength(5);
     expect(exit.value.operations[0]?.status).toBe("failed");
   });
@@ -1224,7 +1215,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(
       Effect.gen(function* () {
-        yield* Effect.fork(
+        yield* Effect.forkChild(
           Effect.never.pipe(
             withCounterLock(yield* KeyValueStore, {
               mint,
@@ -1237,11 +1228,11 @@ describe("Receive.receive", () => {
           receiveAndInspect(sourceToken),
           "1 second",
         );
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "CounterLockTimeout",
       keysetId: KEYSET_HEX,
     });
@@ -1271,9 +1262,9 @@ describe("Receive.receive", () => {
         const receipts = yield* runOnTestClock(
           Effect.all(
             [
-              Effect.either(receiveText(sourceToken)),
+              Effect.result(receiveText(sourceToken)),
               Effect.delay(
-                Effect.either(receiveText(sourceToken)),
+                Effect.result(receiveText(sourceToken)),
                 "16 seconds",
               ),
               Effect.delay(Effect.sync(answerFirstSwap), "17 seconds"),
@@ -1283,16 +1274,16 @@ describe("Receive.receive", () => {
           "1 second",
         );
         return { receipts, ...(yield* inventory) };
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
     const {
       receipts: [first, second],
       operations,
     } = exit.value;
-    expect(first._tag).toBe("Right");
-    assert(second._tag === "Left");
-    expect(second.left._tag).toBe("TokenAlreadyKnown");
+    expect(first._tag).toBe("Success");
+    assert(second._tag === "Failure");
+    expect(second.failure._tag).toBe("TokenAlreadyKnown");
     expect(receiveCounters).toHaveLength(1);
     expect(operations).toEqual([
       expect.objectContaining({ kind: "receive", status: "done" }),
@@ -1332,11 +1323,11 @@ describe("Receive.receive", () => {
           inspector: yield* Inspector.orNoop,
         };
         const receiveIn = (wallet: LoadedWallet) =>
-          Effect.either(
+          Effect.result(
             receiveDraft(
               {
                 ...stores,
-                instances: WalletInstances.make({
+                instances: WalletInstances.of({
                   get: () => Effect.succeed(wallet),
                 }),
               },
@@ -1355,16 +1346,16 @@ describe("Receive.receive", () => {
           "100 millis",
         );
         return { receipts, ...(yield* inventory) };
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
     const {
       receipts: [first, second],
       operations,
     } = exit.value;
-    expect(first._tag).toBe("Right");
-    assert(second._tag === "Left");
-    expect(second.left._tag).toBe("TokenAlreadyKnown");
+    expect(first._tag).toBe("Success");
+    assert(second._tag === "Failure");
+    expect(second.failure._tag).toBe("TokenAlreadyKnown");
     expect(swaps).toEqual([KEYSET_HEX]);
     expect(operations).toEqual([
       expect.objectContaining({ kind: "receive", status: "done" }),
@@ -1379,7 +1370,7 @@ describe("Receive.receive", () => {
 
     const exit = await run(
       Effect.gen(function* () {
-        yield* Effect.fork(
+        yield* Effect.forkChild(
           Effect.never.pipe(
             withReceiveLock(yield* KeyValueStore, {
               mint,
@@ -1388,15 +1379,15 @@ describe("Receive.receive", () => {
           ),
         );
         const receipt = yield* runOnTestClock(
-          Effect.either(receiveText(sourceToken)),
+          Effect.result(receiveText(sourceToken)),
           "1 second",
         );
         return { receipt, ...(yield* inventory) };
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left).toMatchObject({
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure).toMatchObject({
       _tag: "CounterLockTimeout",
       mint,
       keysetId: null,
@@ -1448,8 +1439,8 @@ describe("Receive.receive of an unfinished receive", () => {
     );
     assert(Exit.isSuccess(exit));
     const { transfer, receipt, proofs, operations, counter } = exit.value;
-    assert(receipt._tag === "Right");
-    expect(receipt.right).toMatchObject({
+    assert(receipt._tag === "Success");
+    expect(receipt.success).toMatchObject({
       operationId: transfer.id,
       amount: 5,
     });
@@ -1483,8 +1474,8 @@ describe("Receive.receive of an unfinished receive", () => {
     );
     assert(Exit.isSuccess(exit));
     const { transfer, receipt, operations } = exit.value;
-    assert(receipt._tag === "Right");
-    expect(receipt.right.operationId).toBe(transfer.id);
+    assert(receipt._tag === "Success");
+    expect(receipt.success.operationId).toBe(transfer.id);
     expect(operations).toEqual([
       expect.objectContaining({ id: transfer.id, status: "done" }),
       expect.objectContaining({ kind: "deferredReceive", status: "done" }),
@@ -1507,8 +1498,8 @@ describe("Receive.receive of an unfinished receive", () => {
       }),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
-    expect(exit.value.receipt.right.amount).toBe(5);
+    assert(exit.value.receipt._tag === "Success");
+    expect(exit.value.receipt.success.amount).toBe(5);
     expect(secretsOf(exit.value.proofs)).toEqual(["rcv-a", "rcv-b"]);
     expect(exit.value.operations[0]?.status).toBe("done");
   });
@@ -1532,7 +1523,7 @@ describe("Receive.receive of an unfinished receive", () => {
       }),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
+    assert(exit.value.receipt._tag === "Success");
     expect(checks).toBe(1);
     expect(restoreCalls).toEqual([]);
     expect(receiveCounters).toEqual([3]);
@@ -1562,8 +1553,8 @@ describe("Receive.receive of an unfinished receive", () => {
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.lost._tag).toBe("MintUnreachable");
-    assert(exit.value.receipt._tag === "Right");
-    expect(exit.value.receipt.right.amount).toBe(5);
+    assert(exit.value.receipt._tag === "Success");
+    expect(exit.value.receipt.success.amount).toBe(5);
     expect(receiveCounters).toEqual([1]);
     expect(restoreCalls).toEqual([{ start: 1, count: 2 }]);
     expect(exit.value.operations[0]?.status).toBe("done");
@@ -1585,8 +1576,8 @@ describe("Receive.receive of an unfinished receive", () => {
       }),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("TokenAlreadySpent");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("TokenAlreadySpent");
     expect(restoreCalls).toEqual([{ start: 1, count: 2 }]);
     expect(receiveCounters).toEqual([]);
     expect(exit.value.operations).toEqual([
@@ -1619,8 +1610,8 @@ describe("Receive.receive of an unfinished receive", () => {
       }),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("TokenAlreadySpent");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("TokenAlreadySpent");
     expect(receiveCounters).toEqual([]);
     expect(exit.value.operations).toEqual([
       expect.objectContaining({ status: "failed", error: unreachable }),
@@ -1645,7 +1636,7 @@ describe("Receive.receive of an unfinished receive", () => {
       }),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
+    assert(exit.value.receipt._tag === "Success");
     expect(receiveCounters).toEqual([3]);
     expect(secretsOf(exit.value.proofs)).toEqual(["rcv-a", "rcv-b"]);
   });
@@ -1670,7 +1661,7 @@ describe("Receive.receive of an unfinished receive", () => {
       }),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Right");
+    assert(exit.value.receipt._tag === "Success");
     expect(stateChecks).toBe(0);
     expect(restoreCalls).toEqual([]);
     expect(receiveCounters).toEqual([3]);
@@ -1696,8 +1687,8 @@ describe("Receive.receive of an unfinished receive", () => {
       }),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("MintUnreachable");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("MintUnreachable");
     expect(receiveCounters).toEqual([]);
     expect(exit.value.proofs).toEqual([]);
     expect(exit.value.operations[0]).toMatchObject({
@@ -1729,7 +1720,7 @@ describe("Receive.receive of an unfinished receive", () => {
           instances: yield* WalletInstances,
           inspector: yield* Inspector.orNoop,
         };
-        const result = yield* Effect.either(
+        const result = yield* Effect.result(
           receiveReplaced(ctx, sourceToken, {
             operation: stale,
             reason: "returnToWallet",
@@ -1739,8 +1730,8 @@ describe("Receive.receive of an unfinished receive", () => {
       }),
     );
     assert(Exit.isSuccess(exit));
-    assert(exit.value.result._tag === "Left");
-    expect(exit.value.result.left).toMatchObject({
+    assert(exit.value.result._tag === "Failure");
+    expect(exit.value.result.failure).toMatchObject({
       _tag: "TokenAlreadyKnown",
       operationId: exit.value.stale.id,
     });
@@ -1984,7 +1975,7 @@ describe("Receive.resumeDeferred", () => {
         const deferred = yield* Effect.flip(receiveText(sourceToken));
         assert(deferred._tag === "ReceiveDeferred");
         stalls.now = true;
-        const pass = yield* Effect.fork(resumeDeferred);
+        const pass = yield* Effect.forkChild(resumeDeferred);
         yield* settlePromises;
         yield* closeStored(deferred.operationId);
         yield* Deferred.fail(
@@ -2092,7 +2083,7 @@ describe("Receive.resumeDeferred", () => {
         const results = yield* runOnTestClock(resumeDeferred, "1 second");
         const elapsed = (yield* Clock.currentTimeMillis) - start;
         return { results, elapsed, ...(yield* inventory) };
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
     assert(Exit.isSuccess(exit));
     expect(exit.value.results.map((result) => result.status)).toEqual([
@@ -2371,7 +2362,7 @@ describe("Receive.receive of a P2PK-locked token", () => {
   const receiveLocked = (unlockingKey?: P2pkUnlockingKey) =>
     Effect.gen(function* () {
       const receive = yield* Receive;
-      const receipt = yield* Effect.either(
+      const receipt = yield* Effect.result(
         receive.receive(new ReceiveDraft({ text: lockedToken }), {
           unlockingKey,
         }),
@@ -2385,9 +2376,9 @@ describe("Receive.receive of a P2PK-locked token", () => {
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations } = exit.value;
 
-    assert(receipt._tag === "Left");
-    assert(receipt.left._tag === "TokenLocked");
-    expect(receipt.left.pubkeys).toEqual([p2pkPubkeyOf(ownerKey)]);
+    assert(receipt._tag === "Failure");
+    assert(receipt.failure._tag === "TokenLocked");
+    expect(receipt.failure.pubkeys).toEqual([p2pkPubkeyOf(ownerKey)]);
     expect(configs).toEqual([]);
     expect(proofs).toEqual([]);
     expect(operations).toEqual([]);
@@ -2398,8 +2389,8 @@ describe("Receive.receive of a P2PK-locked token", () => {
     const exit = await makeHarness(wallet).run(receiveLocked(otherKey));
     assert(Exit.isSuccess(exit));
 
-    assert(exit.value.receipt._tag === "Left");
-    expect(exit.value.receipt.left._tag).toBe("TokenLocked");
+    assert(exit.value.receipt._tag === "Failure");
+    expect(exit.value.receipt.failure._tag).toBe("TokenLocked");
     expect(configs).toEqual([]);
   });
 
@@ -2409,7 +2400,7 @@ describe("Receive.receive of a P2PK-locked token", () => {
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations } = exit.value;
 
-    assert(receipt._tag === "Right");
+    assert(receipt._tag === "Success");
     expect(configs).toEqual([ownerKey]);
     expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
     expect(proofs.every((p) => p.state === "available")).toBe(true);
@@ -2439,8 +2430,8 @@ describe("Receive.receive of a NUT-18 payment payload", () => {
     assert(Exit.isSuccess(exit));
     const { receipt, proofs, operations } = exit.value;
 
-    assert(receipt._tag === "Right");
-    expect(receipt.right.amount).toBe(5);
+    assert(receipt._tag === "Success");
+    expect(receipt.success.amount).toBe(5);
     expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
     expect(operations.map((op) => [op.kind, op.status, op.amount])).toEqual([
       ["receive", "done", 6],

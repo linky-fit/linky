@@ -1,4 +1,5 @@
-import { Effect, TestClock, TestContext } from "effect";
+import { Effect } from "effect";
+import { TestClock } from "effect/testing";
 import { inMemoryKeyValueStore } from "./inMemoryKeyValueStore";
 import { KeyValueStore } from "./KeyValueStore";
 
@@ -81,7 +82,7 @@ describe("inMemoryKeyValueStore", () => {
         expect(yield* kv.tryAcquireLease("k", 1_000)).toBeNull();
         yield* TestClock.adjust("201 millis");
         expect(yield* kv.tryAcquireLease("k", 1_000)).not.toBeNull();
-      }).pipe(Effect.provide(TestContext.TestContext)),
+      }).pipe(Effect.provide(TestClock.layer())),
     );
   });
 });

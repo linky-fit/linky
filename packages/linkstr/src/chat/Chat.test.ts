@@ -1,4 +1,4 @@
-import { Effect, Either, Exit, Layer } from "effect";
+import { Context, Effect, Exit, Layer, Result } from "effect";
 import { ClientId, RelayUrl, RumorId, UnixSeconds } from "../domain/primitives";
 import { unwrapToRumor } from "../internal/giftWrap";
 import type { SignedWrapEvent } from "../internal/nostrEvent";
@@ -63,9 +63,7 @@ const runWith = <A, E>(
     transport,
   );
   return Effect.runPromiseExit(
-    program.pipe(
-      Effect.provide(Chat.Default.pipe(Layer.provide(dependencies))),
-    ),
+    program.pipe(Effect.provide(Chat.layer.pipe(Layer.provide(dependencies)))),
   );
 };
 
@@ -73,7 +71,7 @@ describe("Chat sends", () => {
   it.each([
     {
       name: "text",
-      run: (chat: Chat) =>
+      run: (chat: Context.Service.Shape<typeof Chat>) =>
         chat.sendText(
           new TextMessageDraft({
             to: bob.pubkey,
@@ -85,7 +83,7 @@ describe("Chat sends", () => {
     },
     {
       name: "image",
-      run: (chat: Chat) =>
+      run: (chat: Context.Service.Shape<typeof Chat>) =>
         chat.sendImage(
           new ImageMessageDraft({ to: bob.pubkey, image, clientId }),
         ),
@@ -119,7 +117,7 @@ describe("Chat sends", () => {
       expect(recipient.created_at).toBeLessThanOrEqual(
         Math.ceil(Date.now() / 1000),
       );
-      const rumor = Either.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
+      const rumor = Result.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
       expect(rumor.id).toBe(exit.value.rumorId);
       expect(rumor.kind).toBe(kind);
     },
@@ -175,7 +173,7 @@ describe("Chat sends", () => {
     for (const wrap of published) {
       const key =
         recipientOf(wrap) === alice.pubkey ? alice.secretKey : bob.secretKey;
-      const rumor = Either.getOrThrow(unwrapToRumor(wrap, key));
+      const rumor = Result.getOrThrow(unwrapToRumor(wrap, key));
       expect(rumor.id).toBe(exit.value.rumorId);
       expect(rumor.kind).toBe(14);
       expect(rumor.content).toBe(cashuToken);
@@ -206,7 +204,7 @@ describe("Chat sends", () => {
       (wrap) => recipientOf(wrap) === bob.pubkey,
     );
     assert(recipient !== undefined);
-    const rumor = Either.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
+    const rumor = Result.getOrThrow(unwrapToRumor(recipient, bob.secretKey));
     expect(rumor.created_at).toBe(sentAt);
     expect(rumor.id).toBe(exit.value.rumorId);
   });

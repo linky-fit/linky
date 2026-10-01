@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@linky-fit/domain": "workspace:*",
-    "effect": "^3.19.19"
+    "effect": "^4.0.0"
   },
   "devDependencies": {
     "@linky-fit/config": "workspace:*",

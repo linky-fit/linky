@@ -71,7 +71,7 @@ export const tableRepository = <
     Effect.asVoid,
   );
   const rotateAfter = <E>(write: Effect.Effect<void, E>) =>
-    Effect.zipRight(write, maybeRotate);
+    Effect.andThen(write, maybeRotate);
   const ifAbsent = (
     id: LinkyDbSchema[T]["id"],
     write: Effect.Effect<void, ShardDbError>,

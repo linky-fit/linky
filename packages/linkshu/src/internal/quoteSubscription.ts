@@ -70,9 +70,10 @@ const MINT_QUOTE_COMMAND = "bolt11_mint_quote";
  * settlement is missed unless we subscribe again. Backoff caps out because
  * the poll is carrying the topup meanwhile; this only restores the shortcut.
  */
-const RESUBSCRIBE_SCHEDULE = Schedule.exponential(Duration.seconds(1)).pipe(
-  Schedule.either(Schedule.spaced(Duration.seconds(30))),
-);
+const RESUBSCRIBE_SCHEDULE = Schedule.min([
+  Schedule.exponential(Duration.seconds(1)),
+  Schedule.spaced(Duration.seconds(30)),
+]);
 
 /**
  * Websocket support is per method and unit, so a mint may push bolt11/sat
@@ -107,7 +108,7 @@ const subscribeOnce = (
   wallet: LoadedWallet,
   quote: { readonly quoteId: QuoteId; readonly mint: MintUrl },
 ): Effect.Effect<MintQuoteBolt11Response, MintUnreachable | MintRejected> =>
-  Effect.async<MintQuoteBolt11Response, MintUnreachable | MintRejected>(
+  Effect.callback<MintQuoteBolt11Response, MintUnreachable | MintRejected>(
     (resume) => {
       let cancel: (() => void) | null = null;
       let removeCloseListener: (() => void) | null = null;

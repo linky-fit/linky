@@ -16,7 +16,7 @@ import {
   type WrapInboxEvent,
 } from "@linky-fit/linkstr";
 
-const ShopMessage = Schema.Union(
+const ShopMessage = Schema.Union([
   Schema.Struct({
     v: Schema.Literal(1),
     type: Schema.Literal("PaymentRecord"),
@@ -27,7 +27,7 @@ const ShopMessage = Schema.Union(
     v: Schema.Literal(1),
     type: Schema.Literal("EmployeeRemoved"),
   }),
-);
+]);
 const shop = appMessageChannel(AppNamespace.make("myshop"), ShopMessage);
 
 const report = (owner: Pubkey) =>

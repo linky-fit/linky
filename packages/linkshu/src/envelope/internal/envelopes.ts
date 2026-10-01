@@ -236,7 +236,7 @@ export const probeEnvelope = (
       : proofs;
   });
 
-const bySlot = Order.mapInput(Order.number, (proof: Proof) => proof.amount);
+const bySlot = Order.mapInput(Order.Number, (proof: Proof) => proof.amount);
 
 /**
  * Stores an envelope's proofs `held` under its operation. Both derive from

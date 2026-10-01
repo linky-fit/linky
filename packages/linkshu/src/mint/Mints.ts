@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { MintInUse } from "../domain/errors";
 import type { MintRejected, MintUnreachable } from "../domain/errors";
 import type { MintUrl } from "../domain/primitives";
@@ -53,9 +53,8 @@ const buildMintInfo = (mint: MintUrl, wallet: LoadedWallet): MintInfo => {
  * vertical) — that cache is internal and never part of this interface,
  * because raw cashu-ts types do not cross the public boundary.
  */
-export class Mints extends Effect.Service<Mints>()("linkshu/Mints", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Mints extends Context.Service<Mints>()("linkshu/Mints", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const proofStore = yield* ProofStore;
     const operationStore = yield* OperationStore;
@@ -114,4 +113,9 @@ export class Mints extends Effect.Service<Mints>()("linkshu/Mints", {
 
     return { info, knownMints, addKnownMint, removeKnownMint } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

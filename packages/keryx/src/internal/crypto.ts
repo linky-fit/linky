@@ -14,7 +14,7 @@ const Ed25519Key = Schema.Struct({
   keytype: Schema.Literal("ed25519"),
   scheme: Schema.Literal("ed25519"),
   keyval: Schema.Struct({
-    public: Schema.String.pipe(Schema.pattern(/^[0-9a-f]{64}$/)),
+    public: Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/)),
   }),
 });
 const decodeEd25519Key = Schema.decodeUnknownOption(Ed25519Key);

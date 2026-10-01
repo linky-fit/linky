@@ -10,11 +10,11 @@ import {
 import { RelayUrl, UnixSeconds } from "../domain/primitives";
 import type { RelayPublishResult } from "../services/NostrTransport";
 
-export const RelayConnectionState = Schema.Literal(
+export const RelayConnectionState = Schema.Literals([
   "connecting",
   "connected",
   "unreachable",
-);
+]);
 export type RelayConnectionState = typeof RelayConnectionState.Type;
 
 /** Outcome of the most recent publish attempt against one relay. */
@@ -97,7 +97,7 @@ const make: Effect.Effect<RelayHealthService> = Effect.gen(function* () {
 
   return {
     current: SubscriptionRef.get(ref),
-    changes: ref.changes,
+    changes: SubscriptionRef.changes(ref),
     reportSubscribing: (relay) =>
       apply(relay, (current) =>
         current.state === "connected"
@@ -157,10 +157,10 @@ const make: Effect.Effect<RelayHealthService> = Effect.gen(function* () {
  * feed). `observeTransport` is its feeder; without that decorator — or
  * without this layer — nothing breaks, the snapshot just stays empty.
  */
-export class RelayHealth extends Context.Tag("linkstr/RelayHealth")<
+export class RelayHealth extends Context.Service<
   RelayHealth,
   RelayHealthService
->() {
+>()("linkstr/RelayHealth") {
   static readonly live: Layer.Layer<RelayHealth> = Layer.effect(
     RelayHealth,
     make,

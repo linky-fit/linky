@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Result } from "effect";
 import { isRumorId } from "../domain/primitives";
 import type { ClientId, Pubkey, UnixSeconds } from "../domain/primitives";
 import type { DropReason } from "../inbox/events";
@@ -41,7 +41,7 @@ export const encodePaymentNoticeRumor = (
 export const decodePaymentNoticeRumor = (
   rumor: Rumor,
   identity: LinkstrIdentityService,
-): Either.Either<PaymentNoticeInboxEvent, DropReason> => {
+): Result.Result<PaymentNoticeInboxEvent, DropReason> => {
   if (
     rumor.kind !== PAYMENT_NOTICE_KIND ||
     !rumor.tags.some(
@@ -51,10 +51,10 @@ export const decodePaymentNoticeRumor = (
     !tagValues(rumor.tags, "p").includes(identity.pubkey) ||
     !isRumorId(rumor.id)
   ) {
-    return Either.left("invalid-notice");
+    return Result.fail("invalid-notice");
   }
 
-  return Either.right(
+  return Result.succeed(
     new PaymentNoticeReceived({
       noticeId: rumor.id,
       from: rumor.pubkey,

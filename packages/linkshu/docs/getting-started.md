@@ -22,7 +22,7 @@ import {
   runLinkshu,
   Tokens,
 } from "@linky-fit/linkshu";
-import { Effect, Either } from "effect";
+import { Effect, Result } from "effect";
 
 // Disposable seed: random bytes own nothing and are gone when the process exits.
 const bip39Seed = Bip39Seed.make(crypto.getRandomValues(new Uint8Array(64)));
@@ -35,14 +35,14 @@ const program = Effect.gen(function* () {
   );
 
   const receive = yield* Receive;
-  const outcome = yield* Effect.either(
+  const outcome = yield* Effect.result(
     receive.receive(new ReceiveDraft({ text: "not a cashu token" })),
   );
-  if (Either.isLeft(outcome)) {
-    console.log(`receive failed: ${outcome.left._tag}`);
+  if (Result.isFailure(outcome)) {
+    console.log(`receive failed: ${outcome.failure._tag}`);
     return;
   }
-  console.log(`received ${outcome.right.amount} ${outcome.right.unit}`);
+  console.log(`received ${outcome.success.amount} ${outcome.success.unit}`);
 });
 
 await runLinkshu({ bip39Seed }, program);
@@ -55,7 +55,7 @@ balance 0 sat across 0 mints
 receive failed: TokenParseFailed
 ```
 
-`Effect.either` turned the typed failure into a value; without it the promise rejects with the error. Nothing was stored, because a parse failure never creates an operation.
+`Effect.result` turned the typed failure into a value; without it the promise rejects with the error. Nothing was stored, because a parse failure never creates an operation.
 
 ## What you bring
 
@@ -88,7 +88,7 @@ Rebuild the runtime when the seed changes and dispose the old one, with `Restore
 
 ## Drafts from user input
 
-`new SendDraft({...})` needs already-branded values. From plain strings and numbers, decode the whole draft; every field is validated at once and a bad one throws a `ParseError`:
+`new SendDraft({...})` needs already-branded values. From plain strings and numbers, decode the whole draft; every field is validated at once and a bad one throws a `SchemaError`:
 
 ```ts
 import { Send, SendDraft } from "@linky-fit/linkshu";

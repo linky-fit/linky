@@ -73,7 +73,7 @@ const unknownWrapForAlice = () => {
 // Mirrors the linkstr-react runtime composition: vertical services over base
 // services, the transport tapped, Inspector.live provided beneath everything.
 const servicesWith = (transport: NostrTransportService) =>
-  Layer.mergeAll(Reactions.Default, WrapInbox.Default, Profiles.Default).pipe(
+  Layer.mergeAll(Reactions.layer, WrapInbox.layer, Profiles.layer).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         LinkstrIdentity.fromSecretKey(alice.secretKey),

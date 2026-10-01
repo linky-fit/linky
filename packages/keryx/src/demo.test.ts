@@ -1,4 +1,4 @@
-import { Effect, Either, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import {
   CompanyIdentity,
   CompanyTrust,
@@ -19,7 +19,7 @@ const ORIGIN = "https://keryx-demo.github.io";
 const FEED =
   "https://keryx-demo.github.io/channels/tracking/m1-4zSDEm_Av71cnV26ZqQ/feed.json";
 
-const join = () => Either.getOrThrow(parseJoinUrl(demoCapture.joinUrl));
+const join = () => Result.getOrThrow(parseJoinUrl(demoCapture.joinUrl));
 
 const pair = async () => {
   const { fetch } = makeFixtureFetch();
@@ -112,8 +112,8 @@ describe("the keryx-demo.github.io publisher", () => {
 
   it("round-trips the persisted trust and identity as JSON strings", async () => {
     const snapshot = await pair();
-    const trustJson = Schema.parseJson(CompanyTrust);
-    const identityJson = Schema.parseJson(CompanyIdentity);
+    const trustJson = Schema.fromJsonString(CompanyTrust);
+    const identityJson = Schema.fromJsonString(CompanyIdentity);
     expect(
       Schema.decodeSync(trustJson)(
         Schema.encodeSync(trustJson)(snapshot.trust),

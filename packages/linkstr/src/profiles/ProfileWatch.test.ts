@@ -95,7 +95,7 @@ const withWatch = <A>(
   }).pipe(
     Effect.scoped,
     Effect.provide(
-      ProfileWatch.Default.pipe(
+      ProfileWatch.layer.pipe(
         Layer.provideMerge(
           Layer.mergeAll(
             Layer.succeed(NostrTransport, watchTransport(subscriptions)),
@@ -170,9 +170,11 @@ describe("ProfileWatch", () => {
             updatedAt: base + 20,
           }),
         );
-        expect(
-          droppedWith(inspected).filter((drop) => drop.reason === "stale"),
-        ).toHaveLength(2);
+        yield* eventually(
+          () =>
+            droppedWith(inspected).filter((drop) => drop.reason === "stale")
+              .length === 2,
+        );
       }),
     ));
 
@@ -230,11 +232,12 @@ describe("ProfileWatch", () => {
         expect(facts[0]).toEqual(
           expect.objectContaining({ _tag: "ProfileUpdated" }),
         );
-        expect(
-          droppedWith(inspected).filter(
-            (drop) => drop.reason === "malformed-profile",
-          ),
-        ).toHaveLength(2);
+        yield* eventually(
+          () =>
+            droppedWith(inspected).filter(
+              (drop) => drop.reason === "malformed-profile",
+            ).length === 2,
+        );
       }),
     ));
 
@@ -266,6 +269,7 @@ describe("ProfileWatch", () => {
             updatedAt: base + 4,
           }),
         );
+        yield* eventually(() => droppedWith(inspected).length === 2);
         const reasons = droppedWith(inspected).map((drop) => drop.reason);
         expect(reasons).toContain("other-d-tag");
         expect(reasons).toContain("expired");
@@ -308,7 +312,7 @@ describe("ProfileWatch without read relays", () => {
         ),
       ).pipe(
         Effect.provide(
-          ProfileWatch.Default.pipe(
+          ProfileWatch.layer.pipe(
             Layer.provide(
               Layer.mergeAll(
                 Layer.succeed(NostrTransport, watchTransport([])),

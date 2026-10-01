@@ -69,12 +69,14 @@ export const toyStore = (
 
 const manualClock = () => {
   let nowMs = 0;
+  const nowNanos = () => BigInt(nowMs) * 1_000_000n;
   const clock: Clock.Clock = {
-    [Clock.ClockTypeId]: Clock.ClockTypeId,
     currentTimeMillis: Effect.sync(() => nowMs),
-    currentTimeNanos: Effect.sync(() => BigInt(nowMs) * 1_000_000n),
-    unsafeCurrentTimeMillis: () => nowMs,
-    unsafeCurrentTimeNanos: () => BigInt(nowMs) * 1_000_000n,
+    currentTimeNanos: Effect.sync(nowNanos),
+    monotonicTimeNanos: Effect.sync(nowNanos),
+    currentTimeMillisUnsafe: () => nowMs,
+    currentTimeNanosUnsafe: nowNanos,
+    monotonicTimeNanosUnsafe: nowNanos,
     sleep: () => Effect.void,
   };
   return {
@@ -89,7 +91,7 @@ const testClock = manualClock();
 
 /** Runs under a manual clock that only `tick` advances. */
 export const run = <A, E>(effect: Effect.Effect<A, E>): A =>
-  Effect.runSync(Effect.withClock(testClock.clock)(effect));
+  Effect.runSync(Effect.provideService(effect, Clock.Clock, testClock.clock));
 
 export const tick = (millis: number): void => {
   testClock.advance(millis);

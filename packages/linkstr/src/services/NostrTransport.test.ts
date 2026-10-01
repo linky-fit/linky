@@ -113,8 +113,12 @@ describe("makeRelayPoolTransport publishing one event twice", () => {
         const publishing = makeRelayPoolTransport(pool, {
           publishTimeout: Duration.millis(500),
         });
-        const first = yield* Effect.fork(publishing.publish([relayOk], event));
-        const second = yield* Effect.fork(publishing.publish([relayOk], event));
+        const first = yield* Effect.forkChild(
+          publishing.publish([relayOk], event),
+        );
+        const second = yield* Effect.forkChild(
+          publishing.publish([relayOk], event),
+        );
         yield* eventually(() => waiting.has(event.id));
         waiting.get(event.id)?.("");
         return [yield* Fiber.join(first), yield* Fiber.join(second)];
@@ -169,7 +173,7 @@ describe("makeRelayPoolTransport subscribe", () => {
 
     const result = await Effect.runPromise(
       Effect.gen(function* () {
-        const fiber = yield* Effect.fork(
+        const fiber = yield* Effect.forkChild(
           makeRelayPoolTransport(pool).subscribe(
             relayOk,
             { kinds: [1059] },
@@ -220,7 +224,7 @@ describe("makeRelayPoolTransport subscribe", () => {
 
     await Effect.runPromise(
       Effect.gen(function* () {
-        const fiber = yield* Effect.fork(
+        const fiber = yield* Effect.forkChild(
           makeRelayPoolTransport(pool).subscribe(
             relayOk,
             { kinds: [1059] },
@@ -243,7 +247,7 @@ describe("makeRelayPoolTransport fetch", () => {
 
     const result = await Effect.runPromise(
       Effect.gen(function* () {
-        const fiber = yield* Effect.fork(
+        const fiber = yield* Effect.forkChild(
           makeRelayPoolTransport(pool).fetch(relayOk, { kinds: [0] }),
         );
         yield* eventually(() => subscriptions.length === 1);
@@ -264,7 +268,7 @@ describe("makeRelayPoolTransport fetch", () => {
 
     const result = await Effect.runPromise(
       Effect.gen(function* () {
-        const fiber = yield* Effect.fork(
+        const fiber = yield* Effect.forkChild(
           makeRelayPoolTransport(pool, {
             fetchEoseTimeout: Duration.millis(50),
           }).fetch(relayOk, { kinds: [0] }),
@@ -284,7 +288,7 @@ describe("makeRelayPoolTransport fetch", () => {
 
     const result = await Effect.runPromise(
       Effect.gen(function* () {
-        const fiber = yield* Effect.fork(
+        const fiber = yield* Effect.forkChild(
           makeRelayPoolTransport(pool).fetch(relayOk, { kinds: [0] }),
         );
         yield* eventually(() => subscriptions.length === 1);
@@ -310,7 +314,7 @@ describe("makeRelayPoolTransport fetch", () => {
 
       const exit = await Effect.runPromiseExit(
         Effect.gen(function* () {
-          const fiber = yield* Effect.fork(
+          const fiber = yield* Effect.forkChild(
             makeRelayPoolTransport(pool, {
               fetchEoseTimeout: Duration.millis(50),
             }).fetch(relayOk, { kinds: [0] }),

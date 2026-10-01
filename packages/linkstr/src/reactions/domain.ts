@@ -2,14 +2,14 @@ import { Schema } from "effect";
 import { WrapDelivery } from "../domain/delivery";
 import { ClientId, Pubkey, RumorId, UnixSeconds } from "../domain/primitives";
 
-export const Emoji = Schema.NonEmptyTrimmedString.pipe(
-  Schema.maxLength(32),
-  Schema.brand("Emoji"),
-);
+export const Emoji = Schema.Trimmed.check(
+  Schema.isNonEmpty(),
+  Schema.isMaxLength(32),
+).pipe(Schema.brand("Emoji"));
 export type Emoji = typeof Emoji.Type;
 
 /** Kind of the message being reacted to; the codec maps this to the ["k"] tag. */
-export const TargetKind = Schema.Literal("text", "image");
+export const TargetKind = Schema.Literals(["text", "image"]);
 export type TargetKind = typeof TargetKind.Type;
 
 export class ReactionDraft extends Schema.Class<ReactionDraft>("ReactionDraft")(

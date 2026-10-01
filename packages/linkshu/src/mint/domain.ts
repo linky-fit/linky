@@ -8,7 +8,7 @@ export class MintInfo extends Schema.Class<MintInfo>("MintInfo")({
    * Cashu-side input fee of the preferred active keyset, per thousand proof
    * inputs (NUT-02 `input_fee_ppk`); null when the mint publishes none.
    */
-  inputFeePpk: Schema.NullOr(Schema.Int.pipe(Schema.nonNegative())),
+  inputFeePpk: Schema.NullOr(Schema.Natural),
   /** NUT-15 multi-path payments. */
   supportsMpp: Schema.Boolean,
   /** NUT-11 P2PK: sends may lock their proofs to a key (`SendDraft.lockTo`). */

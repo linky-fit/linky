@@ -1,4 +1,4 @@
-import { Either, Schema } from "effect";
+import { Result, Schema } from "effect";
 import { unwrapToRumor } from "../internal/giftWrap";
 import { SignedWrapEvent, tagValues } from "../internal/nostrEvent";
 import type { Rumor } from "../internal/nostrEvent";
@@ -10,7 +10,7 @@ export interface AuthenticatedWrap {
   readonly rumor: Rumor;
 }
 
-const decodeWrapEither = Schema.decodeUnknownEither(SignedWrapEvent);
+const decodeWrapResult = Schema.decodeUnknownResult(SignedWrapEvent);
 
 /**
  * Vertical-neutral half of inbound processing: validate the outer wrap,
@@ -20,23 +20,23 @@ const decodeWrapEither = Schema.decodeUnknownEither(SignedWrapEvent);
 export const authenticateWrap = (
   input: unknown,
   identity: LinkstrIdentityService,
-): Either.Either<AuthenticatedWrap, WrapDropped> => {
-  const decodedWrap = decodeWrapEither(input);
-  if (Either.isLeft(decodedWrap)) {
-    return Either.left(
+): Result.Result<AuthenticatedWrap, WrapDropped> => {
+  const decodedWrap = decodeWrapResult(input);
+  if (Result.isFailure(decodedWrap)) {
+    return Result.fail(
       new WrapDropped({ wrapId: null, reason: "malformed-wrap" }),
     );
   }
-  const wrap = decodedWrap.right;
+  const wrap = decodedWrap.success;
 
   if (!tagValues(wrap.tags, "p").includes(identity.pubkey)) {
-    return Either.left(
+    return Result.fail(
       new WrapDropped({ wrapId: wrap.id, reason: "not-addressed-to-me" }),
     );
   }
 
   return unwrapToRumor(wrap, identity.secretKey).pipe(
-    Either.map((rumor) => ({ wrap, rumor })),
-    Either.mapLeft((reason) => new WrapDropped({ wrapId: wrap.id, reason })),
+    Result.map((rumor) => ({ wrap, rumor })),
+    Result.mapError((reason) => new WrapDropped({ wrapId: wrap.id, reason })),
   );
 };

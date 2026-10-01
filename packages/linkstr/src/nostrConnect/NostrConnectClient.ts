@@ -1,5 +1,14 @@
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
-import { Deferred, Duration, Effect, Either, Option, Schema } from "effect";
+import {
+  Context,
+  Deferred,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Result,
+  Schema,
+} from "effect";
 import type { Scope } from "effect";
 import { generateSecretKey } from "nostr-tools";
 import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
@@ -37,7 +46,7 @@ const REPLY_TIMEOUT = Duration.seconds(60);
 const SUBSCRIBE_WAIT = Duration.seconds(5);
 const SINCE_MARGIN_SECONDS = 60;
 
-const Reply = Schema.parseJson(
+const Reply = Schema.fromJsonString(
   Schema.Struct({
     id: Schema.String,
     result: Schema.optional(Schema.String),
@@ -46,7 +55,7 @@ const Reply = Schema.parseJson(
 );
 const decodeReply = Schema.decodeUnknownOption(Reply);
 const decodeSignedEvent = Schema.decodeUnknownOption(
-  Schema.parseJson(SignedPlainEvent),
+  Schema.fromJsonString(SignedPlainEvent),
 );
 
 type Pending = Deferred.Deferred<
@@ -68,10 +77,10 @@ const isSameTemplate = (
  * and relays `sign_event` requests to it. Only replies from the signer that
  * answered with the secret count; nothing is stored.
  */
-export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
+export class NostrConnectClient extends Context.Service<NostrConnectClient>()(
   "linkstr/NostrConnectClient",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const transport = yield* NostrTransport;
       const inspector = yield* Inspector.orNoop;
 
@@ -98,7 +107,7 @@ export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
           let signerPubkey: Pubkey | null = null;
 
           const onEvent = (raw: unknown): void => {
-            const event = Either.getOrNull(decodeVerifiedPlainEvent(raw));
+            const event = Result.getOrNull(decodeVerifiedPlainEvent(raw));
             if (event === null || event.kind !== NOSTR_CONNECT_KIND) return;
             if (signerPubkey !== null && event.pubkey !== signerPubkey) return;
             let plaintext: string;
@@ -115,12 +124,12 @@ export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
             if (signerPubkey === null) {
               if (reply.result !== secret) return;
               signerPubkey = event.pubkey;
-              Deferred.unsafeDone(signer, Effect.succeed(event.pubkey));
+              Deferred.doneUnsafe(signer, Effect.succeed(event.pubkey));
               return;
             }
             const waiting = pending.get(reply.id);
             if (waiting === undefined) return;
-            Deferred.unsafeDone(
+            Deferred.doneUnsafe(
               waiting,
               reply.result === undefined
                 ? Effect.fail(
@@ -138,9 +147,9 @@ export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
             const failure = new NostrConnectRelaysUnreachable({
               failures: [...ended],
             });
-            Deferred.unsafeDone(signer, Effect.fail(failure));
+            Deferred.doneUnsafe(signer, Effect.fail(failure));
             for (const waiting of pending.values()) {
-              Deferred.unsafeDone(waiting, Effect.fail(failure));
+              Deferred.doneUnsafe(waiting, Effect.fail(failure));
             }
           };
           const filter = {
@@ -155,7 +164,7 @@ export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
               const live = yield* Deferred.make<void>();
               yield* transport
                 .subscribe(relay, filter, onEvent, {
-                  onEose: () => Deferred.unsafeDone(live, Effect.void),
+                  onEose: () => Deferred.doneUnsafe(live, Effect.void),
                 })
                 .pipe(
                   Effect.match({
@@ -184,10 +193,12 @@ export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
           }
 
           const connected = Deferred.await(signer).pipe(
-            Effect.timeoutFail({
+            Effect.timeoutOrElse({
               duration: options.connectTimeout ?? CONNECT_TIMEOUT,
-              onTimeout: () =>
-                new NostrConnectSignerTimedOut({ waitingFor: "connect" }),
+              orElse: () =>
+                Effect.fail(
+                  new NostrConnectSignerTimedOut({ waitingFor: "connect" }),
+                ),
             }),
           );
 
@@ -220,10 +231,12 @@ export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
                 return yield* new NostrConnectRequestNotDelivered({ results });
               }
               return yield* Deferred.await(reply).pipe(
-                Effect.timeoutFail({
+                Effect.timeoutOrElse({
                   duration: options.replyTimeout ?? REPLY_TIMEOUT,
-                  onTimeout: () =>
-                    new NostrConnectSignerTimedOut({ waitingFor: "reply" }),
+                  orElse: () =>
+                    Effect.fail(
+                      new NostrConnectSignerTimedOut({ waitingFor: "reply" }),
+                    ),
                 }),
               );
             }).pipe(Effect.ensuring(Effect.sync(() => pending.delete(id))));
@@ -242,7 +255,7 @@ export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
               const verified =
                 signed === null
                   ? null
-                  : Either.getOrNull(decodeVerifiedPlainEvent(signed));
+                  : Result.getOrNull(decodeVerifiedPlainEvent(signed));
               if (verified === null || !isSameTemplate(verified, template)) {
                 return yield* new NostrConnectSignRefused({
                   method: "sign_event",
@@ -268,4 +281,6 @@ export class NostrConnectClient extends Effect.Service<NostrConnectClient>()(
       return { open } as const;
     }),
   },
-) {}
+) {
+  static readonly layer = Layer.effect(this, this.make);
+}

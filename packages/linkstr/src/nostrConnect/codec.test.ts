@@ -178,9 +178,9 @@ describe("answerNostrConnectRequest", () => {
       device: null,
     });
     assert("result" in answer.response);
-    const event = Schema.decodeUnknownSync(Schema.parseJson(SignedPlainEvent))(
-      answer.response.result,
-    );
+    const event = Schema.decodeUnknownSync(
+      Schema.fromJsonString(SignedPlainEvent),
+    )(answer.response.result);
     expect(verifyEvent(event)).toBe(true);
     expect(event).toMatchObject({
       pubkey: me.pubkey,

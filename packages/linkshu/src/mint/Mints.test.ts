@@ -42,7 +42,7 @@ const baseInfo: GetInfoResponse = {
 const stubInstances = (loaded: LoadedWallet): Layer.Layer<WalletInstances> =>
   Layer.succeed(
     WalletInstances,
-    WalletInstances.make({ get: () => Effect.succeed(loaded) }),
+    WalletInstances.of({ get: () => Effect.succeed(loaded) }),
   );
 
 const stubProofStore = (
@@ -152,9 +152,7 @@ const runMints = <A, E>(
 ): Promise<Exit.Exit<A, E>> =>
   Effect.runPromiseExit(
     program.pipe(
-      Effect.provide(
-        Mints.DefaultWithoutDependencies.pipe(Layer.provide(deps)),
-      ),
+      Effect.provide(Mints.layerWithoutDependencies.pipe(Layer.provide(deps))),
     ),
   );
 
@@ -328,7 +326,7 @@ describe("Mints.addKnownMint", () => {
     const inspector = recordingInspector();
     const instances = Layer.succeed(
       WalletInstances,
-      WalletInstances.make({ get: () => Effect.die("must not load") }),
+      WalletInstances.of({ get: () => Effect.die("must not load") }),
     );
 
     const exit = await runMints(
@@ -355,7 +353,7 @@ describe("Mints.addKnownMint", () => {
 describe("Mints.removeKnownMint", () => {
   const instances = Layer.succeed(
     WalletInstances,
-    WalletInstances.make({ get: () => Effect.die("must not load") }),
+    WalletInstances.of({ get: () => Effect.die("must not load") }),
   );
 
   it("forgets a seen mint no proof names", async () => {

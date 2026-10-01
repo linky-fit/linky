@@ -57,12 +57,12 @@ const makeWallet = (args: HarnessArgs): LoadedWallet =>
 const makeHarness = (args: HarnessArgs = {}) => {
   const inspector = recordingInspector();
   const wallet = makeWallet(args);
-  const layer = Validation.DefaultWithoutDependencies.pipe(
+  const layer = Validation.layerWithoutDependencies.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         Layer.succeed(
           WalletInstances,
-          WalletInstances.make({
+          WalletInstances.of({
             // Only the mint under test loads; anything else is a second mint
             // this wallet cannot reach right now.
             get: (requested) =>
@@ -96,7 +96,7 @@ interface ProofSeed {
 /** Seeds proofs, runs one validation call, and reports the resulting inventory. */
 const withProofs = <A, E>(
   seeds: ReadonlyArray<ProofSeed>,
-  operation: (validation: Validation) => Effect.Effect<A, E>,
+  operation: (validation: Validation["Service"]) => Effect.Effect<A, E>,
 ) =>
   Effect.gen(function* () {
     yield* Effect.forEach(seeds, (seed) =>

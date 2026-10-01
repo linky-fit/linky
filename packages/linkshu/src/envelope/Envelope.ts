@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Context, Effect, Layer, Result } from "effect";
 import {
   AmountConsumedByFee,
   EnvelopeBusy,
@@ -108,9 +108,8 @@ const statusOf = (
  * pays at most once. Open envelopes hold their proofs `held` under an
  * `envelope` operation, out of the balance.
  */
-export class Envelope extends Effect.Service<Envelope>()("linkshu/Envelope", {
-  dependencies: [WalletInstances.Default],
-  effect: Effect.gen(function* () {
+export class Envelope extends Context.Service<Envelope>()("linkshu/Envelope", {
+  make: Effect.gen(function* () {
     const kv = yield* KeyValueStore;
     const proofStore = yield* ProofStore;
     const operationStore = yield* OperationStore;
@@ -240,8 +239,8 @@ export class Envelope extends Effect.Service<Envelope>()("linkshu/Envelope", {
           const wallet = yield* instances.get(draft.mint, sat);
           const signed = yield* adoptSigned(wallet, draft);
           if (signed !== null) return opened("adopted", signed);
-          const funded = yield* Effect.either(fund(wallet, draft));
-          if (Either.isRight(funded)) return funded.right;
+          const funded = yield* Effect.result(fund(wallet, draft));
+          if (Result.isSuccess(funded)) return funded.success;
           // Another device funding the key in the meantime makes this swap
           // fail on its outputs or on synced inputs; the envelope is theirs.
           const raced = yield* Effect.orElseSucceed(
@@ -249,7 +248,7 @@ export class Envelope extends Effect.Service<Envelope>()("linkshu/Envelope", {
             () => null,
           );
           return raced === null
-            ? yield* Effect.fail(funded.left)
+            ? yield* Effect.fail(funded.failure)
             : opened("adopted", raced);
         }),
       ).pipe(
@@ -465,4 +464,9 @@ export class Envelope extends Effect.Service<Envelope>()("linkshu/Envelope", {
 
     return { open, state, send, release } as const;
   }),
-}) {}
+}) {
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(WalletInstances.layer),
+  );
+}

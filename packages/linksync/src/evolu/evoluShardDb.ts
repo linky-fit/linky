@@ -5,7 +5,7 @@ import {
   sqliteFalse,
   sqliteTrue,
 } from "@evolu/common";
-import { Deferred, Duration, Effect, FiberId } from "effect";
+import { Deferred, Duration, Effect } from "effect";
 import type {
   Columns,
   Mutation,
@@ -301,10 +301,10 @@ export const createEvoluShardDb = (
     if (!isMutationResult(validation))
       return fail("unexpected mutation result");
     if (!validation.ok) return fail(JSON.stringify(validation.error));
-    const completed = Deferred.unsafeMake<void>(FiberId.none);
+    const completed = Deferred.makeUnsafe<void>();
     callUntyped(evolu, mutation.kind, mutation.table, row, {
       ownerId: mutation.ownerId,
-      onComplete: () => Deferred.unsafeDone(completed, Effect.void),
+      onComplete: () => Deferred.doneUnsafe(completed, Effect.void),
     });
     const entry = record(mutation, new Date().toISOString());
     return Effect.succeed({
@@ -332,15 +332,17 @@ export const createEvoluShardDb = (
         batch.map(({ applied }) => applied),
         { discard: true },
       ).pipe(
-        Effect.timeoutFail({
+        Effect.timeoutOrElse({
           duration: MAX_WRITE_COMPLETION_WAIT,
-          onTimeout: () =>
-            new ShardDbError({
-              table: [...new Set(mutations.map(({ table }) => table))].join(
-                ",",
-              ),
-              message: "Evolu did not confirm the write",
-            }),
+          orElse: () =>
+            Effect.fail(
+              new ShardDbError({
+                table: [...new Set(mutations.map(({ table }) => table))].join(
+                  ",",
+                ),
+                message: "Evolu did not confirm the write",
+              }),
+            ),
         }),
         Effect.tapError(() => Effect.sync(() => batch.forEach(unconfirm))),
       ),

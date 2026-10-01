@@ -19,9 +19,7 @@ export class ProfileMetadata extends Schema.Class<ProfileMetadata>(
    * Content fields linkstr does not model (`website`, `banner`, `bot`, …),
    * raw as decoded, so a republish built from a decoded profile keeps them.
    */
-  extraFields: Schema.optional(
-    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-  ),
+  extraFields: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
 }) {}
 
 export class StatusDraft extends Schema.Class<StatusDraft>("StatusDraft")({
