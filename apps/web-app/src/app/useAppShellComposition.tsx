@@ -36,13 +36,11 @@ import {
   getDisplayUnitLabel,
   getNextDisplayCurrency,
   isFiatDisplayCurrency,
-  normalizeAllowedDisplayCurrencies,
   type DisplayCurrency,
 } from "../utils/displayAmounts";
 import { MAIN_MINT_URL, normalizeMintUrl } from "../utils/mint";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import {
-  getInitialAllowedDisplayCurrencies,
   getInitialDecimalAmountInputEnabled,
   getInitialDisplayCurrency,
   getInitialSeenReceiptsEnabledAtSec,
@@ -72,6 +70,7 @@ import { isUnknownContactId } from "./hooks/messages/contactIdentity";
 import { useChatMessageEffects } from "./hooks/messages/useChatMessageEffects";
 import { useAppDataTransfer } from "./hooks/useAppDataTransfer";
 import { useAppLanguage } from "./hooks/useAppLanguage";
+import { useAllowedDisplayCurrencies } from "./hooks/useAllowedDisplayCurrencies";
 import { useAppPreferences } from "./hooks/useAppPreferences";
 import { useTopDownTilt } from "./hooks/useTopDownTilt";
 import { useArmedDeleteTimeouts } from "./hooks/useArmedDeleteTimeouts";
@@ -189,9 +188,8 @@ export const useAppShellComposition = ({
     useState<string | null>(null);
   const mainSwipeRef = React.useRef<HTMLDivElement | null>(null);
   const mainSwipeScrollTimerRef = React.useRef<number | null>(null);
-  const [allowedDisplayCurrencies, setAllowedDisplayCurrencies] = useState<
-    DisplayCurrency[]
-  >(() => getInitialAllowedDisplayCurrencies());
+  const { allowedDisplayCurrencies, toggleAllowedDisplayCurrency } =
+    useAllowedDisplayCurrencies();
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>(() =>
     getInitialDisplayCurrency(),
   );
@@ -228,23 +226,6 @@ export const useAppShellComposition = ({
       getNextDisplayCurrency(current, allowedDisplayCurrencies),
     );
   }, [allowedDisplayCurrencies]);
-
-  const toggleAllowedDisplayCurrency = React.useCallback(
-    (currency: DisplayCurrency) => {
-      setAllowedDisplayCurrencies((current) => {
-        if (current.includes(currency)) {
-          if (current.length <= 1) return current;
-          return current.filter((candidate) => candidate !== currency);
-        }
-
-        return normalizeAllowedDisplayCurrencies(
-          current.concat(currency),
-          currency,
-        );
-      });
-    },
-    [],
-  );
 
   const toggleDecimalAmountInput = React.useCallback(() => {
     setDecimalAmountInputEnabled((current) => !current);
