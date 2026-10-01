@@ -35,7 +35,7 @@ import {
   redeemLnurlWithdraw,
   type LnurlWithdrawPreview,
 } from "../../../lnurlPay";
-import { NOSTR_RELAYS } from "../../../utils/nostrRelays";
+import { recommendedNostrRelays } from "../../../utils/nostrRelays";
 import {
   CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
@@ -494,7 +494,7 @@ export const useCashuWalletComposition = ({
 
   const topupRecipientNprofile = React.useMemo(() => {
     const pubkey = decodeNpub(currentNpub ?? "");
-    return pubkey ? encodeNprofile(pubkey, NOSTR_RELAYS) : null;
+    return pubkey ? encodeNprofile(pubkey, recommendedNostrRelays()) : null;
   }, [currentNpub]);
 
   const {
@@ -2323,7 +2323,10 @@ export const useCashuWalletComposition = ({
       return;
     }
 
-    const recipientNprofile = encodeNprofile(recipientPubkeyHex, NOSTR_RELAYS);
+    const recipientNprofile = encodeNprofile(
+      recipientPubkeyHex,
+      recommendedNostrRelays(),
+    );
     const preferredMint =
       normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) ?? MAIN_MINT_URL;
     const requestId = makeLocalId();

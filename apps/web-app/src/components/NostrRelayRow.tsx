@@ -3,11 +3,17 @@ import { navigateTo } from "../hooks/useRouting";
 
 interface NostrRelayRowProps {
   detail: string | null;
+  label: string | null;
   state: RelayDotState;
   url: string;
 }
 
-export function NostrRelayRow({ detail, state, url }: NostrRelayRowProps) {
+export function NostrRelayRow({
+  detail,
+  label,
+  state,
+  url,
+}: NostrRelayRowProps) {
   return (
     <button
       type="button"
@@ -17,6 +23,7 @@ export function NostrRelayRow({ detail, state, url }: NostrRelayRowProps) {
       <div className="settings-left">
         <span className="relay-cell">
           <span className="relay-url">{url}</span>
+          {label ? <span className="relay-detail">{label}</span> : null}
           {detail ? <span className="relay-detail">{detail}</span> : null}
         </span>
       </div>

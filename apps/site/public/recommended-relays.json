@@ -1,0 +1,9 @@
+{
+  "nostr": [
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://nostr.linky.fit",
+    "wss://nostr.eu.freedomrelay.dev"
+  ],
+  "evolu": ["wss://evolu.eu.freedomrelay.dev", "wss://evolu.linky.fit"]
+}

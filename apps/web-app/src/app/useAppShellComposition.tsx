@@ -177,6 +177,7 @@ export const useAppShellComposition = ({
   const evoluServersReloadRequired = evoluServers.reloadRequired;
   const saveEvoluServerUrls = evoluServers.setServerUrls;
   const isEvoluServerOffline = evoluServers.isOffline;
+  const isEvoluServerRecommended = evoluServers.isRecommended;
   const setEvoluServerOffline = evoluServers.setServerOffline;
 
   const [newEvoluServerUrl, setNewEvoluServerUrl] = useState("");
@@ -491,6 +492,7 @@ export const useAppShellComposition = ({
     groupNames,
     handleSaveContact,
     isBankPaymentOfferCanceled,
+    isRecommendedRelay,
     isSavingContact,
     lastMessageByContactId,
     mentionContacts,
@@ -1610,6 +1612,7 @@ export const useAppShellComposition = ({
       evoluTableCounts: evoluDbInfo.info.tableCounts,
       evoluWipeStorageIsBusy,
       isEvoluServerOffline,
+      isEvoluServerRecommended,
       newEvoluServerUrl,
       pendingEvoluServerDeleteUrl,
       requestRotateShard: shardRotation.rotate,
@@ -1646,6 +1649,7 @@ export const useAppShellComposition = ({
     },
     relaySettingsInput: {
       canSaveNewRelay,
+      isRecommendedRelay,
       newRelayUrl,
       pendingRelayDeleteUrl,
       relayUrls,

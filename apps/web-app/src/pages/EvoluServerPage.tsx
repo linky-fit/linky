@@ -12,6 +12,7 @@ export function EvoluServerPage(): React.ReactElement {
     evoluServerStatusByUrl,
     evoluServerUrls,
     isEvoluServerOffline,
+    isEvoluServerRecommended,
     pendingEvoluServerDeleteUrl,
     saveEvoluServerUrls,
     setEvoluServerOffline,
@@ -91,33 +92,37 @@ export function EvoluServerPage(): React.ReactElement {
                   </div>
                 </div>
 
-                <div className="settings-row settings-error-note">
-                  <button
-                    type="button"
-                    className="btn-wide danger"
-                    onClick={() => {
-                      if (
-                        pendingEvoluServerDeleteUrl === selectedEvoluServerUrl
-                      ) {
-                        const selectedLower =
-                          selectedEvoluServerUrl.toLowerCase();
-                        const nextUrls = evoluServerUrls.filter(
-                          (u) => u.toLowerCase() !== selectedLower,
-                        );
-                        setPendingEvoluServerDeleteUrl(null);
-                        setEvoluServerOffline(selectedEvoluServerUrl, false);
-                        saveEvoluServerUrls(nextUrls);
-                        navigateTo({ route: "evoluServers" });
-                        return;
-                      }
+                {isEvoluServerRecommended(selectedEvoluServerUrl) ? (
+                  <p className="muted">{t("relayRecommendedNote")}</p>
+                ) : (
+                  <div className="settings-row settings-error-note">
+                    <button
+                      type="button"
+                      className="btn-wide danger"
+                      onClick={() => {
+                        if (
+                          pendingEvoluServerDeleteUrl === selectedEvoluServerUrl
+                        ) {
+                          const selectedLower =
+                            selectedEvoluServerUrl.toLowerCase();
+                          const nextUrls = evoluServerUrls.filter(
+                            (u) => u.toLowerCase() !== selectedLower,
+                          );
+                          setPendingEvoluServerDeleteUrl(null);
+                          setEvoluServerOffline(selectedEvoluServerUrl, false);
+                          saveEvoluServerUrls(nextUrls);
+                          navigateTo({ route: "evoluServers" });
+                          return;
+                        }
 
-                      setStatus(t("deleteArmedHint"));
-                      setPendingEvoluServerDeleteUrl(selectedEvoluServerUrl);
-                    }}
-                  >
-                    {t("evoluServerRemove")}
-                  </button>
-                </div>
+                        setStatus(t("deleteArmedHint"));
+                        setPendingEvoluServerDeleteUrl(selectedEvoluServerUrl);
+                      }}
+                    >
+                      {t("evoluServerRemove")}
+                    </button>
+                  </div>
+                )}
               </>
             );
           })()}

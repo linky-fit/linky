@@ -563,8 +563,8 @@ export const useContactsMessagingComposition = ({
 
   const {
     canSaveNewRelay,
+    isRecommendedRelay,
     newRelayUrl,
-    nostrFetchRelays,
     pendingRelayDeleteUrl,
     relayUrls,
     requestDeleteSelectedRelay,
@@ -580,7 +580,7 @@ export const useContactsMessagingComposition = ({
     t,
   });
 
-  useLinkstrConfigSync({ currentNsec, nostrFetchRelays });
+  useLinkstrConfigSync({ currentNsec, nostrFetchRelays: relayUrls });
   useLinkstrInspectorBridge();
 
   useLinkstrProfileSync({
@@ -2173,6 +2173,7 @@ export const useContactsMessagingComposition = ({
     handleSaveContact,
     getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled,
+    isRecommendedRelay,
     isSavingContact,
     lastMessageByContactId: lastVisibleMessageByContactId,
     mentionContacts,

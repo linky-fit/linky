@@ -27,7 +27,7 @@ vi.mock("@linky-fit/linkstr", async (importOriginal) => {
   };
 });
 vi.mock("./utils/nostrRelays", () => ({
-  NOSTR_RELAYS: ["wss://configured.example"],
+  recommendedNostrRelays: () => ["wss://configured.example"],
   ALLOW_INSECURE_LOCALHOST_RELAYS: false,
 }));
 vi.mock("./utils/pushNsecStorage", () => ({

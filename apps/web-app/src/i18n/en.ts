@@ -210,6 +210,8 @@ export const en = {
   invalidRelayUrl: "Enter a secure WebSocket relay URL (wss://).",
   relayUrl: "Relay URL",
   relayStatusLabel: "Status",
+  relayRecommended: "Recommended",
+  relayRecommendedNote: "Recommended by Linky, so it stays configured.",
   relayStateConnected: "Connected",
   relayStateConnecting: "Connecting…",
   relayStateUnreachable: "Unreachable",

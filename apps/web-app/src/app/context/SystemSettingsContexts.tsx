@@ -56,6 +56,7 @@ export interface EvoluSettingsContextValue {
   evoluTableCounts: Record<string, number | null>;
   evoluWipeStorageIsBusy: boolean;
   isEvoluServerOffline: (url: string) => boolean;
+  isEvoluServerRecommended: (url: string) => boolean;
   newEvoluServerUrl: string;
   pendingEvoluServerDeleteUrl: string | null;
   requestClearDatabase: () => void;
@@ -100,6 +101,7 @@ export interface MintSettingsContextValue {
 
 export interface RelaySettingsContextValue {
   canSaveNewRelay: boolean;
+  isRecommendedRelay: (url: string) => boolean;
   newRelayUrl: string;
   pendingRelayDeleteUrl: string | null;
   relayUrls: string[];

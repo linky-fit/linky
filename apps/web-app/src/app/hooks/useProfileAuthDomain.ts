@@ -34,7 +34,7 @@ import {
   saveCachedProfile,
   saveCachedStatus,
 } from "../../profileCache";
-import { NOSTR_RELAYS } from "../../utils/nostrRelays";
+import { recommendedNostrRelays } from "../../utils/nostrRelays";
 import { readClipboardText } from "../../platform/clipboard";
 import {
   clearIdentitySecrets,
@@ -361,7 +361,7 @@ export const useProfileAuthDomain = ({
         ...(trimmedPicture ? { picture: trimmedPicture } : {}),
       });
 
-      const config = buildLinkstrConfig(nsec, NOSTR_RELAYS);
+      const config = buildLinkstrConfig(nsec, recommendedNostrRelays());
       if (config === null) {
         throw new Error(t("onboardingCreateFailed"));
       }
@@ -401,14 +401,16 @@ export const useProfileAuthDomain = ({
           : null);
       if (!metadata) return true;
 
-      const config = buildLinkstrConfig(newNsec, NOSTR_RELAYS);
+      const config = buildLinkstrConfig(newNsec, recommendedNostrRelays());
       if (config === null) return false;
 
       setLinkstrConfig(config);
       const publishExit = await publishProfile(metadata);
       if (Exit.isFailure(publishExit)) {
         // Hand the runtime back to the still-active identity before bailing.
-        setLinkstrConfig(buildLinkstrConfig(previousNsec, NOSTR_RELAYS));
+        setLinkstrConfig(
+          buildLinkstrConfig(previousNsec, recommendedNostrRelays()),
+        );
         return false;
       }
 

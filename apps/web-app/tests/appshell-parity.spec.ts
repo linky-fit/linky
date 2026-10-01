@@ -394,8 +394,13 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(title).toHaveText("Nostr-Relay");
     await expect(page.getByText("Status", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Löschen", exact: true }),
+      page.getByText("Von Linky empfohlen, daher bleibt es eingerichtet.", {
+        exact: true,
+      }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Löschen", exact: true }),
+    ).toHaveCount(0);
     await close.click();
     await expect(page).toHaveURL(/#nostr-relays$/);
     await close.click();

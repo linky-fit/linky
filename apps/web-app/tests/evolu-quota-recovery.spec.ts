@@ -12,13 +12,15 @@ import { topUp } from "./helpers/wallet";
 
 test.use({ actionTimeout: 20_000 });
 
+const recoveryRelay = "ws://localhost:4001";
+
+// The recommended relay starts offline, so bringing it online adds capacity.
 const addRecoveryRelay = async (page: Page): Promise<void> => {
-  await page.goto("/#evolu-server/new");
+  await page.goto(`/#evolu-server/${encodeURIComponent(recoveryRelay)}`);
   await expect(
     page.getByRole("button", { name: "Clear Evolu storage", exact: true }),
   ).toHaveCount(0);
-  await page.locator("#evoluServerUrl").fill("ws://localhost:4001");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Go online", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Reload now", exact: true }),
   ).toBeVisible();
@@ -41,16 +43,19 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     const errors = watchAppErrors(page, label);
     await setBaseStorage(page);
     await setSeedLoginStorage(page, identity);
-    await page.addInitScript(() => {
+    await page.addInitScript((offlineRelay) => {
       const initialized = "linky.test.quota-relay-configured";
       if (sessionStorage.getItem(initialized) === "1") return;
-      localStorage.setItem("linky.evoluServers.defaultRemoved.v1", "true");
       localStorage.setItem(
-        "linky.evoluServers.v1",
+        "linky.evoluServers.user.v1",
         JSON.stringify(["ws://localhost:4002"]),
       );
+      localStorage.setItem(
+        "linky.evoluServers.disabled.v1",
+        JSON.stringify([offlineRelay]),
+      );
       sessionStorage.setItem(initialized, "1");
-    });
+    }, recoveryRelay);
     await stubFiatRates(page);
     await page.goto("/#wallet");
     await waitForNetworkReady(page);

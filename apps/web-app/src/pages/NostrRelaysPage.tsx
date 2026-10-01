@@ -5,7 +5,7 @@ import { relayDotState, useRelayHealth } from "../app/hooks/useRelayHealth";
 import { NostrRelayRow } from "../components/NostrRelayRow";
 
 export function NostrRelaysPage(): React.ReactElement {
-  const { relayUrls } = useRelaySettingsContext();
+  const { isRecommendedRelay, relayUrls } = useRelaySettingsContext();
   const relayHealth = useRelayHealth();
   const { t } = useAppShellCore();
   return (
@@ -22,6 +22,7 @@ export function NostrRelaysPage(): React.ReactElement {
                 url={url}
                 state={relayDotState(health)}
                 detail={health?.state === "unreachable" ? health.detail : null}
+                label={isRecommendedRelay(url) ? t("relayRecommended") : null}
               />
             );
           })}

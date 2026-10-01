@@ -11,7 +11,6 @@ import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
 import {
   identityFromNsec,
   NostrSecretKey,
-  RelayUrl,
   runLinkstr,
   WrapId,
   WrapInbox,
@@ -31,7 +30,7 @@ import {
   getReceivedMoneyCopyForLanguage,
 } from "./app/lib/cashuNotificationCopy";
 import {
-  NOSTR_RELAYS,
+  recommendedNostrRelays,
   ALLOW_INSECURE_LOCALHOST_RELAYS,
 } from "./utils/nostrRelays";
 import { getStoredPushContactName } from "./utils/pushContactNamesStorage";
@@ -44,7 +43,6 @@ declare const self: ServiceWorkerGlobalScope;
 // wrap fetch past it.
 const WRAP_FETCH_TIMEOUT_MS = 5000;
 
-const isRelayUrl = Schema.is(RelayUrl);
 const isWrapId = Schema.is(WrapId);
 
 interface PushNotificationData {
@@ -196,7 +194,7 @@ async function fetchWrapInboxEvent(
     return null;
   }
 
-  const readRelays = NOSTR_RELAYS.filter(isRelayUrl);
+  const readRelays = recommendedNostrRelays();
   if (readRelays.length === 0) {
     logSw("sw decrypt fetch skipped because no relays were available", {
       data: envelope.data ?? {},

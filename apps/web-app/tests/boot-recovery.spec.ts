@@ -143,8 +143,10 @@ for (const failureTiming of ["before", "after"]) {
     await setBaseStorage(page);
     await setSeedLoginStorage(page, await createSeedIdentity());
     await page.addInitScript(() => {
-      localStorage.setItem("linky.evoluServers.defaultRemoved.v1", "true");
-      localStorage.setItem("linky.evoluServers.v1", "[]");
+      localStorage.setItem(
+        "linky.evoluServers.disabled.v1",
+        JSON.stringify(["ws://localhost:4001"]),
+      );
     });
     await page.goto("/#wallet");
     await expect(page.getByLabel("Available balance")).toBeVisible();

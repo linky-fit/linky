@@ -214,6 +214,8 @@ export const cs = {
   invalidRelayUrl: "Zadejte zabezpečenou WebSocket adresu relay (wss://).",
   relayUrl: "Relay URL",
   relayStatusLabel: "Stav",
+  relayRecommended: "Doporučený",
+  relayRecommendedNote: "Doporučuje ho Linky, proto zůstává nastavený.",
   relayStateConnected: "Připojeno",
   relayStateConnecting: "Připojování…",
   relayStateUnreachable: "Nedostupný",

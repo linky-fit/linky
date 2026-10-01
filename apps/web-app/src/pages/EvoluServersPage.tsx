@@ -21,6 +21,7 @@ export function EvoluServersPage(): React.ReactElement {
     evoluTableCounts,
     evoluWipeStorageIsBusy,
     isEvoluServerOffline,
+    isEvoluServerRecommended,
     requestClearDatabase,
     syncOwnerId,
   } = useEvoluSettingsContext();
@@ -62,7 +63,14 @@ export function EvoluServersPage(): React.ReactElement {
                 onClick={() => navigateTo({ route: "evoluServer", id: url })}
               >
                 <div className="settings-left">
-                  <span className="relay-url">{url}</span>
+                  <span className="relay-cell">
+                    <span className="relay-url">{url}</span>
+                    {isEvoluServerRecommended(url) ? (
+                      <span className="relay-detail">
+                        {t("relayRecommended")}
+                      </span>
+                    ) : null}
+                  </span>
                 </div>
                 <div className="settings-right">
                   <span

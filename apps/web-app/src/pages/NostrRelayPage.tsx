@@ -6,6 +6,7 @@ import { formatRelativeTime } from "../utils/formatting";
 
 export function NostrRelayPage(): React.ReactElement {
   const {
+    isRecommendedRelay,
     pendingRelayDeleteUrl,
     requestDeleteSelectedRelay,
     selectedRelayUrl,
@@ -76,18 +77,22 @@ export function NostrRelayPage(): React.ReactElement {
         </div>
       ) : null}
 
-      <div className="settings-row">
-        <button
-          className={
-            pendingRelayDeleteUrl === selectedRelayUrl
-              ? "btn-wide danger"
-              : "btn-wide"
-          }
-          onClick={requestDeleteSelectedRelay}
-        >
-          {t("delete")}
-        </button>
-      </div>
+      {isRecommendedRelay(selectedRelayUrl) ? (
+        <p className="muted nostr-relay-note">{t("relayRecommendedNote")}</p>
+      ) : (
+        <div className="settings-row">
+          <button
+            className={
+              pendingRelayDeleteUrl === selectedRelayUrl
+                ? "btn-wide danger"
+                : "btn-wide"
+            }
+            onClick={requestDeleteSelectedRelay}
+          >
+            {t("delete")}
+          </button>
+        </div>
+      )}
     </section>
   );
 }

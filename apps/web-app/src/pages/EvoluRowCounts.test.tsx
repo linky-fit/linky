@@ -37,6 +37,7 @@ vi.mock("../app/context/SystemSettingsContexts", () => ({
     evoluServerUrls: counts.servers,
     evoluServerStatusByUrl: {},
     isEvoluServerOffline: (url: string) => counts.disabled.includes(url),
+    isEvoluServerRecommended: () => false,
     evoluShards: [],
     evoluSyncOwnerIds: [],
   }),

@@ -66,6 +66,7 @@ const createEvoluSettings = (
   evoluTableCounts: {},
   evoluWipeStorageIsBusy: false,
   isEvoluServerOffline: () => false,
+  isEvoluServerRecommended: () => false,
   newEvoluServerUrl: "",
   pendingEvoluServerDeleteUrl: null,
   requestRotateShard: noopAsync,
@@ -111,6 +112,7 @@ const mintSettings: MintSettingsContextValue = {
 
 const relaySettings: RelaySettingsContextValue = {
   canSaveNewRelay: false,
+  isRecommendedRelay: () => false,
   newRelayUrl: "",
   pendingRelayDeleteUrl: null,
   relayUrls: [],

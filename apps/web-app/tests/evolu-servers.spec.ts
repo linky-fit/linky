@@ -5,7 +5,7 @@ import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
 
-test("relay removals survive reload, including the final relay", async ({
+test("recommended relays stay configured while the user's own relays come and go", async ({
   page,
 }) => {
   await setBaseStorage(page);
@@ -17,44 +17,37 @@ test("relay removals survive reload, including the final relay", async ({
   );
   await page.goto("/#evolu-servers");
   const rows = page.locator(".evolu-server-list button");
-  await expect(rows.first()).toBeVisible();
-  const urls = await rows.locator(".relay-url").allTextContents();
+  const recommended = rows.filter({ hasText: "ws://localhost:4001" });
+  const custom = rows.filter({ hasText: "wss://sync.example.com" });
+  const noBackupWarning = page.getByText(
+    /Your app data is not being backed up or synced via Evolu/,
+  );
+  await expect(rows).toHaveCount(1);
+  await expect(recommended).toContainText("Recommended");
 
-  for (const url of [...urls].reverse()) {
-    await rows.filter({ hasText: url }).click();
-    await page.getByRole("button", { name: "Go offline", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Remove server", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Remove server", exact: true })
-      .click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
-    await expect(rows.filter({ hasText: url })).toHaveCount(0);
-    await page.reload();
-    await expect(
-      page.getByRole("heading", { name: "Row counts", exact: true }),
-    ).toBeVisible();
-    await expect(rows.filter({ hasText: url })).toHaveCount(0);
-  }
+  await recommended.click();
   await expect(
-    page.getByText("No Evolu servers configured.", { exact: true }),
+    page.getByText("Recommended by Linky, so it stays configured.", {
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
-    page.getByText(/Your app data is not being backed up or synced via Evolu/),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("linky.evoluServers.v1") ?? "null"),
-    ),
-  ).toEqual([]);
+    page.getByRole("button", { name: "Remove server", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Go offline", exact: true }).click();
+  await page.goto("/#evolu-servers");
+  await expect(noBackupWarning).toBeVisible();
+  await page.reload();
+  await expect(noBackupWarning).toBeVisible();
 
   await page.getByRole("button", { name: "Add server", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Add server", exact: true })
     .fill("wss://sync.example.com");
   await page.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(rows).toHaveCount(1);
+  await expect(rows).toHaveCount(2);
+  await expect(custom).not.toContainText("Recommended");
+  await expect(noBackupWarning).not.toBeVisible();
   await page.goto("/#advanced/inspector/timeline");
   await page
     .getByRole("searchbox", { name: "Filter rows" })
@@ -65,19 +58,22 @@ test("relay removals survive reload, including the final relay", async ({
       .first(),
   ).toBeVisible();
   await page.goto("/#evolu-servers");
-  await expect(
-    page.getByText(/Your app data is not being backed up or synced via Evolu/),
-  ).not.toBeVisible();
+  await page.reload();
+  await expect(rows).toHaveCount(2);
+
+  await custom.click();
+  for (let click = 0; click < 2; click += 1) {
+    await page
+      .getByRole("button", { name: "Remove server", exact: true })
+      .click();
+  }
+  await expect(page).toHaveURL(/#evolu-servers$/);
   await page.reload();
   await expect(rows).toHaveCount(1);
-  await rows.first().click();
-  await page.getByRole("button", { name: "Go offline", exact: true }).click();
-  await page.goto("/#evolu-servers");
-  await expect(
-    page.getByText(/Your app data is not being backed up or synced via Evolu/),
-  ).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByText(/Your app data is not being backed up or synced via Evolu/),
-  ).toBeVisible();
+  await expect(recommended).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("linky.evoluServers.user.v1") ?? "null"),
+    ),
+  ).toEqual([]);
 });

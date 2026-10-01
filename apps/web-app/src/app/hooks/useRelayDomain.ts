@@ -13,15 +13,14 @@ import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
 import type { Route } from "../../types/route";
 import {
+  isRecommendedNostrRelay,
   isRelayUrl,
   loadCachedRelayLists,
-  loadInitialRelayUrls,
-  needsLinkyNostrRelayMigration,
-  completeLinkyNostrRelayMigration,
-  withLinkyNostrRelay,
-  NOSTR_RELAYS,
+  relayIdentity,
   saveCachedRelayLists,
+  withRecommendedNostrRelays,
 } from "../../utils/nostrRelays";
+import { useRecommendedRelays } from "./useRecommendedRelays";
 import { nowSeconds } from "../../utils/time";
 import type { Translate } from "../../i18n";
 
@@ -37,8 +36,8 @@ interface UseRelayDomainParams {
 
 interface UseRelayDomainResult {
   canSaveNewRelay: boolean;
+  isRecommendedRelay: (url: string) => boolean;
   newRelayUrl: string;
-  nostrFetchRelays: string[];
   pendingRelayDeleteUrl: string | null;
   relayUrls: string[];
   requestDeleteSelectedRelay: () => void;
@@ -51,10 +50,17 @@ function haveSameRelayUrls(
   left: readonly string[],
   right: readonly string[],
 ): boolean {
-  if (left.length !== right.length) return false;
-  const sortedRight = [...right].sort();
-  return [...left].sort().every((url, index) => url === sortedRight[index]);
+  const rightIds = new Set(right.filter(isRelayUrl).map(relayIdentity));
+  const leftIds = new Set(left.filter(isRelayUrl).map(relayIdentity));
+  return (
+    leftIds.size === rightIds.size &&
+    [...leftIds].every((id) => rightIds.has(id))
+  );
 }
+
+const loadCachedRelayUrls = (pubkey: string | null): string[] => [
+  ...((pubkey === null ? null : loadCachedRelayLists(pubkey))?.relayUrls ?? []),
+];
 
 function newestUpdatedAt(lists: {
   relaysUpdatedAt: number | null;
@@ -89,16 +95,35 @@ export const useRelayDomain = ({
     return identityFromNsec(nsec)?.pubkey ?? null;
   }, [currentNsec]);
 
+  const { recommendedRelays, unretireNostrRelay } =
+    useRecommendedRelays(networkEnabled);
+
+  // Keeps the array identity while the relays stay the same, because a new
+  // array rebuilds the Nostr runtime and replays the inbox.
   const [relayUrls, setRelayUrls] = React.useState<string[]>(() =>
-    loadInitialRelayUrls(cachePubkey),
+    withRecommendedNostrRelays(
+      loadCachedRelayUrls(cachePubkey),
+      recommendedRelays,
+    ),
+  );
+  const updateRelayUrls = React.useCallback(
+    (urls: readonly string[]) => {
+      const next = withRecommendedNostrRelays(urls, recommendedRelays);
+      setRelayUrls((current) =>
+        haveSameRelayUrls(current, next) ? current : next,
+      );
+    },
+    [recommendedRelays],
   );
 
   React.useEffect(() => {
-    const next = loadInitialRelayUrls(cachePubkey);
-    setRelayUrls((current) =>
-      haveSameRelayUrls(current, next) ? current : [...next],
-    );
-  }, [cachePubkey]);
+    updateRelayUrls(loadCachedRelayUrls(cachePubkey));
+  }, [cachePubkey, updateRelayUrls]);
+
+  const isRecommendedRelay = React.useCallback(
+    (url: string) => isRecommendedNostrRelay(url, recommendedRelays),
+    [recommendedRelays],
+  );
 
   const persistLocalRelayUrls = React.useCallback(
     (urls: readonly string[]) => {
@@ -122,20 +147,6 @@ export const useRelayDomain = ({
     }, 5000);
     return () => window.clearTimeout(timeoutId);
   }, [pendingRelayDeleteUrl]);
-
-  const nostrFetchRelays = React.useMemo(() => {
-    const merged = [...relayUrls, ...NOSTR_RELAYS];
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const raw of merged) {
-      const url = raw.trim();
-      if (!isRelayUrl(url)) continue;
-      if (seen.has(url)) continue;
-      seen.add(url);
-      out.push(url);
-    }
-    return out;
-  }, [relayUrls]);
 
   const selectedRelayUrl = React.useMemo(() => {
     if (route.kind !== "nostrRelay") return null;
@@ -186,6 +197,7 @@ export const useRelayDomain = ({
     if (relayProfileSyncForNpubRef.current === relaySyncKey) return;
 
     let cancelled = false;
+    let publishing = false;
     let retryTimeout: number | undefined;
 
     const run = async () => {
@@ -200,77 +212,25 @@ export const useRelayDomain = ({
           new Set((lists.relays ?? []).map((entry) => entry.relay)),
         );
         const inboxRelayUrls = Array.from(new Set(lists.dmRelays ?? []));
-        const urls = relayListUrls.length > 0 ? relayListUrls : inboxRelayUrls;
+        const publishedUrls =
+          relayListUrls.length > 0 ? relayListUrls : inboxRelayUrls;
 
         if (cancelled) return;
 
         const cached =
           cachePubkey === null ? null : loadCachedRelayLists(cachePubkey);
+        // A relay can serve lists older than the ones this device last saved.
+        const source =
+          publishedUrls.length === 0 ||
+          (cached !== null && newestUpdatedAt(lists) < newestUpdatedAt(cached))
+            ? (cached?.relayUrls ?? [])
+            : publishedUrls;
+        const urls = withRecommendedNostrRelays(source, recommendedRelays);
 
         if (
-          cachePubkey !== null &&
-          needsLinkyNostrRelayMigration(cachePubkey)
+          haveSameRelayUrls(relayListUrls, urls) &&
+          haveSameRelayUrls(inboxRelayUrls, urls)
         ) {
-          const source =
-            cached !== null && newestUpdatedAt(cached) > newestUpdatedAt(lists)
-              ? cached.relayUrls
-              : urls.length > 0
-                ? Array.from(new Set([...relayListUrls, ...inboxRelayUrls]))
-                : (cached?.relayUrls ?? NOSTR_RELAYS);
-          const migrated = withLinkyNostrRelay(source);
-          // Publish before changing state: changing relays rebuilds the runtime
-          // and interrupts any in-flight publish on the previous runtime.
-          const receipt = await publishNostrRelayLists(migrated);
-          if (cancelled) return;
-          saveCachedRelayLists(cachePubkey, {
-            relayUrls: migrated,
-            relaysUpdatedAt: receipt.relayList.sentAt,
-            dmRelaysUpdatedAt: receipt.dmRelayList.sentAt,
-          });
-          if (
-            haveSameRelayUrls(
-              loadCachedRelayLists(cachePubkey)?.relayUrls ?? [],
-              migrated,
-            )
-          ) {
-            completeLinkyNostrRelayMigration(cachePubkey);
-          }
-          relayProfileSyncForNpubRef.current = relayProfileSyncKey(
-            currentNpub,
-            migrated,
-          );
-          setRelayUrls(migrated);
-          reportAppLog({
-            tag: "relayList.linkyRelayMigrated",
-            summary: "Added the Linky relay to the Nostr relay lists",
-            links: {
-              wrap: [receipt.relayList.eventId, receipt.dmRelayList.eventId],
-            },
-            payload: { relayCount: migrated.length },
-          });
-          return;
-        }
-
-        if (urls.length > 0) {
-          if (
-            cached !== null &&
-            newestUpdatedAt(lists) < newestUpdatedAt(cached)
-          ) {
-            // A relay served events older than what we already synced; keep
-            // the newer cached list and mark this state as synced.
-            relayProfileSyncForNpubRef.current = relaySyncKey;
-            return;
-          }
-
-          // Record before setRelayUrls: the state change re-runs this effect,
-          // and the recorded key makes that follow-up run a no-op.
-          relayProfileSyncForNpubRef.current = relayProfileSyncKey(
-            currentNpub,
-            urls,
-          );
-          setRelayUrls((current) =>
-            haveSameRelayUrls(current, urls) ? current : urls,
-          );
           if (cachePubkey !== null) {
             saveCachedRelayLists(cachePubkey, {
               relayUrls: urls,
@@ -278,36 +238,41 @@ export const useRelayDomain = ({
               dmRelaysUpdatedAt: lists.dmRelaysUpdatedAt,
             });
           }
-
-          if (
-            currentNsec &&
-            !haveSameRelayUrls(relayListUrls, inboxRelayUrls)
-          ) {
-            await publishNostrRelayLists(urls);
+        } else {
+          publishing = true;
+          // Publish before changing state: changing relays rebuilds the runtime
+          // and interrupts any in-flight publish on the previous runtime.
+          const receipt = await publishNostrRelayLists(urls);
+          if (cancelled) return;
+          if (cachePubkey !== null) {
+            saveCachedRelayLists(cachePubkey, {
+              relayUrls: urls,
+              relaysUpdatedAt: receipt.relayList.sentAt,
+              dmRelaysUpdatedAt: receipt.dmRelayList.sentAt,
+            });
           }
-          return;
+          reportAppLog({
+            tag: "relayList.reconciled",
+            summary:
+              "Published the Nostr relay lists with the recommended relays",
+            links: {
+              wrap: [receipt.relayList.eventId, receipt.dmRelayList.eventId],
+            },
+            payload: { relayUrls: urls, previousRelayUrls: publishedUrls },
+          });
         }
 
-        // No published list found: republish the last known list so relays
-        // regain it, falling back to the defaults for a fresh identity.
-        const fallback = cached === null ? NOSTR_RELAYS : cached.relayUrls;
+        // Record before updateRelayUrls: the state change re-runs this effect,
+        // and the recorded key makes that follow-up run a no-op.
         relayProfileSyncForNpubRef.current = relayProfileSyncKey(
           currentNpub,
-          fallback,
+          urls,
         );
-        setRelayUrls((current) =>
-          haveSameRelayUrls(current, fallback) ? current : [...fallback],
-        );
-        if (currentNsec) {
-          await publishNostrRelayLists([...fallback]);
-        }
+        updateRelayUrls(urls);
       } catch (e) {
         if (cancelled) return;
         relayProfileSyncForNpubRef.current = null;
-        if (
-          cachePubkey !== null &&
-          needsLinkyNostrRelayMigration(cachePubkey)
-        ) {
+        if (publishing) {
           retryTimeout = window.setTimeout(retrySync, 30_000);
         }
         reportAppLog({
@@ -330,8 +295,10 @@ export const useRelayDomain = ({
     fetchOwnRelayLists,
     networkEnabled,
     publishNostrRelayLists,
+    recommendedRelays,
     relayUrls,
     syncAttempt,
+    updateRelayUrls,
   ]);
 
   const saveNewRelay = React.useCallback(() => {
@@ -346,13 +313,18 @@ export const useRelayDomain = ({
       return;
     }
 
-    const already = relayUrls.some((u) => u === url);
+    const already = relayUrls.some(
+      (u) => relayIdentity(u) === relayIdentity(url),
+    );
     if (already) {
       navigateTo({ route: "nostrRelays" });
       return;
     }
 
     const nextUrls = [...relayUrls, url];
+    unretireNostrRelay(
+      (retired) => relayIdentity(retired) === relayIdentity(url),
+    );
     if (currentNpub) {
       relayProfileSyncForNpubRef.current = relayProfileSyncKey(
         currentNpub,
@@ -379,11 +351,13 @@ export const useRelayDomain = ({
     relayUrls,
     setStatus,
     t,
+    unretireNostrRelay,
   ]);
 
   const requestDeleteSelectedRelay = React.useCallback(() => {
     if (route.kind !== "nostrRelay") return;
     if (!selectedRelayUrl) return;
+    if (isRecommendedRelay(selectedRelayUrl)) return;
     if (relayUrls.length <= 1) {
       setStatus(`${t("errorPrefix")}: ${t("fillAtLeastOne")}`);
       return;
@@ -415,6 +389,7 @@ export const useRelayDomain = ({
     setStatus(t("deleteArmedHint"));
   }, [
     currentNpub,
+    isRecommendedRelay,
     pendingRelayDeleteUrl,
     persistLocalRelayUrls,
     publishNostrRelayLists,
@@ -429,8 +404,8 @@ export const useRelayDomain = ({
 
   return {
     canSaveNewRelay,
+    isRecommendedRelay,
     newRelayUrl,
-    nostrFetchRelays,
     pendingRelayDeleteUrl,
     relayUrls,
     requestDeleteSelectedRelay,

@@ -33,6 +33,7 @@ import { isRecord } from "./utils/unknown";
 import { getInspectorEmissionEnabled } from "./devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
 import { reportAppLog } from "./devtools/inspector/appLog";
+import { loadRecommendedRelays } from "./utils/recommendedRelays";
 
 const isEvoluLoggingEnabled = (): boolean => {
   if (!import.meta.env.DEV) return false;
@@ -42,12 +43,17 @@ const isEvoluLoggingEnabled = (): boolean => {
   return safeLocalStorageGet("linky_debug_evolu_sql") === "1";
 };
 
-const EVOLU_SERVERS_STORAGE_KEY = "linky.evoluServers.v1";
+// Servers the user added; the recommended servers are always configured on top.
+const EVOLU_USER_SERVERS_STORAGE_KEY = "linky.evoluServers.user.v1";
 
-// Backwards-compatible flag that allows removing the built-in default servers.
-// Without this, we can only store "extras" and the defaults would always be re-added.
-const EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY =
+// Pre-recommendation storage, read once to migrate it into the user servers.
+const LEGACY_EVOLU_SERVERS_STORAGE_KEY = "linky.evoluServers.v1";
+const LEGACY_EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY =
   "linky.evoluServers.defaultRemoved.v1";
+const LEGACY_DEFAULT_EVOLU_SERVER_URLS = [
+  "wss://evolu.linky.fit",
+  "wss://free.evoluhq.com",
+];
 
 const EVOLU_SERVERS_DISABLED_STORAGE_KEY = "linky.evoluServers.disabled.v1";
 
@@ -65,11 +71,6 @@ const envEvoluServerUrls = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
   .split(",")
   .map((url) => url.trim())
   .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
-
-const DEFAULT_EVOLU_SERVER_URLS: ReadonlyArray<string> =
-  envEvoluServerUrls.length > 0
-    ? envEvoluServerUrls
-    : ["wss://evolu.linky.fit", "wss://free.evoluhq.com"];
 
 // Generate a valid SimpleName (1-42 chars, alphanumeric + dash) from mnemonic
 // Each user gets their own SQLite database file
@@ -265,29 +266,28 @@ export const setEvoluServerDisabled = (
   safeLocalStorageSetJson(EVOLU_SERVERS_DISABLED_STORAGE_KEY, next);
 };
 
-const getEvoluConfiguredServerUrls = (): ReadonlyArray<string> => {
-  const stored = safeLocalStorageGetJson(
-    EVOLU_SERVERS_STORAGE_KEY,
-    EffectSchema.Array(EffectSchema.String),
-    [],
+// Read once per launch: a refreshed recommendation applies on the next start,
+// when the transports are created again.
+const RECOMMENDED_EVOLU_SERVER_URLS = normalizeUrlList(
+  envEvoluServerUrls.length > 0
+    ? envEvoluServerUrls
+    : loadRecommendedRelays().evolu,
+);
+
+const isRecommendedEvoluServer = (url: string): boolean =>
+  RECOMMENDED_EVOLU_SERVER_URLS.some(
+    (recommended) => recommended.toLowerCase() === url.toLowerCase(),
   );
 
-  const defaultRemoved = safeLocalStorageGetJson(
-    EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY,
-    EffectSchema.Boolean,
-    false,
-  );
-
-  const combined = [
-    ...(defaultRemoved ? [] : DEFAULT_EVOLU_SERVER_URLS),
-    ...stored,
-  ];
-
-  const unique = normalizeUrlList(combined);
-
-  // If everything is removed, return empty list (= local-only instance).
-  return unique;
-};
+const getEvoluConfiguredServerUrls = (): ReadonlyArray<string> =>
+  normalizeUrlList([
+    ...RECOMMENDED_EVOLU_SERVER_URLS,
+    ...safeLocalStorageGetJson(
+      EVOLU_USER_SERVERS_STORAGE_KEY,
+      EffectSchema.Array(EffectSchema.String),
+      [],
+    ),
+  ]);
 
 const getEvoluActiveServerUrls = (): ReadonlyArray<string> => {
   const configured = getEvoluConfiguredServerUrls();
@@ -297,39 +297,47 @@ const getEvoluActiveServerUrls = (): ReadonlyArray<string> => {
 };
 
 const setEvoluServerUrls = (urls: ReadonlyArray<string>): void => {
-  // The legacy reader merges defaults unless this flag is set. Store the full
-  // selection so individual defaults and an empty list survive reloads.
-  safeLocalStorageSetJson(EVOLU_SERVERS_STORAGE_KEY, normalizeUrlList(urls));
-  safeLocalStorageSetJson(EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY, true);
+  safeLocalStorageSetJson(
+    EVOLU_USER_SERVERS_STORAGE_KEY,
+    normalizeUrlList(urls).filter((url) => !isRecommendedEvoluServer(url)),
+  );
 };
 
-const migrateLinkyEvoluServer = (): void => {
-  const migrationKey = "linky.evoluServers.linkyRelayAdded.v1";
-  if (envEvoluServerUrls.length > 0) return;
-  if (safeLocalStorageGet(migrationKey) === "true") return;
-
-  const relay = "wss://evolu.linky.fit";
-  const configured = getEvoluConfiguredServerUrls();
-  if (!configured.includes(relay)) {
-    const stored = safeLocalStorageGetJson(
-      EVOLU_SERVERS_STORAGE_KEY,
-      EffectSchema.Array(EffectSchema.String),
-      [],
-    );
-    safeLocalStorageSetJson(EVOLU_SERVERS_STORAGE_KEY, [...stored, relay]);
-  }
-  setEvoluServerDisabled(relay, false);
-
-  if (!getEvoluActiveServerUrls().includes(relay)) return;
-  safeLocalStorageSetJson(migrationKey, true);
+// Older versions stored the full selection, or nothing while the built-in
+// defaults were untouched; servers that are not recommended now stay as the
+// user's. A fresh install has neither a selection nor a seed.
+const migrateLegacyEvoluServers = (): void => {
+  if (safeLocalStorageGet(EVOLU_USER_SERVERS_STORAGE_KEY) !== null) return;
+  const stored = safeLocalStorageGetJson(
+    LEGACY_EVOLU_SERVERS_STORAGE_KEY,
+    EffectSchema.Array(EffectSchema.String),
+    [],
+  );
+  const defaultsRemoved = safeLocalStorageGetJson(
+    LEGACY_EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY,
+    EffectSchema.Boolean,
+    false,
+  );
+  const isExistingInstall =
+    safeLocalStorageGet(LEGACY_EVOLU_SERVERS_STORAGE_KEY) !== null ||
+    safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY) !== null;
+  const legacyDefaults =
+    envEvoluServerUrls.length > 0
+      ? envEvoluServerUrls
+      : LEGACY_DEFAULT_EVOLU_SERVER_URLS;
+  setEvoluServerUrls(
+    isExistingInstall && !defaultsRemoved
+      ? [...legacyDefaults, ...stored]
+      : stored,
+  );
   reportAppLog({
-    tag: "evolu.linkyRelayMigrated",
-    summary: "Enabled the Linky Evolu relay for this installation",
-    payload: { relay },
+    tag: "evolu.userServersMigrated",
+    summary: "Kept the configured Evolu servers that are not recommended",
+    payload: { legacyServerUrls: stored, defaultsRemoved, isExistingInstall },
   });
 };
 
-migrateLinkyEvoluServer();
+migrateLegacyEvoluServers();
 
 const EVOLU_SERVER_URLS: ReadonlyArray<string> = getEvoluActiveServerUrls();
 
@@ -1239,6 +1247,7 @@ export const useEvoluServersManager = (opts?: {
     refreshFromStorage,
     setServerUrls,
     isOffline,
+    isRecommended: isRecommendedEvoluServer,
     setServerOffline,
   } as const;
 };

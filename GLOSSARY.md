@@ -240,6 +240,10 @@ _Avoid_: client, instance, session
 The server that syncs encrypted data between the user's devices; it never sees plaintext.
 _Avoid_: sync server, backend, Evolu server
 
+**Recommended relay**:
+A Nostr relay or Evolu relay that linky.fit/recommended-relays lists; every device keeps it configured, and the relays the user added come on top.
+_Avoid_: default relay, built-in relay
+
 **Device-local**:
 State that stays on one device and never syncs, such as wallet counters.
 _Avoid_: local-only, cached

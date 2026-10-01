@@ -112,6 +112,14 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":
     "The one-time upgrade enabled the Linky Evolu relay before database startup, preserving the other configured servers and their disabled states.",
+  "recommendedRelays.fetched":
+    "The app fetched linky.fit/recommended-relays (at launch and once a day). Nostr relays apply right away; Evolu relays apply on the next launch. The payload lists the recommendation and the Nostr relays it dropped, which leave the relay lists too.",
+  "recommendedRelays.fetchFailed":
+    "Fetching linky.fit/recommended-relays failed; the app keeps using the last fetched recommendation, or the one bundled with the build.",
+  "relayList.reconciled":
+    "The fetched Nostr relay lists lacked a recommended relay, still carried a dropped one, or the two lists disagreed, so the app published both with the recommended relays plus the user's own. Event links identify the signed list publications; a failed publish retries after 30 seconds.",
+  "evolu.userServersMigrated":
+    "The one-time upgrade kept every previously configured Evolu relay that is not recommended as one the user added. It runs before database startup; the payload records the old stored list and whether the old built-in defaults applied.",
   "relayList.linkyRelayMigrated":
     "The one-time upgrade published both Nostr relay lists with the Linky relay added. Event links identify the signed list publications; failed attempts remain pending for retry.",
   "pay.step":

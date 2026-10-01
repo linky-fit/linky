@@ -1,6 +1,10 @@
-import { DEFAULT_NOSTR_RELAYS } from "@linky-fit/linkstr";
 import { RelayUrl } from "@linky-fit/linkstr";
 import { Schema } from "effect";
+import {
+  loadRecommendedRelays,
+  withRecommended,
+  type RecommendedRelays,
+} from "./recommendedRelays";
 import { safeLocalStorageGetJson, safeLocalStorageSetJson } from "./storage";
 
 export const ALLOW_INSECURE_LOCALHOST_RELAYS =
@@ -19,37 +23,33 @@ const envRelays = Array.from(
   ),
 );
 
-export const LINKY_NOSTR_RELAY = "wss://nostr.linky.fit";
+export const relayIdentity = (url: string): string => new URL(url).href;
 
-export const NOSTR_RELAYS =
-  envRelays.length > 0
-    ? envRelays
-    : [...DEFAULT_NOSTR_RELAYS, LINKY_NOSTR_RELAY];
+export const recommendedNostrRelays = (
+  recommended: RecommendedRelays = loadRecommendedRelays(),
+): RelayUrl[] =>
+  envRelays.length > 0 ? envRelays : recommended.nostr.filter(isRelayUrl);
 
-const migrationKey = (pubkey: string): string =>
-  `linky.nostr_relays.linkyRelayAdded.v1.${pubkey}`;
+export const isRecommendedNostrRelay = (
+  url: string,
+  recommended: RecommendedRelays,
+): boolean =>
+  isRelayUrl(url) &&
+  recommendedNostrRelays(recommended).some(
+    (relay) => relayIdentity(relay) === relayIdentity(url),
+  );
 
-export const needsLinkyNostrRelayMigration = (pubkey: string): boolean =>
-  envRelays.length === 0 &&
-  !safeLocalStorageGetJson(migrationKey(pubkey), Schema.Boolean, false);
-
-export const completeLinkyNostrRelayMigration = (pubkey: string): void => {
-  safeLocalStorageSetJson(migrationKey(pubkey), true);
-};
-
-export const withLinkyNostrRelay = (urls: readonly string[]): string[] =>
-  urls.some((url) => new URL(url).href === new URL(LINKY_NOSTR_RELAY).href)
-    ? [...urls]
-    : [...urls, LINKY_NOSTR_RELAY];
-
-export const loadInitialRelayUrls = (pubkey: string | null): string[] => {
-  const urls =
-    (pubkey === null ? null : loadCachedRelayLists(pubkey))?.relayUrls ??
-    NOSTR_RELAYS;
-  return pubkey !== null && needsLinkyNostrRelayMigration(pubkey)
-    ? withLinkyNostrRelay(urls)
-    : [...urls];
-};
+/** The recommended relays plus the user's own, without retired ones. */
+export const withRecommendedNostrRelays = (
+  urls: readonly string[],
+  recommended: RecommendedRelays,
+): string[] =>
+  withRecommended(
+    urls.filter(isRelayUrl),
+    recommendedNostrRelays(recommended),
+    envRelays.length > 0 ? [] : recommended.retiredNostr.filter(isRelayUrl),
+    relayIdentity,
+  );
 
 // NIP-50 relays for profile text search; the default read relays do not
 // index kind-0 content, so contact search would find nothing without them.

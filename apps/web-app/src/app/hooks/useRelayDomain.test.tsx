@@ -22,11 +22,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { clientInspectorStore } from "../../devtools/inspector/clientInspectorStore";
 import {
-  LINKY_NOSTR_RELAY,
   loadCachedRelayLists,
-  needsLinkyNostrRelayMigration,
   saveCachedRelayLists,
 } from "../../utils/nostrRelays";
+import { saveRecommendedRelays } from "../../utils/recommendedRelays";
+import type { Route } from "../../types/route";
 import { useRelayDomain } from "./useRelayDomain";
 import { useLinkstrInspectorBridge } from "../../devtools/inspector/useLinkstrInspectorBridge";
 import InspectorPage from "../../pages/InspectorPage";
@@ -36,11 +36,25 @@ const nsec = nip19.nsecEncode(identity.secretKey);
 const npub = nip19.npubEncode(identity.pubkey);
 const custom = "wss://custom.example.com";
 const inbox = "wss://inbox.example.com";
+const retired = "wss://retired.example.com";
+const recommended = [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://nostr.linky.fit",
+  "wss://nostr.eu.freedomrelay.dev",
+];
+const recommendedRelaysFetch = vi.fn(
+  async () =>
+    new Response(
+      JSON.stringify({ nostr: recommended, evolu: ["wss://evolu.linky.fit"] }),
+    ),
+);
 const now = Math.floor(Date.now() / 1000);
 const published: PublishedEvent[] = [];
 const views: Array<Awaited<ReturnType<typeof renderIntoDocument>>> = [];
 const registries: Array<Registry.Registry> = [];
 const setStatus = vi.fn();
+let runtimeBuilds = 0;
 let state: ReturnType<typeof useRelayDomain> | undefined;
 
 const storedLists = (relays = [custom], dmRelays = relays) => [
@@ -67,6 +81,7 @@ const storedLists = (relays = [custom], dmRelays = relays) => [
 const mount = async (
   transport: NostrTransportService,
   networkEnabled = true,
+  route: Route = { kind: "nostrRelays" },
 ) => {
   const registry = Registry.make();
   registries.push(registry);
@@ -78,7 +93,7 @@ const mount = async (
       currentNpub: npub,
       currentNsec: nsec,
       networkEnabled: enabled,
-      route: { kind: "nostrRelays" },
+      route,
       setStatus,
       t: (key) => key,
     });
@@ -86,7 +101,8 @@ const mount = async (
       state = result;
     }, [result]);
     useEffect(() => {
-      const relays = result.nostrFetchRelays.map((url) => RelayUrl.make(url));
+      runtimeBuilds += 1;
+      const relays = result.relayUrls.map((url) => RelayUrl.make(url));
       registry.set(
         linkstrConfigAtom,
         configWith(identity, layer, {
@@ -95,7 +111,7 @@ const mount = async (
           inspector: true,
         }),
       );
-    }, [result.nostrFetchRelays]);
+    }, [result.relayUrls]);
     return null;
   };
   const view = await renderIntoDocument(
@@ -119,68 +135,88 @@ const flush = async () => {
 };
 
 beforeEach(() => {
+  vi.stubGlobal("fetch", recommendedRelaysFetch);
+  recommendedRelaysFetch.mockClear();
   localStorage.clear();
   clientInspectorStore.clear();
   published.length = 0;
   state = undefined;
   setStatus.mockClear();
+  runtimeBuilds = 0;
 });
 afterEach(async () => {
+  vi.unstubAllGlobals();
   for (const view of views.splice(0)) await view.unmount();
   for (const registry of registries.splice(0)) registry.dispose();
 });
 
-describe("Linky Nostr relay upgrade", () => {
-  it("silently publishes both signed lists, preserves custom relays, and persists completion", async () => {
-    saveCachedRelayLists(identity.pubkey, {
-      relayUrls: [custom],
-      relaysUpdatedAt: now - 100,
-      dmRelaysUpdatedAt: now - 100,
-    });
-    await mount(fakeTransport(published, [], storedLists([custom], [inbox])));
+const publishedTags = (kind: number) =>
+  published
+    .filter((event) => event.kind === kind)
+    .at(-1)
+    ?.tags.map((tag) => tag[1]);
+
+describe("recommended Nostr relays", () => {
+  it("publishes both signed lists with the recommended relays and keeps the user's", async () => {
+    await mount(fakeTransport(published, [], storedLists([custom])));
     await flush();
+    const expected = [...recommended, custom];
     expect(
       state?.relayUrls,
       JSON.stringify(clientInspectorStore.query().rows),
-    ).toEqual([custom, inbox, LINKY_NOSTR_RELAY]);
-    expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(false);
-    expect(loadCachedRelayLists(identity.pubkey)?.relayUrls).toEqual(
-      state?.relayUrls,
-    );
+    ).toEqual(expected);
+    expect(loadCachedRelayLists(identity.pubkey)?.relayUrls).toEqual(expected);
     for (const kind of [10002, 10050]) {
       const event = published.find((item) => item.kind === kind);
       expect(event).toBeDefined();
       if (!event) throw new Error("Missing published list");
       expect(verifyEvent(event)).toBe(true);
-      expect(event.tags.map((tag) => tag[1])).toEqual([
-        custom,
-        inbox,
-        LINKY_NOSTR_RELAY,
-      ]);
+      expect(event.tags.map((tag) => tag[1])).toEqual(expected);
     }
     expect(setStatus).not.toHaveBeenCalled();
     const rows = clientInspectorStore.query().rows;
     expect(
-      rows.find((row) => row.tag === "relayList.linkyRelayMigrated")?.links
-        .wrap,
+      rows.find((row) => row.tag === "relayList.reconciled")?.links.wrap,
     ).toEqual(published.slice(0, 2).map((event) => event.id));
     const viewer = await renderIntoDocument(<InspectorPage />);
     views.push(viewer);
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 150));
     });
-    const migrationRow = Array.from(
+    const reconciledRow = Array.from(
       viewer.container.querySelectorAll("button.timeline-row"),
-    ).find((button) =>
-      button.textContent?.includes("relayList.linkyRelayMigrated"),
-    );
-    expect(migrationRow).toBeDefined();
+    ).find((button) => button.textContent?.includes("relayList.reconciled"));
+    expect(reconciledRow).toBeDefined();
     await act(async () => {
-      migrationRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      reconciledRow?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(
       viewer.container.querySelector(".related-rows")?.textContent,
     ).toContain("WirePlainPublished");
+  });
+
+  it("does not republish lists that already carry the recommended relays", async () => {
+    await mount(
+      fakeTransport(
+        published,
+        [],
+        storedLists([custom, ...recommended.map((url) => url + "/")]),
+      ),
+    );
+    await flush();
+    expect(state?.relayUrls).toEqual([...recommended, custom]);
+    expect(published).toHaveLength(0);
+    expect(recommendedRelaysFetch).toHaveBeenCalledWith(
+      "https://linky.fit/recommended-relays",
+    );
+  });
+
+  it("does not rebuild the Nostr runtime when a sync changes nothing", async () => {
+    await mount(fakeTransport(published, [], storedLists(recommended)));
+    await flush();
+    expect(state?.relayUrls).toEqual(recommended);
+    expect(runtimeBuilds).toBe(1);
+    expect(published).toHaveLength(0);
   });
 
   it("uses a newer cache when the fetched list is stale", async () => {
@@ -191,104 +227,103 @@ describe("Linky Nostr relay upgrade", () => {
     });
     await mount(fakeTransport(published, [], storedLists()));
     await flush();
-    expect(state?.relayUrls).toEqual([inbox, LINKY_NOSTR_RELAY]);
-    expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(false);
+    expect(state?.relayUrls).toEqual([...recommended, inbox]);
+    expect(publishedTags(10002)).toEqual([...recommended, inbox]);
   });
 
-  it("adds Linky locally while offline and waits to publish", async () => {
+  it("adds the recommended relays locally while offline and waits to publish", async () => {
     saveCachedRelayLists(identity.pubkey, {
       relayUrls: [custom],
       relaysUpdatedAt: 1,
       dmRelaysUpdatedAt: 1,
     });
     await mount(fakeTransport(published, []), false);
-    expect(state?.relayUrls).toEqual([custom, LINKY_NOSTR_RELAY]);
+    expect(state?.relayUrls).toEqual([...recommended, custom]);
     expect(published).toHaveLength(0);
-    expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(true);
+    expect(recommendedRelaysFetch).not.toHaveBeenCalled();
   });
 
-  it("keeps a partial publish pending and retries on the next launch", async () => {
-    const transport = fakeTransport(published, [], storedLists());
-    const view = await mount({
-      ...transport,
-      publish: (relays, event) =>
-        Effect.succeed(
-          relays.map(
-            (relay) =>
-              new RelayPublishResult({
-                relay,
-                accepted: event.kind === 10002,
-                detail: "offline",
-              }),
-          ),
-        ),
+  it("drops a relay the endpoint stopped recommending", async () => {
+    saveRecommendedRelays({
+      nostr: [...recommended, retired],
+      evolu: [],
+      retiredNostr: [],
     });
+    await mount(
+      fakeTransport(
+        published,
+        [],
+        storedLists([...recommended, retired, custom]),
+      ),
+    );
     await flush();
-    expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(true);
-    await view.unmount();
-    views.splice(views.indexOf(view), 1);
-    await mount(transport);
-    await flush();
-    expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(false);
+    expect(state?.relayUrls).toEqual([...recommended, custom]);
+    expect(publishedTags(10002)).toEqual([...recommended, custom]);
+    expect(publishedTags(10050)).toEqual([...recommended, custom]);
   });
 
-  it("retries a failed migration after 30 seconds without a reload", async () => {
+  it("keeps a retired relay the user adds back", async () => {
+    saveRecommendedRelays({
+      nostr: recommended,
+      evolu: [],
+      retiredNostr: [retired],
+    });
+    await mount(fakeTransport(published, []), false);
+    await act(async () => state?.setNewRelayUrl(retired));
+    await act(async () => state?.saveNewRelay());
+    expect(state?.relayUrls).toEqual([...recommended, retired]);
+  });
+
+  it("retries a failed publish after 30 seconds without a reload", async () => {
     vi.useFakeTimers();
     try {
       let accepted = false;
       const transport = fakeTransport(published, [], storedLists());
       await mount({
         ...transport,
-        publish: (relays) =>
-          Effect.succeed(
-            relays.map(
+        publish: (relays, event) =>
+          Effect.sync(() => {
+            if (accepted) published.push(event);
+            return relays.map(
               (relay) =>
                 new RelayPublishResult({ relay, accepted, detail: null }),
-            ),
-          ),
+            );
+          }),
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);
       });
-      expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(true);
+      expect(published).toHaveLength(0);
       accepted = true;
       await act(async () => {
         await vi.advanceTimersByTimeAsync(30_000);
       });
-      expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(false);
+      expect(publishedTags(10002)).toEqual([...recommended, custom]);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("does not repeat the migration after later user removal", async () => {
-    const view = await mount(fakeTransport(published, [], storedLists()));
-    await flush();
-    await view.unmount();
-    views.splice(views.indexOf(view), 1);
+  it("deletes the user's relays but not the recommended ones", async () => {
     saveCachedRelayLists(identity.pubkey, {
       relayUrls: [custom],
-      relaysUpdatedAt: now + 1,
-      dmRelaysUpdatedAt: now + 1,
+      relaysUpdatedAt: 1,
+      dmRelaysUpdatedAt: 1,
     });
-    published.length = 0;
-    await mount(fakeTransport(published, [], storedLists()));
-    await flush();
-    expect(state?.relayUrls).toEqual([custom]);
-    expect(published).toHaveLength(0);
-  });
-
-  it("does not duplicate a Linky relay with a trailing slash", async () => {
-    await mount(
-      fakeTransport(
-        published,
-        [],
-        storedLists([custom, LINKY_NOSTR_RELAY + "/"]),
-      ),
+    for (const id of [recommended[0] ?? "", custom]) {
+      const view = await mount(fakeTransport(published, []), false, {
+        kind: "nostrRelay",
+        id,
+      });
+      expect(state?.isRecommendedRelay(id)).toBe(id !== custom);
+      await act(async () => state?.requestDeleteSelectedRelay());
+      await act(async () => state?.requestDeleteSelectedRelay());
+      await view.unmount();
+      views.splice(views.indexOf(view), 1);
+    }
+    expect(loadCachedRelayLists(identity.pubkey)?.relayUrls).toEqual(
+      recommended,
     );
-    await flush();
-    expect(state?.relayUrls).toEqual([custom, LINKY_NOSTR_RELAY + "/"]);
-    expect(needsLinkyNostrRelayMigration(identity.pubkey)).toBe(false);
   });
 });
 
