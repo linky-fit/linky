@@ -30,6 +30,7 @@ import {
 import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
 import type { Translate } from "../../i18n";
+import { getUnknownErrorMessage } from "../../utils/unknown";
 
 interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   closeScan: () => void;
@@ -273,9 +274,9 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           return;
         } catch (error) {
           if (!(error instanceof LnurlTagMismatchError)) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            setStatus(`${t("errorPrefix")}: ${message}`);
+            setStatus(
+              `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "unknown")}`,
+            );
             closeScan();
             return;
           }

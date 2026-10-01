@@ -3,6 +3,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   InsufficientFunds,
   MintRejected,
+  PaymentFailed,
   Bolt11Invoice,
   buildPaymentAmountAttempts,
   buildPaymentFailureAmountAttempts,
@@ -48,12 +49,26 @@ export class RedeemError extends Error {
     this.phase = phase;
   }
 }
-export const getErrorMessage = (error: unknown, fallback: string): string =>
-  error instanceof Error
-    ? error.message
-    : typeof error === "string"
-      ? error
-      : fallback;
+export const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (typeof error === "string") return error || fallback;
+  if (!(error instanceof Error)) return fallback;
+  if (error.message !== "") return error.message;
+  const fields = JSON.stringify(error, (key: string, value: unknown) =>
+    key === "_tag" ? undefined : value,
+  );
+  return fields === undefined || fields === "{}"
+    ? error.name
+    : `${error.name} ${fields}`;
+};
+
+export const describeMeltFailure = (error: unknown): string =>
+  error instanceof InsufficientFunds
+    ? `Insufficient funds: required ${error.required}, available ${error.available}`
+    : error instanceof MintRejected
+      ? error.detail
+      : error instanceof PaymentFailed
+        ? `Lightning payment failed: ${error.detail ?? "no detail from the mint"}`
+        : getErrorMessage(error, "Redeem failed");
 
 const PendingPayment = Schema.fromJsonString(
   Schema.Struct({
@@ -315,12 +330,7 @@ export const redeemToken = (
         return finish(receipt.paidAmount, receipt.feePaid, lightningAddress);
       } catch (error) {
         lastError = error;
-        const message =
-          error instanceof InsufficientFunds
-            ? `Insufficient funds: required ${error.required}, available ${error.available}`
-            : error instanceof MintRejected
-              ? error.detail
-              : getErrorMessage(error, "Redeem failed");
+        const message = describeMeltFailure(error);
         if (error instanceof InsufficientFunds)
           localStorage.removeItem(`${key}.payment`);
         else if (error instanceof MintRejected) await releaseUnpaidAttempt();
@@ -340,5 +350,5 @@ export const redeemToken = (
         }
       }
     }
-    throw new RedeemError(getErrorMessage(lastError, "Redeem failed"), "melt");
+    throw new RedeemError(describeMeltFailure(lastError), "melt");
   });

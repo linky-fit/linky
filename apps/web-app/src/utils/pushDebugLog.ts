@@ -1,5 +1,5 @@
 import { Option, Schema } from "effect";
-import { isRecord } from "./unknown";
+import { getUnknownErrorMessage, isRecord } from "./unknown";
 import type { JsonRecord, JsonValue } from "../types/json";
 import { sleep } from "./time";
 
@@ -39,7 +39,7 @@ function normalizeJsonValue(value: unknown): JsonValue {
 
   if (value instanceof Error) {
     return {
-      message: value.message,
+      message: getUnknownErrorMessage(value, ""),
       name: value.name,
       stack: value.stack ?? null,
     };
