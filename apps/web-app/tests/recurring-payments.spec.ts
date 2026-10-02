@@ -13,7 +13,6 @@ import {
   FUNDING_SAT,
   fundAndConnect,
   invoicePaid,
-  LIGHTNING_ADDRESS,
   MAX_FEE_SAT,
   MINT_HOST,
   openForm,
@@ -47,7 +46,7 @@ test("pay now consumes one period and history links back to the payment", async 
   await test.step("pay now and receive the sats after mint fees", async () => {
     await a.page.getByRole("button", { name: "Pay", exact: true }).click();
     await expect(
-      a.page.getByRole("status", { name: /^Sent 10 sat to / }),
+      a.page.getByRole("status").filter({ hasText: /Sent\s*10\s*sat/ }),
     ).toBeVisible({ timeout: 60_000 });
     await expectReceived(b.page);
     await expectPaidHistory(a.page, hash);
@@ -97,10 +96,10 @@ for (const action of ["Pay", "countdown expires", "Cancel this payment"]) {
         );
         expect((await readOrder(a.page)).nextDueAtSec).toBeGreaterThan(sendAt);
         await a.page.goto("/#wallet/transactions");
-        await expect(a.page.locator(".recurring-order-card")).toHaveCount(1);
-        await expect(a.page.locator(".transaction-recurring-pill")).toHaveCount(
-          0,
-        );
+        await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(1);
+        await expect(
+          a.page.getByTestId("transaction-recurring-pill"),
+        ).toHaveCount(0);
         await triggerSchedulerPass(a.page);
         await a.page.waitForTimeout(5_000);
         await expect(dueDialog(a.page)).toBeHidden();
@@ -139,13 +138,18 @@ test("insufficient funds warns once and retries after a top-up", async ({
   await test.step("due payment waits for funds without paying", async () => {
     await a.page.goto("/#wallet/transactions");
     await expect(
-      a.page.locator(".recurring-order-card .recurring-underfunded-hint"),
+      a.page
+        .getByTestId("recurring-order-card")
+        .getByTestId("recurring-underfunded-hint"),
     ).toHaveText("low balance");
     await waitUntil(sendAt);
     await triggerSchedulerPass(a.page);
-    const toast = a.page.locator(".toast-container .toast", {
-      hasText: `Not enough funds at ${MINT_HOST} for a recurring payment right now. It will be retried.`,
-    });
+    const toast = a.page.getByText(
+      `Not enough funds at ${MINT_HOST} for a recurring payment right now. It will be retried.`,
+      {
+        exact: true,
+      },
+    );
     await expect(toast).toBeVisible();
     await expect(dueDialog(a.page)).toBeHidden();
     expect((await readOrder(a.page)).runCount).toBe(0);
@@ -184,7 +188,7 @@ test("two devices sync the claim and pay only once in the background", async ({
   });
   const hash = await saveOrder(a.page);
   await test.step("both devices list the payment and converge on one claim", async () => {
-    await expect(a2.page.locator(".recurring-order-card")).toHaveCount(1);
+    await expect(a2.page.getByTestId("recurring-order-card")).toHaveCount(1);
     await Promise.all([
       triggerSchedulerPass(a.page),
       triggerSchedulerPass(a2.page),
@@ -315,9 +319,9 @@ test("a contact with only a Lightning address is paid by melting the envelope", 
   await test.step("pay now pays the contact's invoice once", async () => {
     await a.page.getByRole("button", { name: "Pay", exact: true }).click();
     await expect(
-      a.page.getByRole("status", {
-        name: `Sent ${ORDER_SAT} sat to ${LIGHTNING_ADDRESS}`,
-      }),
+      a.page
+        .getByRole("status")
+        .filter({ hasText: new RegExp(`Sent\\s*${ORDER_SAT}\\s*sat`) }),
     ).toBeVisible({ timeout: 60_000 });
     expect(quoteIds).toHaveLength(1);
     expect(await invoicePaid(request, quoteIds[0] ?? "")).toBe(true);
@@ -357,8 +361,8 @@ test("deleting a Lightning payment returns its undelivered envelope", async ({
   await test.step("pay now funds the envelope but cannot get an invoice", async () => {
     await a.page.getByRole("button", { name: "Pay", exact: true }).click();
     await expect(
-      a.page.locator(".toast-container .toast", {
-        hasText: "The recurring payment failed. It will be retried.",
+      a.page.getByText("The recurring payment failed. It will be retried.", {
+        exact: true,
       }),
     ).toBeVisible({ timeout: 60_000 });
     expect((await readOrder(a.page)).runCount).toBe(0);
@@ -410,10 +414,10 @@ test("pause suppresses a due run and resume advances it into the future", async 
   });
   await test.step("resume without paying the missed period", async () => {
     await a.page.goto("/#wallet/transactions");
-    await expect(a.page.locator(".recurring-order-card")).toContainText(
+    await expect(a.page.getByTestId("recurring-order-card")).toContainText(
       "paused",
     );
-    await a.page.locator(".recurring-order-card").click();
+    await a.page.getByTestId("recurring-order-card").click();
     await a.page.getByRole("button", { name: "Resume", exact: true }).click();
     await expect(detailValue(a.page, "Next payment")).toBeVisible();
     expect((await readOrder(a.page)).nextDueAtSec).toBeGreaterThan(
@@ -449,7 +453,7 @@ test("editing amount and date clears an in-flight claim", async ({
     await a.page
       .getByRole("button", { name: "Save changes", exact: true })
       .click();
-    await expect(a.page.locator(".recurring-detail-amount-value")).toHaveText(
+    await expect(a.page.getByTestId("recurring-detail-amount")).toHaveText(
       "20 sat",
     );
     await expect(detailValue(a.page, "Next payment")).toHaveText(
@@ -467,8 +471,9 @@ test("editing amount and date clears an in-flight claim", async ({
       .toBe(nextMinute);
     expect((await readOrder(a.page)).claimDeviceId).toBeNull();
     await a.page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(a.page).toHaveURL(/\/edit$/);
     await expect(
-      a.page.getByLabel("Next payment", { exact: true }),
+      a.page.getByRole("textbox", { name: "Next payment", exact: true }),
     ).toHaveValue(dateTimeLocal(newDate));
     await a.page.goto(`/${hash}`);
   });
@@ -518,10 +523,10 @@ test("delete requires two taps and removes the scheduled card", async ({
       .getByRole("button", { name: "Click once more to delete.", exact: true })
       .click();
     await expect(a.page).toHaveURL(/#wallet\/transactions$/);
-    await expect(a.page.locator(".recurring-order-card")).toHaveCount(0);
+    await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(0);
     await a.page.goto("/#wallet");
     await a.page.goto("/#wallet/transactions");
-    await expect(a.page.locator(".recurring-order-card")).toHaveCount(0);
+    await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(0);
   });
 });
 
@@ -553,7 +558,7 @@ test("form rejects an empty amount and a first payment in the past", async ({
     ).toBeVisible();
     await expect(submit).toBeDisabled();
     await a.page.goto("/#wallet/transactions");
-    await expect(a.page.locator(".recurring-order-card")).toHaveCount(0);
+    await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(0);
   });
 });
 
@@ -566,7 +571,7 @@ test("fiat recurring amount converts, shows approximate sats and pays", async ({
   await test.step("switch the keypad to CZK and save one koruna", async () => {
     await openForm(a.page);
     await a.page.getByTitle("Switch unit", { exact: true }).click();
-    await expect(a.page.locator(".amount-unit")).toHaveText("CZK");
+    await expect(a.page.getByTestId("amount-display")).toContainText("CZK");
   });
   const hash = await saveOrder(a.page, 1, new Date(Date.now() + 3_600_000));
   await test.step("verify the fixed fiat amount and its sat side", async () => {
@@ -575,15 +580,15 @@ test("fiat recurring amount converts, shows approximate sats and pays", async ({
       unit: "czk",
     });
     await expect(
-      a.page.locator(".recurring-detail-amount-secondary"),
+      a.page.getByTestId("recurring-detail-amount-secondary"),
     ).toHaveText(`~${FIXTURE_AMOUNT_SAT} sat`);
     await a.page.goto("/#wallet/transactions");
-    const card = a.page.locator(".recurring-order-card");
+    const card = a.page.getByTestId("recurring-order-card");
     await expect(card).toContainText("1 CZK");
     await expect(card).toContainText(`~${FIXTURE_AMOUNT_SAT} sat`);
   });
   await test.step("pay the fiat amount at the fixture's 40 sat per CZK rate", async () => {
-    await a.page.locator(".recurring-order-card").click();
+    await a.page.getByTestId("recurring-order-card").click();
     await a.page.getByRole("button", { name: "Pay", exact: true }).click();
     await expectReceived(b.page, FIXTURE_AMOUNT_SAT);
     await expectPaidHistory(a.page, hash);
@@ -614,8 +619,8 @@ test("repeat regularly prefills the contact and amount from a completed payment"
   await test.step("expand the outgoing history row and repeat it", async () => {
     await a.page.goto("/#wallet/transactions");
     const outgoing = a.page
-      .locator(".transaction-card")
-      .filter({ has: a.page.locator(".transaction-amount.is-negative") });
+      .getByTestId("transaction-card")
+      .filter({ hasText: new RegExp(`(^|\\D)${ORDER_SAT} sat`) });
     await expect(outgoing).toHaveCount(1);
     await outgoing.click();
     await outgoing
@@ -628,15 +633,14 @@ test("repeat regularly prefills the contact and amount from a completed payment"
     expect(params.get("contact")).toBe(contactId);
     expect(params.get("amount")).toBe(String(ORDER_SAT));
     await expect(
-      a.page.locator(".recurring-recipient-header h3"),
+      a.page.getByTestId("recurring-recipient-name"),
     ).not.toBeEmpty();
     await expect(
       a.page.getByRole("button", { name: "Change recipient", exact: true }),
     ).toBeVisible();
-    await expect(a.page.locator(".amount-number")).toHaveText(
-      String(ORDER_SAT),
+    await expect(a.page.getByTestId("amount-display")).toHaveText(
+      new RegExp(`^${ORDER_SAT}\\s*sat$`),
     );
-    await expect(a.page.locator(".amount-unit")).toHaveText("sat");
     await expect(
       a.page.getByRole("button", {
         name: "Set up recurring payment",

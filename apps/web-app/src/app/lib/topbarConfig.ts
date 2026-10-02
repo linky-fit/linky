@@ -331,7 +331,7 @@ export const buildTopbarRight = ({
 
   if (route.kind === "recurringPayment") {
     return {
-      icon: "edit",
+      icon: "Pencil",
       label: t("edit"),
       onClick: () =>
         navigateTo({ route: "recurringPaymentEdit", id: route.id }),

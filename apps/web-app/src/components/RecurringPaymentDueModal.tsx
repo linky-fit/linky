@@ -2,6 +2,7 @@ import {
   RECURRING_CONFIRM_SEC,
   type RecurringInterval,
 } from "@linky-fit/recurring-payment";
+import { Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
@@ -83,15 +84,15 @@ export function RecurringPaymentDueModal(): React.ReactElement | null {
       closeOnBackdrop={false}
       confirmLabel={t("recurringRunNow")}
       description={
-        <div className="paid-figure is-out recurring-due-recipient">
+        <Stack alignItems="center" gap="$sm">
           <RecurringContactAvatar
-            className="contact-avatar is-xl paid-avatar"
             contact={order ? contacts.get(order.contactId) : undefined}
+            size="lg"
           />
-          <div className="recurring-due-name recurring-truncate">
+          <Text variant="label" bold textAlign="center" numberOfLines={1}>
             {order ? recurringRecipientLabel(order, contacts) : ""}
-          </div>
-        </div>
+          </Text>
+        </Stack>
       }
       isBusy={cashuIsBusy || isDeciding}
       label={t("recurringDueTitle")}

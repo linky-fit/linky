@@ -272,12 +272,7 @@ const TransactionCardView = ({
                   size="sm"
                   tone="neutral"
                   label={t("recurringPaymentTitle")}
-                  onPress={() =>
-                    navigateTo({
-                      route: "recurringPayment",
-                      id: recurringPaymentId,
-                    })
-                  }
+                  testID="transaction-recurring-pill"
                 />
               ) : null}
               {problemStatusPill ? (
@@ -333,10 +328,25 @@ const TransactionCardView = ({
           }
         />
       ))}
+      {isExpanded && recurringPaymentId ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="Repeat"
+          alignSelf="flex-start"
+          onPress={() =>
+            navigateTo({ route: "recurringPayment", id: recurringPaymentId })
+          }
+        >
+          {t("recurringPaymentTitle")}
+        </Button>
+      ) : null}
       {isExpanded && repeatable ? (
         <Button
           variant="secondary"
           size="sm"
+          icon="Repeat"
+          alignSelf="flex-start"
           onPress={() =>
             navigateTo({ route: "recurringPaymentNew", prefill: repeatable })
           }
@@ -720,9 +730,7 @@ export function TransactionsPage(): React.ReactElement {
           <RecurringPaymentsList />
         </Section>
       ) : null}
-      <Section
-        title={hasScheduled ? t("recurringHistorySection") : undefined}
-      >
+      <Section title={hasScheduled ? t("recurringHistorySection") : undefined}>
         {transactions.length === 0 ? (
           <EmptyState title={t("paymentsHistoryEmpty")} />
         ) : (
@@ -762,9 +770,10 @@ export function TransactionsPage(): React.ReactElement {
         )}
       </Section>
       <FloatingActionButton
-        icon="Plus"
+        icon="Repeat"
         label={t("recurringSave")}
         onPress={() => navigateTo({ route: "recurringPaymentNew" })}
+        guide="recurring-add-button"
       />
     </Stack>
   );

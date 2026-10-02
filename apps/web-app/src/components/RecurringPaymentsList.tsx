@@ -2,6 +2,15 @@ import {
   recurringAmountSat,
   recurringOrderState,
 } from "@linky-fit/recurring-payment";
+import {
+  EmptyState,
+  ListRow,
+  opacity,
+  Pill,
+  Row,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import type { FC } from "react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
@@ -40,12 +49,12 @@ export const RecurringPaymentsList: FC = () => {
     [lang],
   );
   if (orders.length === 0) {
-    return <p className="muted recurring-empty">{t("recurringEmpty")}</p>;
+    return <EmptyState title={t("recurringEmpty")} />;
   }
   const nowSec = nowSeconds();
 
   return (
-    <div className="transactions-list">
+    <Stack gap="$xs">
       {orders.map((order) => {
         const state = recurringOrderState(order, nowSec);
         const amountSat = recurringAmountSat(order.amount, fiatRates);
@@ -60,58 +69,71 @@ export const RecurringPaymentsList: FC = () => {
           t,
         );
         return (
-          <button
-            type="button"
+          <Stack
             key={order.id}
-            className={`transaction-card recurring-order-card${state === "active" ? "" : " is-unsuccessful"}`}
-            onClick={() =>
-              navigateTo({ route: "recurringPayment", id: order.id })
-            }
+            testID="recurring-order-card"
+            opacity={state === "active" ? 1 : opacity.disabled}
           >
-            <article className="transaction-row">
-              <RecurringContactAvatar
-                className="contact-avatar transaction-avatar"
-                contact={contacts.get(order.contactId)}
-              />
-              <div className="transaction-main">
-                <div className="transaction-title">
-                  {recurringRecipientLabel(order, contacts)}
-                </div>
-                <div className="transaction-meta">
-                  <span>
+            <ListRow
+              leading={
+                <RecurringContactAvatar
+                  contact={contacts.get(order.contactId)}
+                />
+              }
+              title={recurringRecipientLabel(order, contacts)}
+              description={
+                <Row gap="$sm" flexWrap="wrap" alignItems="center">
+                  <Text variant="caption" color="$colorMuted">
                     {state === "paused"
                       ? t("recurringStatusPaused")
                       : dateFormatter.format(
                           new Date(order.schedule.nextDueAtSec * 1000),
                         )}
-                  </span>
-                  <span className="pill pill-muted transaction-status-pill">
-                    {describeRecurringInterval(order.schedule.interval, t)}
-                  </span>
+                  </Text>
+                  <Pill
+                    size="sm"
+                    tone="neutral"
+                    label={describeRecurringInterval(
+                      order.schedule.interval,
+                      t,
+                    )}
+                  />
                   {underfunded ? (
-                    <span className="recurring-underfunded-hint">
+                    <Text
+                      variant="caption"
+                      color="$warningText"
+                      testID="recurring-underfunded-hint"
+                    >
                       {t("recurringInsufficientFundsHint")}
-                    </span>
+                    </Text>
                   ) : null}
-                </div>
-              </div>
-              <div className="transaction-amount is-negative">
-                {formatRecurringAmountText(order.amount, {
-                  displayCurrency,
-                  fiatRates,
-                  formatSat: formatDisplayedAmountParts,
-                  lang,
-                })}
-                {secondaryAmount ? (
-                  <span className="muted recurring-order-amount-secondary">
-                    {secondaryAmount}
-                  </span>
-                ) : null}
-              </div>
-            </article>
-          </button>
+                </Row>
+              }
+              trailing={
+                <Stack alignItems="flex-end" gap="$xxs">
+                  <Text variant="label" bold color="$dangerText">
+                    {formatRecurringAmountText(order.amount, {
+                      displayCurrency,
+                      fiatRates,
+                      formatSat: formatDisplayedAmountParts,
+                      lang,
+                    })}
+                  </Text>
+                  {secondaryAmount ? (
+                    <Text variant="caption" color="$colorMuted">
+                      {secondaryAmount}
+                    </Text>
+                  ) : null}
+                </Stack>
+              }
+              chevron={false}
+              onPress={() =>
+                navigateTo({ route: "recurringPayment", id: order.id })
+              }
+            />
+          </Stack>
         );
       })}
-    </div>
+    </Stack>
   );
 };

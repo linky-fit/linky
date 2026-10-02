@@ -141,9 +141,9 @@ export const enterAmount = async (
 
 export const openForm = async (page: Page): Promise<void> => {
   await page.goto("/#wallet/transactions");
-  await page.locator(".transactions-page .contacts-fab").click();
+  await page.locator("[data-guide='recurring-add-button']").click();
   await expect(page).toHaveURL(/#wallet\/recurring\/new$/);
-  await page.locator(".recurring-picker-list button").click();
+  await page.getByTestId("recurring-picker-contact").click();
 };
 
 export const saveOrder = async (
@@ -152,7 +152,7 @@ export const saveOrder = async (
   firstRun = new Date(Date.now() + 60_000),
 ): Promise<string> => {
   await enterAmount(page, amount);
-  await page.getByRole("button", { name: "Daily", exact: true }).click();
+  await page.getByRole("radio", { name: "Daily", exact: true }).click();
   await page
     .getByLabel("First payment", { exact: true })
     .fill(dateTimeLocal(firstRun));
@@ -160,9 +160,10 @@ export const saveOrder = async (
     .getByRole("button", { name: "Set up recurring payment", exact: true })
     .click();
   await expect(page).toHaveURL(/#wallet\/transactions$/);
-  await expect(page.locator(".recurring-order-card")).toHaveCount(1);
-  await expect(page.locator(".recurring-order-card")).toContainText("daily");
-  await page.locator(".recurring-order-card").click();
+  const card = page.getByTestId("recurring-order-card");
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText("daily");
+  await card.click();
   await expect(page).toHaveURL(/#wallet\/recurring\/[^/]+$/);
   return new URL(page.url()).hash;
 };
@@ -328,24 +329,21 @@ export const expectReceived = async (
   return balance;
 };
 
+/** A detail row's value, which the row labels with its title. */
 export const detailValue = (page: Page, label: string) =>
-  page
-    .locator(".settings-row")
-    .filter({ has: page.getByText(label, { exact: true }) })
-    .locator(".settings-value");
+  page.getByLabel(label, { exact: true });
 
 export const expectPaidHistory = async (
   page: Page,
   hash: string,
 ): Promise<void> => {
   await page.goto("/#wallet/transactions");
-  const pill = page.getByRole("button", {
-    name: "Recurring payment",
-    exact: true,
-  });
+  const pill = page.getByTestId("transaction-recurring-pill");
   await expect(pill).toHaveCount(1);
-  await expect(pill).toHaveClass(/transaction-recurring-pill/);
-  await pill.click();
+  await page.getByTestId("transaction-card").filter({ has: pill }).click();
+  await page
+    .getByRole("button", { name: "Recurring payment", exact: true })
+    .click();
   await expect.poll(() => new URL(page.url()).hash).toBe(hash);
   await expect(detailValue(page, "Payments made")).toHaveText("1");
   await expect(detailValue(page, "Last payment")).toContainText("paid");
