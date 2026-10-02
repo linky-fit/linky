@@ -74,6 +74,7 @@ export const useRouting = () => {
 type NavigationAction =
   | { route: "advanced" }
   | { route: "advancedAutoPayLimit" }
+  | { route: "advancedBoltCard" }
   | { route: "advancedInspector" }
   | { route: "advancedInspectorTimeline" }
   | { route: "advancedPushDebug" }
@@ -157,6 +158,9 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "advancedPushDebug":
       window.location.assign("#advanced/push-debug");
+      break;
+    case "advancedBoltCard":
+      window.location.assign("#advanced/bolt-card");
       break;
     case "mints":
       window.location.assign("#advanced/mints");

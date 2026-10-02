@@ -6,6 +6,7 @@ import { Topbar } from "../../components/Topbar";
 import { useDesktopSplitView } from "../../hooks/useDesktopSplitView";
 import {
   AdvancedAutoPayLimitPage,
+  AdvancedBoltCardPage,
   AdvancedPage,
   BankPaymentOfferDetailPage,
   CashuTokenEmitPage,
@@ -128,6 +129,8 @@ const RoutePage = (): React.ReactElement => {
       return <ProxyPaymentsPage />;
     case "advancedAutoPayLimit":
       return <AdvancedAutoPayLimitPage />;
+    case "advancedBoltCard":
+      return <AdvancedBoltCardPage />;
     case "advancedInspector":
       return <InspectorSettingsPage />;
     case "advancedInspectorTimeline":

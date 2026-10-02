@@ -1,6 +1,7 @@
 package fit.linky.app;
 
 import android.Manifest;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -9,10 +10,13 @@ import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
+import android.nfc.cardemulation.CardEmulation;
 import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Parcelable;
 import android.os.SystemClock;
 import android.webkit.JavascriptInterface;
@@ -59,6 +63,13 @@ public class MainActivity extends BridgeActivity {
 	private static final String EVENT_BACK_BUTTON = "linky-native-back-button";
 	private static final String EVENT_NOTIFICATION_OPEN = "linky-native-notification-open";
 	private static final String EVENT_NFC_WRITE = "linky-native-nfc-write";
+	private static final String EVENT_BOLT_CARD = "linky-native-bolt-card";
+	// Enabling the HCE component re-registers it asynchronously, so the
+	// preferred-service request is repeated once registration has settled.
+	private static final long BOLT_CARD_PREFERRED_RETRY_MS = 750L;
+	private static final String BOLT_CARD_AID = "D2760000850101";
+	private static final long BOLT_CARD_REGISTRATION_POLL_MS = 100L;
+	private static final long BOLT_CARD_REGISTRATION_WAIT_MS = 3000L;
 	private static final String EVENT_NOTIFICATION_PERMISSION = "linky-native-notification-permission";
 	private static final String EVENT_SCAN_RESULT = "linky-native-scan-result";
 	private static final String EXTRA_NOTIFICATION_ROUTE = "linky_notification_route";
@@ -129,6 +140,11 @@ public class MainActivity extends BridgeActivity {
 	private String lastSuccessfulNfcWriteUrl = null;
 	private NfcAdapter nfcAdapter;
 	private String pendingNfcWriteUrl = null;
+	private boolean boltCardEmulationActive = false;
+	// Bumped by every start and stop, so a registration poll of an earlier
+	// session never reports "started" for a later one.
+	private int boltCardEmulationGeneration = 0;
+	private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
 	private androidx.activity.result.ActivityResultLauncher<String> notificationPermissionLauncher;
 	private SharedPreferences bridgePreferences;
@@ -166,6 +182,7 @@ public class MainActivity extends BridgeActivity {
 		webView.addJavascriptInterface(new LinkyNativeWindowInsetsBridge(), "LinkyNativeWindowInsets");
 		webView.addJavascriptInterface(new LinkyNativeDeepLinksBridge(), "LinkyNativeDeepLinks");
 		webView.addJavascriptInterface(new LinkyNativeNfcBridge(), "LinkyNativeNfc");
+		webView.addJavascriptInterface(new LinkyNativeBoltCardBridge(), "LinkyNativeBoltCard");
 
 		View rootView = webView.getRootView();
 		nativeQrScannerOverlay = rootView.findViewById(R.id.native_qr_scan_overlay);
@@ -244,6 +261,7 @@ public class MainActivity extends BridgeActivity {
 		super.onResume();
 		activeInstanceRef = new WeakReference<>(this);
 		appInForeground = true;
+		registerBoltCardService();
 		if (nativeQrScannerOpen && hasCameraPermission() && nativeQrScannerView != null) {
 			nativeQrScannerView.resume();
 		}
@@ -263,6 +281,9 @@ public class MainActivity extends BridgeActivity {
 		}
 		super.onPause();
 		appInForeground = false;
+		// A card must never stay readable while the user is not looking at Linky.
+		stopBoltCardEmulation("stopped");
+		unregisterBoltCardService();
 		if (pendingNfcWriteUrl != null) {
 			finishPendingNfcWrite("cancelled", null);
 			return;
@@ -279,6 +300,7 @@ public class MainActivity extends BridgeActivity {
 
 	@Override
 	public void onDestroy() {
+		stopBoltCardEmulation("stopped");
 		MainActivity activeInstance = activeInstanceRef.get();
 		if (activeInstance == this) {
 			activeInstanceRef = new WeakReference<>(null);
@@ -1148,6 +1170,178 @@ public class MainActivity extends BridgeActivity {
 		@JavascriptInterface
 		public String consumePendingNotificationOpenDetail() {
 			return MainActivity.this.consumePendingNotificationOpenDetail();
+		}
+	}
+
+	private boolean isBoltCardEmulationSupported() {
+		return nfcAdapter != null
+			&& getPackageManager().hasSystemFeature(PackageManager.FEATURE_NFC_HOST_CARD_EMULATION);
+	}
+
+	private ComponentName boltCardServiceComponent() {
+		return new ComponentName(this, LinkyBoltCardHceService.class);
+	}
+
+	private void dispatchBoltCardEvent(String status, String message) {
+		JSONObject detail = new JSONObject();
+		try {
+			detail.put("status", status);
+			if (message != null && !message.trim().isEmpty()) {
+				detail.put("message", message.trim());
+			}
+		} catch (Exception ignored) {
+			// ignore JSON bridge payload failures
+		}
+		dispatchWindowEvent(EVENT_BOLT_CARD, detail);
+	}
+
+	private void preferBoltCardService() {
+		if (!appInForeground || !isBoltCardEmulationSupported()) {
+			return;
+		}
+		try {
+			CardEmulation.getInstance(nfcAdapter)
+				.setPreferredService(this, boltCardServiceComponent());
+		} catch (Exception ignored) {
+			// Without the preference Android may ask the user which app answers.
+		}
+	}
+
+	/**
+	 * Registers the card service whenever Linky is in front, long before a
+	 * session starts: re-registration and the routing update it triggers take
+	 * up to a second. The service answers "not found" until a session sets a URL.
+	 */
+	private void registerBoltCardService() {
+		if (!isBoltCardEmulationSupported()) {
+			return;
+		}
+		try {
+			getPackageManager().setComponentEnabledSetting(
+				boltCardServiceComponent(),
+				PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+				PackageManager.DONT_KILL_APP
+			);
+		} catch (Exception ignored) {
+			// startBoltCardEmulation reports the failure if a session needs it
+		}
+		preferBoltCardService();
+		mainHandler.postDelayed(this::preferBoltCardService, BOLT_CARD_PREFERRED_RETRY_MS);
+	}
+
+	private void unregisterBoltCardService() {
+		if (!isBoltCardEmulationSupported()) {
+			return;
+		}
+		try {
+			CardEmulation.getInstance(nfcAdapter).unsetPreferredService(this);
+		} catch (Exception ignored) {
+			// the preference ends with the activity anyway
+		}
+		try {
+			getPackageManager().setComponentEnabledSetting(
+				boltCardServiceComponent(),
+				PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+				PackageManager.DONT_KILL_APP
+			);
+		} catch (Exception ignored) {
+			// the service answers nothing once its URL is cleared
+		}
+	}
+
+	private boolean isBoltCardServiceRouted() {
+		try {
+			return CardEmulation.getInstance(nfcAdapter)
+				.isDefaultServiceForAid(boltCardServiceComponent(), BOLT_CARD_AID);
+		} catch (Exception ignored) {
+			return false;
+		}
+	}
+
+	/** Reports "started" once Android routes the AID to Linky, or says it could not confirm. */
+	private void confirmBoltCardRouting(int generation, long startedAtMs) {
+		if (!boltCardEmulationActive || generation != boltCardEmulationGeneration) {
+			return;
+		}
+		if (isBoltCardServiceRouted()) {
+			dispatchBoltCardEvent("started", null);
+			return;
+		}
+		if (SystemClock.elapsedRealtime() - startedAtMs >= BOLT_CARD_REGISTRATION_WAIT_MS) {
+			// Some devices answer isDefaultServiceForAid wrongly; the card may
+			// still work, so the session goes on and the app records the doubt.
+			dispatchBoltCardEvent("started", "unconfirmed");
+			return;
+		}
+		mainHandler.postDelayed(
+			() -> confirmBoltCardRouting(generation, startedAtMs),
+			BOLT_CARD_REGISTRATION_POLL_MS
+		);
+	}
+
+	private void startBoltCardEmulation(String url) {
+		if (!isBoltCardEmulationSupported()) {
+			dispatchBoltCardEvent("unsupported", null);
+			return;
+		}
+		if (!nfcAdapter.isEnabled()) {
+			dispatchBoltCardEvent("disabled", null);
+			return;
+		}
+		if (url == null || !LinkyBoltCardHceService.setNdefUrl(url.trim())) {
+			dispatchBoltCardEvent("error", "Unsupported bolt card URL.");
+			return;
+		}
+
+		// Reader mode turns card emulation off, so a pending tag write yields.
+		cancelPendingNfcWrite();
+		LinkyBoltCardHceService.setListener(new LinkyBoltCardHceService.Listener() {
+			@Override
+			public void onNdefRead() {
+				dispatchBoltCardEvent("read", null);
+			}
+
+			@Override
+			public void onDeactivated() {
+				dispatchBoltCardEvent("deselected", null);
+			}
+		});
+		// Normally done in onResume already; repeated in case that failed.
+		registerBoltCardService();
+		boltCardEmulationActive = true;
+		boltCardEmulationGeneration += 1;
+		confirmBoltCardRouting(boltCardEmulationGeneration, SystemClock.elapsedRealtime());
+	}
+
+	private void stopBoltCardEmulation(String status) {
+		if (!boltCardEmulationActive) {
+			return;
+		}
+		boltCardEmulationActive = false;
+		boltCardEmulationGeneration += 1;
+		LinkyBoltCardHceService.clear();
+		dispatchBoltCardEvent(status, null);
+	}
+
+	private final class LinkyNativeBoltCardBridge {
+		@JavascriptInterface
+		public boolean isSupported() {
+			return isBoltCardEmulationSupported();
+		}
+
+		@JavascriptInterface
+		public void start(String url) {
+			runOnUiThread(() -> startBoltCardEmulation(url));
+		}
+
+		@JavascriptInterface
+		public boolean setUrl(String url) {
+			return url != null && LinkyBoltCardHceService.replaceNdefUrl(url.trim());
+		}
+
+		@JavascriptInterface
+		public void stop() {
+			runOnUiThread(() -> stopBoltCardEmulation("stopped"));
 		}
 	}
 

@@ -15,6 +15,11 @@ const settingSchemas = {
   allowTestMints: Flag,
   /** The display currencies the user enabled; the app drops ones it does not know. */
   displayCurrencies: Schema.parseJson(Schema.Array(Schema.String)),
+  /**
+   * Whether the Send screen arms the device's NFC bolt card; absent means off.
+   * Synced, while each Android device keeps its own card.
+   */
+  "boltCard.armOnSend": Flag,
 };
 
 export type SettingKey = keyof typeof settingSchemas;

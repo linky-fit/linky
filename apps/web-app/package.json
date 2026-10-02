@@ -25,6 +25,7 @@
     "@evolu/react": "^10.4.0",
     "@evolu/react-web": "^2.4.0",
     "@gandlaf21/bc-ur": "1.1.12",
+    "@linky-fit/bolt-card": "workspace:*",
     "@linky-fit/identity": "workspace:*",
     "@linky-fit/linkshu": "workspace:*",
     "@linky-fit/linksync": "workspace:*",

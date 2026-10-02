@@ -13,12 +13,14 @@ WORKDIR /app
 # Manifests first so editing source does not bust the dependency layer.
 COPY package.json bun.lock ./
 COPY patches patches
+COPY apps/bolt-card-bridge/package.json apps/bolt-card-bridge/
 COPY apps/desktop/package.json apps/desktop/
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/
 COPY apps/native-shell/package.json apps/native-shell/
 COPY apps/push/package.json apps/push/
 COPY apps/site/package.json apps/site/
 COPY apps/web-app/package.json apps/web-app/
+COPY packages/bolt-card/package.json packages/bolt-card/
 COPY packages/config/package.json packages/config/
 COPY packages/identity/package.json packages/identity/
 COPY packages/linkshu/package.json packages/linkshu/

@@ -74,6 +74,22 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "User exported contacts and the cashu wallet as a backup file: a browser download on the web, the system share sheet in the native shell. The payload holds counts only, never the rows.",
   AppDataExportFailed:
     "The backup file could not be built or handed to the platform for a reason other than the user dismissing the share sheet.",
+  "boltCard.sessionStarted":
+    'The Send screen opened with the synced "arm on Send" switch on, so the NFC bolt card is switching on. The device starts connecting to its card bridge and arming NFC at the same time; cardLoadMs is how long reading the card from the native key store took. The boltCardSession link ties every row of this session together.',
+  "boltCard.nfcStarted":
+    "NFC card emulation is armed and a reader can read the card. msSinceStart measures activation; routingConfirmed is false when Android did not confirm within 3 s that it routes the NDEF application to Linky, so the card may not answer.",
+  "boltCard.bridgeReady":
+    "The card authenticated on its bridge, which now forwards POS requests. A POS that read the card earlier waits at the bridge for this moment. reconnects counts the attempts it took after a drop.",
+  "boltCard.bridgeLost":
+    "The connection to the card bridge closed during the session. willReconnect says whether the device tries again; a POS request arriving meanwhile waits at the bridge.",
+  "boltCard.tagRead":
+    "A reader read the card's NDEF URL. The payload counter is the tap that was read; the device already serves the next one.",
+  "boltCard.withdrawAnswered":
+    "A POS opened the card URL and the bridge forwarded it. The card either offered a withdraw up to maxWithdrawableSat (spendable balance minus the melt fee reserve) or rejected the tap with the reason the POS shows.",
+  "boltCard.invoiceAnswered":
+    "A POS sent its invoice to the card's LNURL callback. An accepted invoice ends the session and goes through the scanned-invoice payment path: auto-pay up to the limit, confirmation above it.",
+  "boltCard.sessionEnded":
+    "The bolt card switched off: after an accepted invoice (paying), when the Send screen closed or the app paused (ended), or on a failure (bridge, NFC, storage).",
   "bankOffer.recipientPinned":
     "Bank details are reserved for this recipient before publishing. Retries keep the same recipient even if delivery acknowledgments are lost or earlier acceptances arrive late.",
   "bankOffer.staggerExtended":
@@ -164,6 +180,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A topup's NUT-17 subscription failed or its socket closed. It will retry with backoff while HTTP polling continues. The quote link connects the retry to settlement; normal cancellation emits no failure.",
   "autoswap.estimate":
     "linkshu priced moving an amount between mints: a mint quote at the target and a melt quote for its invoice at the source, plus the source's input fee allowance. Nothing is paid; both quotes expire unused. A following autoswap.claim with the same mints performs the move.",
+  "settings.boltCardArmOnSend":
+    'The user switched the synced "arm on Send" bolt card setting. On makes the Send screen arm NFC card emulation on every Android device with NFC; unset counts as off.',
   "settings.allowTestMints":
     'The user switched the synced "Allow test mints" setting. Off hides test-mint balances, mint lists and chat tokens and refuses new test-mint tokens; stored test-mint proofs stay untouched.',
   "settings.displayCurrencies":

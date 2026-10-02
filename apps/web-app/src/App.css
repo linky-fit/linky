@@ -426,6 +426,42 @@
   background: rgba(15, 23, 42, 0.95);
 }
 
+.scan-bolt-card-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  min-height: 46px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.scan-bolt-card-status.is-ready {
+  color: var(--color-success);
+}
+
+.scan-bolt-card-status.is-failed {
+  color: #fca5a5;
+}
+
+.scan-bolt-card-status-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.scan-bolt-card-retry {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
 .scan-footer-actions {
   display: flex;
   justify-content: center;
@@ -8092,4 +8128,13 @@ button.cashu-token-pill {
 .payment-request-confirm-warning {
   margin-top: 8px;
   color: #fca5a5;
+}
+
+.bolt-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 20px;
+  padding-left: 20px;
+  line-height: 1.45;
 }

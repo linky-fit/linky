@@ -9,4 +9,5 @@
     <string name="push_notification_channel_name">Linky messages</string>
     <string name="push_notification_fallback_title">Linky</string>
     <string name="push_notification_fallback_body">Nová aktivita v Linky</string>
+    <string name="bolt_card_service_description">Linky bolt card</string>
 </resources>
