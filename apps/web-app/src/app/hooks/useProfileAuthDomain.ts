@@ -43,7 +43,8 @@ import {
   readStoredSlip39Seed,
   writeStoredCashuMnemonic,
 } from "../../platform/identitySecrets";
-import { scheduleActiveEvoluDatabaseWipe } from "../../platform/evoluLocalDatabase";
+import { reportAppLog } from "../../devtools/inspector/appLog";
+import { markLogoutPending } from "../../platform/logoutWipe";
 import { triggerPasswordManagerSeedSave } from "../../platform/passwordManager";
 import { CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY } from "../../utils/constants";
 import { getDefaultNip05IdentifierFromAddress } from "../../utils/nostrNip05";
@@ -1012,16 +1013,15 @@ export const useProfileAuthDomain = ({
 
       void (async () => {
         setLogoutArmed(false);
-        scheduleActiveEvoluDatabaseWipe();
+        reportAppLog({
+          tag: "auth.loggedOut",
+          summary:
+            "User logged out; every tab reloads to erase this device's data",
+          payload: { evoluConnected },
+        });
+        // Native secret storage lives outside the site data the wipe deletes.
         await clearIdentitySecrets();
-
-        setIsSeedLogin(false);
-        setActiveNostrIdentitySource("derived");
-        setCashuSeedMnemonic(null);
-        setSlip39Seed(null);
-        clearLegacyLaneStorage();
-
-        navigateTo({ route: "contacts" });
+        markLogoutPending();
         globalThis.location.reload();
       })();
     },

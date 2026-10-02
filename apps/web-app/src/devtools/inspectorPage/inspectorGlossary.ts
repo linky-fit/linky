@@ -18,6 +18,8 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
 };
 
 const TAG_DESCRIPTIONS: Record<string, string> = {
+  "auth.loggedOut":
+    "User confirmed logout. Every open tab reloads and the first one to boot deletes everything the site stored on this device: the Evolu databases, IndexedDB (including this inspector buffer), localStorage, caches and the service worker. The payload says whether Evolu was connected, i.e. whether unsynced data may have been lost.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "conversations.archived":
@@ -110,8 +112,6 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
   "evolu.serversChanged":
     "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
-  "evolu.loggedOutDatabasesWiped":
-    "Boot deleted the local databases of accounts logged out on this device. The payload lists the wiped database names and those that could not be deleted yet (usually still open in another tab), which are retried on the next boot.",
   "evolu.linkyRelayMigrated":
     "The one-time upgrade enabled the Linky Evolu relay before database startup, preserving the other configured servers and their disabled states.",
   "recommendedRelays.fetched":

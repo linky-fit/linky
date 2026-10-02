@@ -13,6 +13,11 @@ import {
   shouldUseInMemoryEvoluStorage,
 } from "./platform/evoluWebStorage";
 import { installIosViewportHeal } from "./platform/iosViewportHeal";
+import {
+  finishPendingLogout,
+  isLogoutPending,
+  onLogoutInAnotherTab,
+} from "./platform/logoutWipe";
 import type {
   BroadcastChannelLike,
   BroadcastMessageHandler,
@@ -710,6 +715,14 @@ const bootstrap = async () => {
     applyEvoluWebCompatPolyfills();
     installIosViewportHeal();
     console.log("[linky][boot] polyfills done");
+
+    if (isLogoutPending()) {
+      setStage("logout-wipe");
+      await finishPendingLogout();
+      window.location.reload();
+      return;
+    }
+    onLogoutInAnotherTab(() => window.location.reload());
 
     setStage("storage-compat");
     let storagePromptShown = false;
