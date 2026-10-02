@@ -41,7 +41,8 @@ export const cs = {
   dedupeContactsFailed: "Deduplikace se nepovedla.",
   exportDone: "Export hotov.",
   exportFailed: "Export se nepovedl.",
-  importDone: "Import hotov.",
+  importDone:
+    "Import hotov. Přidané kontakty: {added}, upravené: {updated}, důkazy: {proofs}, operace peněženky: {operations}.",
   importWalletNotReady:
     "Peněženka se ještě načítá. Zkuste import za chvíli znovu.",
   importFailed: "Import se nepovedl.",

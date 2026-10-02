@@ -223,6 +223,7 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
       let addedContacts = 0;
       let updatedContacts = 0;
       let addedTokens = 0;
+      let restoredOperations = 0;
 
       for (const item of importedContacts) {
         const rec = asRecord(item);
@@ -299,6 +300,7 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
           const draft = decodeNewOperation(item);
           if (Option.isNone(draft)) continue;
           await importCashuOperation(draft.value);
+          restoredOperations += 1;
         }
         const drafts = decodeImportProofDrafts(importedProofs);
         if (Option.isSome(drafts) && drafts.value.length > 0) {
@@ -325,13 +327,22 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
         }
       }
 
-      if (addedContacts === 0 && updatedContacts === 0 && addedTokens === 0) {
+      if (
+        addedContacts === 0 &&
+        updatedContacts === 0 &&
+        addedTokens === 0 &&
+        restoredOperations === 0
+      ) {
         pushToast(t("importNothing"));
         return;
       }
 
       pushToast(
-        `${t("importDone")} (${addedContacts}/${updatedContacts}/${addedTokens})`,
+        t("importDone")
+          .replace("{added}", String(addedContacts))
+          .replace("{updated}", String(updatedContacts))
+          .replace("{proofs}", String(addedTokens))
+          .replace("{operations}", String(restoredOperations)),
       );
     },
     [

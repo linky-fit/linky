@@ -42,7 +42,8 @@ export const en = {
   dedupeContactsFailed: "Deduplication failed.",
   exportDone: "Export complete.",
   exportFailed: "Export failed.",
-  importDone: "Import complete.",
+  importDone:
+    "Import complete. Contacts added: {added}, updated: {updated}, proofs: {proofs}, wallet operations: {operations}.",
   importWalletNotReady:
     "The wallet is still loading. Try importing again in a moment.",
   importFailed: "Import failed.",
