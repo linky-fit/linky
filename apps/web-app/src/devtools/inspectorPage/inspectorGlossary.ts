@@ -31,11 +31,15 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   ShardsSubscribed:
     "The set of owners this device syncs was reconciled: the app owner plus every visible shard of every scope, at boot, after each rotation and after explicit forgetting. Owner links list the whole set; the payload says why and how many.",
   AccountHydrated:
-    "The account's data has arrived from an Evolu relay: the app owner and then every shard its pointers make visible finished a sync round. Nostr and the writes the user did not ask for start only after this. Owner links list the synced owners; the payload gives the time since the page loaded.",
+    "The account's data has arrived from an Evolu relay: the app owner and then every shard its pointers make visible finished a sync round. Nostr and the writes the user did not ask for start only after this. Owner links list the synced owners; the payload gives the owner count and the time since the page loaded.",
   ShardRotated:
     "A scope's shard pointer moved to a new index, rotated on this device (its writes crossed the byte or mutation rule, or the debug page asked) or on another one. The new shard is subscribed for sync; the owner link is its id.",
   OwnerSyncFailed:
-    "An Evolu relay answered a sync request with a protocol error (QuotaError, WriteKeyError, WriteError or SyncError). When the relay had already answered the owner without an error, the owner's sync round ends there and what the relay held arrived in the rounds before (endsRound true). Otherwise the owner stays unsynced, so hydration keeps waiting for it (endsRound false). The owner link names the owner; the payload names the error.",
+    "An Evolu relay answered a sync request with a protocol error (QuotaError, WriteKeyError, WriteError or SyncError). When the relay had already answered the owner without an error on the same connection, the owner's sync round ends there and what the relay held arrived in the rounds before (endsRound true). Otherwise the owner stays unsynced, so hydration and pointer repair keep waiting for it (endsRound false). The owner link names the owner; the payload names the error.",
+  WriteUnconfirmed:
+    "Evolu's worker did not report a local write applied within 10 seconds, which happens when Evolu drops the batch it was in. The write fails, so its caller retries or reports it like any failed write. Links name the shard owner and the row id.",
+  ShardPointerRepaired:
+    "After hydration, a scope's shard pointer stood below a shard that holds rows, so this device moved it back up to the newest such shard and the shards in between are read again. It happens when a device wrote the pointer from a stale read, such as a seed restore on an older build. The payload gives scope, from and to; the owner link is the shard now active.",
   LaneMigrationStarted:
     "First launch on this device after the shard storage update: the old owner lanes are about to be copied into the per-scope shards. Owner links list the legacy lanes read.",
   LaneMigrationScopeIngested:
@@ -52,6 +56,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "After hydration, conversation archives this device sees were copied onto their contacts, where the archive state now lives. It also fires for archives an older app version wrote on the conversation; an archive is copied only onto a contact without one, and an unarchive clears both, so it is never undone. Contact and conversation links identify the rows.",
   "evolu.legacySpentProofSyncFailed":
     "A terminal proof state could not be mirrored to legacy storage. An older device may show stale funds until its mint check corrects them; the next proof change retries.",
+  "evolu.shardPointerRepairFailed":
+    "Writing a repaired shard pointer failed; the pointer stays where it was and the next launch checks again.",
+  "evolu.laneMigrationScreenReleased":
+    "The first-run migrating screen waited 15 seconds for an Evolu relay and gave way to the app. The legacy lanes are still copied into the shards once a relay answers; until then the app shows the shards as they are.",
   "evolu.laneMigrationFailed":
     "The lane migration threw before it could finish; the done flag stays unset and the next launch retries. The app keeps running on the lanes meanwhile.",
   EvoluSyncRetry:
@@ -96,6 +104,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A bank-offer snapshot was rejected or held for an authenticated offerer snapshot. It cannot update the offer or authorize settlement yet.",
   "bankOffer.staggerDropped":
     "The queued recipients of a staggered proxy payment offer were discarded because the offer stopped being open — someone accepted it, it ended, or it expired.",
+  "reactions.retractionStored":
+    "A retraction arrived for a reaction this device has not stored, so a removed copy was written in its place; any device that receives the reaction later finds it removed. The rumor link is the reaction's id, the pubkey link who retracted it.",
   "profiles.searchProfiles":
     "Add-contact text search: a NIP-50 kind-0 query fanned out to the read relays plus the configured search relays; relays without NIP-50 answer with unrelated profiles, so only hits that match the query locally are returned (the params carry the query and limit).",
   "contacts.dedupeFailed":

@@ -106,8 +106,22 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
     return Effect.sync(() => [...tableRows(table).values()]);
   }
 
+  function readCopies<T extends keyof S & string>(
+    table: T,
+    id: string,
+  ): Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  function readCopies(
+    table: string,
+    id: string,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    return Effect.sync(() =>
+      [...tableRows(table).values()].filter((row) => row.id === id),
+    );
+  }
+
   return {
     readTable,
+    readCopies,
     mutate: (mutations) =>
       Effect.map(Clock.currentTimeMillis, (millis) => {
         const nowIso = new Date(millis).toISOString();

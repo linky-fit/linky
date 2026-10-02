@@ -48,7 +48,7 @@ const toPositiveInt = (value: unknown, fallback: number): number => {
   return rounded > 0 ? rounded : fallback;
 };
 
-const isSqliteTrueish = (value: unknown): boolean => {
+export const isSqliteTrueish = (value: unknown): boolean => {
   if (value === true || value === 1 || value === "1") return true;
   return trimString(value).toLowerCase() === "true";
 };

@@ -2,6 +2,7 @@ import type {
   OwnSeenReceiptConfirmed,
   SeenReceiptReceived,
 } from "@linky-fit/linkstr";
+import { NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 
 /** Peer's reported seen window: our messages in (sinceSec, seenUpToSec]. */
 export interface PeerSeenWindow {
@@ -14,7 +15,10 @@ export interface PeerSeenWindow {
 const PEER_SEEN_FUTURE_MARGIN_SEC = 24 * 60 * 60;
 
 export interface SeenReceiptInboxContext {
-  advanceContactPeerSeen: (contactId: string, window: PeerSeenWindow) => void;
+  advanceContactPeerSeen: (
+    contactId: string,
+    window: PeerSeenWindow,
+  ) => Promise<WriteOutcome>;
   findContactId: (pubkey: string) => string | null;
   getPeerSeenWindow: (contactId: string) => PeerSeenWindow | null;
   identitySinceSec: number | null;
@@ -44,23 +48,24 @@ export const resolvePeerSeenAdvance = (
 export const applySeenReceiptReceived = (
   event: SeenReceiptReceived,
   ctx: SeenReceiptInboxContext,
-): void => {
-  if (ctx.isBlockedPubkey(event.from)) return;
+): Promise<WriteOutcome> => {
+  if (ctx.isBlockedPubkey(event.from)) return NO_WRITE;
   if (ctx.identitySinceSec !== null && event.sentAt < ctx.identitySinceSec) {
-    return;
+    return NO_WRITE;
   }
   // Receipts from unknown-contact threads are dropped: they have no contact
   // row to hold the window, and their chats show no seen state anyway.
   const contactId = ctx.findContactId(event.from);
-  if (contactId === null) return;
+  if (contactId === null) return NO_WRITE;
 
   const advance = resolvePeerSeenAdvance(
     ctx.getPeerSeenWindow(contactId),
     { sinceSec: event.sinceSec, seenUpToSec: event.seenUpToSec },
     ctx.nowSec,
   );
-  if (advance === null) return;
-  ctx.advanceContactPeerSeen(contactId, advance);
+  return advance === null
+    ? NO_WRITE
+    : ctx.advanceContactPeerSeen(contactId, advance);
 };
 
 /**

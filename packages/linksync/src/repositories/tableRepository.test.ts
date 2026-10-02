@@ -3,7 +3,7 @@ import { makeInMemoryShardDb, ShardDbError, type ShardDb } from "../core";
 import { createId } from "../model/ids";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
-import { runNow } from "../testing/linky";
+import { linkyStore, runNow } from "../testing/linky";
 import { testAppOwner } from "../testing/toy";
 import { tableRepository } from "./tableRepository";
 import {
@@ -12,8 +12,12 @@ import {
   NonEmptyString1000,
   PositiveInt,
 } from "@evolu/common";
-import { RumorId } from "@linky-fit/linkstr";
-import { directConversationIdFor, nostrMessageIdFor } from "../model/ids";
+import { Pubkey, RumorId } from "@linky-fit/linkstr";
+import {
+  directConversationIdFor,
+  nostrMessageIdFor,
+  nostrReactionIdFor,
+} from "../model/ids";
 
 describe("tableRepository", () => {
   it("keeps a write that succeeded when the rotation's pointer write fails", () => {
@@ -56,10 +60,7 @@ describe("tableRepository", () => {
       tableRepository(store, "messages", "message");
 
     it("writes a new row once and keeps what changed it since", () => {
-      const store = createLinkyStore(
-        makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns),
-        testAppOwner(),
-      );
+      const { store } = linkyStore();
       const messages = messagesOf(store);
       expect(runNow(messages.insertIfAbsent(message("hi")))).toBe(true);
       runNow(
@@ -74,10 +75,7 @@ describe("tableRepository", () => {
     });
 
     it("does not revive a removed row", () => {
-      const store = createLinkyStore(
-        makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns),
-        testAppOwner(),
-      );
+      const { store } = linkyStore();
       const messages = messagesOf(store);
       runNow(messages.insertIfAbsent(message("hi")));
       runNow(messages.remove(nostrMessageIdFor(rumorId)));
@@ -86,10 +84,7 @@ describe("tableRepository", () => {
     });
 
     it("leaves a row in an older shard where it is", () => {
-      const store = createLinkyStore(
-        makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns),
-        testAppOwner(),
-      );
+      const { store } = linkyStore();
       const messages = messagesOf(store);
       runNow(messages.insertIfAbsent(message("hi")));
       runNow(store.rotate("messages"));
@@ -98,6 +93,50 @@ describe("tableRepository", () => {
       expect(copies.map((row) => row.ownerId)).toEqual([
         store.shardOwner("messages", 0).id,
       ]);
+    });
+  });
+
+  describe("removeIfAbsent", () => {
+    const rumorId = RumorId.make("cd".repeat(32));
+    const reactor = Pubkey.make("ef".repeat(32));
+    const id = nostrReactionIdFor(rumorId, reactor);
+    const reactionsOf = (store: ReturnType<typeof createLinkyStore>) =>
+      tableRepository(store, "messages", "reaction");
+    const reaction = {
+      id,
+      conversationId: directConversationIdFor(createId<"Contact">()),
+      messageId: NonEmptyString1000.orThrow("ab".repeat(32)),
+      reactorPubkey: NonEmptyString1000.orThrow(reactor),
+      emoji: NonEmptyString100.orThrow("👍"),
+      createdAtSec: PositiveInt.orThrow(1),
+      wrapId: NonEmptyString1000.orThrow(rumorId),
+    };
+
+    it("stores a removal that refuses the row arriving later", () => {
+      const { store } = linkyStore();
+      const reactions = reactionsOf(store);
+      expect(
+        runNow(
+          reactions.removeIfAbsent({
+            id,
+            reactorPubkey: reaction.reactorPubkey,
+            wrapId: reaction.wrapId,
+          }),
+        ),
+      ).toBe(true);
+      expect(runNow(reactions.insertIfAbsent(reaction))).toBe(false);
+      expect(runNow(reactions.all)).toEqual([]);
+      expect(runNow(store.copies("messages", "reaction"))).toEqual([
+        expect.objectContaining({ id, isDeleted: 1, messageId: null }),
+      ]);
+    });
+
+    it("leaves a stored row alone", () => {
+      const { store } = linkyStore();
+      const reactions = reactionsOf(store);
+      runNow(reactions.insertIfAbsent(reaction));
+      expect(runNow(reactions.removeIfAbsent({ id }))).toBe(false);
+      expect(runNow(reactions.all)).toHaveLength(1);
     });
   });
 });

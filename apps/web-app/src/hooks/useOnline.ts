@@ -7,7 +7,7 @@ const readOnline = (): boolean =>
 export const useOnline = (): boolean => {
   const [online, setOnline] = React.useState(readOnline);
   React.useEffect(() => {
-    const update = () => setOnline(readOnline());
+    const update = (event: Event) => setOnline(event.type === "online");
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
     return () => {

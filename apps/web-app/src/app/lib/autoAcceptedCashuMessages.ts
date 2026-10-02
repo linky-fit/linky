@@ -5,13 +5,13 @@ import {
 } from "../../utils/storage";
 import type { LocalNostrMessage } from "../types/appTypes";
 
-// Messages whose cashu token the message-driven auto-accept has already
-// resolved terminally — received, already known, or permanently spent. The
-// in-session dedup ref forgets these on reload, and linkshu deliberately keeps
-// a failed receive retryable, so without a persistent record a permanently
-// spent token is re-attempted (and re-fails) on every launch. Only terminal
-// outcomes are recorded; a transient mint failure stays retryable.
-// Entries are rumor ids; entries stored before them are row ids.
+// Rumor ids (row ids in older entries) of messages whose cashu token the
+// message-driven auto-accept has already resolved terminally — received,
+// already known, or permanently spent. The in-session dedup ref forgets these
+// on reload, and linkshu deliberately keeps a failed receive retryable, so
+// without a persistent record a permanently spent token is re-attempted (and
+// re-fails) on every launch. Only terminal outcomes are recorded; a transient
+// mint failure stays retryable.
 const STORAGE_KEY = "linky.cashu.auto_accepted_message_ids.v1";
 const MAX_TRACKED_IDS = 1000;
 

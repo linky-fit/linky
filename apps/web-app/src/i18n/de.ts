@@ -238,6 +238,8 @@ export const de = {
     "Evolu hat einen Fehler gemeldet. Einige Änderungen haben deine anderen Geräte möglicherweise nicht erreicht.",
   evoluSyncing: "Wird synchronisiert…",
   evoluNotSynced: "Nicht synchronisiert",
+  evoluRelayWaiting:
+    "Warte auf das Evolu-Relay. Neue Nachrichten kommen an, sobald deine Daten synchronisiert sind.",
   evoluCapacityMeasuring: "Wird gemessen…",
   evoluWipeStorage: "Evolu-Speicher leeren",
   evoluWipeStorageBusy: "Evolu-Speicher wird geleert…",

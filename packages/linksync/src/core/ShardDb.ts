@@ -78,6 +78,11 @@ export interface ShardDb<S extends DbSchema> {
   readonly readTable: <T extends keyof S & string>(
     table: T,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  /** Every owner's copy of the row with this id, tombstones included. */
+  readonly readCopies: <T extends keyof S & string>(
+    table: T,
+    id: string,
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /** Column-level writes; an `update` of an unknown `(ownerId, id)` creates a row. */
   readonly mutate: (
     mutations: ReadonlyArray<Mutation>,

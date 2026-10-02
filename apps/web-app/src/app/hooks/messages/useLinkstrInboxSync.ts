@@ -1,10 +1,10 @@
 import { createContactNameFormatter } from "../../../utils/contactName";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
-import { Schema } from "effect";
 import { decodeNpub, identityFromNsec, UnixSeconds } from "@linky-fit/linkstr";
 import type {
   BankOfferInboxEvent,
   InboxDelivery,
+  Pubkey,
   WrapInboxEvent,
 } from "@linky-fit/linkstr";
 import type { AppliedBankPaymentOfferSnapshot } from "@linky-fit/proxy-payment";
@@ -16,14 +16,16 @@ import {
 } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
+import { Schema } from "effect";
 import { BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY } from "../../../utils/constants";
+import { safeLocalStorageGetJson } from "../../../utils/storage";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type {
+  AppendLocalNostrMessage,
+  AppendLocalNostrReaction,
   ContactNameRowLike,
   LocalNostrMessage,
   LocalNostrReaction,
-  NewLocalNostrMessage,
-  NewLocalNostrReaction,
   PaymentLogData,
   RouteWithOptionalId,
   UpdateLocalNostrMessage,
@@ -57,10 +59,10 @@ import {
 import {
   getInitialNostrIdentitySource,
   getInitialNostrIdentitySwitchedAtSec,
-  safeLocalStorageGetJson,
 } from "../../../utils/storage";
 import { trimString } from "../../../utils/validation";
 import { nowSeconds } from "../../../utils/time";
+import { allWrites, NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 import type { Translate } from "../../../i18n";
 
 // Fallback backfill window for a first session without a persisted cursor.
@@ -79,7 +81,7 @@ const isBlockedPubkey = (pubkey: string): boolean => {
     .includes(normalizedPubkey);
 };
 
-const deriveMyPubkey = (currentNsec: string | null): string | null => {
+const deriveMyPubkey = (currentNsec: string | null): Pubkey | null => {
   if (!currentNsec) return null;
   return identityFromNsec(currentNsec.trim())?.pubkey ?? null;
 };
@@ -112,9 +114,9 @@ const buildContactIndex = (
 };
 
 interface UseLinkstrInboxSyncParams {
-  advanceContactPeerSeen: (contactId: string, window: PeerSeenWindow) => void;
-  appendLocalNostrMessage: (message: NewLocalNostrMessage) => string;
-  appendLocalNostrReaction: (reaction: NewLocalNostrReaction) => string;
+  advanceContactPeerSeen: SeenReceiptInboxContext["advanceContactPeerSeen"];
+  appendLocalNostrMessage: AppendLocalNostrMessage;
+  appendLocalNostrReaction: AppendLocalNostrReaction;
   applyBankPaymentOfferSnapshot: (
     event: BankOfferInboxEvent,
   ) => readonly AppliedBankPaymentOfferSnapshot[];
@@ -124,6 +126,8 @@ interface UseLinkstrInboxSyncParams {
   formatDisplayedAmountText: (amountSat: number) => string;
   getPeerSeenWindow: (contactId: string) => PeerSeenWindow | null;
   logPayStep: (step: string, data?: PaymentLogData) => void;
+  /** See `ChatInboxContext.visibleSinceSec`. */
+  messagesVisibleSinceSec: number | null;
   maybeShowPwaNotification: (
     title: string,
     body: string,
@@ -131,7 +135,7 @@ interface UseLinkstrInboxSyncParams {
   ) => Promise<void>;
   nostrMessagesLatestRef: React.MutableRefObject<LocalNostrMessage[]>;
   nostrMessagesLocal: readonly LocalNostrMessage[];
-  nostrReactionWrapIdsRef: React.MutableRefObject<Set<string>>;
+  knownReactionKeysRef: React.MutableRefObject<Set<string>>;
   nostrReactionsLocal: readonly LocalNostrReaction[];
   onOpenInboxMessageToast: (params: {
     contactId: string;
@@ -140,16 +144,18 @@ interface UseLinkstrInboxSyncParams {
   pushToast: (message: string, options?: PushToastOptions) => void;
   recordSentSeenReceipt: (peerPubkey: string, seenUpToSec: number) => void;
   route: RouteWithOptionalId;
-  softDeleteLocalNostrReactionsByWrapIds: (wrapIds: readonly string[]) => void;
+  softDeleteLocalNostrReactionsByWrapIds: ReactionInboxContext["softDeleteLocalNostrReactionsByWrapIds"];
+  storeRetractedReaction: ReactionInboxContext["storeRetractedReaction"];
   t: Translate;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
   updateLocalNostrReaction: UpdateLocalNostrReaction;
 }
 
+/** Handles an inbox event; resolves once everything it stored is written. */
 export type DispatchInboxEvent = (
   event: WrapInboxEvent,
   delivery: InboxDelivery,
-) => void;
+) => Promise<WriteOutcome>;
 
 /**
  * The app's single wrap-inbox consumer: applies every typed linkstr inbox
@@ -181,7 +187,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
     paramsRef.current = params;
   });
 
-  const buildHandlers = React.useCallback((myPubkeyHex: string) => {
+  const buildHandlers = React.useCallback((myPubkeyHex: Pubkey) => {
     const latest = paramsRef.current;
 
     const findContact = (pubkey: string): InboxContact | null => {
@@ -201,14 +207,16 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
       appendLocalNostrReaction: latest.appendLocalNostrReaction,
       identitySinceSec: identitySinceSecRef.current,
       isBlockedPubkey,
-      knownReactionWrapIds: latest.nostrReactionWrapIdsRef.current,
+      knownReactionKeys: latest.knownReactionKeysRef.current,
       messages: latest.nostrMessagesLatestRef.current,
       myPubkey: myPubkeyHex,
       reactions: latest.nostrReactionsLocal,
       softDeleteLocalNostrReactionsByWrapIds:
         latest.softDeleteLocalNostrReactionsByWrapIds,
       state: reactionSessionStateRef.current,
+      storeRetractedReaction: latest.storeRetractedReaction,
       updateLocalNostrReaction: latest.updateLocalNostrReaction,
+      visibleSinceSec: latest.messagesVisibleSinceSec,
     };
 
     const chatCtx: ChatInboxContext = {
@@ -219,6 +227,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
       messages: latest.nostrMessagesLatestRef.current,
       resolveContactId: (peerPubkey) => findContact(peerPubkey)?.id ?? null,
       updateLocalNostrMessage: latest.updateLocalNostrMessage,
+      visibleSinceSec: latest.messagesVisibleSinceSec,
     };
 
     const seenReceiptCtx: SeenReceiptInboxContext = {
@@ -247,7 +256,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
 
   const dispatchInboxEvent = React.useCallback<DispatchInboxEvent>(
     (event, delivery) => {
-      if (!enabled || myPubkey === null) return;
+      if (!enabled || myPubkey === null) return NO_WRITE;
       const { chatCtx, notificationsCtx, reactionCtx, seenReceiptCtx } =
         buildHandlers(myPubkey);
       const cutoff = identitySinceSecRef.current;
@@ -256,45 +265,48 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
         case "OwnReactionConfirmed":
         case "ReactionRetracted":
         case "OwnRetractionConfirmed":
-          processReactionInboxEvent(event, reactionCtx);
-          return;
+          return processReactionInboxEvent(event, reactionCtx);
         case "ChatMessageReceived": {
-          const inserted = applyChatMessageReceived(event, chatCtx);
-          if (inserted && delivery === "live") {
-            notifyInsertedChatMessage(inserted, notificationsCtx);
+          const handled = applyChatMessageReceived(event, chatCtx);
+          if (!handled.inserted) return handled.written;
+          // Store reactions waiting for this message after it becomes available.
+          const reactionsWritten = retryDeferredReactions(
+            buildHandlers(myPubkey).reactionCtx,
+          );
+          if (delivery === "live") {
+            notifyInsertedChatMessage(handled.inserted, notificationsCtx);
           }
-          return;
+          return allWrites([handled.written, reactionsWritten]);
         }
         case "OwnChatMessageConfirmed":
-          applyOwnChatMessageConfirmed(event, chatCtx);
-          return;
+          return applyOwnChatMessageConfirmed(event, chatCtx);
         case "PaymentNoticeReceived": {
-          if (isBlockedPubkey(event.from)) return;
-          if (cutoff !== null && event.sentAt < cutoff) return;
+          if (isBlockedPubkey(event.from)) return NO_WRITE;
+          if (cutoff !== null && event.sentAt < cutoff) return NO_WRITE;
           const contactId =
             notificationsCtx.findContact(event.from)?.id ??
             buildUnknownContactId(event.from);
-          if (!contactId) return;
+          if (!contactId) return NO_WRITE;
           handlePaymentNoticeReceived(
             event,
             contactId,
             delivery,
             notificationsCtx,
           );
-          return;
+          return NO_WRITE;
         }
         case "BankOfferSnapshotReceived":
         case "OwnBankOfferSnapshotConfirmed": {
-          if (cutoff !== null && event.sentAt < cutoff) return;
+          if (cutoff !== null && event.sentAt < cutoff) return NO_WRITE;
           const peerPubkey =
             event._tag === "OwnBankOfferSnapshotConfirmed"
               ? event.to
               : event.from;
-          if (isBlockedPubkey(peerPubkey)) return;
+          if (isBlockedPubkey(peerPubkey)) return NO_WRITE;
           const contactId =
             notificationsCtx.findContact(peerPubkey)?.id ??
             buildUnknownContactId(peerPubkey);
-          if (!contactId) return;
+          if (!contactId) return NO_WRITE;
           const accepted =
             paramsRef.current.applyBankPaymentOfferSnapshot(event);
           if (accepted.length === 0)
@@ -317,16 +329,15 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
               },
               notificationsCtx,
             );
-          return;
+          return NO_WRITE;
         }
         case "SeenReceiptReceived":
-          applySeenReceiptReceived(event, seenReceiptCtx);
-          return;
+          return applySeenReceiptReceived(event, seenReceiptCtx);
         case "OwnSeenReceiptConfirmed":
           applyOwnSeenReceiptConfirmed(event, seenReceiptCtx);
-          return;
+          return NO_WRITE;
         case "WrapDropped":
-          return;
+          return NO_WRITE;
       }
     },
     [buildHandlers, enabled, myPubkey],
@@ -346,14 +357,17 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
     // once it holds a checkpoint.
     setWrapInboxHandler({
       since: UnixSeconds.make(nowSeconds() - INBOX_BACKFILL_SINCE_SEC),
-      onEvent: dispatchInboxEvent,
+      onEvent: async (event, delivery) => {
+        const outcome = await dispatchInboxEvent(event, delivery);
+        if (!outcome.ok) console.warn("[linky][inbox] write failed", outcome);
+      },
     });
     return () => setWrapInboxHandler(null);
   }, [currentNsec, dispatchInboxEvent, enabled, myPubkey, setWrapInboxHandler]);
 
   React.useEffect(() => {
     if (myPubkey === null) return;
-    retryDeferredReactions(buildHandlers(myPubkey).reactionCtx);
+    void retryDeferredReactions(buildHandlers(myPubkey).reactionCtx);
   }, [buildHandlers, myPubkey, nostrMessagesLocal]);
 
   return dispatchInboxEvent;

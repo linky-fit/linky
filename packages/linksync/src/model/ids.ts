@@ -4,7 +4,7 @@ import {
   createRandomBytes,
   id,
 } from "@evolu/common";
-import type { RumorId } from "@linky-fit/linkstr";
+import type { Pubkey, RumorId } from "@linky-fit/linkstr";
 import type { SettingKey } from "./settings";
 
 export const ContactId = id("Contact");
@@ -55,9 +55,16 @@ export const directConversationIdFor = (contactId: ContactId): ConversationId =>
 export const nostrMessageIdFor = (rumorId: RumorId): MessageId =>
   createIdFromString<"Message">(`message/nostr/${rumorId}`);
 
-/** A reaction from Nostr is one row on every device. */
-export const nostrReactionIdFor = (rumorId: RumorId): ReactionId =>
-  createIdFromString<"Reaction">(`reaction/nostr/${rumorId}`);
+/**
+ * A reaction from Nostr is one row on every device. The reactor is part of
+ * the id, so a retraction stored before its reaction can only remove a
+ * reaction of whoever retracted it.
+ */
+export const nostrReactionIdFor = (
+  rumorId: RumorId,
+  reactor: Pubkey,
+): ReactionId =>
+  createIdFromString<"Reaction">(`reaction/nostr/${reactor}/${rumorId}`);
 
 export const settingIdFor = (key: SettingKey): SettingId =>
   createIdFromString<"Setting">(`setting/${key}`);

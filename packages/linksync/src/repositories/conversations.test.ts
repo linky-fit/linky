@@ -116,31 +116,6 @@ describe("conversations repository", () => {
     expect(oldCopy?.isDeleted).toBe(1);
   });
 
-  it("tells when the oldest visible shard began once older ones are forgotten", () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    try {
-      const { store } = linkyStore();
-      const conversations = makeConversationsRepository(store);
-      const writeChatAt = (atSec: number) => {
-        vi.setSystemTime(atSec * 1000);
-        runNow(conversations.ensureDirect(createId<"Contact">()));
-      };
-      writeChatAt(1_000);
-      expect(runNow(conversations.visibleSinceSec)).toBeNull();
-      for (const atSec of [2_000, 3_000, 4_000, 5_000]) {
-        runNow(store.rotate("messages"));
-        writeChatAt(atSec);
-      }
-      expect(runNow(conversations.visibleSinceSec)).toBeNull();
-
-      runNow(store.forget("messages"));
-
-      expect(runNow(conversations.visibleSinceSec)).toBe(2_000);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it("starts a chat created over forgotten shards read up to where the visible ones begin", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
@@ -155,8 +130,11 @@ describe("conversations repository", () => {
         runNow(store.rotate("messages"));
         ensureAt(atSec);
       }
+      expect(runNow(conversations.visibleSinceSec)).toBeNull();
+
       runNow(store.forget("messages"));
 
+      expect(runNow(conversations.visibleSinceSec)).toBe(2_000);
       expect(ensureAt(6_000).lastSeenAtSec).toBe(2_000);
     } finally {
       vi.useRealTimers();

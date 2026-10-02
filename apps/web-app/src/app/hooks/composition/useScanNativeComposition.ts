@@ -567,7 +567,7 @@ export const useScanNativeComposition = ({
         }
 
         const event = fetched.value;
-        dispatchInboxEvent(event, "backfill");
+        void dispatchInboxEvent(event, "backfill");
         const peerPubkey = inboxPeerPubkey(event);
         if (!peerPubkey) {
           return openedFromNotificationData;

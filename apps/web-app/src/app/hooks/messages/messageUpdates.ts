@@ -1,11 +1,11 @@
 import type {
   LocalNostrMessage,
-  LocalNostrReaction,
   UpdateLocalNostrMessage,
   UpdateLocalNostrReaction,
 } from "../../types/appTypes";
 import { asNonEmptyString, trimString } from "../../../utils/validation";
 import { nowSeconds } from "../../../utils/time";
+import { isSqliteTrueish } from "./messageRows";
 
 export interface NostrMessageUpdatePayload {
   clientId?: string | null;
@@ -36,41 +36,34 @@ export interface NostrReactionUpdatePayload {
   wrapId?: string;
 }
 
-export interface NostrMessageShadowState {
-  clientId?: string | null;
-  content?: string;
-  createdAtSec?: number;
-  editedAtSec?: number | null;
-  editedFromId?: string | null;
-  isEdited?: boolean;
-  localOnly?: boolean;
-  originalContent?: string | null;
-  pubkey?: string | null;
-  replyToContent?: string | null;
-  replyToId?: string | null;
-  rootMessageId?: string | null;
-  rumorId?: string | null;
-  status?: "pending" | "sent";
-  wrapId?: string;
+/** The columns of a stored message an update compares against. */
+export interface StoredMessageFields {
+  readonly clientId: string | null;
+  readonly content: string | null;
+  readonly createdAtSec: number | null;
+  readonly editedAtSec: number | null;
+  readonly editedFromId: string | null;
+  readonly isEdited: string | null;
+  readonly localOnly: string | null;
+  readonly originalContent: string | null;
+  readonly pubkey: string | null;
+  readonly replyToContent: string | null;
+  readonly replyToId: string | null;
+  readonly rootMessageId: string | null;
+  readonly rumorId: string | null;
+  readonly status: string | null;
+  readonly wrapId: string | null;
 }
 
-export interface NostrReactionShadowState {
-  clientId?: string | null;
-  emoji?: string | null;
-  messageId?: string | null;
-  reactorPubkey?: string | null;
-  status?: "pending" | "sent";
-  wrapId?: string;
+/** The columns of a stored reaction an update compares against. */
+export interface StoredReactionFields {
+  readonly clientId: string | null;
+  readonly emoji: string | null;
+  readonly messageId: string | null;
+  readonly reactorPubkey: string | null;
+  readonly status: string | null;
+  readonly wrapId: string | null;
 }
-
-const readShadowText = <T extends object>(
-  shadow: T,
-  key: keyof T,
-  fallback: string | null,
-): string | null =>
-  Object.prototype.hasOwnProperty.call(shadow, key)
-    ? asNonEmptyString(shadow[key])
-    : fallback;
 
 const positiveInt = (value: unknown, fallback: number): number => {
   const numeric = Number(value ?? 0);
@@ -80,13 +73,6 @@ const positiveInt = (value: unknown, fallback: number): number => {
 };
 const status = (value: unknown): "pending" | "sent" =>
   value === "pending" ? "pending" : "sent";
-
-// A row not read back yet, such as a send whose insert is still queued, has no known status.
-const knownStatus = (
-  shadowStatus: "pending" | "sent" | undefined,
-  current: { readonly status?: "pending" | "sent" } | undefined,
-): "pending" | "sent" | undefined =>
-  shadowStatus ?? (current === undefined ? undefined : status(current.status));
 
 const MESSAGE_TEXT_FIELDS = [
   "pubkey",
@@ -98,29 +84,28 @@ const MESSAGE_TEXT_FIELDS = [
   "rootMessageId",
   "editedFromId",
   "originalContent",
-] satisfies readonly (keyof NostrMessageShadowState)[];
+] satisfies readonly (keyof StoredMessageFields)[];
 const MESSAGE_BOOLEAN_FIELDS = [
   "localOnly",
   "isEdited",
-] satisfies readonly (keyof NostrMessageShadowState)[];
+] satisfies readonly (keyof StoredMessageFields)[];
 const REACTION_TEXT_FIELDS = [
   "messageId",
   "reactorPubkey",
   "emoji",
   "wrapId",
   "clientId",
-] satisfies readonly (keyof NostrReactionShadowState)[];
+] satisfies readonly (keyof StoredReactionFields)[];
 
+/** The columns of `updates` that differ from the stored row; null when nothing changes. */
 export const buildMessageUpdate = (
   id: string,
   updates: Parameters<UpdateLocalNostrMessage>[1],
-  current: LocalNostrMessage | undefined,
-  shadow: NostrMessageShadowState,
+  current: StoredMessageFields,
 ): NostrMessageUpdatePayload | null => {
   const payload: NostrMessageUpdatePayload = { id };
-  const currentWrapId =
-    readShadowText(shadow, "wrapId", asNonEmptyString(current?.wrapId)) ?? "";
-  const currentStatus = knownStatus(shadow.status, current);
+  const currentWrapId = asNonEmptyString(current.wrapId) ?? "";
+  const currentStatus = status(current.status);
   if (updates.wrapId !== undefined) {
     const next = trimString(updates.wrapId);
     const nextStatus =
@@ -129,68 +114,50 @@ export const buildMessageUpdate = (
       currentWrapId &&
       !currentWrapId.startsWith("pending:") &&
       nextStatus === "sent";
-    if (next && next !== currentWrapId && !keepSentWrap)
-      payload.wrapId = shadow.wrapId = next;
+    if (next && next !== currentWrapId && !keepSentWrap) payload.wrapId = next;
   }
   if (updates.status !== undefined && status(updates.status) !== currentStatus)
-    payload.status = shadow.status = status(updates.status);
+    payload.status = status(updates.status);
   for (const field of MESSAGE_TEXT_FIELDS) {
     if (updates[field] === undefined) continue;
     const next =
       field === "content" ? updates[field] : asNonEmptyString(updates[field]);
-    if (
-      next?.trim() &&
-      next !==
-        (readShadowText(shadow, field, asNonEmptyString(current?.[field])) ??
-          "")
-    ) {
+    if (next?.trim() && next !== (asNonEmptyString(current[field]) ?? ""))
       payload[field] = next;
-      shadow[field] = next;
-    }
   }
   for (const field of MESSAGE_BOOLEAN_FIELDS) {
-    if (updates[field] && !(shadow[field] ?? current?.[field])) {
+    if (updates[field] && !isSqliteTrueish(current[field]))
       payload[field] = "1";
-      shadow[field] = true;
-    }
   }
   if (updates.createdAtSec !== undefined) {
     const next = positiveInt(updates.createdAtSec, nowSeconds());
-    if (next !== (shadow.createdAtSec ?? current?.createdAtSec ?? 0))
-      payload.createdAtSec = shadow.createdAtSec = next;
+    if (next !== (current.createdAtSec ?? 0)) payload.createdAtSec = next;
   }
   if (updates.editedAtSec) {
     const next = positiveInt(updates.editedAtSec, nowSeconds());
-    const previous =
-      shadow.editedAtSec !== undefined
-        ? shadow.editedAtSec
-        : (current?.editedAtSec ?? null);
-    if (next !== previous) payload.editedAtSec = shadow.editedAtSec = next;
+    if (next !== current.editedAtSec) payload.editedAtSec = next;
   }
   return Object.keys(payload).length > 1 ? payload : null;
 };
 
+/** The columns of `updates` that differ from the stored row; null when nothing changes. */
 export const buildReactionUpdate = (
   id: string,
   updates: Parameters<UpdateLocalNostrReaction>[1],
-  current: LocalNostrReaction | undefined,
-  shadow: NostrReactionShadowState,
+  current: StoredReactionFields,
 ): NostrReactionUpdatePayload | null => {
   const payload: NostrReactionUpdatePayload = { id };
   for (const field of REACTION_TEXT_FIELDS) {
     if (updates[field] === undefined) continue;
     const next = asNonEmptyString(updates[field]);
-    if (
-      next &&
-      next !== readShadowText(shadow, field, asNonEmptyString(current?.[field]))
-    ) {
+    if (next && next !== asNonEmptyString(current[field]))
       payload[field] = next;
-      shadow[field] = next;
-    }
   }
-  const currentStatus = knownStatus(shadow.status, current);
-  if (updates.status !== undefined && status(updates.status) !== currentStatus)
-    payload.status = shadow.status = status(updates.status);
+  if (
+    updates.status !== undefined &&
+    status(updates.status) !== status(current.status)
+  )
+    payload.status = status(updates.status);
   return Object.keys(payload).length > 1 ? payload : null;
 };
 

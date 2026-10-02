@@ -22,7 +22,6 @@ import {
 } from "../lib/contactChatState";
 import { runWrite } from "../lib/storeWrite";
 import { useConversationArchiveMigration } from "../migrations/useConversationArchiveMigration";
-import { useAccountHydrated } from "./useLinksync";
 import type { Translate } from "../../i18n";
 
 import { reportAppLog } from "../../devtools/inspector/appLog";
@@ -37,6 +36,7 @@ const withNormalizedName = (
 };
 
 interface UseContactsDomainParams {
+  accountHydrated: boolean;
   contacts: ContactsRepository;
   conversations: ConversationsRepository;
   noGroupFilterValue: string;
@@ -50,6 +50,7 @@ interface UseContactsDomainParams {
 }
 
 export const useContactsDomain = ({
+  accountHydrated,
   contacts: contactsRepository,
   conversations,
   noGroupFilterValue,
@@ -79,7 +80,7 @@ export const useContactsDomain = ({
     contactRows,
     contactsRepository,
     conversationRows,
-    hydrated: useAccountHydrated(),
+    hydrated: accountHydrated,
   });
 
   const contacts = React.useMemo(

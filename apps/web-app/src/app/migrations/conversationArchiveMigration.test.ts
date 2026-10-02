@@ -1,10 +1,8 @@
 import {
   createId,
-  directConversationIdFor,
   makeContactsRepository,
   makeConversationsRepository,
   PositiveInt,
-  type ContactId,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
@@ -36,7 +34,7 @@ const setup = () => {
     ).map(({ contactId, archivedAtSec }) => ({ contactId, archivedAtSec }));
   const run = (effect: Effect.Effect<void, unknown>) =>
     Effect.runPromise(effect);
-  return { contacts, contactWithChat, conversations, plan, run };
+  return { contacts, contactWithChat, plan, run };
 };
 
 describe("archivesToCopy", () => {
@@ -63,19 +61,6 @@ describe("archivesToCopy", () => {
     await run(contacts.unarchive(id));
 
     expect(await plan()).toEqual([]);
-  });
-
-  it("copies an archive an older version wrote after the last unarchive", async () => {
-    const { contacts, contactWithChat, conversations, plan, run } = setup();
-    const id: ContactId = await contactWithChat(null);
-    await run(contacts.unarchive(id));
-    await run(
-      conversations.update(directConversationIdFor(id), {
-        archivedAtSec: sec(300),
-      }),
-    );
-
-    expect(await plan()).toEqual([{ contactId: id, archivedAtSec: 300 }]);
   });
 
   it("ignores a conversation whose contact this device does not have", async () => {

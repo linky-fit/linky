@@ -7,6 +7,7 @@ import {
   makeInMemoryShardDb,
   shardScope,
   type ShardPointerColumns,
+  type ShardStoreOptions,
 } from "../core";
 
 /** A schema with no Linky in it, for testing the shard rules alone. */
@@ -40,7 +41,13 @@ export const testAppOwner = (seed = 1): AppOwner =>
 
 export const toyStore = (
   appOwner = testAppOwner(),
-  dbOptions: { readonly holdSync?: boolean } = {},
+  {
+    holdSync,
+    ...storeOptions
+  }: { readonly holdSync?: boolean } & Pick<
+    ShardStoreOptions<ToySchema, typeof toyScopes>,
+    "holdWritesUntilHydrated" | "retention"
+  > = {},
 ) => {
   const db = makeInMemoryShardDb<ToySchema>(
     {
@@ -49,12 +56,13 @@ export const toyStore = (
       note: ["id", "title", "body"],
       chat: ["id", "text"],
     },
-    dbOptions,
+    holdSync === undefined ? {} : { holdSync },
   );
   const store = createShardStore<ToySchema, typeof toyScopes>({
     db,
     appOwner,
     scopes: toyScopes,
+    ...storeOptions,
   });
   return { db, store, appOwner };
 };

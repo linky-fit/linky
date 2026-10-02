@@ -12,6 +12,7 @@ import {
 import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
+import { NO_WRITE } from "../../lib/storeWrite";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,
@@ -20,15 +21,17 @@ import type {
 import {
   createReactionInboxSessionState,
   processReactionInboxEvent,
+  reactionKey,
   retryDeferredReactions,
+  storedReactionKey,
   type ReactionInboxContext,
 } from "./reactionInbox";
 
-const myPubkey = getPublicKey(createSecretKey(1));
-const peerPubkey = getPublicKey(createSecretKey(2));
-const otherPubkey = getPublicKey(createSecretKey(3));
-const TARGET_RUMOR_ID = "a".repeat(64);
-const REACTION_ID = "b".repeat(64);
+const myPubkey = Pubkey.make(getPublicKey(createSecretKey(1)));
+const peerPubkey = Pubkey.make(getPublicKey(createSecretKey(2)));
+const otherPubkey = Pubkey.make(getPublicKey(createSecretKey(3)));
+const TARGET_RUMOR_ID = RumorId.make("a".repeat(64));
+const REACTION_ID = RumorId.make("b".repeat(64));
 const SENT_AT = 1_700_000_010;
 
 const createStoredMessage = (
@@ -75,6 +78,7 @@ const ownReactionConfirmed = (
 interface HarnessOptions {
   blockedPubkeys?: readonly string[];
   identitySinceSec?: number | null;
+  visibleSinceSec?: number | null;
   messages?: LocalNostrMessage[];
   reactions?: LocalNostrReaction[];
 }
@@ -82,25 +86,33 @@ interface HarnessOptions {
 const createHarness = (options: HarnessOptions = {}) => {
   const messages = options.messages ?? [];
   const reactions = options.reactions ?? [];
-  const knownReactionWrapIds = new Set(
-    reactions.map((reaction) => reaction.wrapId).filter(Boolean),
+  const knownReactionKeys = new Set(
+    reactions.flatMap(
+      (reaction) =>
+        storedReactionKey(reaction.reactorPubkey, reaction.wrapId) ?? [],
+    ),
   );
   const softDeleted: string[][] = [];
+  const storedRetractions: Array<[string, string]> = [];
   const blockedPubkeys = new Set(options.blockedPubkeys ?? []);
 
-  const appendLocalNostrReaction = vi.fn(
-    (reaction: NewLocalNostrReaction): string => {
-      const id = `reaction-${reactions.length + 1}`;
-      reactions.push({ ...reaction, id, status: reaction.status ?? "sent" });
-      knownReactionWrapIds.add(reaction.wrapId);
-      return id;
-    },
-  );
+  const appendLocalNostrReaction = vi.fn((reaction: NewLocalNostrReaction) => {
+    const id = `reaction-${reactions.length + 1}`;
+    reactions.push({ ...reaction, id, status: reaction.status ?? "sent" });
+    const key = storedReactionKey(reaction.reactorPubkey, reaction.wrapId);
+    if (key !== null) knownReactionKeys.add(key);
+    return { id, written: NO_WRITE };
+  });
   const updateLocalNostrReaction = vi.fn(
     (id: string, updates: Partial<LocalNostrReaction>) => {
       const reaction = reactions.find((candidate) => candidate.id === id);
       if (reaction) Object.assign(reaction, updates);
-      if (updates.wrapId) knownReactionWrapIds.add(updates.wrapId);
+      const key =
+        reaction && updates.wrapId
+          ? storedReactionKey(reaction.reactorPubkey, updates.wrapId)
+          : null;
+      if (key !== null) knownReactionKeys.add(key);
+      return NO_WRITE;
     },
   );
   const softDeleteLocalNostrReactionsByWrapIds = vi.fn(
@@ -112,6 +124,7 @@ const createHarness = (options: HarnessOptions = {}) => {
         );
         if (index !== -1) reactions.splice(index, 1);
       }
+      return NO_WRITE;
     },
   );
 
@@ -119,22 +132,29 @@ const createHarness = (options: HarnessOptions = {}) => {
     appendLocalNostrReaction,
     identitySinceSec: options.identitySinceSec ?? null,
     isBlockedPubkey: (pubkey) => blockedPubkeys.has(pubkey),
-    knownReactionWrapIds,
+    knownReactionKeys,
     messages,
     myPubkey,
     reactions,
     softDeleteLocalNostrReactionsByWrapIds,
     state: createReactionInboxSessionState(),
+    storeRetractedReaction: (reactionId, retractor) => {
+      storedRetractions.push([reactionId, retractor]);
+      knownReactionKeys.add(reactionKey(retractor, reactionId));
+      return NO_WRITE;
+    },
     updateLocalNostrReaction,
+    visibleSinceSec: options.visibleSinceSec ?? null,
   };
 
   return {
     appendLocalNostrReaction,
     ctx,
-    knownReactionWrapIds,
+    knownReactionKeys,
     messages,
     reactions,
     softDeleted,
+    storedRetractions,
     updateLocalNostrReaction,
   };
 };
@@ -264,6 +284,7 @@ describe("processReactionInboxEvent", () => {
 
     expect(harness.softDeleted).toEqual([[REACTION_ID]]);
     expect(harness.reactions).toEqual([someoneElses]);
+    expect(harness.storedRetractions).toEqual([]);
   });
 
   it("applies an own retraction with my pubkey as the retractor", () => {
@@ -307,6 +328,23 @@ describe("processReactionInboxEvent", () => {
     processReactionInboxEvent(reactionAdded(), harness.ctx);
 
     expect(harness.appendLocalNostrReaction).not.toHaveBeenCalled();
+    expect(harness.storedRetractions).toEqual([[REACTION_ID, peerPubkey]]);
+  });
+
+  it("stores a retraction once, and not for a blocked peer", () => {
+    const harness = createHarness({ blockedPubkeys: [otherPubkey] });
+    const retraction = (from: string) =>
+      new ReactionRetracted({
+        reactionIds: [RumorId.make(REACTION_ID)],
+        from: Pubkey.make(from),
+        sentAt: UnixSeconds.make(SENT_AT),
+      });
+
+    processReactionInboxEvent(retraction(peerPubkey), harness.ctx);
+    processReactionInboxEvent(retraction(peerPubkey), harness.ctx);
+    processReactionInboxEvent(retraction(otherPubkey), harness.ctx);
+
+    expect(harness.storedRetractions).toEqual([[REACTION_ID, peerPubkey]]);
   });
 
   it("does not let a peer's retraction suppress reactions they did not author", () => {
@@ -407,9 +445,22 @@ describe("processReactionInboxEvent", () => {
     expect(harness.ctx.state.deferredReactions.size).toBe(0);
   });
 
+  it("stores no reaction sent before the visible shards began", () => {
+    const harness = createHarness({
+      visibleSinceSec: SENT_AT + 1,
+      messages: [createStoredMessage()],
+    });
+
+    processReactionInboxEvent(reactionAdded(), harness.ctx);
+    processReactionInboxEvent(ownReactionConfirmed(), harness.ctx);
+
+    expect(harness.appendLocalNostrReaction).not.toHaveBeenCalled();
+    expect(harness.ctx.state.deferredReactions.size).toBe(0);
+  });
+
   it("skips a reaction whose wrapId belongs to a soft-deleted row", () => {
     const harness = createHarness({ messages: [createStoredMessage()] });
-    harness.knownReactionWrapIds.add(REACTION_ID);
+    harness.knownReactionKeys.add(reactionKey(peerPubkey, REACTION_ID));
 
     processReactionInboxEvent(reactionAdded(), harness.ctx);
 

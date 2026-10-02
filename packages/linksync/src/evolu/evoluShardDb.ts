@@ -5,8 +5,15 @@ import {
   sqliteFalse,
   sqliteTrue,
 } from "@evolu/common";
-import { Effect } from "effect";
-import type { Columns, Mutation, OwnerUsage, Row, ShardDb } from "../core";
+import { Deferred, Duration, Effect, FiberId } from "effect";
+import type {
+  Columns,
+  Mutation,
+  OwnerUsage,
+  Row,
+  ShardDb,
+  SystemColumns,
+} from "../core";
 import { ShardDbError } from "../core";
 import { LinkySchema, type LinkyDbSchema } from "../model/schema";
 import type { OwnerSync } from "./ownerSync";
@@ -28,7 +35,10 @@ import type { OwnerSync } from "./ownerSync";
  *
  * Evolu runs every mutation queued in one microtask as a single transaction
  * and drops the whole batch when any of them fails validation, so each row is
- * validated (`onlyValidate`) before it is queued.
+ * validated (`onlyValidate`) before it is queued. A write resolves once
+ * Evolu's worker has applied it (`onComplete`). A batch Evolu drops never
+ * completes, so one still unapplied after a bound fails, leaves
+ * the overlay and is reported through `onWriteUnconfirmed`.
  *
  * An owner the worker reports synced counts as synced only after a fresh
  * query has answered: the worker answers queries in order, so by then the
@@ -46,22 +56,33 @@ export interface EvoluRuntime {
 
 type LinkyTable = keyof LinkyDbSchema & string;
 
+const MAX_WRITE_COMPLETION_WAIT = Duration.seconds(10);
+
 const isTable = (table: string): table is LinkyTable => table in LinkySchema;
 
-const isStoredRow = (
-  row: UntypedRow,
-): row is Row<Columns> & { readonly updatedAt: string | null } =>
+type StoredRow = Columns &
+  Omit<SystemColumns, "createdAt" | "updatedAt"> & {
+    readonly createdAt: string | null;
+    readonly updatedAt: string | null;
+  };
+
+const isStoredRow = (row: UntypedRow): row is StoredRow =>
   typeof row.id === "string" &&
   OwnerIdType.fromUnknown(row.ownerId).ok &&
-  typeof row.createdAt === "string" &&
+  (row.createdAt === null || typeof row.createdAt === "string") &&
   (row.updatedAt === null || typeof row.updatedAt === "string");
 
 // Evolu stamps `createdAt` on insert and upsert and `updatedAt` only on
-// update, so a row that was never updated reads back with a null
-// `updatedAt`; the port promises the last change time there.
-const withLastChangeTime = (
-  row: Row<Columns> & { readonly updatedAt: string | null },
-): Row<Columns> => ({ ...row, updatedAt: row.updatedAt ?? row.createdAt });
+// update, so a row that was never updated reads back with a null `updatedAt`,
+// and a row an update created (a tombstone of a row that has not arrived)
+// with a null `createdAt`; the port promises both times.
+const withChangeTimes = (row: StoredRow): ReadonlyArray<Row<Columns>> => {
+  const createdAt = row.createdAt ?? row.updatedAt;
+  const updatedAt = row.updatedAt ?? row.createdAt;
+  return createdAt === null || updatedAt === null
+    ? []
+    : [{ ...row, createdAt, updatedAt }];
+};
 
 const isMutationResult = (
   value: unknown,
@@ -129,9 +150,21 @@ const asRow = (entry: OverlayEntry, previous?: Row<Columns>): Row<Columns> => {
   };
 };
 
+/** A write Evolu never reported applied within the bound; it may have been dropped. */
+export interface UnconfirmedWrite {
+  readonly table: string;
+  readonly ownerId: OwnerId;
+  readonly id: string;
+}
+
+export interface EvoluShardDbOptions {
+  readonly onWriteUnconfirmed?: (write: UnconfirmedWrite) => void;
+}
+
 export const createEvoluShardDb = (
   evolu: EvoluRuntime,
   ownerSync: OwnerSync,
+  { onWriteUnconfirmed }: EvoluShardDbOptions = {},
 ): ShardDb<LinkyDbSchema> => {
   const overlay = new Map<string, OverlayEntry>();
   // Evolu queries are branded strings that Evolu keys its promise cache by;
@@ -165,6 +198,7 @@ export const createEvoluShardDb = (
   const mergeOverlay = (
     table: string,
     loaded: ReadonlyArray<Row<Columns>>,
+    onlyId?: string,
   ): ReadonlyArray<Row<Columns>> => {
     const seen = new Set<string>();
     const merged = loaded.map((row) => {
@@ -181,6 +215,7 @@ export const createEvoluShardDb = (
     const pending = [...overlay.values()].filter(
       (entry) =>
         entry.table === table &&
+        (onlyId === undefined || entry.columns.id === onlyId) &&
         !seen.has(overlayKey(table, entry.ownerId, entry.columns.id)),
     );
     return [...merged, ...pending.map((entry) => asRow(entry))];
@@ -196,14 +231,37 @@ export const createEvoluShardDb = (
   ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
     if (!isTable(table)) return Effect.succeed([]);
     return Effect.map(loadRows(tableQuery(table)), (rows) =>
-      mergeOverlay(table, rows.filter(isStoredRow).map(withLastChangeTime)),
+      mergeOverlay(table, rows.filter(isStoredRow).flatMap(withChangeTimes)),
     );
   }
 
-  const record = (mutation: Mutation, nowIso: string): void => {
+  function readCopies<T extends LinkyTable>(
+    table: T,
+    id: string,
+  ): Effect.Effect<ReadonlyArray<Row<LinkyDbSchema[T]>>>;
+  function readCopies(
+    table: string,
+    id: string,
+  ): Effect.Effect<ReadonlyArray<Row<Columns>>> {
+    if (!isTable(table)) return Effect.succeed([]);
+    const query = asQuery(
+      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
+        db.selectFrom(table).selectAll().where("id", "=", id),
+      ),
+    );
+    return Effect.map(loadRows(query), (rows) =>
+      mergeOverlay(
+        table,
+        rows.filter(isStoredRow).flatMap(withChangeTimes),
+        id,
+      ),
+    );
+  }
+
+  const record = (mutation: Mutation, nowIso: string): OverlayEntry => {
     const key = overlayKey(mutation.table, mutation.ownerId, mutation.row.id);
     const previous = overlay.get(key);
-    overlay.set(key, {
+    const entry: OverlayEntry = {
       table: mutation.table,
       ownerId: mutation.ownerId,
       columns:
@@ -211,7 +269,9 @@ export const createEvoluShardDb = (
           ? mutation.row
           : { ...previous?.columns, ...mutation.row },
       writtenAtIso: nowIso,
-    });
+    };
+    overlay.set(key, entry);
+    return entry;
   };
 
   // The port tombstones with a boolean; Evolu's mutation takes its SqliteBoolean.
@@ -222,24 +282,69 @@ export const createEvoluShardDb = (
       : { ...columns, isDeleted: isDeleted ? sqliteTrue : sqliteFalse };
   };
 
-  const apply = (mutation: Mutation): Effect.Effect<void, ShardDbError> => {
+  interface Queued {
+    readonly mutation: Mutation;
+    readonly entry: OverlayEntry;
+    readonly applied: Effect.Effect<void>;
+  }
+
+  /** Queues the mutation at once, so a batch stays one Evolu transaction. */
+  const queue = (mutation: Mutation): Effect.Effect<Queued, ShardDbError> => {
     const fail = (message: string) =>
       Effect.fail(new ShardDbError({ table: mutation.table, message }));
     if (!isTable(mutation.table)) return fail("unknown table");
     const row = toEvoluRow(mutation.row);
-    const call = (onlyValidate: boolean) =>
-      callUntyped(evolu, mutation.kind, mutation.table, row, {
-        ownerId: mutation.ownerId,
-        onlyValidate,
-      });
-    const validation = call(true);
+    const validation = callUntyped(evolu, mutation.kind, mutation.table, row, {
+      ownerId: mutation.ownerId,
+      onlyValidate: true,
+    });
     if (!isMutationResult(validation))
       return fail("unexpected mutation result");
     if (!validation.ok) return fail(JSON.stringify(validation.error));
-    call(false);
-    record(mutation, new Date().toISOString());
-    return Effect.void;
+    const completed = Deferred.unsafeMake<void>(FiberId.none);
+    callUntyped(evolu, mutation.kind, mutation.table, row, {
+      ownerId: mutation.ownerId,
+      onComplete: () => Deferred.unsafeDone(completed, Effect.void),
+    });
+    const entry = record(mutation, new Date().toISOString());
+    return Effect.succeed({
+      mutation,
+      entry,
+      applied: Deferred.await(completed),
+    });
   };
+
+  const unconfirm = ({ mutation, entry }: Queued): void => {
+    const key = overlayKey(mutation.table, mutation.ownerId, mutation.row.id);
+    if (overlay.get(key) === entry) overlay.delete(key);
+    onWriteUnconfirmed?.({
+      table: mutation.table,
+      ownerId: mutation.ownerId,
+      id: mutation.row.id,
+    });
+  };
+
+  const mutate = (
+    mutations: ReadonlyArray<Mutation>,
+  ): Effect.Effect<void, ShardDbError> =>
+    Effect.flatMap(Effect.forEach(mutations, queue), (batch) =>
+      Effect.all(
+        batch.map(({ applied }) => applied),
+        { discard: true },
+      ).pipe(
+        Effect.timeoutFail({
+          duration: MAX_WRITE_COMPLETION_WAIT,
+          onTimeout: () =>
+            new ShardDbError({
+              table: [...new Set(mutations.map(({ table }) => table))].join(
+                ",",
+              ),
+              message: "Evolu did not confirm the write",
+            }),
+        }),
+        Effect.tapError(() => Effect.sync(() => batch.forEach(unconfirm))),
+      ),
+    );
 
   // `evolu_history` keys rows by the owner id's bytes, not its base64url text.
   const ownerUsage = (ownerId: OwnerId): Effect.Effect<OwnerUsage> => {
@@ -292,7 +397,8 @@ export const createEvoluShardDb = (
 
   return {
     readTable,
-    mutate: (mutations) => Effect.forEach(mutations, apply, { discard: true }),
+    readCopies,
+    mutate,
     subscribe: (table, listener) => {
       const unsubscribe = callUntyped(
         evolu,

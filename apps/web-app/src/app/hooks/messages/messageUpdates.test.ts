@@ -1,102 +1,74 @@
 import { describe, expect, it } from "vitest";
-import type {
-  LocalNostrMessage,
-  LocalNostrReaction,
-} from "../../types/appTypes";
 import {
-  applyMessageUpdate,
   buildMessageUpdate,
   buildReactionUpdate,
-  type NostrMessageShadowState,
+  type StoredMessageFields,
+  type StoredReactionFields,
 } from "./messageUpdates";
 
-const message: LocalNostrMessage = {
-  rumorId: null,
-  id: "message",
-  contactId: "contact",
-  direction: "out",
+const message: StoredMessageFields = {
+  clientId: null,
   content: "original",
-  pubkey: "pubkey",
-  wrapId: "pending:message",
   createdAtSec: 100,
-  status: "pending",
-  replyToId: "reply",
   editedAtSec: 123,
+  editedFromId: null,
+  isEdited: null,
+  localOnly: null,
+  originalContent: null,
+  pubkey: "pubkey",
+  replyToContent: null,
+  replyToId: "reply",
+  rootMessageId: null,
+  rumorId: null,
+  status: "pending",
+  wrapId: "pending:message",
 };
-const reaction: LocalNostrReaction = {
-  id: "reaction",
+const reaction: StoredReactionFields = {
+  clientId: null,
+  emoji: "👍",
   messageId: "message",
   reactorPubkey: "pubkey",
-  emoji: "👍",
-  wrapId: "pending:reaction",
-  createdAtSec: 100,
   status: "pending",
+  wrapId: "pending:reaction",
 };
 
 describe("message updates", () => {
-  it("deduplicates acknowledgments against the shadow before the read model catches up", () => {
-    const shadow = {};
+  it("writes an acknowledgment once, and keeps the first sent wrap", () => {
     expect(
       buildMessageUpdate(
-        message.id,
+        "message",
         { wrapId: "sent-wrap", status: "sent" },
         message,
-        shadow,
       ),
-    ).toEqual({ id: message.id, wrapId: "sent-wrap", status: "sent" });
+    ).toEqual({ id: "message", wrapId: "sent-wrap", status: "sent" });
     expect(
       buildMessageUpdate(
-        message.id,
+        "message",
         { wrapId: "different-sent-wrap", status: "sent" },
-        message,
-        shadow,
+        { ...message, wrapId: "sent-wrap", status: "sent" },
       ),
     ).toBeNull();
   });
-  it("writes the status of a row it has not read back yet", () => {
+  it("leaves fields that already hold the value alone", () => {
     expect(
       buildMessageUpdate(
-        message.id,
-        { wrapId: "sent-wrap", status: "sent" },
-        undefined,
-        {},
-      ),
-    ).toEqual({ id: message.id, wrapId: "sent-wrap", status: "sent" });
-    expect(
-      buildReactionUpdate(
-        reaction.id,
-        { wrapId: "sent-wrap", status: "sent" },
-        undefined,
-        {},
-      ),
-    ).toEqual({ id: reaction.id, wrapId: "sent-wrap", status: "sent" });
-  });
-  it("distinguishes a cleared shadow field from an absent field", () => {
-    const shadow: NostrMessageShadowState = {
-      replyToId: null,
-      editedAtSec: null,
-    };
-    expect(
-      buildMessageUpdate(
-        message.id,
+        "message",
         { replyToId: "reply", editedAtSec: 123 },
         message,
-        shadow,
-      ),
-    ).toEqual({ id: message.id, replyToId: "reply", editedAtSec: 123 });
-    expect(
-      buildMessageUpdate(
-        message.id,
-        { replyToId: "reply", editedAtSec: 123 },
-        message,
-        {},
       ),
     ).toBeNull();
+    expect(
+      buildMessageUpdate(
+        "message",
+        { replyToId: "reply", editedAtSec: 123 },
+        { ...message, replyToId: null, editedAtSec: null },
+      ),
+    ).toEqual({ id: "message", replyToId: "reply", editedAtSec: 123 });
   });
   it("ignores empty optional values and false-only writes while retaining content whitespace", () => {
     expect(
       buildMessageUpdate(
-        message.id,
+        "message",
         {
           replyToId: null,
           content: " ",
@@ -105,50 +77,28 @@ describe("message updates", () => {
           editedAtSec: null,
         },
         message,
-        {},
       ),
     ).toBeNull();
-    const payload = buildMessageUpdate(
-      message.id,
-      {
-        content: "  edited  ",
-        localOnly: true,
-        isEdited: true,
-        editedAtSec: 234,
-      },
-      message,
-      {},
-    );
-    expect(payload).toEqual({
-      id: message.id,
+    expect(
+      buildMessageUpdate(
+        "message",
+        {
+          content: "  edited  ",
+          localOnly: true,
+          isEdited: true,
+          editedAtSec: 234,
+        },
+        message,
+      ),
+    ).toEqual({
+      id: "message",
       content: "  edited  ",
       localOnly: "1",
       isEdited: "1",
       editedAtSec: 234,
     });
-    expect(payload && applyMessageUpdate(message, payload)).toMatchObject({
-      content: "  edited  ",
-      localOnly: true,
-      isEdited: true,
-      editedAtSec: 234,
-    });
   });
-  it("applies nullable overlay updates without losing other message fields", () => {
-    expect(
-      applyMessageUpdate(
-        { ...message, clientId: "client", localOnly: true },
-        {
-          id: message.id,
-          clientId: null,
-          pubkey: null,
-          replyToId: null,
-          localOnly: null,
-        },
-      ),
-    ).toEqual({ ...message, pubkey: "", replyToId: null, localOnly: false });
-  });
-  it("updates each reaction field and suppresses the repeated delivery", () => {
-    const shadow = {};
+  it("updates each reaction field and only what differs", () => {
     const updates = {
       messageId: "next-message",
       reactorPubkey: "next-pubkey",
@@ -156,14 +106,15 @@ describe("message updates", () => {
       wrapId: "sent-reaction",
       clientId: "client",
     };
-    expect(buildReactionUpdate(reaction.id, updates, reaction, shadow)).toEqual(
-      { id: reaction.id, ...updates },
-    );
+    expect(buildReactionUpdate("reaction", updates, reaction)).toEqual({
+      id: "reaction",
+      ...updates,
+    });
     expect(
-      buildReactionUpdate(reaction.id, updates, reaction, shadow),
+      buildReactionUpdate("reaction", updates, { ...reaction, ...updates }),
     ).toBeNull();
     expect(
-      buildReactionUpdate(reaction.id, { status: "sent" }, reaction, shadow),
-    ).toEqual({ id: reaction.id, status: "sent" });
+      buildReactionUpdate("reaction", { status: "sent" }, reaction),
+    ).toEqual({ id: "reaction", status: "sent" });
   });
 });

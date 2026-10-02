@@ -43,6 +43,7 @@ import {
   readStoredSlip39Seed,
   writeStoredCashuMnemonic,
 } from "../../platform/identitySecrets";
+import { markAwaitingFirstHydration } from "../../firstHydration";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import { markLogoutPending } from "../../platform/logoutWipe";
 import { triggerPasswordManagerSeedSave } from "../../platform/passwordManager";
@@ -440,6 +441,7 @@ export const useProfileAuthDomain = ({
         invalidMessageKey?: I18nKey;
         persistSyncedIdentity?: boolean;
         recordChatNotice?: boolean;
+        restoredAccount?: boolean;
         switchedAtSec?: number | null;
       },
     ) => {
@@ -496,6 +498,9 @@ export const useProfileAuthDomain = ({
         slip39Seed: normalizedSlip39,
         switchedAtSec,
       });
+
+      if (options?.restoredAccount === true)
+        markAwaitingFirstHydration(appMnemonic);
 
       if (options?.persistSyncedIdentity !== false) {
         await upsertActiveNostrIdentity(raw, identitySource, switchedAtSec);
@@ -905,6 +910,7 @@ export const useProfileAuthDomain = ({
           // Do not overwrite a custom identity that may still be syncing to
           // this newly restored device.
           persistSyncedIdentity: false,
+          restoredAccount: true,
           switchedAtSec: null,
         });
       } finally {

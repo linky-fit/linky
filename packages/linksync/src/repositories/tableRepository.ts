@@ -28,6 +28,14 @@ export interface TableRepository<C extends Columns> {
   readonly insertIfAbsent: (
     row: WriteRow<C>,
   ) => Effect.Effect<boolean, ShardDbError>;
+  /**
+   * Records the removal of a row that has not arrived: writes the columns
+   * given as a tombstone unless a visible shard holds a copy of the id, so a
+   * later `insertIfAbsent` of the id is refused. Returns whether it wrote.
+   */
+  readonly removeIfAbsent: (
+    row: { readonly id: C["id"] } & Patch<C>,
+  ) => Effect.Effect<boolean, ShardDbError>;
   readonly update: (
     id: C["id"],
     patch: Patch<C>,
@@ -64,17 +72,25 @@ export const tableRepository = <
   );
   const rotateAfter = <E>(write: Effect.Effect<void, E>) =>
     Effect.zipRight(write, maybeRotate);
+  const ifAbsent = (
+    id: LinkyDbSchema[T]["id"],
+    write: Effect.Effect<void, ShardDbError>,
+  ) =>
+    Effect.flatMap(store.copiesOf(scope, table, id), (copies) =>
+      copies.length > 0
+        ? Effect.succeed(false)
+        : Effect.as(rotateAfter(write), true),
+    );
   return {
     all,
     byId: (id) =>
-      Effect.map(all, (rows) => rows.find((row) => row.id === id) ?? null),
-    insert: (row) => rotateAfter(store.insert(scope, table, row)),
-    insertIfAbsent: (row) =>
-      Effect.flatMap(store.copies(scope, table), (copies) =>
-        copies.some((copy) => copy.id === row.id)
-          ? Effect.succeed(false)
-          : Effect.as(rotateAfter(store.insert(scope, table, row)), true),
+      Effect.map(store.copiesOf(scope, table, id), ([newest]) =>
+        newest === undefined || newest.isDeleted === 1 ? null : newest,
       ),
+    insert: (row) => rotateAfter(store.insert(scope, table, row)),
+    insertIfAbsent: (row) => ifAbsent(row.id, store.insert(scope, table, row)),
+    removeIfAbsent: (row) =>
+      ifAbsent(row.id, store.insertRemoved(scope, table, row)),
     update: (id, patch) => rotateAfter(store.update(scope, table, id, patch)),
     remove: (id) => rotateAfter(store.remove(scope, table, id)),
     maybeRotate,

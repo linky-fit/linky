@@ -1,4 +1,4 @@
-// Migration bridge; removal gate in app/migrations/AGENTS.md
+// Migration bridge, stays until no supported version archives on the conversation; removal gate in app/migrations/AGENTS.md
 //
 // The archive state moved from the conversation (messages scope, of which a
 // new device sees only the newest shards) to the contact (never forgotten).

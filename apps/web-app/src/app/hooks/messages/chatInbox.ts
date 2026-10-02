@@ -6,9 +6,10 @@ import type {
   OwnChatMessageConfirmed,
 } from "@linky-fit/linkstr";
 import { serializePrivateImageMessage } from "../../lib/privateImageMessage";
+import { NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 import type {
+  AppendLocalNostrMessage,
   LocalNostrMessage,
-  NewLocalNostrMessage,
   PaymentLogData,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
@@ -44,7 +45,7 @@ const chatMessageContentFromBody = (body: MessageBody): string => {
 };
 
 export interface ChatInboxContext {
-  appendLocalNostrMessage: (message: NewLocalNostrMessage) => string;
+  appendLocalNostrMessage: AppendLocalNostrMessage;
   identitySinceSec: number | null;
   isBlockedPubkey: (pubkey: string) => boolean;
   logPayStep: (step: string, data?: PaymentLogData) => void;
@@ -52,6 +53,12 @@ export interface ChatInboxContext {
   /** Known-contact lookup; unknown senders fall back to a synthetic id. */
   resolveContactId: (peerPubkey: string) => string | null;
   updateLocalNostrMessage: UpdateLocalNostrMessage;
+  /**
+   * When the oldest visible messages shard began; a message or reaction sent
+   * before it is not stored, since its row may sit in a forgotten shard (a
+   * removed one included) and it would count as read anyway.
+   */
+  visibleSinceSec: number | null;
 }
 
 export interface InsertedChatMessage {
@@ -62,6 +69,22 @@ export interface InsertedChatMessage {
   messageId: string;
   peerPubkey: string;
 }
+
+export interface HandledChatMessage {
+  /** The message stored as new; null for an edit, a duplicate or a drop. */
+  inserted: InsertedChatMessage | null;
+  written: Promise<WriteOutcome>;
+}
+
+const NOTHING_INSERTED: HandledChatMessage = {
+  inserted: null,
+  written: NO_WRITE,
+};
+
+const updatedOnly = (written: Promise<WriteOutcome>): HandledChatMessage => ({
+  inserted: null,
+  written,
+});
 
 const matchesIncomingConversation = (
   message: LocalNostrMessage,
@@ -75,14 +98,17 @@ const matchesIncomingConversation = (
 export const applyChatMessageReceived = (
   event: ChatMessageReceived,
   ctx: ChatInboxContext,
-): InsertedChatMessage | null => {
-  if (ctx.isBlockedPubkey(event.from)) return null;
+): HandledChatMessage => {
+  if (ctx.isBlockedPubkey(event.from)) return NOTHING_INSERTED;
   if (ctx.identitySinceSec !== null && event.sentAt < ctx.identitySinceSec) {
-    return null;
+    return NOTHING_INSERTED;
+  }
+  if (ctx.visibleSinceSec !== null && event.sentAt < ctx.visibleSinceSec) {
+    return NOTHING_INSERTED;
   }
   const contactId =
     ctx.resolveContactId(event.from) ?? buildUnknownContactId(event.from);
-  if (!contactId) return null;
+  if (!contactId) return NOTHING_INSERTED;
 
   const content = chatMessageContentFromBody(event.body);
   const scoped = ctx.messages.filter((message) =>
@@ -109,55 +135,58 @@ export const applyChatMessageReceived = (
         links: { rumor: event.messageId, message: editOf },
         payload: null,
       });
-      return null;
+      return NOTHING_INSERTED;
     }
     if (target) {
       // A replayed backfill must not roll an already-applied newer edit back.
       if (target.isEdited && (target.editedAtSec ?? 0) >= event.sentAt) {
-        return null;
+        return NOTHING_INSERTED;
       }
       const targetId = trimString(target.id);
-      if (!targetId) return null;
+      if (!targetId) return NOTHING_INSERTED;
       const existingOriginal =
         trimString(target.originalContent) || target.content;
-      ctx.updateLocalNostrMessage(targetId, {
-        content,
-        status: "sent",
-        pubkey: event.from,
-        rumorId: editOf,
-        isEdited: true,
-        editedAtSec: event.sentAt,
-        editedFromId: editOf,
-        originalContent: existingOriginal || null,
-      });
-      return null;
+      return updatedOnly(
+        ctx.updateLocalNostrMessage(targetId, {
+          content,
+          status: "sent",
+          pubkey: event.from,
+          rumorId: editOf,
+          isEdited: true,
+          editedAtSec: event.sentAt,
+          editedFromId: editOf,
+          originalContent: existingOriginal || null,
+        }),
+      );
     }
   } else {
     const editedVersion = scoped.find(
       (message) => trimString(message.editedFromId) === event.messageId,
     );
     if (editedVersion && parseCashuPaymentRequestMessage(content)) {
-      ctx.updateLocalNostrMessage(editedVersion.id, {
-        content,
-        originalContent: null,
-        isEdited: false,
-        editedAtSec: null,
-        editedFromId: null,
-        createdAtSec: event.sentAt,
-        rumorId: event.messageId,
-        wrapId: event.messageId,
-        pubkey: event.from,
-      });
-      return null;
+      return updatedOnly(
+        ctx.updateLocalNostrMessage(editedVersion.id, {
+          content,
+          originalContent: null,
+          isEdited: false,
+          editedAtSec: null,
+          editedFromId: null,
+          createdAtSec: event.sentAt,
+          rumorId: event.messageId,
+          wrapId: event.messageId,
+          pubkey: event.from,
+        }),
+      );
     }
     if (editedVersion) {
       const editedVersionId = trimString(editedVersion.id);
-      if (!trimString(editedVersion.originalContent) && editedVersionId) {
-        ctx.updateLocalNostrMessage(editedVersionId, {
-          originalContent: content,
-        });
-      }
-      return null;
+      return !trimString(editedVersion.originalContent) && editedVersionId
+        ? updatedOnly(
+            ctx.updateLocalNostrMessage(editedVersionId, {
+              originalContent: content,
+            }),
+          )
+        : NOTHING_INSERTED;
     }
   }
 
@@ -166,13 +195,16 @@ export const applyChatMessageReceived = (
     (message) => trimString(message.rumorId) === stableRumorId,
   );
   if (existing) {
-    if ((existing.status ?? "sent") === "pending") {
-      ctx.updateLocalNostrMessage(trimString(existing.id), { status: "sent" });
-    }
-    return null;
+    return (existing.status ?? "sent") === "pending"
+      ? updatedOnly(
+          ctx.updateLocalNostrMessage(trimString(existing.id), {
+            status: "sent",
+          }),
+        )
+      : NOTHING_INSERTED;
   }
 
-  const rowId = ctx.appendLocalNostrMessage({
+  const appended = ctx.appendLocalNostrMessage({
     contactId,
     direction: "in",
     content,
@@ -193,13 +225,16 @@ export const applyChatMessageReceived = (
         }
       : {}),
   });
-  if (!rowId) return null;
+  if (!appended.id) return NOTHING_INSERTED;
   return {
-    contactId,
-    content,
-    createdAtSec: event.sentAt,
-    messageId: rowId,
-    peerPubkey: event.from,
+    inserted: {
+      contactId,
+      content,
+      createdAtSec: event.sentAt,
+      messageId: appended.id,
+      peerPubkey: event.from,
+    },
+    written: appended.written,
   };
 };
 
@@ -211,9 +246,9 @@ export const applyChatMessageReceived = (
 export const applyOwnChatMessageConfirmed = (
   event: OwnChatMessageConfirmed,
   ctx: ChatInboxContext,
-): void => {
+): Promise<WriteOutcome> => {
   if (ctx.identitySinceSec !== null && event.sentAt < ctx.identitySinceSec) {
-    return;
+    return NO_WRITE;
   }
   const outgoing = ctx.messages.filter(
     (message) => trimString(message.direction) === "out",
@@ -225,10 +260,10 @@ export const applyOwnChatMessageConfirmed = (
         )
       : undefined) ??
     outgoing.find((message) => trimString(message.rumorId) === event.messageId);
-  if (!row) return;
-  if ((row.status ?? "sent") !== "pending") return;
+  if (!row) return NO_WRITE;
+  if ((row.status ?? "sent") !== "pending") return NO_WRITE;
 
-  ctx.updateLocalNostrMessage(trimString(row.id), {
+  const written = ctx.updateLocalNostrMessage(trimString(row.id), {
     status: "sent",
     ...(trimString(row.rumorId)
       ? {}
@@ -239,4 +274,5 @@ export const applyOwnChatMessageConfirmed = (
     clientId: event.clientId,
     rumorId: event.messageId,
   });
+  return written;
 };

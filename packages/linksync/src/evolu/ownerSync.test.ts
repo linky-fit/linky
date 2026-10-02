@@ -130,6 +130,25 @@ describe("reportOwnerSync", () => {
     expect(relay.failed).toEqual([[owner, "QuotaError", true]]);
   });
 
+  it("does not end a round at an error after a reconnect dropped the error-free answer", async () => {
+    let continued = false;
+    const relay = relaySocket(() => {
+      if (continued) return;
+      continued = true;
+      queueMicrotask(() => relay.socket.send(request(owner)));
+    });
+    relay.socket.send(request(owner));
+    relay.receive(response(owner));
+    await macrotask();
+
+    relay.open();
+    relay.socket.send(request(owner));
+    relay.receive(response(owner, ProtocolErrorCode.SyncError));
+    await macrotask();
+    expect(relay.synced).toEqual([]);
+    expect(relay.failed).toEqual([[owner, "SyncError", false]]);
+  });
+
   it("keeps an owner whose first answer is an error unsynced", async () => {
     const relay = relaySocket();
     relay.socket.send(request(owner));
@@ -203,7 +222,7 @@ describe("trackOwnerSync", () => {
     });
     expect([...ownerSync.syncedOwners()]).toEqual([owner]);
     expect(notified).toBe(1);
-    expect(failures).toEqual([
+    expect(failures).toMatchObject([
       { ownerId: other, error: "WriteKeyError", endsRound: false },
     ]);
     expect(evoluMessages).toEqual([{ type: "refreshQueries" }]);

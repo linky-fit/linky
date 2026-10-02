@@ -1,6 +1,7 @@
 import type { TransactionId } from "@linky-fit/linksync";
 import type { ContactId } from "../../evolu";
 import type { ContactWithChatState } from "../lib/contactChatState";
+import type { WriteOutcome } from "../lib/storeWrite";
 import type { I18nKey } from "../../i18n";
 import type {
   Pubkey,
@@ -230,10 +231,20 @@ type UpdateLocalNostrMessageFields = Pick<
   | "wrapId"
 >;
 
+/** A row handed to the store: its id at once, and its write's outcome once stored. */
+export interface AppendedRow {
+  readonly id: string;
+  readonly written: Promise<WriteOutcome>;
+}
+
+export type AppendLocalNostrMessage = (
+  message: NewLocalNostrMessage,
+) => AppendedRow;
+
 export type UpdateLocalNostrMessage = (
   id: string,
   updates: Partial<UpdateLocalNostrMessageFields>,
-) => void;
+) => Promise<WriteOutcome>;
 
 export type NewLocalNostrReaction = Omit<
   LocalNostrReaction,
@@ -247,10 +258,14 @@ type UpdateLocalNostrReactionFields = Pick<
   "clientId" | "emoji" | "messageId" | "reactorPubkey" | "status" | "wrapId"
 >;
 
+export type AppendLocalNostrReaction = (
+  reaction: NewLocalNostrReaction,
+) => AppendedRow;
+
 export type UpdateLocalNostrReaction = (
   id: string,
   updates: Partial<UpdateLocalNostrReactionFields>,
-) => void;
+) => Promise<WriteOutcome>;
 
 export interface ChatReactionChip {
   count: number;

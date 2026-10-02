@@ -1,10 +1,10 @@
 # Core
 
-The generic shard store: no Linky in it. The repositories are its everyday surface; call the store directly to boot it, to add a scope or a port, and for what the repositories do not wrap (`forget`, `rotate`, `ingest`, `copies`, hydration).
+The generic shard store: no Linky in it. The repositories are its everyday surface; call the store directly to boot it, to add a scope or a port, and for what the repositories do not wrap (`forget`, `rotate`, `ingest`, `copies`, `copiesOf`, hydration, pointer repair).
 
 ## Scopes
 
-`appScope(tables)` lives in the Evolu `AppOwner`, one fixed partition. `shardScope({ tables, rotation, forget })` lives in `ShardOwner`s derived as `deriveShardOwner(appOwner, [scope, index])`; `rotation: null` pins the scope to index 0, `forget` is `"never"` or `{ keepNewest }`. `visibleIndexes(scope, active)` and `forgottenIndexes(scope, active)` are the two pure functions a policy reduces to.
+`appScope(tables)` lives in the Evolu `AppOwner`, one fixed partition. `shardScope({ tables, rotation, forget })` lives in `ShardOwner`s derived as `deriveShardOwner(appOwner, [scope, index])`; `rotation: null` pins the scope to index 0, `forget` is `"never"` or `{ keepNewest }`. `keepNewest(scope)` is the number of newest shards a device keeps (`Infinity` for a scope never forgotten); `visibleIndexes(scope, active)` and `forgottenIndexes(scope, active)` are the two pure functions a policy reduces to.
 
 ## Creating a store
 
@@ -15,16 +15,17 @@ const db = makeInMemoryShardDb<Schema>(tableColumns);
 const store = createShardStore<Schema, typeof scopes>({ db, appOwner, scopes });
 ```
 
-`Schema` maps table name to column types and must include `shardPointer` (`CoreSchema`); pass both type arguments explicitly, they cannot be inferred from the port. `createLinkyStore(db, appOwner, { scopes?, retention? })` builds the store over `LinkyDbSchema` with `linkyScopes`; a test passes its own `scopes` for small rotation rules.
+`Schema` maps table name to column types and must include `shardPointer` (`CoreSchema`); pass both type arguments explicitly, they cannot be inferred from the port. `createLinkyStore(db, appOwner, { scopes?, retention?, holdWritesUntilHydrated? })` builds the store over `LinkyDbSchema` with `linkyScopes`; a test passes its own `scopes` for small rotation rules.
 
-Reads and writes are `Effect`s. Errors are `ShardDbError` (the port rejected a write), `RowNotFound` (an id no visible shard holds) and `UnknownScope`. Time comes from Effect's `Clock`, so tests drive the cooldown with a manual clock.
+Reads and writes are `Effect`s. Errors are `ShardDbError` (the port rejected or never confirmed a write), `RowNotFound` (an id no visible shard holds) and `UnknownScope`. Time comes from Effect's `Clock`, so tests drive the cooldown with a manual clock.
 
 ## Lifecycle
 
 1. `reconcileSync()` right after creating the store. Sync uses the app owner plus every visible shard of every scope, and nothing else is subscribed.
 2. `followPointers(onRotated)` once, kept for the store's lifetime. A rotation on another device arrives as a pointer change, and this subscription is what subscribes the new shard here; it reports local rotations too.
-3. Hold every write the user did not ask for until the store is [hydrated](#hydration).
-4. `forget(scope?)` only on an explicit user action. It narrows one scope, or every forgettable scope, to its newest window, notifies readers and unsubscribes the rest; it deletes only when the port can.
+3. Hold every write the user did not ask for until the store is [hydrated](#hydration), and every write on a device that has never been hydrated with the account (`holdWritesUntilHydrated`).
+4. `repairPointers()` once, in the background: it waits for hydration and then for the relay ([pointer repair](#pointer-repair)).
+5. `forget(scope?)` only on an explicit user action. It narrows one scope, or every forgettable scope, to its newest window, notifies readers and unsubscribes the rest; it deletes only when the port can.
 
 `subscribe(scope, listener)` fires after a change to the scope's tables or pointer and after explicit forgetting; `subscribePointers(listener)` after any pointer change, local or synced, and after forgetting.
 
@@ -32,15 +33,26 @@ Reads and writes are `Effect`s. Errors are `ShardDbError` (the port rejected a w
 
 The store is hydrated once the app owner has finished a sync round with a relay and, after it, every shard its pointers make visible has too (the port's `isOwnerSynced`). Before that, reads show only what the device holds: on a restored device nothing, with every pointer at its provisional index 0. A write made then lands in the wrong shard or hides the account's copies, so background work waits.
 
-- `hydrated` checks now and returns whether the store is hydrated; `subscribeHydration(listener)` fires once when it becomes so. The pair is a `LiveSource` (`useHydrated` in [react](./react.md)). `whenHydrated` completes then.
+- `hydrated` checks now and returns whether the store is hydrated; `subscribeHydration(listener)` fires once when it becomes so. The pair is a `LiveSource` (`useHydrated` in [react](./react.md)).
 - It latches: a later rotation or a lost connection does not undo it.
-- It needs a relay to answer. Offline, or while no relay answers, it stays false and `whenHydrated` waits; nothing times out. A relay whose answers to an owner so far are all protocol errors has not answered it; an error after an error-free answer ends the owner's round. A brand-new account hydrates as soon as the relay answers that it holds nothing. An owner the port syncs with no relay at all counts as synced once used.
+- It needs a relay to answer. Offline, or while no relay answers, it stays false; nothing times out. A relay whose answers to an owner so far are all protocol errors has not answered it; an error after an error-free answer ends the owner's round. A brand-new account hydrates as soon as the relay answers that it holds nothing. An owner the port syncs with no relay at all counts as synced once used.
 - On hydration the store retains the windows of the forgettable scopes ([retention](#device-local-retention)).
 - `ingest` waits for it, so the rows are compared with the account's copies; an ingest of no rows returns at once.
+- `holdWritesUntilHydrated: true` in the store options makes every row write (`insert`, `insertRemoved`, `update`, `remove`) wait for it too. Pass it on a device that has not yet been hydrated with the account, such as right after a restore, where a write before the pointers lands in shard 0 and drops out of view once they arrive; a device that has been hydrated before already holds the pointers and can stay offline-first.
 
 ## Rotation
 
 The store does not schedule the check: every `TableRepository` write ends with `maybeRotate`, a batch writer runs it once, and of concurrent writes only the first passing check rotates while the rest report `cooldown`. A rotation writes the pointer into the app owner and reconciles sync at once, so the new shard uploads. `rotate(scope)` moves the pointer unconditionally.
+
+## Pointer repair
+
+A pointer is one synced row whose columns merge last-writer-wins, so a device that writes an index from a stale read moves every device's pointer back down, and the shards above it drop out of view. `repairPointers()` undoes that. Once the store is hydrated it checks every rotating scope at once: it syncs the shard above the active index, waits until a relay answered for it, and when the shard holds any row, tombstones included, checks the next one. It then writes the highest such index as a rotation does, `rotatedAtMs` included, and resolves with a `PointerRepair` per moved scope.
+
+- It never moves a pointer down: it writes only an index above the one it reads, and local rotations and repairs write one at a time.
+- Probed shards stay subscribed only when they end up visible.
+- Offline it waits, with the probed shard subscribed; nothing times out, so run it in the background.
+- Like a pointer change from another device, a repair keeps the device's retained window, so a forgettable scope shows the shards in between until `forget`.
+- Rows written into the lower shard while the pointer was down stay there; where an id also exists above, the higher shard's copy wins again.
 
 ## Ids and owners
 

@@ -230,6 +230,8 @@ export const en = {
     "Evolu reported an error. Some changes may not have reached your other devices.",
   evoluSyncing: "Syncing…",
   evoluNotSynced: "Not synced",
+  evoluRelayWaiting:
+    "Waiting for the Evolu relay. New messages arrive once your data has synced.",
   evoluCapacityMeasuring: "Measuring…",
   evoluWipeStorage: "Clear Evolu storage",
   evoluWipeStorageBusy: "Clearing Evolu storage…",

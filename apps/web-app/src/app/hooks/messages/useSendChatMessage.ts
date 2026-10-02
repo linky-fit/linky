@@ -20,14 +20,12 @@ import {
   parsePrivateImageMessage,
 } from "../../lib/privateImageMessage";
 import type {
+  AppendLocalNostrMessage,
   ContactIdentityRowLike,
-  NewLocalNostrMessage,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
 import { resolveNostrChatIdentity } from "./contactIdentity";
 import type { Translate } from "../../../i18n";
-
-type AppendLocalNostrMessage = (message: NewLocalNostrMessage) => string;
 
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
@@ -195,7 +193,7 @@ export const useSendChatMessage = <
           });
         }
 
-        const pendingId = appendLocalNostrMessage({
+        const appended = appendLocalNostrMessage({
           contactId: String(selectedContact.id),
           direction: "out",
           content: messageContent,
@@ -215,7 +213,10 @@ export const useSendChatMessage = <
               }
             : {}),
         });
+        const pendingId = appended.id;
         if (!pendingId) throw new Error("failed to persist message");
+        const written = await appended.written;
+        if (!written.ok) throw new Error(written.error);
         triggerChatScrollToBottom(pendingId);
         const clearDraft = options?.clearDraft !== false;
         if (clearDraft) setChatDraft("");

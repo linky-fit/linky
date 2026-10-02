@@ -234,6 +234,8 @@ export const cs = {
     "Evolu nahlásilo chybu. Některé změny se nemusely dostat na vaše ostatní zařízení.",
   evoluSyncing: "Synchronizuji…",
   evoluNotSynced: "Nesynchronizuje se",
+  evoluRelayWaiting:
+    "Čekám na Evolu relay. Nové zprávy dorazí, jakmile se synchronizují tvoje data.",
   evoluCapacityMeasuring: "Měřím…",
   evoluWipeStorage: "Vyčistit Evolu storage",
   evoluWipeStorageBusy: "Čistím Evolu storage…",

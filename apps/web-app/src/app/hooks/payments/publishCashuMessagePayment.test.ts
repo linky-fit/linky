@@ -19,6 +19,7 @@ import { getPublicKey, nip19 } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { buildCashuToken } from "../../../testUtils/cashuToken";
+import { NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 import type { LocalNostrMessage } from "../../types/appTypes";
 import { publishCashuMessagePayment } from "./publishCashuMessagePayment";
 import type {
@@ -69,7 +70,10 @@ const createArgs = () => {
   const ids = ["token-client", "notice-client"];
   const nostrMessagesLocal: LocalNostrMessage[] = [];
   return {
-    appendLocalNostrMessage: vi.fn(() => "new-local-message"),
+    appendLocalNostrMessage: vi.fn(() => ({
+      id: "new-local-message",
+      written: NO_WRITE,
+    })),
     batches: [
       {
         amount: 100,
@@ -109,11 +113,95 @@ const createArgs = () => {
           ),
         ),
       ),
-    updateLocalNostrMessage: vi.fn(),
+    updateLocalNostrMessage: vi.fn(() => NO_WRITE),
   };
 };
 
 describe("publishCashuMessagePayment", () => {
+  it.each([false, true])(
+    "waits for stored token content before enqueueing, reused=%s",
+    async (reuse) => {
+      const args = createArgs();
+      let resolveStored!: (outcome: WriteOutcome) => void;
+      const stored = new Promise<WriteOutcome>((resolve) => {
+        resolveStored = resolve;
+      });
+      args.appendLocalNostrMessage.mockReturnValue({
+        id: "pending-message",
+        written: stored,
+      });
+      args.updateLocalNostrMessage.mockReturnValueOnce(stored);
+      const publishing = publishCashuMessagePayment({
+        ...args,
+        ...(reuse
+          ? {
+              pendingMessageId: "pending-message",
+              nostrMessagesLocal: [
+                {
+                  id: "pending-message",
+                  contactId,
+                  content: "queued",
+                  rumorId: null,
+                  createdAtSec: 1,
+                  direction: "out" as const,
+                  pubkey: "",
+                  wrapId: "pending:old",
+                },
+              ],
+            }
+          : {}),
+      });
+      await Promise.resolve();
+      expect(args.enqueueOutbox).not.toHaveBeenCalled();
+      expect(args.sendPaymentNotice).not.toHaveBeenCalled();
+      resolveStored({ ok: true });
+      expect(await publishing).toMatchObject({
+        publishedTokenTexts: [tokenText],
+      });
+      expect(args.enqueueOutbox).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each([false, true])(
+    "rejects failed token persistence without enqueueing, reused=%s",
+    async (reuse) => {
+      const args = createArgs();
+      const failed = Promise.resolve<WriteOutcome>({
+        ok: false,
+        error: "storage unavailable",
+      });
+      args.appendLocalNostrMessage.mockReturnValue({
+        id: "pending-message",
+        written: failed,
+      });
+      args.updateLocalNostrMessage.mockReturnValueOnce(failed);
+      await expect(
+        publishCashuMessagePayment({
+          ...args,
+          ...(reuse
+            ? {
+                pendingMessageId: "pending-message",
+                nostrMessagesLocal: [
+                  {
+                    id: "pending-message",
+                    contactId,
+                    content: "queued",
+                    rumorId: null,
+                    createdAtSec: 1,
+                    direction: "out" as const,
+                    pubkey: "",
+                    wrapId: "pending:old",
+                  },
+                ],
+              }
+            : {}),
+        }),
+      ).rejects.toThrow("storage unavailable");
+      expect(args.enqueueOutbox).not.toHaveBeenCalled();
+      expect(args.sendPaymentNotice).not.toHaveBeenCalled();
+    },
+  );
+
   it("enqueues the token draft with reply context and reuses one pending message", async () => {
     const args = createArgs();
     const pendingMessage: LocalNostrMessage = {

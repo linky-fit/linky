@@ -1988,7 +1988,7 @@ export const useCashuWalletComposition = ({
           createdAtSec: Math.ceil(Date.now() / 1e3),
           status: "pending",
           clientId,
-        });
+        }).id;
         if (!pendingId) throw new Error("failed to persist message");
 
         const closed = await forgetCashuTransfer(tokenId);

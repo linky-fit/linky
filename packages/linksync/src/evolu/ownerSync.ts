@@ -1,15 +1,8 @@
 import type { OwnerId, SimpleName, Worker } from "@evolu/common";
 import type { CreateDbWorker } from "@evolu/common/local-first";
-import type { PageMessage, WorkerMessage } from "./dbWorker";
+import type { OwnerSyncFailed, PageMessage, WorkerMessage } from "./dbWorker";
 
-/** A relay answered a request for the owner with a protocol error. */
-export interface OwnerSyncFailure {
-  readonly ownerId: OwnerId;
-  /** Evolu's `ProtocolErrorCode` name, such as `QuotaError`. */
-  readonly error: string;
-  /** False while the relay has not yet answered the owner without an error; the owner then stays unsynced. */
-  readonly endsRound: boolean;
-}
+export type OwnerSyncFailure = Omit<OwnerSyncFailed, "type">;
 
 /** Owners whose sync round with a relay finished since the database worker started. */
 export interface OwnerSync {
@@ -45,9 +38,7 @@ export const trackOwnerSync = (
         onMessage: (callback) =>
           worker.onMessage((message) => {
             if (message.type === "linksync.ownerSyncFailed") {
-              const { ownerId, error, endsRound } = message;
-              for (const listener of failureListeners)
-                listener({ ownerId, error, endsRound });
+              for (const listener of failureListeners) listener(message);
               return;
             }
             if (message.type !== "linksync.ownersSynced") {

@@ -20,8 +20,8 @@ import { previewTokenText } from "../../../utils/formatting";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
 import { makeLocalId } from "../../../utils/validation";
 import type {
+  AppendLocalNostrMessage,
   LocalNostrMessage,
-  NewLocalNostrMessage,
   PaymentLogData,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
@@ -47,7 +47,7 @@ interface PublishCashuMessagePaymentDependencies {
 }
 
 interface PublishCashuMessagePaymentArgs {
-  appendLocalNostrMessage: (message: NewLocalNostrMessage) => string;
+  appendLocalNostrMessage: AppendLocalNostrMessage;
   batches: readonly CashuMessagePaymentSendBatch[];
   contactId: ContactId;
   contactNpub: string;
@@ -139,46 +139,50 @@ export const publishCashuMessagePayment = async ({
     let localMessageId = "";
     let messageId: RumorId | null = null;
     let sendError: string | null = null;
-    try {
-      const token = decodeCashuTokenText(messageText);
-      if (Either.isLeft(token)) {
-        sendError = "invalid cashu token";
+    const token = decodeCashuTokenText(messageText);
+    if (Either.isLeft(token)) {
+      sendError = "invalid cashu token";
+    } else {
+      if (canReusePendingMessage && !reusedPendingMessage) {
+        localMessageId = pendingMessageId ?? "";
+        reusedPendingMessage = true;
+        const written = await updateLocalNostrMessage(localMessageId, {
+          clientId,
+          content: messageText,
+          localOnly: false,
+          pubkey: myPublicKey,
+          status: "pending",
+          wrapId: `pending:${clientId}`,
+        });
+        if (!written.ok) throw new Error(written.error);
       } else {
-        if (canReusePendingMessage && !reusedPendingMessage) {
-          localMessageId = pendingMessageId ?? "";
-          reusedPendingMessage = true;
-          updateLocalNostrMessage(localMessageId, {
-            clientId,
-            content: messageText,
-            localOnly: false,
-            pubkey: myPublicKey,
-            status: "pending",
-            wrapId: `pending:${clientId}`,
-          });
-        } else {
-          localMessageId = appendLocalNostrMessage({
-            ...(replyContext?.replyToId
-              ? {
-                  replyToContent: replyContext.replyToContent,
-                  replyToId: replyContext.replyToId,
-                  rootMessageId:
-                    (replyContext.rootMessageId ?? "").trim() ||
-                    replyContext.replyToId,
-                }
-              : {}),
-            clientId,
-            contactId: contactId,
-            content: messageText,
-            createdAtSec: nowSec(),
-            direction: "out",
-            pubkey: myPublicKey,
-            rumorId: null,
-            status: "pending",
-            wrapId: `pending:${clientId}`,
-          });
-        }
-        if (!localMessageId) throw new Error("failed to persist message");
+        const appended = appendLocalNostrMessage({
+          ...(replyContext?.replyToId
+            ? {
+                replyToContent: replyContext.replyToContent,
+                replyToId: replyContext.replyToId,
+                rootMessageId:
+                  (replyContext.rootMessageId ?? "").trim() ||
+                  replyContext.replyToId,
+              }
+            : {}),
+          clientId,
+          contactId: contactId,
+          content: messageText,
+          createdAtSec: nowSec(),
+          direction: "out",
+          pubkey: myPublicKey,
+          rumorId: null,
+          status: "pending",
+          wrapId: `pending:${clientId}`,
+        });
+        localMessageId = appended.id;
+        const written = await appended.written;
+        if (!written.ok) throw new Error(written.error);
+      }
+      if (!localMessageId) throw new Error("failed to persist message");
 
+      try {
         const draft = new TokenMessageDraft({
           to: contactPublicKey,
           token: token.right,
@@ -199,9 +203,9 @@ export const publishCashuMessagePayment = async ({
         } else {
           sendError = failureMessage(exit.cause);
         }
+      } catch (error) {
+        sendError = getUnknownErrorMessage(error, "publish failed");
       }
-    } catch (error) {
-      sendError = getUnknownErrorMessage(error, "publish failed");
     }
 
     if (messageId === null) {

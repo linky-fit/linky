@@ -15,6 +15,7 @@ import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { parsePrivateImageMessage } from "../../lib/privateImageMessage";
+import { NO_WRITE } from "../../lib/storeWrite";
 import type {
   LocalNostrMessage,
   NewLocalNostrMessage,
@@ -27,7 +28,7 @@ import {
 import { buildUnknownContactId } from "./contactIdentity";
 
 const peerPubkey = getPublicKey(createSecretKey(2));
-const strangerPubkey = getPublicKey(createSecretKey(3));
+const unknownSenderPubkey = getPublicKey(createSecretKey(3));
 const MESSAGE_RUMOR_ID = "a".repeat(64);
 const EDIT_RUMOR_ID = "b".repeat(64);
 const REPLY_RUMOR_ID = "d".repeat(64);
@@ -67,6 +68,7 @@ const ownConfirmed = (
 interface HarnessOptions {
   blockedPubkeys?: readonly string[];
   identitySinceSec?: number | null;
+  visibleSinceSec?: number | null;
   messages?: LocalNostrMessage[];
 }
 
@@ -74,17 +76,16 @@ const createHarness = (options: HarnessOptions = {}) => {
   const messages = options.messages ?? [];
   const blockedPubkeys = new Set(options.blockedPubkeys ?? []);
 
-  const appendLocalNostrMessage = vi.fn(
-    (message: NewLocalNostrMessage): string => {
-      const id = `message-${messages.length + 1}`;
-      messages.push({ ...message, id, status: message.status ?? "sent" });
-      return id;
-    },
-  );
+  const appendLocalNostrMessage = vi.fn((message: NewLocalNostrMessage) => {
+    const id = `message-${messages.length + 1}`;
+    messages.push({ ...message, id, status: message.status ?? "sent" });
+    return { id, written: NO_WRITE };
+  });
   const updateLocalNostrMessage = vi.fn(
     (id: string, updates: Partial<LocalNostrMessage>) => {
       const message = messages.find((candidate) => candidate.id === id);
       if (message) Object.assign(message, updates);
+      return NO_WRITE;
     },
   );
   const logPayStep = vi.fn();
@@ -97,6 +98,7 @@ const createHarness = (options: HarnessOptions = {}) => {
     messages,
     resolveContactId: (pubkey) => (pubkey === peerPubkey ? "contact-1" : null),
     updateLocalNostrMessage,
+    visibleSinceSec: options.visibleSinceSec ?? null,
   };
 
   return {
@@ -112,7 +114,7 @@ describe("applyChatMessageReceived", () => {
   it("appends an incoming text message keyed by its rumor id", () => {
     const harness = createHarness();
 
-    const inserted = applyChatMessageReceived(
+    const { inserted } = applyChatMessageReceived(
       received({
         replyTo: RumorId.make(REPLY_RUMOR_ID),
         root: RumorId.make(REPLY_RUMOR_ID),
@@ -147,12 +149,12 @@ describe("applyChatMessageReceived", () => {
     const harness = createHarness();
 
     applyChatMessageReceived(
-      received({ from: Pubkey.make(strangerPubkey) }),
+      received({ from: Pubkey.make(unknownSenderPubkey) }),
       harness.ctx,
     );
 
     expect(harness.messages[0]?.contactId).toBe(
-      buildUnknownContactId(strangerPubkey),
+      buildUnknownContactId(unknownSenderPubkey),
     );
   });
 
@@ -162,8 +164,8 @@ describe("applyChatMessageReceived", () => {
     const first = applyChatMessageReceived(received(), harness.ctx);
     const second = applyChatMessageReceived(received(), harness.ctx);
 
-    expect(first).not.toBeNull();
-    expect(second).toBeNull();
+    expect(first.inserted).not.toBeNull();
+    expect(second.inserted).toBeNull();
     expect(harness.appendLocalNostrMessage).toHaveBeenCalledTimes(1);
   });
 
@@ -214,7 +216,7 @@ describe("applyChatMessageReceived", () => {
       ],
     });
 
-    const inserted = applyChatMessageReceived(
+    const { inserted } = applyChatMessageReceived(
       received({
         messageId: RumorId.make(EDIT_RUMOR_ID),
         body: new TextBody({ text: "hello, edited" }),
@@ -326,6 +328,16 @@ describe("applyChatMessageReceived", () => {
     const cutoff = createHarness({ identitySinceSec: SENT_AT + 1 });
     applyChatMessageReceived(received(), cutoff.ctx);
     expect(cutoff.appendLocalNostrMessage).not.toHaveBeenCalled();
+  });
+
+  it("stores no message sent before the visible shards began, so a forgotten or removed row stays gone", () => {
+    const before = createHarness({ visibleSinceSec: SENT_AT + 1 });
+    applyChatMessageReceived(received(), before.ctx);
+    expect(before.appendLocalNostrMessage).not.toHaveBeenCalled();
+
+    const within = createHarness({ visibleSinceSec: SENT_AT });
+    applyChatMessageReceived(received(), within.ctx);
+    expect(within.appendLocalNostrMessage).toHaveBeenCalledTimes(1);
   });
 });
 

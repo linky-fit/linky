@@ -28,6 +28,7 @@ Money truth is the proofs and operations, never forgotten; the transaction histo
 - `insert` writes into the active shard of the scope (the shard the pointer names, or index 0).
 - `update` of a row in the active shard patches it in place. Update of a row in an older shard copies the whole row, patch applied, into the active shard and tombstones the copy where it was. Retired shards therefore receive at most tombstones.
 - `remove` tombstones the row where it lives; nothing is copied.
+- `insertRemoved` writes a tombstone into the active shard for a row that has not arrived yet, so a later insert of that id can be refused. It carries only the columns given.
 - A read takes every row of the visible shards, keeps one copy per id from the highest shard index, and drops tombstones.
 - `rotate` upserts the scope's pointer to `index + 1`. The device that rotated keeps using the new index until its read model shows it, so a lagging query cannot send writes back to the old shard.
 - Sync uses the app owner plus every visible shard of every scope; nothing else is subscribed.
@@ -44,14 +45,14 @@ A cursor update copies the conversation into the active messages shard; `markSee
 
 Copy-on-write identity is the row `id`. These ids are deterministic, so every device lands on one row:
 
-| Id                        | Derived from               | Why                                                 |
-| ------------------------- | -------------------------- | --------------------------------------------------- |
-| `cashuProofIdFor`         | the proof secret           | a synced or restored proof never duplicates         |
-| `cashuOperationIdFor`     | linkshu's `operationKeyOf` | re-inserting an operation upserts its row           |
-| `directConversationIdFor` | the contact id             | every device derives one conversation per contact   |
-| `nostrMessageIdFor`       | the message's rumor id     | a message fetched again stays one row               |
-| `nostrReactionIdFor`      | the reaction's rumor id    | a reaction fetched again stays one row              |
-| `settingIdFor`            | the key                    | one row per key                                     |
-| `activeNostrIdentityId`   | constant                   | one mirrored identity row                           |
-| `shardPointerId`          | the scope name             | one pointer row per scope, upserted by every device |
-| `createId`                | random                     | everything else                                     |
+| Id                        | Derived from                        | Why                                                                                                  |
+| ------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `cashuProofIdFor`         | the proof secret                    | a synced or restored proof never duplicates                                                          |
+| `cashuOperationIdFor`     | linkshu's `operationKeyOf`          | re-inserting an operation upserts its row                                                            |
+| `directConversationIdFor` | the contact id                      | every device derives one conversation per contact                                                    |
+| `nostrMessageIdFor`       | the message's rumor id              | a message fetched again stays one row                                                                |
+| `nostrReactionIdFor`      | the reaction's rumor id and reactor | a reaction fetched again stays one row; a removal stored first applies only to its author's reaction |
+| `settingIdFor`            | the key                             | one row per key                                                                                      |
+| `activeNostrIdentityId`   | constant                            | one mirrored identity row                                                                            |
+| `shardPointerId`          | the scope name                      | one pointer row per scope, upserted by every device                                                  |
+| `createId`                | random                              | everything else                                                                                      |

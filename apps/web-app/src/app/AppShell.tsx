@@ -2,6 +2,7 @@ import React from "react";
 import "../App.css";
 import { AuthenticatedLayout } from "../components/AuthenticatedLayout";
 import { CashuContactSendBanner } from "../components/CashuContactSendBanner";
+import { EvoluRelayWaitBanner } from "../components/EvoluRelayWaitBanner";
 import { InstallPwaBanner } from "../components/InstallPwaBanner";
 import { PwaUpdateBanner } from "../components/PwaUpdateBanner";
 import { MigratingDataScreen } from "../components/MigratingDataScreen";
@@ -73,6 +74,7 @@ const AuthenticatedAppShell = ({
   return (
     <div className={`${pageClassNameWithSwipe} authenticated-page`}>
       <PwaUpdateBanner t={t} />
+      <EvoluRelayWaitBanner t={t} />
       <CashuContactSendBanner
         amountText={
           pendingCashuContactSend

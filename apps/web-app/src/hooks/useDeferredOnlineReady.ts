@@ -1,4 +1,5 @@
 import React from "react";
+import { useOnline } from "./useOnline";
 
 interface IdleDeadlineLike {
   readonly didTimeout: boolean;
@@ -20,11 +21,6 @@ interface UseDeferredOnlineReadyOptions {
   delayMs?: number;
   idleTimeoutMs?: number;
 }
-
-const readOnlineState = (): boolean => {
-  if (typeof navigator === "undefined") return true;
-  return navigator.onLine !== false;
-};
 
 const getRequestIdleCallback = (): RequestIdleCallbackLike | null => {
   const candidate = Reflect.get(window, "requestIdleCallback");
@@ -52,26 +48,7 @@ export const useDeferredOnlineReady = (
   const idleTimeoutMs = options?.idleTimeoutMs ?? 1500;
 
   const [hasDeferredStartup, setHasDeferredStartup] = React.useState(false);
-  const [isOnline, setIsOnline] = React.useState<boolean>(() =>
-    readOnlineState(),
-  );
-
-  React.useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
+  const isOnline = useOnline();
 
   React.useEffect(() => {
     let cancelled = false;

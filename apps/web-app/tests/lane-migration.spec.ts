@@ -6,11 +6,17 @@ import { deriveEvoluOwnerMnemonicFromSlip39 } from "../src/utils/slip39Nostr";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { watchAppErrors } from "./helpers/diagnostics";
 import {
+  holdEvoluRelay,
+  releaseEvoluRelay,
+  startSilentEvoluRelay,
+} from "./helpers/evoluRelay";
+import {
   createSeedIdentity,
   setRandomIdentityStorage,
   setSeedLoginStorage,
   type SeedIdentity,
 } from "./helpers/identity";
+import { shardOwnerId } from "./helpers/linkyHooks";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { EVOLU_RELAY_URL } from "./helpers/stack";
 import { mintUrl } from "../../../packages/linkshu/tests/integration/helpers";
@@ -726,36 +732,99 @@ test("a restored device leaves the pointers of an account that rotated past shar
   }
 });
 
-test("lane rows wait for the Evolu relay, and the migrating screen gives way once the browser is offline", async ({
+test("a device moves a contacts pointer that was reset to 0 back up to the newest shard with rows", async ({
+  browser,
+}, testInfo) => {
+  const identity = await createSeedIdentity();
+  const device = await openDevice(
+    browser,
+    testInfo.project.use.baseURL,
+    "reset pointer",
+    async (page) => {
+      await setSeedLoginStorage(page, identity);
+      await page.addInitScript(() =>
+        localStorage.setItem("linky.inspector_enabled", "true"),
+      );
+    },
+  );
+  const { page } = device;
+  try {
+    const appOwnerId = await hooks.appOwnerId(page);
+    const writePointer = (row: Row) =>
+      hooks.upsert(
+        page,
+        "shardPointer",
+        { id: shardPointerId("contacts"), scope: "contacts", ...row },
+        appOwnerId,
+      );
+    const contactsIndex = () =>
+      hooks
+        .shardRows(page, "meta", "shardPointer")
+        .then((rows) => rows.find((row) => row.scope === "contacts")?.index);
+    const contacts = () =>
+      hooks.shardRows(page, "contacts", "contact").then(byName);
+
+    await writePointer({ index: 2, rotatedAtMs: Date.now() });
+    for (const index of [1, 2]) {
+      await hooks.upsert(
+        page,
+        "contact",
+        { id: await hooks.createId(page), name: `Shard ${index}` },
+        await shardOwnerId(page, "contacts", index),
+      );
+    }
+    await expect.poll(contacts).toEqual(["Shard 1", "Shard 2"]);
+
+    // What an early seed restore wrote: only the index, newer than the rotation.
+    await writePointer({ index: 0 });
+    await expect.poll(contacts).toEqual([]);
+
+    await page.reload();
+    await expect(page.getByLabel("Available balance")).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect.poll(contactsIndex, { timeout: 60_000 }).toBe(2);
+    await expect.poll(contacts).toEqual(["Shard 1", "Shard 2"]);
+    await page.goto("/#advanced/inspector/timeline");
+    await expect(
+      page
+        .getByText("contacts shard pointer moved back up from index 0 to 2")
+        .first(),
+    ).toBeVisible();
+    device.errors.assertClean();
+  } finally {
+    await device.context.close();
+  }
+});
+
+test("lane rows wait for the Evolu relay, and the migrating screen gives way after its bound", async ({
   browser,
 }, testInfo) => {
   const device = await openDevice(
     browser,
     testInfo.project.use.baseURL,
-    "offline-upgrade",
+    "silent relay",
     setRandomIdentityStorage,
   );
   const { context, page } = device;
+  const relay = await startSilentEvoluRelay();
   const doneFlag = () =>
     page.evaluate((flag) => localStorage.getItem(flag), DONE_FLAG);
   const shardContacts = async () =>
     byName(await hooks.shardRows(page, "contacts", "contact"));
-  const servers = {
-    user: "linky.evoluServers.user.v1",
-    disabled: "linky.evoluServers.disabled.v1",
-    local: "ws://localhost:4001",
-    // Nothing listens here, so Evolu keeps retrying a relay that never answers.
-    silent: "ws://localhost:4999",
-  };
   const removeDoneFlagAndReload = async () => {
     await page.evaluate((flag) => localStorage.removeItem(flag), DONE_FLAG);
     await page.reload();
   };
+  const migrating = page.getByRole("status").filter({
+    hasText: "Migrating data",
+  });
+  // Shown only while the account is not hydrated, and lanes are ingested only after hydration.
+  const waitingForRelay = page.getByRole("status").filter({
+    hasText: "Waiting for the Evolu relay",
+  });
   try {
-    await page.evaluate((servers) => {
-      localStorage.setItem(servers.user, JSON.stringify([servers.silent]));
-      localStorage.setItem(servers.disabled, JSON.stringify([servers.local]));
-    }, servers);
+    await holdEvoluRelay(page, relay);
     await removeDoneFlagAndReload();
     await expect(page.getByLabel("Available balance")).toBeVisible();
     await expect.poll(doneFlag).toBe("1");
@@ -767,37 +836,29 @@ test("lane rows wait for the Evolu relay, and the migrating screen gives way onc
         { id: await hooks.createId(page), name: "Held contact" },
         await hooks.appOwnerId(page),
       );
-      await page.waitForTimeout(3_000);
+      await expect(waitingForRelay).toBeVisible();
       expect(await shardContacts()).toEqual([]);
     });
 
-    await test.step("a first run with lane rows keeps the screen up until the browser is offline", async () => {
+    await test.step("with a silent relay, the screen gives way after its bound and says what it waits for", async () => {
       await removeDoneFlagAndReload();
-      const migrating = page.getByRole("status").filter({
-        hasText: "Migrating data",
+      await expect(migrating).toBeVisible();
+      await expect(page.getByLabel("Available balance")).toBeVisible({
+        timeout: 30_000,
       });
-      await expect(migrating).toBeVisible();
-      await page.waitForTimeout(3_000);
-      await expect(migrating).toBeVisible();
-
-      await context.setOffline(true);
-      await expect(page.getByLabel("Available balance")).toBeVisible();
+      await expect(waitingForRelay).toBeVisible();
       expect(await doneFlag()).toBeNull();
       expect(await shardContacts()).toEqual([]);
     });
 
-    await test.step("back online with a relay that answers, the lane row is ingested", async () => {
-      await context.setOffline(false);
-      await page.evaluate((servers) => {
-        localStorage.removeItem(servers.user);
-        localStorage.removeItem(servers.disabled);
-      }, servers);
-      await page.reload();
+    await test.step("with a relay that answers, the lane row is ingested", async () => {
+      await releaseEvoluRelay(page);
       await expect.poll(doneFlag).toBe("1");
       await expect.poll(shardContacts).toEqual(["Held contact"]);
     });
     device.errors.assertClean();
   } finally {
     await context.close();
+    await relay.close();
   }
 });

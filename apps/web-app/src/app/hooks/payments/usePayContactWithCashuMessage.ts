@@ -30,10 +30,10 @@ import {
 import { selectSendMintForAmount } from "../../lib/paymentMintSelection";
 import type { SendMintBalance } from "../../lib/paymentMintSelection";
 import type {
+  AppendLocalNostrMessage,
   ContactRowLike,
   LocalNostrMessage,
   LoggedPaymentEventParams,
-  NewLocalNostrMessage,
   PaymentLogData,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
@@ -46,8 +46,6 @@ import type { CashuMessagePaymentHookResult } from "./cashuMessagePaymentTypes";
 import { publishCashuMessagePayment } from "./publishCashuMessagePayment";
 import { nowSeconds } from "../../../utils/time";
 import type { Translate } from "../../../i18n";
-
-type AppendLocalNostrMessage = (message: NewLocalNostrMessage) => string;
 
 interface UsePayContactWithCashuMessageParams {
   appendLocalNostrMessage: AppendLocalNostrMessage;
@@ -204,7 +202,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
           t("appTitle");
         const displayAmount = formatDisplayedAmountParts(amountSat);
         const clientId = makeLocalId();
-        const messageId = appendLocalNostrMessage({
+        const appended = appendLocalNostrMessage({
           clientId,
           contactId: contactId,
           content: t("payQueuedMessage")
@@ -222,6 +220,15 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
           status: "pending",
           wrapId: `pending:pay:${clientId}`,
         });
+        const written = await appended.written;
+        if (!appended.id || !written.ok) {
+          const error = written.ok
+            ? "failed to persist message"
+            : written.error;
+          if (notify) setStatus(`${t("payFailed")}: ${error}`);
+          return { error, ok: false, queued: false, retryable: true };
+        }
+        const messageId = appended.id;
         logPayStep("queued-offline", {
           amountSat,
           contactId: contactId,

@@ -17,9 +17,10 @@ import { createSecretKey } from "../../../testUtils/nostrKeys";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type { PrivateImageMessagePayload } from "../../lib/privateImageMessage";
 import { serializePrivateImageMessage } from "../../lib/privateImageMessage";
+import { NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 import type {
+  AppendLocalNostrMessage,
   ContactIdentityRowLike,
-  NewLocalNostrMessage,
   UpdateLocalNostrMessage,
 } from "../../types/appTypes";
 import type { ChatSendOutcome, ReplyContext } from "./useSendChatMessage";
@@ -93,11 +94,9 @@ interface SetupOptions {
 const setup = async (options: SetupOptions = {}) => {
   let sendChatMessage: SendChatMessage | null = null;
   const operations: string[] = [];
-  const appendLocalNostrMessage = vi.fn<
-    (message: NewLocalNostrMessage) => string
-  >(() => {
+  const appendLocalNostrMessage = vi.fn<AppendLocalNostrMessage>(() => {
     operations.push("append");
-    return "pending-message";
+    return { id: "pending-message", written: NO_WRITE };
   });
   const setChatDraft = vi.fn();
   const setChatSendIsBusy = vi.fn();
@@ -106,6 +105,7 @@ const setup = async (options: SetupOptions = {}) => {
   const triggerChatScrollToBottom = vi.fn();
   const updateLocalNostrMessage = vi.fn<UpdateLocalNostrMessage>(() => {
     operations.push("update");
+    return NO_WRITE;
   });
   const replyContext = options.replyContext ?? null;
 
@@ -158,6 +158,63 @@ describe("useSendChatMessage", () => {
     createPrivateImageSendPayloadMock.mockReset();
     enqueueOutboxMock.mockReset();
     vi.restoreAllMocks();
+  });
+
+  it("keeps the draft and outbox untouched until the message is stored", async () => {
+    const harness = await setup();
+    let resolveStored!: (outcome: WriteOutcome) => void;
+    const stored = new Promise<WriteOutcome>((resolve) => {
+      resolveStored = resolve;
+    });
+    harness.appendLocalNostrMessage.mockReturnValue({
+      id: "pending-message",
+      written: stored,
+    });
+    enqueueOutboxMock.mockImplementation(async (input) =>
+      Exit.succeed(
+        receipt(
+          input.op.draft.clientId ?? ClientId.make("fallback"),
+          input.ref,
+        ),
+      ),
+    );
+    let sending: Promise<ChatSendOutcome> | undefined;
+    await act(async () => {
+      sending = harness.getSend()?.();
+    });
+
+    expect(harness.appendLocalNostrMessage).toHaveBeenCalledOnce();
+    expect(enqueueOutboxMock).not.toHaveBeenCalled();
+    expect(harness.setChatDraft).not.toHaveBeenCalled();
+    expect(harness.setReplyContext).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveStored({ ok: true });
+      expect(await sending).toBe("enqueued");
+    });
+    expect(enqueueOutboxMock).toHaveBeenCalledOnce();
+    expect(harness.setChatDraft).toHaveBeenCalledWith("");
+    await act(async () => harness.root.unmount());
+  });
+
+  it("keeps the draft and does not send when storing the message fails", async () => {
+    const harness = await setup();
+    harness.appendLocalNostrMessage.mockReturnValue({
+      id: "pending-message",
+      written: Promise.resolve({ ok: false, error: "storage full" }),
+    });
+    await act(async () => {
+      expect(await harness.getSend()?.()).toBe("failed");
+    });
+
+    expect(enqueueOutboxMock).not.toHaveBeenCalled();
+    expect(harness.setChatDraft).not.toHaveBeenCalled();
+    expect(harness.setReplyContext).not.toHaveBeenCalled();
+    expect(harness.setStatus).toHaveBeenCalledWith(
+      expect.stringContaining("storage full"),
+    );
+    expect(harness.setChatSendIsBusy).toHaveBeenLastCalledWith(false);
+    await act(async () => harness.root.unmount());
   });
 
   it("enqueues text with reply context and stores receipt fields", async () => {

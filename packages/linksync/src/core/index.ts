@@ -1,6 +1,7 @@
 export {
   appScope,
   forgottenIndexes,
+  keepNewest,
   shardScope,
   visibleIndexes,
 } from "./scope";
@@ -37,6 +38,7 @@ export {
 export type {
   CoreSchema,
   ForgottenShard,
+  PointerRepair,
   RotationOutcome,
   Shard,
   ShardPointerColumns,

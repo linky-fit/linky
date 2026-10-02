@@ -33,6 +33,7 @@ import { getPublicKey, nip19 } from "nostr-tools";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSecretKey } from "../../../testUtils/nostrKeys";
+import { NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 import { buildCashuToken } from "../../../testUtils/cashuToken";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import type {
@@ -158,7 +159,7 @@ const setup = async (options: SetupOptions = {}) => {
   const dismissPaymentSending = vi.fn<PayParams["dismissPaymentSending"]>();
   const updateLocalNostrMessage =
     options.updateLocalNostrMessage ??
-    vi.fn<PayParams["updateLocalNostrMessage"]>();
+    vi.fn<PayParams["updateLocalNostrMessage"]>(() => NO_WRITE);
   const sendCashuToken =
     options.sendCashuToken ?? vi.fn(async () => Either.right(sendReceipt));
 
@@ -190,7 +191,8 @@ const setup = async (options: SetupOptions = {}) => {
   const Harness = () => {
     const pay = usePayContactWithCashuMessage<ContactRowLike>({
       appendLocalNostrMessage:
-        options.appendLocalNostrMessage ?? (() => "local-message"),
+        options.appendLocalNostrMessage ??
+        (() => ({ id: "local-message", written: NO_WRITE })),
       cashuBalance: 1_000,
       cashuTransferLifecycle,
       currentNpub,
@@ -490,9 +492,70 @@ describe("usePayContactWithCashuMessage", () => {
     await act(async () => harness.root.unmount());
   });
 
+  it("holds the offline queue and success overlay until its placeholder is stored", async () => {
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    let resolveStored!: (outcome: WriteOutcome) => void;
+    const stored = new Promise<WriteOutcome>((resolve) => {
+      resolveStored = resolve;
+    });
+    const harness = await setup({
+      appendLocalNostrMessage: () => ({
+        id: "offline-message",
+        written: stored,
+      }),
+    });
+    const paying = harness.getPay()?.({
+      amountSat: 600,
+      contact: { id: CONTACT_ID, name: "Alice", npub: contactNpub },
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(harness.enqueuePendingPayment).not.toHaveBeenCalled();
+    expect(harness.showPaidOverlay).not.toHaveBeenCalled();
+    resolveStored({ ok: true });
+    await act(async () => {
+      expect(await paying).toEqual({ ok: true, queued: true });
+    });
+    expect(harness.enqueuePendingPayment).toHaveBeenCalledOnce();
+    await act(async () => harness.root.unmount());
+  });
+
+  it.each([false, true])(
+    "reports message persistence failure without claiming payment success, offline=%s",
+    async (offline) => {
+      vi.spyOn(navigator, "onLine", "get").mockReturnValue(!offline);
+      const harness = await setup({
+        appendLocalNostrMessage: () => ({
+          id: "message",
+          written: Promise.resolve({ ok: false, error: "storage unavailable" }),
+        }),
+      });
+      expect(await payAlice(harness)).toMatchObject({
+        ok: false,
+        queued: false,
+        error: "storage unavailable",
+      });
+      expect(enqueueOutboxMock).not.toHaveBeenCalled();
+      expect(harness.enqueuePendingPayment).not.toHaveBeenCalled();
+      expect(harness.showPaidOverlay).not.toHaveBeenCalled();
+      expect(harness.forget).not.toHaveBeenCalled();
+      expect(harness.logPaymentEvent).not.toHaveBeenCalledWith(
+        expect.objectContaining({ status: "ok" }),
+      );
+      expect(harness.setStatus).toHaveBeenCalledWith(
+        "payFailed: storage unavailable",
+      );
+      await act(async () => harness.root.unmount());
+    },
+  );
+
   it("queues an offline placeholder without swapping or publishing", async () => {
     vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
-    const appendLocalNostrMessage = vi.fn(() => "offline-message");
+    const appendLocalNostrMessage = vi.fn(() => ({
+      id: "offline-message",
+      written: NO_WRITE,
+    }));
     const sendCashuToken = vi.fn<SendCashuToken>();
     const harness = await setup({ appendLocalNostrMessage, sendCashuToken });
 

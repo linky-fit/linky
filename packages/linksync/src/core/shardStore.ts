@@ -52,6 +52,13 @@ export interface ShardRotation<Scope extends string = string> {
   readonly index: number;
 }
 
+/** A scope whose pointer a repair moved up to the newest shard holding rows. */
+export interface PointerRepair<Scope extends string = string> {
+  readonly scope: Scope;
+  readonly from: number;
+  readonly to: number;
+}
+
 export interface ForgottenShard {
   readonly scope: string;
   readonly index: number;
@@ -101,6 +108,15 @@ export interface ShardStore<
     scope: Scope,
     table: T,
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
+  /** The copies of one row in the visible shards, tombstones included, highest shard first. */
+  readonly copiesOf: <
+    Scope extends keyof R & string,
+    T extends TableOf<R, Scope>,
+  >(
+    scope: Scope,
+    table: T,
+    id: S[T]["id"],
+  ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
   /** Writes the row into the active shard. */
   readonly insert: <
     Scope extends keyof R & string,
@@ -109,6 +125,18 @@ export interface ShardStore<
     scope: Scope,
     table: T,
     row: WriteRow<S[T]>,
+  ) => Effect.Effect<void, ShardDbError>;
+  /**
+   * Writes the columns given into the active shard as a tombstone: the
+   * removal of a row that has not arrived yet. Required columns may be absent.
+   */
+  readonly insertRemoved: <
+    Scope extends keyof R & string,
+    T extends TableOf<R, Scope>,
+  >(
+    scope: Scope,
+    table: T,
+    row: { readonly id: S[T]["id"] } & Patch<S[T]>,
   ) => Effect.Effect<void, ShardDbError>;
   /**
    * Copy-on-write: a row in the active shard is patched in place; a row in
@@ -137,7 +165,7 @@ export interface ShardStore<
    * Copies rows from outside the scope's shards (a legacy lane, an older
    * app version's owner) into the active shard. Idempotent: a row already
    * present with the same or a newer `updatedAt` is skipped, and a row the
-   * shards have tombstoned is not resurrected. Rows wait for `whenHydrated`,
+   * shards have tombstoned is not resurrected. Rows wait for hydration,
    * so they are compared with the account's copies, not a partial sync.
    */
   readonly ingest: <
@@ -171,10 +199,18 @@ export interface ShardStore<
    * show the account's data. Once true it stays true for the store's life.
    */
   readonly hydrated: Effect.Effect<boolean>;
-  /** Completes once `hydrated` is true; it does not complete while no relay answers. */
-  readonly whenHydrated: Effect.Effect<void>;
   /** Fires once, when the store becomes hydrated. */
   readonly subscribeHydration: (listener: () => void) => () => void;
+  /**
+   * Once hydrated, moves each rotating scope's pointer up while the shard
+   * above it holds rows, tombstones included: a pointer written back to a
+   * lower index hides the shards above it. Each probe waits for the relay to
+   * answer for that shard; offline it waits. Never moves a pointer down.
+   */
+  readonly repairPointers: () => Effect.Effect<
+    ReadonlyArray<PointerRepair<keyof R & string>>,
+    ShardDbError
+  >;
   /** Shards outside a forgettable scope's window: unsubscribed, deleted when the port can. */
   readonly forget: (
     scope?: keyof R & string,
@@ -210,6 +246,11 @@ export interface ShardStoreOptions<
   readonly appOwner: AppOwner;
   readonly scopes: R;
   readonly retention?: ShardRetention;
+  /**
+   * Every row write waits until the store is hydrated, for a device that has
+   * never seen the account's pointers: a write before them lands in shard 0.
+   */
+  readonly holdWritesUntilHydrated?: boolean;
 }
 
 const SYSTEM_COLUMNS = new Set([
@@ -364,17 +405,32 @@ export const createShardStore = <
       copies.filter(isLive),
     );
 
+  const visibleNewestFirst = <C extends Columns>(
+    shards: ReadonlyArray<Shard>,
+    all: ReadonlyArray<Row<C>>,
+  ): ReadonlyArray<Row<C>> => {
+    const index = indexByOwner(shards);
+    return all
+      .filter((row) => index.has(row.ownerId))
+      .sort(
+        (a, b) => (index.get(b.ownerId) ?? 0) - (index.get(a.ownerId) ?? 0),
+      );
+  };
+
   const copies = <T extends keyof S & string>(scope: string, table: T) =>
     Effect.map(
       Effect.all([visibleShards(scope), db.readTable(table)]),
-      ([shards, all]) => {
-        const index = indexByOwner(shards);
-        return all
-          .filter((row) => index.has(row.ownerId))
-          .sort(
-            (a, b) => (index.get(b.ownerId) ?? 0) - (index.get(a.ownerId) ?? 0),
-          );
-      },
+      ([shards, all]) => visibleNewestFirst(shards, all),
+    );
+
+  const copiesOf = <T extends keyof S & string>(
+    scope: string,
+    table: T,
+    id: string,
+  ) =>
+    Effect.map(
+      Effect.all([visibleShards(scope), db.readCopies(table, id)]),
+      ([shards, all]) => visibleNewestFirst(shards, all),
     );
 
   const activeOwner = (scope: string): Effect.Effect<SyncOwner> =>
@@ -392,12 +448,11 @@ export const createShardStore = <
     table: T,
     id: string,
   ): Effect.Effect<Row<S[T]>, RowNotFound> =>
-    Effect.flatMap(rows(scope, table), (live) => {
-      const found = live.find((row) => row.id === id);
-      return found === undefined
+    Effect.flatMap(copiesOf(scope, table, id), ([newest]) =>
+      newest === undefined || !isLive(newest)
         ? Effect.fail(new RowNotFound({ scope, table, id }))
-        : Effect.succeed(found);
-    });
+        : Effect.succeed(newest),
+    );
 
   const update = <T extends keyof S & string>(
     scope: string,
@@ -406,6 +461,7 @@ export const createShardStore = <
     patch: Readonly<Record<string, unknown>>,
   ): Effect.Effect<void, ShardDbError | RowNotFound> =>
     Effect.gen(function* () {
+      yield* beforeWrite;
       const current = yield* locateLive(scope, table, id);
       yield* retainBeforeWrite(scope);
       const active = yield* activeOwner(scope);
@@ -437,8 +493,8 @@ export const createShardStore = <
     id: string,
   ): Effect.Effect<void, ShardDbError | RowNotFound> =>
     Effect.gen(function* () {
-      const { copies } = yield* shardCopies(scope, table);
-      const current = copies.find((row) => row.id === id);
+      yield* beforeWrite;
+      const [current] = yield* copiesOf(scope, table, id);
       if (current === undefined)
         return yield* Effect.fail(new RowNotFound({ scope, table, id }));
       if (!isLive(current)) return;
@@ -570,21 +626,108 @@ export const createShardStore = <
           }),
   );
 
+  const beforeWrite: Effect.Effect<void> = options.holdWritesUntilHydrated
+    ? whenHydrated
+    : Effect.void;
+
+  const scopeNames = Object.keys(scopes).filter(
+    (scope): scope is keyof R & string => scope in scopes,
+  );
+
+  // Every local pointer write reads the index it raises under this lock.
+  const pointerLock = Effect.unsafeMakeSemaphore(1);
+
+  const movePointer = (
+    scope: string,
+    index: number,
+  ): Effect.Effect<void, ShardDbError> =>
+    Effect.gen(function* () {
+      const nowMs = yield* Clock.currentTimeMillis;
+      yield* writePointer(scope, index, nowMs);
+      pendingIndex.set(scope, index);
+      rotatedLocallyAtMs.set(scope, nowMs);
+      yield* reconcileSync();
+    });
+
+  const isRotating = (scope: string): boolean => {
+    const scopeDefinition = definition(scope);
+    return (
+      scopeDefinition.owner === "shard" && scopeDefinition.rotation !== null
+    );
+  };
+
   const rotate = (
     scope: string,
   ): Effect.Effect<number, ShardDbError | UnknownScope> =>
+    pointerLock.withPermits(1)(
+      Effect.gen(function* () {
+        if (!isRotating(scope)) return yield* activeIndex(scope);
+        yield* retainBeforeWrite(scope);
+        const next = (yield* activeIndex(scope)) + 1;
+        yield* movePointer(scope, next);
+        return next;
+      }),
+    );
+
+  const whenOwnerSynced = (ownerId: OwnerId): Effect.Effect<void> =>
+    Effect.async<void>((resume) => {
+      const check = () => {
+        if (!db.isOwnerSynced(ownerId)) return;
+        stop();
+        resume(Effect.void);
+      };
+      const stop = db.subscribeOwnerSync(check);
+      check();
+      return Effect.sync(stop);
+    });
+
+  /** Syncs the shard's owner until the scope closes and tells whether it holds rows. */
+  const probeHoldsRows = (scope: string, index: number) =>
     Effect.gen(function* () {
-      const scopeDefinition = definition(scope);
-      if (scopeDefinition.owner === "app" || scopeDefinition.rotation === null)
-        return yield* activeIndex(scope);
-      yield* retainBeforeWrite(scope);
-      const next = (yield* activeIndex(scope)) + 1;
-      const nowMs = yield* Clock.currentTimeMillis;
-      yield* writePointer(scope, next, nowMs);
-      pendingIndex.set(scope, next);
-      rotatedLocallyAtMs.set(scope, nowMs);
-      yield* reconcileSync();
-      return next;
+      const owner = shardOwner(scope, index);
+      yield* Effect.acquireRelease(
+        Effect.sync(() => db.useOwner(owner)),
+        (unuse) => Effect.sync(unuse),
+      );
+      yield* whenOwnerSynced(owner.id);
+      const tables = yield* Effect.forEach(definition(scope).tables, (table) =>
+        db.readTable(table),
+      );
+      return tables.some((rows) =>
+        rows.some((row) => row.ownerId === owner.id),
+      );
+    });
+
+  const repairPointer = (
+    scope: keyof R & string,
+  ): Effect.Effect<PointerRepair<keyof R & string> | null, ShardDbError> =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        let top = yield* activeIndex(scope);
+        while (yield* probeHoldsRows(scope, top + 1)) top += 1;
+        return yield* pointerLock.withPermits(1)(
+          Effect.gen(function* () {
+            const from = yield* activeIndex(scope);
+            if (top <= from) return null;
+            yield* movePointer(scope, top);
+            return { scope, from, to: top };
+          }),
+        );
+      }),
+    );
+
+  const repairPointers = (): Effect.Effect<
+    ReadonlyArray<PointerRepair<keyof R & string>>,
+    ShardDbError
+  > =>
+    Effect.gen(function* () {
+      yield* whenHydrated;
+      const repairs = yield* Effect.forEach(
+        scopeNames.filter(isRotating),
+        repairPointer,
+        { concurrency: "unbounded" },
+      );
+      return repairs.filter((repair) => repair !== null);
     });
 
   const maybeRotate = (
@@ -667,10 +810,6 @@ export const createShardStore = <
     };
   };
 
-  const scopeNames = Object.keys(scopes).filter(
-    (scope): scope is keyof R & string => scope in scopes,
-  );
-
   const followPointers = (
     onRotated: (rotation: ShardRotation<keyof R & string>) => void,
   ): (() => void) => {
@@ -702,11 +841,28 @@ export const createShardStore = <
     visibleShards,
     rows,
     copies,
+    copiesOf,
     insert: (scope, table, row) =>
       Effect.gen(function* () {
+        yield* beforeWrite;
         yield* retainBeforeWrite(scope);
         const owner = yield* activeOwner(scope);
         yield* upsertInto(table, owner.id, row);
+      }),
+    insertRemoved: (scope, table, row) =>
+      Effect.gen(function* () {
+        yield* beforeWrite;
+        yield* retainBeforeWrite(scope);
+        const owner = yield* activeOwner(scope);
+        // An update of an unknown row creates it, without the insert's required columns.
+        yield* db.mutate([
+          {
+            kind: "update",
+            table,
+            ownerId: owner.id,
+            row: { ...row, isDeleted: true },
+          },
+        ]);
       }),
     update,
     remove,
@@ -720,8 +876,8 @@ export const createShardStore = <
     syncOwners,
     reconcileSync,
     hydrated: checkHydration,
-    whenHydrated,
     subscribeHydration,
+    repairPointers,
     forget,
     subscribe,
     subscribePointers,

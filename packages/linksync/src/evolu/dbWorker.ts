@@ -23,8 +23,8 @@ import {
  * whose last response leaves no request unanswered by the next macrotask has
  * nothing left to reconcile with that relay. A response carrying a protocol
  * error ends the round too, since Evolu does not continue from it, but only
- * once the relay has answered the owner without an error: only then has what
- * it holds arrived.
+ * once the relay has answered the owner without an error on the current
+ * connection: only then has what it holds arrived.
  */
 
 export interface OwnersSynced {
@@ -97,6 +97,7 @@ export const reportOwnerSync =
       onOpen: () => {
         // A request sent before a reconnect is never answered; Evolu syncs every owner again on open.
         unanswered.clear();
+        answeredWithoutError.clear();
         options.onOpen?.();
       },
       onMessage: (data) => {

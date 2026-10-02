@@ -52,13 +52,16 @@ const range = (first: number, last: number): ReadonlyArray<number> =>
     ? []
     : Array.from({ length: last - first + 1 }, (_, offset) => first + offset);
 
+/** How many of a scope's newest shards a device keeps; `Infinity` when it forgets none. */
+export const keepNewest = (scope: ScopeDefinition<string>): number =>
+  scope.owner === "shard" && scope.forget !== "never"
+    ? scope.forget.keepNewest
+    : Infinity;
+
 const firstKeptIndex = (
   scope: ScopeDefinition<string>,
   activeIndex: number,
-): number =>
-  scope.owner === "shard" && scope.forget !== "never"
-    ? Math.max(0, activeIndex - scope.forget.keepNewest + 1)
-    : 0;
+): number => Math.max(0, activeIndex - keepNewest(scope) + 1);
 
 /** Shard indexes a device reads and syncs: all of them, or the newest N. */
 export const visibleIndexes = (

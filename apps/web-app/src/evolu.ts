@@ -2,16 +2,9 @@ import { ContactId } from "./evoluIds";
 export { ContactId, TransactionId } from "./evoluIds";
 import { Schema as EffectSchema } from "effect";
 import * as Evolu from "@evolu/common";
-import {
-  createConsole,
-  createEvolu,
-  createRandomBytes,
-  createTime,
-  SimpleName,
-} from "@evolu/common";
+import { createEvolu, SimpleName } from "@evolu/common";
 import {
   appOwnerFromMnemonic,
-  createLinkyStore,
   linkyScopes,
   LinkySchema,
   type CashuOperationId,
@@ -19,15 +12,24 @@ import {
   type LinkyScope,
   type LinkyStore,
   type NostrIdentityId,
+  type PointerRepair,
   type ShardRotation,
 } from "@linky-fit/linksync";
-import { createEvoluShardDb, trackOwnerSync } from "@linky-fit/linksync/evolu";
-import { createSharedWebWorker } from "@evolu/web";
+import {
+  createEvoluShardDb,
+  trackOwnerSync,
+  type UnconfirmedWrite,
+} from "@linky-fit/linksync/evolu";
+import { createSharedWebWorker, evoluWebDeps } from "@evolu/web";
 import { flushSync } from "react-dom";
 import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "./mnemonic";
+import {
+  createAccountStore,
+  markAwaitingFirstHydration,
+} from "./firstHydration";
 import { shouldUseInMemoryEvoluStorage } from "./platform/evoluWebStorage";
 import type { JsonValue } from "./types/json";
 import { base64 } from "@scure/base";
@@ -549,14 +551,9 @@ ownerSync.subscribeFailures(({ ownerId, error, endsRound }) => {
 });
 
 const evoluDeps: Evolu.EvoluDeps = {
-  console: createConsole(),
-  createDbWorker: evoluWorker.createDbWorker,
+  ...evoluWebDeps,
   flushSync,
-  randomBytes: createRandomBytes(),
-  // Evolu reloads the whole app after a reset; this is not hash navigation.
-  // eslint-disable-next-line no-restricted-syntax
-  reloadApp: (url) => location.replace(url),
-  time: createTime(),
+  createDbWorker: evoluWorker.createDbWorker,
 };
 
 const createEvoluForUser = (mnemonic: string | null) => {
@@ -649,9 +646,56 @@ const reportAccountHydrated = async (store: LinkyStore): Promise<void> => {
       tag: "AccountHydrated",
       summary: `Account data arrived for the app owner and ${owners.length - 1} shards`,
       links: { owner: owners },
-      payload: { owners: owners.length, sincePageLoadMs: performance.now() },
+      payload: {
+        owners: owners.length,
+        sincePageLoadMs: performance.now(),
+      },
     },
   ]);
+};
+
+const reportWriteUnconfirmed = (write: UnconfirmedWrite): void => {
+  if (!getInspectorEmissionEnabled()) return;
+  reportInspectorRows([
+    {
+      at: Date.now(),
+      channel: "evolu.sync",
+      tag: "WriteUnconfirmed",
+      summary: `Evolu did not confirm a ${write.table} write within 10 s; it may have been dropped`,
+      links: { owner: write.ownerId, row: write.id },
+      payload: write,
+    },
+  ]);
+};
+
+const reportShardPointersRepaired = (
+  store: LinkyStore,
+  repairs: ReadonlyArray<PointerRepair<LinkyScope>>,
+): void => {
+  if (!getInspectorEmissionEnabled() || repairs.length === 0) return;
+  reportInspectorRows(
+    repairs.map((repair) => ({
+      at: Date.now(),
+      channel: "evolu.sync",
+      tag: "ShardPointerRepaired",
+      summary: `${repair.scope} shard pointer moved back up from index ${repair.from} to ${repair.to}`,
+      links: { owner: store.shardOwner(repair.scope, repair.to).id },
+      payload: repair,
+    })),
+  );
+};
+
+/** Runs in the background: it waits for hydration and for the relay. */
+const repairShardPointers = (store: LinkyStore): void => {
+  void Effect.runPromise(store.repairPointers()).then(
+    (repairs) => reportShardPointersRepaired(store, repairs),
+    (error: unknown) =>
+      reportAppLog({
+        tag: "evolu.shardPointerRepairFailed",
+        summary: "Moving reset shard pointers back up failed",
+        payload: { error: String(error) },
+      }),
+  );
 };
 
 const appScopes = {
@@ -720,11 +764,14 @@ export const getLinkyStore = (): Promise<LinkyStore> => {
   ]).then(async ([owner]) => {
     const key = (scope: string) =>
       `linky.shards.retainedFrom.${owner.id}.${scope}`;
-    const store = createLinkyStore(
-      createEvoluShardDb(evolu, ownerSync),
+    const store = createAccountStore(
+      createEvoluShardDb(evolu, ownerSync, {
+        onWriteUnconfirmed: reportWriteUnconfirmed,
+      }),
       owner,
       {
         scopes: appScopes,
+        hasEvoluRelay: EVOLU_TRANSPORTS.length > 0,
         retention: {
           get: (scope) =>
             safeLocalStorageGetJson(
@@ -747,7 +794,10 @@ export const getLinkyStore = (): Promise<LinkyStore> => {
       reportShardRotated(store, rotation);
       void reportShardsSubscribed(store, "rotation");
     });
-    store.subscribeHydration(() => void reportAccountHydrated(store));
+    store.subscribeHydration(() => {
+      void reportAccountHydrated(store);
+    });
+    repairShardPointers(store);
     return store;
   });
   return linkyStorePromise;
@@ -1089,6 +1139,7 @@ export const wipeEvoluStorage = (): void => {
     throw new Error("Missing stored mnemonic");
   }
 
+  markAwaitingFirstHydration(mnemonicResult.value);
   // Hard wipe Evolu local storage (journal + state) and reload.
   void getEvolu().restoreAppOwner(mnemonicResult.value, { reload: true });
 };

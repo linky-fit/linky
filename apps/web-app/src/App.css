@@ -74,6 +74,13 @@
   cursor: progress;
 }
 
+.evolu-relay-wait-banner {
+  top: var(--topbar-height);
+  z-index: 9;
+  padding: 6px 14px;
+  pointer-events: none;
+}
+
 .install-pwa-overlay {
   position: fixed;
   inset: 0;

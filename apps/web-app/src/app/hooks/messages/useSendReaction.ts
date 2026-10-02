@@ -17,9 +17,9 @@ import { Cause, Exit, Schema } from "effect";
 import React from "react";
 import { makeLocalId } from "../../../utils/validation";
 import type {
+  AppendLocalNostrReaction,
   ContactIdentityRowLike,
   LocalNostrReaction,
-  NewLocalNostrReaction,
   UpdateLocalNostrReaction,
 } from "../../types/appTypes";
 import { resolveNostrChatIdentity } from "./contactIdentity";
@@ -28,8 +28,6 @@ import type { Translate } from "../../../i18n";
 const isPubkey = Schema.is(Pubkey);
 const isRumorId = Schema.is(RumorId);
 const isEmoji = Schema.is(Emoji);
-
-type AppendLocalNostrReaction = (reaction: NewLocalNostrReaction) => string;
 
 interface SendReactionArgs {
   emoji: string;
@@ -142,7 +140,7 @@ export const useSendReaction = <
           wrapId: `pending:${clientId}`,
           clientId,
           status: "pending",
-        });
+        }).id;
         if (!pendingReactionId) throw new Error("failed to persist reaction");
 
         const draft = new ReactionDraft({

@@ -16,6 +16,7 @@ export const createLinkyStore = (
   options: {
     readonly scopes?: LinkyScopes;
     readonly retention?: ShardRetention;
+    readonly holdWritesUntilHydrated?: boolean;
   } = {},
 ): LinkyStore =>
   createShardStore<LinkyDbSchema, LinkyScopes>({
@@ -23,4 +24,5 @@ export const createLinkyStore = (
     appOwner,
     scopes: options.scopes ?? linkyScopes,
     ...(options.retention ? { retention: options.retention } : {}),
+    holdWritesUntilHydrated: options.holdWritesUntilHydrated ?? false,
   });

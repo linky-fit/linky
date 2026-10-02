@@ -86,7 +86,7 @@ import {
   readUnknownContactIdPubkey,
 } from "../messages/contactIdentity";
 import type { PeerSeenWindow } from "../messages/seenReceiptInbox";
-import { runWrite } from "../../lib/storeWrite";
+import { NO_WRITE, runWrite } from "../../lib/storeWrite";
 import { useChatReadCursorSync } from "../messages/useChatReadCursorSync";
 import { useUnknownSenderReassignment } from "../messages/useUnknownSenderReassignment";
 import { applyOutboxResult } from "../messages/outboxResults";
@@ -418,6 +418,7 @@ export const useContactsMessagingComposition = ({
     [],
   );
 
+  const accountHydrated = useAccountHydrated();
   const {
     activeGroup,
     contacts,
@@ -435,6 +436,7 @@ export const useContactsMessagingComposition = ({
     toggleContactsFilter,
     ungroupedCount,
   } = useContactsDomain({
+    accountHydrated,
     contacts: contactsRepository,
     conversations: conversationsRepository,
     noGroupFilterValue: NO_GROUP_FILTER,
@@ -467,7 +469,6 @@ export const useContactsMessagingComposition = ({
     void setStoredPushContactNames(records);
   }, [contacts]);
 
-  const accountHydrated = useAccountHydrated();
   const {
     appendLocalNostrMessage,
     appendLocalNostrReaction,
@@ -477,7 +478,7 @@ export const useContactsMessagingComposition = ({
     nostrMessagesLatestRef,
     nostrMessagesLocal,
     nostrMessagesRecent,
-    nostrReactionWrapIdsRef,
+    knownReactionKeysRef,
     nostrReactionsLocal,
     pendingPaymentsKey,
     reactionsByMessageId,
@@ -485,6 +486,7 @@ export const useContactsMessagingComposition = ({
     removeLocalNostrMessagesByContactId,
     softDeleteLocalNostrReaction,
     softDeleteLocalNostrReactionsByWrapIds,
+    storeRetractedReaction,
     updateLocalNostrMessage,
     updateLocalNostrReaction,
   } = useMessagesDomain({
@@ -1924,10 +1926,10 @@ export const useContactsMessagingComposition = ({
     (contactId: string, seenWindow: PeerSeenWindow) => {
       const id = ContactId.from(contactId);
       const atSec = PositiveInt.from(seenWindow.seenUpToSec);
-      if (!id.ok || !atSec.ok) return;
+      if (!id.ok || !atSec.ok) return NO_WRITE;
       const sinceSec = PositiveInt.from(seenWindow.sinceSec);
       peerSeenWrittenByContactIdRef.current.set(contactId, seenWindow);
-      void runWrite(
+      return runWrite(
         Effect.flatMap(conversationsRepository.ensureDirect(id.value), (chat) =>
           conversationsRepository.setPeerSeen(chat.id, {
             sinceSec: sinceSec.ok ? sinceSec.value : null,
@@ -1935,9 +1937,10 @@ export const useContactsMessagingComposition = ({
           }),
         ),
       ).then((outcome) => {
-        if (outcome.ok) return;
+        if (outcome.ok) return outcome;
         peerSeenWrittenByContactIdRef.current.delete(contactId);
         console.warn("[linky][conversations] peer seen write failed", outcome);
+        return outcome;
       });
     },
     [conversationsRepository],
@@ -1954,16 +1957,18 @@ export const useContactsMessagingComposition = ({
     formatDisplayedAmountText,
     getPeerSeenWindow,
     logPayStep,
+    messagesVisibleSinceSec,
     maybeShowPwaNotification,
     nostrMessagesLatestRef,
     nostrMessagesLocal,
-    nostrReactionWrapIdsRef,
+    knownReactionKeysRef,
     nostrReactionsLocal,
     onOpenInboxMessageToast: openInboxMessageToast,
     pushToast,
     recordSentSeenReceipt,
     route,
     softDeleteLocalNostrReactionsByWrapIds,
+    storeRetractedReaction,
     t,
     updateLocalNostrMessage,
     updateLocalNostrReaction,

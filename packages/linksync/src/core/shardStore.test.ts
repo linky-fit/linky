@@ -7,8 +7,11 @@ import {
   toyStore,
   type ToySchema,
 } from "../testing/toy";
-import { makeInMemoryShardDb } from "./inMemoryShardDb";
-import { createShardStore, shardPointerId } from "./shardStore";
+import {
+  createShardStore,
+  shardPointerId,
+  type PointerRepair,
+} from "./shardStore";
 
 const note = (id: string, title = `title ${id}`) => ({ id, title });
 
@@ -455,44 +458,49 @@ describe("shard store", () => {
       expect(await hydrated(store)).toBe(true);
     });
 
-    it("notifies once and lets waiters through", async () => {
+    it("notifies once", async () => {
       const { db, store } = toyStore(testAppOwner(), { holdSync: true });
       let notified = 0;
       store.subscribeHydration(() => {
         notified += 1;
       });
-      let waited = false;
-      void Effect.runPromise(store.whenHydrated).then(() => {
-        waited = true;
-      });
       await settle();
-      expect(waited).toBe(false);
+      expect(notified).toBe(0);
 
       for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
       await settle();
-      expect(waited).toBe(true);
       expect(notified).toBe(1);
       db.finishSync(testAppOwner(9).id);
       await settle();
       expect(notified).toBe(1);
     });
 
+    it("holds a write until the pointers are known, when asked to", async () => {
+      const toy = toyStore(testAppOwner(), {
+        holdSync: true,
+        holdWritesUntilHydrated: true,
+      });
+      const { db, store, appOwner } = toy;
+      run(store.reconcileSync());
+      const write = Effect.runPromise(
+        store.insert("chats", "chat", { id: "c1", text: "hi" }),
+      );
+      await settle();
+      expect(run(db.readTable("chat"))).toEqual([]);
+
+      setPointer(toy, 3);
+      db.finishSync(appOwner.id);
+      for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
+      await write;
+      expect(run(db.readTable("chat")).map((row) => row.ownerId)).toEqual([
+        store.shardOwner("chats", 3).id,
+      ]);
+    });
+
     it("pins retention only once the pointers are known", async () => {
       const writes: Array<{ scope: string; first: number }> = [];
-      const appOwner = testAppOwner();
-      const db = makeInMemoryShardDb<ToySchema>(
-        {
-          shardPointer: ["id", "scope", "index", "rotatedAtMs"],
-          setting: ["id", "value"],
-          note: ["id", "title", "body"],
-          chat: ["id", "text"],
-        },
-        { holdSync: true },
-      );
-      const store = createShardStore<ToySchema, typeof toyScopes>({
-        db,
-        appOwner,
-        scopes: toyScopes,
+      const toy = toyStore(testAppOwner(), {
+        holdSync: true,
         retention: {
           get: () => undefined,
           set: (scope, first) => {
@@ -500,16 +508,132 @@ describe("shard store", () => {
           },
         },
       });
-      const hydration = Effect.runPromise(store.whenHydrated);
+      const { db, store, appOwner } = toy;
+      const hydration = new Promise((resolve) =>
+        store.subscribeHydration(() => resolve(undefined)),
+      );
       run(store.reconcileSync());
       await settle();
       expect(writes).toEqual([]);
 
-      setPointer({ db, store, appOwner }, 3);
+      setPointer(toy, 3);
       db.finishSync(appOwner.id);
       for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
       await hydration;
       expect(writes).toEqual([{ scope: "chats", first: 2 }]);
+    });
+  });
+
+  describe("pointer repair", () => {
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
+    const seedNotes = (
+      { db, store }: ReturnType<typeof toyStore>,
+      indexes: ReadonlyArray<number>,
+    ) =>
+      run(
+        db.mutate(
+          indexes.map((index) => ({
+            kind: "upsert",
+            table: "note",
+            ownerId: store.shardOwner("notes", index).id,
+            row: note(`n${index}`),
+          })),
+        ),
+      );
+    const answerUsedOwners = async (db: ReturnType<typeof toyStore>["db"]) => {
+      for (const ownerId of db.usedOwners()) db.finishSync(ownerId);
+      await settle();
+    };
+    const pointerOf = ({ db }: ReturnType<typeof toyStore>) =>
+      run(db.readTable("shardPointer")).find((row) => row.scope === "notes");
+
+    it("moves a reset pointer up to the newest shard holding rows", async () => {
+      const toy = toyStore();
+      const { db, store } = toy;
+      seedNotes(toy, [0, 1, 2, 3]);
+      const pointerId = shardPointerId("notes");
+      run(
+        db.mutate([
+          {
+            kind: "update",
+            table: "note",
+            ownerId: store.shardOwner("notes", 3).id,
+            row: { id: "n3", isDeleted: true },
+          },
+          {
+            kind: "upsert",
+            table: "shardPointer",
+            ownerId: toy.appOwner.id,
+            row: { id: pointerId, scope: "notes", index: 3, rotatedAtMs: 1 },
+          },
+          {
+            kind: "update",
+            table: "shardPointer",
+            ownerId: toy.appOwner.id,
+            row: { id: pointerId, index: 0 },
+          },
+        ]),
+      );
+      run(store.reconcileSync());
+
+      expect(await Effect.runPromise(store.repairPointers())).toEqual([
+        { scope: "notes", from: 0, to: 3 },
+      ]);
+      expect(run(store.activeIndex("notes"))).toBe(3);
+      expect(pointerOf(toy)?.rotatedAtMs).toBeGreaterThan(1);
+      expect(
+        run(store.rows("notes", "note"))
+          .map((row) => row.id)
+          .sort(),
+      ).toEqual(["n0", "n1", "n2"]);
+      expect(db.usedOwners()).toContain(store.shardOwner("notes", 3).id);
+      expect(db.usedOwners()).not.toContain(store.shardOwner("notes", 4).id);
+    });
+
+    it("leaves the pointer alone when the next shard is empty", async () => {
+      const toy = toyStore();
+      seedNotes(toy, [0]);
+      run(toy.store.reconcileSync());
+      expect(await Effect.runPromise(toy.store.repairPointers())).toEqual([]);
+      expect(pointerOf(toy)).toBeUndefined();
+      expect(toy.db.usedOwners()).not.toContain(
+        toy.store.shardOwner("notes", 1).id,
+      );
+    });
+
+    it("waits while the relay does not answer for a probed shard", async () => {
+      const toy = toyStore(testAppOwner(), { holdSync: true });
+      const { db, store } = toy;
+      seedNotes(toy, [1]);
+      run(store.reconcileSync());
+      let repairs: ReadonlyArray<PointerRepair> | undefined;
+      void Effect.runPromise(store.repairPointers()).then((result) => {
+        repairs = result;
+      });
+      for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
+      await settle();
+      expect(repairs).toBeUndefined();
+      expect(run(store.activeIndex("notes"))).toBe(0);
+
+      await answerUsedOwners(db);
+      await answerUsedOwners(db);
+      expect(repairs).toEqual([{ scope: "notes", from: 0, to: 1 }]);
+    });
+
+    it("never moves the pointer below a rotation made meanwhile", async () => {
+      const toy = toyStore(testAppOwner(), { holdSync: true });
+      const { db, store } = toy;
+      seedNotes(toy, [1, 2]);
+      run(store.reconcileSync());
+      for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
+      const repairs = Effect.runPromise(store.repairPointers());
+      await settle();
+      for (let i = 0; i < 3; i += 1) run(store.rotate("notes"));
+      for (let i = 0; i < 3; i += 1) await answerUsedOwners(db);
+
+      expect(await repairs).toEqual([]);
+      expect(run(store.activeIndex("notes"))).toBe(3);
+      expect(pointerOf(toy)?.index).toBe(3);
     });
   });
 

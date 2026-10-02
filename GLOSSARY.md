@@ -253,7 +253,7 @@ A Nostr relay or Evolu relay that linky.fit/recommended-relays lists; every devi
 _Avoid_: default relay, built-in relay
 
 **Hydrated**:
-A device is hydrated once the account's synced data, its shard pointers included, has arrived from an Evolu relay since the app opened; until then it makes no write the user did not ask for.
+A device is hydrated once the account's synced data, its shard pointers included, has arrived from an Evolu relay since the app opened. Until then it makes no write the user did not ask for, and a device that restored the account, or cleared its local data, holds the user's writes too.
 _Avoid_: synced, bootstrapped, ready
 
 **Device-local**:

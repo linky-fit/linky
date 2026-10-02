@@ -1,4 +1,4 @@
 export { createEvoluShardDb } from "./evoluShardDb";
-export type { EvoluRuntime } from "./evoluShardDb";
+export type { EvoluRuntime, UnconfirmedWrite } from "./evoluShardDb";
 export { trackOwnerSync } from "./ownerSync";
-export type { OwnerSync, OwnerSyncFailure } from "./ownerSync";
+export type { OwnerSync } from "./ownerSync";
