@@ -114,6 +114,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The reviewed request or approved recipient changed during token creation. Delivery was stopped and the app attempted to return the pending transfer to the wallet; a failed return leaves it recoverable.",
   "paymentRequest.editRejected":
     "An incoming edit tried to create or change a payment request. Payment requests are immutable; the sender must send a new request.",
+  "bankOffer.backgroundResponseFailed":
+    "A proxy payment response the app sends on its own failed: the offerer's auto-responder (bank details to the winning payer, accepted_by_other to the rest, retried every 30 seconds) or the cancel of an expired offer. The reason is missing-identity, invalid-response, details-reserved, publish-failed or error with its message; the user sees no toast.",
   "bankOffer.snapshotNotAuthorized":
     "A bank-offer snapshot was rejected or held for an authenticated offerer snapshot. It cannot update the offer or authorize settlement yet.",
   "bankOffer.staggerDropped":

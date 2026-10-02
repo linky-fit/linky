@@ -406,7 +406,8 @@ describe("useBankPaymentOffers", () => {
         ? Exit.fail(new Error("acknowledgment lost"))
         : Exit.succeed(receipt(draft)),
     );
-    const current = await setup();
+    const setStatus = vi.fn();
+    const current = await setup({ setStatus });
     await act(async () => {
       current().applyBankPaymentOfferSnapshot(snapshot("offered"));
       current().applyBankPaymentOfferSnapshot(
@@ -427,6 +428,8 @@ describe("useBankPaymentOffers", () => {
         .map(([draft]) => draft.to);
     expect(attempts().length).toBeGreaterThan(0);
     expect(new Set(attempts())).toEqual(new Set([recipient.pubkey]));
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(setStatus).not.toHaveBeenCalled();
     // Reload rebuilds the state from snapshots, but must retain the recipient choice.
     await unmounts.shift()?.();
     const reloaded = await setup();
@@ -500,6 +503,20 @@ describe("useBankPaymentOffers", () => {
       status: "canceled",
     });
     expect(current().isBankPaymentOfferCanceled("offer-1")).toBe(true);
+  });
+
+  it("cancels an expired offer without a toast when the publish fails", async () => {
+    sendBankOfferMock.mockResolvedValue(Exit.fail(new Error("relay down")));
+    const setStatus = vi.fn();
+    const current = await setup({ setStatus });
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(snapshot("offered"));
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(300_000));
+    expect(sendBankOfferMock).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "canceled" }),
+    );
+    expect(setStatus).not.toHaveBeenCalled();
   });
 
   it("responds from a chat row by looking the thread up, never from the row's content", async () => {
