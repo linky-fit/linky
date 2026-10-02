@@ -24,13 +24,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getInitialSiteDisplayCurrency,
-  getInitialSiteLocale,
   siteDisplayCurrencies,
   siteDisplayCurrencyStorageKey,
-  siteLocaleStorageKey,
   type SiteDisplayCurrency,
   type SiteLocale,
 } from "../sitePreferences";
+import { useSiteLocale } from "../useSiteLocale";
 import { forwardCashuTokenPrivately } from "./paymentTelemetry";
 import {
   flushPaymentTelemetryQueue,
@@ -311,7 +310,7 @@ const replaceHashToken = (token: string): void => {
   window.history.replaceState(null, "", url.toString());
 };
 export function useCashuPage() {
-  const [locale, setLocale] = useState<SiteLocale>(getInitialSiteLocale);
+  const [locale, setLocale] = useSiteLocale();
   const [displayCurrency, setDisplayCurrency] = useState<SiteDisplayCurrency>(
     getInitialSiteDisplayCurrency,
   );
@@ -362,14 +361,6 @@ export function useCashuPage() {
     const nextIndex = (currentIndex + 1) % siteDisplayCurrencies.length;
     setDisplayCurrency(siteDisplayCurrencies[nextIndex] ?? "sat");
   };
-
-  useEffect(() => {
-    document.documentElement.lang = locale;
-  }, [locale]);
-
-  useEffect(() => {
-    window.localStorage.setItem(siteLocaleStorageKey, locale);
-  }, [locale]);
 
   useEffect(() => {
     window.localStorage.setItem(siteDisplayCurrencyStorageKey, displayCurrency);

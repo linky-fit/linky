@@ -6,6 +6,7 @@ interface LocaleCopy {
   czechLabel: string;
   currencyLabel: string;
   expandOptionsLabel: string;
+  followUsLabel: string;
   englishLabel: string;
   germanLabel: string;
   githubLabel: string;
@@ -44,6 +45,7 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     czechLabel: "Čeština",
     currencyLabel: "Jednotky",
     expandOptionsLabel: "Další možnosti ↓",
+    followUsLabel: "Sledujte nás",
     englishLabel: "English",
     germanLabel: "Deutsch",
     githubLabel: "GitHub",
@@ -83,6 +85,7 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     czechLabel: "Čeština",
     currencyLabel: "Units",
     expandOptionsLabel: "Show options ↓",
+    followUsLabel: "Follow us",
     englishLabel: "English",
     germanLabel: "Deutsch",
     githubLabel: "GitHub",
@@ -122,6 +125,7 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     czechLabel: "Čeština",
     currencyLabel: "Einheiten",
     expandOptionsLabel: "Weitere Optionen ↓",
+    followUsLabel: "Folge uns",
     englishLabel: "English",
     germanLabel: "Deutsch",
     githubLabel: "GitHub",

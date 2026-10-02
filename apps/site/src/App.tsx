@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteFooter } from "./SiteFooter";
 import { SiteHeaderMenu } from "./SiteHeaderMenu";
-import {
-  getInitialSiteLocale,
-  siteLocaleStorageKey,
-  type SiteLocale,
-} from "./sitePreferences";
+import type { SiteLocale } from "./sitePreferences";
+import { useSiteLocale } from "./useSiteLocale";
 
 type CtaMode = "android-apk" | "google-play" | "web" | "zapstore";
 
@@ -20,7 +17,6 @@ interface LocaleCopy {
   czechLabel: string;
   englishLabel: string;
   germanLabel: string;
-  htmlLang: string;
   switchLabel: string;
   title: string;
   subtitle: string;
@@ -31,6 +27,7 @@ interface LocaleCopy {
   ctaMenuLabel: string;
   privacyLabel: string;
   heroImageAlt: string;
+  followUsLabel: string;
   githubLabel: string;
   nostrLabel: string;
   uspSectionTitle: string;
@@ -60,7 +57,6 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     czechLabel: "Čeština",
     englishLabel: "English",
     germanLabel: "Deutsch",
-    htmlLang: "cs",
     switchLabel: "Jazyk",
     title: "Budujte svou bitcoinovou síť",
     subtitle:
@@ -72,6 +68,7 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     ctaMenuLabel: "Možnosti otevření aplikace",
     privacyLabel: "Ochrana soukromí",
     heroImageAlt: "Aplikace Linky na telefonu v ruce",
+    followUsLabel: "Sledujte nás",
     githubLabel: "GitHub",
     nostrLabel: "Nostr profil",
     uspSectionTitle: "Proč Linky",
@@ -109,7 +106,6 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     czechLabel: "Čeština",
     englishLabel: "English",
     germanLabel: "Deutsch",
-    htmlLang: "en",
     switchLabel: "Language",
     title: "Build your bitcoin network",
     subtitle:
@@ -121,6 +117,7 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     ctaMenuLabel: "App launch options",
     privacyLabel: "Privacy Policy",
     heroImageAlt: "The Linky app on a phone held in hand",
+    followUsLabel: "Follow us",
     githubLabel: "GitHub",
     nostrLabel: "Nostr profile",
     uspSectionTitle: "Why Linky",
@@ -158,7 +155,6 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     czechLabel: "Čeština",
     englishLabel: "English",
     germanLabel: "Deutsch",
-    htmlLang: "de",
     switchLabel: "Sprache",
     title: "Baue dein Bitcoin-Netzwerk auf",
     subtitle:
@@ -170,6 +166,7 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     ctaMenuLabel: "Optionen zum Öffnen der App",
     privacyLabel: "Datenschutz",
     heroImageAlt: "Die Linky-App auf einem Smartphone in der Hand",
+    followUsLabel: "Folge uns",
     githubLabel: "GitHub",
     nostrLabel: "Nostr-Profil",
     uspSectionTitle: "Warum Linky",
@@ -305,18 +302,10 @@ function AppCta({
 }
 
 function App() {
-  const [locale, setLocale] = useState<SiteLocale>(getInitialSiteLocale);
+  const [locale, setLocale] = useSiteLocale();
   const [ctaMode, setCtaMode] = useState<CtaMode>(getDefaultCtaMode);
   const [brandIsCompact, setBrandIsCompact] = useState(false);
   const activeCopy = useMemo(() => copy[locale], [locale]);
-
-  useEffect(() => {
-    document.documentElement.lang = activeCopy.htmlLang;
-  }, [activeCopy.htmlLang]);
-
-  useEffect(() => {
-    window.localStorage.setItem(siteLocaleStorageKey, locale);
-  }, [locale]);
 
   useEffect(() => {
     const updateBrand = () => {
@@ -421,6 +410,7 @@ function App() {
         </div>
 
         <SiteFooter
+          followUsLabel={activeCopy.followUsLabel}
           githubLabel={activeCopy.githubLabel}
           nostrLabel={activeCopy.nostrLabel}
           privacyLabel={activeCopy.privacyLabel}

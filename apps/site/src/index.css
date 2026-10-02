@@ -53,7 +53,8 @@ button {
 }
 
 .site-shell,
-.cashu-shell {
+.cashu-shell,
+.follow-shell {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
@@ -361,7 +362,8 @@ button {
 .topbar,
 .hero,
 .usp-section,
-.footer-section {
+.footer-section,
+.follow-section {
   width: min(1120px, 100%);
   margin: 0 auto;
 }
@@ -910,6 +912,59 @@ button {
   }
 }
 
+.follow-section {
+  max-width: 640px;
+  margin-top: 24px;
+}
+
+.follow-section h1 {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: clamp(2.6rem, 9vw, 4.4rem);
+  line-height: 1;
+}
+
+.follow-links {
+  display: grid;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.follow-link {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(7, 18, 18, 0.72);
+  transition: background 160ms ease;
+}
+
+.follow-link:hover {
+  background: rgba(20, 184, 166, 0.14);
+}
+
+.follow-link-icon {
+  flex: none;
+  width: 64px;
+  height: 64px;
+}
+
+.follow-link-text {
+  display: grid;
+  min-width: 0;
+}
+
+.follow-link-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.follow-link-detail {
+  color: rgba(247, 244, 234, 0.66);
+  overflow-wrap: anywhere;
+}
+
 .footer-links {
   display: flex;
   flex-wrap: wrap;
@@ -929,7 +984,8 @@ button {
 }
 
 @media (min-width: 840px) {
-  .cashu-shell {
+  .cashu-shell,
+  .follow-shell {
     padding: 28px 24px 34px;
   }
 

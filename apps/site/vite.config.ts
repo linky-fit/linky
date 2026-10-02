@@ -24,15 +24,15 @@ const readRootPackageVersion = (): string => {
   return version;
 };
 
-const cashuRedirect = (): Plugin => ({
-  name: "cashu-redirect",
+const trailingSlashRedirect = (): Plugin => ({
+  name: "trailing-slash-redirect",
   configureServer(server: ViteDevServer) {
     server.middlewares.use(
       (req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
         const url = req.url ?? "";
-        if (url === "/cashu") {
+        if (url === "/cashu" || url === "/follow-us") {
           res.statusCode = 302;
-          res.setHeader("Location", "/cashu/");
+          res.setHeader("Location", `${url}/`);
           res.end();
           return;
         }
@@ -85,6 +85,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         cashu: path.resolve(__dirname, "cashu/index.html"),
+        followUs: path.resolve(__dirname, "follow-us/index.html"),
         main: path.resolve(__dirname, "index.html"),
         privacy: path.resolve(__dirname, "privacy.html"),
       },
@@ -93,5 +94,5 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(readRootPackageVersion()),
   },
-  plugins: [react(), cashuRedirect(), lnurlProxy()],
+  plugins: [react(), trailingSlashRedirect(), lnurlProxy()],
 });
