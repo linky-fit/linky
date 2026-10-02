@@ -93,6 +93,15 @@ describe("toLocalNostrMessage", () => {
     });
     expect(toLocalNostrMessage(row, undefined)).toBeNull();
   });
+
+  it("leaves the status unknown while its column has not synced", () => {
+    const message = toLocalNostrMessage(
+      messageRow({ status: null }),
+      contactId,
+    );
+    expect(message).not.toBeNull();
+    expect(message).not.toHaveProperty("status");
+  });
 });
 
 describe("write rows", () => {

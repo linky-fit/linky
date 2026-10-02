@@ -58,6 +58,7 @@ const message = new ChatMessageReceived({
   replyTo: null,
   root: null,
   editOf: null,
+  clientId: null,
   sentAt,
 });
 

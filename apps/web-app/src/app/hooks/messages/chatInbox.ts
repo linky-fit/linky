@@ -192,7 +192,9 @@ export const applyChatMessageReceived = (
 
   const stableRumorId = event.editOf ?? event.messageId;
   const existing = scoped.find(
-    (message) => trimString(message.rumorId) === stableRumorId,
+    (message) =>
+      trimString(message.rumorId) === stableRumorId ||
+      (event.clientId !== null && message.clientId === event.clientId),
   );
   if (existing) {
     return (existing.status ?? "sent") === "pending"
@@ -215,6 +217,7 @@ export const applyChatMessageReceived = (
     pubkey: event.from,
     createdAtSec: event.sentAt,
     status: "sent",
+    ...(event.clientId !== null ? { clientId: event.clientId } : {}),
     ...(event.replyTo !== null ? { replyToId: event.replyTo } : {}),
     ...(event.root !== null ? { rootMessageId: event.root } : {}),
     ...(event.editOf !== null

@@ -43,6 +43,14 @@ const toText = (value: unknown): string =>
 const toStatus = (value: unknown): "pending" | "sent" =>
   trimString(value) === "pending" ? "pending" : "sent";
 
+/** A status column that has not synced yet stays unknown instead of `sent`. */
+const syncedStatus = (
+  value: unknown,
+): { readonly status?: "pending" | "sent" } => {
+  const status = trimString(value);
+  return status === "pending" || status === "sent" ? { status } : {};
+};
+
 const toPositiveInt = (value: unknown, fallback: number): number => {
   const asNumber = Number(value ?? 0);
   if (!Number.isFinite(asNumber)) return fallback;
@@ -96,7 +104,7 @@ export const toLocalNostrMessage = (
     rumorId: asNonEmptyString(row.rumorId),
     pubkey: trimString(row.pubkey),
     createdAtSec: toPositiveInt(row.createdAtSec, nowSec()),
-    status: toStatus(row.status),
+    ...syncedStatus(row.status),
     localOnly: isSqliteTrueish(row.localOnly),
     replyToId: asNonEmptyString(row.replyToId),
     replyToContent: asNonEmptyString(row.replyToContent),

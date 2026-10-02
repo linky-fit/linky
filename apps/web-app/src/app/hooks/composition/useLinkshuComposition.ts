@@ -2,6 +2,10 @@ import type { WalletRepository } from "@linky-fit/linksync";
 import {
   Autoswap,
   AutoswapDraft,
+  Envelope,
+  EnvelopeMeltDraft,
+  EnvelopeOpenDraft,
+  EnvelopeRef,
   FeeProbe,
   FeeProbeDraft,
   linkshuServices,
@@ -34,6 +38,15 @@ import type {
   Bip39Seed,
   CounterLockTimeout,
   DeferredReceiveResult,
+  EnvelopeMeltError,
+  EnvelopeOpened,
+  EnvelopeOpenError,
+  EnvelopeReleased,
+  EnvelopeReleaseError,
+  EnvelopeSendError,
+  EnvelopeState,
+  EnvelopeStateError,
+  EnvelopeToken,
   FeeProbeError,
   ImportProofDraft,
   InvalidTransferTransition,
@@ -144,6 +157,33 @@ interface MeltCashuInvoiceArgs {
 export type MeltCashuInvoice = (
   args: MeltCashuInvoiceArgs,
 ) => Promise<Either.Either<MeltReceipt, MeltError>>;
+
+export interface CashuEnvelopeRef {
+  readonly mint: string;
+  readonly key: string;
+}
+
+/**
+ * linkshu `Envelope` and `Melt.meltEnvelope`; invalid mint/key input and
+ * defects reject.
+ */
+export interface CashuEnvelopes {
+  readonly open: (
+    args: CashuEnvelopeRef & { readonly amountSat: number },
+  ) => Promise<Either.Either<EnvelopeOpened, EnvelopeOpenError>>;
+  readonly state: (
+    ref: CashuEnvelopeRef,
+  ) => Promise<Either.Either<EnvelopeState, EnvelopeStateError>>;
+  readonly send: (
+    ref: CashuEnvelopeRef,
+  ) => Promise<Either.Either<EnvelopeToken, EnvelopeSendError>>;
+  readonly melt: (
+    args: CashuEnvelopeRef & { readonly invoice: string },
+  ) => Promise<Either.Either<MeltReceipt, EnvelopeMeltError>>;
+  readonly release: (
+    ref: CashuEnvelopeRef,
+  ) => Promise<Either.Either<EnvelopeReleased, EnvelopeReleaseError>>;
+}
 
 /** Retries tokens kept for an unreachable mint (linkshu `Receive.resumeDeferred`). */
 export type ResumeDeferredCashuReceives = () => Promise<
@@ -312,6 +352,9 @@ const decodeFeeProbeDraft = Schema.decodeUnknownSync(FeeProbeDraft);
 const decodeRestoreDraft = Schema.decodeUnknownSync(RestoreDraft);
 const decodeTopupDraft = Schema.decodeUnknownSync(TopupDraft);
 const decodePaidQuoteDraft = Schema.decodeUnknownSync(PaidQuoteDraft);
+const decodeEnvelopeRef = Schema.decodeUnknownSync(EnvelopeRef);
+const decodeEnvelopeOpenDraft = Schema.decodeUnknownSync(EnvelopeOpenDraft);
+const decodeEnvelopeMeltDraft = Schema.decodeUnknownSync(EnvelopeMeltDraft);
 
 /**
  * NUT-20 quotes are locked to the nostr key: topups lock new quotes to it,
@@ -642,6 +685,44 @@ export const useLinkshuComposition = ({
         }),
       );
 
+    const withEnvelope = <A, E>(
+      ref: CashuEnvelopeRef,
+      use: (envelope: Envelope, decoded: EnvelopeRef) => Effect.Effect<A, E>,
+    ): Promise<Either.Either<A, E>> =>
+      runEither(
+        Effect.suspend(() => {
+          const decoded = decodeEnvelopeRef(ref);
+          return Effect.flatMap(Envelope, (envelope) => use(envelope, decoded));
+        }),
+      );
+
+    const cashuEnvelopes: CashuEnvelopes = {
+      open: ({ mint, key, amountSat }) =>
+        runEither(
+          Effect.suspend(() => {
+            const draft = decodeEnvelopeOpenDraft({
+              mint,
+              key,
+              amount: amountSat,
+            });
+            return Effect.flatMap(Envelope, (envelope) => envelope.open(draft));
+          }),
+        ),
+      state: (ref) =>
+        withEnvelope(ref, (envelope, decoded) => envelope.state(decoded)),
+      send: (ref) =>
+        withEnvelope(ref, (envelope, decoded) => envelope.send(decoded)),
+      melt: ({ mint, key, invoice }) =>
+        runEither(
+          Effect.suspend(() => {
+            const draft = decodeEnvelopeMeltDraft({ mint, key, invoice });
+            return Effect.flatMap(Melt, (melt) => melt.meltEnvelope(draft));
+          }),
+        ),
+      release: (ref) =>
+        withEnvelope(ref, (envelope, decoded) => envelope.release(decoded)),
+    };
+
     const cashuTransferLifecycle: CashuTransferLifecycle = {
       reclaim: (id) =>
         run(
@@ -694,6 +775,7 @@ export const useLinkshuComposition = ({
     return {
       adoptPaidCashuQuote,
       autoswapCashu,
+      cashuEnvelopes,
       cashuTransferLifecycle,
       checkAllCashuTokens,
       inspectCashuProofStates,
@@ -737,6 +819,7 @@ export const useLinkshuComposition = ({
     /** Every stored proof, test mints included; backups must not lose hidden funds. */
     allWalletProofs: readModel.model.proofs,
     autoswapCashu: operations?.autoswapCashu ?? null,
+    cashuEnvelopes: operations?.cashuEnvelopes ?? null,
     cashuTransferLifecycle: operations?.cashuTransferLifecycle ?? null,
     checkAllCashuTokens: operations?.checkAllCashuTokens ?? null,
     inspectCashuProofStates: operations?.inspectCashuProofStates ?? null,

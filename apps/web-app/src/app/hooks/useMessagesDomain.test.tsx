@@ -1,4 +1,3 @@
-import { Pubkey, RumorId } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import {
   createId,
@@ -16,11 +15,22 @@ import {
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React, { act } from "react";
+import {
+  ChatMessageReceived,
+  ClientId,
+  Pubkey,
+  RumorId,
+  TextBody,
+  UnixSeconds,
+} from "@linky-fit/linkstr";
+import { getPublicKey } from "nostr-tools";
 import { describe, expect, it, vi } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
+import { createSecretKey } from "../../testUtils/nostrKeys";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../../utils/constants";
 import type { NewLocalNostrMessage } from "../types/appTypes";
+import { applyChatMessageReceived } from "./messages/chatInbox";
 
 vi.mock("./useLinksync", () => ({ useConversationRows: () => [] }));
 
@@ -346,5 +356,62 @@ describe("useMessagesDomain", () => {
     expect(await reactions()).toHaveLength(0);
     await view.unmount();
     vi.useRealTimers();
+  });
+
+  it("keeps messages that share a client id with another sender or direction", async () => {
+    const { store } = makeTestLinkyStore();
+    const { domain, view } = await renderDomain(store);
+    const alice = getPublicKey(createSecretKey(2));
+    const bob = getPublicKey(createSecretKey(3));
+    const clientId = ClientId.make("same-client");
+    const receive = (from: string, rumorId: string, text: string) => {
+      const current = domain();
+      applyChatMessageReceived(
+        new ChatMessageReceived({
+          messageId: RumorId.make(rumorId),
+          from: Pubkey.make(from),
+          body: new TextBody({ text }),
+          replyTo: null,
+          root: null,
+          editOf: null,
+          clientId,
+          sentAt: UnixSeconds.make(100),
+        }),
+        {
+          appendLocalNostrMessage: current.appendLocalNostrMessage,
+          identitySinceSec: null,
+          isBlockedPubkey: () => false,
+          logPayStep: () => undefined,
+          messages: current.nostrMessagesLocal,
+          resolveContactId: () => null,
+          updateLocalNostrMessage: current.updateLocalNostrMessage,
+          visibleSinceSec: null,
+        },
+      );
+    };
+
+    await act(async () => {
+      receive(alice, "a".repeat(64), "from alice");
+    });
+    await act(async () => {
+      receive(bob, "b".repeat(64), "from bob");
+    });
+    await act(async () => {
+      domain().appendLocalNostrMessage({
+        clientId,
+        contactId: `${UNKNOWN_CONTACT_ID_PREFIX}${alice}`,
+        content: "to alice",
+        createdAtSec: 101,
+        direction: "out",
+        pubkey: alice,
+        rumorId: null,
+        wrapId: "w-out",
+      });
+    });
+
+    expect(
+      domain().nostrMessagesLocal.map((message) => message.content),
+    ).toEqual(["from alice", "from bob", "to alice"]);
+    await view.unmount();
   });
 });

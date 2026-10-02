@@ -40,7 +40,7 @@ export const de = {
   recurringFailedBody:
     "Senden von {amount} {unit} an {name} ist fehlgeschlagen. Es wird erneut versucht.",
   recurringWaitingForFundsBody:
-    "Das Guthaben reicht nicht, um {amount} {unit} an {name} zu senden. Lade vor der nächsten Fälligkeit auf, sonst wird diese Zahlung übersprungen.",
+    "Das Guthaben bei {mint} reicht nicht, um {amount} {unit} an {name} zu senden. Lade {mint} vor der nächsten Fälligkeit auf, sonst wird diese Zahlung übersprungen.",
   recurringSkippedNoFundsBody:
     "{amount} {unit} an {name} übersprungen: Guthaben reicht nicht.",
   recurringSkippedFailingBody:
@@ -57,7 +57,7 @@ export const de = {
   recurringCancelledToast:
     "Zahlung abgebrochen. Die nächste folgt zum nächsten Termin.",
   recurringWaitingForFunds:
-    "Für eine wiederkehrende Zahlung reicht das Guthaben gerade nicht. Es wird erneut versucht.",
+    "Für eine wiederkehrende Zahlung reicht das Guthaben bei {mint} gerade nicht. Es wird erneut versucht.",
   recurringWaitingForRates:
     "Kein Wechselkurs, um die wiederkehrende Zahlung in Sats umzurechnen. Es wird erneut versucht.",
   recurringRecipientUnavailable:
@@ -66,6 +66,20 @@ export const de = {
     "Die Wallet ist gerade beschäftigt, versuche es gleich noch einmal.",
   recurringRunFailedToast:
     "Die wiederkehrende Zahlung ist fehlgeschlagen. Es wird erneut versucht.",
+  recurringNeedsAttention:
+    "Ein Teil des bei {mint} für eine wiederkehrende Zahlung zurückgelegten Guthabens wurde anderweitig ausgegeben. Lösche die wiederkehrende Zahlung, um den Rest deinem Guthaben zurückzugeben.",
+  recurringNeedsAttentionCashu:
+    "Ein Teil des Tokens, den eine wiederkehrende Zahlung bei {mint} zurückgelegt hat, wurde anderweitig ausgegeben. Lösche die wiederkehrende Zahlung, um sie zu stoppen.",
+  recurringCancelTooLate:
+    "Diese Zahlung ist bereits unterwegs und kann nicht mehr abgebrochen werden.",
+  recurringDeletedTokenSentBody:
+    "{amount} {unit} an {name} gesendet: eine gelöschte wiederkehrende Zahlung hatte sie bereits zurückgelegt.",
+  recurringDeletedTokenKeptBody:
+    "{amount} {unit} bleiben bei {mint} für eine gelöschte wiederkehrende Zahlung zurückgelegt: ihr Kontakt ist auf diesem Gerät unbekannt, und ihr Token wurde vielleicht schon zugestellt.",
+  recurringDeletedTokenPartlySpentBody:
+    "{amount} {unit} bleiben bei {mint} für eine gelöschte wiederkehrende Zahlung zurückgelegt: ein Teil ihres Tokens wurde anderweitig ausgegeben, daher wird der Rest weder gesendet noch deinem Guthaben gutgeschrieben.",
+  recurringDeletePreparedStillSent:
+    "Eine bereits vorbereitete Zahlung wird dem Kontakt trotzdem gesendet.",
   recurringSaveFailed:
     "Die wiederkehrende Zahlung konnte nicht gespeichert werden.",
   recurringChooseContact: "An wen zahlen",
@@ -96,11 +110,10 @@ export const de = {
   recurringNextRun: "Nächste Zahlung",
   recurringLastRun: "Letzte Zahlung",
   recurringRunsCount: "Ausgeführte Zahlungen",
+  recurringMintLabel: "Bezahlt von",
   recurringRunPaid: "bezahlt",
   recurringRunFailed: "fehlgeschlagen",
   recurringRunSkipped: "übersprungen",
-  recurringRunRunning: "läuft",
-  recurringRunInterrupted: "unterbrochen",
   recurringStatusActive: "aktiv",
   recurringStatusPaused: "pausiert",
   recurringPause: "Pausieren",
@@ -950,9 +963,9 @@ export const de = {
   cashuProofsColumnMint: "Mint",
   cashuProofsColumnMintState: "Bei der Mint",
   cashuHeldProofsHint:
-    "Eingaben einer Lightning-Zahlung, die die Mint noch nicht abgeschlossen hat. Sie kommen zurück oder werden ausgegeben, sobald die Mint antwortet.",
+    "Für eine wiederkehrende Zahlung zurückgelegt, bis sie rausgeht, oder Eingaben einer Lightning-Zahlung, die die Mint noch nicht abgeschlossen hat.",
   cashuHeldUnknownHint:
-    "Von einem unbekannten Vorgang gehalten. Freigegeben, sobald die Mint sie als nicht ausgegeben meldet.",
+    "Von einem Vorgang gehalten, der noch nicht auf dieses Gerät synchronisiert wurde.",
   cashuSpentProofsKept:
     "Ausgegebene Proofs für die Buchführung behalten: {count}.",
   cashuTransfers: "Übertragungen",

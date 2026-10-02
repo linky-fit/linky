@@ -239,7 +239,9 @@ const REQUIRED_COLUMNS: {
     "intervalUnit",
     "intervalCount",
     "anchorAtSec",
-    "nextDueAtSec",
+    "mintUrl",
+    "rail",
+    "progress",
   ],
 };
 

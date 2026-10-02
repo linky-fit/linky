@@ -33,10 +33,6 @@ import { safeLocalStorageSet } from "../../utils/storage";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { describeTaggedCashuError } from "../lib/cashuStoredError";
 import { selectSendMintForAmount } from "../lib/paymentMintSelection";
-import {
-  recurringRunDetails,
-  type RecurringRunRef,
-} from "@linky-fit/recurring-payment";
 import type { SendMintBalance } from "../lib/paymentMintSelection";
 import type {
   ContactPayRowLike,
@@ -54,11 +50,6 @@ interface MeltFailure {
   readonly message: string;
   /** The melt was sent and the mint has not settled it; not a failure yet. */
   readonly pending: PaymentPending | null;
-}
-
-export interface PayLightningAddressOptions {
-  /** Set when a recurring payment pays: recorded on the transaction, no UI. */
-  recurringRun?: RecurringRunRef | null;
 }
 
 interface UseLightningPaymentsDomainParams {
@@ -296,9 +287,7 @@ export const useLightningPaymentsDomain = ({
       amountSat: number,
       contact: ContactPayRowLike | null,
       comment?: string | null,
-      options?: PayLightningAddressOptions,
     ) => {
-      const recurringRun = options?.recurringRun ?? null;
       const paymentTarget = lnAddress.trim();
       // The LUD-12 comment is the note; an invoice description stands in
       // when there is none.
@@ -332,21 +321,18 @@ export const useLightningPaymentsDomain = ({
         }
         const mintBalance =
           walletMintBalances.find((entry) => entry.mint === mint)?.amount ?? 0;
-        if (!recurringRun) {
-          showPaymentSending({
-            direction: "out",
-            amountSat,
-            contact: paidOverlayContact(contact),
-          });
-        }
+        showPaymentSending({
+          direction: "out",
+          amountSat,
+          contact: paidOverlayContact(contact),
+        });
 
         // Paying the full balance leaves no headroom for fees; the ladder
-        // degrades the requested LNURL amount until amount + fees fit. A
-        // recurring run pays exactly its scheduled amount or fails.
-        const degradeAmount = recurringRun === null;
-        const queuedAmountAttempts = degradeAmount
-          ? buildPaymentAmountAttempts(amountSat, mintBalance)
-          : [amountSat];
+        // degrades the requested LNURL amount until amount + fees fit.
+        const queuedAmountAttempts = buildPaymentAmountAttempts(
+          amountSat,
+          mintBalance,
+        );
         const seenAmountAttempts = new Set(queuedAmountAttempts);
         let finalErrorMessage: string | null = null;
         let finalErrorMint: string | null = null;
@@ -359,7 +345,6 @@ export const useLightningPaymentsDomain = ({
         ) {
           const attemptedAmountSat = queuedAmountAttempts[attemptIndex];
           const canRetryLower = (errorMessage: string): boolean => {
-            if (!degradeAmount) return false;
             if (!isRetryablePaymentAmountFailure(errorMessage)) return false;
             for (const retryAmountSat of buildPaymentFailureAmountAttempts(
               attemptedAmountSat,
@@ -412,7 +397,6 @@ export const useLightningPaymentsDomain = ({
                 {
                   lightningAddress: paidLightningAddress,
                   lightningInvoice: attemptInvoice,
-                  ...recurringRunDetails(recurringRun),
                 },
                 contact?.id ?? null,
                 commentNote ?? attemptInvoicePreview?.description ?? null,
@@ -460,7 +444,6 @@ export const useLightningPaymentsDomain = ({
               ...(successActionUrlDescription
                 ? { lnurlSuccessUrlDescription: successActionUrlDescription }
                 : {}),
-              ...recurringRunDetails(recurringRun),
             },
             fee: receipt.feePaid,
             mint: receipt.mint,
@@ -473,9 +456,6 @@ export const useLightningPaymentsDomain = ({
           });
 
           rememberFirstPayment();
-          // A recurring payment reports its own result: no overlay, no
-          // success-action status, no save-contact prompt.
-          if (recurringRun) return true;
 
           const displayAmount = formatDisplayedAmountParts(receipt.paidAmount);
           showPaidOverlay(
@@ -527,7 +507,6 @@ export const useLightningPaymentsDomain = ({
             ...(lastAttemptInvoice
               ? { lightningInvoice: lastAttemptInvoice }
               : {}),
-            ...recurringRunDetails(recurringRun),
           },
           fee: null,
           mint: finalErrorMint,

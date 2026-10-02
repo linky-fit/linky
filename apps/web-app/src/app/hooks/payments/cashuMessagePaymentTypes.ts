@@ -1,5 +1,9 @@
+import type { ClientId } from "@linky-fit/linkstr";
+
 export interface CashuMessagePaymentSendBatch {
   amount: number;
+  /** A fixed id makes a repeat of the same payment reuse its message row. */
+  clientId?: ClientId;
   mint: string;
   token: string;
   unit: string | null;

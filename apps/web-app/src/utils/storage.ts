@@ -234,19 +234,20 @@ export const canLockAcrossTabs = (): boolean =>
   typeof navigator.locks?.query === "function";
 
 /**
- * Runs `fn` unless a run under `key` is already going on in any tab. Without
- * Web Locks it takes the localStorage lease lock instead, which two tabs can
- * both take, and rejects when that lock is held.
+ * Runs `fn` unless a run under `key` is already going on in any tab, and
+ * returns its result; `undefined` when it did not run. Without Web Locks it
+ * takes the localStorage lease lock instead, which two tabs can both take,
+ * and rejects when that lock is held.
  */
-export const withTabLockIfFree = async (args: {
+export const withTabLockIfFree = async <T>(args: {
   key: string;
   ttlMs: number;
-  fn: () => Promise<void>;
-}): Promise<void> => {
+  fn: () => Promise<T>;
+}): Promise<T | undefined> => {
   if (!canLockAcrossTabs()) {
     return withLocalStorageLeaseLock({ ...args, timeoutMs: 0 });
   }
-  await navigator.locks.request(args.key, { ifAvailable: true }, (lock) =>
+  return navigator.locks.request(args.key, { ifAvailable: true }, (lock) =>
     lock === null ? undefined : args.fn(),
   );
 };

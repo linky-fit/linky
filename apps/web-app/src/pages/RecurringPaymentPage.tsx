@@ -19,6 +19,7 @@ import {
 import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeLocale } from "../utils/formatting";
+import { formatMintHost } from "../utils/mint";
 import { nowSeconds } from "../utils/time";
 
 interface RecurringPaymentPageProps {
@@ -175,6 +176,7 @@ export function RecurringPaymentPage({
               )
             : null}
           {row(t("recurringRunsCount"), String(order.schedule.runCount))}
+          {row(t("recurringMintLabel"), formatMintHost(order.mintUrl))}
 
           <div className="actions recurring-actions">
             {state === "active"
@@ -209,6 +211,11 @@ export function RecurringPaymentPage({
               },
             )}
           </div>
+          {deleteArmed && order.rail === "cashu" ? (
+            <p className="muted recurring-hint">
+              {t("recurringDeletePreparedStillSent")}
+            </p>
+          ) : null}
           <p className="muted recurring-hint">{t("recurringOnlyWhileOpen")}</p>
         </div>
       </div>

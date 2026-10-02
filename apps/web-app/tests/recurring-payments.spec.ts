@@ -2,6 +2,7 @@ import { expect } from "@playwright/test";
 import { readBalanceSat } from "./helpers/appState";
 import { FIXTURE_AMOUNT_SAT } from "./helpers/network";
 import {
+  addLightningContact,
   claimOrder,
   dateTimeLocal,
   detailValue,
@@ -11,10 +12,15 @@ import {
   expectReceived,
   FUNDING_SAT,
   fundAndConnect,
+  invoicePaid,
+  LIGHTNING_ADDRESS,
+  MAX_FEE_SAT,
+  MINT_HOST,
   openForm,
   ORDER_SAT,
   readOrder,
   saveOrder,
+  serveLightningAddress,
   test,
   triggerSchedulerPass,
   waitForCountdown,
@@ -32,10 +38,12 @@ test("pay now consumes one period and history links back to the payment", async 
   const b = await bootAccount("B");
   await test.step("fund A and save both contacts", () => fundAndConnect(a, b));
   const hash =
-    await test.step("create a daily payment from history", async () => {
+    await test.step("create a daily payment bound to the default mint", async () => {
       await openForm(a.page);
       return saveOrder(a.page);
     });
+  await expect(detailValue(a.page, "Paid from")).toHaveText(MINT_HOST);
+  expect((await readOrder(a.page)).rail).toBe("cashu");
   await test.step("pay now and receive the sats after mint fees", async () => {
     await a.page.getByRole("button", { name: "Pay", exact: true }).click();
     await expect(
@@ -136,8 +144,7 @@ test("insufficient funds warns once and retries after a top-up", async ({
     await waitUntil(sendAt);
     await triggerSchedulerPass(a.page);
     const toast = a.page.locator(".toast-container .toast", {
-      hasText:
-        "Not enough funds for a recurring payment right now. It will be retried.",
+      hasText: `Not enough funds at ${MINT_HOST} for a recurring payment right now. It will be retried.`,
     });
     await expect(toast).toBeVisible();
     await expect(dueDialog(a.page)).toBeHidden();
@@ -233,6 +240,148 @@ test("two devices sync the claim and pay only once in the background", async ({
     expect(await readBalanceSat(a2.page)).toBe(balance);
     for (const device of [a, a2])
       expect((await readOrder(device.page)).runCount).toBe(1);
+  });
+});
+
+test("two devices paying the same run at once pay it only once", async ({
+  bootAccount,
+}) => {
+  const a = await bootAccount("A");
+  const b = await bootAccount("B");
+  const a2 = await bootAccount("A2", { identity: a.identity });
+  await test.step("fund and sync both payer devices", async () => {
+    await fundAndConnect(a, b);
+    await expect
+      .poll(() => readBalanceSat(a2.page), { timeout: 60_000 })
+      .toBe(FUNDING_SAT);
+    await openForm(a.page);
+  });
+  const hash = await saveOrder(
+    a.page,
+    ORDER_SAT,
+    new Date(Date.now() + 3_600_000),
+  );
+  await test.step("both devices press Pay at the same moment", async () => {
+    await a2.page.goto(`/${hash}`);
+    const pay = (page: typeof a.page) =>
+      page.getByRole("button", { name: "Pay", exact: true });
+    await expect(pay(a2.page)).toBeEnabled();
+    await Promise.all([pay(a.page).click(), pay(a2.page).click()]);
+  });
+  await test.step("the contact receives one payment and both devices agree", async () => {
+    const received = await expectReceived(b.page);
+    for (const device of [a, a2]) {
+      await expect
+        .poll(async () => (await readOrder(device.page)).runCount, {
+          timeout: 60_000,
+        })
+        .toBe(1);
+    }
+    await a.page.waitForTimeout(10_000);
+    expect(await readBalanceSat(b.page)).toBe(received);
+    await a.page.goto("/#wallet");
+    await a2.page.goto("/#wallet");
+    await expect
+      .poll(
+        async () => {
+          const balance = await readBalanceSat(a.page);
+          return balance === (await readBalanceSat(a2.page)) ? balance : null;
+        },
+        { timeout: 60_000 },
+      )
+      .toBeGreaterThanOrEqual(FUNDING_SAT - ORDER_SAT - MAX_FEE_SAT);
+    await expectPaidHistory(a.page, hash);
+  });
+});
+
+test("a contact with only a Lightning address is paid by melting the envelope", async ({
+  bootAccount,
+  request,
+}) => {
+  const a = await bootAccount("A");
+  const quoteIds = await serveLightningAddress(a.page, request);
+  await test.step("fund A and save a Lightning-only contact", async () => {
+    await topUp(a.page, FUNDING_SAT);
+    await expect.poll(() => readBalanceSat(a.page)).toBe(FUNDING_SAT);
+    await addLightningContact(a.page);
+    await openForm(a.page);
+  });
+  const hash = await saveOrder(
+    a.page,
+    ORDER_SAT,
+    new Date(Date.now() + 3_600_000),
+  );
+  expect((await readOrder(a.page)).rail).toBe("lightning");
+  await test.step("pay now pays the contact's invoice once", async () => {
+    await a.page.getByRole("button", { name: "Pay", exact: true }).click();
+    await expect(
+      a.page.getByRole("status", {
+        name: `Sent ${ORDER_SAT} sat to ${LIGHTNING_ADDRESS}`,
+      }),
+    ).toBeVisible({ timeout: 60_000 });
+    expect(quoteIds).toHaveLength(1);
+    expect(await invoicePaid(request, quoteIds[0] ?? "")).toBe(true);
+    await expectPaidHistory(a.page, hash);
+  });
+  await test.step("another pass pays nothing more", async () => {
+    await a.page.goto("/#wallet");
+    const balance = await readBalanceSat(a.page);
+    // Paid once: the swap into the envelope and the melt each cost fees.
+    expect(balance).toBeLessThanOrEqual(FUNDING_SAT - ORDER_SAT);
+    expect(balance).toBeGreaterThan(FUNDING_SAT - 2 * ORDER_SAT);
+    await triggerSchedulerPass(a.page);
+    await a.page.waitForTimeout(5_000);
+    expect(await readBalanceSat(a.page)).toBe(balance);
+    expect(quoteIds).toHaveLength(1);
+    expect((await readOrder(a.page)).runCount).toBe(1);
+  });
+});
+
+test("deleting a Lightning payment returns its undelivered envelope", async ({
+  bootAccount,
+  request,
+}) => {
+  const a = await bootAccount("A");
+  await serveLightningAddress(a.page, request, false);
+  await test.step("fund A and save a Lightning-only contact", async () => {
+    await topUp(a.page, FUNDING_SAT);
+    await expect.poll(() => readBalanceSat(a.page)).toBe(FUNDING_SAT);
+    await addLightningContact(a.page);
+    await openForm(a.page);
+  });
+  const hash = await saveOrder(
+    a.page,
+    ORDER_SAT,
+    new Date(Date.now() + 3_600_000),
+  );
+  await test.step("pay now funds the envelope but cannot get an invoice", async () => {
+    await a.page.getByRole("button", { name: "Pay", exact: true }).click();
+    await expect(
+      a.page.locator(".toast-container .toast", {
+        hasText: "The recurring payment failed. It will be retried.",
+      }),
+    ).toBeVisible({ timeout: 60_000 });
+    expect((await readOrder(a.page)).runCount).toBe(0);
+    await a.page.goto("/#wallet");
+    await expect
+      .poll(() => readBalanceSat(a.page))
+      .toBeLessThanOrEqual(FUNDING_SAT - ORDER_SAT);
+  });
+  await test.step("delete releases the envelope back to the balance", async () => {
+    await a.page.goto(`/${hash}`);
+    const remove = a.page.getByRole("button", { name: "Delete", exact: true });
+    await remove.click();
+    await a.page
+      .getByRole("button", { name: "Click once more to delete.", exact: true })
+      .click();
+    await expect(a.page).toHaveURL(/#wallet\/transactions$/);
+    await a.page.goto("/#wallet");
+    await expect
+      .poll(() => readBalanceSat(a.page), { timeout: 60_000 })
+      .toBeGreaterThan(FUNDING_SAT - ORDER_SAT);
+    expect(await readBalanceSat(a.page)).toBeGreaterThanOrEqual(
+      FUNDING_SAT - MAX_FEE_SAT,
+    );
   });
 });
 

@@ -27,6 +27,7 @@ interface HookOverrides {
   restoreCashuTokens?: RestoreCashuTokens | null;
   pushToast?: (message: string) => void;
   reclaimCashuTokens?: ReclaimCashuTokens;
+  recoverEnvelopes?: () => Promise<void>;
 }
 
 const emptyReport = new RestoreReport({
@@ -60,6 +61,7 @@ const renderRestore = (overrides: HookOverrides): RestoreMissingTokens => {
       mintInfoDeduped: [],
       pushToast: overrides.pushToast ?? (() => {}),
       readSeenMintsFromStorage: () => [],
+      recoverEnvelopes: overrides.recoverEnvelopes ?? (async () => {}),
       rememberSeenMint: () => {},
       reclaimCashuTokens: overrides.reclaimCashuTokens ?? null,
       restoreCashuTokens:
@@ -118,17 +120,20 @@ describe("useRestoreMissingTokens", () => {
     },
   );
 
-  it("scans every wallet mint plus the main mint", async () => {
+  it("scans every wallet mint plus the main mint, then the envelopes", async () => {
     const restoreCashuTokens = vi.fn<RestoreCashuTokens>(() =>
       Promise.resolve(emptyResult),
     );
+    const recoverEnvelopes = vi.fn(async () => {});
 
     const restore = renderRestore({
       walletMints: ["https://mint-a.example", "https://mint-b.example/"],
       restoreCashuTokens,
+      recoverEnvelopes,
     });
     await act(() => restore());
 
+    expect(recoverEnvelopes).toHaveBeenCalledTimes(1);
     expect(restoreCashuTokens).toHaveBeenCalledTimes(1);
     expect(restoreCashuTokens.mock.calls[0][0]).toEqual([
       "https://mint-a.example",
@@ -180,14 +185,18 @@ describe("bulk recovery actions", () => {
     const restoreCashuTokens = vi.fn<RestoreCashuTokens>(
       async () => emptyResult,
     );
+    const recoverEnvelopes = vi.fn(async () => {});
     const recover = renderRestore({
       reclaimCashuTokens,
       restoreCashuTokens,
+      recoverEnvelopes,
       walletMints: ["https://mint-a.example"],
     });
     await act(() => recover("reclaim"));
     expect(reclaimCashuTokens).toHaveBeenLastCalledWith(undefined);
+    expect(recoverEnvelopes).not.toHaveBeenCalled();
     await act(() => recover("all"));
+    expect(recoverEnvelopes).toHaveBeenCalledTimes(1);
     expect(reclaimCashuTokens).toHaveBeenLastCalledWith([
       "https://mint-a.example",
       MAIN_MINT_URL,

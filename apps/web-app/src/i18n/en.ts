@@ -40,7 +40,7 @@ export const en = {
   recurringFailedBody:
     "Sending {amount} {unit} to {name} failed. It will be retried.",
   recurringWaitingForFundsBody:
-    "Not enough funds to send {amount} {unit} to {name}. Top up before the next payment is due, or this one is skipped.",
+    "Not enough funds at {mint} to send {amount} {unit} to {name}. Top up {mint} before the next payment is due, or this one is skipped.",
   recurringSkippedNoFundsBody:
     "Skipped {amount} {unit} to {name}: not enough funds.",
   recurringSkippedFailingBody:
@@ -56,13 +56,27 @@ export const en = {
   recurringCancelledToast:
     "Payment cancelled. The next one goes out on its next date.",
   recurringWaitingForFunds:
-    "Not enough funds for a recurring payment right now. It will be retried.",
+    "Not enough funds at {mint} for a recurring payment right now. It will be retried.",
   recurringWaitingForRates:
     "No exchange rate to convert the recurring payment to sats. It will be retried.",
   recurringRecipientUnavailable:
     "The recurring payment cannot be sent: the contact has no npub or Lightning address.",
   recurringWalletBusy: "The wallet is busy right now, try again in a moment.",
   recurringRunFailedToast: "The recurring payment failed. It will be retried.",
+  recurringNeedsAttention:
+    "Part of the funds set aside at {mint} for a recurring payment were spent elsewhere. Delete the recurring payment to return the rest to your balance.",
+  recurringNeedsAttentionCashu:
+    "Part of the token a recurring payment set aside at {mint} was spent elsewhere. Delete the recurring payment to stop it.",
+  recurringCancelTooLate:
+    "This payment already went out and can no longer be cancelled.",
+  recurringDeletedTokenSentBody:
+    "Sent {amount} {unit} to {name}: a deleted recurring payment had already set it aside for them.",
+  recurringDeletedTokenKeptBody:
+    "{amount} {unit} stays set aside at {mint} for a deleted recurring payment: its contact is unknown on this device, and its token may already have been delivered.",
+  recurringDeletedTokenPartlySpentBody:
+    "{amount} {unit} stays set aside at {mint} for a deleted recurring payment: part of its token was spent elsewhere, so the rest is neither sent nor returned to your balance.",
+  recurringDeletePreparedStillSent:
+    "A payment already prepared is still sent to the contact.",
   recurringSaveFailed: "The recurring payment could not be saved.",
   recurringChooseContact: "Who to pay",
   recurringSearchContacts: "Search contacts",
@@ -91,11 +105,10 @@ export const en = {
   recurringNextRun: "Next payment",
   recurringLastRun: "Last payment",
   recurringRunsCount: "Payments made",
+  recurringMintLabel: "Paid from",
   recurringRunPaid: "paid",
   recurringRunFailed: "failed",
   recurringRunSkipped: "skipped",
-  recurringRunRunning: "running",
-  recurringRunInterrupted: "interrupted",
   recurringStatusActive: "active",
   recurringStatusPaused: "paused",
   recurringPause: "Pause",
@@ -934,9 +947,9 @@ export const en = {
   cashuProofsColumnMint: "Mint",
   cashuProofsColumnMintState: "At mint",
   cashuHeldProofsHint:
-    "Inputs of a Lightning payment the mint has not settled. They return or clear once the mint answers.",
+    "Set aside for a recurring payment until it goes out, or inputs of a Lightning payment the mint has not settled yet.",
   cashuHeldUnknownHint:
-    "Held by an unknown operation. Released once the mint reports them unspent.",
+    "Held by an operation that has not synced to this device yet.",
   cashuSpentProofsKept: "Spent proofs kept for bookkeeping: {count}.",
   cashuTransfers: "Transfers",
   cashuTransfersEmpty: "No open transfers.",

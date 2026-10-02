@@ -141,6 +141,7 @@ import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 import { drainLegacyAcceptedCashuToken } from "../../migrations/legacyAcceptedTokenDrain";
 import { useLinkshuComposition } from "./useLinkshuComposition";
 import {
+  useAccountHydrated,
   useSetting,
   useRecurringPaymentsRepository,
   useSettingsRepository,
@@ -150,6 +151,7 @@ import { runWrite } from "../../lib/storeWrite";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
 import { useRecurringPaymentsActions } from "../payments/useRecurringPaymentsActions";
 import { useRecurringPaymentsScheduler } from "../payments/useRecurringPaymentsScheduler";
+import { useSendTokenMessage } from "../payments/useSendTokenMessage";
 import { useInterruptedReceiveRecovery } from "../cashu/useInterruptedReceiveRecovery";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
 import { useProfileComposition } from "./useProfileComposition";
@@ -274,6 +276,7 @@ export const useCashuWalletComposition = ({
   const wallet = useWalletRepository();
   const settingsRepository = useSettingsRepository();
   const recurringPaymentsRepository = useRecurringPaymentsRepository();
+  const accountHydrated = useAccountHydrated();
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
   const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
     mode: "promiseExit",
@@ -530,6 +533,7 @@ export const useCashuWalletComposition = ({
     adoptPaidCashuQuote,
     allWalletProofs,
     autoswapCashu,
+    cashuEnvelopes,
     cashuTransferLifecycle,
     checkAllCashuTokens,
     inspectCashuProofStates,
@@ -2122,6 +2126,29 @@ export const useCashuWalletComposition = ({
     return [...mints];
   }, [walletOperations, walletProofs]);
 
+  const sendTokenMessage = useSendTokenMessage({
+    appendLocalNostrMessage,
+    currentNpub,
+    logPayStep,
+    nostrMessagesLocal,
+    updateLocalNostrMessage,
+  });
+  const recurringScheduler = useRecurringPaymentsScheduler({
+    contacts,
+    envelopes: cashuEnvelopes,
+    fiatRates,
+    formatDisplayedAmountParts,
+    hydrated: accountHydrated,
+    logPaymentEvent,
+    maybeShowPwaNotification,
+    mintBalances: walletBalances.perMint,
+    pushToast,
+    repository: recurringPaymentsRepository,
+    sendTokenMessage,
+    showPaidOverlay,
+    t,
+  });
+
   const recoverTokens = useRestoreMissingTokens({
     allowTestMints,
     cashuIsBusy,
@@ -2133,6 +2160,7 @@ export const useCashuWalletComposition = ({
     mintInfoDeduped,
     pushToast,
     readSeenMintsFromStorage,
+    recoverEnvelopes: recurringScheduler.recoverEnvelopes,
     rememberSeenMint,
     restoreCashuTokens,
     reclaimCashuTokens,
@@ -2576,34 +2604,16 @@ export const useCashuWalletComposition = ({
     ],
   );
 
-  const recurringScheduler = useRecurringPaymentsScheduler({
-    cashuBalance,
-    cashuIsBusy,
+  const recurringDefaultMintUrl = normalizeMintUrl(
+    defaultMintUrl ?? MAIN_MINT_URL,
+  );
+  const recurringPaymentsActions = useRecurringPaymentsActions({
     contacts,
-    enabled: sendCashuToken !== null && meltCashuInvoice !== null,
-    fiatRates,
-    formatDisplayedAmountParts,
-    maybeShowPwaNotification,
-    payContactWithCashuMessage,
-    payLightningAddressWithCashu: (lnAddress, amountSat, contact, options) =>
-      payLightningAddressWithCashuBase(
-        lnAddress,
-        amountSat,
-        contact,
-        null,
-        options,
-      ),
+    defaultMintUrl: recurringDefaultMintUrl,
     payWithCashuEnabled,
     pushToast,
     repository: recurringPaymentsRepository,
-    setCashuIsBusy,
-    showPaidOverlay,
-    t,
-    transactions,
-  });
-  const recurringPaymentsActions = useRecurringPaymentsActions({
-    pushToast,
-    repository: recurringPaymentsRepository,
+    runNow: recurringScheduler.runNow,
     runOrderNow: recurringScheduler.runOrderNow,
     t,
   });
@@ -2612,13 +2622,19 @@ export const useCashuWalletComposition = ({
       ...recurringPaymentsActions,
       cancelDue: recurringScheduler.cancelDue,
       confirmDueNow: recurringScheduler.confirmDueNow,
+      defaultMintUrl: recurringDefaultMintUrl,
       dueConfirmation: recurringScheduler.dueConfirmation,
+      mintBalanceSat: (mintUrl: string) =>
+        walletBalances.perMint.find((entry) => entry.mint === mintUrl)
+          ?.amount ?? 0,
     }),
     [
+      recurringDefaultMintUrl,
       recurringPaymentsActions,
       recurringScheduler.cancelDue,
       recurringScheduler.confirmDueNow,
       recurringScheduler.dueConfirmation,
+      walletBalances.perMint,
     ],
   );
 

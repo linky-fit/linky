@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { LocalNostrMessage } from "../../types/appTypes";
-import { dedupeNostrMessagesByPriority } from "./messageHelpers";
+import {
+  dedupeChatMessages,
+  dedupeNostrMessagesByPriority,
+} from "./messageHelpers";
 
 const makeMessage = (
   id: string,
@@ -39,5 +42,19 @@ describe("dedupeNostrMessagesByPriority", () => {
     expect(deduped).toHaveLength(1);
     expect(deduped[0]?.wrapId).toBe("wrap-fixed");
     expect(deduped[0]?.clientId).toBe("client-fixed");
+  });
+});
+
+describe("dedupeChatMessages", () => {
+  it("collapses a client id only within one conversation and direction", () => {
+    const shared = { clientId: "client-fixed" };
+    const deduped = dedupeChatMessages([
+      makeMessage("1", shared),
+      makeMessage("2", shared),
+      makeMessage("3", { ...shared, contactId: "contact-2" }),
+      makeMessage("4", { ...shared, direction: "out" }),
+    ]);
+
+    expect(deduped.map((message) => message.id)).toEqual(["1", "3", "4"]);
   });
 });
