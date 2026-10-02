@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "dev:prod": "vite --mode prod-services --port 5175",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && bun build ../site/lnurlw/handler.ts --target node --outfile api/lnurlw.js",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
     "typecheck": "tsc -b",

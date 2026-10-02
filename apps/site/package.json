@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && bun build lnurlw/handler.ts --target node --outfile api/lnurlw.js",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
     "test": "vitest run",

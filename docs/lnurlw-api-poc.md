@@ -2,6 +2,8 @@
 
 The API runs in the existing site and web-app deployments at `/api/lnurlw`. It uses wallet-signed sessions and encrypted Nostr request/reply messages, with no database or server signing secrets. Both projects select Node 22 for native WebSocket support. There is no NFC or application-wallet integration. The included simulator acknowledges invoices without paying them.
 
+Each project's build bundles the API and its workspace dependencies into a Node entry point. Generated API files stay out of git.
+
 ## Try a preview
 
 From the repository, run:

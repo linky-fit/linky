@@ -3,7 +3,7 @@ import eslintConfig, {
   testHelperImportIgnores,
   testHelperImportPatterns,
 } from "@linky-fit/config/eslint";
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 
 const httpMessage = "Outbound HTTP goes through safeFetch (api/_safeFetch.ts).";
 const httpImportPatterns = [
@@ -16,6 +16,7 @@ const websiteMessage =
   "The site is a plain website: no service worker, no install prompt.";
 
 export default defineConfig([
+  globalIgnores(["api/lnurlw.js"]),
   ...eslintConfig,
   {
     files: ["api/**/*.{ts,tsx}"],

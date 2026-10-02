@@ -21,8 +21,8 @@ import {
   getFirstQueryValue,
   getPublicOrigin,
   setJsonProxyHeaders,
-} from "./_npubcash.js";
-import type { ApiRequest, ApiResponse } from "./_npubcash.js";
+} from "../api/_npubcash.js";
+import type { ApiRequest, ApiResponse } from "../api/_npubcash.js";
 
 const SESSION_BODY = Schema.Struct({ session: Schema.Unknown });
 const TIMEOUT_MS = 12_000;

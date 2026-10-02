@@ -3,7 +3,7 @@ import webAppEslintConfig, {
   testHelperImportPatterns,
   testHelperImportIgnores,
 } from "@linky-fit/config/eslint";
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 
 const storageMessage =
   "Browser storage goes through utils/storage.ts (safeLocalStorage* / safeSessionStorage* helpers).";
@@ -56,6 +56,7 @@ const wipeImportPatterns = [
 ];
 
 export default defineConfig([
+  globalIgnores(["api/lnurlw.js"]),
   ...webAppEslintConfig,
   {
     files: ["src/**/*.{ts,tsx}"],
