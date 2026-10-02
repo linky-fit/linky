@@ -912,9 +912,20 @@ button {
   }
 }
 
+.follow-shell {
+  display: flex;
+  flex-direction: column;
+}
+
 .follow-section {
   max-width: 640px;
   margin-top: 24px;
+}
+
+.follow-shell .footer-links {
+  margin-top: auto;
+  padding-top: 26px;
+  padding-bottom: 0;
 }
 
 .follow-section h1 {
@@ -933,8 +944,8 @@ button {
 .follow-link {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  gap: 12px;
+  padding-right: 16px;
   border-radius: 22px;
   background: rgba(7, 18, 18, 0.72);
   transition: background 160ms ease;
@@ -942,6 +953,32 @@ button {
 
 .follow-link:hover {
   background: rgba(20, 184, 166, 0.14);
+}
+
+.follow-link-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px 0 16px 16px;
+}
+
+.follow-copy {
+  flex: none;
+  padding: 8px 14px;
+  border: 1px solid rgba(143, 225, 212, 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: #8fe1d4;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.follow-copy:hover {
+  background: rgba(143, 225, 212, 0.12);
 }
 
 .follow-link-icon {

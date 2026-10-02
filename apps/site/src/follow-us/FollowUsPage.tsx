@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { copyTextToClipboard } from "../clipboard";
 import { SiteFooter } from "../SiteFooter";
 import { SiteHeaderMenu, type SiteHeaderMenuCopy } from "../SiteHeaderMenu";
 import type { SiteLocale } from "../sitePreferences";
@@ -12,6 +13,8 @@ interface FollowUsCopy extends SiteHeaderMenuCopy {
   eyebrow: string;
   title: string;
   starLabel: string;
+  copyLabel: string;
+  copiedLabel: string;
   followUsLabel: string;
   githubLabel: string;
   nostrLabel: string;
@@ -27,6 +30,8 @@ const copy: Record<SiteLocale, FollowUsCopy> = {
     eyebrow: "Zůstaňme v kontaktu",
     title: "Sledujte Linky",
     starLabel: "Dejte nám hvězdičku",
+    copyLabel: "Kopírovat",
+    copiedLabel: "Zkopírováno",
     followUsLabel: "Sledujte nás",
     githubLabel: "GitHub",
     nostrLabel: "Nostr profil",
@@ -40,6 +45,8 @@ const copy: Record<SiteLocale, FollowUsCopy> = {
     eyebrow: "Stay in touch",
     title: "Follow Linky",
     starLabel: "Give us a star",
+    copyLabel: "Copy",
+    copiedLabel: "Copied",
     followUsLabel: "Follow us",
     githubLabel: "GitHub",
     nostrLabel: "Nostr profile",
@@ -53,6 +60,8 @@ const copy: Record<SiteLocale, FollowUsCopy> = {
     eyebrow: "Bleib in Kontakt",
     title: "Folge Linky",
     starLabel: "Gib uns einen Stern",
+    copyLabel: "Kopieren",
+    copiedLabel: "Kopiert",
     followUsLabel: "Folge uns",
     githubLabel: "GitHub",
     nostrLabel: "Nostr-Profil",
@@ -61,28 +70,60 @@ const copy: Record<SiteLocale, FollowUsCopy> = {
 };
 
 interface SocialLinkProps {
+  action?: ReactNode;
   detail: string;
   href: string;
   iconSrc: string;
   title: string;
 }
 
-function SocialLink({ detail, href, iconSrc, title }: SocialLinkProps) {
+function SocialLink({ action, detail, href, iconSrc, title }: SocialLinkProps) {
   const opensNewTab = href.startsWith("https://");
 
   return (
-    <a
-      className="follow-link"
-      href={href}
-      target={opensNewTab ? "_blank" : undefined}
-      rel={opensNewTab ? "noreferrer" : undefined}
+    <div className="follow-link">
+      <a
+        className="follow-link-main"
+        href={href}
+        target={opensNewTab ? "_blank" : undefined}
+        rel={opensNewTab ? "noreferrer" : undefined}
+      >
+        <img className="follow-link-icon" src={iconSrc} alt="" />
+        <span className="follow-link-text">
+          <span className="follow-link-title">{title}</span>
+          <span className="follow-link-detail">{detail}</span>
+        </span>
+      </a>
+      {action}
+    </div>
+  );
+}
+
+interface CopyButtonProps {
+  copiedLabel: string;
+  copyLabel: string;
+  value: string;
+}
+
+function CopyButton({ copiedLabel, copyLabel, value }: CopyButtonProps) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timeout);
+  }, [copied]);
+
+  return (
+    <button
+      className="follow-copy"
+      type="button"
+      onClick={() => {
+        void copyTextToClipboard(value).then(setCopied);
+      }}
     >
-      <img className="follow-link-icon" src={iconSrc} alt="" />
-      <span className="follow-link-text">
-        <span className="follow-link-title">{title}</span>
-        <span className="follow-link-detail">{detail}</span>
-      </span>
-    </a>
+      {copied ? copiedLabel : copyLabel}
+    </button>
   );
 }
 
@@ -119,12 +160,6 @@ function FollowUsPage() {
 
         <div className="follow-links">
           <SocialLink
-            href={nostrUri}
-            iconSrc="/nostr.svg"
-            title="Nostr"
-            detail={nostrNpub}
-          />
-          <SocialLink
             href="https://x.com/LinkyFit"
             iconSrc="/x.svg"
             title="X"
@@ -135,6 +170,19 @@ function FollowUsPage() {
             iconSrc="/github.svg"
             title="GitHub"
             detail={`${activeCopy.starLabel} ★`}
+          />
+          <SocialLink
+            href={nostrUri}
+            iconSrc="/nostr.svg"
+            title="Nostr"
+            detail={nostrNpub}
+            action={
+              <CopyButton
+                copiedLabel={activeCopy.copiedLabel}
+                copyLabel={activeCopy.copyLabel}
+                value={nostrNpub}
+              />
+            }
           />
         </div>
       </section>
