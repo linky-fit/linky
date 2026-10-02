@@ -15,11 +15,6 @@ const settingSchemas = {
   allowTestMints: Flag,
   /** The display currencies the user enabled; the app drops ones it does not know. */
   displayCurrencies: Schema.parseJson(Schema.Array(Schema.String)),
-  /** When the first device moved lane data to shards; the first writer wins. */
-  "laneMigration.cutoffMs": Schema.NumberFromString.pipe(
-    Schema.int(),
-    Schema.positive(),
-  ),
 };
 
 export type SettingKey = keyof typeof settingSchemas;

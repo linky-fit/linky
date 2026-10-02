@@ -1,7 +1,7 @@
 /**
  * Copies the legacy per-scope owner lanes into the linksync shards on the first
- * launch after the update and, for the 180-day grace period, re-copies rows an
- * older app version wrote to a lane. It is the only code allowed to read the
+ * launch after the update and, for the grace period (180 days from release
+ * 26.9.18), re-copies rows an older app version wrote to a lane. It is the only code allowed to read the
  * legacy tables (`cashuToken`, `nostrMessage`, `nostrReaction`, `ownerMeta`,
  * the legacy chat columns on `contact`) and the only code that writes back to a
  * lane: it mirrors terminal `cashuProof.state = spent` to existing legacy proof
@@ -49,7 +49,6 @@ import {
   isLaneMigrationDoneLocally,
   markLaneMigrationDoneLocally,
   legacySnapshotKey,
-  readLaneMigrationCutoffMs,
   readLegacyLaneIndexes,
   runLaneToShardMigration,
   type LaneMigrationReport,
@@ -155,6 +154,8 @@ const countsByScope = (report: LaneMigrationReport) => {
 const bootLaneMigration = async (): Promise<void> => {
   const startedAtMs = Date.now();
   const firstRun = !isLaneMigrationDoneLocally();
+  const gracePeriodActive = isLaneGracePeriodActive(startedAtMs);
+  if (!firstRun && !gracePeriodActive) return;
   const store = await getLinkyStore();
   const seed = (await readStoredSlip39Seed())?.trim() ?? "";
   const ownerMeta = await evolu.loadQuery(createOwnerMetaAllQuery());
@@ -166,16 +167,11 @@ const bootLaneMigration = async (): Promise<void> => {
     : [];
   const legacyOwners = [store.appOwner, ...laneOwners];
   const legacyOwnerIds = legacyOwners.map((owner) => owner.id);
-  const cutoffMs = await Effect.runPromise(readLaneMigrationCutoffMs(store));
   await Effect.runPromise(store.reconcileSync());
 
-  if (!isLaneGracePeriodActive(cutoffMs, startedAtMs)) {
-    markLaneMigrationDoneLocally();
-    return;
-  }
-
   // Legacy rows remain inputs; only terminal proof states are mirrored back.
-  for (const owner of laneOwners) evolu.useOwner(owner);
+  // After the grace period a first run ingests only the lanes held locally.
+  if (gracePeriodActive) for (const owner of laneOwners) evolu.useOwner(owner);
 
   emit(
     firstRun ? "LaneMigrationStarted" : "LaneGracePeriodReingestStarted",
@@ -187,7 +183,7 @@ const bootLaneMigration = async (): Promise<void> => {
       firstRun,
       seedLogin: seed !== "",
       laneOwners: laneOwners.length,
-      cutoffMs,
+      gracePeriodActive,
     },
   );
 
@@ -197,7 +193,6 @@ const bootLaneMigration = async (): Promise<void> => {
     snapshot,
     legacyOwnerIds: new Set(legacyOwnerIds),
     ingestLegacyTokens: (rows) => ingestLegacyTokensThroughShards(store, rows),
-    nowMs: startedAtMs,
   });
   markLaneMigrationDoneLocally();
 
@@ -209,7 +204,7 @@ const bootLaneMigration = async (): Promise<void> => {
     if (mirroring) return;
     mirroring = true;
     try {
-      while (dirty && isLaneGracePeriodActive(report.cutoffMs, Date.now())) {
+      while (dirty && isLaneGracePeriodActive(Date.now())) {
         dirty = false;
         const [legacy, shardCopies] = await Promise.all([
           evolu.loadQuery(proofQuery),
@@ -264,10 +259,7 @@ const bootLaneMigration = async (): Promise<void> => {
     try {
       while (pending) {
         pending = false;
-        const cutoff = await Effect.runPromise(
-          readLaneMigrationCutoffMs(store),
-        );
-        if (!isLaneGracePeriodActive(cutoff, Date.now())) return;
+        if (!isLaneGracePeriodActive(Date.now())) return;
         const latest = await readLegacyLaneSnapshot();
         const indexes = readLegacyLaneIndexes(
           latest.ownerMeta,
@@ -291,7 +283,6 @@ const bootLaneMigration = async (): Promise<void> => {
           legacyOwnerIds: ownerIds,
           ingestLegacyTokens: (rows) =>
             ingestLegacyTokensThroughShards(store, rows),
-          nowMs: Date.now(),
         });
         lastSnapshotKey = nextKey;
         await mirrorSpentProofs();
@@ -299,10 +290,7 @@ const bootLaneMigration = async (): Promise<void> => {
           "LaneGracePeriodReingested",
           "Re-ingested legacy rows received after boot",
           legacyOwnerIds,
-          {
-            cutoffMs: ingested.cutoffMs,
-            counts: ingested.counts,
-          },
+          { counts: ingested.counts },
         );
       }
     } catch (error: unknown) {
@@ -356,8 +344,7 @@ const bootLaneMigration = async (): Promise<void> => {
     {
       firstRun,
       durationMs: Date.now() - startedAtMs,
-      cutoffMs: report.cutoffMs,
-      pointersWritten: report.pointersWritten,
+      gracePeriodActive,
       counts: report.counts,
     },
   );

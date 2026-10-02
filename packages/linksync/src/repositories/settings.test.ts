@@ -23,11 +23,11 @@ describe("settings repository", () => {
     const { db, store } = linkyStore();
     const settings = makeSettingsRepository(store);
     runNow(settings.set("allowTestMints", false));
-    runNow(settings.set("laneMigration.cutoffMs", 5_000));
+    runNow(settings.set("displayCurrencies", ["CZK"]));
     const values = runNow(db.readTable("setting")).map((row) => row.value);
-    expect(values).toEqual(expect.arrayContaining(["0", "5000"]));
+    expect(values).toEqual(expect.arrayContaining(["0", '["CZK"]']));
     expect(runNow(settings.get("allowTestMints"))).toBe(false);
-    expect(runNow(settings.get("laneMigration.cutoffMs"))).toBe(5_000);
+    expect(runNow(settings.get("displayCurrencies"))).toEqual(["CZK"]);
   });
 
   it("reads a value it cannot decode as absent", () => {

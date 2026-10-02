@@ -37,7 +37,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   LaneMigrationScopeIngested:
     "One scope of the lane migration finished: how many rows of each table were copied into the active shard and how many were skipped (a required column missing, a reaction without its message).",
   LaneMigrationDone:
-    "The lane migration finished. The payload carries the synced cutoff, the shard pointers written, and the per-table counts; the grace period for older app versions starts at the cutoff.",
+    "The lane migration finished. The payload carries the per-table counts and whether the grace period for older app versions, 180 days from release 26.9.18, is still running.",
   LaneGracePeriodReingestStarted:
     "A later launch inside the grace period: the old lanes are read again so rows written by an older app version reach the shards.",
   LaneGracePeriodReingested:

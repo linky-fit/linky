@@ -9,6 +9,7 @@ import {
   makeInMemoryShardDb,
   makeSettingsRepository,
   type LinkyDbSchema,
+  type Mutation,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +26,7 @@ import {
   clearLegacyLaneStorage,
   isLaneGracePeriodActive,
   LANE_MIGRATION_GRACE_PERIOD_MS,
+  LANE_MIGRATION_RELEASED_AT_MS,
   legacyPointerIndex,
   legacySnapshotKey,
   readLegacyLaneIndexes,
@@ -210,14 +212,12 @@ const setup = () => {
       laneA.id,
       laneB.id,
     ]),
-    nowMs = 1_000,
   ) =>
     runLaneToShardMigration({
       store,
       snapshot: { ...emptySnapshot, ...snapshot },
       legacyOwnerIds,
       ingestLegacyTokens,
-      nowMs,
     });
   const rows = <T extends "contact" | "conversation" | "message" | "reaction">(
     scope: "contacts" | "messages",
@@ -417,25 +417,34 @@ describe("runLaneToShardMigration", () => {
     ).toBe("https://mint.example");
   });
 
-  it("writes pointers and the cutoff once and is idempotent", async () => {
-    const { run, store } = setup();
+  it("is idempotent", async () => {
+    const { run } = setup();
     const peer = contact(laneA);
-    const first = await run({ contacts: [peer] }, undefined, 5_000);
-    expect(first.pointersWritten).toBe(4);
-    expect(first.cutoffMs).toBe(5_000);
-
-    const second = await run({ contacts: [peer] }, undefined, 9_000);
-    expect(second.pointersWritten).toBe(0);
-    expect(second.cutoffMs).toBe(5_000);
+    await run({ contacts: [peer] });
+    const second = await run({ contacts: [peer] });
     expect(
       second.counts.find((count) => count.table === "contact")?.ingested,
     ).toBe(0);
-    expect(
-      Effect.runSync(
-        makeSettingsRepository(store).get("laneMigration.cutoffMs"),
-      ),
-    ).toBe(5_000);
-    expect(Effect.runSync(store.rows("meta", "shardPointer"))).toHaveLength(4);
+  });
+
+  it("leaves the account's rotated pointers alone when a fresh device runs before sync", async () => {
+    const migrated = setup();
+    for (let rotation = 0; rotation < 3; rotation += 1)
+      await Effect.runPromise(migrated.store.rotate("contacts"));
+
+    const fresh = setup();
+    const written: Array<Mutation> = [];
+    const mutate = fresh.db.mutate;
+    vi.spyOn(fresh.db, "mutate").mockImplementation((mutations) => {
+      written.push(...mutations);
+      return mutate(mutations);
+    });
+    await fresh.run({});
+
+    // The fresh device writes later, so Evolu's per-column last-writer-wins applies its columns everywhere.
+    await Effect.runPromise(migrated.db.mutate(written));
+    expect(Effect.runSync(migrated.store.activeIndex("contacts"))).toBe(3);
+    expect(written).toEqual([]);
   });
 
   it("re-ingests a lane row updated after the first run and leaves shard edits alone", async () => {
@@ -524,12 +533,11 @@ describe("readLegacyLaneIndexes", () => {
 });
 
 describe("isLaneGracePeriodActive", () => {
-  it("stays active without a cutoff and for 180 days after it", () => {
-    expect(isLaneGracePeriodActive(null, 1)).toBe(true);
-    expect(isLaneGracePeriodActive(1_000, 1_000 + 10)).toBe(true);
-    expect(
-      isLaneGracePeriodActive(1_000, 1_000 + LANE_MIGRATION_GRACE_PERIOD_MS),
-    ).toBe(false);
+  it("stays active for 180 days after the release", () => {
+    const end = LANE_MIGRATION_RELEASED_AT_MS + LANE_MIGRATION_GRACE_PERIOD_MS;
+    expect(isLaneGracePeriodActive(LANE_MIGRATION_RELEASED_AT_MS)).toBe(true);
+    expect(isLaneGracePeriodActive(end - 1)).toBe(true);
+    expect(isLaneGracePeriodActive(end)).toBe(false);
   });
 });
 

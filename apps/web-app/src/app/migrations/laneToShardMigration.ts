@@ -14,6 +14,10 @@
 // that syncs in late carries an old `updatedAt`, so a watermark would skip
 // it, while the ingest's per-row comparison costs one map lookup.
 //
+// It writes no shard pointer and no cutoff: a restored device runs it before
+// the app owner syncs, and Evolu's last-writer-wins would let that write
+// replace the account's real values on every device.
+//
 // This module is the only caller of the old lane derivation.
 
 import {
@@ -21,12 +25,8 @@ import {
   appOwnerFromMnemonic,
   directConversationIdFor,
   linkyTableColumns,
-  makeSettingsRepository,
   NonEmptyString100,
-  NonNegativeInt,
   settingIdFor,
-  shardPointerId,
-  ShardPointerId,
   type Columns,
   type ContactId,
   type LinkyDbSchema,
@@ -61,6 +61,8 @@ import { toLegacyTokenRow } from "./legacyTokenRow";
 import { readRowOwnerId } from "../lib/rowOwnerId";
 
 export const LANE_MIGRATION_DONE_STORAGE_KEY = "linky.laneMigration.done.v1";
+/** Release 26.9.18, the first production release carrying the migration. */
+export const LANE_MIGRATION_RELEASED_AT_MS = Date.UTC(2026, 8, 19);
 /** Extending is safe; shortening strands rows on devices that have not migrated yet. */
 export const LANE_MIGRATION_GRACE_PERIOD_MS = 180 * 24 * 60 * 60 * 1000;
 
@@ -96,17 +98,8 @@ export const isLaneMigrationDoneLocally = (): boolean =>
 export const markLaneMigrationDoneLocally = (): void =>
   safeLocalStorageSet(LANE_MIGRATION_DONE_STORAGE_KEY, "1");
 
-/** Null cutoff means no device has migrated yet, so the lanes are still live. */
-export const isLaneGracePeriodActive = (
-  cutoffMs: number | null,
-  nowMs: number,
-): boolean =>
-  cutoffMs === null || nowMs < cutoffMs + LANE_MIGRATION_GRACE_PERIOD_MS;
-
-export const readLaneMigrationCutoffMs = (
-  store: LinkyStore,
-): Effect.Effect<number | null> =>
-  makeSettingsRepository(store).get("laneMigration.cutoffMs");
+export const isLaneGracePeriodActive = (nowMs: number): boolean =>
+  nowMs < LANE_MIGRATION_RELEASED_AT_MS + LANE_MIGRATION_GRACE_PERIOD_MS;
 
 /**
  * The old pointer value: JSON `{ index, ... }` from later versions, or the
@@ -343,8 +336,6 @@ export interface TableIngestCount {
 
 export interface LaneMigrationReport {
   readonly counts: ReadonlyArray<TableIngestCount>;
-  readonly cutoffMs: number;
-  readonly pointersWritten: number;
 }
 
 export interface LaneMigrationInput {
@@ -356,7 +347,6 @@ export interface LaneMigrationInput {
   readonly ingestLegacyTokens: (
     rows: ReadonlyArray<LegacyTokenRow>,
   ) => Promise<void>;
-  readonly nowMs: number;
 }
 
 // Evolu stamps `updatedAt` only on update; a row that was only ever upserted
@@ -380,17 +370,15 @@ const nonNull = <A>(values: ReadonlyArray<A | null>): ReadonlyArray<A> =>
   values.filter((value): value is A => value !== null);
 
 /**
- * Ingests the snapshot into the shards, writes the pointers and the cutoff
- * when they are missing, and reports what happened. Safe to run on every
- * boot: rows already in a shard with the same or a newer `updatedAt` are
- * left alone, and existing pointers and settings win.
+ * Ingests the snapshot into the shards and reports what happened. Safe to
+ * run on every boot: rows already in a shard with the same or a newer
+ * `updatedAt` are left alone.
  */
 export const runLaneToShardMigration = ({
   store,
   snapshot,
   legacyOwnerIds,
   ingestLegacyTokens,
-  nowMs,
 }: LaneMigrationInput): Promise<LaneMigrationReport> =>
   Effect.runPromise(
     Effect.gen(function* () {
@@ -565,25 +553,6 @@ export const runLaneToShardMigration = ({
             ]),
       ]);
 
-      const pointers = yield* store.rows("meta", "shardPointer");
-      let pointersWritten = 0;
-      for (const scope of LEGACY_LANE_SCOPES) {
-        if (pointers.some((pointer) => pointer.scope === scope)) continue;
-        const id = ShardPointerId.fromUnknown(shardPointerId(scope));
-        if (!id.ok) continue;
-        yield* store.insert("meta", "shardPointer", {
-          id: id.value,
-          scope: NonEmptyString100.orThrow(scope),
-          index: NonNegativeInt.orThrow(0),
-        });
-        pointersWritten += 1;
-      }
-
-      const settings = makeSettingsRepository(store);
-      const existingCutoff = yield* readLaneMigrationCutoffMs(store);
-      if (existingCutoff === null)
-        yield* settings.set("laneMigration.cutoffMs", nowMs);
-
-      return { counts, cutoffMs: existingCutoff ?? nowMs, pointersWritten };
+      return { counts };
     }),
   );

@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { OwnerRole } from "@linky-fit/identity";
+import { shardPointerId } from "@linky-fit/linksync";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 import { deriveEvoluOwnerMnemonicFromSlip39 } from "../src/utils/slip39Nostr";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
@@ -370,21 +371,13 @@ test("owner lanes migrate into shards, a fresh device reads them from the relay,
         nsec: identity.nsec,
       });
 
-      const pointers = await hooks.shardRows(
-        source.page,
-        "meta",
-        "shardPointer",
-      );
-      expect(pointers.map((row) => row.scope).sort()).toEqual([
-        "cashu",
-        "contacts",
-        "messages",
-        "transactions",
-      ]);
+      expect(
+        await hooks.shardRows(source.page, "meta", "shardPointer"),
+      ).toEqual([]);
       const settings = await hooks.shardRows(source.page, "meta", "setting");
       expect(
-        settings.find((row) => row.key === "laneMigration.cutoffMs")?.value,
-      ).toMatch(/^\d+$/);
+        settings.find((row) => row.key === "laneMigration.cutoffMs"),
+      ).toBeUndefined();
     });
 
     const follower = await openDevice(browser, baseURL, "fresh", (page) =>
@@ -646,5 +639,86 @@ test("a fresh device ingests late relay rows and discovers later legacy lanes wi
   } finally {
     await writer.context.close();
     await reader.context.close();
+  }
+});
+
+test("a restored device leaves the pointers of an account that rotated past shard 0", async ({
+  browser,
+}, testInfo) => {
+  const identity = await createSeedIdentity();
+  const baseURL = testInfo.project.use.baseURL;
+  const login = (page: Page) => setSeedLoginStorage(page, identity);
+  const rotated = await openDevice(browser, baseURL, "rotated", login);
+  const devices = [rotated];
+  try {
+    const appOwnerId = await hooks.appOwnerId(rotated.page);
+    await hooks.upsert(
+      rotated.page,
+      "shardPointer",
+      {
+        id: shardPointerId("contacts"),
+        scope: "contacts",
+        index: 2,
+        rotatedAtMs: Date.now(),
+      },
+      appOwnerId,
+    );
+    const contactsIndex = (page: Page) =>
+      hooks
+        .shardRows(page, "meta", "shardPointer")
+        .then((rows) => rows.find((row) => row.scope === "contacts")?.index);
+
+    // The restored device migrates while its Evolu server is still unreachable, as on a slow relay.
+    const restored = await openDevice(browser, baseURL, "restored", (page) =>
+      login(page).then(() =>
+        page.addInitScript(() => {
+          if (sessionStorage.getItem("e2e.evolu-released") === "1") return;
+          localStorage.setItem(
+            "linky.evoluServers.disabled.v1",
+            JSON.stringify(["ws://localhost:4001"]),
+          );
+        }),
+      ),
+    );
+    devices.push(restored);
+    await expect
+      .poll(() =>
+        restored.page.evaluate((flag) => localStorage.getItem(flag), DONE_FLAG),
+      )
+      .toBe("1");
+    await restored.page.evaluate(() => {
+      sessionStorage.setItem("e2e.evolu-released", "1");
+      localStorage.removeItem("linky.evoluServers.disabled.v1");
+    });
+    await restored.page.reload();
+    await expect(restored.page.getByLabel("Available balance")).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect
+      .poll(() => contactsIndex(restored.page), { timeout: 60_000 })
+      .toBe(2);
+
+    // The restored device's earlier app-owner writes reach the rotated device no later than this one.
+    const marker = await hooks.createId(restored.page);
+    await hooks.upsert(
+      restored.page,
+      "setting",
+      { id: marker, key: "e2e.marker", value: "1" },
+      appOwnerId,
+    );
+    await expect
+      .poll(
+        () =>
+          hooks
+            .shardRows(rotated.page, "meta", "setting")
+            .then((rows) => rows.some((row) => row.id === marker)),
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+    expect(await contactsIndex(rotated.page)).toBe(2);
+    expect(await contactsIndex(restored.page)).toBe(2);
+    for (const device of devices) device.errors.assertClean();
+  } finally {
+    for (const device of devices) await device.context.close();
   }
 });
