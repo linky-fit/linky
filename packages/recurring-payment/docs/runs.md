@@ -16,7 +16,7 @@
 
 ## The amount
 
-`RecurringAmount` is `{ amount, unit }` with `unit` `sat` or one of `FIAT_RECURRING_UNITS` (`czk`, `eur`, `chf`, `usd`). A fiat amount is stored in hundredths (`fiatRecurringAmount(150.5, "czk")` is `{ amount: 15050, unit: "czk" }`; `recurringFiatValue` reads it back) and converted at each run: `recurringAmountSat(amount, fiatRates)` takes per-BTC rates (`FiatRatesPerBtc`, which linkshu's `FiatRates` satisfies) and returns `null` while a fiat amount has no rate.
+`RecurringAmount` is `{ amount, unit }` with `unit` `sat` or one of `FIAT_RECURRING_UNITS` (`czk`, `eur`, `chf`, `usd`, `brl`). A fiat amount is stored in hundredths (`fiatRecurringAmount(150.5, "czk")` is `{ amount: 15050, unit: "czk" }`; `recurringFiatValue` reads it back) and converted at each run: `recurringAmountSat(amount, fiatRates)` takes per-BTC rates (`FiatRatesPerBtc`, which linkshu's `FiatRates` satisfies) and returns `null` while a fiat amount has no rate.
 
 ## The mint is the arbiter
 

@@ -8,6 +8,7 @@ import {
 } from "./amount";
 
 const rates: FiatRatesPerBtc = {
+  brlPerBtc: 600_000,
   chfPerBtc: 90_000,
   czkPerBtc: 2_000_000,
   eurPerBtc: 100_000,
@@ -21,6 +22,10 @@ describe("recurringAmountSat", () => {
     );
     // 150.00 CZK at 2 000 000 CZK/BTC = 7 500 sat
     expect(recurringAmountSat({ amount: 15_000, unit: "czk" }, rates)).toBe(
+      7_500,
+    );
+    // 45.00 BRL at 600 000 BRL/BTC = 7 500 sat
+    expect(recurringAmountSat({ amount: 4_500, unit: "brl" }, rates)).toBe(
       7_500,
     );
   });
@@ -53,6 +58,7 @@ describe("fiat amounts", () => {
   it("knows the supported units", () => {
     expect(isRecurringAmountUnit("sat")).toBe(true);
     expect(isRecurringAmountUnit("usd")).toBe(true);
+    expect(isRecurringAmountUnit("brl")).toBe(true);
     expect(isRecurringAmountUnit("gold")).toBe(false);
   });
 });

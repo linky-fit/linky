@@ -8,6 +8,7 @@ import {
 } from "./recurringAmount";
 
 const rates: FiatRates = {
+  brlPerBtc: 600_000,
   chfPerBtc: 90_000,
   czkPerBtc: 2_000_000,
   eurPerBtc: 100_000,
@@ -78,6 +79,27 @@ describe("formatRecurringAmountParts", () => {
         options("czk"),
       ),
     ).toEqual({ amountText: "150.5", approxPrefix: "", unitLabel: "CZK" });
+  });
+
+  it("fixes a BRL payment and shows it exactly as R$ in Portuguese", () => {
+    expect(
+      recurringAmountFromInput({
+        amountSat: "",
+        displayCurrency: "brl",
+        displayValue: "45,5",
+        fiatRates: rates,
+      }),
+    ).toEqual({ amount: 4_550, unit: "brl" });
+    expect(
+      formatRecurringAmountParts(
+        { amount: 4_550, unit: "brl" },
+        {
+          ...options("sat"),
+          displayCurrency: "brl",
+          lang: "pt",
+        },
+      ),
+    ).toEqual({ amountText: "45,5", approxPrefix: "", unitLabel: "R$" });
   });
 
   it("marks a fiat payment approximate in sats and in another fiat", () => {

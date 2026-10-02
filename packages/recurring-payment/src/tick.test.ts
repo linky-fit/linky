@@ -208,6 +208,7 @@ describe("planRecurringPaymentTick", () => {
       ]);
       // 150.00 CZK at 2 000 000 CZK/BTC = 7 500 sat
       const rates: FiatRatesPerBtc = {
+        brlPerBtc: 600_000,
         chfPerBtc: 90_000,
         czkPerBtc: 2_000_000,
         eurPerBtc: 100_000,

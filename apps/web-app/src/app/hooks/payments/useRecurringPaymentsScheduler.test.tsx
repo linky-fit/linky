@@ -477,6 +477,7 @@ describe("useRecurringPaymentsScheduler", () => {
     await waiting.unmount();
 
     const rates = {
+      brlPerBtc: 600_000,
       chfPerBtc: 90_000,
       czkPerBtc: 2_000_000,
       eurPerBtc: 100_000,

@@ -28,6 +28,100 @@ export const pt = {
   back: "Voltar",
   menu: "Menu",
   transactionsTitle: "Transações",
+  recurringPaymentsTitle: "Pagamentos recorrentes",
+  recurringPaymentTitle: "Pagamento recorrente",
+  recurringPaymentNewTitle: "Novo pagamento recorrente",
+  recurringPaymentEditTitle: "Editar pagamento recorrente",
+  recurringEmpty: "Nenhum pagamento recorrente ainda.",
+  recurringScheduledSection: "Agendados",
+  recurringHistorySection: "Histórico",
+  recurringInsufficientFundsHint: "saldo baixo",
+  recurringNotifyBody:
+    "{amount} {unit} para {name} saem em {minutes} min. Abra o Linky para cancelar.",
+  recurringSentBody: "{amount} {unit} enviados a {name}.",
+  recurringFailedBody:
+    "O envio de {amount} {unit} a {name} falhou. Vamos tentar de novo.",
+  recurringWaitingForFundsBody:
+    "Fundos insuficientes em {mint} para enviar {amount} {unit} a {name}. Recarregue {mint} antes do próximo vencimento, senão este pagamento será pulado.",
+  recurringSkippedNoFundsBody:
+    "Pagamento de {amount} {unit} a {name} pulado: fundos insuficientes.",
+  recurringSkippedFailingBody:
+    "Pagamento de {amount} {unit} a {name} pulado: o pagamento continuou falhando.",
+  recurringSkippedRecipientBody:
+    "Pagamento de {amount} {unit} pulado: não é possível pagar ao destinatário.",
+  recurringDueTitle: "Pagamento agendado",
+  recurringDueReady: "O pagamento recorrente está pronto.",
+  recurringDueReadyDaily: "O pagamento recorrente diário está pronto.",
+  recurringDueReadyWeekly: "O pagamento recorrente semanal está pronto.",
+  recurringDueReadyMonthly: "O pagamento recorrente mensal está pronto.",
+  recurringDueCancel: "Cancelar este pagamento",
+  recurringCancelledToast:
+    "Pagamento cancelado. O próximo sai na data seguinte.",
+  recurringWaitingForFunds:
+    "Fundos insuficientes em {mint} para um pagamento recorrente agora. Vamos tentar de novo.",
+  recurringWaitingForRates:
+    "Sem cotação para converter o pagamento recorrente em sats. Vamos tentar de novo.",
+  recurringRecipientUnavailable:
+    "O pagamento recorrente não pode ser enviado: o contato não tem npub nem endereço Lightning.",
+  recurringWalletBusy:
+    "A carteira está ocupada agora, tente de novo em instantes.",
+  recurringRunFailedToast:
+    "O pagamento recorrente falhou. Vamos tentar de novo.",
+  recurringNeedsAttention:
+    "Parte dos fundos reservados em {mint} para um pagamento recorrente foi gasta em outro lugar. Exclua o pagamento recorrente para devolver o restante ao seu saldo.",
+  recurringNeedsAttentionCashu:
+    "Parte do token que um pagamento recorrente reservou em {mint} foi gasta em outro lugar. Exclua o pagamento recorrente para interrompê-lo.",
+  recurringCancelTooLate:
+    "Este pagamento já saiu e não pode mais ser cancelado.",
+  recurringDeletedTokenSentBody:
+    "{amount} {unit} enviados a {name}: um pagamento recorrente excluído já tinha reservado esse valor para o contato.",
+  recurringDeletedTokenKeptBody:
+    "{amount} {unit} continuam reservados em {mint} para um pagamento recorrente excluído: o contato dele é desconhecido neste aparelho, e o token pode já ter sido entregue.",
+  recurringDeletedTokenPartlySpentBody:
+    "{amount} {unit} continuam reservados em {mint} para um pagamento recorrente excluído: parte do token foi gasta em outro lugar, então o restante não é enviado nem devolvido ao seu saldo.",
+  recurringDeletePreparedStillSent:
+    "Um pagamento já preparado ainda será enviado ao contato.",
+  recurringSaveFailed: "Não foi possível salvar o pagamento recorrente.",
+  recurringChooseContact: "Para quem pagar",
+  recurringSearchContacts: "Buscar contatos",
+  recurringNoPayableContacts: "Nenhum contato com npub ou endereço Lightning.",
+  recurringChangeRecipient: "Trocar destinatário",
+  recurringFrequencyLabel: "Com que frequência",
+  recurringPresetDaily: "Diário",
+  recurringPresetWeekly: "Semanal",
+  recurringPresetMonthly: "Mensal",
+  recurringFirstRunLabel: "Primeiro pagamento",
+  recurringSummaryNext: "Próximo pagamento {date}",
+  recurringSave: "Configurar pagamento recorrente",
+  recurringSaveChanges: "Salvar alterações",
+  recurringFirstRunInPast: "O primeiro pagamento não pode estar no passado.",
+  recurringInvalidForm:
+    "Escolha um destinatário, um valor e a data do primeiro pagamento.",
+  recurringEveryHour: "a cada hora",
+  recurringEveryDay: "diariamente",
+  recurringEveryWeek: "semanalmente",
+  recurringEveryMonth: "mensalmente",
+  recurringEveryNHours: "a cada {count} horas",
+  recurringEveryNDays: "a cada {count} dias",
+  recurringEveryNWeeks: "a cada {count} semanas",
+  recurringEveryNMonths: "a cada {count} meses",
+  recurringApproxSat: "~{amount} sat",
+  recurringNextRun: "Próximo pagamento",
+  recurringLastRun: "Último pagamento",
+  recurringRunsCount: "Pagamentos feitos",
+  recurringMintLabel: "Pago a partir de",
+  recurringRunPaid: "pago",
+  recurringRunFailed: "falhou",
+  recurringRunSkipped: "pulado",
+  recurringStatusActive: "ativo",
+  recurringStatusPaused: "pausado",
+  recurringPause: "Pausar",
+  recurringResume: "Retomar",
+  recurringRunNow: "Pagar",
+  recurringNotFound: "Pagamento recorrente não encontrado.",
+  recurringOnlyWhileOpen:
+    "Qualquer aparelho seu com o Linky em execução envia o pagamento, também em segundo plano. Você recebe um aviso um minuto antes; com o aplicativo aberto, vê uma contagem regressiva e pode pagar na hora ou cancelar.",
+  recurringRepeatAction: "Repetir regularmente",
   showTransactions: "Mostrar transações",
   feedback: "Feedback",
   donate: "Doar",
@@ -871,9 +965,9 @@ export const pt = {
   cashuProofsColumnMint: "Mint",
   cashuProofsColumnMintState: "No mint",
   cashuHeldProofsHint:
-    "Entradas de um pagamento Lightning que o mint ainda não liquidou. Elas voltam ou são baixadas quando o mint responder.",
+    "Reservadas para um pagamento recorrente até ele sair, ou entradas de um pagamento Lightning que o mint ainda não liquidou.",
   cashuHeldUnknownHint:
-    "Retidas por uma operação desconhecida. Liberadas quando o mint informar que não foram gastas.",
+    "Retidas por uma operação que ainda não foi sincronizada com este aparelho.",
   cashuSpentProofsKept: "Provas gastas mantidas para contabilidade: {count}.",
   cashuTransfers: "Transferências",
   cashuTransfersEmpty: "Nenhuma transferência em aberto.",
