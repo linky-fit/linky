@@ -76,6 +76,7 @@ import type {
   ContactRowLike,
   LocalNostrMessage,
   PaymentLogData,
+  ProxyPaymentPayerContact,
 } from "../../types/appTypes";
 import { useContactEditor } from "../contacts/useContactEditor";
 import { useVisibleContacts } from "../contacts/useVisibleContacts";
@@ -1172,6 +1173,32 @@ export const useContactsMessagingComposition = ({
     unreadByContactId,
   });
 
+  const proxyPaymentPayerContacts = React.useMemo<ProxyPaymentPayerContact[]>(
+    () =>
+      displayContactsSearchData
+        .filter(
+          ({ contact, statusFilterValues }) =>
+            statusFilterValues.length > 0 &&
+            contact.isUnknownContact !== true &&
+            (contact.archivedAtSec ?? 0) <= 0,
+        )
+        .map(({ contact, statusFilterValues }) => {
+          const npub = normalizeNpubIdentifier(contact.npub ?? "");
+          return {
+            contact,
+            currencies: statusFilterValues,
+            pictureUrl: npub ? (nostrPictureByNpub[npub] ?? null) : null,
+          };
+        })
+        .sort((left, right) =>
+          contactNameCollator.compare(
+            left.contact.name ?? "",
+            right.contact.name ?? "",
+          ),
+        ),
+    [contactNameCollator, displayContactsSearchData, nostrPictureByNpub],
+  );
+
   const bankPaymentOfferCurrency =
     route.kind === "bankPayment"
       ? getBankPaymentOfferCurrency(route.spdPayload)
@@ -2133,6 +2160,7 @@ export const useContactsMessagingComposition = ({
     bankPaymentOfferRecipientCount,
     bankPaymentOfferStaggerDelaySec,
     blockArchivedContact,
+    proxyPaymentPayerContacts,
     blockUnknownContactFromChat,
     addChatAttachments,
     canSaveNewRelay,

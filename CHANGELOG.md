@@ -12,6 +12,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+### en-US
+
+- Proxy payments accept Slovak payme.sk payment links (versions 1 and 2) as bank QR codes; "Open in bank" opens the link.
+
+### cs-CZ
+
+- Proxy platby přijímají slovenské platební odkazy payme.sk (verze 1 a 2) jako bankovní QR; „Otevřít v bance“ otevře odkaz.
+
 ## [26.10.1] - 2026-10-02
 
 ### en-US

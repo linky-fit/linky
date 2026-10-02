@@ -747,6 +747,8 @@ export const cs = {
   spdPaymentEditInvalid: "Upravené údaje platby nejsou platné.",
   spdPaymentInvalidAccount: "Neplatné číslo účtu.",
   spdPaymentInvalidBic: "Neplatný BIC / SWIFT.",
+  spdPaymentInvalidReference:
+    "Zadejte buď referenci platby, nebo symboly platby, ne obojí.",
   spdPaymentInvalidAmount: "Neplatná částka.",
 
   scan: "Skenovat",
@@ -1004,19 +1006,23 @@ export const cs = {
   cashuTokenClaimedWithAmount: "Tvůj token za {amount} byl využit",
   conversations: "Konverzace",
   proxyPayments: "Proxy platby",
-  proxyPaymentsEarnTitle: "Získat bitcoin",
-  proxyPaymentsEarnIntro:
-    "Od svých přátel můžete získat bitcoin, když za ně zaplatíte bankovním převodem.",
-  proxyPaymentsNotificationsHint:
-    "Pro plynulou proxy platbu je potřeba mít zapnuté notifikace.",
-  proxyPaymentsPayTitle: "Platit bitcoinem",
-  proxyPaymentsPayIntro:
-    "Nascanujte QR pro bankovní převod. Vyberete ze svých přátel, kdo za vás zaplatí fiatem a získá část vašeho bitcoinu.",
+  proxyPaymentsHeroTitle: "Převod zaplatí kamarád. Vy mu pošlete bitcoin.",
+  proxyPaymentsHeroBody:
+    "Naskenujte QR kód bankovního převodu. Nabídku dostane několik vašich přátel, kdo ji přijme první, převod zaplatí ze své banky a vy mu pošlete sats.",
+  proxyPaymentsScanBankQr: "Naskenovat QR",
+  proxyPaymentsEnterManually: "Zadat ručně",
+  proxyPaymentsPayersTitle: "Kdo za vás zaplatí",
+  proxyPaymentsPayersEmpty:
+    "Zatím to nenabízí nikdo z vašich kontaktů. Kdo si to zapne, objeví se tady.",
+  proxyPaymentsEarnTitle: "Vydělávejte bitcoin",
+  proxyPaymentsEarnBody:
+    "Zaplaťte za přátele bankovní převod a dostanete za něj sats. Každá nabídka přijde jako notifikace, proto musí být notifikace zapnuté.",
   proxyPaymentsProvideCzk: "Platby v CZK",
   proxyPaymentsProvideEur: "Platby v EUR",
+  proxyPaymentsEarnActive: "Vaše kontakty vám teď mohou posílat nabídky.",
+  proxyPaymentsNotificationsHint:
+    "Pro plynulou proxy platbu je potřeba mít zapnuté notifikace.",
   proxyPaymentsNotificationsRequired: "Nejdřív je potřeba zapnout notifikace.",
-  proxyPaymentsScanBankQr: "Naskenovat bankovní QR",
-  proxyPaymentsEnterManually: "Zadat údaje ručně",
   otherContacts: "Ostatní kontakty",
   today: "Dnes",
   yesterday: "Včera",

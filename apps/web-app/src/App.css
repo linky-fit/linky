@@ -1645,12 +1645,137 @@ button.settings-link .settings-right {
   margin-bottom: 0;
 }
 
-.settings-section.proxy-payments-pay-section {
-  padding-top: 32px;
+.proxy-payments-page {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  margin-top: 10px;
 }
 
-.proxy-payments-pay-section .actions {
-  margin-top: 24px;
+.proxy-payments-hero h1 {
+  margin: 0 0 10px;
+  color: #f8fafc;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  max-width: 18em;
+}
+
+.proxy-payments-hero p,
+.proxy-payments-section > p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 36em;
+}
+
+.proxy-payments-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.proxy-payments-actions .contacts-qr-btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  min-height: 88px;
+  flex-direction: column;
+}
+
+.proxy-payments-section h2 {
+  margin: 0 0 6px;
+  color: #e2e8f0;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.proxy-payments-section > p {
+  margin-bottom: 14px;
+}
+
+.proxy-payments-earn {
+  padding-top: 26px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.proxy-payments-payers {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.proxy-payments-payer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+}
+
+.proxy-payments-currency {
+  flex: 0 0 auto;
+  min-width: 44px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(45, 212, 191, 0.14);
+  color: #99f6e4;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.proxy-payments-avatars {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.proxy-payments-avatar {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #1e293b;
+  box-shadow: 0 0 0 2px var(--app-flat-bg);
+  color: var(--app-primary-button-bg);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.proxy-payments-avatar + .proxy-payments-avatar {
+  margin-left: -8px;
+}
+
+.proxy-payments-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.proxy-payments-avatar-more {
+  color: #cbd5e1;
+}
+
+.proxy-payments-payer-names {
+  min-width: 0;
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proxy-payments-earn-active {
+  margin: 10px 0 0;
+  color: #99f6e4;
+  font-size: 13px;
 }
 
 .settings-value {

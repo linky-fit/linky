@@ -22,7 +22,11 @@ import type {
   MoneyRoutesProps,
   PeopleRoutesProps,
 } from "../routes/AppRouteContent";
-import type { ContactsGuideStep, TopbarButton } from "../types/appTypes";
+import type {
+  ContactsGuideStep,
+  ProxyPaymentPayerContact,
+  TopbarButton,
+} from "../types/appTypes";
 import type { PaidOverlayDetails, PaidOverlayPhase } from "../lib/paidOverlay";
 import {
   SystemSettingsContextsProvider,
@@ -114,6 +118,7 @@ export interface AppShellCoreContextValue {
   profileEditsSavable: boolean;
   profileStatus: string | null;
   profileStatusCurrencies: readonly ProfileStatusCurrency[];
+  proxyPaymentPayerContacts: readonly ProxyPaymentPayerContact[];
   profileStatusIsSaving: boolean;
   profilePhotoInputRef: React.RefObject<HTMLInputElement | null>;
   selectedProfileStatusCurrencies: readonly ProfileStatusCurrency[];

@@ -9,7 +9,7 @@ import {
   normalizeBankAccountInput,
 } from "./bankAccount";
 
-export type BankPaymentFormat = "bysquare" | "epc" | "spd";
+export type BankPaymentFormat = "bysquare" | "epc" | "payme" | "spd";
 
 export interface BankPayment {
   fields: Record<string, string>;
@@ -82,6 +82,8 @@ const createBankPayment = (args: {
   return { fields, format: args.format, payload: args.payload };
 };
 
+const IBAN_PATTERN = /^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/;
+
 const parseEpcPayment = (input: string): BankPayment => {
   const payload = input.trim();
   const lines = payload.replace(/\r\n/g, "\n").split("\n");
@@ -94,9 +96,7 @@ const parseEpcPayment = (input: string): BankPayment => {
   }
 
   const account = (lines[6] ?? "").replace(/\s/g, "").toUpperCase();
-  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(account)) {
-    throw new Error("spd-missing-account");
-  }
+  if (!IBAN_PATTERN.test(account)) throw new Error("spd-missing-account");
 
   const amountAndCurrency = (lines[7] ?? "").trim().toUpperCase();
   const amountMatch = /^EUR(\d+(?:\.\d{1,2})?)?$/.exec(amountAndCurrency);
@@ -151,12 +151,87 @@ const parsePayBySquarePayment = (input: string): BankPayment => {
   });
 };
 
+// Slovak Banking Association payment link (payme.sk). Version 1 is
+// `https://payme.sk?V=1&…`; version 2 moves the version into the path as
+// `/2/{m|e|q|p}/PME`, where the type letter decides which attributes are
+// mandatory. Only the attributes are validated here; what the type requires
+// is the bank app's business.
+const PAYME_HOSTS = new Set(["payme.sk", "www.payme.sk"]);
+const PAYME_V2_PATH_PATTERN = /^\/2\/[meqp]\/PME\/?$/i;
+const PAYME_SYMBOLS_PATTERN = /^\/VS(\d{0,10})\/SS(\d{0,10})\/KS(\d{0,4})$/i;
+
+const parsePaymeUrl = (payload: string): URL | null => {
+  if (!/^https?:\/\//i.test(payload)) return null;
+  let url: URL;
+  try {
+    url = new URL(payload);
+  } catch {
+    return null;
+  }
+  if (!PAYME_HOSTS.has(url.hostname)) return null;
+  const isV2 = PAYME_V2_PATH_PATTERN.test(url.pathname);
+  const isV1 = url.pathname === "/" && url.searchParams.get("V") === "1";
+  return isV2 || isV1 ? url : null;
+};
+
+const isPaymePayload = (payload: string): boolean =>
+  parsePaymeUrl(payload) !== null;
+
+// Query parameter names are matched case-insensitively because QR scanners
+// return byte-mode payloads in whatever case they were encoded.
+const getPaymeAttributes = (url: URL): Record<string, string> => {
+  const attributes: Record<string, string> = {};
+  for (const [key, value] of url.searchParams) {
+    attributes[key.toUpperCase()] = value;
+  }
+  return attributes;
+};
+
+const parsePaymePayment = (input: string): BankPayment => {
+  const payload = input.trim();
+  const url = parsePaymeUrl(payload);
+  if (!url) throw new Error("bank-payment-invalid-payme");
+  const attributes = getPaymeAttributes(url);
+
+  const account = (attributes["IBAN"] ?? "").replace(/\s/g, "").toUpperCase();
+  if (!IBAN_PATTERN.test(account)) throw new Error("spd-missing-account");
+
+  const amount = (attributes["AM"] ?? "").trim();
+  if (amount && !/^\d+(\.\d{1,2})?$/.test(amount)) {
+    throw new Error("bank-payment-invalid-amount");
+  }
+
+  // The Slovak symbols travel inside PI as `/VS…/SS…/KS…`; any other PI is
+  // the plain end-to-end reference.
+  const reference = (attributes["PI"] ?? "").trim();
+  const symbols = PAYME_SYMBOLS_PATTERN.exec(reference);
+
+  // The standard supports SEPA only, so a missing currency means EUR.
+  return createBankPayment({
+    fields: {
+      ACC: account,
+      AM: amount,
+      CC: (attributes["CC"] ?? "").trim().toUpperCase() || "EUR",
+      DT: attributes["DT"],
+      MSG: attributes["MSG"],
+      RF: symbols ? undefined : reference,
+      RN: attributes["CN"],
+      "X-KS": symbols?.[3],
+      "X-SS": symbols?.[2],
+      "X-VS": symbols?.[1],
+    },
+    format: "payme",
+    payload,
+  });
+};
+
 export const parseBankPayment = (input: string): BankPayment => {
   const payload = input.trim();
   if (isSpdPaymentPayload(payload)) return parseSpdPayment(payload);
   if (payload.replace(/\r\n/g, "\n").startsWith("BCD\n")) {
     return parseEpcPayment(payload);
   }
+  if (isPaymePayload(payload)) return parsePaymePayment(payload);
   if (BYSQUARE_PAYLOAD_PATTERN.test(payload)) {
     return parsePayBySquarePayment(payload);
   }
@@ -175,6 +250,7 @@ export const isBankPaymentPayload = (input: string): boolean => {
   const payload = input.trim();
   if (isSpdPaymentPayload(payload)) return true;
   if (payload.replace(/\r\n/g, "\n").startsWith("BCD\n")) return true;
+  if (isPaymePayload(payload)) return true;
   return (
     BYSQUARE_PAYLOAD_PATTERN.test(payload) &&
     tryParseBankPayment(payload) !== null
@@ -224,13 +300,28 @@ const EPC_EDITABLE_FIELD_KEYS: readonly BankPaymentFieldKey[] = [
   "MSG",
 ];
 
+const PAYME_EDITABLE_FIELD_KEYS: readonly BankPaymentFieldKey[] = [
+  "RN",
+  "ACC",
+  "RF",
+  "X-VS",
+  "X-SS",
+  "X-KS",
+  "MSG",
+  "DT",
+];
+
 // Fields a user may change before forwarding the payment, in display order.
 // The amount is edited separately; the currency stays fixed because it
 // selects which contacts can be asked to pay.
 export const getBankPaymentEditableFieldKeys = (
   format: BankPaymentFormat,
 ): readonly BankPaymentFieldKey[] =>
-  format === "epc" ? EPC_EDITABLE_FIELD_KEYS : SPD_EDITABLE_FIELD_KEYS;
+  format === "epc"
+    ? EPC_EDITABLE_FIELD_KEYS
+    : format === "payme"
+      ? PAYME_EDITABLE_FIELD_KEYS
+      : SPD_EDITABLE_FIELD_KEYS;
 
 const normalizeBankPaymentAmount = (value: string): string => {
   const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
@@ -384,6 +475,40 @@ const serializePayBySquarePayment = (
   });
 };
 
+// Spaces are encoded as `+` and `/` as `%2F`, which is what URLSearchParams
+// produces and what the standard's own examples use.
+const serializePaymePayment = (
+  payload: string,
+  fields: Record<string, string>,
+): string => {
+  const url = parsePaymeUrl(payload);
+  if (!url) throw new Error("bank-payment-invalid-payme");
+
+  const symbols = ["X-VS", "X-SS", "X-KS"].map((key) => fields[key] ?? "");
+  if (symbols.some(Boolean) && fields["RF"]) {
+    throw new Error("bank-payment-invalid-reference");
+  }
+  const reference = symbols.some(Boolean)
+    ? `/VS${symbols[0]}/SS${symbols[1]}/KS${symbols[2]}`
+    : (fields["RF"] ?? "");
+
+  const params = new URLSearchParams();
+  if (url.searchParams.get("V") === "1") params.set("V", "1");
+  for (const [name, value] of [
+    ["IBAN", fields["ACC"]],
+    ["AM", fields["AM"]],
+    ["CC", fields["CC"]],
+    ["DT", fields["DT"]],
+    ["PI", reference],
+    ["MSG", fields["MSG"]],
+    ["CN", fields["RN"]],
+  ] as const) {
+    if (value) params.set(name, value);
+  }
+  url.search = params.toString();
+  return url.toString();
+};
+
 // Re-encodes the payment in its original QR format with the edited fields
 // applied; empty values remove the field. Throws when the result is not a
 // valid payment (e.g. missing account or malformed amount).
@@ -397,6 +522,8 @@ export const updateBankPaymentFields = (
       ? serializeSpdPayment(fields)
       : payment.format === "epc"
         ? serializeEpcPayment(payment.payload, fields)
-        : serializePayBySquarePayment(payment.payload, fields);
+        : payment.format === "payme"
+          ? serializePaymePayment(payment.payload, fields)
+          : serializePayBySquarePayment(payment.payload, fields);
   return parseBankPayment(payload);
 };

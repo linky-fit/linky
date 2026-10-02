@@ -215,6 +215,10 @@ const EDIT_ERRORS: Record<string, BankPaymentEditError> = {
     key: "spdPaymentInvalidAmount",
   },
   "bank-payment-invalid-bic": { field: "BIC", key: "spdPaymentInvalidBic" },
+  "bank-payment-invalid-reference": {
+    field: "RF",
+    key: "spdPaymentInvalidReference",
+  },
   "spd-missing-account": { field: "ACC", key: "spdPaymentMissingAccount" },
 };
 

@@ -739,6 +739,8 @@ export const en = {
   spdPaymentEditInvalid: "The edited payment details are not valid.",
   spdPaymentInvalidAccount: "Invalid account number.",
   spdPaymentInvalidBic: "Invalid BIC / SWIFT.",
+  spdPaymentInvalidReference:
+    "Use either a payment reference or the payment symbols, not both.",
   spdPaymentInvalidAmount: "Invalid amount.",
 
   scan: "Scan",
@@ -995,19 +997,24 @@ export const en = {
   cashuTokenClaimedWithAmount: "Your token of {amount} has been claimed",
   conversations: "Conversations",
   proxyPayments: "Proxy payments",
+  proxyPaymentsHeroTitle:
+    "A friend pays the transfer. You pay them in bitcoin.",
+  proxyPaymentsHeroBody:
+    "Scan the QR code of a bank transfer. A few of your friends get the offer, the first to accept pays it from their bank, and you send them sats.",
+  proxyPaymentsScanBankQr: "Scan QR",
+  proxyPaymentsEnterManually: "Enter manually",
+  proxyPaymentsPayersTitle: "Who can pay for you",
+  proxyPaymentsPayersEmpty:
+    "None of your contacts offers this yet. Whoever turns it on shows up here.",
   proxyPaymentsEarnTitle: "Earn bitcoin",
-  proxyPaymentsEarnIntro:
-    "Earn bitcoin from your friends by paying their bank transfers for them.",
-  proxyPaymentsNotificationsHint:
-    "A smooth proxy payment needs notifications turned on.",
-  proxyPaymentsPayTitle: "Pay with bitcoin",
-  proxyPaymentsPayIntro:
-    "Scan a bank transfer QR. Then pick which of your friends pays it in fiat for you and gets part of your bitcoin.",
+  proxyPaymentsEarnBody:
+    "Pay a friend's bank transfer and get sats for it. Each offer arrives as a notification, so notifications stay on.",
   proxyPaymentsProvideCzk: "Payments in CZK",
   proxyPaymentsProvideEur: "Payments in EUR",
+  proxyPaymentsEarnActive: "Your contacts can now send you offers.",
+  proxyPaymentsNotificationsHint:
+    "A smooth proxy payment needs notifications turned on.",
   proxyPaymentsNotificationsRequired: "Enable notifications first.",
-  proxyPaymentsScanBankQr: "Scan bank QR",
-  proxyPaymentsEnterManually: "Enter details manually",
   otherContacts: "Other contacts",
   today: "Today",
   yesterday: "Yesterday",

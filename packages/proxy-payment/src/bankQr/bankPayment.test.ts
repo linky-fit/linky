@@ -69,6 +69,131 @@ describe("spdPayment", () => {
     expect(getBankPaymentOfferCurrency(payload)).toBe("EUR");
   });
 
+  it("parses payme.sk version 2 links with Slovak payment symbols", () => {
+    const payload =
+      "https://payme.sk/2/e/PME?IBAN=SK6807200002891987426353&AM=200.30&CC=EUR&PI=%2FVS2546874464%2FSS2019568456%2FKS1118&CN=The+Best+e-shops+ltd&MSG=my+e-shop,+Kosice";
+
+    const payment = parseBankPayment(payload);
+
+    expect(payment.format).toBe("payme");
+    expect(payment.payload).toBe(payload);
+    expect(payment.fields).toEqual({
+      ACC: "SK6807200002891987426353",
+      AM: "200.30",
+      CC: "EUR",
+      MSG: "my e-shop, Kosice",
+      RN: "The Best e-shops ltd",
+      "X-KS": "1118",
+      "X-SS": "2019568456",
+      "X-VS": "2546874464",
+    });
+    expect(isBankPaymentPayload(payload)).toBe(true);
+    expect(getBankPaymentOfferCurrency(payload)).toBe("EUR");
+  });
+
+  it("keeps a free-form payme reference, defaults the currency and accepts %20 and odd case", () => {
+    const payment = parseBankPayment(
+      "HTTPS://PAYME.SK/2/M/PME?IBAN=sk68%200720%200002%208919%208742%206353&AM=5&PI=QR-ab29e346f1d841c8a95a63d857490818&CN=The%20Best%20Cafes%20ltd&MSG=Cafe%20on%20the%20corner",
+    );
+
+    expect(payment.format).toBe("payme");
+    expect(payment.fields["ACC"]).toBe("SK6807200002891987426353");
+    expect(payment.fields["CC"]).toBe("EUR");
+    expect(payment.fields["RF"]).toBe("QR-ab29e346f1d841c8a95a63d857490818");
+    expect(payment.fields["RN"]).toBe("The Best Cafes ltd");
+    expect(payment.fields["MSG"]).toBe("Cafe on the corner");
+    expect(payment.fields["X-VS"]).toBeUndefined();
+  });
+
+  it("parses payme.sk version 1 links", () => {
+    const payment = parseBankPayment(
+      "https://www.payme.sk?V=1&IBAN=SK6807200002891987426353&AM=200.30&CC=EUR&DT=20201205&PI=%2FVS2546874464%2FSS2019568456%2FKS1118&MSG=Thank+you+for+lunch.&CN=Alice+Payee",
+    );
+
+    expect(payment.format).toBe("payme");
+    expect(payment.fields["ACC"]).toBe("SK6807200002891987426353");
+    expect(payment.fields["AM"]).toBe("200.30");
+    expect(payment.fields["DT"]).toBe("20201205");
+    expect(payment.fields["MSG"]).toBe("Thank you for lunch.");
+    expect(payment.fields["RN"]).toBe("Alice Payee");
+    expect(payment.fields["X-VS"]).toBe("2546874464");
+  });
+
+  it("rejects payme links that are not payment links or carry bad data", () => {
+    expect(tryParseBankPayment("https://payme.sk/")).toBeNull();
+    expect(isBankPaymentPayload("https://payme.sk/spoznajte-payme")).toBe(
+      false,
+    );
+    expect(
+      tryParseBankPayment(
+        "https://payme.sk/3/p/PME?IBAN=SK6807200002891987426353&CN=A",
+      ),
+    ).toBeNull();
+    expect(
+      tryParseBankPayment(
+        "https://example.com/2/p/PME?IBAN=SK6807200002891987426353&CN=A",
+      ),
+    ).toBeNull();
+    expect(() =>
+      parseBankPayment("https://payme.sk/2/p/PME?CN=Alice+Payee&AM=1"),
+    ).toThrow("spd-missing-account");
+    expect(() =>
+      parseBankPayment(
+        "https://payme.sk/2/p/PME?IBAN=SK6807200002891987426353&AM=1,5&CN=A",
+      ),
+    ).toThrow("bank-payment-invalid-amount");
+    expect(
+      getBankPaymentOfferCurrency(
+        "https://payme.sk/2/p/PME?IBAN=SK6807200002891987426353&AM=1&CC=USD&CN=A",
+      ),
+    ).toBeNull();
+  });
+
+  it("re-encodes edited payme links in place", () => {
+    const payment = parseBankPayment(
+      "https://payme.sk/2/p/PME?IBAN=SK6807200002891987426353&AM=8.59&CC=EUR&DT=20280430&MSG=Thank+you+for+lunch&CN=Alice+Payee",
+    );
+
+    const updated = updateBankPaymentFields(payment, {
+      AM: "12,5",
+      MSG: "Lunch & coffee",
+      "X-VS": "123",
+    });
+
+    expect(updated.format).toBe("payme");
+    expect(updated.payload).toBe(
+      "https://payme.sk/2/p/PME?IBAN=SK6807200002891987426353&AM=12.5&CC=EUR&DT=20280430&PI=%2FVS123%2FSS%2FKS&MSG=Lunch+%26+coffee&CN=Alice+Payee",
+    );
+    expect(updated.fields["AM"]).toBe("12.5");
+    expect(updated.fields["MSG"]).toBe("Lunch & coffee");
+    expect(updated.fields["X-VS"]).toBe("123");
+    expect(updated.fields["X-SS"]).toBeUndefined();
+
+    const withReference = updateBankPaymentFields(updated, {
+      RF: "INV-42",
+      "X-VS": "",
+    });
+    expect(withReference.payload).toContain("&PI=INV-42&");
+    expect(withReference.fields["RF"]).toBe("INV-42");
+
+    expect(() =>
+      updateBankPaymentFields(withReference, { "X-KS": "0308" }),
+    ).toThrow("bank-payment-invalid-reference");
+    expect(() => updateBankPaymentFields(payment, { ACC: "" })).toThrow(
+      "spd-missing-account",
+    );
+  });
+
+  it("keeps the version 1 marker when re-encoding", () => {
+    const payment = parseBankPayment(
+      "https://www.payme.sk?V=1&IBAN=SK6807200002891987426353&CN=Alice+Payee",
+    );
+
+    expect(updateBankPaymentFields(payment, { AM: "3" }).payload).toBe(
+      "https://www.payme.sk/?V=1&IBAN=SK6807200002891987426353&AM=3&CC=EUR&CN=Alice+Payee",
+    );
+  });
+
   it("parses European Payments Council SEPA QR payments", () => {
     const payload = [
       "BCD",

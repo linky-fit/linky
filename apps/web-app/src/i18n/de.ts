@@ -747,6 +747,8 @@ export const de = {
   spdPaymentEditInvalid: "Die bearbeiteten Zahlungsangaben sind ungültig.",
   spdPaymentInvalidAccount: "Ungültige Kontonummer.",
   spdPaymentInvalidBic: "Ungültiger BIC / SWIFT.",
+  spdPaymentInvalidReference:
+    "Entweder Zahlungsreferenz oder Zahlungssymbole angeben, nicht beides.",
   spdPaymentInvalidAmount: "Ungültiger Betrag.",
   spdPaymentBic: "BIC / SWIFT",
   spdPaymentReference: "Zahlungsreferenz",
@@ -1003,19 +1005,24 @@ export const de = {
   cashuTokenClaimedWithAmount: "Dein Token über {amount} wurde eingelöst",
   conversations: "Unterhaltungen",
   proxyPayments: "Proxy-Zahlungen",
+  proxyPaymentsHeroTitle:
+    "Ein Freund zahlt die Überweisung. Du zahlst ihm in Bitcoin.",
+  proxyPaymentsHeroBody:
+    "Scanne den QR-Code einer Banküberweisung. Ein paar deiner Freunde bekommen das Angebot, wer zuerst annimmt, zahlt sie von seinem Konto, und du schickst ihm Sats.",
+  proxyPaymentsScanBankQr: "QR scannen",
+  proxyPaymentsEnterManually: "Manuell eingeben",
+  proxyPaymentsPayersTitle: "Wer für dich zahlt",
+  proxyPaymentsPayersEmpty:
+    "Noch keiner deiner Kontakte bietet das an. Wer es einschaltet, erscheint hier.",
   proxyPaymentsEarnTitle: "Bitcoin verdienen",
-  proxyPaymentsEarnIntro:
-    "Verdiene Bitcoin von deinen Freunden, indem du ihre Banküberweisungen für sie bezahlst.",
-  proxyPaymentsNotificationsHint:
-    "Für eine reibungslose Proxy-Zahlung müssen Benachrichtigungen aktiviert sein.",
-  proxyPaymentsPayTitle: "Mit Bitcoin bezahlen",
-  proxyPaymentsPayIntro:
-    "Scanne den QR-Code einer Banküberweisung. Dann wählst du, wer von deinen Freunden sie in Fiat für dich bezahlt und dafür einen Teil deines Bitcoin bekommt.",
+  proxyPaymentsEarnBody:
+    "Bezahle die Banküberweisung eines Freundes und bekomme dafür Sats. Jedes Angebot kommt als Benachrichtigung, deshalb müssen Benachrichtigungen eingeschaltet bleiben.",
   proxyPaymentsProvideCzk: "Zahlungen in CZK",
   proxyPaymentsProvideEur: "Zahlungen in EUR",
+  proxyPaymentsEarnActive: "Deine Kontakte können dir jetzt Angebote schicken.",
+  proxyPaymentsNotificationsHint:
+    "Für eine reibungslose Proxy-Zahlung müssen Benachrichtigungen aktiviert sein.",
   proxyPaymentsNotificationsRequired: "Zuerst Benachrichtigungen aktivieren.",
-  proxyPaymentsScanBankQr: "Bank-QR scannen",
-  proxyPaymentsEnterManually: "Daten manuell eingeben",
   otherContacts: "Weitere Kontakte",
   today: "Heute",
   yesterday: "Gestern",

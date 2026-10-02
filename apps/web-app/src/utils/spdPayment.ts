@@ -37,10 +37,22 @@ const openSpdPaymentOnAndroid = async (spdPayload: string): Promise<void> => {
   window.location.assign(url.toString());
 };
 
+// A payme link deep-links into the installed bank app; without one the
+// payme.sk site shows the same payment as a PAY by square code. Opening in a
+// new tab keeps Linky open, with a same-tab fallback when popups are blocked.
+const openPaymeLink = (url: string): void => {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) window.location.assign(url);
+};
+
 export const openSpdPaymentInBank = async (
   spdPayload: string,
 ): Promise<void> => {
   const payment = parseBankPayment(spdPayload);
+  if (payment.format === "payme") {
+    openPaymeLink(payment.payload);
+    return;
+  }
   if (payment.format !== "spd") {
     await shareSpdPaymentQrJpeg(payment.payload);
     return;
