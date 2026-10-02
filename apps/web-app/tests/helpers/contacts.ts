@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { UNKNOWN_CONTACT_ID_PREFIX } from "../../src/utils/constants";
 
 /**
  * Add a contact by npub and return its local contact id.
@@ -14,7 +15,10 @@ export const addContactByNpub = async (
   await page.goto("/#contacts");
   const addButton = page.locator("[data-guide='contact-add-button']").first();
   await expect(addButton).toBeVisible();
-  const cards = page.locator("[data-guide='contact-card']");
+  // An unknown sender's card turns into the saved contact, so only saved cards count.
+  const cards = page.locator(
+    `[data-guide='contact-card']:not([data-guide-contact-id^='${UNKNOWN_CONTACT_ID_PREFIX}'])`,
+  );
   const previousCount = await cards.count();
   await addButton.click();
   await page.waitForURL(/#contact\/new$/, { timeout: 20_000 });

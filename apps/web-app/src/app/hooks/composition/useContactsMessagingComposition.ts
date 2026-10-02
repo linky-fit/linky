@@ -1,4 +1,5 @@
 import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
+import { useAccountHydrated } from "../useLinksync";
 import type { ProfileMetadata } from "@linky-fit/linkstr";
 import {
   ContactId,
@@ -32,6 +33,7 @@ import { useLinkstrInspectorBridge } from "../../../devtools/inspector/useLinkst
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
 import { useDocumentVisible } from "../../../hooks/useDocumentVisible";
 import { useLatest } from "../../../hooks/useLatest";
+import { useOnline } from "../../../hooks/useOnline";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import { type Lang } from "../../../i18n";
 import {
@@ -100,7 +102,6 @@ import {
 } from "../messages/useSendChatMessage";
 import { useSendReaction } from "../messages/useSendReaction";
 import { useContactsDomain } from "../useContactsDomain";
-import { useEvoluNostrBootstrapReady } from "../useEvoluNostrBootstrapReady";
 import { useFeedbackContact } from "../useFeedbackContact";
 import { useLinkstrConfigSync } from "../useLinkstrConfigSync";
 import {
@@ -196,13 +197,10 @@ const reportContactsAddedToGroup = (
     payload: { contactIds, group, messageId: pending.messageId },
   });
 };
-type NostrBootstrapParams = Parameters<typeof useEvoluNostrBootstrapReady>[0];
 
 interface UseContactsMessagingCompositionParams {
-  activeSyncedNostrIdentity: IdentityOwnersCompositionResult["activeSyncedNostrIdentity"];
   appOwnerId: IdentityOwnersCompositionResult["appOwnerId"];
   appOwnerIdRef: IdentityOwnersCompositionResult["appOwnerIdRef"];
-  cashuProofs: NostrBootstrapParams["tokensSnapshot"];
   contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   contactsRepository: ContactsRepository;
   conversationsRepository: ConversationsRepository;
@@ -228,17 +226,13 @@ interface UseContactsMessagingCompositionParams {
   setPayAmount: React.Dispatch<React.SetStateAction<string>>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   syncedNostrIdentityMatchesLocal: boolean;
-  syncedNostrIdentityRow: IdentityOwnersCompositionResult["syncedNostrIdentityRow"];
   t: Translate;
   transactions: Pick<TransactionsRepository, "all" | "update">;
-  transactionsBootstrapSnapshot: NostrBootstrapParams["transactionsSnapshot"];
 }
 
 export const useContactsMessagingComposition = ({
-  activeSyncedNostrIdentity,
   appOwnerId,
   appOwnerIdRef,
-  cashuProofs,
   contactPayBackToChatRef,
   contactsRepository,
   conversationsRepository,
@@ -257,10 +251,8 @@ export const useContactsMessagingComposition = ({
   setPayAmount,
   setStatus,
   syncedNostrIdentityMatchesLocal,
-  syncedNostrIdentityRow,
   t,
   transactions,
-  transactionsBootstrapSnapshot,
 }: UseContactsMessagingCompositionParams) => {
   const [recentlyAddedContactId, setRecentlyAddedContactId] =
     useState<ContactId | null>(null);
@@ -504,53 +496,15 @@ export const useContactsMessagingComposition = ({
     route,
   });
 
-  // The store resolved before the shell mounted and subscribes every shard
-  // itself, so the app owner is the whole readiness signal for Nostr work.
-  const evoluNostrOwnerKey =
-    currentNpub && appOwnerId ? `${currentNpub}|${appOwnerId}` : "";
-
-  const nostrIdentityBootstrapReady =
-    Boolean(activeSyncedNostrIdentity) && syncedNostrIdentityMatchesLocal;
-
-  const [
-    missingSyncedIdentityFallbackKey,
-    setMissingSyncedIdentityFallbackKey,
-  ] = React.useState("");
-
-  React.useEffect(() => {
-    if (!isSeedLogin || !evoluNostrOwnerKey || activeSyncedNostrIdentity) {
-      setMissingSyncedIdentityFallbackKey("");
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setMissingSyncedIdentityFallbackKey(evoluNostrOwnerKey);
-    }, 8_000);
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [activeSyncedNostrIdentity, evoluNostrOwnerKey, isSeedLogin]);
-
-  const identityBootstrapReady = isSeedLogin
-    ? nostrIdentityBootstrapReady ||
-      missingSyncedIdentityFallbackKey === evoluNostrOwnerKey
-    : true;
-
-  const identitiesSnapshot = React.useMemo(
-    () => (syncedNostrIdentityRow ? [syncedNostrIdentityRow] : []),
-    [syncedNostrIdentityRow],
-  );
-  const nostrBootstrapReady = useEvoluNostrBootstrapReady({
-    contactsSnapshot: contacts,
-    enabled: Boolean(currentNsec),
-    identitiesSnapshot: identitiesSnapshot,
-    identityReady: identityBootstrapReady,
-    messagesSnapshot: nostrMessagesLocal,
-    ownerKey: evoluNostrOwnerKey,
-    reactionsSnapshot: nostrReactionsLocal,
-    tokensSnapshot: cashuProofs,
-    transactionsSnapshot: transactionsBootstrapSnapshot,
-  });
+  const accountHydrated = useAccountHydrated();
+  // Passive Nostr work waits for hydration, with no timeout, and for the
+  // synced identity it settles: a seed login with none synced keeps its own.
+  const online = useOnline();
+  const nostrBootstrapReady =
+    online &&
+    Boolean(currentNsec) &&
+    accountHydrated &&
+    (!isSeedLogin || syncedNostrIdentityMatchesLocal);
   const deferredOnlineReady = useDeferredOnlineReady();
   const canRunNostrNetworkWork = deferredOnlineReady && nostrBootstrapReady;
 

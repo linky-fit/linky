@@ -84,9 +84,7 @@ import {
   useShardRotation,
   useShardSummaries,
   useSyncOwnerIds,
-  useTransactionRecords,
   useTransactionsRepository,
-  useWalletProofs,
 } from "./hooks/useLinksync";
 import { useOwnerScopedStorage } from "./hooks/useOwnerScopedStorage";
 import { useStatusToasts } from "./hooks/useStatusToasts";
@@ -126,7 +124,6 @@ export const useAppShellComposition = ({
   const { dismissToast, toasts, pushToast } = useToasts();
   const { lang, setLang, t } = useAppLanguage();
   const {
-    activeSyncedNostrIdentity,
     appOwnerId,
     appOwnerIdRef,
     appendIdentityChangeNoticesRef,
@@ -139,7 +136,6 @@ export const useAppShellComposition = ({
     seedMnemonic,
     slip39Seed,
     syncedNostrIdentityMatchesLocal,
-    syncedNostrIdentityRow,
   } = useIdentityOwnersComposition({
     currentNsec,
     lang,
@@ -153,11 +149,9 @@ export const useAppShellComposition = ({
   const conversationsRepository = useConversationsRepository();
   const settingsRepository = useSettingsRepository();
   const transactions = useTransactionsRepository();
-  const transactionRecords = useTransactionRecords();
   const evoluShards = useShardSummaries();
   const evoluSyncOwnerIds = useSyncOwnerIds();
   const shardRotation = useShardRotation();
-  const walletProofs = useWalletProofs();
 
   const {
     logPaymentEvent,
@@ -553,10 +547,8 @@ export const useAppShellComposition = ({
     updateLocalNostrMessage,
     visibleContacts,
   } = useContactsMessagingComposition({
-    activeSyncedNostrIdentity,
     appOwnerId,
     appOwnerIdRef,
-    cashuProofs: walletProofs,
     contactPayBackToChatRef,
     contactsRepository,
     conversationsRepository,
@@ -575,10 +567,8 @@ export const useAppShellComposition = ({
     setPayAmount,
     setStatus,
     syncedNostrIdentityMatchesLocal,
-    syncedNostrIdentityRow,
     t,
     transactions,
-    transactionsBootstrapSnapshot: transactionRecords,
   });
 
   React.useEffect(() => {

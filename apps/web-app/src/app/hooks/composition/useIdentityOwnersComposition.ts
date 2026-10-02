@@ -112,13 +112,11 @@ export const useIdentityOwnersComposition = ({
 
   return {
     ...profileAuth,
-    activeSyncedNostrIdentity,
     appOwnerId,
     appOwnerIdRef,
     appendIdentityChangeNoticesRef,
     currentNsec,
     myProfileMetadataRef,
     syncedNostrIdentityMatchesLocal,
-    syncedNostrIdentityRow,
   };
 };

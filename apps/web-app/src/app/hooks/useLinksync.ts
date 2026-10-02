@@ -28,7 +28,7 @@ import {
   useLiveValue,
   useRepositoryRows,
 } from "@linky-fit/linksync/react";
-import type { StoredOperation, StoredProof } from "@linky-fit/linkshu";
+import type { StoredOperation } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
@@ -106,18 +106,7 @@ export const useWalletRepository = (): WalletRepository => {
   return React.useMemo(() => makeWalletRepository(store), [store]);
 };
 
-const NO_PROOFS: ReadonlyArray<StoredProof> = [];
 const NO_OPERATIONS: ReadonlyArray<StoredOperation> = [];
-
-/** The stored proofs, kept current, for code outside the wallet runtime. */
-export const useWalletProofs = (): ReadonlyArray<StoredProof> => {
-  const wallet = useWalletRepository();
-  const source = React.useMemo(
-    () => ({ all: wallet.proofs.loadAll, subscribe: wallet.subscribe }),
-    [wallet],
-  );
-  return useLiveValue(source, NO_PROOFS);
-};
 
 export const useWalletOperations = (): ReadonlyArray<StoredOperation> => {
   const wallet = useWalletRepository();

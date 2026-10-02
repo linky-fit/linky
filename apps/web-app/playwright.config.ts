@@ -43,12 +43,10 @@ export default defineConfig({
       // `bun run e2e` (scripts/e2e.sh) starts it and runs this project.
       name: "local-stack",
       testMatch: LOCAL_STACK_SPECS,
-      // Three cold app boots plus a full offer state machine; the slowest test
-      // takes about a minute in CI.
+      // Three cold app boots plus a full offer state machine.
       timeout: 150_000,
-      // The app deliberately does nothing relay-facing for the first ~2.5-8s
-      // (useEvoluNostrBootstrapReady), so the default 5s expect timeout can
-      // expire inside that quiet window.
+      // Nostr waits until the account's data has arrived from the Evolu relay,
+      // which a cold boot can stretch past the default 5s expect timeout.
       expect: { timeout: 20_000 },
       use: {
         // No slow-motion knob: per-action delays miss topup quote and offer phase deadlines.
