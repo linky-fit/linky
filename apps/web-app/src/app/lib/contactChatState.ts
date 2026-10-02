@@ -4,9 +4,8 @@ import {
   type ConversationRow,
 } from "@linky-fit/linksync";
 
-/** The direct conversation's state, read alongside the contact for display. */
+/** The direct conversation's read cursors, read alongside the contact for display. */
 export interface ContactChatState {
-  archivedAtSec: number | null;
   chatLastSeenAtSec: number | null;
   chatPeerSeenSinceSec: number | null;
   chatPeerSeenAtSec: number | null;
@@ -27,7 +26,6 @@ export const joinContactChatState = (
     );
     return {
       ...contact,
-      archivedAtSec: conversation?.archivedAtSec ?? null,
       chatLastSeenAtSec: conversation?.lastSeenAtSec ?? null,
       chatPeerSeenSinceSec: conversation?.peerSeenSinceSec ?? null,
       chatPeerSeenAtSec: conversation?.peerSeenAtSec ?? null,

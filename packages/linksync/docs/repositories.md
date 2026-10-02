@@ -10,7 +10,10 @@ Every write ends with the rotation check. A pointer write the port rejects does 
 
 ## Contacts
 
-`makeContactsRepository(store)` is a plain `TableRepository` over `contact`: profile fields and the user's overrides. Chat state lives in [conversations](#conversations). Contacts are never forgotten.
+`makeContactsRepository(store)` is a `TableRepository` over `contact`: profile fields, the user's overrides and the archive state. Read cursors live in [conversations](#conversations). Contacts are never forgotten, so the archive state reaches every device however old it is.
+
+- `archive(id, atSec)` sets `archivedAtSec`; an incoming message newer than it is the consumer's signal to unarchive.
+- `unarchive(id)` clears `archivedAtSec` on the contact and on its direct conversation, where older app versions archive; the conversation's fresh copy in the active shard hides any older archived copy. Copy a conversation's archive onto the contact only while the contact has none, and an unarchive is never undone by an older copy.
 
 ```ts
 import {
@@ -33,13 +36,13 @@ The repository returns one row per id; deduplicating unsaved peers by npub is th
 
 ## Conversations
 
-`makeConversationsRepository(store)`: chats with their read cursor and archive state, plus `messages` and `reactions`, `TableRepository`s over those two tables. All three live in the `messages` scope, which keeps the newest 4 shards.
+`makeConversationsRepository(store)`: chats with their read cursors, plus `messages` and `reactions`, `TableRepository`s over those two tables. All three live in the `messages` scope, which keeps the newest 4 shards.
 
 - `ensureDirect(contactId)` creates the contact's direct chat on first use with the derived id `directConversationIdFor(contactId)`. Insert messages with the `conversationId` it returns; messages have no `contactId`.
 - A message or reaction that arrived over Nostr takes `nostrMessageIdFor(rumorId)` / `nostrReactionIdFor(rumorId)` and goes in with `insertIfAbsent`, so a second relay, a later session or another device fetching it again neither duplicates it nor resets its edits and status, and a removed one stays removed. The id ignores the conversation, so moving the message to another contact keeps it. An own send is stored before its rumor exists, so its row has a random id; matching rows by rumor id across the two kinds is the consumer's.
 - `markSeen(id, atSec)` moves the cursor forward only; a lower or equal value is ignored, so an idle chat's row may be forgotten with its old messages.
 - `removedReactions` returns the tombstoned reaction copies in the visible shards, so a removed reaction's wrap id stays known.
-- Archive is a chat action, so `archive` and `unarchive` live here and not on the contact.
+- `archivedAtSec` on a conversation is written only by older app versions; the archive state lives on the [contact](#contacts).
 
 ## Wallet
 

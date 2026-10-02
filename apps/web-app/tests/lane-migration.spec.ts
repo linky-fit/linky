@@ -294,9 +294,10 @@ test("owner lanes migrate into shards, a fresh device reads them from the relay,
         "contact",
       );
       expect(byName(contacts)).toEqual(["Lane one", "Lane zero"]);
-      expect(
-        contacts.find((row) => row.id === contactA)?.chatLastSeenAtSec,
-      ).toBeNull();
+      expect(contacts.find((row) => row.id === contactA)).toMatchObject({
+        chatLastSeenAtSec: null,
+        archivedAtSec: 1_700_000_200,
+      });
 
       const conversationA = await hooks.conversationIdFor(
         source.page,

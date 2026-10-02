@@ -1176,13 +1176,7 @@ export const useContactsMessagingComposition = ({
 
   const unarchiveContact = React.useCallback(
     async (id: ContactId) => {
-      const result = await runWrite(
-        Effect.flatMap(conversationsRepository.forContact(id), (chat) =>
-          chat === null
-            ? Effect.void
-            : conversationsRepository.unarchive(chat.id),
-        ),
-      );
+      const result = await runWrite(contactsRepository.unarchive(id));
 
       if (result.ok) {
         reportAppLog({
@@ -1205,7 +1199,7 @@ export const useContactsMessagingComposition = ({
       }
       return result;
     },
-    [contacts, conversationsRepository, reassignNostrConversationContactId],
+    [contacts, contactsRepository, reassignNostrConversationContactId],
   );
 
   const restoreArchivedContact = React.useCallback(
@@ -1233,16 +1227,16 @@ export const useContactsMessagingComposition = ({
     [setStatus, t, unarchiveContact],
   );
 
-  // Archiving is a conversation action and marks the chat read; the messages
-  // stay on this contact and a newer incoming message restores it. It runs on
-  // one click; the toast offers to undo it.
+  // Archiving marks the chat read; the messages stay on this contact and a
+  // newer incoming message restores it. It runs on one click; the toast offers
+  // to undo it.
   const archiveContact = React.useCallback(
     async (id: ContactId) => {
       const archivedAtSec = PositiveInt.orThrow(Math.ceil(Date.now() / 1e3));
       const result = await runWrite(
-        Effect.flatMap(conversationsRepository.ensureDirect(id), (chat) =>
-          Effect.zipRight(
-            conversationsRepository.archive(chat.id, archivedAtSec),
+        Effect.zipRight(
+          contactsRepository.archive(id, archivedAtSec),
+          Effect.flatMap(conversationsRepository.ensureDirect(id), (chat) =>
             conversationsRepository.markSeen(chat.id, archivedAtSec),
           ),
         ),
@@ -1269,6 +1263,7 @@ export const useContactsMessagingComposition = ({
     },
     [
       closeContactDetail,
+      contactsRepository,
       conversationsRepository,
       pushToast,
       setStatus,

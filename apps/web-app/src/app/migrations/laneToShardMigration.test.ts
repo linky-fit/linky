@@ -231,7 +231,7 @@ beforeEach(() => {
 });
 
 describe("runLaneToShardMigration", () => {
-  it("splits contacts into profile and conversation rows", async () => {
+  it("keeps the archive on the contact and moves the chat state to the conversation", async () => {
     const { run, store } = setup();
     const chatted = contact(laneA, {
       name: text("Alice"),
@@ -252,6 +252,9 @@ describe("runLaneToShardMigration", () => {
       "Carol",
     ]);
     expect(Object.keys(contacts[0] ?? {})).not.toContain("chatLastSeenAtSec");
+    expect(contacts.find((row) => row.id === chatted.id)?.archivedAtSec).toBe(
+      1_700_000_060,
+    );
 
     const conversations = Effect.runSync(
       store.rows("messages", "conversation"),

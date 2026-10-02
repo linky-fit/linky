@@ -1,7 +1,8 @@
-import { NonEmptyString1000 } from "@evolu/common";
+import { NonEmptyString1000, PositiveInt } from "@evolu/common";
 import { createId } from "../model/ids";
 import { linkyStore, runNow } from "../testing/linky";
 import { makeContactsRepository } from "./contacts";
+import { makeConversationsRepository } from "./conversations";
 
 const name = (value: string) => NonEmptyString1000.orThrow(value);
 
@@ -30,6 +31,26 @@ describe("contacts repository", () => {
     expect(runNow(contacts.all)).toMatchObject([
       { name: "Alicia", ownerId: store.shardOwner("contacts", 1).id },
     ]);
+  });
+
+  it("unarchives a contact and the conversation an older version archived", () => {
+    const { store } = linkyStore();
+    const contacts = makeContactsRepository(store);
+    const conversations = makeConversationsRepository(store);
+    const id = createId<"Contact">();
+    runNow(contacts.insert({ id }));
+    const chat = runNow(conversations.ensureDirect(id));
+    runNow(
+      conversations.update(chat.id, { archivedAtSec: PositiveInt.orThrow(20) }),
+    );
+    runNow(contacts.archive(id, PositiveInt.orThrow(30)));
+    expect(runNow(contacts.byId(id))).toMatchObject({ archivedAtSec: 30 });
+
+    runNow(contacts.unarchive(id));
+    expect(runNow(contacts.byId(id))).toMatchObject({ archivedAtSec: null });
+    expect(runNow(conversations.byId(chat.id))).toMatchObject({
+      archivedAtSec: null,
+    });
   });
 
   it("notifies subscribers", () => {

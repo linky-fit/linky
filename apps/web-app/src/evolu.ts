@@ -420,7 +420,7 @@ type OwnerMetaId = typeof OwnerMetaId.Type;
  * The app schema is a superset of the package's `LinkySchema`: the package
  * tables plus the legacy lane tables (`nostrMessage`, `nostrReaction`,
  * `cashuToken`, `ownerMeta`) and the legacy columns older versions wrote
- * (chat state on `contact`, `category` and `phase` on `transaction`), all of
+ * (read cursors on `contact`, `category` and `phase` on `transaction`), all of
  * which only the lane migration reads. The package's branded ids are the
  * source of truth; only the legacy tables keep ids of their own.
  * Legacy schema removal gate in app/migrations/AGENTS.md.
@@ -429,7 +429,6 @@ export const Schema = {
   ...LinkySchema,
   contact: {
     ...LinkySchema.contact,
-    archivedAtSec: Evolu.nullOr(Evolu.PositiveInt),
     // Read cursor: created_at (seconds) of the newest chat message the user
     // has seen in this conversation.
     chatLastSeenAtSec: Evolu.nullOr(Evolu.PositiveInt),

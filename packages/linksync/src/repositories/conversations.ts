@@ -50,18 +50,11 @@ export interface ConversationsRepository extends TableRepository<
     conversationId: ConversationId,
     window: PeerSeenWindow,
   ) => Effect.Effect<void, ShardDbError | RowNotFound>;
-  readonly archive: (
-    conversationId: ConversationId,
-    atSec: PositiveInt,
-  ) => Effect.Effect<void, ShardDbError | RowNotFound>;
-  readonly unarchive: (
-    conversationId: ConversationId,
-  ) => Effect.Effect<void, ShardDbError | RowNotFound>;
 }
 
 const DIRECT = NonEmptyString100.orThrow("direct");
 
-/** Chats with their cursors and archive state, plus the messages and reactions in them. */
+/** Chats with their cursors, plus the messages and reactions in them. */
 export const makeConversationsRepository = (
   store: LinkyStore,
 ): ConversationsRepository => {
@@ -112,9 +105,5 @@ export const makeConversationsRepository = (
         peerSeenSinceSec: window.sinceSec,
         peerSeenAtSec: window.atSec,
       }),
-    archive: (conversationId, atSec) =>
-      conversations.update(conversationId, { archivedAtSec: atSec }),
-    unarchive: (conversationId) =>
-      conversations.update(conversationId, { archivedAtSec: null }),
   };
 };

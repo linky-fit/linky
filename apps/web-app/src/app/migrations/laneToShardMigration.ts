@@ -4,7 +4,8 @@
 // per scope and index, plus the app owner itself for nsec-only logins and
 // pre-lane rows) into the active shard of its scope through the linksync
 // store's legacy ingest, which is idempotent by id and keeps the newer copy.
-// Contact chat state becomes a `conversation` row, messages and reactions
+// A contact keeps its archive state; its chat state, the archive included for
+// older app versions, becomes a `conversation` row, messages and reactions
 // point at that conversation, `cashuToken` rows go through linkshu's legacy
 // ingest, and transactions lose their deprecated columns.
 //

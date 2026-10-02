@@ -52,7 +52,7 @@ export const LinkySchema = {
     source: nullOr(NonEmptyString100),
     switchedAtSec: nullOr(PositiveInt),
   },
-  /** Contacts scope: the profile and the user's overrides, no chat state. */
+  /** Contacts scope: the profile, the user's overrides and the archive state. */
   contact: {
     id: ContactId,
     name: nullOr(NonEmptyString1000),
@@ -66,8 +66,9 @@ export const LinkySchema = {
     // Contact-list grouping; unrelated to chat groups.
     groupName: nullOr(NonEmptyString1000),
     groupNamesJson: nullOr(NonEmptyString1000),
+    archivedAtSec: nullOr(PositiveInt),
   },
-  /** Messages scope: one chat, its read cursor, and its archive state. */
+  /** Messages scope: one chat and its read cursors. */
   conversation: {
     id: ConversationId,
     // "direct" | "group"
@@ -76,6 +77,7 @@ export const LinkySchema = {
     contactId: nullOr(ContactId),
     // Group chats (future): JSON array of participant pubkeys.
     participantsJson: nullOr(NonEmptyString),
+    // Written only by older app versions; the archive state lives on `contact`.
     archivedAtSec: nullOr(PositiveInt),
     // Read cursor: created_at (seconds) of the newest message the user has seen.
     lastSeenAtSec: nullOr(PositiveInt),

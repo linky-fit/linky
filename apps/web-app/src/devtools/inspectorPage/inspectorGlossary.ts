@@ -23,9 +23,9 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "conversations.archived":
-    "User archived a contact's chat: the conversation row (messages scope) records the archive time and its read cursor moves there; the contact row is untouched. The contact and conversation links identify both rows.",
+    "User archived a contact's chat: the contact row (contacts scope) records the archive time and the conversation's read cursor moves there. The contact and conversation links identify both rows.",
   "conversations.unarchived":
-    "A conversation left the archive, either by the user restoring the contact or because an incoming message newer than the archive time arrived.",
+    "A contact left the archive, either by the user restoring it or because an incoming message newer than the archive time arrived; it clears the archive on the contact and on its conversation, where older app versions keep it.",
   ShardsForgotten:
     "Explicit local forget of old chat shards. Payload lists scope, index and whether owner data was deleted; owner links correlate with shard rotation and subscription rows. Evolu 7 reports deleted: false.",
   ShardsSubscribed:

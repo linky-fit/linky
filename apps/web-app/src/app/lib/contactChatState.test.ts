@@ -12,7 +12,7 @@ import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { joinContactChatState } from "./contactChatState";
 
 describe("joinContactChatState", () => {
-  it("reads the chat state from the contact's direct conversation", async () => {
+  it("reads the read cursors from the direct conversation and the archive from the contact", async () => {
     const { store } = makeTestLinkyStore();
     const contacts = makeContactsRepository(store);
     const conversations = makeConversationsRepository(store);
@@ -31,7 +31,7 @@ describe("joinContactChatState", () => {
     await Effect.runPromise(
       Effect.all([
         conversations.markSeen(chat.id, PositiveInt.orThrow(50)),
-        conversations.archive(chat.id, PositiveInt.orThrow(60)),
+        contacts.archive(withChat, PositiveInt.orThrow(60)),
         conversations.setPeerSeen(chat.id, {
           sinceSec: PositiveInt.orThrow(10),
           atSec: PositiveInt.orThrow(40),

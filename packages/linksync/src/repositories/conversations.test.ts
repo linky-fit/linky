@@ -32,21 +32,17 @@ describe("conversations repository", () => {
     expect(runNow(conversations.byId(id))?.lastSeenAtSec).toBe(200);
   });
 
-  it("records the peer's seen window and the archive state", () => {
+  it("records the peer's seen window", () => {
     const { store } = linkyStore();
     const conversations = makeConversationsRepository(store);
     const { id } = runNow(conversations.ensureDirect(createId<"Contact">()));
     runNow(
       conversations.setPeerSeen(id, { sinceSec: sec(10), atSec: sec(20) }),
     );
-    runNow(conversations.archive(id, sec(30)));
     expect(runNow(conversations.byId(id))).toMatchObject({
       peerSeenSinceSec: 10,
       peerSeenAtSec: 20,
-      archivedAtSec: 30,
     });
-    runNow(conversations.unarchive(id));
-    expect(runNow(conversations.byId(id))?.archivedAtSec).toBeNull();
   });
 
   it("lists the messages and reactions of one conversation", () => {
