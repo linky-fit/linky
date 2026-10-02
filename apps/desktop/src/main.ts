@@ -57,8 +57,8 @@ const openExternally = (url: string) => {
 
 const createWindow = () => {
   const window = new BrowserWindow({
-    width: 440,
-    height: 900,
+    width: 1024,
+    height: 820,
     minWidth: 360,
     minHeight: 600,
     show: false,
