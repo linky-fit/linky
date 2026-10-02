@@ -49,7 +49,9 @@ These work on error messages. `Melt` itself fails with a typed `InsufficientFund
 
 ## LNURL-pay and withdraw
 
-`isLnurlPayTarget` accepts a lightning address, bech32 `lnurl1...`, `lnurlp://`, or an https URL; `resolveLnurlPayRequestUrl` gives the LUD-06 request URL and throws on anything else. `fetchLnurlPayPreview` returns the `LnurlPayPreview` (callback, min/max, `commentAllowed`, raw metadata) and `fetchLnurlInvoiceForTarget` the `LnurlPayInvoiceResult`, after verifying the metadata hash and amount (LUD-06 step 7). Fixed-amount LNURLs that re-quote in fiat are followed within 2 % drift. `LnurlTagMismatchError` is thrown when the server's `tag` is not the expected one.
+`isLnurlPayTarget` accepts a lightning address, bech32 `lnurl1...`, `lnurlp://`, or an https URL; `resolveLnurlPayRequestUrl` gives the LUD-06 request URL and throws on anything else. `fetchLnurlPayPreview` returns the `LnurlPayPreview` (callback, min/max, `commentAllowed`, raw metadata) and `fetchLnurlInvoiceForTarget(target, amountSat, comment?)` the `LnurlPayInvoiceResult`, after verifying the metadata hash and amount (LUD-06 step 7). Fixed-amount LNURLs that re-quote in fiat are followed within 2 % drift. `LnurlTagMismatchError` is thrown when the server's `tag` is not the expected one.
+
+A `comment` is the LUD-12 payer note. Offer it only when the preview's `commentAllowed` is positive: the comment is cut to that length and sent with the invoice request, and a provider that then answers with an error fails the call rather than being paid without the note. A provider that advertises no `commentAllowed` gets one attempt with the comment (at most 140 characters) and a silent retry without it.
 
 Every fetcher takes an optional `fallback: LnurlFallback = (url) => Promise<Response>`, tried when the direct fetch fails, for example a CORS proxy.
 

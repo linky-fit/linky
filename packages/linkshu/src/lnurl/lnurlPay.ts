@@ -430,41 +430,40 @@ export const fetchLnurlInvoiceForTarget = async (
   callbackUrl.searchParams.set("amount", String(amountMsat));
 
   const rawComment = String(comment ?? "").trim();
-
-  // Some LNURL-pay providers omit/misreport commentAllowed. We try to include
-  // a short comment (e.g., user display name) and fall back silently if it
-  // causes invoice fetch to fail.
-  const canUseComment = rawComment.length > 0;
   const providerAdvertisesComment = payRequest.commentAllowed > 0;
-  const maybeWithCommentUrl = (() => {
-    if (!canUseComment) return null;
+  // LUD-12: a comment goes to a provider that advertises `commentAllowed`,
+  // cut to that length. Some providers accept comments without advertising
+  // them, so those get one try with a short comment and a silent retry
+  // without it.
+  const commentLimit = providerAdvertisesComment
+    ? payRequest.commentAllowed
+    : 140;
+  const withCommentUrl = (() => {
+    if (!rawComment) return null;
     const u = new URL(callbackUrl.toString());
-    const maxLen = providerAdvertisesComment ? payRequest.commentAllowed : 140;
-    if (maxLen <= 0) return null;
-    u.searchParams.set("comment", rawComment.slice(0, maxLen));
+    u.searchParams.set("comment", rawComment.slice(0, commentLimit));
     return u.toString();
   })();
 
-  const invoiceJson = await (async () => {
-    if (maybeWithCommentUrl && !providerAdvertisesComment) {
-      try {
-        const withCommentJson = await fetchLnurlJson(
-          maybeWithCommentUrl,
-          fallback,
-        );
-        if (!isLnurlInvoiceResponse(withCommentJson)) {
-          throw new Error("Invalid LNURL invoice response");
-        }
-        return withCommentJson;
-      } catch {
-        // Retry without comment.
-      }
-    }
-    const fallbackJson = await fetchLnurlJson(callbackUrl.toString(), fallback);
-    if (!isLnurlInvoiceResponse(fallbackJson)) {
+  const fetchInvoiceJson = async (url: string) => {
+    const json = await fetchLnurlJson(url, fallback);
+    if (!isLnurlInvoiceResponse(json)) {
       throw new Error("Invalid LNURL invoice response");
     }
-    return fallbackJson;
+    return json;
+  };
+
+  const invoiceJson = await (async () => {
+    if (withCommentUrl && providerAdvertisesComment) {
+      return fetchInvoiceJson(withCommentUrl);
+    }
+    if (withCommentUrl) {
+      const attempt = await fetchInvoiceJson(withCommentUrl).catch(() => null);
+      if (attempt !== null && !isLnurlErrorStatus(attempt.status)) {
+        return attempt;
+      }
+    }
+    return fetchInvoiceJson(callbackUrl.toString());
   })();
   if (isLnurlErrorStatus(invoiceJson.status)) {
     throw new Error(

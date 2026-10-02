@@ -225,3 +225,69 @@ describe("LNURL HTTPS policy", () => {
     expect(fallback.mock.calls).toHaveLength(2);
   });
 });
+
+describe("LNURL-pay comments (LUD-12)", () => {
+  const invoiceResponse = () => Response.json({ pr: "lnbc1testinvoice" });
+  const callback = "https://example.com/callback";
+  const invoiceUrl = (fetchSpy: ReturnType<typeof vi.spyOn>, call: number) =>
+    new URL(String(fetchSpy.mock.calls[call]?.[0]));
+
+  it("sends the comment, cut to commentAllowed, when the provider advertises it", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        Response.json({ ...payRequest(callback), commentAllowed: 5 }),
+      )
+      .mockResolvedValueOnce(invoiceResponse());
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1, "coffee money"),
+    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(invoiceUrl(fetchSpy, 1).searchParams.get("comment")).toBe("coffe");
+  });
+
+  it("surfaces a rejected comment instead of paying without it", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        Response.json({ ...payRequest(callback), commentAllowed: 100 }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ status: "ERROR", reason: "comment refused" }),
+      );
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1, "coffee"),
+    ).rejects.toThrow("comment refused");
+  });
+
+  it("tries a comment once on a provider that does not advertise it, then retries bare", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(payRequest(callback)))
+      .mockResolvedValueOnce(Response.json({ status: "ERROR", reason: "no" }))
+      .mockResolvedValueOnce(invoiceResponse());
+
+    await expect(
+      fetchLnurlInvoiceForTarget("alice@example.com", 1, "coffee"),
+    ).resolves.toMatchObject({ pr: "lnbc1testinvoice" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(invoiceUrl(fetchSpy, 1).searchParams.get("comment")).toBe("coffee");
+    expect(invoiceUrl(fetchSpy, 2).searchParams.has("comment")).toBe(false);
+  });
+
+  it("asks for a bare invoice when there is no comment", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        Response.json({ ...payRequest(callback), commentAllowed: 100 }),
+      )
+      .mockResolvedValueOnce(invoiceResponse());
+
+    await fetchLnurlInvoiceForTarget("alice@example.com", 1);
+
+    expect(invoiceUrl(fetchSpy, 1).searchParams.has("comment")).toBe(false);
+  });
+});
