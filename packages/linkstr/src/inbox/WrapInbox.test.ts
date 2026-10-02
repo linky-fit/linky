@@ -1,5 +1,16 @@
-import { Duration, Effect, Exit, Fiber, Layer, Scope, Stream } from "effect";
-import { getEventHash } from "nostr-tools";
+import {
+  Deferred,
+  Duration,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Scope,
+  Stream,
+} from "effect";
+import { finalizeEvent, generateSecretKey, getEventHash } from "nostr-tools";
+import { encrypt, getConversationKey } from "nostr-tools/nip44";
+import { createSeal } from "nostr-tools/nip59";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { encodeBankOfferRumor } from "../bankOffers/codec";
 import { BankOfferDraft, BankOfferId } from "../bankOffers/domain";
@@ -21,12 +32,17 @@ import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import {
   makeRelayPoolTransport,
   NostrTransport,
+  RelayUnreachable,
 } from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import { eventually, FakeRelay, makeIdentity, poolFor } from "../testing";
 import { InboxCursorStore } from "./InboxCursorStore";
-import { NIP59_BACKDATE_MARGIN_SECONDS, WrapInbox } from "./WrapInbox";
+import {
+  MAX_BACKFILL_AGE_SECONDS,
+  NIP59_BACKDATE_MARGIN_SECONDS,
+  WrapInbox,
+} from "./WrapInbox";
 import type {
   DeliveredInboxEvent,
   WrapInboxEvent,
@@ -41,6 +57,8 @@ const relayA = RelayUrl.make("wss://relay-a.test");
 const relayB = RelayUrl.make("wss://relay-b.test");
 
 const sentAt = UnixSeconds.make(1_754_000_000);
+const nowSec = () => Math.floor(Date.now() / 1000);
+const hoursAgo = (hours: number) => UnixSeconds.make(nowSec() - hours * 3600);
 
 const reactionWrap = (emoji: string, recipient = alice.pubkey) => {
   const rumor = encodeReactionRumor(
@@ -102,6 +120,21 @@ const bankOfferWrap = (own: boolean, invalid = false) => {
   return wrapRumorFor(rumor, author.secretKey, alice.pubkey);
 };
 
+/** Two wraps whose randomized NIP-59 timestamps differ, oldest first. */
+const distinctlyTimedWraps = (): [NostrToolsEvent, NostrToolsEvent] => {
+  for (;;) {
+    const [first, second] = [reactionWrap("👍"), reactionWrap("🔥")].sort(
+      (a, b) => a.created_at - b.created_at,
+    );
+    if (
+      first !== undefined &&
+      second !== undefined &&
+      first.created_at < second.created_at
+    )
+      return [first, second];
+  }
+};
+
 const withRumorContent = (rumor: Rumor, content: string): Rumor => {
   const fields = {
     pubkey: rumor.pubkey,
@@ -127,9 +160,41 @@ const recordingCursorStore = (initial: UnixSeconds | null = null) => {
   return { layer, saved };
 };
 
+interface FetchCall {
+  readonly filter: Filter;
+  readonly relay: RelayUrl;
+}
+
+/** Page size a relay serves at most, whatever `limit` asks for. */
+const RELAY_PAGE_CAP = 3;
+
+/** A relay's stored wraps served like a relay would: newest first, capped. */
+const storedPage = (
+  stored: ReadonlyArray<NostrToolsEvent>,
+  filter: Filter,
+): Array<NostrToolsEvent> =>
+  stored
+    .filter(
+      (wrap) =>
+        wrap.created_at >= (filter.since ?? 0) &&
+        wrap.created_at <= (filter.until ?? Number.MAX_SAFE_INTEGER),
+    )
+    .sort((a, b) => b.created_at - a.created_at)
+    .slice(0, Math.min(RELAY_PAGE_CAP, filter.limit ?? RELAY_PAGE_CAP));
+
+interface Backfill {
+  /** Each relay's stored wraps, served to the backfill walk. */
+  readonly stored?: ReadonlyMap<RelayUrl, ReadonlyArray<NostrToolsEvent>>;
+  /** Records every page the walk asked for. */
+  readonly pages?: Array<FetchCall>;
+  /** Replaces the stored-wrap fetch, e.g. to hold a page back. */
+  readonly fetch?: NostrTransportService["fetch"];
+}
+
 const dependenciesFor = (
   fakes: Array<[RelayUrl, FakeRelay]>,
   cursorStore: Layer.Layer<InboxCursorStore> = InboxCursorStore.inMemory,
+  backfill: Backfill = {},
 ) =>
   WrapInbox.Default.pipe(
     Layer.provide(
@@ -139,10 +204,16 @@ const dependenciesFor = (
           readRelays: fakes.map(([url]) => url),
           writeRelays: [],
         }),
-        Layer.succeed(
-          NostrTransport,
-          makeRelayPoolTransport(poolFor(new Map(fakes))),
-        ),
+        Layer.succeed(NostrTransport, {
+          ...makeRelayPoolTransport(poolFor(new Map(fakes))),
+          fetch:
+            backfill.fetch ??
+            ((relay, filter) =>
+              Effect.sync(() => {
+                backfill.pages?.push({ relay, filter });
+                return storedPage(backfill.stored?.get(relay) ?? [], filter);
+              })),
+        }),
         cursorStore,
       ),
     ),
@@ -159,7 +230,13 @@ const eventsOf = (
 
 const runOpen = <A, E>(
   fakes: Array<[RelayUrl, FakeRelay]>,
-  options: { since?: UnixSeconds; cursorStore?: Layer.Layer<InboxCursorStore> },
+  options: {
+    since?: UnixSeconds;
+    cursorStore?: Layer.Layer<InboxCursorStore>;
+    /** Confirm every event as soon as it is collected; default true. */
+    autoAck?: boolean;
+    backfill?: Backfill;
+  },
   body: (harness: Harness) => Effect.Effect<A, E>,
 ): Promise<A> =>
   Effect.gen(function* () {
@@ -171,20 +248,20 @@ const runOpen = <A, E>(
     const collected: Array<DeliveredInboxEvent> = [];
     yield* Effect.forkScoped(
       Stream.runForEach(feed.events, (event) =>
-        Effect.sync(() => collected.push(event)),
+        Effect.andThen(
+          Effect.sync(() => collected.push(event)),
+          options.autoAck === false ? Effect.void : event.ack,
+        ),
       ),
     );
     return yield* body({ feed, collected });
   }).pipe(
     Effect.scoped,
-    Effect.provide(dependenciesFor(fakes, options.cursorStore)),
+    Effect.provide(
+      dependenciesFor(fakes, options.cursorStore, options.backfill),
+    ),
     Effect.runPromise,
   );
-
-interface FetchCall {
-  readonly filter: Filter;
-  readonly relay: RelayUrl;
-}
 
 const fetchDependenciesFor = (
   readRelays: ReadonlyArray<RelayUrl>,
@@ -390,10 +467,16 @@ describe("WrapInbox", () => {
         Effect.gen(function* () {
           yield* eventually(() => fakeA.subscriptions.length === 1);
           expect(fakeA.subscriptions[0]?.filters).toEqual([
-            { kinds: [1059], "#p": [alice.pubkey] },
+            {
+              kinds: [1059],
+              "#p": [alice.pubkey],
+              since: expect.any(Number),
+              limit: 1,
+            },
           ]);
 
           fakeA.emit(wrap);
+          fakeA.eose();
           yield* eventually(() => collected.length === 1);
           expect(collected[0]?.event).toEqual(
             expect.objectContaining({
@@ -403,6 +486,7 @@ describe("WrapInbox", () => {
               sentAt,
             }),
           );
+          yield* eventually(() => store.saved.length === 1);
           expect(store.saved).toEqual([wrap.created_at]);
         }),
     );
@@ -410,18 +494,108 @@ describe("WrapInbox", () => {
 
   it("prefers the stored cursor over the since fallback", async () => {
     const fakeA = new FakeRelay();
-    const stored = UnixSeconds.make(1_756_000_000);
+    const stored = hoursAgo(1);
     const store = recordingCursorStore(stored);
 
     await runOpen(
       [[relayA, fakeA]],
-      { since: UnixSeconds.make(1_755_000_000), cursorStore: store.layer },
+      { since: hoursAgo(2), cursorStore: store.layer },
       () =>
         Effect.gen(function* () {
           yield* eventually(() => fakeA.subscriptions.length === 1);
           expect(fakeA.subscriptions[0]?.filters[0]?.since).toBe(
             stored - NIP59_BACKDATE_MARGIN_SECONDS,
           );
+        }),
+    );
+  });
+
+  it("moves the cursor only once the consumer confirms the event", async () => {
+    const fakeA = new FakeRelay();
+    const wrap = reactionWrap("👍");
+    const store = recordingCursorStore();
+
+    await runOpen(
+      [[relayA, fakeA]],
+      { cursorStore: store.layer, autoAck: false },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          fakeA.emit(wrap);
+          fakeA.eose();
+          yield* eventually(() => collected.length === 1);
+          yield* Effect.sleep(Duration.millis(20));
+          expect(store.saved).toEqual([]);
+
+          const [delivered] = collected;
+          assert(delivered !== undefined);
+          yield* delivered.ack;
+          yield* delivered.ack;
+          expect(store.saved).toEqual([wrap.created_at]);
+        }),
+    );
+  });
+
+  it("holds the cursor while an older wrap delivered out of order is unconfirmed", async () => {
+    const fakeA = new FakeRelay();
+    const [older, newer] = distinctlyTimedWraps();
+    const store = recordingCursorStore();
+
+    await runOpen(
+      [[relayA, fakeA]],
+      { cursorStore: store.layer, autoAck: false },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          fakeA.emit(newer);
+          fakeA.emit(older);
+          fakeA.eose();
+          yield* eventually(() => collected.length === 2);
+          yield* Effect.sleep(Duration.millis(20));
+
+          const [newerEvent, olderEvent] = collected;
+          assert(newerEvent !== undefined && olderEvent !== undefined);
+          yield* newerEvent.ack;
+          expect(store.saved).toEqual([]);
+
+          yield* olderEvent.ack;
+          expect(store.saved).toEqual([newer.created_at]);
+        }),
+    );
+  });
+
+  it("lets confirmed drops and deduped copies settle the cursor", async () => {
+    const fakeA = new FakeRelay();
+    const fakeB = new FakeRelay();
+    const wrap = reactionWrap("👍");
+    const store = recordingCursorStore();
+
+    await runOpen(
+      [
+        [relayA, fakeA],
+        [relayB, fakeB],
+      ],
+      { cursorStore: store.layer, autoAck: false },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          yield* eventually(
+            () =>
+              fakeA.subscriptions.length === 1 &&
+              fakeB.subscriptions.length === 1,
+          );
+          fakeA.emit(wrap);
+          fakeB.emit(wrap);
+          fakeA.emit({ ...wrap, id: "ff".repeat(32) });
+          fakeA.eose();
+          fakeB.eose();
+          yield* eventually(() => collected.length === 2);
+          yield* Effect.sleep(Duration.millis(20));
+          expect(collected[1]?.event).toEqual(
+            expect.objectContaining({ _tag: "WrapDropped" }),
+          );
+
+          yield* Effect.forEach(collected, (delivered) => delivered.ack);
+          expect(store.saved).toEqual([wrap.created_at]);
         }),
     );
   });
@@ -642,9 +816,9 @@ describe("WrapInbox", () => {
     );
   });
 
-  it("resubscribes after a relay-side close, backfilling from the cursor", async () => {
+  it("resubscribes after a relay-side close, backfilling from where the open started", async () => {
     const fakeA = new FakeRelay();
-    const since = UnixSeconds.make(1_755_000_000);
+    const since = hoursAgo(72);
     const firstWrap = reactionWrap("👍");
     const secondWrap = reactionWrap("🔥");
 
@@ -661,7 +835,7 @@ describe("WrapInbox", () => {
         fakeA.closeFromRelay("connection reset");
         yield* eventually(() => fakeA.subscriptions.length === 2);
         expect(fakeA.subscriptions[1]?.filters[0]?.since).toBe(
-          firstWrap.created_at - NIP59_BACKDATE_MARGIN_SECONDS,
+          since - NIP59_BACKDATE_MARGIN_SECONDS,
         );
 
         fakeA.emit(firstWrap);
@@ -827,6 +1001,326 @@ describe("WrapInbox", () => {
         ]),
       ),
       Effect.runPromise,
+    );
+  });
+});
+
+describe("WrapInbox backfill", () => {
+  const storedWraps = (count: number): Array<NostrToolsEvent> =>
+    Array.from({ length: count }, (_, index) => reactionWrap(`${index}`));
+
+  const chatWrapAt = (createdAt: number, text: string): NostrToolsEvent => {
+    const fields = {
+      pubkey: bob.pubkey,
+      created_at: createdAt,
+      kind: 14,
+      tags: [["p", alice.pubkey]],
+      content: text,
+    };
+    const rumor = { ...fields, id: getEventHash(fields) };
+    const seal = createSeal(rumor, bob.secretKey, alice.pubkey);
+    const secretKey = generateSecretKey();
+    return finalizeEvent(
+      {
+        kind: 1059,
+        created_at: createdAt,
+        tags: [["p", alice.pubkey]],
+        content: encrypt(
+          JSON.stringify(seal),
+          getConversationKey(secretKey, alice.pubkey),
+        ),
+      },
+      secretKey,
+    );
+  };
+
+  it.each([
+    { boundaryCount: 200, relayCap: 500, incomplete: false },
+    { boundaryCount: 201, relayCap: 200, incomplete: true },
+  ])(
+    "walks below $boundaryCount wraps sharing a second with relay cap $relayCap",
+    async ({ boundaryCount, relayCap, incomplete }) => {
+      const fakeA = new FakeRelay();
+      const boundary = hoursAgo(4 * 24);
+      const older = chatWrapAt(boundary - 3 * 24 * 3600, "older");
+      const newest = chatWrapAt(nowSec(), "live");
+      const stored = [
+        ...Array.from({ length: boundaryCount }, (_, index) =>
+          chatWrapAt(boundary, String(index)),
+        ),
+        older,
+      ];
+      const store = recordingCursorStore(hoursAgo(8 * 24));
+      const fetch: NostrTransportService["fetch"] = (_relay, filter) =>
+        Effect.succeed(
+          stored
+            .filter(
+              (wrap) =>
+                wrap.created_at >= (filter.since ?? 0) &&
+                wrap.created_at <= (filter.until ?? Number.MAX_SAFE_INTEGER),
+            )
+            .slice(0, Math.min(relayCap, filter.limit ?? relayCap)),
+        );
+
+      await runOpen(
+        [[relayA, fakeA]],
+        { cursorStore: store.layer, backfill: { fetch } },
+        ({ collected }) =>
+          Effect.gen(function* () {
+            yield* eventually(() => fakeA.subscriptions.length === 1);
+            fakeA.eose();
+            yield* eventually(() =>
+              collected.some(({ wrapId }) => wrapId === older.id),
+            );
+            expect(collected).toHaveLength(201);
+            expect(
+              collected.every(
+                ({ event }) => event._tag === "ChatMessageReceived",
+              ),
+            ).toBe(true);
+            yield* eventually(() => store.saved.length > 0);
+
+            fakeA.emit(newest);
+            yield* eventually(() => collected.length === 202);
+            yield* Effect.sleep(Duration.millis(20));
+            expect(store.saved.at(-1)).toBe(
+              incomplete ? boundary : newest.created_at,
+            );
+          }),
+      );
+    },
+    15_000,
+  );
+
+  it("walks a relay's stored wraps back in pages past its result cap", async () => {
+    const fakeA = new FakeRelay();
+    const stored = storedWraps(7);
+    const pages: Array<FetchCall> = [];
+    const store = recordingCursorStore();
+
+    await runOpen(
+      [[relayA, fakeA]],
+      {
+        cursorStore: store.layer,
+        backfill: { stored: new Map([[relayA, stored]]), pages },
+      },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          expect(pages).toEqual([]);
+          fakeA.eose();
+          yield* eventually(() => collected.length === 7);
+          yield* eventually(() => store.saved.length === 1);
+
+          expect(new Set(collected.map(({ delivery }) => delivery))).toEqual(
+            new Set(["backfill"]),
+          );
+          const newestFirst = stored
+            .map((wrap) => wrap.created_at)
+            .sort((a, b) => b - a);
+          expect(pages[0]?.filter).toEqual({
+            kinds: [1059],
+            "#p": [alice.pubkey],
+            since: fakeA.subscriptions[0]?.filters[0]?.since,
+            limit: 200,
+          });
+          expect(pages[1]?.filter.until).toBe(newestFirst[RELAY_PAGE_CAP - 1]);
+          expect(store.saved).toEqual([newestFirst[0]]);
+        }),
+    );
+  });
+
+  it("retains an unresolved boundary after failed walks until a complete walk replaces it", async () => {
+    const fakeA = new FakeRelay();
+    const boundary = hoursAgo(4 * 24);
+    const newest = chatWrapAt(nowSec(), "live");
+    const stored = [
+      ...Array.from({ length: 4 }, (_, index) =>
+        chatWrapAt(boundary, String(index)),
+      ),
+      chatWrapAt(boundary - 3 * 24 * 3600, "older"),
+    ];
+    const store = recordingCursorStore(hoursAgo(8 * 24));
+    let failures = 0;
+    let recovered = false;
+    const fetch: NostrTransportService["fetch"] = (relay, filter) =>
+      Effect.suspend(() => {
+        if (!recovered && (filter.until ?? boundary) < boundary) {
+          failures++;
+          return Effect.fail(new RelayUnreachable({ relay, detail: "reset" }));
+        }
+        return Effect.succeed(
+          stored
+            .filter(
+              (wrap) =>
+                wrap.created_at >= (filter.since ?? 0) &&
+                wrap.created_at <= (filter.until ?? Number.MAX_SAFE_INTEGER),
+            )
+            .slice(0, Math.min(recovered ? 5 : 3, filter.limit ?? 5)),
+        );
+      });
+
+    await runOpen(
+      [[relayA, fakeA]],
+      { cursorStore: store.layer, backfill: { fetch } },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            yield* eventually(() => fakeA.subscriptions.length === attempt);
+            if (attempt === 1) fakeA.emit(newest);
+            fakeA.eose();
+            yield* eventually(() => failures === attempt);
+          }
+          yield* eventually(() => store.saved.length > 0);
+          expect(store.saved.at(-1)).toBe(boundary);
+          expect(collected).toHaveLength(4);
+
+          recovered = true;
+          yield* eventually(() => fakeA.subscriptions.length === 4);
+          fakeA.eose();
+          yield* eventually(() => store.saved.at(-1) === newest.created_at);
+          expect(collected).toHaveLength(6);
+        }),
+    );
+  });
+
+  it("never reaches further back than the maximum backfill age", async () => {
+    const fakeA = new FakeRelay();
+    const ancient = hoursAgo(90 * 24);
+
+    await runOpen(
+      [[relayA, fakeA]],
+      { cursorStore: recordingCursorStore(ancient).layer },
+      () =>
+        Effect.gen(function* () {
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          const since = fakeA.subscriptions[0]?.filters[0]?.since ?? 0;
+          expect(
+            Math.abs(since - (nowSec() - MAX_BACKFILL_AGE_SECONDS)),
+          ).toBeLessThan(5);
+        }),
+    );
+  });
+
+  it("holds the cursor until the walk has finished", async () => {
+    const fakeA = new FakeRelay();
+    const [older, newer] = distinctlyTimedWraps();
+    const store = recordingCursorStore();
+    const lastPage = Effect.runSync(Deferred.make<void>());
+    let fetches = 0;
+    const fetch: NostrTransportService["fetch"] = () =>
+      fetches++ === 0
+        ? Effect.succeed([older])
+        : Effect.as(Deferred.await(lastPage), []);
+
+    await runOpen(
+      [[relayA, fakeA]],
+      { cursorStore: store.layer, backfill: { fetch } },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          fakeA.eose();
+          fakeA.emit(newer);
+          yield* eventually(() => collected.length === 2 && fetches === 2);
+          expect(store.saved).toEqual([]);
+
+          yield* Deferred.succeed(lastPage, undefined);
+          yield* eventually(() => store.saved.length === 1);
+          expect(store.saved).toEqual([newer.created_at]);
+        }),
+    );
+  });
+
+  it("holds the cursor for a read relay that has not answered yet", async () => {
+    const fakeA = new FakeRelay();
+    const fakeB = new FakeRelay();
+    const wrap = reactionWrap("👍");
+    const store = recordingCursorStore();
+
+    await runOpen(
+      [
+        [relayA, fakeA],
+        [relayB, fakeB],
+      ],
+      { cursorStore: store.layer },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          yield* eventually(
+            () =>
+              fakeA.subscriptions.length === 1 &&
+              fakeB.subscriptions.length === 1,
+          );
+          fakeA.emit(wrap);
+          fakeA.eose();
+          yield* eventually(() => collected.length === 1);
+          yield* Effect.sleep(Duration.millis(20));
+          expect(store.saved).toEqual([]);
+
+          fakeB.eose();
+          yield* eventually(() => store.saved.length === 1);
+          expect(store.saved).toEqual([wrap.created_at]);
+        }),
+    );
+  });
+
+  it("gives up holding the cursor for a relay that fails every attempt, and later walks it from where the open started", async () => {
+    const fakeA = new FakeRelay();
+    const fakeB = new FakeRelay();
+    fakeB.down = true;
+    const cursor = hoursAgo(72);
+    const wrap = reactionWrap("👍");
+    const store = recordingCursorStore(cursor);
+
+    await runOpen(
+      [
+        [relayA, fakeA],
+        [relayB, fakeB],
+      ],
+      { cursorStore: store.layer },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          fakeA.emit(wrap);
+          fakeA.eose();
+          yield* eventually(() => collected.length === 1);
+          yield* eventually(() => store.saved.length === 1);
+          expect(fakeB.connectAttempts).toBeGreaterThanOrEqual(3);
+
+          fakeB.down = false;
+          yield* eventually(() => fakeB.subscriptions.length === 1);
+          expect(fakeB.subscriptions[0]?.filters[0]?.since).toBe(
+            cursor - NIP59_BACKDATE_MARGIN_SECONDS,
+          );
+        }),
+    );
+  });
+
+  it("keeps a relay's unfinished walk holding the cursor across a reconnect", async () => {
+    const fakeA = new FakeRelay();
+    const wrap = reactionWrap("👍");
+    const store = recordingCursorStore();
+    let fetches = 0;
+    const fetch: NostrTransportService["fetch"] = (relay) =>
+      fetches++ === 0
+        ? Effect.fail(new RelayUnreachable({ relay, detail: "reset" }))
+        : Effect.succeed([]);
+
+    await runOpen(
+      [[relayA, fakeA]],
+      { cursorStore: store.layer, backfill: { fetch } },
+      ({ collected }) =>
+        Effect.gen(function* () {
+          yield* eventually(() => fakeA.subscriptions.length === 1);
+          fakeA.eose();
+          yield* eventually(() => fakeA.subscriptions.length === 2);
+          fakeA.emit(wrap);
+          yield* eventually(() => collected.length === 1);
+          expect(store.saved).toEqual([]);
+
+          fakeA.eose();
+          yield* eventually(() => store.saved.length === 1);
+          expect(store.saved).toEqual([wrap.created_at]);
+        }),
     );
   });
 });

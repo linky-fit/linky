@@ -232,6 +232,25 @@ export const linkstrEventToRow = (
         links: { wrap: [event.wrapId] },
         payload: event,
       };
+    case "InboxWalkGivenUp":
+      return {
+        at,
+        channel: "nostr.operation",
+        tag: event._tag,
+        summary: `inbox stops waiting for ${event.relay}'s backfill walk after ${event.failedAttempts} failed attempts`,
+        links: {},
+        context: { relay: event.relay },
+        payload: event,
+      };
+    case "InboxEventUnconfirmed":
+      return {
+        at,
+        channel: "nostr.operation",
+        tag: event._tag,
+        summary: `${event.eventTag} left unconfirmed (${event.delivery}): ${event.error}`,
+        links: event.wrapId === null ? {} : { wrap: [event.wrapId] },
+        payload: event,
+      };
     case "InboxRouted": {
       const { links, summary } = routedSummaryAndLinks(
         event.event,

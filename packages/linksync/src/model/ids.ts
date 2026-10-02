@@ -69,6 +69,10 @@ export const nostrReactionIdFor = (
 export const settingIdFor = (key: SettingKey): SettingId =>
   createIdFromString<"Setting">(`setting/${key}`);
 
+/** Each Nostr identity's inbox cursor is one setting row, shared by every device. */
+export const inboxCursorSettingIdFor = (pubkey: Pubkey): SettingId =>
+  createIdFromString<"Setting">(`setting/inboxCursor/${pubkey}`);
+
 /** One row mirrors the active identity; older clients wrote random ids. */
 export const activeNostrIdentityId: NostrIdentityId =
   createIdFromString<"NostrIdentity">("nostrIdentity/active");

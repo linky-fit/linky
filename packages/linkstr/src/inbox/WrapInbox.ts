@@ -1,10 +1,11 @@
 import {
+  Deferred,
   Duration,
   Effect,
   Either,
+  Exit,
   Option,
   Queue,
-  Ref,
   Schema,
   Stream,
 } from "effect";
@@ -17,7 +18,11 @@ import { NoReadRelaysConfigured } from "../domain/errors";
 import { UnixSeconds, WrapId } from "../domain/primitives";
 import type { RelayUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
-import { InboxRouted, InboxWrapDeduped } from "../inspector/events";
+import {
+  InboxRouted,
+  InboxWalkGivenUp,
+  InboxWrapDeduped,
+} from "../inspector/events";
 import { inspectPlainOperation } from "../internal/inspectPlainOperation";
 import { redactInspectorSecrets } from "../internal/redactInspectorSecrets";
 import type { InspectedPlainResult } from "../internal/inspectPlainOperation";
@@ -54,8 +59,15 @@ export type WrapInboxEvent =
  * codecs stay delivery-agnostic; only the inbox machine knows the boundary.
  */
 export interface DeliveredInboxEvent {
+  /** The gift wrap the event came in; null when the outer event was malformed. */
+  readonly wrapId: WrapId | null;
   readonly delivery: InboxDelivery;
   readonly event: WrapInboxEvent;
+  /**
+   * Confirms that the consumer has handled and stored the event. The cursor
+   * never passes an unconfirmed event; confirming twice is a no-op.
+   */
+  readonly ack: Effect.Effect<void>;
 }
 
 export interface WrapInboxOptions {
@@ -90,6 +102,14 @@ const GIFT_WRAP_KIND = 1059;
 /** NIP-59 wraps carry timestamps randomized up to two days into the past. */
 export const NIP59_BACKDATE_MARGIN_SECONDS = 2 * 24 * 60 * 60;
 
+/** The backfill never reaches further back than this, however old the cursor. */
+export const MAX_BACKFILL_AGE_SECONDS = 30 * 24 * 60 * 60;
+
+const BACKFILL_PAGE_LIMIT = 200;
+
+/** A relay whose attempts end this many times in a row before its walk finishes stops holding the cursor. */
+const MAX_FAILED_WALK_ATTEMPTS = 3;
+
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
 
 const decodeWrapIdField = Schema.decodeUnknownEither(
@@ -106,11 +126,13 @@ const wrapIdOf = (raw: unknown): WrapId | null =>
  * Owns the app's single kind-1059 subscription: one filter per read relay,
  * wraps deduped across relays, authenticated and routed by rumor kind into
  * typed inbox facts. Each relay runs its own resubscribe loop, so one dead
- * relay never stalls the others; every (re)subscription backfills from the
- * cursor minus the NIP-59 backdate margin. The cursor is loaded from and
- * checkpointed to `InboxCursorStore` — the backdate margin makes eager
- * checkpointing safe, since the next session refetches everything the
- * current one could still deliver.
+ * relay never stalls the others. Every (re)subscription opens a live
+ * subscription, then walks the relay's stored wraps back in pages to the
+ * cursor minus the NIP-59 backdate margin, so relay result caps never
+ * truncate the backfill. The cursor is loaded from and checkpointed to
+ * `InboxCursorStore`, and only moves once no read relay has a walk left to
+ * finish (or has failed too often) and the consumer has confirmed every
+ * delivered wrap.
  */
 export class WrapInbox extends Effect.Service<WrapInbox>()(
   "linkstr/WrapInbox",
@@ -137,7 +159,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
             ]),
           );
           if (relays.length === 0) return yield* new NoReadRelaysConfigured();
-          const raws = yield* fetchRawEvents(transport, relays, {
+          const { events: raws } = yield* fetchRawEvents(transport, relays, {
             ids: [wrapId],
             kinds: [GIFT_WRAP_KIND],
             "#p": [identity.pubkey],
@@ -184,8 +206,25 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
           const resubscribeDelay =
             options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY;
 
-          const cursor = yield* Ref.make<UnixSeconds | null>(
-            (yield* cursorStore.load) ?? options?.since ?? null,
+          let cursor: UnixSeconds | null =
+            (yield* cursorStore.load) ?? options?.since ?? null;
+          // Fixed per open, so a relay walking later still reaches wraps others confirmed meanwhile.
+          const since = Math.max(
+            (cursor ?? 0) - NIP59_BACKDATE_MARGIN_SECONDS,
+            (yield* nowSeconds) - MAX_BACKFILL_AGE_SECONDS,
+            0,
+          );
+          let newestConfirmed = 0;
+          let outstanding = 0;
+          // Relays that have not finished a walk since it last started; every
+          // read relay starts here, so one that is slow to answer holds too.
+          const walking = new Set<RelayUrl>(relays);
+          const unresolvedBoundaries = new Map<RelayUrl, number>();
+          let closed = false;
+          yield* Effect.addFinalizer(() =>
+            Effect.sync(() => {
+              closed = true;
+            }),
           );
           const rawWraps = yield* Effect.acquireRelease(
             Queue.unbounded<RawArrival>(),
@@ -193,60 +232,198 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
           );
           const seenWrapIds = makeSeenWrapIds(DEFAULT_SEEN_WRAP_IDS_CAPACITY);
 
-          const filterFrom = (since: UnixSeconds | null): Filter => ({
-            kinds: [GIFT_WRAP_KIND],
-            "#p": [identity.pubkey],
-            ...(since === null
-              ? {}
-              : {
-                  since: Math.max(since - NIP59_BACKDATE_MARGIN_SECONDS, 0),
-                }),
+          const arrive = (arrival: RawArrival): void => {
+            if (Queue.unsafeOffer(rawWraps, arrival)) outstanding++;
+          };
+
+          // Relays deliver out of order and walks newest first, so the cursor
+          // moves only once no walk runs and every delivered wrap is confirmed.
+          const advanceWhenSettled = Effect.suspend(() => {
+            if (closed || outstanding > 0 || walking.size > 0)
+              return Effect.void;
+            const confirmed = Math.min(
+              newestConfirmed,
+              ...unresolvedBoundaries.values(),
+            );
+            if (confirmed <= (cursor ?? 0)) return Effect.void;
+            const next = UnixSeconds.make(confirmed);
+            cursor = next;
+            return cursorStore.save(next);
           });
 
-          // The phase is scoped to one subscription attempt: after a
-          // reconnect the relay replays its stored window, which is backfill
-          // again until its next EOSE.
-          const subscribeFromCursor = (relay: RelayUrl) =>
+          const settle = (wrapCreatedAt: number | null): Effect.Effect<void> =>
             Effect.gen(function* () {
-              const filter = filterFrom(yield* Ref.get(cursor));
+              if (wrapCreatedAt !== null) {
+                // Clamped: a sender-controlled future timestamp must not push
+                // the cursor past real time, or restarts would skip everything
+                // published before it.
+                newestConfirmed = Math.max(
+                  newestConfirmed,
+                  Math.min(wrapCreatedAt, yield* nowSeconds),
+                );
+              }
+              outstanding--;
+              yield* advanceWhenSettled;
+            });
+
+          const ackOnce = (
+            wrapCreatedAt: number | null,
+          ): Effect.Effect<void> => {
+            let acked = false;
+            return Effect.suspend(() => {
+              if (acked) return Effect.void;
+              acked = true;
+              return settle(wrapCreatedAt);
+            });
+          };
+
+          const wrapFilter = (window: Filter): Filter => ({
+            kinds: [GIFT_WRAP_KIND],
+            "#p": [identity.pubkey],
+            ...window,
+          });
+
+          // Inclusive pages retain timestamp ties; a saturated boundary holds the cursor there.
+          const walkBack = (relay: RelayUrl) =>
+            Effect.gen(function* () {
+              walking.add(relay);
+              const delivered = new Set<string>();
+              let until: number | null = null;
+              let limit = BACKFILL_PAGE_LIMIT;
+              let largestPage = 0;
+              let unresolvedBoundary = Number.POSITIVE_INFINITY;
+              for (;;) {
+                const page = yield* transport.fetch(
+                  relay,
+                  wrapFilter({
+                    since,
+                    ...(until === null ? {} : { until }),
+                    limit,
+                  }),
+                );
+                largestPage = Math.max(largestPage, page.length);
+                const fresh = page.filter((raw) => !delivered.has(raw.id));
+                for (const raw of fresh) {
+                  delivered.add(raw.id);
+                  arrive({ delivery: "backfill", raw });
+                }
+                const times = page
+                  .map((raw) => raw.created_at)
+                  .filter(Number.isInteger);
+                if (times.length === 0) break;
+                const oldest = Math.min(...times);
+                if (until !== null && oldest >= until) {
+                  if (page.length === largestPage) {
+                    if (limit === BACKFILL_PAGE_LIMIT) {
+                      limit *= 2;
+                      continue;
+                    }
+                    unresolvedBoundary = Math.min(unresolvedBoundary, until);
+                    unresolvedBoundaries.set(
+                      relay,
+                      Math.min(
+                        unresolvedBoundaries.get(relay) ?? unresolvedBoundary,
+                        unresolvedBoundary,
+                      ),
+                    );
+                  }
+                  until--;
+                } else {
+                  until = oldest;
+                }
+                limit = BACKFILL_PAGE_LIMIT;
+                if (until < since) break;
+              }
+              if (Number.isFinite(unresolvedBoundary))
+                unresolvedBoundaries.set(relay, unresolvedBoundary);
+              else unresolvedBoundaries.delete(relay);
+              walking.delete(relay);
+              yield* advanceWhenSettled;
+            });
+
+          // The live subscription asks for one stored wrap only: some relays
+          // never answer `limit: 0` with EOSE. Its EOSE starts the walk, so a
+          // wrap published meanwhile arrives live. The phase is scoped to one
+          // attempt: after a reconnect, wraps are backfill until the next EOSE.
+          const subscribeAndWalk = (relay: RelayUrl) =>
+            Effect.gen(function* () {
+              const subscribed = yield* Deferred.make<void>();
               let eoseSeen = false;
-              yield* transport.subscribe(
+              const live = transport.subscribe(
                 relay,
-                filter,
-                (event) => {
-                  Queue.unsafeOffer(rawWraps, {
+                wrapFilter({ since, limit: 1 }),
+                (event) =>
+                  arrive({
                     delivery: eoseSeen ? "live" : "backfill",
                     raw: event,
-                  });
-                },
+                  }),
                 {
                   onEose: () => {
                     eoseSeen = true;
+                    Deferred.unsafeDone(subscribed, Exit.void);
                   },
                 },
               );
+              const backfill = Deferred.await(subscribed).pipe(
+                Effect.zipRight(walkBack(relay)),
+                Effect.zipRight(Effect.never),
+              );
+              yield* Effect.raceFirst(live, backfill);
             });
 
-          const keepSubscribed = (relay: RelayUrl) =>
-            resubscribeForever(subscribeFromCursor(relay), resubscribeDelay);
+          const keepSubscribed = (relay: RelayUrl) => {
+            let failedAttempts = 0;
+            const afterAttempt = Effect.suspend(() => {
+              if (!walking.has(relay)) {
+                failedAttempts = 0;
+                return Effect.void;
+              }
+              failedAttempts++;
+              if (failedAttempts < MAX_FAILED_WALK_ATTEMPTS) return Effect.void;
+              walking.delete(relay);
+              inspector.emit(
+                () =>
+                  new InboxWalkGivenUp(
+                    { relay, failedAttempts },
+                    { disableValidation: true },
+                  ),
+              );
+              return advanceWhenSettled;
+            });
+            return resubscribeForever(
+              Effect.zipRight(
+                Effect.exit(subscribeAndWalk(relay)),
+                afterAttempt,
+              ),
+              resubscribeDelay,
+            );
+          };
 
           yield* Effect.forEach(relays, (relay) =>
             Effect.forkScoped(keepSubscribed(relay)),
           );
 
-          const advanceCursor = (wrapCreatedAt: number): Effect.Effect<void> =>
-            Effect.gen(function* () {
-              // Clamped: a sender-controlled future timestamp must not push
-              // the cursor past real time, or restarts would skip everything
-              // published before it.
-              const next = Math.min(wrapCreatedAt, yield* nowSeconds);
-              const advanced = yield* Ref.modify(cursor, (current) =>
-                next > (current ?? 0)
-                  ? [UnixSeconds.make(next), UnixSeconds.make(next)]
-                  : [null, current],
-              );
-              if (advanced !== null) yield* cursorStore.save(advanced);
-            });
+          const routed = (
+            wrapId: WrapId | null,
+            rumorKind: number | null,
+            delivery: InboxDelivery,
+            event: WrapInboxEvent,
+            ack: Effect.Effect<void>,
+          ): Option.Option<DeliveredInboxEvent> => {
+            inspector.emit(
+              () =>
+                new InboxRouted(
+                  {
+                    wrapId,
+                    rumorKind,
+                    delivery,
+                    event: redactInspectorSecrets(event),
+                  },
+                  { disableValidation: true },
+                ),
+            );
+            return Option.some({ wrapId, delivery, event, ack });
+          };
 
           const processRaw = ({
             delivery,
@@ -255,59 +432,37 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
             Effect.suspend(() => {
               const wrapId = wrapIdOf(raw);
               if (wrapId !== null && seenWrapIds.has(wrapId)) {
-                return Effect.sync(() => {
-                  inspector.emit(
-                    () =>
-                      new InboxWrapDeduped(
-                        { wrapId },
-                        { disableValidation: true },
-                      ),
-                  );
-                  return Option.none<DeliveredInboxEvent>();
-                });
+                inspector.emit(
+                  () =>
+                    new InboxWrapDeduped(
+                      { wrapId },
+                      { disableValidation: true },
+                    ),
+                );
+                return Effect.as(settle(null), Option.none());
               }
               const decoded = decodeWrapEvent(raw, identity);
               if (decoded.wrap === null) {
-                return Effect.sync(() => {
-                  inspector.emit(
-                    () =>
-                      new InboxRouted(
-                        {
-                          wrapId: decoded.event.wrapId,
-                          rumorKind: null,
-                          delivery,
-                          event: redactInspectorSecrets(decoded.event),
-                        },
-                        { disableValidation: true },
-                      ),
-                  );
-                  return Option.some<DeliveredInboxEvent>({
+                return Effect.succeed(
+                  routed(
+                    decoded.event.wrapId,
+                    null,
                     delivery,
-                    event: decoded.event,
-                  });
-                });
+                    decoded.event,
+                    ackOnce(null),
+                  ),
+                );
               }
               const { wrap } = decoded;
-              return Effect.sync(() => seenWrapIds.add(wrap.id)).pipe(
-                Effect.andThen(advanceCursor(wrap.created_at)),
-                Effect.map(() => {
-                  inspector.emit(
-                    () =>
-                      new InboxRouted(
-                        {
-                          wrapId: wrap.id,
-                          rumorKind: decoded.rumorKind,
-                          delivery,
-                          event: redactInspectorSecrets(decoded.event),
-                        },
-                        { disableValidation: true },
-                      ),
-                  );
-                  return Option.some<DeliveredInboxEvent>({
-                    delivery,
-                    event: decoded.event,
-                  });
-                }),
+              seenWrapIds.add(wrap.id);
+              return Effect.succeed(
+                routed(
+                  wrap.id,
+                  decoded.rumorKind,
+                  delivery,
+                  decoded.event,
+                  ackOnce(wrap.created_at),
+                ),
               );
             });
 

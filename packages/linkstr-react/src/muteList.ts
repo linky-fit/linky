@@ -8,3 +8,7 @@ export const publishMuteListAtom = linkstrRuntimeAtom.fn<
 >()((pubkeys) =>
   Effect.flatMap(MuteList, (muteList) => muteList.publishMuteList(pubkeys)),
 );
+
+export const fetchOwnMuteListAtom = linkstrRuntimeAtom.fn<void>()(() =>
+  Effect.flatMap(MuteList, (muteList) => muteList.fetchOwnMuteList()),
+);

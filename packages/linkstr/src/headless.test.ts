@@ -141,8 +141,16 @@ describe("runLinkstr", () => {
           const inbox = yield* WrapInbox;
           const feed = yield* inbox.open({ since });
           yield* eventually(() => fake.subscriptions.length === 1);
+          fake.eose();
+          yield* eventually(() => fake.subscriptions.length === 2);
+          fake.eose();
           fake.emit(wrap);
-          return yield* Stream.runCollect(Stream.take(feed.events, 1));
+          return yield* Stream.runCollect(
+            Stream.take(
+              Stream.tap(feed.events, ({ ack }) => ack),
+              1,
+            ),
+          );
         }),
       ),
     );
@@ -160,15 +168,15 @@ describe("runLinkstr", () => {
         Effect.gen(function* () {
           const inbox = yield* WrapInbox;
           yield* inbox.open({ since });
-          yield* eventually(() => fake.subscriptions.length === 2);
+          yield* eventually(() => fake.subscriptions.length === 3);
         }),
       ),
     );
 
-    expect(fake.subscriptions[1]?.filters[0]?.since).toBe(
+    expect(fake.subscriptions[2]?.filters[0]?.since).toBe(
       wrap.created_at - NIP59_BACKDATE_MARGIN_SECONDS,
     );
-    expect(fake.subscriptions[1]?.closed).toBe(true);
+    expect(fake.subscriptions[2]?.closed).toBe(true);
   });
 
   it("rejects with the effect's typed failure", async () => {

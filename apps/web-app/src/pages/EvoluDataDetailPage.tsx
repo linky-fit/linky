@@ -53,6 +53,7 @@ export function EvoluDataDetailPage(): React.ReactElement {
     "conversation",
     "message",
     "reaction",
+    "unknownSenderMessage",
     "cashuToken",
     "cashuProof",
     "cashuOperation",

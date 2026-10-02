@@ -46,6 +46,13 @@ The repository returns one row per id; deduplicating unsaved peers by npub is th
 - `removedReactions` returns the tombstoned reaction copies in the visible shards, so a removed reaction's wrap id and reactor stay known; a tombstone stored before its reaction has no conversation, message or emoji.
 - `archivedAtSec` on a conversation is written only by older app versions; the archive state lives on the [contact](#contacts).
 
+## Unknown senders
+
+`makeUnknownSendersRepository(store)` is a `TableRepository` over `unknownSenderMessage` in the `unknownSenders` scope, which keeps the newest 2 shards: conversations with peers who are not contacts, one row per message, keyed by the sender's `peerPubkey`. A message from Nostr takes `nostrMessageIdFor(rumorId)` and goes in with `insertIfAbsent`, as in [conversations](#conversations). Reactions and seen receipts from unknown senders have no table.
+
+- `moveToContact(peerPubkey, contactId)` runs once the sender is a contact: it inserts each message into the contact's direct conversation with `insertIfAbsent` under the same id, then removes it here, and returns how many left. Repeating it, or another device doing it at the same time, moves nothing twice; a message whose required columns have not synced yet stays until the next call.
+- `removeSender(peerPubkey)` removes every message of the sender, for deleting or blocking the chat.
+
 ## Wallet
 
 `makeWalletRepository(store)` implements linkshu's `ProofStore` and `OperationStore` ports over the `cashu` scope, which is never forgotten. Give the layers to `linkshuServices` or `runLinkshu`:
@@ -84,3 +91,9 @@ A row's id says which event it records, so writing the same event again (a retry
 `makeSettingsRepository(store)`: small synced values in the app owner, one row per key (`settingIdFor(key)`). Only keys registered in `LinkySettings` compile; each key's schema maps its typed value to the stored text. `get` returns the decoded value, or `null` when the row is absent or holds text the schema rejects; `set` encodes the value and dies when the text is empty or over 1000 characters; `remove` is a no-op when absent. Shard pointers share the scope but have their own table; never write them through settings.
 
 A new setting is a new `LinkySettings` entry. Keys and encodings are synced data that older app versions on other devices read, so never rename a key or change its encoding; add a new key instead.
+
+## Inbox cursors
+
+`makeInboxCursorsRepository(store)` keeps each Nostr identity's inbox cursor (a linkstr `UnixSeconds`) as a setting row in the app owner, keyed by pubkey (`inboxCursorSettingIdFor(pubkey)`), so a restored or second device can start its inbox where another device's left off. `get(pubkey)` returns the cursor, or `null` when the row is absent or unreadable; `set(pubkey, cursor)` writes it unconditionally, last writer wins.
+
+The app owner is never rotated and Evolu keeps every write against its quota, so write rarely, and only a cursor this device has fetched up to itself.

@@ -38,7 +38,7 @@ if (Exit.isFailure(exit)) console.warn(Cause.pretty(exit.cause)); // e.g. Linkst
 | `republishOwnProfileAtom`                          | `Profiles.republishOwnProfile`                                                       |
 | `discoverActiveProfilesAtom`, `searchProfilesAtom` | `Profiles.discoverActiveProfiles`, `Profiles.searchProfiles` (`{ query, options? }`) |
 | `publishRelayListsAtom`, `fetchOwnRelayListsAtom`  | `RelayLists.publishRelayLists`, `RelayLists.fetchOwnRelayLists`                      |
-| `publishMuteListAtom`                              | `MuteList.publishMuteList`                                                           |
+| `publishMuteListAtom`, `fetchOwnMuteListAtom`      | `MuteList.publishMuteList`, `MuteList.fetchOwnMuteList`                              |
 | `fetchWrapEventAtom`                               | `WrapInbox.fetchWrapEvent` (`{ wrapId, extraRelays? }`)                              |
 
 Chat sends and reaction adds go through `enqueueOutboxAtom` ([outbox.md](./outbox.md)); there is no `sendTextAtom`.
@@ -85,7 +85,7 @@ export const useInboxSync = (
 ```
 
 - Run **one** sync loop per app. The feed is single-consumer; fan out inside your handler by `_tag`.
-- `onEvent` may return a promise; the next event waits for it.
+- Return the promise of what the handler stores; the event is acked when it resolves. A rejection leaves it unacked (`InboxEventUnconfirmed`).
 - `since` only matters on a first session with an empty cursor store ([inbox.md](./inbox.md#the-cursor-and-inboxcursorstore)).
 - `fetchWrapEventAtom` is the one-shot counterpart for notification opens.
 

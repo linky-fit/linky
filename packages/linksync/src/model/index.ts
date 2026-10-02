@@ -17,6 +17,7 @@ export type {
 } from "./schema";
 export {
   linkyScopes,
+  messageScopes,
   SHARD_MAX_BYTES,
   SHARD_ROTATION_COOLDOWN_MS,
 } from "./scopes";

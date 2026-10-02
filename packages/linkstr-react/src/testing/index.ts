@@ -47,6 +47,8 @@ export interface FakeSubscription {
   readonly relay: RelayUrl;
   readonly filter: Filter;
   readonly onEvent: (event: NostrToolsEvent) => void;
+  /** Ends the stored events, as the relay's EOSE would. */
+  readonly eose: () => void;
 }
 
 /**
@@ -67,9 +69,14 @@ export const fakeTransport = (
           new RelayPublishResult({ relay, accepted: true, detail: null }),
       );
     }),
-  subscribe: (relay, filter, onEvent) =>
+  subscribe: (relay, filter, onEvent, options) =>
     Effect.suspend(() => {
-      const subscription: FakeSubscription = { relay, filter, onEvent };
+      const subscription: FakeSubscription = {
+        relay,
+        filter,
+        onEvent,
+        eose: () => options?.onEose?.(),
+      };
       subscriptions.push(subscription);
       return Effect.never.pipe(
         Effect.ensuring(

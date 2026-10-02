@@ -6,6 +6,7 @@ import { createEvolu, SimpleName } from "@evolu/common";
 import {
   appOwnerFromMnemonic,
   linkyScopes,
+  messageScopes,
   LinkySchema,
   type CashuOperationId,
   type CashuProofId,
@@ -715,7 +716,18 @@ export const setE2eMessagesRotation = (enabled: boolean): void => {
 
 export const forgetChatShards = async () => {
   const store = await getLinkyStore();
-  const forgotten = await Effect.runPromise(store.forget("messages"));
+  const forgotten = (
+    await Effect.runPromise(
+      Effect.forEach(messageScopes, (scope) =>
+        Effect.map(store.forget(scope), (shards) =>
+          shards.map((shard) => ({
+            ...shard,
+            owner: store.shardOwner(scope, shard.index).id,
+          })),
+        ),
+      ),
+    )
+  ).flat();
   if (getInspectorEmissionEnabled()) {
     reportInspectorRows([
       {
@@ -723,11 +735,7 @@ export const forgetChatShards = async () => {
         channel: "evolu.sync",
         tag: "ShardsForgotten",
         summary: `Forgot ${forgotten.length} old chat shards locally`,
-        links: {
-          owner: forgotten.map(
-            ({ index }) => store.shardOwner("messages", index).id,
-          ),
-        },
+        links: { owner: forgotten.map(({ owner }) => owner) },
         payload: forgotten,
       },
     ]);
@@ -908,6 +916,7 @@ const getEvoluDatabaseInfo = async (
     "conversation",
     "message",
     "reaction",
+    "unknownSenderMessage",
     "cashuToken",
     "cashuProof",
     "cashuOperation",
@@ -1101,6 +1110,7 @@ export const loadEvoluCurrentData = async (): Promise<
     "conversation",
     "message",
     "reaction",
+    "unknownSenderMessage",
     "cashuToken",
     "cashuProof",
     "cashuOperation",

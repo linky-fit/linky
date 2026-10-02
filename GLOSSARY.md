@@ -37,7 +37,7 @@ The other party of a conversation or offer, whether or not they are a contact.
 _Avoid_: counterparty, remote user, other side
 
 **Unknown sender**:
-A peer who wrote to the user but is not a contact; they stay outside contacts until the user adds them.
+A peer who wrote to the user but is not a contact; they stay outside contacts until the user adds them, and their messages move into the conversation once the sender becomes a contact.
 _Avoid_: stranger, anonymous contact
 
 ## Messaging
@@ -105,6 +105,18 @@ _Avoid_: send queue, retry queue
 **Backfill**:
 Events a relay replays from storage when the user connects, as opposed to **live** events that arrive afterwards; only live events interrupt the user.
 _Avoid_: history sync, catch-up
+
+**Inbox cursor**:
+The time up to which a device has fetched and stored the identity's incoming gift wraps; the next start fetches from there, and it syncs, so a restored device starts where another one left off.
+_Avoid_: since, checkpoint, last seen
+
+**Block list**:
+The peers the user blocked; nothing they send is shown or stored. Each device keeps its own and merges it with the mute list.
+_Avoid_: ban list, ignore list
+
+**Mute list**:
+The block list as the identity publishes it in a plain event, which is how the user's other devices learn it.
+_Avoid_: blocklist event, kind 10000
 
 **Push marker**:
 A plaintext tag on a gift wrap that asks the push service to notify the recipient; it deliberately reveals that much metadata.
@@ -261,7 +273,7 @@ State that stays on one device and never syncs, such as wallet counters.
 _Avoid_: local-only, cached
 
 **Scope**:
-One kind of synced data with its own storage policy: identity, contacts, messages, wallet or transactions.
+One kind of synced data with its own storage policy: identity, contacts, messages, unknown senders, wallet or transactions.
 _Avoid_: lane, category, bucket
 
 **Shard**:
@@ -273,7 +285,7 @@ Starting a new shard for a scope once the current one is full.
 _Avoid_: rollover, split
 
 **Forget**:
-Dropping a scope's older shards from a device; messages and transactions can be forgotten, money and contacts never.
+Dropping a scope's older shards from a device; messages, unknown senders' messages and transactions can be forgotten, money and contacts never.
 _Avoid_: delete, prune, archive
 
 **Inspector**:

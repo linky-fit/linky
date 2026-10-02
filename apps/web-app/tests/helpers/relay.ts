@@ -4,7 +4,8 @@ import {
   type WebSocket as PlaywrightWebSocket,
 } from "@playwright/test";
 import { Option, Schema } from "effect";
-import { finalizeEvent, nip19 } from "nostr-tools";
+import { finalizeEvent, nip19, type NostrEvent } from "nostr-tools";
+import { wrapEvent } from "nostr-tools/nip59";
 
 import { isNostrRelay, NOSTR_RELAY_URL } from "./stack";
 
@@ -17,6 +18,7 @@ const decodeSubscriptionFrame = Schema.decodeUnknownOption(
         Schema.Struct({
           kinds: Schema.Array(Schema.Number),
           "#p": Schema.Array(Schema.String),
+          limit: Schema.optional(Schema.Number),
         }),
       ),
       Schema.Tuple(Schema.Literal("EOSE", "CLOSE"), Schema.String),
@@ -38,10 +40,12 @@ export const watchNostrInbox = (
       const decoded = decodeSubscriptionFrame(String(payload));
       if (Option.isNone(decoded)) return;
       const frame = decoded.value;
+      // The live subscription asks for one stored wrap; backfill pages ask for more.
       if (
         frame[0] === "REQ" &&
         frame[2].kinds.includes(1059) &&
-        frame[2]["#p"].includes(pubkey)
+        frame[2]["#p"].includes(pubkey) &&
+        frame[2].limit === 1
       ) {
         inboxSubscriptionId = frame[1];
         readySockets.delete(socket);
@@ -70,7 +74,7 @@ export const watchNostrInbox = (
   };
 };
 
-const npubToHex = (npub: string): string => {
+export const npubToHex = (npub: string): string => {
   const decoded = nip19.decode(npub);
   if (decoded.type !== "npub" || typeof decoded.data !== "string") {
     throw new Error(`Not an npub: ${npub}`);
@@ -151,28 +155,8 @@ const nsecToSecretKey = (nsec: string): Uint8Array => {
   return decoded.data;
 };
 
-/**
- * Publish the NIP-38 general status the app would publish from Settings >
- * Payments > Proxy payments. The switch there first enables push
- * notifications, which a service-worker-blocked test browser cannot do, so the
- * test signs the same `kind:30315` event itself; the relay does not care who
- * pressed the switch.
- */
-export const publishProfileStatusToRelay = async (
-  nsec: string,
-  currencies: readonly string[],
-): Promise<void> => {
-  const event = finalizeEvent(
-    {
-      content: currencies.join(", "),
-      created_at: Math.floor(Date.now() / 1000),
-      kind: 30315,
-      tags: [["d", "general"]],
-    },
-    nsecToSecretKey(nsec),
-  );
-
-  await new Promise<void>((resolve, reject) => {
+const publishToRelay = (event: NostrEvent): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
     const socket = new WebSocket(NOSTR_RELAY_URL);
     const timer = setTimeout(() => {
       socket.close();
@@ -194,9 +178,78 @@ export const publishProfileStatusToRelay = async (
       clearTimeout(timer);
       socket.close();
       if (parsed[2] === true) resolve();
-      else reject(new Error(`relay rejected status: ${String(parsed[3])}`));
+      else reject(new Error(`relay rejected event: ${String(parsed[3])}`));
     };
   });
+
+/**
+ * Publish the NIP-38 general status the app would publish from Settings >
+ * Payments > Proxy payments. The switch there first enables push
+ * notifications, which a service-worker-blocked test browser cannot do, so the
+ * test signs the same `kind:30315` event itself; the relay does not care who
+ * pressed the switch.
+ */
+export const publishProfileStatusToRelay = (
+  nsec: string,
+  currencies: readonly string[],
+): Promise<void> =>
+  publishToRelay(
+    finalizeEvent(
+      {
+        content: currencies.join(", "),
+        created_at: Math.floor(Date.now() / 1000),
+        kind: 30315,
+        tags: [["d", "general"]],
+      },
+      nsecToSecretKey(nsec),
+    ),
+  );
+
+/**
+ * Gift-wrap a NIP-17 text message to the recipient and publish it, as a peer
+ * on any NIP-17 client would; no browser needed for the sender.
+ */
+export const sendDirectMessage = (
+  senderNsec: string,
+  recipientNpub: string,
+  text: string,
+  createdAtSec = Math.floor(Date.now() / 1000),
+): Promise<void> => {
+  const recipient = npubToHex(recipientNpub);
+  return publishToRelay(
+    wrapEvent(
+      {
+        content: text,
+        created_at: createdAtSec,
+        kind: 14,
+        tags: [["p", recipient]],
+      },
+      nsecToSecretKey(senderNsec),
+      recipient,
+    ),
+  );
+};
+
+/** Block until the account's newest mute list on the relay lists the pubkey. */
+export const waitForMuteListOnRelay = async (
+  npub: string,
+  mutedPubkey: string,
+): Promise<void> => {
+  const author = npubToHex(npub);
+  await expect
+    .poll(
+      async () => {
+        const lists = await queryRelay(
+          { authors: [author], kinds: [10000], limit: 1 },
+          10_000,
+        ).catch(() => []);
+        return lists.some((list) =>
+          list.tags.some((tag) => tag[0] === "p" && tag[1] === mutedPubkey),
+        );
+      },
+      { message: "the mute list on the relay lists the blocked pubkey" },
+    )
+    .toBe(true);
 };
 
 /**

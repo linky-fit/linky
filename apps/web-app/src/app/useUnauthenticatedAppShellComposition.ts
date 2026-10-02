@@ -20,6 +20,7 @@ export const useUnauthenticatedAppShellComposition = () => {
     appendIdentityChangeNoticesRef,
     currentNsec: null,
     identityRepository: null,
+    inboxCursors: null,
     lang,
     myProfileMetadataRef,
     pushToast,

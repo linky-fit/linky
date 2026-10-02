@@ -126,6 +126,19 @@ export class InboxWrapDeduped extends Schema.TaggedClass<InboxWrapDeduped>()(
 ) {}
 
 /**
+ * The inbox stopped holding its cursor for a relay whose last
+ * `failedAttempts` attempts all ended before its backfill walk finished, so
+ * one failing relay cannot hold the cursor for the whole session.
+ */
+export class InboxWalkGivenUp extends Schema.TaggedClass<InboxWalkGivenUp>()(
+  "InboxWalkGivenUp",
+  {
+    relay: RelayUrl,
+    failedAttempts: Schema.Int,
+  },
+) {}
+
+/**
  * The inbox turned a wrap into a typed fact — including `WrapDropped` ones,
  * which is where unknown rumor kinds surface (`rumorKind` names them; it is
  * null when the wrap failed authentication before decryption).
@@ -137,6 +150,21 @@ export class InboxRouted extends Schema.TaggedClass<InboxRouted>()(
     rumorKind: Schema.NullOr(Schema.Int),
     delivery: InboxDelivery,
     event: Schema.Unknown,
+  },
+) {}
+
+/**
+ * The inbox's consumer failed to handle an event, so it stays unconfirmed
+ * and holds the cursor until the inbox reopens. Emitted by the consumer
+ * (linkstr-react's `wrapInboxAtom`), not by `WrapInbox`.
+ */
+export class InboxEventUnconfirmed extends Schema.TaggedClass<InboxEventUnconfirmed>()(
+  "InboxEventUnconfirmed",
+  {
+    wrapId: Schema.NullOr(WrapId),
+    delivery: InboxDelivery,
+    eventTag: Schema.String,
+    error: Schema.String,
   },
 ) {}
 
@@ -166,5 +194,7 @@ export type InspectorEvent =
   | WireSubscriptionEnded
   | WireEventReceived
   | InboxWrapDeduped
+  | InboxWalkGivenUp
   | InboxRouted
+  | InboxEventUnconfirmed
   | ProfileWatchRouted;

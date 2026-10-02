@@ -38,6 +38,11 @@ export const linkyScopes = {
     rotation: rotation(160),
     forget: { keepNewest: 4 },
   }),
+  unknownSenders: shardScope({
+    tables: ["unknownSenderMessage"],
+    rotation: rotation(160),
+    forget: { keepNewest: 2 },
+  }),
   cashu: shardScope({
     tables: ["cashuProof", "cashuOperation"],
     rotation: rotation(170),
@@ -52,3 +57,9 @@ export const linkyScopes = {
 
 export type LinkyScopes = typeof linkyScopes;
 export type LinkyScope = keyof LinkyScopes;
+
+/** The scopes that hold conversations' messages, which a user forgets together. */
+export const messageScopes = [
+  "messages",
+  "unknownSenders",
+] as const satisfies ReadonlyArray<LinkyScope>;
