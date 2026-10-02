@@ -21,6 +21,8 @@ import {
   type ContactWithChatState,
 } from "../lib/contactChatState";
 import { runWrite } from "../lib/storeWrite";
+import { useConversationArchiveMigration } from "../migrations/useConversationArchiveMigration";
+import { useAccountHydrated } from "./useLinksync";
 import type { Translate } from "../../i18n";
 
 import { reportAppLog } from "../../devtools/inspector/appLog";
@@ -73,6 +75,12 @@ export const useContactsDomain = ({
 
   const contactRows = useRepositoryRows(contactsRepository);
   const conversationRows = useRepositoryRows(conversations);
+  useConversationArchiveMigration({
+    contactRows,
+    contactsRepository,
+    conversationRows,
+    hydrated: useAccountHydrated(),
+  });
 
   const contacts = React.useMemo(
     () =>

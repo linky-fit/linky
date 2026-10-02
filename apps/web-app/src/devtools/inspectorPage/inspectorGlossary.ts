@@ -48,6 +48,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A boot or late-row grace-period re-ingest finished; counts show which lane rows were newer than their shard copies.",
   LaneSpentProofsMirrored:
     "During the migration grace period, spent shard proofs mark their existing legacy copies spent so older devices stop counting them. Owner and proof links identify the copies; no proof secrets are logged.",
+  ArchiveCopiedToContact:
+    "After hydration, conversation archives this device sees were copied onto their contacts, where the archive state now lives. It also fires for archives an older app version wrote on the conversation; an archive is copied only onto a contact without one, and an unarchive clears both, so it is never undone. Contact and conversation links identify the rows.",
   "evolu.legacySpentProofSyncFailed":
     "A terminal proof state could not be mirrored to legacy storage. An older device may show stale funds until its mint check corrects them; the next proof change retries.",
   "evolu.laneMigrationFailed":
