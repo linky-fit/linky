@@ -16,28 +16,26 @@ export const decodeFiatRates = (raw: string | null): FiatRates | null => {
 };
 export const isFiatRatesStale = (rates: FiatRates | null): boolean =>
   !rates || Date.now() - rates.fetchedAtMs >= FIAT_RATES_TTL_MS;
-const CoinbaseRates = Schema.Struct({
-  data: Schema.Struct({
-    rates: Schema.Struct({
-      CHF: Schema.NumberFromString,
-      CZK: Schema.NumberFromString,
-      EUR: Schema.NumberFromString,
-      USD: Schema.NumberFromString,
-    }),
+const YadioRates = Schema.Struct({
+  BTC: Schema.Struct({
+    CHF: Schema.Number,
+    CZK: Schema.Number,
+    EUR: Schema.Number,
+    USD: Schema.Number,
   }),
 });
 export const fetchFiatRates = async (
   signal: AbortSignal,
 ): Promise<FiatRates | null> => {
-  const response = await fetch(
-    "https://api.coinbase.com/v2/exchange-rates?currency=BTC",
-    { headers: { Accept: "application/json" }, signal },
-  );
+  const response = await fetch("https://api.yadio.io/exrates/BTC", {
+    headers: { Accept: "application/json" },
+    signal,
+  });
   if (!response.ok) return null;
   const payload: unknown = await response.json();
-  const parsed = Schema.decodeUnknownOption(CoinbaseRates)(payload);
+  const parsed = Schema.decodeUnknownOption(YadioRates)(payload);
   if (parsed._tag === "None") return null;
-  const rates = parsed.value.data.rates;
+  const rates = parsed.value.BTC;
   const result = {
     chfPerBtc: rates.CHF,
     czkPerBtc: rates.CZK,

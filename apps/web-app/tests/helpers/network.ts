@@ -16,17 +16,14 @@ const TRANSPARENT_PNG = Buffer.from(
  * unexercised. It returns null unless all four currencies are present and > 0.
  */
 export const stubFiatRates = async (page: Page): Promise<void> => {
-  await page.route("**/api.coinbase.com/**", (route) =>
+  await page.route("**/api.yadio.io/**", (route) =>
     route.fulfill({
       body: JSON.stringify({
-        data: {
-          currency: "BTC",
-          rates: {
-            CHF: String(CZK_PER_BTC),
-            CZK: String(CZK_PER_BTC),
-            EUR: String(CZK_PER_BTC),
-            USD: String(CZK_PER_BTC),
-          },
+        BTC: {
+          CHF: CZK_PER_BTC,
+          CZK: CZK_PER_BTC,
+          EUR: CZK_PER_BTC,
+          USD: CZK_PER_BTC,
         },
       }),
       contentType: "application/json",
