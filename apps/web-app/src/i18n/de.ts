@@ -161,6 +161,42 @@ export const de = {
   payWithCashuDisabled:
     "Cashu-Zahlungen sind in den erweiterten Einstellungen deaktiviert.",
   lightningInvoiceAutoPayLimit: "Limit für automatische Zahlungen",
+  boltCardTitle: "NFC-Bolt-Card",
+  boltCardConnecting: "Karte wird eingeschaltet…",
+  boltCardPaying: "Das Terminal hat seine Rechnung geschickt, zahle…",
+  boltCardEnded: "Die Karte ist ausgeschaltet.",
+  boltCardRetry: "Erneut einschalten",
+  boltCardSendActive:
+    "Bolt-Card ist aktiv, halte dein Handy an das Terminal (bis zu {amount})",
+  boltCardArmOnSend: "Mit dem Senden-Bildschirm einschalten",
+  boltCardIntro:
+    "Dein Handy kann als kontaktlose Bitcoin-Karte (Bolt-Card) dienen. Ist der Schalter an, öffne den Senden-Bildschirm und halte dein Handy an ein Terminal, das Bolt-Cards annimmt. Die Zahlung kommt aus deinem Linky-Wallet.",
+  boltCardInfoTitle: "Gut zu wissen",
+  boltCardInfoRisk:
+    "Solange der Senden-Bildschirm offen ist, kann jedes Lesegerät in der Nähe die Karte lesen und bis zu {amount} ohne Bestätigung abbuchen.",
+  boltCardInfoAndroid:
+    "Funktioniert nur in Linky für Android mit NFC und braucht Internet.",
+  boltCardInfoSync: "Der Schalter gilt für alle deine Geräte.",
+  boltCardBridgeUrlHint:
+    "Der Dienst, über den das Terminal die Karte erreicht. Ändere ihn nur, wenn du eine eigene Bridge betreibst.",
+  boltCardErrorUnsupported: "Dieses Gerät kann keine NFC-Karte emulieren.",
+  boltCardErrorNfcDisabled: "Schalte NFC ein, um mit der Karte zu zahlen.",
+  boltCardErrorBridge: "Die Karten-Bridge ist nicht erreichbar.",
+  boltCardErrorStorage:
+    "Die Karte konnte auf diesem Gerät nicht gespeichert werden.",
+  boltCardErrorExhausted:
+    "Der Zähler der Karte ist aufgebraucht; ersetze sie in den Einstellungen.",
+  boltCardErrorNative: "Die NFC-Kartenemulation ist fehlgeschlagen.",
+  boltCardBridgeUrl: "Karten-Bridge",
+  boltCardBridgeUrlInvalid: "Gib eine http(s)-Adresse ein.",
+  boltCardCurrentCard: "Karte auf diesem Gerät",
+  boltCardNoCard: "Noch keine Karte; sie entsteht bei der ersten Nutzung.",
+  boltCardId: "Karte {id}",
+  boltCardTaps: "{count}× gelesen",
+  boltCardReplace: "Karte ersetzen",
+  boltCardReplaceConfirm: "Wirklich ersetzen? Erneut tippen",
+  boltCardReplaceHint:
+    "Eine neue Karte bekommt neue Schlüssel, und die Adressen der alten Karte funktionieren nicht mehr.",
   bankPaymentOfferStaggerDelay: "Verzögerung zwischen Angebotsempfängern",
   bankPaymentOfferStaggerDelayDecrease: "Verzögerung verringern",
   bankPaymentOfferStaggerDelayIncrease: "Verzögerung erhöhen",

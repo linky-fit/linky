@@ -43,4 +43,15 @@ describe("settings repository", () => {
       runNow(makeSettingsRepository(store).get("allowTestMints")),
     ).toBeNull();
   });
+
+  it("keeps the bolt card Send switch off until a device sets it", () => {
+    const { db, store } = linkyStore();
+    const settings = makeSettingsRepository(store);
+    expect(runNow(settings.get("boltCard.armOnSend"))).toBeNull();
+    runNow(settings.set("boltCard.armOnSend", true));
+    expect(runNow(settings.get("boltCard.armOnSend"))).toBe(true);
+    expect(runNow(db.readTable("setting")).map((row) => row.value)).toEqual([
+      "1",
+    ]);
+  });
 });

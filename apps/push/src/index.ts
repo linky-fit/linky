@@ -50,18 +50,23 @@ const server = Bun.serve({
   },
 });
 
+const SHUTDOWN_GRACE_MS = 5_000;
 let shuttingDown = false;
 
+// A signal handler replaces Bun's default exit and `bun --watch` keeps the
+// process alive, so it must exit itself or it outlives `bun run dev`.
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) {
-    return;
+    process.exit(1);
   }
   shuttingDown = true;
   console.info(`[push] shutting down on ${signal}`);
+  setTimeout(() => process.exit(1), SHUTDOWN_GRACE_MS).unref();
   clearInterval(cleanupTimer);
   await relayWatcher.stop();
   storage.close();
-  server.stop(true);
+  await server.stop(true);
+  process.exit(0);
 }
 
 process.on("SIGINT", () => {

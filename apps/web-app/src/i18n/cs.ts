@@ -158,6 +158,41 @@ export const cs = {
   receiveMethod: "Způsob přijímání",
   payWithCashuDisabled: "Platit s cashu je vypnuto v pokročilém nastavení.",
   lightningInvoiceAutoPayLimit: "Limit autoplatby",
+  boltCardTitle: "NFC bolt card",
+  boltCardConnecting: "Zapínám kartu…",
+  boltCardPaying: "Terminál poslal fakturu, platím…",
+  boltCardEnded: "Karta je vypnutá.",
+  boltCardRetry: "Zapnout znovu",
+  boltCardSendActive:
+    "Bolt card je aktivní, přiložte telefon k terminálu (až {amount})",
+  boltCardArmOnSend: "Aktivovat na obrazovce Odeslat",
+  boltCardIntro:
+    "Telefon může fungovat jako bezkontaktní bitcoinová karta (bolt card). Se zapnutým přepínačem stačí otevřít obrazovku Odeslat a přiložit telefon k terminálu, který bolt card přijímá. Platba proběhne z vaší peněženky Linky.",
+  boltCardInfoTitle: "Dobré vědět",
+  boltCardInfoRisk:
+    "Dokud je otevřená obrazovka Odeslat, může kartu přečíst kterákoli čtečka v dosahu a zaplatit až {amount} bez potvrzení.",
+  boltCardInfoAndroid:
+    "Funguje jen v Linky pro Android s NFC a vyžaduje internet.",
+  boltCardInfoSync: "Přepínač platí pro všechna vaše zařízení.",
+  boltCardBridgeUrlHint:
+    "Adresa služby, přes kterou terminál s kartou komunikuje. Měňte ji jen tehdy, když provozujete vlastní bridge.",
+  boltCardErrorUnsupported: "Toto zařízení neumí emulovat NFC kartu.",
+  boltCardErrorNfcDisabled: "Pro platbu kartou zapněte NFC.",
+  boltCardErrorBridge: "Nepodařilo se spojit s bridgem karty.",
+  boltCardErrorStorage: "Kartu se nepodařilo uložit v tomto zařízení.",
+  boltCardErrorExhausted:
+    "Karta vyčerpala počítadlo; v nastavení ji vyměňte za novou.",
+  boltCardErrorNative: "Emulace NFC karty selhala.",
+  boltCardBridgeUrl: "Bridge karty",
+  boltCardBridgeUrlInvalid: "Zadejte adresu http(s).",
+  boltCardCurrentCard: "Karta v tomto zařízení",
+  boltCardNoCard: "Karta zatím neexistuje, vznikne při prvním použití.",
+  boltCardId: "Karta {id}",
+  boltCardTaps: "Přiloženo {count}×",
+  boltCardReplace: "Vyměnit kartu",
+  boltCardReplaceConfirm: "Opravdu vyměnit? Klepněte znovu",
+  boltCardReplaceHint:
+    "Nová karta dostane nové klíče a staré adresy karty přestanou fungovat.",
   bankPaymentOfferStaggerDelay: "Prodleva mezi příjemci nabídky",
   bankPaymentOfferStaggerDelayDecrease: "Zkrátit prodlevu",
   bankPaymentOfferStaggerDelayIncrease: "Prodloužit prodlevu",

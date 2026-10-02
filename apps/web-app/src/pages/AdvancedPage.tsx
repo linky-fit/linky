@@ -16,6 +16,7 @@ import {
   Landmark,
   Languages,
   LogOut,
+  Nfc,
   QrCode,
   RadioTower,
   RotateCw,
@@ -43,6 +44,7 @@ import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSe
 import { SettingsLinkRow, SettingsToggleRow } from "../components/SettingsRows";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
+import { supportsNativeBoltCard } from "../platform/nativeBridge";
 import { isDesktopShell } from "../platform/runtime";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 
@@ -244,6 +246,14 @@ export function AdvancedPage(): React.ReactElement {
             </span>
           }
         />
+
+        {supportsNativeBoltCard() ? (
+          <SettingsLinkRow
+            onClick={() => navigateTo({ route: "advancedBoltCard" })}
+            icon={<Nfc size={18} />}
+            label={t("boltCardTitle")}
+          />
+        ) : null}
       </div>
 
       <div className="settings-section">

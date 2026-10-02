@@ -128,6 +128,13 @@ interface AndroidDeepLinksBridge {
   consumePendingUrl?: () => string | null;
 }
 
+interface AndroidBoltCardBridge {
+  isSupported?: () => boolean;
+  setUrl?: (url: string) => boolean;
+  start?: (url: string) => void;
+  stop?: () => void;
+}
+
 interface AndroidNfcBridge {
   areSupported?: () => boolean;
   cancelWrite?: () => void;
@@ -257,6 +264,11 @@ const getAndroidWindowInsetsBridge = (): AndroidWindowInsetsBridge | null => {
 
 const getAndroidDeepLinksBridge = (): AndroidDeepLinksBridge | null => {
   const value = Reflect.get(globalThis, "LinkyNativeDeepLinks");
+  return isRecord(value) ? value : null;
+};
+
+const getAndroidBoltCardBridge = (): AndroidBoltCardBridge | null => {
+  const value = Reflect.get(globalThis, "LinkyNativeBoltCard");
   return isRecord(value) ? value : null;
 };
 
@@ -751,6 +763,89 @@ export const cancelNativeNfcWrite = (): boolean => {
     return true;
   } catch {
     return false;
+  }
+};
+
+const NATIVE_BOLT_CARD_EVENT = "linky-native-bolt-card";
+
+const NATIVE_BOLT_CARD_STATUSES = [
+  "started",
+  "read",
+  "deselected",
+  "stopped",
+  "disabled",
+  "unsupported",
+  "error",
+] as const;
+
+export type NativeBoltCardStatus = (typeof NATIVE_BOLT_CARD_STATUSES)[number];
+
+export interface NativeBoltCardEvent {
+  message: string | null;
+  status: NativeBoltCardStatus;
+}
+
+const isNativeBoltCardStatus = (
+  value: string | null,
+): value is NativeBoltCardStatus =>
+  NATIVE_BOLT_CARD_STATUSES.some((status) => status === value);
+
+/** Android only: iOS has no general card emulation and the web none at all. */
+export const supportsNativeBoltCard = (): boolean => {
+  const bridge = getAndroidBoltCardBridge();
+  if (!isNativePlatform() || !bridge?.isSupported) return false;
+  try {
+    return bridge.isSupported();
+  } catch {
+    return false;
+  }
+};
+
+/** Calls `listener` for every card emulation event; returns the unsubscribe. */
+export const listenNativeBoltCard = (
+  listener: (event: NativeBoltCardEvent) => void,
+): (() => void) => {
+  const onEvent: EventListener = (event) => {
+    if (!(event instanceof CustomEvent) || !isRecord(event.detail)) return;
+    const status = asNonEmptyString(Reflect.get(event.detail, "status"));
+    if (!isNativeBoltCardStatus(status)) return;
+    listener({
+      message: asNonEmptyString(Reflect.get(event.detail, "message")),
+      status,
+    });
+  };
+  window.addEventListener(NATIVE_BOLT_CARD_EVENT, onEvent);
+  return () => window.removeEventListener(NATIVE_BOLT_CARD_EVENT, onEvent);
+};
+
+/** Starts serving `url`; the outcome arrives as a `started` or failure event. */
+export const startNativeBoltCard = (url: string): boolean => {
+  const bridge = getAndroidBoltCardBridge();
+  if (!bridge?.start) return false;
+  try {
+    bridge.start(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Swaps the URL the next NFC read serves; false once native stopped the card. */
+export const setNativeBoltCardUrl = (url: string): boolean => {
+  const bridge = getAndroidBoltCardBridge();
+  if (!bridge?.setUrl) return false;
+  try {
+    return bridge.setUrl(url);
+  } catch {
+    return false;
+  }
+};
+
+export const stopNativeBoltCard = (): void => {
+  try {
+    getAndroidBoltCardBridge()?.stop?.();
+  } catch {
+    // The activity stops emulation on pause anyway.
   }
 };
 

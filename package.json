@@ -10,7 +10,7 @@
     "tools/*"
   ],
   "scripts": {
-    "dev": "docker compose -f docker-compose.dev.yml up -d --wait && bun run --filter @linky-fit/web-app --filter @linky-fit/push dev",
+    "dev": "docker compose -f docker-compose.dev.yml up -d --wait && bun run --filter @linky-fit/web-app --filter @linky-fit/push --filter @linky-fit/bolt-card-bridge dev",
     "dev:prod": "bun run --filter @linky-fit/web-app dev:prod",
     "dev:services": "docker compose -f docker-compose.dev.yml up",
     "build": "bun run --filter @linky-fit/web-app build",
@@ -35,6 +35,7 @@
     "linkshu": "bun apps/linkshu-cli/src/index.ts",
     "push:dev": "bun run --filter @linky-fit/push dev",
     "push:start": "bun run --filter @linky-fit/push start",
+    "bolt-card-bridge:dev": "bun run --filter @linky-fit/bolt-card-bridge dev",
     "eslint": "bun run --workspaces --if-present eslint",
     "prettier": "bun run --workspaces --if-present prettier",
     "typecheck": "bun run --workspaces --if-present typecheck",

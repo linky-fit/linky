@@ -157,6 +157,41 @@ export const en = {
   receiveMethod: "Receive method",
   payWithCashuDisabled: "Pay with cashu is disabled in Advanced settings.",
   lightningInvoiceAutoPayLimit: "Auto-pay limit",
+  boltCardTitle: "NFC bolt card",
+  boltCardConnecting: "Switching the card on…",
+  boltCardPaying: "The terminal sent its invoice, paying…",
+  boltCardEnded: "The card is switched off.",
+  boltCardRetry: "Switch on again",
+  boltCardSendActive:
+    "Bolt card is on, hold your phone to the terminal (up to {amount})",
+  boltCardArmOnSend: "Switch on with the Send screen",
+  boltCardIntro:
+    "Your phone can work as a contactless bitcoin card (bolt card). With this switch on, open the Send screen and hold your phone to a terminal that accepts bolt cards. The payment comes from your Linky wallet.",
+  boltCardInfoTitle: "Good to know",
+  boltCardInfoRisk:
+    "While the Send screen is open, any reader nearby can read the card and charge up to {amount} without confirmation.",
+  boltCardInfoAndroid:
+    "Works only in Linky for Android with NFC and needs internet.",
+  boltCardInfoSync: "The switch applies to all your devices.",
+  boltCardBridgeUrlHint:
+    "The service the terminal reaches the card through. Change it only if you run your own bridge.",
+  boltCardErrorUnsupported: "This device cannot emulate an NFC card.",
+  boltCardErrorNfcDisabled: "Turn on NFC to pay with the card.",
+  boltCardErrorBridge: "Could not reach the card bridge.",
+  boltCardErrorStorage: "The card could not be stored on this device.",
+  boltCardErrorExhausted:
+    "The card used up its counter; replace it in settings.",
+  boltCardErrorNative: "NFC card emulation failed.",
+  boltCardBridgeUrl: "Card bridge",
+  boltCardBridgeUrlInvalid: "Enter an http(s) address.",
+  boltCardCurrentCard: "Card on this device",
+  boltCardNoCard: "No card yet; one is created on first use.",
+  boltCardId: "Card {id}",
+  boltCardTaps: "Tapped {count}×",
+  boltCardReplace: "Replace card",
+  boltCardReplaceConfirm: "Really replace? Tap again",
+  boltCardReplaceHint:
+    "A new card gets new keys, and the old card's addresses stop working.",
   bankPaymentOfferStaggerDelay: "Delay between offer recipients",
   bankPaymentOfferStaggerDelayDecrease: "Decrease delay",
   bankPaymentOfferStaggerDelayIncrease: "Increase delay",

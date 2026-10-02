@@ -34,6 +34,7 @@ export type Route =
   | { kind: "settingsProxyPayments" }
   | { kind: "advanced" }
   | { kind: "advancedAutoPayLimit" }
+  | { kind: "advancedBoltCard" }
   | { kind: "advancedInspector" }
   | { kind: "advancedInspectorTimeline" }
   | { kind: "advancedPushDebug" }
@@ -101,6 +102,7 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#advanced/inspector/timeline") {
     return { kind: "advancedInspectorTimeline" };
   }
+  if (hash === "#advanced/bolt-card") return { kind: "advancedBoltCard" };
   if (hash === "#advanced/push-debug") {
     return { kind: "advancedPushDebug" };
   }

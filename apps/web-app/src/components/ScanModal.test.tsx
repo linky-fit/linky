@@ -20,6 +20,12 @@ vi.mock("../devtools/inspector/inspectorEnabled", () => ({
   useInspectorEmissionEnabled: () => false,
 }));
 
+// The bolt card row reads the synced setting and NFC support itself; here it
+// only matters where the Send screen places it.
+vi.mock("./BoltCardSendStatus", () => ({
+  BoltCardSendStatus: () => <div data-testid="bolt-card-send-status" />,
+}));
+
 vi.mock("../app/context/AppShellContexts", () => ({
   useAppShellCore: mockScanCore,
   useAppShellActions: mockScanActions,
@@ -276,4 +282,17 @@ describe("ScanModal", () => {
 
     expect(onTypePayment).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["send", "receive", "contacts"] as const)(
+    "places the bolt card row only on the Send screen (%s)",
+    async (scanEntryPoint) => {
+      const { container } = await renderIntoDocument(
+        <TestScanModal {...baseProps} scanEntryPoint={scanEntryPoint} />,
+      );
+      expect(
+        container.querySelector('[data-testid="bolt-card-send-status"]') !==
+          null,
+      ).toBe(scanEntryPoint === "send");
+    },
+  );
 });

@@ -208,6 +208,18 @@ _Avoid_: spending limit, confirmation threshold
 Linky signing the user into another website with a key derived from their identity.
 _Avoid_: Lightning login, wallet login
 
+**Bolt card**:
+The NFC card a device emulates so a bolt card POS can charge the user's wallet; it belongs to that one device.
+_Avoid_: virtual card, NFC wallet, contactless card
+
+**Card tap**:
+One payment started by holding the phone to a POS while the bolt card is active, which it is while the Send screen is open and the user turned the card on in settings.
+_Avoid_: NFC payment, contactless payment
+
+**Card bridge**:
+The service that hosts the bolt card's LNURL-withdraw endpoint and relays its requests to the device; it never holds funds.
+_Avoid_: bolt card server, card backend, lnurlw server
+
 ## Proxy payments
 
 **Proxy payment**:

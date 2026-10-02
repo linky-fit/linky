@@ -58,6 +58,7 @@ export const resolveBackAction = (
     case "settingsMasterKeys":
     case "settingsProxyPayments":
     case "advancedAutoPayLimit":
+    case "advancedBoltCard":
     case "advancedInspector":
     case "mints":
     case "nostrRelays":
@@ -200,6 +201,7 @@ const SHOWS_MENU_BUTTON: Record<
 > = {
   advanced: false,
   advancedAutoPayLimit: false,
+  advancedBoltCard: false,
   advancedInspector: false,
   advancedInspectorTimeline: false,
   advancedPushDebug: false,
@@ -359,6 +361,7 @@ const TOPBAR_TITLE_KEY: Record<
 > = {
   advanced: "settings",
   advancedAutoPayLimit: "lightningInvoiceAutoPayLimit",
+  advancedBoltCard: "boltCardTitle",
   advancedInspector: "nostrInspector",
   advancedInspectorTimeline: "nostrInspector",
   bankPayment: "spdPaymentTitle",

@@ -13,6 +13,7 @@ import {
 } from "../app/context/AppShellContexts";
 import { useInspectorEmissionEnabled } from "../devtools/inspector/inspectorEnabled";
 import { navigateTo } from "../hooks/useRouting";
+import { BoltCardSendStatus } from "./BoltCardSendStatus";
 
 export function ScanModal(): React.ReactElement {
   const {
@@ -151,6 +152,7 @@ export function ScanModal(): React.ReactElement {
               {t("manualPayOpen")}
             </button>
           ) : null}
+          {isSendScan ? <BoltCardSendStatus /> : null}
           <div className="scan-footer-actions">
             {showTypeAction ? (
               <button

@@ -23,6 +23,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "settingsProxyPayments":
     case "advanced":
     case "advancedAutoPayLimit":
+    case "advancedBoltCard":
     case "advancedInspector":
     case "advancedInspectorTimeline":
     case "advancedPushDebug":
@@ -83,6 +84,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "settingsMasterKeys":
     case "settingsProxyPayments":
     case "advancedAutoPayLimit":
+    case "advancedBoltCard":
     case "advancedInspector":
     case "mints":
     case "nostrRelays":

@@ -1,4 +1,5 @@
 export { AdvancedAutoPayLimitPage } from "./AdvancedAutoPayLimitPage";
+export { AdvancedBoltCardPage } from "./AdvancedBoltCardPage";
 export { AdvancedPage } from "./AdvancedPage";
 export { BankPaymentOfferDetailPage } from "./BankPaymentOfferDetailPage";
 export { CashuTokenEmitPage } from "./CashuTokenEmitPage";
