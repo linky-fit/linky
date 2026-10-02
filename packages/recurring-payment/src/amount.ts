@@ -1,4 +1,10 @@
-export const FIAT_RECURRING_UNITS = ["czk", "eur", "chf", "usd"] as const;
+export const FIAT_RECURRING_UNITS = [
+  "czk",
+  "eur",
+  "chf",
+  "usd",
+  "brl",
+] as const;
 export type FiatRecurringUnit = (typeof FIAT_RECURRING_UNITS)[number];
 
 /** The unit a recurring payment is fixed in: sats, or the fiat currency the user typed. */

@@ -41,6 +41,9 @@ export const getRecurringReminderCopyForLanguage = (
   if (normalized.startsWith("de")) {
     return "Eine wiederkehrende Zahlung ist bereit. Öffne Linky, um sie zu senden.";
   }
+  if (normalized.startsWith("pt")) {
+    return "Um pagamento recorrente está pronto. Abra o Linky para enviá-lo.";
+  }
   return "A recurring payment is ready. Open Linky to send it.";
 };
 

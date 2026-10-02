@@ -117,7 +117,7 @@ export const LinkySchema = {
     rail: NonEmptyString100,
     // In `unit`: sats for "sat", hundredths (cents, haléře) for a fiat code.
     amount: PositiveInt,
-    // "sat" | "czk" | "eur" | "chf" | "usd"
+    // "sat" | "czk" | "eur" | "chf" | "usd" | "brl"
     unit: NonEmptyString100,
     // "hour" | "day" | "week" | "month", multiplied by intervalCount.
     intervalUnit: NonEmptyString100,
