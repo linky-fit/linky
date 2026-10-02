@@ -1,0 +1,29 @@
+{
+  "name": "@linky-fit/desktop",
+  "productName": "Linky",
+  "private": true,
+  "version": "0.1.0",
+  "license": "0BSD",
+  "description": "Linky desktop app for macOS",
+  "type": "module",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "bun build src/main.ts src/preload.ts --target node --format cjs --external electron --outdir dist --entry-naming [name].cjs",
+    "dev": "bun run build && LINKY_DESKTOP_URL=${LINKY_DESKTOP_URL:-http://localhost:5173} electron .",
+    "start": "bun run build && electron .",
+    "dist:mac": "bun run build && electron-builder --config electron-builder.config.js --mac --arm64 --publish never",
+    "typecheck": "tsc -p tsconfig.json",
+    "eslint": "eslint --fix src electron-builder.config.js eslint.config.js prettier.config.js",
+    "prettier": "prettier --write src electron-builder.config.js eslint.config.js package.json prettier.config.js tsconfig.json"
+  },
+  "devDependencies": {
+    "@linky-fit/config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "effect": "^3.19.19",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "typescript": "~5.9.3"
+  }
+}

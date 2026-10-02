@@ -19,6 +19,8 @@
     "site:build": "bun run --filter @linky-fit/site build",
     "site:preview": "bun run --filter @linky-fit/site preview",
     "errors:dev": "bun run --filter @linky-fit/nostr-error-tracker dev",
+    "desktop:dev": "bun run --filter @linky-fit/desktop dev",
+    "desktop:mac": "bun run --filter @linky-fit/desktop dist:mac",
     "native:android:release:check": "bun run --filter @linky-fit/native-shell android:release:check",
     "native:android:icons": "bun run --filter @linky-fit/native-shell android:icons",
     "native:android:add": "bun run --filter @linky-fit/native-shell android:add",
