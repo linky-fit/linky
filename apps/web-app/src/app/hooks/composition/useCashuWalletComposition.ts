@@ -2179,7 +2179,6 @@ export const useCashuWalletComposition = ({
     };
 
     setCashuIsBusy(true);
-    setStatus(t("cashuEmitting"));
 
     try {
       const mint = selectSendMintForAmount(
@@ -2229,7 +2228,6 @@ export const useCashuWalletComposition = ({
       });
 
       setCashuEmitAmount("");
-      setStatus(null);
       const routeId = CashuOperationIdType.fromUnknown(receipt.operationId);
       navigateTo(
         routeId.ok

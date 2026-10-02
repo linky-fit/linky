@@ -1,7 +1,7 @@
 import { parseMintUrl } from "@linky-fit/linkshu";
 import { sqliteTrue } from "@linky-fit/linksync";
 import { Gauge, Wallet } from "lucide-react";
-import type React from "react";
+import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { holdingOf, mintHoldings } from "../app/lib/mintHoldings";
@@ -83,6 +83,7 @@ export function MintDetailPage() {
     setStatus,
   } = useMintSettingsContext();
   const { formatDisplayedAmountText, lang, route, t } = useAppShellCore();
+  const [isSettingDefault, setIsSettingDefault] = React.useState(false);
   const mintUrl = route.kind === "mint" ? route.mintUrl : "";
 
   const cleaned = normalizeMintUrl(mintUrl);
@@ -137,6 +138,12 @@ export function MintDetailPage() {
     navigateTo({ route: "mints" });
   };
 
+  const setAsDefault = async () => {
+    setIsSettingDefault(true);
+    await applyDefaultMintSelection(cleaned);
+    setIsSettingDefault(false);
+  };
+
   return (
     <section className="panel settings-page">
       <div className="settings-section mint-detail-header">
@@ -151,8 +158,8 @@ export function MintDetailPage() {
             <button
               type="button"
               className="btn-wide secondary"
-              disabled={cashuIsBusy}
-              onClick={() => void applyDefaultMintSelection(cleaned)}
+              disabled={cashuIsBusy || isSettingDefault}
+              onClick={() => void setAsDefault()}
             >
               {t("mintSetAsDefault")}
             </button>

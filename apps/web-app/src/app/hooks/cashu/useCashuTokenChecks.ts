@@ -85,7 +85,6 @@ export const useCashuTokenChecks = ({
       }
       if (cashuIsBusy) return "skipped";
       setCashuIsBusy(true);
-      setStatus(t("cashuChecking"));
       try {
         const outcome = await checkCashuTransfer(id);
         if (Either.isLeft(outcome)) {
@@ -94,7 +93,6 @@ export const useCashuTokenChecks = ({
         }
         switch (outcome.right.status) {
           case "live":
-            setStatus(null);
             pushToast(t("cashuCheckOk"));
             return "ok";
           case "spent":
@@ -119,10 +117,8 @@ export const useCashuTokenChecks = ({
     if (cashuIsBusy) return;
     setCashuBulkCheckIsBusy(true);
     setCashuIsBusy(true);
-    setStatus(t("cashuChecking"));
     try {
       const report = await checkAllCashuTokens();
-      setStatus(null);
       if (report.markedSpent.length > 0) {
         pushToast(t("cashuInvalid"));
       } else if (report.unavailableMints.length > 0) {
