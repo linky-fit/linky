@@ -85,7 +85,6 @@ export const useCashuTokenChecks = ({
       }
       if (cashuIsBusy) return "skipped";
       setCashuIsBusy(true);
-      setStatus(t("cashuChecking"));
       try {
         const outcome = await checkCashuTransfer(id);
         if (Either.isLeft(outcome)) {
@@ -94,15 +93,12 @@ export const useCashuTokenChecks = ({
         }
         switch (outcome.right.status) {
           case "live":
-            setStatus(null);
             pushToast(t("cashuCheckOk"));
             return "ok";
           case "spent":
-            setStatus(t("cashuInvalid"));
             pushToast(t("cashuInvalid"));
             return "invalid";
           case "unavailable":
-            setStatus(t("cashuCheckFailed"));
             pushToast(t("cashuCheckFailed"));
             return "transient";
         }
@@ -110,7 +106,7 @@ export const useCashuTokenChecks = ({
         setCashuIsBusy(false);
       }
     },
-    [cashuIsBusy, checkCashuTransfer, pushToast, setCashuIsBusy, setStatus, t],
+    [cashuIsBusy, checkCashuTransfer, pushToast, setCashuIsBusy, t],
   );
 
   const checkAllCashuTokensAndDeleteInvalid = React.useCallback(async () => {
@@ -119,10 +115,8 @@ export const useCashuTokenChecks = ({
     if (cashuIsBusy) return;
     setCashuBulkCheckIsBusy(true);
     setCashuIsBusy(true);
-    setStatus(t("cashuChecking"));
     try {
       const report = await checkAllCashuTokens();
-      setStatus(null);
       if (report.markedSpent.length > 0) {
         pushToast(t("cashuInvalid"));
       } else if (report.unavailableMints.length > 0) {
@@ -141,7 +135,6 @@ export const useCashuTokenChecks = ({
     pushToast,
     setCashuBulkCheckIsBusy,
     setCashuIsBusy,
-    setStatus,
     t,
   ]);
 

@@ -76,6 +76,16 @@ import {
 const RESPONDER_RETRY_MS = 30_000;
 const STAGGER_RETRY_MS = 5_000;
 
+type OfferResponseFailure =
+  | {
+      readonly reason:
+        | "details-reserved"
+        | "invalid-response"
+        | "missing-identity"
+        | "publish-failed";
+    }
+  | { readonly reason: "error"; readonly error: string };
+
 interface UseBankPaymentOffersParams {
   chatMessages: LocalNostrMessage[];
   contacts: readonly ContactRowLike[];
@@ -198,30 +208,28 @@ export const useBankPaymentOffers = ({
     [pubkeyFor],
   );
 
-  const respondToOffer = React.useCallback(
+  const sendOfferResponse = React.useCallback(
     async (
       offer: BankPaymentOffer,
       nextStatus: BankOfferStatus,
       options?: BankPaymentOfferResponseOptions,
-    ): Promise<boolean> => {
-      const draft = myPubHex
-        ? bankPaymentOfferResponseDraft(offer, nextStatus, myPubHex, options)
-        : null;
-      if (!draft) {
-        setStatus(t(myPubHex ? "spdPaymentOfferFailed" : "profileMissingNpub"));
-        return false;
-      }
+    ): Promise<OfferResponseFailure | null> => {
+      if (!myPubHex) return { reason: "missing-identity" };
+      const draft = bankPaymentOfferResponseDraft(
+        offer,
+        nextStatus,
+        myPubHex,
+        options,
+      );
+      if (!draft) return { reason: "invalid-response" };
       try {
         if (nextStatus === "bank_details_sent") {
           const reserved = await reserveBankPaymentOfferBankDetails({
             candidateKey: `${offer.offerId}:${offer.peer}`,
             offerId: offer.offerId,
-            ownerPubkey: myPubHex ?? "",
+            ownerPubkey: myPubHex,
           });
-          if (!reserved) {
-            setStatus(t("spdPaymentOfferFailed"));
-            return false;
-          }
+          if (!reserved) return { reason: "details-reserved" };
           if (getInspectorEmissionEnabled()) {
             reportInspectorRows([
               {
@@ -244,16 +252,66 @@ export const useBankPaymentOffers = ({
             ]);
           }
         }
-        if (await publish(offer.peer, draft)) return true;
-        setStatus(t("spdPaymentOfferFailed"));
+        if (await publish(offer.peer, draft)) return null;
+        return { reason: "publish-failed" };
       } catch (error) {
-        setStatus(
-          `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "publish failed")}`,
-        );
+        return {
+          reason: "error",
+          error: getUnknownErrorMessage(error, "publish failed"),
+        };
+      }
+    },
+    [myPubHex, publish],
+  );
+
+  const respondToOffer = React.useCallback(
+    async (
+      offer: BankPaymentOffer,
+      nextStatus: BankOfferStatus,
+      options?: BankPaymentOfferResponseOptions,
+    ): Promise<boolean> => {
+      const failure = await sendOfferResponse(offer, nextStatus, options);
+      if (failure === null) return true;
+      switch (failure.reason) {
+        case "missing-identity":
+          setStatus(t("profileMissingNpub"));
+          break;
+        case "error":
+          setStatus(`${t("errorPrefix")}: ${failure.error}`);
+          break;
+        default:
+          setStatus(t("spdPaymentOfferFailed"));
       }
       return false;
     },
-    [myPubHex, publish, setStatus, t],
+    [sendOfferResponse, setStatus, t],
+  );
+
+  // Responses the app sends on its own (auto-responder, expiry) report
+  // failures to the inspector; a toast would interrupt a user who did nothing.
+  const respondToOfferInBackground = React.useCallback(
+    async (
+      offer: BankPaymentOffer,
+      nextStatus: BankOfferStatus,
+      options?: BankPaymentOfferResponseOptions,
+    ): Promise<boolean> => {
+      const failure = await sendOfferResponse(offer, nextStatus, options);
+      if (failure === null) return true;
+      if (getInspectorEmissionEnabled()) {
+        reportInspectorRows([
+          {
+            at: Date.now(),
+            channel: "nostr.operation",
+            tag: "bankOffer.backgroundResponseFailed",
+            summary: `automatic proxy payment response "${nextStatus}" failed: ${failure.reason}`,
+            links: { offer: offer.offerId, pubkey: offer.peer },
+            payload: { nextStatus, ...failure },
+          },
+        ]);
+      }
+      return false;
+    },
+    [sendOfferResponse],
   );
 
   // UI rows only name the thread; every field comes from the authenticated state.
@@ -467,7 +525,7 @@ export const useBankPaymentOffers = ({
           const lockKey = `${BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.${step.offerId}`;
           const closeLosers = async () => {
             for (const loser of step.losers) {
-              await respondToOffer(loser, "accepted_by_other");
+              await respondToOfferInBackground(loser, "accepted_by_other");
             }
           };
           if (step.winner) {
@@ -526,7 +584,7 @@ export const useBankPaymentOffers = ({
                     )
                   : currentStep.candidate;
                 if (!candidate) return;
-                const sent = await respondToOffer(
+                const sent = await respondToOfferInBackground(
                   candidate,
                   "bank_details_sent",
                   {
@@ -544,7 +602,7 @@ export const useBankPaymentOffers = ({
                   myPubHex,
                 ).find((current) => current.offerId === step.offerId)?.losers ??
                   []) {
-                  await respondToOffer(loser, "accepted_by_other");
+                  await respondToOfferInBackground(loser, "accepted_by_other");
                 }
               },
             });
@@ -579,7 +637,7 @@ export const useBankPaymentOffers = ({
       cancelled = true;
       window.clearTimeout(retryTimeoutId);
     };
-  }, [myPubHex, offers, respondToOffer]);
+  }, [myPubHex, offers, respondToOfferInBackground]);
 
   // Staggered offers: queued recipients (persisted by requestBankPaymentOffer)
   // receive the offer once their delay elapses, unless the offer meanwhile
@@ -747,7 +805,7 @@ export const useBankPaymentOffers = ({
             if (group.expiresAtSec > nowSec) continue;
             for (const offer of group.offers) {
               if (cancelled) return;
-              await respondToOffer(offer, "canceled");
+              await respondToOfferInBackground(offer, "canceled");
             }
           }
         } finally {
@@ -763,7 +821,7 @@ export const useBankPaymentOffers = ({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [expiryGroups, respondToOffer]);
+  }, [expiryGroups, respondToOfferInBackground]);
 
   const bankPaymentOfferMessages = React.useMemo(
     () =>

@@ -1072,24 +1072,23 @@ export const useAppShellComposition = ({
   const copyNostrKeys = async () => {
     const nsec = currentNsec.trim();
     if (!nsec) return;
-    await navigator.clipboard?.writeText(nsec);
-    pushToast(t("nostrKeysCopied"));
+    const copied = await writeClipboardText(nsec);
+    pushToast(t(copied ? "nostrKeysCopied" : "copyFailed"));
   };
 
   const copySeed = async () => {
     const value = (slip39Seed ?? "").trim();
-    if (value) {
-      await navigator.clipboard?.writeText(value);
-      safeLocalStorageSet(
-        CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
-        "1",
-      );
-      setContactsOnboardingHasBackedUpKeys(true);
-      pushToast(t("seedCopied"));
+    if (!value) {
+      pushToast(t("seedMissing"));
       return;
     }
-
-    pushToast(t("seedMissing"));
+    if (!(await writeClipboardText(value))) {
+      pushToast(t("copyFailed"));
+      return;
+    }
+    safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY, "1");
+    setContactsOnboardingHasBackedUpKeys(true);
+    pushToast(t("seedCopied"));
   };
 
   const saveSeedToPasswordManager =

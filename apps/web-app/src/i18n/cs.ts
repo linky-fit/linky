@@ -57,6 +57,7 @@ export const cs = {
   notificationsNotLoggedIn: "Nejste přihlášeni",
   notificationsRegistered: "Zaregistrováno",
   notificationsDisabled: "Notifikace vypnuty",
+  notificationsEnableError: "Notifikace se nepodařilo zapnout",
   notificationsDisableError: "Notifikace se nepodařilo vypnout",
   notificationsDenied: "Zamítnuto",
   notificationsError: "Chyba",
@@ -352,7 +353,6 @@ export const cs = {
   mintUrlInvalid: "Neplatná URL mintu.",
   mintSaved: "Mint uložen.",
   mintUpdateFailed: "Aktualizace mintu selhala.",
-  mintUpdating: "Aktualizuji mint…",
 
   unknown: "Neznámé",
   mintNotFound: "Mint nenalezen.",
@@ -803,7 +803,6 @@ export const cs = {
   cashuCheckToken: "Zkontrolovat token",
   cashuCheckAllTokens: "Zkontrolovat vše",
   cashuCheckIssuedTokens: "Zkontrolovat využité",
-  cashuChecking: "Kontroluji token…",
   cashuCheckOk: "Token je v pořádku.",
   pwaUpdateAvailable: "Nová verze Linky je k dispozici",
   pwaUpdateButton: "Aktualizovat",
@@ -841,7 +840,6 @@ export const cs = {
   cashuReturnedToWallet: "Token byl vrácen do peněženky.",
   cashuAddToken: "Přidat token",
   cashuEmit: "Emitovat",
-  cashuEmitting: "Vytvářím token…",
   cashuMultipleMintsWarningTitle: "Tokeny jsou rozdělené mezi minty",
   cashuMultipleMintsWarningBody:
     "Dostupné ukazuje největší jeden mint, protože jeden token nejde emitovat z více mintů najednou.",
@@ -937,8 +935,8 @@ export const cs = {
   paymentRequestStatusPaid: "Zaplaceno",
   paymentRequestStatusDeclined: "Odmítnuto",
   paymentRequestDeclinedMessage: "Žádost o platbu byla odmítnuta.",
-  paymentRequestUnknownContact:
-    "Tato žádost o platbu patří Nostr kontaktu, který ještě nemáte uložený.",
+  paymentRequestNoTransport:
+    "Tato žádost o platbu neobsahuje způsob, jak platbu doručit.",
   paymentRequestSelfPayment:
     "Platba {amount} {unit} na váš vlastní účet — prostředky zůstávají v peněžence.",
   availablePrefix: "dostupné:",

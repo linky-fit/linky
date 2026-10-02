@@ -98,7 +98,6 @@ export const useNpubCashMintSelection = ({
       }
 
       try {
-        setStatus(t("mintUpdating"));
         await updateNpubCashMint(cleaned);
       } catch (error) {
         const message = String(error ?? "");
@@ -107,7 +106,6 @@ export const useNpubCashMintSelection = ({
         } else {
           pushToast(t("mintUpdateFailed"));
         }
-        setStatus(null);
         return false;
       }
 

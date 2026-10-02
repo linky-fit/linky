@@ -114,6 +114,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The reviewed request or approved recipient changed during token creation. Delivery was stopped and the app attempted to return the pending transfer to the wallet; a failed return leaves it recoverable.",
   "paymentRequest.editRejected":
     "An incoming edit tried to create or change a payment request. Payment requests are immutable; the sender must send a new request.",
+  "bankOffer.backgroundResponseFailed":
+    "A proxy payment response the app sends on its own failed: the offerer's auto-responder (bank details to the winning payer, accepted_by_other to the rest, retried every 30 seconds) or the cancel of an expired offer. The reason is missing-identity, invalid-response, details-reserved, publish-failed or error with its message; the user sees no toast.",
   "bankOffer.snapshotNotAuthorized":
     "A bank-offer snapshot was rejected or held for an authenticated offerer snapshot. It cannot update the offer or authorize settlement yet.",
   "bankOffer.staggerDropped":
@@ -146,6 +148,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The user approved an LNURL-auth request and the domain confirmed the login. Linky signed the challenge with a linking key derived per domain from the active Nostr key; the session itself lives at the domain, not in the app.",
   "lnurlAuth.failed":
     "An approved LNURL-auth request did not end in a confirmed login — the domain rejected it (expired challenge, unknown key), answered with something other than OK, or the callback never completed. The payload carries the reason shown to the user.",
+  "push.registerFailed":
+    "Turning on push notifications in settings failed after the permission was granted: no service worker, no VAPID key, a failed push subscription or a push server error. The user saw a generic error; the payload carries the technical reason.",
   "relayList.publishFailed":
     "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
   "relayList.syncFailed":

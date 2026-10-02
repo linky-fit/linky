@@ -58,6 +58,7 @@ export const en = {
   notificationsNotLoggedIn: "You are not logged in",
   notificationsRegistered: "Registered",
   notificationsDisabled: "Notifications disabled",
+  notificationsEnableError: "Notifications could not be enabled",
   notificationsDisableError: "Notifications could not be disabled",
   notificationsDenied: "Denied",
   notificationsError: "Error",
@@ -347,7 +348,6 @@ export const en = {
   mintUrlInvalid: "Invalid mint URL.",
   mintSaved: "Mint saved.",
   mintUpdateFailed: "Mint update failed.",
-  mintUpdating: "Updating mint…",
 
   unknown: "Unknown",
   mintNotFound: "Mint not found.",
@@ -795,7 +795,6 @@ export const en = {
   cashuCheckToken: "Check token",
   cashuCheckAllTokens: "Check all",
   cashuCheckIssuedTokens: "Check claimed",
-  cashuChecking: "Checking token…",
   cashuCheckOk: "Token is OK.",
   pwaUpdateAvailable: "A new version of Linky is available",
   pwaUpdateButton: "Update",
@@ -831,7 +830,6 @@ export const en = {
   cashuReturnedToWallet: "Token was returned to the wallet.",
   cashuAddToken: "Add token",
   cashuEmit: "Issue",
-  cashuEmitting: "Creating token…",
   cashuMultipleMintsWarningTitle: "Tokens are split across mints",
   cashuMultipleMintsWarningBody:
     "Available shows the largest single mint because one token cannot be issued from several mints at once.",
@@ -927,8 +925,8 @@ export const en = {
   paymentRequestStatusPaid: "Paid",
   paymentRequestStatusDeclined: "Declined",
   paymentRequestDeclinedMessage: "Payment request declined.",
-  paymentRequestUnknownContact:
-    "This payment request belongs to a Nostr contact you have not saved yet.",
+  paymentRequestNoTransport:
+    "This payment request has no way to deliver the payment.",
   paymentRequestSelfPayment:
     "{amount} {unit} to your own account — the funds stay in your wallet.",
   availablePrefix: "available:",

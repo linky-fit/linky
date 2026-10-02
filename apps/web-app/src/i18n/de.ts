@@ -58,6 +58,7 @@ export const de = {
   notificationsNotLoggedIn: "Du bist nicht angemeldet",
   notificationsRegistered: "Registriert",
   notificationsDisabled: "Benachrichtigungen deaktiviert",
+  notificationsEnableError: "Benachrichtigungen konnten nicht aktiviert werden",
   notificationsDisableError:
     "Benachrichtigungen konnten nicht deaktiviert werden",
   notificationsDenied: "Abgelehnt",
@@ -357,7 +358,6 @@ export const de = {
   mintUrlInvalid: "Ungültige Mint-URL.",
   mintSaved: "Mint gespeichert.",
   mintUpdateFailed: "Mint-Aktualisierung fehlgeschlagen.",
-  mintUpdating: "Mint wird aktualisiert…",
   unknown: "Unbekannt",
   mintNotFound: "Mint nicht gefunden.",
   mintFees: "Gebühren",
@@ -806,7 +806,6 @@ export const de = {
   cashuCheckToken: "Token prüfen",
   cashuCheckAllTokens: "Alle prüfen",
   cashuCheckIssuedTokens: "Eingelöste prüfen",
-  cashuChecking: "Token wird geprüft…",
   cashuCheckOk: "Token ist in Ordnung.",
   pwaUpdateAvailable: "Eine neue Version von Linky ist verfügbar",
   pwaUpdateButton: "Aktualisieren",
@@ -842,7 +841,6 @@ export const de = {
   cashuReturnedToWallet: "Token wurde an die Wallet zurückgegeben.",
   cashuAddToken: "Token hinzufügen",
   cashuEmit: "Ausstellen",
-  cashuEmitting: "Token wird erstellt…",
   cashuMultipleMintsWarningTitle: "Token sind auf mehrere Mints verteilt",
   cashuMultipleMintsWarningBody:
     "Eine Zahlung kann nur Token eines einzelnen Mints verwenden.",
@@ -940,8 +938,8 @@ export const de = {
   paymentRequestStatusPaid: "Bezahlt",
   paymentRequestStatusDeclined: "Abgelehnt",
   paymentRequestDeclinedMessage: "Zahlungsanforderung abgelehnt.",
-  paymentRequestUnknownContact:
-    "Diese Zahlungsanforderung gehört zu einem nicht gespeicherten Nostr-Kontakt.",
+  paymentRequestNoTransport:
+    "Diese Zahlungsanforderung enthält keinen Weg, die Zahlung zuzustellen.",
   paymentRequestSelfPayment:
     "{amount} {unit} an dein eigenes Konto — das Guthaben bleibt in deiner Wallet.",
   availablePrefix: "verfügbar:",

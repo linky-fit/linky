@@ -236,11 +236,25 @@ describe("notifyBankOfferSnapshot", () => {
   it("toasts and notifies for a live incoming offer", () => {
     const harness = createHarness();
     notifyBankOfferSnapshot(offer(), incomingScope, harness.ctx);
-    expect(harness.pushToast).toHaveBeenCalledWith("Alice: Zaplatíš za mě?");
+    expect(harness.pushToast).toHaveBeenCalledWith(
+      "Alice: bankPaymentOfferPreviewIncoming",
+    );
     expect(harness.maybeShowPwaNotification).toHaveBeenCalledWith(
       "Alice",
-      "Zaplatíš za mě?",
+      "bankPaymentOfferPreviewIncoming",
       SNAPSHOT_RUMOR_ID,
+    );
+  });
+
+  it("names a payer's status update by its localized label, not the wire text", () => {
+    const harness = createHarness();
+    notifyBankOfferSnapshot(
+      offer("accepted"),
+      { ...incomingScope, isOutgoing: true },
+      harness.ctx,
+    );
+    expect(harness.pushToast).toHaveBeenCalledWith(
+      "Alice: bankPaymentOfferTitle: bankPaymentOfferStatusAccepted",
     );
   });
 

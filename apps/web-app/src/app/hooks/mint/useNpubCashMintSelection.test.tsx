@@ -117,6 +117,7 @@ describe("useNpubCashMintSelection", () => {
     ).toBeNull();
     expect(harness.setDefaultMintUrl).not.toHaveBeenCalled();
     expect(harness.pushToast).toHaveBeenCalledWith("mintUpdateFailed");
+    expect(harness.setStatus).not.toHaveBeenCalled();
 
     await act(async () => {
       harness.root.unmount();

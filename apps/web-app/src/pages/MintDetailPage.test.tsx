@@ -49,9 +49,15 @@ describe("MintDetailPage", () => {
     await unmount();
   });
 
-  it("offers to make another mint the default", async () => {
+  it("offers to make another mint the default and stays disabled while it saves", async () => {
     mintUrl = "https://mint.minibits.cash/Bitcoin";
-    const applyDefaultMintSelection = vi.fn(async () => true);
+    let finishSaving: (applied: boolean) => void = () => {};
+    const applyDefaultMintSelection = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishSaving = resolve;
+        }),
+    );
     mintSettings = createMintSettings({ applyDefaultMintSelection });
 
     const { container, unmount } = await renderIntoDocument(<MintDetailPage />);
@@ -68,6 +74,11 @@ describe("MintDetailPage", () => {
       setDefault.click();
     });
     expect(applyDefaultMintSelection).toHaveBeenCalledWith(mintUrl);
+    expect(setDefault.disabled).toBe(true);
+    await act(async () => {
+      finishSaving(false);
+    });
+    expect(setDefault.disabled).toBe(false);
     await unmount();
   });
 });

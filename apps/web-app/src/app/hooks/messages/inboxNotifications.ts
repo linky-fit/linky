@@ -7,7 +7,10 @@ import {
   type BankPaymentOffer,
 } from "@linky-fit/proxy-payment";
 import { extractCashuTokenFromText } from "../../lib/tokenText";
-import { formatChatMessagePreviewText } from "../../lib/chatMessageDisplay";
+import {
+  formatBankPaymentOfferPreviewText,
+  formatChatMessagePreviewText,
+} from "../../lib/chatMessageDisplay";
 import {
   isOpenBankPaymentOffer,
   isOpenChatForContact,
@@ -231,18 +234,23 @@ export const notifyBankOfferSnapshot = (
   }
 
   if (scope.isSelfAuthored) return;
+  const offerText = formatBankPaymentOfferPreviewText(
+    offer,
+    scope.isOutgoing ? "out" : "in",
+    ctx.t,
+  );
   if (!activeChat && !activeOffer) {
     showVisibleToast(
       ctx,
       ctx
         .t("chatIncomingMessageToast")
         .replace("{name}", senderLabel(ctx, scope.peerPubkey))
-        .replace("{message}", offer.text),
+        .replace("{message}", offerText),
     );
   }
   void ctx.maybeShowPwaNotification(
     notificationTitle(ctx, scope.peerPubkey),
-    offer.text,
+    offerText,
     offer.snapshotId,
   );
 };
