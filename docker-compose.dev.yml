@@ -7,7 +7,7 @@ services:
     # emulation without the platform-mismatch warning.
     platform: linux/amd64
     ports:
-      - "7777:8080"
+      - "${LINKY_E2E_NOSTR_PORT:-7777}:8080"
     volumes:
       - nostr-relay-data:/usr/src/app/db
     # `up --wait` must wait for the port, not the process: the app never retries
@@ -26,7 +26,7 @@ services:
     image: linky-evolu-relay
     build: docker/evolu-relay
     ports:
-      - "4001:4000"
+      - "${LINKY_E2E_EVOLU_PORT:-4001}:4000"
     environment:
       EVOLU_OWNER_QUOTA_BYTES: ${EVOLU_OWNER_QUOTA_BYTES:-0}
     volumes:
@@ -49,7 +49,7 @@ services:
     profiles: [e2e, quota]
     image: linky-evolu-relay
     ports:
-      - "4002:4000"
+      - "${LINKY_E2E_EVOLU_QUOTA_PORT:-4002}:4000"
     environment:
       EVOLU_OWNER_QUOTA_BYTES: "16384"
     volumes:
@@ -60,7 +60,7 @@ services:
     image: docker.io/cashubtc/nutshell:0.20.3
     command: ["poetry", "run", "mint"]
     ports:
-      - "3338:3338"
+      - "${LINKY_E2E_MINT_PORT:-3338}:3338"
     volumes:
       - cashu-mint-data:/app/data
     environment: &cashu-mint-environment
@@ -104,7 +104,7 @@ services:
     <<: *cashu-mint
     profiles: ["integration", "e2e"]
     ports:
-      - "3339:3338"
+      - "${LINKY_E2E_TARGET_MINT_PORT:-3339}:3338"
     volumes:
       - cashu-mint-target-data:/app/data
     environment:
@@ -117,21 +117,22 @@ services:
   # ports.
   web-app:
     profiles: ["e2e"]
-    image: linky-web-app
+    # scripts/e2e.sh tags it per checkout so worktrees never run each other's build.
+    image: ${LINKY_E2E_WEB_IMAGE:-linky-web-app}
     build:
       context: .
       dockerfile: docker/web-app/Dockerfile
       args:
         VITE_ALLOW_INSECURE_LOCALHOST_RELAYS: "1"
-        VITE_NOSTR_RELAYS: ws://localhost:7777
-        VITE_EVOLU_SERVER_URLS: ws://localhost:4001
-        VITE_MAIN_MINT_URL: http://localhost:3338
+        VITE_NOSTR_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT:-7777}
+        VITE_EVOLU_SERVER_URLS: ws://localhost:${LINKY_E2E_EVOLU_PORT:-4001}
+        VITE_MAIN_MINT_URL: http://localhost:${LINKY_E2E_MINT_PORT:-3338}
         VITE_NPUB_CASH_DISABLED: "true"
         VITE_PUSH_SERVER_URL: http://localhost:8787
         # Installs window.__linkyE2E, the seed/read hooks the Playwright suites use.
         VITE_E2E: "1"
     ports:
-      - "5176:80"
+      - "${LINKY_E2E_WEB_PORT:-5176}:80"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
       interval: 3s

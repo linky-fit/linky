@@ -1,8 +1,9 @@
 /**
  * Mint management: the "Allow test mints" switch hides the local FakeWallet
  * mint's funds without touching them, the move form opens with the whole
- * balance, an explicit amount moves from :3338 to :3339 after its fee
- * estimate is shown, and the add button makes a typed mint the default.
+ * balance, an explicit amount moves from the main mint to the target mint
+ * after its fee estimate is shown, and the add button makes a typed mint the
+ * default.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
@@ -20,11 +21,14 @@ import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { topUp } from "./helpers/wallet";
 import {
   loadMintWallet,
+  mintUrl,
   targetMintUrl,
   tokenOf,
 } from "../../../packages/linkshu/tests/integration/helpers";
 
-const SOURCE_MINT_URL = "http://localhost:3338";
+const SOURCE_MINT_URL = mintUrl;
+const SOURCE_HOST = new URL(mintUrl).host;
+const TARGET_HOST = new URL(targetMintUrl).host;
 const FUNDING_SAT = 100;
 const TARGET_TOKEN_SAT = 16;
 const MOVE_SAT = 30;
@@ -82,9 +86,9 @@ test("test mints can be hidden and funds move between mints", async ({
     await page.goto("/#wallet");
     await expect.poll(() => readBalanceSat(page)).toBe(0);
     await page.goto("/#advanced/mints");
-    await expect(
-      page.getByRole("button", { name: /localhost:3338/ }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: SOURCE_HOST })).toHaveCount(
+      0,
+    );
   });
 
   await test.step("turning them back on reveals the untouched funds", async () => {
@@ -93,7 +97,7 @@ test("test mints can be hidden and funds move between mints", async ({
     await expect.poll(() => readBalanceSat(page)).toBe(FUNDING_SAT);
     await page.goto("/#advanced/mints");
     await expect(
-      page.getByRole("button", { name: /^localhost:3338\b/ }),
+      page.getByRole("button", { name: new RegExp(`^${SOURCE_HOST}\\b`) }),
     ).toHaveAttribute("aria-current", "true");
   });
 
@@ -120,7 +124,7 @@ test("test mints can be hidden and funds move between mints", async ({
     await expect(moveForm).toContainText(`Maximum ${FUNDING_SAT} sat`);
     const targetMint = page
       .getByLabel("To mint")
-      .getByRole("button", { name: "localhost:3339" });
+      .getByRole("button", { name: TARGET_HOST });
     await targetMint.click();
     await expect(targetMint).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Clear form", exact: true }).click();
@@ -159,7 +163,7 @@ test("test mints can be hidden and funds move between mints", async ({
     await expect(page.locator(".mint-choice-badge.is-default")).toBeVisible();
     await page.goto("/#advanced/mints");
     await expect(
-      page.getByRole("button", { name: /^localhost:3339\b/ }),
+      page.getByRole("button", { name: new RegExp(`^${TARGET_HOST}\\b`) }),
     ).toHaveAttribute("aria-current", "true");
   });
 

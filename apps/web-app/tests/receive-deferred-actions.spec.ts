@@ -32,6 +32,7 @@ import {
   type SeedIdentity,
 } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { isNostrRelay } from "./helpers/stack";
 import { topUp } from "./helpers/wallet";
 import {
   fundToken,
@@ -175,7 +176,7 @@ const sendTokenInChat = async (page: Page, sat: number): Promise<void> => {
 /** Holds what the app sends to the Nostr relay until the returned release. */
 const holdNostrRelay = async (context: BrowserContext) => {
   let held: Array<() => void> | null = [];
-  await context.routeWebSocket(/ws:\/\/localhost:7777\/?$/, (socket) => {
+  await context.routeWebSocket(isNostrRelay, (socket) => {
     const server = socket.connectToServer();
     socket.onMessage((message) => {
       if (held === null) server.send(message);

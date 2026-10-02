@@ -4,6 +4,7 @@ import { Schema } from "effect";
 import {
   fundToken,
   loadMintWallet,
+  mintUrl,
   targetMintUrl,
 } from "../../../packages/linkshu/tests/integration/helpers";
 
@@ -23,7 +24,7 @@ test("an unlisted mint advertising simulated Lightning cannot consume a token", 
     const url = new URL(route.request().url());
     if (url.pathname.includes("/melt")) meltRequests += 1;
     const response = await route.fetch({
-      url: `http://localhost:3338${url.pathname}${url.search}`,
+      url: `${mintUrl}${url.pathname}${url.search}`,
     });
     if (url.pathname === "/v1/info") {
       const info = Schema.decodeUnknownSync(
@@ -119,31 +120,28 @@ for (const mode of [
     let reloaded = false;
     let meltCalls = 0;
     let blockStateChecks = false;
-    await page.route("http://localhost:3338/v1/checkstate", (route) =>
+    await page.route(`${mintUrl}/v1/checkstate`, (route) =>
       blockStateChecks ? route.abort("failed") : route.continue(),
     );
     if (mode === "rejected") {
-      await page.route(
-        "http://localhost:3338/v1/melt/bolt11",
-        async (route) => {
-          if (route.request().method() !== "POST") return route.continue();
-          meltCalls += 1;
-          if (meltCalls > 1) return route.continue();
-          await route.fulfill({
-            status: 400,
-            json: {
-              code: 11000,
-              detail: "not enough inputs provided for melt",
-            },
-          });
-        },
-      );
+      await page.route(`${mintUrl}/v1/melt/bolt11`, async (route) => {
+        if (route.request().method() !== "POST") return route.continue();
+        meltCalls += 1;
+        if (meltCalls > 1) return route.continue();
+        await route.fulfill({
+          status: 400,
+          json: {
+            code: 11000,
+            detail: "not enough inputs provided for melt",
+          },
+        });
+      });
     }
     if (mode === "interrupted" || mode === "swap-interrupted") {
       await page.route(
         mode === "swap-interrupted"
-          ? "http://localhost:3338/v1/swap"
-          : "http://localhost:3338/v1/melt/bolt11",
+          ? `${mintUrl}/v1/swap`
+          : `${mintUrl}/v1/melt/bolt11`,
         async (route) => {
           if (route.request().method() !== "POST" || interrupted)
             return route.continue();
@@ -154,10 +152,8 @@ for (const mode of [
           await route.abort("failed");
         },
       );
-      await page.route(
-        "http://localhost:3338/v1/melt/quote/bolt11/*",
-        (route) =>
-          interrupted && !reloaded ? route.abort("failed") : route.continue(),
+      await page.route(`${mintUrl}/v1/melt/quote/bolt11/*`, (route) =>
+        interrupted && !reloaded ? route.abort("failed") : route.continue(),
       );
     }
     await page.goto("/cashu/");

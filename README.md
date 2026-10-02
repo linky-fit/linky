@@ -13,11 +13,12 @@ bun run test         # unit tests in every workspace
 bun run check-code   # typecheck, eslint --fix, prettier --write
 ```
 
-End-to-end tests (Playwright against the Docker stack):
+End-to-end tests (Playwright against a Docker stack owned by the checkout, so worktrees can run them side by side):
 
 ```bash
-docker compose -f docker-compose.dev.yml --profile e2e up -d --build --wait
-cd apps/web-app && bunx playwright test --project=local-stack
+bun run e2e          # web-app suite; extra args go to Playwright
+bun run e2e site     # site suite
+bun run e2e down     # stop the stack and drop its data
 ```
 
 ## Workspaces

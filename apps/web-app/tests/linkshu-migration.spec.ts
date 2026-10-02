@@ -39,14 +39,18 @@ import {
   waitForNetworkReady,
 } from "./helpers/appState";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
-import { fundToken } from "../../../packages/linkshu/tests/integration/helpers";
+import {
+  fundToken,
+  mintUrl,
+  targetMintUrl,
+} from "../../../packages/linkshu/tests/integration/helpers";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { topUp } from "./helpers/wallet";
 
 /** VITE_MAIN_MINT_URL baked into the e2e image (docker-compose.dev.yml). */
-const MINT_URL = "http://localhost:3338";
-const TARGET_MINT_URL = "http://localhost:3339";
+const MINT_URL = mintUrl;
+const TARGET_MINT_URL = targetMintUrl;
 const UNIT = "sat";
 
 const FUNDING_SAT = 100;

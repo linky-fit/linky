@@ -12,6 +12,8 @@ import {
   type SeedIdentity,
 } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { EVOLU_RELAY_URL } from "./helpers/stack";
+import { mintUrl } from "../../../packages/linkshu/tests/integration/helpers";
 
 /**
  * The lanes are seeded through `window.__linkyE2E` (a VITE_E2E build hook)
@@ -248,7 +250,7 @@ test("owner lanes migrate into shards, a fresh device reads them from the relay,
         "cashuProof",
         {
           id: await hooks.createId(source.page),
-          mint: "http://localhost:3338",
+          mint: mintUrl,
           unit: "sat",
           keysetId: "00lanezero",
           amount: 8,
@@ -532,7 +534,7 @@ test("spent shard proofs mark existing legacy copies spent during the grace peri
     const id = await hooks.createId(device.page);
     const proof = {
       id,
-      mint: "http://localhost:3338",
+      mint: mintUrl,
       unit: "sat",
       keysetId: "00legacy",
       amount: 8,
@@ -671,13 +673,13 @@ test("a restored device leaves the pointers of an account that rotated past shar
     // The restored device migrates while its Evolu server is still unreachable, as on a slow relay.
     const restored = await openDevice(browser, baseURL, "restored", (page) =>
       login(page).then(() =>
-        page.addInitScript(() => {
+        page.addInitScript((relay) => {
           if (sessionStorage.getItem("e2e.evolu-released") === "1") return;
           localStorage.setItem(
             "linky.evoluServers.disabled.v1",
-            JSON.stringify(["ws://localhost:4001"]),
+            JSON.stringify([relay]),
           );
-        }),
+        }, EVOLU_RELAY_URL),
       ),
     );
     devices.push(restored);

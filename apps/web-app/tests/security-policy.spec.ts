@@ -2,6 +2,11 @@ import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import vercel from "../vercel.json" with { type: "json" };
 import { setBaseStorage } from "./helpers/appState";
+import { NOSTR_RELAY_URL } from "./helpers/stack";
+import {
+  mintUrl,
+  targetMintUrl,
+} from "../../../packages/linkshu/tests/integration/helpers";
 
 test.use({ serviceWorkers: "block" });
 
@@ -96,19 +101,19 @@ test("built CSP covers every script, blocks injected code and allows local servi
   expect(violations.scriptRan).toBeUndefined();
   expect(violations.handlerRan).toBeUndefined();
 
-  for (const port of [3338, 3339]) {
+  for (const mint of [mintUrl, targetMintUrl]) {
     expect(
       await page.evaluate(
-        async (port) => (await fetch(`http://localhost:${port}/v1/info`)).ok,
-        port,
+        async (mint) => (await fetch(`${mint}/v1/info`)).ok,
+        mint,
       ),
     ).toBe(true);
   }
   expect(
     await page.evaluate(
-      () =>
+      (relay) =>
         new Promise<boolean>((resolve) => {
-          const socket = new WebSocket("ws://localhost:7777");
+          const socket = new WebSocket(relay);
           socket.onopen = () => {
             socket.close();
             resolve(true);
@@ -118,6 +123,7 @@ test("built CSP covers every script, blocks injected code and allows local servi
             resolve(false);
           };
         }),
+      NOSTR_RELAY_URL,
     ),
   ).toBe(true);
 });

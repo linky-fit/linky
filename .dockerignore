@@ -9,3 +9,7 @@ dist
 .vscode
 coverage
 **/coverage
+**/tests
+**/test-results
+**/playwright-report
+**/.inspector

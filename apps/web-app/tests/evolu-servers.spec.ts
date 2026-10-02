@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { setRandomIdentityStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { EVOLU_RELAY_URL } from "./helpers/stack";
 
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
 
@@ -17,7 +18,7 @@ test("recommended relays stay configured while the user's own relays come and go
   );
   await page.goto("/#evolu-servers");
   const rows = page.locator(".evolu-server-list button");
-  const recommended = rows.filter({ hasText: "ws://localhost:4001" });
+  const recommended = rows.filter({ hasText: EVOLU_RELAY_URL });
   const custom = rows.filter({ hasText: "wss://sync.example.com" });
   const noBackupWarning = page.getByText(
     /Your app data is not being backed up or synced via Evolu/,

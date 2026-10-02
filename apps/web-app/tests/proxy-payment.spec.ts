@@ -51,6 +51,7 @@ import {
   stubFiatRates,
   stubThirdPartyAssets,
 } from "./helpers/network";
+import { isNostrRelay } from "./helpers/stack";
 import { topUp } from "./helpers/wallet";
 import {
   publishProfileStatusToRelay,
@@ -104,7 +105,7 @@ const bootAccount = async (
 
   const page = await context.newPage();
   if (inbox) {
-    await page.routeWebSocket(/ws:\/\/localhost:7777\/?$/, (socket) => {
+    await page.routeWebSocket(isNostrRelay, (socket) => {
       const server = socket.connectToServer();
       const failedWraps = new Set<string>();
       socket.onMessage((message) => {

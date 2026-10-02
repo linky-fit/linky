@@ -39,6 +39,7 @@
     "prettier": "bun run --workspaces --if-present prettier",
     "typecheck": "bun run --workspaces --if-present typecheck",
     "test": "bun run --workspaces --if-present test",
+    "e2e": "bash scripts/e2e.sh",
     "check-code": "bun run typecheck && bun run eslint && bun run prettier",
     "build:npm": "bun run --filter @linky-fit/linkshu --filter @linky-fit/linkstr build:npm",
     "check:npm": "bash packages/config/npm/check.sh"

@@ -6,7 +6,7 @@ import {
 import { Option, Schema } from "effect";
 import { finalizeEvent, nip19 } from "nostr-tools";
 
-const LOCAL_RELAY_URL = "ws://localhost:7777";
+import { isNostrRelay, NOSTR_RELAY_URL } from "./stack";
 
 const decodeSubscriptionFrame = Schema.decodeUnknownOption(
   Schema.parseJson(
@@ -32,7 +32,7 @@ export const watchNostrInbox = (
   const pubkey = npubToHex(npub);
   const readySockets = new Set<PlaywrightWebSocket>();
   page.on("websocket", (socket) => {
-    if (socket.url().replace(/\/$/, "") !== LOCAL_RELAY_URL) return;
+    if (!isNostrRelay(socket.url())) return;
     let inboxSubscriptionId: string | null = null;
     socket.on("framesent", ({ payload }) => {
       const decoded = decodeSubscriptionFrame(String(payload));
@@ -102,7 +102,7 @@ const queryRelay = (
   timeoutMs: number,
 ): Promise<NostrEventShape[]> =>
   new Promise((resolve, reject) => {
-    const socket = new WebSocket(LOCAL_RELAY_URL);
+    const socket = new WebSocket(NOSTR_RELAY_URL);
     const events: NostrEventShape[] = [];
     const subscriptionId = `e2e-${Math.floor(Date.now() % 1e9)}`;
 
@@ -173,7 +173,7 @@ export const publishProfileStatusToRelay = async (
   );
 
   await new Promise<void>((resolve, reject) => {
-    const socket = new WebSocket(LOCAL_RELAY_URL);
+    const socket = new WebSocket(NOSTR_RELAY_URL);
     const timer = setTimeout(() => {
       socket.close();
       reject(new Error("relay publish timed out"));
@@ -230,6 +230,6 @@ export const waitForProfileStatusOnRelay = async (
   }
 
   throw new Error(
-    `kind:30315 status containing ${currency} never reached ${LOCAL_RELAY_URL} for ${npub}`,
+    `kind:30315 status containing ${currency} never reached ${NOSTR_RELAY_URL} for ${npub}`,
   );
 };

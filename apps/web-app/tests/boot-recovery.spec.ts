@@ -9,6 +9,7 @@ import { addContactByNpub } from "./helpers/contacts";
 import { BOOT_DIAGNOSTIC_TEST_PHRASES } from "../src/utils/bootDiagnosticSecrets.fixture";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { EVOLU_RELAY_URL } from "./helpers/stack";
 
 test.use({ serviceWorkers: "block" });
 
@@ -142,12 +143,12 @@ for (const failureTiming of ["before", "after"]) {
     await page.setViewportSize(MOBILE_VIEWPORT);
     await setBaseStorage(page);
     await setSeedLoginStorage(page, await createSeedIdentity());
-    await page.addInitScript(() => {
+    await page.addInitScript((relay) => {
       localStorage.setItem(
         "linky.evoluServers.disabled.v1",
-        JSON.stringify(["ws://localhost:4001"]),
+        JSON.stringify([relay]),
       );
-    });
+    }, EVOLU_RELAY_URL);
     await page.goto("/#wallet");
     await expect(page.getByLabel("Available balance")).toBeVisible();
     await addContactByNpub(page, (await createSeedIdentity()).npub);

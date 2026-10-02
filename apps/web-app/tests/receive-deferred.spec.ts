@@ -70,7 +70,7 @@ const operationRows = (page: Page) =>
 
 const mintPending = (page: Page) =>
   page
-    .locator(".mint-choice-item", { hasText: "localhost:3338" })
+    .locator(".mint-choice-item", { hasText: new URL(mintUrl).host })
     .locator(".mint-choice-pending");
 
 const openWallet = async (browser: Browser) => {
@@ -132,7 +132,7 @@ test("a token whose mint is unreachable stays pending until the mint answers", a
       );
     await page.goto("/#advanced/mints");
     await expect(
-      page.locator(".mint-choice-item", { hasText: "localhost:3338" }),
+      page.locator(".mint-choice-item", { hasText: new URL(mintUrl).host }),
     ).toContainText(/\d+ sat/);
     await expect(mintPending(page)).toHaveCount(0);
   });

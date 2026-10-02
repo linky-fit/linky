@@ -8,11 +8,12 @@ import {
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates } from "./helpers/network";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
+import { EVOLU_QUOTA_RELAY_URL, EVOLU_RELAY_URL } from "./helpers/stack";
 import { topUp } from "./helpers/wallet";
 
 test.use({ actionTimeout: 20_000 });
 
-const recoveryRelay = "ws://localhost:4001";
+const recoveryRelay = EVOLU_RELAY_URL;
 
 // The recommended relay starts offline, so bringing it online adds capacity.
 const addRecoveryRelay = async (page: Page): Promise<void> => {
@@ -43,19 +44,22 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
     const errors = watchAppErrors(page, label);
     await setBaseStorage(page);
     await setSeedLoginStorage(page, identity);
-    await page.addInitScript((offlineRelay) => {
-      const initialized = "linky.test.quota-relay-configured";
-      if (sessionStorage.getItem(initialized) === "1") return;
-      localStorage.setItem(
-        "linky.evoluServers.user.v1",
-        JSON.stringify(["ws://localhost:4002"]),
-      );
-      localStorage.setItem(
-        "linky.evoluServers.disabled.v1",
-        JSON.stringify([offlineRelay]),
-      );
-      sessionStorage.setItem(initialized, "1");
-    }, recoveryRelay);
+    await page.addInitScript(
+      ({ quotaRelay, offlineRelay }) => {
+        const initialized = "linky.test.quota-relay-configured";
+        if (sessionStorage.getItem(initialized) === "1") return;
+        localStorage.setItem(
+          "linky.evoluServers.user.v1",
+          JSON.stringify([quotaRelay]),
+        );
+        localStorage.setItem(
+          "linky.evoluServers.disabled.v1",
+          JSON.stringify([offlineRelay]),
+        );
+        sessionStorage.setItem(initialized, "1");
+      },
+      { quotaRelay: EVOLU_QUOTA_RELAY_URL, offlineRelay: recoveryRelay },
+    );
     await stubFiatRates(page);
     await page.goto("/#wallet");
     await waitForNetworkReady(page);

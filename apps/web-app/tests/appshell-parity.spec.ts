@@ -9,6 +9,8 @@ import {
 } from "./helpers/identity";
 import { watchAppErrors } from "./helpers/diagnostics";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { EVOLU_RELAY_URL, NOSTR_RELAY_URL } from "./helpers/stack";
+import { mintUrl } from "../../../packages/linkshu/tests/integration/helpers";
 
 test.use({ serviceWorkers: "block" });
 
@@ -379,7 +381,10 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(page).toHaveURL(/#advanced\/mints$/);
     await expect(title).toHaveText("Mints");
     await expect(
-      page.getByRole("button", { name: "localhost:3338 Test", exact: true }),
+      page.getByRole("button", {
+        name: `${new URL(mintUrl).host} Test`,
+        exact: true,
+      }),
     ).toHaveAttribute("aria-current", "true");
     await close.click();
     await expect(page).toHaveURL(/#settings$/);
@@ -389,8 +394,10 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await page.getByRole("button", { name: /^Nostr \d+\/\d+/ }).click();
     await expect(page).toHaveURL(/#nostr-relays$/);
     await expect(title).toHaveText("Nostr-Relay");
-    await page.getByRole("button", { name: /ws:\/\/localhost:7777/ }).click();
-    await expect(page).toHaveURL(/#nostr-relay\/ws%3A%2F%2Flocalhost%3A7777$/);
+    await page.getByRole("button", { name: NOSTR_RELAY_URL }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`#nostr-relay/${encodeURIComponent(NOSTR_RELAY_URL)}$`),
+    );
     await expect(title).toHaveText("Nostr-Relay");
     await expect(page.getByText("Status", { exact: true })).toBeVisible();
     await expect(
@@ -414,8 +421,10 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await page.getByRole("button", { name: /^Evolu \d+\/\d+/ }).click();
     await expect(page).toHaveURL(/#evolu-servers$/);
     await expect(title).toHaveText("Evolu-Server");
-    await page.getByRole("button", { name: /ws:\/\/localhost:4001/ }).click();
-    await expect(page).toHaveURL(/#evolu-server\/ws%3A%2F%2Flocalhost%3A4001$/);
+    await page.getByRole("button", { name: EVOLU_RELAY_URL }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`#evolu-server/${encodeURIComponent(EVOLU_RELAY_URL)}$`),
+    );
     await expect(
       page.getByText("Synchronisierung", { exact: true }),
     ).toBeVisible();

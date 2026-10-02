@@ -31,7 +31,9 @@ import {
   type SeedIdentity,
 } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
+import { EVOLU_RELAY_URL } from "./helpers/stack";
 import { topUp } from "./helpers/wallet";
+import { mintUrl } from "../../../packages/linkshu/tests/integration/helpers";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 
 declare global {
@@ -119,13 +121,13 @@ const bootRestored = async (
 ) => {
   const device = await bootDevice(browser, label, identity);
   await watchReceiveStatuses(device.page);
-  await device.page.addInitScript(() => {
+  await device.page.addInitScript((relay) => {
     if (sessionStorage.getItem("e2e.evolu-released") === "1") return;
     localStorage.setItem(
       "linky.evoluServers.disabled.v1",
-      JSON.stringify(["ws://localhost:4001"]),
+      JSON.stringify([relay]),
     );
-  });
+  }, EVOLU_RELAY_URL);
   const mintCalls: string[] = [];
   device.page.on("request", (request) => {
     mintCalls.push(new URL(request.url()).pathname);
@@ -212,7 +214,7 @@ test("a seed restore does not re-accept chat tokens the old device received", as
 
   await test.step("B restores the seed while its mint is unreachable", async () => {
     const restored = await bootRestored(browser, "B mint down", bIdentity);
-    const mintRoute = "http://localhost:3338/**";
+    const mintRoute = `${mintUrl}/**`;
     await restored.context.route(mintRoute, (route) =>
       route.abort("connectionrefused"),
     );
