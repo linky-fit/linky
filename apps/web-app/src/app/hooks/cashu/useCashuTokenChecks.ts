@@ -96,11 +96,9 @@ export const useCashuTokenChecks = ({
             pushToast(t("cashuCheckOk"));
             return "ok";
           case "spent":
-            setStatus(t("cashuInvalid"));
             pushToast(t("cashuInvalid"));
             return "invalid";
           case "unavailable":
-            setStatus(t("cashuCheckFailed"));
             pushToast(t("cashuCheckFailed"));
             return "transient";
         }
@@ -108,7 +106,7 @@ export const useCashuTokenChecks = ({
         setCashuIsBusy(false);
       }
     },
-    [cashuIsBusy, checkCashuTransfer, pushToast, setCashuIsBusy, setStatus, t],
+    [cashuIsBusy, checkCashuTransfer, pushToast, setCashuIsBusy, t],
   );
 
   const checkAllCashuTokensAndDeleteInvalid = React.useCallback(async () => {
@@ -137,7 +135,6 @@ export const useCashuTokenChecks = ({
     pushToast,
     setCashuBulkCheckIsBusy,
     setCashuIsBusy,
-    setStatus,
     t,
   ]);
 
