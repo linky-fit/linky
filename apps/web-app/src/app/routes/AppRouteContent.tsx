@@ -22,9 +22,9 @@ import {
   EvoluCurrentDataPage,
   EvoluDataDetailPage,
   EvoluHistoryDataPage,
-  EvoluServerNewPage,
-  EvoluServerPage,
-  EvoluServersPage,
+  EvoluRelayNewPage,
+  EvoluRelayPage,
+  EvoluRelaysPage,
   InspectorSettingsPage,
   LanguagePage,
   ReceiveMethodPage,
@@ -146,16 +146,16 @@ const RoutePage = (): React.ReactElement => {
       return <MintDetailPage />;
     case "chatStorage":
       return <ChatStoragePage />;
-    case "evoluServers":
-      return <EvoluServersPage />;
+    case "evoluRelays":
+      return <EvoluRelaysPage />;
     case "evoluCurrentData":
       return <EvoluCurrentDataPage />;
     case "evoluHistoryData":
       return <EvoluHistoryDataPage />;
-    case "evoluServer":
-      return <EvoluServerPage />;
-    case "evoluServerNew":
-      return <EvoluServerNewPage />;
+    case "evoluRelay":
+      return <EvoluRelayPage />;
+    case "evoluRelayNew":
+      return <EvoluRelayNewPage />;
     case "evoluData":
       return <EvoluDataDetailPage />;
     case "nostrRelays":

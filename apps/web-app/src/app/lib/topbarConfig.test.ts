@@ -71,8 +71,8 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "mints" })).toBe("#settings");
     expect(backHashFor({ kind: "mintNew" })).toBe("#advanced/mints");
     expect(backHashFor({ kind: "nostrRelays" })).toBe("#settings");
-    expect(backHashFor({ kind: "evoluServers" })).toBe("#settings");
-    expect(backHashFor({ kind: "chatStorage" })).toBe("#evolu-servers");
+    expect(backHashFor({ kind: "evoluRelays" })).toBe("#settings");
+    expect(backHashFor({ kind: "chatStorage" })).toBe("#evolu-relays");
   });
 
   it("walks wallet sub-pages back up one level at a time", () => {

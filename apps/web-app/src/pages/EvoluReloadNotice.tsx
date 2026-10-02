@@ -4,18 +4,18 @@ import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
 import { reportAppLog } from "../devtools/inspector/appLog";
 
 export function EvoluReloadNotice(): React.ReactElement | null {
-  const { evoluErrorType, evoluServersReloadRequired } =
+  const { evoluErrorType, evoluRelaysReloadRequired } =
     useEvoluSettingsContext();
   const { t } = useAppShellCore();
-  if (!evoluServersReloadRequired && evoluErrorType !== "ProtocolQuotaError") {
+  if (!evoluRelaysReloadRequired && evoluErrorType !== "ProtocolQuotaError") {
     return null;
   }
   return (
     <>
       <p className="muted">
         {t(
-          evoluServersReloadRequired
-            ? "evoluServersReloadHint"
+          evoluRelaysReloadRequired
+            ? "evoluRelaysReloadHint"
             : "evoluQuotaRecoveryHint",
         )}
       </p>
@@ -29,15 +29,15 @@ export function EvoluReloadNotice(): React.ReactElement | null {
               summary: "Reloading to retry Evolu synchronization",
               payload: {
                 errorType: evoluErrorType,
-                settingsChanged: evoluServersReloadRequired,
+                settingsChanged: evoluRelaysReloadRequired,
               },
             });
             window.location.reload();
           }}
         >
           {t(
-            evoluServersReloadRequired
-              ? "evoluServersReloadButton"
+            evoluRelaysReloadRequired
+              ? "evoluRelaysReloadButton"
               : "evoluRetrySync",
           )}
         </button>

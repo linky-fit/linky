@@ -91,10 +91,10 @@ type NavigationAction =
   | { route: "evoluCurrentData" }
   | { route: "evoluData" }
   | { route: "evoluHistoryData" }
-  | { route: "evoluServer"; id: string }
-  | { route: "evoluServerNew" }
+  | { route: "evoluRelay"; id: string }
+  | { route: "evoluRelayNew" }
   | { route: "chatStorage" }
-  | { route: "evoluServers" }
+  | { route: "evoluRelays" }
   | { route: "lnAddressPay"; lnAddress: string }
   | { route: "manualPay" }
   | { route: "bankPayment"; spdPayload: string; editing?: boolean }
@@ -252,8 +252,8 @@ export const navigateTo = (action: NavigationAction): void => {
     case "chatStorage":
       window.location.assign("#advanced/chat-storage");
       return;
-    case "evoluServers":
-      window.location.assign("#evolu-servers");
+    case "evoluRelays":
+      window.location.assign("#evolu-relays");
       break;
     case "evoluData":
       window.location.assign("#evolu-data");
@@ -264,11 +264,11 @@ export const navigateTo = (action: NavigationAction): void => {
     case "evoluHistoryData":
       window.location.assign("#evolu-history-data");
       break;
-    case "evoluServer":
-      window.location.assign(`#evolu-server/${encodeURIComponent(action.id)}`);
+    case "evoluRelay":
+      window.location.assign(`#evolu-relay/${encodeURIComponent(action.id)}`);
       break;
-    case "evoluServerNew":
-      window.location.assign("#evolu-server/new");
+    case "evoluRelayNew":
+      window.location.assign("#evolu-relay/new");
       break;
   }
 };

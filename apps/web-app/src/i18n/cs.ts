@@ -111,7 +111,7 @@ export const cs = {
   logoutArmedHint:
     "Pro odhlášení a smazání dat Linky z tohoto zařízení klikněte ještě jednou.",
   logoutUnsyncedArmedHint:
-    "Toto zařízení není synchronizované. Odhlášení smaže změny a peníze, které se nedostaly na server. Pro odhlášení přesto klikněte ještě jednou.",
+    "Toto zařízení není synchronizované. Odhlášení smaže změny a peníze, které se nedostaly na Evolu relay. Pro odhlášení přesto klikněte ještě jednou.",
 
   nostrIdentity: "Nostr identita",
   masterKeys: "Hlavní klíče",
@@ -213,7 +213,7 @@ export const cs = {
     "Profil se nepodařilo publikovat pod novým klíčem. Klíče nebyly změněny — zkuste to znovu.",
 
   nostrRelay: "Nostr relay",
-  evoluServer: "Evolu server",
+  evoluRelay: "Evolu relay",
   addRelay: "Přidat relay",
   invalidRelayUrl: "Zadejte zabezpečenou WebSocket adresu relay (wss://).",
   relayUrl: "Relay URL",
@@ -237,25 +237,25 @@ export const cs = {
   evoluCapacityMeasuring: "Měřím…",
   evoluWipeStorage: "Vyčistit Evolu storage",
   evoluWipeStorageBusy: "Čistím Evolu storage…",
-  evoluServersEmpty: "Žádné Evolu servery nejsou nastavené.",
-  evoluServerOfflineLabel: "Offline",
-  evoluServerOfflineDisable: "Přejít offline",
-  evoluServerOfflineEnable: "Přejít online",
-  evoluServerOfflineStatus: "Offline",
-  evoluAddServerLabel: "Přidat server",
-  evoluAddServerButton: "Přidat",
-  evoluAddServerInvalid: "Neplatná URL serveru (očekávám wss://…)",
-  evoluAddServerAlready: "Server už je přidaný.",
-  evoluAddServerSaved: "Server uložen. Pro použití obnovte stránku.",
-  evoluServersReloadHint:
-    "Aby se změny projevily (sync přes nové servery), je potřeba obnovit stránku.",
+  evoluRelaysEmpty: "Žádný Evolu relay není nastavený.",
+  evoluRelayOfflineLabel: "Offline",
+  evoluRelayOfflineDisable: "Přejít offline",
+  evoluRelayOfflineEnable: "Přejít online",
+  evoluRelayOfflineStatus: "Offline",
+  evoluAddRelayLabel: "Přidat relay",
+  evoluAddRelayButton: "Přidat",
+  evoluAddRelayInvalid: "Neplatná adresa relaye (očekávám wss://…)",
+  evoluAddRelayAlready: "Relay už je přidaný.",
+  evoluAddRelaySaved: "Relay uložen. Pro použití obnovte stránku.",
+  evoluRelaysReloadHint:
+    "Aby se změny projevily (sync přes nové relaye), je potřeba obnovit stránku.",
   evoluQuotaRecoveryHint:
-    "Po zvýšení limitu úložiště serveru zkuste synchronizaci z tohoto zařízení znovu. Můžete také přidat server s dostatečným úložištěm na všech zařízeních. Opakování zachová místní data; jejich smazáním můžete ztratit nesynchronizované změny.",
+    "Po zvýšení limitu úložiště relaye zkuste synchronizaci z tohoto zařízení znovu. Můžete také přidat relay s dostatečným úložištěm na všech zařízeních. Opakování zachová místní data; jejich smazáním můžete ztratit nesynchronizované změny.",
   evoluRetrySync: "Zkusit synchronizaci znovu",
-  evoluServersReloadButton: "Obnovit teď",
-  evoluServerRemove: "Odebrat server",
+  evoluRelaysReloadButton: "Obnovit teď",
+  evoluRelayRemove: "Odebrat relay",
   evoluNoBackupWarning:
-    "Žádný Evolu server není zapnutý. Data aplikace se přes Evolu nezálohují ani nesynchronizují. Při ztrátě zařízení nebo smazání jeho dat o ně můžete přijít. Pro obnovení zálohování přidejte nebo zapněte server.",
+    "Žádný Evolu relay není zapnutý. Data aplikace se přes Evolu nezálohují ani nesynchronizují. Při ztrátě zařízení nebo smazání jeho dat o ně můžete přijít. Pro obnovení zálohování přidejte nebo zapněte relay.",
   evoluRawDbSize: "Velikost SQLite souboru",
   evoluRowCounts: "Počty řádků",
   chatStorage: "Úložiště chatů",
@@ -265,7 +265,7 @@ export const cs = {
   chatStorageSubscribed: "Odebírané na tomto zařízení",
   chatStorageForget: "Zapomenout staré shardy chatů",
   chatStorageForgetHint:
-    "Staré zprávy a stav neaktivních chatů zmizí z historie na tomto zařízení. Kontakty a peníze zůstanou kompletní. V Evolu 7 se pouze zruší místní odběr: data zůstávají na disku i na serveru. Smazání na serveru čeká na podporu deleteOwner v Evolu.",
+    "Staré zprávy a stav neaktivních chatů zmizí z historie na tomto zařízení. Kontakty a peníze zůstanou kompletní. V Evolu 7 se pouze zruší místní odběr: data zůstávají na disku i na relayi. Smazání z relaye čeká na podporu deleteOwner v Evolu.",
   chatStorageForgotten: "Staré shardy chatů byly na tomto zařízení zapomenuty.",
   chatStorageFailed:
     "Staré shardy chatů se nepodařilo zapomenout. Zkuste to znovu.",

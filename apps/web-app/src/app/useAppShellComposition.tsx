@@ -7,7 +7,7 @@ import { ContactCard } from "../components/ContactCard";
 import {
   useEvoluDatabaseInfoState,
   useEvoluLastError,
-  useEvoluServersManager,
+  useEvoluRelaysManager,
   wipeEvoluStorage as wipeEvoluStorageImpl,
   type ContactId,
 } from "../evolu";
@@ -170,23 +170,24 @@ export const useAppShellComposition = ({
     transactions,
   });
 
-  const evoluServers = useEvoluServersManager();
-  const evoluServerUrls = evoluServers.configuredUrls;
-  const evoluActiveServerUrls = evoluServers.activeUrls;
-  const evoluServerStatusByUrl = evoluServers.statusByUrl;
-  const evoluServersReloadRequired = evoluServers.reloadRequired;
-  const saveEvoluServerUrls = evoluServers.setServerUrls;
-  const isEvoluServerOffline = evoluServers.isOffline;
-  const isEvoluServerRecommended = evoluServers.isRecommended;
-  const setEvoluServerOffline = evoluServers.setServerOffline;
+  const evoluRelays = useEvoluRelaysManager();
+  const evoluRelayUrls = evoluRelays.configuredUrls;
+  const evoluActiveRelayUrls = evoluRelays.activeUrls;
+  const evoluRelayStatusByUrl = evoluRelays.statusByUrl;
+  const evoluRelaysReloadRequired = evoluRelays.reloadRequired;
+  const saveEvoluRelayUrls = evoluRelays.setRelayUrls;
+  const isEvoluRelayOffline = evoluRelays.isOffline;
+  const isEvoluRelayRecommended = evoluRelays.isRecommended;
+  const setEvoluRelayOffline = evoluRelays.setRelayOffline;
 
-  const [newEvoluServerUrl, setNewEvoluServerUrl] = useState("");
+  const [newEvoluRelayUrl, setNewEvoluRelayUrl] = useState("");
 
   const [status, setStatus] = useState<string | null>(null);
   const importDataFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const [pendingEvoluServerDeleteUrl, setPendingEvoluServerDeleteUrl] =
-    useState<string | null>(null);
+  const [pendingEvoluRelayDeleteUrl, setPendingEvoluRelayDeleteUrl] = useState<
+    string | null
+  >(null);
   const mainSwipeRef = React.useRef<HTMLDivElement | null>(null);
   const mainSwipeScrollTimerRef = React.useRef<number | null>(null);
   const { allowedDisplayCurrencies, toggleAllowedDisplayCurrency } =
@@ -332,36 +333,31 @@ export const useAppShellComposition = ({
 
   const evoluDbInfo = useEvoluDatabaseInfoState({
     enabled:
-      route.kind === "evoluServers" ||
-      route.kind === "evoluServer" ||
-      route.kind === "evoluServerNew" ||
+      route.kind === "evoluRelays" ||
+      route.kind === "evoluRelay" ||
+      route.kind === "evoluRelayNew" ||
       route.kind === "evoluData" ||
       route.kind === "evoluCurrentData" ||
       route.kind === "evoluHistoryData",
   });
 
-  const evoluConnectedServerCount = useMemo(() => {
-    return evoluActiveServerUrls.reduce((sum, url) => {
-      return sum + (evoluServerStatusByUrl[url] === "connected" ? 1 : 0);
+  const evoluConnectedRelayCount = useMemo(() => {
+    return evoluActiveRelayUrls.reduce((sum, url) => {
+      return sum + (evoluRelayStatusByUrl[url] === "connected" ? 1 : 0);
     }, 0);
-  }, [evoluActiveServerUrls, evoluServerStatusByUrl]);
+  }, [evoluActiveRelayUrls, evoluRelayStatusByUrl]);
 
   const evoluOverallStatus = useMemo(() => {
     if (!appOwnerId) return "disconnected" as const;
     if (evoluHasError) return "disconnected" as const;
-    if (evoluActiveServerUrls.length === 0) return "disconnected" as const;
-    const states = evoluActiveServerUrls.map(
-      (url) => evoluServerStatusByUrl[url] ?? "checking",
+    if (evoluActiveRelayUrls.length === 0) return "disconnected" as const;
+    const states = evoluActiveRelayUrls.map(
+      (url) => evoluRelayStatusByUrl[url] ?? "checking",
     );
     if (states.some((s) => s === "connected")) return "connected" as const;
     if (states.some((s) => s === "checking")) return "checking" as const;
     return "disconnected" as const;
-  }, [
-    appOwnerId,
-    evoluActiveServerUrls,
-    evoluHasError,
-    evoluServerStatusByUrl,
-  ]);
+  }, [appOwnerId, evoluActiveRelayUrls, evoluHasError, evoluRelayStatusByUrl]);
 
   const [evoluWipeStorageIsBusy, setEvoluWipeStorageIsBusy] =
     useState<boolean>(false);
@@ -864,10 +860,10 @@ export const useAppShellComposition = ({
 
   useArmedDeleteTimeouts({
     pendingCashuDeleteId,
-    pendingEvoluServerDeleteUrl,
+    pendingEvoluRelayDeleteUrl,
     pendingMintDeleteUrl,
     setPendingCashuDeleteId,
-    setPendingEvoluServerDeleteUrl,
+    setPendingEvoluRelayDeleteUrl,
     setPendingMintDeleteUrl,
   });
 
@@ -1583,9 +1579,9 @@ export const useAppShellComposition = ({
       dedupeContacts,
       dedupeContactsIsBusy,
       defaultMintDisplay,
-      evoluConnectedServerCount,
+      evoluConnectedRelayCount,
       evoluOverallStatus,
-      evoluServerUrls,
+      evoluRelayUrls,
       exportAppData,
       handleImportAppDataFilePicked,
       importDataFileInputRef,
@@ -1609,23 +1605,23 @@ export const useAppShellComposition = ({
       evoluHasError,
       evoluErrorType: evoluLastError?.type ?? null,
       evoluHistoryCount: evoluDbInfo.info.historyCount,
-      evoluServerStatusByUrl,
-      evoluServerUrls,
-      evoluServersReloadRequired,
+      evoluRelayStatusByUrl,
+      evoluRelayUrls,
+      evoluRelaysReloadRequired,
       evoluShards,
       evoluSyncOwnerIds,
       evoluTableCounts: evoluDbInfo.info.tableCounts,
       evoluWipeStorageIsBusy,
-      isEvoluServerOffline,
-      isEvoluServerRecommended,
-      newEvoluServerUrl,
-      pendingEvoluServerDeleteUrl,
+      isEvoluRelayOffline,
+      isEvoluRelayRecommended,
+      newEvoluRelayUrl,
+      pendingEvoluRelayDeleteUrl,
       requestRotateShard: shardRotation.rotate,
       rotatingShardScope: shardRotation.busyScope,
-      saveEvoluServerUrls,
-      setEvoluServerOffline,
-      setNewEvoluServerUrl,
-      setPendingEvoluServerDeleteUrl,
+      saveEvoluRelayUrls,
+      setEvoluRelayOffline,
+      setNewEvoluRelayUrl,
+      setPendingEvoluRelayDeleteUrl,
       setStatus,
       syncOwnerId: appOwnerId,
       wipeEvoluStorage,

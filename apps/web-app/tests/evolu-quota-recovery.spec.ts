@@ -16,7 +16,7 @@ const recoveryRelay = "ws://localhost:4001";
 
 // The recommended relay starts offline, so bringing it online adds capacity.
 const addRecoveryRelay = async (page: Page): Promise<void> => {
-  await page.goto(`/#evolu-server/${encodeURIComponent(recoveryRelay)}`);
+  await page.goto(`/#evolu-relay/${encodeURIComponent(recoveryRelay)}`);
   await expect(
     page.getByRole("button", { name: "Clear Evolu storage", exact: true }),
   ).toHaveCount(0);
@@ -99,7 +99,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
           /#wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/,
         );
       }
-      await source.page.goto("/#evolu-servers");
+      await source.page.goto("/#evolu-relays");
       await expect(source.page.getByRole("alert")).toContainText(
         "Sync storage limit reached",
       );

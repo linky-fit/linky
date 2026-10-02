@@ -12,13 +12,13 @@ const schema = {
   },
 };
 
-const configuredServers = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
+const configuredRelays = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
   .split(",")
   .map((url) => url.trim())
   .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
 
-export const EVOLU_SERVERS = configuredServers.length
-  ? configuredServers
+export const EVOLU_RELAYS = configuredRelays.length
+  ? configuredRelays
   : ["wss://evolu.linky.fit"];
 
 export const createTrackerStore = (ownerMnemonic: string) => {
@@ -31,7 +31,7 @@ export const createTrackerStore = (ownerMnemonic: string) => {
   const evolu = Evolu.createEvolu(evoluReactWebDeps)(schema, {
     name: Evolu.SimpleName.orThrow(`linky-errors-${owner.id}`),
     externalAppOwner: owner,
-    transports: EVOLU_SERVERS.map((url) => ({ type: "WebSocket", url })),
+    transports: EVOLU_RELAYS.map((url) => ({ type: "WebSocket", url })),
   });
   const query = evolu.createQuery((db) =>
     db

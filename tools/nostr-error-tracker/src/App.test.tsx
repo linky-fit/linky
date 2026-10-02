@@ -63,7 +63,7 @@ const resolutionStore = vi.hoisted(() => {
 vi.mock("./issueStore", async () => {
   const { useSyncExternalStore } = await import("react");
   return {
-    EVOLU_SERVERS: ["ws://localhost:4001"],
+    EVOLU_RELAYS: ["ws://localhost:4001"],
     createTrackerStore: vi.fn(() => ({})),
     useIssueResolutions: function useMockIssueResolutions() {
       const resolutions = useSyncExternalStore(

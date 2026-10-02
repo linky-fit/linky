@@ -1,41 +1,41 @@
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
-import { deriveEvoluServerState } from "../app/lib/evoluServerState";
+import { deriveEvoluRelayState } from "../app/lib/evoluRelayState";
 import { navigateTo } from "../hooks/useRouting";
 import { EvoluReloadNotice } from "./EvoluReloadNotice";
 import { EvoluSyncErrorNotice } from "./EvoluSyncErrorNotice";
 
-export function EvoluServerPage(): React.ReactElement {
+export function EvoluRelayPage(): React.ReactElement {
   const {
     evoluHasError,
-    evoluServerStatusByUrl,
-    evoluServerUrls,
-    isEvoluServerOffline,
-    isEvoluServerRecommended,
-    pendingEvoluServerDeleteUrl,
-    saveEvoluServerUrls,
-    setEvoluServerOffline,
-    setPendingEvoluServerDeleteUrl,
+    evoluRelayStatusByUrl,
+    evoluRelayUrls,
+    isEvoluRelayOffline,
+    isEvoluRelayRecommended,
+    pendingEvoluRelayDeleteUrl,
+    saveEvoluRelayUrls,
+    setEvoluRelayOffline,
+    setPendingEvoluRelayDeleteUrl,
     setStatus,
     syncOwnerId,
   } = useEvoluSettingsContext();
   const { route, t } = useAppShellCore();
-  const selectedEvoluServerUrl = route.kind === "evoluServer" ? route.id : null;
+  const selectedEvoluRelayUrl = route.kind === "evoluRelay" ? route.id : null;
 
   return (
     <section className="panel">
       <EvoluSyncErrorNotice />
       <EvoluReloadNotice />
 
-      {selectedEvoluServerUrl ? (
+      {selectedEvoluRelayUrl ? (
         <>
           {(() => {
-            const offline = isEvoluServerOffline(selectedEvoluServerUrl);
-            const { state, labelKey } = deriveEvoluServerState({
+            const offline = isEvoluRelayOffline(selectedEvoluRelayUrl);
+            const { state, labelKey } = deriveEvoluRelayState({
               evoluHasError,
               isOffline: offline,
-              state: evoluServerStatusByUrl[selectedEvoluServerUrl],
+              state: evoluRelayStatusByUrl[selectedEvoluRelayUrl],
               syncOwnerId,
             });
 
@@ -43,7 +43,7 @@ export function EvoluServerPage(): React.ReactElement {
               <>
                 <div className="settings-row">
                   <div className="settings-left">
-                    <span className="relay-url">{selectedEvoluServerUrl}</span>
+                    <span className="relay-url">{selectedEvoluRelayUrl}</span>
                   </div>
                   <div className="settings-right">
                     <span
@@ -74,7 +74,7 @@ export function EvoluServerPage(): React.ReactElement {
                 <div className="settings-row">
                   <div className="settings-left">
                     <span className="settings-label">
-                      {t("evoluServerOfflineLabel")}
+                      {t("evoluRelayOfflineLabel")}
                     </span>
                   </div>
                   <div className="settings-right">
@@ -82,17 +82,17 @@ export function EvoluServerPage(): React.ReactElement {
                       type="button"
                       className="secondary"
                       onClick={() => {
-                        setEvoluServerOffline(selectedEvoluServerUrl, !offline);
+                        setEvoluRelayOffline(selectedEvoluRelayUrl, !offline);
                       }}
                     >
                       {offline
-                        ? t("evoluServerOfflineEnable")
-                        : t("evoluServerOfflineDisable")}
+                        ? t("evoluRelayOfflineEnable")
+                        : t("evoluRelayOfflineDisable")}
                     </button>
                   </div>
                 </div>
 
-                {isEvoluServerRecommended(selectedEvoluServerUrl) ? (
+                {isEvoluRelayRecommended(selectedEvoluRelayUrl) ? (
                   <p className="muted">{t("relayRecommendedNote")}</p>
                 ) : (
                   <div className="settings-row settings-error-note">
@@ -101,25 +101,25 @@ export function EvoluServerPage(): React.ReactElement {
                       className="btn-wide danger"
                       onClick={() => {
                         if (
-                          pendingEvoluServerDeleteUrl === selectedEvoluServerUrl
+                          pendingEvoluRelayDeleteUrl === selectedEvoluRelayUrl
                         ) {
                           const selectedLower =
-                            selectedEvoluServerUrl.toLowerCase();
-                          const nextUrls = evoluServerUrls.filter(
+                            selectedEvoluRelayUrl.toLowerCase();
+                          const nextUrls = evoluRelayUrls.filter(
                             (u) => u.toLowerCase() !== selectedLower,
                           );
-                          setPendingEvoluServerDeleteUrl(null);
-                          setEvoluServerOffline(selectedEvoluServerUrl, false);
-                          saveEvoluServerUrls(nextUrls);
-                          navigateTo({ route: "evoluServers" });
+                          setPendingEvoluRelayDeleteUrl(null);
+                          setEvoluRelayOffline(selectedEvoluRelayUrl, false);
+                          saveEvoluRelayUrls(nextUrls);
+                          navigateTo({ route: "evoluRelays" });
                           return;
                         }
 
                         setStatus(t("deleteArmedHint"));
-                        setPendingEvoluServerDeleteUrl(selectedEvoluServerUrl);
+                        setPendingEvoluRelayDeleteUrl(selectedEvoluRelayUrl);
                       }}
                     >
-                      {t("evoluServerRemove")}
+                      {t("evoluRelayRemove")}
                     </button>
                   </div>
                 )}

@@ -20,7 +20,7 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 - The recovery seed stays out of every HTTP request; secrets stay out of every log
 - Inspector rows hold decrypted plaintext and stay on the device in production
 - Local Evolu data is cleared only by the user; quota errors are recovered by adding relay capacity, and degraded storage asks the user instead of falling back silently
-- Env vars set only fresh-origin defaults; relay and Evolu server lists are user settings
+- Env vars set only fresh-origin defaults; Nostr relay and Evolu relay lists are user settings
 
 ## Conventions
 

@@ -60,9 +60,9 @@ export type Route =
   | { kind: "nostrRelay"; id: string }
   | { kind: "nostrRelayNew" }
   | { kind: "chatStorage" }
-  | { kind: "evoluServers" }
-  | { kind: "evoluServer"; id: string }
-  | { kind: "evoluServerNew" }
+  | { kind: "evoluRelays" }
+  | { kind: "evoluRelay"; id: string }
+  | { kind: "evoluRelayNew" }
   | { kind: "evoluData" }
   | { kind: "evoluCurrentData" }
   | { kind: "evoluHistoryData" }
@@ -163,16 +163,16 @@ export const parseRouteFromHash = (): Route => {
   if (relayId) return { kind: "nostrRelay", id: relayId };
 
   if (hash === "#advanced/chat-storage") return { kind: "chatStorage" };
-  if (hash === "#evolu-servers") return { kind: "evoluServers" };
+  if (hash === "#evolu-relays") return { kind: "evoluRelays" };
   if (hash === "#evolu-data") return { kind: "evoluData" };
   if (hash === "#evolu-current-data") return { kind: "evoluCurrentData" };
   if (hash === "#evolu-history-data") return { kind: "evoluHistoryData" };
 
-  if (hash === "#evolu-server/new") return { kind: "evoluServerNew" };
+  if (hash === "#evolu-relay/new") return { kind: "evoluRelayNew" };
 
-  const evoluServerPrefix = "#evolu-server/";
-  const evoluServerId = decodeHashSegment(hash, evoluServerPrefix);
-  if (evoluServerId) return { kind: "evoluServer", id: evoluServerId };
+  const evoluRelayPrefix = "#evolu-relay/";
+  const evoluRelayId = decodeHashSegment(hash, evoluRelayPrefix);
+  if (evoluRelayId) return { kind: "evoluRelay", id: evoluRelayId };
 
   const chatPrefix = "#chat/";
   if (hash.startsWith(chatPrefix)) {
