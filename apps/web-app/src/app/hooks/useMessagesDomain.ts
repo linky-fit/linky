@@ -73,6 +73,8 @@ interface UseMessagesDomainParams {
   chatMessagesRef: React.RefObject<HTMLDivElement | null>;
   contacts: ReadonlyArray<{ readonly id: ContactId }>;
   conversations: ConversationsRepository;
+  /** Background writes (legacy import, retention prune) wait until the account is hydrated. */
+  hydrated: boolean;
   route: Route;
 }
 
@@ -133,6 +135,7 @@ export const useMessagesDomain = ({
   chatMessagesRef,
   contacts,
   conversations,
+  hydrated,
   route,
 }: UseMessagesDomainParams) => {
   const activeChatRouteId =
@@ -375,7 +378,8 @@ export const useMessagesDomain = ({
   const legacyImportDoneRef = React.useRef(false);
 
   React.useEffect(() => {
-    if (loadedMessageRows === null || legacyImportDoneRef.current) return;
+    if (!hydrated || loadedMessageRows === null || legacyImportDoneRef.current)
+      return;
     legacyImportDoneRef.current = true;
 
     const existingMessages = dedupeNostrMessagesByPriority(nostrMessagesLocal);
@@ -424,7 +428,7 @@ export const useMessagesDomain = ({
       }
       safeLocalStorageRemove(storageKey);
     }
-  }, [insertNostrMessage, loadedMessageRows, nostrMessagesLocal]);
+  }, [hydrated, insertNostrMessage, loadedMessageRows, nostrMessagesLocal]);
 
   const scrollActiveChatToBottom = React.useCallback(
     (contactId: string) => {
@@ -826,7 +830,9 @@ export const useMessagesDomain = ({
     removeNostrReaction,
   ]);
 
+  // Before hydration a reaction's message may not have arrived yet, so it would look orphaned.
   React.useEffect(() => {
+    if (!hydrated) return;
     const messageCountsByContact = new Map<string, number>();
     for (const message of nostrMessagesLocal) {
       const contactId = trimString(message.contactId);
@@ -866,7 +872,7 @@ export const useMessagesDomain = ({
       retentionPruneTimerRef.current = null;
       pruneRetention();
     }, RETENTION_PRUNE_THROTTLE_MS);
-  }, [nostrMessagesLocal, nostrReactionsLocal, pruneRetention]);
+  }, [hydrated, nostrMessagesLocal, nostrReactionsLocal, pruneRetention]);
 
   React.useEffect(() => {
     return () => {

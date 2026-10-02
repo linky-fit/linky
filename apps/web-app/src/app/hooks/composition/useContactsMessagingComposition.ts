@@ -24,10 +24,7 @@ import {
 } from "@linky-fit/linkstr-react";
 import { Effect, Schema } from "effect";
 import React, { useMemo, useState } from "react";
-import {
-  deriveDefaultProfile,
-  omitSyntheticContactLightningAddress,
-} from "../../../derivedProfile";
+import { deriveDefaultProfile } from "../../../derivedProfile";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { useLinkstrInspectorBridge } from "../../../devtools/inspector/useLinkstrInspectorBridge";
 import { useDeferredOnlineReady } from "../../../hooks/useDeferredOnlineReady";
@@ -66,7 +63,6 @@ import { getBankPaymentOfferCurrency } from "@linky-fit/proxy-payment";
 import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
 import { useBankPaymentOffers } from "../useBankPaymentOffers";
 import { collectUnreadNewestIncomingByContactId } from "../../lib/chatUnread";
-import { findUniqueContactByLightningAddress } from "../../lib/contactIdentity";
 import { buildLinkyPaymentRequestDeclineMessage } from "../../lib/paymentRequestMessage";
 import { getChatAttachmentRejection } from "../../lib/privateImageMessage";
 import {
@@ -89,6 +85,7 @@ import {
 import type { PeerSeenWindow } from "../messages/seenReceiptInbox";
 import { runWrite } from "../../lib/storeWrite";
 import { useChatReadCursorSync } from "../messages/useChatReadCursorSync";
+import { useUnknownSenderReassignment } from "../messages/useUnknownSenderReassignment";
 import { applyOutboxResult } from "../messages/outboxResults";
 import { useChatSeenReceiptSync } from "../messages/useChatSeenReceiptSync";
 import {
@@ -467,6 +464,7 @@ export const useContactsMessagingComposition = ({
     void setStoredPushContactNames(records);
   }, [contacts]);
 
+  const accountHydrated = useAccountHydrated();
   const {
     appendLocalNostrMessage,
     appendLocalNostrReaction,
@@ -493,10 +491,10 @@ export const useContactsMessagingComposition = ({
     chatMessagesRef,
     contacts,
     conversations: conversationsRepository,
+    hydrated: accountHydrated,
     route,
   });
 
-  const accountHydrated = useAccountHydrated();
   // Passive Nostr work waits for hydration, with no timeout, and for the
   // synced identity it settles: a seed login with none synced keeps its own.
   const online = useOnline();
@@ -700,87 +698,13 @@ export const useContactsMessagingComposition = ({
     unknownNameByNpub,
   ]);
 
-  React.useEffect(() => {
-    // The lightning-address match guesses identity and writes an npub, so it
-    // only considers active contacts; a direct npub match also reclaims
-    // threads of archived contacts.
-    const activeContacts = contacts.filter((contact) => {
-      const archivedAtSec = contact.archivedAtSec ?? 0;
-      return !Number.isFinite(archivedAtSec) || archivedAtSec <= 0;
-    });
-
-    for (const unknownContact of unknownContacts) {
-      const unknownContactId = unknownContact.id.trim();
-      const unknownNpub = normalizeNpubIdentifier(unknownContact.npub ?? "");
-      if (!unknownContactId || !unknownNpub) continue;
-
-      let knownContact = contacts.find((contact) => {
-        const knownContactId = contact.id.trim();
-        if (!knownContactId || knownContactId === unknownContactId) {
-          return false;
-        }
-        return normalizeNpubIdentifier(contact.npub ?? "") === unknownNpub;
-      });
-
-      let matchedByLightningAddress = false;
-      let matchedMetadata: ProfileMetadata | null = null;
-      if (!knownContact) {
-        matchedMetadata = loadCachedProfile(unknownNpub)?.metadata ?? null;
-        const profileLightningAddress = matchedMetadata
-          ? omitSyntheticContactLightningAddress(
-              (matchedMetadata.lud16 ?? "").trim() ||
-                (matchedMetadata.lud06 ?? "").trim(),
-              unknownNpub,
-            )
-          : "";
-        const lightningContact = findUniqueContactByLightningAddress(
-          activeContacts,
-          profileLightningAddress,
-        );
-        if (lightningContact) {
-          knownContact = lightningContact;
-          matchedByLightningAddress = true;
-        }
-      }
-
-      const knownContactId = (knownContact?.id ?? "").trim();
-      if (!knownContactId) continue;
-
-      if (matchedByLightningAddress && knownContact) {
-        const bestName = matchedMetadata
-          ? getBestNostrName(matchedMetadata)
-          : null;
-        const parsedNpub = NonEmptyString1000.fromUnknown(unknownNpub);
-        if (!parsedNpub.ok) continue;
-        const parsedName = bestName
-          ? NonEmptyString1000.fromUnknown(bestName)
-          : null;
-        const patch = {
-          npub: parsedNpub.value,
-          ...(!(knownContact.name ?? "").trim() && parsedName?.ok
-            ? { name: parsedName.value }
-            : {}),
-        };
-        void runWrite(contactsRepository.update(knownContact.id, patch)).then(
-          (outcome) => {
-            if (outcome.ok)
-              reassignNostrConversationContactId(
-                unknownContactId,
-                knownContactId,
-              );
-          },
-        );
-        continue;
-      }
-
-      reassignNostrConversationContactId(unknownContactId, knownContactId);
-    }
-  }, [
+  useUnknownSenderReassignment({
     contacts,
     contactsRepository,
-    reassignNostrConversationContactId,
-    unknownContacts,
-  ]);
+    hydrated: accountHydrated,
+    reassign: reassignNostrConversationContactId,
+    unknownSenders: unknownContacts,
+  });
 
   const unknownContactNpubs = React.useMemo(() => {
     const seen = new Set<string>();
@@ -2054,6 +1978,7 @@ export const useContactsMessagingComposition = ({
     chatMessages: chatMessagesWithBankPaymentOffers,
     conversations: conversationsRepository,
     documentVisible,
+    hydrated: accountHydrated,
     route,
     selectedContact,
   });

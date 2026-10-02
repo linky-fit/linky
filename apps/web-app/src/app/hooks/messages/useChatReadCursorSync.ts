@@ -21,6 +21,8 @@ interface UseChatReadCursorSyncParams {
   chatMessages: readonly LocalNostrMessage[];
   conversations: Pick<ConversationsRepository, "ensureDirect" | "markSeen">;
   documentVisible: boolean;
+  /** The cursor waits for hydration so it never writes over a conversation that has not arrived. */
+  hydrated: boolean;
   route: RouteWithOptionalId;
   selectedContact: ChatReadCursorContact | null;
 }
@@ -32,6 +34,7 @@ export const useChatReadCursorSync = ({
   chatMessages,
   conversations,
   documentVisible,
+  hydrated,
   route,
   selectedContact,
 }: UseChatReadCursorSyncParams): void => {
@@ -41,7 +44,7 @@ export const useChatReadCursorSync = ({
 
   React.useEffect(() => {
     // A chat open in a background tab does not count as read.
-    if (!documentVisible) return;
+    if (!documentVisible || !hydrated) return;
     if (route.kind !== "chat" || !selectedContact) return;
     const contactId = selectedContact.id.trim();
     if (!contactId || contactId !== (route.id ?? "").trim()) return;
@@ -69,5 +72,12 @@ export const useChatReadCursorSync = ({
       lastWrittenAtSecByContactIdRef.current.delete(contactId);
       console.warn("[linky][conversations] read cursor write failed", outcome);
     });
-  }, [chatMessages, conversations, documentVisible, route, selectedContact]);
+  }, [
+    chatMessages,
+    conversations,
+    documentVisible,
+    hydrated,
+    route,
+    selectedContact,
+  ]);
 };

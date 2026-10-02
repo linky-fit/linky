@@ -45,6 +45,7 @@ describe("useChatReadCursorSync", () => {
       chatMessages: [incoming(100), incoming(200)],
       conversations,
       documentVisible: true,
+      hydrated: true,
       route: { kind: "chat", id: contactId },
       selectedContact: { id: contactId, chatLastSeenAtSec: null },
     };
@@ -71,6 +72,7 @@ describe("useChatReadCursorSync", () => {
       chatMessages: [incoming(100)],
       conversations,
       documentVisible: true,
+      hydrated: true,
       route: { kind: "chat", id: contactId },
       selectedContact: { id: contactId, chatLastSeenAtSec: 100 },
     });
@@ -78,6 +80,7 @@ describe("useChatReadCursorSync", () => {
       chatMessages: [incoming(100), incoming(300)],
       conversations,
       documentVisible: false,
+      hydrated: true,
       route: { kind: "chat", id: contactId },
       selectedContact: { id: contactId, chatLastSeenAtSec: 100 },
     });
@@ -85,6 +88,33 @@ describe("useChatReadCursorSync", () => {
       await Promise.resolve();
     });
     expect(await Effect.runPromise(conversations.all)).toHaveLength(0);
+    await view.unmount();
+  });
+
+  it("waits for hydration before writing the cursor", async () => {
+    const { store } = makeTestLinkyStore();
+    const conversations = makeConversationsRepository(store);
+    const contactId: ContactId = createId<"Contact">();
+    const params: Params = {
+      chatMessages: [incoming(100)],
+      conversations,
+      documentVisible: true,
+      hydrated: false,
+      route: { kind: "chat", id: contactId },
+      selectedContact: { id: contactId, chatLastSeenAtSec: null },
+    };
+    const view = await mount(params);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(await Effect.runPromise(conversations.all)).toHaveLength(0);
+
+    await view.update({ ...params, hydrated: true });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const chat = await Effect.runPromise(conversations.forContact(contactId));
+    expect(chat?.lastSeenAtSec).toBe(100);
     await view.unmount();
   });
 });

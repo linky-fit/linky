@@ -1,4 +1,12 @@
-import { makeConversationsRepository } from "@linky-fit/linksync";
+import {
+  createId,
+  directConversationIdFor,
+  makeConversationsRepository,
+  NonEmptyString100,
+  NonEmptyString1000,
+  PositiveInt,
+} from "@linky-fit/linksync";
+import { Effect } from "effect";
 import React, { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
@@ -36,6 +44,7 @@ describe("useMessagesDomain", () => {
       chatMessagesRef: { current: null },
       contacts: [],
       conversations,
+      hydrated: true,
       route: { kind: "contacts" },
     };
     const domainRef: { current: MessagesDomain | null } = { current: null };
@@ -57,5 +66,51 @@ describe("useMessagesDomain", () => {
       domainRef.current?.nostrMessagesLocal.map((message) => message.content),
     ).toEqual(["first", "second"]);
     await view.unmount();
+  });
+
+  it("prunes a reaction without its message only once the account is hydrated", async () => {
+    vi.useFakeTimers();
+    const { store } = makeTestLinkyStore();
+    const conversations = makeConversationsRepository(store);
+    const text = NonEmptyString1000.orThrow;
+    await Effect.runPromise(
+      conversations.reactions.insert({
+        id: createId<"Reaction">(),
+        conversationId: directConversationIdFor(createId<"Contact">()),
+        messageId: text("message-in-a-shard-still-syncing"),
+        reactorPubkey: text("peer"),
+        emoji: NonEmptyString100.orThrow("👍"),
+        createdAtSec: PositiveInt.orThrow(100),
+        wrapId: text("wrap-1"),
+      }),
+    );
+    const params: Parameters<typeof useMessagesDomain>[0] = {
+      appOwnerId: null,
+      appOwnerIdRef: { current: null },
+      chatForceScrollToBottomRef: { current: false },
+      chatMessagesRef: { current: null },
+      contacts: [],
+      conversations,
+      hydrated: false,
+      route: { kind: "contacts" },
+    };
+    const Probe = ({ hydrated }: { hydrated: boolean }) => {
+      useMessagesDomain({ ...params, hydrated });
+      return null;
+    };
+    const reactions = () => Effect.runPromise(conversations.reactions.all);
+    const view = await renderIntoDocument(<Probe hydrated={false} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(await reactions()).toHaveLength(1);
+
+    await view.rerender(<Probe hydrated />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(await reactions()).toHaveLength(0);
+    await view.unmount();
+    vi.useRealTimers();
   });
 });
