@@ -934,8 +934,8 @@ export const cs = {
   paymentRequestStatusPaid: "Zaplaceno",
   paymentRequestStatusDeclined: "Odmítnuto",
   paymentRequestDeclinedMessage: "Žádost o platbu byla odmítnuta.",
-  paymentRequestUnknownContact:
-    "Tato žádost o platbu patří Nostr kontaktu, který ještě nemáte uložený.",
+  paymentRequestNoTransport:
+    "Tato žádost o platbu neobsahuje způsob, jak platbu doručit.",
   paymentRequestSelfPayment:
     "Platba {amount} {unit} na váš vlastní účet — prostředky zůstávají v peněžence.",
   availablePrefix: "dostupné:",

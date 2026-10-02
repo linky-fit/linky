@@ -147,21 +147,29 @@ export const parseLinkyPaymentRequestDeclineMessage = (
   };
 };
 
+export type PaymentRequestPostTarget =
+  | { readonly kind: "none" }
+  | { readonly kind: "insecure" }
+  | { readonly kind: "allowed"; readonly url: URL };
+
 /**
  * A NUT-18 POST transport target must use https, otherwise the bearer cashu
  * proofs it receives travel in the clear and any network observer can redeem
  * them. `http:` is accepted only in development builds (localhost testing).
+ * A missing or unparseable URL is no POST transport at all.
  */
-export const paymentRequestPostUrlIsAllowed = (
-  rawUrl: string,
+export const resolvePaymentRequestPostTarget = (
+  rawUrl: string | null,
   options: { allowHttp: boolean },
-): boolean => {
+): PaymentRequestPostTarget => {
   let url: URL;
   try {
-    url = new URL(rawUrl);
+    url = new URL((rawUrl ?? "").trim());
   } catch {
-    return false;
+    return { kind: "none" };
   }
-  if (url.protocol === "https:") return true;
-  return url.protocol === "http:" && options.allowHttp;
+  const allowed =
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && options.allowHttp);
+  return allowed ? { kind: "allowed", url } : { kind: "insecure" };
 };

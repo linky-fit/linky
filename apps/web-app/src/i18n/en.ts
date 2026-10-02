@@ -924,8 +924,8 @@ export const en = {
   paymentRequestStatusPaid: "Paid",
   paymentRequestStatusDeclined: "Declined",
   paymentRequestDeclinedMessage: "Payment request declined.",
-  paymentRequestUnknownContact:
-    "This payment request belongs to a Nostr contact you have not saved yet.",
+  paymentRequestNoTransport:
+    "This payment request has no way to deliver the payment.",
   paymentRequestSelfPayment:
     "{amount} {unit} to your own account — the funds stay in your wallet.",
   availablePrefix: "available:",

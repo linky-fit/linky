@@ -117,7 +117,7 @@ import {
   buildCashuPaymentRequestMessage,
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,
-  paymentRequestPostUrlIsAllowed,
+  resolvePaymentRequestPostTarget,
 } from "../../lib/paymentRequestMessage";
 import { getCashuTokenMessageInfo as getCashuTokenMessageInfoBase } from "../../lib/tokenMessageInfo";
 import type {
@@ -1134,29 +1134,22 @@ export const useCashuWalletComposition = ({
     [chatMessages, nostrMessagesLocal, nostrMessagesRecent],
   );
 
+  /**
+   * False only when the request has no usable POST transport; any other
+   * outcome, its own error toast included, is handled here.
+   */
   const payCashuPaymentRequestViaPost = React.useCallback(
     async (requestInfo: CashuPaymentRequestMessageInfo): Promise<boolean> => {
-      const postUrlRaw = (requestInfo.transportPostUrl ?? "").trim();
-      if (!postUrlRaw) return false;
-
-      let postUrl: URL;
-      try {
-        postUrl = new URL(postUrlRaw);
-      } catch {
-        setStatus(t("paymentRequestUnknownContact"));
-        return false;
-      }
-
-      // An `http:` POST target exposes the bearer proofs to anyone on the
-      // network path, so it is only accepted in development builds.
-      if (
-        !paymentRequestPostUrlIsAllowed(postUrlRaw, {
-          allowHttp: import.meta.env.DEV,
-        })
-      ) {
+      const postTarget = resolvePaymentRequestPostTarget(
+        requestInfo.transportPostUrl,
+        { allowHttp: import.meta.env.DEV },
+      );
+      if (postTarget.kind === "none") return false;
+      if (postTarget.kind === "insecure") {
         setStatus(t("paymentRequestInsecureTransport"));
-        return false;
+        return true;
       }
+      const postUrl = postTarget.url;
 
       if (cashuBalance < requestInfo.amount) {
         setStatus(t("payInsufficient"));
@@ -1399,7 +1392,7 @@ export const useCashuWalletComposition = ({
         const contact = ensureContactForCashuPaymentRequest(requestInfo);
         if (!contact?.id) {
           if (await payCashuPaymentRequestViaPost(requestInfo)) return;
-          setStatus(t("paymentRequestUnknownContact"));
+          setStatus(t("paymentRequestNoTransport"));
           return;
         }
 

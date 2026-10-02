@@ -937,8 +937,8 @@ export const de = {
   paymentRequestStatusPaid: "Bezahlt",
   paymentRequestStatusDeclined: "Abgelehnt",
   paymentRequestDeclinedMessage: "Zahlungsanforderung abgelehnt.",
-  paymentRequestUnknownContact:
-    "Diese Zahlungsanforderung gehört zu einem nicht gespeicherten Nostr-Kontakt.",
+  paymentRequestNoTransport:
+    "Diese Zahlungsanforderung enthält keinen Weg, die Zahlung zuzustellen.",
   paymentRequestSelfPayment:
     "{amount} {unit} an dein eigenes Konto — das Guthaben bleibt in deiner Wallet.",
   availablePrefix: "verfügbar:",

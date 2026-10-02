@@ -6,7 +6,7 @@ import {
   buildLinkyPaymentRequestDeclineMessage,
   parseCashuPaymentRequestMessage,
   parseLinkyPaymentRequestDeclineMessage,
-  paymentRequestPostUrlIsAllowed,
+  resolvePaymentRequestPostTarget,
 } from "./paymentRequestMessage";
 import { encodeBase64Url } from "../../utils/base64";
 
@@ -73,38 +73,33 @@ describe("paymentRequestMessage", () => {
   });
 });
 
-describe("paymentRequestPostUrlIsAllowed", () => {
+describe("resolvePaymentRequestPostTarget", () => {
+  const kindOf = (url: string | null, allowHttp: boolean) =>
+    resolvePaymentRequestPostTarget(url, { allowHttp }).kind;
+
   it("allows https targets", () => {
-    expect(
-      paymentRequestPostUrlIsAllowed("https://pay.example/req", {
-        allowHttp: false,
-      }),
-    ).toBe(true);
+    const target = resolvePaymentRequestPostTarget("https://pay.example/req", {
+      allowHttp: false,
+    });
+    expect(target.kind === "allowed" && target.url.href).toBe(
+      "https://pay.example/req",
+    );
   });
 
   it("rejects http targets in production but allows them in dev", () => {
-    expect(
-      paymentRequestPostUrlIsAllowed("http://pay.example/req", {
-        allowHttp: false,
-      }),
-    ).toBe(false);
-    expect(
-      paymentRequestPostUrlIsAllowed("http://localhost:3338/req", {
-        allowHttp: true,
-      }),
-    ).toBe(true);
+    expect(kindOf("http://pay.example/req", false)).toBe("insecure");
+    expect(kindOf("http://localhost:3338/req", true)).toBe("allowed");
   });
 
-  it("rejects non-http(s) schemes and unparseable input", () => {
-    for (const url of [
-      "ftp://pay.example",
-      "javascript:alert(1)",
-      "not a url",
-      "",
-    ]) {
-      expect(paymentRequestPostUrlIsAllowed(url, { allowHttp: true })).toBe(
-        false,
-      );
+  it("rejects non-http(s) schemes", () => {
+    for (const url of ["ftp://pay.example", "javascript:alert(1)"]) {
+      expect(kindOf(url, true)).toBe("insecure");
+    }
+  });
+
+  it("treats a missing or unparseable URL as no transport", () => {
+    for (const url of [null, "", "  ", "not a url"]) {
+      expect(kindOf(url, true)).toBe("none");
     }
   });
 });
