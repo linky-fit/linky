@@ -452,6 +452,11 @@ export const en = {
   english: "English",
   german: "Deutsch",
 
+  appearance: "Appearance",
+  appearanceAuto: "Automatic",
+  appearanceLight: "Light",
+  appearanceDark: "Dark",
+
   list: "List",
   contactsTitle: "Contacts",
   contactsSearchPlaceholder: "Search contacts",

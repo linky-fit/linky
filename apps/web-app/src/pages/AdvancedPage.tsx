@@ -26,6 +26,7 @@ import {
 } from "../app/hooks/useRelayHealth";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
 
+import { useColorModePreference } from "../hooks/useColorMode";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import {
@@ -33,6 +34,7 @@ import {
   type ConnectionState,
 } from "../utils/connectionStatus";
 import { isDesktopShell } from "../platform/runtime";
+import { COLOR_MODE_PREFERENCE_LABEL_KEYS } from "../utils/colorMode";
 import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 
@@ -76,6 +78,7 @@ export function AdvancedPage(): React.ReactElement {
     toggleShowProfileQrOnTilt,
   } = useAppShellActions();
   const notifications = usePushNotificationsSetting();
+  const colorModePreference = useColorModePreference();
   const [armedSecurityAction, setArmedSecurityAction] = useState<
     "copyNostr" | "pasteNostr" | null
   >(null);
@@ -198,6 +201,12 @@ export function AdvancedPage(): React.ReactElement {
       <Section title={t("settingsGeneral")}>
         {linkRow("Languages", t("language"), () =>
           navigateTo({ route: "settingsLanguage" }),
+        )}
+        {linkRow(
+          "Palette",
+          t("appearance"),
+          () => navigateTo({ route: "settingsAppearance" }),
+          valueText(t(COLOR_MODE_PREFERENCE_LABEL_KEYS[colorModePreference])),
         )}
         {linkRow("Bitcoin", t("unit"), () =>
           navigateTo({ route: "settingsUnits" }),

@@ -28,6 +28,7 @@ export type Route =
   | { kind: "contacts" }
   | { kind: "settings" }
   | { kind: "settingsLanguage" }
+  | { kind: "settingsAppearance" }
   | { kind: "settingsUnits" }
   | { kind: "settingsReceiveMethod" }
   | { kind: "settingsMasterKeys" }
@@ -83,6 +84,7 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "#contacts") return { kind: "contacts" };
   if (hash === "#settings") return { kind: "settings" };
   if (hash === "#settings/language") return { kind: "settingsLanguage" };
+  if (hash === "#settings/appearance") return { kind: "settingsAppearance" };
   if (hash === "#settings/units") return { kind: "settingsUnits" };
   if (hash === "#settings/receive-method") {
     return { kind: "settingsReceiveMethod" };

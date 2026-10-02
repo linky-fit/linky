@@ -1,10 +1,11 @@
 @import "./assets/manrope/manrope.css";
 
 :root {
-  /* Painted before the JS bundle loads, so these repeat themes.dark of @linky-fit/ui. */
+  /* Painted before the JS bundle loads, so these repeat themes.dark and themes.light of @linky-fit/ui. */
   --app-flat-bg: #020617;
   --app-color: #e2e8f0;
   --app-accent: #2dd4bf;
+  color-scheme: dark;
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --native-keyboard-inset: 0px;
@@ -24,6 +25,13 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-color-mode="light"] {
+  --app-flat-bg: #f1f5f9;
+  --app-color: #0f172a;
+  --app-accent: #0f766e;
+  color-scheme: light;
 }
 
 html,

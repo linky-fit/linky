@@ -17,6 +17,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
 
     case "settings":
     case "settingsLanguage":
+    case "settingsAppearance":
     case "settingsUnits":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
@@ -78,6 +79,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "bankPaymentNew":
     case "lnAddressPay":
     case "settingsLanguage":
+    case "settingsAppearance":
     case "settingsUnits":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":

@@ -53,6 +53,7 @@ export const resolveBackAction = (
       return navigateToMainReturn;
 
     case "settingsLanguage":
+    case "settingsAppearance":
     case "settingsUnits":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
@@ -231,6 +232,7 @@ const SHOWS_MENU_BUTTON: Record<
   profileEdit: false,
   settings: false,
   settingsLanguage: false,
+  settingsAppearance: false,
   settingsMasterKeys: false,
   settingsProxyPayments: false,
   settingsReceiveMethod: false,
@@ -392,6 +394,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   profileEdit: "profile",
   settings: "settings",
   settingsLanguage: "language",
+  settingsAppearance: "appearance",
   settingsMasterKeys: "masterKeys",
   settingsProxyPayments: "proxyPayments",
   settingsReceiveMethod: "receiveMethod",

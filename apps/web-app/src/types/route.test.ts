@@ -49,12 +49,15 @@ describe("parseRouteFromHash", () => {
     expect(parseRouteFromHash()).toEqual({ kind: "contacts" });
   });
 
-  it("parses settings and its language and units subpages", () => {
+  it("parses settings and its language, appearance and units subpages", () => {
     replaceHash("#settings");
     expect(parseRouteFromHash()).toEqual({ kind: "settings" });
 
     replaceHash("#settings/language");
     expect(parseRouteFromHash()).toEqual({ kind: "settingsLanguage" });
+
+    replaceHash("#settings/appearance");
+    expect(parseRouteFromHash()).toEqual({ kind: "settingsAppearance" });
 
     replaceHash("#settings/units");
     expect(parseRouteFromHash()).toEqual({ kind: "settingsUnits" });

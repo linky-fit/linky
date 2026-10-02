@@ -9,6 +9,7 @@ import {
 } from "@linky-fit/ui";
 import React, { type ReactNode } from "react";
 import { getInitialLang, translations } from "./i18n";
+import { getColorMode } from "./utils/colorMode";
 import {
   downloadBootDiagnostics,
   formatBootError,
@@ -48,7 +49,7 @@ export class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       const text = translations[getInitialLang()];
       return (
-        <UIProvider mode="dark">
+        <UIProvider mode={getColorMode()}>
           <ScrollView height="100%">
             <Stack padding="$xxxl">
               <Text variant="heading">{text.appCrashed}</Text>

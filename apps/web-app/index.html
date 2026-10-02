@@ -20,6 +20,19 @@
          data clears, so viewport experiments need a fresh origin. -->
 
     <title>Linky</title>
+    <script>
+      // Mirrors getColorMode in src/utils/colorMode.ts so the first paint already has the right colors.
+      try {
+        const preference = localStorage.getItem("linky.color_mode");
+        const light =
+          preference === "light" ||
+          (preference !== "dark" &&
+            matchMedia("(prefers-color-scheme: light)").matches);
+        if (light) document.documentElement.dataset.colorMode = "light";
+      } catch {
+        // Storage can be unavailable; the boot screen stays dark.
+      }
+    </script>
   </head>
   <body>
     <div id="root">
@@ -28,8 +41,8 @@
           min-height: 100vh;
           display: grid;
           place-items: center;
-          background: #020617;
-          color: #f9fbfc;
+          background: var(--app-flat-bg, #020617);
+          color: var(--app-color, #f9fbfc);
           font-family:
             system-ui,
             -apple-system,

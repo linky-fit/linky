@@ -457,6 +457,11 @@ export const cs = {
   english: "English",
   german: "Deutsch",
 
+  appearance: "Vzhled",
+  appearanceAuto: "Automaticky",
+  appearanceLight: "Světlý",
+  appearanceDark: "Tmavý",
+
   list: "Seznam",
   contactsTitle: "Kontakty",
   contactsSearchPlaceholder: "Vyhledat kontakt",

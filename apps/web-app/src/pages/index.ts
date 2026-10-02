@@ -22,6 +22,7 @@ export { EvoluServersPage } from "./EvoluServersPage";
 export { InspectorSettingsPage } from "./InspectorSettingsPage";
 export { LnAddressPayPage } from "./LnAddressPayPage";
 export { LanguagePage } from "./LanguagePage";
+export { AppearancePage } from "./AppearancePage";
 export { ReceiveMethodPage } from "./ReceiveMethodPage";
 export { ManualPayPage } from "./ManualPayPage";
 export { MasterKeysPage } from "./MasterKeysPage";

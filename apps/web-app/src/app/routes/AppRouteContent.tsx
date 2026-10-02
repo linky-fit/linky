@@ -37,6 +37,7 @@ import {
   EvoluServersPage,
   InspectorSettingsPage,
   LanguagePage,
+  AppearancePage,
   ReceiveMethodPage,
   LnAddressPayPage,
   ManualPayPage,
@@ -124,6 +125,8 @@ const RoutePage = (): React.ReactElement => {
       return <SettingsPage />;
     case "settingsLanguage":
       return <LanguagePage />;
+    case "settingsAppearance":
+      return <AppearancePage />;
     case "settingsReceiveMethod":
       return <ReceiveMethodPage />;
     case "settingsMasterKeys":

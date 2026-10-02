@@ -36,6 +36,7 @@ import type {
 } from "./types/browser";
 import type { JsonValue } from "./types/json";
 import { decodeBase64Url, encodeBase64Url } from "./utils/base64";
+import { getColorMode } from "./utils/colorMode";
 import {
   downloadBootDiagnostics,
   formatBootError,
@@ -541,7 +542,7 @@ const getBootErrorText = () => {
   };
 };
 
-const bootTheme = themes.dark;
+const bootTheme = themes[getColorMode()];
 
 const bootFont = (
   variant: TextVariant,
