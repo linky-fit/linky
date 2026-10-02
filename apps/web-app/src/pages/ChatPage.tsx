@@ -593,7 +593,7 @@ interface ChatComposerProps {
   t: Translate;
 }
 
-const ChatComposer = memo(function ChatComposer({
+export const ChatComposer = memo(function ChatComposer({
   canPayThisContact,
   canRequestThisContact,
   canStartPay,
@@ -626,6 +626,10 @@ const ChatComposer = memo(function ChatComposer({
 }: ChatComposerProps) {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const pendingSendDraftRef = useRef<string | null>(null);
+  const [previousDraftProps, setPreviousDraftProps] = useState({
+    chatDraft,
+    chatSendIsBusy,
+  });
   const [draft, setDraft] = useState(chatDraft);
   const draftRef = useLatest(draft);
   const [composeCaret, setComposeCaret] = useState(chatDraft.length);
@@ -654,10 +658,21 @@ const ChatComposer = memo(function ChatComposer({
     !chatSendIsBusy && hasRecipient && (hasDraftText || hasAttachmentsToSend);
   const canAttach = hasRecipient && !editContext;
 
-  useEffect(() => {
-    setDraft(chatDraft);
-    setComposeCaret(chatDraft.length);
-  }, [chatDraft]);
+  // Adjust before committing the render so a completed send cannot clear newer input.
+  if (
+    previousDraftProps.chatDraft !== chatDraft ||
+    previousDraftProps.chatSendIsBusy !== chatSendIsBusy
+  ) {
+    setPreviousDraftProps({ chatDraft, chatSendIsBusy });
+    const preserveNextDraft =
+      chatDraft === "" &&
+      (chatSendIsBusy || previousDraftProps.chatSendIsBusy) &&
+      draft !== previousDraftProps.chatDraft;
+    if (previousDraftProps.chatDraft !== chatDraft && !preserveNextDraft) {
+      setDraft(chatDraft);
+      setComposeCaret(chatDraft.length);
+    }
+  }
 
   useEffect(
     () => () => {
