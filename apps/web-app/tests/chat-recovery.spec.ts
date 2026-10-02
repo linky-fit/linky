@@ -142,7 +142,7 @@ test("chat reaches a peer, edit and reaction survive reload, pending topup resum
       await a.page.unroute("**/v1/mint/bolt11");
       await a.page.goto("/#wallet");
       await expect
-        .poll(() => readBalanceSat(a.page), { timeout: 90000 })
+        .poll(() => readBalanceSat(a.page), { timeout: 60_000 })
         .toBe(50);
       await a.page.reload();
       await expect.poll(() => readBalanceSat(a.page)).toBe(50);

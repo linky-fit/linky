@@ -5,7 +5,7 @@ export default defineConfig({
   workers: 1,
   use: {
     baseURL: "http://localhost:5180",
-    trace: "on",
+    trace: "retain-on-failure",
     viewport: { width: 390, height: 844 },
   },
   webServer: {

@@ -340,7 +340,7 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
 
     await test.step("converted pending records are claimed into balance", async () => {
       await expect
-        .poll(() => readBalanceSat(page), { timeout: 120_000 })
+        .poll(() => readBalanceSat(page), { timeout: 60_000 })
         .toBeGreaterThanOrEqual(PENDING_TOPUP_SAT + PENDING_AUTOSWAP_SAT);
 
       // Claim completion retires the converted linkshu pending records.
@@ -366,7 +366,7 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
     await test.step("top-up derives from the migrated counter", async () => {
       await topUp(page, FUNDING_SAT);
       await expect
-        .poll(() => readBalanceSat(page), { timeout: 120_000 })
+        .poll(() => readBalanceSat(page), { timeout: 60_000 })
         .toBe(FUNDING_SAT + PENDING_TOPUP_SAT + PENDING_AUTOSWAP_SAT);
 
       // Minting consumed deterministic slots starting at the migrated value.
@@ -407,7 +407,7 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
       // INVOICE_SAT is under the default auto-pay limit, so the payment runs
       // without a confirmation step; the balance drop is the settlement.
       await expect
-        .poll(() => readBalanceSat(page), { timeout: 120_000 })
+        .poll(() => readBalanceSat(page), { timeout: 60_000 })
         .toBeLessThanOrEqual(balanceBeforeReload - INVOICE_SAT);
 
       // Melt change lands as its own row, so poll past any transient dip

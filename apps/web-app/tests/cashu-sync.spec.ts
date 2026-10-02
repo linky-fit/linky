@@ -96,7 +96,7 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
           exact: true,
         }),
       ).toBeVisible({
-        timeout: 90_000,
+        timeout: 60_000,
       });
       await source.page.goto("/#wallet");
       await expect.poll(() => readBalanceSat(source.page)).toBe(restoredAmount);

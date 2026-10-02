@@ -45,8 +45,9 @@ export default defineConfig({
       // Rebuild the e2e image after source changes; VITE_* is inlined at build.
       name: "local-stack",
       testMatch: LOCAL_STACK_SPECS,
-      // Three cold app boots plus a full offer state machine.
-      timeout: 600_000,
+      // Three cold app boots plus a full offer state machine; the slowest test
+      // takes about a minute in CI.
+      timeout: 150_000,
       // The app deliberately does nothing relay-facing for the first ~2.5-8s
       // (useEvoluNostrBootstrapReady), so the default 5s expect timeout can
       // expire inside that quiet window.
@@ -55,7 +56,7 @@ export default defineConfig({
         // No slow-motion knob: per-action delays miss topup quote and offer phase deadlines.
         // Prefer --ui or the trace over --headed.
         baseURL: "http://localhost:5176",
-        trace: "on",
+        trace: "retain-on-failure",
         screenshot: "only-on-failure",
       },
     },

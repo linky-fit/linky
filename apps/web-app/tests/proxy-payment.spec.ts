@@ -231,7 +231,7 @@ const runProxyPayment = async (
     await test.step("A funds a wallet", async () => {
       await topUp(a.page, FUNDING_SAT);
       await expect
-        .poll(() => readBalanceSat(a.page), { timeout: 120_000 })
+        .poll(() => readBalanceSat(a.page), { timeout: 60_000 })
         .toBeGreaterThanOrEqual(FUNDING_SAT);
     });
 
@@ -327,7 +327,7 @@ const runProxyPayment = async (
       for (const account of [b, c]) {
         await account.page.waitForURL(
           new RegExp(`bank-payment-offer/${offerId}$`),
-          { timeout: 120_000 },
+          { timeout: 60_000 },
         );
       }
       if (ambiguousDelivery) {
@@ -406,7 +406,7 @@ const runProxyPayment = async (
         await expect
           .poll(
             async () => (await hasBankDetails(b)) || (await hasBankDetails(c)),
-            { timeout: 90_000 },
+            { timeout: 60_000 },
           )
           .toBe(true);
 
@@ -421,7 +421,7 @@ const runProxyPayment = async (
         loser.page.getByText("Someone else accepted the offer first", {
           exact: false,
         }),
-      ).toBeVisible({ timeout: 90_000 });
+      ).toBeVisible({ timeout: 60_000 });
 
       await expect(
         loser.page.getByText("Waiting for bank details.", { exact: false }),
@@ -510,7 +510,7 @@ const runProxyPayment = async (
       const settle = a.page.getByRole("button", {
         name: "Mark done",
       });
-      await expect(settle).toBeVisible({ timeout: 120_000 });
+      await expect(settle).toBeVisible({ timeout: 60_000 });
       const offerCard = a.page.locator(".chat-bank-payment-offer-card", {
         has: settle,
       });
@@ -533,7 +533,7 @@ const runProxyPayment = async (
       await expect(settle).toBeEnabled();
       await settle.click();
       await expect
-        .poll(() => readBalanceSat(winner.page), { timeout: 240_000 })
+        .poll(() => readBalanceSat(winner.page), { timeout: 60_000 })
         .toBeGreaterThanOrEqual(FIXTURE_AMOUNT_SAT - MAX_REDEEM_FEE_SAT);
 
       const received = await readBalanceSat(winner.page);
@@ -560,7 +560,7 @@ const runProxyPayment = async (
                 ),
               offerId,
             ),
-          { timeout: 120_000 },
+          { timeout: 60_000 },
         )
         .toBeNull();
     });
