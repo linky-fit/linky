@@ -56,7 +56,7 @@ const wipeImportPatterns = [
 ];
 
 export default defineConfig([
-  globalIgnores(["api/lnurlw.js"]),
+  globalIgnores(["lnurlw/bundle.js"]),
   ...webAppEslintConfig,
   {
     files: ["src/**/*.{ts,tsx}"],

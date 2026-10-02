@@ -28,5 +28,5 @@ apps/web-app/.inspector/
 
 local/**/*
 # Bundled serverless API entry points
-apps/site/api/lnurlw.js
-apps/web-app/api/lnurlw.js
+apps/site/lnurlw/bundle.js
+apps/web-app/lnurlw/bundle.js

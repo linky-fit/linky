@@ -16,10 +16,10 @@ const websiteMessage =
   "The site is a plain website: no service worker, no install prompt.";
 
 export default defineConfig([
-  globalIgnores(["api/lnurlw.js"]),
+  globalIgnores(["lnurlw/bundle.js"]),
   ...eslintConfig,
   {
-    files: ["api/**/*.{ts,tsx}"],
+    files: ["{api,lnurlw}/**/*.{ts,tsx}"],
     ignores: ["api/_safeFetch.ts"],
     rules: {
       "no-restricted-globals": [
@@ -39,7 +39,7 @@ export default defineConfig([
   },
   {
     files: testHelperImportIgnores.map((pattern) => [
-      "api/**/*.{ts,tsx}",
+      "{api,lnurlw}/**/*.{ts,tsx}",
       pattern,
     ]),
     rules: {
