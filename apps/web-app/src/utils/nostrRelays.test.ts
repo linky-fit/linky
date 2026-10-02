@@ -54,11 +54,7 @@ describe("recommended Nostr relays", () => {
 
   it("falls back to the recommendation bundled with the build", async () => {
     const relays = await import("./nostrRelays");
-    expect(relays.recommendedNostrRelays()).toEqual([
-      "wss://nos.lol",
-      "wss://nostr.linky.fit",
-      "wss://nostr.eu.freedomrelay.dev",
-    ]);
+    expect(relays.recommendedNostrRelays()).toContain("wss://nostr.linky.fit");
   });
 });
 

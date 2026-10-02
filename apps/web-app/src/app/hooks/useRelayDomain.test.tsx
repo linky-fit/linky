@@ -38,9 +38,8 @@ const custom = "wss://custom.example.com";
 const inbox = "wss://inbox.example.com";
 const retired = "wss://retired.example.com";
 const recommended = [
-  "wss://nos.lol",
-  "wss://nostr.linky.fit",
-  "wss://nostr.eu.freedomrelay.dev",
+  "wss://recommended-a.example.com",
+  "wss://recommended-b.example.com",
 ];
 const recommendedRelaysFetch = vi.fn(
   async () =>
@@ -137,6 +136,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", recommendedRelaysFetch);
   recommendedRelaysFetch.mockClear();
   localStorage.clear();
+  saveRecommendedRelays({ nostr: recommended, evolu: [], retiredNostr: [] });
   clientInspectorStore.clear();
   published.length = 0;
   state = undefined;
