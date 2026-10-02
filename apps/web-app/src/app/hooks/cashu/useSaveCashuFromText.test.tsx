@@ -2,10 +2,12 @@ import { transactionIdForOperation } from "@linky-fit/linksync";
 import { Either, Schema } from "effect";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
 import {
   CounterLockTimeout,
   CurrencyUnit,
   KeysetId,
+  MintRejected,
   MintUrl,
   ReceiveReceipt,
   TokenAlreadySpent,
@@ -20,6 +22,7 @@ import { useCashuDomain } from "../useCashuDomain";
 import { useSaveCashuFromText } from "./useSaveCashuFromText";
 
 type SaveCashuFromText = ReturnType<typeof useSaveCashuFromText>;
+type SetDraft = React.Dispatch<React.SetStateAction<string>>;
 
 const translateToKey: Translate = (key) => key;
 
@@ -29,7 +32,7 @@ const setup = async (
 ) => {
   const ref: { current: SaveCashuFromText | null } = { current: null };
   const setStatus = vi.fn();
-  const setCashuDraft = vi.fn();
+  const setCashuDraft = vi.fn<SetDraft>();
   const logPaymentEvent = vi.fn();
 
   const Probe = (): null => {
@@ -78,6 +81,25 @@ const mint = MintUrl.make("https://x.cz");
 
 const alreadySpent: ReceiveCashuToken = async () =>
   Either.left(new TokenAlreadySpent({ mint }));
+
+const mintBusy: ReceiveCashuToken = async () =>
+  Either.left(
+    new CounterLockTimeout({
+      mint,
+      unit: CurrencyUnit.make("sat"),
+      keysetId: null,
+    }),
+  );
+
+/** The draft as React state would hold it after the hook's updates. */
+const draftAfterUpdates = (
+  setCashuDraft: Mock<SetDraft>,
+  typed: string,
+): string =>
+  setCashuDraft.mock.calls.reduce(
+    (draft, [next]) => (typeof next === "function" ? next(draft) : next),
+    typed,
+  );
 
 describe("useSaveCashuFromText", () => {
   it("resolves terminally when the mint reports the token already spent", async () => {
@@ -162,6 +184,38 @@ describe("useSaveCashuFromText", () => {
     expect(onResolved).toHaveBeenCalledWith("terminal");
     expect(setStatus).not.toHaveBeenCalled();
     expect(logPaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it("puts a pasted token back into the draft when its mint was busy", async () => {
+    const { save, setCashuDraft } = await setup(mintBusy);
+
+    await save("cashuBbusymint");
+
+    expect(draftAfterUpdates(setCashuDraft, "cashuBbusymint")).toBe(
+      "cashuBbusymint",
+    );
+  });
+
+  it("clears the draft after a receive that can never succeed", async () => {
+    const { save, setCashuDraft } = await setup(alreadySpent);
+
+    await save("cashuBspenttoken");
+
+    expect(draftAfterUpdates(setCashuDraft, "cashuBspenttoken")).toBe("");
+  });
+
+  it("clears the draft and resolves terminally after the mint rejected the token", async () => {
+    const { save, setCashuDraft } = await setup(async () =>
+      Either.left(
+        new MintRejected({ mint, code: 11001, detail: "invalid proofs" }),
+      ),
+    );
+    const onResolved = vi.fn();
+
+    await save("cashuBrejected", { onResolved });
+
+    expect(draftAfterUpdates(setCashuDraft, "cashuBrejected")).toBe("");
+    expect(onResolved).toHaveBeenCalledWith("terminal");
   });
 
   it("keeps the paste draft for an automatic receive", async () => {

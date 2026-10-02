@@ -10,7 +10,10 @@ import { navigateTo } from "../../../hooks/useRouting";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
 import type { LoggedPaymentEventParams } from "../../types/appTypes";
-import { describeTaggedCashuError } from "../../lib/cashuStoredError";
+import {
+  describeTaggedCashuError,
+  isTransientCashuErrorTag,
+} from "../../lib/cashuStoredError";
 import { isUnknownContactId } from "../messages/contactIdentity";
 import type { ReceiveCashuToken } from "../composition/useLinkshuComposition";
 import { nowSeconds } from "../../../utils/time";
@@ -163,6 +166,9 @@ export const useSaveCashuFromText = ({
 
       if (!automatic) setCashuDraft("");
       report(t("cashuAccepting"));
+      const restoreDraftForRetry = (): void => {
+        if (!automatic) setCashuDraft((draft) => draft || tokenRaw);
+      };
 
       await enqueueCashuOp(async () => {
         setCashuIsBusy(true);
@@ -171,22 +177,16 @@ export const useSaveCashuFromText = ({
 
           if (Either.isLeft(outcome)) {
             const error = outcome.left;
-            // A token linkshu already holds, one whose proofs are spent, one
-            // the mint fee eats whole, or an undecodable one can never succeed
-            // on retry; a mint that was unreachable or lock contention can.
             // The caller uses this to stop (or keep) auto-retrying the message
             // that carried the token.
-            const isTerminal =
-              error._tag === "TokenAlreadyKnown" ||
-              error._tag === "TokenAlreadySpent" ||
-              error._tag === "AmountConsumedByFee" ||
-              error._tag === "TokenParseFailed";
+            const isTerminal = !isTransientCashuErrorTag(error._tag);
             options?.onResolved?.(isTerminal ? "terminal" : "transient");
             if (error._tag === "TokenAlreadyKnown") {
               report(t("cashuExists"));
               navigateAfterSave(options);
               return;
             }
+            if (!isTerminal) restoreDraftForRetry();
             const message = describeTaggedCashuError(error) ?? error._tag;
             const isLogged =
               !automatic || (isTerminal && error._tag !== "TokenAlreadySpent");
@@ -255,6 +255,7 @@ export const useSaveCashuFromText = ({
           const message = getUnknownErrorMessage(error, "Accept failed");
           if (!automatic) logFailure(message);
           report(`${t("cashuAcceptFailed")}: ${message}`);
+          restoreDraftForRetry();
           options?.onResolved?.("transient");
         } finally {
           setCashuIsBusy(false);

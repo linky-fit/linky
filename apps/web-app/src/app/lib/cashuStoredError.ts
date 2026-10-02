@@ -119,8 +119,9 @@ const storedErrorTag = (stored: unknown): unknown => {
 export const isStoredCashuErrorTokenSpent = (stored: unknown): boolean =>
   storedErrorTag(stored) === "TokenAlreadySpent";
 
-/** True when a stored error says the mint was not reached or the wallet was busy, so trying again may succeed. */
-export const isStoredCashuErrorTransient = (stored: unknown): boolean => {
-  const tag = storedErrorTag(stored);
-  return tag === "MintUnreachable" || tag === "CounterLockTimeout";
-};
+/** True for an error tag saying the mint was not reached or the wallet was busy, so trying again may succeed. */
+export const isTransientCashuErrorTag = (tag: unknown): boolean =>
+  tag === "MintUnreachable" || tag === "CounterLockTimeout";
+
+export const isStoredCashuErrorTransient = (stored: unknown): boolean =>
+  isTransientCashuErrorTag(storedErrorTag(stored));
