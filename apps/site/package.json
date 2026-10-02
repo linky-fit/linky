@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "license": "0BSD",
   "type": "module",
+  "exports": {
+    "./recommended-relays.json": "./public/recommended-relays.json"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import bundledRecommendedRelays from "../../../site/public/recommended-relays.json";
+import bundledRecommendedRelays from "@linky-fit/site/recommended-relays.json";
 import { safeLocalStorageGetJson, safeLocalStorageSetJson } from "./storage";
 
 const STORAGE_KEY = "linky.recommendedRelays.v1";
