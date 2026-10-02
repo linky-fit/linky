@@ -1,17 +1,12 @@
 import type { RecurringPaymentId } from "@linky-fit/domain";
 import { recurringAmountSat, type FiatRatesPerBtc } from "./amount";
-import type { RecurringPaymentOrder } from "./order";
-import {
-  advanceRecurringSchedule,
-  decideRecurringRun,
-  nextDueAfter,
-  type RecurringScheduleAdvance,
-} from "./schedule";
+import { recurringEnvelopeKey, type RecurringPaymentOrder } from "./order";
+import { decideRecurringRun, nextDueAfter } from "./schedule";
 
 /**
  * Lead time between claiming a due payment and sending it. The user is
  * notified at claim time; the window also lets claims written by devices that
- * raced each other converge through sync, so a single device pays.
+ * raced each other converge through sync, so usually a single device acts.
  */
 export const RECURRING_NOTICE_SEC = 60;
 /**
@@ -24,8 +19,6 @@ export const RECURRING_CONFIRM_SEC = 10;
 export const RECURRING_CLAIM_TAKEOVER_SEC = 10 * 60;
 /** Pause between attempts of a run whose last attempt failed. */
 export const RECURRING_RUN_RETRY_DELAY_SEC = 10 * 60;
-/** A `running` mark older than this belongs to a launch that died mid-run. */
-export const RECURRING_RUN_STALE_SEC = 15 * 60;
 
 export type RecurringSkipReason =
   | "insufficientFunds"
@@ -33,13 +26,30 @@ export type RecurringSkipReason =
   | "cancelled"
   | "invalidRecipient";
 
-export interface RecurringRunAction {
-  kind: "run";
+/** One payment of an order: its number and the due time it pays. */
+export interface RecurringRun {
   order: RecurringPaymentOrder;
-  amountSat: number;
+  /** The order's `runCount` when the run was planned; names its envelope. */
+  runIndex: number;
   dueAtSec: number;
+}
+
+export interface RecurringRunAction extends RecurringRun {
+  kind: "run";
+  /** The amount a new envelope is opened with; an existing one keeps its own. */
+  amountSat: number;
   missedCount: number;
-  advance: RecurringScheduleAdvance;
+}
+
+/**
+ * The balance at the order's mint does not cover `run`. Its envelope may
+ * still exist (funded before a restart, or by another device), so ask the
+ * mint before waiting or skipping, and pay `run` from it if it does.
+ */
+interface RecurringUnfunded {
+  order: RecurringPaymentOrder;
+  dueAtSec: number;
+  run: RecurringRunAction;
 }
 
 export type RecurringTickAction =
@@ -54,21 +64,38 @@ export type RecurringTickAction =
       kind: "skip";
       order: RecurringPaymentOrder;
       dueAtSec: number;
-      reason: Extract<RecurringSkipReason, "insufficientFunds" | "failed">;
-      advance: RecurringScheduleAdvance;
+      reason: "failed";
     }
-  | { kind: "waitFunds"; order: RecurringPaymentOrder; dueAtSec: number }
-  | { kind: "waitRates"; order: RecurringPaymentOrder; dueAtSec: number }
-  | { kind: "markInterrupted"; order: RecurringPaymentOrder };
+  | (RecurringUnfunded & { kind: "skip"; reason: "insufficientFunds" })
+  | (RecurringUnfunded & { kind: "waitFunds" })
+  | { kind: "waitRates"; order: RecurringPaymentOrder; dueAtSec: number };
+
+/** `waitFunds` or the `insufficientFunds` skip: both carry the `run` the balance did not cover. */
+export type RecurringUnfundedAction = Extract<
+  RecurringTickAction,
+  { run: RecurringRunAction }
+>;
+
+export const isRecurringUnfunded = (
+  action: RecurringTickAction,
+): action is RecurringUnfundedAction =>
+  action.kind === "waitFunds" ||
+  (action.kind === "skip" && action.reason === "insufficientFunds");
 
 export interface RecurringTickInput {
   orders: ReadonlyArray<RecurringPaymentOrder>;
   nowSec: number;
   deviceId: string;
-  /** Spendable sats; a due run waits until they cover the amount. */
-  balanceSat: number;
-  /** Null while no rate is known; a fiat payment then waits. */
+  /** Available sats per mint URL; a due run waits until its mint covers the amount. */
+  balanceSatByMint: ReadonlyMap<string, number>;
+  /** Null while no rate is known; a fiat payment without a funded envelope then waits. */
   fiatRates: FiatRatesPerBtc | null;
+  /**
+   * Sats of each run envelope the mint is known to have signed, by
+   * `recurringEnvelopeKey`. Such a run pays from its envelope, so it needs
+   * neither an exchange rate nor balance.
+   */
+  fundedEnvelopeSat: ReadonlyMap<string, number>;
   /** Per order id: no new attempt before this time (set after a failure). */
   retryNotBeforeSec: ReadonlyMap<RecurringPaymentId, number>;
 }
@@ -88,7 +115,6 @@ export const recurringUpcoming = (
   order: RecurringPaymentOrder,
   nowSec: number,
 ): RecurringUpcoming | null => {
-  if (order.lastRunStatus === "running") return null;
   const decision = decideRecurringRun(
     order.schedule,
     nowSec + RECURRING_NOTICE_SEC,
@@ -117,16 +143,21 @@ export const recurringSkipDeadlineSec = (
   dueAtSec: number,
 ): number => nextDueAfter(order.schedule, dueAtSec);
 
+/** A run the balance does not cover waits for funds until its period ends, then is skipped. */
+export const unfundedAction = (
+  run: RecurringRunAction,
+  nowSec: number,
+): RecurringUnfundedAction => {
+  const { order, dueAtSec } = run;
+  return nowSec >= recurringSkipDeadlineSec(order, dueAtSec)
+    ? { kind: "skip", order, dueAtSec, reason: "insufficientFunds", run }
+    : { kind: "waitFunds", order, dueAtSec, run };
+};
+
 const planOrder = (
   order: RecurringPaymentOrder,
   input: RecurringTickInput,
 ): RecurringTickAction | null => {
-  if (order.lastRunStatus === "running") {
-    const startedAt = order.lastRunAtSec ?? 0;
-    return input.nowSec - startedAt > RECURRING_RUN_STALE_SEC
-      ? { kind: "markInterrupted", order }
-      : null;
-  }
   const upcoming = recurringUpcoming(order, input.nowSec);
   if (upcoming === null) return null;
   const { dueAtSec, sendAtSec, claimDeviceId } = upcoming;
@@ -140,7 +171,6 @@ const planOrder = (
       : null;
   }
 
-  const advance = advanceRecurringSchedule(order.schedule, input.nowSec);
   const deadlinePassed =
     input.nowSec >= recurringSkipDeadlineSec(order, dueAtSec);
   const attemptedThisPeriod =
@@ -148,26 +178,29 @@ const planOrder = (
     order.lastRunAtSec !== null &&
     order.lastRunAtSec >= dueAtSec;
   if (attemptedThisPeriod && deadlinePassed) {
-    return { kind: "skip", order, dueAtSec, reason: "failed", advance };
+    return { kind: "skip", order, dueAtSec, reason: "failed" };
   }
-  const amountSat = recurringAmountSat(order.amount, input.fiatRates);
+  const runIndex = order.schedule.runCount;
+  const envelopeSat = input.fundedEnvelopeSat.get(
+    recurringEnvelopeKey(order.id, runIndex),
+  );
+  const amountSat =
+    envelopeSat ?? recurringAmountSat(order.amount, input.fiatRates);
   if (amountSat === null) return { kind: "waitRates", order, dueAtSec };
-  if (input.balanceSat < amountSat) {
-    return deadlinePassed
-      ? { kind: "skip", order, dueAtSec, reason: "insufficientFunds", advance }
-      : { kind: "waitFunds", order, dueAtSec };
-  }
   const retryNotBefore = input.retryNotBeforeSec.get(order.id) ?? 0;
   if (input.nowSec < retryNotBefore) return null;
   const decision = decideRecurringRun(order.schedule, input.nowSec);
-  return {
+  const run: RecurringRunAction = {
     kind: "run",
     order,
+    runIndex,
     amountSat,
     dueAtSec,
     missedCount: decision.kind === "due" ? decision.missedCount : 0,
-    advance,
   };
+  const balanceSat = input.balanceSatByMint.get(order.mintUrl) ?? 0;
+  if (envelopeSat !== undefined || balanceSat >= amountSat) return run;
+  return unfundedAction(run, input.nowSec);
 };
 
 /**
@@ -181,34 +214,21 @@ export const planRecurringPaymentTick = (
     const action = planOrder(order, input);
     return action === null ? [] : [action];
   });
-  const dueOf = (action: RecurringTickAction): number =>
-    action.kind === "markInterrupted" ? 0 : action.dueAtSec;
-  return actions.sort((a, b) => dueOf(a) - dueOf(b));
+  return actions.sort((a, b) => a.dueAtSec - b.dueAtSec);
 };
 
 /**
  * A run started on demand, outside the planner: it skips the notice window
- * and consumes the pending period, so the next due time is the first one
- * after whichever is later, now or the pending due time.
+ * and pays the pending period, even one not due yet.
  */
 export const runNowAction = (
   order: RecurringPaymentOrder,
   amountSat: number,
-  nowSec: number,
-): RecurringRunAction => {
-  const { schedule } = order;
-  return {
-    kind: "run",
-    order,
-    amountSat,
-    dueAtSec: schedule.nextDueAtSec,
-    missedCount: 0,
-    advance: {
-      nextDueAtSec: nextDueAfter(
-        schedule,
-        Math.max(nowSec, schedule.nextDueAtSec),
-      ),
-      runCount: schedule.runCount + 1,
-    },
-  };
-};
+): RecurringRunAction => ({
+  kind: "run",
+  order,
+  runIndex: order.schedule.runCount,
+  amountSat,
+  dueAtSec: order.schedule.nextDueAtSec,
+  missedCount: 0,
+});

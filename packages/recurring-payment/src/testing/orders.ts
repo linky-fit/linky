@@ -3,7 +3,11 @@ import {
   type ContactId,
   type RecurringPaymentId,
 } from "@linky-fit/domain";
-import type { RecurringPaymentOrder } from "../order";
+import {
+  recurringProgressColumn,
+  type RecurringPaymentColumns,
+  type RecurringPaymentOrder,
+} from "../order";
 
 export const recurringPaymentIdFor = (key: string): RecurringPaymentId =>
   createIdFromString<"RecurringPayment">(`test/recurring/${key}`);
@@ -13,14 +17,17 @@ export const contactIdFor = (key: string): ContactId =>
 
 export const HOUR = 3600;
 export const DUE = 1_800_000_000;
+export const MINT = "https://mint.example";
 
-/** A 6-hourly sat payment due at `DUE`, unclaimed, never run. */
+/** A 6-hourly sat payment over Cashu from `MINT` due at `DUE`, unclaimed, never run. */
 export const recurringOrderFixture = (
   overrides: Partial<RecurringPaymentOrder> = {},
 ): RecurringPaymentOrder => ({
   id: recurringPaymentIdFor("rp-1"),
   createdAtSec: DUE - 10 * HOUR,
   contactId: contactIdFor("contact-1"),
+  mintUrl: MINT,
+  rail: "cashu",
   amount: { amount: 100, unit: "sat" },
   schedule: {
     anchorAtSec: DUE,
@@ -33,5 +40,30 @@ export const recurringOrderFixture = (
   lastRunAtSec: null,
   lastRunStatus: null,
   claim: null,
+  ...overrides,
+});
+
+/** The stored columns `recurringOrderFixture()` is read from. */
+export const recurringColumnsFixture = (
+  overrides: Partial<RecurringPaymentColumns> = {},
+): RecurringPaymentColumns => ({
+  id: recurringPaymentIdFor("rp-1"),
+  createdAtSec: DUE - 10 * HOUR,
+  contactId: contactIdFor("contact-1"),
+  mintUrl: MINT,
+  rail: "cashu",
+  amount: 100,
+  unit: "sat",
+  intervalUnit: "hour",
+  intervalCount: 6,
+  anchorAtSec: DUE,
+  timeZone: "UTC",
+  progress: recurringProgressColumn({ runCount: 0, nextDueAtSec: DUE }),
+  lastRunAtSec: null,
+  lastRunStatus: null,
+  pausedAtSec: null,
+  claimDeviceId: null,
+  claimAtSec: null,
+  claimDueAtSec: null,
   ...overrides,
 });

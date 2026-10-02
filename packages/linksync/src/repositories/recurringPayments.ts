@@ -5,7 +5,7 @@ import type { LinkyDbSchema, RecurringPaymentRow } from "../model/schema";
 import type { LinkyStore } from "../model/store";
 import { tableRepository, type TableRepository } from "./tableRepository";
 
-/** A recurring payment row whose schedule and recipient columns have all arrived. */
+/** A recurring payment row whose schedule, progress, mint, rail and recipient columns have all arrived. */
 export interface RecurringPaymentRecord extends Omit<
   RecurringPaymentRow,
   | "amount"
@@ -14,7 +14,9 @@ export interface RecurringPaymentRecord extends Omit<
   | "createdAtSec"
   | "intervalCount"
   | "intervalUnit"
-  | "nextDueAtSec"
+  | "mintUrl"
+  | "progress"
+  | "rail"
   | "unit"
 > {
   readonly amount: PositiveInt;
@@ -23,7 +25,9 @@ export interface RecurringPaymentRecord extends Omit<
   readonly createdAtSec: PositiveInt;
   readonly intervalCount: PositiveInt;
   readonly intervalUnit: string;
-  readonly nextDueAtSec: PositiveInt;
+  readonly mintUrl: string;
+  readonly progress: string;
+  readonly rail: string;
   readonly unit: string;
 }
 
@@ -33,6 +37,8 @@ export interface RecurringPaymentsRepository extends Omit<
 > {
   /** Rows the scheduler can act on; a row still arriving column by column is skipped. */
   readonly all: Effect.Effect<ReadonlyArray<RecurringPaymentRecord>>;
+  /** Removed payments; their scope is never forgotten, so every tombstone stays readable. */
+  readonly deleted: Effect.Effect<ReadonlyArray<RecurringPaymentRecord>>;
 }
 
 export const normalizeRecurringPayment = (
@@ -45,7 +51,9 @@ export const normalizeRecurringPayment = (
     row.createdAtSec === null ||
     row.intervalCount === null ||
     row.intervalUnit === null ||
-    row.nextDueAtSec === null ||
+    row.mintUrl === null ||
+    row.progress === null ||
+    row.rail === null ||
     row.unit === null
   ) {
     return null;
@@ -58,23 +66,44 @@ export const normalizeRecurringPayment = (
     createdAtSec: row.createdAtSec,
     intervalCount: row.intervalCount,
     intervalUnit: row.intervalUnit,
-    nextDueAtSec: row.nextDueAtSec,
+    mintUrl: row.mintUrl,
+    progress: row.progress,
+    rail: row.rail,
     unit: row.unit,
   };
 };
 
-/** Recurring payments share the `transactions` scope with the history they produce. */
+const toRecords = (
+  rows: ReadonlyArray<RecurringPaymentRow>,
+): RecurringPaymentRecord[] =>
+  rows.flatMap((row) => {
+    const record = normalizeRecurringPayment(row);
+    return record === null ? [] : [record];
+  });
+
+/** The highest shard's copy of each id; `copies` come highest shard first. */
+const newestCopies = (
+  copies: ReadonlyArray<RecurringPaymentRow>,
+): RecurringPaymentRow[] => {
+  const newest = new Map<string, RecurringPaymentRow>();
+  for (const copy of copies) {
+    if (!newest.has(copy.id)) newest.set(copy.id, copy);
+  }
+  return [...newest.values()];
+};
+
+/** Recurring payments live with the contacts they pay, in a scope that is never forgotten. */
 export const makeRecurringPaymentsRepository = (
   store: LinkyStore,
 ): RecurringPaymentsRepository => {
-  const table = tableRepository(store, "transactions", "recurringPayment");
+  const table = tableRepository(store, "contacts", "recurringPayment");
   return {
     ...table,
-    all: Effect.map(table.all, (rows) =>
-      rows.flatMap((row) => {
-        const record = normalizeRecurringPayment(row);
-        return record === null ? [] : [record];
-      }),
+    all: Effect.map(table.all, toRecords),
+    deleted: Effect.map(
+      store.copies("contacts", "recurringPayment"),
+      (copies) =>
+        toRecords(newestCopies(copies).filter((row) => row.isDeleted === 1)),
     ),
   };
 };

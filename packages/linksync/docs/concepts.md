@@ -10,11 +10,11 @@ A scope is one kind of data with one storage policy. `meta` lives in the Evolu `
 | ---------------- | ------------------------------------ | ------------------------------------- | ------------------------ | ------------- |
 | `meta`           | `AppOwner`                           | `shardPointer`, `setting`             | no                       | never         |
 | `identity`       | `ShardOwner` `["identity", 0]`       | `nostrIdentity`                       | no                       | never         |
-| `contacts`       | `ShardOwner` `["contacts", n]`       | `contact`                             | 256 KiB or 220 mutations | never         |
+| `contacts`       | `ShardOwner` `["contacts", n]`       | `contact`, `recurringPayment`         | 256 KiB or 220 mutations | never         |
 | `messages`       | `ShardOwner` `["messages", n]`       | `conversation`, `message`, `reaction` | 256 KiB or 160 mutations | keep newest 4 |
 | `unknownSenders` | `ShardOwner` `["unknownSenders", n]` | `unknownSenderMessage`                | 256 KiB or 160 mutations | keep newest 2 |
 | `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`        | 256 KiB or 170 mutations | never         |
-| `transactions`   | `ShardOwner` `["transactions", n]`   | `transaction`, `recurringPayment`     | 256 KiB or 220 mutations | keep newest 4 |
+| `transactions`   | `ShardOwner` `["transactions", n]`   | `transaction`                         | 256 KiB or 220 mutations | keep newest 4 |
 
 A shard rotates once its Evolu history holds `SHARD_MAX_BYTES` (256 KiB) of column values or the scope's mutation count, whichever comes first, with `SHARD_ROTATION_COOLDOWN_MS` (60 s) between rotations of one scope. The byte threshold is a quarter of the official Evolu relay's 1 MB per-owner quota, leaving room for encryption and per-row overhead. Rotation moves a pointer; nothing is copied.
 
@@ -42,7 +42,7 @@ Messages from unknown senders keep 2, so spam from unknown senders neither grows
 
 A fresh device reads and subscribes only the newest N shards. An existing device retains its older locally held shards across rotations and reloads until an explicit forget, remembered through the device-local `ShardRetention` port ([core](./core.md#device-local-retention)). `ShardStore.forget(scope?)` narrows one scope, or every forgettable scope, to its newest window and notifies readers. Evolu 7 only unsubscribes and hides the older rows (`deleted: false`); local bytes and relay history remain until Evolu can delete an owner. The in-memory port deletes.
 
-A cursor update copies the conversation into the active messages shard; `markSeen` only writes for a newer message, so an idle chat's read cursors may be forgotten with its old messages. Every cursor written since the oldest visible shard began is visible, so a consumer can treat messages up to `visibleSinceSec` ([repositories](./repositories.md#conversations)) as read. The archive state lives on the contact, which is never forgotten, so every device sees which chats are archived.
+A cursor update copies the conversation into the active messages shard; `markSeen` only writes for a newer message, so an idle chat's read cursors may be forgotten with its old messages. Every cursor written since the oldest visible shard began is visible, so a consumer can treat messages up to `visibleSinceSec` ([repositories](./repositories.md#conversations)) as read. The archive state lives on the contact, which is never forgotten, so every device sees which chats are archived. A recurring payment is never forgotten either: a removed one's tombstone still names the envelope it may have left at its mint.
 
 ## Ids
 

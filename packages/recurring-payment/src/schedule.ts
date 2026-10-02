@@ -1,6 +1,6 @@
-// Schedule math for recurring payments: when the next run is
-// due, how many due times were missed, and how the order advances after a
-// run. Pure and storage-agnostic; the engine and the UI build on it.
+// Schedule math for recurring payments: when the next run is due and how many
+// due times were missed. Pure and storage-agnostic; the planner, the
+// transitions and the UI build on it.
 //
 // Due times are anchor + n intervals evaluated in the order's own time zone,
 // never "last run + interval": a month-end anchor then clamps to each month's
@@ -293,21 +293,3 @@ export const decideRecurringRun = (
     missedCount: Math.max(0, nextIndex - dueIndex - 1),
   };
 };
-
-export interface RecurringScheduleAdvance {
-  nextDueAtSec: number;
-  runCount: number;
-}
-
-/**
- * State after a run settled at `nowSec` (paid, failed for good, or skipped):
- * the next due time is the first one after now, so missed periods are never
- * paid retroactively.
- */
-export const advanceRecurringSchedule = (
-  state: RecurringScheduleState,
-  nowSec: number,
-): RecurringScheduleAdvance => ({
-  nextDueAtSec: nextDueAfter(state, nowSec),
-  runCount: state.runCount + 1,
-});
