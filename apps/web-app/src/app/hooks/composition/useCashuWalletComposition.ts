@@ -903,7 +903,6 @@ export const useCashuWalletComposition = ({
       logPaymentEvent,
       nostrMessagesLocal,
       payWithCashuEnabled,
-      pushToast,
       sendCashuToken,
       setContactsOnboardingHasPaid,
       setStatus,

@@ -132,7 +132,6 @@ interface SetupOptions {
   returnToWallet?: CashuTransferLifecycle["returnToWallet"];
   logPaymentEvent?: PayParams["logPaymentEvent"];
   nostrMessagesLocal?: LocalNostrMessage[];
-  pushToast?: PayParams["pushToast"];
   sendCashuToken?: SendCashuToken;
   setStatus?: PayParams["setStatus"];
   showPaidOverlay?: PayParams["showPaidOverlay"];
@@ -151,7 +150,6 @@ const setup = async (options: SetupOptions = {}) => {
     );
   const logPaymentEvent =
     options.logPaymentEvent ?? vi.fn<PayParams["logPaymentEvent"]>();
-  const pushToast = options.pushToast ?? vi.fn<PayParams["pushToast"]>();
   const setStatus = options.setStatus ?? vi.fn<PayParams["setStatus"]>();
   const showPaidOverlay =
     options.showPaidOverlay ?? vi.fn<PayParams["showPaidOverlay"]>();
@@ -209,7 +207,6 @@ const setup = async (options: SetupOptions = {}) => {
       logPaymentEvent,
       nostrMessagesLocal: options.nostrMessagesLocal ?? [],
       payWithCashuEnabled: true,
-      pushToast,
       sendCashuToken,
       setContactsOnboardingHasPaid: vi.fn(),
       setStatus,
@@ -235,7 +232,6 @@ const setup = async (options: SetupOptions = {}) => {
     getPay: () => payContact,
     returnToWallet,
     logPaymentEvent,
-    pushToast,
     root,
     sendCashuToken,
     setStatus,
@@ -576,24 +572,28 @@ describe("usePayContactWithCashuMessage", () => {
     await act(async () => harness.root.unmount());
   });
 
-  it("keeps the pending row and returns queued on enqueue failure", async () => {
+  it("keeps the pending row and fails the payment when the outbox rejects the message", async () => {
     enqueueOutboxMock.mockResolvedValue(
       Exit.fail({ _tag: "LinkstrNotConfigured" }),
     );
-    const pushToast = vi.fn<PayParams["pushToast"]>();
+    const setStatus = vi.fn<PayParams["setStatus"]>();
     const showPaidOverlay = vi.fn<PayParams["showPaidOverlay"]>();
-    const harness = await setup({ pushToast, showPaidOverlay });
+    const harness = await setup({ setStatus, showPaidOverlay });
 
     const result = await payAlice(harness);
 
-    expect(result).toEqual({ ok: true, queued: true });
+    expect(result).toEqual({
+      error: "LinkstrNotConfigured",
+      ok: false,
+      queued: false,
+    });
     expect(harness.forget).not.toHaveBeenCalled();
     expect(sendPaymentNoticeMock).not.toHaveBeenCalled();
-    expect(pushToast).toHaveBeenCalledWith("payFailed: LinkstrNotConfigured");
-    expect(showPaidOverlay).toHaveBeenCalledWith(
-      "paidQueuedTo",
-      expect.objectContaining({ direction: "out" }),
+    expect(setStatus).toHaveBeenCalledExactlyOnceWith(
+      "payFailed: LinkstrNotConfigured",
     );
+    expect(showPaidOverlay).not.toHaveBeenCalled();
+    expect(navigateToMock).not.toHaveBeenCalled();
 
     await act(async () => harness.root.unmount());
   });
