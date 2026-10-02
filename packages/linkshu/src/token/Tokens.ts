@@ -406,8 +406,9 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
      * Carries rows of the previous storage model into the inventory. A row
      * is ingested when any of its proofs is not yet stored; `pending` rows
      * are skipped, `accepted` becomes `available`, `reserved` is `held` by
-     * the pending melt whose inputs sum to the row (`available` when no melt
-     * matches), `issued`/`externalized` become a `send` transfer with
+     * the pending melt already holding part of the row, else by the one
+     * whose inputs sum to the row (`available` when no melt matches),
+     * `issued`/`externalized` become a `send` transfer with
      * handed-out proofs, and `error` is `spent` only when the recorded error
      * says so — everything else is `available` for the next mint check to
      * decide. A `reserved` row's proofs that older releases stored `held` by
@@ -428,11 +429,12 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
             .map((proof) => [proof.secret, proof]),
         );
         const pendingMelts = yield* melts.readAll;
-        const linkedMelts = new Set(
+        const holderOf = new Map(
           stored
             .filter((proof) => proof.state === "held")
-            .map((proof) => proof.operationId),
+            .map((proof) => [proof.secret, proof.operationId]),
         );
+        const linkedMelts = new Set(holderOf.values());
         let ingestedRows = 0;
         let proofCount = 0;
         for (const row of rows) {
@@ -456,12 +458,17 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
           let operationId: OperationId | null = null;
           if (row.state === "reserved") {
             const total = totalAmount(decoded.proofs);
-            const melt = pendingMelts.find(
-              (candidate) =>
-                candidate.mint === decoded.mint &&
-                candidate.inputsTotal === total &&
-                !linkedMelts.has(candidate.id),
+            const rowHolders = new Set(
+              decoded.proofs.map((proof) => holderOf.get(proof.secret)),
             );
+            const melt =
+              pendingMelts.find((candidate) => rowHolders.has(candidate.id)) ??
+              pendingMelts.find(
+                (candidate) =>
+                  candidate.mint === decoded.mint &&
+                  candidate.inputsTotal === total &&
+                  !linkedMelts.has(candidate.id),
+              );
             if (melt !== undefined) {
               state = "held";
               operationId = melt.id;
