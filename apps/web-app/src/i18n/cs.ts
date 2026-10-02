@@ -36,6 +36,16 @@ export const cs = {
   recurringNotifyBody:
     "{amount} {unit} pro {name} odejde za {minutes} min. Otevřete Linky, pokud ji chcete zrušit.",
   recurringSentBody: "{amount} {unit} pro {name} odesláno.",
+  recurringFailedBody:
+    "Odeslání {amount} {unit} pro {name} se nezdařilo. Zkusím to znovu.",
+  recurringWaitingForFundsBody:
+    "Na odeslání {amount} {unit} pro {name} nemáte dost prostředků. Doplňte je do další splatnosti, jinak se tato platba přeskočí.",
+  recurringSkippedNoFundsBody:
+    "Platba {amount} {unit} pro {name} byla přeskočena: nedostatek prostředků.",
+  recurringSkippedFailingBody:
+    "Platba {amount} {unit} pro {name} byla přeskočena: opakovaně se nezdařila.",
+  recurringSkippedRecipientBody:
+    "Platba {amount} {unit} byla přeskočena: příjemci nelze zaplatit.",
   recurringDueTitle: "Plánovaná platba",
   recurringDueReady: "Pravidelná platba je připravena.",
   recurringDueReadyDaily: "Pravidelná denní platba je připravena.",

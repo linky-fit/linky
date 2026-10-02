@@ -341,11 +341,12 @@ export const useLightningPaymentsDomain = ({
         }
 
         // Paying the full balance leaves no headroom for fees; the ladder
-        // degrades the requested LNURL amount until amount + fees fit.
-        const queuedAmountAttempts = buildPaymentAmountAttempts(
-          amountSat,
-          mintBalance,
-        );
+        // degrades the requested LNURL amount until amount + fees fit. A
+        // recurring run pays exactly its scheduled amount or fails.
+        const degradeAmount = recurringRun === null;
+        const queuedAmountAttempts = degradeAmount
+          ? buildPaymentAmountAttempts(amountSat, mintBalance)
+          : [amountSat];
         const seenAmountAttempts = new Set(queuedAmountAttempts);
         let finalErrorMessage: string | null = null;
         let finalErrorMint: string | null = null;
@@ -358,6 +359,7 @@ export const useLightningPaymentsDomain = ({
         ) {
           const attemptedAmountSat = queuedAmountAttempts[attemptIndex];
           const canRetryLower = (errorMessage: string): boolean => {
+            if (!degradeAmount) return false;
             if (!isRetryablePaymentAmountFailure(errorMessage)) return false;
             for (const retryAmountSat of buildPaymentFailureAmountAttempts(
               attemptedAmountSat,

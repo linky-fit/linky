@@ -12,6 +12,7 @@ import {
 import { Either } from "effect";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { recurringPaymentIdFor } from "../../testUtils/recurringOrders";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import type { MeltCashuInvoice } from "./composition/useLinkshuComposition";
 import type { LnurlPayInvoiceResult } from "../../lnurlPay";
@@ -333,6 +334,43 @@ describe("payLightningAddressWithCashu", () => {
         phase: "complete",
         status: "ok",
       }),
+    );
+    await act(async () => harness.root.unmount());
+  });
+
+  it("fails a recurring run instead of sending less than its amount", async () => {
+    fetchLnurlInvoiceForTargetMock.mockImplementation(
+      async (_target, amountSat) => ({
+        lightningAddress: "alice@example.com",
+        pr: `lnbc-mock-${amountSat}`,
+        successAction: null,
+      }),
+    );
+    const melt = vi.fn<MeltCashuInvoice>(async ({ invoice }) => {
+      const amount = Number(invoice.replace("lnbc-mock-", ""));
+      return insufficientFunds(amount + 3, 100);
+    });
+    const harness = await setup({ meltCashuInvoice: melt });
+
+    const paid = await harness.payments.payLightningAddressWithCashu(
+      "alice@example.com",
+      100,
+      {
+        recurringRun: {
+          recurringPaymentId: recurringPaymentIdFor("rp-1"),
+          dueAtSec: 1_000,
+        },
+      },
+    );
+
+    expect(paid).toBe(false);
+    const attemptedAmounts = fetchLnurlInvoiceForTargetMock.mock.calls.map(
+      ([, amountSat]) => amountSat,
+    );
+    expect(attemptedAmounts).toEqual([100]);
+    expect(melt).toHaveBeenCalledTimes(1);
+    expect(harness.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "error" }),
     );
     await act(async () => harness.root.unmount());
   });

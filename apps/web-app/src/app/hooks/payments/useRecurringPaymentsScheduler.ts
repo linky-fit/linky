@@ -23,13 +23,14 @@ import {
   type RecurringPaymentPatch,
   type RecurringRunAction,
   type RecurringRunRef,
+  type RecurringSkipReason,
   type RecurringTickAction,
 } from "@linky-fit/recurring-payment";
 import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { useLatest } from "../../../hooks/useLatest";
-import type { Translate } from "../../../i18n";
+import type { I18nKey, Translate } from "../../../i18n";
 import type {
   DisplayAmountParts,
   FiatRates,
@@ -120,6 +121,12 @@ interface UseRecurringPaymentsSchedulerParams {
     tickIntervalMs?: number;
   };
 }
+
+const SKIPPED_BODY = {
+  failed: "recurringSkippedFailingBody",
+  insufficientFunds: "recurringSkippedNoFundsBody",
+  invalidRecipient: "recurringSkippedRecipientBody",
+} as const satisfies Record<Exclude<RecurringSkipReason, "cancelled">, I18nKey>;
 
 const orderLinks = (order: RecurringPaymentOrder): Record<string, string> => ({
   recurringPayment: order.id,
@@ -243,6 +250,35 @@ export const useRecurringPaymentsScheduler = ({
     [latest],
   );
 
+  const orderAmountSat = React.useCallback(
+    (order: RecurringPaymentOrder): number =>
+      recurringAmountSat(order.amount, latest.current.fiatRates) ?? 0,
+    [latest],
+  );
+
+  const notifyOrder = React.useCallback(
+    (
+      order: RecurringPaymentOrder,
+      amountSat: number,
+      body: string,
+      tag: string,
+    ): void => {
+      const contact = findContact(order.contactId);
+      const { amount, unit } = formatAmount(amountSat);
+      void latest.current
+        .maybeShowPwaNotification(
+          latest.current.t("recurringPaymentTitle"),
+          body
+            .replace("{amount}", amount)
+            .replace("{unit}", unit)
+            .replace("{name}", contact ? contactDisplayName(contact) : ""),
+          tag,
+        )
+        .catch(() => undefined);
+    },
+    [findContact, formatAmount, latest],
+  );
+
   /** The history decides whether a run that never finished had moved money. */
   const settleInterruptedRun = React.useCallback(
     async (order: RecurringPaymentOrder): Promise<void> => {
@@ -277,28 +313,18 @@ export const useRecurringPaymentsScheduler = ({
       const { order, dueAtSec, takeover } = action;
       const now = nowSec();
       await patchOrder(order, claimPatch(deviceId, now, dueAtSec));
-      const contact = findContact(order.contactId);
-      const amountSat = recurringAmountSat(
-        order.amount,
-        latest.current.fiatRates,
-      );
-      const { amount, unit } = formatAmount(amountSat ?? 0);
       const minutes = Math.max(
         1,
         Math.ceil((Math.max(dueAtSec, now + RECURRING_NOTICE_SEC) - now) / 60),
       );
-      void latest.current
-        .maybeShowPwaNotification(
-          latest.current.t("recurringPaymentTitle"),
-          latest.current
-            .t("recurringNotifyBody")
-            .replace("{amount}", amount)
-            .replace("{unit}", unit)
-            .replace("{name}", contact ? contactDisplayName(contact) : "")
-            .replace("{minutes}", String(minutes)),
-          `recurring:${order.id}:${dueAtSec}`,
-        )
-        .catch(() => undefined);
+      notifyOrder(
+        order,
+        orderAmountSat(order),
+        latest.current
+          .t("recurringNotifyBody")
+          .replace("{minutes}", String(minutes)),
+        `recurring:${order.id}:${dueAtSec}`,
+      );
       reportAppLog({
         tag: "recurring.claimed",
         summary: `recurring payment claimed${takeover ? " (takeover)" : ""}`,
@@ -311,7 +337,7 @@ export const useRecurringPaymentsScheduler = ({
         },
       });
     },
-    [deviceId, findContact, formatAmount, latest, nowSec, patchOrder],
+    [deviceId, latest, notifyOrder, nowSec, orderAmountSat, patchOrder],
   );
 
   const settleRun = React.useCallback(
@@ -338,17 +364,12 @@ export const useRecurringPaymentsScheduler = ({
             contact: paidOverlayContact(contact),
           },
         );
-        void latest.current
-          .maybeShowPwaNotification(
-            latest.current.t("recurringPaymentTitle"),
-            latest.current
-              .t("recurringSentBody")
-              .replace("{amount}", amount)
-              .replace("{unit}", unit)
-              .replace("{name}", name),
-            `recurring-sent:${order.id}:${action.dueAtSec}`,
-          )
-          .catch(() => undefined);
+        notifyOrder(
+          order,
+          action.amountSat,
+          latest.current.t("recurringSentBody"),
+          `recurring-sent:${order.id}:${action.dueAtSec}`,
+        );
       } else {
         await patchOrder(order, runFailedPatch(order));
         retryNotBeforeRef.current.set(
@@ -356,6 +377,12 @@ export const useRecurringPaymentsScheduler = ({
           startedAtSec + RECURRING_RUN_RETRY_DELAY_SEC,
         );
         latest.current.pushToast(latest.current.t("recurringRunFailedToast"));
+        notifyOrder(
+          order,
+          action.amountSat,
+          latest.current.t("recurringFailedBody"),
+          `recurring-failed:${order.id}:${action.dueAtSec}`,
+        );
       }
       reportAppLog({
         tag: "recurring.run",
@@ -373,7 +400,24 @@ export const useRecurringPaymentsScheduler = ({
         },
       });
     },
-    [findContact, formatAmount, latest, patchOrder],
+    [findContact, formatAmount, latest, notifyOrder, patchOrder],
+  );
+
+  const notifySkipped = React.useCallback(
+    (
+      order: RecurringPaymentOrder,
+      amountSat: number,
+      dueAtSec: number,
+      reason: keyof typeof SKIPPED_BODY,
+    ): void => {
+      notifyOrder(
+        order,
+        amountSat,
+        latest.current.t(SKIPPED_BODY[reason]),
+        `recurring-skipped:${order.id}:${dueAtSec}`,
+      );
+    },
+    [latest, notifyOrder],
   );
 
   const executeRun = React.useCallback(
@@ -401,6 +445,7 @@ export const useRecurringPaymentsScheduler = ({
         latest.current.pushToast(
           latest.current.t("recurringRecipientUnavailable"),
         );
+        notifySkipped(order, amountSat, dueAtSec, "invalidRecipient");
         reportAppLog({
           tag: "recurring.skipped",
           summary: "recurring payment skipped (recipient cannot be paid)",
@@ -454,7 +499,7 @@ export const useRecurringPaymentsScheduler = ({
       await settleRun(action, outcome, startedAtSec);
       return outcome.ok ? "paid" : "failed";
     },
-    [findContact, latest, nowSec, patchOrder, settleRun],
+    [findContact, latest, notifySkipped, nowSec, patchOrder, settleRun],
   );
 
   const runOrderNow = React.useCallback(
@@ -522,6 +567,12 @@ export const useRecurringPaymentsScheduler = ({
               action.order,
               runSkippedPatch(action.advance, now),
             );
+            notifySkipped(
+              action.order,
+              orderAmountSat(action.order),
+              action.dueAtSec,
+              action.reason,
+            );
             reportAppLog({
               tag: "recurring.skipped",
               summary: `recurring payment skipped (${action.reason})`,
@@ -541,6 +592,14 @@ export const useRecurringPaymentsScheduler = ({
                   : "recurringWaitingForRates",
               ),
             );
+            if (action.kind === "waitFunds") {
+              notifyOrder(
+                action.order,
+                orderAmountSat(action.order),
+                latest.current.t("recurringWaitingForFundsBody"),
+                `recurring-waiting:${action.order.id}:${action.dueAtSec}`,
+              );
+            }
             reportAppLog({
               tag:
                 action.kind === "waitFunds"
@@ -615,7 +674,10 @@ export const useRecurringPaymentsScheduler = ({
     isVisible,
     latest,
     loadOrders,
+    notifyOrder,
+    notifySkipped,
     nowSec,
+    orderAmountSat,
     patchOrder,
     settleInterruptedRun,
   ]);

@@ -338,6 +338,11 @@ describe("useRecurringPaymentsScheduler", () => {
     expect(view.params.pushToast).toHaveBeenCalledWith(
       "recurringRunFailedToast",
     );
+    expect(view.params.maybeShowPwaNotification).toHaveBeenCalledWith(
+      "recurringPaymentTitle",
+      "recurringFailedBody",
+      `recurring-failed:${ORDER_ID}:${DUE}`,
+    );
     expect(view.params.showPaidOverlay).not.toHaveBeenCalled();
     await view.unmount();
   });
@@ -352,10 +357,56 @@ describe("useRecurringPaymentsScheduler", () => {
 
   it("waits for funds and tells the user once", async () => {
     const view = await mount({ ...claimedBy("device-a"), amount: 5_000 });
+    await act(async () => {
+      await view.scheduler().runNow();
+    });
 
     expect(view.params.payContactWithCashuMessage).not.toHaveBeenCalled();
+    expect(view.params.pushToast).toHaveBeenCalledTimes(1);
     expect(view.params.pushToast).toHaveBeenCalledWith(
       "recurringWaitingForFunds",
+    );
+    expect(view.params.maybeShowPwaNotification).toHaveBeenCalledTimes(1);
+    expect(view.params.maybeShowPwaNotification).toHaveBeenCalledWith(
+      "recurringPaymentTitle",
+      "recurringWaitingForFundsBody",
+      `recurring-waiting:${ORDER_ID}:${DUE}`,
+    );
+    await view.unmount();
+  });
+
+  it("skips a period still unfunded at the next due time and notifies", async () => {
+    const view = await mount({
+      ...claimedBy("device-a"),
+      amount: 5_000,
+      nextDueAtSec: DUE - 6 * HOUR,
+      claimDueAtSec: DUE - 6 * HOUR,
+    });
+
+    expect(view.row()).toMatchObject({ lastRunStatus: "skipped" });
+    expect(view.params.maybeShowPwaNotification).toHaveBeenCalledWith(
+      "recurringPaymentTitle",
+      "recurringSkippedNoFundsBody",
+      `recurring-skipped:${ORDER_ID}:${DUE - 6 * HOUR}`,
+    );
+    await view.unmount();
+  });
+
+  it("skips a period whose payment kept failing and notifies", async () => {
+    const view = await mount({
+      ...claimedBy("device-a"),
+      nextDueAtSec: DUE - 6 * HOUR,
+      claimDueAtSec: DUE - 6 * HOUR,
+      lastRunAtSec: DUE - HOUR,
+      lastRunStatus: "failed",
+    });
+
+    expect(view.row()).toMatchObject({ lastRunStatus: "skipped" });
+    expect(view.params.payContactWithCashuMessage).not.toHaveBeenCalled();
+    expect(view.params.maybeShowPwaNotification).toHaveBeenCalledWith(
+      "recurringPaymentTitle",
+      "recurringSkippedFailingBody",
+      `recurring-skipped:${ORDER_ID}:${DUE - 6 * HOUR}`,
     );
     await view.unmount();
   });
@@ -374,6 +425,11 @@ describe("useRecurringPaymentsScheduler", () => {
     });
     expect(view.params.pushToast).toHaveBeenCalledWith(
       "recurringRecipientUnavailable",
+    );
+    expect(view.params.maybeShowPwaNotification).toHaveBeenCalledWith(
+      "recurringPaymentTitle",
+      "recurringSkippedRecipientBody",
+      `recurring-skipped:${ORDER_ID}:${DUE}`,
     );
     await view.unmount();
   });
@@ -519,6 +575,11 @@ describe("useRecurringPaymentsScheduler", () => {
       });
       expect(view.params.pushToast).toHaveBeenCalledWith(
         "recurringCancelledToast",
+      );
+      expect(view.params.maybeShowPwaNotification).not.toHaveBeenCalledWith(
+        "recurringPaymentTitle",
+        expect.stringMatching(/^recurringSkipped/),
+        expect.anything(),
       );
       expect(view.scheduler().dueConfirmation).toBeNull();
       await view.unmount();

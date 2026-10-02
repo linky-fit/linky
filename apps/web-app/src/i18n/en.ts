@@ -37,6 +37,16 @@ export const en = {
   recurringNotifyBody:
     "{amount} {unit} to {name} goes out in {minutes} min. Open Linky to cancel it.",
   recurringSentBody: "Sent {amount} {unit} to {name}.",
+  recurringFailedBody:
+    "Sending {amount} {unit} to {name} failed. It will be retried.",
+  recurringWaitingForFundsBody:
+    "Not enough funds to send {amount} {unit} to {name}. Top up before the next payment is due, or this one is skipped.",
+  recurringSkippedNoFundsBody:
+    "Skipped {amount} {unit} to {name}: not enough funds.",
+  recurringSkippedFailingBody:
+    "Skipped {amount} {unit} to {name}: the payment kept failing.",
+  recurringSkippedRecipientBody:
+    "Skipped {amount} {unit}: the recipient cannot be paid.",
   recurringDueTitle: "Scheduled payment",
   recurringDueReady: "The recurring payment is ready.",
   recurringDueReadyDaily: "The daily recurring payment is ready.",
