@@ -1,10 +1,16 @@
+import { RumorId } from "@linky-fit/linkstr";
 import {
   createId,
   directConversationIdFor,
   makeConversationsRepository,
+  NonEmptyString,
   NonEmptyString100,
   NonEmptyString1000,
+  nostrMessageIdFor,
+  nostrReactionIdFor,
   PositiveInt,
+  type ContactId,
+  type ConversationsRepository,
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import React, { act } from "react";
@@ -33,7 +39,142 @@ const fromStranger = (
   wrapId,
 });
 
+const renderDomain = async (
+  conversations: ConversationsRepository,
+  contacts: ReadonlyArray<{ readonly id: ContactId }> = [],
+) => {
+  const domainRef: { current: MessagesDomain | null } = { current: null };
+  const params: Parameters<typeof useMessagesDomain>[0] = {
+    appOwnerId: null,
+    appOwnerIdRef: { current: null },
+    chatForceScrollToBottomRef: { current: false },
+    chatMessagesRef: { current: null },
+    contacts,
+    conversations,
+    hydrated: true,
+    route: { kind: "contacts" },
+  };
+  const Probe = () => {
+    const domain = useMessagesDomain(params);
+    React.useEffect(() => {
+      domainRef.current = domain;
+    }, [domain]);
+    return null;
+  };
+  const view = await renderIntoDocument(<Probe />);
+  const domain = (): MessagesDomain => {
+    if (!domainRef.current) throw new Error("hook did not render");
+    return domainRef.current;
+  };
+  return { domain, view };
+};
+
+const rumorId = RumorId.make("a".repeat(64));
+
+const fromNostr = (contactId: string): NewLocalNostrMessage => ({
+  contactId,
+  content: "hello",
+  createdAtSec: 100,
+  direction: "in",
+  pubkey: "peer",
+  rumorId,
+  status: "sent",
+  wrapId: rumorId,
+});
+
 describe("useMessagesDomain", () => {
+  it("stores a message from Nostr under the id its rumor derives, and keeps it when its sender becomes a contact", async () => {
+    const { store } = makeTestLinkyStore();
+    const conversations = makeConversationsRepository(store);
+    const contactId = createId<"Contact">();
+    const { domain, view } = await renderDomain(conversations, [
+      { id: contactId },
+    ]);
+    const unknownId = `${UNKNOWN_CONTACT_ID_PREFIX}peer`;
+
+    await act(async () => {
+      domain().appendLocalNostrMessage(fromNostr(unknownId));
+    });
+    expect(domain().nostrMessagesLocal.map((message) => message.id)).toEqual([
+      nostrMessageIdFor(rumorId),
+    ]);
+
+    await act(async () => {
+      domain().reassignLocalNostrMessagesContactId(unknownId, contactId);
+    });
+    const rows = await Effect.runPromise(conversations.messages.all);
+    expect(rows.map((row) => row.id)).toEqual([nostrMessageIdFor(rumorId)]);
+    expect(domain().nostrMessagesLocal).toHaveLength(1);
+    await view.unmount();
+  });
+
+  it("stores a reaction from Nostr under the id its rumor derives", async () => {
+    const { store } = makeTestLinkyStore();
+    const conversations = makeConversationsRepository(store);
+    const contactId = createId<"Contact">();
+    const { domain, view } = await renderDomain(conversations, [
+      { id: contactId },
+    ]);
+    const reactionRumorId = RumorId.make("b".repeat(64));
+
+    await act(async () => {
+      domain().appendLocalNostrMessage(fromNostr(contactId));
+    });
+    await act(async () => {
+      domain().appendLocalNostrReaction({
+        createdAtSec: 101,
+        emoji: "👍",
+        messageId: rumorId,
+        reactorPubkey: "peer",
+        status: "sent",
+        wrapId: reactionRumorId,
+      });
+    });
+    const rows = await Effect.runPromise(conversations.reactions.all);
+    expect(rows.map((row) => row.id)).toEqual([
+      nostrReactionIdFor(reactionRumorId),
+    ]);
+    await view.unmount();
+  });
+
+  it("shows one message when an older random-id row holds the same rumor", async () => {
+    const { store } = makeTestLinkyStore();
+    const conversations = makeConversationsRepository(store);
+    const contactId = createId<"Contact">();
+    const conversationId = directConversationIdFor(contactId);
+    const row = {
+      conversationId,
+      direction: NonEmptyString100.orThrow("in"),
+      content: NonEmptyString.orThrow("hello"),
+      wrapId: NonEmptyString1000.orThrow(rumorId),
+      rumorId: NonEmptyString1000.orThrow(rumorId),
+      createdAtSec: PositiveInt.orThrow(100),
+      status: NonEmptyString100.orThrow("sent"),
+    };
+    await Effect.runPromise(
+      Effect.zipRight(
+        conversations.ensureDirect(contactId),
+        Effect.zipRight(
+          conversations.messages.insert({ ...row, id: createId<"Message">() }),
+          conversations.messages.insert({
+            ...row,
+            id: nostrMessageIdFor(rumorId),
+          }),
+        ),
+      ),
+    );
+    const { domain, view } = await renderDomain(conversations, [
+      { id: contactId },
+    ]);
+
+    expect(domain().nostrMessagesLocal).toHaveLength(1);
+    await act(async () => {
+      domain().appendLocalNostrMessage(fromNostr(contactId));
+    });
+    expect(await Effect.runPromise(conversations.messages.all)).toHaveLength(2);
+    await view.unmount();
+  });
+
   it("keeps every message of a burst from a sender not in contacts", async () => {
     const { store } = makeTestLinkyStore();
     const conversations = makeConversationsRepository(store);

@@ -4,7 +4,7 @@ One repository per scope, each built over a `LinkyStore`. A repository returns r
 
 ## `TableRepository`
 
-`tableRepository(store, scope, table)` is the shape every repository is or extends: `all`, `byId`, `insert`, `update`, `remove`, `maybeRotate` and `subscribe`. `insert` takes `id` plus the non-nullable columns; nullable ones may be omitted. `update` is copy-on-write; `update` and `remove` fail with `RowNotFound` for an id no visible shard holds. Column values are Evolu's branded types (`NonEmptyString1000`, `PositiveInt`, `SqliteBoolean`, ...), re-exported from the package entry.
+`tableRepository(store, scope, table)` is the shape every repository is or extends: `all`, `byId`, `insert`, `insertIfAbsent`, `update`, `remove`, `maybeRotate` and `subscribe`. `insert` takes `id` plus the non-nullable columns; nullable ones may be omitted, and it overwrites the active shard's copy of that id. `insertIfAbsent` writes only when no visible shard holds a copy of the id, live or tombstoned, and returns whether it wrote: use it for a deterministic id whose row may since have been updated or removed. `update` is copy-on-write; `update` and `remove` fail with `RowNotFound` for an id no visible shard holds. Column values are Evolu's branded types (`NonEmptyString1000`, `PositiveInt`, `SqliteBoolean`, ...), re-exported from the package entry.
 
 Every write ends with the rotation check. A pointer write the port rejects does not fail the row write: the repository logs it and the next write repeats the check, so chained writes are never left halfway over bookkeeping.
 
@@ -36,6 +36,7 @@ The repository returns one row per id; deduplicating unsaved peers by npub is th
 `makeConversationsRepository(store)`: chats with their read cursor and archive state, plus `messages` and `reactions`, `TableRepository`s over those two tables. All three live in the `messages` scope, which keeps the newest 4 shards.
 
 - `ensureDirect(contactId)` creates the contact's direct chat on first use with the derived id `directConversationIdFor(contactId)`. Insert messages with the `conversationId` it returns; messages have no `contactId`.
+- A message or reaction that arrived over Nostr takes `nostrMessageIdFor(rumorId)` / `nostrReactionIdFor(rumorId)` and goes in with `insertIfAbsent`, so a second relay, a later session or another device fetching it again neither duplicates it nor resets its edits and status, and a removed one stays removed. The id ignores the conversation, so moving the message to another contact keeps it. An own send is stored before its rumor exists, so its row has a random id; matching rows by rumor id across the two kinds is the consumer's.
 - `markSeen(id, atSec)` moves the cursor forward only; a lower or equal value is ignored, so an idle chat's row may be forgotten with its old messages.
 - `removedReactions` returns the tombstoned reaction copies in the visible shards, so a removed reaction's wrap id stays known.
 - Archive is a chat action, so `archive` and `unarchive` live here and not on the contact.

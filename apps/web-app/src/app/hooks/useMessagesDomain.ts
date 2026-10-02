@@ -1,10 +1,12 @@
-import type { Pubkey } from "@linky-fit/linkstr";
+import { isRumorId, type Pubkey } from "@linky-fit/linkstr";
 import { enqueueStoredPendingPayment } from "../lib/pendingPayments";
 import {
   ContactId,
   createId,
   directConversationIdFor,
   MessageId,
+  nostrMessageIdFor,
+  nostrReactionIdFor,
   ReactionId,
   type ConversationsRepository,
   type MessageRow,
@@ -127,6 +129,12 @@ const parseReactionId = (value: string): ReactionId | null => {
 };
 
 const NO_ROWS: ReadonlyArray<never> = [];
+
+/** The id every device gives a message from Nostr; null for a send that has no rumor yet. */
+const nostrMessageIdOf = (message: NewLocalNostrMessage): MessageId | null => {
+  const rumorId = trimString(message.rumorId);
+  return isRumorId(rumorId) ? nostrMessageIdFor(rumorId) : null;
+};
 
 export const useMessagesDomain = ({
   appOwnerId,
@@ -337,7 +345,8 @@ export const useMessagesDomain = ({
     (message: NewLocalNostrMessage): LocalNostrMessage | null => {
       const contactId = parseContactId(trimString(message.contactId));
       if (!contactId) return null;
-      const id = createId<"Message">();
+      const nostrId = nostrMessageIdOf(message);
+      const id = nostrId ?? createId<"Message">();
       const wrapId = trimString(message.wrapId) || `pending:${makeLocalId()}`;
       const row = toMessageWriteRow(
         id,
@@ -349,7 +358,9 @@ export const useMessagesDomain = ({
       write(
         "message",
         Effect.flatMap(conversations.ensureDirect(contactId), () =>
-          conversations.messages.insert(row),
+          nostrId === null
+            ? conversations.messages.insert(row)
+            : conversations.messages.insertIfAbsent(row),
         ),
       );
       return localMessageFrom(message, id, wrapId);
@@ -472,7 +483,7 @@ export const useMessagesDomain = ({
       if (isUnknownContactId(contactId)) {
         const nextMessage = localMessageFrom(
           message,
-          makeLocalId(),
+          nostrMessageIdOf(message) ?? makeLocalId(),
           wrapId || `pending:${makeLocalId()}`,
         );
         persistOverlayMessages(
@@ -575,7 +586,8 @@ export const useMessagesDomain = ({
       );
       const contactId = target ? parseContactId(target.contactId) : null;
       if (!contactId) return "";
-      const id = createId<"Reaction">();
+      const nostrId = isRumorId(wrapId) ? nostrReactionIdFor(wrapId) : null;
+      const id = nostrId ?? createId<"Reaction">();
       const row = toReactionWriteRow(
         id,
         directConversationIdFor(contactId),
@@ -586,7 +598,9 @@ export const useMessagesDomain = ({
       write(
         "reaction",
         Effect.flatMap(conversations.ensureDirect(contactId), () =>
-          conversations.reactions.insert(row),
+          nostrId === null
+            ? conversations.reactions.insert(row)
+            : conversations.reactions.insertIfAbsent(row),
         ),
       );
       return id;

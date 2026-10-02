@@ -53,6 +53,24 @@ describe("message updates", () => {
       ),
     ).toBeNull();
   });
+  it("writes the status of a row it has not read back yet", () => {
+    expect(
+      buildMessageUpdate(
+        message.id,
+        { wrapId: "sent-wrap", status: "sent" },
+        undefined,
+        {},
+      ),
+    ).toEqual({ id: message.id, wrapId: "sent-wrap", status: "sent" });
+    expect(
+      buildReactionUpdate(
+        reaction.id,
+        { wrapId: "sent-wrap", status: "sent" },
+        undefined,
+        {},
+      ),
+    ).toEqual({ id: reaction.id, wrapId: "sent-wrap", status: "sent" });
+  });
   it("distinguishes a cleared shadow field from an absent field", () => {
     const shadow: NostrMessageShadowState = {
       replyToId: null,

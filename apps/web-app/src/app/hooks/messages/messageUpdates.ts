@@ -81,6 +81,13 @@ const positiveInt = (value: unknown, fallback: number): number => {
 const status = (value: unknown): "pending" | "sent" =>
   value === "pending" ? "pending" : "sent";
 
+// A row not read back yet, such as a send whose insert is still queued, has no known status.
+const knownStatus = (
+  shadowStatus: "pending" | "sent" | undefined,
+  current: { readonly status?: "pending" | "sent" } | undefined,
+): "pending" | "sent" | undefined =>
+  shadowStatus ?? (current === undefined ? undefined : status(current.status));
+
 const MESSAGE_TEXT_FIELDS = [
   "pubkey",
   "content",
@@ -113,7 +120,7 @@ export const buildMessageUpdate = (
   const payload: NostrMessageUpdatePayload = { id };
   const currentWrapId =
     readShadowText(shadow, "wrapId", asNonEmptyString(current?.wrapId)) ?? "";
-  const currentStatus = shadow.status ?? status(current?.status);
+  const currentStatus = knownStatus(shadow.status, current);
   if (updates.wrapId !== undefined) {
     const next = trimString(updates.wrapId);
     const nextStatus =
@@ -181,7 +188,7 @@ export const buildReactionUpdate = (
       shadow[field] = next;
     }
   }
-  const currentStatus = shadow.status ?? status(current?.status);
+  const currentStatus = knownStatus(shadow.status, current);
   if (updates.status !== undefined && status(updates.status) !== currentStatus)
     payload.status = shadow.status = status(updates.status);
   return Object.keys(payload).length > 1 ? payload : null;

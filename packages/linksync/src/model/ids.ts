@@ -4,6 +4,7 @@ import {
   createRandomBytes,
   id,
 } from "@evolu/common";
+import type { RumorId } from "@linky-fit/linkstr";
 import type { SettingKey } from "./settings";
 
 export const ContactId = id("Contact");
@@ -49,6 +50,14 @@ export const cashuOperationIdFor = (operationKey: string): CashuOperationId =>
 /** A direct chat has one conversation per contact, derivable without a lookup. */
 export const directConversationIdFor = (contactId: ContactId): ConversationId =>
   createIdFromString<"Conversation">(`conversation/direct/${contactId}`);
+
+/** A message from Nostr is one row on every device, whichever conversation holds it. */
+export const nostrMessageIdFor = (rumorId: RumorId): MessageId =>
+  createIdFromString<"Message">(`message/nostr/${rumorId}`);
+
+/** A reaction from Nostr is one row on every device. */
+export const nostrReactionIdFor = (rumorId: RumorId): ReactionId =>
+  createIdFromString<"Reaction">(`reaction/nostr/${rumorId}`);
 
 export const settingIdFor = (key: SettingKey): SettingId =>
   createIdFromString<"Setting">(`setting/${key}`);

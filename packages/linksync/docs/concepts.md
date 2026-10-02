@@ -49,6 +49,8 @@ Copy-on-write identity is the row `id`. These ids are deterministic, so every de
 | `cashuProofIdFor`         | the proof secret           | a synced or restored proof never duplicates         |
 | `cashuOperationIdFor`     | linkshu's `operationKeyOf` | re-inserting an operation upserts its row           |
 | `directConversationIdFor` | the contact id             | every device derives one conversation per contact   |
+| `nostrMessageIdFor`       | the message's rumor id     | a message fetched again stays one row               |
+| `nostrReactionIdFor`      | the reaction's rumor id    | a reaction fetched again stays one row              |
 | `settingIdFor`            | the key                    | one row per key                                     |
 | `activeNostrIdentityId`   | constant                   | one mirrored identity row                           |
 | `shardPointerId`          | the scope name             | one pointer row per scope, upserted by every device |

@@ -20,6 +20,14 @@ export interface TableRepository<C extends Columns> {
   readonly byId: (id: C["id"]) => Effect.Effect<Row<C> | null>;
   /** Writes into the active shard, then runs `maybeRotate`. */
   readonly insert: (row: WriteRow<C>) => Effect.Effect<void, ShardDbError>;
+  /**
+   * `insert` unless a visible shard holds a copy with the row's id, live or
+   * tombstoned, so a deterministic id neither overwrites later changes nor
+   * revives a removed row. Returns whether it wrote.
+   */
+  readonly insertIfAbsent: (
+    row: WriteRow<C>,
+  ) => Effect.Effect<boolean, ShardDbError>;
   readonly update: (
     id: C["id"],
     patch: Patch<C>,
@@ -61,6 +69,12 @@ export const tableRepository = <
     byId: (id) =>
       Effect.map(all, (rows) => rows.find((row) => row.id === id) ?? null),
     insert: (row) => rotateAfter(store.insert(scope, table, row)),
+    insertIfAbsent: (row) =>
+      Effect.flatMap(store.copies(scope, table), (copies) =>
+        copies.some((copy) => copy.id === row.id)
+          ? Effect.succeed(false)
+          : Effect.as(rotateAfter(store.insert(scope, table, row)), true),
+      ),
     update: (id, patch) => rotateAfter(store.update(scope, table, id, patch)),
     remove: (id) => rotateAfter(store.remove(scope, table, id)),
     maybeRotate,
