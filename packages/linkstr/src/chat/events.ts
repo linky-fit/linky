@@ -26,6 +26,7 @@ export class ChatMessageReceived extends Schema.TaggedClass<ChatMessageReceived>
     replyTo: Schema.NullOr(RumorId),
     root: Schema.NullOr(RumorId),
     editOf: Schema.NullOr(RumorId),
+    clientId: Schema.NullOr(ClientId),
     sentAt: UnixSeconds,
   },
 ) {}

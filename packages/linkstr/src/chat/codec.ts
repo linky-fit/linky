@@ -349,8 +349,10 @@ export const decodeChatRumor = (
       return yield* Either.left<DropReason>("invalid-message");
     }
 
+    const clientTag = firstTagValue(rumor.tags, "client");
+    const clientId =
+      clientTag !== null && isClientId(clientTag) ? clientTag : null;
     if (rumor.pubkey === identity.pubkey) {
-      const clientTag = firstTagValue(rumor.tags, "client");
       return new OwnChatMessageConfirmed({
         messageId,
         to: peer,
@@ -358,8 +360,7 @@ export const decodeChatRumor = (
         replyTo,
         root,
         editOf,
-        clientId:
-          clientTag !== null && isClientId(clientTag) ? clientTag : null,
+        clientId,
         sentAt: rumor.created_at,
       });
     }
@@ -371,6 +372,7 @@ export const decodeChatRumor = (
       replyTo,
       root,
       editOf,
+      clientId,
       sentAt: rumor.created_at,
     });
   });

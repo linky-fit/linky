@@ -54,6 +54,8 @@ For a message that must survive going offline, enqueue `{ _tag: "chat.text", dra
 
 A receipt (`ChatMessageReceipt`, or `MessageEditReceipt` for edits) only exists when the recipient copy was accepted.
 
+`sendToken` delivers **recipient first**: the self copy is published only after a relay accepted the recipient copy, so an own echo of a token message always means the recipient's copy reached a relay. A token send no relay accepted for the recipient therefore fails with `NoRelayReachable`, never `RecipientNotReached`.
+
 Push: `sendText` and `sendImage` tag the recipient's wrap with `["linky", "push"]` so a push server can notify. `sendToken` and `edit` do not; follow a token send with a push-marked [payment notice](./payment-kinds.md#payment-notices) when the recipient should be woken up.
 
 ### Images and files
@@ -66,7 +68,7 @@ A token message is a plain kind 14 whose content is the token; the receiver clas
 
 ## Wire format
 
-Every send is a NIP-17 rumor delivered as two gift wraps, self and peer, published in parallel ([wire conventions](./concepts.md#wire-conventions)).
+Every send is a NIP-17 rumor delivered as two gift wraps, self and peer, published in parallel, except a token: its recipient copy goes first ([wire conventions](./concepts.md#wire-conventions)).
 
 | Send  | Kind | Tags, in order                                                                                                                                                                                                                                                                               | Content                               |
 | ----- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
@@ -81,10 +83,11 @@ Every send is a NIP-17 rumor delivered as two gift wraps, self and peer, publish
 
 ## Receiving
 
-Chat facts arrive on the wrap inbox ([inbox.md](./inbox.md)): `ChatMessageReceived` is a peer's message, `OwnChatMessageConfirmed` your own message seen on a relay (echo or another device). Edits are not a separate event: both facts carry `editOf`, and a set `editOf` means a new version of that id. `body` is a `MessageBody`: `TextBody`, `ImageBody` or `TokenBody`.
+Chat facts arrive on the wrap inbox ([inbox.md](./inbox.md)): `ChatMessageReceived` is a peer's message, `OwnChatMessageConfirmed` your own message seen on a relay (echo or another device). Edits are not a separate event: both facts carry `editOf`, and a set `editOf` means a new version of that id. Both facts also carry the sender's `clientId` (null when the rumor has no valid `client` tag): two rumors from one sender with one `clientId` are the same message published twice, for example by two of the sender's devices, each with its own `sentAt` and therefore its own `messageId`. `body` is a `MessageBody`: `TextBody`, `ImageBody` or `TokenBody`.
 
 ```ts
 import type {
+  ClientId,
   MessageBody,
   Pubkey,
   RumorId,
@@ -94,7 +97,13 @@ import type {
 
 interface ChatStore {
   // Placeholders for your persistence layer.
-  insertIncoming: (id: RumorId, from: Pubkey, body: MessageBody) => void;
+  /** Skips a message already stored by `id`, or by `from` + `clientId`. */
+  insertIncoming: (
+    id: RumorId,
+    from: Pubkey,
+    clientId: ClientId | null,
+    body: MessageBody,
+  ) => void;
   applyEdit: (editOf: RumorId, body: MessageBody, sentAt: UnixSeconds) => void;
   markSent: (clientIdOrMessageId: string) => void;
 }
@@ -106,7 +115,12 @@ export const chatHandler =
       case "ChatMessageReceived":
         if (event.editOf !== null)
           return store.applyEdit(event.editOf, event.body, event.sentAt);
-        return store.insertIncoming(event.messageId, event.from, event.body);
+        return store.insertIncoming(
+          event.messageId,
+          event.from,
+          event.clientId,
+          event.body,
+        );
       case "OwnChatMessageConfirmed":
         return store.markSent(event.clientId ?? event.messageId);
       default:

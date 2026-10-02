@@ -213,27 +213,34 @@ describe("Chat sends", () => {
 
   it.each([
     {
-      name: "RecipientNotReached",
+      name: "self copy relays only",
       accept: (wrap: SignedWrapEvent) => recipientOf(wrap) === alice.pubkey,
     },
-    { name: "NoRelayReachable", accept: () => false },
-  ])("maps token delivery failure to $name", async ({ name, accept }) => {
-    const exit = await runWith(
-      stubWrapTransport([], accept),
-      Effect.gen(function* () {
-        const chat = yield* Chat;
-        return yield* chat.sendToken(
-          new TokenMessageDraft({
-            to: bob.pubkey,
-            token: cashuToken,
-            clientId,
-          }),
-        );
-      }),
-    );
+    { name: "no relay", accept: () => false },
+  ])(
+    "never publishes a token's self copy the recipient did not get ($name)",
+    async ({ accept }) => {
+      const published: Array<SignedWrapEvent> = [];
+      const exit = await runWith(
+        stubWrapTransport(published, accept),
+        Effect.gen(function* () {
+          const chat = yield* Chat;
+          return yield* chat.sendToken(
+            new TokenMessageDraft({
+              to: bob.pubkey,
+              token: cashuToken,
+              clientId,
+            }),
+          );
+        }),
+      );
 
-    expect(exit).toEqual(
-      Exit.fail(expect.objectContaining({ _tag: name, clientId })),
-    );
-  });
+      expect(exit).toEqual(
+        Exit.fail(
+          expect.objectContaining({ _tag: "NoRelayReachable", clientId }),
+        ),
+      );
+      expect(published.map(recipientOf)).toEqual([bob.pubkey]);
+    },
+  );
 });

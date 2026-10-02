@@ -295,7 +295,7 @@ describe("chat rumor decoding", () => {
     );
   });
 
-  it("decodes an addressed incoming text from the rumor author", () => {
+  it("decodes an addressed incoming text from the rumor author, with its client id", () => {
     const rumor = encodeTextMessageRumor(
       new TextMessageDraft({
         to: alice.pubkey,
@@ -312,6 +312,7 @@ describe("chat rumor decoding", () => {
           _tag: "ChatMessageReceived",
           from: bob.pubkey,
           body: expect.objectContaining({ text: "incoming" }),
+          clientId,
         }),
       ),
     );
