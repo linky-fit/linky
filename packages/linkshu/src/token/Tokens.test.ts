@@ -1414,6 +1414,31 @@ describe("Tokens.ingestLegacyRows", () => {
     });
   });
 
+  it("completes a partially repaired reserved row under the melt already holding part of it", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const melt = yield* seedOperation(
+          quoteOperation({ inputsTotal: Amount.make(6) }),
+        );
+        yield* seedProofs(mint, [proof(4, "sec-a1")], "held", melt.id);
+        yield* seedProofs(mint, [proof(2, "sec-a2")], "held");
+        yield* (yield* Tokens).ingestLegacyRows([
+          legacyRow("linked", tokenA, "reserved"),
+        ]);
+        return { melt, ...(yield* inventory) };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { melt, proofs } = exit.value;
+    expect(proofs.find((p) => p.secret === "sec-a2")).toMatchObject({
+      state: "held",
+      operationId: melt.id,
+    });
+  });
+
   it("skips proofs the inventory already holds and is idempotent", async () => {
     const { run, events } = makeHarness();
 
