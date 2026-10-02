@@ -12,14 +12,15 @@ const TRANSPARENT_PNG = Buffer.from(
 /**
  * Pin the BTC/fiat rate by routing the request rather than seeding the
  * `linky.fiat_rates.v1` cache, which would suppress the fetch and leave
- * parseFetchedRates — the only CZK->sat conversion in production —
- * unexercised. It returns null unless all four currencies are present and > 0.
+ * fetchFiatRates — the only CZK->sat conversion in production —
+ * unexercised. It returns null unless every currency is present and > 0.
  */
 export const stubFiatRates = async (page: Page): Promise<void> => {
   await page.route("**/api.yadio.io/**", (route) =>
     route.fulfill({
       body: JSON.stringify({
         BTC: {
+          BRL: CZK_PER_BTC,
           CHF: CZK_PER_BTC,
           CZK: CZK_PER_BTC,
           EUR: CZK_PER_BTC,

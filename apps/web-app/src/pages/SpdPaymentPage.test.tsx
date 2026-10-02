@@ -23,6 +23,7 @@ vi.mock("../app/context/AppShellContexts", () => ({
 
 vi.mock("../app/hooks/useFiatRates", () => ({
   useFiatRates: () => ({
+    brlPerBtc: 1_000_000,
     chfPerBtc: 1_000_000,
     czkPerBtc: 1_000_000,
     eurPerBtc: 1_000_000,
