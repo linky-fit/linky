@@ -1,7 +1,9 @@
+import { appOwnerFromMnemonic } from "@linky-fit/linksync";
 import { test, expect, type Page } from "@playwright/test";
 import { setBaseStorage, expectSingleLoad } from "./helpers/appState";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { addContactByNpub } from "./helpers/contacts";
+import { EVOLU_RELAY_URL } from "./helpers/stack";
 import { stubFiatRates } from "./helpers/network";
 import { watchAppErrors, expectNoBootErrorPanel } from "./helpers/diagnostics";
 
@@ -72,4 +74,67 @@ test("a second device receives a new contact and updates Evolu row counts withou
   } finally {
     for (const device of devices) await device.context.close();
   }
+});
+
+test("the Evolu wait status reserves space below the mobile navigation", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setBaseStorage(page);
+  const identity = await createSeedIdentity();
+  await setSeedLoginStorage(page, identity);
+  await stubFiatRates(page);
+  await page.addInitScript(
+    ({ relay, ownerId }) => {
+      localStorage.setItem(
+        `linky.shards.awaitingFirstHydration.${ownerId}`,
+        "1",
+      );
+      localStorage.setItem(
+        "linky.evoluServers.disabled.v1",
+        JSON.stringify([relay]),
+      );
+    },
+    {
+      relay: EVOLU_RELAY_URL,
+      ownerId: appOwnerFromMnemonic(identity.evoluMnemonic)!.id,
+    },
+  );
+  await page.goto("/#contacts");
+  const status = page.getByRole("status").filter({
+    hasText: "Waiting for the Evolu relay",
+  });
+  await expect(status).toBeVisible();
+  await testInfo.attach("Evolu wait status on mobile", {
+    body: await page.screenshot({
+      path: testInfo.outputPath("evolu-wait-mobile.png"),
+    }),
+    contentType: "image/png",
+  });
+  const header = await page.locator(".mobile-app-topbar .topbar").boundingBox();
+  const banner = await status.boundingBox();
+  const content = await page.locator(".main-swipe").boundingBox();
+  await testInfo.attach("Evolu wait layout bounds", {
+    body: JSON.stringify({ header, banner, content }),
+    contentType: "application/json",
+  });
+  expect(header).not.toBeNull();
+  expect(banner).not.toBeNull();
+  expect(content).not.toBeNull();
+  expect(banner!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
+  expect(content!.y).toBeGreaterThanOrEqual(banner!.y + banner!.height);
+  await expect(status.locator(".btn-spinner")).toHaveCSS(
+    "animation-name",
+    "btn-spinner-spin",
+  );
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.locator(".desktop-app-layout")).toBeVisible();
+  const desktopBanner = await status.boundingBox();
+  const desktopContent = await page
+    .locator(".desktop-app-layout")
+    .boundingBox();
+  expect(desktopContent!.y).toBeGreaterThanOrEqual(
+    desktopBanner!.y + desktopBanner!.height,
+  );
+  expect(desktopContent!.y + desktopContent!.height).toBeLessThanOrEqual(800);
 });

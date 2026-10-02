@@ -75,10 +75,26 @@
 }
 
 .evolu-relay-wait-banner {
-  top: var(--topbar-height);
-  z-index: 9;
-  padding: 6px 14px;
-  pointer-events: none;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0 calc(-1 * var(--page-gutter)) 8px;
+  padding: 8px var(--page-gutter);
+  background: rgba(148, 163, 184, 0.06);
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.evolu-relay-wait-banner .btn-spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+}
+
+.page.chat-page > .evolu-relay-wait-banner {
+  margin: 8px 0 0;
 }
 
 .install-pwa-overlay {
@@ -5500,12 +5516,25 @@ button.bank-payment-amount-button:hover {
     overflow: hidden;
   }
 
+  .page.authenticated-page:has(> .evolu-relay-wait-banner) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page.authenticated-page > .evolu-relay-wait-banner {
+    width: min(1240px, 100%);
+    margin: 0 auto 12px;
+    border-radius: 8px;
+  }
+
   .mobile-app-topbar {
     display: none;
   }
 
   .desktop-app-layout {
     display: grid;
+    flex: 1 1 auto;
+    min-height: 0;
     grid-template-columns: 104px minmax(360px, 0.88fr) minmax(420px, 1.12fr);
     gap: 16px;
     width: min(1240px, 100%);

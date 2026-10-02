@@ -5,6 +5,7 @@ import {
 } from "../app/context/AppShellContexts";
 import { useDesktopSplitView } from "../hooks/useDesktopSplitView";
 import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
+import { EvoluRelayWaitBanner } from "./EvoluRelayWaitBanner";
 import { ContactsGuideOverlay } from "./ContactsGuideOverlay";
 import { LightningInvoiceConfirmModal } from "./LightningInvoiceConfirmModal";
 import { CashuPaymentRequestConfirmModal } from "./CashuPaymentRequestConfirmModal";
@@ -36,6 +37,7 @@ export function AuthenticatedLayout({
   return (
     <>
       <Topbar className="mobile-app-topbar" />
+      <EvoluRelayWaitBanner t={state.t} />
 
       {state.contactsGuide && state.contactsGuideActiveStep?.step ? (
         <ContactsGuideOverlay

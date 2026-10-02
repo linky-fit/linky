@@ -19,12 +19,9 @@ export const EvoluRelayWaitBanner: React.FC<EvoluRelayWaitBannerProps> = ({
   if (!due || hydrated) return null;
 
   return (
-    <div
-      className="pwa-update-banner evolu-relay-wait-banner"
-      role="status"
-      aria-live="polite"
-    >
-      <span className="pwa-update-banner-text">{t("evoluRelayWaiting")}</span>
+    <div className="evolu-relay-wait-banner" role="status" aria-live="polite">
+      <span className="btn-spinner" aria-hidden="true" />
+      <span>{t("evoluRelayWaiting")}</span>
     </div>
   );
 };
