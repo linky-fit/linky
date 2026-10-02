@@ -529,6 +529,18 @@ const getBootErrorText = () => {
       title: "Startfehler",
     };
   }
+  if (language.startsWith("pt")) {
+    return {
+      details: "Detalhes",
+      download: "Baixar diagnóstico",
+      reload: "Limpar cache e recarregar",
+      stage: "O aplicativo parou na etapa",
+      temporary: "Continuar em uma sessão temporária",
+      temporaryDescription:
+        "O armazenamento local não responde. Uma sessão temporária carrega os dados sincronizados, mas as novas alterações não ficam salvas neste aparelho.",
+      title: "Erro ao iniciar",
+    };
+  }
   return {
     details: "Details",
     download: "Download diagnostics",

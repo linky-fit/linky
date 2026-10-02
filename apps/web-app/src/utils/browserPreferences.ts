@@ -23,6 +23,7 @@ export const getDefaultLang = (): Lang => {
   const language = getPrimaryBrowserLanguage();
   if (language.startsWith("cs")) return "cs";
   if (language.startsWith("de")) return "de";
+  if (language.startsWith("pt")) return "pt";
   return "en";
 };
 
@@ -31,6 +32,7 @@ export const getDefaultDisplayCurrency = (): DisplayCurrency => {
 
   if (language.startsWith("cs")) return "czk";
   if (language.startsWith("en")) return "usd";
+  if (language.startsWith("pt-br")) return "brl";
   return "sat";
 };
 

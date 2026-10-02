@@ -17,6 +17,23 @@ const fiatRates = {
 };
 
 describe("formatDisplayAmountParts", () => {
+  it("formats BRL with the Brazilian unit label in Portuguese", () => {
+    expect(
+      formatDisplayAmountParts(100_000, {
+        displayCurrency: "brl",
+        fiatRates,
+        lang: "pt",
+      }),
+    ).toMatchObject({ amountText: "300", approxPrefix: "~", unitLabel: "R$" });
+    expect(
+      formatDisplayAmountParts(100_000, {
+        displayCurrency: "brl",
+        fiatRates,
+        lang: "en",
+      }).unitLabel,
+    ).toBe("BRL");
+  });
+
   it("does not mark a real fiat zero as approximate", () => {
     expect(
       formatDisplayAmountParts(0, {

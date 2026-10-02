@@ -77,6 +77,7 @@ export const normalizeLocale = (lang?: string): string => {
   if (raw) {
     if (raw === "cs") return "cs-CZ";
     if (raw === "de") return "de-DE";
+    if (raw === "pt") return "pt-BR";
     if (raw === "en") return "en-US";
     return raw;
   }
@@ -85,6 +86,7 @@ export const normalizeLocale = (lang?: string): string => {
     if (docLang) {
       if (docLang === "cs") return "cs-CZ";
       if (docLang === "de") return "de-DE";
+      if (docLang === "pt") return "pt-BR";
       return docLang;
     }
   }
@@ -93,6 +95,7 @@ export const normalizeLocale = (lang?: string): string => {
     if (navLang) {
       if (navLang === "cs") return "cs-CZ";
       if (navLang === "de") return "de-DE";
+      if (navLang === "pt") return "pt-BR";
       return navLang;
     }
   }

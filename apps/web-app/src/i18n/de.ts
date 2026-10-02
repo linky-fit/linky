@@ -464,6 +464,7 @@ export const de = {
   czech: "Čeština",
   english: "English",
   german: "Deutsch",
+  portuguese: "Português (Brasil)",
 
   list: "Liste",
   contactsTitle: "Kontakte",

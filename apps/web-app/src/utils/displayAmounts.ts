@@ -2,7 +2,7 @@ import type { FiatRates } from "@linky-fit/linkshu";
 export type { FiatRates } from "@linky-fit/linkshu";
 import { formatInteger, normalizeLocale } from "./formatting";
 
-type FiatDisplayCurrency = "czk" | "eur" | "chf" | "usd";
+type FiatDisplayCurrency = "czk" | "eur" | "chf" | "usd" | "brl";
 
 export type DisplayCurrency = "sat" | "btc" | FiatDisplayCurrency | "hidden";
 
@@ -13,6 +13,7 @@ export const DISPLAY_CURRENCIES: ReadonlyArray<DisplayCurrency> = [
   "eur",
   "chf",
   "usd",
+  "brl",
   "hidden",
 ];
 
@@ -36,7 +37,8 @@ export const isFiatDisplayCurrency = (
   displayCurrency === "czk" ||
   displayCurrency === "eur" ||
   displayCurrency === "chf" ||
-  displayCurrency === "usd";
+  displayCurrency === "usd" ||
+  displayCurrency === "brl";
 
 const getRateForCurrency = (
   displayCurrency: FiatDisplayCurrency,
@@ -51,6 +53,8 @@ const getRateForCurrency = (
       return fiatRates.chfPerBtc;
     case "usd":
       return fiatRates.usdPerBtc;
+    case "brl":
+      return fiatRates.brlPerBtc;
   }
 };
 
@@ -69,6 +73,7 @@ export const parseDisplayCurrency = (
   if (normalized === "eur") return "eur";
   if (normalized === "chf") return "chf";
   if (normalized === "usd") return "usd";
+  if (normalized === "brl") return "brl";
   if (normalized === "hidden" || normalized === "masked") return "hidden";
   return null;
 };
@@ -134,6 +139,8 @@ export const getDisplayUnitLabel = (
       return "CHF";
     case "usd":
       return "USD";
+    case "brl":
+      return normalizeLocale(lang).startsWith("pt") ? "R$" : "BRL";
     case "hidden":
       return "*****";
     case "sat":

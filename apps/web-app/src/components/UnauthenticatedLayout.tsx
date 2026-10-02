@@ -542,6 +542,7 @@ export const UnauthenticatedLayout: React.FC<UnauthenticatedLayoutProps> = ({
             { value: "cs", label: t("czech") },
             { value: "de", label: t("german") },
             { value: "en", label: t("english") },
+            { value: "pt", label: t("portuguese") },
           ]}
           onValueChange={setLang}
         />
