@@ -137,7 +137,8 @@ export interface ShardStore<
    * Copies rows from outside the scope's shards (a legacy lane, an older
    * app version's owner) into the active shard. Idempotent: a row already
    * present with the same or a newer `updatedAt` is skipped, and a row the
-   * shards have tombstoned is not resurrected.
+   * shards have tombstoned is not resurrected. Rows wait for `whenHydrated`,
+   * so they are compared with the account's copies, not a partial sync.
    */
   readonly ingest: <
     Scope extends keyof R & string,
@@ -457,6 +458,8 @@ export const createShardStore = <
     incoming: ReadonlyArray<Row<S[T]>>,
   ): Effect.Effect<{ readonly ingested: number }, ShardDbError> =>
     Effect.gen(function* () {
+      if (incoming.length === 0) return { ingested: 0 };
+      yield* whenHydrated;
       const { copies } = yield* shardCopies(scope, table);
       const known = new Map(copies.map((row) => [row.id, row]));
       const active = yield* activeOwner(scope);

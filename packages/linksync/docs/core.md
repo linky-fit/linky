@@ -36,6 +36,7 @@ The store is hydrated once the app owner has finished a sync round with a relay 
 - It latches: a later rotation or a lost connection does not undo it.
 - It needs a relay to answer. Offline, or while no relay answers, it stays false and `whenHydrated` waits; nothing times out. A relay whose answers to an owner so far are all protocol errors has not answered it; an error after an error-free answer ends the owner's round. A brand-new account hydrates as soon as the relay answers that it holds nothing. An owner the port syncs with no relay at all counts as synced once used.
 - On hydration the store retains the windows of the forgettable scopes ([retention](#device-local-retention)).
+- `ingest` waits for it, so the rows are compared with the account's copies; an ingest of no rows returns at once.
 
 ## Rotation
 

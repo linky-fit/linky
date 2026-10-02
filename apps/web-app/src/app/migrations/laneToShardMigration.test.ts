@@ -199,8 +199,8 @@ const emptySnapshot: LegacyLaneSnapshot = {
   ownerMeta: [],
 };
 
-const setup = () => {
-  const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns);
+const setup = (dbOptions: { readonly holdSync?: boolean } = {}) => {
+  const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns, dbOptions);
   const store = createLinkyStore(db, appOwner);
   const ingestLegacyTokens = vi.fn<
     (rows: ReadonlyArray<LegacyTokenRow>) => Promise<void>
@@ -425,6 +425,48 @@ describe("runLaneToShardMigration", () => {
     expect(
       second.counts.find((count) => count.table === "contact")?.ingested,
     ).toBe(0);
+  });
+
+  it("waits for hydration before comparing lane rows with the account's shard copies", async () => {
+    const { db, run, store } = setup({ holdSync: true });
+    const written: Array<Mutation> = [];
+    const mutate = db.mutate;
+    vi.spyOn(db, "mutate").mockImplementation((mutations) => {
+      written.push(...mutations);
+      return mutate(mutations);
+    });
+    const peer = contact(laneA, { name: text("Alice") });
+    const migration = run({ contacts: [peer] });
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(written).toEqual([]);
+
+    // The account's copy, renamed on another device, syncs in before hydration completes.
+    await Effect.runPromise(
+      db.mutate([
+        {
+          kind: "upsert",
+          table: "contact",
+          ownerId: store.shardOwner("contacts", 0).id,
+          row: { id: peer.id, name: text("Alice Edited") },
+        },
+      ]),
+    );
+    for (const owner of Effect.runSync(store.syncOwners()))
+      db.finishSync(owner.id);
+    const report = await migration;
+
+    expect(
+      report.counts.find((count) => count.table === "contact")?.ingested,
+    ).toBe(0);
+    expect(
+      Effect.runSync(store.rows("contacts", "contact")).map((row) => row.name),
+    ).toEqual(["Alice Edited"]);
+  });
+
+  it("does not wait for hydration when the device holds no legacy rows", async () => {
+    const { run } = setup({ holdSync: true });
+    const report = await run({});
+    expect(report.counts.every((count) => count.ingested === 0)).toBe(true);
   });
 
   it("leaves the account's rotated pointers alone when a fresh device runs before sync", async () => {

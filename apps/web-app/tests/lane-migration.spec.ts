@@ -724,3 +724,79 @@ test("a restored device leaves the pointers of an account that rotated past shar
     for (const device of devices) await device.context.close();
   }
 });
+
+test("lane rows wait for the Evolu relay, and the migrating screen gives way once the browser is offline", async ({
+  browser,
+}, testInfo) => {
+  const device = await openDevice(
+    browser,
+    testInfo.project.use.baseURL,
+    "offline-upgrade",
+    setRandomIdentityStorage,
+  );
+  const { context, page } = device;
+  const doneFlag = () =>
+    page.evaluate((flag) => localStorage.getItem(flag), DONE_FLAG);
+  const shardContacts = async () =>
+    byName(await hooks.shardRows(page, "contacts", "contact"));
+  const servers = {
+    user: "linky.evoluServers.user.v1",
+    disabled: "linky.evoluServers.disabled.v1",
+    local: "ws://localhost:4001",
+    // Nothing listens here, so Evolu keeps retrying a relay that never answers.
+    silent: "ws://localhost:4999",
+  };
+  const removeDoneFlagAndReload = async () => {
+    await page.evaluate((flag) => localStorage.removeItem(flag), DONE_FLAG);
+    await page.reload();
+  };
+  try {
+    await page.evaluate((servers) => {
+      localStorage.setItem(servers.user, JSON.stringify([servers.silent]));
+      localStorage.setItem(servers.disabled, JSON.stringify([servers.local]));
+    }, servers);
+    await removeDoneFlagAndReload();
+    await expect(page.getByLabel("Available balance")).toBeVisible();
+    await expect.poll(doneFlag).toBe("1");
+
+    await test.step("a lane row written while the relay is silent is not ingested yet", async () => {
+      await hooks.upsert(
+        page,
+        "contact",
+        { id: await hooks.createId(page), name: "Held contact" },
+        await hooks.appOwnerId(page),
+      );
+      await page.waitForTimeout(3_000);
+      expect(await shardContacts()).toEqual([]);
+    });
+
+    await test.step("a first run with lane rows keeps the screen up until the browser is offline", async () => {
+      await removeDoneFlagAndReload();
+      const migrating = page.getByRole("status").filter({
+        hasText: "Migrating data",
+      });
+      await expect(migrating).toBeVisible();
+      await page.waitForTimeout(3_000);
+      await expect(migrating).toBeVisible();
+
+      await context.setOffline(true);
+      await expect(page.getByLabel("Available balance")).toBeVisible();
+      expect(await doneFlag()).toBeNull();
+      expect(await shardContacts()).toEqual([]);
+    });
+
+    await test.step("back online with a relay that answers, the lane row is ingested", async () => {
+      await context.setOffline(false);
+      await page.evaluate((servers) => {
+        localStorage.removeItem(servers.user);
+        localStorage.removeItem(servers.disabled);
+      }, servers);
+      await page.reload();
+      await expect.poll(doneFlag).toBe("1");
+      await expect.poll(shardContacts).toEqual(["Held contact"]);
+    });
+    device.errors.assertClean();
+  } finally {
+    await context.close();
+  }
+});

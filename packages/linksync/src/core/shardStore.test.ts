@@ -597,6 +597,41 @@ describe("shard store", () => {
       expect(run(store.rows("notes", "note"))[0]?.title).toBe("later");
     });
 
+    it("waits for hydration and compares with the copies that synced meanwhile", async () => {
+      const { db, store } = toyStore(testAppOwner(), { holdSync: true });
+      seedLegacy(db);
+      const ingested = Effect.runPromise(
+        store.ingest(
+          "notes",
+          "note",
+          run(store.foreignRows("note", legacy.id)),
+        ),
+      );
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(run(store.rows("notes", "note"))).toEqual([]);
+
+      await Effect.runPromise(
+        db.mutate([
+          {
+            kind: "upsert",
+            table: "note",
+            ownerId: store.shardOwner("notes", 0).id,
+            row: note("a", "edited on another device"),
+          },
+        ]),
+      );
+      for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
+      expect(await ingested).toEqual({ ingested: 0 });
+      expect(run(store.rows("notes", "note"))[0]?.title).toBe(
+        "edited on another device",
+      );
+    });
+
+    it("does not wait when there is nothing to ingest", () => {
+      const { store } = toyStore(testAppOwner(), { holdSync: true });
+      expect(run(store.ingest("notes", "note", []))).toEqual({ ingested: 0 });
+    });
+
     it("does not resurrect a row the shards have deleted", () => {
       const { db, store } = toyStore();
       seedLegacy(db);

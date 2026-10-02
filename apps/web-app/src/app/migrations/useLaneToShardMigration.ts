@@ -41,6 +41,7 @@ import {
 import { readStoredSlip39Seed } from "../../platform/identitySecrets";
 import { localStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
 import { resolveLinkshuSeed } from "../../platform/linkshu/resolveLinkshuSeed";
+import { useOnline } from "../../hooks/useOnline";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { legacyProofsToMarkSpent } from "./legacySpentProofs";
 import {
@@ -316,7 +317,8 @@ const bootLaneMigration = async (): Promise<void> => {
     createOwnerMetaAllQuery(),
   ])
     evolu.subscribeQuery(query)(() => void reingestLateRows());
-  await reingestLateRows();
+  // Late rows wait for hydration; the migrating screen waits only for the first run.
+  void reingestLateRows();
 
   const shardOwnerIds = (await Effect.runPromise(store.syncOwners())).map(
     (owner) => owner.id,
@@ -357,8 +359,13 @@ let bootRun: Promise<void> | null = null;
  * Runs the lane-to-shard migration before the authenticated shell mounts and
  * says whether the "migrating data" screen should be up. The first run on a
  * device shows the screen; later boots re-ingest in the background for the
- * grace period. A failure logs, leaves the done flag unset so the next boot
- * retries, and lets the shell mount: the lanes are still the app's data.
+ * grace period. Ingest waits for hydration, so a device holding legacy rows
+ * keeps the screen up until an Evolu relay has answered, and drops it for good
+ * once the browser is offline: the shell shows the shards until the ingest
+ * completes. A device holding none (a brand-new account, a restore) passes at
+ * once and ingests the lanes that sync in later in the background. A failure logs,
+ * leaves the done flag unset so the next boot retries, and lets the shell
+ * mount: the lanes are still the app's data.
  */
 export const useLaneToShardMigration = (): boolean => {
   // Suspends until Evolu has opened, the way the shell's own queries do, so a
@@ -368,6 +375,10 @@ export const useLaneToShardMigration = (): boolean => {
   const [migrating, setMigrating] = React.useState(
     () => !isLaneMigrationDoneLocally(),
   );
+  const online = useOnline();
+  React.useEffect(() => {
+    if (!online) setMigrating(false);
+  }, [online]);
 
   React.useEffect(() => {
     let cancelled = false;
