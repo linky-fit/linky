@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectUnreadNewestIncomingByContactId,
+  contactsToUnarchive,
   isConversationUnread,
   resolveChatLastSeenAdvance,
   summarizeConversationReadTimes,
@@ -127,6 +128,7 @@ describe("collectUnreadNewestIncomingByContactId", () => {
         { ...message("out", 25), contactId: "c" },
       ],
       new Map([["b", 40]]),
+      null,
     );
 
     expect(unread).toEqual(new Map([["a", 20]]));
@@ -139,8 +141,71 @@ describe("collectUnreadNewestIncomingByContactId", () => {
         { ...message("out", 30), contactId: "a" },
       ],
       new Map([["a", 10]]),
+      null,
     );
 
     expect(unread).toEqual(new Map([["a", 20]]));
+  });
+
+  it("counts messages up to the oldest visible shard as read", () => {
+    const unread = collectUnreadNewestIncomingByContactId(
+      [
+        { ...message("in", 50), contactId: "forgotten" },
+        { ...message("in", 50), contactId: "revived" },
+        { ...message("in", 150), contactId: "revived" },
+        { ...message("in", 150), contactId: "brandNew" },
+      ],
+      new Map(),
+      100,
+    );
+
+    expect(unread).toEqual(
+      new Map([
+        ["revived", 150],
+        ["brandNew", 150],
+      ]),
+    );
+  });
+});
+
+describe("contactsToUnarchive", () => {
+  const archived = (id: string, archivedAtSec: number | null) => ({
+    id,
+    archivedAtSec,
+  });
+
+  it("restores an archived contact only for unread messages newer than the archive", () => {
+    const unread = collectUnreadNewestIncomingByContactId(
+      [
+        { ...message("in", 80), contactId: "quiet" },
+        { ...message("in", 80), contactId: "writes" },
+        { ...message("in", 200), contactId: "writes" },
+        { ...message("in", 200), contactId: "active" },
+      ],
+      new Map(),
+      100,
+    );
+
+    expect(
+      contactsToUnarchive(
+        [
+          archived("quiet", 90),
+          archived("writes", 150),
+          archived("active", null),
+        ],
+        unread,
+      ).map((contact) => contact.id),
+    ).toEqual(["writes"]);
+  });
+
+  it("keeps a contact archived when its chat has no visible cursor and only older messages", () => {
+    const unread = collectUnreadNewestIncomingByContactId(
+      [{ ...message("in", 120), contactId: "old" }],
+      new Map(),
+      null,
+    );
+
+    expect(unread.get("old")).toBe(120);
+    expect(contactsToUnarchive([archived("old", 130)], unread)).toEqual([]);
   });
 });

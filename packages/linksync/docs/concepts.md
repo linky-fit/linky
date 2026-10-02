@@ -38,7 +38,7 @@ A forgettable scope keeps its newest N shards, the active one included. Messages
 
 A fresh device reads and subscribes only the newest N shards. An existing device retains its older locally held shards across rotations and reloads until an explicit forget, remembered through the device-local `ShardRetention` port ([core](./core.md#device-local-retention)). `ShardStore.forget(scope?)` narrows one scope, or every forgettable scope, to its newest window and notifies readers. Evolu 7 only unsubscribes and hides the older rows (`deleted: false`); local bytes and relay history remain until Evolu can delete an owner. The in-memory port deletes.
 
-A cursor update copies the conversation into the active messages shard; `markSeen` only writes for a newer message, so an idle chat's read cursors may be forgotten with its old messages. The archive state lives on the contact, which is never forgotten, so every device sees which chats are archived.
+A cursor update copies the conversation into the active messages shard; `markSeen` only writes for a newer message, so an idle chat's read cursors may be forgotten with its old messages. Every cursor written since the oldest visible shard began is visible, so a consumer can treat messages up to `visibleSinceSec` ([repositories](./repositories.md#conversations)) as read. The archive state lives on the contact, which is never forgotten, so every device sees which chats are archived.
 
 ## Ids
 

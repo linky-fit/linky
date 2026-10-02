@@ -64,14 +64,19 @@ export const resolveChatLastSeenAdvance = (
   return target > toPositiveSec(lastSeenAtSec) ? target : null;
 };
 
+// Messages up to `visibleSinceSec` count as read: their chat's read cursor may
+// sit in a forgotten shard, while reading anything newer would have written
+// the cursor into a shard this device sees.
 export const collectUnreadNewestIncomingByContactId = (
   messages: readonly (ConversationReadMessage & { contactId: string })[],
   lastSeenAtSecByContactId: ReadonlyMap<string, number>,
+  visibleSinceSec: number | null,
 ): Map<string, number> => {
   const timesByContactId = new Map<string, ConversationReadTimes>();
   for (const message of messages) {
     const contactId = message.contactId.trim();
     if (!contactId) continue;
+    if (message.createdAtSec <= (visibleSinceSec ?? 0)) continue;
     let times = timesByContactId.get(contactId);
     if (!times) {
       times = emptyTimes();
@@ -89,3 +94,18 @@ export const collectUnreadNewestIncomingByContactId = (
   }
   return unreadByContactId;
 };
+
+/** Archived contacts with an unread incoming message newer than the archive. */
+export const contactsToUnarchive = <
+  C extends { id: string; archivedAtSec: number | null },
+>(
+  contacts: readonly C[],
+  unreadByContactId: ReadonlyMap<string, number>,
+): C[] =>
+  contacts.filter((contact) => {
+    const archivedAtSec = toPositiveSec(contact.archivedAtSec);
+    return (
+      archivedAtSec > 0 &&
+      (unreadByContactId.get(contact.id.trim()) ?? 0) > archivedAtSec
+    );
+  });

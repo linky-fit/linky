@@ -1,6 +1,6 @@
-import type { PositiveInt } from "@evolu/common";
-import { NonEmptyString100 } from "@evolu/common";
+import { NonEmptyString100, PositiveInt } from "@evolu/common";
 import { Effect } from "effect";
+import type { OwnerId } from "@evolu/common";
 import type { RowNotFound, ShardDbError } from "../core";
 import {
   directConversationIdFor,
@@ -39,6 +39,12 @@ export interface ConversationsRepository extends TableRepository<
   readonly reactionsIn: (
     conversationId: ConversationId,
   ) => Effect.Effect<ReadonlyArray<ReactionRow>>;
+  /**
+   * When the oldest messages shard this device reads began (its earliest
+   * row), or null when the device reads the scope from its first shard. Read
+   * cursors written before it may sit in a forgotten shard.
+   */
+  readonly visibleSinceSec: Effect.Effect<number | null>;
   /** Tombstoned reaction copies in the visible shards, so a removed reaction's wrap is still known. */
   readonly removedReactions: Effect.Effect<ReadonlyArray<ReactionRow>>;
   /** Moves the read cursor forward; never backwards. */
@@ -65,6 +71,42 @@ export const makeConversationsRepository = (
   const forContact = (contactId: ContactId) =>
     conversations.byId(directConversationIdFor(contactId));
 
+  const earliestRowSec = (ownerId: OwnerId) =>
+    Effect.map(
+      Effect.all([
+        store.copies("messages", "conversation"),
+        store.copies("messages", "message"),
+        store.copies("messages", "reaction"),
+      ]),
+      (copies) => {
+        const startedAtMs = copies
+          .flat()
+          .filter((row) => row.ownerId === ownerId)
+          .reduce((earliest, row) => {
+            const atMs = Date.parse(row.createdAt);
+            return atMs < earliest ? atMs : earliest;
+          }, Infinity);
+        return Number.isFinite(startedAtMs)
+          ? Math.floor(startedAtMs / 1000)
+          : null;
+      },
+    );
+
+  // Once hydrated, the oldest visible shard holds every row it will get before this device writes.
+  const startedSecByOwner = new Map<OwnerId, number>();
+  const visibleSinceSec: Effect.Effect<number | null> = Effect.gen(
+    function* () {
+      const [oldest] = yield* store.visibleShards("messages");
+      if (oldest === undefined || oldest.index === 0) return null;
+      const known = startedSecByOwner.get(oldest.owner.id);
+      if (known !== undefined) return known;
+      const startedSec = yield* earliestRowSec(oldest.owner.id);
+      if (startedSec !== null && (yield* store.hydrated))
+        startedSecByOwner.set(oldest.owner.id, startedSec);
+      return startedSec;
+    },
+  );
+
   return {
     ...conversations,
     messages,
@@ -74,7 +116,17 @@ export const makeConversationsRepository = (
       Effect.flatMap(forContact(contactId), (existing) => {
         if (existing !== null) return Effect.succeed(existing);
         const id = directConversationIdFor(contactId);
-        return conversations.insert({ id, kind: DIRECT, contactId }).pipe(
+        return visibleSinceSec.pipe(
+          Effect.flatMap((sinceSec) =>
+            conversations.insert({
+              id,
+              kind: DIRECT,
+              contactId,
+              ...(sinceSec === null
+                ? {}
+                : { lastSeenAtSec: PositiveInt.orThrow(sinceSec) }),
+            }),
+          ),
           Effect.flatMap(() => conversations.byId(id)),
           Effect.flatMap((created) =>
             created === null
@@ -91,6 +143,7 @@ export const makeConversationsRepository = (
       Effect.map(reactions.all, (rows) =>
         rows.filter((row) => row.conversationId === conversationId),
       ),
+    visibleSinceSec,
     removedReactions: Effect.map(store.copies("messages", "reaction"), (rows) =>
       rows.filter((row) => row.isDeleted === 1),
     ),

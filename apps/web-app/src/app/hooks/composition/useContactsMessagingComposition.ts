@@ -1,5 +1,5 @@
 import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
-import { useAccountHydrated } from "../useLinksync";
+import { useAccountHydrated, useMessagesVisibleSinceSec } from "../useLinksync";
 import type { ProfileMetadata } from "@linky-fit/linkstr";
 import {
   ContactId,
@@ -62,7 +62,10 @@ import { setStoredPushContactNames } from "../../../utils/pushContactNamesStorag
 import { getBankPaymentOfferCurrency } from "@linky-fit/proxy-payment";
 import { mergeBankPaymentOffersIntoLastMessageByContactId } from "../../lib/bankPaymentOfferRows";
 import { useBankPaymentOffers } from "../useBankPaymentOffers";
-import { collectUnreadNewestIncomingByContactId } from "../../lib/chatUnread";
+import {
+  collectUnreadNewestIncomingByContactId,
+  contactsToUnarchive,
+} from "../../lib/chatUnread";
 import { buildLinkyPaymentRequestDeclineMessage } from "../../lib/paymentRequestMessage";
 import { getChatAttachmentRejection } from "../../lib/privateImageMessage";
 import {
@@ -1024,15 +1027,18 @@ export const useContactsMessagingComposition = ({
     return byContactId;
   }, [contacts]);
 
+  const messagesVisibleSinceSec = useMessagesVisibleSinceSec();
   const unreadByContactId = React.useMemo(
     () =>
       collectUnreadNewestIncomingByContactId(
         [...nostrMessagesLocal, ...bankPaymentOfferMessages],
         chatLastSeenAtSecByContactId,
+        messagesVisibleSinceSec,
       ),
     [
       bankPaymentOfferMessages,
       chatLastSeenAtSecByContactId,
+      messagesVisibleSinceSec,
       nostrMessagesLocal,
     ],
   );
@@ -1318,24 +1324,20 @@ export const useContactsMessagingComposition = ({
     { contacts, contactsRepository, pushToast, t },
   );
 
-  // An incoming message newer than the archive brings the contact back. The
-  // in-flight set keeps the effect from repeating the write before the
+  // The in-flight set keeps the effect from repeating the write before the
   // restored row is read back.
   const unarchivingRef = React.useRef(new Set<string>());
   React.useEffect(() => {
-    for (const contact of contacts) {
-      const archivedAtSec = contact.archivedAtSec ?? 0;
-      if (!Number.isFinite(archivedAtSec) || archivedAtSec <= 0) continue;
+    if (!accountHydrated) return;
+    for (const contact of contactsToUnarchive(contacts, unreadByContactId)) {
       const contactId = contact.id.trim();
-      if (!contactId || unarchivingRef.current.has(contactId)) continue;
-      const newestIncomingAtSec = unreadByContactId.get(contactId) ?? 0;
-      if (newestIncomingAtSec <= archivedAtSec) continue;
+      if (unarchivingRef.current.has(contactId)) continue;
       unarchivingRef.current.add(contactId);
       void unarchiveContact(contact.id).finally(() => {
         unarchivingRef.current.delete(contactId);
       });
     }
-  }, [contacts, unarchiveContact, unreadByContactId]);
+  }, [accountHydrated, contacts, unarchiveContact, unreadByContactId]);
 
   const blockArchivedContact = React.useCallback(async () => {
     if (route.kind !== "contactEdit") return;
