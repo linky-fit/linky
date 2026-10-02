@@ -1,5 +1,14 @@
 import { recurringOrderState } from "@linky-fit/recurring-payment";
-import { Pause, Play, Send, Trash2 } from "lucide-react";
+import {
+  Amount,
+  Button,
+  EmptyState,
+  ListRow,
+  Pill,
+  Row,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
@@ -28,7 +37,7 @@ interface RecurringPaymentPageProps {
 
 export function RecurringPaymentPage({
   id,
-}: RecurringPaymentPageProps): React.ReactElement {
+}: RecurringPaymentPageProps): React.ReactElement | null {
   const {
     cashuIsBusy,
     displayCurrency,
@@ -60,12 +69,8 @@ export function RecurringPaymentPage({
   );
 
   if (order === null) {
-    return (
-      <section className="panel panel-plain">
-        <p className="muted">
-          {orders.length === 0 ? "" : t("recurringNotFound")}
-        </p>
-      </section>
+    return orders.length === 0 ? null : (
+      <EmptyState title={t("recurringNotFound")} />
     );
   }
 
@@ -87,17 +92,6 @@ export function RecurringPaymentPage({
     t,
   );
 
-  const row = (label: string, value: string): React.ReactElement => (
-    <div className="settings-row">
-      <div className="settings-left">
-        <span className="settings-label">{label}</span>
-      </div>
-      <div className="settings-right">
-        <span className="muted settings-value">{value}</span>
-      </div>
-    </div>
-  );
-
   const payNow = async (): Promise<void> => {
     setIsRunning(true);
     try {
@@ -107,118 +101,110 @@ export function RecurringPaymentPage({
     }
   };
 
-  const actionButton = (
-    label: string,
-    icon: React.ReactNode,
-    onClick: () => void,
-    options: { className?: string; disabled?: boolean } = {},
-  ): React.ReactElement => (
-    <button
-      type="button"
-      className={options.className ?? "btn-wide secondary"}
-      disabled={options.disabled ?? false}
-      onClick={onClick}
-    >
-      <span className="btn-label-with-icon">
-        <span className="btn-label-icon" aria-hidden="true">
-          {icon}
-        </span>
-        <span>{label}</span>
-      </span>
-    </button>
-  );
-
   return (
-    <section className="panel panel-plain">
-      <div className="form-grid">
-        <div className="form-col recurring-detail">
-          <div className="contact-header">
-            <RecurringContactAvatar
-              className="contact-avatar is-large"
-              contact={contacts.get(order.contactId)}
-            />
-            <div className="contact-header-text">
-              <h3 className="unspaced recurring-truncate">
-                {recurringRecipientLabel(order, contacts)}
-              </h3>
-              <p className="muted unspaced">
-                {describeRecurringInterval(order.schedule.interval, t)}
-              </p>
-            </div>
-            <span
-              className={`pill transaction-status-pill${state === "active" ? "" : " pill-muted"}`}
-            >
-              {state === "paused"
+    <Stack gap="$lg">
+      <Stack alignItems="center" gap="$sm">
+        <RecurringContactAvatar
+          contact={contacts.get(order.contactId)}
+          size="lg"
+        />
+        <Text variant="title" textAlign="center" numberOfLines={1}>
+          {recurringRecipientLabel(order, contacts)}
+        </Text>
+        <Row gap="$sm" alignItems="center">
+          <Text variant="label" color="$colorMuted">
+            {describeRecurringInterval(order.schedule.interval, t)}
+          </Text>
+          <Pill
+            size="sm"
+            tone={state === "active" ? "accent" : "neutral"}
+            label={
+              state === "paused"
                 ? t("recurringStatusPaused")
-                : t("recurringStatusActive")}
-            </span>
-          </div>
+                : t("recurringStatusActive")
+            }
+          />
+        </Row>
+      </Stack>
 
-          <div className="recurring-detail-amount">
-            <span className="recurring-detail-amount-value">{amountText}</span>
-            {secondaryAmount ? (
-              <span className="muted recurring-detail-amount-secondary">
-                {secondaryAmount}
-              </span>
-            ) : null}
-          </div>
+      <Stack alignItems="center" gap="$xs">
+        <Stack testID="recurring-detail-amount">
+          <Amount value={amountText} size="md" />
+        </Stack>
+        {secondaryAmount ? (
+          <Text
+            variant="caption"
+            color="$colorMuted"
+            testID="recurring-detail-amount-secondary"
+          >
+            {secondaryAmount}
+          </Text>
+        ) : null}
+      </Stack>
 
-          {state === "active"
-            ? row(
-                t("recurringNextRun"),
-                formatDate(order.schedule.nextDueAtSec),
-              )
-            : null}
-          {order.lastRunAtSec !== null
-            ? row(
-                t("recurringLastRun"),
-                `${formatDate(order.lastRunAtSec)}${lastRun ? ` · ${lastRun}` : ""}`,
-              )
-            : null}
-          {row(t("recurringRunsCount"), String(order.schedule.runCount))}
-          {row(t("recurringMintLabel"), formatMintHost(order.mintUrl))}
+      <Stack gap="$none">
+        {state === "active" ? (
+          <ListRow
+            title={t("recurringNextRun")}
+            value={formatDate(order.schedule.nextDueAtSec)}
+          />
+        ) : null}
+        {order.lastRunAtSec !== null ? (
+          <ListRow
+            title={t("recurringLastRun")}
+            value={`${formatDate(order.lastRunAtSec)}${lastRun ? ` · ${lastRun}` : ""}`}
+          />
+        ) : null}
+        <ListRow
+          title={t("recurringRunsCount")}
+          value={String(order.schedule.runCount)}
+        />
+        <ListRow
+          title={t("recurringMintLabel")}
+          value={formatMintHost(order.mintUrl)}
+        />
+      </Stack>
 
-          <div className="actions recurring-actions">
-            {state === "active"
-              ? actionButton(
-                  isRunning ? t("payPaying") : t("recurringRunNow"),
-                  isRunning ? (
-                    <span className="btn-spinner" />
-                  ) : (
-                    <Send size={18} />
-                  ),
-                  () => void payNow(),
-                  { className: "btn-wide", disabled: cashuIsBusy || isRunning },
-                )
-              : null}
-            {actionButton(
-              state === "paused" ? t("recurringResume") : t("recurringPause"),
-              state === "paused" ? <Play size={18} /> : <Pause size={18} />,
-              () => void setRecurringPaymentPaused(order, state !== "paused"),
-            )}
-            {actionButton(
-              deleteArmed ? t("deleteArmedHint") : t("delete"),
-              <Trash2 size={18} />,
-              () => {
-                void requestDeleteRecurringPayment(order).then((deleted) => {
-                  if (deleted) navigateTo({ route: "transactions" });
-                });
-              },
-              {
-                className: deleteArmed
-                  ? "btn-wide danger"
-                  : "btn-wide secondary",
-              },
-            )}
-          </div>
-          {deleteArmed && order.rail === "cashu" ? (
-            <p className="muted recurring-hint">
-              {t("recurringDeletePreparedStillSent")}
-            </p>
-          ) : null}
-          <p className="muted recurring-hint">{t("recurringOnlyWhileOpen")}</p>
-        </div>
-      </div>
-    </section>
+      <Stack gap="$sm">
+        {state === "active" ? (
+          <Button
+            icon="Send"
+            loading={isRunning}
+            disabled={cashuIsBusy || isRunning}
+            onPress={() => void payNow()}
+          >
+            {t("recurringRunNow")}
+          </Button>
+        ) : null}
+        <Button
+          variant="secondary"
+          icon={state === "paused" ? "Play" : "Pause"}
+          onPress={() =>
+            void setRecurringPaymentPaused(order, state !== "paused")
+          }
+        >
+          {state === "paused" ? t("recurringResume") : t("recurringPause")}
+        </Button>
+        <Button
+          variant={deleteArmed ? "danger" : "secondary"}
+          icon="Trash2"
+          onPress={() => {
+            void requestDeleteRecurringPayment(order).then((deleted) => {
+              if (deleted) navigateTo({ route: "transactions" });
+            });
+          }}
+        >
+          {deleteArmed ? t("deleteArmedHint") : t("delete")}
+        </Button>
+      </Stack>
+      {deleteArmed && order.rail === "cashu" ? (
+        <Text variant="caption" color="$colorMuted">
+          {t("recurringDeletePreparedStillSent")}
+        </Text>
+      ) : null}
+      <Text variant="caption" color="$colorMuted">
+        {t("recurringOnlyWhileOpen")}
+      </Text>
+    </Stack>
   );
 }

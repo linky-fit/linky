@@ -9,7 +9,17 @@ import {
   type RecurringIntervalUnit,
   type RecurringPaymentOrder,
 } from "@linky-fit/recurring-payment";
-import { Repeat } from "lucide-react";
+import {
+  Button,
+  EmptyState,
+  ListRow,
+  Notice,
+  Row,
+  SegmentedControl,
+  Stack,
+  Text,
+  TextField,
+} from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
@@ -26,8 +36,7 @@ import {
   epochToDateTimeLocal,
   nextFullHourSec,
 } from "../app/lib/recurringPaymentDisplay";
-import { AmountDisplay } from "../components/AmountDisplay";
-import { Keypad } from "../components/Keypad";
+import { AmountKeypad } from "../components/AmountKeypad";
 import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
@@ -76,11 +85,6 @@ const readPrefillFromHash = (): FormInitial => {
   };
 };
 
-const pill = (active: boolean): string =>
-  active
-    ? "group-filter-btn contact-group-pill is-active"
-    : "group-filter-btn contact-group-pill";
-
 interface RecurringPaymentFormPageProps {
   editId?: RecurringPaymentId;
 }
@@ -88,7 +92,7 @@ interface RecurringPaymentFormPageProps {
 /** New payment, or an existing one when `editId` is set (same fields, saved in place). */
 export function RecurringPaymentFormPage({
   editId,
-}: RecurringPaymentFormPageProps): React.ReactElement {
+}: RecurringPaymentFormPageProps): React.ReactElement | null {
   const { displayCurrency, fiatRates, t } = useAppShellCore();
   const orders = useRecurringPaymentOrders();
   const order = editId
@@ -118,12 +122,8 @@ export function RecurringPaymentFormPage({
   }, [editId, order === null]);
 
   if (initial === null) {
-    return (
-      <section className="panel panel-plain">
-        <p className="muted">
-          {orders.length === 0 ? "" : t("recurringNotFound")}
-        </p>
-      </section>
+    return orders.length === 0 ? null : (
+      <EmptyState title={t("recurringNotFound")} />
     );
   }
   return (
@@ -144,7 +144,7 @@ function RecurringPaymentForm({
   initial,
   order,
 }: RecurringPaymentFormProps): React.ReactElement {
-  const { cashuIsBusy, displayCurrency, displayUnit, fiatRates, lang, t } =
+  const { cashuIsBusy, displayCurrency, fiatRates, lang, t } =
     useAppShellCore();
   const { createRecurringPayment, defaultMintUrl, updateRecurringPayment } =
     useRecurringPaymentsContext();
@@ -281,112 +281,74 @@ function RecurringPaymentForm({
   };
 
   return (
-    <section className="panel panel-plain recurring-form">
-      <div className="contact-header recurring-recipient-header">
-        <RecurringContactAvatar
-          className="contact-avatar is-large"
-          contact={contact}
-        />
-        <div className="contact-header-text">
-          <h3 className="unspaced recurring-truncate">
+    <Stack gap="$lg">
+      <Row gap="$md" alignItems="center">
+        <RecurringContactAvatar contact={contact} size="md" />
+        <Stack flex={1} gap="$xxs" alignItems="flex-start">
+          <Text
+            variant="title"
+            numberOfLines={1}
+            testID="recurring-recipient-name"
+          >
             {contactSummaryLabel(contact)}
-          </h3>
-          <button
-            type="button"
-            className="wallet-subtle-link recurring-inline-link"
-            onClick={() => setContactId("")}
-          >
+          </Text>
+          <Button variant="ghost" size="sm" onPress={() => setContactId("")}>
             {t("recurringChangeRecipient")}
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Stack>
+      </Row>
 
-      <AmountDisplay
-        amount={amount}
-        cycleOnClick
-        inputDisplayValue={amountInput.inputDisplayValue}
-      />
-      <Keypad
-        ariaLabel={`${t("payAmount")} (${displayUnit})`}
-        decimalKeyEnabled={amountInput.decimalKeyEnabled}
-        disabled={false}
-        onKeyPress={(key: string) => amountInput.onKeyPress(key)}
-        translations={{
-          clearForm: t("clearForm"),
-          decimalPoint: t("decimalPoint"),
-          delete: t("delete"),
-        }}
-      />
+      <AmountKeypad amount={amount} input={amountInput} />
 
-      <label>{t("recurringFrequencyLabel")}</label>
-      <div className="contact-group-selector recurring-pills" role="radiogroup">
-        {FREQUENCIES.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            className={pill(frequency === option.key)}
-            aria-pressed={frequency === option.key}
-            onClick={() => setFrequency(option.key)}
-          >
-            {t(option.label)}
-          </button>
-        ))}
-      </div>
+      <Stack gap="$xs">
+        <Text variant="label">{t("recurringFrequencyLabel")}</Text>
+        <SegmentedControl
+          accessibilityLabel={t("recurringFrequencyLabel")}
+          value={frequency}
+          options={FREQUENCIES.map((option) => ({
+            value: option.key,
+            label: t(option.label),
+          }))}
+          onValueChange={setFrequency}
+        />
+      </Stack>
 
-      <label htmlFor="recurringFirstRun">
-        {order ? t("recurringNextRun") : t("recurringFirstRunLabel")}
-      </label>
-      <input
-        id="recurringFirstRun"
+      <TextField
+        label={order ? t("recurringNextRun") : t("recurringFirstRunLabel")}
         type="datetime-local"
         min={epochToDateTimeLocal(earliestFirstRunSec)}
         value={firstRunText ?? epochToDateTimeLocal(defaultFirstRunSec)}
-        onChange={(event) => setFirstRunText(event.target.value)}
-      />
-      <p
-        className={
-          firstRunInPast
-            ? "error-text recurring-summary"
-            : "muted recurring-summary"
+        onChangeText={setFirstRunText}
+        error={firstRunInPast ? t("recurringFirstRunInPast") : undefined}
+        hint={
+          secondRunSec === null
+            ? t("recurringInvalidForm")
+            : t("recurringSummaryNext").replace(
+                "{date}",
+                formatDate(secondRunSec),
+              )
         }
+      />
+
+      <ListRow
+        title={t("recurringMintLabel")}
+        value={formatMintHost(mintUrl)}
+      />
+
+      {error ? <Notice tone="danger" title={error} /> : null}
+      <Text variant="caption" color="$colorMuted">
+        {t("recurringOnlyWhileOpen")}
+      </Text>
+
+      <Button
+        icon="Repeat"
+        loading={isSaving}
+        disabled={!canSave || isSaving}
+        onPress={() => void submit()}
       >
-        <Repeat size={14} aria-hidden="true" />
-        <span>
-          {firstRunInPast
-            ? t("recurringFirstRunInPast")
-            : secondRunSec === null
-              ? t("recurringInvalidForm")
-              : t("recurringSummaryNext").replace(
-                  "{date}",
-                  formatDate(secondRunSec),
-                )}
-        </span>
-      </p>
-
-      <label>{t("recurringMintLabel")}</label>
-      <p className="muted recurring-summary">{formatMintHost(mintUrl)}</p>
-
-      {error ? <p className="error-text">{error}</p> : null}
-      <p className="muted recurring-hint">{t("recurringOnlyWhileOpen")}</p>
-
-      <div className="actions">
-        <button
-          type="button"
-          className="btn-wide"
-          onClick={() => void submit()}
-          disabled={!canSave || isSaving}
-        >
-          <span className="btn-label-with-icon">
-            <span className="btn-label-icon" aria-hidden="true">
-              <Repeat size={18} />
-            </span>
-            <span>
-              {order ? t("recurringSaveChanges") : t("recurringSave")}
-            </span>
-          </span>
-        </button>
-      </div>
-    </section>
+        {order ? t("recurringSaveChanges") : t("recurringSave")}
+      </Button>
+    </Stack>
   );
 }
 
@@ -405,50 +367,36 @@ function ContactPicker({
 }: ContactPickerProps): React.ReactElement {
   const { t } = useAppShellCore();
   return (
-    <section className="panel panel-plain recurring-picker">
-      <label htmlFor="recurringSearch">{t("recurringChooseContact")}</label>
-      <input
-        id="recurringSearch"
+    <Stack gap="$md">
+      <TextField
+        label={t("recurringChooseContact")}
         value={search}
-        onChange={(event) => onSearch(event.target.value)}
+        onChangeText={onSearch}
         placeholder={t("recurringSearchContacts")}
         autoCapitalize="none"
-        autoCorrect="off"
+        autoCorrect={false}
         spellCheck={false}
       />
       {contacts.length === 0 ? (
-        <p className="muted recurring-hint">
-          {t("recurringNoPayableContacts")}
-        </p>
+        <EmptyState title={t("recurringNoPayableContacts")} />
       ) : (
-        <div className="transactions-list recurring-picker-list">
+        <Stack gap="$xs">
           {contacts.map((candidate) => (
-            <button
-              type="button"
+            <ListRow
               key={candidate.id}
-              className="transaction-card recurring-order-card"
-              onClick={() => onPick(candidate)}
-            >
-              <article className="transaction-row">
-                <RecurringContactAvatar
-                  className="contact-avatar transaction-avatar"
-                  contact={candidate}
-                />
-                <div className="transaction-main">
-                  <div className="transaction-title">
-                    {contactSummaryLabel(candidate)}
-                  </div>
-                  {candidate.name && candidate.lnAddress ? (
-                    <div className="transaction-meta recurring-truncate">
-                      {candidate.lnAddress}
-                    </div>
-                  ) : null}
-                </div>
-              </article>
-            </button>
+              testID="recurring-picker-contact"
+              leading={<RecurringContactAvatar contact={candidate} />}
+              title={contactSummaryLabel(candidate)}
+              description={
+                candidate.name && candidate.lnAddress
+                  ? candidate.lnAddress
+                  : undefined
+              }
+              onPress={() => onPick(candidate)}
+            />
           ))}
-        </div>
+        </Stack>
       )}
-    </section>
+    </Stack>
   );
 }
