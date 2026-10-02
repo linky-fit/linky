@@ -727,6 +727,7 @@ export const cs = {
   spdPaymentAmountUnknown: "Platba z QR",
   spdPaymentRecipient: "Příjemce",
   spdPaymentAccount: "Účet",
+  spdPaymentPixKey: "Klíč Pix",
   spdPaymentBic: "BIC / SWIFT",
   spdPaymentReference: "Reference platby",
   spdPaymentAmount: "Částka",
@@ -740,6 +741,10 @@ export const cs = {
   spdPaymentEditInvalid: "Upravené údaje platby nejsou platné.",
   spdPaymentInvalidAccount: "Neplatné číslo účtu.",
   spdPaymentInvalidBic: "Neplatný BIC / SWIFT.",
+  spdPaymentInvalidMessage:
+    "Zpráva se musí vejít do kódu Pix: jen písmena bez diakritiky a kratší.",
+  spdPaymentInvalidRecipient:
+    "Jméno příjemce smí mít jen písmena bez diakritiky, nejvýše 25 znaků.",
   spdPaymentInvalidReference:
     "Zadejte buď referenci platby, nebo symboly platby, ne obojí.",
   spdPaymentInvalidAmount: "Neplatná částka.",
@@ -996,6 +1001,7 @@ export const cs = {
     "Zaplaťte za přátele bankovní převod a dostanete za něj sats. Každá nabídka přijde jako notifikace, proto musí být notifikace zapnuté.",
   proxyPaymentsProvideCzk: "Platby v CZK",
   proxyPaymentsProvideEur: "Platby v EUR",
+  proxyPaymentsProvideBrl: "Platby v BRL (Pix)",
   proxyPaymentsEarnActive: "Vaše kontakty vám teď mohou posílat nabídky.",
   proxyPaymentsNotificationsHint:
     "Pro plynulou proxy platbu je potřeba mít zapnuté notifikace.",

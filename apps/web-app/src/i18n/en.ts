@@ -719,6 +719,7 @@ export const en = {
   spdPaymentAmountUnknown: "QR payment",
   spdPaymentRecipient: "Recipient",
   spdPaymentAccount: "Account",
+  spdPaymentPixKey: "Pix key",
   spdPaymentBic: "BIC / SWIFT",
   spdPaymentReference: "Payment reference",
   spdPaymentAmount: "Amount",
@@ -732,6 +733,10 @@ export const en = {
   spdPaymentEditInvalid: "The edited payment details are not valid.",
   spdPaymentInvalidAccount: "Invalid account number.",
   spdPaymentInvalidBic: "Invalid BIC / SWIFT.",
+  spdPaymentInvalidMessage:
+    "The message must fit a Pix code: plain letters only, and shorter.",
+  spdPaymentInvalidRecipient:
+    "The recipient name must be plain letters, up to 25 characters.",
   spdPaymentInvalidReference:
     "Use either a payment reference or the payment symbols, not both.",
   spdPaymentInvalidAmount: "Invalid amount.",
@@ -988,6 +993,7 @@ export const en = {
     "Pay a friend's bank transfer and get sats for it. Each offer arrives as a notification, so notifications stay on.",
   proxyPaymentsProvideCzk: "Payments in CZK",
   proxyPaymentsProvideEur: "Payments in EUR",
+  proxyPaymentsProvideBrl: "Payments in BRL (Pix)",
   proxyPaymentsEarnActive: "Your contacts can now send you offers.",
   proxyPaymentsNotificationsHint:
     "A smooth proxy payment needs notifications turned on.",

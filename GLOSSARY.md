@@ -227,7 +227,7 @@ Getting a bank transfer paid by a peer in exchange for sats.
 _Avoid_: bank payment, fiat payment, exchange
 
 **Bank QR**:
-A scanned bank payment code in SPD, EPC, PAY by square or payme link format that describes the transfer to be paid.
+A scanned bank payment code in SPD, EPC, PAY by square, payme link or Pix format that describes the transfer to be paid.
 _Avoid_: payment QR, SPAYD
 
 **Offer**:

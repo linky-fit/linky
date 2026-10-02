@@ -395,3 +395,152 @@ describe("spdPayment", () => {
     expect(updated.fields["X-VS"]).toBe("20260043");
   });
 });
+
+// Payloads follow the Pix "BR Code" layout (EMV tags, CRC-16/CCITT-FALSE).
+const PIX_STATIC =
+  "00020126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-426655440000520400005303986540510.005802BR5913Fulano de Tal6008BRASILIA62070503***6304288F";
+const PIX_WITH_DESCRIPTION =
+  "00020101021126600014br.gov.bcb.pix0120alice@exemplo.com.br0214Almoco de hoje52040000530398654071234.565802BR5913Alice Pereira6009SAO PAULO62110507ALM2026630447DC";
+const PIX_DYNAMIC =
+  "00020101021226600014br.gov.bcb.pix2538qr.exemplo.com.br/pix/v2/cobv/9d36b84f520400005303986540541.005802BR5917Padaria do Centro6009SAO PAULO62070503***6304D0CD";
+const PIX_NO_AMOUNT =
+  "00020126360014br.gov.bcb.pix0114+55119999988885204000053039865802BR5903Bob6003RIO62070503***6304CB10";
+const PIX_USD =
+  "00020126360014br.gov.bcb.pix0114+551199999888852040000530384054045.005802BR5903Bob6003RIO62070503***6304D462";
+
+describe("pixPayment", () => {
+  it("parses a static Pix code with a random key", () => {
+    const payment = parseBankPayment(PIX_STATIC);
+
+    expect(payment.format).toBe("pix");
+    expect(payment.payload).toBe(PIX_STATIC);
+    expect(payment.fields).toEqual({
+      ACC: "123e4567-e12b-12d1-a456-426655440000",
+      AM: "10.00",
+      CC: "BRL",
+      RN: "Fulano de Tal",
+    });
+    expect(isBankPaymentPayload(PIX_STATIC)).toBe(true);
+    expect(getBankPaymentOfferCurrency(PIX_STATIC)).toBe("BRL");
+  });
+
+  it("reads the description, the txid and an e-mail key", () => {
+    const payment = parseBankPayment(PIX_WITH_DESCRIPTION);
+
+    expect(payment.fields).toEqual({
+      ACC: "alice@exemplo.com.br",
+      AM: "1234.56",
+      CC: "BRL",
+      MSG: "Almoco de hoje",
+      RF: "ALM2026",
+      RN: "Alice Pereira",
+    });
+  });
+
+  it("exposes the payload URL of a dynamic Pix as the account", () => {
+    const payment = parseBankPayment(PIX_DYNAMIC);
+
+    expect(payment.fields["ACC"]).toBe(
+      "qr.exemplo.com.br/pix/v2/cobv/9d36b84f",
+    );
+    expect(payment.fields["AM"]).toBe("41.00");
+    expect(payment.fields["RN"]).toBe("Padaria do Centro");
+    expect(payment.fields["RF"]).toBeUndefined();
+  });
+
+  it("accepts a code without an amount and keeps the phone key", () => {
+    const payment = parseBankPayment(PIX_NO_AMOUNT);
+
+    expect(payment.fields["ACC"]).toBe("+5511999998888");
+    expect(payment.fields["AM"]).toBeUndefined();
+    expect(payment.fields["CC"]).toBe("BRL");
+  });
+
+  it("rejects a wrong CRC, a foreign currency, a missing key and malformed tags", () => {
+    const wrongCrc = `${PIX_STATIC.slice(0, -4)}0000`;
+    expect(() => parseBankPayment(wrongCrc)).toThrow(
+      "bank-payment-invalid-pix-crc",
+    );
+    expect(isBankPaymentPayload(wrongCrc)).toBe(false);
+    expect(() => parseBankPayment(PIX_USD)).toThrow("bank-payment-invalid-pix");
+    expect(() =>
+      parseBankPayment(
+        "00020126180014br.gov.bcb.pix52040000530398658 02BR5903Bob6003RIO62070503***6304AAAA",
+      ),
+    ).toThrow("bank-payment-invalid-pix");
+    expect(
+      tryParseBankPayment("000201 some text mentioning br.gov.bcb.pix"),
+    ).toBeNull();
+    expect(getBankPaymentOfferCurrency(PIX_USD)).toBeNull();
+  });
+
+  it("re-encodes edits with fresh lengths and CRC, cents and a txid", () => {
+    const payment = parseBankPayment(PIX_STATIC);
+
+    const updated = updateBankPaymentFields(payment, {
+      AM: "12,5",
+      MSG: "Café & bolo",
+      RF: "FAT42",
+      RN: "João da Silva",
+    });
+
+    expect(updated.format).toBe("pix");
+    expect(updated.payload).toBe(
+      "00020126730014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-4266554400000211Cafe & bolo520400005303986540512.505802BR5913Joao da Silva6008BRASILIA62090505FAT426304F8A7",
+    );
+    expect(updated.fields).toEqual({
+      ACC: "123e4567-e12b-12d1-a456-426655440000",
+      AM: "12.50",
+      CC: "BRL",
+      MSG: "Cafe & bolo",
+      RF: "FAT42",
+      RN: "Joao da Silva",
+    });
+  });
+
+  it("keeps a dynamic Pix URL in its own subtag and drops a cleared amount", () => {
+    const payment = parseBankPayment(PIX_DYNAMIC);
+
+    const updated = updateBankPaymentFields(payment, {
+      ACC: "qr.exemplo.com.br/pix/v2/cobv/outro",
+      AM: "",
+    });
+
+    expect(updated.payload).toBe(
+      "00020101021226570014br.gov.bcb.pix2535qr.exemplo.com.br/pix/v2/cobv/outro5204000053039865802BR5917Padaria do Centro6009SAO PAULO62070503***63042AE6",
+    );
+    expect(updated.fields["ACC"]).toBe("qr.exemplo.com.br/pix/v2/cobv/outro");
+    expect(updated.fields["AM"]).toBeUndefined();
+  });
+
+  it("rejects edits a Pix code cannot carry", () => {
+    const payment = parseBankPayment(PIX_STATIC);
+
+    expect(() => updateBankPaymentFields(payment, { RN: "" })).toThrow(
+      "bank-payment-invalid-recipient",
+    );
+    expect(() =>
+      updateBankPaymentFields(payment, {
+        RN: "A name that is far too long for Pix",
+      }),
+    ).toThrow("bank-payment-invalid-recipient");
+    expect(() => updateBankPaymentFields(payment, { RF: "FAT-42" })).toThrow(
+      "bank-payment-invalid-reference",
+    );
+    expect(() => updateBankPaymentFields(payment, { MSG: "Ação ✓" })).toThrow(
+      "bank-payment-invalid-message",
+    );
+    expect(() =>
+      updateBankPaymentFields(payment, { MSG: "x".repeat(60) }),
+    ).toThrow("bank-payment-invalid-pix");
+    expect(() => updateBankPaymentFields(payment, { ACC: "a b" })).toThrow(
+      "bank-payment-invalid-account",
+    );
+    expect(() => updateBankPaymentFields(payment, { ACC: "" })).toThrow(
+      "spd-missing-account",
+    );
+    expect(() => updateBankPaymentFields(payment, { AM: "1.234" })).toThrow(
+      "bank-payment-invalid-amount",
+    );
+  });
+});

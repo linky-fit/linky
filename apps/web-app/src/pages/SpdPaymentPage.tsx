@@ -22,6 +22,7 @@ import {
   BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC,
   type BankPayment,
   type BankPaymentFieldKey,
+  type BankPaymentFormat,
   type BankPaymentOfferCurrency,
   formatDomesticBankAccount,
   getBankPaymentEditableFieldKeys,
@@ -128,6 +129,8 @@ const getRateForCurrency = (
   fiatRates: FiatRates,
 ): number | null => {
   switch (currency.toUpperCase()) {
+    case "BRL":
+      return fiatRates.brlPerBtc;
     case "CHF":
       return fiatRates.chfPerBtc;
     case "CZK":
@@ -184,13 +187,24 @@ const FIELD_LABEL_KEYS: Record<BankPaymentFieldKey, I18nKey> = {
   "X-VS": "spdPaymentVariableSymbol",
 };
 
+// A Pix payment is addressed by a key, not an account number.
+const getFieldLabelKey = (
+  format: BankPaymentFormat,
+  key: BankPaymentFieldKey,
+): I18nKey =>
+  format === "pix" && key === "ACC"
+    ? "spdPaymentPixKey"
+    : FIELD_LABEL_KEYS[key];
+
 const buildSpdRows = (
   payment: BankPayment,
   t: Translate,
 ): SpdPaymentFieldRow[] =>
   getBankPaymentEditableFieldKeys(payment.format).flatMap((key) => {
     const value = getDisplayedFieldValue(payment, key);
-    return value ? [{ key, label: t(FIELD_LABEL_KEYS[key]), value }] : [];
+    return value
+      ? [{ key, label: t(getFieldLabelKey(payment.format, key)), value }]
+      : [];
   });
 
 type BankPaymentFields = Record<string, string>;
@@ -227,6 +241,14 @@ const EDIT_ERRORS: Record<string, BankPaymentEditError> = {
     key: "spdPaymentInvalidAmount",
   },
   "bank-payment-invalid-bic": { field: "BIC", key: "spdPaymentInvalidBic" },
+  "bank-payment-invalid-message": {
+    field: "MSG",
+    key: "spdPaymentInvalidMessage",
+  },
+  "bank-payment-invalid-recipient": {
+    field: "RN",
+    key: "spdPaymentInvalidRecipient",
+  },
   "bank-payment-invalid-reference": {
     field: "RF",
     key: "spdPaymentInvalidReference",
@@ -474,7 +496,7 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
               <TextField
                 key={key}
                 id={`bank-payment-field-${key}`}
-                label={t(FIELD_LABEL_KEYS[key])}
+                label={t(getFieldLabelKey(payment.format, key))}
                 {...(fieldError ? { error: t(fieldError.key) } : {})}
                 inputMode={key === "AM" ? "decimal" : undefined}
                 type={isDate ? "date" : undefined}

@@ -111,7 +111,7 @@ const login = async (scanned: string) => {
 
 ## Fiat rates
 
-`fetchFiatRates(signal)` fetches BTC rates from yadio.io as `FiatRates` (CHF, CZK, EUR, USD per BTC plus `fetchedAtMs`) and returns `null` on HTTP or shape errors. Cache the JSON under `FIAT_RATES_CACHE_STORAGE_KEY`, read it back with `decodeFiatRates`, and refresh when `isFiatRatesStale` says so (older than `FIAT_RATES_TTL_MS`, 10 minutes).
+`fetchFiatRates(signal)` fetches BTC rates from yadio.io as `FiatRates` (BRL, CHF, CZK, EUR, USD per BTC plus `fetchedAtMs`) and returns `null` on HTTP or shape errors. Cache the JSON under `FIAT_RATES_CACHE_STORAGE_KEY`, read it back with `decodeFiatRates`, and refresh when `isFiatRatesStale` says so (older than `FIAT_RATES_TTL_MS`, 10 minutes).
 
 ## Errors
 

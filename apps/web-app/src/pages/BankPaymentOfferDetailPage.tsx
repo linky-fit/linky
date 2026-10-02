@@ -178,7 +178,10 @@ const buildPaymentRows = (
   };
 
   addRow("RN", t("spdPaymentRecipient"));
-  addRow("ACC", t("spdPaymentAccount"));
+  addRow(
+    "ACC",
+    t(payment.format === "pix" ? "spdPaymentPixKey" : "spdPaymentAccount"),
+  );
   addRow("BIC", t("spdPaymentBic"));
   addRow("RF", t("spdPaymentReference"));
   addRow("X-VS", t("spdPaymentVariableSymbol"));

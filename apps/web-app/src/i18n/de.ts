@@ -729,6 +729,7 @@ export const de = {
   spdPaymentAmountUnknown: "QR-Zahlung",
   spdPaymentRecipient: "Empfänger",
   spdPaymentAccount: "Konto",
+  spdPaymentPixKey: "Pix-Schlüssel",
   spdPaymentAmount: "Betrag",
   spdPaymentVariableSymbol: "Variables Symbol",
   spdPaymentSpecificSymbol: "Spezifisches Symbol",
@@ -740,6 +741,10 @@ export const de = {
   spdPaymentEditInvalid: "Die bearbeiteten Zahlungsangaben sind ungültig.",
   spdPaymentInvalidAccount: "Ungültige Kontonummer.",
   spdPaymentInvalidBic: "Ungültiger BIC / SWIFT.",
+  spdPaymentInvalidMessage:
+    "Die Nachricht muss in einen Pix-Code passen: nur einfache Buchstaben und kürzer.",
+  spdPaymentInvalidRecipient:
+    "Der Empfängername darf nur einfache Buchstaben enthalten, höchstens 25 Zeichen.",
   spdPaymentInvalidReference:
     "Entweder Zahlungsreferenz oder Zahlungssymbole angeben, nicht beides.",
   spdPaymentInvalidAmount: "Ungültiger Betrag.",
@@ -996,6 +1001,7 @@ export const de = {
     "Bezahle die Banküberweisung eines Freundes und bekomme dafür Sats. Jedes Angebot kommt als Benachrichtigung, deshalb müssen Benachrichtigungen eingeschaltet bleiben.",
   proxyPaymentsProvideCzk: "Zahlungen in CZK",
   proxyPaymentsProvideEur: "Zahlungen in EUR",
+  proxyPaymentsProvideBrl: "Zahlungen in BRL (Pix)",
   proxyPaymentsEarnActive: "Deine Kontakte können dir jetzt Angebote schicken.",
   proxyPaymentsNotificationsHint:
     "Für eine reibungslose Proxy-Zahlung müssen Benachrichtigungen aktiviert sein.",

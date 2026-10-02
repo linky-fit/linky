@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 const PositiveNumber = Schema.Number.pipe(Schema.finite(), Schema.positive());
 export const FiatRates = Schema.Struct({
+  brlPerBtc: PositiveNumber,
   chfPerBtc: PositiveNumber,
   czkPerBtc: PositiveNumber,
   eurPerBtc: PositiveNumber,
@@ -18,6 +19,7 @@ export const isFiatRatesStale = (rates: FiatRates | null): boolean =>
   !rates || Date.now() - rates.fetchedAtMs >= FIAT_RATES_TTL_MS;
 const YadioRates = Schema.Struct({
   BTC: Schema.Struct({
+    BRL: Schema.Number,
     CHF: Schema.Number,
     CZK: Schema.Number,
     EUR: Schema.Number,
@@ -37,6 +39,7 @@ export const fetchFiatRates = async (
   if (parsed._tag === "None") return null;
   const rates = parsed.value.BTC;
   const result = {
+    brlPerBtc: rates.BRL,
     chfPerBtc: rates.CHF,
     czkPerBtc: rates.CZK,
     eurPerBtc: rates.EUR,

@@ -1,3 +1,4 @@
+import { BANK_PAYMENT_OFFER_CURRENCIES } from "@linky-fit/proxy-payment";
 import { asNonEmptyString } from "./utils/validation";
 /**
  * Linky's kind-30315 status conventions: the last status line may carry a
@@ -7,7 +8,7 @@ import { asNonEmptyString } from "./utils/validation";
 
 // The currencies a user can offer to pay for friends (proxy payments).
 // Older statuses may still carry BTC or USD; both parse and are dropped.
-export const PROFILE_STATUS_CURRENCIES = ["CZK", "EUR"] as const;
+export const PROFILE_STATUS_CURRENCIES = BANK_PAYMENT_OFFER_CURRENCIES;
 const LEGACY_PROFILE_STATUS_CURRENCIES = ["BTC", "USD"] as const;
 const STATUS_FILTER_PREFIX = "status:";
 

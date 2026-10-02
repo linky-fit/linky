@@ -27,10 +27,13 @@ import {
   type ProfileStatusCurrency,
 } from "../nostrStatus";
 const CURRENCY_LABEL_KEYS: Record<ProfileStatusCurrency, I18nKey> = {
+  BRL: "proxyPaymentsProvideBrl",
   CZK: "proxyPaymentsProvideCzk",
   EUR: "proxyPaymentsProvideEur",
 };
+// Brazilian transfers go through Pix, which is addressed by a key.
 const CURRENCY_ICONS: Record<ProfileStatusCurrency, IconName> = {
+  BRL: "KeyRound",
   CZK: "Banknote",
   EUR: "Euro",
 };

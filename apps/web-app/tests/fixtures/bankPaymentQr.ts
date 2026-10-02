@@ -1,7 +1,7 @@
 /**
  * A Czech SPD bank-payment QR, as scanned off a real invoice.
  *
- * The currency must be CZK or EUR: getBankPaymentOfferCurrency returns null
+ * The currency must be CZK, EUR or BRL: getBankPaymentOfferCurrency returns null
  * for anything else, which silently empties the offer's recipient list.
  *
  * The PNG is generated once from SPD_PAYLOAD (`qrcode` package) and committed,

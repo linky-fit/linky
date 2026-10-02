@@ -8,6 +8,7 @@ import {
 } from "./displayAmounts";
 
 const fiatRates = {
+  brlPerBtc: 300_000,
   chfPerBtc: 45_000,
   czkPerBtc: 1_000_000,
   eurPerBtc: 46_000,
