@@ -1,18 +1,30 @@
 import type { LocalNostrMessage } from "../../types/appTypes";
 import { trimString } from "../../../utils/validation";
 
-export const getLocalNostrMessageRumorKey = (
-  message: Pick<LocalNostrMessage, "contactId" | "direction" | "rumorId">,
+type ConversationScope = Pick<LocalNostrMessage, "contactId" | "direction">;
+
+const conversationKey = (
+  message: ConversationScope,
+  id: string | null | undefined,
 ): string => {
-  const rumorId = trimString(message.rumorId);
-  if (!rumorId) return "";
+  const value = trimString(id);
+  if (!value) return "";
 
   const contactId = trimString(message.contactId);
   const direction = trimString(message.direction);
   if (!contactId || (direction !== "in" && direction !== "out")) return "";
 
-  return `${contactId}|${direction}|${rumorId}`;
+  return `${contactId}|${direction}|${value}`;
 };
+
+export const getLocalNostrMessageRumorKey = (
+  message: ConversationScope & Pick<LocalNostrMessage, "rumorId">,
+): string => conversationKey(message, message.rumorId);
+
+/** Senders pick client ids, so one is unique only per conversation and direction. */
+export const getLocalNostrMessageClientKey = (
+  message: ConversationScope & Pick<LocalNostrMessage, "clientId">,
+): string => conversationKey(message, message.clientId);
 
 const pickPreferredMessage = (
   current: LocalNostrMessage,
@@ -109,12 +121,12 @@ export const dedupeNostrMessagesByPriority = (
 
   const deduped: LocalNostrMessage[] = [];
   const indexByWrapId = new Map<string, number>();
-  const indexByClientId = new Map<string, number>();
+  const indexByClientKey = new Map<string, number>();
   const indexByRumorKey = new Map<string, number>();
 
   for (const message of rows) {
     const wrapId = trimString(message.wrapId);
-    const clientId = trimString(message.clientId);
+    const clientKey = getLocalNostrMessageClientKey(message);
     const rumorKey = getLocalNostrMessageRumorKey(message);
 
     let existingIndex: number | undefined;
@@ -126,8 +138,8 @@ export const dedupeNostrMessagesByPriority = (
         matchedBy = "wrap";
       }
     }
-    if (existingIndex === undefined && clientId) {
-      const byClient = indexByClientId.get(clientId);
+    if (existingIndex === undefined && clientKey) {
+      const byClient = indexByClientKey.get(clientKey);
       if (byClient !== undefined) {
         existingIndex = byClient;
         matchedBy = "client";
@@ -144,7 +156,7 @@ export const dedupeNostrMessagesByPriority = (
     if (existingIndex === undefined) {
       const nextIndex = deduped.push(message) - 1;
       if (wrapId) indexByWrapId.set(wrapId, nextIndex);
-      if (clientId) indexByClientId.set(clientId, nextIndex);
+      if (clientKey) indexByClientKey.set(clientKey, nextIndex);
       if (rumorKey) indexByRumorKey.set(rumorKey, nextIndex);
       continue;
     }
@@ -186,10 +198,10 @@ export const dedupeNostrMessagesByPriority = (
       alternateMessage,
     );
     const nextWrapId = trimString(nextMessage.wrapId);
-    const nextClientId = trimString(nextMessage.clientId);
+    const nextClientKey = getLocalNostrMessageClientKey(nextMessage);
     const nextRumorKey = getLocalNostrMessageRumorKey(nextMessage);
     if (nextWrapId) indexByWrapId.set(nextWrapId, existingIndex);
-    if (nextClientId) indexByClientId.set(nextClientId, existingIndex);
+    if (nextClientKey) indexByClientKey.set(nextClientKey, existingIndex);
     if (nextRumorKey) indexByRumorKey.set(nextRumorKey, existingIndex);
   }
 
@@ -201,7 +213,7 @@ export const dedupeChatMessages = (
   list: LocalNostrMessage[],
 ): LocalNostrMessage[] => {
   const seenWrapIds = new Set<string>();
-  const seenClientIds = new Set<string>();
+  const seenClientKeys = new Set<string>();
   const seenRumorKeys = new Set<string>();
   const seenFallbackKeys = new Set<string>();
   const deduped: LocalNostrMessage[] = [];
@@ -213,10 +225,10 @@ export const dedupeChatMessages = (
       seenWrapIds.add(wrapId);
     }
 
-    const clientId = trimString(message.clientId);
-    if (clientId) {
-      if (seenClientIds.has(clientId)) continue;
-      seenClientIds.add(clientId);
+    const clientKey = getLocalNostrMessageClientKey(message);
+    if (clientKey) {
+      if (seenClientKeys.has(clientKey)) continue;
+      seenClientKeys.add(clientKey);
     }
 
     const rumorKey = getLocalNostrMessageRumorKey(message);
@@ -225,7 +237,7 @@ export const dedupeChatMessages = (
       seenRumorKeys.add(rumorKey);
     }
 
-    if (!wrapId && !clientId) {
+    if (!wrapId && !clientKey) {
       const content = trimString(message.content);
       const createdAtSec = message.createdAtSec || 0;
       const direction = trimString(message.direction);

@@ -1,12 +1,14 @@
 import {
   createId,
-  NonNegativeInt,
+  NonEmptyString100,
+  NonEmptyString1000,
   PositiveInt,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
 import {
-  CLEAR_CLAIM_PATCH,
+  editPatch,
   pausePatch,
+  recurringProgressColumn,
   resumePatch,
   type RecurringPaymentOrder,
 } from "@linky-fit/recurring-payment";
@@ -20,7 +22,9 @@ import {
   recurringPaymentUpdate,
   type RecurringPaymentInput,
 } from "../../lib/recurringPaymentStore";
+import { pickRecurringRail, recurringRecipient } from "../../lib/recurringRail";
 import { runWrite } from "../../lib/storeWrite";
+import type { ContactRowLike } from "../../types/appTypes";
 import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler";
 
 export type { RecurringPaymentInput } from "../../lib/recurringPaymentStore";
@@ -43,8 +47,15 @@ export interface RecurringPaymentsActions {
 }
 
 interface UseRecurringPaymentsActionsParams {
+  contacts: readonly ContactRowLike[];
+  /** New payments are bound to the default mint of their creation time. */
+  defaultMintUrl: string;
+  /** With the contact, picks the rail a new payment is bound to. */
+  payWithCashuEnabled: boolean;
   pushToast: (message: string) => void;
   repository: RecurringPaymentsRepository;
+  /** A scheduler pass; it settles the envelope of a payment just deleted. */
+  runNow: RecurringPaymentsScheduler["runNow"];
   runOrderNow: RecurringPaymentsScheduler["runOrderNow"];
   t: Translate;
 }
@@ -53,11 +64,16 @@ const DELETE_ARM_MS = 5000;
 
 /**
  * User-facing mutations on recurring payments, all through the linksync
- * repository. Deleting is a two-tap armed action.
+ * repository. Deleting is a two-tap armed action; the scheduler's next pass
+ * settles the deleted payment's envelope.
  */
 export const useRecurringPaymentsActions = ({
+  contacts,
+  defaultMintUrl,
+  payWithCashuEnabled,
   pushToast,
   repository,
+  runNow,
   runOrderNow,
   t,
 }: UseRecurringPaymentsActionsParams): RecurringPaymentsActions => {
@@ -83,16 +99,38 @@ export const useRecurringPaymentsActions = ({
     [pushToast, t],
   );
 
+  const findContact = React.useCallback(
+    (contactId: string) => contacts.find((contact) => contact.id === contactId),
+    [contacts],
+  );
+
+  const refuseRecipient = React.useCallback((): false => {
+    pushToast(t("recurringRecipientUnavailable"));
+    return false;
+  }, [pushToast, t]);
+
   const createRecurringPayment = React.useCallback(
     async (input: RecurringPaymentInput): Promise<boolean> => {
       const contactId = readContactId(input.contactId);
       if (contactId === null) return false;
+      const rail = pickRecurringRail(
+        findContact(contactId),
+        payWithCashuEnabled,
+      );
+      if (rail === null) return refuseRecipient();
       const id = createId<"RecurringPayment">();
       const outcome = await runWrite(
         repository.insert({
           id,
           createdAtSec: PositiveInt.orThrow(nowSeconds()),
-          runCount: NonNegativeInt.orThrow(0),
+          mintUrl: NonEmptyString1000.orThrow(defaultMintUrl),
+          rail: NonEmptyString100.orThrow(rail),
+          progress: NonEmptyString1000.orThrow(
+            recurringProgressColumn({
+              runCount: 0,
+              nextDueAtSec: input.firstDueAtSec,
+            }),
+          ),
           ...recurringPaymentColumns(input, contactId),
         }),
       );
@@ -105,11 +143,20 @@ export const useRecurringPaymentsActions = ({
           amount: input.amount,
           firstDueAtSec: input.firstDueAtSec,
           interval: input.interval,
+          mintUrl: defaultMintUrl,
+          rail,
         },
       });
       return true;
     },
-    [reportWriteFailure, repository],
+    [
+      defaultMintUrl,
+      findContact,
+      payWithCashuEnabled,
+      refuseRecipient,
+      reportWriteFailure,
+      repository,
+    ],
   );
 
   const updateRecurringPayment = React.useCallback(
@@ -119,10 +166,13 @@ export const useRecurringPaymentsActions = ({
     ): Promise<boolean> => {
       const contactId = readContactId(input.contactId);
       if (contactId === null) return false;
+      if (recurringRecipient(findContact(contactId), order.rail) === null) {
+        return refuseRecipient();
+      }
       const outcome = await runWrite(
         repository.update(order.id, {
           ...recurringPaymentColumns(input, contactId),
-          ...recurringPaymentUpdate(CLEAR_CLAIM_PATCH),
+          ...recurringPaymentUpdate(editPatch(order, input.firstDueAtSec)),
         }),
       );
       if (!outcome.ok) return reportWriteFailure(outcome.error);
@@ -144,7 +194,7 @@ export const useRecurringPaymentsActions = ({
       });
       return true;
     },
-    [reportWriteFailure, repository],
+    [findContact, refuseRecipient, reportWriteFailure, repository],
   );
 
   const setRecurringPaymentPaused = React.useCallback(
@@ -187,9 +237,10 @@ export const useRecurringPaymentsActions = ({
         links: { recurringPayment: order.id },
         payload: null,
       });
+      void runNow();
       return true;
     },
-    [pendingDeleteId, reportWriteFailure, repository],
+    [pendingDeleteId, reportWriteFailure, repository, runNow],
   );
 
   const runRecurringPaymentNow = React.useCallback(

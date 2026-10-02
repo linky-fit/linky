@@ -44,6 +44,7 @@ const received = (
     replyTo: null,
     root: null,
     editOf: null,
+    clientId: null,
     sentAt: UnixSeconds.make(SENT_AT),
     ...overrides,
   });
@@ -167,6 +168,28 @@ describe("applyChatMessageReceived", () => {
     expect(first.inserted).not.toBeNull();
     expect(second.inserted).toBeNull();
     expect(harness.appendLocalNostrMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("dedupes one message its sender published twice under one client id", () => {
+    // Two of the sender's devices deliver the same recurring payment: same
+    // client id, different sentAt and therefore different rumor ids.
+    const harness = createHarness();
+    const clientId = ClientId.make("recurring-run");
+
+    const first = applyChatMessageReceived(received({ clientId }), harness.ctx);
+    const second = applyChatMessageReceived(
+      received({
+        clientId,
+        messageId: RumorId.make(EDIT_RUMOR_ID),
+        sentAt: UnixSeconds.make(SENT_AT + 5),
+      }),
+      harness.ctx,
+    );
+
+    expect(first.inserted).not.toBeNull();
+    expect(second.inserted).toBeNull();
+    expect(harness.messages).toHaveLength(1);
+    expect(harness.messages[0]?.clientId).toBe(clientId);
   });
 
   it("stores an image body as the serialized private-image content", () => {

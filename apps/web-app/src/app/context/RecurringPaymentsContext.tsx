@@ -7,7 +7,12 @@ export type RecurringPaymentsContextValue = RecurringPaymentsActions &
   Pick<
     RecurringPaymentsScheduler,
     "cancelDue" | "confirmDueNow" | "dueConfirmation"
-  >;
+  > & {
+    /** The mint a new payment is bound to. */
+    defaultMintUrl: string;
+    /** Available sats at one mint, which is all a payment can use. */
+    mintBalanceSat: (mintUrl: string) => number;
+  };
 
 const RecurringPaymentsContext =
   React.createContext<RecurringPaymentsContextValue | null>(null);

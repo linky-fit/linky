@@ -176,6 +176,10 @@ _Avoid_: transfer, rebalance, migrate funds
 Turning proofs into a token for someone else to claim.
 _Avoid_: pay, transfer
 
+**Envelope**:
+Proofs set aside at one mint for one payment, named by a key; every device derives the same envelope from the key, so the mint funds it once and the payment goes out at most once.
+_Avoid_: reservation, escrow, locked funds
+
 **Receive**:
 Redeeming a token at its mint into the user's own proofs.
 _Avoid_: claim, redeem, accept
@@ -261,11 +265,15 @@ The user's instruction to pay a contact a fixed amount daily, weekly or monthly 
 _Avoid_: standing order, subscription, scheduled payment
 
 **Run**:
-One payment a recurring payment makes for one due time; a missed period is paid once and the rest are skipped.
+One payment of a recurring payment, numbered by how many were paid before it; each number has its own envelope, so it is paid at most once. A missed period is paid once and the rest are skipped.
 _Avoid_: execution, instance, occurrence
 
+**Rail**:
+How every run of a recurring payment reaches the contact, chosen once when it is created: a token sent over Nostr (Cashu) or a melt paying their Lightning address (Lightning).
+_Avoid_: payment method, channel
+
 **Claim**:
-The mark a device writes on a recurring payment before a due time, naming itself as the one device that pays it.
+The mark a device writes on a recurring payment before a due time, naming the device that shows the countdown and notifications; it never decides whether money moves.
 _Avoid_: lock, lease, reservation
 
 ## Sync and devices

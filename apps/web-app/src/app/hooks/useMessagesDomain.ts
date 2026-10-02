@@ -66,6 +66,7 @@ import {
 import {
   dedupeChatMessages,
   dedupeNostrMessagesByPriority,
+  getLocalNostrMessageClientKey,
   getLocalNostrMessageRumorKey,
 } from "./messages/messageHelpers";
 import {
@@ -435,13 +436,13 @@ export const useMessagesDomain = ({
 
     const existingMessages = dedupeNostrMessagesByPriority(nostrMessagesLocal);
     const seenWrapIds = new Set<string>();
-    const seenClientIds = new Set<string>();
+    const seenClientKeys = new Set<string>();
     const seenRumorKeys = new Set<string>();
     for (const existingMessage of existingMessages) {
       const wrapId = trimString(existingMessage.wrapId);
       if (wrapId) seenWrapIds.add(wrapId);
-      const clientId = trimString(existingMessage.clientId);
-      if (clientId) seenClientIds.add(clientId);
+      const clientKey = getLocalNostrMessageClientKey(existingMessage);
+      if (clientKey) seenClientKeys.add(clientKey);
       const rumorKey = getLocalNostrMessageRumorKey(existingMessage);
       if (rumorKey) seenRumorKeys.add(rumorKey);
     }
@@ -459,10 +460,10 @@ export const useMessagesDomain = ({
         );
         for (const legacyMessage of legacyMessages) {
           const wrapId = trimString(legacyMessage.wrapId);
-          const clientId = trimString(legacyMessage.clientId);
+          const clientKey = getLocalNostrMessageClientKey(legacyMessage);
           const rumorKey = getLocalNostrMessageRumorKey(legacyMessage);
           if (wrapId && seenWrapIds.has(wrapId)) continue;
-          if (clientId && seenClientIds.has(clientId)) continue;
+          if (clientKey && seenClientKeys.has(clientKey)) continue;
           if (rumorKey && seenRumorKeys.has(rumorKey)) continue;
           if (
             !storeMessage({
@@ -472,7 +473,7 @@ export const useMessagesDomain = ({
           )
             continue;
           if (wrapId) seenWrapIds.add(wrapId);
-          if (clientId) seenClientIds.add(clientId);
+          if (clientKey) seenClientKeys.add(clientKey);
           if (rumorKey) seenRumorKeys.add(rumorKey);
         }
         safeLocalStorageSet(migrationKey, "1");
@@ -504,11 +505,12 @@ export const useMessagesDomain = ({
       const content = toText(message.content);
       if (!contactId || !direction || !content.trim()) return NOT_APPENDED;
       const wrapId = trimString(message.wrapId);
-      const clientId = trimString(message.clientId);
+      const clientKey = getLocalNostrMessageClientKey(message);
       const rumorId = trimString(message.rumorId);
 
       const existing = nostrMessagesLatestRef.current.find((current) => {
-        if (clientId && trimString(current.clientId) === clientId) return true;
+        if (clientKey && getLocalNostrMessageClientKey(current) === clientKey)
+          return true;
         if (wrapId && trimString(current.wrapId) === wrapId) return true;
         if (rumorId && trimString(current.rumorId) === rumorId) return true;
         return (

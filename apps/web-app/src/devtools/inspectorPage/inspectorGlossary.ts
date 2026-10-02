@@ -185,7 +185,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "tokens.importOperation":
     "A backup operation was restored as-is; an existing operation with the same key was replaced.",
   "tokens.ingestLegacyRows":
-    "Rows of the legacy cashuToken table were carried into the proof inventory: accepted → available, reserved → held, issued/externalized → a send transfer with handed-out proofs, error → spent only when the recorded error says so. Rows whose proofs are already stored are skipped.",
+    "Rows of the legacy cashuToken table were carried into the proof inventory: accepted → available, reserved → held by its pending melt (available when none matches), issued/externalized → a send transfer with handed-out proofs, error → spent only when the recorded error says so. Rows whose proofs are already stored are skipped.",
   "tokens.forget":
     "A transfer was closed by the app because nothing is left to do about it (a delivered messenger send, a dismissed failed receive, a deferred receive the user discarded). Handed-out proofs stay handed out until the mint reports them spent; a discarded deferral's token is gone unless the user kept its text. Discarding a deferral a resume pass already handed to its receive fails with InvalidTransferTransition.",
   "restore.restore":
@@ -229,9 +229,9 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "melt.historyResolved":
     "The app updated a pending Lightning payment in the transaction history after melt.resume settled it — to paid (amount and fee) or failed. The quote link connects it to the melt rows.",
   "recurring.claimed":
-    "This device claimed an upcoming recurring payment: it wrote its device id and the due time to the row and notified the user. The payment goes out after a short claim window (long enough for racing claims to converge), from whichever device the synced claim names. takeover means the previous claimant never paid.",
+    "This device claimed an upcoming recurring payment: it wrote its device id and the due time to the row and notified the user. The device the synced claim names shows the countdown and pays after a short claim window; the claim never decides whether money moves, the run's envelope at the mint does. takeover means the previous claimant went away.",
   "recurring.run":
-    "A recurring payment was executed on this device: paid or failed, with the amount, the due time it settles, and how many due times were skipped because Linky was closed. The recurringPayment and contact links join it to the chat payment steps.",
+    "One attempt at a recurring payment on this device: it opened the run's envelope (keyed by payment id and runIndex) at the order's mint, asked the mint about it and delivered it. status paid (delivered false: the envelope was already spent, e.g. by another device; a token counts as delivered once a relay accepted its message), waiting (a melt of it is in flight, or its token message is still queued), busy (another tab holds it, or a melt record does; retried after the retry delay), unfunded (the balance covered the amount but not the swap fee; handled like waiting for funds), mixed (part of it spent; needs the user) or failed with the error. The operation link joins it to the linkshu envelope.* rows.",
   "recurring.skipped":
     "A due recurring payment was skipped without paying — the user cancelled it from the in-app countdown, funds stayed insufficient or attempts kept failing until the grace window closed, or the contact can no longer be paid. The payload's reason says which; the schedule moved on to the next due time.",
   "recurring.confirmationShown":
@@ -241,9 +241,15 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "recurring.updated":
     "The user edited a recurring payment: amount, interval, recipient, or next payment date. The payload carries the new values and the previous ones; any claim for the old due time was dropped.",
   "recurring.waitingForFunds":
-    "A recurring payment is due but the spendable balance is below its amount; the scheduler keeps retrying until the grace window closes. Reported once per due time.",
-  "recurring.interrupted":
-    "A recurring payment was found marked running for longer than a run can take, so an earlier launch died mid-run. recorded says whether the transaction history holds a payment for that due time: true marks the run paid, false restores the due time so the payment goes out on a later pass instead of being lost.",
+    "A recurring payment is due but the balance at its mint is below its amount and the mint holds no envelope for the run; the scheduler keeps retrying until the grace window closes. Reported once per due time.",
+  "recurring.envelopesRecovered":
+    "A scheduler pass walked the envelopes of one recurring payment, from its current run up to the first key the mint never signed (a stale write can move the count below an envelope already funded), once per session and again after a wallet restore; deleted payments included. The payload lists each key's status; settled false means the walk is repeated after the retry delay (mint unreachable, a melt in flight, a token not delivered yet).",
+  "recurring.deletedTokenDelivered":
+    "The Cashu token set aside for a deleted recurring payment was delivered to its contact: it may already have been in their chat, so it is theirs and never returns to the balance. The user is told once.",
+  "recurring.deletedTokenKept":
+    "A deleted Cashu recurring payment still holds a token that is not delivered here: this device knows no npub for its contact (the token goes out once the contact turns up), or part of the token was spent elsewhere (the rest is neither sent nor released). The token stays set aside, since it may already have been delivered; the user is told once per session.",
+  "recurring.envelopeReleased":
+    "The envelope of a deleted Lightning recurring payment was swapped back into the balance (or the attempt failed, see error). A Cashu recurring payment's envelope is never released: its token is delivered to the contact instead.",
   "send.rowForgotten":
     "The app dropped a pending send row because its token verifiably reached the recipient (chat message published, or payment request POSTed). Follow the row link back to the send.send operation that produced it.",
 };

@@ -26,6 +26,8 @@ interface UseRestoreMissingTokensParams {
   mintInfoDeduped: readonly { canonicalUrl?: string | null }[];
   pushToast: (message: string) => void;
   readSeenMintsFromStorage: () => string[];
+  /** Checks the recurring payment envelopes, which the counter scan cannot see. */
+  recoverEnvelopes: () => Promise<void>;
   rememberSeenMint: (mintUrl: string | null | undefined) => void;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   restoreCashuTokens: RestoreCashuTokens | null;
@@ -56,6 +58,7 @@ export const useRestoreMissingTokens = ({
   mintInfoDeduped,
   pushToast,
   readSeenMintsFromStorage,
+  recoverEnvelopes,
   rememberSeenMint,
   restoreCashuTokens,
   reclaimCashuTokens,
@@ -124,6 +127,7 @@ export const useRestoreMissingTokens = ({
               const result = await reclaimCashuTokens(
                 mode === "all" ? mints : undefined,
               );
+              if (mode === "all") await recoverEnvelopes();
               const report = result.reclaim;
               const incomplete =
                 report.unresolvedProofs.length > 0 ||
@@ -140,6 +144,7 @@ export const useRestoreMissingTokens = ({
               mints,
               setTokensRestoreProgress,
             );
+            await recoverEnvelopes();
             const incomplete =
               restore.unavailableMints.length > 0 ||
               reclaim.unresolvedProofs.length > 0;
@@ -192,6 +197,7 @@ export const useRestoreMissingTokens = ({
       mintInfoDeduped,
       pushToast,
       readSeenMintsFromStorage,
+      recoverEnvelopes,
       rememberSeenMint,
       restoreCashuTokens,
       reclaimCashuTokens,

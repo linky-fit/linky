@@ -39,7 +39,7 @@ export const cs = {
   recurringFailedBody:
     "Odeslání {amount} {unit} pro {name} se nezdařilo. Zkusím to znovu.",
   recurringWaitingForFundsBody:
-    "Na odeslání {amount} {unit} pro {name} nemáte dost prostředků. Doplňte je do další splatnosti, jinak se tato platba přeskočí.",
+    "Na odeslání {amount} {unit} pro {name} nemáte na {mint} dost prostředků. Doplňte {mint} do další splatnosti, jinak se tato platba přeskočí.",
   recurringSkippedNoFundsBody:
     "Platba {amount} {unit} pro {name} byla přeskočena: nedostatek prostředků.",
   recurringSkippedFailingBody:
@@ -54,7 +54,7 @@ export const cs = {
   recurringDueCancel: "Zrušit tuto platbu",
   recurringCancelledToast: "Platba zrušena. Další proběhne v dalším termínu.",
   recurringWaitingForFunds:
-    "Na pravidelnou platbu teď nemáte dost prostředků. Zkusím to znovu.",
+    "Na pravidelnou platbu teď nemáte na {mint} dost prostředků. Zkusím to znovu.",
   recurringWaitingForRates:
     "Chybí kurz pro přepočet pravidelné platby na saty. Zkusím to znovu.",
   recurringRecipientUnavailable:
@@ -62,6 +62,19 @@ export const cs = {
   recurringWalletBusy:
     "Peněženka je zrovna zaneprázdněná, zkuste to za chvíli.",
   recurringRunFailedToast: "Pravidelná platba se nezdařila. Zkusím to znovu.",
+  recurringNeedsAttention:
+    "Část prostředků vyhrazených na {mint} pro pravidelnou platbu byla utracena jinde. Smažte pravidelnou platbu a zbytek se vrátí do zůstatku.",
+  recurringNeedsAttentionCashu:
+    "Část tokenu, který pravidelná platba vyhradila na {mint}, byla utracena jinde. Smažte pravidelnou platbu, aby se zastavila.",
+  recurringCancelTooLate: "Tato platba už odešla a nejde ji zrušit.",
+  recurringDeletedTokenSentBody:
+    "{amount} {unit} pro {name} odesláno: smazaná pravidelná platba je už měla vyhrazené.",
+  recurringDeletedTokenKeptBody:
+    "{amount} {unit} zůstává vyhrazeno na {mint} pro smazanou pravidelnou platbu: její kontakt toto zařízení nezná a její token už mohl být doručen.",
+  recurringDeletedTokenPartlySpentBody:
+    "{amount} {unit} zůstává vyhrazeno na {mint} pro smazanou pravidelnou platbu: část jejího tokenu byla utracena jinde, takže zbytek se neodešle ani nevrátí do zůstatku.",
+  recurringDeletePreparedStillSent:
+    "Platba, která už je připravená, se kontaktu i tak odešle.",
   recurringSaveFailed: "Pravidelnou platbu se nepodařilo uložit.",
   recurringChooseContact: "Komu platit",
   recurringSearchContacts: "Hledat kontakt",
@@ -89,11 +102,10 @@ export const cs = {
   recurringNextRun: "Další platba",
   recurringLastRun: "Poslední platba",
   recurringRunsCount: "Provedeno plateb",
+  recurringMintLabel: "Platí se z",
   recurringRunPaid: "zaplaceno",
   recurringRunFailed: "selhalo",
   recurringRunSkipped: "přeskočeno",
-  recurringRunRunning: "probíhá",
-  recurringRunInterrupted: "přerušeno",
   recurringStatusActive: "aktivní",
   recurringStatusPaused: "pozastaveno",
   recurringPause: "Pozastavit",
@@ -943,9 +955,9 @@ export const cs = {
   cashuProofsColumnMint: "Mincovna",
   cashuProofsColumnMintState: "U mincovny",
   cashuHeldProofsHint:
-    "Vstupy Lightning platby, kterou mincovna ještě nevyřídila. Vrátí se nebo se utratí, jakmile mincovna odpoví.",
+    "Vyhrazeno pro pravidelnou platbu, dokud neodejde, nebo vstupy Lightning platby, kterou mincovna ještě nevyřídila.",
   cashuHeldUnknownHint:
-    "Zadržené neznámou operací. Uvolní se, jakmile mincovna nahlásí, že nejsou utracené.",
+    "Zadržené operací, která se do tohoto zařízení ještě nesynchronizovala.",
   cashuSpentProofsKept: "Utracené důkazy ponechané pro evidenci: {count}.",
   cashuTransfers: "Převody",
   cashuTransfersEmpty: "Žádné otevřené převody.",

@@ -5,6 +5,7 @@ import {
 import type { FC } from "react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
 import {
   recurringRecipientLabel,
   useRecurringContactSummaries,
@@ -22,14 +23,9 @@ import { RecurringContactAvatar } from "./RecurringContactAvatar";
 
 /** Every recurring payment with its interval pill, amount, and next due date. */
 export const RecurringPaymentsList: FC = () => {
-  const {
-    cashuBalance,
-    displayCurrency,
-    fiatRates,
-    formatDisplayedAmountParts,
-    lang,
-    t,
-  } = useAppShellCore();
+  const { mintBalanceSat } = useRecurringPaymentsContext();
+  const { displayCurrency, fiatRates, formatDisplayedAmountParts, lang, t } =
+    useAppShellCore();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
   const dateFormatter = React.useMemo(
@@ -54,7 +50,9 @@ export const RecurringPaymentsList: FC = () => {
         const state = recurringOrderState(order, nowSec);
         const amountSat = recurringAmountSat(order.amount, fiatRates);
         const underfunded =
-          state === "active" && amountSat !== null && cashuBalance < amountSat;
+          state === "active" &&
+          amountSat !== null &&
+          mintBalanceSat(order.mintUrl) < amountSat;
         const secondaryAmount = recurringAmountSecondaryText(
           order.amount,
           fiatRates,

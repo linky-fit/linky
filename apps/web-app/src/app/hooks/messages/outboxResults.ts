@@ -19,6 +19,16 @@ const parseOutboxRef = (ref: OutboxRef): ParsedOutboxRef | null => {
   return null;
 };
 
+const messageJobFailedListeners = new Set<(messageRowId: string) => void>();
+
+/** Tells a sender that the outbox gave up on the job of a message row. */
+export const onMessageJobFailed = (
+  listener: (messageRowId: string) => void,
+): (() => void) => {
+  messageJobFailedListeners.add(listener);
+  return () => messageJobFailedListeners.delete(listener);
+};
+
 export interface OutboxResultTargets {
   readonly updateLocalNostrMessage: UpdateLocalNostrMessage;
   readonly updateLocalNostrReaction: UpdateLocalNostrReaction;
@@ -38,6 +48,9 @@ export const applyOutboxResult = (
       reason: result.reason,
       ref: result.ref,
     });
+    if (parsedRef.kind === "message") {
+      for (const listener of messageJobFailedListeners) listener(parsedRef.id);
+    }
     return;
   }
 

@@ -130,7 +130,7 @@ export const publishCashuMessagePayment = async ({
       token: previewTokenText(batch.token),
     });
 
-    const clientId = ClientId.make(createId());
+    const clientId = batch.clientId ?? ClientId.make(createId());
     logPayStep("publish-pending", {
       clientId,
       token: previewTokenText(messageText),

@@ -1,5 +1,14 @@
-import { expect, test as base, type Page } from "@playwright/test";
+import {
+  expect,
+  test as base,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 import { Schema } from "effect";
+import {
+  mintUrl,
+  targetMintUrl,
+} from "../../../../packages/linkshu/tests/integration/helpers";
 import {
   expectSingleLoad,
   MOBILE_VIEWPORT,
@@ -95,8 +104,10 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
 
 export const FUNDING_SAT = 100;
 export const ORDER_SAT = 10;
-// The source swap and the receiver each pay the mint's input fee.
+// The envelope swap and the receiver each pay the mint's input fee.
 export const MAX_FEE_SAT = 2;
+/** The dev stack's default mint, which new recurring payments are bound to. */
+export const MINT_HOST = new URL(mintUrl).host;
 
 export const fundAndConnect = async (
   a: Account,
@@ -160,20 +171,107 @@ const OrderState = Schema.Struct({
   id: Schema.String,
   amount: Schema.Number,
   unit: Schema.String,
-  nextDueAtSec: Schema.Number,
-  runCount: Schema.Number,
+  rail: Schema.String,
+  progress: Schema.parseJson(
+    Schema.Struct({ runCount: Schema.Number, nextDueAtSec: Schema.Number }),
+  ),
   claimAtSec: Schema.NullOr(Schema.Number),
   claimDeviceId: Schema.NullOr(Schema.String),
   lastRunStatus: Schema.NullOr(Schema.String),
 });
 
+/** The one recurring payment row, its progress spread out as `runCount` and `nextDueAtSec`. */
 export const readOrder = async (page: Page) => {
   const rows = await page.evaluate(async () => {
     if (!window.__linkyE2E) throw new Error("Missing __linkyE2E");
-    return window.__linkyE2E.shardRows("transactions", "recurringPayment");
+    return window.__linkyE2E.shardRows("contacts", "recurringPayment");
   });
   expect(rows).toHaveLength(1);
-  return Schema.decodeUnknownSync(OrderState)(rows[0]);
+  const { progress, ...order } = Schema.decodeUnknownSync(OrderState)(rows[0]);
+  return { ...order, ...progress };
+};
+
+/** A Lightning address served by `serveLightningAddress`; no Nostr profile behind it. */
+export const LIGHTNING_ADDRESS = "carol@lnurl.test";
+/** The dev stack's second mint; its quotes stand in for the contact's invoices. */
+const INVOICE_MINT_URL = targetMintUrl;
+
+const json = (body: unknown) => ({
+  status: 200,
+  contentType: "application/json",
+  headers: { "access-control-allow-origin": "*" },
+  body: JSON.stringify(body),
+});
+
+/**
+ * Answers `LIGHTNING_ADDRESS` (LNURL-pay) in the page with invoices from the
+ * second dev mint and returns their quote ids. `invoices: false` makes every
+ * invoice request fail.
+ */
+export const serveLightningAddress = async (
+  page: Page,
+  request: APIRequestContext,
+  invoices = true,
+): Promise<string[]> => {
+  const quoteIds: string[] = [];
+  await page.route("https://lnurl.test/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/.well-known/nostr.json") {
+      return route.fulfill(json({ names: {} }));
+    }
+    if (url.pathname === "/.well-known/lnurlp/carol") {
+      return route.fulfill(
+        json({
+          tag: "payRequest",
+          callback: "https://lnurl.test/callback",
+          minSendable: 1_000,
+          maxSendable: 100_000_000,
+          metadata: JSON.stringify([["text/plain", "Carol"]]),
+        }),
+      );
+    }
+    if (!invoices) return route.fulfill({ status: 500, body: "down" });
+    const amountSat = Number(url.searchParams.get("amount")) / 1000;
+    const response = await request.post(
+      `${INVOICE_MINT_URL}/v1/mint/quote/bolt11`,
+      { data: { amount: amountSat, unit: "sat" } },
+    );
+    const quote = Schema.decodeUnknownSync(
+      Schema.Struct({ quote: Schema.String, request: Schema.String }),
+    )(await response.json());
+    quoteIds.push(quote.quote);
+    return route.fulfill(json({ pr: quote.request, routes: [] }));
+  });
+  return quoteIds;
+};
+
+/** Whether the second dev mint saw the invoice of `quoteId` paid. */
+export const invoicePaid = async (
+  request: APIRequestContext,
+  quoteId: string,
+): Promise<boolean> => {
+  const response = await request.get(
+    `${INVOICE_MINT_URL}/v1/mint/quote/bolt11/${quoteId}`,
+  );
+  const { state } = Schema.decodeUnknownSync(
+    Schema.Struct({ state: Schema.String }),
+  )(await response.json());
+  return state === "PAID" || state === "ISSUED";
+};
+
+/** Saves a contact that has only `LIGHTNING_ADDRESS`, so payments to it go over Lightning. */
+export const addLightningContact = async (page: Page): Promise<void> => {
+  await page.goto("/#contacts");
+  await page.locator("[data-guide='contact-add-button']").first().click();
+  await page.waitForURL(/#contact\/new$/);
+  const search = page.locator("[data-guide='contact-search-input']");
+  await search.fill(LIGHTNING_ADDRESS);
+  await search.press("Enter");
+  await page
+    .getByRole("button", { name: "Create contact", exact: true })
+    .click({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.waitForURL(/#(?:contacts)?$/, { timeout: 20_000 });
 };
 
 export const triggerSchedulerPass = async (page: Page): Promise<void> => {

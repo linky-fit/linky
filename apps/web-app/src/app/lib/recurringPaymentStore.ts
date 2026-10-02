@@ -1,7 +1,7 @@
 import {
   ContactId,
   NonEmptyString100,
-  NonNegativeInt,
+  NonEmptyString1000,
   PositiveInt,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
@@ -22,7 +22,7 @@ export interface RecurringPaymentInput {
 
 type RepositoryPatch = Parameters<RecurringPaymentsRepository["update"]>[1];
 
-/** The schedule and amount columns a form writes, for both insert and edit. */
+/** The schedule and amount columns a form writes; the due time goes into `progress` through a patch. */
 export const recurringPaymentColumns = (
   input: RecurringPaymentInput,
   contactId: ContactId,
@@ -34,7 +34,6 @@ export const recurringPaymentColumns = (
   intervalCount: PositiveInt.orThrow(input.interval.count),
   anchorAtSec: PositiveInt.orThrow(input.firstDueAtSec),
   timeZone: NonEmptyString100.orThrow(currentTimeZone()),
-  nextDueAtSec: PositiveInt.orThrow(input.firstDueAtSec),
 });
 
 export const readContactId = (contactId: string): ContactId | null => {
@@ -42,9 +41,8 @@ export const readContactId = (contactId: string): ContactId | null => {
   return decoded.ok ? decoded.value : null;
 };
 
-const positive = (value: number): PositiveInt => PositiveInt.orThrow(value);
 const positiveOrNull = (value: number | null): PositiveInt | null =>
-  value === null ? null : positive(value);
+  value === null ? null : PositiveInt.orThrow(value);
 
 /** Brands a package patch for the repository; its values are ours, so a bad one is a bug. */
 export const recurringPaymentUpdate = (
@@ -70,13 +68,10 @@ export const recurringPaymentUpdate = (
   ...(patch.lastRunStatus !== undefined
     ? { lastRunStatus: NonEmptyString100.orThrow(patch.lastRunStatus) }
     : {}),
-  ...(patch.nextDueAtSec !== undefined
-    ? { nextDueAtSec: positive(patch.nextDueAtSec) }
-    : {}),
   ...(patch.pausedAtSec !== undefined
     ? { pausedAtSec: positiveOrNull(patch.pausedAtSec) }
     : {}),
-  ...(patch.runCount !== undefined
-    ? { runCount: NonNegativeInt.orThrow(patch.runCount) }
+  ...(patch.progress !== undefined
+    ? { progress: NonEmptyString1000.orThrow(patch.progress) }
     : {}),
 });

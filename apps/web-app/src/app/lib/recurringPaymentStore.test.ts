@@ -1,16 +1,15 @@
 import type { RecurringPaymentRecord } from "@linky-fit/linksync";
-import {
-  NonEmptyString100,
-  NonNegativeInt,
-  PositiveInt,
-} from "@linky-fit/linksync";
+import { NonEmptyString100, PositiveInt } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import {
   contactIdFor,
   recurringPaymentIdFor,
 } from "../../testUtils/recurringOrders";
-import { readRecurringPaymentOrder } from "@linky-fit/recurring-payment";
+import {
+  readRecurringPaymentOrder,
+  recurringProgressColumn,
+} from "@linky-fit/recurring-payment";
 
 const { appOwner } = makeTestLinkyStore();
 
@@ -24,16 +23,20 @@ const record = (
   isDeleted: null,
   createdAtSec: PositiveInt.orThrow(1_700_000_000),
   contactId: contactIdFor("contact-1"),
+  mintUrl: "https://mint.example",
+  rail: "cashu",
   amount: PositiveInt.orThrow(21_000),
   unit: "sat",
   intervalUnit: "month",
   intervalCount: PositiveInt.orThrow(1),
   anchorAtSec: PositiveInt.orThrow(1_700_000_000),
   timeZone: NonEmptyString100.orThrow("Europe/Prague"),
-  nextDueAtSec: PositiveInt.orThrow(1_702_592_400),
+  progress: recurringProgressColumn({
+    runCount: 0,
+    nextDueAtSec: 1_702_592_400,
+  }),
   lastRunAtSec: null,
   lastRunStatus: null,
-  runCount: null,
   pausedAtSec: null,
   claimDeviceId: null,
   claimAtSec: null,
@@ -42,11 +45,13 @@ const record = (
 });
 
 describe("readRecurringPaymentOrder", () => {
-  it("reads a payment with defaults filled in", () => {
+  it("reads a payment with its mint, rail and no run yet", () => {
     expect(readRecurringPaymentOrder(record())).toEqual({
       id: recurringPaymentIdFor("rp-1"),
       createdAtSec: 1_700_000_000,
       contactId: contactIdFor("contact-1"),
+      mintUrl: "https://mint.example",
+      rail: "cashu",
       amount: { amount: 21_000, unit: "sat" },
       schedule: {
         anchorAtSec: 1_700_000_000,
@@ -76,7 +81,10 @@ describe("readRecurringPaymentOrder", () => {
         claimAtSec: PositiveInt.orThrow(1_702_592_100),
         claimDueAtSec: PositiveInt.orThrow(1_702_592_400),
         lastRunStatus: NonEmptyString100.orThrow("paid"),
-        runCount: NonNegativeInt.orThrow(3),
+        progress: recurringProgressColumn({
+          runCount: 3,
+          nextDueAtSec: 1_702_592_400,
+        }),
       }),
     );
     expect(order?.claim).toEqual({
@@ -100,6 +108,8 @@ describe("readRecurringPaymentOrder", () => {
   });
 
   it.each([
+    ["unknown rail", { rail: "carrier pigeon" }],
+    ["unreadable progress", { progress: "{}" }],
     ["unknown interval unit", { intervalUnit: "fortnight" }],
     ["unknown amount unit", { unit: "gold" }],
   ])("rejects a record with %s", (_label, overrides) => {

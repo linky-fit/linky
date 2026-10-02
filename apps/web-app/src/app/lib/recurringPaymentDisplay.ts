@@ -38,10 +38,6 @@ export const recurringLastRunLabel = (
       return t("recurringRunFailed");
     case "skipped":
       return t("recurringRunSkipped");
-    case "running":
-      return t("recurringRunRunning");
-    case "interrupted":
-      return t("recurringRunInterrupted");
     case null:
       return null;
   }

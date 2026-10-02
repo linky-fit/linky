@@ -33,6 +33,7 @@ import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import { normalizeLocale } from "../utils/formatting";
+import { formatMintHost } from "../utils/mint";
 import { nowSeconds } from "../utils/time";
 
 type Frequency = Extract<RecurringIntervalUnit, "day" | "week" | "month">;
@@ -145,8 +146,9 @@ function RecurringPaymentForm({
 }: RecurringPaymentFormProps): React.ReactElement {
   const { cashuIsBusy, displayCurrency, displayUnit, fiatRates, lang, t } =
     useAppShellCore();
-  const { createRecurringPayment, updateRecurringPayment } =
+  const { createRecurringPayment, defaultMintUrl, updateRecurringPayment } =
     useRecurringPaymentsContext();
+  const mintUrl = order ? order.mintUrl : defaultMintUrl;
   const contacts = useRecurringContactSummaries();
 
   const [contactId, setContactId] = React.useState(initial.contactId);
@@ -360,6 +362,9 @@ function RecurringPaymentForm({
                 )}
         </span>
       </p>
+
+      <label>{t("recurringMintLabel")}</label>
+      <p className="muted recurring-summary">{formatMintHost(mintUrl)}</p>
 
       {error ? <p className="error-text">{error}</p> : null}
       <p className="muted recurring-hint">{t("recurringOnlyWhileOpen")}</p>
