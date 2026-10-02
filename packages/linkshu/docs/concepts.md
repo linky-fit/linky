@@ -47,6 +47,8 @@ The wallet is an inventory. The `ProofStore` holds one `StoredProof` per proof; 
 
 Proof secrets derive from the seed and a per-(mint, unit, keyset) counter (NUT-13). Two contexts (tabs, a service worker, two CLI processes) advancing one counter at once would derive the same secrets and collide at the mint. So every context on a device that uses the seed shares one durable `KeyValueStore`; the package serializes counter use through a lease in that store, renewed for as long as the operation holding it runs, and recovers from collisions itself. If it cannot get the lease in time, the operation fails with `CounterLockTimeout` before deriving anything.
 
+Receives also take turns per mint, through a receive lease in the same store: wallets loaded before and after a keyset rotation bind different keysets, so the counter lease alone would let two contexts receive one token at once. The order is fixed: a receive takes the mint's receive lease first and the counter lease second, and nothing waits for a receive lease while it holds a counter lease, so the two never deadlock. Waiting 30 s for a receive lease fails with `CounterLockTimeout`, its `keysetId` null.
+
 Counters never move backwards and over-advance on ambiguity (blank outputs, collisions): a gap costs a restore scan, a reuse costs a mint rejection loop. The counter slot a quote attempt reserved is also written onto the operation (`counter`), which syncs, so a resume on another device re-derives the same outputs instead of burning a second block.
 
 ## Error classification

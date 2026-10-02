@@ -2,7 +2,7 @@ import type { Proof as CashuProof, SwapPreview } from "@cashu/cashu-ts";
 import { Duration, Effect, Either, Schema } from "effect";
 import {
   AmountConsumedByFee,
-  type CounterLockTimeout,
+  CounterLockTimeout,
   MintRejected,
   MintUnreachable,
   TokenAlreadyKnown,
@@ -20,6 +20,7 @@ import {
   withCounterLock,
 } from "../../internal/counters";
 import type { CounterScope } from "../../internal/counters";
+import { withKeyLease } from "../../internal/lease";
 import {
   insertOperation,
   inspectOperationWith,
@@ -727,6 +728,34 @@ const dedup = (
     return { reopened, proofs };
   });
 
+const RECEIVE_LOCK_KEY_PREFIX = "linkshu.receiveLock.";
+
+/**
+ * Cross-context turns over a mint's receives. The counter lock alone would
+ * not do: wallets loaded before and after a keyset rotation bind different
+ * keysets, so two contexts would take different counter locks for one
+ * token. Taken before the counter lock, never while holding one. Waiting
+ * longer than 30 s fails with `CounterLockTimeout`, its `keysetId` null.
+ */
+export const withReceiveLock =
+  (
+    kv: KeyValueStoreService,
+    { mint, unit }: { readonly mint: MintUrl; readonly unit: CurrencyUnit },
+  ) =>
+  <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | CounterLockTimeout, R> =>
+    withKeyLease(kv, RECEIVE_LOCK_KEY_PREFIX + encodeURIComponent(mint), {
+      acquireTimeoutMs: 30_000,
+      // Slower polling than the counter lock bounds a 30 s wait at 60 store calls.
+      pollMs: 500,
+    })(effect).pipe(
+      Effect.catchTag(
+        "LeaseLockTimeout",
+        () => new CounterLockTimeout({ mint, unit, keysetId: null }),
+      ),
+    );
+
 /**
  * Receiving a token is one call: extract and decode the text, dedup against
  * stored transfers and proofs, ask the mint whether the proofs are spent,
@@ -736,9 +765,10 @@ const dedup = (
  * `failed`, carrying the serialized error, so that pasting the text again
  * retries it.
  *
- * Everything after the mint's keysets load runs under the counter lock, so
- * two contexts receiving one token see each other's outcome. Each swap
- * attempt persists its output slot on the transfer before it reaches the
+ * Everything after parsing runs under the mint's receive lock, so two
+ * contexts receiving one token see each other's outcome whatever keyset
+ * their wallets bind; dedup, writes and the swap run under the counter lock
+ * as well. Each swap attempt persists its output slot on the transfer before it reaches the
  * mint: receiving the text of an unfinished receive resumes it, taking the
  * outputs from NUT-09 when the mint already signed them.
  *
@@ -754,14 +784,13 @@ const dedup = (
  * and the send `returned` only once the fresh proofs are stored, so funds are
  * never outside the store.
  */
-export const receiveTokenText = (
+const receiveParsed = (
   ctx: ReceiveContext,
-  text: string,
+  parsed: ReceivableToken,
   replaced: ReplacedTransfer | null,
 ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
   Effect.gen(function* () {
     const reason = replaced?.reason ?? "receive";
-    const parsed = yield* parseReceivable(text);
     // The mint's keysets decide dedup (short v2 ids in v4 text) and the fee,
     // so a mint that will not load ends the receive before anything is recorded.
     const wallet = yield* ctx.instances.get(parsed.mint, parsed.unit);
@@ -899,3 +928,13 @@ export const receiveTokenText = (
       }),
     );
   });
+
+/** Receives pasted or message-borne text, or takes back `replaced`. */
+export const receiveTokenText = (
+  ctx: ReceiveContext,
+  text: string,
+  replaced: ReplacedTransfer | null,
+): Effect.Effect<ReceiveReceipt, ReceiveError> =>
+  Effect.flatMap(parseReceivable(text), (parsed) =>
+    receiveParsed(ctx, parsed, replaced).pipe(withReceiveLock(ctx.kv, parsed)),
+  );

@@ -27,8 +27,8 @@ The receipt's `tokenText` is the re-signed encoding of the proofs now in the wal
 ## How it works
 
 1. Extract. `extractTokenText` finds a token inside arbitrary text: bare `cashuA…`/`cashuB…`, `cashu:`/`web+cashu:`/`lightning:`/`nostr:` schemes, URLs carrying the token in a query parameter, hash, or path, and legacy cashu.me JSON bundles.
-2. Load the mint and decode the token's proofs. The mint's keysets expand the short keyset ids of v4 text and decide the fee; when the ids do not resolve, the keysets are refreshed from the mint once. A mint that does not load or refresh ends the receive before anything is written. A token whose proofs still do not decode after a refresh names no keyset of the mint and fails `TokenParseFailed` (`undecodable`), writing nothing.
-3. Take the counter lock. Everything from here on runs under the lock of the mint's active keyset, so two contexts receiving one token see each other's outcome.
+2. Take the mint's receive lease, held to the end of the receive. It is per mint, whatever keyset a context's wallet binds, so two contexts receiving one token see each other's outcome even across a keyset rotation. Then load the mint and decode the token's proofs. The mint's keysets expand the short keyset ids of v4 text and decide the fee; when the ids do not resolve, the keysets are refreshed from the mint once. A mint that does not load or refresh ends the receive before anything is written. A token whose proofs still do not decode after a refresh names no keyset of the mint and fails `TokenParseFailed` (`undecodable`), writing nothing.
+3. Take the counter lock of the mint's active keyset. Everything from here on runs under it as well.
 4. Dedup. The text is known when a `send` or a `done` receive carries it, or when any proof secret it encodes is already in the inventory, in any state. A match fails with `TokenAlreadyKnown` and touches nothing: swapping a token whose proofs the wallet holds would kill the stored copies. An unfinished receive of the text (`pending` or `failed`) is not a match; it is resumed in place (below).
 5. Check the fee. The mint's input fee for the token's proofs (NUT-02) must leave something to sign, else `AmountConsumedByFee` before any inventory change.
 6. Check the proof states (NUT-07), when the mint lists NUT-07 in its info; taking back a `send` skips it, its handed-out proofs being the wallet's own. A proof the mint reports `SPENT` fails with `TokenAlreadySpent` and nothing is written, unless the receive's own recorded attempt spent it (below). A mint that cannot be reached, rejects the check, reports a proof `PENDING` or leaves one unanswered, or has not answered within 15 seconds fails with `MintUnreachable` or `MintRejected`, and nothing is written either.
@@ -68,7 +68,7 @@ Guide-specific tags; the rest are in [errors.md](./errors.md).
 | `AmountConsumedByFee` | the token is worth no more than the mint's input fee for its proofs                                | none                                                                                                        |
 | `TokenAlreadySpent`   | the mint reported the proofs spent                                                                 | none from the state check (a resumed receive as it was); `failed` from the swap (`Tokens.forget` closes it) |
 
-`MintRejected` and `MintUnreachable` from loading the mint, refreshing its keysets or the state check write nothing; from the swap they leave the receive `failed`. `MintUnreachable` may be retried. `CounterLockTimeout` comes before anything is recorded; retry it.
+`MintRejected` and `MintUnreachable` from loading the mint, refreshing its keysets or the state check write nothing; from the swap they leave the receive `failed`. `MintUnreachable` may be retried. `CounterLockTimeout` comes before anything is recorded (`keysetId` null when another context held the mint's receive lease for 30 s); retry it.
 
 ## Related
 

@@ -41,7 +41,7 @@ import { parseTokenText } from "../token/codec";
 import { ReceiveDraft } from "./domain";
 import { Inspector } from "../inspector/Inspector";
 import { Receive } from "./Receive";
-import { receiveTokenText } from "./internal/acceptFlow";
+import { receiveTokenText, withReceiveLock } from "./internal/acceptFlow";
 
 const mint = MintUrl.make("https://mint.example");
 const counterKey = deterministicCounterKey({
@@ -899,6 +899,113 @@ describe("Receive.receive", () => {
     expect(operations).toEqual([
       expect.objectContaining({ kind: "receive", status: "done" }),
     ]);
+  });
+
+  it("keeps a second receive of the text out while it runs in a context whose wallet binds a newer keyset", async () => {
+    let spent = false;
+    let answerFirstSwap = () => {};
+    const firstSwapAnswered = new Promise<void>((resolve) => {
+      answerFirstSwap = resolve;
+    });
+    const swaps: string[] = [];
+    const walletBoundTo = (keysetId: string) =>
+      makeWallet({
+        keysetId,
+        receive: async () => {
+          swaps.push(keysetId);
+          if (swaps.length === 1) await firstSwapAnswered;
+          if (spent)
+            throw new MintOperationError(11001, "Token already spent.");
+          spent = true;
+          return receivedProofs;
+        },
+      }).wallet;
+    const olderKeyset = walletBoundTo(KEYSET_HEX);
+    const newerKeyset = walletBoundTo("00c0ffee00c0ffee");
+    const { run } = makeHarness(olderKeyset);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(1_700_000_000_000);
+        const stores = {
+          kv: yield* KeyValueStore,
+          proofStore: yield* ProofStore,
+          operationStore: yield* OperationStore,
+          inspector: yield* Inspector.orNoop,
+        };
+        const receiveIn = (wallet: LoadedWallet) =>
+          Effect.either(
+            receiveTokenText(
+              {
+                ...stores,
+                instances: WalletInstances.make({
+                  get: () => Effect.succeed(wallet),
+                }),
+              },
+              sourceToken,
+              null,
+            ),
+          );
+        const receipts = yield* runOnTestClock(
+          Effect.all(
+            [
+              receiveIn(olderKeyset),
+              Effect.delay(receiveIn(newerKeyset), "1 second"),
+              Effect.delay(Effect.sync(answerFirstSwap), "2 seconds"),
+            ],
+            { concurrency: "unbounded" },
+          ),
+          "100 millis",
+        );
+        return { receipts, ...(yield* inventory) };
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    const {
+      receipts: [first, second],
+      operations,
+    } = exit.value;
+    expect(first._tag).toBe("Right");
+    assert(second._tag === "Left");
+    expect(second.left._tag).toBe("TokenAlreadyKnown");
+    expect(swaps).toEqual([KEYSET_HEX]);
+    expect(operations).toEqual([
+      expect.objectContaining({ kind: "receive", status: "done" }),
+    ]);
+  });
+
+  it("writes nothing and fails CounterLockTimeout without a keyset when another context holds the mint's receives for 30 s", async () => {
+    const { wallet, receiveCounters } = makeWallet({
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.fork(
+          Effect.never.pipe(
+            withReceiveLock(yield* KeyValueStore, {
+              mint,
+              unit: CurrencyUnit.make("sat"),
+            }),
+          ),
+        );
+        const receipt = yield* runOnTestClock(
+          Effect.either(receiveText(sourceToken)),
+          "1 second",
+        );
+        return { receipt, ...(yield* inventory) };
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "CounterLockTimeout",
+      mint,
+      keysetId: null,
+    });
+    expect(receiveCounters).toEqual([]);
+    expect(exit.value.operations).toEqual([]);
   });
 });
 

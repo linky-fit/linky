@@ -147,15 +147,16 @@ export class QuoteAlreadyIssued extends Schema.TaggedError<QuoteAlreadyIssued>()
 ) {}
 
 /**
- * The cross-context lease protecting this deterministic counter could not be
- * acquired in time; another tab/process holds it. Nothing was derived.
+ * A cross-context lease could not be acquired in time; another tab/process
+ * holds it. `keysetId` names the deterministic counter the lease protects,
+ * or is null for the lease over the mint's receives.
  */
 export class CounterLockTimeout extends Schema.TaggedError<CounterLockTimeout>()(
   "CounterLockTimeout",
   {
     mint: MintUrl,
     unit: CurrencyUnit,
-    keysetId: KeysetId,
+    keysetId: Schema.NullOr(KeysetId),
   },
 ) {}
 
