@@ -36,7 +36,7 @@ export interface AdvancedSettingsContextValue {
   receiveMethod: ReceiveMethod;
   relayUrls: string[];
   requestImportAppData: () => void;
-  requestLogout: () => void;
+  requestLogout: (options: { evoluConnected: boolean }) => void;
   requestPasteNostrKeys: () => Promise<void>;
   saveSeedToPasswordManager: () => Promise<PasswordManagerSaveResult>;
   seedMnemonic: string | null;

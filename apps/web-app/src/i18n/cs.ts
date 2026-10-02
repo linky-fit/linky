@@ -108,7 +108,10 @@ export const cs = {
   paymentsHistoryFee: "Poplatek",
 
   logout: "Odhlásit se",
-  logoutArmedHint: "Pro odhlášení klikněte ještě jednou.",
+  logoutArmedHint:
+    "Pro odhlášení a smazání dat Linky z tohoto zařízení klikněte ještě jednou.",
+  logoutUnsyncedArmedHint:
+    "Toto zařízení není synchronizované. Odhlášení smaže změny a peníze, které se nedostaly na server. Pro odhlášení přesto klikněte ještě jednou.",
 
   nostrIdentity: "Nostr identita",
   masterKeys: "Hlavní klíče",

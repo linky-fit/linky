@@ -399,7 +399,11 @@ export function AdvancedPage(): React.ReactElement {
               ? "settings-danger-link is-armed"
               : "settings-danger-link"
           }
-          onClick={requestLogout}
+          onClick={() =>
+            requestLogout({
+              evoluConnected: evoluOverallStatus === "connected",
+            })
+          }
           icon={<LogOut size={18} />}
           label={t("logout")}
         />

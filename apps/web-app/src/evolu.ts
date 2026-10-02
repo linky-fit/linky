@@ -21,6 +21,11 @@ import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "./mnemonic";
+import {
+  activeEvoluDbName,
+  evoluDbNameFor,
+  wipeScheduledEvoluDatabases,
+} from "./platform/evoluLocalDatabase";
 import { shouldUseInMemoryEvoluStorage } from "./platform/evoluWebStorage";
 import type { JsonValue } from "./types/json";
 import { base64 } from "@scure/base";
@@ -71,20 +76,6 @@ const envEvoluServerUrls = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
   .split(",")
   .map((url) => url.trim())
   .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
-
-// Generate a valid SimpleName (1-42 chars, alphanumeric + dash) from mnemonic
-// Each user gets their own SQLite database file
-const generateDbNameFromMnemonic = (mnemonic: string): string => {
-  // Simple hash function to create a short unique identifier
-  let hash = 0;
-  for (let i = 0; i < mnemonic.length; i++) {
-    const char = mnemonic.charCodeAt(i);
-    hash = ((hash << 5) - hash + char) | 0;
-  }
-  // Convert to positive hex string, take first 8 chars for brevity
-  const hashHex = Math.abs(hash).toString(16).padStart(8, "0").slice(0, 8);
-  return `linky-${hashHex}`;
-};
 
 type Stringifiable =
   | string
@@ -514,9 +505,7 @@ export const Schema = {
 };
 
 const createEvoluForUser = (mnemonic: string | null) => {
-  const dbName = mnemonic ? generateDbNameFromMnemonic(mnemonic) : "linky-anon";
-
-  const validatedName = SimpleName.from(dbName);
+  const validatedName = SimpleName.from(evoluDbNameFor(mnemonic));
   const finalName = validatedName.ok
     ? validatedName.value
     : SimpleName.orThrow("linky-default");
@@ -551,6 +540,8 @@ const getEvolu = (mnemonic?: string | null): EvoluInstance => {
 };
 
 export const evolu = getEvolu();
+
+void wipeScheduledEvoluDatabases();
 
 let linkyStorePromise: Promise<LinkyStore> | null = null;
 
@@ -809,11 +800,7 @@ const getEvoluDatabaseInfo = async (
       const root = await navigator.storage?.getDirectory?.();
       if (!root) return 0;
 
-      const mnemonic = safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY);
-
-      const expectedDir = mnemonic
-        ? `.${generateDbNameFromMnemonic(mnemonic)}`
-        : ".linky-anon";
+      const expectedDir = `.${activeEvoluDbName()}`;
 
       let totalSize = 0;
       const allDirs: string[] = [];

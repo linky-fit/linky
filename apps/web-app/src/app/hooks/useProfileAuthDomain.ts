@@ -43,6 +43,7 @@ import {
   readStoredSlip39Seed,
   writeStoredCashuMnemonic,
 } from "../../platform/identitySecrets";
+import { scheduleActiveEvoluDatabaseWipe } from "../../platform/evoluLocalDatabase";
 import { triggerPasswordManagerSeedSave } from "../../platform/passwordManager";
 import { CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY } from "../../utils/constants";
 import { getDefaultNip05IdentifierFromAddress } from "../../utils/nostrNip05";
@@ -142,7 +143,7 @@ interface UseProfileAuthDomainResult {
   pasteReturningSlip39FromClipboard: () => Promise<void>;
   pickPendingOnboardingPhoto: () => Promise<void>;
   requestPasteNostrKeys: () => Promise<void>;
-  requestLogout: () => void;
+  requestLogout: (options: { evoluConnected: boolean }) => void;
   savePendingOnboardingBackupToPasswordManager: () => Promise<void>;
   seedMnemonic: string | null;
   cyclePendingOnboardingAvatarControl: (
@@ -999,27 +1000,33 @@ export const useProfileAuthDomain = ({
     t,
   ]);
 
-  const requestLogout = React.useCallback(() => {
-    if (!logoutArmed) {
-      setLogoutArmed(true);
-      pushToast(t("logoutArmedHint"));
-      return;
-    }
+  const requestLogout = React.useCallback(
+    ({ evoluConnected }: { evoluConnected: boolean }) => {
+      if (!logoutArmed) {
+        setLogoutArmed(true);
+        pushToast(
+          t(evoluConnected ? "logoutArmedHint" : "logoutUnsyncedArmedHint"),
+        );
+        return;
+      }
 
-    void (async () => {
-      setLogoutArmed(false);
-      await clearIdentitySecrets();
+      void (async () => {
+        setLogoutArmed(false);
+        scheduleActiveEvoluDatabaseWipe();
+        await clearIdentitySecrets();
 
-      setIsSeedLogin(false);
-      setActiveNostrIdentitySource("derived");
-      setCashuSeedMnemonic(null);
-      setSlip39Seed(null);
-      clearLegacyLaneStorage();
+        setIsSeedLogin(false);
+        setActiveNostrIdentitySource("derived");
+        setCashuSeedMnemonic(null);
+        setSlip39Seed(null);
+        clearLegacyLaneStorage();
 
-      navigateTo({ route: "contacts" });
-      globalThis.location.reload();
-    })();
-  }, [logoutArmed, pushToast, t]);
+        navigateTo({ route: "contacts" });
+        globalThis.location.reload();
+      })();
+    },
+    [logoutArmed, pushToast, t],
+  );
 
   React.useEffect(() => {
     if (!logoutArmed) return;

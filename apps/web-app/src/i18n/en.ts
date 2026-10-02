@@ -108,7 +108,10 @@ export const en = {
   paymentsHistoryFee: "Fee",
 
   logout: "Log out",
-  logoutArmedHint: "Click once more to log out.",
+  logoutArmedHint:
+    "Click once more to log out and delete Linky's data from this device.",
+  logoutUnsyncedArmedHint:
+    "This device isn't synced. Logging out deletes changes and funds that haven't reached a server. Click once more to log out anyway.",
 
   nostrIdentity: "Nostr identity",
   masterKeys: "Master keys",

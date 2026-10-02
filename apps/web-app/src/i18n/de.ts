@@ -110,7 +110,10 @@ export const de = {
   paymentsHistoryEmpty: "Noch keine Transaktionen.",
   paymentsHistoryFee: "Gebühr",
   logout: "Abmelden",
-  logoutArmedHint: "Klicke zum Abmelden noch einmal.",
+  logoutArmedHint:
+    "Klicke noch einmal, um dich abzumelden und Linkys Daten von diesem Gerät zu löschen.",
+  logoutUnsyncedArmedHint:
+    "Dieses Gerät ist nicht synchronisiert. Beim Abmelden werden Änderungen und Guthaben gelöscht, die keinen Server erreicht haben. Klicke noch einmal, um dich trotzdem abzumelden.",
 
   nostrIdentity: "Nostr-Identität",
   masterKeys: "Hauptschlüssel",
