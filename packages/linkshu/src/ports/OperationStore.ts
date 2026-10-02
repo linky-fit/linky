@@ -17,7 +17,8 @@ import {
  * `topup`, `autoswap`) are what a resumer finishes after a crash; transfer
  * kinds (`send`, `receive`) remember token text for dedup and for taking a
  * handed-out token back; a `deferredReceive` keeps the text of a token whose
- * mint could not be reached until `Receive.resumeDeferred` receives it.
+ * mint could not be reached until `Receive.resumeDeferred` receives it; an
+ * `envelope` holds the proofs a caller's key reserved, its text naming them.
  * Inputs are never stored on the operation: they are the proof rows whose
  * `operationId` points here.
  */
@@ -28,6 +29,7 @@ export const OperationKind = Schema.Literal(
   "send",
   "receive",
   "deferredReceive",
+  "envelope",
 );
 export type OperationKind = typeof OperationKind.Type;
 
@@ -40,6 +42,8 @@ export type OperationKind = typeof OperationKind.Type;
  * - `deferredReceive`: `pending` → `done` (received, here or on another
  *   device, handed to its `receive`, or discarded) | `failed` (spent,
  *   eaten by the mint's fee or undecodable, see `error`)
+ * - `envelope`: `pending` (proofs `held`) → `issued` (token handed out) →
+ *   `done` (spent at the mint) | `returned` (released into the wallet)
  */
 export const OperationStatus = Schema.Literal(
   "pending",
@@ -59,7 +63,10 @@ const operationFields = {
   /** The target mint for `autoswap`. */
   mint: MintUrl,
   unit: CurrencyUnit,
-  /** Quote kinds and transfers: the keyset the deterministic outputs derive from. */
+  /**
+   * Quote kinds and transfers: the keyset the deterministic outputs derive
+   * from; `envelope`: the keyset its proofs were signed on.
+   */
   keysetId: Schema.NullOr(KeysetId),
   amount: Amount,
   /** `melt` only. */
@@ -85,7 +92,8 @@ const operationFields = {
   createdAt: UnixSeconds,
   /**
    * Transfer kinds and `deferredReceive`: the original text, kept for dedup,
-   * `returnToWallet` and the deferred retry.
+   * `returnToWallet` and the deferred retry; `envelope`: its proofs; a
+   * `melt` paying from an envelope: that envelope's text.
    */
   tokenText: Schema.NullOr(TokenText),
   /** Serialized tagged error of the last failure. */
@@ -111,19 +119,19 @@ export interface OperationPatch {
 }
 
 /**
- * The natural key an operation id derives from: an operation with token text
- * is identified by its kind and that text, a quote operation by kind, mint,
- * and quote id. A `deferredReceive` therefore never shares a row with the
- * `receive` of the same text.
+ * The natural key an operation id derives from: a quote operation is
+ * identified by kind, mint, and quote id, any other by its kind and token
+ * text. A `deferredReceive` therefore never shares a row with the `receive`
+ * of the same text, nor a melt with the envelope it pays from.
  * Adapters hash it into their own id format (`deriveStoreId` for stores
  * without one).
  */
 export const operationKeyOf = (
   operation: Pick<NewOperation, "kind" | "mint" | "quoteId" | "tokenText">,
 ): string =>
-  operation.tokenText === null
-    ? [operation.kind, operation.mint, operation.quoteId ?? ""].join("|")
-    : [operation.kind, operation.tokenText].join("|");
+  operation.quoteId === null && operation.tokenText !== null
+    ? [operation.kind, operation.tokenText].join("|")
+    : [operation.kind, operation.mint, operation.quoteId ?? ""].join("|");
 
 export interface OperationStoreService {
   /**

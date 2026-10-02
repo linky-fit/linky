@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import {
   Amount,
   CurrencyUnit,
+  EnvelopeKey,
   KeysetId,
   MintUrl,
   NonNegativeAmount,
@@ -184,6 +185,30 @@ export class MintInUse extends Schema.TaggedError<MintInUse>()("MintInUse", {
   proofCount: Schema.Int.pipe(Schema.nonNegative()),
   deferredReceiveCount: Schema.Int.pipe(Schema.nonNegative()),
 }) {}
+
+/**
+ * Another context on this device holds the envelope's lease (it is opening,
+ * melting or releasing it) and did not finish in time. Transient.
+ */
+export class EnvelopeBusy extends Schema.TaggedError<EnvelopeBusy>()(
+  "EnvelopeBusy",
+  {
+    mint: MintUrl,
+    key: EnvelopeKey,
+  },
+) {}
+
+/**
+ * No envelope with that key is open on this device: never opened here, or
+ * its proofs are already handed out, being melted, spent or released.
+ */
+export class EnvelopeNotFound extends Schema.TaggedError<EnvelopeNotFound>()(
+  "EnvelopeNotFound",
+  {
+    mint: MintUrl,
+    key: EnvelopeKey,
+  },
+) {}
 
 export class OperationNotFound extends Schema.TaggedError<OperationNotFound>()(
   "OperationNotFound",

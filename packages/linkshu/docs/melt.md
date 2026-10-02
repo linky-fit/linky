@@ -69,7 +69,33 @@ const settleInterruptedMelts = Effect.gen(function* () {
 });
 ```
 
+An input can sync in from another device after its melt closed here (a melt operation synced ahead of its proof rows). Each `resumePending` also settles such inputs by the melt's outcome, with reason `melt-late-input`: `spent` under a `paid` melt, else back to the melt's envelope or to the balance.
+
 Do not pay the invoice again while a melt is pending: `melt` with the same `quoteId` fails with `PaymentFailed` while the quote is not `UNPAID`. `held` inputs are not a transfer; `Tokens.returnToWallet` cannot release them, only the mint's answer through `resumePending` does.
+
+## Paying from an envelope
+
+`meltEnvelope(draft)` pays an invoice with an open envelope's proofs ([envelope.md](./envelope.md)). The invoice must ask for exactly the envelope's amount, else `PaymentFailed` before anything moves. `available` proofs at the same mint cover only the fee reserve and the input fees: that much is swapped out fee-inclusive as for `melt`, nothing when both are zero.
+
+```ts
+import { Effect } from "effect";
+import { EnvelopeMeltDraft, Melt } from "@linky-fit/linkshu";
+import type { Bolt11Invoice, EnvelopeKey, MintUrl } from "@linky-fit/linkshu";
+
+const payFromEnvelope = (
+  mint: MintUrl,
+  key: EnvelopeKey,
+  invoice: Bolt11Invoice,
+) =>
+  Effect.gen(function* () {
+    const melt = yield* Melt;
+    return yield* melt.meltEnvelope(
+      new EnvelopeMeltDraft({ mint, key, invoice }),
+    );
+  });
+```
+
+The envelope's proofs move `held` under the `melt` operation with the other inputs, and the melt operation keeps the envelope's token text, so whichever device settles the melt knows which inputs are the envelope's. The melt runs and resumes as above. When the mint answers `PAID` the envelope closes `done`; when the melt ends `unpaid` or `failed`, the envelope's proofs go back `held` under the envelope (whose operation is stored first if it has not synced to this device) and only the other inputs return to the balance, so the next attempt pays from the same envelope. Two wallets melting one envelope for different invoices end the same way: the mint pays one melt and rejects the other's spent inputs, the loser's envelope proofs go back under its envelope, and its next `Envelope.state` reads `spent`. It fails with `EnvelopeNotFound` when the envelope is not open here and with `EnvelopeBusy` when another context holds its lease.
 
 ## Errors
 

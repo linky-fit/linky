@@ -44,6 +44,7 @@ import {
   answerProofStates,
   fakeMintInfo,
   fakeReceiveSwap,
+  fakeKeyChain,
   fakeWallet,
   KEYSET_HEX,
   proof,
@@ -103,7 +104,7 @@ const makeWallet = (args: FakeWalletArgs) => {
   const restoreCalls: Array<{ start: number; count: number }> = [];
   const wallet = fakeWallet({
     keysetId: args.keysetId ?? KEYSET_HEX,
-    keyChain: { getKeysets: () => args.keysets ?? [] },
+    keyChain: fakeKeyChain(args.keysets),
     getMintInfo: () => fakeMintInfo(args.advertisesStateCheck ?? true),
     loadMint: args.loadMint ?? (() => Promise.reject(new TypeError("offline"))),
     checkProofsStates:

@@ -98,6 +98,16 @@ export const OperationId = Schema.NonEmptyTrimmedString.pipe(
 );
 export type OperationId = typeof OperationId.Type;
 
+/**
+ * The caller's name for an envelope. Its outputs derive from the seed and
+ * this key alone, so one key names one envelope on every device; never
+ * reuse a key for a different payment.
+ */
+export const EnvelopeKey = Schema.NonEmptyTrimmedString.pipe(
+  Schema.brand("EnvelopeKey"),
+);
+export type EnvelopeKey = typeof EnvelopeKey.Type;
+
 /** Deterministic-derivation counter position (NUT-13); per mint/unit/keyset. */
 export const DeterministicCounter = Schema.Int.pipe(
   Schema.nonNegative(),

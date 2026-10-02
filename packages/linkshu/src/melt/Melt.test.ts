@@ -8,6 +8,7 @@ import type {
 import { Amount, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
 import {
+  Bip39Seed,
   Bolt11Invoice,
   CurrencyUnit,
   KeysetId,
@@ -17,6 +18,7 @@ import {
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
+import { CashuSeed } from "../ports/CashuSeed";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import type { StoredOperation } from "../ports/OperationStore";
@@ -196,6 +198,7 @@ const makeHarness = (
         Layer.succeed(KeyValueStore, storage.kv),
         Layer.succeed(ProofStore, storage.proofs),
         Layer.succeed(OperationStore, storage.operations),
+        CashuSeed.fromBytes(Bip39Seed.make(new Uint8Array(64))),
         inspector.layer,
       ),
     ),

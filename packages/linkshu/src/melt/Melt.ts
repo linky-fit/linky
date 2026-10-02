@@ -1,10 +1,11 @@
 import type {
   MeltProofsResponse,
   MeltQuoteBolt11Response,
-  Proof as CashuProof,
+  SendResponse,
 } from "@cashu/cashu-ts";
 import { Duration, Effect, Either, Schema } from "effect";
 import {
+  EnvelopeNotFound,
   InsufficientFunds,
   MintRejected,
   MintUnreachable,
@@ -13,7 +14,23 @@ import {
   QuoteExpired,
 } from "../domain/errors";
 import { Amount, NonNegativeAmount, UnixSeconds } from "../domain/primitives";
-import type { MintUrl, QuoteId } from "../domain/primitives";
+import type {
+  Bolt11Invoice,
+  MintUrl,
+  QuoteId,
+  TokenText,
+} from "../domain/primitives";
+import type { EnvelopeMeltDraft, EnvelopeMeltError } from "../envelope/domain";
+import { firstEnvelopeSecret } from "../envelope/internal/derivation";
+import {
+  closeIfSpent,
+  envelopeOfMelt,
+  heldRowsOf,
+  loadEnvelope,
+  returnToEnvelope,
+  withEnvelopeLease,
+} from "../envelope/internal/envelopes";
+import type { MeltOfEnvelope } from "../envelope/internal/envelopes";
 import { Inspector } from "../inspector/Inspector";
 import { cashuAmountToNumber } from "../internal/cashuAmounts";
 import { recoverFromCollision } from "../internal/collisionRecovery";
@@ -23,7 +40,7 @@ import {
   withCounterLock,
 } from "../internal/counters";
 import type { CounterScope } from "../internal/counters";
-import { inspectOperationWith } from "../internal/operations";
+import { inspectOperation } from "../internal/operations";
 import { isRecoverableOutputCollision } from "../internal/outputCollisions";
 import {
   domainToNewProofs,
@@ -38,21 +55,26 @@ import { checkProofStates, unspentProofs } from "../internal/proofStates";
 import { pollUntil } from "../internal/poll";
 import { decodeQuoteId, emitQuoteState } from "../internal/quotes";
 import {
+  malformedSwapProofs,
   selectSpendableProofs,
   settleSwap,
   swapProofsForAmount,
 } from "../internal/spend";
+import type { SpendContext } from "../internal/spend";
 import { nowSeconds } from "../internal/time";
 import { sat } from "../internal/units";
+import { inputFeeForProofs } from "../mint/internal/keysetFees";
 import {
   boundKeysetId,
   classifyMintError,
   WalletInstances,
 } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
+import { CashuSeed } from "../ports/CashuSeed";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
+import type { StoredOperation } from "../ports/OperationStore";
 import type { StoredProof } from "../ports/ProofStore";
 import type { Proof } from "../token/domain";
 import { toDomainProofs } from "../token/internal/cashuProofs";
@@ -145,8 +167,23 @@ const paymentPendingOf = (pending: PendingMelt): PaymentPending =>
 interface MeltExecution {
   readonly wallet: LoadedWallet;
   readonly raw: MeltQuoteBolt11Response;
-  readonly inputs: ReadonlyArray<CashuProof>;
+  readonly inputs: ReadonlyArray<Proof>;
   readonly pending: PendingMelt;
+}
+
+/** Fresh melt inputs swapped out of the balance, not yet booked. */
+interface FundedInputs {
+  readonly spendContext: SpendContext;
+  readonly spendable: ReadonlyArray<StoredProof>;
+  readonly swapped: SendResponse;
+  readonly inputs: ReadonlyArray<Proof>;
+}
+
+/** What `melt` and `meltEnvelope` pay: an invoice at a mint, maybe already quoted. */
+interface MeltTarget {
+  readonly mint: MintUrl;
+  readonly invoice: Bolt11Invoice;
+  readonly quoteId?: QuoteId | undefined;
 }
 
 /**
@@ -158,6 +195,7 @@ interface MeltExecution {
  * persisted as `available` proofs before the receipt resolves; a failure
  * after the swap loses no funds. A melt the mint has not settled leaves a
  * `melt` operation `held` over its inputs, and `resumePending` finishes it.
+ * An envelope's proofs that a melt did not spend go back to the envelope.
  */
 export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
   dependencies: [WalletInstances.Default],
@@ -167,12 +205,14 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
     const operationStore = yield* OperationStore;
     const instances = yield* WalletInstances;
     const inspector = yield* Inspector.orNoop;
+    const { bip39Seed } = yield* CashuSeed;
     const ctx = { proofStore, inspector };
+    const envelopeCtx = { proofStore, operationStore, inspector };
     const records = meltRecords({ kv, operationStore, inspector });
 
     const createQuoteAt = (
       wallet: LoadedWallet,
-      draft: MeltDraft,
+      draft: MeltTarget,
     ): Effect.Effect<
       { raw: MeltQuoteBolt11Response; quote: MeltQuote },
       MintUnreachable | MintRejected
@@ -205,26 +245,69 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         ),
       );
 
+    /** Inputs of a melt the mint did not execute: back to their envelope or the balance. */
+    const returnInputs = (
+      melt: MeltOfEnvelope,
+      inputs: ReadonlyArray<StoredProof>,
+      reason: string,
+    ): Effect.Effect<void, MintRejected> =>
+      Effect.gen(function* () {
+        const rest = yield* returnToEnvelope(envelopeCtx, melt, inputs, reason);
+        yield* setProofState(ctx, rest, "available", reason, null);
+      });
+
     /**
      * The mint never executed (or reversed) the melt: the inputs return to
-     * balance and the record is closed.
+     * their envelope or the balance, and the record is closed.
      */
     const releaseInputs = (
       pending: PendingMelt,
       status: "unpaid" | "failed",
       reason: string,
       error?: string,
-    ): Effect.Effect<void> =>
+    ): Effect.Effect<void, MintRejected> =>
       Effect.gen(function* () {
-        yield* setProofState(
-          ctx,
-          yield* heldInputs(pending),
-          "available",
-          reason,
-          null,
-        );
+        yield* returnInputs(pending, yield* heldInputs(pending), reason);
         yield* records.settle(pending, status, error);
       });
+
+    /** Inputs of a closed melt follow its outcome: spent when it paid, else returned. */
+    const settleClosedInputs = (
+      melt: StoredOperation,
+      inputs: ReadonlyArray<StoredProof>,
+    ): Effect.Effect<void, MintRejected> =>
+      melt.status === "paid"
+        ? setProofState(ctx, inputs, "spent", "melt-late-input")
+        : returnInputs(
+            { mint: melt.mint, envelope: melt.tokenText },
+            inputs,
+            "melt-late-input",
+          );
+
+    /**
+     * Proofs still `held` under a closed melt: they synced in after the
+     * melt settled, here or on another device.
+     */
+    const lateInputs = Effect.gen(function* () {
+      const closed = new Map(
+        (yield* operationStore.loadAll)
+          .filter(
+            (operation) =>
+              operation.kind === "melt" && operation.status !== "pending",
+          )
+          .map((operation) => [operation.id, operation]),
+      );
+      const late = new Map<StoredOperation, StoredProof[]>();
+      for (const proof of yield* proofStore.loadAll) {
+        const melt =
+          proof.state === "held" && proof.operationId !== null
+            ? closed.get(proof.operationId)
+            : undefined;
+        if (melt !== undefined)
+          late.set(melt, [...(late.get(melt) ?? []), proof]);
+      }
+      return late;
+    });
 
     /**
      * Re-derives the melt's blank range via NUT-09 when the change proofs did
@@ -291,12 +374,12 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           ),
           "melt-change",
         );
-        yield* setProofState(
-          ctx,
-          yield* heldInputs(pending),
-          "spent",
-          "melt-paid",
-        );
+        const inputs = yield* heldInputs(pending);
+        yield* setProofState(ctx, inputs, "spent", "melt-paid");
+        const envelope = yield* envelopeOfMelt(envelopeCtx, pending, inputs);
+        if (envelope !== null) {
+          yield* closeIfSpent(envelopeCtx, envelope, "melt-paid");
+        }
         yield* records.settle(pending, "paid");
         return new MeltReceipt({
           mint: pending.mint,
@@ -507,39 +590,37 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         return (yield* createQuoteAt(wallet, draft)).quote;
       }).pipe(
         // The invoice never reaches the inspector; the quote holds no secrets.
-        inspectOperationWith(
-          inspector,
-          "melt.quote",
-          { mint: draft.mint },
-          (priced) => priced,
-        ),
+        inspectOperation(inspector, "melt.quote", { mint: draft.mint }),
       );
 
-    const melt = (draft: MeltDraft): Effect.Effect<MeltReceipt, MeltError> =>
+    /** The quote to pay: fetched or re-checked, unexpired and `UNPAID`. */
+    const payableQuote = (
+      wallet: LoadedWallet,
+      target: MeltTarget,
+    ): Effect.Effect<
+      { raw: MeltQuoteBolt11Response; quote: MeltQuote },
+      MeltError
+    > =>
       Effect.gen(function* () {
-        const wallet = yield* instances.get(draft.mint, sat);
-        const keysetId = yield* boundKeysetId(draft.mint, wallet);
-        const scope: CounterScope = { mint: draft.mint, unit: sat, keysetId };
-
-        const quoteId = draft.quoteId;
+        const quoteId = target.quoteId;
         const priced =
           quoteId === undefined
-            ? yield* createQuoteAt(wallet, draft)
+            ? yield* createQuoteAt(wallet, target)
             : yield* Effect.gen(function* () {
                 const raw = yield* Effect.tryPromise({
                   try: () => wallet.checkMeltQuoteBolt11(quoteId),
-                  catch: (error) => classifyMintError(draft.mint, error),
+                  catch: (error) => classifyMintError(target.mint, error),
                 });
-                if (raw.request !== draft.invoice)
+                if (raw.request !== target.invoice)
                   return yield* new MintRejected({
-                    mint: draft.mint,
+                    mint: target.mint,
                     code: null,
                     detail: "melt quote does not match invoice",
                   });
-                return { raw, quote: yield* toMeltQuote(draft.mint, raw) };
+                return { raw, quote: yield* toMeltQuote(target.mint, raw) };
               });
-        const { raw, quote } = priced;
-        if (quoteStateOf(raw) !== "UNPAID") {
+        const { quote } = priced;
+        if (quoteStateOf(priced.raw) !== "UNPAID") {
           return yield* new PaymentFailed({
             mint: quote.mint,
             quoteId: quote.quoteId,
@@ -549,108 +630,204 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         if (quote.expiresAt !== null && (yield* nowSeconds) > quote.expiresAt) {
           return yield* new QuoteExpired({
             quoteId: quote.quoteId,
-            mint: draft.mint,
+            mint: target.mint,
           });
         }
+        return priced;
+      });
 
+    /**
+     * Swaps `amount` out of the balance at the scope's mint, fee-inclusive:
+     * melt inputs must also cover their own cashu input fee, or the mint
+     * rejects them as short.
+     */
+    const fundInputs = (
+      wallet: LoadedWallet,
+      scope: CounterScope,
+      amount: number,
+    ): Effect.Effect<FundedInputs, MeltError> =>
+      Effect.gen(function* () {
         const spendContext = {
           proofStore,
           inspector,
           wallet,
-          mint: draft.mint,
+          mint: scope.mint,
           unit: sat,
           reason: "melt",
         };
         const { spendable, available } =
           yield* selectSpendableProofs(spendContext);
-        const needed = quote.amount + quote.feeReserve;
-        if (available < needed) {
+        if (available < amount) {
           return yield* new InsufficientFunds({
-            mint: draft.mint,
-            required: Amount.make(needed),
+            mint: scope.mint,
+            required: Amount.make(amount),
             available: NonNegativeAmount.make(available),
           });
         }
-
         const swapped = yield* swapProofsForAmount(
           { kv, inspector, wallet, scope },
           {
-            amount: Amount.make(needed),
+            amount: Amount.make(amount),
             proofs: spendable.map(toDomainProof),
             available,
-            // The melt inputs must also cover their own cashu input fee, or
-            // the mint rejects `amount + feeReserve` as short.
             includeFees: true,
           },
         );
         const inputs = toDomainProofs(swapped.send);
         if (inputs === null || inputs.length === 0) {
-          return yield* new MintRejected({
-            mint: draft.mint,
-            code: null,
-            detail: "mint returned malformed proofs from the swap",
-          });
+          return yield* malformedSwapProofs(scope.mint);
         }
+        return { spendContext, spendable, swapped, inputs };
+      });
 
-        // The record, its held inputs, and the remainder all land before
-        // the consumed sources are marked spent, so the funds are never
-        // outside the store and a crash from here on is resumable.
-        const pending = yield* records.create({
-          quoteId: quote.quoteId,
-          mint: draft.mint,
-          unit: sat,
-          keysetId,
-          invoice: draft.invoice,
-          amount: quote.amount,
-          feeReserve: quote.feeReserve,
-          inputsTotal: Amount.make(totalAmount(inputs)),
-          expiresAt: quote.expiresAt,
-          createdAt: UnixSeconds.make(yield* nowSeconds),
-          counter: null,
-        });
+    /**
+     * Books funded inputs under the melt record: the inputs `held`, the
+     * remainder `available`, then the consumed sources `spent`.
+     */
+    const holdFunded = (
+      funded: FundedInputs,
+      pending: PendingMelt,
+    ): Effect.Effect<void, MintRejected> =>
+      Effect.gen(function* () {
         const held = toNewProofs(
-          swapped.send,
-          draft.mint,
+          funded.swapped.send,
+          pending.mint,
           sat,
           "held",
           pending.id,
         );
-        if (held === null) {
-          return yield* new MintRejected({
-            mint: draft.mint,
-            code: null,
-            detail: "mint returned malformed proofs from the swap",
-          });
-        }
+        if (held === null) return yield* malformedSwapProofs(pending.mint);
         yield* insertProofs(ctx, held, "melt");
         const outcome = yield* settleSwap(
-          spendContext,
-          spendable,
-          swapped,
+          funded.spendContext,
+          funded.spendable,
+          funded.swapped,
           "melt-keep",
         );
-        if (outcome === null) {
-          return yield* new MintRejected({
-            mint: draft.mint,
-            code: null,
-            detail: "mint returned malformed proofs from the swap",
-          });
-        }
+        if (outcome === null) return yield* malformedSwapProofs(pending.mint);
+      });
 
+    const createRecord = (
+      scope: CounterScope,
+      target: MeltTarget,
+      quote: MeltQuote,
+      inputs: ReadonlyArray<Proof>,
+      envelope: TokenText | null,
+    ) =>
+      Effect.flatMap(nowSeconds, (now) =>
+        records.create({
+          quoteId: quote.quoteId,
+          mint: scope.mint,
+          unit: sat,
+          keysetId: scope.keysetId,
+          invoice: target.invoice,
+          amount: quote.amount,
+          feeReserve: quote.feeReserve,
+          inputsTotal: Amount.make(totalAmount(inputs)),
+          expiresAt: quote.expiresAt,
+          createdAt: UnixSeconds.make(now),
+          counter: null,
+          envelope,
+        }),
+      );
+
+    const scopeAt = (wallet: LoadedWallet, mint: MintUrl) =>
+      Effect.map(
+        boundKeysetId(mint, wallet),
+        (keysetId): CounterScope => ({ mint, unit: sat, keysetId }),
+      );
+
+    const melt = (draft: MeltDraft): Effect.Effect<MeltReceipt, MeltError> =>
+      Effect.gen(function* () {
+        const wallet = yield* instances.get(draft.mint, sat);
+        const scope = yield* scopeAt(wallet, draft.mint);
+        const { raw, quote } = yield* payableQuote(wallet, draft);
+        const funded = yield* fundInputs(
+          wallet,
+          scope,
+          quote.amount + quote.feeReserve,
+        );
+        // The record, its held inputs, and the remainder all land before
+        // the consumed sources are marked spent, so the funds are never
+        // outside the store and a crash from here on is resumable.
+        const pending = yield* createRecord(
+          scope,
+          draft,
+          quote,
+          funded.inputs,
+          null,
+        );
+        yield* holdFunded(funded, pending);
         return yield* executeMelt({
           wallet,
           raw,
-          inputs: swapped.send,
+          inputs: funded.inputs,
           pending,
         });
       }).pipe(
         // The invoice never reaches the inspector; the receipt holds no secrets.
-        inspectOperationWith(
-          inspector,
-          "melt.melt",
-          { mint: draft.mint },
-          (receipt) => receipt,
-        ),
+        inspectOperation(inspector, "melt.melt", { mint: draft.mint }),
+      );
+
+    /**
+     * Pays an invoice for exactly the envelope's amount with the envelope's
+     * proofs; balance at the same mint covers only the fee reserve and input
+     * fees. A melt that does not pay leaves the proofs in the envelope.
+     */
+    const meltEnvelope = (
+      draft: EnvelopeMeltDraft,
+    ): Effect.Effect<MeltReceipt, EnvelopeMeltError> =>
+      withEnvelopeLease(
+        kv,
+        draft,
+      )(
+        Effect.gen(function* () {
+          const notFound = new EnvelopeNotFound({
+            mint: draft.mint,
+            key: draft.key,
+          });
+          const envelope = yield* loadEnvelope(
+            envelopeCtx,
+            draft.mint,
+            firstEnvelopeSecret(bip39Seed, draft.key),
+          );
+          if (envelope === null || envelope.operation.status !== "pending") {
+            return yield* notFound;
+          }
+          const held = heldRowsOf(yield* proofStore.loadAll, envelope);
+          if (held.length !== envelope.proofs.length) return yield* notFound;
+
+          const wallet = yield* instances.get(draft.mint, sat);
+          const scope = yield* scopeAt(wallet, draft.mint);
+          const { raw, quote } = yield* payableQuote(wallet, draft);
+          if (quote.amount !== envelope.operation.amount) {
+            return yield* new PaymentFailed({
+              mint: draft.mint,
+              quoteId: quote.quoteId,
+              detail: "the invoice does not ask for the envelope's amount",
+            });
+          }
+          const extra =
+            quote.feeReserve + inputFeeForProofs(wallet, envelope.proofs);
+          const funded =
+            extra > 0 ? yield* fundInputs(wallet, scope, extra) : null;
+          const inputs = [...envelope.proofs, ...(funded?.inputs ?? [])];
+          const pending = yield* createRecord(
+            scope,
+            draft,
+            quote,
+            inputs,
+            envelope.tokenText,
+          );
+          yield* setProofState(ctx, held, "held", "melt", pending.id);
+          if (funded !== null) yield* holdFunded(funded, pending);
+          return yield* executeMelt({ wallet, raw, inputs, pending });
+        }),
+      ).pipe(
+        inspectOperation(inspector, "melt.meltEnvelope", {
+          mint: draft.mint,
+          key: draft.key,
+        }),
       );
 
     const status = (priced: MeltQuote) =>
@@ -702,16 +879,11 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
             return yield* Effect.fail(settled.left);
         }
       }).pipe(
-        inspectOperationWith(
-          inspector,
-          "melt.resume",
-          {
-            mint: pending.mint,
-            quoteId: pending.quoteId,
-            operationId: pending.id,
-          },
-          (result) => result,
-        ),
+        inspectOperation(inspector, "melt.resume", {
+          mint: pending.mint,
+          quoteId: pending.quoteId,
+          operationId: pending.id,
+        }),
         Effect.catchAll(() =>
           Effect.succeed(resultOf(pending, "unresolved", null)),
         ),
@@ -723,16 +895,13 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         for (const pending of yield* records.readAll) {
           results.push(yield* resumeOne(pending));
         }
+        for (const [melt, inputs] of yield* lateInputs) {
+          // An envelope text that does not decode leaves its inputs held.
+          yield* Effect.ignore(settleClosedInputs(melt, inputs));
+        }
         return results;
-      }).pipe(
-        inspectOperationWith(
-          inspector,
-          "melt.resumePending",
-          {},
-          (results) => results,
-        ),
-      );
+      }).pipe(inspectOperation(inspector, "melt.resumePending", {}));
 
-    return { quote, melt, status, resumePending } as const;
+    return { quote, melt, meltEnvelope, status, resumePending } as const;
   }),
 }) {}

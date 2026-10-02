@@ -1,6 +1,6 @@
 # @linky-fit/linkshu
 
-A cashu wallet as a typed [Effect](https://effect.website) library. Each wallet operation is a service that takes a draft and returns a receipt: receive a token, send an amount, pay a bolt11 invoice, top up over Lightning, move funds between mints, validate proofs, restore from seed. You bring a BIP-39 seed and three storage ports; the package decides every proof and operation state change.
+A cashu wallet as a typed [Effect](https://effect.website) library. Each wallet operation is a service that takes a draft and returns a receipt: receive a token, send an amount, pay a bolt11 invoice, top up over Lightning, move funds between mints, reserve an amount under a key that devices sharing the seed pay at most once, validate proofs, restore from seed. You bring a BIP-39 seed and three storage ports; the package decides every proof and operation state change.
 
 Operations take and return token text (`cashuA…`/`cashuB…`), never proof lists. Raw cashu-ts types never cross the package boundary.
 

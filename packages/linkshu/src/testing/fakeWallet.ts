@@ -1,4 +1,5 @@
 import type {
+  Keyset,
   OutputDataLike,
   Proof,
   ProofLike,
@@ -33,12 +34,20 @@ export const fakeMintInfo = (stateCheck = true): MintInfo =>
     },
   });
 
+/** A key chain listing `keysets` that fetches no keys. */
+export const fakeKeyChain = (
+  keysets: ReadonlyArray<Keyset> = [],
+): LoadedWallet["keyChain"] => ({
+  getKeysets: () => [...keysets],
+  ensureKeysetKeys: notUnderTest,
+});
+
 /** A wallet whose every call fails; tests override only what they exercise. */
 export const fakeWallet = (
   overrides: Partial<LoadedWallet> = {},
 ): LoadedWallet => ({
   keysetId: KEYSET_HEX,
-  keyChain: { getKeysets: () => [] },
+  keyChain: fakeKeyChain(),
   getMintInfo: () => fakeMintInfo(),
   loadMint: notUnderTest,
   prepareSwapToReceive: notUnderTest,
@@ -48,6 +57,7 @@ export const fakeWallet = (
   mint: {
     webSocketConnection: { onClose: () => undefined },
     disconnectWebSocket: () => undefined,
+    restore: notUnderTest,
   },
   on: { mintQuoteUpdates: notUnderTest },
   createMintQuoteBolt11: notUnderTest,

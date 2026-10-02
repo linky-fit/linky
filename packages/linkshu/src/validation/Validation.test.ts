@@ -169,7 +169,6 @@ describe("Validation.checkAll", () => {
     expect(result.checkedProofs).toBe(4);
     expect(result.markedSpent).toHaveLength(1);
     expect(result.markedSpent[0]?.amount).toBe(3);
-    expect(result.released).toBe(0);
     // The other mint is its own group, and it is not reachable here.
     expect(result.unavailableMints).toEqual([otherMint]);
 
@@ -194,7 +193,9 @@ describe("Validation.checkAll", () => {
     );
   });
 
-  it("releases proofs held by an unknown operation once the mint reports them unspent", async () => {
+  it("leaves a held proof alone while its holder has not synced", async () => {
+    // A held envelope or melt proof whose operationId column arrives after
+    // its state column must never become spendable balance.
     const { run } = makeHarness();
     const knownMelt = OperationId.make("melt-1");
 
@@ -209,26 +210,9 @@ describe("Validation.checkAll", () => {
     );
 
     assert(Exit.isSuccess(exit));
-    expect(exit.value.result.released).toBe(1);
-    // The proof a known melt holds belongs to that melt's resumer.
-    expect(exit.value.result.checkedProofs).toBe(1);
-    expect(stateOfSecret(exit.value.proofs, "sec-b1")).toBe("available");
-    expect(stateOfSecret(exit.value.proofs, "sec-a1")).toBe("held");
-  });
-
-  it("keeps a held-by-unknown proof held while the mint reports it pending", async () => {
-    const { run } = makeHarness({ stateOf: () => "PENDING" });
-
-    const exit = await run(
-      withProofs(
-        [{ proofs: [b1], state: "held", operationId: null }],
-        (validation) => validation.checkAll,
-      ),
-    );
-
-    assert(Exit.isSuccess(exit));
-    expect(exit.value.result.released).toBe(0);
+    expect(exit.value.result.checkedProofs).toBe(0);
     expect(stateOfSecret(exit.value.proofs, "sec-b1")).toBe("held");
+    expect(stateOfSecret(exit.value.proofs, "sec-a1")).toBe("held");
   });
 
   it("marks only the spent proof; its neighbour stays available", async () => {

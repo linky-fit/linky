@@ -42,6 +42,7 @@ import {
   spentSecrets,
   unspentProofs,
 } from "../../internal/proofStates";
+import { malformedSwapProofs } from "../../internal/spend";
 import { nowSeconds } from "../../internal/time";
 import { inputFeeForProofs } from "../../mint/internal/keysetFees";
 import {
@@ -262,13 +263,6 @@ const restoreLatestAttempt = (
       ),
     );
     return restored.proofs;
-  });
-
-const malformedSwapProofs = (mint: MintUrl): MintRejected =>
-  new MintRejected({
-    mint,
-    code: null,
-    detail: "mint returned malformed proofs from the swap",
   });
 
 const unanswered = (mint: MintUrl): MintUnreachable =>

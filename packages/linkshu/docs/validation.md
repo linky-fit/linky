@@ -13,7 +13,6 @@ const checkWallet = Effect.gen(function* () {
   const report = yield* validation.checkAll;
   return {
     spent: report.markedSpent.length,
-    released: report.released,
     offline: report.unavailableMints,
   };
 });
@@ -23,19 +22,18 @@ const checkWallet = Effect.gen(function* () {
 
 One batched checkstate call per mint and unit. Per proof:
 
-| Mint's answer                                        | What happens                                                                         |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `SPENT`                                              | proof → `spent` (its `operationId` link is kept as history); listed in `markedSpent` |
-| `UNSPENT`, and the proof is `held` with no operation | proof → `available`: a migrated row whose melt is unknown is back in balance         |
-| `UNSPENT` otherwise                                  | nothing changes                                                                      |
-| `PENDING` / unanswered / unrecognized                | nothing changes; a missing answer is never a guess                                   |
-| mint unreachable or rejects the query                | whole group untouched; mint listed in `unavailableMints`                             |
+| Mint's answer                         | What happens                                                                         |
+| ------------------------------------- | ------------------------------------------------------------------------------------ |
+| `SPENT`                               | proof → `spent` (its `operationId` link is kept as history); listed in `markedSpent` |
+| `UNSPENT`                             | nothing changes                                                                      |
+| `PENDING` / unanswered / unrecognized | nothing changes; a missing answer is never a guess                                   |
+| mint unreachable or rejects the query | whole group untouched; mint listed in `unavailableMints`                             |
 
 ### The calls
 
 | Call                         | Proofs considered                                                   | Returns                                                                                                       |
 | ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `checkAll`                   | `available`, plus `held` with `operationId === null`                | `ValidationReport`                                                                                            |
+| `checkAll`                   | `available`                                                         | `ValidationReport`                                                                                            |
 | `checkTransfer(operationId)` | a `send`'s `handedOut`/`externalized` proofs, or a `receive`'s text | `TransferCheckResult`; `"unavailable"` when the mint gave no usable answer                                    |
 | `checkIssued`                | `handedOut` and `externalized`                                      | `IssuedClaimReport`; a send whose every handed-out proof is spent is closed `done` (the recipient claimed it) |
 | `inspectProofStates`         | every proof that is not `spent`                                     | `ProofStateSnapshot[]`; no writes                                                                             |
@@ -44,7 +42,7 @@ One batched checkstate call per mint and unit. Per proof:
 
 `inspectProofStates` returns `{ proofId, state }` per proof, `state` being `unspent`, `pending`, `spent`, or `unknown` (missing answer or unreachable mint). These are current mint answers, separate from the stored `state`, and contain no secrets.
 
-Proofs `held` by a known melt belong to [`Melt.resumePending`](./melt.md#resumepending); validation never touches them. Validation never deletes a proof and never reopens a closed operation.
+`held` proofs belong to their melt's [`Melt.resumePending`](./melt.md#resumepending) or to their [envelope](./envelope.md); validation never touches them, even while the holder has not synced to this device (`operationId` still null). Validation never deletes a proof and never reopens a closed operation.
 
 ### When to run it
 

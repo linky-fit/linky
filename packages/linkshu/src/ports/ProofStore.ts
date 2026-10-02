@@ -15,11 +15,9 @@ import {
  * mint reports spent is dead whatever the wallet thought.
  *
  * - `available`    — spendable balance
- * - `held`         — inputs of an in-flight melt (`operationId` names it);
- *                    null `operationId` means the holding operation is
- *                    unknown (migrated from a `reserved` row without record)
- *                    and the proof returns to `available` once the mint
- *                    reports it unspent
+ * - `held`         — inputs of an in-flight melt or an open envelope
+ *                    (`operationId` names it); null `operationId` means the
+ *                    holder has not synced yet, and the proof stays held
  * - `handedOut`    — encoded into a token someone else may claim
  *                    (`operationId` names the send)
  * - `externalized` — handed off outside the app entirely

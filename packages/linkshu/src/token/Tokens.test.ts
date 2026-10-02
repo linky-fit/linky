@@ -49,6 +49,7 @@ import type { ProofState, StoredProof } from "../ports/ProofStore";
 import {
   answerProofStates,
   fakeReceiveSwap,
+  fakeKeyChain,
   fakeWallet,
   KEYSET_HEX,
   proof,
@@ -101,7 +102,7 @@ const makeHarness = (args: HarnessArgs = {}) => {
   let receiveCalls = 0;
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
-    keyChain: { getKeysets: () => args.keysets ?? [] },
+    keyChain: fakeKeyChain(args.keysets),
     checkProofsStates: args.checkProofsStates ?? answerProofStates(),
     ...fakeReceiveSwap((text) => {
       receiveCalls += 1;
@@ -1342,7 +1343,7 @@ describe("Tokens.ingestLegacyRows", () => {
     expect(operations).toHaveLength(2);
   });
 
-  it("holds reserved rows under the pending melt whose inputs sum to them", async () => {
+  it("holds reserved rows under the pending melt whose inputs sum to them, the rest available", async () => {
     const { run } = makeHarness();
 
     const exit = await run(
@@ -1361,14 +1362,56 @@ describe("Tokens.ingestLegacyRows", () => {
     assert(Exit.isSuccess(exit));
     const { melt, report, proofs } = exit.value;
     expect(report).toMatchObject({ ingestedRows: 2, proofs: 3 });
-    expect(proofs.every((p) => p.state === "held")).toBe(true);
-    expect(proofs.find((p) => p.secret === "sec-a1")?.operationId).toBe(
-      melt.id,
+    expect(proofs.find((p) => p.secret === "sec-a1")).toMatchObject({
+      state: "held",
+      operationId: melt.id,
+    });
+    expect(proofs.find((p) => p.secret === "sec-a2")).toMatchObject({
+      state: "held",
+      operationId: melt.id,
+    });
+    expect(proofs.find((p) => p.secret === "sec-b1")).toMatchObject({
+      state: "available",
+      operationId: null,
+    });
+  });
+
+  it("sorts reserved rows an older release stored held by no operation, and nothing else", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const melt = yield* seedOperation(
+          quoteOperation({ inputsTotal: Amount.make(6) }),
+        );
+        yield* seedProofs(
+          mint,
+          [...proofsA, proof(8, "sec-b1"), proof(16, "sec-c1")],
+          "held",
+        );
+        const report = yield* (yield* Tokens).ingestLegacyRows([
+          legacyRow("linked", tokenA, "reserved"),
+          legacyRow("orphan", tokenB, "reserved"),
+        ]);
+        return { melt, report, ...(yield* inventory) };
+      }),
     );
-    expect(proofs.find((p) => p.secret === "sec-a2")?.operationId).toBe(
-      melt.id,
-    );
-    expect(proofs.find((p) => p.secret === "sec-b1")?.operationId).toBeNull();
+
+    assert(Exit.isSuccess(exit));
+    const { melt, report, proofs } = exit.value;
+    expect(report).toMatchObject({ ingestedRows: 0, proofs: 0 });
+    expect(proofs.find((p) => p.secret === "sec-a1")).toMatchObject({
+      state: "held",
+      operationId: melt.id,
+    });
+    expect(proofs.find((p) => p.secret === "sec-b1")).toMatchObject({
+      state: "available",
+      operationId: null,
+    });
+    expect(proofs.find((p) => p.secret === "sec-c1")).toMatchObject({
+      state: "held",
+      operationId: null,
+    });
   });
 
   it("skips proofs the inventory already holds and is idempotent", async () => {

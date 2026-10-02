@@ -17,7 +17,12 @@ import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { StoredProof } from "../ports/ProofStore";
-import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import {
+  fakeKeyChain,
+  fakeWallet,
+  KEYSET_HEX,
+  proof,
+} from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { proofsIn, secretsOf, seedProofs } from "../testing/inventory";
 import { decodeTokenText, parseTokenText } from "../token/codec";
@@ -81,7 +86,7 @@ const makeWallet = (args: FakeWalletArgs) => {
   const restoreCalls: Array<{ start: number; count: number }> = [];
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
-    keyChain: { getKeysets: () => args.keysets ?? [] },
+    keyChain: fakeKeyChain(args.keysets),
     checkProofsStates: (proofs) =>
       args.checkStatesError !== undefined
         ? Promise.reject(args.checkStatesError)

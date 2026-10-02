@@ -14,6 +14,8 @@ import {
   type MintQuoteBolt11Response,
   type OutputConfig,
   type OutputType,
+  type PostRestorePayload,
+  type PostRestoreResponse,
   type Proof,
   type ProofLike,
   type ProofState,
@@ -48,7 +50,7 @@ export const seenMintKey = (mint: MintUrl): string =>
  */
 export interface LoadedWallet {
   readonly keysetId: string;
-  readonly keyChain: Pick<KeyChain, "getKeysets">;
+  readonly keyChain: Pick<KeyChain, "getKeysets" | "ensureKeysetKeys">;
   getMintInfo(): CashuMintInfo;
   /** `forceRefresh` re-fetches the mint's info and keysets in place. */
   loadMint(forceRefresh?: boolean): Promise<void>;
@@ -67,10 +69,12 @@ export interface LoadedWallet {
   checkProofsStates(
     proofs: Array<Pick<ProofLike, "secret" | "id">>,
   ): Promise<ProofState[]>;
-  /** Shared mint socket: observe disconnects and close it after the last subscriber. */
   readonly mint: {
+    /** Shared mint socket: observe disconnects and close it after the last subscriber. */
     readonly webSocketConnection: Pick<WSConnection, "onClose"> | undefined;
     disconnectWebSocket(): void;
+    /** NUT-09 over outputs the wallet built itself. */
+    restore(payload: PostRestorePayload): Promise<PostRestoreResponse>;
   };
   readonly on: {
     mintQuoteUpdates(

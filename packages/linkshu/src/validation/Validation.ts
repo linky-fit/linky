@@ -5,9 +5,9 @@ import { Inspector } from "../inspector/Inspector";
 import { inspectOperation, patchOperation } from "../internal/operations";
 import { amountOf, setProofState, toDomainProof } from "../internal/proofs";
 import {
+  answerAt,
   checkProofStates,
   spentSecrets,
-  unspentProofs,
 } from "../internal/proofStates";
 import type { ProofStateEntry } from "../internal/proofStates";
 import { WalletInstances } from "../mint/internal/WalletInstances";
@@ -48,30 +48,16 @@ const groupByMint = (
   return [...groups.values()];
 };
 
-type Answer = "unspent" | "pending" | "spent" | "unknown";
-
 /** v4 text with short keyset ids needs the mint's list; try both ways. */
 const decodeWithKeysets = (text: string, keysetIds: readonly string[]) =>
   decodeTokenText(text, keysetIds) ?? decodeTokenText(text);
 
-const answerAt = (
-  states: ReadonlyArray<ProofStateEntry>,
-  index: number,
-): Answer => {
-  const raw = states[index]?.state.trim().toUpperCase();
-  if (raw === "UNSPENT") return "unspent";
-  if (raw === "PENDING") return "pending";
-  if (raw === "SPENT") return "spent";
-  return "unknown";
-};
-
 /**
  * NUT-07 proof-state validation of the inventory. One batched checkstate
  * call per mint+unit group; per proof, `SPENT` is persisted as the terminal
- * state, `UNSPENT` releases a proof held by an unknown operation, and a
- * `PENDING`, unanswered, or unrecognized answer changes nothing — a missing
- * answer is never a guess. Mint unavailability is data in the reports,
- * never a failure of the operation.
+ * state, any other answer changes nothing — a missing answer is never a
+ * guess. Mint unavailability is data in the reports, never a failure of the
+ * operation.
  */
 export class Validation extends Effect.Service<Validation>()(
   "linkshu/Validation",
@@ -101,54 +87,39 @@ export class Validation extends Effect.Service<Validation>()(
           );
         }).pipe(Effect.catchAll(() => Effect.succeed(null)));
 
-      /** Persists what one mint answer settles; returns the spent proofs. */
+      /** Persists the spent proofs of one mint answer and returns them. */
       const applyAnswer = (
         group: MintGroup,
         states: ReadonlyArray<ProofStateEntry>,
         reason: string,
-      ): Effect.Effect<{
-        readonly spent: ReadonlyArray<StoredProof>;
-        readonly released: ReadonlyArray<StoredProof>;
-      }> =>
+      ): Effect.Effect<ReadonlyArray<StoredProof>> =>
         Effect.gen(function* () {
-          const domain = group.proofs.map(toDomainProof);
-          const spentSet = spentSecrets(domain, states);
-          const unspentSet = new Set(
-            unspentProofs(domain, states).map((proof) => proof.secret),
+          const spentSet = spentSecrets(
+            group.proofs.map(toDomainProof),
+            states,
           );
           const spent = group.proofs.filter((proof) =>
             spentSet.has(proof.secret),
           );
-          const released = group.proofs.filter(
-            (proof) =>
-              proof.state === "held" &&
-              proof.operationId === null &&
-              unspentSet.has(proof.secret),
-          );
           // Spent proofs keep their operation link: which send handed them
           // out is history the transfer still reads.
           yield* setProofState(ctx, spent, "spent", reason);
-          yield* setProofState(ctx, released, "available", reason, null);
-          return { spent, released };
+          return spent;
         });
 
       /**
-       * Checks the balance: every `available` proof, plus proofs `held` by
-       * an unknown operation, which return to balance once the mint says
-       * they are unspent. Proofs held by a known operation belong to its
-       * resumer; handed-out proofs to `checkIssued`.
+       * Checks the balance: every `available` proof. A `held` proof belongs
+       * to its holder's resumer even while its holder has not synced here;
+       * handed-out proofs belong to `checkIssued`.
        */
       const checkAll: Effect.Effect<ValidationReport> = Effect.gen(
         function* () {
           const proofs = (yield* proofStore.loadAll).filter(
-            (proof) =>
-              proof.state === "available" ||
-              (proof.state === "held" && proof.operationId === null),
+            (proof) => proof.state === "available",
           );
           const markedSpent: SpentProofReport[] = [];
           const unavailableMints: MintUrl[] = [];
           let checkedProofs = 0;
-          let released = 0;
           for (const group of groupByMint(proofs)) {
             const states = yield* askMint(group);
             if (states === null) {
@@ -156,10 +127,9 @@ export class Validation extends Effect.Service<Validation>()(
               continue;
             }
             checkedProofs += Math.min(states.length, group.proofs.length);
-            const applied = yield* applyAnswer(group, states, "validation");
-            released += applied.released.length;
+            const spent = yield* applyAnswer(group, states, "validation");
             markedSpent.push(
-              ...applied.spent.map(
+              ...spent.map(
                 (proof) =>
                   new SpentProofReport({
                     proofId: proof.id,
@@ -171,7 +141,6 @@ export class Validation extends Effect.Service<Validation>()(
           return new ValidationReport({
             checkedProofs,
             markedSpent,
-            released,
             unavailableMints,
           });
         },
@@ -239,7 +208,7 @@ export class Validation extends Effect.Service<Validation>()(
           for (const group of groupByMint(handedOut)) {
             const states = yield* askMint(group);
             if (states === null) continue;
-            spent.push(...(yield* applyAnswer(group, states, "claimed")).spent);
+            spent.push(...(yield* applyAnswer(group, states, "claimed")));
           }
           return new IssuedClaimReport({
             claimed: yield* closeClaimed(operations, proofs, spent),
@@ -283,7 +252,7 @@ export class Validation extends Effect.Service<Validation>()(
             if (group === undefined) return unavailable;
             const states = yield* askMint(group);
             if (states === null) return unavailable;
-            const { spent } = yield* applyAnswer(group, states, "check");
+            const spent = yield* applyAnswer(group, states, "check");
             if (spent.length === handedOut.length) {
               yield* closeClaimed(operations, proofs, spent);
               return new TransferCheckResult({ operationId, status: "spent" });

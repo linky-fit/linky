@@ -40,6 +40,8 @@ A mint is either fully scanned (`scannedMints`) or reported as not scanned (`una
 
 Restore knows nothing about operations: proofs it finds land as balance with no `operationId`, even if a pending melt or send once held them. Run the resumers and `Validation.checkIssued` afterwards when that matters.
 
+The scan cannot find envelopes, whose outputs derive from a key instead of a counter. Ask `Envelope.state` about each key afterwards ([envelope.md](./envelope.md#after-a-restore)).
+
 A seed-only recovery has no cursor, so it walks the full derivation tree of every keyset. Expect the first scan to take noticeably longer than later ones.
 
 ### `restoreAndReclaim`
