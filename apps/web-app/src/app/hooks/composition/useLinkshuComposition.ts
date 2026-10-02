@@ -32,6 +32,7 @@ import type {
   AutoswapEstimateError,
   AutoswapReceipt,
   Bip39Seed,
+  CounterLockTimeout,
   DeferredReceiveResult,
   FeeProbeError,
   ImportProofDraft,
@@ -269,7 +270,9 @@ export interface CashuTransferLifecycle {
    */
   readonly forget: (
     operationId: string,
-  ) => Promise<Either.Either<void, TransferTransitionError>>;
+  ) => Promise<
+    Either.Either<void, TransferTransitionError | CounterLockTimeout>
+  >;
   /** Restores backup proofs as-is; returns how many were new. */
   readonly importProofs: (
     drafts: ReadonlyArray<ImportProofDraft>,
@@ -692,6 +695,8 @@ export const useLinkshuComposition = ({
   const walletDeferredReceives = React.useMemo(
     () =>
       withoutHiddenTestMints(
+        // Linky is sat-only: a non-sat deferral is neither shown nor
+        // discardable here, yet it still keeps its mint known.
         readModel.model.operations.filter(isShownDeferredReceive),
         allowTestMints,
       ),

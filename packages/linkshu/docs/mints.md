@@ -24,7 +24,9 @@ const forgetMint = (mint: MintUrl) =>
   Effect.flatMap(Mints, (mints) => mints.removeKnownMint(mint)).pipe(
     Effect.as("forgotten"),
     Effect.catchTag("MintInUse", (inUse) =>
-      Effect.succeed(`still holds ${inUse.proofCount} unspent proofs`),
+      Effect.succeed(
+        `still holds ${inUse.proofCount} unspent proofs and ${inUse.deferredReceiveCount} deferred receives`,
+      ),
     ),
   );
 ```
@@ -43,7 +45,7 @@ Successful wallet loads are cached for the runtime's lifetime; a failed load is 
 
 `knownMints` is the union of the mints named by stored proofs (any state), by stored operations (`mint`, and `sourceMint` of autoswaps), and the seen mints. A mint is recorded as seen the first time any operation loads its wallet successfully, `Mints.info` included, or explicitly through `addKnownMint`, which needs no network and registers a mint before it holds funds. `Restore` scans `knownMints` when given no `mints`.
 
-`removeKnownMint` removes a mint from the seen set. It fails with `MintInUse` while any proof at the mint is not `spent` (`available`, `held`, `handedOut`, or `externalized` alike). A mint still named by `spent` proofs or by operations can be forgotten and comes back into `knownMints` through them. `Restore.wipeSeedBoundState` leaves the seen set alone.
+`removeKnownMint` removes a mint from the seen set. It fails with `MintInUse` while any proof at the mint is not `spent` (`available`, `held`, `handedOut`, or `externalized` alike), or while a `pending` `deferredReceive` waits for the mint ([receive.md](./receive.md#deferred-receives)); `Tokens.forget` discards one the user gives up on. A mint still named by `spent` proofs or by other operations can be forgotten and comes back into `knownMints` through them. `Restore.wipeSeedBoundState` leaves the seen set alone.
 
 ### Icons
 
@@ -77,11 +79,11 @@ Pick `probeMint` as a different, Lightning-backed mint; a mint quoting a melt to
 
 ## Errors
 
-| Tag               | Raised by                   | When                                                                          |
-| ----------------- | --------------------------- | ----------------------------------------------------------------------------- |
-| `MintInUse`       | `removeKnownMint`           | unspent proofs still name the mint (`proofCount` says how many)               |
-| `MintUnreachable` | `info`, `probeLightningFee` | wallet load failed, either probe mint unreachable, or the probe exceeded 15 s |
-| `MintRejected`    | `info`, `probeLightningFee` | unusable info or keysets; a quote without invoice or fee reserve              |
+| Tag               | Raised by                   | When                                                                                                      |
+| ----------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `MintInUse`       | `removeKnownMint`           | unspent proofs (`proofCount`) or `pending` deferred receives (`deferredReceiveCount`) still name the mint |
+| `MintUnreachable` | `info`, `probeLightningFee` | wallet load failed, either probe mint unreachable, or the probe exceeded 15 s                             |
+| `MintRejected`    | `info`, `probeLightningFee` | unusable info or keysets; a quote without invoice or fee reserve                                          |
 
 `knownMints` and `addKnownMint` never fail; `removeKnownMint` is a no-op for a mint that was never seen.
 

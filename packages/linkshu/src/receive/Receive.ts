@@ -5,6 +5,7 @@ import { inspectOperationWith, redactReceipt } from "../internal/operations";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore } from "../ports/OperationStore";
+import type { OperationPatch } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import { DeferredReceiveResult, ReceiveError } from "./domain";
 import type { ReceiveDraft, ReceiveReceipt } from "./domain";
@@ -68,6 +69,18 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
         ),
       );
 
+    const closeAs = (
+      deferred: DeferredOperation,
+      patch: OperationPatch,
+    ): Effect.Effect<DeferredReceiveResult> =>
+      closeDeferral(ctx, deferred, patch).pipe(
+        Effect.as(deferredResult(deferred, "closed")),
+        // Another context holds the mint's receive lease; a later pass closes it.
+        Effect.catchTag("CounterLockTimeout", () =>
+          Effect.succeed(deferredResult(deferred, "pending")),
+        ),
+      );
+
     const resumeOne = (
       deferred: DeferredOperation,
     ): Effect.Effect<DeferredReceiveResult> =>
@@ -95,16 +108,14 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
         const error = outcome.left;
         switch (error._tag) {
           case "TokenAlreadyKnown":
-            yield* closeDeferral(ctx, deferred, { status: "done" });
-            return deferredResult(deferred, "closed");
+            return yield* closeAs(deferred, { status: "done" });
           case "TokenAlreadySpent":
           case "AmountConsumedByFee":
           case "TokenParseFailed":
-            yield* closeDeferral(ctx, deferred, {
+            return yield* closeAs(deferred, {
               status: "failed",
               error: encodeStoredError(error),
             });
-            return deferredResult(deferred, "closed");
           case "MintUnreachable":
           case "MintRejected":
           case "CounterLockTimeout":

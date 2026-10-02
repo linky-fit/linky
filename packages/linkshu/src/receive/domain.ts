@@ -68,8 +68,9 @@ export class DeferredReceiveResult extends Schema.Class<DeferredReceiveResult>(
    * `failed` — the swap failed after its `receive` was recorded: that
    * receive is `failed` with the error and carries the retry, the deferral
    * is `done`;
-   * `pending` — the mint still cannot be loaded, refreshed or asked;
-   * nothing was written and the deferral waits for the next pass.
+   * `pending` — the mint still cannot be loaded, refreshed or asked, or
+   * another context held the mint's receive lease for 30 s; nothing was
+   * written and the deferral waits for the next pass.
    */
   status: Schema.Literal("received", "closed", "failed", "pending"),
   /** Set only for `received`. */

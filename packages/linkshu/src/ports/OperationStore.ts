@@ -38,8 +38,8 @@ export type OperationKind = typeof OperationKind.Type;
  *   delivered) | `returned` (taken back into the wallet)
  * - `receive`: `pending` → `done` | `failed`
  * - `deferredReceive`: `pending` → `done` (received, here or on another
- *   device, or handed to its `receive`) | `failed` (spent, eaten by the
- *   mint's fee or undecodable, see `error`)
+ *   device, handed to its `receive`, or discarded) | `failed` (spent,
+ *   eaten by the mint's fee or undecodable, see `error`)
  */
 export const OperationStatus = Schema.Literal(
   "pending",

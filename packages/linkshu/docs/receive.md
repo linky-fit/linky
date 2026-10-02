@@ -61,7 +61,7 @@ What remains (#470):
 
 A fresh token whose mint cannot be loaded or refreshed (step 2), or cannot be asked (step 6), fails with `ReceiveDeferred` and keeps its text under a `pending` `deferredReceive` operation, so a token with no other copy (a claim a server handed out once, a cleared paste field) is not lost. Its id derives from `deferredReceive|tokenText`, so it never shares a row with the token's `receive`, and a device whose mint is down writes nothing another device's `done` receive could be overwritten by. A pending deferral of the same text is reused. A text a transfer already carries fails with `TokenAlreadyKnown` instead, and an unfinished receive of the text fails with the mint's error, left for its own resume.
 
-Receiving a deferred text again is a full receive: while the mint still cannot be used it returns the same `operationId`, and once the mint answers the `receive` it writes closes the deferral `done`.
+Receiving a deferred text again is a full receive: while the mint still cannot be used it returns the same `operationId`, and once the mint answers the `receive` it writes closes the deferral `done`. An unfinished receive of the text that finishes from its restored outputs closes the deferral too.
 
 `resumeDeferred` receives the text of every `pending` deferral again, under the same steps, and returns one `DeferredReceiveResult` per deferral; the doc comment on its `status` says what each outcome means. The deferral ends as follows:
 
@@ -74,7 +74,7 @@ Receiving a deferred text again is a full receive: while the mint still cannot b
 
 A `closed` result created no `receive` and received no proofs. A `failed` result hands the token over to its `receive`: retry it with `Tokens.returnToWallet` or by receiving the text again, as any failed receive ([resuming](#resuming-an-unfinished-receive)).
 
-A pass only ever moves a deferral it found `pending`, and moves it once: the deferral's status is read again under the mint's receive lease before its receive is written, and a deferral another pass or device closed meanwhile ends `closed` with nothing written. A pass never inserts or reopens a deferral; only a fresh receive of the text does. Two passes at once in two tabs record the token once; two devices race as described in [Two devices receiving the same token](#two-devices-receiving-the-same-token).
+A pass only ever moves a deferral it found `pending`, and moves it once: the deferral's status is read again under the mint's receive lease before its receive is written, and a deferral another pass or device closed meanwhile, or the user discarded with `Tokens.forget`, ends `closed` with nothing written. A pass never inserts or reopens a deferral; only a fresh receive of the text does. Two passes at once in two tabs record the token once; two devices race as described in [Two devices receiving the same token](#two-devices-receiving-the-same-token).
 
 ```ts
 import { Effect } from "effect";
@@ -91,6 +91,8 @@ const retryDeferred = Effect.gen(function* () {
 ```
 
 It never fails. Run it when the runtime comes up, when connectivity returns, and on a backoff while deferrals stay `pending`. Once one deferral at a mint stays `pending`, the rest at that mint wait for the next pass instead of each waiting out the timeout.
+
+`Tokens.forget(operationId)` closes a `pending` deferral `done` when the user gives up on its mint ([tokens.md](./tokens.md#send-transitions)). It takes the mint's receive lease, so a forget issued while a receive at that mint runs waits for it to end. If that receive handed the deferral to its `receive`, the forget fails with `InvalidTransferTransition`, because the token is already being received; otherwise it closes the deferral, and no later pass brings it back. Nothing else holds the token, so keep its `tokenText` first; receiving that text again defers it once more while the mint is still down, or receives it once the mint answers. `Mints.removeKnownMint` refuses a mint with a `pending` deferral ([mints.md](./mints.md#the-known-mint-set)).
 
 ## Errors
 

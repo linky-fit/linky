@@ -1,7 +1,22 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
 import { getEncodedToken, Keyset, MintOperationError } from "@cashu/cashu-ts";
-import { Effect, Either, Exit, Layer, Schema } from "effect";
-import { MintRejected, TokenAlreadySpent } from "../domain/errors";
+import {
+  Deferred,
+  Effect,
+  Either,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  Schema,
+  TestClock,
+  TestContext,
+} from "effect";
+import {
+  MintRejected,
+  MintUnreachable,
+  TokenAlreadySpent,
+} from "../domain/errors";
 import {
   Amount,
   Bolt11Invoice,
@@ -15,7 +30,9 @@ import {
   UnixSeconds,
 } from "../domain/primitives";
 import { WalletInstances } from "../mint/internal/WalletInstances";
+import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
+import { KeyValueStore } from "../ports/KeyValueStore";
 import {
   inMemoryOperationStore,
   makeInMemoryOperationStore,
@@ -36,6 +53,7 @@ import {
   KEYSET_HEX,
   proof,
 } from "../testing/fakeWallet";
+import { runOnTestClock, settlePromises } from "../testing/clock";
 import { recordingInspector } from "../testing/inspector";
 import {
   amountIn,
@@ -44,6 +62,10 @@ import {
   seedProofs,
   seedTransfer,
 } from "../testing/inventory";
+import { Receive } from "../receive/Receive";
+import { withReceiveLock } from "../receive/internal/acceptFlow";
+import { ReceiveDraft } from "../receive/domain";
+import type { DeferredReceiveResult } from "../receive/domain";
 import { ImportProofDraft, LegacyTokenRow } from "./domain";
 import { Tokens } from "./Tokens";
 
@@ -107,7 +129,11 @@ const makeHarness = (args: HarnessArgs = {}) => {
   );
 
   const run = <A, E>(
-    program: Effect.Effect<A, E, Tokens | ProofStore | OperationStore>,
+    program: Effect.Effect<
+      A,
+      E,
+      Tokens | ProofStore | OperationStore | KeyValueStore
+    >,
   ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
 
   return { run, events: inspector.events, receiveCalls: () => receiveCalls };
@@ -543,6 +569,243 @@ describe("Tokens.forget on a receive", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value).toBe(outcome);
   });
+});
+
+describe("Tokens.forget on a deferred receive", () => {
+  it.each([
+    ["pending", "done"],
+    ["failed", "InvalidTransferTransition"],
+    ["done", "InvalidTransferTransition"],
+  ] as const)("from %s ends %s", async (from, outcome) => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const deferral = yield* seedTransfer(
+          "deferredReceive",
+          from,
+          mint,
+          tokenA,
+          6,
+        );
+        const result = yield* Effect.either(
+          (yield* Tokens).forget(deferral.id),
+        );
+        const { operations } = yield* inventory;
+        return Either.isRight(result)
+          ? operationById(operations, deferral.id)?.status
+          : result.left._tag;
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value).toBe(outcome);
+  });
+
+  it("closes the deferral under tokens.forget and leaves the inventory alone", async () => {
+    const { run, events } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const deferral = yield* seedTransfer(
+          "deferredReceive",
+          "pending",
+          mint,
+          tokenA,
+          6,
+        );
+        yield* (yield* Tokens).forget(deferral.id);
+        return { deferral, ...(yield* inventory) };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.proofs).toEqual([]);
+    expect(events).toEqual([
+      expect.objectContaining({
+        _tag: "OperationChanged",
+        operationId: exit.value.deferral.id,
+        kind: "deferredReceive",
+        from: "pending",
+        to: "done",
+        reason: "forget",
+      }),
+      expect.objectContaining({
+        _tag: "OperationSucceeded",
+        name: "tokens.forget",
+        params: { operationId: exit.value.deferral.id },
+      }),
+    ]);
+  });
+
+  it("fails CounterLockTimeout and keeps the deferral while another context holds the mint's receive lease", async () => {
+    const { run } = makeHarness();
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* TestClock.setTime(1_700_000_000_000);
+        const deferral = yield* seedTransfer(
+          "deferredReceive",
+          "pending",
+          mint,
+          tokenA,
+          6,
+        );
+        yield* Effect.fork(
+          Effect.never.pipe(withReceiveLock(yield* KeyValueStore, deferral)),
+        );
+        const result = yield* runOnTestClock(
+          Effect.either((yield* Tokens).forget(deferral.id)),
+          "1 second",
+        );
+        const { operations } = yield* inventory;
+        return {
+          result,
+          status: operationById(operations, deferral.id)?.status,
+        };
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.result._tag === "Left");
+    expect(exit.value.result.left).toMatchObject({
+      _tag: "CounterLockTimeout",
+      mint,
+      unit: sat,
+      keysetId: null,
+    });
+    expect(exit.value.status).toBe("pending");
+  });
+
+  /** Tokens and Receive over one set of stores, the mint as `wallet` loads. */
+  const receiveHarness = (
+    load: () => Effect.Effect<LoadedWallet, MintUnreachable>,
+  ) => {
+    const layer = Layer.mergeAll(
+      Tokens.DefaultWithoutDependencies,
+      Receive.DefaultWithoutDependencies,
+    ).pipe(
+      Layer.provideMerge(
+        Layer.mergeAll(
+          Layer.succeed(WalletInstances, WalletInstances.make({ get: load })),
+          inMemoryKeyValueStore,
+          inMemoryProofStore,
+          inMemoryOperationStore,
+          recordingInspector().layer,
+        ),
+      ),
+    );
+    return <A, E>(
+      program: Effect.Effect<
+        A,
+        E,
+        Tokens | Receive | ProofStore | OperationStore
+      >,
+    ) => Effect.runPromiseExit(program.pipe(Effect.provide(layer)));
+  };
+
+  const unreachable = () =>
+    Effect.fail(new MintUnreachable({ mint, detail: "fetch failed" }));
+
+  const deferTokenA = Effect.flatMap(Receive, (receive) =>
+    Effect.flip(receive.receive(new ReceiveDraft({ text: tokenA }))),
+  );
+
+  const resumeDeferred = Effect.flatMap(
+    Receive,
+    (receive) => receive.resumeDeferred,
+  );
+
+  const statusesOf = (results: ReadonlyArray<DeferredReceiveResult>) =>
+    results.map((result) => result.status);
+
+  const kindsAndStatuses = (operations: ReadonlyArray<StoredOperation>) =>
+    operations.map((operation) => [operation.kind, operation.status]);
+
+  it("keeps the token again when its text is received after the forget", async () => {
+    const run = receiveHarness(unreachable);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const first = yield* deferTokenA;
+        assert(first._tag === "ReceiveDeferred");
+        yield* (yield* Tokens).forget(first.operationId);
+        const again = yield* deferTokenA;
+        return { first, again, ...(yield* inventory) };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.again._tag === "ReceiveDeferred");
+    expect(exit.value.again.operationId).toBe(exit.value.first.operationId);
+    expect(kindsAndStatuses(exit.value.operations)).toEqual([
+      ["deferredReceive", "pending"],
+    ]);
+  });
+
+  it.each([
+    ["stays unreachable", "pending", "done"],
+    ["answers", "received", "InvalidTransferTransition"],
+  ] as const)(
+    "makes a discard wait for a pass that is loading the mint when the mint %s",
+    async (_, status, forgotten) => {
+      const loading = Effect.runSync(
+        Deferred.make<LoadedWallet, MintUnreachable>(),
+      );
+      const stalls = { now: false };
+      const wallet = fakeWallet({
+        checkProofsStates: answerProofStates(),
+        ...fakeReceiveSwap(() => Promise.resolve(swappedProofs)),
+      });
+      const run = receiveHarness(() =>
+        stalls.now ? Deferred.await(loading) : unreachable(),
+      );
+
+      const exit = await run(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(1_700_000_000_000);
+          const deferred = yield* deferTokenA;
+          assert(deferred._tag === "ReceiveDeferred");
+          stalls.now = true;
+          const pass = yield* Effect.fork(resumeDeferred);
+          yield* settlePromises;
+          const forget = yield* Effect.fork(
+            Effect.either((yield* Tokens).forget(deferred.operationId)),
+          );
+          yield* settlePromises;
+          const waited = Option.isNone(yield* Fiber.poll(forget));
+          yield* status === "pending"
+            ? Deferred.fail(
+                loading,
+                new MintUnreachable({ mint, detail: "fetch failed" }),
+              )
+            : Deferred.succeed(loading, wallet);
+          const results = yield* Fiber.join(pass);
+          const forgetResult = yield* runOnTestClock(
+            Fiber.join(forget),
+            "500 millis",
+          );
+          return { waited, results, forgetResult, ...(yield* inventory) };
+        }).pipe(Effect.provide(TestContext.TestContext)),
+      );
+
+      assert(Exit.isSuccess(exit));
+      const { waited, results, forgetResult, operations } = exit.value;
+      expect(waited).toBe(true);
+      expect(statusesOf(results)).toEqual([status]);
+      expect(
+        Either.isRight(forgetResult) ? "done" : forgetResult.left._tag,
+      ).toBe(forgotten);
+      expect(kindsAndStatuses(operations)).toEqual(
+        status === "pending"
+          ? [["deferredReceive", "done"]]
+          : [
+              ["deferredReceive", "done"],
+              ["receive", "done"],
+            ],
+      );
+    },
+  );
 });
 
 interface Seed {

@@ -8,6 +8,7 @@ import {
 } from "./domain";
 import type { ImportProofDraft, LegacyTokenRow } from "./domain";
 import { OperationNotFound, TokenParseFailed } from "../domain/errors";
+import type { CounterLockTimeout } from "../domain/errors";
 import { Amount, NonNegativeAmount } from "../domain/primitives";
 import type { MintUrl, OperationId } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
@@ -38,6 +39,7 @@ import type { ReceiveError } from "../receive/domain";
 import {
   parseReceivable,
   receiveTokenText,
+  withReceiveLock,
 } from "../receive/internal/acceptFlow";
 import type { ReceiveContext } from "../receive/internal/acceptFlow";
 import type { DecodedToken } from "./domain";
@@ -54,6 +56,21 @@ export class LegacyIngestReport extends Schema.Class<LegacyIngestReport>(
 
 const isTransfer = (operation: StoredOperation): boolean =>
   operation.kind === "send" || operation.kind === "receive";
+
+const isForgettable = (operation: StoredOperation): boolean =>
+  isTransfer(operation) || operation.kind === "deferredReceive";
+
+/** Statuses `forget` closes, per kind. */
+const forgettableFrom = (operation: StoredOperation): ReadonlyArray<string> => {
+  switch (operation.kind) {
+    case "send":
+      return ["issued", "pending", "externalized"];
+    case "receive":
+      return ["pending", "failed"];
+    default:
+      return ["pending"];
+  }
+};
 
 const toTransfer = (operation: StoredOperation): TokenTransfer | null => {
   if (
@@ -156,10 +173,11 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
 
     const requireTransfer = (
       operationId: OperationId,
+      accepts: (operation: StoredOperation) => boolean = isTransfer,
     ): Effect.Effect<StoredOperation, OperationNotFound> =>
       Effect.flatMap(operationStore.loadAll, (rows) => {
         const operation = rows.find(
-          (candidate) => candidate.id === operationId && isTransfer(candidate),
+          (candidate) => candidate.id === operationId && accepts(candidate),
         );
         return operation === undefined
           ? Effect.fail(new OperationNotFound({ operationId }))
@@ -218,30 +236,42 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
         "externalized",
       );
 
+    const close = (
+      operation: StoredOperation,
+    ): Effect.Effect<void, InvalidTransferTransition> =>
+      forgettableFrom(operation).includes(operation.status)
+        ? patchOperation(ctx, operation, { status: "done" }, "forget")
+        : new InvalidTransferTransition({
+            operationId: operation.id,
+            from: operation.status,
+            to: "done",
+          });
+
     /**
      * Closes a transfer the caller has nothing left to do about: a `send`
-     * whose token verifiably reached its recipient, or a `receive` that
-     * failed for good. Not a refund — handed-out proofs stay handed out and
-     * are still reported spent once the recipient claims them.
+     * whose token verifiably reached its recipient, a `receive` that failed
+     * for good, or a pending `deferredReceive` the user gives up on. Not a
+     * refund — handed-out proofs stay handed out and are still reported
+     * spent once the recipient claims them, and a discarded deferral's token
+     * is gone unless its text is kept elsewhere.
      */
     const forget = (
       operationId: OperationId,
-    ): Effect.Effect<void, OperationNotFound | InvalidTransferTransition> =>
-      Effect.gen(function* () {
-        const transfer = yield* requireTransfer(operationId);
-        const closable =
-          transfer.kind === "send"
-            ? ["issued", "pending", "externalized"]
-            : ["pending", "failed"];
-        if (!closable.includes(transfer.status)) {
-          return yield* new InvalidTransferTransition({
-            operationId,
-            from: transfer.status,
-            to: "done",
-          });
-        }
-        yield* patchOperation(ctx, transfer, { status: "done" }, "forget");
-      }).pipe(inspectOperation(inspector, "tokens.forget", { operationId }));
+    ): Effect.Effect<
+      void,
+      OperationNotFound | InvalidTransferTransition | CounterLockTimeout
+    > =>
+      Effect.flatMap(
+        requireTransfer(operationId, isForgettable),
+        (operation) =>
+          operation.kind === "deferredReceive"
+            ? // Reread under the lease: a receive may have taken it over since.
+              Effect.flatMap(
+                requireTransfer(operationId, isForgettable),
+                close,
+              ).pipe(withReceiveLock(kv, operation))
+            : close(operation),
+      ).pipe(inspectOperation(inspector, "tokens.forget", { operationId }));
 
     /**
      * Bring a transfer's funds back: a handed-out `send` is re-received so

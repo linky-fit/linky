@@ -31,7 +31,7 @@ Reads are pull-based: re-run them when the stores change. `transfers` covers `se
 
 ### Send transitions
 
-Each is `(operationId) => Effect<void, OperationNotFound | InvalidTransferTransition>`; states and statuses are in [concepts.md](./concepts.md#proofs-and-operations).
+Each is `(operationId) => Effect<void, OperationNotFound | InvalidTransferTransition>`, and `forget` adds `CounterLockTimeout`; states and statuses are in [concepts.md](./concepts.md#proofs-and-operations).
 
 | Call               | From                                | To             | Proofs                                |
 | ------------------ | ----------------------------------- | -------------- | ------------------------------------- |
@@ -40,6 +40,8 @@ Each is `(operationId) => Effect<void, OperationNotFound | InvalidTransferTransi
 | `forget`           | `issued`, `pending`, `externalized` | `done`         | untouched                             |
 
 `forget` closes a transfer the caller has nothing left to do about: a send whose token verifiably reached its recipient, or a `receive` in `pending`/`failed` that will never be retried. It is not a refund; the handed-out proofs stay `handedOut` and are still reported `spent` once the recipient claims them.
+
+`forget` also closes a `pending` `deferredReceive` (`done`) whose mint the user gives up on; any other status fails with `InvalidTransferTransition`, as does a deferral a resume pass has just handed to its `receive` (the two take turns, see [receive.md](./receive.md#deferred-receives)). Nothing was received, so the token's value is gone unless the caller keeps its `tokenText` first. Receiving that text again later keeps it as a `pending` deferral once more, or receives it if the mint answers ([receive.md](./receive.md#deferred-receives)).
 
 ### `returnToWallet`
 
@@ -71,12 +73,13 @@ On a send, a transient failure (`MintUnreachable`, `CounterLockTimeout`) leaves 
 
 ## Errors
 
-| Tag                         | Raised by                               | When                                                     |
-| --------------------------- | --------------------------------------- | -------------------------------------------------------- |
-| `OperationNotFound`         | transitions, `forget`, `returnToWallet` | no transfer with that id (quote operations do not count) |
-| `InvalidTransferTransition` | transitions, `forget`, `returnToWallet` | the status forbids it (`from`, `to` in the error)        |
-| `ReceiveError` members      | `returnToWallet`                        | see [receive.md](./receive.md#errors)                    |
-| `TokenParseFailed`          | `adoptToken`                            | the text holds no decodable token                        |
+| Tag                         | Raised by                               | When                                                                                                |
+| --------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `OperationNotFound`         | transitions, `forget`, `returnToWallet` | no transfer with that id (quote operations do not count; `forget` also accepts a `deferredReceive`) |
+| `InvalidTransferTransition` | transitions, `forget`, `returnToWallet` | the status forbids it (`from`, `to` in the error)                                                   |
+| `CounterLockTimeout`        | `forget` of a `deferredReceive`         | another context held the mint's receive lease for 30 s; the deferral is untouched, retry            |
+| `ReceiveError` members      | `returnToWallet`                        | see [receive.md](./receive.md#errors)                                                               |
+| `TokenParseFailed`          | `adoptToken`                            | the text holds no decodable token                                                                   |
 
 ## Related
 

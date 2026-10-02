@@ -1457,6 +1457,31 @@ describe("Receive.receive of an unfinished receive", () => {
     expect(counter).toBe("3");
   });
 
+  it("finishes from the restored outputs and closes the text's pending deferral", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+      restore: () => Promise.resolve({ proofs: receivedProofs }),
+      stateOf: sourceSpent,
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const transfer = yield* seedInterruptedReceive;
+        yield* seedTransfer("deferredReceive", "pending", mint, sourceToken, 6);
+        return { transfer, ...(yield* receiveAndInspect(sourceToken)) };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    const { transfer, receipt, operations } = exit.value;
+    assert(receipt._tag === "Right");
+    expect(receipt.right.operationId).toBe(transfer.id);
+    expect(operations).toEqual([
+      expect.objectContaining({ id: transfer.id, status: "done" }),
+      expect.objectContaining({ kind: "deferredReceive", status: "done" }),
+    ]);
+  });
+
   it("closes the receive without storing twice when the proofs were already stored", async () => {
     const { wallet } = makeWallet({
       receive: () => Promise.reject(new Error("must not be called")),

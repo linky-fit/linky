@@ -175,10 +175,14 @@ export class CounterLockTimeout extends Schema.TaggedError<CounterLockTimeout>()
   },
 ) {}
 
-/** Unspent proofs still name the mint; it cannot be forgotten. */
+/**
+ * Unspent proofs or pending deferred receives still name the mint; it cannot
+ * be forgotten. At least one of the counts is positive.
+ */
 export class MintInUse extends Schema.TaggedError<MintInUse>()("MintInUse", {
   mint: MintUrl,
-  proofCount: Schema.Int.pipe(Schema.positive()),
+  proofCount: Schema.Int.pipe(Schema.nonNegative()),
+  deferredReceiveCount: Schema.Int.pipe(Schema.nonNegative()),
 }) {}
 
 export class OperationNotFound extends Schema.TaggedError<OperationNotFound>()(

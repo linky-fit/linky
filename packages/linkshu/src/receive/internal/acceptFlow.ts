@@ -713,13 +713,14 @@ const DEFERRAL_REASON = "deferred-receive";
 
 /**
  * Patches the deferral only while it is still `pending`, as stored now: a
- * deferral another pass or device closed stays as they left it.
+ * deferral another pass or device closed stays as they left it. Takes the
+ * mint's receive lease, so it never interleaves with a receive of the mint.
  */
 export const closeDeferral = (
   ctx: ReceiveContext,
   deferral: StoredOperation,
   patch: OperationPatch,
-): Effect.Effect<void> =>
+): Effect.Effect<void, CounterLockTimeout> =>
   Effect.flatMap(ctx.operationStore.loadAll, (operations) => {
     const current = operations.find(
       (operation) =>
@@ -728,7 +729,7 @@ export const closeDeferral = (
     return current === undefined
       ? Effect.void
       : patchOperation(ctx, current, patch, DEFERRAL_REASON);
-  });
+  }).pipe(withReceiveLock(ctx.kv, deferral));
 
 /**
  * Where a received text comes from: pasted or carried by a message

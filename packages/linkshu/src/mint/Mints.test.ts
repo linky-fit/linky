@@ -14,7 +14,7 @@ import {
 import { Inspector } from "../inspector/Inspector";
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { OperationStore, StoredOperation } from "../ports/OperationStore";
-import type { OperationKind } from "../ports/OperationStore";
+import type { OperationKind, OperationStatus } from "../ports/OperationStore";
 import { ProofStore, StoredProof } from "../ports/ProofStore";
 import type { ProofState } from "../ports/ProofStore";
 import { fakeWallet, KEYSET_HEX } from "../testing/fakeWallet";
@@ -433,16 +433,56 @@ describe("Mints.removeKnownMint", () => {
         Effect.flatMap(Mints, (mints) => mints.removeKnownMint(mint)),
       );
 
-      expect(exit).toEqual(Exit.fail(new MintInUse({ mint, proofCount: 1 })));
+      expect(exit).toEqual(
+        Exit.fail(
+          new MintInUse({ mint, proofCount: 1, deferredReceiveCount: 0 }),
+        ),
+      );
       expect(kv.removed).toEqual([]);
       expect(inspector.events).toEqual([
         expect.objectContaining({
           _tag: "OperationFailed",
           name: "mints.removeKnownMint",
           params: { mint },
-          error: new MintInUse({ mint, proofCount: 1 }),
+          error: new MintInUse({
+            mint,
+            proofCount: 1,
+            deferredReceiveCount: 0,
+          }),
         }),
       ]);
     },
   );
+
+  it("refuses while a pending deferred receive names the mint", async () => {
+    const kv = recordingKv({ [seenMintKey(mint)]: mint });
+    const deferral = (id: string, status: OperationStatus) =>
+      new StoredOperation({
+        ...operationAt(id, "deferredReceive", mint),
+        status,
+      });
+
+    const exit = await runMints(
+      Layer.mergeAll(
+        instances,
+        stubProofStore([]),
+        stubOperationStore([
+          deferral("d-1", "pending"),
+          deferral("d-2", "done"),
+          deferral("d-3", "failed"),
+          operationAt("r-1", "receive", mint),
+        ]),
+        kv.layer,
+        Inspector.disabled,
+      ),
+      Effect.flatMap(Mints, (mints) => mints.removeKnownMint(mint)),
+    );
+
+    expect(exit).toEqual(
+      Exit.fail(
+        new MintInUse({ mint, proofCount: 0, deferredReceiveCount: 1 }),
+      ),
+    );
+    expect(kv.removed).toEqual([]);
+  });
 });

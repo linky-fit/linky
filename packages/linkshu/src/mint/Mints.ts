@@ -81,20 +81,32 @@ export class Mints extends Effect.Service<Mints>()("linkshu/Mints", {
         .set(seenMintKey(mint), mint)
         .pipe(inspectOperation(inspector, "mints.addKnownMint", { mint }));
 
-    /** Unspent proofs at the mint, whatever the wallet considers them. */
-    const countProofsAt = (mint: MintUrl): Effect.Effect<number> =>
-      Effect.map(
-        proofStore.loadAll,
-        (proofs) =>
-          proofs.filter(
-            (proof) => proof.mint === mint && proof.state !== "spent",
-          ).length,
-      );
+    /** Unspent proofs and pending deferred receives naming the mint. */
+    const usesOf = (mint: MintUrl) =>
+      Effect.all({
+        proofCount: Effect.map(
+          proofStore.loadAll,
+          (proofs) =>
+            proofs.filter(
+              (proof) => proof.mint === mint && proof.state !== "spent",
+            ).length,
+        ),
+        deferredReceiveCount: Effect.map(
+          operationStore.loadAll,
+          (operations) =>
+            operations.filter(
+              (operation) =>
+                operation.mint === mint &&
+                operation.kind === "deferredReceive" &&
+                operation.status === "pending",
+            ).length,
+        ),
+      });
 
     const removeKnownMint = (mint: MintUrl): Effect.Effect<void, MintInUse> =>
-      Effect.flatMap(countProofsAt(mint), (proofCount) =>
-        proofCount > 0
-          ? Effect.fail(new MintInUse({ mint, proofCount }))
+      Effect.flatMap(usesOf(mint), (uses) =>
+        uses.proofCount > 0 || uses.deferredReceiveCount > 0
+          ? Effect.fail(new MintInUse({ mint, ...uses }))
           : kv.remove(seenMintKey(mint)),
       ).pipe(inspectOperation(inspector, "mints.removeKnownMint", { mint }));
 
