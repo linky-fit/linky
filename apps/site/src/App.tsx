@@ -28,8 +28,6 @@ interface LocaleCopy {
   privacyLabel: string;
   heroImageAlt: string;
   followUsLabel: string;
-  githubLabel: string;
-  nostrLabel: string;
   uspSectionTitle: string;
   uspItems: [UspItemCopy, UspItemCopy, UspItemCopy];
   closingSectionTitle: string;
@@ -69,8 +67,6 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     privacyLabel: "Ochrana soukromí",
     heroImageAlt: "Aplikace Linky na telefonu v ruce",
     followUsLabel: "Sledujte nás",
-    githubLabel: "GitHub",
-    nostrLabel: "Nostr profil",
     uspSectionTitle: "Proč Linky",
     uspItems: [
       {
@@ -118,8 +114,6 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     privacyLabel: "Privacy Policy",
     heroImageAlt: "The Linky app on a phone held in hand",
     followUsLabel: "Follow us",
-    githubLabel: "GitHub",
-    nostrLabel: "Nostr profile",
     uspSectionTitle: "Why Linky",
     uspItems: [
       {
@@ -167,8 +161,6 @@ const copy: Record<SiteLocale, LocaleCopy> = {
     privacyLabel: "Datenschutz",
     heroImageAlt: "Die Linky-App auf einem Smartphone in der Hand",
     followUsLabel: "Folge uns",
-    githubLabel: "GitHub",
-    nostrLabel: "Nostr-Profil",
     uspSectionTitle: "Warum Linky",
     uspItems: [
       {
@@ -411,8 +403,6 @@ function App() {
 
         <SiteFooter
           followUsLabel={activeCopy.followUsLabel}
-          githubLabel={activeCopy.githubLabel}
-          nostrLabel={activeCopy.nostrLabel}
           privacyLabel={activeCopy.privacyLabel}
         />
       </section>

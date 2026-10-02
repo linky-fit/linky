@@ -9,7 +9,6 @@ interface LocaleCopy {
   followUsLabel: string;
   englishLabel: string;
   germanLabel: string;
-  githubLabel: string;
   invalidToken: string;
   linkyPrimaryAction: string;
   lightningAddressLabel: string;
@@ -17,7 +16,6 @@ interface LocaleCopy {
   lightningAddressPlaceholder: string;
   loadingToken: string;
   noTokenLoaded: string;
-  nostrLabel: string;
   openInWalletLabel: string;
   pageTitle: string;
   payoutIntro: string;
@@ -48,7 +46,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     followUsLabel: "Sledujte nás",
     englishLabel: "English",
     germanLabel: "Deutsch",
-    githubLabel: "GitHub",
     invalidToken: "Utraceno",
     linkyPrimaryAction: "Vyzvednout v Linky",
     lightningAddressLabel: "Lightning adresa",
@@ -57,7 +54,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     loadingToken: "Ověřuji token u mintu…",
     noTokenLoaded:
       "Vlož token ručně nebo otevři stránku rovnou s tokenem v URL.",
-    nostrLabel: "Nostr profil",
     openInWalletLabel: "Otevřít v peněžence",
     pageTitle: "Vytvoř odkaz pro vyzvednutí bitcoinu na lightning adresu",
     payoutIntro:
@@ -88,7 +84,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     followUsLabel: "Follow us",
     englishLabel: "English",
     germanLabel: "Deutsch",
-    githubLabel: "GitHub",
     invalidToken: "Spent",
     linkyPrimaryAction: "Redeem in Linky",
     lightningAddressLabel: "Lightning address",
@@ -97,7 +92,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     loadingToken: "Checking the token with the mint…",
     noTokenLoaded:
       "Paste a token manually or open the page directly with a token in the URL.",
-    nostrLabel: "Nostr profile",
     openInWalletLabel: "Open in wallet",
     pageTitle: "Create a link to redeem bitcoin to a lightning address",
     payoutIntro:
@@ -128,7 +122,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     followUsLabel: "Folge uns",
     englishLabel: "English",
     germanLabel: "Deutsch",
-    githubLabel: "GitHub",
     invalidToken: "Ausgegeben",
     linkyPrimaryAction: "In Linky einlösen",
     lightningAddressLabel: "Lightning-Adresse",
@@ -138,7 +131,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     loadingToken: "Token wird beim Mint geprüft…",
     noTokenLoaded:
       "Füge einen Token ein oder öffne die Seite direkt mit einem Token in der URL.",
-    nostrLabel: "Nostr-Profil",
     openInWalletLabel: "In Wallet öffnen",
     pageTitle:
       "Erstelle einen Link zum Einlösen von Bitcoin an eine Lightning-Adresse",

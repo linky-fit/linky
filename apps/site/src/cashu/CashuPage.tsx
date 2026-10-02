@@ -280,8 +280,6 @@ function CashuPage() {
 
       <SiteFooter
         followUsLabel={activeCopy.followUsLabel}
-        githubLabel={activeCopy.githubLabel}
-        nostrLabel={activeCopy.nostrLabel}
         privacyLabel={activeCopy.privacyLabel}
       />
     </main>

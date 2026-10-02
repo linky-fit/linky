@@ -16,8 +16,6 @@ interface FollowUsCopy extends SiteHeaderMenuCopy {
   copyLabel: string;
   copiedLabel: string;
   followUsLabel: string;
-  githubLabel: string;
-  nostrLabel: string;
   privacyLabel: string;
 }
 
@@ -33,8 +31,6 @@ const copy: Record<SiteLocale, FollowUsCopy> = {
     copyLabel: "Kopírovat",
     copiedLabel: "Zkopírováno",
     followUsLabel: "Sledujte nás",
-    githubLabel: "GitHub",
-    nostrLabel: "Nostr profil",
     privacyLabel: "Ochrana soukromí",
   },
   en: {
@@ -48,8 +44,6 @@ const copy: Record<SiteLocale, FollowUsCopy> = {
     copyLabel: "Copy",
     copiedLabel: "Copied",
     followUsLabel: "Follow us",
-    githubLabel: "GitHub",
-    nostrLabel: "Nostr profile",
     privacyLabel: "Privacy Policy",
   },
   de: {
@@ -63,8 +57,6 @@ const copy: Record<SiteLocale, FollowUsCopy> = {
     copyLabel: "Kopieren",
     copiedLabel: "Kopiert",
     followUsLabel: "Folge uns",
-    githubLabel: "GitHub",
-    nostrLabel: "Nostr-Profil",
     privacyLabel: "Datenschutz",
   },
 };
@@ -189,8 +181,6 @@ function FollowUsPage() {
 
       <SiteFooter
         followUsLabel={activeCopy.followUsLabel}
-        githubLabel={activeCopy.githubLabel}
-        nostrLabel={activeCopy.nostrLabel}
         privacyLabel={activeCopy.privacyLabel}
       />
     </main>
