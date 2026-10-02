@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  advanceRecurringSchedule,
   currentTimeZone,
   decideRecurringRun,
   isValidRecurringInterval,
+  nextDueAfter,
   nextRecurringOccurrenceAfter,
   recurringDueAt,
   resolveTimeZone,
@@ -170,8 +170,8 @@ describe("recurringSchedule", () => {
     });
   });
 
-  describe("advanceRecurringSchedule", () => {
-    it("moves to the first due time after now and counts the run", () => {
+  describe("nextDueAfter", () => {
+    it("finds the first due time after now on the schedule's own grid", () => {
       const anchor = utc(2026, 1, 1, 8);
       const state: RecurringScheduleState = {
         anchorAtSec: anchor,
@@ -181,10 +181,7 @@ describe("recurringSchedule", () => {
         runCount: 4,
         pausedAtSec: null,
       };
-      expect(advanceRecurringSchedule(state, utc(2026, 1, 4, 11))).toEqual({
-        nextDueAtSec: utc(2026, 1, 5, 8),
-        runCount: 5,
-      });
+      expect(nextDueAfter(state, utc(2026, 1, 4, 11))).toBe(utc(2026, 1, 5, 8));
     });
   });
 

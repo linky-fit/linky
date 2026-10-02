@@ -1,5 +1,10 @@
-import type { RecurringPaymentOrder, RecurringPaymentRunStatus } from "./order";
-import { nextDueAfter, type RecurringScheduleAdvance } from "./schedule";
+import {
+  recurringProgressColumn,
+  type RecurringPaymentOrder,
+  type RecurringPaymentRunStatus,
+} from "./order";
+import { nextDueAfter } from "./schedule";
+import type { RecurringRun } from "./tick";
 
 /** The columns one state change writes; the app brands them for its store. */
 export interface RecurringPaymentPatch {
@@ -8,12 +13,23 @@ export interface RecurringPaymentPatch {
   claimDueAtSec?: number | null;
   lastRunAtSec?: number | null;
   lastRunStatus?: RecurringPaymentRunStatus;
-  nextDueAtSec?: number;
   pausedAtSec?: number | null;
-  runCount?: number;
+  /** `recurringProgressColumn` text: the run count and due time, always written together. */
+  progress?: string;
 }
 
-/** This device takes the due time; the last writer to sync is the one that pays. */
+/** Moves the due time and keeps the count the order was read with. */
+const movedDuePatch = (
+  order: RecurringPaymentOrder,
+  nextDueAtSec: number,
+): RecurringPaymentPatch => ({
+  progress: recurringProgressColumn({
+    runCount: order.schedule.runCount,
+    nextDueAtSec,
+  }),
+});
+
+/** This device shows the countdown for the due time and notifies the user. */
 export const claimPatch = (
   deviceId: string,
   nowSec: number,
@@ -24,72 +40,57 @@ export const claimPatch = (
   claimDueAtSec: dueAtSec,
 });
 
-/** After an edit: a new grid starts and an in-flight claim no longer applies. */
-export const CLEAR_CLAIM_PATCH: RecurringPaymentPatch = {
+/**
+ * After an edit of the schedule: the new first due time starts a new grid,
+ * the count stays, and an in-flight claim no longer applies.
+ */
+export const editPatch = (
+  order: RecurringPaymentOrder,
+  firstDueAtSec: number,
+): RecurringPaymentPatch => ({
+  ...movedDuePatch(order, firstDueAtSec),
   claimAtSec: null,
   claimDeviceId: null,
   claimDueAtSec: null,
-};
-
-/**
- * Written before money moves, with the schedule already advanced, so no other
- * pass or device pays the same period.
- */
-export const runStartedPatch = (
-  advance: RecurringScheduleAdvance,
-  startedAtSec: number,
-): RecurringPaymentPatch => ({
-  lastRunAtSec: startedAtSec,
-  lastRunStatus: "running",
-  nextDueAtSec: advance.nextDueAtSec,
-  runCount: advance.runCount,
 });
 
-export const RUN_PAID_PATCH: RecurringPaymentPatch = { lastRunStatus: "paid" };
+/** Missed periods are not paid retroactively, and a pending one paid early is consumed. */
+const nextDueAfterRun = (
+  run: Pick<RecurringRun, "order" | "dueAtSec">,
+  nowSec: number,
+): number => nextDueAfter(run.order.schedule, Math.max(nowSec, run.dueAtSec));
 
 /**
- * Rolls the schedule back to the due time so the next pass retries; the
- * planner skips the run for good once its period ends.
+ * Written once the run's money went out. Setting rather than incrementing the
+ * count makes a repeat from another device or tab write the same row.
  */
-export const runFailedPatch = (
-  order: RecurringPaymentOrder,
-): RecurringPaymentPatch => ({
-  lastRunStatus: "failed",
-  nextDueAtSec: order.schedule.nextDueAtSec,
-  runCount: order.schedule.runCount,
-});
-
-/** The period is given up; the schedule moves on. */
-export const runSkippedPatch = (
-  advance: RecurringScheduleAdvance,
+export const runPaidPatch = (
+  run: RecurringRun,
   nowSec: number,
 ): RecurringPaymentPatch => ({
   lastRunAtSec: nowSec,
-  lastRunStatus: "skipped",
-  nextDueAtSec: advance.nextDueAtSec,
-  runCount: advance.runCount,
+  lastRunStatus: "paid",
+  progress: recurringProgressColumn({
+    runCount: run.runIndex + 1,
+    nextDueAtSec: nextDueAfterRun(run, nowSec),
+  }),
 });
 
-/**
- * Settles a run that never finished (the app died mid-payment). Its schedule
- * is already advanced. When the history records the payment the run is paid;
- * when it does not, the money never moved, so the claimed due time is
- * restored and the payment goes out on a later pass instead of vanishing.
- */
-export const interruptedRunPatch = (
-  order: RecurringPaymentOrder,
-  recorded: boolean,
-): RecurringPaymentPatch => {
-  if (recorded) return RUN_PAID_PATCH;
-  const dueAtSec = order.claim?.dueAtSec;
-  return dueAtSec === undefined
-    ? { lastRunStatus: "interrupted" }
-    : {
-        lastRunStatus: "interrupted",
-        nextDueAtSec: dueAtSec,
-        runCount: Math.max(0, order.schedule.runCount - 1),
-      };
-};
+/** The run stays due; the planner skips it once its period ends. */
+export const runFailedPatch = (nowSec: number): RecurringPaymentPatch => ({
+  lastRunAtSec: nowSec,
+  lastRunStatus: "failed",
+});
+
+/** The period is given up: the schedule moves on and the next run keeps its number. */
+export const runSkippedPatch = (
+  run: Pick<RecurringRun, "order" | "dueAtSec">,
+  nowSec: number,
+): RecurringPaymentPatch => ({
+  ...movedDuePatch(run.order, nextDueAfterRun(run, nowSec)),
+  lastRunAtSec: nowSec,
+  lastRunStatus: "skipped",
+});
 
 export const pausePatch = (nowSec: number): RecurringPaymentPatch => ({
   pausedAtSec: nowSec,
@@ -100,9 +101,11 @@ export const resumePatch = (
   order: RecurringPaymentOrder,
   nowSec: number,
 ): RecurringPaymentPatch => ({
-  pausedAtSec: null,
-  nextDueAtSec:
+  ...movedDuePatch(
+    order,
     order.schedule.nextDueAtSec > nowSec
       ? order.schedule.nextDueAtSec
       : nextDueAfter(order.schedule, nowSec),
+  ),
+  pausedAtSec: null,
 });

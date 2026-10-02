@@ -1,20 +1,22 @@
 import { describe, expect, it } from "vitest";
 import type { RecurringPaymentId } from "@linky-fit/domain";
 import type { FiatRatesPerBtc } from "./amount";
-import type { RecurringPaymentOrder } from "./order";
+import { recurringEnvelopeKey, type RecurringPaymentOrder } from "./order";
 import {
   DUE,
   HOUR,
+  MINT,
   recurringOrderFixture,
   recurringPaymentIdFor,
 } from "./testing/orders";
 import {
+  isRecurringUnfunded,
   planRecurringPaymentTick,
   RECURRING_CLAIM_TAKEOVER_SEC,
   RECURRING_NOTICE_SEC,
-  RECURRING_RUN_STALE_SEC,
   recurringUpcoming,
   runNowAction,
+  unfundedAction,
 } from "./tick";
 
 const NOTICE = RECURRING_NOTICE_SEC;
@@ -33,8 +35,10 @@ const plan = (
   nowSec: number,
   extra: {
     balanceSat?: number;
+    balanceMint?: string;
     deviceId?: string;
     fiatRates?: FiatRatesPerBtc | null;
+    funded?: [string, number][];
     retry?: [RecurringPaymentId, number][];
   } = {},
 ) =>
@@ -42,8 +46,11 @@ const plan = (
     orders,
     nowSec,
     deviceId: extra.deviceId ?? "device-a",
-    balanceSat: extra.balanceSat ?? 1_000,
+    balanceSatByMint: new Map([
+      [extra.balanceMint ?? MINT, extra.balanceSat ?? 1_000],
+    ]),
     fiatRates: extra.fiatRates ?? null,
+    fundedEnvelopeSat: new Map(extra.funded ?? []),
     retryNotBeforeSec: new Map(extra.retry ?? []),
   });
 
@@ -82,10 +89,10 @@ describe("planRecurringPaymentTick", () => {
       expect(plan([claimed], DUE)).toMatchObject([
         {
           kind: "run",
+          runIndex: 0,
           amountSat: 100,
           dueAtSec: DUE,
           missedCount: 0,
-          advance: { nextDueAtSec: DUE + 6 * HOUR, runCount: 1 },
         },
       ]);
     });
@@ -101,6 +108,14 @@ describe("planRecurringPaymentTick", () => {
     it("leaves a payment claimed by another device to that device", () => {
       const theirs = order(claimedBy("device-b", DUE - NOTICE));
       expect(plan([theirs], DUE)).toEqual([]);
+    });
+
+    it("names the run by the order's count of paid runs", () => {
+      const third = order({
+        ...claimedBy("device-a", DUE - NOTICE),
+        schedule: { ...order().schedule, runCount: 2 },
+      });
+      expect(plan([third], DUE)).toMatchObject([{ kind: "run", runIndex: 2 }]);
     });
 
     it("takes over when the claimant never paid", () => {
@@ -129,6 +144,45 @@ describe("planRecurringPaymentTick", () => {
       expect(plan([order(mine)], DUE + 6 * HOUR, poor)).toMatchObject([
         { kind: "skip", reason: "insufficientFunds", dueAtSec: DUE },
       ]);
+    });
+
+    it("counts only the balance at the order's mint", () => {
+      expect(
+        plan([order(mine)], DUE, { balanceMint: "https://other.example" }),
+      ).toMatchObject([{ kind: "waitFunds" }]);
+    });
+
+    it("hands an unfunded payment the run to pay from an envelope that already exists", () => {
+      const run = { kind: "run", runIndex: 0, dueAtSec: DUE, amountSat: 100 };
+      expect(plan([order(mine)], DUE, { balanceSat: 0 })).toMatchObject([
+        { kind: "waitFunds", run },
+      ]);
+      expect(
+        plan([order(mine)], DUE + 6 * HOUR, { balanceSat: 0 }),
+      ).toMatchObject([{ kind: "skip", reason: "insufficientFunds", run }]);
+    });
+
+    it("turns a run the wallet could not fund into a wait, or a skip once its period ended", () => {
+      const run = runNowAction(order(mine), 100);
+      const waiting = unfundedAction(run, DUE + HOUR);
+      const skipped = unfundedAction(run, DUE + 6 * HOUR);
+
+      expect(waiting).toMatchObject({ kind: "waitFunds", dueAtSec: DUE, run });
+      expect(skipped).toMatchObject({
+        kind: "skip",
+        reason: "insufficientFunds",
+        dueAtSec: DUE,
+        run,
+      });
+      expect([waiting, skipped].every(isRecurringUnfunded)).toBe(true);
+      expect(
+        isRecurringUnfunded({
+          kind: "skip",
+          order: order(),
+          dueAtSec: DUE,
+          reason: "failed",
+        }),
+      ).toBe(false);
     });
 
     it("pays a payment missed for days as soon as the wallet allows", () => {
@@ -164,6 +218,16 @@ describe("planRecurringPaymentTick", () => {
       ).toMatchObject([{ kind: "run", amountSat: 7_500 }]);
     });
 
+    it("pays a run from its funded envelope without a rate or balance", () => {
+      const fiat = order({ ...mine, amount: { amount: 15_000, unit: "czk" } });
+      const funded: [string, number][] = [
+        [recurringEnvelopeKey(fiat.id, 0), 7_400],
+      ];
+      expect(plan([fiat], DUE + HOUR, { balanceSat: 0, funded })).toMatchObject(
+        [{ kind: "run", runIndex: 0, amountSat: 7_400 }],
+      );
+    });
+
     it("holds back a failed payment until its retry time", () => {
       const failed = order({
         ...mine,
@@ -174,6 +238,9 @@ describe("planRecurringPaymentTick", () => {
         [recurringPaymentIdFor("rp-1"), DUE + 10 * 60],
       ];
       expect(plan([failed], DUE + 5 * 60, { retry })).toEqual([]);
+      expect(plan([failed], DUE + 5 * 60, { retry, balanceSat: 0 })).toEqual(
+        [],
+      );
       expect(plan([failed], DUE + 10 * 60, { retry })).toMatchObject([
         { kind: "run" },
       ]);
@@ -189,14 +256,6 @@ describe("planRecurringPaymentTick", () => {
         { kind: "skip", reason: "failed" },
       ]);
     });
-  });
-
-  it("marks a stale running mark interrupted and waits on a fresh one", () => {
-    const running = order({ lastRunStatus: "running", lastRunAtSec: DUE });
-    expect(plan([running], DUE + 60)).toEqual([]);
-    expect(plan([running], DUE + RECURRING_RUN_STALE_SEC + 1)).toMatchObject([
-      { kind: "markInterrupted" },
-    ]);
   });
 
   it("does nothing for a paused payment", () => {
@@ -242,32 +301,22 @@ describe("recurringUpcoming", () => {
     });
   });
 
-  it("is quiet while a run is in flight or nothing is due soon", () => {
-    expect(
-      recurringUpcoming(order({ lastRunStatus: "running" }), DUE),
-    ).toBeNull();
+  it("is quiet while nothing is due soon", () => {
     expect(recurringUpcoming(order(), DUE - NOTICE - 1)).toBeNull();
   });
 
   describe("runNowAction", () => {
-    it("pays the pending period now and moves to the one after it", () => {
+    it("pays the pending period now, even before it is due", () => {
       const future = DUE + 5 * HOUR;
       const pending = order({
-        schedule: { ...order().schedule, nextDueAtSec: future },
+        schedule: { ...order().schedule, nextDueAtSec: future, runCount: 3 },
       });
-      expect(runNowAction(pending, 100, DUE)).toMatchObject({
+      expect(runNowAction(pending, 100)).toMatchObject({
         kind: "run",
+        runIndex: 3,
         amountSat: 100,
         dueAtSec: future,
         missedCount: 0,
-        advance: { nextDueAtSec: future + HOUR, runCount: 1 },
-      });
-    });
-
-    it("counts from now when the pending due time is already past", () => {
-      expect(runNowAction(order(), 100, DUE + 7 * HOUR).advance).toEqual({
-        nextDueAtSec: DUE + 12 * HOUR,
-        runCount: 1,
       });
     });
   });

@@ -1,6 +1,6 @@
 # Schedule
 
-`RecurringScheduleState` is what the schedule math needs from an order: the anchor (`anchorAtSec`, the first due time), the `interval` (`{ unit, count }` with `unit` one of `hour`, `day`, `week`, `month`), the IANA `timeZone` the order was created in (`null` when unknown), the pending `nextDueAtSec`, `runCount` and `pausedAtSec`.
+`RecurringScheduleState` is what the schedule math needs from an order: the anchor (`anchorAtSec`, the first due time), the `interval` (`{ unit, count }` with `unit` one of `hour`, `day`, `week`, `month`), the IANA `timeZone` the order was created in (`null` when unknown), the pending `nextDueAtSec`, `runCount` (paid runs so far) and `pausedAtSec`. `nextDueAtSec` and `runCount` are stored together as the order's progress (see [Runs](./runs.md#the-order)).
 
 ## Due times
 
@@ -29,4 +29,4 @@ nextDueAfter(order.schedule, nowSec); // the same, straight from a schedule
 
 `decideRecurringRun(schedule, nowSec)` returns `paused`, `wait` (with `untilSec`) or `due` (with `dueAtSec` and `missedCount`). A payment is due as soon as `nowSec ≥ nextDueAtSec` however many due times passed while the app was closed; `missedCount` says how many were skipped so the run can say so. `pausedAtSec` wins over everything.
 
-`advanceRecurringSchedule(schedule, nowSec)` is the state after a run settled: `nextDueAtSec` becomes the first due time strictly after now, so missed periods are never paid retroactively, and `runCount` grows by one.
+A run never moves the schedule before its money went out. `runPaidPatch` and `runSkippedPatch` (see [Runs](./runs.md#transitions)) move `nextDueAtSec` to the first due time after both now and the settled due time, so missed periods are never paid retroactively and a period paid early is not paid again; only `runPaidPatch` advances `runCount`.

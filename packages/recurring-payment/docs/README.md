@@ -2,7 +2,7 @@
 
 How to use Linky's recurring-payment domain library. These are guides, not an API reference: the exported types are the reference, and the [package README](../README.md) holds the design rules.
 
-- [Schedule](./schedule.md) — intervals, due times in a time zone, catch-up, advancing after a run
-- [Runs](./runs.md) — the order model, the amount, the planner's actions, the transition patches, run references in the history, reminder times
+- [Schedule](./schedule.md) — intervals, due times in a time zone, catch-up, where a run moves the schedule
+- [Runs](./runs.md) — the order model, the amount, the run protocol with the mint as the arbiter, the planner's actions, the transition patches, run references in the history, reminder times
 
 The stored rows are described in linksync's [repositories guide](../../linksync/docs/repositories.md#recurring-payments).
