@@ -9,7 +9,7 @@ interface UseInterruptedReceiveRecoveryParams {
   cashuTransfers: readonly TokenTransfer[];
   /** Messages chat auto-accept scans for tokens. */
   messages: readonly LocalNostrMessage[];
-  /** Wallet loaded, initial sync settled, linkshu runtime composed. */
+  /** Wallet loaded, account hydrated, linkshu runtime composed. */
   ready: boolean;
   saveCashuFromText: (
     text: string,
@@ -19,8 +19,8 @@ interface UseInterruptedReceiveRecoveryParams {
 
 /**
  * Resumes, once per launch, every receive a reload, crash or unreachable
- * mint cut short. It waits for the initial sync, so a receive another
- * device finished is usually `done` by then. Tokens an incoming message
+ * mint cut short. It waits for hydration, so a receive another device
+ * finished is `done` by then. Tokens an incoming message
  * carries are left to chat auto-accept, which records their sender and
  * payment request. The app starts these, not the user, so they run quiet: a
  * token that lands is announced, anything else reaches only the inspector.

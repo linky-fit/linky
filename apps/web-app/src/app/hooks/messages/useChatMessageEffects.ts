@@ -1,6 +1,7 @@
 import React from "react";
 import type { Route } from "../../../types/route";
 import {
+  cashuAutoAcceptKey,
   isCashuAutoAcceptResolved,
   markCashuAutoAcceptResolved,
 } from "../../lib/autoAcceptedCashuMessages";
@@ -11,6 +12,7 @@ import type { ContactRowLike, LocalNostrMessage } from "../../types/appTypes";
 import type { SaveCashuFromTextOptions } from "../cashu/useSaveCashuFromText";
 
 interface UseChatMessageEffectsParams<TContact extends ContactRowLike> {
+  /** Keyed by `cashuAutoAcceptKey`. */
   autoAcceptedChatMessageIdsRef: React.MutableRefObject<Set<string>>;
   cashuIsBusy: boolean;
   cashuTokensHydratedRef: React.MutableRefObject<boolean>;
@@ -28,7 +30,7 @@ interface UseChatMessageEffectsParams<TContact extends ContactRowLike> {
   } | null;
   isCashuTokenKnownAny: (tokenRaw: string) => boolean;
   isCashuTokenStored: (tokenRaw: string) => boolean;
-  /** A bounded wait that usually, not always, lets synced wallet history land first. */
+  /** Holds until the account is hydrated, so synced wallet history is already here. */
   nostrBootstrapReady: boolean;
   nostrMessagesRecent: readonly LocalNostrMessage[];
   route: Route;
@@ -98,10 +100,10 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
       const candidates = newestFirst ? [...messages].reverse() : messages;
 
       for (const message of candidates) {
-        const id = message.id;
-        if (!id) continue;
-        if (autoAcceptedChatMessageIdsRef.current.has(id)) continue;
-        if (isCashuAutoAcceptResolved(id)) continue;
+        const key = cashuAutoAcceptKey(message);
+        if (!key) continue;
+        if (autoAcceptedChatMessageIdsRef.current.has(key)) continue;
+        if (isCashuAutoAcceptResolved(message)) continue;
         if (message.direction !== "in") continue;
 
         const content = message.content;
@@ -113,7 +115,7 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
         // Not marked attempted: allowing test mints later accepts it.
         if (info.isHiddenTestMint) continue;
 
-        autoAcceptedChatMessageIdsRef.current.add(id);
+        autoAcceptedChatMessageIdsRef.current.add(key);
         if (!info.isValid) continue;
         if (isCashuTokenKnownAny(info.tokenRaw)) continue;
         if (isCashuTokenStored(info.tokenRaw)) continue;
@@ -125,7 +127,7 @@ export const useChatMessageEffects = <TContact extends ContactRowLike>({
           ...(contactId ? { contactId } : {}),
           ...(requestId ? { requestId } : {}),
           onResolved: (resolution) => {
-            if (resolution === "terminal") markCashuAutoAcceptResolved(id);
+            if (resolution === "terminal") markCashuAutoAcceptResolved(message);
           },
         });
         return;
