@@ -24,7 +24,7 @@ import {
   OperationId,
   TokenText,
 } from "../domain/primitives";
-import { deterministicCounterKey } from "../internal/counters";
+import { deterministicCounterKey, withCounterLock } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
 import { inMemoryKeyValueStore } from "../ports/inMemoryKeyValueStore";
@@ -1204,6 +1204,39 @@ describe("Receive.receive", () => {
     expect(exit.value.receipt.left._tag).toBe("MintRejected");
     expect(receiveCounters).toHaveLength(5);
     expect(exit.value.operations[0]?.status).toBe("failed");
+  });
+
+  it("fails CounterLockTimeout, writing nothing, while another context holds the counter lock past the wait", async () => {
+    const { wallet } = makeWallet({
+      receive: () => Promise.reject(new Error("must not be called")),
+    });
+    const { run } = makeHarness(wallet);
+
+    const exit = await run(
+      Effect.gen(function* () {
+        yield* Effect.fork(
+          Effect.never.pipe(
+            withCounterLock(yield* KeyValueStore, {
+              mint,
+              unit: CurrencyUnit.make("sat"),
+              keysetId: KeysetId.make(KEYSET_HEX),
+            }),
+          ),
+        );
+        return yield* runOnTestClock(
+          receiveAndInspect(sourceToken),
+          "1 second",
+        );
+      }).pipe(Effect.provide(TestContext.TestContext)),
+    );
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left).toMatchObject({
+      _tag: "CounterLockTimeout",
+      keysetId: KEYSET_HEX,
+    });
+    expect(exit.value.operations).toEqual([]);
+    expect(exit.value.proofs).toEqual([]);
   });
 
   it("keeps a second receive of the text out while a slow swap outlasts the counter lease", async () => {

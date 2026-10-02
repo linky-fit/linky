@@ -104,7 +104,7 @@ Guide-specific tags; the rest are in [errors.md](./errors.md).
 | `TokenAlreadySpent`   | the mint reported the proofs spent                                                                 | none from the state check (a resumed receive as it was); `failed` from the swap (`Tokens.forget` closes it) |
 | `ReceiveDeferred`     | before the swap, a fresh token's mint could not be loaded, refreshed or asked                      | a `pending` `deferredReceive` (`operationId`); no `receive`                                                 |
 
-A fresh receive returns `MintRejected` and `MintUnreachable` only from the swap, which leaves the receive `failed`; before the swap it defers instead. A receive retried through `Tokens.returnToWallet` or by receiving its text again returns them from loading the mint, refreshing its keysets or the state check too, and then writes nothing. `MintUnreachable` may be retried. `CounterLockTimeout` comes before anything is recorded (`keysetId` null when another context held the mint's receive lease for 30 s); retry it.
+A fresh receive returns `MintRejected` and `MintUnreachable` only from the swap, which leaves the receive `failed`; before the swap it defers instead. A receive retried through `Tokens.returnToWallet` or by receiving its text again returns them from loading the mint, refreshing its keysets or the state check too, and then writes nothing. `MintUnreachable` may be retried. `CounterLockTimeout` comes before anything is recorded, a deferral included (`keysetId` null when another context held the mint's receive lease for 30 s): retry it, and when your copy of the text is the only one (a token a server hands out once), keep it until a call ends any other way.
 
 ## Related
 

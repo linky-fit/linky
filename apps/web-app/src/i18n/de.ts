@@ -781,6 +781,8 @@ export const de = {
   cashuAccepting: "Token wird angenommen…",
   cashuAccepted: "Token angenommen.",
   cashuAcceptFailed: "Token konnte nicht angenommen werden",
+  npubCashClaimUnsaved:
+    "Eine Zahlung an deine Lightning-Adresse konnte auf diesem Gerät nicht gespeichert werden. Kopiere ihren Token, um sie zu behalten.",
   cashuReceiveDeferred:
     "Die Mint ist nicht erreichbar. Der Token ist gespeichert und wird empfangen, sobald die Mint wieder erreichbar ist.",
   mintPendingAmount: "{amount} ausstehend",

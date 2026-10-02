@@ -1,3 +1,4 @@
+import type { PushToastOptions } from "../../../hooks/useToasts";
 import {
   transactionIdForOperation,
   transactionIdForRequest,
@@ -171,6 +172,7 @@ type OwnerScopedStorageResult = ReturnType<typeof useOwnerScopedStorage>;
 
 interface UseCashuWalletCompositionParams {
   contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
+  copyText: (value: string) => Promise<void>;
   contactsMessaging: Pick<
     ContactsMessagingCompositionResult,
     | "saveNpubContact"
@@ -226,7 +228,7 @@ interface UseCashuWalletCompositionParams {
     | "setOwnedProfileLightningAddresses"
     | "setOwnedProfileLightningAddressesLoading"
   >;
-  pushToast: (message: string) => void;
+  pushToast: (message: string, options?: PushToastOptions) => void;
   route: ReturnType<typeof useRouting>;
   setContactPaymentIntent: React.Dispatch<
     React.SetStateAction<"pay" | "request">
@@ -239,6 +241,7 @@ interface UseCashuWalletCompositionParams {
 
 export const useCashuWalletComposition = ({
   contactPayBackToChatRef,
+  copyText,
   contactsMessaging,
   formatDisplayedAmountParts,
   formatDisplayedAmountText,
@@ -829,6 +832,7 @@ export const useCashuWalletComposition = ({
     allowTestMints,
     adoptPaidCashuQuote,
     cashuIsBusy,
+    copyText,
     currentNpub: nostrBootstrapReady ? currentNpub : null,
     currentNsec: nostrBootstrapReady ? currentNsec : null,
     enqueueCashuOp,
@@ -840,6 +844,7 @@ export const useCashuWalletComposition = ({
     maybeShowPwaNotification,
     mintInfoByUrl,
     npubCashClaimInFlightRef,
+    pushToast,
     receiveCashuToken,
     refreshMintInfo,
     rememberCashuTokenKnown,

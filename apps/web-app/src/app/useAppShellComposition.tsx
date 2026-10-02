@@ -802,6 +802,7 @@ export const useAppShellComposition = ({
     walletWarningDismissed,
   } = useCashuWalletComposition({
     contactPayBackToChatRef,
+    copyText,
     contactsMessaging: {
       saveNpubContact,
       appendLocalNostrMessage,

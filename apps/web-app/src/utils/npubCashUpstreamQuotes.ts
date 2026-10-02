@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { JsonValue } from "../types/json";
+import { NPUB_CASH_REQUEST_TIMEOUT_MS } from "./npubCashServer";
 import { asRecord, isHttpUrl } from "./validation";
 
 /**
@@ -126,6 +127,7 @@ export const listUpstreamPaidQuotes = async (args: {
     const res = await fetch(request.url, {
       method: "GET",
       headers: { Authorization: auth },
+      signal: AbortSignal.timeout(NPUB_CASH_REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const parsed = parseUpstreamQuotesPage(

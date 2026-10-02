@@ -50,6 +50,16 @@ export const safeLocalStorageSet = (key: string, value: string): void => {
   }
 };
 
+/** False when storage refused the write, full or unavailable. */
+export const tryLocalStorageSet = (key: string, value: string): boolean => {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const safeLocalStorageRemove = (key: string): void => {
   try {
     localStorage.removeItem(key);
@@ -206,6 +216,24 @@ export const withLocalStorageLeaseLock = async <T>(args: {
 // The boot compatibility shim has no query method and cannot lock across tabs.
 export const canLockAcrossTabs = (): boolean =>
   typeof navigator.locks?.query === "function";
+
+/**
+ * Runs `fn` unless a run under `key` is already going on in any tab. Without
+ * Web Locks it takes the localStorage lease lock instead, which two tabs can
+ * both take, and rejects when that lock is held.
+ */
+export const withTabLockIfFree = async (args: {
+  key: string;
+  ttlMs: number;
+  fn: () => Promise<void>;
+}): Promise<void> => {
+  if (!canLockAcrossTabs()) {
+    return withLocalStorageLeaseLock({ ...args, timeoutMs: 0 });
+  }
+  await navigator.locks.request(args.key, { ifAvailable: true }, (lock) =>
+    lock === null ? undefined : args.fn(),
+  );
+};
 
 const readStoredInt = (key: string): number | null => {
   const parsed = Number.parseInt(trimString(safeLocalStorageGet(key)), 10);

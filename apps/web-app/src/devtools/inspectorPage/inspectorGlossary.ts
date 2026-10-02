@@ -168,6 +168,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The user enabled or disabled a display currency in Settings. The list is a synced setting, so other devices follow it; which enabled currency is shown stays per device.",
   LightningFeeProbed:
     "linkshu measured a mint's Lightning fee by pricing another mint's unpaid invoice as a melt quote. Nothing is paid; links carry both quote ids.",
+  "npubCash.claimsUnsaved":
+    "Storage refused to keep tokens Linky's npub.cash server had just handed out, each only once. They are held in memory for this session and received at once; while one is neither saved nor received, the user is asked to copy it.",
   "npubCash.upstreamQuotesListed":
     "The wallet asked upstream npub.cash which mint quotes for the user's <npub>@npub.cash address were paid; the payload counts what was listed and what was new. Each new quote is then minted by a linkshu topup.adopt operation sharing its quote link.",
   "melt.resume":

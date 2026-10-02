@@ -74,6 +74,8 @@ export const LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX =
   "linky.local.npubCashClaimLastAttempt.v1";
 export const LOCAL_NPUB_CASH_UPSTREAM_QUOTES_STORAGE_KEY_PREFIX =
   "linky.local.npubCashUpstreamQuotes.v1";
+export const LOCAL_NPUB_CASH_CLAIM_INBOX_STORAGE_KEY_PREFIX =
+  "linky.local.npubCashClaimInbox.v1";
 
 export const BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY =
   "linky.blocked_nostr_pubkeys.v1";

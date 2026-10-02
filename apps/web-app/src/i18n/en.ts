@@ -770,6 +770,8 @@ export const en = {
   cashuAccepting: "Accepting token…",
   cashuAccepted: "Token accepted.",
   cashuAcceptFailed: "Failed to accept token",
+  npubCashClaimUnsaved:
+    "This device could not save a payment to your lightning address. Copy its token to keep it.",
   cashuReceiveDeferred:
     "The mint is unreachable. The token is saved and will be received once the mint is back.",
   mintPendingAmount: "{amount} pending",

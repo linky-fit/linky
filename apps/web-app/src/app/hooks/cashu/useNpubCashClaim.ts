@@ -7,14 +7,21 @@ import React from "react";
 import { parseTokenText, type OperationId } from "@linky-fit/linkshu";
 import { JsonValue } from "../../../types/json";
 import {
+  LOCAL_NPUB_CASH_CLAIM_INBOX_STORAGE_KEY_PREFIX,
   LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX,
   LOCAL_NPUB_CASH_CLAIM_LOCK_STORAGE_KEY_PREFIX,
   LOCAL_NPUB_CASH_UPSTREAM_QUOTES_STORAGE_KEY_PREFIX,
 } from "../../../utils/constants";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
+import {
+  addToClaimInbox,
+  readClaimInbox,
+  removeFromClaimInbox,
+} from "../../../utils/npubCashClaimInbox";
 import { extractUniqueClaimTokens } from "../../../utils/npubCashClaimResponse";
 import {
   isNpubCashDisabled,
+  NPUB_CASH_REQUEST_TIMEOUT_MS,
   NPUB_CASH_SERVER_BASE_URL,
   NPUB_CASH_UPSTREAM_BASE_URL,
 } from "../../../utils/npubCashServer";
@@ -30,10 +37,11 @@ import type {
   UpstreamPaidQuotesListing,
 } from "../../../utils/npubCashUpstreamQuotes";
 import type { Route } from "../../../types/route";
+import type { PushToastOptions } from "../../../hooks/useToasts";
 import {
   safeLocalStorageGet,
   safeLocalStorageSet,
-  withLocalStorageLeaseLock,
+  withTabLockIfFree,
 } from "../../../utils/storage";
 import { getUnknownErrorMessage } from "../../../utils/unknown";
 import { getInspectorEmissionEnabled } from "../../../devtools/inspector/inspectorEnabled";
@@ -57,6 +65,7 @@ interface UseNpubCashClaimParams {
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   adoptPaidCashuQuote: AdoptPaidCashuQuote | null;
   cashuIsBusy: boolean;
+  copyText: (value: string) => Promise<void>;
   currentNpub: string | null;
   currentNsec: string | null;
   enqueueCashuOp: <T>(op: () => Promise<T>) => Promise<T>;
@@ -76,6 +85,7 @@ interface UseNpubCashClaimParams {
   ) => Promise<void>;
   mintInfoByUrl: ReadonlyMap<string, LocalMintInfoRow>;
   npubCashClaimInFlightRef: React.MutableRefObject<boolean>;
+  pushToast: (message: string, options?: PushToastOptions) => void;
   /** Null until the linkshu runtime is composed (seed + owners resolved). */
   receiveCashuToken: ReceiveCashuToken | null;
   refreshMintInfo: (mintUrl: string) => Promise<void> | void;
@@ -108,6 +118,21 @@ interface ReceivedPayment {
   readonly method: PaymentTelemetryMethod;
   readonly details?: JsonValue;
 }
+
+const reportClaimsUnsaved = (count: number): void => {
+  if (!getInspectorEmissionEnabled()) return;
+  reportInspectorRows([
+    {
+      at: Date.now(),
+      channel: "cashu",
+      tag: "npubCash.claimsUnsaved",
+      summary: `storage refused ${count} claimed npub.cash tokens; kept for this session only`,
+      links: {},
+      context: { server: NPUB_CASH_SERVER_BASE_URL },
+      payload: { count },
+    },
+  ]);
+};
 
 const reportUpstreamQuotesListed = (
   listing: UpstreamPaidQuotesListing,
@@ -147,12 +172,16 @@ const reportUpstreamQuotesListed = (
  * `<npub>@npub.cash` funds must not auto-swap to the default mint.
  * Only polling, lock/interval/cursor bookkeeping, and app-side notifications
  * live here.
- * Transient failures persist nothing; the next poll simply retries.
+ * Claimed tokens wait in a device-local inbox until linkshu holds or settles
+ * them; upstream quotes stay listed until adopted. The next poll retries both.
+ * A token the inbox could not store is held for this session and received at
+ * once; the first poll it is neither stored nor received offers to copy it.
  */
 export const useNpubCashClaim = ({
   adoptPaidCashuQuote,
   allowTestMints,
   cashuIsBusy,
+  copyText,
   currentNpub,
   currentNsec,
   enqueueCashuOp,
@@ -164,6 +193,7 @@ export const useNpubCashClaim = ({
   maybeShowPwaNotification,
   mintInfoByUrl,
   npubCashClaimInFlightRef,
+  pushToast,
   receiveCashuToken,
   refreshMintInfo,
   rememberCashuTokenKnown,
@@ -174,6 +204,9 @@ export const useNpubCashClaim = ({
   t,
   touchMintInfo,
 }: UseNpubCashClaimParams) => {
+  const unsavedClaimsRef = React.useRef<readonly string[]>([]);
+  const offeredCopiesRef = React.useRef(new Set<string>());
+
   const announceReceived = React.useCallback(
     ({ amount, details, method, mint, operationId, unit }: ReceivedPayment) => {
       touchReceivingMint(mint, {
@@ -237,13 +270,17 @@ export const useNpubCashClaim = ({
     ],
   );
 
-  const acceptAndStoreCashuToken = React.useCallback(
-    async (tokenText: string) => {
+  /**
+   * True once the token needs no copy here: linkshu received it, keeps it
+   * (a deferral, or a receive that carries it) or refused it for good.
+   */
+  const receiveClaimedToken = React.useCallback(
+    async (tokenText: string): Promise<boolean> => {
       const tokenRaw = tokenText.trim();
-      if (!tokenRaw) return;
-      if (receiveCashuToken === null) return;
+      if (!tokenRaw) return true;
+      if (receiveCashuToken === null) return false;
 
-      await enqueueCashuOp(async () => {
+      return enqueueCashuOp(async () => {
         setCashuIsBusy(true);
 
         const parsed = parseTokenText(tokenRaw);
@@ -265,24 +302,24 @@ export const useNpubCashClaim = ({
         };
 
         try {
-          if (isHiddenTestMint(parsedMint, allowTestMints)) {
-            logFailure(t("cashuTestMintRejected"));
-            return;
-          }
+          // Left in the inbox: turning test mints back on receives it.
+          if (isHiddenTestMint(parsedMint, allowTestMints)) return false;
           const outcome = await receiveCashuToken(tokenRaw);
 
           if (Either.isLeft(outcome)) {
             const error = outcome.left;
+            // A receive that waited out another one's turn wrote nothing.
+            if (error._tag === "CounterLockTimeout") return false;
             // A deferred token is kept by linkshu and received on a later retry.
             if (
               error._tag === "TokenAlreadyKnown" ||
               error._tag === "ReceiveDeferred"
             )
-              return;
+              return true;
             const message = describeTaggedCashuError(error) ?? error._tag;
             logFailure(message);
             setStatus(`${t("cashuAcceptFailed")}: ${message}`);
-            return;
+            return true;
           }
 
           const receipt = outcome.right;
@@ -294,10 +331,12 @@ export const useNpubCashClaim = ({
             unit: receipt.unit,
             method: "cashu_receive",
           });
+          return true;
         } catch (error) {
           const message = getUnknownErrorMessage(error, "Accept failed");
           logFailure(message);
           setStatus(`${t("cashuAcceptFailed")}: ${message}`);
+          return false;
         } finally {
           setCashuIsBusy(false);
         }
@@ -316,19 +355,75 @@ export const useNpubCashClaim = ({
     ],
   );
 
-  const claimFromLinkyServer = React.useCallback(async () => {
+  /** Lets go of each token linkshu now holds or settled. */
+  const receiveClaims = React.useCallback(
+    async (inboxKey: string, tokens: readonly string[]) => {
+      for (const tokenText of tokens) {
+        if (await receiveClaimedToken(tokenText)) {
+          removeFromClaimInbox(inboxKey, tokenText);
+          unsavedClaimsRef.current = unsavedClaimsRef.current.filter(
+            (unsaved) => unsaved !== tokenText,
+          );
+        } else if (
+          unsavedClaimsRef.current.includes(tokenText) &&
+          !offeredCopiesRef.current.has(tokenText)
+        ) {
+          offeredCopiesRef.current.add(tokenText);
+          pushToast(t("npubCashClaimUnsaved"), {
+            action: {
+              label: t("copy"),
+              onClick: () => void copyText(tokenText),
+            },
+          });
+        }
+      }
+    },
+    [copyText, pushToast, receiveClaimedToken, t],
+  );
+
+  const claimFromLinkyServer = React.useCallback(async (): Promise<
+    readonly string[]
+  > => {
     const url = `${NPUB_CASH_SERVER_BASE_URL}/api/v1/claim`;
     const auth = await makeNip98AuthHeader(url, "GET");
     const res = await fetch(url, {
       method: "GET",
       headers: { Authorization: auth },
+      signal: AbortSignal.timeout(NPUB_CASH_REQUEST_TIMEOUT_MS),
     });
-    if (!res.ok) return;
+    if (!res.ok) return [];
     const json = Schema.decodeUnknownSync(JsonValue)(await res.json());
-    for (const tokenText of extractUniqueClaimTokens(json)) {
-      await acceptAndStoreCashuToken(tokenText);
+    return extractUniqueClaimTokens(json);
+  }, [makeNip98AuthHeader]);
+
+  /**
+   * Saved claims are received before the server is asked, so a stalled
+   * claim request never holds them back.
+   */
+  const collectFromLinkyServer = React.useCallback(async () => {
+    const inboxKey = makeLocalStorageKey(
+      LOCAL_NPUB_CASH_CLAIM_INBOX_STORAGE_KEY_PREFIX,
+    );
+    unsavedClaimsRef.current = addToClaimInbox(
+      inboxKey,
+      unsavedClaimsRef.current,
+    );
+    await receiveClaims(inboxKey, [
+      ...readClaimInbox(inboxKey),
+      ...unsavedClaimsRef.current,
+    ]);
+
+    const claimed = await claimFromLinkyServer();
+    const refused = addToClaimInbox(inboxKey, claimed);
+    if (refused.length > 0) {
+      reportClaimsUnsaved(refused.length);
+      unsavedClaimsRef.current = [
+        ...unsavedClaimsRef.current,
+        ...refused.filter((token) => !unsavedClaimsRef.current.includes(token)),
+      ];
     }
-  }, [acceptAndStoreCashuToken, makeNip98AuthHeader]);
+    await receiveClaims(inboxKey, claimed);
+  }, [claimFromLinkyServer, makeLocalStorageKey, receiveClaims]);
 
   /**
    * One quote at a time through the wallet queue. A definitive answer —
@@ -449,9 +544,8 @@ export const useNpubCashClaim = ({
         LOCAL_NPUB_CASH_CLAIM_LAST_ATTEMPT_STORAGE_KEY_PREFIX,
       );
 
-      await withLocalStorageLeaseLock({
+      await withTabLockIfFree({
         key: lockKey,
-        timeoutMs: 0,
         ttlMs: NPUB_CASH_CLAIM_LOCK_TTL_MS,
         fn: async () => {
           if (npubCashClaimInFlightRef.current) return;
@@ -469,7 +563,7 @@ export const useNpubCashClaim = ({
           try {
             // Each host on its own: one being down must not starve the other.
             for (const collect of [
-              claimFromLinkyServer,
+              collectFromLinkyServer,
               sweepUpstreamPaidQuotes,
             ]) {
               try {
@@ -488,7 +582,7 @@ export const useNpubCashClaim = ({
     }
   }, [
     cashuIsBusy,
-    claimFromLinkyServer,
+    collectFromLinkyServer,
     currentNpub,
     currentNsec,
     makeLocalStorageKey,

@@ -778,6 +778,8 @@ export const cs = {
   cashuAccepting: "Přijímám token…",
   cashuAccepted: "Token přijat.",
   cashuAcceptFailed: "Nepodařilo se přijmout token",
+  npubCashClaimUnsaved:
+    "Platbu na vaši lightning adresu se na tomto zařízení nepodařilo uložit. Zkopírujte si její token, ať o ni nepřijdete.",
   cashuReceiveDeferred:
     "Mint je nedostupný. Token je uložený a přijme se, jakmile bude mint zase dostupný.",
   mintPendingAmount: "{amount} čeká",
