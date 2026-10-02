@@ -1,4 +1,5 @@
 import React from "react";
+import { reportAppLog } from "../../devtools/inspector/appLog";
 import { getNativeNotificationPermissionState } from "../../platform/nativeBridge";
 import { isNativePlatform } from "../../platform/runtime";
 import { useAppShellCore } from "../context/AppShellContexts";
@@ -100,7 +101,12 @@ export const usePushNotificationsSetting = (): PushNotificationsSetting => {
           const result = await registerPushNotifications(currentNsec);
           if (!result.success) {
             setPushNotificationsDisabledByUser(true);
-            pushToast(result.error ?? t("notificationsError"));
+            reportAppLog({
+              tag: "push.registerFailed",
+              summary: "Turning on push notifications failed",
+              payload: { error: result.error ?? null },
+            });
+            pushToast(t("notificationsEnableError"));
             return false;
           }
           setPushNotificationsDisabledByUser(false);

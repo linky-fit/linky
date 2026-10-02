@@ -57,6 +57,7 @@ export const cs = {
   notificationsNotLoggedIn: "Nejste přihlášeni",
   notificationsRegistered: "Zaregistrováno",
   notificationsDisabled: "Notifikace vypnuty",
+  notificationsEnableError: "Notifikace se nepodařilo zapnout",
   notificationsDisableError: "Notifikace se nepodařilo vypnout",
   notificationsDenied: "Zamítnuto",
   notificationsError: "Chyba",

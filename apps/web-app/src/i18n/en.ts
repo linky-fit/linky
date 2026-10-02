@@ -58,6 +58,7 @@ export const en = {
   notificationsNotLoggedIn: "You are not logged in",
   notificationsRegistered: "Registered",
   notificationsDisabled: "Notifications disabled",
+  notificationsEnableError: "Notifications could not be enabled",
   notificationsDisableError: "Notifications could not be disabled",
   notificationsDenied: "Denied",
   notificationsError: "Error",
