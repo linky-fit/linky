@@ -7,6 +7,7 @@ import {
   toyStore,
   type ToySchema,
 } from "../testing/toy";
+import { makeInMemoryShardDb } from "./inMemoryShardDb";
 import { createShardStore, shardPointerId } from "./shardStore";
 
 const note = (id: string, title = `title ${id}`) => ({ id, title });
@@ -290,7 +291,7 @@ describe("shard store", () => {
     expect(writes).toEqual([{ scope: "chats", first: 0 }]);
     run(store.insert("chats", "chat", { id: "b", text: "second" }));
     run(store.update("chats", "chat", "a", { text: "edited" }));
-    run(store.retainVisibleShards());
+    run(store.hydrated);
     expect(writes).toEqual([{ scope: "chats", first: 0 }]);
     run(store.rotate("chats"));
     run(store.rotate("chats"));
@@ -370,7 +371,7 @@ describe("shard store", () => {
       scopes: toyScopes,
     });
     run(store.reconcileSync());
-    run(store.retainVisibleShards());
+    run(store.hydrated);
     setPointer(3);
     expect(
       run(store.visibleShards("chats")).map((shard) => shard.index),
@@ -404,7 +405,7 @@ describe("shard store", () => {
     expect(
       run(store.visibleShards("chats")).map((shard) => shard.index),
     ).toEqual([2, 3]);
-    run(store.retainVisibleShards());
+    run(store.hydrated);
     run(
       db.mutate([
         {
@@ -418,6 +419,98 @@ describe("shard store", () => {
     expect(
       run(store.visibleShards("chats")).map((shard) => shard.index),
     ).toEqual([2, 3, 4, 5]);
+  });
+
+  describe("hydration", () => {
+    const setPointer = (
+      { db, appOwner }: ReturnType<typeof toyStore>,
+      index: number,
+    ) =>
+      run(
+        db.mutate([
+          {
+            kind: "upsert",
+            table: "shardPointer",
+            ownerId: appOwner.id,
+            row: { id: shardPointerId("chats"), scope: "chats", index },
+          },
+        ]),
+      );
+    const hydrated = (store: ReturnType<typeof toyStore>["store"]) =>
+      Effect.runPromise(store.hydrated);
+    const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+    it("needs the app owner and then every shard its pointers make visible", async () => {
+      const toy = toyStore(testAppOwner(), { holdSync: true });
+      const { db, store, appOwner } = toy;
+      for (const owner of run(store.syncOwners()))
+        if (owner.id !== appOwner.id) db.finishSync(owner.id);
+      expect(await hydrated(store)).toBe(false);
+
+      setPointer(toy, 3);
+      db.finishSync(appOwner.id);
+      expect(await hydrated(store)).toBe(false);
+
+      for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
+      expect(await hydrated(store)).toBe(true);
+    });
+
+    it("notifies once and lets waiters through", async () => {
+      const { db, store } = toyStore(testAppOwner(), { holdSync: true });
+      let notified = 0;
+      store.subscribeHydration(() => {
+        notified += 1;
+      });
+      let waited = false;
+      void Effect.runPromise(store.whenHydrated).then(() => {
+        waited = true;
+      });
+      await settle();
+      expect(waited).toBe(false);
+
+      for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
+      await settle();
+      expect(waited).toBe(true);
+      expect(notified).toBe(1);
+      db.finishSync(testAppOwner(9).id);
+      await settle();
+      expect(notified).toBe(1);
+    });
+
+    it("pins retention only once the pointers are known", async () => {
+      const writes: Array<{ scope: string; first: number }> = [];
+      const appOwner = testAppOwner();
+      const db = makeInMemoryShardDb<ToySchema>(
+        {
+          shardPointer: ["id", "scope", "index", "rotatedAtMs"],
+          setting: ["id", "value"],
+          note: ["id", "title", "body"],
+          chat: ["id", "text"],
+        },
+        { holdSync: true },
+      );
+      const store = createShardStore<ToySchema, typeof toyScopes>({
+        db,
+        appOwner,
+        scopes: toyScopes,
+        retention: {
+          get: () => undefined,
+          set: (scope, first) => {
+            writes.push({ scope, first });
+          },
+        },
+      });
+      const hydration = Effect.runPromise(store.whenHydrated);
+      run(store.reconcileSync());
+      await settle();
+      expect(writes).toEqual([]);
+
+      setPointer({ db, store, appOwner }, 3);
+      db.finishSync(appOwner.id);
+      for (const owner of run(store.syncOwners())) db.finishSync(owner.id);
+      await hydration;
+      expect(writes).toEqual([{ scope: "chats", first: 2 }]);
+    });
   });
 
   describe("forget", () => {

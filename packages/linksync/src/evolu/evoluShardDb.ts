@@ -9,6 +9,7 @@ import { Effect } from "effect";
 import type { Columns, Mutation, OwnerUsage, Row, ShardDb } from "../core";
 import { ShardDbError } from "../core";
 import { LinkySchema, type LinkyDbSchema } from "../model/schema";
+import type { OwnerSync } from "./ownerSync";
 
 /**
  * The `ShardDb` port over a live Evolu 7 instance: the one place the package
@@ -28,6 +29,10 @@ import { LinkySchema, type LinkyDbSchema } from "../model/schema";
  * Evolu runs every mutation queued in one microtask as a single transaction
  * and drops the whole batch when any of them fails validation, so each row is
  * validated (`onlyValidate`) before it is queued.
+ *
+ * An owner the worker reports synced counts as synced only after a fresh
+ * query has answered: the worker answers queries in order, so by then the
+ * refresh its sync round triggered has reached the subscribed queries too.
  */
 
 /**
@@ -83,7 +88,11 @@ const callUntyped = (
 };
 
 interface UntypedSelect {
-  selectFrom: (table: string) => { selectAll: () => unknown };
+  selectFrom: (table: string) => {
+    selectAll: () => {
+      where: (column: string, op: "=", value: string) => unknown;
+    };
+  };
 }
 
 const overlayKey = (table: string, ownerId: OwnerId, id: string): string =>
@@ -122,6 +131,7 @@ const asRow = (entry: OverlayEntry, previous?: Row<Columns>): Row<Columns> => {
 
 export const createEvoluShardDb = (
   evolu: EvoluRuntime,
+  ownerSync: OwnerSync,
 ): ShardDb<LinkyDbSchema> => {
   const overlay = new Map<string, OverlayEntry>();
   // Evolu queries are branded strings that Evolu keys its promise cache by;
@@ -251,6 +261,35 @@ export const createEvoluShardDb = (
     });
   };
 
+  const readable = new Set<OwnerId>();
+  const syncListeners = new Set<() => void>();
+  let barriers = 0;
+  let absorbing = Promise.resolve();
+  const absorbSyncedOwners = (): void => {
+    const reported = [...ownerSync.syncedOwners()].filter(
+      (ownerId) => !readable.has(ownerId),
+    );
+    if (reported.length === 0) return;
+    barriers += 1;
+    const barrier = asQuery(
+      callUntyped(evolu, "createQuery", (db: UntypedSelect) =>
+        db
+          .selectFrom("shardPointer")
+          .selectAll()
+          .where("id", "=", `linksync-barrier-${barriers}`),
+      ),
+    );
+    const markReadable = () => {
+      for (const ownerId of reported) readable.add(ownerId);
+      for (const listener of syncListeners) listener();
+    };
+    absorbing = absorbing
+      .then(() => callUntyped(evolu, "loadQuery", barrier))
+      .then(markReadable, markReadable);
+  };
+  ownerSync.subscribe(absorbSyncedOwners);
+  absorbSyncedOwners();
+
   return {
     readTable,
     mutate: (mutations) => Effect.forEach(mutations, apply, { discard: true }),
@@ -268,6 +307,13 @@ export const createEvoluShardDb = (
       };
     },
     useOwner: (owner: SyncOwner) => evolu.useOwner(owner),
+    isOwnerSynced: (ownerId) => readable.has(ownerId),
+    subscribeOwnerSync: (listener) => {
+      syncListeners.add(listener);
+      return () => {
+        syncListeners.delete(listener);
+      };
+    },
     ownerUsage,
     deleteOwner: null,
   };

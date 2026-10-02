@@ -162,7 +162,7 @@ for (const failureTiming of ["before", "after"]) {
       }
     });
     let injected = false;
-    await page.route(/\/assets\/Db\.worker-[^/]+\.js$/, async (route) => {
+    await page.route(/\/assets\/evoluDb\.worker-[^/]+\.js$/, async (route) => {
       if (injected) return route.continue();
       injected = true;
       const response = await route.fetch();

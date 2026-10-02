@@ -164,8 +164,16 @@ export interface ShardStore<
   readonly syncOwners: () => Effect.Effect<ReadonlyArray<SyncOwner>>;
   /** Uses the owners in `syncOwners` and unuses the rest. */
   readonly reconcileSync: () => Effect.Effect<void>;
-  /** Retains the current windows after initial pointer hydration has settled. */
-  readonly retainVisibleShards: () => Effect.Effect<void>;
+  /**
+   * Whether the store is hydrated: the app owner, and after it every shard
+   * its pointers make visible, finished a sync round with a relay, so reads
+   * show the account's data. Once true it stays true for the store's life.
+   */
+  readonly hydrated: Effect.Effect<boolean>;
+  /** Completes once `hydrated` is true; it does not complete while no relay answers. */
+  readonly whenHydrated: Effect.Effect<void>;
+  /** Fires once, when the store becomes hydrated. */
+  readonly subscribeHydration: (listener: () => void) => () => void;
   /** Shards outside a forgettable scope's window: unsubscribed, deleted when the port can. */
   readonly forget: (
     scope?: keyof R & string,
@@ -505,6 +513,60 @@ export const createShardStore = <
         }
     });
 
+  let isHydrated = false;
+  const hydrationListeners = new Set<() => void>();
+  let watchingHydration = false;
+
+  // Retention waits for hydration: before it, a fresh device's windows are provisional.
+  const checkHydration: Effect.Effect<boolean> = Effect.gen(function* () {
+    if (isHydrated) return true;
+    const owners = yield* syncOwners();
+    if (!owners.every((owner) => db.isOwnerSynced(owner.id))) return false;
+    if (isHydrated) return true;
+    isHydrated = true;
+    yield* Effect.forEach(Object.keys(scopes), retainBeforeWrite, {
+      discard: true,
+    });
+    for (const listener of hydrationListeners) listener();
+    hydrationListeners.clear();
+    return true;
+  });
+
+  const watchHydration = (): void => {
+    if (watchingHydration) return;
+    watchingHydration = true;
+    // Checks run one after another, like `followPointers`.
+    let queue = Promise.resolve();
+    const stop = db.subscribeOwnerSync(() => {
+      queue = queue.then(() =>
+        Effect.runPromise(checkHydration).then((done) => {
+          if (done) stop();
+        }),
+      );
+    });
+  };
+
+  const subscribeHydration = (listener: () => void): (() => void) => {
+    if (isHydrated) return () => {};
+    hydrationListeners.add(listener);
+    watchHydration();
+    void Effect.runPromise(checkHydration);
+    return () => {
+      hydrationListeners.delete(listener);
+    };
+  };
+
+  const whenHydrated: Effect.Effect<void> = Effect.flatMap(
+    checkHydration,
+    (done) =>
+      done
+        ? Effect.void
+        : Effect.async<void>((resume) => {
+            const stop = subscribeHydration(() => resume(Effect.void));
+            return Effect.sync(stop);
+          }),
+  );
+
   const rotate = (
     scope: string,
   ): Effect.Effect<number, ShardDbError | UnknownScope> =>
@@ -654,8 +716,9 @@ export const createShardStore = <
     maybeRotate,
     syncOwners,
     reconcileSync,
-    retainVisibleShards: () =>
-      Effect.forEach(Object.keys(scopes), retainBeforeWrite, { discard: true }),
+    hydrated: checkHydration,
+    whenHydrated,
+    subscribeHydration,
     forget,
     subscribe,
     subscribePointers,

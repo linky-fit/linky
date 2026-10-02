@@ -5,7 +5,11 @@ import { createRoot } from "react-dom/client";
 import { createId } from "../model/ids";
 import { makeTransactionsRepository } from "../repositories/transactions";
 import { linkyStore, runNow } from "../testing/linky";
-import { useRepositoryRows, useVisibleShards } from "./index";
+import { makeInMemoryShardDb } from "../core";
+import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
+import { createLinkyStore } from "../model/store";
+import { testAppOwner } from "../testing/toy";
+import { useHydrated, useRepositoryRows, useVisibleShards } from "./index";
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
@@ -60,6 +64,24 @@ describe("react bindings", () => {
     runNow(store.rotate("transactions"));
     await settle();
     expect(indexes).toEqual([0, 1]);
+    await view.unmount();
+  });
+
+  it("turns hydrated once every synced owner finished", async () => {
+    const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns, {
+      holdSync: true,
+    });
+    const store = createLinkyStore(db, testAppOwner());
+    let hydrated: boolean | null = null;
+    const view = await mount(() => {
+      hydrated = useHydrated(store);
+      return null;
+    });
+    await settle();
+    expect(hydrated).toBe(false);
+    for (const owner of runNow(store.syncOwners())) db.finishSync(owner.id);
+    await settle();
+    expect(hydrated).toBe(true);
     await view.unmount();
   });
 });

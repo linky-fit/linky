@@ -57,3 +57,17 @@ export const useVisibleShards = <
   );
   return useLiveValue(source, NO_ROWS);
 };
+
+/** Whether the store is hydrated; `false` until the first read answers. */
+export const useHydrated = <
+  S extends CoreSchema,
+  R extends ScopeRegistry<keyof S & string>,
+>(
+  store: ShardStore<S, R>,
+): boolean => {
+  const source = useMemo(
+    () => ({ all: store.hydrated, subscribe: store.subscribeHydration }),
+    [store],
+  );
+  return useLiveValue(source, false);
+};

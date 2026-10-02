@@ -1,7 +1,8 @@
-import { ownerIdToOwnerIdBytes } from "@evolu/common";
+import { ownerIdToOwnerIdBytes, type OwnerId } from "@evolu/common";
 import { Effect } from "effect";
 import { testAppOwner } from "../testing/toy";
 import { createEvoluShardDb, type EvoluRuntime } from "./evoluShardDb";
+import type { OwnerSync } from "./ownerSync";
 
 /**
  * A stand-in for the Evolu instance: records every mutation and query, and
@@ -17,6 +18,7 @@ const fakeEvolu = () => {
   }> = [];
   const queries: string[] = [];
   let rows: ReadonlyArray<Record<string, unknown>> = [];
+  let held: Array<() => void> | null = null;
   const mutation =
     (kind: string) =>
     (
@@ -50,7 +52,10 @@ const fakeEvolu = () => {
     },
     loadQuery: (query: string) => {
       queries.push(query);
-      return Promise.resolve(rows);
+      const answer = rows;
+      if (held === null) return Promise.resolve(answer);
+      const waiting = held;
+      return new Promise((resolve) => waiting.push(() => resolve(answer)));
     },
     subscribeQuery: () => () => () => {},
     upsert: mutation("upsert"),
@@ -64,13 +69,45 @@ const fakeEvolu = () => {
     seed: (next: ReadonlyArray<Record<string, unknown>>) => {
       rows = next;
     },
+    holdQueries: () => {
+      held = [];
+    },
+    answerQueries: () => {
+      for (const answer of held ?? []) answer();
+      held = null;
+    },
   };
 };
+
+/** The page side of the worker's owner sync reports, driven by the test. */
+const reportedOwnerSync = () => {
+  const synced = new Set<OwnerId>();
+  const listeners = new Set<() => void>();
+  const ownerSync: OwnerSync = {
+    syncedOwners: () => synced,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    subscribeFailures: () => () => {},
+  };
+  return {
+    ownerSync,
+    report: (ownerId: OwnerId) => {
+      synced.add(ownerId);
+      for (const listener of listeners) listener();
+    },
+  };
+};
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("evolu shard db", () => {
   it("hands Evolu a SqliteBoolean tombstone, not the port's boolean", async () => {
     const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime);
+    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
     const owner = testAppOwner();
     await Effect.runPromise(
       db.mutate([
@@ -105,7 +142,7 @@ describe("evolu shard db", () => {
 
   it("serves its own tombstone from the overlay until the row reflects it", async () => {
     const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime);
+    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
     const owner = testAppOwner();
     fake.seed([
       {
@@ -133,7 +170,7 @@ describe("evolu shard db", () => {
 
   it("asks evolu_history for the owner id's bytes", async () => {
     const fake = fakeEvolu();
-    const db = createEvoluShardDb(fake.runtime);
+    const db = createEvoluShardDb(fake.runtime, reportedOwnerSync().ownerSync);
     const owner = testAppOwner();
     fake.seed([{ mutations: 3, bytes: 40 }]);
     expect(await Effect.runPromise(db.ownerUsage(owner.id))).toEqual({
@@ -144,5 +181,36 @@ describe("evolu shard db", () => {
       `"=","bytes:${ownerIdToOwnerIdBytes(owner.id).length}"`,
     );
     expect(fake.queries[0]).not.toContain(owner.id);
+  });
+
+  it("counts a reported owner synced once a fresh query has answered", async () => {
+    const fake = fakeEvolu();
+    const sync = reportedOwnerSync();
+    const owner = testAppOwner();
+    const db = createEvoluShardDb(fake.runtime, sync.ownerSync);
+    let notified = 0;
+    db.subscribeOwnerSync(() => {
+      notified += 1;
+    });
+    fake.holdQueries();
+    sync.report(owner.id);
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(false);
+    expect(fake.queries.at(-1)).toContain("linksync-barrier-1");
+
+    fake.answerQueries();
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(true);
+    expect(notified).toBe(1);
+  });
+
+  it("takes owners the worker reported before the db was created", async () => {
+    const fake = fakeEvolu();
+    const sync = reportedOwnerSync();
+    const owner = testAppOwner();
+    sync.report(owner.id);
+    const db = createEvoluShardDb(fake.runtime, sync.ownerSync);
+    await settle();
+    expect(db.isOwnerSynced(owner.id)).toBe(true);
   });
 });

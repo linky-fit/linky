@@ -89,6 +89,13 @@ export interface ShardDb<S extends DbSchema> {
   ) => () => void;
   /** Opts the owner into sync; returns the unuse function. */
   readonly useOwner: (owner: SyncOwner) => () => void;
+  /**
+   * Whether the owner finished a sync round with a relay since the database
+   * opened, and `readTable` already returns what that round brought.
+   */
+  readonly isOwnerSynced: (ownerId: OwnerId) => boolean;
+  /** Fires after more owners finished their sync round. */
+  readonly subscribeOwnerSync: (listener: () => void) => () => void;
   readonly ownerUsage: (ownerId: OwnerId) => Effect.Effect<OwnerUsage>;
   /** Evolu 7 cannot delete an owner; `null` until the port can. */
   readonly deleteOwner: ((ownerId: OwnerId) => Effect.Effect<void>) | null;

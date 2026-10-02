@@ -38,13 +38,19 @@ export const toyScopes = {
 export const testAppOwner = (seed = 1): AppOwner =>
   createAppOwner(OwnerSecret.orThrow(new Uint8Array(32).fill(seed)));
 
-export const toyStore = (appOwner = testAppOwner()) => {
-  const db = makeInMemoryShardDb<ToySchema>({
-    shardPointer: ["id", "scope", "index", "rotatedAtMs"],
-    setting: ["id", "value"],
-    note: ["id", "title", "body"],
-    chat: ["id", "text"],
-  });
+export const toyStore = (
+  appOwner = testAppOwner(),
+  dbOptions: { readonly holdSync?: boolean } = {},
+) => {
+  const db = makeInMemoryShardDb<ToySchema>(
+    {
+      shardPointer: ["id", "scope", "index", "rotatedAtMs"],
+      setting: ["id", "value"],
+      note: ["id", "title", "body"],
+      chat: ["id", "text"],
+    },
+    dbOptions,
+  );
   const store = createShardStore<ToySchema, typeof toyScopes>({
     db,
     appOwner,

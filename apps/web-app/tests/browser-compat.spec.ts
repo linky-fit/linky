@@ -25,14 +25,17 @@ for (const realm of ["page", "worker", "both"]) {
     if (realm !== "worker") await page.addInitScript(removeNewBuiltins);
     let workerRequests = 0;
     if (realm !== "page") {
-      await page.route(/\/assets\/Db\.worker-[^/]+\.js$/, async (route) => {
-        workerRequests += 1;
-        const response = await route.fetch();
-        await route.fulfill({
-          response,
-          body: `(${removeNewBuiltins.toString()})();\n${await response.text()}`,
-        });
-      });
+      await page.route(
+        /\/assets\/evoluDb\.worker-[^/]+\.js$/,
+        async (route) => {
+          workerRequests += 1;
+          const response = await route.fetch();
+          await route.fulfill({
+            response,
+            body: `(${removeNewBuiltins.toString()})();\n${await response.text()}`,
+          });
+        },
+      );
     }
 
     await page.goto("/#wallet");

@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./evolu": "./src/evolu/index.ts",
+    "./evolu/worker": "./src/evolu/dbWorker.ts",
     "./react": "./src/react/index.ts"
   },
   "scripts": {
@@ -18,7 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@evolu/common": "^7.4.1",
+    "@evolu/common": "7.4.1",
     "@linky-fit/linkshu": "workspace:*",
     "effect": "^3.19.19"
   },

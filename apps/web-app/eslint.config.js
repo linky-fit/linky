@@ -43,7 +43,7 @@ const evoluImportPatterns = [
   {
     group: ["@evolu/*"],
     message:
-      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts and src/app/migrations import @evolu/* directly.",
+      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/evoluDb.worker.ts and src/app/migrations import @evolu/* directly.",
   },
 ];
 const wipeImportPatterns = [
@@ -104,7 +104,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/evolu.ts", "src/app/migrations/**"],
+    files: ["src/evolu.ts", "src/evoluDb.worker.ts", "src/app/migrations/**"],
     ignores: testHelperImportIgnores,
     rules: {
       "no-restricted-imports": [

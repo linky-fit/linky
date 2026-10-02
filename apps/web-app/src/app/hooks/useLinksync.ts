@@ -23,7 +23,11 @@ import {
   type TransactionsRepository,
   type WalletRepository,
 } from "@linky-fit/linksync";
-import { useLiveValue, useRepositoryRows } from "@linky-fit/linksync/react";
+import {
+  useHydrated,
+  useLiveValue,
+  useRepositoryRows,
+} from "@linky-fit/linksync/react";
 import type { StoredOperation, StoredProof } from "@linky-fit/linkshu";
 import { Effect } from "effect";
 import React from "react";
@@ -204,9 +208,5 @@ export const useShardRotation = () => {
   return { busyScope, rotate };
 };
 
-export const useRetainShardHistory = (ready: boolean): void => {
-  const store = useLinkyStore();
-  React.useEffect(() => {
-    if (ready) void Effect.runPromise(store.retainVisibleShards());
-  }, [ready, store]);
-};
+/** Whether the account's data has arrived from an Evolu relay; see `ShardStore.hydrated`. */
+export const useAccountHydrated = (): boolean => useHydrated(useLinkyStore());

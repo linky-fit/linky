@@ -18,24 +18,6 @@ import { fetchLinkPreview } from "./server/linkPreview";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Workers have their own globals, so the page's polyfills cannot protect Evolu.
-const evoluWorkerPolyfills = (): Plugin => ({
-  name: "evolu-worker-polyfills",
-  enforce: "pre",
-  transform(code, id) {
-    if (
-      !id.includes("/@evolu/web/") ||
-      !id.split("?")[0]?.endsWith("/Db.worker.js")
-    )
-      return;
-    const polyfills = path.join(__dirname, "src/platform/browserPolyfills.ts");
-    return {
-      code: `import ${JSON.stringify(polyfills)};\n${code}`,
-      map: null,
-    };
-  },
-});
-
 const sqliteWasmPath = path.join(__dirname, "public/sqlite-wasm/sqlite3.wasm");
 const workspacePackageJsonPath = path.join(
   __dirname,
@@ -206,7 +188,7 @@ export default defineConfig({
     __APP_COMMIT_SHA__: JSON.stringify(appCommitSha),
   },
   optimizeDeps: {
-    exclude: ["@evolu/react-web"],
+    exclude: ["@evolu/web"],
     // App is intentionally imported lazily from main.tsx so boot diagnostics
     // can catch module-load failures. Vite's dep scanner does not eagerly walk
     // that dynamic import, so include app/runtime deps here to avoid mid-boot
@@ -252,7 +234,6 @@ export default defineConfig({
   },
   plugins: [
     bootDiagnosticRedaction(),
-    evoluWorkerPolyfills(),
     serveSqliteWasm(),
     inspectorCollector(),
     linkPreviewApi(),
@@ -272,8 +253,9 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ["**/*.{js,wasm,css,html,woff2}"],
         rollupFormat: "es",
-        // pdf.js is loaded on demand for PDF previews; don't precache it.
-        globIgnores: ["**/pdf.worker*", "**/pdfjs-*"],
+        // pdf.js is loaded on demand for PDF previews, and Evolu's own
+        // database worker never starts (src/evoluDb.worker.ts replaces it).
+        globIgnores: ["**/pdf.worker*", "**/pdfjs-*", "**/Db.worker*"],
       },
       manifest: {
         name: "Linky",
@@ -320,7 +302,6 @@ export default defineConfig({
     contentSecurityPolicyMeta(),
   ],
   ...(useHttps ? { server: { host: true, https: {} } } : {}),
-  worker: { plugins: () => [evoluWorkerPolyfills()] },
   build: {
     rollupOptions: {
       output: {

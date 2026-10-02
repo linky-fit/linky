@@ -2,7 +2,13 @@ import { ContactId } from "./evoluIds";
 export { ContactId, TransactionId } from "./evoluIds";
 import { Schema as EffectSchema } from "effect";
 import * as Evolu from "@evolu/common";
-import { createEvolu, SimpleName } from "@evolu/common";
+import {
+  createConsole,
+  createEvolu,
+  createRandomBytes,
+  createTime,
+  SimpleName,
+} from "@evolu/common";
 import {
   appOwnerFromMnemonic,
   createLinkyStore,
@@ -15,8 +21,9 @@ import {
   type NostrIdentityId,
   type ShardRotation,
 } from "@linky-fit/linksync";
-import { createEvoluShardDb } from "@linky-fit/linksync/evolu";
-import { evoluReactWebDeps } from "@evolu/react-web";
+import { createEvoluShardDb, trackOwnerSync } from "@linky-fit/linksync/evolu";
+import { createSharedWebWorker } from "@evolu/web";
+import { flushSync } from "react-dom";
 import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
@@ -513,6 +520,46 @@ export const Schema = {
   },
 };
 
+const evoluWorker = trackOwnerSync((name) =>
+  createSharedWebWorker(
+    name,
+    () =>
+      new Worker(new URL("./evoluDb.worker.ts", import.meta.url), {
+        type: "module",
+      }),
+  ),
+);
+
+/** Which owners finished a sync round with an Evolu relay; the shard store's hydration rests on it. */
+export const ownerSync = evoluWorker.ownerSync;
+
+ownerSync.subscribeFailures(({ ownerId, error, endsRound }) => {
+  if (!getInspectorEmissionEnabled()) return;
+  reportInspectorRows([
+    {
+      at: Date.now(),
+      channel: "evolu.sync",
+      tag: "OwnerSyncFailed",
+      summary: endsRound
+        ? `An Evolu relay answered with ${error}; the owner's sync round ended there`
+        : `An Evolu relay answered with ${error} before any error-free answer; the owner stays unsynced`,
+      links: { owner: ownerId },
+      payload: { ownerId, error, endsRound },
+    },
+  ]);
+});
+
+const evoluDeps: Evolu.EvoluDeps = {
+  console: createConsole(),
+  createDbWorker: evoluWorker.createDbWorker,
+  flushSync,
+  randomBytes: createRandomBytes(),
+  // Evolu reloads the whole app after a reset; this is not hash navigation.
+  // eslint-disable-next-line no-restricted-syntax
+  reloadApp: (url) => location.replace(url),
+  time: createTime(),
+};
+
 const createEvoluForUser = (mnemonic: string | null) => {
   const dbName = mnemonic ? generateDbNameFromMnemonic(mnemonic) : "linky-anon";
 
@@ -523,7 +570,7 @@ const createEvoluForUser = (mnemonic: string | null) => {
 
   const externalAppOwner = mnemonic ? appOwnerFromMnemonic(mnemonic) : null;
 
-  return createEvolu(evoluReactWebDeps)(Schema, {
+  return createEvolu(evoluDeps)(Schema, {
     name: finalName,
     transports: EVOLU_TRANSPORTS,
     enableLogging: isEvoluLoggingEnabled(),
@@ -587,6 +634,23 @@ const reportShardsSubscribed = async (
       summary: `Syncing the app owner and ${owners.length - 1} shards`,
       links: { owner: owners },
       payload: { reason, owners: owners.length },
+    },
+  ]);
+};
+
+const reportAccountHydrated = async (store: LinkyStore): Promise<void> => {
+  if (!getInspectorEmissionEnabled()) return;
+  const owners = (await Effect.runPromise(store.syncOwners())).map(
+    (owner) => owner.id,
+  );
+  reportInspectorRows([
+    {
+      at: Date.now(),
+      channel: "evolu.sync",
+      tag: "AccountHydrated",
+      summary: `Account data arrived for the app owner and ${owners.length - 1} shards`,
+      links: { owner: owners },
+      payload: { owners: owners.length, sincePageLoadMs: performance.now() },
     },
   ]);
 };
@@ -657,29 +721,34 @@ export const getLinkyStore = (): Promise<LinkyStore> => {
   ]).then(async ([owner]) => {
     const key = (scope: string) =>
       `linky.shards.retainedFrom.${owner.id}.${scope}`;
-    const store = createLinkyStore(createEvoluShardDb(evolu), owner, {
-      scopes: appScopes,
-      retention: {
-        get: (scope) =>
-          safeLocalStorageGetJson(
-            key(scope),
-            EffectSchema.NullOr(
-              EffectSchema.Number.pipe(
-                EffectSchema.int(),
-                EffectSchema.nonNegative(),
+    const store = createLinkyStore(
+      createEvoluShardDb(evolu, ownerSync),
+      owner,
+      {
+        scopes: appScopes,
+        retention: {
+          get: (scope) =>
+            safeLocalStorageGetJson(
+              key(scope),
+              EffectSchema.NullOr(
+                EffectSchema.Number.pipe(
+                  EffectSchema.int(),
+                  EffectSchema.nonNegative(),
+                ),
               ),
-            ),
-            null,
-          ) ?? undefined,
-        set: (scope, first) => safeLocalStorageSetJson(key(scope), first),
+              null,
+            ) ?? undefined,
+          set: (scope, first) => safeLocalStorageSetJson(key(scope), first),
+        },
       },
-    });
+    );
     await Effect.runPromise(store.reconcileSync());
     void reportShardsSubscribed(store, "boot");
     store.followPointers((rotation) => {
       reportShardRotated(store, rotation);
       void reportShardsSubscribed(store, "rotation");
     });
+    store.subscribeHydration(() => void reportAccountHydrated(store));
     return store;
   });
   return linkyStorePromise;

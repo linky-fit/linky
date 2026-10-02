@@ -12,6 +12,8 @@ import type {
 export interface InMemoryShardDb<S extends DbSchema> extends ShardDb<S> {
   /** Owners currently opted into sync, for asserting the subscribe set. */
   readonly usedOwners: () => ReadonlyArray<OwnerId>;
+  /** With `holdSync`, marks the owner's sync round finished. */
+  readonly finishSync: (ownerId: OwnerId) => void;
 }
 
 const rowKey = (ownerId: OwnerId, id: string): string => `${ownerId}/${id}`;
@@ -30,15 +32,19 @@ export type TableColumns<S extends DbSchema> = {
  * per table keyed by `(ownerId, id)`, so it has the same phantom-row
  * behavior as Evolu: an update aimed at the wrong owner creates a new row.
  * `tableColumns` lists each table's columns so a column never written reads
- * back as `null`, the way Evolu returns it.
+ * back as `null`, the way Evolu returns it. There is no relay, so every owner
+ * counts as synced unless `holdSync` keeps them unsynced until `finishSync`.
  */
 export const makeInMemoryShardDb = <S extends DbSchema>(
   tableColumns: TableColumns<S>,
+  options: { readonly holdSync?: boolean } = {},
 ): InMemoryShardDb<S> => {
   const tables = new Map<string, Map<string, Row<Columns>>>();
   const usage = new Map<OwnerId, { mutations: number; bytes: number }>();
   const listeners = new Map<string, Set<() => void>>();
   const used = new Map<OwnerId, number>();
+  const synced = new Set<OwnerId>();
+  const syncListeners = new Set<() => void>();
 
   const tableRows = (table: string): Map<string, Row<Columns>> => {
     const existing = tables.get(table);
@@ -136,6 +142,17 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
         }
         usage.delete(ownerId);
       }),
+    isOwnerSynced: (ownerId) => !options.holdSync || synced.has(ownerId),
+    subscribeOwnerSync: (listener) => {
+      syncListeners.add(listener);
+      return () => {
+        syncListeners.delete(listener);
+      };
+    },
     usedOwners: () => [...used.keys()],
+    finishSync: (ownerId) => {
+      synced.add(ownerId);
+      for (const listener of syncListeners) listener();
+    },
   };
 };

@@ -30,8 +30,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Explicit local forget of old chat shards. Payload lists scope, index and whether owner data was deleted; owner links correlate with shard rotation and subscription rows. Evolu 7 reports deleted: false.",
   ShardsSubscribed:
     "The set of owners this device syncs was reconciled: the app owner plus every visible shard of every scope, at boot, after each rotation and after explicit forgetting. Owner links list the whole set; the payload says why and how many.",
+  AccountHydrated:
+    "The account's data has arrived from an Evolu relay: the app owner and then every shard its pointers make visible finished a sync round. Nostr and the writes the user did not ask for start only after this. Owner links list the synced owners; the payload gives the time since the page loaded.",
   ShardRotated:
     "A scope's shard pointer moved to a new index, rotated on this device (its writes crossed the byte or mutation rule, or the debug page asked) or on another one. The new shard is subscribed for sync; the owner link is its id.",
+  OwnerSyncFailed:
+    "An Evolu relay answered a sync request with a protocol error (QuotaError, WriteKeyError, WriteError or SyncError). When the relay had already answered the owner without an error, the owner's sync round ends there and what the relay held arrived in the rounds before (endsRound true). Otherwise the owner stays unsynced, so hydration keeps waiting for it (endsRound false). The owner link names the owner; the payload names the error.",
   LaneMigrationStarted:
     "First launch on this device after the shard storage update: the old owner lanes are about to be copied into the per-scope shards. Owner links list the legacy lanes read.",
   LaneMigrationScopeIngested:

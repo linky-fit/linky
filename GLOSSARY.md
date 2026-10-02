@@ -252,6 +252,10 @@ _Avoid_: sync server, backend, Evolu server
 A Nostr relay or Evolu relay that linky.fit/recommended-relays lists; every device keeps it configured, and the relays the user added come on top.
 _Avoid_: default relay, built-in relay
 
+**Hydrated**:
+A device is hydrated once the account's synced data, its shard pointers included, has arrived from an Evolu relay since the app opened; until then it makes no write the user did not ask for.
+_Avoid_: synced, bootstrapped, ready
+
 **Device-local**:
 State that stays on one device and never syncs, such as wallet counters.
 _Avoid_: local-only, cached

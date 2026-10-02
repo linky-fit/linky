@@ -1,4 +1,3 @@
-import { useRetainShardHistory } from "../useLinksync";
 import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
 import type { ProfileMetadata } from "@linky-fit/linkstr";
 import {
@@ -552,7 +551,6 @@ export const useContactsMessagingComposition = ({
     tokensSnapshot: cashuProofs,
     transactionsSnapshot: transactionsBootstrapSnapshot,
   });
-  useRetainShardHistory(nostrBootstrapReady);
   const deferredOnlineReady = useDeferredOnlineReady();
   const canRunNostrNetworkWork = deferredOnlineReady && nostrBootstrapReady;
 

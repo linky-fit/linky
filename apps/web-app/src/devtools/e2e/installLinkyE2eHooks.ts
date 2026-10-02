@@ -17,6 +17,7 @@ import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStora
 import {
   evolu,
   getLinkyStore,
+  ownerSync,
   Schema,
   setE2eMessagesRotation,
 } from "../../evolu";
@@ -57,6 +58,8 @@ export interface LinkyE2eHooks {
     ReadonlyArray<{ scope: string; index: number; deleted: boolean }>
   >;
   readonly syncOwnerIds: () => Promise<ReadonlyArray<string>>;
+  /** Whether the shard store is hydrated. */
+  readonly hydrated: () => Promise<boolean>;
   readonly createId: () => string;
   readonly directConversationIdFor: (contactId: string) => string;
   readonly activeNostrIdentityId: string;
@@ -110,7 +113,7 @@ const upsert: LinkyE2eHooks["upsert"] = (table, row, ownerId) =>
   });
 
 export const installLinkyE2eHooks = (): void => {
-  const db = createEvoluShardDb(evolu);
+  const db = createEvoluShardDb(evolu, ownerSync);
   const walletStore = makeLocalStorageKeyValueStore();
   window.__linkyE2E = {
     setMessagesRotation: setE2eMessagesRotation,
@@ -160,6 +163,7 @@ export const installLinkyE2eHooks = (): void => {
         (owner) => owner.id,
       );
     },
+    hydrated: async () => Effect.runPromise((await getLinkyStore()).hydrated),
     createId: () => createId(),
     directConversationIdFor: (contactId) => {
       const decoded = ContactId.fromUnknown(contactId);

@@ -20,8 +20,8 @@
     "nostr-tools": "^2.25.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "@evolu/common": "^7.4.1",
-    "@evolu/react-web": "^2.4.0",
+    "@evolu/common": "7.4.1",
+    "@evolu/react-web": "2.4.0",
     "@noble/hashes": "^2.0.1"
   },
   "devDependencies": {
