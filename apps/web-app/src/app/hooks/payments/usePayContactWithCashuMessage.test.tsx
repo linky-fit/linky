@@ -492,6 +492,38 @@ describe("usePayContactWithCashuMessage", () => {
     await act(async () => harness.root.unmount());
   });
 
+  it("puts the note into the token memo and the transaction", async () => {
+    const sendCashuToken = vi.fn<SendCashuToken>(async () =>
+      Either.right(sendReceipt),
+    );
+    enqueueOutboxMock.mockImplementation(async (input) =>
+      Exit.succeed(
+        enqueueReceipt(input.op.draft.clientId ?? fallbackClientId, input.ref),
+      ),
+    );
+    sendPaymentNoticeMock.mockImplementation(async (draft) =>
+      Exit.succeed(noticeReceipt(draft.clientId ?? fallbackClientId)),
+    );
+    const harness = await setup({ sendCashuToken });
+
+    await act(async () => {
+      await harness.getPay()?.({
+        amountSat: 600,
+        contact: { id: CONTACT_ID, name: "Alice", npub: contactNpub },
+        memo: " lunch ",
+      });
+    });
+
+    expect(sendCashuToken).toHaveBeenCalledWith(
+      expect.objectContaining({ amountSat: 600, memo: "lunch" }),
+    );
+    expect(harness.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ note: "lunch", status: "ok" }),
+    );
+
+    await act(async () => harness.root.unmount());
+  });
+
   it("holds the offline queue and success overlay until its placeholder is stored", async () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     let resolveStored!: (outcome: WriteOutcome) => void;

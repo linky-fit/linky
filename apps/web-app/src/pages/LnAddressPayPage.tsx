@@ -28,11 +28,14 @@ interface LnAddressPayPageProps {
   knownContactPictureUrl: string | null;
   lnAddress: string;
   lnAddressPayAmount: string;
+  lnAddressPayNote: string;
   payLightningAddressWithCashu: (
     lnAddress: string,
     amountSat: number,
+    comment: string | null,
   ) => Promise<void>;
   setLnAddressPayAmount: (value: string | ((prev: string) => string)) => void;
+  setLnAddressPayNote: (value: string) => void;
 }
 
 export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
@@ -44,8 +47,10 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
   knownContactPictureUrl,
   lnAddress,
   lnAddressPayAmount,
+  lnAddressPayNote,
   payLightningAddressWithCashu,
   setLnAddressPayAmount,
+  setLnAddressPayNote,
 }) => {
   const { formatDisplayedAmountText, t } = useAppShellCore();
   const {
@@ -78,6 +83,8 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
   )}`;
 
   const rangeError = getLnurlPayAmountRangeError(preview, amountSat, t);
+  // LUD-12: only a recipient that accepts comments gets a note.
+  const commentAllowed = preview?.commentAllowed ?? 0;
 
   const invalid =
     !canPayWithCashu ||
@@ -125,6 +132,15 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
           </Stack>
         </Row>
       }
+      note={
+        commentAllowed > 0
+          ? {
+              maxLength: commentAllowed,
+              onChange: setLnAddressPayNote,
+              value: lnAddressPayNote,
+            }
+          : undefined
+      }
       notices={
         <LnurlPayPreviewNotices
           error={previewError}
@@ -136,7 +152,11 @@ export const LnAddressPayPage: FC<LnAddressPayPageProps> = ({
       onAmountChange={setLnAddressPayAmount}
       onSubmit={() => {
         if (invalid) return;
-        void payLightningAddressWithCashu(lnAddress, amountSat);
+        void payLightningAddressWithCashu(
+          lnAddress,
+          amountSat,
+          commentAllowed > 0 ? lnAddressPayNote.trim() || null : null,
+        );
       }}
       submitBusy={cashuIsBusy}
       submitDisabled={invalid}

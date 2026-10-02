@@ -128,6 +128,8 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       contact: TContact;
       fromQueue?: boolean;
       logCompletedOnly?: boolean;
+      /** Travels as the token's memo and is kept as the transaction note. */
+      memo?: string | null;
       paymentNoticeContext?: PaymentNoticeContext;
       paymentNoticeOfferId?: string;
       paymentRequestId?: string | null;
@@ -140,6 +142,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         contact,
         fromQueue,
         logCompletedOnly = false,
+        memo,
         paymentNoticeContext,
         paymentNoticeOfferId,
         paymentRequestId,
@@ -148,6 +151,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         replyContext,
       } = args;
       const notify = !fromQueue;
+      const note = (memo ?? "").trim() || null;
       if (isPaymentAuthorized && !isPaymentAuthorized()) {
         setStatus(t("payApprovalChanged"));
         return {
@@ -321,6 +325,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         try {
           sendOutcome = await sendCashuToken({
             amountSat,
+            memo: note,
             mint,
             produceAs: "pending",
           });
@@ -446,6 +451,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
             fee: null,
             method: "cashu_chat",
             mint: receipt.mint,
+            note,
             phase: publishing.hasPendingMessages ? "publish" : "complete",
             status: "ok",
             transactionId: transactionIdForOperation(receipt.operationId),

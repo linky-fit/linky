@@ -392,7 +392,9 @@ function ChatMessageComponent({
             .join(" · ")}
           {...(info.isHiddenTestMint
             ? { hint: t("cashuTestMintHiddenHint") }
-            : {})}
+            : info.memo
+              ? { hint: info.memo }
+              : {})}
           tone={!info.isValid || info.isHiddenTestMint ? "neutral" : "accent"}
           onMintIconError={onMintIconError}
         />
@@ -771,6 +773,9 @@ function ChatMessageComponent({
       }
       amount={paymentCardAmount(paymentRequestInfo.amount)}
     >
+      {paymentRequestInfo.description ? (
+        <CardNote>{paymentRequestInfo.description}</CardNote>
+      ) : null}
       {message.isEdited && !isOut ? (
         <CardNote>{t("paymentRequestChanged")}</CardNote>
       ) : null}

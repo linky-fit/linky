@@ -120,7 +120,10 @@ import {
   type CashuPaymentRequestMessageInfo,
   paymentRequestPostUrlIsAllowed,
 } from "../../lib/paymentRequestMessage";
-import { getCashuTokenMessageInfo as getCashuTokenMessageInfoBase } from "../../lib/tokenMessageInfo";
+import {
+  getCashuTokenMessageInfo as getCashuTokenMessageInfoBase,
+  readCashuTokenMemo,
+} from "../../lib/tokenMessageInfo";
 import type {
   ContactRowLike,
   LocalNostrMessage,
@@ -393,6 +396,7 @@ export const useCashuWalletComposition = ({
   );
 
   const [lnAddressPayAmount, setLnAddressPayAmount] = useState<string>("");
+  const [lnAddressPayNote, setLnAddressPayNote] = useState<string>("");
 
   const [pendingCashuTokenContactPickId, setPendingCashuTokenContactPickId] =
     useState<CashuOperationId | null>(null);
@@ -500,6 +504,7 @@ export const useCashuWalletComposition = ({
     routeKind: route.kind,
     setContactPaymentIntent,
     setLnAddressPayAmount,
+    setLnAddressPayNote,
     setPayAmount,
   });
 
@@ -705,8 +710,10 @@ export const useCashuWalletComposition = ({
 
   const {
     setTopupAmount,
+    setTopupNote,
     startBackgroundTopup,
     topupAmount,
+    topupNote,
     topupInvoice,
     topupInvoiceCashuRequest,
     topupInvoiceError,
@@ -975,63 +982,69 @@ export const useCashuWalletComposition = ({
     t,
   });
 
-  const paySelectedContact = React.useCallback(async () => {
-    if (cashuIsBusy) return;
-    if (route.kind !== "contactPay") return;
-    if (!selectedContact) return;
+  const paySelectedContact = React.useCallback(
+    async (options?: { note?: string | null }) => {
+      if (cashuIsBusy) return;
+      if (route.kind !== "contactPay") return;
+      if (!selectedContact) return;
 
-    const amountSat = Number.parseInt(payAmount.trim(), 10);
-    if (!Number.isFinite(amountSat) || amountSat <= 0) {
-      setStatus(t("payInvalidAmount"));
-      return;
-    }
-
-    if (amountSat > cashuBalance) {
-      if (!requestPaymentMintMelt(amountSat)) {
-        setStatus(t("payInsufficient"));
-      }
-      return;
-    }
-
-    const normalizedMethod =
-      contactPayMethod === "lightning" || contactPayMethod === "cashu"
-        ? contactPayMethod
-        : "cashu";
-
-    if (normalizedMethod === "lightning") {
-      const lnAddress = (selectedContact.lnAddress ?? "").trim();
-      if (!lnAddress) {
-        setStatus(t("payMissingLn"));
+      const note = (options?.note ?? "").trim() || null;
+      const amountSat = Number.parseInt(payAmount.trim(), 10);
+      if (!Number.isFinite(amountSat) || amountSat <= 0) {
+        setStatus(t("payInvalidAmount"));
         return;
       }
-      setLnAddressPayAmount(String(amountSat));
-      navigateTo({ route: "lnAddressPay", lnAddress });
-      return;
-    }
 
-    setCashuIsBusy(true);
-    try {
-      await payContactWithCashuMessage({
-        contact: selectedContact,
-        amountSat,
-      });
-    } finally {
-      setCashuIsBusy(false);
-    }
-  }, [
-    cashuIsBusy,
-    cashuBalance,
-    contactPayMethod,
-    payAmount,
-    payContactWithCashuMessage,
-    requestPaymentMintMelt,
-    route.kind,
-    selectedContact,
-    setCashuIsBusy,
-    setLnAddressPayAmount,
-    setStatus,
-    t,
-  ]);
+      if (amountSat > cashuBalance) {
+        if (!requestPaymentMintMelt(amountSat)) {
+          setStatus(t("payInsufficient"));
+        }
+        return;
+      }
+
+      const normalizedMethod =
+        contactPayMethod === "lightning" || contactPayMethod === "cashu"
+          ? contactPayMethod
+          : "cashu";
+
+      if (normalizedMethod === "lightning") {
+        const lnAddress = (selectedContact.lnAddress ?? "").trim();
+        if (!lnAddress) {
+          setStatus(t("payMissingLn"));
+          return;
+        }
+        setLnAddressPayAmount(String(amountSat));
+        setLnAddressPayNote(note ?? "");
+        navigateTo({ route: "lnAddressPay", lnAddress });
+        return;
+      }
+
+      setCashuIsBusy(true);
+      try {
+        await payContactWithCashuMessage({
+          contact: selectedContact,
+          amountSat,
+          memo: note,
+        });
+      } finally {
+        setCashuIsBusy(false);
+      }
+    },
+    [
+      cashuIsBusy,
+      cashuBalance,
+      contactPayMethod,
+      payAmount,
+      payContactWithCashuMessage,
+      requestPaymentMintMelt,
+      route.kind,
+      selectedContact,
+      setCashuIsBusy,
+      setLnAddressPayAmount,
+      setStatus,
+      t,
+    ],
+  );
 
   const findContactForCashuPaymentRequest = React.useCallback(
     (requestInfo: CashuPaymentRequestMessageInfo) => {
@@ -1211,6 +1224,7 @@ export const useCashuWalletComposition = ({
 
         const sendOutcome = await sendCashuToken({
           amountSat: requestInfo.amount,
+          memo: requestInfo.description,
           mint,
           produceAs: "pending",
         });
@@ -1288,6 +1302,7 @@ export const useCashuWalletComposition = ({
           },
           fee: null,
           mint: receipt.mint,
+          note: requestInfo.description,
           unit: receipt.unit,
           error: null,
           contactId: null,
@@ -1407,6 +1422,7 @@ export const useCashuWalletComposition = ({
           await payContactWithCashuMessage({
             contact,
             amountSat: requestInfo.amount,
+            memo: requestInfo.description,
             paymentRequestId: requestInfo.requestId,
             ...(previousRequestRumorId
               ? {
@@ -1468,14 +1484,22 @@ export const useCashuWalletComposition = ({
   });
 
   const payLightningAddressWithCashu = React.useCallback(
-    async (lnAddress: string, amountSat: number): Promise<void> => {
+    async (
+      lnAddress: string,
+      amountSat: number,
+      comment?: string | null,
+    ): Promise<void> => {
       if (amountSat > cashuBalance) {
         if (!requestPaymentMintMelt(amountSat)) {
           setStatus(t("payInsufficient"));
         }
         return;
       }
-      const paid = await payLightningAddressWithCashuBase(lnAddress, amountSat);
+      const paid = await payLightningAddressWithCashuBase(
+        lnAddress,
+        amountSat,
+        comment,
+      );
       if (paid) navigateTo({ route: "wallet" });
     },
     [
@@ -1936,8 +1960,7 @@ export const useCashuWalletComposition = ({
         return;
       }
 
-      const transactionNote =
-        (contact.name ?? "").trim() || (contact.lnAddress ?? "").trim() || null;
+      const transactionNote = readCashuTokenMemo(tokenText);
       const logIssuedTokenSendTransaction = (phase: "complete" | "publish") => {
         logPaymentEvent({
           amount: tokenMeta.amount,
@@ -2135,115 +2158,121 @@ export const useCashuWalletComposition = ({
         )
       : null;
 
-  const emitCashuToken = React.useCallback(async () => {
-    const amountSat = Number.parseInt(cashuEmitAmount.trim(), 10);
-    if (!Number.isFinite(amountSat) || amountSat <= 0) {
-      setStatus(t("payInvalidAmount"));
-      return;
-    }
+  const emitCashuToken = React.useCallback(
+    async (options?: { note?: string | null }) => {
+      const note = (options?.note ?? "").trim() || null;
+      const amountSat = Number.parseInt(cashuEmitAmount.trim(), 10);
+      if (!Number.isFinite(amountSat) || amountSat <= 0) {
+        setStatus(t("payInvalidAmount"));
+        return;
+      }
 
-    if (cashuIsBusy) return;
-    if (cashuBalance < amountSat) {
-      setStatus(t("payInsufficient"));
-      return;
-    }
-    if (sendCashuToken === null) {
-      setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
-      return;
-    }
-
-    const logEmitFailure = (error: string, mint: string | null): void => {
-      logPaymentEvent({
-        direction: "out",
-        status: "error",
-        amount: amountSat,
-        fee: null,
-        mint,
-        unit: "sat",
-        error,
-        contactId: null,
-        method: "unknown",
-        phase: "swap",
-      });
-    };
-
-    setCashuIsBusy(true);
-    setStatus(t("cashuEmitting"));
-
-    try {
-      const mint = selectSendMintForAmount(
-        walletBalances.perMint,
-        normalizeMintUrl(defaultMintUrl ?? ""),
-        amountSat,
-      );
-      if (mint === null) {
+      if (cashuIsBusy) return;
+      if (cashuBalance < amountSat) {
         setStatus(t("payInsufficient"));
         return;
       }
-
-      const outcome = await sendCashuToken({
-        amountSat,
-        mint,
-        produceAs: "issued",
-      });
-      if (Either.isLeft(outcome)) {
-        const sendError = outcome.left;
-        const errorMessage =
-          describeTaggedCashuError(sendError) ?? sendError._tag;
-        logEmitFailure(errorMessage, mint);
-        setStatus(
-          sendError._tag === "InsufficientFunds"
-            ? t("payInsufficient")
-            : `${t("payFailed")}: ${errorMessage}`,
-        );
+      if (sendCashuToken === null) {
+        setStatus(`${t("errorPrefix")}: Cashu storage is not ready`);
         return;
       }
 
-      const receipt = outcome.right;
-      logPaymentEvent({
-        direction: "out",
-        status: "ok",
-        transactionId: transactionIdForOperation(receipt.operationId),
-        amount: receipt.amount,
-        details: {
-          issuedToken: receipt.tokenText,
-        },
-        fee: null,
-        mint: receipt.mint,
-        unit: receipt.unit,
-        error: null,
-        contactId: null,
-        method: "unknown",
-        phase: "swap",
-      });
+      const logEmitFailure = (error: string, mint: string | null): void => {
+        logPaymentEvent({
+          direction: "out",
+          status: "error",
+          amount: amountSat,
+          fee: null,
+          mint,
+          unit: "sat",
+          error,
+          contactId: null,
+          method: "unknown",
+          phase: "swap",
+        });
+      };
 
-      setCashuEmitAmount("");
-      setStatus(null);
-      const routeId = CashuOperationIdType.fromUnknown(receipt.operationId);
-      navigateTo(
-        routeId.ok
-          ? { route: "cashuToken", id: routeId.value }
-          : { route: "cashuTokens" },
-      );
-    } catch (error) {
-      const errorMessage = getUnknownErrorMessage(error, "unknown");
-      logEmitFailure(errorMessage, null);
-      setStatus(`${t("payFailed")}: ${errorMessage}`);
-    } finally {
-      setCashuIsBusy(false);
-    }
-  }, [
-    cashuBalance,
-    cashuEmitAmount,
-    cashuIsBusy,
-    defaultMintUrl,
-    logPaymentEvent,
-    sendCashuToken,
-    setCashuEmitAmount,
-    setStatus,
-    t,
-    walletBalances.perMint,
-  ]);
+      setCashuIsBusy(true);
+      setStatus(t("cashuEmitting"));
+
+      try {
+        const mint = selectSendMintForAmount(
+          walletBalances.perMint,
+          normalizeMintUrl(defaultMintUrl ?? ""),
+          amountSat,
+        );
+        if (mint === null) {
+          setStatus(t("payInsufficient"));
+          return;
+        }
+
+        const outcome = await sendCashuToken({
+          amountSat,
+          memo: note,
+          mint,
+          produceAs: "issued",
+        });
+        if (Either.isLeft(outcome)) {
+          const sendError = outcome.left;
+          const errorMessage =
+            describeTaggedCashuError(sendError) ?? sendError._tag;
+          logEmitFailure(errorMessage, mint);
+          setStatus(
+            sendError._tag === "InsufficientFunds"
+              ? t("payInsufficient")
+              : `${t("payFailed")}: ${errorMessage}`,
+          );
+          return;
+        }
+
+        const receipt = outcome.right;
+        logPaymentEvent({
+          direction: "out",
+          status: "ok",
+          transactionId: transactionIdForOperation(receipt.operationId),
+          amount: receipt.amount,
+          details: {
+            issuedToken: receipt.tokenText,
+          },
+          fee: null,
+          mint: receipt.mint,
+          note,
+          unit: receipt.unit,
+          error: null,
+          contactId: null,
+          method: "unknown",
+          phase: "swap",
+        });
+
+        setCashuEmitAmount("");
+        setStatus(null);
+        const routeId = CashuOperationIdType.fromUnknown(receipt.operationId);
+        navigateTo(
+          routeId.ok
+            ? { route: "cashuToken", id: routeId.value }
+            : { route: "cashuTokens" },
+        );
+      } catch (error) {
+        const errorMessage = getUnknownErrorMessage(error, "unknown");
+        logEmitFailure(errorMessage, null);
+        setStatus(`${t("payFailed")}: ${errorMessage}`);
+      } finally {
+        setCashuIsBusy(false);
+      }
+    },
+    [
+      cashuBalance,
+      cashuEmitAmount,
+      cashuIsBusy,
+      defaultMintUrl,
+      logPaymentEvent,
+      sendCashuToken,
+      setCashuEmitAmount,
+      setStatus,
+      t,
+      walletBalances.perMint,
+    ],
+  );
 
   const meltLargestForeignMintToMainMint = React.useCallback(async () => {
     if (cashuIsBusy) return;
@@ -2374,85 +2403,92 @@ export const useCashuWalletComposition = ({
     touchMintInfo,
   });
 
-  const requestSelectedContact = React.useCallback(async () => {
-    if (route.kind !== "contactPay") return;
-    if (!selectedContact) return;
+  const requestSelectedContact = React.useCallback(
+    async (options?: { note?: string | null }) => {
+      if (route.kind !== "contactPay") return;
+      if (!selectedContact) return;
 
-    const amountSat = Number.parseInt(payAmount.trim(), 10);
-    if (!Number.isFinite(amountSat) || amountSat <= 0) {
-      setStatus(t("payInvalidAmount"));
-      return;
-    }
+      const note = (options?.note ?? "").trim() || null;
+      const amountSat = Number.parseInt(payAmount.trim(), 10);
+      if (!Number.isFinite(amountSat) || amountSat <= 0) {
+        setStatus(t("payInvalidAmount"));
+        return;
+      }
 
-    const normalizedNpub = normalizeNpubIdentifier(selectedContact.npub ?? "");
-    if (!normalizedNpub) {
-      setStatus(t("chatMissingContactNpub"));
-      return;
-    }
+      const normalizedNpub = normalizeNpubIdentifier(
+        selectedContact.npub ?? "",
+      );
+      if (!normalizedNpub) {
+        setStatus(t("chatMissingContactNpub"));
+        return;
+      }
 
-    const recipientPubkeyHex = decodeNpub(currentNpub ?? "");
+      const recipientPubkeyHex = decodeNpub(currentNpub ?? "");
 
-    if (!recipientPubkeyHex) {
-      setStatus(t("profileMissingNpub"));
-      return;
-    }
+      if (!recipientPubkeyHex) {
+        setStatus(t("profileMissingNpub"));
+        return;
+      }
 
-    const recipientNprofile = encodeNprofile(
-      recipientPubkeyHex,
-      recommendedNostrRelays(),
-    );
-    const preferredMint =
-      normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) ?? MAIN_MINT_URL;
-    const requestId = makeLocalId();
-    const requestText = buildCashuPaymentRequestMessage({
-      amount: amountSat,
-      mintUrls: [preferredMint],
-      recipientNprofile,
-      requestId,
-    });
-
-    const outcome = await sendChatMessage({
-      clearDraft: false,
-      text: requestText,
-    });
-    if (outcome !== "enqueued") return;
-
-    logPaymentEvent({
-      amount: amountSat,
-      contactId: route.id,
-      details: {
+      const recipientNprofile = encodeNprofile(
+        recipientPubkeyHex,
+        recommendedNostrRelays(),
+      );
+      const preferredMint =
+        normalizeMintUrl(defaultMintUrl ?? MAIN_MINT_URL) ?? MAIN_MINT_URL;
+      const requestId = makeLocalId();
+      const requestText = buildCashuPaymentRequestMessage({
+        amount: amountSat,
+        description: note,
         mintUrls: [preferredMint],
         recipientNprofile,
         requestId,
-        requestText,
-      },
-      direction: "in",
-      method: "cashu_chat",
-      mint: preferredMint,
-      note: t("requestPaymentLabel"),
-      status: "ok",
-      transactionId: transactionIdForRequest(requestId),
-      unit: "sat",
-    });
+      });
 
-    if ((contactPayBackToChatRef.current ?? "") === route.id) {
-      navigateTo({ route: "chat", id: route.id });
-      return;
-    }
+      const outcome = await sendChatMessage({
+        clearDraft: false,
+        text: requestText,
+      });
+      if (outcome !== "enqueued") return;
 
-    navigateTo({ route: "contact", id: route.id });
-  }, [
-    contactPayBackToChatRef,
-    currentNpub,
-    defaultMintUrl,
-    payAmount,
-    route,
-    selectedContact,
-    sendChatMessage,
-    logPaymentEvent,
-    setStatus,
-    t,
-  ]);
+      logPaymentEvent({
+        amount: amountSat,
+        contactId: route.id,
+        details: {
+          mintUrls: [preferredMint],
+          recipientNprofile,
+          requestId,
+          requestText,
+        },
+        direction: "in",
+        method: "cashu_chat",
+        mint: preferredMint,
+        note,
+        status: "ok",
+        transactionId: transactionIdForRequest(requestId),
+        unit: "sat",
+      });
+
+      if ((contactPayBackToChatRef.current ?? "") === route.id) {
+        navigateTo({ route: "chat", id: route.id });
+        return;
+      }
+
+      navigateTo({ route: "contact", id: route.id });
+    },
+    [
+      contactPayBackToChatRef,
+      currentNpub,
+      defaultMintUrl,
+      payAmount,
+      route,
+      selectedContact,
+      sendChatMessage,
+      logPaymentEvent,
+      setStatus,
+      t,
+    ],
+  );
 
   const paymentRequestContactsRef = useLatest(contacts);
   const onPayChatPaymentRequest = React.useCallback(
@@ -2487,6 +2523,7 @@ export const useCashuWalletComposition = ({
           await payContactWithCashuMessage({
             contact: reviewedRecipient,
             amountSat: reviewedRequest.amount,
+            memo: reviewedRequest.description,
             paymentRequestId: reviewedRequest.requestId,
             isPaymentAuthorized,
             replyContext: {
@@ -2609,6 +2646,7 @@ export const useCashuWalletComposition = ({
     knownLnAddressPayContactPictureUrl,
     lightningInvoiceAutoPayLimit,
     lnAddressPayAmount,
+    lnAddressPayNote,
     lnurlWithdrawIsBusy,
     makeNip98AuthHeader,
     markCashuTokenExternalized,
@@ -2652,6 +2690,7 @@ export const useCashuWalletComposition = ({
     setContactPayMethod,
     setLightningInvoiceAutoPayLimit,
     setLnAddressPayAmount,
+    setLnAddressPayNote,
     setMintInfoAll,
     setAllowTestMints,
     setPayWithCashuEnabled,
@@ -2660,12 +2699,14 @@ export const useCashuWalletComposition = ({
     setPendingLnurlWithdrawConfirmation,
     setPostPaySaveContact,
     setTopupAmount,
+    setTopupNote,
     settleBankPaymentOffer,
     showPaidOverlay,
     startSendCashuTokenToContact,
     tokensRestoreIsBusy,
     tokensRestoreProgress,
     topupAmount,
+    topupNote,
     topupInvoice,
     topupInvoiceCashuRequest,
     topupInvoiceError,

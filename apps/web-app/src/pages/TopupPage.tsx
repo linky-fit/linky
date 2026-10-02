@@ -2,6 +2,7 @@ import { Button, Row, Stack } from "@linky-fit/ui";
 import type { FC } from "react";
 import { useAppShellActions } from "../app/context/AppShellContexts";
 import { AmountKeypad } from "../components/AmountKeypad";
+import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
@@ -10,17 +11,21 @@ interface TopupPageProps {
   currentNpub: string | null;
   displayUnit: string;
   setTopupAmount: (value: string | ((prev: string) => string)) => void;
+  setTopupNote: (value: string) => void;
   t: Translate;
   topupAmount: string;
   topupInvoiceIsBusy: boolean;
+  topupNote: string;
 }
 
 export const TopupPage: FC<TopupPageProps> = ({
   currentNpub,
   setTopupAmount,
+  setTopupNote,
   t,
   topupAmount,
   topupInvoiceIsBusy,
+  topupNote,
 }) => {
   const { pasteScanValue } = useAppShellActions();
 
@@ -45,6 +50,14 @@ export const TopupPage: FC<TopupPageProps> = ({
         amount={topupAmount}
         input={amountInput}
         disabled={topupInvoiceIsBusy}
+        below={
+          <PaymentNoteInput
+            disabled={topupInvoiceIsBusy}
+            onChange={setTopupNote}
+            t={t}
+            value={topupNote}
+          />
+        }
       />
 
       <Button

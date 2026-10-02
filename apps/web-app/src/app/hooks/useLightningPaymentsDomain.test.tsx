@@ -19,7 +19,11 @@ import type { LnurlPayInvoiceResult } from "../../lnurlPay";
 const { fetchLnurlInvoiceForTargetMock } = vi.hoisted(() => ({
   fetchLnurlInvoiceForTargetMock:
     vi.fn<
-      (target: string, amountSat: number) => Promise<LnurlPayInvoiceResult>
+      (
+        target: string,
+        amountSat: number,
+        comment?: string,
+      ) => Promise<LnurlPayInvoiceResult>
     >(),
 }));
 
@@ -255,6 +259,39 @@ describe("payLightningAddressWithCashu", () => {
       }),
     );
     expect(harness.setPostPaySaveContact).not.toHaveBeenCalled();
+    await act(async () => harness.root.unmount());
+  });
+
+  it("sends the note as the LNURL comment and keeps it on the transaction", async () => {
+    fetchLnurlInvoiceForTargetMock.mockResolvedValue({
+      lightningAddress: "alice@example.com",
+      pr: "lnbc-mock-invoice",
+      successAction: null,
+    });
+    const melt = vi.fn<MeltCashuInvoice>(async () =>
+      Either.right(meltReceipt(40)),
+    );
+    const harness = await setup({ meltCashuInvoice: melt });
+
+    const paid = await harness.payments.payLightningAddressWithCashu(
+      "alice@example.com",
+      40,
+      " thanks! ",
+    );
+
+    expect(paid).toBe(true);
+    expect(fetchLnurlInvoiceForTargetMock).toHaveBeenCalledWith(
+      "alice@example.com",
+      40,
+      "thanks!",
+    );
+    expect(harness.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "lightning_address",
+        note: "thanks!",
+        status: "ok",
+      }),
+    );
     await act(async () => harness.root.unmount());
   });
 

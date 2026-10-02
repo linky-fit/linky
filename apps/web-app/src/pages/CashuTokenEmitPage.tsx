@@ -2,6 +2,7 @@ import { Button, Notice, Stack } from "@linky-fit/ui";
 import { useState, type Dispatch, type FC, type SetStateAction } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { AmountKeypad } from "../components/AmountKeypad";
+import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 
 interface CashuTokenEmitPageProps {
@@ -12,7 +13,7 @@ interface CashuTokenEmitPageProps {
   cashuMeltToMainMintButtonLabel: string | null;
   cashuHasMultipleAcceptedMints: boolean;
   displayUnit: string;
-  emitCashuToken: () => Promise<void>;
+  emitCashuToken: (options: { note: string | null }) => Promise<void>;
   meltLargestForeignMintToMainMint: () => Promise<void>;
   setCashuEmitAmount: Dispatch<SetStateAction<string>>;
 }
@@ -30,6 +31,7 @@ export const CashuTokenEmitPage: FC<CashuTokenEmitPageProps> = ({
 }) => {
   const { formatDisplayedAmountText, t } = useAppShellCore();
   const [mintWarningDismissed, setMintWarningDismissed] = useState(false);
+  const [note, setNote] = useState("");
   const amountSat = Number.parseInt(cashuEmitAmount.trim(), 10);
   const insufficient = amountSat > cashuBalance;
   const invalid =
@@ -86,6 +88,14 @@ export const CashuTokenEmitPage: FC<CashuTokenEmitPageProps> = ({
         amount={cashuEmitAmount}
         input={amountInput}
         disabled={cashuIsBusy}
+        below={
+          <PaymentNoteInput
+            disabled={cashuIsBusy}
+            onChange={setNote}
+            t={t}
+            value={note}
+          />
+        }
       />
 
       {insufficient && !meltLabel ? (
@@ -94,7 +104,7 @@ export const CashuTokenEmitPage: FC<CashuTokenEmitPageProps> = ({
 
       <Button
         onPress={() => {
-          void emitCashuToken();
+          void emitCashuToken({ note: note.trim() || null });
         }}
         disabled={invalid}
         tooltip={insufficient ? t("payInsufficient") : undefined}

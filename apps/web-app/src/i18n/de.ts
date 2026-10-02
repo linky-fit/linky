@@ -916,6 +916,8 @@ export const de = {
   requestPaymentSend: "Anfordern",
   requestPaymentHint: "Bitte diesen Kontakt, den Betrag unten zu bezahlen.",
   requestPaymentLabel: "Zahlungsanforderung",
+  paymentNoteLabel: "Notiz",
+  paymentNotePlaceholder: "Notiz hinzufügen",
   paymentRequestPreviewIncoming: "Fordert {amount} an",
   paymentRequestPreviewOutgoing: "Du forderst {amount} an",
   paymentRequestDeclinedPreviewIncoming: "Zahlungsanforderung abgelehnt",

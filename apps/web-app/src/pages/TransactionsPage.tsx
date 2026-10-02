@@ -129,7 +129,6 @@ const hasTransactionDetails = (
     hasStoredToken(["gainedToken", "acceptedToken"], "gainedTokenIds") ||
     [
       details.lightningInvoice,
-      details.lightningMemo,
       details.lightningPreimage,
       details.lnurlSuccessMessage,
       details.lnurlSuccessUrl,
@@ -221,6 +220,11 @@ const TransactionCardView = ({
         title={title}
         description={
           <Stack gap="$xxs">
+            {item.note && item.note !== title ? (
+              <Text variant="caption" color="$colorSubtle" numberOfLines={2}>
+                {item.note}
+              </Text>
+            ) : null}
             {lnurlMessage ? (
               <Text variant="caption" color="$colorSubtle" numberOfLines={2}>
                 {lnurlMessage}
@@ -364,7 +368,6 @@ export function TransactionsPage(): React.ReactElement {
   const buildTitle = React.useCallback(
     (item: TransactionItem): string => {
       if (isPaymentRequestTransaction(item)) return t("requestPaymentLabel");
-      if (item.note) return item.note;
 
       const contact = item.contactId ? contactsById.get(item.contactId) : null;
       if (contact) {
@@ -520,11 +523,12 @@ export function TransactionsPage(): React.ReactElement {
           : null;
       const feeText = fee !== null ? formatAmountText(fee, item.unit) : "";
       const lightningInvoice = asNonEmptyString(details?.lightningInvoice);
+      // Rows written before notes were stored only have the invoice to read
+      // the description from.
       const lightningMemo =
-        asNonEmptyString(details?.lightningMemo) ??
-        (lightningInvoice
+        item.note === null && lightningInvoice
           ? (getLightningInvoicePreview(lightningInvoice)?.description ?? null)
-          : null);
+          : null;
       const lightningPreimage = asNonEmptyString(details?.lightningPreimage);
       const lnurlSuccessMessage = asNonEmptyString(
         details?.lnurlSuccessMessage,

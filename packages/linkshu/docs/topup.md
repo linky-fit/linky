@@ -36,7 +36,7 @@ const topupOnce = (bip39Seed: Bip39Seed, mint: MintUrl) =>
 
 ## How it works
 
-1. Quote. `start` requests a bolt11 mint quote and persists it as a `pending` `topup` operation before returning the handle. Any invoice you can show is one the package can finish or resume.
+1. Quote. `start` requests a bolt11 mint quote and persists it as a `pending` `topup` operation before returning the handle. Any invoice you can show is one the package can finish or resume. A draft `description` becomes the invoice's bolt11 description when the mint advertises NUT-04 descriptions; other mints get a quote without one, so keep the text yourself if you want to show it later.
 2. Watch. The quote is polled every 5 s until the mint reports it paid. Transient failures keep the poll alive (the device may be offline); a long run of them ends it with `MintUnreachable`, and an unknown quote (`MintRejected`) ends it at once. When the mint advertises NUT-17 websockets, a subscription runs alongside as a shortcut (re-subscribed with backoff when dropped) but the poll never depends on it, and a push never mints on its own: the claim re-checks the quote over HTTP under the counter lock.
 3. Mint under the counter lock. The reserved counter slot is written to the operation's `counter` (synced) and the counter advanced before the outputs are derived, so a resumed attempt re-derives the same outputs. If the mint says the quote was already issued (a lost response), the proofs are reclaimed via NUT-09 from that slot instead of minted twice.
 4. Persist. The proofs are stored `available`, then the operation closes `done`.

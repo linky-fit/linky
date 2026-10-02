@@ -53,6 +53,7 @@ import type {
 } from "../../types/appTypes";
 import { describeTaggedCashuError } from "../../lib/cashuStoredError";
 import { touchReceivingMint } from "../../lib/receivingMint";
+import { readCashuTokenMemo } from "../../lib/tokenMessageInfo";
 import { isHiddenTestMint } from "../../../utils/mint";
 import type { Translate } from "../../../i18n";
 import type {
@@ -117,6 +118,7 @@ interface ReceivedPayment {
   readonly unit: string | null;
   readonly method: PaymentTelemetryMethod;
   readonly details?: JsonValue;
+  readonly note?: string | null;
 }
 
 const reportClaimsUnsaved = (count: number): void => {
@@ -208,7 +210,15 @@ export const useNpubCashClaim = ({
   const offeredCopiesRef = React.useRef(new Set<string>());
 
   const announceReceived = React.useCallback(
-    ({ amount, details, method, mint, operationId, unit }: ReceivedPayment) => {
+    ({
+      amount,
+      details,
+      method,
+      mint,
+      note,
+      operationId,
+      unit,
+    }: ReceivedPayment) => {
       touchReceivingMint(mint, {
         isMintDeleted,
         mintInfoByUrl,
@@ -227,6 +237,7 @@ export const useNpubCashClaim = ({
         error: null,
         contactId: null,
         method,
+        note: note ?? null,
         phase: "receive",
         ...(details === undefined ? {} : { details }),
       });
@@ -329,6 +340,7 @@ export const useNpubCashClaim = ({
           announceReceived({
             amount: receipt.amount,
             mint: receipt.mint,
+            note: readCashuTokenMemo(receipt.tokenText),
             operationId: receipt.operationId,
             unit: receipt.unit,
             method: "cashu_receive",

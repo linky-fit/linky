@@ -123,6 +123,8 @@ export type ReceiveCashuToken = (
 
 interface SendCashuTokenArgs {
   readonly amountSat: number;
+  /** The token's memo (NUT-00), shown to whoever receives it. */
+  readonly memo?: string | null;
   readonly mint: string;
   /** `issued` for QR/share (claim-watched), `pending` for messenger sends. */
   readonly produceAs: "issued" | "pending";
@@ -166,6 +168,8 @@ export type ProbeLightningFee = (
 
 interface StartCashuTopupArgs {
   readonly amountSat: number;
+  /** The invoice's bolt11 description, when the mint supports one. */
+  readonly description?: string | null;
   readonly mint: string;
 }
 
@@ -459,10 +463,20 @@ export const useLinkshuComposition = ({
     const resumeDeferredCashuReceives: ResumeDeferredCashuReceives = () =>
       run(Effect.flatMap(Receive, (receive) => receive.resumeDeferred));
 
-    const sendCashuToken: SendCashuToken = ({ amountSat, mint, produceAs }) =>
+    const sendCashuToken: SendCashuToken = ({
+      amountSat,
+      memo,
+      mint,
+      produceAs,
+    }) =>
       runEither(
         Effect.suspend(() => {
-          const draft = decodeSendDraft({ amount: amountSat, mint, produceAs });
+          const draft = decodeSendDraft({
+            amount: amountSat,
+            mint,
+            produceAs,
+            ...(memo ? { memo } : {}),
+          });
           return Effect.flatMap(Send, (send) => send.send(draft));
         }),
       );
@@ -478,10 +492,18 @@ export const useLinkshuComposition = ({
     const resumePendingCashuMelts: ResumePendingCashuMelts = () =>
       run(Effect.flatMap(Melt, (melt) => melt.resumePending));
 
-    const startCashuTopup: StartCashuTopup = ({ amountSat, mint }) =>
+    const startCashuTopup: StartCashuTopup = ({
+      amountSat,
+      description,
+      mint,
+    }) =>
       runEither(
         Effect.suspend(() => {
-          const draft = decodeTopupDraft({ mint, amount: amountSat });
+          const draft = decodeTopupDraft({
+            mint,
+            amount: amountSat,
+            ...(description ? { description } : {}),
+          });
           return Effect.flatMap(Topup, (topup) =>
             Scope.extend(topup.start(draft), topupScope),
           );

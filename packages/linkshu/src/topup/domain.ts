@@ -19,6 +19,11 @@ import {
 export class TopupDraft extends Schema.Class<TopupDraft>("TopupDraft")({
   mint: MintUrl,
   amount: Amount,
+  /**
+   * The invoice's bolt11 description (NUT-04 `description`). Sent only to a
+   * mint that advertises support for it; other mints get a plain quote.
+   */
+  description: Schema.optional(Schema.NonEmptyString),
 }) {}
 
 /** The mint quote to display: pay `invoice` and the topup completes itself. */

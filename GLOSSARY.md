@@ -212,6 +212,10 @@ _Avoid_: address service, custodial address
 A message asking the peer to pay a stated amount; once received it cannot be changed.
 _Avoid_: invoice, bill, request for payment
 
+**Note**:
+The free text the user attaches to a payment or payment request, carried as the bolt11 description, the token memo, the LNURL comment or the request description, and kept on the transaction.
+_Avoid_: memo, comment, message, label
+
 **Auto-pay limit**:
 The amount up to which invoices and payment requests are paid without asking.
 _Avoid_: spending limit, confirmation threshold

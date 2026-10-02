@@ -45,6 +45,7 @@ interface BuildMoneyRoutePropsParams {
   knownLnAddressPayContact: MoneyRoutesProps["lnAddressPayProps"]["knownContact"];
   knownLnAddressPayContactPictureUrl: MoneyRoutesProps["lnAddressPayProps"]["knownContactPictureUrl"];
   lnAddressPayAmount: MoneyRoutesProps["lnAddressPayProps"]["lnAddressPayAmount"];
+  lnAddressPayNote: MoneyRoutesProps["lnAddressPayProps"]["lnAddressPayNote"];
   manualPayContacts: MoneyRoutesProps["manualPayProps"]["contacts"];
   manualPayNostrPictureByNpub: MoneyRoutesProps["manualPayProps"]["nostrPictureByNpub"];
   onRequestBankPaymentOffer: MoneyRoutesProps["spdPaymentProps"]["onRequestReimbursement"];
@@ -72,15 +73,18 @@ interface BuildMoneyRoutePropsParams {
   setCashuEmitAmount: MoneyRoutesProps["cashuTokenEmitProps"]["setCashuEmitAmount"];
   setCashuDraft: MoneyRoutesProps["cashuTokenNewProps"]["setCashuDraft"];
   setLnAddressPayAmount: MoneyRoutesProps["lnAddressPayProps"]["setLnAddressPayAmount"];
+  setLnAddressPayNote: MoneyRoutesProps["lnAddressPayProps"]["setLnAddressPayNote"];
   shareCashuTokenText: MoneyRoutesProps["cashuTokenProps"] extends () => infer Props
     ? Props extends { shareTokenText: infer Fn }
       ? Fn
       : never
     : never;
   setTopupAmount: MoneyRoutesProps["topupProps"]["setTopupAmount"];
+  setTopupNote: MoneyRoutesProps["topupProps"]["setTopupNote"];
   receiveMethod: MoneyRoutesProps["topupInvoiceProps"]["receiveMethod"];
   t: Translate;
   topupAmount: MoneyRoutesProps["topupProps"]["topupAmount"];
+  topupNote: MoneyRoutesProps["topupProps"]["topupNote"];
   topupInvoice: MoneyRoutesProps["topupInvoiceProps"]["topupInvoice"];
   topupInvoiceCashuRequest: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceCashuRequest"];
   topupInvoiceError: MoneyRoutesProps["topupInvoiceProps"]["topupInvoiceError"];
@@ -129,6 +133,7 @@ export const buildMoneyRouteProps = ({
   knownLnAddressPayContact,
   knownLnAddressPayContactPictureUrl,
   lnAddressPayAmount,
+  lnAddressPayNote,
   manualPayContacts,
   manualPayNostrPictureByNpub,
   onRequestBankPaymentOffer,
@@ -148,10 +153,13 @@ export const buildMoneyRouteProps = ({
   setCashuEmitAmount,
   setCashuDraft,
   setLnAddressPayAmount,
+  setLnAddressPayNote,
   shareCashuTokenText,
   setTopupAmount,
+  setTopupNote,
   t,
   topupAmount,
+  topupNote,
   topupInvoice,
   topupInvoiceCashuRequest,
   topupInvoiceError,
@@ -248,7 +256,9 @@ export const buildMoneyRouteProps = ({
       knownContact: knownLnAddressPayContact,
       knownContactPictureUrl: knownLnAddressPayContactPictureUrl,
       lnAddressPayAmount,
+      lnAddressPayNote,
       setLnAddressPayAmount,
+      setLnAddressPayNote,
       displayUnit,
       payLightningAddressWithCashu,
     },
@@ -286,6 +296,8 @@ export const buildMoneyRouteProps = ({
       currentNpub,
       topupAmount,
       setTopupAmount,
+      topupNote,
+      setTopupNote,
       topupInvoiceIsBusy,
       displayUnit,
       t,

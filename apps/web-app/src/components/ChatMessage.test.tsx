@@ -2,6 +2,7 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import type { BankPaymentOfferInfo } from "@linky-fit/proxy-payment";
+import type { CashuPaymentRequestMessageInfo } from "../app/lib/paymentRequestMessage";
 import { serializePrivateImageMessage } from "../app/lib/privateImageMessage";
 import type { LocalNostrMessage } from "../app/types/appTypes";
 import {
@@ -70,6 +71,7 @@ interface RenderChatMessageOptions {
   onAddNpubContacts?: (npubs: readonly string[], messageId: string) => void;
   contactsGroupAssignment?: MessageContactsGroupAssignment | null;
   onSettleBankPaymentOffer?: () => Promise<void>;
+  paymentRequestInfo?: CashuPaymentRequestMessageInfo | null;
 }
 
 const buttonWithText = (container: ParentNode, text: string) =>
@@ -135,7 +137,7 @@ const renderChatMessage = async (
       }
       payPaymentRequestBusy={false}
       payPaymentRequestDisabled={false}
-      paymentRequestInfo={null}
+      paymentRequestInfo={options.paymentRequestInfo ?? null}
       paymentRequestStatus={null}
       previousMessage={null}
       reactions={[]}
@@ -373,6 +375,48 @@ describe("ChatMessage image message actions", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("ChatMessage payment request card", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const requestInfo = (
+    description: string | null,
+  ): CashuPaymentRequestMessageInfo => ({
+    amount: 21,
+    description,
+    encodedRequest: "creqA",
+    mintUrls: [],
+    requestId: "request-1",
+    transportNprofile: null,
+    transportPostUrl: null,
+    transportPubkeyHex: null,
+    unit: "sat",
+  });
+
+  it("shows the request's note under the amount", async () => {
+    const container = await renderChatMessage("creqA", {
+      paymentRequestInfo: requestInfo("lunch"),
+    });
+
+    expect(
+      container.querySelector('[data-testid="chat-payment-request-card"]')
+        ?.textContent,
+    ).toContain("lunch");
+  });
+
+  it("renders no note line for a request without one", async () => {
+    const container = await renderChatMessage("creqA", {
+      paymentRequestInfo: requestInfo(null),
+    });
+
+    expect(
+      container.querySelector('[data-testid="chat-payment-request-card"]')
+        ?.textContent,
+    ).not.toContain("lunch");
   });
 });
 

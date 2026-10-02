@@ -3,12 +3,18 @@ import type { IconName } from "@linky-fit/ui";
 import type { FC, ReactNode } from "react";
 import type { Translate } from "../i18n";
 import { AmountKeypad } from "./AmountKeypad";
+import {
+  PaymentNoteInput,
+  type PaymentNoteInputProps,
+} from "./PaymentNoteInput";
 import { useAmountInputKeypad } from "./useAmountInputKeypad";
 
 interface PaymentAmountPanelProps {
   amount: string;
   cashuIsBusy: boolean;
   header: ReactNode;
+  /** Shown under the amount when the payment can carry a note. */
+  note?: Omit<PaymentNoteInputProps, "t"> | undefined;
   notices?: ReactNode | undefined;
   onAmountChange: React.Dispatch<React.SetStateAction<string>>;
   onSubmit: () => void;
@@ -27,6 +33,7 @@ export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
   amount,
   cashuIsBusy,
   header,
+  note,
   notices,
   onAmountChange,
   onSubmit,
@@ -51,6 +58,7 @@ export const PaymentAmountPanel: FC<PaymentAmountPanelProps> = ({
           amount={amount}
           input={amountInput}
           disabled={cashuIsBusy}
+          below={note ? <PaymentNoteInput {...note} t={t} /> : undefined}
         />
 
         {submitBlockedReason ? (

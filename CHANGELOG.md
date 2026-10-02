@@ -17,12 +17,14 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 - Proxy payments accept Slovak payme.sk payment links (versions 1 and 2) as bank QR codes; "Open in bank" opens the link.
 - Proxy payments work in Brazil: Pix QR codes (static and dynamic) are recognized, contacts can offer to pay in BRL, and sats are converted at the BRL rate.
 - Brazilian Portuguese translation; the Brazilian real (BRL, shown as R$) is a display currency and the default one for Brazilian browsers.
+- Payments, payment requests, issued tokens and top-up invoices can carry a note; it reaches the recipient and shows in the history.
 
 ### cs-CZ
 
 - Proxy platby přijímají slovenské platební odkazy payme.sk (verze 1 a 2) jako bankovní QR; „Otevřít v bance“ otevře odkaz.
 - Proxy platby fungují v Brazílii: aplikace rozpozná QR kódy Pix (statické i dynamické), kontakty mohou nabízet platby v BRL a saty se přepočítávají kurzem BRL.
 - Překlad do brazilské portugalštiny; brazilský real (BRL, zobrazený jako R$) je zobrazovací měna a výchozí pro brazilské prohlížeče.
+- Platby, žádosti o platbu, vydané tokeny a dobíjecí faktury mohou nést popisek; dostane se k příjemci a zobrazí se v historii.
 
 ## [26.10.1] - 2026-10-02
 

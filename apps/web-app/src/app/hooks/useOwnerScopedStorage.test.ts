@@ -103,7 +103,6 @@ describe("buildTransactionInsertPayload", () => {
         details: {
           acceptedToken: gainedToken,
           lightningInvoice: "lnbc1invoice",
-          lightningMemo: "derived memo",
           rawToken: "cashu-raw",
           requestId: "request-1",
           requestText: "large request payload",
@@ -113,7 +112,7 @@ describe("buildTransactionInsertPayload", () => {
         direction: "out",
         fee: 1,
         method: "unknown",
-        note: "redundant title",
+        note: "  coffee  ",
         phase: "swap",
         status: "ok",
       },
@@ -131,6 +130,7 @@ describe("buildTransactionInsertPayload", () => {
       direction: "out",
       fee: 1,
       method: "cashu_emit",
+      note: "coffee",
       status: "ok",
     });
   });

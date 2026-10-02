@@ -8,7 +8,7 @@ import {
   Stack,
   Text,
 } from "@linky-fit/ui";
-import { useEffect, type FC } from "react";
+import { useEffect, useState, type FC } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { LnurlPayPreviewNotices } from "../components/LnurlPayPreviewNotices";
 import { PaymentAmountPanel } from "../components/PaymentAmountPanel";
@@ -35,9 +35,9 @@ interface ContactPayPageProps {
   displayUnit: string;
   nostrPictureByNpub: Record<string, string | null>;
   payAmount: string;
-  paySelectedContact: () => Promise<void>;
+  paySelectedContact: (options: { note: string | null }) => Promise<void>;
   payWithCashuEnabled: boolean;
-  requestSelectedContact: () => Promise<void>;
+  requestSelectedContact: (options: { note: string | null }) => Promise<void>;
   selectedContact: Contact | null;
   setContactPayMethod: React.Dispatch<
     React.SetStateAction<"lightning" | "cashu" | null>
@@ -61,6 +61,7 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
   setPayAmount,
 }) => {
   const { formatDisplayedAmountText, t } = useAppShellCore();
+  const [note, setNote] = useState("");
 
   const ln = (selectedContact?.lnAddress ?? "").trim();
   const npub = normalizeNpubIdentifier(selectedContact?.npub ?? "");
@@ -110,6 +111,16 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
   const lnurlRangeError = lightningActive
     ? getLnurlPayAmountRangeError(lnurlPreview.preview, amountSat, t)
     : null;
+  // A request's description and a token's memo always travel; a Lightning
+  // payment carries a note only where the recipient accepts a LUD-12 comment.
+  const commentAllowed = lightningActive
+    ? (lnurlPreview.preview?.commentAllowed ?? 0)
+    : 0;
+  const noteInput = !lightningActive
+    ? { onChange: setNote, value: note }
+    : commentAllowed > 0
+      ? { maxLength: commentAllowed, onChange: setNote, value: note }
+      : undefined;
   const invalid = isRequestFlow
     ? !npub || !Number.isFinite(amountSat) || amountSat <= 0
     : (method === "lightning" ? !ln : !canUseCashu) ||
@@ -169,6 +180,7 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
           </Stack>
         </Row>
       }
+      note={noteInput}
       notices={
         <>
           {!isRequestFlow && method === "cashu" && !payWithCashuEnabled && (
@@ -195,11 +207,12 @@ export const ContactPayPage: FC<ContactPayPageProps> = ({
       }
       onAmountChange={setPayAmount}
       onSubmit={() => {
+        const trimmedNote = noteInput ? note.trim() || null : null;
         if (isRequestFlow) {
-          void requestSelectedContact();
+          void requestSelectedContact({ note: trimmedNote });
           return;
         }
-        void paySelectedContact();
+        void paySelectedContact({ note: trimmedNote });
       }}
       sendGuideId={isRequestFlow ? "request-send" : "pay-send"}
       stepGuideId="pay-step3"

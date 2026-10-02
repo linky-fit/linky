@@ -27,6 +27,7 @@ const describeTopupError = (error: TopupError): string =>
 interface ActiveTopup {
   readonly amountSat: number;
   readonly mint: string;
+  readonly note: string | null;
   readonly quote: TopupQuote;
 }
 
@@ -71,6 +72,7 @@ export const useTopupFlow = ({
     null,
   );
   const [topupAmount, setTopupAmount] = React.useState<string>("");
+  const [topupNote, setTopupNote] = React.useState<string>("");
   const [topupInvoiceError, setTopupInvoiceError] = React.useState<
     string | null
   >(null);
@@ -89,8 +91,10 @@ export const useTopupFlow = ({
   const finalizedQuoteIdsRef = React.useRef<Set<string>>(new Set());
   /** Quotes with a live completion continuation attached. */
   const watchedQuoteIdsRef = React.useRef<Set<string>>(new Set());
-  /** `mint|amount` of the start request currently being applied. */
+  /** `mint|amount|note` of the start request currently being applied. */
   const startedKeyRef = React.useRef<string | null>(null);
+  /** The note typed for each quote; a resumed quote has only its invoice. */
+  const noteByQuoteIdRef = React.useRef<Map<string, string>>(new Map());
   const startBalanceRef = React.useRef<number | null>(null);
 
   const completeTopup = React.useCallback(
@@ -104,13 +108,14 @@ export const useTopupFlow = ({
         details: {
           ...(gainedToken ? { gainedToken } : {}),
           lightningInvoice: quote.invoice,
-          ...(invoicePreview?.description
-            ? { lightningMemo: invoicePreview.description }
-            : {}),
         },
         direction: "in",
         method: "lightning_invoice",
         mint: quote.mint,
+        note:
+          noteByQuoteIdRef.current.get(quote.quoteId) ??
+          invoicePreview?.description ??
+          null,
         status: "ok",
         transactionId: transactionIdForQuote(
           "topup",
@@ -135,6 +140,7 @@ export const useTopupFlow = ({
       if (active === null || active.quote.quoteId !== quote.quoteId) return;
       setActiveTopup(null);
       setTopupAmount("");
+      setTopupNote("");
       startedKeyRef.current = null;
       startBalanceRef.current = null;
       if (routeKindRef.current !== "topupInvoice") return;
@@ -243,30 +249,40 @@ export const useTopupFlow = ({
       return;
     }
 
+    const note = topupNote.trim() || null;
     if (
       activeTopup !== null &&
       activeTopup.amountSat === amountSat &&
-      activeTopup.mint === mint
+      activeTopup.mint === mint &&
+      activeTopup.note === note
     ) {
       return;
     }
 
     // A failed start keeps its key, so retrying takes a changed amount or a
     // route re-entry — never an effect-rerun loop of fresh quotes.
-    const requestKey = `${mint}|${amountSat}`;
+    const requestKey = `${mint}|${amountSat}|${note ?? ""}`;
     if (startedKeyRef.current === requestKey) return;
     startedKeyRef.current = requestKey;
     setTopupInvoiceError(null);
     setTopupInvoiceIsBusy(true);
 
-    void startCashuTopup({ amountSat, mint }).then(
+    void startCashuTopup({
+      amountSat,
+      mint,
+      ...(note ? { description: note } : {}),
+    }).then(
       (outcome) => {
-        if (Either.isRight(outcome)) watchTopup(outcome.right);
+        if (Either.isRight(outcome)) {
+          if (note)
+            noteByQuoteIdRef.current.set(outcome.right.quote.quoteId, note);
+          watchTopup(outcome.right);
+        }
         // A newer request supersedes this one; the quote stays watched.
         if (startedKeyRef.current !== requestKey) return;
         if (Either.isRight(outcome)) {
           startBalanceRef.current = null;
-          setActiveTopup({ amountSat, mint, quote: outcome.right.quote });
+          setActiveTopup({ amountSat, mint, note, quote: outcome.right.quote });
         } else {
           setTopupInvoiceError(
             `${tRef.current("topupInvoiceFailed")}: ${describeTopupError(outcome.left)}`,
@@ -288,6 +304,7 @@ export const useTopupFlow = ({
     startCashuTopup,
     tRef,
     topupAmount,
+    topupNote,
     watchTopup,
   ]);
 
@@ -302,6 +319,7 @@ export const useTopupFlow = ({
     const cashuRequest = topupRecipientNprofile
       ? buildCashuPaymentRequestMessage({
           amount: activeTopup.amountSat,
+          description: activeTopup.note,
           mintUrls: [activeTopup.mint],
           recipientNprofile: topupRecipientNprofile,
           requestId: activeTopup.quote.quoteId,
@@ -323,6 +341,7 @@ export const useTopupFlow = ({
     setTopupInvoiceIsBusy(false);
     if (routeKind !== "topup" && activeTopupRef.current === null) {
       setTopupAmount("");
+      setTopupNote("");
     }
   }, [activeTopupRef, routeKind]);
 
@@ -366,8 +385,10 @@ export const useTopupFlow = ({
 
   return {
     setTopupAmount,
+    setTopupNote,
     startBackgroundTopup,
     topupAmount,
+    topupNote,
     topupInvoice: activeTopup?.quote.invoice ?? null,
     topupInvoiceCashuRequest,
     topupInvoiceError,

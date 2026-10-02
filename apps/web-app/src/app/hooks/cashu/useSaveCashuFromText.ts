@@ -17,6 +17,7 @@ import {
 import { isUnknownContactId } from "../messages/contactIdentity";
 import type { ReceiveCashuToken } from "../composition/useLinkshuComposition";
 import { touchReceivingMint } from "../../lib/receivingMint";
+import { readCashuTokenMemo } from "../../lib/tokenMessageInfo";
 import { isHiddenTestMint } from "../../../utils/mint";
 import type { Translate } from "../../../i18n";
 
@@ -227,6 +228,7 @@ export const useSaveCashuFromText = ({
             },
             fee: null,
             mint: receipt.mint,
+            note: readCashuTokenMemo(receipt.tokenText),
             unit: receipt.unit,
             error: null,
             method: "cashu_receive",

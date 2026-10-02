@@ -4,7 +4,10 @@ import {
   serializePrivateImageMessage,
   type PrivateImageMessagePayload,
 } from "./privateImageMessage";
-import { getCashuTokenMessageInfo } from "./tokenMessageInfo";
+import {
+  getCashuTokenMessageInfo,
+  readCashuTokenMemo,
+} from "./tokenMessageInfo";
 
 describe("getCashuTokenMessageInfo", () => {
   it("renders cashu.me legacy proof bundles as claimable tokens", () => {
@@ -76,6 +79,15 @@ describe("getCashuTokenMessageInfo", () => {
       false,
     );
     expect(getCashuTokenMessageInfo(token, new Set())?.isValid).toBe(true);
+  });
+
+  it("exposes the token memo and reads it for the transaction note", () => {
+    const token = buildCashuToken({ memo: " coffee " });
+
+    expect(getCashuTokenMessageInfo(token)?.memo).toBe("coffee");
+    expect(readCashuTokenMemo(token)).toBe("coffee");
+    expect(getCashuTokenMessageInfo(buildCashuToken())?.memo).toBeNull();
+    expect(readCashuTokenMemo(buildCashuToken())).toBeNull();
   });
 
   it("flags a test-mint token only while test mints are off", () => {

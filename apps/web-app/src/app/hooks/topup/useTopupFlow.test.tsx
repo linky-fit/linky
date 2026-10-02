@@ -203,6 +203,36 @@ describe("useTopupFlow", () => {
     await harness.unmount();
   });
 
+  it("asks the mint for the note as invoice description and records it", async () => {
+    const quote = topupQuote();
+    const deferred = deferredHandle(quote);
+    const start = vi.fn<StartCashuTopup>(async () =>
+      Either.right(deferred.handle),
+    );
+    const harness = await setup({ startCashuTopup: start });
+
+    await act(async () => {
+      harness.flow().setTopupNote(" rent ");
+      harness.flow().setTopupAmount("21");
+    });
+
+    await waitFor(() => {
+      expect(start).toHaveBeenCalledWith({
+        amountSat: 21,
+        description: "rent",
+        mint: MINT_URL,
+      });
+    });
+
+    await deferred.settle(Either.right(topupReceipt(quote)));
+
+    expect(harness.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ note: "rent", status: "ok" }),
+    );
+    expect(harness.flow().topupNote).toBe("");
+    await harness.unmount();
+  });
+
   it("does not start twice for one amount and mint", async () => {
     const deferred = deferredHandle(topupQuote());
     const start = vi.fn<StartCashuTopup>(async () =>

@@ -914,6 +914,8 @@ export const cs = {
   requestPaymentSend: "Požádat",
   requestPaymentHint: "Požádejte tento kontakt o zaplacení částky níže.",
   requestPaymentLabel: "Žádost o platbu",
+  paymentNoteLabel: "Popisek",
+  paymentNotePlaceholder: "Přidat popisek",
   paymentRequestPreviewIncoming: "Žádost o {amount}",
   paymentRequestPreviewOutgoing: "Žádáte o {amount}",
   paymentRequestDeclinedPreviewIncoming: "Žádost o platbu odmítnuta",

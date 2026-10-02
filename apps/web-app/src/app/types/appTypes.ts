@@ -56,6 +56,7 @@ interface PaymentEventFields {
   fee?: number | null;
   method?: PaymentTelemetryMethod | null;
   mint?: string | null;
+  /** The payment's note: bolt11 description, token memo, LNURL comment or request description. */
   note?: string | null;
   phase?: PaymentTelemetryPhase | null;
   unit?: string | null;

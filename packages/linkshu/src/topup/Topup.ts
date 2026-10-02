@@ -277,8 +277,15 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
       Effect.gen(function* () {
         const wallet = yield* instances.get(draft.mint, sat);
         const keysetId = yield* boundKeysetId(draft.mint, wallet);
+        // cashu-ts rejects a description the mint does not advertise
+        // (NUT-04); the quote is still worth creating without it.
+        const description =
+          draft.description !== undefined &&
+          wallet.getMintInfo().supportsNut04Description("bolt11", sat)
+            ? draft.description
+            : undefined;
         const raw = yield* Effect.tryPromise({
-          try: () => wallet.createMintQuoteBolt11(draft.amount),
+          try: () => wallet.createMintQuoteBolt11(draft.amount, description),
           catch: (error) => classifyMintError(draft.mint, error),
         });
         const quote = yield* decodeMintQuote(draft.mint, raw);

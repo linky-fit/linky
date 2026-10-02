@@ -152,6 +152,7 @@ export const useLightningPaymentsDomain = ({
       method: PaymentTelemetryMethod,
       details: Record<string, JsonValue>,
       contactId: string | null,
+      note: string | null,
     ) => {
       logPaymentEvent({
         direction: "out",
@@ -161,6 +162,7 @@ export const useLightningPaymentsDomain = ({
         details: { ...details, meltQuoteId: pending.quoteId },
         fee: null,
         mint: pending.mint,
+        note,
         unit: "sat",
         error: null,
         contactId,
@@ -205,12 +207,8 @@ export const useLightningPaymentsDomain = ({
         }
 
         showPaymentSending({ direction: "out", amountSat: invoiceAmountSat });
-        const invoiceDetails = {
-          lightningInvoice: normalized,
-          ...(invoicePreview?.description
-            ? { lightningMemo: invoicePreview.description }
-            : {}),
-        };
+        const invoiceDetails = { lightningInvoice: normalized };
+        const note = invoicePreview?.description ?? null;
         const outcome = await meltOnMint(meltCashuInvoice, normalized, mint);
 
         if (Either.isLeft(outcome)) {
@@ -220,6 +218,7 @@ export const useLightningPaymentsDomain = ({
               "lightning_invoice",
               invoiceDetails,
               null,
+              note,
             );
             return true;
           }
@@ -253,6 +252,7 @@ export const useLightningPaymentsDomain = ({
           details: invoiceDetails,
           fee: receipt.feePaid,
           mint: receipt.mint,
+          note,
           unit: "sat",
           error: null,
           contactId: null,
@@ -298,8 +298,11 @@ export const useLightningPaymentsDomain = ({
   );
 
   const payLightningAddressWithCashu = React.useCallback(
-    async (lnAddress: string, amountSat: number) => {
+    async (lnAddress: string, amountSat: number, comment?: string | null) => {
       const paymentTarget = lnAddress.trim();
+      // The LUD-12 comment is the note; an invoice description stands in
+      // when there is none.
+      const commentNote = (comment ?? "").trim() || null;
       if (!paymentTarget) return false;
       if (!Number.isFinite(amountSat) || amountSat <= 0) {
         setStatus(`${t("errorPrefix")}: ${t("payInvalidAmount")}`);
@@ -347,7 +350,6 @@ export const useLightningPaymentsDomain = ({
         let finalErrorMessage: string | null = null;
         let finalErrorMint: string | null = null;
         let lastAttemptInvoice: string | null = null;
-        let lastAttemptInvoicePreview: LightningInvoicePreview | null = null;
 
         for (
           let attemptIndex = 0;
@@ -375,6 +377,7 @@ export const useLightningPaymentsDomain = ({
             const invoiceResult = await fetchLnurlInvoiceForTarget(
               paymentTarget,
               attemptedAmountSat,
+              commentNote ?? undefined,
             );
             if (invoiceResult.lightningAddress) {
               resolvedLightningAddress = invoiceResult.lightningAddress;
@@ -383,7 +386,6 @@ export const useLightningPaymentsDomain = ({
             attemptSuccessAction = invoiceResult.successAction;
             attemptInvoicePreview = getLightningInvoicePreview(attemptInvoice);
             lastAttemptInvoice = attemptInvoice;
-            lastAttemptInvoicePreview = attemptInvoicePreview;
           } catch (error) {
             const errorMessage = getUnknownErrorMessage(error, "unknown");
             if (canRetryLower(errorMessage)) continue;
@@ -410,11 +412,9 @@ export const useLightningPaymentsDomain = ({
                 {
                   lightningAddress: paidLightningAddress,
                   lightningInvoice: attemptInvoice,
-                  ...(attemptInvoicePreview?.description
-                    ? { lightningMemo: attemptInvoicePreview.description }
-                    : {}),
                 },
                 knownContact?.id ?? null,
+                commentNote ?? attemptInvoicePreview?.description ?? null,
               );
               return true;
             }
@@ -450,9 +450,6 @@ export const useLightningPaymentsDomain = ({
             details: {
               lightningAddress: paidLightningAddress,
               lightningInvoice: attemptInvoice,
-              ...(attemptInvoicePreview?.description
-                ? { lightningMemo: attemptInvoicePreview.description }
-                : {}),
               ...(successActionMessage
                 ? { lnurlSuccessMessage: successActionMessage }
                 : {}),
@@ -465,6 +462,7 @@ export const useLightningPaymentsDomain = ({
             },
             fee: receipt.feePaid,
             mint: receipt.mint,
+            note: commentNote ?? attemptInvoicePreview?.description ?? null,
             unit: "sat",
             error: null,
             contactId: knownContact?.id ?? null,
@@ -526,9 +524,6 @@ export const useLightningPaymentsDomain = ({
             lightningAddress: resolvedLightningAddress,
             ...(lastAttemptInvoice
               ? { lightningInvoice: lastAttemptInvoice }
-              : {}),
-            ...(lastAttemptInvoicePreview?.description
-              ? { lightningMemo: lastAttemptInvoicePreview.description }
               : {}),
           },
           fee: null,

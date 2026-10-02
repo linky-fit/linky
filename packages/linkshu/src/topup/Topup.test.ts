@@ -322,6 +322,62 @@ describe("Topup", () => {
     );
   });
 
+  it.each([
+    { advertised: true, sent: "coffee" },
+    { advertised: false, sent: undefined },
+  ])(
+    "passes the description to the quote only when the mint advertises it (advertised: $advertised)",
+    async ({ advertised, sent }) => {
+      const storage = freshStorage();
+      const quoteArgs: Array<[unknown, string | undefined]> = [];
+      const { wallet } = makeWallet({ states: [quoteResponse("PAID")] });
+      const described: LoadedWallet = {
+        ...wallet,
+        getMintInfo: () =>
+          new CashuMintInfo({
+            ...websocketMintInfo([]),
+            nuts: {
+              "4": {
+                methods: [
+                  {
+                    method: "bolt11",
+                    unit: "sat",
+                    min_amount: null,
+                    max_amount: null,
+                    ...(advertised ? { description: true } : {}),
+                  },
+                ],
+                disabled: false,
+              },
+              "5": { methods: [], disabled: false },
+            },
+          }),
+        createMintQuoteBolt11: (amount, description) => {
+          quoteArgs.push([amount, description]);
+          return Promise.resolve(quoteResponse("UNPAID"));
+        },
+      };
+      const { run } = makeHarness(described, storage);
+
+      const exit = await run(
+        Effect.gen(function* () {
+          const topup = yield* Topup;
+          const handle = yield* topup.start(
+            new TopupDraft({
+              mint,
+              amount: Amount.make(16),
+              description: "coffee",
+            }),
+          );
+          return yield* handle.result;
+        }),
+      );
+
+      assert(Exit.isSuccess(exit));
+      expect(quoteArgs).toEqual([[16, sent]]);
+    },
+  );
+
   it("resumes an interrupted topup on a fresh runtime over the same storage", async () => {
     const storage = freshStorage();
 

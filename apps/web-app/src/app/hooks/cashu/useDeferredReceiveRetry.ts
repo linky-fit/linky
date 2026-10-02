@@ -10,6 +10,7 @@ import { getUnknownErrorMessage } from "../../../utils/unknown";
 import type { PaidOverlayDetails } from "../../lib/paidOverlay";
 import { touchReceivingMint } from "../../lib/receivingMint";
 import type { ReceivingMintBookkeeping } from "../../lib/receivingMint";
+import { readCashuTokenMemo } from "../../lib/tokenMessageInfo";
 import type { LoggedPaymentEventParams } from "../../types/appTypes";
 import type { ResumeDeferredCashuReceives } from "../composition/useLinkshuComposition";
 import { useResumeOnLaunchAndOnline } from "../useResumeOnLaunchAndOnline";
@@ -78,6 +79,7 @@ export const useDeferredReceiveRetry = ({
           details: { acceptedToken: receipt.tokenText },
           fee: null,
           mint: receipt.mint,
+          note: readCashuTokenMemo(receipt.tokenText),
           unit: receipt.unit,
           error: null,
           method: "cashu_receive",

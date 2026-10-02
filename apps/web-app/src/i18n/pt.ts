@@ -920,6 +920,8 @@ export const pt = {
   requestPaymentSend: "Pedir",
   requestPaymentHint: "Peça a este contato que pague o valor abaixo.",
   requestPaymentLabel: "Pedido de pagamento",
+  paymentNoteLabel: "Nota",
+  paymentNotePlaceholder: "Adicionar uma nota",
   paymentRequestPreviewIncoming: "Pedindo {amount}",
   paymentRequestPreviewOutgoing: "Você está pedindo {amount}",
   paymentRequestDeclinedPreviewIncoming: "Pedido de pagamento recusado",

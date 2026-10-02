@@ -904,6 +904,8 @@ export const en = {
   requestPaymentSend: "Request",
   requestPaymentHint: "Ask this contact to pay the amount below.",
   requestPaymentLabel: "Payment request",
+  paymentNoteLabel: "Note",
+  paymentNotePlaceholder: "Add a note",
   paymentRequestPreviewIncoming: "Requesting {amount}",
   paymentRequestPreviewOutgoing: "You are requesting {amount}",
   paymentRequestDeclinedPreviewIncoming: "Payment request declined",

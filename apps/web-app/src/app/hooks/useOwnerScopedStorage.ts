@@ -196,6 +196,7 @@ export const buildTransactionInsertPayload = (args: {
   const mint = (args.event.mint ?? "").trim();
   const unit = (args.event.unit ?? "").trim();
   const error = (args.event.error ?? "").trim();
+  const note = (args.event.note ?? "").trim();
   const status = normalizePaymentTelemetryStatus({
     error: args.event.error,
     status:
@@ -237,6 +238,7 @@ export const buildTransactionInsertPayload = (args: {
     mint: columnOrOmit(NonEmptyString1000, mint),
     unit: columnOrOmit(NonEmptyString100, unit),
     error: columnOrOmit(NonEmptyString1000, error.slice(0, 1000)),
+    note: columnOrOmit(NonEmptyString1000, note.slice(0, 1000)),
     contactId: storedContactId,
     detailsJson: columnOrOmit(NonEmptyString, detailsJson ?? ""),
     method: columnOrOmit(NonEmptyString100, storedMethod),
@@ -246,6 +248,7 @@ export const buildTransactionInsertPayload = (args: {
   if (optional.mint !== undefined) payload.mint = optional.mint;
   if (optional.unit !== undefined) payload.unit = optional.unit;
   if (optional.error !== undefined) payload.error = optional.error;
+  if (optional.note !== undefined) payload.note = optional.note;
   if (optional.contactId !== undefined) payload.contactId = optional.contactId;
   if (optional.detailsJson !== undefined)
     payload.detailsJson = optional.detailsJson;

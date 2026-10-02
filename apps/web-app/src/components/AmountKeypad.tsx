@@ -1,4 +1,5 @@
 import { Card, Keypad } from "@linky-fit/ui";
+import type { ReactNode } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { DisplayAmount } from "./DisplayAmount";
 import type { AmountInput } from "./useAmountInputKeypad";
@@ -8,10 +9,17 @@ interface AmountKeypadProps {
   amount: string;
   input: AmountInput;
   disabled?: boolean | undefined;
+  /** Sits between the amount and the keys, e.g. the payment note. */
+  below?: ReactNode;
 }
 
 /** The typed amount above the keypad that edits it. */
-export function AmountKeypad({ amount, input, disabled }: AmountKeypadProps) {
+export function AmountKeypad({
+  amount,
+  input,
+  disabled,
+  below,
+}: AmountKeypadProps) {
   const { displayUnit, t } = useAppShellCore();
   const amountSat = Number.parseInt(amount.trim(), 10);
   return (
@@ -23,6 +31,7 @@ export function AmountKeypad({ amount, input, disabled }: AmountKeypadProps) {
           size="lg"
         />
       </Card>
+      {below}
       <Keypad
         accessibilityLabel={`${t("payAmount")} (${displayUnit})`}
         decimal={input.decimalKeyEnabled}

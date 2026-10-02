@@ -9,11 +9,20 @@ export interface CashuTokenMessageInfo {
   /** A test-mint token while test mints are off: shown, never accepted. */
   isHiddenTestMint: boolean;
   isValid: boolean;
+  /** The sender's note carried in the token (NUT-00 memo). */
+  memo: string | null;
   mintDisplay: string | null;
   mintUrl: string | null;
   tokenRaw: string;
   unit: string | null;
 }
+
+const getCashuTokenMemo = (memo: string | null | undefined): string | null =>
+  (memo ?? "").trim() || null;
+
+/** The note a received or sent token carries, for the transaction history. */
+export const readCashuTokenMemo = (tokenText: string): string | null =>
+  getCashuTokenMemo(parseTokenText(tokenText)?.memo);
 
 export const getMintDisplay = (
   mintValue: string | null | undefined,
@@ -44,6 +53,7 @@ export const getCashuTokenMessageInfo = (
 
   return {
     tokenRaw,
+    memo: getCashuTokenMemo(parsed.memo),
     mintDisplay: getMintDisplay(parsed.mint),
     mintUrl: parsed.mint,
     amount: parsed.amount,
