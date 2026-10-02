@@ -70,6 +70,9 @@ export const isNativePlatform = (): boolean => {
   return getPlatformTarget() !== "web";
 };
 
+export const isDesktopShell = (): boolean =>
+  typeof window !== "undefined" && window.linkyDesktop !== undefined;
+
 const getNativePlatform = (): TelemetryEnvironmentFacts["nativePlatform"] => {
   const target = getPlatformTarget();
   return target === "web" ? null : target;

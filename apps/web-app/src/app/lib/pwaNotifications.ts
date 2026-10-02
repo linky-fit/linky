@@ -36,6 +36,12 @@ export const showPwaNotification = async ({
     ? { body: safeBody, tag: tag }
     : { body: safeBody };
 
+  // Electron never displays service worker notifications.
+  if (window.linkyDesktop) {
+    window.linkyDesktop.notify(safeTitle, safeBody);
+    return;
+  }
+
   try {
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.ready.catch(() => null);

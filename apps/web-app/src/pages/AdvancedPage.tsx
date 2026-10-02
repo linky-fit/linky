@@ -43,6 +43,7 @@ import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSe
 import { SettingsLinkRow, SettingsToggleRow } from "../components/SettingsRows";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
+import { isDesktopShell } from "../platform/runtime";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 
 export function AdvancedPage(): React.ReactElement {
@@ -180,13 +181,16 @@ export function AdvancedPage(): React.ReactElement {
           label={t("feedback")}
         />
 
-        <SettingsToggleRow
-          icon={<Bell size={18} />}
-          label={t("notifications")}
-          checked={notifications.enabled}
-          disabled={!currentNsec || notifications.isBusy}
-          onChange={(checked) => void notifications.setEnabled(checked)}
-        />
+        {/* Electron has no Web Push service; the running desktop app notifies. */}
+        {isDesktopShell() ? null : (
+          <SettingsToggleRow
+            icon={<Bell size={18} />}
+            label={t("notifications")}
+            checked={notifications.enabled}
+            disabled={!currentNsec || notifications.isBusy}
+            onChange={(checked) => void notifications.setEnabled(checked)}
+          />
+        )}
 
         <SettingsToggleRow
           icon={<CheckCheck size={18} />}

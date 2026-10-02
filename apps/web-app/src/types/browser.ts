@@ -46,9 +46,15 @@ interface BarcodeDetectorConstructorLike {
   new (options: { formats: string[] }): BarcodeDetectorLike;
 }
 
+/** Exposed by the `apps/desktop` preload. */
+interface LinkyDesktopBridge {
+  notify(title: string, body: string): void;
+}
+
 declare global {
   interface Window {
     BarcodeDetector?: BarcodeDetectorConstructorLike;
+    linkyDesktop?: LinkyDesktopBridge;
   }
 }
 
