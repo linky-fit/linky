@@ -9,7 +9,7 @@ import type {
   StoredProof,
 } from "@linky-fit/linkshu";
 import React from "react";
-import type { EvoluErrorType, EvoluServerStatus } from "../../evolu";
+import type { EvoluErrorType, EvoluRelayStatus } from "../../evolu";
 import type { ShardSummary } from "../hooks/useLinksync";
 import type { PasswordManagerSaveResult } from "../../platform/passwordManager";
 import type { ProbeLightningFee } from "../hooks/composition/useLinkshuComposition";
@@ -23,9 +23,9 @@ export interface AdvancedSettingsContextValue {
   dedupeContacts: () => Promise<void>;
   dedupeContactsIsBusy: boolean;
   defaultMintDisplay: string | null;
-  evoluConnectedServerCount: number;
-  evoluOverallStatus: EvoluServerStatus;
-  evoluServerUrls: string[];
+  evoluConnectedRelayCount: number;
+  evoluOverallStatus: EvoluRelayStatus;
+  evoluRelayUrls: string[];
   exportAppData: () => void;
   handleImportAppDataFilePicked: (file: File | null) => Promise<void>;
   importDataFileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -51,26 +51,26 @@ export interface EvoluSettingsContextValue {
   evoluHasError: boolean;
   evoluErrorType: EvoluErrorType | null;
   evoluHistoryCount: number | null;
-  evoluServerStatusByUrl: Record<string, EvoluServerStatus>;
-  evoluServerUrls: string[];
-  evoluServersReloadRequired: boolean;
+  evoluRelayStatusByUrl: Record<string, EvoluRelayStatus>;
+  evoluRelayUrls: string[];
+  evoluRelaysReloadRequired: boolean;
   /** Every scope's active shard and visible shard set. */
   evoluShards: ReadonlyArray<ShardSummary>;
   /** The owner ids the store syncs: the app owner and every visible shard. */
   evoluSyncOwnerIds: ReadonlyArray<string>;
   evoluTableCounts: Record<string, number | null>;
   evoluWipeStorageIsBusy: boolean;
-  isEvoluServerOffline: (url: string) => boolean;
-  isEvoluServerRecommended: (url: string) => boolean;
-  newEvoluServerUrl: string;
-  pendingEvoluServerDeleteUrl: string | null;
+  isEvoluRelayOffline: (url: string) => boolean;
+  isEvoluRelayRecommended: (url: string) => boolean;
+  newEvoluRelayUrl: string;
+  pendingEvoluRelayDeleteUrl: string | null;
   requestClearDatabase: () => void;
   requestRotateShard: (scope: LinkyScope) => Promise<void>;
   rotatingShardScope: LinkyScope | null;
-  saveEvoluServerUrls: (urls: string[]) => void;
-  setEvoluServerOffline: (url: string, offline: boolean) => void;
-  setNewEvoluServerUrl: (url: string) => void;
-  setPendingEvoluServerDeleteUrl: (url: string | null) => void;
+  saveEvoluRelayUrls: (urls: string[]) => void;
+  setEvoluRelayOffline: (url: string, offline: boolean) => void;
+  setNewEvoluRelayUrl: (url: string) => void;
+  setPendingEvoluRelayDeleteUrl: (url: string | null) => void;
   setStatus: (message: string) => void;
   syncOwnerId: string | null;
   wipeEvoluStorage: () => Promise<void>;

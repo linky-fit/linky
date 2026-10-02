@@ -2,26 +2,26 @@ import { MessageCircle } from "lucide-react";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
-import { deriveEvoluServerState } from "../app/lib/evoluServerState";
+import { deriveEvoluRelayState } from "../app/lib/evoluRelayState";
 import { SettingsLinkRow } from "../components/SettingsRows";
 import { navigateTo } from "../hooks/useRouting";
 import { EvoluReloadNotice } from "./EvoluReloadNotice";
 import { EvoluSyncErrorNotice } from "./EvoluSyncErrorNotice";
 
-export function EvoluServersPage(): React.ReactElement {
+export function EvoluRelaysPage(): React.ReactElement {
   const {
     clearDatabaseArmed,
     evoluHasError,
     evoluErrorType,
     evoluHistoryCount,
-    evoluServerStatusByUrl,
-    evoluServerUrls,
+    evoluRelayStatusByUrl,
+    evoluRelayUrls,
     evoluShards,
     evoluSyncOwnerIds,
     evoluTableCounts,
     evoluWipeStorageIsBusy,
-    isEvoluServerOffline,
-    isEvoluServerRecommended,
+    isEvoluRelayOffline,
+    isEvoluRelayRecommended,
     requestClearDatabase,
     syncOwnerId,
   } = useEvoluSettingsContext();
@@ -37,21 +37,21 @@ export function EvoluServersPage(): React.ReactElement {
     <section className="panel">
       <EvoluSyncErrorNotice />
       <EvoluReloadNotice />
-      {evoluServerUrls.every(isEvoluServerOffline) && (
+      {evoluRelayUrls.every(isEvoluRelayOffline) && (
         <p className="muted" role="status">
           {t("evoluNoBackupWarning")}
         </p>
       )}
-      {/* Server list */}
-      {evoluServerUrls.length === 0 ? (
-        <p className="muted evolu-server-empty">{t("evoluServersEmpty")}</p>
+      {/* Relay list */}
+      {evoluRelayUrls.length === 0 ? (
+        <p className="muted evolu-relay-empty">{t("evoluRelaysEmpty")}</p>
       ) : (
-        <div className="evolu-server-list">
-          {evoluServerUrls.map((url) => {
-            const { state, labelKey } = deriveEvoluServerState({
+        <div className="evolu-relay-list">
+          {evoluRelayUrls.map((url) => {
+            const { state, labelKey } = deriveEvoluRelayState({
               evoluHasError,
-              isOffline: isEvoluServerOffline(url),
-              state: evoluServerStatusByUrl[url],
+              isOffline: isEvoluRelayOffline(url),
+              state: evoluRelayStatusByUrl[url],
               syncOwnerId,
             });
 
@@ -60,12 +60,12 @@ export function EvoluServersPage(): React.ReactElement {
                 type="button"
                 className="settings-row settings-link"
                 key={url}
-                onClick={() => navigateTo({ route: "evoluServer", id: url })}
+                onClick={() => navigateTo({ route: "evoluRelay", id: url })}
               >
                 <div className="settings-left">
                   <span className="relay-cell">
                     <span className="relay-url">{url}</span>
-                    {isEvoluServerRecommended(url) ? (
+                    {isEvoluRelayRecommended(url) ? (
                       <span className="relay-detail">
                         {t("relayRecommended")}
                       </span>
@@ -84,7 +84,7 @@ export function EvoluServersPage(): React.ReactElement {
                     aria-label={state}
                     title={state}
                   />
-                  <span className="muted evolu-server-status-label">
+                  <span className="muted evolu-relay-status-label">
                     {t(labelKey)}
                   </span>
                   <span className="settings-chevron" aria-hidden="true">

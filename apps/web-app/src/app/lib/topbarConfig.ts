@@ -61,7 +61,7 @@ export const resolveBackAction = (
     case "advancedInspector":
     case "mints":
     case "nostrRelays":
-    case "evoluServers":
+    case "evoluRelays":
       return () => navigateTo({ route: "settings" });
 
     case "bankPaymentNew":
@@ -121,12 +121,12 @@ export const resolveBackAction = (
     case "nostrRelayNew":
       return () => navigateTo({ route: "nostrRelays" });
 
-    case "evoluServer":
-    case "evoluServerNew":
+    case "evoluRelay":
+    case "evoluRelayNew":
     case "chatStorage":
     case "evoluCurrentData":
     case "evoluHistoryData":
-      return () => navigateTo({ route: "evoluServers" });
+      return () => navigateTo({ route: "evoluRelays" });
 
     case "contactNew":
     case "contact":
@@ -194,7 +194,7 @@ export const buildTopbar = ({
 const SHOWS_MENU_BUTTON: Record<
   Exclude<
     Route["kind"],
-    "chat" | "contact" | "contactNew" | "evoluServers" | "nostrRelays" | "topup"
+    "chat" | "contact" | "contactNew" | "evoluRelays" | "nostrRelays" | "topup"
   >,
   boolean
 > = {
@@ -218,8 +218,8 @@ const SHOWS_MENU_BUTTON: Record<
   evoluCurrentData: false,
   evoluData: false,
   evoluHistoryData: false,
-  evoluServer: true,
-  evoluServerNew: true,
+  evoluRelay: true,
+  evoluRelayNew: true,
   lnAddressPay: true,
   manualPay: false,
   mint: true,
@@ -284,11 +284,11 @@ export const buildTopbarRight = ({
     };
   }
 
-  if (route.kind === "evoluServers") {
+  if (route.kind === "evoluRelays") {
     return {
       icon: "+",
-      label: t("evoluAddServerLabel"),
-      onClick: () => navigateTo({ route: "evoluServerNew" }),
+      label: t("evoluAddRelayLabel"),
+      onClick: () => navigateTo({ route: "evoluRelayNew" }),
     };
   }
 
@@ -379,9 +379,9 @@ const TOPBAR_TITLE_KEY: Record<
   evoluCurrentData: "evoluData",
   evoluData: "evoluData",
   evoluHistoryData: "evoluHistory",
-  evoluServer: "evoluServer",
-  evoluServerNew: "evoluAddServerLabel",
-  evoluServers: "evoluServer",
+  evoluRelay: "evoluRelay",
+  evoluRelayNew: "evoluAddRelayLabel",
+  evoluRelays: "evoluRelay",
   lnAddressPay: "pay",
   manualPay: "manualPayTitle",
   mint: "mints",

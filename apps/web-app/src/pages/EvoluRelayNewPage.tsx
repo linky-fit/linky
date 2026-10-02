@@ -4,15 +4,15 @@ import {
   useAdvancedSettingsContext,
   useEvoluSettingsContext,
 } from "../app/context/SystemSettingsContexts";
-import { normalizeEvoluServerUrl } from "../evolu";
+import { normalizeEvoluRelayUrl } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 
-export function EvoluServerNewPage(): React.ReactElement {
+export function EvoluRelayNewPage(): React.ReactElement {
   const {
-    evoluServerUrls,
-    newEvoluServerUrl,
-    saveEvoluServerUrls,
-    setNewEvoluServerUrl,
+    evoluRelayUrls,
+    newEvoluRelayUrl,
+    saveEvoluRelayUrls,
+    setNewEvoluRelayUrl,
     setStatus,
   } = useEvoluSettingsContext();
   const { t } = useAppShellCore();
@@ -20,11 +20,11 @@ export function EvoluServerNewPage(): React.ReactElement {
 
   return (
     <section className="panel">
-      <label htmlFor="evoluServerUrl">{t("evoluAddServerLabel")}</label>
+      <label htmlFor="evoluRelayUrl">{t("evoluAddRelayLabel")}</label>
       <input
-        id="evoluServerUrl"
-        value={newEvoluServerUrl}
-        onChange={(e) => setNewEvoluServerUrl(e.target.value)}
+        id="evoluRelayUrl"
+        value={newEvoluRelayUrl}
+        onChange={(e) => setNewEvoluRelayUrl(e.target.value)}
         placeholder="wss://..."
         autoCapitalize="none"
         autoCorrect="off"
@@ -35,29 +35,29 @@ export function EvoluServerNewPage(): React.ReactElement {
         <button
           type="button"
           onClick={() => {
-            const normalized = normalizeEvoluServerUrl(newEvoluServerUrl);
+            const normalized = normalizeEvoluRelayUrl(newEvoluRelayUrl);
             if (!normalized) {
-              pushToast(t("evoluAddServerInvalid"));
+              pushToast(t("evoluAddRelayInvalid"));
               return;
             }
             if (
-              evoluServerUrls.some(
+              evoluRelayUrls.some(
                 (u) => u.toLowerCase() === normalized.toLowerCase(),
               )
             ) {
-              pushToast(t("evoluAddServerAlready"));
-              navigateTo({ route: "evoluServers" });
+              pushToast(t("evoluAddRelayAlready"));
+              navigateTo({ route: "evoluRelays" });
               return;
             }
 
-            saveEvoluServerUrls([...evoluServerUrls, normalized]);
-            setNewEvoluServerUrl("");
-            setStatus(t("evoluAddServerSaved"));
-            navigateTo({ route: "evoluServers" });
+            saveEvoluRelayUrls([...evoluRelayUrls, normalized]);
+            setNewEvoluRelayUrl("");
+            setStatus(t("evoluAddRelaySaved"));
+            navigateTo({ route: "evoluRelays" });
           }}
-          disabled={!normalizeEvoluServerUrl(newEvoluServerUrl)}
+          disabled={!normalizeEvoluRelayUrl(newEvoluRelayUrl)}
         >
-          {t("evoluAddServerButton")}
+          {t("evoluAddRelayButton")}
         </button>
       </div>
     </section>

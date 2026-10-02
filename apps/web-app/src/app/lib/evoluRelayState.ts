@@ -1,24 +1,24 @@
-type EvoluServerConnectionState = "connected" | "checking" | "disconnected";
+type EvoluRelayConnectionState = "connected" | "checking" | "disconnected";
 
-interface DeriveEvoluServerStateOptions {
+interface DeriveEvoluRelayStateOptions {
   evoluHasError: boolean;
   isOffline: boolean;
-  state: EvoluServerConnectionState | undefined;
+  state: EvoluRelayConnectionState | undefined;
   /** The app owner the store syncs; null before the session has one. */
   syncOwnerId: string | null;
 }
 
-export function deriveEvoluServerState({
+export function deriveEvoluRelayState({
   evoluHasError,
   isOffline,
   state,
   syncOwnerId,
-}: DeriveEvoluServerStateOptions): {
-  state: EvoluServerConnectionState;
+}: DeriveEvoluRelayStateOptions): {
+  state: EvoluRelayConnectionState;
   isSynced: boolean;
   labelKey:
     | "evoluNotSynced"
-    | "evoluServerOfflineStatus"
+    | "evoluRelayOfflineStatus"
     | "evoluSyncing"
     | "evoluSyncOk";
 } {
@@ -29,7 +29,7 @@ export function deriveEvoluServerState({
     !isOffline &&
     resolvedState === "connected";
   const labelKey = isOffline
-    ? "evoluServerOfflineStatus"
+    ? "evoluRelayOfflineStatus"
     : isSynced
       ? "evoluSyncOk"
       : resolvedState === "checking"

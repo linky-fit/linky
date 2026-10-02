@@ -7795,13 +7795,13 @@ button.cashu-token-pill {
 .settings-error-note {
   margin-top: 10px;
 }
-.evolu-server-empty {
+.evolu-relay-empty {
   margin-top: 0;
 }
-.evolu-server-list {
+.evolu-relay-list {
   margin-bottom: 24px;
 }
-.evolu-server-status-label {
+.evolu-relay-status-label {
   margin-left: 10px;
 }
 .settings-row-layout {

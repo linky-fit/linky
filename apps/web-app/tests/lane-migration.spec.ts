@@ -668,7 +668,7 @@ test("a restored device leaves the pointers of an account that rotated past shar
         .shardRows(page, "meta", "shardPointer")
         .then((rows) => rows.find((row) => row.scope === "contacts")?.index);
 
-    // The restored device migrates while its Evolu server is still unreachable, as on a slow relay.
+    // The restored device migrates while its Evolu relay is still unreachable, as when the relay is slow.
     const restored = await openDevice(browser, baseURL, "restored", (page) =>
       login(page).then(() =>
         page.addInitScript(() => {

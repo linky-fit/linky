@@ -49,7 +49,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "evolu.laneMigrationFailed":
     "The lane migration threw before it could finish; the done flag stays unset and the next launch retries. The app keeps running on the lanes meanwhile.",
   EvoluSyncRetry:
-    "The user reloads the app to retry Evolu sync after a quota or server configuration change. Local history is preserved.",
+    "The user reloads the app to retry Evolu sync after a quota or relay configuration change. Local history is preserved.",
   EvoluError:
     "Evolu reported a database or sync error. The owner link identifies the affected sync account when available; relay reachability alone does not confirm its data synced.",
   WirePublished:
@@ -111,9 +111,9 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "relayList.syncFailed":
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
   "evolu.serversChanged":
-    "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
+    "The user changed the Evolu relay list. The payload records the saved configured and enabled relays, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":
-    "The one-time upgrade enabled the Linky Evolu relay before database startup, preserving the other configured servers and their disabled states.",
+    "The one-time upgrade enabled the Linky Evolu relay before database startup, preserving the other configured relays and their disabled states.",
   "recommendedRelays.fetched":
     "The app fetched linky.fit/recommended-relays (at launch and once a day). Nostr relays apply right away; Evolu relays apply on the next launch. The payload lists the recommendation and the Nostr relays it dropped, which leave the relay lists too.",
   "recommendedRelays.fetchFailed":

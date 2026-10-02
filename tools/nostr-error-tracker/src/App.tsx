@@ -9,7 +9,7 @@ import {
 import {
   createTrackerStore,
   useIssueResolutions,
-  EVOLU_SERVERS,
+  EVOLU_RELAYS,
 } from "./issueStore";
 import type { TrackerStore } from "./issueStore";
 import { reloadPage } from "./navigation";
@@ -713,7 +713,7 @@ function Dashboard({ session, onLogout, store }: StoredDashboardProps) {
               automatically. Refresh to apply.
             </p>
             <p className="small muted">
-              Evolu sync: {EVOLU_SERVERS.join(", ")}. Changes are saved locally
+              Evolu sync: {EVOLU_RELAYS.join(", ")}. Changes are saved locally
               and sync when connected.
             </p>
             {result && (

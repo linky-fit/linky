@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvoluErrorType } from "../evolu";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { EvoluDataDetailPage } from "./EvoluDataDetailPage";
-import { EvoluServersPage } from "./EvoluServersPage";
+import { EvoluRelaysPage } from "./EvoluRelaysPage";
 
 const counts = vi.hoisted(() => {
   const state: {
@@ -10,14 +10,14 @@ const counts = vi.hoisted(() => {
     history: number | null;
     errorType: EvoluErrorType | null;
     reloadRequired: boolean;
-    servers: string[];
+    relays: string[];
     disabled: string[];
   } = {
     tables: {},
     history: null,
     errorType: null,
     reloadRequired: false,
-    servers: [],
+    relays: [],
     disabled: [],
   };
   return state;
@@ -31,13 +31,13 @@ vi.mock("../app/context/SystemSettingsContexts", () => ({
   useEvoluSettingsContext: () => ({
     evoluTableCounts: counts.tables,
     evoluErrorType: counts.errorType,
-    evoluServersReloadRequired: counts.reloadRequired,
+    evoluRelaysReloadRequired: counts.reloadRequired,
     evoluHistoryCount: counts.history,
     evoluDatabaseBytes: 4096,
-    evoluServerUrls: counts.servers,
-    evoluServerStatusByUrl: {},
-    isEvoluServerOffline: (url: string) => counts.disabled.includes(url),
-    isEvoluServerRecommended: () => false,
+    evoluRelayUrls: counts.relays,
+    evoluRelayStatusByUrl: {},
+    isEvoluRelayOffline: (url: string) => counts.disabled.includes(url),
+    isEvoluRelayRecommended: () => false,
     evoluShards: [],
     evoluSyncOwnerIds: [],
   }),
@@ -65,18 +65,18 @@ beforeEach(() => {
   counts.history = null;
   counts.errorType = null;
   counts.reloadRequired = false;
-  counts.servers = [];
+  counts.relays = [];
   counts.disabled = [];
 });
 
 describe("Evolu row counts", () => {
-  it("shows a normal reload on the server list after server settings change", async () => {
+  it("shows a normal reload on the relay list after relay settings change", async () => {
     counts.reloadRequired = true;
-    const view = await renderIntoDocument(<EvoluServersPage />);
-    expect(view.container.textContent).toContain("evoluServersReloadHint");
+    const view = await renderIntoDocument(<EvoluRelaysPage />);
+    expect(view.container.textContent).toContain("evoluRelaysReloadHint");
     expect(
       Array.from(view.container.querySelectorAll("button")).some(
-        (button) => button.textContent === "evoluServersReloadButton",
+        (button) => button.textContent === "evoluRelaysReloadButton",
       ),
     ).toBe(true);
     await view.unmount();
@@ -85,7 +85,7 @@ describe("Evolu row counts", () => {
   it("explains quota failures without claiming the database is empty", async () => {
     counts.errorType = "ProtocolQuotaError";
     counts.tables = { cashuToken: 4 };
-    const view = await renderIntoDocument(<EvoluServersPage />);
+    const view = await renderIntoDocument(<EvoluRelaysPage />);
     expect(view.container.querySelector('[role="alert"]')?.textContent).toBe(
       "evoluQuotaExceeded",
     );
@@ -103,13 +103,13 @@ describe("Evolu row counts", () => {
   });
 
   it("distinguishes pending counts from a confirmed empty database", async () => {
-    const view = await renderIntoDocument(<EvoluServersPage />);
+    const view = await renderIntoDocument(<EvoluRelaysPage />);
     expect(rowValue(view.container, "evoluData")).toContain("unknown");
     expect(rowValue(view.container, "evoluHistory")).toContain("unknown");
 
     counts.tables = { contact: 0, ownerMeta: 0 };
     counts.history = 0;
-    await view.rerender(<EvoluServersPage />);
+    await view.rerender(<EvoluRelaysPage />);
     expect(rowValue(view.container, "evoluData")).toContain("0 rows");
     expect(rowValue(view.container, "evoluHistory")).toContain("0 rows");
     await view.unmount();
@@ -125,10 +125,10 @@ describe("Evolu row counts", () => {
   it("does not present partial counts or their percentages as complete totals", async () => {
     counts.tables = { contact: 7, cashuToken: null, ownerMeta: 2 };
     counts.history = 870;
-    const servers = await renderIntoDocument(<EvoluServersPage />);
-    expect(rowValue(servers.container, "evoluData")).toContain("unknown");
-    expect(rowValue(servers.container, "evoluHistory")).toContain("870 rows");
-    await servers.unmount();
+    const relays = await renderIntoDocument(<EvoluRelaysPage />);
+    expect(rowValue(relays.container, "evoluData")).toContain("unknown");
+    expect(rowValue(relays.container, "evoluHistory")).toContain("870 rows");
+    await relays.unmount();
 
     const detail = await renderIntoDocument(<EvoluDataDetailPage />);
     expect(rowValue(detail.container, "evoluCurrentDataJson")).toBe("unknown");
@@ -141,19 +141,19 @@ describe("Evolu row counts", () => {
 
 describe("Evolu backup warning", () => {
   it.each([
-    { servers: [], disabled: [], warning: true },
+    { relays: [], disabled: [], warning: true },
     {
-      servers: ["wss://sync.example.com"],
+      relays: ["wss://sync.example.com"],
       disabled: ["wss://sync.example.com"],
       warning: true,
     },
-    { servers: ["wss://sync.example.com"], disabled: [], warning: false },
+    { relays: ["wss://sync.example.com"], disabled: [], warning: false },
   ])(
-    "shows warning=$warning for $servers with $disabled disabled",
-    async ({ servers, disabled, warning }) => {
-      counts.servers = servers;
+    "shows warning=$warning for $relays with $disabled disabled",
+    async ({ relays, disabled, warning }) => {
+      counts.relays = relays;
       counts.disabled = disabled;
-      const view = await renderIntoDocument(<EvoluServersPage />);
+      const view = await renderIntoDocument(<EvoluRelaysPage />);
       expect(view.container.textContent?.includes("evoluNoBackupWarning")).toBe(
         warning,
       );

@@ -29,7 +29,7 @@ test("a second device receives a new contact and updates Evolu row counts withou
     await setBaseStorage(page);
     await setSeedLoginStorage(page, identity);
     await stubFiatRates(page);
-    await page.goto("/#evolu-servers");
+    await page.goto("/#evolu-relays");
     await expect(
       page.getByRole("heading", { name: "Row counts" }),
     ).toBeVisible();
@@ -54,7 +54,7 @@ test("a second device receives a new contact and updates Evolu row counts withou
     });
 
     await test.step("diagnostic counts include the synced row without a reload", async () => {
-      await restored.page.goto("/#evolu-servers");
+      await restored.page.goto("/#evolu-relays");
       await expect
         .poll(() => readCurrentRows(restored.page))
         .toBeGreaterThan(initialRows);

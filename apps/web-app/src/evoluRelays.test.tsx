@@ -11,7 +11,7 @@ vi.mock("./hooks/useDeferredOnlineReady", () => ({
   useDeferredOnlineReady: () => false,
 }));
 
-import { useEvoluServersManager } from "./evolu";
+import { useEvoluRelaysManager } from "./evolu";
 
 const recommended = [
   "wss://evolu.eu.freedomrelay.dev",
@@ -30,16 +30,14 @@ describe("Evolu relay settings", () => {
     "keeps the recommended relays when saving $saved and reopening settings",
     async ({ saved, configured }) => {
       function Settings() {
-        const servers = useEvoluServersManager();
+        const relays = useEvoluRelaysManager();
         return (
           <>
-            <output>{JSON.stringify(servers.configuredUrls)}</output>
+            <output>{JSON.stringify(relays.configuredUrls)}</output>
             <data>
-              {JSON.stringify(
-                servers.configuredUrls.map(servers.isRecommended),
-              )}
+              {JSON.stringify(relays.configuredUrls.map(relays.isRecommended))}
             </data>
-            <button onClick={() => servers.setServerUrls(saved)}>Save</button>
+            <button onClick={() => relays.setRelayUrls(saved)}>Save</button>
           </>
         );
       }

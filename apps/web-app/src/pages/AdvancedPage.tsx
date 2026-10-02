@@ -52,9 +52,9 @@ export function AdvancedPage(): React.ReactElement {
     dedupeContacts,
     dedupeContactsIsBusy,
     defaultMintDisplay,
-    evoluConnectedServerCount,
+    evoluConnectedRelayCount,
     evoluOverallStatus,
-    evoluServerUrls,
+    evoluRelayUrls,
     exportAppData,
     handleImportAppDataFilePicked,
     importDataFileInputRef,
@@ -264,13 +264,13 @@ export function AdvancedPage(): React.ReactElement {
         />
 
         <SettingsLinkRow
-          onClick={() => navigateTo({ route: "evoluServers" })}
+          onClick={() => navigateTo({ route: "evoluRelays" })}
           icon={<Cloud size={18} />}
           label="Evolu"
           tail={
             <span className="settings-tail-content settings-connection-state">
               <span className="relay-count">
-                {evoluConnectedServerCount}/{evoluServerUrls.length}
+                {evoluConnectedRelayCount}/{evoluRelayUrls.length}
               </span>
               <span className={`status-dot ${evoluOverallStatus}`} />
             </span>

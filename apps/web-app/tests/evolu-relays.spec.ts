@@ -15,8 +15,8 @@ test("recommended relays stay configured while the user's own relays come and go
   await page.addInitScript(() =>
     localStorage.setItem("linky.inspector_enabled", "true"),
   );
-  await page.goto("/#evolu-servers");
-  const rows = page.locator(".evolu-server-list button");
+  await page.goto("/#evolu-relays");
+  const rows = page.locator(".evolu-relay-list button");
   const recommended = rows.filter({ hasText: "ws://localhost:4001" });
   const custom = rows.filter({ hasText: "wss://sync.example.com" });
   const noBackupWarning = page.getByText(
@@ -32,17 +32,17 @@ test("recommended relays stay configured while the user's own relays come and go
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Remove server", exact: true }),
+    page.getByRole("button", { name: "Remove relay", exact: true }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Go offline", exact: true }).click();
-  await page.goto("/#evolu-servers");
+  await page.goto("/#evolu-relays");
   await expect(noBackupWarning).toBeVisible();
   await page.reload();
   await expect(noBackupWarning).toBeVisible();
 
-  await page.getByRole("button", { name: "Add server", exact: true }).click();
+  await page.getByRole("button", { name: "Add relay", exact: true }).click();
   await page
-    .getByRole("textbox", { name: "Add server", exact: true })
+    .getByRole("textbox", { name: "Add relay", exact: true })
     .fill("wss://sync.example.com");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(rows).toHaveCount(2);
@@ -54,20 +54,20 @@ test("recommended relays stay configured while the user's own relays come and go
     .fill("evolu.serversChanged");
   await expect(
     page
-      .getByText("Updated Evolu servers; reload required", { exact: true })
+      .getByText("Updated Evolu relays; reload required", { exact: true })
       .first(),
   ).toBeVisible();
-  await page.goto("/#evolu-servers");
+  await page.goto("/#evolu-relays");
   await page.reload();
   await expect(rows).toHaveCount(2);
 
   await custom.click();
   for (let click = 0; click < 2; click += 1) {
     await page
-      .getByRole("button", { name: "Remove server", exact: true })
+      .getByRole("button", { name: "Remove relay", exact: true })
       .click();
   }
-  await expect(page).toHaveURL(/#evolu-servers$/);
+  await expect(page).toHaveURL(/#evolu-relays$/);
   await page.reload();
   await expect(rows).toHaveCount(1);
   await expect(recommended).toBeVisible();

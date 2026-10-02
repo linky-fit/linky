@@ -407,15 +407,15 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(page).toHaveURL(/#settings$/);
   });
 
-  await test.step("inspect Evolu server, current data, history, and capacity", async () => {
+  await test.step("inspect Evolu relay, current data, history, and capacity", async () => {
     await expect(
       page.getByRole("button", { name: "Chat-Speicher", exact: true }),
     ).toHaveCount(0);
     await page.getByRole("button", { name: /^Evolu \d+\/\d+/ }).click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
-    await expect(title).toHaveText("Evolu-Server");
+    await expect(page).toHaveURL(/#evolu-relays$/);
+    await expect(title).toHaveText("Evolu-Relay");
     await page.getByRole("button", { name: /ws:\/\/localhost:4001/ }).click();
-    await expect(page).toHaveURL(/#evolu-server\/ws%3A%2F%2Flocalhost%3A4001$/);
+    await expect(page).toHaveURL(/#evolu-relay\/ws%3A%2F%2Flocalhost%3A4001$/);
     await expect(
       page.getByText("Synchronisierung", { exact: true }),
     ).toBeVisible();
@@ -423,7 +423,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       page.getByRole("button", { name: "Offline gehen", exact: true }),
     ).toBeVisible();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(page).toHaveURL(/#evolu-relays$/);
     await page
       .getByRole("button", { name: "Chat-Speicher", exact: true })
       .click();
@@ -439,7 +439,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       }),
     ).toBeDisabled();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(page).toHaveURL(/#evolu-relays$/);
     await page.getByText("Daten", { exact: true }).click();
     await expect(page).toHaveURL(/#evolu-current-data$/);
     await expect(title).toHaveText("Daten");
@@ -453,7 +453,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       }),
     ).toBeVisible();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(page).toHaveURL(/#evolu-relays$/);
     await page.getByText("Verlauf", { exact: true }).click();
     await expect(page).toHaveURL(/#evolu-history-data$/);
     await expect(title).toHaveText("Verlauf");
@@ -463,7 +463,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       ).toBeVisible();
     }
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(page).toHaveURL(/#evolu-relays$/);
     await page.goto("/#evolu-data");
     await expect(title).toHaveText("Daten");
     await expect(page.getByText(/^\d+\.\d % des 1-MiB-Limits$/)).toBeVisible();

@@ -246,7 +246,7 @@ test("a token discarded on one device stays discarded when another device replay
         .poll(() => operationRows(restored.page), { timeout: 60_000 })
         .toEqual([["deferredReceive", "done"]]);
       if (discardingDevice !== null) {
-        // The discard reached the Evolu server, so its device may go.
+        // The discard reached the Evolu relay, so its device may go.
         discardingDevice.errors.assertClean();
         await discardingDevice.context.close();
         discardingDevice = null;

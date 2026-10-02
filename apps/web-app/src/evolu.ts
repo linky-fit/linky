@@ -43,21 +43,21 @@ const isEvoluLoggingEnabled = (): boolean => {
   return safeLocalStorageGet("linky_debug_evolu_sql") === "1";
 };
 
-// Servers the user added; the recommended servers are always configured on top.
-const EVOLU_USER_SERVERS_STORAGE_KEY = "linky.evoluServers.user.v1";
+// Relays the user added; the recommended relays are always configured on top.
+const EVOLU_USER_RELAYS_STORAGE_KEY = "linky.evoluServers.user.v1";
 
-// Pre-recommendation storage, read once to migrate it into the user servers.
-const LEGACY_EVOLU_SERVERS_STORAGE_KEY = "linky.evoluServers.v1";
-const LEGACY_EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY =
+// Pre-recommendation storage, read once to migrate it into the user relays.
+const LEGACY_EVOLU_RELAYS_STORAGE_KEY = "linky.evoluServers.v1";
+const LEGACY_EVOLU_RELAYS_DEFAULT_REMOVED_STORAGE_KEY =
   "linky.evoluServers.defaultRemoved.v1";
-const LEGACY_DEFAULT_EVOLU_SERVER_URLS = [
+const LEGACY_DEFAULT_EVOLU_RELAY_URLS = [
   "wss://evolu.linky.fit",
   "wss://free.evoluhq.com",
 ];
 
-const EVOLU_SERVERS_DISABLED_STORAGE_KEY = "linky.evoluServers.disabled.v1";
+const EVOLU_RELAYS_DISABLED_STORAGE_KEY = "linky.evoluServers.disabled.v1";
 
-export type EvoluServerStatus = "checking" | "connected" | "disconnected";
+export type EvoluRelayStatus = "checking" | "connected" | "disconnected";
 export type EvoluErrorType = Evolu.EvoluError["type"];
 
 interface EvoluDatabaseInfo {
@@ -67,7 +67,7 @@ interface EvoluDatabaseInfo {
   updatedAtMs: number | null;
 }
 
-const envEvoluServerUrls = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
+const envEvoluRelayUrls = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
   .split(",")
   .map((url) => url.trim())
   .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
@@ -96,7 +96,7 @@ type Stringifiable =
   | null
   | undefined;
 
-type EvoluServerUrlInput = Stringifiable;
+type EvoluRelayUrlInput = Stringifiable;
 
 const isJsonValue = (value: unknown): value is JsonValue => {
   if (
@@ -205,8 +205,8 @@ const loadUntypedQueryRows = async (
   }
 };
 
-export const normalizeEvoluServerUrl = (
-  value: EvoluServerUrlInput,
+export const normalizeEvoluRelayUrl = (
+  value: EvoluRelayUrlInput,
 ): string | null => {
   const raw = String(value ?? "")
     .trim()
@@ -216,7 +216,7 @@ export const normalizeEvoluServerUrl = (
     const u = new URL(raw);
     if (u.protocol !== "wss:" && u.protocol !== "ws:") return null;
     const pathname = u.pathname.replace(/\/+$/, "");
-    // Preserve pathname (some servers may be hosted under a path), but drop
+    // Preserve pathname (some relays may be hosted under a path), but drop
     // search/hash for stable identity.
     return `${u.origin}${pathname === "/" ? "" : pathname}`.replace(/\/+$/, "");
   } catch {
@@ -225,10 +225,10 @@ export const normalizeEvoluServerUrl = (
 };
 
 const normalizeUrlList = (
-  urls: ReadonlyArray<EvoluServerUrlInput>,
+  urls: ReadonlyArray<EvoluRelayUrlInput>,
 ): ReadonlyArray<string> => {
   const combined = urls
-    .map(normalizeEvoluServerUrl)
+    .map(normalizeEvoluRelayUrl)
     .filter((v): v is string => Boolean(v));
 
   const unique: string[] = [];
@@ -243,103 +243,100 @@ const normalizeUrlList = (
   return unique;
 };
 
-const getEvoluDisabledServerUrls = (): ReadonlyArray<string> => {
+const getEvoluDisabledRelayUrls = (): ReadonlyArray<string> => {
   const stored = safeLocalStorageGetJson(
-    EVOLU_SERVERS_DISABLED_STORAGE_KEY,
+    EVOLU_RELAYS_DISABLED_STORAGE_KEY,
     EffectSchema.Array(EffectSchema.String),
     [],
   );
   return normalizeUrlList(stored);
 };
 
-export const setEvoluServerDisabled = (
-  url: string,
-  disabled: boolean,
-): void => {
-  const normalized = normalizeEvoluServerUrl(url);
+export const setEvoluRelayDisabled = (url: string, disabled: boolean): void => {
+  const normalized = normalizeEvoluRelayUrl(url);
   if (!normalized) return;
-  const current = [...getEvoluDisabledServerUrls()];
+  const current = [...getEvoluDisabledRelayUrls()];
   const lower = normalized.toLowerCase();
   const next = disabled
     ? normalizeUrlList([...current, normalized])
     : normalizeUrlList(current.filter((u) => u.toLowerCase() !== lower));
-  safeLocalStorageSetJson(EVOLU_SERVERS_DISABLED_STORAGE_KEY, next);
+  safeLocalStorageSetJson(EVOLU_RELAYS_DISABLED_STORAGE_KEY, next);
 };
 
 // Read once per launch: a refreshed recommendation applies on the next start,
 // when the transports are created again.
-const RECOMMENDED_EVOLU_SERVER_URLS = normalizeUrlList(
-  envEvoluServerUrls.length > 0
-    ? envEvoluServerUrls
+const RECOMMENDED_EVOLU_RELAY_URLS = normalizeUrlList(
+  envEvoluRelayUrls.length > 0
+    ? envEvoluRelayUrls
     : loadRecommendedRelays().evolu,
 );
 
-const isRecommendedEvoluServer = (url: string): boolean =>
-  RECOMMENDED_EVOLU_SERVER_URLS.some(
+const isRecommendedEvoluRelay = (url: string): boolean =>
+  RECOMMENDED_EVOLU_RELAY_URLS.some(
     (recommended) => recommended.toLowerCase() === url.toLowerCase(),
   );
 
-const getEvoluConfiguredServerUrls = (): ReadonlyArray<string> =>
+const getEvoluConfiguredRelayUrls = (): ReadonlyArray<string> =>
   normalizeUrlList([
-    ...RECOMMENDED_EVOLU_SERVER_URLS,
+    ...RECOMMENDED_EVOLU_RELAY_URLS,
     ...safeLocalStorageGetJson(
-      EVOLU_USER_SERVERS_STORAGE_KEY,
+      EVOLU_USER_RELAYS_STORAGE_KEY,
       EffectSchema.Array(EffectSchema.String),
       [],
     ),
   ]);
 
-const getEvoluActiveServerUrls = (): ReadonlyArray<string> => {
-  const configured = getEvoluConfiguredServerUrls();
-  const disabled = getEvoluDisabledServerUrls();
+const getEvoluActiveRelayUrls = (): ReadonlyArray<string> => {
+  const configured = getEvoluConfiguredRelayUrls();
+  const disabled = getEvoluDisabledRelayUrls();
   const disabledLower = new Set(disabled.map((u) => u.toLowerCase()));
   return configured.filter((u) => !disabledLower.has(u.toLowerCase()));
 };
 
-const setEvoluServerUrls = (urls: ReadonlyArray<string>): void => {
+const setEvoluRelayUrls = (urls: ReadonlyArray<string>): void => {
   safeLocalStorageSetJson(
-    EVOLU_USER_SERVERS_STORAGE_KEY,
-    normalizeUrlList(urls).filter((url) => !isRecommendedEvoluServer(url)),
+    EVOLU_USER_RELAYS_STORAGE_KEY,
+    normalizeUrlList(urls).filter((url) => !isRecommendedEvoluRelay(url)),
   );
 };
 
 // Older versions stored the full selection, or nothing while the built-in
-// defaults were untouched; servers that are not recommended now stay as the
+// defaults were untouched; relays that are not recommended now stay as the
 // user's. A fresh install has neither a selection nor a seed.
-const migrateLegacyEvoluServers = (): void => {
-  if (safeLocalStorageGet(EVOLU_USER_SERVERS_STORAGE_KEY) !== null) return;
+const migrateLegacyEvoluRelays = (): void => {
+  if (safeLocalStorageGet(EVOLU_USER_RELAYS_STORAGE_KEY) !== null) return;
   const stored = safeLocalStorageGetJson(
-    LEGACY_EVOLU_SERVERS_STORAGE_KEY,
+    LEGACY_EVOLU_RELAYS_STORAGE_KEY,
     EffectSchema.Array(EffectSchema.String),
     [],
   );
   const defaultsRemoved = safeLocalStorageGetJson(
-    LEGACY_EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY,
+    LEGACY_EVOLU_RELAYS_DEFAULT_REMOVED_STORAGE_KEY,
     EffectSchema.Boolean,
     false,
   );
   const isExistingInstall =
-    safeLocalStorageGet(LEGACY_EVOLU_SERVERS_STORAGE_KEY) !== null ||
+    safeLocalStorageGet(LEGACY_EVOLU_RELAYS_STORAGE_KEY) !== null ||
     safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY) !== null;
   const legacyDefaults =
-    envEvoluServerUrls.length > 0
-      ? envEvoluServerUrls
-      : LEGACY_DEFAULT_EVOLU_SERVER_URLS;
-  setEvoluServerUrls(
+    envEvoluRelayUrls.length > 0
+      ? envEvoluRelayUrls
+      : LEGACY_DEFAULT_EVOLU_RELAY_URLS;
+  setEvoluRelayUrls(
     isExistingInstall && !defaultsRemoved
       ? [...legacyDefaults, ...stored]
       : stored,
   );
   reportAppLog({
     tag: "evolu.userServersMigrated",
-    summary: "Kept the configured Evolu servers that are not recommended",
+    summary: "Kept the configured Evolu relays that are not recommended",
     payload: { legacyServerUrls: stored, defaultsRemoved, isExistingInstall },
   });
 };
 
-migrateLegacyEvoluServers();
+migrateLegacyEvoluRelays();
 
-const EVOLU_SERVER_URLS: ReadonlyArray<string> = getEvoluActiveServerUrls();
+const EVOLU_RELAY_URLS: ReadonlyArray<string> = getEvoluActiveRelayUrls();
 
 const buildEvoluTransports = (
   urls: ReadonlyArray<string>,
@@ -349,7 +346,7 @@ const buildEvoluTransports = (
 const EVOLU_TRANSPORTS: ReadonlyArray<{
   type: "WebSocket";
   url: string;
-}> = buildEvoluTransports(EVOLU_SERVER_URLS);
+}> = buildEvoluTransports(EVOLU_RELAY_URLS);
 
 const probeWebSocketConnection = (
   url: string,
@@ -1114,7 +1111,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
   } as const;
 };
 
-export const useEvoluServersManager = (opts?: {
+export const useEvoluRelaysManager = (opts?: {
   probeIntervalMs?: number;
   probeTimeoutMs?: number;
 }) => {
@@ -1123,13 +1120,13 @@ export const useEvoluServersManager = (opts?: {
   const canRunNetworkWork = useDeferredOnlineReady();
 
   const [configuredUrls, setConfiguredUrlsState] = useState<string[]>(() => [
-    ...getEvoluConfiguredServerUrls(),
+    ...getEvoluConfiguredRelayUrls(),
   ]);
   const [disabledUrls, setDisabledUrlsState] = useState<string[]>(() => [
-    ...getEvoluDisabledServerUrls(),
+    ...getEvoluDisabledRelayUrls(),
   ]);
   const [statusByUrl, setStatusByUrl] = useState<
-    Record<string, EvoluServerStatus>
+    Record<string, EvoluRelayStatus>
   >(() => ({}));
   const [reloadRequired, setReloadRequired] = useState(false);
 
@@ -1150,20 +1147,20 @@ export const useEvoluServersManager = (opts?: {
   );
 
   const refreshFromStorage = useCallback(() => {
-    setConfiguredUrlsState([...getEvoluConfiguredServerUrls()]);
-    setDisabledUrlsState([...getEvoluDisabledServerUrls()]);
+    setConfiguredUrlsState([...getEvoluConfiguredRelayUrls()]);
+    setDisabledUrlsState([...getEvoluDisabledRelayUrls()]);
   }, []);
 
-  const setServerUrls = useCallback(
+  const setRelayUrls = useCallback(
     (nextUrls: string[]) => {
-      setEvoluServerUrls(nextUrls);
+      setEvoluRelayUrls(nextUrls);
       if (getInspectorEmissionEnabled()) {
         reportAppLog({
           tag: "evolu.serversChanged",
-          summary: "Updated Evolu servers; reload required",
+          summary: "Updated Evolu relays; reload required",
           payload: {
-            configuredUrls: getEvoluConfiguredServerUrls(),
-            activeUrls: getEvoluActiveServerUrls(),
+            configuredUrls: getEvoluConfiguredRelayUrls(),
+            activeUrls: getEvoluActiveRelayUrls(),
           },
         });
       }
@@ -1173,9 +1170,9 @@ export const useEvoluServersManager = (opts?: {
     [refreshFromStorage],
   );
 
-  const setServerOffline = useCallback(
+  const setRelayOffline = useCallback(
     (url: string, offline: boolean) => {
-      setEvoluServerDisabled(url, offline);
+      setEvoluRelayDisabled(url, offline);
       refreshFromStorage();
       setReloadRequired(true);
     },
@@ -1245,9 +1242,9 @@ export const useEvoluServersManager = (opts?: {
     statusByUrl: effectiveStatusByUrl,
     reloadRequired,
     refreshFromStorage,
-    setServerUrls,
+    setRelayUrls,
     isOffline,
-    isRecommended: isRecommendedEvoluServer,
-    setServerOffline,
+    isRecommended: isRecommendedEvoluRelay,
+    setRelayOffline,
   } as const;
 };
