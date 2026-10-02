@@ -205,6 +205,23 @@ export const publishProfileStatusToRelay = (
     ),
   );
 
+/** Publish a kind-0 profile, as any Nostr client can, with whatever it claims. */
+export const publishProfileToRelay = (
+  nsec: string,
+  metadata: Readonly<Record<string, string>>,
+): Promise<void> =>
+  publishToRelay(
+    finalizeEvent(
+      {
+        content: JSON.stringify(metadata),
+        created_at: Math.floor(Date.now() / 1000),
+        kind: 0,
+        tags: [],
+      },
+      nsecToSecretKey(nsec),
+    ),
+  );
+
 /**
  * Gift-wrap a NIP-17 text message to the recipient and publish it, as a peer
  * on any NIP-17 client would; no browser needed for the sender.

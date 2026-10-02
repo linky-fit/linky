@@ -209,16 +209,21 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
         return;
       }
 
+      // A lightning address is not an identity: contacts match on npub, and a
+      // contact without one is skipped only when an identical row exists.
+      const addressOnlyKey = (
+        name: string | null | undefined,
+        lnAddress: string | null | undefined,
+      ) => `${(name ?? "").trim()}\n${(lnAddress ?? "").trim().toLowerCase()}`;
       const existingByNpub = new Map<string, TContact>();
-      const existingByLn = new Map<string, TContact>();
+      const addressOnlyKeys = new Set<string>();
       for (const contact of contacts) {
         const npub = (contact.npub ?? "").trim();
-        const ln = (contact.lnAddress ?? "").trim().toLowerCase();
         if (npub) existingByNpub.set(npub, contact);
-        if (ln) existingByLn.set(ln, contact);
+        else
+          addressOnlyKeys.add(addressOnlyKey(contact.name, contact.lnAddress));
       }
       const insertedNpubs = new Set<string>();
-      const insertedLnAddresses = new Set<string>();
 
       let addedContacts = 0;
       let updatedContacts = 0;
@@ -238,15 +243,12 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
 
         if (!name && !npub && !lnAddress) continue;
 
-        const existing =
-          (npub ? existingByNpub.get(npub) : undefined) ??
-          (lnAddress ? existingByLn.get(lnAddress.toLowerCase()) : undefined);
-        const normalizedLnAddress = lnAddress?.toLowerCase() ?? null;
+        const existing = npub ? existingByNpub.get(npub) : undefined;
         if (
           !existing &&
-          ((npub && insertedNpubs.has(npub)) ||
-            (normalizedLnAddress &&
-              insertedLnAddresses.has(normalizedLnAddress)))
+          (npub
+            ? insertedNpubs.has(npub)
+            : addressOnlyKeys.has(addressOnlyKey(name, lnAddress)))
         ) {
           continue;
         }
@@ -283,9 +285,7 @@ export const useAppDataTransfer = <TContact extends ImportableContact>({
           if (result.ok) {
             addedContacts += 1;
             if (npub) insertedNpubs.add(npub);
-            if (normalizedLnAddress) {
-              insertedLnAddresses.add(normalizedLnAddress);
-            }
+            else addressOnlyKeys.add(addressOnlyKey(name, lnAddress));
           }
         }
       }

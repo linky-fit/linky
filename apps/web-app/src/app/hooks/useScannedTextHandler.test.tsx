@@ -1,4 +1,5 @@
 import { encodeNprofile, encodeNpub } from "@linky-fit/linkstr";
+import { createId } from "@linky-fit/linksync";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { encode } from "cbor-x";
 import { bech32 } from "@scure/base";
@@ -35,12 +36,16 @@ afterEach(async () => {
 
 const translateToKey: Translate = (key) => key;
 
+type ScanParams = Parameters<typeof useScannedTextHandler>[0];
+
 const setup = async ({
   autoPayLimit = 0,
+  contacts = [],
   currentNpub = null,
   cashuIsBusy = false,
 }: {
   autoPayLimit?: number;
+  contacts?: ScanParams["contacts"];
   currentNpub?: string | null;
   cashuIsBusy?: boolean;
 } = {}) => {
@@ -67,7 +72,7 @@ const setup = async ({
     });
     const handle = useScannedTextHandler({
       closeScan: () => undefined,
-      contacts: [],
+      contacts,
       contactsRepository: { insert: () => Effect.void },
       currentNpub,
       extractCashuTokenFromText: () => null,
@@ -163,6 +168,25 @@ describe("scanned LNURL-auth targets", () => {
     expect(scan.requestLnurlAuthConfirmation).not.toHaveBeenCalled();
     expect(fetchSpy).toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+});
+
+describe("scanned lightning addresses", () => {
+  it("opens the address pay screen even when a contact has the address", async () => {
+    const scan = await setup({
+      contacts: [
+        {
+          id: createId<"Contact">(),
+          name: "Alice",
+          npub: encodeNpub(makeIdentity().pubkey),
+          lnAddress: "alice@linky.fit",
+        },
+      ],
+    });
+
+    await scan.handle("alice@linky.fit");
+
+    expect(window.location.hash).toBe("#payln/alice%40linky.fit");
   });
 });
 

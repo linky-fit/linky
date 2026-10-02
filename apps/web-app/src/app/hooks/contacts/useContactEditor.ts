@@ -15,12 +15,8 @@ import {
   searchProfilesAtom,
   useAtomSet,
 } from "@linky-fit/linkstr-react";
-import {
-  createId,
-  type ContactsRepository,
-  type TransactionsRepository,
-} from "@linky-fit/linksync";
-import { Effect, Exit } from "effect";
+import { createId, type ContactsRepository } from "@linky-fit/linksync";
+import { Exit } from "effect";
 import React from "react";
 import { ContactId } from "../../../evoluIds";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -51,7 +47,6 @@ import { runWrite } from "../../lib/storeWrite";
 import type { ContactFormState, ContactRowLike } from "../../types/appTypes";
 import { fetchAndCacheProfile } from "../useLinkstrProfileSync";
 import { useContactSuggestions } from "./useContactSuggestions";
-import { asNonEmptyString } from "../../../utils/validation";
 import type { Translate } from "../../../i18n";
 
 interface ContactNewPrefill {
@@ -123,30 +118,7 @@ interface UseContactEditorParams {
   >;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
-  transactions: Pick<TransactionsRepository, "all" | "update">;
 }
-
-const readLightningAddressFromDetailsJson = (value: unknown): string | null => {
-  const detailsJson = asNonEmptyString(value);
-  if (!detailsJson) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(detailsJson);
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
-      return null;
-    }
-
-    return asNonEmptyString(
-      "lightningAddress" in parsed ? parsed.lightningAddress : null,
-    );
-  } catch {
-    return null;
-  }
-};
 
 const decodeDirectNpubIdentifier = async (
   value: string,
@@ -176,7 +148,6 @@ export const useContactEditor = ({
   setRecentlyAddedContactId,
   setStatus,
   t,
-  transactions,
 }: UseContactEditorParams) => {
   const [form, setForm] = React.useState<ContactFormState>(
     makeEmptyContactForm(),
@@ -228,26 +199,6 @@ export const useContactEditor = ({
     ({ id, ...patch }: ContactFieldsPatch) =>
       runWrite(contactsRepository.update(id, patch)),
     [contactsRepository],
-  );
-
-  const backfillLightningAddressTransactions = React.useCallback(
-    async (contactId: ContactId, lnAddress: string) => {
-      const normalizedLnAddress = lnAddress.trim().toLowerCase();
-      if (!normalizedLnAddress) return;
-
-      const records = await Effect.runPromise(transactions.all);
-      for (const record of records) {
-        if (record.contactId !== null) continue;
-        if (record.method !== "lightning_address") continue;
-        const transactionLnAddress = readLightningAddressFromDetailsJson(
-          record.detailsJson,
-        );
-        if (transactionLnAddress?.toLowerCase() !== normalizedLnAddress)
-          continue;
-        await Effect.runPromise(transactions.update(record.id, { contactId }));
-      }
-    },
-    [transactions],
   );
 
   const seededEditContactIdRef = React.useRef<ContactId | null>(null);
@@ -420,7 +371,6 @@ export const useContactEditor = ({
       groupName: group,
       groupNamesJson: groups.length ? groupNamesJson : null,
     });
-    let savedContactId: ContactId | null = editingId;
     const selectedNpub = normalizeNpubIdentifier(selectedContact?.npub ?? "");
     const cachedMetadata = npub
       ? (loadCachedProfile(npub)?.metadata ?? undefined)
@@ -557,7 +507,6 @@ export const useContactEditor = ({
         contactsRepository.insert({ id, ...createPayload }),
       );
       if (result.ok) {
-        savedContactId = id;
         setRecentlyAddedContactId(id);
         setStatus(t("contactSaved"));
       } else {
@@ -565,10 +514,6 @@ export const useContactEditor = ({
         setIsSavingContact(false);
         return;
       }
-    }
-
-    if (savedContactId && lnAddress) {
-      await backfillLightningAddressTransactions(savedContactId, lnAddress);
     }
 
     if (route.kind === "contactEdit" && editingId) {
@@ -581,7 +526,6 @@ export const useContactEditor = ({
     navigateTo({ route: "contacts" });
     setIsSavingContact(false);
   }, [
-    backfillLightningAddressTransactions,
     clearContactForm,
     contactEditInitial,
     contacts,
@@ -844,15 +788,11 @@ export const useContactEditor = ({
 
       setRecentlyAddedContactId(id);
       setStatus(t("contactSaved"));
-      if (lnAddress) {
-        await backfillLightningAddressTransactions(id, lnAddress);
-      }
       clearContactForm();
       navigateTo({ route: "contacts" });
       setIsSavingContact(false);
     },
     [
-      backfillLightningAddressTransactions,
       clearContactForm,
       contacts,
       contactsRepository,

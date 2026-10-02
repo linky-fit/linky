@@ -7,7 +7,8 @@ import {
   TokenText,
   UnixSeconds,
 } from "@linky-fit/linkshu";
-import { Schema } from "effect";
+import { createId } from "@linky-fit/linksync";
+import { Effect, Schema } from "effect";
 import { act, createRef, useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { en } from "../../i18n/en";
@@ -37,7 +38,12 @@ const walletUnavailable: WalletImports = {
   importCashuProofs: null,
 };
 
-const mount = async (wallet: WalletImports = walletUnavailable) => {
+type HookParams = Parameters<typeof useAppDataTransfer>[0];
+
+const mount = async (
+  wallet: WalletImports = walletUnavailable,
+  stored: Pick<HookParams, "contacts" | "contactsRepository"> | null = null,
+) => {
   const insert = vi.fn();
   const update = vi.fn();
   const pushToast = vi.fn();
@@ -57,6 +63,7 @@ const mount = async (wallet: WalletImports = walletUnavailable) => {
           throw new Error("Unexpected contact update");
         },
       },
+      ...stored,
       ...wallet,
       importDataFileInputRef: createRef<HTMLInputElement>(),
       pushToast,
@@ -167,5 +174,48 @@ describe("useAppDataTransfer", () => {
     expect(pushToast).toHaveBeenCalledWith(
       "Import complete. Contacts added: 0, updated: 0, proofs: 0, wallet operations: 1.",
     );
+  });
+
+  it("matches imported contacts by npub and never by lightning address", async () => {
+    const insert = vi.fn<HookParams["contactsRepository"]["insert"]>(
+      () => Effect.void,
+    );
+    const update = vi.fn<HookParams["contactsRepository"]["update"]>(
+      () => Effect.void,
+    );
+    const { transfer } = await mount(walletUnavailable, {
+      contacts: [
+        {
+          id: createId<"Contact">(),
+          name: "Alice",
+          npub: "npub1alice",
+          lnAddress: "shared@linky.fit",
+        },
+        { id: createId<"Contact">(), name: "Bob", lnAddress: "bob@linky.fit" },
+      ],
+      contactsRepository: { insert, update },
+    });
+    const file = Object.assign(new File([], "backup.txt"), {
+      text: async () =>
+        JSON.stringify({
+          contacts: [
+            {
+              name: "Mallory",
+              npub: "npub1mallory",
+              lnAddress: "shared@linky.fit",
+            },
+            { name: "Bob", lnAddress: "BOB@linky.fit" },
+            { name: "Bobby", lnAddress: "bob@linky.fit" },
+          ],
+        }),
+    });
+
+    await act(() => transfer.handleImportAppDataFilePicked(file));
+
+    expect(update).not.toHaveBeenCalled();
+    expect(insert.mock.calls.map(([row]) => row.name)).toEqual([
+      "Mallory",
+      "Bobby",
+    ]);
   });
 });

@@ -7,7 +7,6 @@ import { navigateTo } from "../../hooks/useRouting";
 import { parseLnurlAuthTarget } from "../../lnurlAuth";
 import {
   fetchLnurlWithdrawPreview,
-  inferLightningAddressFromLnurlTarget,
   isLightningAddress,
   isLnurlPayTarget,
   isLnurlWithdrawTarget,
@@ -235,22 +234,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           return;
         }
 
-        const needle = maybeLnAddress.toLowerCase();
-        const existing = contacts.find(
-          (contact) =>
-            (contact.lnAddress ?? "").trim().toLowerCase() === needle,
-        );
-
         closeScan();
-        if (existing?.id) {
-          navigateTo({
-            route: "contactPay",
-            id: ContactId.orThrow(existing.id),
-          });
-          return;
-        }
-
-        // New address: open pay screen and offer to save contact after success.
         navigateTo({ route: "lnAddressPay", lnAddress: maybeLnAddress });
         return;
       }
@@ -289,24 +273,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           return;
         }
 
-        const inferredLnAddress =
-          inferLightningAddressFromLnurlTarget(maybeLnAddress);
-        const existing = inferredLnAddress
-          ? contacts.find(
-              (contact) =>
-                (contact.lnAddress ?? "").trim().toLowerCase() ===
-                inferredLnAddress.toLowerCase(),
-            )
-          : null;
-
         closeScan();
-        if (existing?.id) {
-          navigateTo({
-            route: "contactPay",
-            id: ContactId.orThrow(existing.id),
-          });
-          return;
-        }
         navigateTo({ route: "lnAddressPay", lnAddress: maybeLnAddress });
         return;
       }

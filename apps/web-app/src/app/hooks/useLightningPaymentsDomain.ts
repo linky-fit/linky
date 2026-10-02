@@ -56,7 +56,6 @@ interface UseLightningPaymentsDomainParams {
   canPayWithCashu: boolean;
   cashuBalance: number;
   cashuIsBusy: boolean;
-  contacts: readonly ContactPayRowLike[];
   defaultMintUrl: string | null;
   dismissPaymentSending: () => void;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
@@ -89,7 +88,6 @@ export const useLightningPaymentsDomain = ({
   canPayWithCashu,
   cashuBalance,
   cashuIsBusy,
-  contacts,
   defaultMintUrl,
   dismissPaymentSending,
   formatDisplayedAmountParts,
@@ -108,20 +106,6 @@ export const useLightningPaymentsDomain = ({
     safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
     setContactsOnboardingHasPaid(true);
   }, [setContactsOnboardingHasPaid]);
-
-  const findContactByLightningAddress = React.useCallback(
-    (lightningAddress: string | null) => {
-      if (!lightningAddress) return null;
-      const normalized = lightningAddress.toLowerCase();
-      return (
-        contacts.find(
-          (contact) =>
-            (contact.lnAddress ?? "").trim().toLowerCase() === normalized,
-        ) ?? null
-      );
-    },
-    [contacts],
-  );
 
   const meltOnMint = React.useCallback(
     async (
@@ -298,7 +282,12 @@ export const useLightningPaymentsDomain = ({
   );
 
   const payLightningAddressWithCashu = React.useCallback(
-    async (lnAddress: string, amountSat: number, comment?: string | null) => {
+    async (
+      lnAddress: string,
+      amountSat: number,
+      contact: ContactPayRowLike | null,
+      comment?: string | null,
+    ) => {
       const paymentTarget = lnAddress.trim();
       // The LUD-12 comment is the note; an invoice description stands in
       // when there is none.
@@ -335,9 +324,7 @@ export const useLightningPaymentsDomain = ({
         showPaymentSending({
           direction: "out",
           amountSat,
-          contact: paidOverlayContact(
-            findContactByLightningAddress(resolvedLightningAddress),
-          ),
+          contact: paidOverlayContact(contact),
         });
 
         // Paying the full balance leaves no headroom for fees; the ladder
@@ -401,8 +388,6 @@ export const useLightningPaymentsDomain = ({
           );
 
           const paidLightningAddress = resolvedLightningAddress;
-          const knownContact =
-            findContactByLightningAddress(paidLightningAddress);
 
           if (Either.isLeft(outcome)) {
             if (outcome.left.pending !== null) {
@@ -413,7 +398,7 @@ export const useLightningPaymentsDomain = ({
                   lightningAddress: paidLightningAddress,
                   lightningInvoice: attemptInvoice,
                 },
-                knownContact?.id ?? null,
+                contact?.id ?? null,
                 commentNote ?? attemptInvoicePreview?.description ?? null,
               );
               return true;
@@ -465,7 +450,7 @@ export const useLightningPaymentsDomain = ({
             note: commentNote ?? attemptInvoicePreview?.description ?? null,
             unit: "sat",
             error: null,
-            contactId: knownContact?.id ?? null,
+            contactId: contact?.id ?? null,
             method: "lightning_address",
             phase: "complete",
           });
@@ -478,14 +463,11 @@ export const useLightningPaymentsDomain = ({
                 `${displayAmount.approxPrefix}${displayAmount.amountText}`,
               )
               .replace("{unit}", displayAmount.unitLabel)
-              .replace(
-                "{name}",
-                (knownContact?.name ?? "").trim() || displayTarget,
-              ),
+              .replace("{name}", (contact?.name ?? "").trim() || displayTarget),
             {
               direction: "out",
               amountSat: receipt.paidAmount,
-              contact: paidOverlayContact(knownContact),
+              contact: paidOverlayContact(contact),
             },
           );
 
@@ -506,7 +488,7 @@ export const useLightningPaymentsDomain = ({
 
           rememberFirstPayment();
 
-          if (paidLightningAddress && !knownContact?.id) {
+          if (paidLightningAddress && !contact?.id) {
             setPostPaySaveContact({
               lnAddress: paidLightningAddress,
               amountSat: receipt.paidAmount,
@@ -530,8 +512,7 @@ export const useLightningPaymentsDomain = ({
           mint: finalErrorMint,
           unit: "sat",
           error: finalErrorMessage,
-          contactId:
-            findContactByLightningAddress(resolvedLightningAddress)?.id ?? null,
+          contactId: contact?.id ?? null,
           method: "lightning_address",
           phase: finalErrorMint ? "melt" : "invoice_fetch",
         });
@@ -547,7 +528,6 @@ export const useLightningPaymentsDomain = ({
       cashuIsBusy,
       defaultMintUrl,
       dismissPaymentSending,
-      findContactByLightningAddress,
       formatDisplayedAmountParts,
       logPaymentEvent,
       meltCashuInvoice,

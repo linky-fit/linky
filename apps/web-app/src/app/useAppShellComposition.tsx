@@ -565,7 +565,6 @@ export const useAppShellComposition = ({
     setStatus,
     syncedNostrIdentityMatchesLocal,
     t,
-    transactions,
   });
 
   React.useEffect(() => {

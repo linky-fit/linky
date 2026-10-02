@@ -34,7 +34,6 @@ import React, { type ComponentRef, useMemo, useState } from "react";
 import type { CashuOperationId, ContactId } from "../../../evolu";
 import { navigateTo, useRouting } from "../../../hooks/useRouting";
 import {
-  inferLightningAddressFromLnurlTarget,
   redeemLnurlWithdraw,
   type LnurlWithdrawPreview,
 } from "../../../lnurlPay";
@@ -397,6 +396,8 @@ export const useCashuWalletComposition = ({
 
   const [lnAddressPayAmount, setLnAddressPayAmount] = useState<string>("");
   const [lnAddressPayNote, setLnAddressPayNote] = useState<string>("");
+  const [lnAddressPayContactId, setLnAddressPayContactId] =
+    useState<ContactId | null>(null);
 
   const [pendingCashuTokenContactPickId, setPendingCashuTokenContactPickId] =
     useState<CashuOperationId | null>(null);
@@ -505,6 +506,7 @@ export const useCashuWalletComposition = ({
     setContactPaymentIntent,
     setLnAddressPayAmount,
     setLnAddressPayNote,
+    setLnAddressPayContactId,
     setPayAmount,
   });
 
@@ -1015,6 +1017,7 @@ export const useCashuWalletComposition = ({
         }
         setLnAddressPayAmount(String(amountSat));
         setLnAddressPayNote(note ?? "");
+        setLnAddressPayContactId(selectedContact.id);
         navigateTo({ route: "lnAddressPay", lnAddress });
         return;
       }
@@ -1467,7 +1470,6 @@ export const useCashuWalletComposition = ({
     canPayWithCashu,
     cashuBalance,
     cashuIsBusy,
-    contacts,
     defaultMintUrl,
     dismissPaymentSending,
     formatDisplayedAmountParts,
@@ -1482,6 +1484,16 @@ export const useCashuWalletComposition = ({
     t,
     walletMintBalances: walletBalances.perMint,
   });
+
+  // Only a contact the user chose to pay; a lightning address never identifies one.
+  const knownLnAddressPayContact = React.useMemo(
+    () =>
+      route.kind === "lnAddressPay" && lnAddressPayContactId
+        ? (contacts.find((contact) => contact.id === lnAddressPayContactId) ??
+          null)
+        : null,
+    [contacts, lnAddressPayContactId, route.kind],
+  );
 
   const payLightningAddressWithCashu = React.useCallback(
     async (
@@ -1498,12 +1510,14 @@ export const useCashuWalletComposition = ({
       const paid = await payLightningAddressWithCashuBase(
         lnAddress,
         amountSat,
+        knownLnAddressPayContact,
         comment,
       );
       if (paid) navigateTo({ route: "wallet" });
     },
     [
       cashuBalance,
+      knownLnAddressPayContact,
       payLightningAddressWithCashuBase,
       requestPaymentMintMelt,
       setStatus,
@@ -2561,22 +2575,6 @@ export const useCashuWalletComposition = ({
     [allowTestMints, knownTransferTexts],
   );
 
-  const knownLnAddressPayContact = React.useMemo(() => {
-    if (route.kind !== "lnAddressPay") return null;
-
-    const inferredLnAddress = inferLightningAddressFromLnurlTarget(
-      route.lnAddress,
-    );
-    if (!inferredLnAddress) return null;
-
-    return (
-      contacts.find(
-        (contact) =>
-          (contact.lnAddress ?? "").trim().toLowerCase() ===
-          inferredLnAddress.toLowerCase(),
-      ) ?? null
-    );
-  }, [contacts, route]);
   const knownLnAddressPayContactPictureUrl = React.useMemo(() => {
     const npub = normalizeNpubIdentifier(knownLnAddressPayContact?.npub ?? "");
     return npub ? (nostrPictureByNpub[npub] ?? null) : null;

@@ -57,6 +57,7 @@ const contactSearchFields = (contact: ManualPayContact): string[] => {
   ].filter((field) => field.length > 0);
 };
 
+// A typed name or npub picks the contact; a lightning address is paid as itself.
 const findExactContact = (
   contacts: readonly ManualPayContact[],
   query: string,
@@ -66,7 +67,7 @@ const findExactContact = (
 
   return (
     contacts.find((contact) =>
-      contactSearchFields(contact).some(
+      [contact.name, contact.npub].some(
         (field) => normalizeSearch(field) === needle,
       ),
     ) ?? null

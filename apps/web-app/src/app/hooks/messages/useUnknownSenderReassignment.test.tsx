@@ -1,5 +1,4 @@
 import { createId } from "@linky-fit/linksync";
-import { Effect } from "effect";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
@@ -15,7 +14,6 @@ describe("useUnknownSenderReassignment", () => {
     const contactId = createId<"Contact">();
     const params: Params = {
       contacts: [{ id: contactId, npub: NPUB }],
-      contactsRepository: { update: () => Effect.void },
       hydrated: false,
       reassign,
       unknownSenders: [{ id: "unknown:sender", npub: NPUB }],

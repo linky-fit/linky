@@ -28,6 +28,7 @@ const LOCAL_STACK_SPECS = [
   "**/receive-deferred-actions.spec.ts",
   "**/restore.spec.ts",
   "**/new-account.spec.ts",
+  "**/lightning-address-identity.spec.ts",
 ];
 
 export default defineConfig({

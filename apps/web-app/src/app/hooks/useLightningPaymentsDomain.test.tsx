@@ -88,7 +88,6 @@ const setup = async ({ balance = 100, meltCashuInvoice }: SetupOptions) => {
       canPayWithCashu: balance > 0,
       cashuBalance: balance,
       cashuIsBusy: false,
-      contacts: [],
       defaultMintUrl: null,
       dismissPaymentSending,
       formatDisplayedAmountParts: (amountSat) => ({
@@ -241,6 +240,7 @@ describe("payLightningAddressWithCashu", () => {
     const paid = await harness.payments.payLightningAddressWithCashu(
       "alice@example.com",
       40,
+      null,
     );
 
     expect(paid).toBe(true);
@@ -276,6 +276,7 @@ describe("payLightningAddressWithCashu", () => {
     const paid = await harness.payments.payLightningAddressWithCashu(
       "alice@example.com",
       40,
+      null,
       " thanks! ",
     );
 
@@ -316,6 +317,7 @@ describe("payLightningAddressWithCashu", () => {
     const paid = await harness.payments.payLightningAddressWithCashu(
       "alice@example.com",
       100,
+      null,
     );
 
     expect(paid).toBe(true);
@@ -357,6 +359,7 @@ describe("payLightningAddressWithCashu", () => {
     const paid = await harness.payments.payLightningAddressWithCashu(
       "alice@example.com",
       40,
+      null,
     );
 
     expect(paid).toBe(false);

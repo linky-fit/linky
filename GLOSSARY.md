@@ -201,7 +201,7 @@ An entry in the payment history the user sees; it is a view of the wallet's oper
 _Avoid_: payment, operation, record
 
 **Lightning address**:
-An email-like address anyone can pay over Lightning.
+An email-like address anyone can pay over Lightning. Anyone can put any address in their profile, so it never identifies a contact.
 _Avoid_: LN address, LUD-16
 
 **npub.cash**:

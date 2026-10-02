@@ -32,7 +32,6 @@ const params: Params = {
   setRecentlyAddedContactId: vi.fn(),
   setStatus: vi.fn(),
   t: (key) => key,
-  transactions: { all: Effect.succeed([]), update: () => Effect.void },
 };
 
 interface EditorProps {

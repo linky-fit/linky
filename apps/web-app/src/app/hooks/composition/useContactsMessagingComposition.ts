@@ -12,7 +12,6 @@ import {
   PositiveInt,
   type ContactsRepository,
   type ConversationsRepository,
-  type TransactionsRepository,
 } from "@linky-fit/linksync";
 import {
   decodeNpub,
@@ -225,7 +224,6 @@ interface UseContactsMessagingCompositionParams {
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   syncedNostrIdentityMatchesLocal: boolean;
   t: Translate;
-  transactions: Pick<TransactionsRepository, "all" | "update">;
 }
 
 export const useContactsMessagingComposition = ({
@@ -249,7 +247,6 @@ export const useContactsMessagingComposition = ({
   setStatus,
   syncedNostrIdentityMatchesLocal,
   t,
-  transactions,
 }: UseContactsMessagingCompositionParams) => {
   const [recentlyAddedContactId, setRecentlyAddedContactId] =
     useState<ContactId | null>(null);
@@ -697,7 +694,6 @@ export const useContactsMessagingComposition = ({
 
   useUnknownSenderReassignment({
     contacts,
-    contactsRepository,
     hydrated: accountHydrated,
     reassign: reassignNostrConversationContactId,
     unknownSenders: unknownContacts,
@@ -1159,7 +1155,6 @@ export const useContactsMessagingComposition = ({
     setRecentlyAddedContactId,
     setStatus,
     t,
-    transactions,
   });
 
   const closeContactDetail = React.useCallback(() => {

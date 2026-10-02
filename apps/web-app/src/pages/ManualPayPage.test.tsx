@@ -1,5 +1,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createId } from "@linky-fit/linksync";
+import { navigateTo } from "../hooks/useRouting";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { ManualPayPage } from "./ManualPayPage";
 
@@ -93,6 +95,42 @@ describe("ManualPayPage", () => {
     });
 
     expect(onSubmitText).toHaveBeenCalledWith("alice@linky.fit");
+  });
+
+  it("pays a typed lightning address as itself even when a contact has it", async () => {
+    const onSubmitText = vi.fn<ManualPayPagePropsSubmit>();
+
+    const { container } = await renderIntoDocument(
+      <ManualPayPage
+        contacts={[
+          { id: createId<"Contact">(), name: "Bob", lnAddress: "bob@pay.test" },
+        ]}
+        nostrPictureByNpub={{}}
+        onSubmitText={onSubmitText}
+        t={translate}
+      />,
+    );
+
+    const input = container.querySelector("input");
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error("manual pay input missing");
+    }
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (candidate) => candidate.textContent === "Continue",
+    );
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error("manual pay submit missing");
+    }
+
+    await act(async () => {
+      setInputValue(input, "bob@pay.test");
+    });
+    await act(async () => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(navigateTo).not.toHaveBeenCalled();
+    expect(onSubmitText).toHaveBeenCalledWith("bob@pay.test");
   });
 
   it("submits invoices without linky.fit expansion", async () => {
