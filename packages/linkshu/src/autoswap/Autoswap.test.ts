@@ -30,6 +30,7 @@ import type { StoredOperation } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import {
   answerProofStates,
+  fakeKeyChain,
   fakeWallet,
   KEYSET_HEX,
   proof,
@@ -95,12 +96,11 @@ const makeWallets = (args: FakeWalletArgs) => {
   const wallet = (): LoadedWallet =>
     fakeWallet({
       keysetId: KEYSET_HEX,
-      keyChain: {
-        getKeysets: () =>
-          args.inputFeePpk === undefined
-            ? []
-            : [new Keyset(KEYSET_HEX, "sat", true, args.inputFeePpk)],
-      },
+      keyChain: fakeKeyChain(
+        args.inputFeePpk === undefined
+          ? []
+          : [new Keyset(KEYSET_HEX, "sat", true, args.inputFeePpk)],
+      ),
       checkProofsStates: answerProofStates(),
       // Every quote gets its own id, so each sizing attempt is its own
       // operation: target-quote-1, target-quote-2, ...
@@ -158,6 +158,7 @@ const makeMelt = (
       );
     },
     resumePending: Effect.succeed([]),
+    meltEnvelope: () => Effect.die("not under test"),
     melt: (draft: MeltDraft) => {
       const index = invoices.length;
       invoices.push(draft.invoice);

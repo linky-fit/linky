@@ -3,6 +3,8 @@ export * from "./autoswap/domain";
 export * from "./composition";
 export * from "./domain/errors";
 export * from "./domain/primitives";
+export * from "./envelope/domain";
+export * from "./envelope/Envelope";
 export * from "./feeProbe/domain";
 export * from "./feeProbe/FeeProbe";
 export * from "./headless";

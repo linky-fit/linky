@@ -15,6 +15,7 @@ The exported types are the reference; these guides say what to call and what eac
 - [Melt](./melt.md): pay a bolt11 invoice
 - [Top up](./topup.md): mint quote, invoice, settlement
 - [Autoswap](./autoswap.md): move a balance from one mint to another
+- [Envelopes](./envelope.md): reserve an amount under a key, so devices sharing the seed pay it at most once
 - [Validation](./validation.md): NUT-07 proof-state checks
 - [Restore](./restore.md): NUT-09 seed recovery and the seed-bound wipe
 - [Tokens](./tokens.md): balances, send transitions, `returnToWallet`, `reclaim`, backup import, token codec

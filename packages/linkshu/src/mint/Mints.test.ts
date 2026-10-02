@@ -17,7 +17,7 @@ import { OperationStore, StoredOperation } from "../ports/OperationStore";
 import type { OperationKind, OperationStatus } from "../ports/OperationStore";
 import { ProofStore, StoredProof } from "../ports/ProofStore";
 import type { ProofState } from "../ports/ProofStore";
-import { fakeWallet, KEYSET_HEX } from "../testing/fakeWallet";
+import { fakeKeyChain, fakeWallet, KEYSET_HEX } from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import { MintInfo } from "./domain";
 import type { LoadedWallet } from "./internal/WalletInstances";
@@ -164,12 +164,10 @@ describe("Mints.info", () => {
       // Bound to the pricier keyset on purpose: info must report the bound
       // keyset's fee, not the cheapest one.
       keysetId: "01aaaa",
-      keyChain: {
-        getKeysets: () => [
-          new Keyset("01aaaa", "sat", true, 120),
-          new Keyset("01bbbb", "sat", true, 5),
-        ],
-      },
+      keyChain: fakeKeyChain([
+        new Keyset("01aaaa", "sat", true, 120),
+        new Keyset("01bbbb", "sat", true, 5),
+      ]),
       getMintInfo: () =>
         new CashuMintInfo({
           ...baseInfo,
@@ -247,10 +245,8 @@ describe("Mints.info", () => {
   it("reports absent optional mint fields as null and mpp as false", async () => {
     const loaded = fakeWallet({
       keysetId: "01aaaa",
-      keyChain: {
-        // No published input_fee_ppk on the bound keyset.
-        getKeysets: () => [new Keyset("01aaaa", "sat", true)],
-      },
+      // No published input_fee_ppk on the bound keyset.
+      keyChain: fakeKeyChain([new Keyset("01aaaa", "sat", true)]),
       getMintInfo: () => new CashuMintInfo(baseInfo),
     });
 

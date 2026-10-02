@@ -8,6 +8,7 @@ import {
   NonNegativeAmount,
   OperationId,
   QuoteId,
+  TokenText,
   UnixSeconds,
 } from "../../domain/primitives";
 import { legacyDecoder, quoteRecordStore } from "../../internal/quoteRecords";
@@ -49,6 +50,11 @@ export class PendingMelt extends Schema.Class<PendingMelt>("PendingMelt")({
    * attempt sent, or null before any attempt reached the mint.
    */
   counter: Schema.NullOr(Schema.Int),
+  /**
+   * `meltEnvelope`: the envelope's token text, so inputs of a melt that did
+   * not pay go back to it even on a device its operation has not synced to.
+   */
+  envelope: Schema.NullOr(TokenText),
 }) {}
 
 const decodePendingMelt = Schema.decodeUnknownOption(PendingMelt);
@@ -88,7 +94,7 @@ const codec: QuoteRecordCodec<PendingMelt> = {
       locked: null,
       expiresAt: draft.expiresAt,
       createdAt: draft.createdAt,
-      tokenText: null,
+      tokenText: draft.envelope,
       error: null,
     }),
   fromOperation: (operation: StoredOperation) => {
@@ -105,6 +111,7 @@ const codec: QuoteRecordCodec<PendingMelt> = {
       expiresAt: operation.expiresAt,
       createdAt: operation.createdAt,
       counter: operation.counter,
+      envelope: operation.tokenText,
     });
     return decoded._tag === "Some" ? decoded.value : null;
   },
@@ -114,7 +121,7 @@ const codec: QuoteRecordCodec<PendingMelt> = {
       const legacy = decodeLegacy(raw);
       if (legacy === null) return null;
       const { blankCounter, ...rest } = legacy;
-      return { ...rest, counter: blankCounter };
+      return { ...rest, counter: blankCounter, envelope: null };
     },
   },
 };

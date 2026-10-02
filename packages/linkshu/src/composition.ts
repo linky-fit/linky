@@ -1,6 +1,7 @@
 import { Layer } from "effect";
 import { Autoswap } from "./autoswap/Autoswap";
 import type { Bip39Seed } from "./domain/primitives";
+import { Envelope } from "./envelope/Envelope";
 import { FeeProbe } from "./feeProbe/FeeProbe";
 import { Melt } from "./melt/Melt";
 import { Mints } from "./mint/Mints";
@@ -44,6 +45,7 @@ export const linkshuServices = (config: LinkshuServicesConfig) =>
     Restore.Default,
     Topup.Default,
     Autoswap.Default,
+    Envelope.Default,
     FeeProbe.Default,
     Mints.Default,
   ).pipe(

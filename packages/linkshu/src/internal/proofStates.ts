@@ -61,6 +61,20 @@ export const checkProofStates = (
         catch: (error) => classifyMintError(mint, error),
       }).pipe(Effect.map((states) => (Array.isArray(states) ? states : [])));
 
+export type ProofAnswer = "unspent" | "pending" | "spent" | "unknown";
+
+/** The mint's answer for the proof at `index`. */
+export const answerAt = (
+  states: ReadonlyArray<ProofStateEntry>,
+  index: number,
+): ProofAnswer => {
+  const raw = stateAt(states, index);
+  if (raw === UNSPENT) return "unspent";
+  if (raw === "PENDING") return "pending";
+  if (raw === SPENT) return "spent";
+  return "unknown";
+};
+
 /** Secrets the mint explicitly reported spent. */
 export const spentSecrets = (
   proofs: ReadonlyArray<Proof>,

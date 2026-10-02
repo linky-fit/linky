@@ -406,21 +406,30 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
      * Carries rows of the previous storage model into the inventory. A row
      * is ingested when any of its proofs is not yet stored; `pending` rows
      * are skipped, `accepted` becomes `available`, `reserved` is `held` by
-     * the pending melt whose inputs sum to the row (or by no known
-     * operation), `issued`/`externalized` become a `send` transfer with
+     * the pending melt whose inputs sum to the row (`available` when no melt
+     * matches), `issued`/`externalized` become a `send` transfer with
      * handed-out proofs, and `error` is `spent` only when the recorded error
      * says so — everything else is `available` for the next mint check to
-     * decide. Never drops funds; safe to run on every load and on every
-     * device, because ids derive from secrets.
+     * decide. A `reserved` row's proofs that older releases stored `held` by
+     * no operation are sorted the same way. Never drops funds; safe to run
+     * on every load and on every device, because ids derive from secrets.
      */
     const ingestLegacyRows = (
       rows: ReadonlyArray<LegacyTokenRow>,
     ): Effect.Effect<LegacyIngestReport> =>
       Effect.gen(function* () {
-        const known = storedSecrets(yield* proofStore.loadAll);
+        const stored = yield* proofStore.loadAll;
+        const known = storedSecrets(stored);
+        const heldByNone = new Map(
+          stored
+            .filter(
+              (proof) => proof.state === "held" && proof.operationId === null,
+            )
+            .map((proof) => [proof.secret, proof]),
+        );
         const pendingMelts = yield* melts.readAll;
         const linkedMelts = new Set(
-          (yield* proofStore.loadAll)
+          stored
             .filter((proof) => proof.state === "held")
             .map((proof) => proof.operationId),
         );
@@ -433,13 +442,19 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
           const fresh = decoded.proofs.filter(
             (proof) => !known.has(proof.secret),
           );
-          if (fresh.length === 0) continue;
+          const stranded =
+            row.state === "reserved"
+              ? decoded.proofs.flatMap(
+                  (proof) => heldByNone.get(proof.secret) ?? [],
+                )
+              : [];
+          if (fresh.length === 0 && stranded.length === 0) continue;
           for (const proof of fresh) known.add(proof.secret);
+          for (const proof of stranded) heldByNone.delete(proof.secret);
 
           let state: ProofState = "available";
           let operationId: OperationId | null = null;
           if (row.state === "reserved") {
-            state = "held";
             const total = totalAmount(decoded.proofs);
             const melt = pendingMelts.find(
               (candidate) =>
@@ -448,6 +463,7 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
                 !linkedMelts.has(candidate.id),
             );
             if (melt !== undefined) {
+              state = "held";
               operationId = melt.id;
               linkedMelts.add(melt.id);
             }
@@ -494,7 +510,14 @@ export class Tokens extends Effect.Service<Tokens>()("linkshu/Tokens", {
             ),
             "legacy-ingest",
           );
-          ingestedRows += 1;
+          yield* setProofState(
+            ctx,
+            stranded,
+            state,
+            "legacy-ingest",
+            operationId,
+          );
+          ingestedRows += fresh.length > 0 ? 1 : 0;
           proofCount += fresh.length;
         }
         return new LegacyIngestReport({ ingestedRows, proofs: proofCount });

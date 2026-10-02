@@ -12,6 +12,7 @@ import { KeyValueStore } from "../ports/KeyValueStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { ProofState } from "../ports/ProofStore";
 import {
+  fakeKeyChain,
   fakeReceiveSwap,
   fakeWallet,
   KEYSET_HEX,
@@ -64,12 +65,10 @@ const makeHarness = (args: HarnessArgs) => {
     fakeWallet({
       ...(args.receive === undefined ? {} : fakeReceiveSwap(args.receive)),
       keysetId: keysetHex,
-      keyChain: {
-        getKeysets: () => [
-          ...(args.keysetsForMint?.(requested) ??
-            args.keysets ?? [new Keyset(keysetHex, "sat", true, 0)]),
-        ],
-      },
+      keyChain: fakeKeyChain(
+        args.keysetsForMint?.(requested) ??
+          args.keysets ?? [new Keyset(keysetHex, "sat", true, 0)],
+      ),
       checkProofsStates: (proofs) =>
         Promise.resolve(
           proofs.map((entry) => ({

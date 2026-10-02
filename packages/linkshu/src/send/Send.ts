@@ -1,11 +1,6 @@
 import { Effect } from "effect";
-import {
-  AmountConsumedByFee,
-  InsufficientFunds,
-  MintRejected,
-} from "../domain/errors";
+import { AmountConsumedByFee, InsufficientFunds } from "../domain/errors";
 import { Amount, NonNegativeAmount, UnixSeconds } from "../domain/primitives";
-import type { MintUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { CounterScope } from "../internal/counters";
 import {
@@ -15,6 +10,7 @@ import {
 } from "../internal/operations";
 import { insertProofs, toDomainProof, toNewProofs } from "../internal/proofs";
 import {
+  malformedSwapProofs,
   selectSpendableProofs,
   settleSwap,
   swapProofsForAmount,
@@ -32,13 +28,6 @@ import { ProofStore } from "../ports/ProofStore";
 import { encodeCashuProofs } from "../token/internal/cashuProofs";
 import { SendReceipt } from "./domain";
 import type { SendDraft, SendError } from "./domain";
-
-const malformedSwapProofs = (mint: MintUrl): MintRejected =>
-  new MintRejected({
-    mint,
-    code: null,
-    detail: "mint returned malformed proofs from the swap",
-  });
 
 /**
  * Sending is one call: select confirmed-unspent `available` proofs, swap the

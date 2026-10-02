@@ -15,8 +15,6 @@ export class ValidationReport extends Schema.Class<ValidationReport>(
   checkedProofs: Schema.Int,
   /** Proofs definitively spent, marked so individually. */
   markedSpent: Schema.Array(SpentProofReport),
-  /** Held-by-unknown proofs the mint reported unspent, now `available`. */
-  released: Schema.Int,
   /** Mints that could not be reached; their proofs were left untouched. */
   unavailableMints: Schema.Array(MintUrl),
 }) {}

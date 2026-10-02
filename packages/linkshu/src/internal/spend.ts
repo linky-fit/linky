@@ -1,7 +1,7 @@
-import type { SendResponse } from "@cashu/cashu-ts";
+import type { OutputDataLike, SendResponse } from "@cashu/cashu-ts";
 import { Effect, Either } from "effect";
-import { InsufficientFunds } from "../domain/errors";
-import type { MintRejected, MintUnreachable } from "../domain/errors";
+import { InsufficientFunds, MintRejected } from "../domain/errors";
+import type { MintUnreachable } from "../domain/errors";
 import { NonNegativeAmount } from "../domain/primitives";
 import type { Amount, CurrencyUnit, MintUrl } from "../domain/primitives";
 import type { InspectorService } from "../inspector/Inspector";
@@ -44,6 +44,13 @@ const MAX_SWAP_ATTEMPTS = 5;
 const SWAP_OUTPUT_BLOCK = 64;
 /** A failed attempt may have burned both blocks. */
 const COLLISION_FALLBACK_BUMP = SWAP_OUTPUT_BLOCK * 2;
+
+export const malformedSwapProofs = (mint: MintUrl): MintRejected =>
+  new MintRejected({
+    mint,
+    code: null,
+    detail: "mint returned malformed proofs from the swap",
+  });
 
 export interface SpendContext {
   readonly proofStore: ProofStoreService;
@@ -108,6 +115,15 @@ export interface SwapRequest {
   readonly available: number;
   /** Make the send outputs also cover their own input fee at the mint. */
   readonly includeFees?: boolean;
+  /**
+   * Send outputs the caller derived itself (an envelope) instead of counter
+   * ones. A collision on them, once the mint has signed them, is not the
+   * counter's, so the swap stops instead of moving the counter.
+   */
+  readonly fixedSend?: {
+    readonly outputs: ReadonlyArray<OutputDataLike>;
+    readonly alreadySigned: Effect.Effect<boolean>;
+  };
 }
 
 /**
@@ -131,9 +147,12 @@ export const swapProofsForAmount = (
       const offeredSecrets = new Set(
         request.proofs.map((proof) => proof.secret),
       );
+      const { fixedSend } = request;
       let counter = yield* readCounter(ctx.kv, ctx.scope);
       let lastCollision: unknown = null;
       for (let attempt = 0; attempt < MAX_SWAP_ATTEMPTS; attempt += 1) {
+        const keepCounter =
+          fixedSend === undefined ? counter + SWAP_OUTPUT_BLOCK : counter;
         const outcome = yield* Effect.either(
           Effect.tryPromise({
             try: () =>
@@ -144,11 +163,11 @@ export const swapProofsForAmount = (
                   ? { includeFees: true }
                   : undefined,
                 {
-                  send: { type: "deterministic", counter },
-                  keep: {
-                    type: "deterministic",
-                    counter: counter + SWAP_OUTPUT_BLOCK,
-                  },
+                  send:
+                    fixedSend === undefined
+                      ? { type: "deterministic", counter }
+                      : { type: "custom", data: [...fixedSend.outputs] },
+                  keep: { type: "deterministic", counter: keepCounter },
                 },
               ),
             catch: (error): unknown => error,
@@ -165,7 +184,7 @@ export const swapProofsForAmount = (
             ctx.kv,
             ctx.inspector,
             ctx.scope,
-            counter + SWAP_OUTPUT_BLOCK + freshKeepCount,
+            keepCounter + freshKeepCount,
             "used",
           );
           return swapped;
@@ -178,7 +197,10 @@ export const swapProofsForAmount = (
             available: NonNegativeAmount.make(request.available),
           });
         }
-        if (!isRecoverableOutputCollision(raw)) {
+        if (
+          !isRecoverableOutputCollision(raw) ||
+          (fixedSend !== undefined && (yield* fixedSend.alreadySigned))
+        ) {
           return yield* Effect.fail(classifyMintError(ctx.scope.mint, raw));
         }
         lastCollision = raw;
