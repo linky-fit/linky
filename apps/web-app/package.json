@@ -4,6 +4,9 @@
   "version": "26.10.1",
   "license": "0BSD",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite",
     "dev:prod": "vite --mode prod-services --port 5175",

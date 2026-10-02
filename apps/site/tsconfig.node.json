@@ -8,6 +8,7 @@
     "vite.config.ts",
     "vitest.config.ts",
     "api/**/*.ts",
+    "scripts/**/*.ts",
     "playwright.config.ts",
     "tests/**/*.ts"
   ]

@@ -26,6 +26,7 @@ Plain (public, signed and published unwrapped):
 Never published:
 
 - [HTTP auth](./http-auth.md): signed events as HTTP credentials for Blossom, NIP-98 and push ownership proofs
+- [LNURL-withdraw sessions](./lnurl-withdraw.md): experimental online-wallet bridge authorization and request/reply bodies
 
 Machinery:
 
@@ -54,6 +55,7 @@ Every event kind the package produces. Wrapped kinds travel inside a kind 1059 g
 | 10000 | mute list                                 | no      | n/a                 | [plain-events.md](./plain-events.md#mute-list)           |
 | 10002 | relay list                                | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
 | 10050 | DM relay list                             | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
+| 24137 | LNURL-withdraw session (never published)  | no      | n/a                 | [LNURL-withdraw sessions](./lnurl-withdraw.md)           |
 | 24242 | Blossom upload auth (never published)     | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
 | 27235 | NIP-98 auth, push proof (never published) | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
 

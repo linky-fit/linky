@@ -1,4 +1,5 @@
 {
+  "functions": { "api/lnurlw.ts": { "maxDuration": 30 } },
   "rewrites": [
     {
       "source": "/.well-known/lnurlp/:user",

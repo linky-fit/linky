@@ -15,6 +15,7 @@ export * from "./domain/delivery";
 export * from "./domain/errors";
 export * from "./domain/primitives";
 export * from "./headless";
+export * from "./lnurlWithdraw";
 export * from "./identity/codec";
 export {
   makeBlossomUploadAuthHeader,
