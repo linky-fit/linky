@@ -3,6 +3,7 @@ import {
   Bolt11Invoice,
   Melt,
   MeltDraft,
+  parseTokenText,
   Receive,
   ReceiveDraft,
   Restore,
@@ -121,13 +122,41 @@ const resumeTopups: Command = Effect.scoped(
   }),
 );
 
+/** No token means "retry the tokens kept while their mint was down". */
 const receive = (operands: ReadonlyArray<string>): Command =>
+  operands.length === 0
+    ? resumeDeferredReceives
+    : receiveToken(requireOperand(operands, "token"));
+
+const receiveToken = (text: string): Command =>
   Effect.gen(function* () {
-    const receipt = yield* (yield* Receive).receive(
-      new ReceiveDraft({ text: requireOperand(operands, "token") }),
-    );
+    const receipt = yield* (yield* Receive).receive(new ReceiveDraft({ text }));
     print(`received ${receipt.amount} ${receipt.unit} from ${receipt.mint}`);
-  });
+  }).pipe(
+    Effect.catchTag("ReceiveDeferred", ({ amount, mint }) =>
+      Effect.sync(() =>
+        print(
+          `kept     ${amount} ${parseTokenText(text)?.unit ?? "sat"} until ${mint} can be used; run "receive" without a token to retry`,
+        ),
+      ),
+    ),
+  );
+
+const resumeDeferredReceives: Command = Effect.gen(function* () {
+  const results = yield* (yield* Receive).resumeDeferred;
+  if (results.length === 0) {
+    print("no deferred receives");
+    return;
+  }
+  for (const result of results) {
+    const receipt = result.receipt;
+    print(
+      receipt === null
+        ? `${result.status.padEnd(8)} ${result.amount} ${result.unit} from ${result.mint}  ${result.operationId}`
+        : `received ${receipt.amount} ${receipt.unit} from ${receipt.mint}`,
+    );
+  }
+});
 
 const send = (mint: MintUrl, amount: Amount): Command =>
   Effect.gen(function* () {

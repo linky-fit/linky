@@ -21,7 +21,8 @@ docker compose -f docker-compose.dev.yml up -d --wait cashu-mint
 | `balance`         | available balance held in the data directory              |
 | `topup <amount>`  | mint quote for `<amount>` sat, then wait for it to settle |
 | `topup`           | finish topups an earlier run left pending                 |
-| `receive <token>` | accept a cashu token                                      |
+| `receive <token>` | accept a cashu token; one whose mint is down is kept      |
+| `receive`         | retry tokens kept while their mint was down               |
 | `send <amount>`   | swap out `<amount>` sat and print the token               |
 | `melt <invoice>`  | pay a bolt11 invoice                                      |
 | `melt`            | settle melts an earlier run left pending                  |
