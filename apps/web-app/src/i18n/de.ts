@@ -37,6 +37,16 @@ export const de = {
   recurringNotifyBody:
     "{amount} {unit} an {name} geht in {minutes} Min. raus. Öffne Linky, um sie abzubrechen.",
   recurringSentBody: "{amount} {unit} an {name} gesendet.",
+  recurringFailedBody:
+    "Senden von {amount} {unit} an {name} ist fehlgeschlagen. Es wird erneut versucht.",
+  recurringWaitingForFundsBody:
+    "Das Guthaben reicht nicht, um {amount} {unit} an {name} zu senden. Lade vor der nächsten Fälligkeit auf, sonst wird diese Zahlung übersprungen.",
+  recurringSkippedNoFundsBody:
+    "{amount} {unit} an {name} übersprungen: Guthaben reicht nicht.",
+  recurringSkippedFailingBody:
+    "{amount} {unit} an {name} übersprungen: Die Zahlung ist wiederholt fehlgeschlagen.",
+  recurringSkippedRecipientBody:
+    "{amount} {unit} übersprungen: Der Empfänger kann nicht bezahlt werden.",
   recurringDueTitle: "Geplante Zahlung",
   recurringDueReady: "Die wiederkehrende Zahlung ist bereit.",
   recurringDueReadyDaily: "Die tägliche wiederkehrende Zahlung ist bereit.",
