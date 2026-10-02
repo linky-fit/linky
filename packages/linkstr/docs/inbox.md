@@ -55,7 +55,7 @@ The backfill starts at the cursor minus the two-day backdate margin, but never m
 | Seen receipts   | `SeenReceiptReceived`                | `OwnSeenReceiptConfirmed`                        |
 | (any)           | `WrapDropped`                        |                                                  |
 
-Peer facts carry `from`; own echoes carry `to` (the peer) and a nullable `clientId` so you can reconcile an optimistic local row. A `switch (event._tag)` or effect's `Match.tag` dispatches; `Match.tagsExhaustive` makes the compiler demand a branch per tag. Run one consumer per process and hand each vertical's tags to its own handler (each vertical guide has one).
+Peer facts carry `from`; own echoes carry `to` (the peer). Chat facts also carry a nullable `clientId`: on an own echo it reconciles an optimistic local row, on a peer message it dedups one message the sender published twice. A `switch (event._tag)` or effect's `Match.tag` dispatches; `Match.tagsExhaustive` makes the compiler demand a branch per tag. Run one consumer per process and hand each vertical's tags to its own handler (each vertical guide has one).
 
 ## Authentication and drop reasons
 

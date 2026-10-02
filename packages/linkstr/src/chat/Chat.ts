@@ -57,6 +57,7 @@ export class Chat extends Effect.Service<Chat>()("linkstr/Chat", {
       sendToPeer(context, "chat.sendToken", draft, {
         encode: encodeTokenMessageRumor,
         receipt: chatReceipt,
+        order: "recipientFirst",
       });
 
     const edit = (
