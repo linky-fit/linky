@@ -15,6 +15,7 @@ import {
   type ReactionRow,
   type WriteRow,
 } from "@linky-fit/linksync";
+import type { Pubkey } from "@linky-fit/linkstr";
 import type {
   LocalNostrMessage,
   LocalNostrReaction,
@@ -33,6 +34,7 @@ import type {
 
 type MessageColumns = LinkyDbSchema["message"];
 type ReactionColumns = LinkyDbSchema["reaction"];
+type UnknownSenderMessageColumns = LinkyDbSchema["unknownSenderMessage"];
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 const toText = (value: unknown): string =>
@@ -74,7 +76,7 @@ export const contactIdByConversationId = (
 };
 
 export const toLocalNostrMessage = (
-  row: MessageRow,
+  row: Omit<MessageRow, "conversationId">,
   contactId: string | undefined,
 ): LocalNostrMessage | null => {
   const directionRaw = trimString(row.direction);
@@ -220,13 +222,13 @@ const optionalText = <T>(
 ): T | undefined =>
   asNonEmptyString(value) === null ? undefined : decode(type, value);
 
-/** The whole message the UI hands over, as the row the repository accepts. */
-export const toMessageWriteRow = (
-  id: MessageId,
-  conversationId: ConversationId,
+type MessageContent = Omit<WriteRow<MessageColumns>, "id" | "conversationId">;
+
+/** The whole message the UI hands over, as the columns every message table shares. */
+const toMessageContent = (
   message: NewLocalNostrMessage,
   wrapIdText: string,
-): WriteRow<MessageColumns> | null => {
+): MessageContent | null => {
   const directionRaw = trimString(message.direction);
   const direction =
     directionRaw === "in" || directionRaw === "out" ? directionRaw : null;
@@ -242,9 +244,7 @@ export const toMessageWriteRow = (
     ? decode(PositiveInt, toPositiveInt(message.editedAtSec, createdAtSec))
     : undefined;
 
-  const row: Mutable<WriteRow<MessageColumns>> = {
-    id,
-    conversationId,
+  const row: Mutable<MessageContent> = {
     direction: NonEmptyString100.orThrow(direction),
     content,
     wrapId,
@@ -271,6 +271,29 @@ export const toMessageWriteRow = (
   const originalContent = optionalText(NonEmptyString, message.originalContent);
   if (originalContent) row.originalContent = originalContent;
   return row;
+};
+
+/** The whole message the UI hands over, as the row the repository accepts. */
+export const toMessageWriteRow = (
+  id: MessageId,
+  conversationId: ConversationId,
+  message: NewLocalNostrMessage,
+  wrapIdText: string,
+): WriteRow<MessageColumns> | null => {
+  const content = toMessageContent(message, wrapIdText);
+  return content && { ...content, id, conversationId };
+};
+
+/** A message in a conversation with an unknown sender, as the row the repository accepts. */
+export const toUnknownSenderWriteRow = (
+  id: MessageId,
+  peerPubkey: Pubkey,
+  message: NewLocalNostrMessage,
+  wrapIdText: string,
+): WriteRow<UnknownSenderMessageColumns> | null => {
+  const content = toMessageContent(message, wrapIdText);
+  const peer = decode(NonEmptyString1000, peerPubkey);
+  return content && peer ? { ...content, id, peerPubkey: peer } : null;
 };
 
 export const toReactionWriteRow = (

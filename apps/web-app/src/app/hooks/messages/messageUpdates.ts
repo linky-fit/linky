@@ -1,5 +1,4 @@
 import type {
-  LocalNostrMessage,
   UpdateLocalNostrMessage,
   UpdateLocalNostrReaction,
 } from "../../types/appTypes";
@@ -159,21 +158,4 @@ export const buildReactionUpdate = (
   )
     payload.status = status(updates.status);
   return Object.keys(payload).length > 1 ? payload : null;
-};
-
-export const applyMessageUpdate = (
-  message: LocalNostrMessage,
-  payload: NostrMessageUpdatePayload,
-): LocalNostrMessage => {
-  const { clientId, pubkey, localOnly, isEdited, ...fields } = payload;
-  const next: LocalNostrMessage = {
-    ...message,
-    ...fields,
-    ...(pubkey !== undefined ? { pubkey: pubkey ?? "" } : {}),
-    ...(localOnly !== undefined ? { localOnly: localOnly === "1" } : {}),
-    ...(isEdited !== undefined ? { isEdited: isEdited === "1" } : {}),
-  };
-  if (clientId === null) delete next.clientId;
-  else if (clientId !== undefined) next.clientId = clientId;
-  return next;
 };

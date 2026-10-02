@@ -22,6 +22,39 @@ import {
   TransactionId,
 } from "./ids";
 
+/** The columns a message has wherever it is stored. */
+export const messageContentColumns = {
+  // "in" | "out"
+  direction: NonEmptyString100,
+  // Decrypted plaintext message.
+  content: NonEmptyString,
+  // Gift-wrapped event id (kind 1059) used for de-duplication.
+  wrapId: NonEmptyString1000,
+  // Inner (rumor) event id (kind 14, unsigned) if available.
+  rumorId: nullOr(NonEmptyString1000),
+  // Sender pubkey hex (64 chars) of the inner message; null for local-only placeholders.
+  pubkey: nullOr(NonEmptyString1000),
+  // created_at (seconds) from the inner event when available.
+  createdAtSec: PositiveInt,
+  // Client-generated id for optimistic send/ack matching.
+  clientId: nullOr(NonEmptyString1000),
+  // "sent" | "pending"
+  status: nullOr(NonEmptyString100),
+  // "1" for local-only placeholders.
+  localOnly: nullOr(NonEmptyString100),
+  // Reply metadata (NIP-10).
+  replyToId: nullOr(NonEmptyString1000),
+  replyToContent: nullOr(NonEmptyString),
+  rootMessageId: nullOr(NonEmptyString1000),
+  // Edit metadata.
+  editedAtSec: nullOr(PositiveInt),
+  editedFromId: nullOr(NonEmptyString1000),
+  // "1" if the message content was edited.
+  isEdited: nullOr(NonEmptyString100),
+  // First known message content before edits.
+  originalContent: nullOr(NonEmptyString),
+};
+
 /**
  * Linky's synced data model, the shape every device converges on. System
  * columns (`createdAt`, `updatedAt`, `isDeleted`, `ownerId`) are added by
@@ -89,35 +122,7 @@ export const LinkySchema = {
   message: {
     id: MessageId,
     conversationId: ConversationId,
-    // "in" | "out"
-    direction: NonEmptyString100,
-    // Decrypted plaintext message.
-    content: NonEmptyString,
-    // Gift-wrapped event id (kind 1059) used for de-duplication.
-    wrapId: NonEmptyString1000,
-    // Inner (rumor) event id (kind 14, unsigned) if available.
-    rumorId: nullOr(NonEmptyString1000),
-    // Sender pubkey hex (64 chars) of the inner message; null for local-only placeholders.
-    pubkey: nullOr(NonEmptyString1000),
-    // created_at (seconds) from the inner event when available.
-    createdAtSec: PositiveInt,
-    // Client-generated id for optimistic send/ack matching.
-    clientId: nullOr(NonEmptyString1000),
-    // "sent" | "pending"
-    status: nullOr(NonEmptyString100),
-    // "1" for local-only placeholders.
-    localOnly: nullOr(NonEmptyString100),
-    // Reply metadata (NIP-10).
-    replyToId: nullOr(NonEmptyString1000),
-    replyToContent: nullOr(NonEmptyString),
-    rootMessageId: nullOr(NonEmptyString1000),
-    // Edit metadata.
-    editedAtSec: nullOr(PositiveInt),
-    editedFromId: nullOr(NonEmptyString1000),
-    // "1" if the message content was edited.
-    isEdited: nullOr(NonEmptyString100),
-    // First known message content before edits.
-    originalContent: nullOr(NonEmptyString),
+    ...messageContentColumns,
   },
   reaction: {
     id: ReactionId,
@@ -134,6 +139,14 @@ export const LinkySchema = {
     clientId: nullOr(NonEmptyString1000),
     // "sent" | "pending"
     status: nullOr(NonEmptyString100),
+  },
+  /** Unknown senders scope: a conversation with a peer who is not a contact. */
+  unknownSenderMessage: {
+    // `nostrMessageIdFor(rumorId)`, so the row keeps its id when it moves to a contact.
+    id: MessageId,
+    // Hex pubkey (64 chars) of the unknown sender, whichever way the message went.
+    peerPubkey: NonEmptyString1000,
+    ...messageContentColumns,
   },
   /** Cashu scope: the wallet inventory, one row per proof, id derived from the secret. */
   cashuProof: {
@@ -216,6 +229,9 @@ export type ContactRow = Row<LinkyDbSchema["contact"]>;
 export type ConversationRow = Row<LinkyDbSchema["conversation"]>;
 export type MessageRow = Row<LinkyDbSchema["message"]>;
 export type ReactionRow = Row<LinkyDbSchema["reaction"]>;
+export type UnknownSenderMessageRow = Row<
+  LinkyDbSchema["unknownSenderMessage"]
+>;
 export type CashuProofRow = Row<LinkyDbSchema["cashuProof"]>;
 export type CashuOperationRow = Row<LinkyDbSchema["cashuOperation"]>;
 export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
@@ -234,6 +250,7 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   conversation: columnNames(LinkySchema.conversation),
   message: columnNames(LinkySchema.message),
   reaction: columnNames(LinkySchema.reaction),
+  unknownSenderMessage: columnNames(LinkySchema.unknownSenderMessage),
   cashuProof: columnNames(LinkySchema.cashuProof),
   cashuOperation: columnNames(LinkySchema.cashuOperation),
   transaction: columnNames(LinkySchema.transaction),

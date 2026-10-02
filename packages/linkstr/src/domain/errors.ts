@@ -59,6 +59,14 @@ export class AllRelaysUnreachable extends Schema.TaggedError<AllRelaysUnreachabl
   },
 ) {}
 
+/** A fetch that needs every relay's answer found nothing while `failures` did not answer. */
+export class SomeRelaysUnanswered extends Schema.TaggedError<SomeRelaysUnanswered>()(
+  "SomeRelaysUnanswered",
+  {
+    failures: Schema.Array(RelayRejection),
+  },
+) {}
+
 export class NoReadRelaysConfigured extends Schema.TaggedError<NoReadRelaysConfigured>()(
   "NoReadRelaysConfigured",
   {},

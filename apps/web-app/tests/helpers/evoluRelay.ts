@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
+import { EVOLU_RELAY_URL } from "./stack";
 import type { Socket } from "node:net";
 import type { Page } from "@playwright/test";
-
-import { EVOLU_RELAY_URL } from "./stack";
 
 const keys = {
   user: "linky.evoluServers.user.v1",

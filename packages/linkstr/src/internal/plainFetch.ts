@@ -19,16 +19,23 @@ export interface PlainFetchOptions {
   readonly perRelayTimeout?: Duration.DurationInput;
 }
 
+export interface RawAnswers {
+  readonly events: Array<NostrToolsEvent>;
+  /** The relays that did not answer. */
+  readonly failures: Array<RelayRejection>;
+}
+
 /**
- * One-shot fetch fanned out across relays: merge what the reachable relays
- * returned, unvalidated. Fails only when no relay answered at all.
+ * One-shot fetch fanned out across relays: what the reachable relays
+ * returned, unvalidated, and which relays did not answer. Fails only when no
+ * relay answered at all.
  */
 export const fetchRawEvents = (
   transport: NostrTransportService,
   relays: ReadonlyArray<RelayUrl>,
   filter: Filter,
   options?: PlainFetchOptions,
-): Effect.Effect<Array<NostrToolsEvent>, AllRelaysUnreachable> =>
+): Effect.Effect<RawAnswers, AllRelaysUnreachable> =>
   Effect.gen(function* () {
     const perRelayTimeout = options?.perRelayTimeout;
     const fetchOne = (relay: RelayUrl) =>
@@ -46,39 +53,38 @@ export const fetchRawEvents = (
       (relay) => Effect.either(fetchOne(relay)),
       { concurrency: "unbounded" },
     );
+    const failures = outcomes
+      .filter(Either.isLeft)
+      .map(
+        ({ left }) =>
+          new RelayRejection({ relay: left.relay, detail: left.detail }),
+      );
     const answered = outcomes.filter(Either.isRight);
-    if (answered.length === 0) {
-      return yield* new AllRelaysUnreachable({
-        failures: outcomes
-          .filter(Either.isLeft)
-          .map(
-            ({ left }) =>
-              new RelayRejection({ relay: left.relay, detail: left.detail }),
-          ),
-      });
-    }
-    return answered.flatMap(({ right }) => right);
+    if (answered.length === 0)
+      return yield* new AllRelaysUnreachable({ failures });
+    return { events: answered.flatMap(({ right }) => right), failures };
   });
 
-/**
- * `fetchRawEvents` narrowed to plain events: malformed or forged events are
- * dropped, newest first so callers pick a winner with `find`.
- */
+/** Malformed or forged events dropped, newest first so callers pick a winner with `find`. */
+export const toPlainEvents = (
+  raws: ReadonlyArray<NostrToolsEvent>,
+): Array<SignedPlainEvent> =>
+  raws
+    .flatMap((raw) =>
+      Either.match(decodeVerifiedPlainEvent(raw), {
+        onLeft: () => [],
+        onRight: (event) => [event],
+      }),
+    )
+    .sort((a, b) => b.created_at - a.created_at);
+
+/** `fetchRawEvents` narrowed to plain events. */
 export const fetchPlainEvents = (
   transport: NostrTransportService,
   relays: ReadonlyArray<RelayUrl>,
   filter: Filter,
   options?: PlainFetchOptions,
 ): Effect.Effect<Array<SignedPlainEvent>, AllRelaysUnreachable> =>
-  fetchRawEvents(transport, relays, filter, options).pipe(
-    Effect.map((raws) =>
-      raws
-        .flatMap((raw) =>
-          Either.match(decodeVerifiedPlainEvent(raw), {
-            onLeft: () => [],
-            onRight: (event) => [event],
-          }),
-        )
-        .sort((a, b) => b.created_at - a.created_at),
-    ),
+  Effect.map(fetchRawEvents(transport, relays, filter, options), ({ events }) =>
+    toPlainEvents(events),
   );

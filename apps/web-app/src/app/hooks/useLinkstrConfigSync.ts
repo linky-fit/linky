@@ -3,6 +3,7 @@ import {
   InboxCursorStore,
   OutboxStore,
 } from "@linky-fit/linkstr";
+import type { InboxCursorsRepository } from "@linky-fit/linksync";
 import {
   linkstrConfigAtom,
   useAtomSet,
@@ -18,13 +19,19 @@ import {
   ALLOW_INSECURE_LOCALHOST_RELAYS,
   isRelayUrl,
 } from "../../utils/nostrRelays";
+import {
+  localInboxCursorKey,
+  syncedInboxCursorStore,
+} from "../lib/syncedInboxCursorStore";
+import { useInboxCursorsRepository } from "./useLinksync";
 
 const OUTBOX_STORAGE_KEY = "linky.outbox";
-const INBOX_CURSOR_STORAGE_KEY_PREFIX = "linky.inbox_cursor";
 
+/** `inboxCursors` is null before sign-in, where the cursor stays on this device. */
 export const buildLinkstrConfig = (
   currentNsec: string | null,
   fetchRelays: readonly string[],
+  inboxCursors: InboxCursorsRepository | null,
   inspectorEnabled: boolean = getInspectorEmissionEnabled(),
 ): LinkstrConfig | null => {
   if (!currentNsec) return null;
@@ -40,10 +47,17 @@ export const buildLinkstrConfig = (
       localStorage,
       OUTBOX_STORAGE_KEY,
     ),
-    inboxCursorStore: InboxCursorStore.fromStringStorage(
-      localStorage,
-      `${INBOX_CURSOR_STORAGE_KEY_PREFIX}.${identity.pubkey}`,
-    ),
+    inboxCursorStore:
+      inboxCursors === null
+        ? InboxCursorStore.fromStringStorage(
+            localStorage,
+            localInboxCursorKey(identity.pubkey),
+          )
+        : syncedInboxCursorStore({
+            pubkey: identity.pubkey,
+            storage: localStorage,
+            cursors: inboxCursors,
+          }),
     inspector: inspectorEnabled,
   };
 };
@@ -58,9 +72,21 @@ export const useLinkstrConfigSync = ({
 }) => {
   const inspectorEnabled = useInspectorEmissionEnabled();
   const setLinkstrConfig = useAtomSet(linkstrConfigAtom);
+  const inboxCursors = useInboxCursorsRepository();
   React.useEffect(() => {
     setLinkstrConfig(
-      buildLinkstrConfig(currentNsec, nostrFetchRelays, inspectorEnabled),
+      buildLinkstrConfig(
+        currentNsec,
+        nostrFetchRelays,
+        inboxCursors,
+        inspectorEnabled,
+      ),
     );
-  }, [currentNsec, inspectorEnabled, nostrFetchRelays, setLinkstrConfig]);
+  }, [
+    currentNsec,
+    inboxCursors,
+    inspectorEnabled,
+    nostrFetchRelays,
+    setLinkstrConfig,
+  ]);
 };

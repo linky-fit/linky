@@ -16,9 +16,7 @@ import {
 } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
-import { Schema } from "effect";
-import { BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY } from "../../../utils/constants";
-import { safeLocalStorageGetJson } from "../../../utils/storage";
+import { isBlockedPubkey } from "../../lib/blockList";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type {
   AppendLocalNostrMessage,
@@ -67,19 +65,6 @@ import type { Translate } from "../../../i18n";
 
 // Fallback backfill window for a first session without a persisted cursor.
 const INBOX_BACKFILL_SINCE_SEC = 3 * 24 * 60 * 60;
-
-const isBlockedPubkey = (pubkey: string): boolean => {
-  const normalizedPubkey = normalizePubkeyHex(pubkey);
-  if (!normalizedPubkey) return false;
-  return safeLocalStorageGetJson(
-    BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
-    Schema.Array(Schema.String),
-    [],
-  )
-    .map(normalizePubkeyHex)
-    .filter((entry): entry is string => Boolean(entry))
-    .includes(normalizedPubkey);
-};
 
 const deriveMyPubkey = (currentNsec: string | null): Pubkey | null => {
   if (!currentNsec) return null;
@@ -269,7 +254,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
         case "ChatMessageReceived": {
           const handled = applyChatMessageReceived(event, chatCtx);
           if (!handled.inserted) return handled.written;
-          // Store reactions waiting for this message after it becomes available.
+          // Store reactions waiting for this message before its event is confirmed.
           const reactionsWritten = retryDeferredReactions(
             buildHandlers(myPubkey).reactionCtx,
           );
@@ -359,7 +344,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
       since: UnixSeconds.make(nowSeconds() - INBOX_BACKFILL_SINCE_SEC),
       onEvent: async (event, delivery) => {
         const outcome = await dispatchInboxEvent(event, delivery);
-        if (!outcome.ok) console.warn("[linky][inbox] write failed", outcome);
+        if (!outcome.ok) throw new Error(outcome.error);
       },
     });
     return () => setWrapInboxHandler(null);

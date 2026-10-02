@@ -1,6 +1,7 @@
 import { Registry } from "./index";
 import {
   ClientId,
+  InboxCursorStore,
   NIP59_BACKDATE_MARGIN_SECONDS,
   RetractionDraft,
   RumorId,
@@ -8,11 +9,12 @@ import {
   WrapId,
 } from "@linky-fit/linkstr";
 import type {
+  InspectorEvent,
   LinkstrIdentityService,
   WrapInboxEvent,
 } from "@linky-fit/linkstr";
 import { recipientOf } from "@linky-fit/linkstr/testing";
-import { Exit } from "effect";
+import { Effect, Exit, Layer } from "effect";
 import type { Event as NostrToolsEvent } from "nostr-tools";
 import type { LinkstrConfig } from "./config";
 import { linkstrConfigAtom } from "./config";
@@ -21,6 +23,7 @@ import {
   wrapInboxAtom,
   wrapInboxHandlerAtom,
 } from "./inbox";
+import { inspectorEventsAtom, inspectorHandlerAtom } from "./inspector";
 import { retractReactionAtom } from "./reactions";
 import {
   configWith,
@@ -110,6 +113,8 @@ describe("wrapInboxAtom", () => {
     expect(subscriptions[0]?.filter).toEqual({
       kinds: [1059],
       "#p": [alice.pubkey],
+      since: expect.any(Number),
+      limit: 1,
     });
 
     subscriptions[0]?.onEvent(wrap);
@@ -125,10 +130,98 @@ describe("wrapInboxAtom", () => {
     unmount();
   });
 
+  it("confirms an event once its handler promise resolves, without holding the next one", async () => {
+    const first = await wrapFromBob(firstReaction);
+    const second = await wrapFromBob(RumorId.make("cd".repeat(32)));
+    const registry = Registry.make();
+    const subscriptions: Array<FakeSubscription> = [];
+    const saved: Array<UnixSeconds> = [];
+    const handled: Array<WrapInboxEvent> = [];
+    let storeFirst = () => {};
+
+    registry.set(linkstrConfigAtom, {
+      ...twoRelayConfig(alice, [], subscriptions),
+      inboxCursorStore: Layer.succeed(InboxCursorStore, {
+        load: Effect.succeed(null),
+        save: (cursor) => Effect.sync(() => saved.push(cursor)),
+      }),
+    });
+    registry.set(wrapInboxHandlerAtom, {
+      onEvent: (event) => {
+        handled.push(event);
+        if (handled.length > 1) return;
+        return new Promise<void>((resolve) => {
+          storeFirst = resolve;
+        });
+      },
+    });
+    const unmount = registry.mount(wrapInboxAtom);
+
+    await expect.poll(() => subscriptions.length).toBe(2);
+    for (const subscription of subscriptions) subscription.eose();
+    subscriptions[0]?.onEvent(first);
+    subscriptions[0]?.onEvent(second);
+    await expect.poll(() => handled.length).toBe(2);
+    expect(saved).toEqual([]);
+
+    storeFirst();
+    await expect
+      .poll(() => saved)
+      .toEqual([Math.max(first.created_at, second.created_at)]);
+
+    unmount();
+  });
+
+  it("reports an event whose handler rejects and leaves it unconfirmed", async () => {
+    const wrap = await wrapFromBob(firstReaction);
+    const registry = Registry.make();
+    const subscriptions: Array<FakeSubscription> = [];
+    const saved: Array<UnixSeconds> = [];
+    const seen: Array<InspectorEvent> = [];
+
+    registry.set(linkstrConfigAtom, {
+      ...twoRelayConfig(alice, [], subscriptions),
+      inspector: true,
+      inboxCursorStore: Layer.succeed(InboxCursorStore, {
+        load: Effect.succeed(null),
+        save: (cursor) => Effect.sync(() => saved.push(cursor)),
+      }),
+    });
+    registry.set(inspectorHandlerAtom, {
+      onEvent: (event) => {
+        seen.push(event);
+      },
+    });
+    const unmountInspector = registry.mount(inspectorEventsAtom);
+    registry.set(wrapInboxHandlerAtom, {
+      onEvent: () => Promise.reject(new Error("store unavailable")),
+    });
+    const unmount = registry.mount(wrapInboxAtom);
+
+    await expect.poll(() => subscriptions.length).toBe(2);
+    for (const subscription of subscriptions) subscription.eose();
+    subscriptions[0]?.onEvent(wrap);
+
+    await expect
+      .poll(() => seen.find((event) => event._tag === "InboxEventUnconfirmed"))
+      .toEqual(
+        expect.objectContaining({
+          wrapId: wrap.id,
+          eventTag: "ReactionRetracted",
+          error: "store unavailable",
+        }),
+      );
+    expect(saved).toEqual([]);
+
+    unmount();
+    unmountInspector();
+    registry.dispose();
+  });
+
   it("backfills from the handler's since cursor", async () => {
     const registry = Registry.make();
     const subscriptions: Array<FakeSubscription> = [];
-    const since = UnixSeconds.make(1_755_000_000);
+    const since = UnixSeconds.make(Math.floor(Date.now() / 1000) - 3600);
 
     registry.set(linkstrConfigAtom, twoRelayConfig(alice, [], subscriptions));
     registry.set(wrapInboxHandlerAtom, { since, onEvent: () => {} });

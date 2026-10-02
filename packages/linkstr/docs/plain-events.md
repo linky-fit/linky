@@ -118,7 +118,9 @@ Two plain replaceable events with empty content: kind 10002 (NIP-65) with one `[
 
 `MuteList.publishMuteList(pubkeys)` publishes your NIP-51 mute list: a kind 10000 event with one `p` tag per blocked pubkey, replacing the previous list on relays. There is no draft class; pass the complete list every time, since the newest event is the list. Publish whenever the local block list changes so other clients on the same key honour it.
 
-In React, call `publishMuteListAtom` with the complete pubkey list whenever it changes; it returns the same `PlainEventReceipt`.
+`fetchOwnMuteList()` asks every read and write relay for your kind 10000 and returns the newest as a `FetchedMuteList`, or `null` when every relay answered and none holds one. When no answering relay holds a list but some relay did not answer, it fails with `SomeRelaysUnanswered`, since the silent relay may hold the only list. Each relay gets 4 s, so a silent relay delays the result by that much at most. Fetch at startup so a new device learns who you blocked elsewhere, and again right before a publish: a replaceable event has no merge, so a publish built without the newest list drops what another device added to it.
+
+In React, call `publishMuteListAtom` with the complete pubkey list whenever it changes; it returns the same `PlainEventReceipt`. `fetchOwnMuteListAtom` runs `fetchOwnMuteList`.
 
 ```ts
 import { Effect } from "effect";
@@ -128,12 +130,12 @@ const publishBlocked = (blocked: ReadonlyArray<Pubkey>) =>
   Effect.flatMap(MuteList, (muteList) => muteList.publishMuteList(blocked));
 ```
 
-Publishing does not block anyone by itself, and there is no fetch or watch of your own mute list. Muting is enforced on receive by you: `WrapInbox` still delivers wraps from muted senders, so drop events whose `from` is on your block list in the inbox handler (and check `to` on `Own…Confirmed` facts if you hide a whole conversation).
+Publishing does not block anyone by itself, and there is no watch of your own mute list. Muting is enforced on receive by you: `WrapInbox` still delivers wraps from muted senders, so drop events whose `from` is on your block list in the inbox handler (and check `to` on `Own…Confirmed` facts if you hide a whole conversation).
 
 ### Wire format
 
-Kind 10000, plain and replaceable: one `["p", pubkey]` per muted contact, empty content, no encrypted section. Anyone can read the list.
+Kind 10000, plain and replaceable: one `["p", pubkey]` per muted contact, empty content, no encrypted section. Anyone can read the list. Decoding keeps the `p` values that are valid pubkeys, once each, and ignores other tags and any encrypted content another client wrote.
 
 ### Errors
 
-`NoRelayAcceptedEvent`; the local block still applies, republish later.
+`NoRelayAcceptedEvent` (publish); the local block still applies, republish later. `AllRelaysUnreachable`, `SomeRelaysUnanswered` and `NoReadRelaysConfigured` (fetch); keep the local list and do not publish, since a publish replaces a list you have not seen.

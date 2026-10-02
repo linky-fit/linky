@@ -2,6 +2,8 @@ import {
   ClientId,
   Emoji,
   EventId,
+  InboxEventUnconfirmed,
+  InboxWalkGivenUp,
   InboxRouted,
   InboxWrapDeduped,
   NoRelayReachable,
@@ -182,6 +184,33 @@ describe("linkstrEventToRow", () => {
       "WrapDropped unsupported-kind (rumor chat message (14))",
     );
     expect(row.links).toEqual({ wrap: [recipientWrapId] });
+  });
+
+  it("names the relay the inbox stopped waiting for", () => {
+    const row = linkstrEventToRow(
+      new InboxWalkGivenUp({ relay, failedAttempts: 3 }),
+      1000,
+    );
+    expect(row.summary).toBe(
+      `inbox stops waiting for ${relay}'s backfill walk after 3 failed attempts`,
+    );
+    expect(row.context).toEqual({ relay });
+  });
+
+  it("links an event the app left unconfirmed to its wrap", () => {
+    const row = linkstrEventToRow(
+      new InboxEventUnconfirmed({
+        wrapId: selfWrapId,
+        delivery: "backfill",
+        eventTag: "ChatMessageReceived",
+        error: "store unavailable",
+      }),
+      1000,
+    );
+    expect(row.summary).toBe(
+      "ChatMessageReceived left unconfirmed (backfill): store unavailable",
+    );
+    expect(row.links).toEqual({ wrap: [selfWrapId] });
   });
 
   it("marks cross-relay dedupes", () => {

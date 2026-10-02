@@ -6,14 +6,15 @@ What the package stores, where, and how a row moves between shards.
 
 A scope is one kind of data with one storage policy. `meta` lives in the Evolu `AppOwner`, the only one; every other scope lives in `ShardOwner`s derived with `deriveShardOwner(appOwner, [scope, index])`. The registry is `linkyScopes`; this table renders it.
 
-| Scope          | Owner                              | Tables                                | Rotates                  | Forget        |
-| -------------- | ---------------------------------- | ------------------------------------- | ------------------------ | ------------- |
-| `meta`         | `AppOwner`                         | `shardPointer`, `setting`             | no                       | never         |
-| `identity`     | `ShardOwner` `["identity", 0]`     | `nostrIdentity`                       | no                       | never         |
-| `contacts`     | `ShardOwner` `["contacts", n]`     | `contact`                             | 256 KiB or 220 mutations | never         |
-| `messages`     | `ShardOwner` `["messages", n]`     | `conversation`, `message`, `reaction` | 256 KiB or 160 mutations | keep newest 4 |
-| `cashu`        | `ShardOwner` `["cashu", n]`        | `cashuProof`, `cashuOperation`        | 256 KiB or 170 mutations | never         |
-| `transactions` | `ShardOwner` `["transactions", n]` | `transaction`                         | 256 KiB or 220 mutations | keep newest 4 |
+| Scope            | Owner                                | Tables                                | Rotates                  | Forget        |
+| ---------------- | ------------------------------------ | ------------------------------------- | ------------------------ | ------------- |
+| `meta`           | `AppOwner`                           | `shardPointer`, `setting`             | no                       | never         |
+| `identity`       | `ShardOwner` `["identity", 0]`       | `nostrIdentity`                       | no                       | never         |
+| `contacts`       | `ShardOwner` `["contacts", n]`       | `contact`                             | 256 KiB or 220 mutations | never         |
+| `messages`       | `ShardOwner` `["messages", n]`       | `conversation`, `message`, `reaction` | 256 KiB or 160 mutations | keep newest 4 |
+| `unknownSenders` | `ShardOwner` `["unknownSenders", n]` | `unknownSenderMessage`                | 256 KiB or 160 mutations | keep newest 2 |
+| `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`        | 256 KiB or 170 mutations | never         |
+| `transactions`   | `ShardOwner` `["transactions", n]`   | `transaction`                         | 256 KiB or 220 mutations | keep newest 4 |
 
 A shard rotates once its Evolu history holds `SHARD_MAX_BYTES` (256 KiB) of column values or the scope's mutation count, whichever comes first, with `SHARD_ROTATION_COOLDOWN_MS` (60 s) between rotations of one scope. The byte threshold is a quarter of the official Evolu relay's 1 MB per-owner quota, leaving room for encryption and per-row overhead. Rotation moves a pointer; nothing is copied.
 
@@ -21,7 +22,7 @@ Money truth is the proofs and operations, never forgotten; the transaction histo
 
 ## Tables
 
-`LinkySchema` holds the columns and their comments. Every non-id column is nullable on read, because a row can arrive column by column from sync; readers validate what they need. `shardPointer`, `setting` and `nostrIdentity` have deterministic ids ([below](#ids)) so every device upserts the same row. `message` and `reaction` carry `conversationId`, so a forgotten shard takes a chat's messages and reactions together.
+`LinkySchema` holds the columns and their comments. Every non-id column is nullable on read, because a row can arrive column by column from sync; readers validate what they need. `shardPointer`, `setting` and `nostrIdentity` have deterministic ids ([below](#ids)) so every device upserts the same row. `message` and `reaction` carry `conversationId`, so a forgotten shard takes a chat's messages and reactions together. An unknown sender's message is stored like a message of a conversation but filed under its sender, so it moves into the conversation unchanged once the sender becomes a contact.
 
 ## How a row moves
 
@@ -37,6 +38,8 @@ Money truth is the proofs and operations, never forgotten; the transaction histo
 
 A forgettable scope keeps its newest N shards, the active one included. Messages keep 4: three retired shards of recent context after a rotation, and a fresh device's initial chat history bounded to roughly 1 MiB of local value bytes at the byte threshold. It is not a message-count or age guarantee.
 
+Messages from unknown senders keep 2, so spam from unknown senders neither grows the conversation history nor stays in it: a rotation still leaves the previous shard's messages visible, and a fresh device reads at most roughly 512 KiB of them. They rotate on the messages thresholds because their rows have the same shape. `messageScopes` lists the two scopes that hold messages, which a user forgets together.
+
 A fresh device reads and subscribes only the newest N shards. An existing device retains its older locally held shards across rotations and reloads until an explicit forget, remembered through the device-local `ShardRetention` port ([core](./core.md#device-local-retention)). `ShardStore.forget(scope?)` narrows one scope, or every forgettable scope, to its newest window and notifies readers. Evolu 7 only unsubscribes and hides the older rows (`deleted: false`); local bytes and relay history remain until Evolu can delete an owner. The in-memory port deletes.
 
 A cursor update copies the conversation into the active messages shard; `markSeen` only writes for a newer message, so an idle chat's read cursors may be forgotten with its old messages. Every cursor written since the oldest visible shard began is visible, so a consumer can treat messages up to `visibleSinceSec` ([repositories](./repositories.md#conversations)) as read. The archive state lives on the contact, which is never forgotten, so every device sees which chats are archived.
@@ -50,7 +53,7 @@ Copy-on-write identity is the row `id`. These ids are deterministic, so every de
 | `cashuProofIdFor`         | the proof secret                    | a synced or restored proof never duplicates                                                          |
 | `cashuOperationIdFor`     | linkshu's `operationKeyOf`          | re-inserting an operation upserts its row                                                            |
 | `directConversationIdFor` | the contact id                      | every device derives one conversation per contact                                                    |
-| `nostrMessageIdFor`       | the message's rumor id              | a message fetched again stays one row                                                                |
+| `nostrMessageIdFor`       | the message's rumor id              | a message fetched again stays one row, in either message table                                       |
 | `nostrReactionIdFor`      | the reaction's rumor id and reactor | a reaction fetched again stays one row; a removal stored first applies only to its author's reaction |
 | `settingIdFor`            | the key                             | one row per key                                                                                      |
 | `activeNostrIdentityId`   | constant                            | one mirrored identity row                                                                            |

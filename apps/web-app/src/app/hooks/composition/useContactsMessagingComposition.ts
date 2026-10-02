@@ -1,5 +1,9 @@
 import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
-import { useAccountHydrated, useMessagesVisibleSinceSec } from "../useLinksync";
+import {
+  useAccountHydrated,
+  useMessagesVisibleSinceSec,
+  useUnknownSendersRepository,
+} from "../useLinksync";
 import type { ProfileMetadata } from "@linky-fit/linkstr";
 import {
   ContactId,
@@ -18,11 +22,10 @@ import {
 } from "@linky-fit/linkstr";
 import {
   fetchProfilesAtom,
-  publishMuteListAtom,
   useAtomSet,
   useOutboxResults,
 } from "@linky-fit/linkstr-react";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 import React, { useMemo, useState } from "react";
 import { deriveDefaultProfile } from "../../../derivedProfile";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
@@ -46,7 +49,6 @@ import {
 } from "../../../profileCache";
 import {
   ARCHIVED_CONTACTS_FILTER,
-  BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
   CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY,
   NO_GROUP_FILTER,
@@ -86,7 +88,7 @@ import {
   readUnknownContactIdPubkey,
 } from "../messages/contactIdentity";
 import type { PeerSeenWindow } from "../messages/seenReceiptInbox";
-import { NO_WRITE, runWrite } from "../../lib/storeWrite";
+import { NO_WRITE, runWrite, type WriteOutcome } from "../../lib/storeWrite";
 import { useChatReadCursorSync } from "../messages/useChatReadCursorSync";
 import { useUnknownSenderReassignment } from "../messages/useUnknownSenderReassignment";
 import { applyOutboxResult } from "../messages/outboxResults";
@@ -108,21 +110,17 @@ import {
   fetchAndCacheProfiles,
   useLinkstrProfileSync,
 } from "../useLinkstrProfileSync";
+import { blockPubkey, isBlockedPubkey } from "../../lib/blockList";
+import { useMuteListSync } from "../messages/useMuteListSync";
 import { useMessagesDomain } from "../useMessagesDomain";
 import { usePushRegistrationLifecycle } from "../usePushRegistrationLifecycle";
 import { useRelayDomain } from "../useRelayDomain";
 import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
-import {
-  safeLocalStorageGet,
-  safeLocalStorageGetJson,
-  safeLocalStorageSetJson,
-} from "../../../utils/storage";
+import { safeLocalStorageGet } from "../../../utils/storage";
 import type { Translate } from "../../../i18n";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 
 const inMemoryNostrPictureCache = new Map<string, string | null>();
-
-const isPubkey = Schema.is(Pubkey);
 
 const INLINE_NPUB_PATTERN =
   /(?:nostr:)?npub1[023456789acdefghjklmnpqrstuvwxyz]+(?:@npub\.cash)?/gi;
@@ -200,7 +198,6 @@ const reportContactsAddedToGroup = (
 
 interface UseContactsMessagingCompositionParams {
   appOwnerId: IdentityOwnersCompositionResult["appOwnerId"];
-  appOwnerIdRef: IdentityOwnersCompositionResult["appOwnerIdRef"];
   contactPayBackToChatRef: React.MutableRefObject<ContactId | null>;
   contactsRepository: ContactsRepository;
   conversationsRepository: ConversationsRepository;
@@ -232,7 +229,6 @@ interface UseContactsMessagingCompositionParams {
 
 export const useContactsMessagingComposition = ({
   appOwnerId,
-  appOwnerIdRef,
   contactPayBackToChatRef,
   contactsRepository,
   conversationsRepository,
@@ -408,6 +404,7 @@ export const useContactsMessagingComposition = ({
     [lang],
   );
 
+  const accountHydrated = useAccountHydrated();
   const reassignContactMessagesRef = React.useRef<
     (fromContactId: string, toContactId: string) => number
   >(() => 0);
@@ -418,7 +415,6 @@ export const useContactsMessagingComposition = ({
     [],
   );
 
-  const accountHydrated = useAccountHydrated();
   const {
     activeGroup,
     contacts,
@@ -469,6 +465,7 @@ export const useContactsMessagingComposition = ({
     void setStoredPushContactNames(records);
   }, [contacts]);
 
+  const unknownSendersRepository = useUnknownSendersRepository();
   const {
     appendLocalNostrMessage,
     appendLocalNostrReaction,
@@ -491,13 +488,13 @@ export const useContactsMessagingComposition = ({
     updateLocalNostrReaction,
   } = useMessagesDomain({
     appOwnerId,
-    appOwnerIdRef,
     chatForceScrollToBottomRef,
     chatMessagesRef,
     contacts,
     conversations: conversationsRepository,
     hydrated: accountHydrated,
     route,
+    unknownSenders: unknownSendersRepository,
   });
 
   // Passive Nostr work waits for hydration, with no timeout, and for the
@@ -510,6 +507,10 @@ export const useContactsMessagingComposition = ({
     (!isSeedLogin || syncedNostrIdentityMatchesLocal);
   const deferredOnlineReady = useDeferredOnlineReady();
   const canRunNostrNetworkWork = deferredOnlineReady && nostrBootstrapReady;
+  const { muteListSynced, syncMuteList } = useMuteListSync({
+    enabled: nostrBootstrapReady,
+    pubkey: chatOwnPubkeyHex,
+  });
 
   usePushRegistrationLifecycle({
     currentNsec,
@@ -636,16 +637,6 @@ export const useContactsMessagingComposition = ({
   });
 
   const unknownContacts = React.useMemo<UnknownChatContact[]>(() => {
-    const blockedPubkeys = new Set(
-      safeLocalStorageGetJson(
-        BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
-        Schema.Array(Schema.String),
-        [],
-      )
-        .map((entry) => normalizePubkeyHex(entry))
-        .filter((entry): entry is string => Boolean(entry)),
-    );
-
     const unknownById = new Map<string, UnknownChatContact>();
 
     for (const [contactId, lastMessage] of lastVisibleMessageByContactId) {
@@ -661,7 +652,7 @@ export const useContactsMessagingComposition = ({
         .map((message) => normalizePubkeyHex(message.pubkey))
         .find((pubkey) => {
           if (!pubkey) return false;
-          if (blockedPubkeys.has(pubkey)) return false;
+          if (isBlockedPubkey(pubkey)) return false;
           const ownPubkey = normalizePubkeyHex(chatOwnPubkeyHex);
           if (ownPubkey && ownPubkey === pubkey) return false;
           return true;
@@ -672,7 +663,7 @@ export const useContactsMessagingComposition = ({
         candidatePubkeyFromThread ??
         candidatePubkeyFromLast ??
         null;
-      if (unknownPubkeyHex && blockedPubkeys.has(unknownPubkeyHex)) continue;
+      if (unknownPubkeyHex && isBlockedPubkey(unknownPubkeyHex)) continue;
       const ownPubkey = normalizePubkeyHex(chatOwnPubkeyHex);
       if (unknownPubkeyHex && ownPubkey && unknownPubkeyHex === ownPubkey) {
         continue;
@@ -1280,41 +1271,16 @@ export const useContactsMessagingComposition = ({
     ],
   );
 
-  const publishMuteList = useAtomSet(publishMuteListAtom, {
-    mode: "promiseExit",
-  });
-
   const blockPubkeyAndPublishMuteList = React.useCallback(
     async (pubkeyHex: string): Promise<boolean> => {
-      const normalizedPubkey = normalizePubkeyHex(pubkeyHex);
-      if (!normalizedPubkey) return false;
-
-      const mergedBlockedPubkeys = Array.from(
-        new Set(
-          safeLocalStorageGetJson(
-            BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
-            Schema.Array(Schema.String),
-            [],
-          )
-            .map((entry) => normalizePubkeyHex(entry))
-            .filter((entry): entry is string => Boolean(entry))
-            .concat(normalizedPubkey),
-        ),
-      );
-
-      safeLocalStorageSetJson(
-        BLOCKED_NOSTR_PUBKEYS_STORAGE_KEY,
-        mergedBlockedPubkeys,
-      );
-
+      const pubkey = normalizePubkeyHex(pubkeyHex);
+      if (!pubkey) return false;
+      blockPubkey(pubkey);
       // Local blocklist applies either way; the mute list is best effort.
-      if (currentNsec) {
-        void publishMuteList(mergedBlockedPubkeys.filter(isPubkey));
-      }
-
+      if (currentNsec) void syncMuteList();
       return true;
     },
-    [currentNsec, publishMuteList],
+    [currentNsec, syncMuteList],
   );
 
   const archiveCurrentContact = React.useCallback(() => {
@@ -1923,25 +1889,26 @@ export const useContactsMessagingComposition = ({
   );
 
   const advanceContactPeerSeen = React.useCallback(
-    (contactId: string, seenWindow: PeerSeenWindow) => {
+    (contactId: string, seenWindow: PeerSeenWindow): Promise<WriteOutcome> => {
       const id = ContactId.from(contactId);
       const atSec = PositiveInt.from(seenWindow.seenUpToSec);
       if (!id.ok || !atSec.ok) return NO_WRITE;
       const sinceSec = PositiveInt.from(seenWindow.sinceSec);
       peerSeenWrittenByContactIdRef.current.set(contactId, seenWindow);
-      return runWrite(
+      const written = runWrite(
         Effect.flatMap(conversationsRepository.ensureDirect(id.value), (chat) =>
           conversationsRepository.setPeerSeen(chat.id, {
             sinceSec: sinceSec.ok ? sinceSec.value : null,
             atSec: atSec.value,
           }),
         ),
-      ).then((outcome) => {
-        if (outcome.ok) return outcome;
+      );
+      void written.then((outcome) => {
+        if (outcome.ok) return;
         peerSeenWrittenByContactIdRef.current.delete(contactId);
         console.warn("[linky][conversations] peer seen write failed", outcome);
-        return outcome;
       });
+      return written;
     },
     [conversationsRepository],
   );
@@ -1953,12 +1920,12 @@ export const useContactsMessagingComposition = ({
     applyBankPaymentOfferSnapshot,
     contacts,
     currentNsec,
-    enabled: nostrBootstrapReady,
+    enabled: nostrBootstrapReady && muteListSynced,
     formatDisplayedAmountText,
     getPeerSeenWindow,
     logPayStep,
-    messagesVisibleSinceSec,
     maybeShowPwaNotification,
+    messagesVisibleSinceSec,
     nostrMessagesLatestRef,
     nostrMessagesLocal,
     knownReactionKeysRef,

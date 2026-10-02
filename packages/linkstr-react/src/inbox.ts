@@ -1,5 +1,9 @@
 import { Atom } from "@effect-atom/atom-react";
-import { WrapInbox } from "@linky-fit/linkstr";
+import {
+  InboxEventUnconfirmed,
+  Inspector,
+  WrapInbox,
+} from "@linky-fit/linkstr";
 import type {
   DeliveredInboxEvent,
   InboxDelivery,
@@ -15,9 +19,11 @@ export interface WrapInboxHandler {
   /** Backfill start when the configured cursor store holds no cursor yet. */
   readonly since?: UnixSeconds;
   /**
-   * Called once per inbox event, in order; the next event waits for it.
-   * `delivery` is "live" only for events published after the relay's EOSE —
-   * the ones worth interrupting the user for.
+   * Called once per inbox event, in order, without waiting for the previous
+   * promise. Return the promise of what the handler stores; the event is
+   * acked when it resolves. A rejection or throw leaves it unacked
+   * (`InboxEventUnconfirmed`). `delivery` is "live" only for events published
+   * after the relay's EOSE — the ones worth interrupting the user for.
    */
   readonly onEvent: (
     event: WrapInboxEvent,
@@ -47,7 +53,8 @@ export const fetchWrapEventAtom = linkstrRuntimeAtom.fn<FetchWrapEventParams>()(
 
 /**
  * While mounted (and a handler is registered), runs the single kind-1059
- * subscription and feeds every typed inbox event through the handler.
+ * subscription, feeds every typed inbox event through the handler and
+ * confirms it once the handler has stored it.
  * Unmounting — or a config/handler swap — closes the relay subscriptions.
  * The atom's value is the last handled event, which is useful for debugging.
  */
@@ -57,13 +64,35 @@ export const wrapInboxAtom = linkstrRuntimeAtom.atom((get) => {
   return Stream.unwrapScoped(
     Effect.gen(function* () {
       const inbox = yield* WrapInbox;
+      const inspector = yield* Inspector.orNoop;
       const feed = yield* inbox.open(
         handler.since === undefined ? {} : { since: handler.since },
       );
+      const reportUnconfirmed =
+        ({ wrapId, delivery, event }: DeliveredInboxEvent) =>
+        (error: unknown) =>
+          inspector.emit(
+            () =>
+              new InboxEventUnconfirmed(
+                {
+                  wrapId,
+                  delivery,
+                  eventTag: event._tag,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+                { disableValidation: true },
+              ),
+          );
       const handle = (delivered: DeliveredInboxEvent) =>
-        Effect.promise(async () => {
-          await handler.onEvent(delivered.event, delivered.delivery);
-        }).pipe(Effect.as(delivered));
+        Effect.sync(() => {
+          void new Promise<void>((resolve) => {
+            resolve(handler.onEvent(delivered.event, delivered.delivery));
+          }).then(
+            () => Effect.runFork(delivered.ack),
+            reportUnconfirmed(delivered),
+          );
+          return delivered;
+        });
       return Stream.mapEffect(feed.events, handle);
     }),
   );

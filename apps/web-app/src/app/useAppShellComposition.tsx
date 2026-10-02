@@ -548,7 +548,6 @@ export const useAppShellComposition = ({
     visibleContacts,
   } = useContactsMessagingComposition({
     appOwnerId,
-    appOwnerIdRef,
     contactPayBackToChatRef,
     contactsRepository,
     conversationsRepository,

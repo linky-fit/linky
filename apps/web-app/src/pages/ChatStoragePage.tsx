@@ -1,19 +1,22 @@
 import { useState } from "react";
-import { linkyScopes } from "@linky-fit/linksync";
+import { keepNewest, linkyScopes, messageScopes } from "@linky-fit/linksync";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useShardSummaries } from "../app/hooks/useLinksync";
 import { forgetChatShards } from "../evolu";
 
 export function ChatStoragePage(): React.ReactElement {
   const { t } = useAppShellCore();
-  const messages = useShardSummaries().find(
-    (shard) => shard.scope === "messages",
-  );
+  const summaries = useShardSummaries();
+  const messages = summaries.find((shard) => shard.scope === "messages");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const policy = linkyScopes.messages.forget;
-  const keep = policy === "never" ? 0 : policy.keepNewest;
+  const keep = keepNewest(linkyScopes.messages);
   const subscribed = messages?.visibleOwnerIds.length ?? 0;
+  const forgettable = summaries.some(
+    (shard) =>
+      messageScopes.some((scope) => scope === shard.scope) &&
+      shard.visibleOwnerIds.length > keepNewest(linkyScopes[shard.scope]),
+  );
   const forget = async () => {
     setBusy(true);
     setStatus("");
@@ -41,7 +44,7 @@ export function ChatStoragePage(): React.ReactElement {
       <button
         type="button"
         className="btn-wide secondary"
-        disabled={busy || subscribed <= keep}
+        disabled={busy || !forgettable}
         onClick={() => void forget()}
       >
         {t("chatStorageForget")}

@@ -220,6 +220,13 @@ const REQUIRED_COLUMNS: {
     "createdAtSec",
     "wrapId",
   ],
+  unknownSenderMessage: [
+    "peerPubkey",
+    "direction",
+    "content",
+    "wrapId",
+    "createdAtSec",
+  ],
   cashuProof: ["mint", "unit", "keysetId", "amount", "secret", "c", "state"],
   cashuOperation: ["kind", "status", "mint", "unit", "amount", "createdAtSec"],
   transaction: ["createdAtSec", "direction", "status"],

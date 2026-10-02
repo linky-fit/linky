@@ -1,6 +1,6 @@
 # Inbox
 
-`WrapInbox` is the one kind-1059 subscription: it backfills from a persisted cursor, authenticates every gift wrap, and hands you typed facts on a single stream. It is also the one-shot decoder for a wrap a push notification names. Rumor, own echo and EOSE are defined in [concepts.md](./concepts.md#vocabulary); in React the same feed runs behind `wrapInboxAtom` ([react.md](./react.md#inbox)).
+`WrapInbox` is the one kind-1059 subscription: it backfills from a persisted cursor in pages, authenticates every gift wrap, and hands you typed facts on a single stream. It is also the one-shot decoder for a wrap a push notification names. Rumor, own echo and EOSE are defined in [concepts.md](./concepts.md#vocabulary); in React the same feed runs behind `wrapInboxAtom` ([react.md](./react.md#inbox)).
 
 ## Open the feed
 
@@ -17,8 +17,10 @@ const consume = Effect.scoped(
     const feed = yield* inbox.open({
       since: UnixSeconds.make(Math.floor(Date.now() / 1000) - LOOKBACK_SECONDS),
     });
-    yield* Stream.runForEach(feed.events, ({ delivery, event }) =>
-      Effect.sync(() => console.log(delivery, event)),
+    yield* Stream.runForEach(feed.events, ({ delivery, event, ack }) =>
+      Effect.sync(() => console.log(delivery, event)).pipe(
+        Effect.zipRight(ack),
+      ),
     );
   }),
 );
@@ -27,9 +29,18 @@ const consume = Effect.scoped(
 - `open(options?)` returns `WrapInboxFeed` and requires a `Scope`. Leaving the scope closes every relay subscription and ends the stream.
 - Options: `since` (backfill start, used only when the cursor store is empty) and `resubscribeDelay` (base of the per-relay reconnect backoff, default 5 s).
 - Fails with `NoReadRelaysConfigured` when `RelayPolicy.readRelays` is empty.
-- `feed.events` is `Stream<DeliveredInboxEvent>`: `{ delivery, event }`. It is **single-consumer**; if two parts of your app need it, consume once and fan out.
-- `delivery` is `"backfill"` until the delivering relay sends EOSE, then `"live"`. Interrupt the user (toast, notification) for live events only. After a reconnect the relay replays its window, so those arrivals are backfill again.
+- `feed.events` is `Stream<DeliveredInboxEvent>`: `{ wrapId, delivery, event, ack }`, where `wrapId` names the gift wrap (null when the outer event was malformed). It is **single-consumer**; if two parts of your app need it, consume once and fan out.
+- Run `ack` once the event is handled and stored, drops included. It may run later and out of order; the cursor waits for it ([below](#the-cursor-and-inboxcursorstore)).
+- `delivery` is `"backfill"` for stored wraps and `"live"` for wraps a relay pushes after its EOSE. Interrupt the user (toast, notification) for live events only. After a reconnect the relay's window is fetched again, so those arrivals are backfill again.
 - Each read relay runs its own subscription and reconnect loop (exponential backoff with jitter from `resubscribeDelay`, capped at 12×), so one dead relay never stalls the others.
+
+## Backfill
+
+Each attempt on a relay opens a live subscription that asks for a single stored wrap (`limit: 1`; some relays never answer `limit: 0` with EOSE). Once the relay answers it with EOSE, the inbox walks the relay's stored wraps back in pages: `limit` 200, newest first, each page's `until` set to the oldest wrap of the page before, down to the backfill start. An empty page ends the walk. A page repeating the boundary second moves the walk below that second, so repeated wraps never hide older history.
+
+If that boundary fills the largest page the relay has served during this walk, the inbox first retries it with `limit` 400. If it still fills the page, the relay may be hiding more wraps in that second. The walk continues through older history, but the cursor cannot pass that unresolved timestamp. Restarts keep those wraps in the backfill window; a relay with a larger result cap can recover them.
+
+The backfill starts at the cursor minus the two-day backdate margin, but never more than `MAX_BACKFILL_AGE_SECONDS` (30 days) ago; older wraps are skipped. The start is fixed when the feed opens, so every attempt on every relay walks back to the same point.
 
 ## The event union
 
@@ -70,11 +81,13 @@ Drops are facts too: log them, count them, but never treat one as an error.
 
 ## The cursor and `InboxCursorStore`
 
-The inbox tracks the newest authenticated wrap `created_at` (clamped to now, so a sender-controlled future timestamp cannot push it past real time) and checkpoints it to `InboxCursorStore` on every advance. Each subscription asks relays for `since = cursor − NIP59_BACKDATE_MARGIN_SECONDS` (two days), because gift-wrap timestamps are randomized into the past. So:
+The cursor is the newest wrap `created_at` the consumer has confirmed, clamped to now so a sender-controlled future timestamp cannot push it past real time. The backfill starts at `cursor − NIP59_BACKDATE_MARGIN_SECONDS` (two days), because gift-wrap timestamps are randomized into the past.
 
-- Restarts replay a bounded window. Handlers must be idempotent by rumor id.
+The cursor moves to the newest confirmed wrap only when every delivered wrap is acked and every read relay has finished a walk since the feed opened. An unresolved timestamp boundary limits that move as described above. A relay whose last three attempts failed before finishing stops holding it (`InboxWalkGivenUp`, [diagnostics.md](./diagnostics.md#event-families)). An event never acked holds it for the session, and the next session fetches it again. The inbox checkpoints each move to `InboxCursorStore`. So:
+
+- Restarts replay at least the two-day window. Handlers must be idempotent by rumor id.
 - `open({ since })` only seeds a session whose store is empty. Once a cursor is saved, `since` is ignored.
-- Without a cursor and without `since`, the first subscription has no `since` at all and relays return whatever they keep.
+- Without a cursor and without `since`, the backfill starts `MAX_BACKFILL_AGE_SECONDS` ago.
 
 Supply the store through `runLinkstr({ inboxCursorStore })`, `linkstrServices({ inboxCursorStore })` or `LinkstrConfig.inboxCursorStore`; the default is in-memory, so a headless run without one replays the full `since` window every time.
 

@@ -5,6 +5,7 @@ import {
   NonEmptyString1000,
   PositiveInt,
   type IdentityRepository,
+  type InboxCursorsRepository,
 } from "@linky-fit/linksync";
 import React from "react";
 import {
@@ -43,8 +44,8 @@ import {
   readStoredSlip39Seed,
   writeStoredCashuMnemonic,
 } from "../../platform/identitySecrets";
-import { markAwaitingFirstHydration } from "../../firstHydration";
 import { reportAppLog } from "../../devtools/inspector/appLog";
+import { markAwaitingFirstHydration } from "../../firstHydration";
 import { markLogoutPending } from "../../platform/logoutWipe";
 import { triggerPasswordManagerSeedSave } from "../../platform/passwordManager";
 import { CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY } from "../../utils/constants";
@@ -124,6 +125,8 @@ interface UseProfileAuthDomainParams {
   currentNsec: string | null;
   /** Null outside an authenticated session; the identity mirror is then not written. */
   identityRepository: IdentityRepository | null;
+  /** Null outside an authenticated session, like `identityRepository`. */
+  inboxCursors: InboxCursorsRepository | null;
   lang: Lang;
   myProfileMetadataRef: React.MutableRefObject<ProfileMetadata | null>;
   pushToast: (message: string) => void;
@@ -165,6 +168,7 @@ export const useProfileAuthDomain = ({
   appendIdentityChangeNoticesRef,
   currentNsec,
   identityRepository,
+  inboxCursors,
   lang,
   myProfileMetadataRef,
   pushToast,
@@ -364,7 +368,11 @@ export const useProfileAuthDomain = ({
         ...(trimmedPicture ? { picture: trimmedPicture } : {}),
       });
 
-      const config = buildLinkstrConfig(nsec, recommendedNostrRelays());
+      const config = buildLinkstrConfig(
+        nsec,
+        recommendedNostrRelays(),
+        inboxCursors,
+      );
       if (config === null) {
         throw new Error(t("onboardingCreateFailed"));
       }
@@ -388,7 +396,14 @@ export const useProfileAuthDomain = ({
         saveCachedStatus(npub, "", nowSeconds());
       }
     },
-    [currentNsec, publishProfile, publishStatus, setLinkstrConfig, t],
+    [
+      currentNsec,
+      inboxCursors,
+      publishProfile,
+      publishStatus,
+      setLinkstrConfig,
+      t,
+    ],
   );
 
   const republishProfileForNewKey = React.useCallback(
@@ -404,7 +419,11 @@ export const useProfileAuthDomain = ({
           : null);
       if (!metadata) return true;
 
-      const config = buildLinkstrConfig(newNsec, recommendedNostrRelays());
+      const config = buildLinkstrConfig(
+        newNsec,
+        recommendedNostrRelays(),
+        inboxCursors,
+      );
       if (config === null) return false;
 
       setLinkstrConfig(config);
@@ -412,7 +431,11 @@ export const useProfileAuthDomain = ({
       if (Exit.isFailure(publishExit)) {
         // Hand the runtime back to the still-active identity before bailing.
         setLinkstrConfig(
-          buildLinkstrConfig(previousNsec, recommendedNostrRelays()),
+          buildLinkstrConfig(
+            previousNsec,
+            recommendedNostrRelays(),
+            inboxCursors,
+          ),
         );
         return false;
       }
@@ -426,6 +449,7 @@ export const useProfileAuthDomain = ({
     [
       currentNsec,
       deriveNpubFromNsec,
+      inboxCursors,
       myProfileMetadataRef,
       publishProfile,
       setLinkstrConfig,
@@ -498,7 +522,6 @@ export const useProfileAuthDomain = ({
         slip39Seed: normalizedSlip39,
         switchedAtSec,
       });
-
       if (options?.restoredAccount === true)
         markAwaitingFirstHydration(appMnemonic);
 

@@ -1,4 +1,4 @@
-import { Effect, Layer, Stream } from "effect";
+import { Duration, Effect, Layer, Stream } from "effect";
 import type { Scope } from "effect";
 import { getEventHash } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
@@ -14,7 +14,11 @@ import { Reactions } from "../reactions/Reactions";
 import { encodeReactionRumor } from "../reactions/codec";
 import { Emoji, ReactionDraft, RetractionDraft } from "../reactions/domain";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
-import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import {
+  NostrTransport,
+  RelayPublishResult,
+  RelayUnreachable,
+} from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import { eventually, makeIdentity } from "../testing";
@@ -258,12 +262,13 @@ describe("Inspector", () => {
     const handlers: Array<(event: NostrToolsEvent) => void> = [];
     const transport: NostrTransportService = {
       publish: () => Effect.die("publish not under test"),
-      subscribe: (_relay, _filter, onEvent) =>
+      subscribe: (_relay, _filter, onEvent, options) =>
         Effect.suspend(() => {
           handlers.push(onEvent);
+          options?.onEose?.();
           return Effect.never;
         }),
-      fetch: () => Effect.die("fetch not under test"),
+      fetch: () => Effect.succeed([]),
     };
 
     await withInspected(transport, (collected) =>
@@ -289,7 +294,12 @@ describe("Inspector", () => {
         ).toEqual(
           expect.objectContaining({
             relay: relayA,
-            filter: { kinds: [1059], "#p": [alice.pubkey] },
+            filter: {
+              kinds: [1059],
+              "#p": [alice.pubkey],
+              since: expect.any(Number),
+              limit: 1,
+            },
           }),
         );
         expect(
@@ -318,6 +328,34 @@ describe("Inspector", () => {
         expect(
           collected.find((event) => event._tag === "InboxWrapDeduped"),
         ).toEqual(expect.objectContaining({ wrapId: wrap.id }));
+      }),
+    );
+  });
+
+  it("emits InboxWalkGivenUp once a relay's attempts keep failing before its walk", async () => {
+    const transport: NostrTransportService = {
+      publish: () => Effect.die("publish not under test"),
+      subscribe: (relay) =>
+        Effect.fail(new RelayUnreachable({ relay, detail: "refused" })),
+      fetch: () => Effect.die("fetch not under test"),
+    };
+
+    await withInspected(transport, (collected) =>
+      Effect.gen(function* () {
+        const inbox = yield* WrapInbox;
+        const feed = yield* inbox.open({
+          resubscribeDelay: Duration.millis(1),
+        });
+        yield* Effect.forkScoped(Stream.runDrain(feed.events));
+        yield* eventually(() =>
+          collected.some((event) => event._tag === "InboxWalkGivenUp"),
+        );
+
+        expect(
+          collected.find((event) => event._tag === "InboxWalkGivenUp"),
+        ).toEqual(
+          expect.objectContaining({ relay: relayA, failedAttempts: 3 }),
+        );
       }),
     );
   });

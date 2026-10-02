@@ -64,6 +64,8 @@ The resubscribe loops of the inbox and profile watch flip an unreachable relay b
 | Operations      | `PlainOperationSucceeded`                                      | a plain publish, a fetch, `outbox.enqueue`, `outbox.job`               |
 | Inbox and watch | `InboxRouted`                                                  | the inbox produced a fact, including `WrapDropped`                     |
 | Inbox and watch | `InboxWrapDeduped`                                             | a cross-relay duplicate was skipped                                    |
+| Inbox and watch | `InboxWalkGivenUp`                                             | a relay stopped holding the inbox cursor after failing three attempts  |
+| Inbox and watch | `InboxEventUnconfirmed`                                        | linkstr-react's inbox handler rejected, so the event stays unconfirmed |
 | Inbox and watch | `ProfileWatchRouted`                                           | `ProfileWatch` routed or dropped (`ProfileEventDropped`) a plain event |
 | Wire            | `WirePublished`                                                | one signed wrap pushed to the write relays                             |
 | Wire            | `WirePlainPublished`                                           | one signed plain event pushed                                          |

@@ -10,6 +10,7 @@ import type { IdentityChangeMessageSource } from "../../lib/identityChangeMessag
 import { toSyncedNostrIdentity } from "../../lib/syncedNostrIdentity";
 import {
   useIdentityRepository,
+  useInboxCursorsRepository,
   useLinkyStore,
   useSyncedNostrIdentityRow,
 } from "../useLinksync";
@@ -42,6 +43,7 @@ export const useIdentityOwnersComposition = ({
 }: UseIdentityOwnersCompositionParams) => {
   const store = useLinkyStore();
   const identityRepository = useIdentityRepository();
+  const inboxCursors = useInboxCursorsRepository();
   const appOwnerId: string = store.appOwner.id;
   const appOwnerIdRef = React.useRef<string | null>(null);
 
@@ -59,6 +61,7 @@ export const useIdentityOwnersComposition = ({
     appendIdentityChangeNoticesRef,
     currentNsec,
     identityRepository,
+    inboxCursors,
     lang,
     myProfileMetadataRef,
     pushToast,

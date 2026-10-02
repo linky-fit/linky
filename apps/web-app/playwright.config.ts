@@ -26,6 +26,7 @@ const LOCAL_STACK_SPECS = [
   "**/seed-restore-chat-tokens.spec.ts",
   "**/receive-deferred.spec.ts",
   "**/receive-deferred-actions.spec.ts",
+  "**/restore.spec.ts",
   "**/new-account.spec.ts",
 ];
 
@@ -44,7 +45,8 @@ export default defineConfig({
       // `bun run e2e` (scripts/e2e.sh) starts it and runs this project.
       name: "local-stack",
       testMatch: LOCAL_STACK_SPECS,
-      // Three cold app boots plus a full offer state machine.
+      // Three cold app boots plus a full offer state machine; the slowest test
+      // takes about a minute in CI.
       timeout: 150_000,
       // Nostr waits until the account's data has arrived from the Evolu relay,
       // which a cold boot can stretch past the default 5s expect timeout.

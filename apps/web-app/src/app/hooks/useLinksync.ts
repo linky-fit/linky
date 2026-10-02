@@ -3,14 +3,17 @@ import {
   makeContactsRepository,
   makeConversationsRepository,
   makeIdentityRepository,
+  makeInboxCursorsRepository,
   makeSettingsRepository,
   makeTransactionsRepository,
+  makeUnknownSendersRepository,
   makeWalletRepository,
   type ContactRow,
   type ContactsRepository,
   type ConversationRow,
   type ConversationsRepository,
   type IdentityRepository,
+  type InboxCursorsRepository,
   type LinkyScope,
   type LinkyStore,
   type MessageRow,
@@ -21,6 +24,7 @@ import {
   type SettingValues,
   type TransactionRecord,
   type TransactionsRepository,
+  type UnknownSendersRepository,
   type WalletRepository,
 } from "@linky-fit/linksync";
 import {
@@ -65,6 +69,16 @@ export const useMessagesVisibleSinceSec = (): number | null => {
     [conversations],
   );
   return useLiveValue<number | null>(source, null);
+};
+
+export const useInboxCursorsRepository = (): InboxCursorsRepository => {
+  const store = useLinkyStore();
+  return React.useMemo(() => makeInboxCursorsRepository(store), [store]);
+};
+
+export const useUnknownSendersRepository = (): UnknownSendersRepository => {
+  const store = useLinkyStore();
+  return React.useMemo(() => makeUnknownSendersRepository(store), [store]);
 };
 
 export const useMessageRows = (): ReadonlyArray<MessageRow> =>

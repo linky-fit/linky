@@ -4,6 +4,7 @@ import {
   createId,
   directConversationIdFor,
   makeConversationsRepository,
+  makeUnknownSendersRepository,
   NonEmptyString,
   NonEmptyString100,
   NonEmptyString1000,
@@ -48,13 +49,13 @@ const domainParams = (
   contacts: ReadonlyArray<{ readonly id: ContactId }> = [],
 ): Parameters<typeof useMessagesDomain>[0] => ({
   appOwnerId: null,
-  appOwnerIdRef: { current: null },
   chatForceScrollToBottomRef: { current: false },
   chatMessagesRef: { current: null },
   contacts,
   conversations: makeConversationsRepository(store),
   hydrated: true,
   route: { kind: "contacts" },
+  unknownSenders: makeUnknownSendersRepository(store),
 });
 
 const renderDomain = async (
@@ -94,26 +95,27 @@ const fromNostr = (contactId: string): NewLocalNostrMessage => ({
 });
 
 describe("useMessagesDomain", () => {
-  it("keeps unknown-sender edits in the device overlay until the sender becomes a contact", async () => {
+  it("stores an unknown sender's message in their scope and moves it when they become a contact", async () => {
     const { store } = makeTestLinkyStore();
     const contactId = createId<"Contact">();
-    const { conversations, domain, view } = await renderDomain(store, [
-      { id: contactId },
-    ]);
+    const { conversations, domain, unknownSenders, view } = await renderDomain(
+      store,
+      [{ id: contactId }],
+    );
+
     await act(async () => {
-      const { id } = domain().appendLocalNostrMessage(
-        fromNostr(unknownSenderId),
-      );
-      await domain().updateLocalNostrMessage(id, {
-        content: "edited",
-        isEdited: true,
-      });
+      domain().appendLocalNostrMessage(fromNostr(unknownSenderId));
     });
-    expect(domain().nostrMessagesLocal[0]).toMatchObject({
-      content: "edited",
-      isEdited: true,
-    });
+    expect(domain().nostrMessagesLocal.map((message) => message.id)).toEqual([
+      nostrMessageIdFor(rumorId),
+    ]);
+    expect(domain().nostrMessagesLocal[0]?.contactId).toBe(unknownSenderId);
+    const stored = await Effect.runPromise(unknownSenders.all);
+    expect(stored.map((row) => [row.id, row.peerPubkey])).toEqual([
+      [nostrMessageIdFor(rumorId), UNKNOWN_SENDER],
+    ]);
     expect(await Effect.runPromise(conversations.messages.all)).toEqual([]);
+
     await act(async () => {
       expect(
         domain().reassignLocalNostrMessagesContactId(
@@ -122,25 +124,49 @@ describe("useMessagesDomain", () => {
         ),
       ).toBe(1);
     });
-    expect(
-      (await Effect.runPromise(conversations.messages.all)).map(
-        (row) => row.content,
-      ),
-    ).toEqual(["edited"]);
-    expect(
-      domain().nostrMessagesLocal.map((message) => message.contactId),
-    ).toEqual([contactId]);
+    const rows = await Effect.runPromise(conversations.messages.all);
+    expect(rows.map((row) => [row.id, row.conversationId])).toEqual([
+      [nostrMessageIdFor(rumorId), directConversationIdFor(contactId)],
+    ]);
+    expect(await Effect.runPromise(unknownSenders.all)).toEqual([]);
+    expect(domain().nostrMessagesLocal.map((m) => m.contactId)).toEqual([
+      contactId,
+    ]);
     await view.unmount();
   });
 
-  it.each(["messages"] as const)(
+  it("updates and deletes an unknown sender's messages in their scope", async () => {
+    const { store } = makeTestLinkyStore();
+    const { domain, unknownSenders, view } = await renderDomain(store);
+
+    await act(async () => {
+      domain().appendLocalNostrMessage(fromNostr(unknownSenderId));
+    });
+    await act(async () => {
+      domain().updateLocalNostrMessage(nostrMessageIdFor(rumorId), {
+        content: "hello, edited",
+        isEdited: true,
+      });
+    });
+    expect(
+      (await Effect.runPromise(unknownSenders.all)).map((row) => row.content),
+    ).toEqual(["hello, edited"]);
+
+    await act(async () => {
+      domain().removeLocalNostrMessagesByContactId(unknownSenderId);
+    });
+    expect(await Effect.runPromise(unknownSenders.all)).toEqual([]);
+    expect(domain().nostrMessagesLocal).toEqual([]);
+    await view.unmount();
+  });
+
+  it.each(["unknownSenders", "messages"] as const)(
     "marks a send in the %s scope sent when its receipt arrives before its row is read back",
     async (scope) => {
       const { store } = makeTestLinkyStore();
       const contactId = createId<"Contact">();
-      const { conversations, domain, view } = await renderDomain(store, [
-        { id: contactId },
-      ]);
+      const { conversations, domain, unknownSenders, view } =
+        await renderDomain(store, [{ id: contactId }]);
 
       await act(async () => {
         const { id } = domain().appendLocalNostrMessage({
@@ -160,7 +186,10 @@ describe("useMessagesDomain", () => {
         });
       });
 
-      const rows = await Effect.runPromise(conversations.messages.all);
+      const rows =
+        scope === "messages"
+          ? await Effect.runPromise(conversations.messages.all)
+          : await Effect.runPromise(unknownSenders.all);
       expect(rows.map((row) => [row.status, row.wrapId])).toEqual([
         ["sent", "e".repeat(64)],
       ]);

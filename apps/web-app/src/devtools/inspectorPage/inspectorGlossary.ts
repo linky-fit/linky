@@ -10,6 +10,8 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
   7: "Reaction to a message (emoji) — inside Linky it travels as the rumor of a gift wrap.",
   14: "Unsigned chat message rumor — normally only seen inside a decrypted gift wrap.",
   1059: "NIP-59 gift wrap: an encrypted envelope that hides sender and content. Outer timestamps are randomized up to 2 days back, so inbox sync re-queries a window and the same wraps legitimately reappear.",
+  10000:
+    "NIP-51 mute list: the pubkeys this user blocked, as public p tags. Each device merges the newest one into its block list before its inbox opens.",
   10002:
     "NIP-65 relay list: announces which relays this user writes to and reads from.",
   10050:
@@ -24,10 +26,16 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "conversations.archived":
     "User archived a contact's chat: the contact row (contacts scope) records the archive time and the conversation's read cursor moves there. The contact and conversation links identify both rows.",
+  "unknownSenders.messageStored":
+    "A message to or from a peer who is not a contact was stored in the unknown senders scope, which syncs to the user's other devices and keeps fewer shards than conversations. Fires once per message; a refetch of a stored rumor is skipped. Message, rumor and pubkey links identify it.",
+  "unknownSenders.movedToContact":
+    "An unknown sender turned out to be a contact (saved, matched by npub or lightning address, or restored from the archive), and their messages moved from the unknown senders scope into the contact's conversation under the same ids. Pubkey, contact and conversation links identify both sides; the payload counts the moved messages.",
+  "unknownSenders.removed":
+    "The user blocked an unknown sender and their messages were removed from the unknown senders scope on every device. The pubkey link identifies the sender.",
   "conversations.unarchived":
     "A contact left the archive, either by the user restoring it or because an incoming message newer than the archive time arrived; it clears the archive on the contact and on its conversation, where older app versions keep it.",
   ShardsForgotten:
-    "Explicit local forget of old chat shards. Payload lists scope, index and whether owner data was deleted; owner links correlate with shard rotation and subscription rows. Evolu 7 reports deleted: false.",
+    "Explicit local forget of old chat shards, conversations and unknown senders' messages alike. Payload lists scope, index and whether owner data was deleted; owner links correlate with shard rotation and subscription rows. Evolu 7 reports deleted: false.",
   ShardsSubscribed:
     "The set of owners this device syncs was reconciled: the app owner plus every visible shard of every scope, at boot, after each rotation and after explicit forgetting. Owner links list the whole set; the payload says why and how many.",
   AccountHydrated:
@@ -52,6 +60,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A boot or late-row grace-period re-ingest finished; counts show which lane rows were newer than their shard copies.",
   LaneSpentProofsMirrored:
     "During the migration grace period, spent shard proofs mark their existing legacy copies spent so older devices stop counting them. Owner and proof links identify the copies; no proof secrets are logged.",
+  UnknownSenderOverlayImported:
+    "After hydration, the unknown-sender messages this device kept in its localStorage overlay were imported into the unknown senders scope and the overlay was cleared. Messages another device already stored and messages of blocked senders are skipped; the payload counts both sides. Message and pubkey links identify the rows.",
   ArchiveCopiedToContact:
     "After hydration, conversation archives this device sees were copied onto their contacts, where the archive state now lives. It also fires for archives an older app version wrote on the conversation; an archive is copied only onto a contact without one, and an unarchive clears both, so it is never undone. Contact and conversation links identify the rows.",
   "evolu.legacySpentProofSyncFailed":
@@ -72,6 +82,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "linkstr opened a live subscription with this filter at the relay; matching events stream in as WireEventReceived rows until it closes.",
   WireEventReceived:
     "An event delivered by a relay on an open subscription, before decryption or routing. Follow its wrap id to see what the inbox made of it.",
+  InboxWalkGivenUp:
+    "A read relay's last attempts all ended before its backfill walk finished, so the inbox cursor no longer waits for that relay; the relay keeps being retried, and wraps only it holds are fetched once it answers.",
+  InboxEventUnconfirmed:
+    "The app's inbox handler failed on an event, so the event stays unconfirmed and holds the inbox cursor until the inbox reopens; the next session fetches it again. The wrap link ties it to the event's InboxRouted row.",
   InboxRouted:
     "The inbox decrypted an incoming gift wrap and routed it to an app-level fact (e.g. ReactionAdded) — or dropped it (WrapDropped) when the rumor could not be used, for example an unsupported kind.",
   ChatImageShared:
@@ -104,8 +118,18 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A bank-offer snapshot was rejected or held for an authenticated offerer snapshot. It cannot update the offer or authorize settlement yet.",
   "bankOffer.staggerDropped":
     "The queued recipients of a staggered proxy payment offer were discarded because the offer stopped being open — someone accepted it, it ended, or it expired.",
+  "muteList.fetchOwn":
+    "Before the inbox opens, and before each block is published, the user's newest kind-10000 mute list is fetched from every read and write relay; the result is null when no relay holds one.",
+  "inbox.cursorLoaded":
+    "The Nostr inbox opened and read its cursors: this device's local one and the synced one any device of the account wrote. It starts from the newer of the two, minus the two-day backdate margin, or from the fallback window when neither exists. The pubkey link names the identity.",
+  "inbox.syncedCursorWritten":
+    "This device wrote its inbox cursor to the synced setting, so a restored or second device starts its backfill there. Written when the inbox moves its cursor 12 hours past the synced value; the payload holds the new and previous value.",
+  "inbox.syncedCursorWriteFailed":
+    "Writing the synced inbox cursor to Evolu failed; the local cursor is unaffected and the next advance tries again.",
   "reactions.retractionStored":
     "A retraction arrived for a reaction this device has not stored, so a removed copy was written in its place; any device that receives the reaction later finds it removed. The rumor link is the reaction's id, the pubkey link who retracted it.",
+  "blockList.muteListMerged":
+    "The newest mute list was merged into this device's block list as a union: a pubkey blocked on either side stays blocked. Added lists the pubkeys the list brought; publish says the merged list goes out because the published one lacks an entry, or no relay holds one. A fetch that cannot tell whether a list exists merges nothing. The wrap link is the fetched list's event id.",
   "profiles.searchProfiles":
     "Add-contact text search: a NIP-50 kind-0 query fanned out to the read relays plus the configured search relays; relays without NIP-50 answer with unrelated profiles, so only hits that match the query locally are returned (the params carry the query and limit).",
   "contacts.dedupeFailed":

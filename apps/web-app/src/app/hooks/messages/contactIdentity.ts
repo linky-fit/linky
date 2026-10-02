@@ -2,6 +2,7 @@ import {
   identityFromNsec,
   parsePubkey,
   type NostrSecretKey,
+  type Pubkey,
 } from "@linky-fit/linkstr";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../../../utils/constants";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
@@ -9,13 +10,13 @@ import type { ContactIdentityRowLike } from "../../types/appTypes";
 
 export const normalizePubkeyHex = (
   value: string | null | undefined,
-): string | null => {
+): Pubkey | null => {
   const normalized = (value ?? "").trim().toLowerCase();
   return parsePubkey(normalized);
 };
 
-// Unknown senders stay out of contacts until the user adds them;
-// their `unknown:<pubkeyHex>` conversations belong in the local overlay.
+// Unknown senders stay out of contacts until the user adds them; the UI
+// names their conversations `unknown:<pubkeyHex>`.
 export const buildUnknownContactId = (
   pubkeyHex: string | null | undefined,
 ): string | null => {
@@ -38,7 +39,7 @@ export const isUnknownContactId = (id: string | null | undefined): boolean => {
 
 export const readUnknownContactIdPubkey = (
   id: string | null | undefined,
-): string | null => {
+): Pubkey | null => {
   const normalizedId = (id ?? "").trim().toLowerCase();
   if (!normalizedId.startsWith(UNKNOWN_CONTACT_ID_PREFIX)) return null;
   return normalizePubkeyHex(
