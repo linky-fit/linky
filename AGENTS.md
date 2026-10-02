@@ -2,7 +2,7 @@
 
 Mobile-first PWA for contacts, Nostr messaging and Lightning/Cashu payments, local-first on Evolu. Bun workspace: `bun` only, never npm/yarn/pnpm.
 
-After every change run `bun run check-code` and fix what remains until it passes.
+Before you commit or declare a task done, run `bun run check-code` and fix what remains until it passes. Don't run it after every edit.
 
 ## Where a rule goes
 
