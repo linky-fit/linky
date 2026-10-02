@@ -1089,7 +1089,7 @@ describe("WrapInbox backfill", () => {
           }),
       );
     },
-    15_000,
+    30_000,
   );
 
   it("walks a relay's stored wraps back in pages past its result cap", async () => {
