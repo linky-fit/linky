@@ -247,13 +247,7 @@ const PageFrame = ({ children, fill }: PageFrameProps): React.ReactElement => (
     gap="$none"
     position="relative"
   >
-    {fill ? (
-      children
-    ) : (
-      <PageBody minHeight={0} overflowY="auto">
-        {children}
-      </PageBody>
-    )}
+    {fill ? children : <PageBody>{children}</PageBody>}
   </Stack>
 );
 
@@ -358,7 +352,7 @@ export const AppRouteContent = (): React.ReactElement => {
                       <RoutePage />
                     </PageFrame>
                   ) : (
-                    <PageBody gutter="detail" minHeight={0} overflowY="auto">
+                    <PageBody gutter="detail">
                       <RoutePage />
                     </PageBody>
                   )}
