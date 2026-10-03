@@ -288,7 +288,11 @@ export const MainSwipeContent = (): React.ReactElement => {
           scrollRef={mainSwipeRef}
           activePage={route.kind === "wallet" ? 1 : 0}
         >
-          <PageBody paddingBottom={floatingActionButtonClearance}>
+          <PageBody
+            flex={undefined}
+            flexGrow={1}
+            paddingBottom={floatingActionButtonClearance}
+          >
             <ContactsPane filterAlwaysOpen={false} />
           </PageBody>
           <PageBody>

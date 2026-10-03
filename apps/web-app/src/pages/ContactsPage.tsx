@@ -8,6 +8,7 @@ import {
   Section,
   Stack,
   TextField,
+  useMedia,
 } from "@linky-fit/ui";
 import type { FC } from "react";
 import React from "react";
@@ -53,6 +54,8 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
     t,
     visibleContacts,
   }) => {
+    const { wide } = useMedia();
+    const ContactList = wide ? ScrollList : Stack;
     const totalVisible =
       visibleContacts.pinned.length +
       visibleContacts.proxyPayments.length +
@@ -135,7 +138,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
           </Stack>
         )}
 
-        <ScrollList flex={1}>
+        <ContactList flex={wide ? 1 : undefined}>
           {!hasAnyContacts ? (
             <EmptyState title={t("noContactsYet")} />
           ) : (
@@ -150,7 +153,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
               {renderSection(otherContactsLabel, visibleContacts.others)}
             </Stack>
           )}
-        </ScrollList>
+        </ContactList>
       </>
     );
   },
