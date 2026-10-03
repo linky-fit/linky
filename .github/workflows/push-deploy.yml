@@ -15,6 +15,14 @@ jobs:
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -eu
             cd /opt/stack
+            test "$(docker compose config --images push)" = "ghcr.io/linky-fit/linky-push:latest"
             docker compose pull push
-            docker compose up -d push
+            expected_commit=$(docker image inspect ghcr.io/linky-fit/linky-push:latest --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' | cut -c1-12)
+            test -n "$expected_commit"
+            docker compose up -d --no-deps push
+            curl --fail --silent --show-error --max-time 10 --retry 10 --retry-delay 2 --retry-all-errors https://push.linky.fit/health
+            actual_commit=$(curl --fail --silent --show-error --max-time 10 https://push.linky.fit/)
+            test "$actual_commit" = "$expected_commit"
+            echo "Deployed push commit $actual_commit"
