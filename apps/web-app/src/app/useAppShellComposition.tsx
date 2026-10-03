@@ -1,6 +1,7 @@
 import { createContactNameFormatter } from "../utils/contactName";
 import { useMemoizedRouteBuilder } from "./hooks/composition/useMemoizedRouteBundle";
 import { ContactId as ContactIdType } from "@linky-fit/linksync";
+import { LINKY_CONTACT_NPUB } from "@linky-fit/supporter";
 import React, { useMemo, useState } from "react";
 import type { MessageContactsGroupAssignment } from "../components/ChatMessage";
 import { ContactCard } from "../components/ContactCard";
@@ -24,10 +25,7 @@ import {
   triggerPasswordManagerSeedSave,
   type PasswordManagerSaveResult,
 } from "../platform/passwordManager";
-import {
-  CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
-  FEEDBACK_CONTACT_NPUB,
-} from "../utils/constants";
+import { CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY } from "../utils/constants";
 import {
   applyAmountInputKey,
   applyAmountInputKeyWithDraft,
@@ -60,6 +58,10 @@ import { useIdentityOwnersComposition } from "./hooks/composition/useIdentityOwn
 import { buildMoneyRouteProps } from "./routes/props/buildMoneyRouteProps";
 import { useProfileComposition } from "./hooks/composition/useProfileComposition";
 import { buildPeopleRouteProps } from "./routes/props/buildPeopleRouteProps";
+import {
+  useSupporterBadges,
+  type HandleSupporterResult,
+} from "./hooks/useSupporterBadges";
 import { useRoutingViewComposition } from "./hooks/composition/useRoutingViewComposition";
 import { useScanNativeComposition } from "./hooks/composition/useScanNativeComposition";
 import { useSystemSettingsComposition } from "./hooks/composition/useSystemSettingsComposition";
@@ -425,6 +427,17 @@ export const useAppShellComposition = ({
     [pushToast, t],
   );
 
+  // Supporter results need the wallet, which is composed after the inbox.
+  const supporterResultHandlerRef = React.useRef<HandleSupporterResult | null>(
+    null,
+  );
+  const handleSupporterResult = React.useCallback<HandleSupporterResult>(
+    (event, delivery) =>
+      supporterResultHandlerRef.current?.(event, delivery) ??
+      Promise.resolve({ ok: false, error: "supporter results not ready" }),
+    [],
+  );
+
   const {
     saveNpubContact,
     activeGroup,
@@ -554,6 +567,7 @@ export const useAppShellComposition = ({
     currentNpub,
     currentNsec,
     formatDisplayedAmountText,
+    handleSupporterResult,
     isSeedLogin,
     lang,
     logPayStep,
@@ -1424,7 +1438,7 @@ export const useAppShellComposition = ({
       effectiveMyLightningAddress,
       effectiveProfileName,
       effectiveProfilePicture,
-      feedbackContactNpub: FEEDBACK_CONTACT_NPUB,
+      feedbackContactNpub: LINKY_CONTACT_NPUB,
       form,
       getCashuTokenMessageInfo,
       getMintIconUrl,
@@ -1508,10 +1522,33 @@ export const useAppShellComposition = ({
     buildPeopleRouteProps,
   );
 
+  const {
+    handleSupporterResult: handleSupporterResultNow,
+    requestBadgePublish,
+  } = useSupporterBadges({
+    appendLocalNostrMessage,
+    cashuOperations,
+    cashuTransferLifecycle,
+    contacts,
+    currentNsec,
+    nostrMessagesLatestRef,
+    nostrReady: nostrBootstrapReady,
+    pushToast,
+    t,
+  });
+  React.useEffect(() => {
+    supporterResultHandlerRef.current = handleSupporterResultNow;
+  }, [handleSupporterResultNow]);
+
   const { mintBalances, payContactFromMint } = supporterPayments;
   const supporterContext = React.useMemo(
-    () => ({ mintBalances, openDonate, payContactFromMint }),
-    [mintBalances, openDonate, payContactFromMint],
+    () => ({
+      mintBalances,
+      openDonate,
+      payContactFromMint,
+      requestBadgePublish,
+    }),
+    [mintBalances, openDonate, payContactFromMint, requestBadgePublish],
   );
 
   const { mainSwipeRouteProps } = useRoutingViewComposition({

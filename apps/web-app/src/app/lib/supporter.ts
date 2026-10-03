@@ -5,6 +5,8 @@ import {
   supporterTierIncludes,
   type SupporterTier,
 } from "@linky-fit/supporter";
+import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
+import type { I18nKey } from "../../i18n";
 import { isHiddenTestMint, normalizeMintUrl } from "../../utils/mint";
 import type { SendMintBalance } from "./paymentMintSelection";
 
@@ -26,6 +28,17 @@ const envMints = commaList(env.VITE_SUPPORTER_ACCEPTED_MINTS);
 /** The identity supporter payments go to; null until it launches, and Donate pays the Linky contact. */
 export const linkyBotNpub: string | null =
   env.VITE_LINKY_BOT_NPUB?.trim() || LINKY_BOT_NPUB;
+
+/** Linky Bot's pubkey: the only issuer whose results and badges count. */
+export const linkyBotPubkey: Pubkey | null =
+  linkyBotNpub === null ? null : decodeNpub(linkyBotNpub);
+
+export const SUPPORTER_TIER_LABEL_KEYS = {
+  bronze: "supporterTierBronze",
+  silver: "supporterTierSilver",
+  gold: "supporterTierGold",
+  diamond: "supporterTierDiamond",
+} as const satisfies Record<SupporterTier, I18nKey>;
 
 /** Mints a supporter payment may come from, normalized. */
 export const supporterAcceptedMints: ReadonlyArray<string> = (

@@ -23,23 +23,16 @@ import { useSupporterContext } from "../app/context/SupporterContext";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { useSupporterAwardRecords } from "../app/hooks/useLinksync";
 import {
+  SUPPORTER_TIER_LABEL_KEYS,
   supporterPaymentMints,
   supporterThemesFor,
 } from "../app/lib/supporter";
 import { SupporterBadgeDisplayOptions } from "../components/SupporterBadgeDisplayOptions";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import { navigateTo } from "../hooks/useRouting";
-import type { I18nKey } from "../i18n";
 import { formatInteger } from "../utils/formatting";
 import { formatMintHost } from "../utils/mint";
 import { nowSeconds } from "../utils/time";
-
-const TIER_LABEL_KEYS = {
-  bronze: "supporterTierBronze",
-  silver: "supporterTierSilver",
-  gold: "supporterTierGold",
-  diamond: "supporterTierDiamond",
-} as const satisfies Record<SupporterTier, I18nKey>;
 
 const readAmountSat = (text: string): number => {
   const amount = Number.parseInt(text, 10);
@@ -81,7 +74,8 @@ export function SupporterDonatePage({
     mints[0]?.mint ??
     null;
   const formatSat = (amount: number) => `${formatInteger(amount, lang)} sat`;
-  const tierLabel = (value: SupporterTier) => t(TIER_LABEL_KEYS[value]);
+  const tierLabel = (value: SupporterTier) =>
+    t(SUPPORTER_TIER_LABEL_KEYS[value]);
 
   const payMonthly = async (fromMint: string): Promise<boolean> => {
     const id = await createRecurringPayment({

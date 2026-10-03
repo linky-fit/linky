@@ -105,6 +105,7 @@ import {
 import { useSendReaction } from "../messages/useSendReaction";
 import { useContactsDomain } from "../useContactsDomain";
 import { useLinkyContacts } from "../useLinkyContacts";
+import type { HandleSupporterResult } from "../useSupporterBadges";
 import { useLinkstrConfigSync } from "../useLinkstrConfigSync";
 import {
   fetchAndCacheProfiles,
@@ -205,6 +206,7 @@ interface UseContactsMessagingCompositionParams {
   currentNpub: string | null;
   currentNsec: string | null;
   formatDisplayedAmountText: (amountSat: number) => string;
+  handleSupporterResult: HandleSupporterResult;
   isSeedLogin: boolean;
   lang: Lang;
   logPayStep: (step: string, data?: PaymentLogData) => void;
@@ -235,6 +237,7 @@ export const useContactsMessagingComposition = ({
   currentNpub,
   currentNsec,
   formatDisplayedAmountText,
+  handleSupporterResult,
   isSeedLogin,
   lang,
   logPayStep,
@@ -1939,6 +1942,7 @@ export const useContactsMessagingComposition = ({
     enabled: nostrBootstrapReady && muteListSynced,
     formatDisplayedAmountText,
     getPeerSeenWindow,
+    handleSupporterResult,
     logPayStep,
     maybeShowPwaNotification,
     messagesVisibleSinceSec,

@@ -14,6 +14,8 @@ export interface SupporterContextValue {
     contactId: ContactId;
     mint: string;
   }) => Promise<boolean>;
+  /** Publishes the profile badge the display setting picks, from this device. */
+  requestBadgePublish: () => void;
 }
 
 const SupporterContext = React.createContext<SupporterContextValue | null>(

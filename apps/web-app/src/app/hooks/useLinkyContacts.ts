@@ -4,9 +4,9 @@ import {
   type ContactId,
   type ContactsRepository,
 } from "@linky-fit/linksync";
+import { LINKY_CONTACT_NPUB } from "@linky-fit/supporter";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
-import { FEEDBACK_CONTACT_NPUB } from "../../utils/constants";
 import { linkyBotNpub } from "../lib/supporter";
 import { runWrite } from "../lib/storeWrite";
 import type { ContactNameRowLike } from "../types/appTypes";
@@ -84,7 +84,7 @@ export const useLinkyContacts = <TContact extends LinkyContactRow>({
   const openFeedbackContact = React.useCallback(
     () =>
       openByNpub({
-        npub: FEEDBACK_CONTACT_NPUB,
+        npub: LINKY_CONTACT_NPUB,
         open: (contact) => {
           if ((contact.name ?? "") === "Feedback") {
             void runWrite(

@@ -210,8 +210,24 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     'The user switched the synced "Allow test mints" setting. Off hides test-mint balances, mint lists and chat tokens and refuses new test-mint tokens; stored test-mint proofs stay untouched.',
   "settings.supporterBadgeDisplay":
     "The user chose which supporter badge contacts see: the tier, the generic Supporter badge, or none. It is a synced setting; themes stay unlocked whatever it says.",
+  "settings.themePalette":
+    "The user picked an app theme in Appearance: Default or a premium palette their supporter awards unlock. It is a device-local preference; when the awards lapse the app renders Default but keeps the choice, so a renewal brings it back.",
   "supporter.donateStarted":
     "The user confirmed a donation to Linky Bot on the donate screen. The payload gives the amount in sat, the tier it reaches (null below Bronze), the mint it is paid from and whether it is monthly. A monthly one continues with recurring.created and the first recurring.run; a single one with the Cashu payment to the contact link.",
+  "supporter.resultReceived":
+    "Linky Bot answered a supporter payment. Rumor links name the result and the token message it answers. The payload gives the status (issued, thanks or refused), and for issued the tier, the awards that verified against Linky Bot and this identity, and the drop reasons of those that did not. Results from anyone else are ignored without a row. Backfilled results fire again within the inbox's replay window.",
+  "supporter.badgeStored":
+    "A verified supporter award was stored in the synced supporter scope for the first time. The award link is its kind 8 event id; storing one makes this device publish the profile badge.",
+  "supporter.tokenReclaimed":
+    "Linky Bot refused a payment because of its mint, so the token's proofs were re-signed back into the wallet. The operation link is the send or envelope that carried them; the payload counts reclaimed, already spent and unresolved proofs.",
+  "supporter.tokenNotReclaimed":
+    "A payment Linky Bot refused for its mint could not be taken back automatically: its message or transfer is not on this device yet, the wallet was not ready, or the reclaim failed.",
+  "supporter.badgePublished":
+    "This device published the supporter award the display setting picks (kind 8, unchanged) and rewrote the Linky entries of the profile badges (kind 30008). The event link is the kind 30008, the award link the kind 8.",
+  "supporter.badgeWithdrawn":
+    "This device rewrote the profile badges (kind 30008) without Linky entries: the display setting is Hide, or no award of the chosen kind is still valid.",
+  "supporter.badgePublishFailed":
+    "Publishing the profile badge failed (no relay answered or accepted it, or the current list could not be fetched). The request stays pending and is retried a minute later and on the next start.",
   "recurring.created":
     "The user created a recurring payment. The payload gives the amount, interval, first due time, the mint every run is paid from and the rail every run is delivered on; the recurring payment and contact links identify it.",
   "settings.displayCurrencies":

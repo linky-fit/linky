@@ -61,6 +61,7 @@ import {
 import { trimString } from "../../../utils/validation";
 import { nowSeconds } from "../../../utils/time";
 import { allWrites, NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
+import type { HandleSupporterResult } from "../useSupporterBadges";
 import type { Translate } from "../../../i18n";
 
 // Fallback backfill window for a first session without a persisted cursor.
@@ -110,6 +111,7 @@ interface UseLinkstrInboxSyncParams {
   enabled: boolean;
   formatDisplayedAmountText: (amountSat: number) => string;
   getPeerSeenWindow: (contactId: string) => PeerSeenWindow | null;
+  handleSupporterResult: HandleSupporterResult;
   logPayStep: (step: string, data?: PaymentLogData) => void;
   /** See `ChatInboxContext.visibleSinceSec`. */
   messagesVisibleSinceSec: number | null;
@@ -322,6 +324,9 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
           applyOwnSeenReceiptConfirmed(event, seenReceiptCtx);
           return NO_WRITE;
         case "SupporterResultReceived":
+          if (isBlockedPubkey(event.from)) return NO_WRITE;
+          if (cutoff !== null && event.sentAt < cutoff) return NO_WRITE;
+          return paramsRef.current.handleSupporterResult(event, delivery);
         case "WrapDropped":
           return NO_WRITE;
       }

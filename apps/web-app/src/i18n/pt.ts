@@ -138,6 +138,17 @@ export const pt = {
   donateConfirmMonthly: "Doar mensalmente",
   donateConfirmOnce: "Doar uma vez",
   donateThanks: "Obrigado! Seu selo chega na conversa com o Linky Bot.",
+  supporterResultIssued: "Obrigado! Seu selo {tier} está guardado.",
+  supporterResultUnverified:
+    "O Linky Bot enviou um selo que não passou na verificação, por isso não foi guardado.",
+  supporterResultThanks:
+    "Obrigado pelo apoio! O valor está abaixo de Bronze, então vem sem selo.",
+  supporterResultMintNotAccepted:
+    "O Linky Bot não aceita tokens desta mint. O pagamento está voltando para sua carteira.",
+  supporterResultTokenSpent:
+    "O Linky Bot não conseguiu receber o pagamento: o token já tinha sido gasto.",
+  supporterResultInvalidToken:
+    "O Linky Bot não conseguiu ler o token do pagamento, então nada foi recebido.",
   supporterTierBronze: "Bronze",
   supporterTierSilver: "Prata",
   supporterTierGold: "Ouro",
@@ -148,6 +159,11 @@ export const pt = {
   supporterBadgeDisplayTier: "Mostrar nível",
   supporterBadgeDisplayGeneric: "Selo genérico de apoiador",
   supporterBadgeDisplayHide: "Ocultar",
+  supporterLineBronze: "Apoiador Bronze",
+  supporterLineSilver: "Apoiador Prata",
+  supporterLineGold: "Apoiador Ouro",
+  supporterLineDiamond: "Apoiador Diamante",
+  supporterLineGeneric: "Apoiador do Linky",
   data: "Dados",
   exportData: "Exportar dados",
   importData: "Importar dados",
@@ -584,6 +600,10 @@ export const pt = {
   appearanceAuto: "Automático",
   appearanceLight: "Claro",
   appearanceDark: "Escuro",
+  appearanceColorMode: "Modo de cor",
+  appearanceTheme: "Tema",
+  appearanceThemeDefault: "Padrão",
+  appearanceThemeLocked: "Desbloqueia com {tier}",
 
   list: "Lista",
   contactsTitle: "Contatos",

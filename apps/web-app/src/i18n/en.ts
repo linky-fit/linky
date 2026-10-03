@@ -134,6 +134,17 @@ export const en = {
   donateConfirmOnce: "Donate once",
   donateThanks:
     "Thank you! Your badge arrives in the conversation with Linky Bot.",
+  supporterResultIssued: "Thank you! Your {tier} badge is stored.",
+  supporterResultUnverified:
+    "Linky Bot sent a badge that did not verify, so it was not stored.",
+  supporterResultThanks:
+    "Thank you for your support! The amount is below Bronze, so it comes without a badge.",
+  supporterResultMintNotAccepted:
+    "Linky Bot does not accept tokens from this mint. The payment is coming back to your wallet.",
+  supporterResultTokenSpent:
+    "Linky Bot could not receive the payment: its token was already spent.",
+  supporterResultInvalidToken:
+    "Linky Bot could not read the payment's token, so nothing was received.",
   supporterTierBronze: "Bronze",
   supporterTierSilver: "Silver",
   supporterTierGold: "Gold",
@@ -144,6 +155,11 @@ export const en = {
   supporterBadgeDisplayTier: "Show tier",
   supporterBadgeDisplayGeneric: "Generic Supporter badge",
   supporterBadgeDisplayHide: "Hide",
+  supporterLineBronze: "Bronze supporter",
+  supporterLineSilver: "Silver supporter",
+  supporterLineGold: "Gold supporter",
+  supporterLineDiamond: "Diamond supporter",
+  supporterLineGeneric: "Linky supporter",
   data: "Data",
   exportData: "Export data",
   importData: "Import data",
@@ -571,6 +587,10 @@ export const en = {
   appearanceAuto: "Automatic",
   appearanceLight: "Light",
   appearanceDark: "Dark",
+  appearanceColorMode: "Color mode",
+  appearanceTheme: "Theme",
+  appearanceThemeDefault: "Default",
+  appearanceThemeLocked: "Unlocks with {tier}",
 
   list: "List",
   contactsTitle: "Contacts",

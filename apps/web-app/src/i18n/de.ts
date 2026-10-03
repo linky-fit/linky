@@ -140,6 +140,17 @@ export const de = {
   donateConfirmOnce: "Einmal spenden",
   donateThanks:
     "Danke! Dein Abzeichen kommt in der Unterhaltung mit Linky Bot an.",
+  supporterResultIssued: "Danke! Dein {tier}-Abzeichen ist gespeichert.",
+  supporterResultUnverified:
+    "Linky Bot hat ein Abzeichen geschickt, das die Prüfung nicht bestanden hat; es wurde nicht gespeichert.",
+  supporterResultThanks:
+    "Danke für deine Unterstützung! Der Betrag liegt unter Bronze, daher gibt es kein Abzeichen.",
+  supporterResultMintNotAccepted:
+    "Linky Bot nimmt keine Tokens dieser Mint an. Die Zahlung kommt zurück in deine Wallet.",
+  supporterResultTokenSpent:
+    "Linky Bot konnte die Zahlung nicht empfangen: Ihr Token war bereits ausgegeben.",
+  supporterResultInvalidToken:
+    "Linky Bot konnte den Token der Zahlung nicht lesen, es wurde nichts empfangen.",
   supporterTierBronze: "Bronze",
   supporterTierSilver: "Silber",
   supporterTierGold: "Gold",
@@ -150,6 +161,11 @@ export const de = {
   supporterBadgeDisplayTier: "Stufe zeigen",
   supporterBadgeDisplayGeneric: "Allgemeines Unterstützer-Abzeichen",
   supporterBadgeDisplayHide: "Ausblenden",
+  supporterLineBronze: "Bronze-Unterstützer",
+  supporterLineSilver: "Silber-Unterstützer",
+  supporterLineGold: "Gold-Unterstützer",
+  supporterLineDiamond: "Diamant-Unterstützer",
+  supporterLineGeneric: "Linky-Unterstützer",
   data: "Daten",
   exportData: "Daten exportieren",
   importData: "Daten importieren",
@@ -590,6 +606,10 @@ export const de = {
   appearanceAuto: "Automatisch",
   appearanceLight: "Hell",
   appearanceDark: "Dunkel",
+  appearanceColorMode: "Farbmodus",
+  appearanceTheme: "Design",
+  appearanceThemeDefault: "Standard",
+  appearanceThemeLocked: "Freigeschaltet mit {tier}",
 
   list: "Liste",
   contactsTitle: "Kontakte",

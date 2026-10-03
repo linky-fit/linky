@@ -130,6 +130,17 @@ export const cs = {
   donateConfirmMonthly: "Přispívat měsíčně",
   donateConfirmOnce: "Přispět jednou",
   donateThanks: "Děkujeme! Odznak dorazí do konverzace s Linky Botem.",
+  supporterResultIssued: "Děkujeme! Váš odznak {tier} je uložený.",
+  supporterResultUnverified:
+    "Linky Bot poslal odznak, který neprošel ověřením, a tak se neuložil.",
+  supporterResultThanks:
+    "Děkujeme za podporu! Částka je pod úrovní Bronz, takže je bez odznaku.",
+  supporterResultMintNotAccepted:
+    "Linky Bot nepřijímá tokeny z tohoto mintu. Platba se vrací do vaší peněženky.",
+  supporterResultTokenSpent:
+    "Linky Bot platbu nepřijal: token už byl utracený.",
+  supporterResultInvalidToken:
+    "Linky Bot nedokázal token platby přečíst, nic nepřijal.",
   supporterTierBronze: "Bronz",
   supporterTierSilver: "Stříbro",
   supporterTierGold: "Zlato",
@@ -140,6 +151,11 @@ export const cs = {
   supporterBadgeDisplayTier: "Ukázat úroveň",
   supporterBadgeDisplayGeneric: "Obecný odznak podporovatele",
   supporterBadgeDisplayHide: "Skrýt",
+  supporterLineBronze: "Bronzový podporovatel",
+  supporterLineSilver: "Stříbrný podporovatel",
+  supporterLineGold: "Zlatý podporovatel",
+  supporterLineDiamond: "Diamantový podporovatel",
+  supporterLineGeneric: "Podporovatel Linky",
   data: "Data",
   exportData: "Export dat",
   importData: "Import dat",
@@ -573,6 +589,10 @@ export const cs = {
   appearanceAuto: "Automaticky",
   appearanceLight: "Světlý",
   appearanceDark: "Tmavý",
+  appearanceColorMode: "Barevný režim",
+  appearanceTheme: "Motiv",
+  appearanceThemeDefault: "Výchozí",
+  appearanceThemeLocked: "Odemkne úroveň {tier}",
 
   list: "Seznam",
   contactsTitle: "Kontakty",

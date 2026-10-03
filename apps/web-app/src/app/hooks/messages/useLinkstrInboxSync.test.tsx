@@ -123,6 +123,7 @@ const render = async (writes: {
       enabled: true,
       formatDisplayedAmountText: String,
       getPeerSeenWindow: () => null,
+      handleSupporterResult: async () => ({ ok: true }),
       logPayStep: () => {},
       maybeShowPwaNotification: () => Promise.resolve(),
       messagesVisibleSinceSec: null,

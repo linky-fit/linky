@@ -1,6 +1,7 @@
 import { ListRow, Stack } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useSupporterContext } from "../app/context/SupporterContext";
 import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
 import {
   SUPPORTER_BADGE_DISPLAY_LABEL_KEYS,
@@ -12,6 +13,7 @@ import {
 export function SupporterBadgeDisplayOptions(): React.ReactElement {
   const { t } = useAppShellCore();
   const { pushToast } = useAdvancedSettingsContext();
+  const { requestBadgePublish } = useSupporterContext();
   const { display, setDisplay } = useSupporterBadgeDisplay();
 
   return (
@@ -24,7 +26,8 @@ export function SupporterBadgeDisplayOptions(): React.ReactElement {
           chevron={false}
           onPress={() =>
             void setDisplay(option).then((outcome) => {
-              if (!outcome.ok) pushToast(outcome.error);
+              if (outcome.ok) requestBadgePublish();
+              else pushToast(outcome.error);
             })
           }
         />
