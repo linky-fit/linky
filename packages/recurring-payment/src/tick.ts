@@ -4,19 +4,11 @@ import { recurringEnvelopeKey, type RecurringPaymentOrder } from "./order";
 import { decideRecurringRun, nextDueAfter } from "./schedule";
 
 /**
- * Lead time between claiming a due payment and sending it. The user is
- * notified at claim time; the window also lets claims written by devices that
- * raced each other converge through sync, so usually a single device acts.
- */
-export const RECURRING_NOTICE_SEC = 60;
-/**
  * Countdown shown in the app before a due payment goes out, with pay-now and
  * cancel. Only when the app is visible; in the background the payment is sent
- * at its send time without it.
+ * at its due time without it.
  */
 export const RECURRING_CONFIRM_SEC = 10;
-/** A claim this far past its send time belongs to a device that went away. */
-export const RECURRING_CLAIM_TAKEOVER_SEC = 10 * 60;
 /** Pause between attempts of a run whose last attempt failed. */
 export const RECURRING_RUN_RETRY_DELAY_SEC = 10 * 60;
 
@@ -53,12 +45,6 @@ interface RecurringUnfunded {
 }
 
 export type RecurringTickAction =
-  | {
-      kind: "claim";
-      order: RecurringPaymentOrder;
-      dueAtSec: number;
-      takeover: boolean;
-    }
   | RecurringRunAction
   | {
       kind: "skip";
@@ -85,7 +71,6 @@ export const isRecurringUnfunded = (
 export interface RecurringTickInput {
   orders: ReadonlyArray<RecurringPaymentOrder>;
   nowSec: number;
-  deviceId: string;
   /** Available sats per mint URL; a due run waits until its mint covers the amount. */
   balanceSatByMint: ReadonlyMap<string, number>;
   /** Null while no rate is known; a fiat payment without a funded envelope then waits. */
@@ -99,38 +84,6 @@ export interface RecurringTickInput {
   /** Per order id: no new attempt before this time (set after a failure). */
   retryNotBeforeSec: ReadonlyMap<RecurringPaymentId, number>;
 }
-
-export interface RecurringUpcoming {
-  dueAtSec: number;
-  /** When the claiming device sends it; null while nobody has claimed it. */
-  sendAtSec: number | null;
-  claimDeviceId: string | null;
-}
-
-/**
- * The due payment inside the notice window (or already overdue), with its
- * claim when one exists for that due time. Null when nothing is due soon.
- */
-export const recurringUpcoming = (
-  order: RecurringPaymentOrder,
-  nowSec: number,
-): RecurringUpcoming | null => {
-  const decision = decideRecurringRun(
-    order.schedule,
-    nowSec + RECURRING_NOTICE_SEC,
-  );
-  if (decision.kind !== "due") return null;
-  const claim =
-    order.claim?.dueAtSec === decision.dueAtSec ? order.claim : null;
-  return {
-    dueAtSec: decision.dueAtSec,
-    sendAtSec:
-      claim === null
-        ? null
-        : Math.max(decision.dueAtSec, claim.atSec + RECURRING_NOTICE_SEC),
-    claimDeviceId: claim?.deviceId ?? null,
-  };
-};
 
 /**
  * End of the window in which a due run may still be attempted: the next due
@@ -158,19 +111,9 @@ const planOrder = (
   order: RecurringPaymentOrder,
   input: RecurringTickInput,
 ): RecurringTickAction | null => {
-  const upcoming = recurringUpcoming(order, input.nowSec);
-  if (upcoming === null) return null;
-  const { dueAtSec, sendAtSec, claimDeviceId } = upcoming;
-  if (sendAtSec === null) {
-    return { kind: "claim", order, dueAtSec, takeover: false };
-  }
-  if (input.nowSec < sendAtSec) return null;
-  if (claimDeviceId !== input.deviceId) {
-    return input.nowSec >= sendAtSec + RECURRING_CLAIM_TAKEOVER_SEC
-      ? { kind: "claim", order, dueAtSec, takeover: true }
-      : null;
-  }
-
+  const decision = decideRecurringRun(order.schedule, input.nowSec);
+  if (decision.kind !== "due") return null;
+  const { dueAtSec, missedCount } = decision;
   const deadlinePassed =
     input.nowSec >= recurringSkipDeadlineSec(order, dueAtSec);
   const attemptedThisPeriod =
@@ -189,14 +132,13 @@ const planOrder = (
   if (amountSat === null) return { kind: "waitRates", order, dueAtSec };
   const retryNotBefore = input.retryNotBeforeSec.get(order.id) ?? 0;
   if (input.nowSec < retryNotBefore) return null;
-  const decision = decideRecurringRun(order.schedule, input.nowSec);
   const run: RecurringRunAction = {
     kind: "run",
     order,
     runIndex,
     amountSat,
     dueAtSec,
-    missedCount: decision.kind === "due" ? decision.missedCount : 0,
+    missedCount,
   };
   const balanceSat = input.balanceSatByMint.get(order.mintUrl) ?? 0;
   if (envelopeSat !== undefined || balanceSat >= amountSat) return run;
@@ -217,10 +159,7 @@ export const planRecurringPaymentTick = (
   return actions.sort((a, b) => a.dueAtSec - b.dueAtSec);
 };
 
-/**
- * A run started on demand, outside the planner: it skips the notice window
- * and pays the pending period, even one not due yet.
- */
+/** A run started on demand, outside the planner: it pays the pending period, even one not due yet. */
 export const runNowAction = (
   order: RecurringPaymentOrder,
   amountSat: number,

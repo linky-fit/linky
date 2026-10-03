@@ -41,12 +41,9 @@ describe("readRecurringPaymentOrder", () => {
     ).toBe("Rent");
   });
 
-  it("reads a complete claim, the progress and a known run status", () => {
+  it("reads the progress and a known run status", () => {
     const order = readRecurringPaymentOrder(
       recurringColumnsFixture({
-        claimDeviceId: "device-a",
-        claimAtSec: DUE - 30,
-        claimDueAtSec: DUE,
         lastRunStatus: "paid",
         progress: recurringProgressColumn({
           runCount: 3,
@@ -54,11 +51,6 @@ describe("readRecurringPaymentOrder", () => {
         }),
       }),
     );
-    expect(order?.claim).toEqual({
-      deviceId: "device-a",
-      atSec: DUE - 30,
-      dueAtSec: DUE,
-    });
     expect(order?.lastRunStatus).toBe("paid");
     expect(order?.schedule).toMatchObject({
       runCount: 3,
@@ -66,15 +58,13 @@ describe("readRecurringPaymentOrder", () => {
     });
   });
 
-  it("ignores a partial claim, a blank zone and an unknown run status", () => {
+  it("ignores a blank zone and an unknown run status", () => {
     const order = readRecurringPaymentOrder(
       recurringColumnsFixture({
-        claimDeviceId: "device-a",
         lastRunStatus: "teleported",
         timeZone: "  ",
       }),
     );
-    expect(order?.claim).toBeNull();
     expect(order?.lastRunStatus).toBeNull();
     expect(order?.schedule.timeZone).toBeNull();
   });

@@ -14,7 +14,6 @@ import {
 } from "./testing/orders";
 import { planRecurringPaymentTick, runNowAction } from "./tick";
 import {
-  claimPatch,
   editPatch,
   resumePatch,
   runFailedPatch,
@@ -32,14 +31,6 @@ const progress = (runCount: number, nextDueAtSec: number) =>
   recurringProgressColumn({ runCount, nextDueAtSec });
 
 describe("transitions", () => {
-  it("claims a due time for a device", () => {
-    expect(claimPatch("device-a", DUE - 30, DUE)).toEqual({
-      claimDeviceId: "device-a",
-      claimAtSec: DUE - 30,
-      claimDueAtSec: DUE,
-    });
-  });
-
   describe("runPaidPatch", () => {
     it("counts the run and moves to the first due time after now", () => {
       expect(runPaidPatch(run, DUE + 7 * HOUR)).toEqual({
@@ -107,12 +98,9 @@ describe("transitions", () => {
     });
   });
 
-  it("starts an edited schedule at its new first due time and drops the claim", () => {
+  it("starts an edited schedule at its new first due time", () => {
     expect(editPatch(order, DUE + 3 * HOUR)).toEqual({
       progress: progress(2, DUE + 3 * HOUR),
-      claimAtSec: null,
-      claimDeviceId: null,
-      claimDueAtSec: null,
     });
   });
 });
@@ -138,14 +126,8 @@ const progressOf = (row: RecurringPaymentColumns): RecurringProgress => {
 };
 
 describe("progress under last-writer-wins sync", () => {
-  const base = recurringColumnsFixture({
-    claimDeviceId: "device-b",
-    claimAtSec: DUE - 60,
-    claimDueAtSec: DUE,
-  });
-  const stale = recurringOrderFixture({
-    claim: { deviceId: "device-b", atSec: DUE - 60, dueAtSec: DUE },
-  });
+  const base = recurringColumnsFixture();
+  const stale = recurringOrderFixture();
   const paid = runPaidPatch({ order: stale, runIndex: 0, dueAtSec: DUE }, DUE);
 
   it("never plans the next run for a period the paid run settled", () => {
@@ -155,7 +137,6 @@ describe("progress under last-writer-wins sync", () => {
       const runs = planRecurringPaymentTick({
         orders: [merged],
         nowSec: DUE + 120,
-        deviceId: "device-b",
         balanceSatByMint: new Map([[MINT, 1_000]]),
         fiatRates: null,
         fundedEnvelopeSat: new Map(),

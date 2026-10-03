@@ -41,6 +41,7 @@ import {
 import { getStoredPushContactName } from "./utils/pushContactNamesStorage";
 import { appendPushDebugLog, flushPushDebugLog } from "./utils/pushDebugLog";
 import { getStoredPushNsec } from "./utils/pushNsecStorage";
+import { readRecurringReminderNotes } from "./utils/recurringReminderNotes";
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -52,6 +53,7 @@ const isWrapId = Schema.is(WrapId);
 
 interface PushNotificationData {
   createdAt?: number;
+  notifyAtSec?: number;
   outerEventId?: string;
   recipientNpub?: string;
   recipientPubkey?: string;
@@ -80,6 +82,10 @@ function readPushNotificationData(value: unknown): PushNotificationData {
   return {
     ...(typeof value.createdAt === "number" && Number.isFinite(value.createdAt)
       ? { createdAt: value.createdAt }
+      : {}),
+    ...(typeof value.notifyAtSec === "number" &&
+    Number.isFinite(value.notifyAtSec)
+      ? { notifyAtSec: value.notifyAtSec }
       : {}),
     ...(typeof value.outerEventId === "string" && value.outerEventId.trim()
       ? { outerEventId: value.outerEventId }
@@ -497,9 +503,13 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     (async () => {
       const clientList = await getWindowClients();
-      const shouldSuppressNotification = hasVisibleWindowClient(clientList);
+      const isReminder = data.type === RECURRING_REMINDER_TYPE;
+      // An open app, even hidden, sends due recurring payments by itself.
+      const shouldSuppressNotification = isReminder
+        ? clientList.length > 0
+        : hasVisibleWindowClient(clientList);
       if (shouldSuppressNotification) {
-        logSw("notification suppressed because app client is visible", {
+        logSw("notification suppressed because an app client is open", {
           data,
           tag: data.outerEventId ?? "linky-inbox",
         });
@@ -510,29 +520,40 @@ self.addEventListener("push", (event) => {
         return;
       }
 
-      const isReminder = data.type === RECURRING_REMINDER_TYPE;
       // A reminder carries no wrap to decrypt; its copy is the app's own.
+      const reminderCopy = isReminder
+        ? getRecurringReminderCopyForLanguage(
+            self.navigator.language,
+            data.notifyAtSec === undefined
+              ? null
+              : await readRecurringReminderNotes(data.notifyAtSec).catch(
+                  () => null,
+                ),
+          )
+        : null;
       const decryptedMessage = isReminder
         ? null
         : await decryptIncomingMessageBody(envelope).catch(() => null);
-      const fallbackBody = isReminder
-        ? getRecurringReminderCopyForLanguage(self.navigator.language)
-        : typeof envelope.body === "string" && envelope.body.trim().length > 0
+      const fallbackBody =
+        reminderCopy?.body ??
+        (typeof envelope.body === "string" && envelope.body.trim().length > 0
           ? truncateNotificationBody(envelope.body)
-          : "";
+          : "");
       const notificationBody = decryptedMessage?.body ?? fallbackBody;
       const senderContactName = decryptedMessage
         ? await getStoredPushContactName(decryptedMessage.senderPub).catch(
             () => null,
           )
         : null;
-      const notificationTitle = buildPushNotificationTitle({
-        contactName: senderContactName,
-        senderPubkey: decryptedMessage?.senderPub,
-        recipientIdentifier:
-          envelope.data?.recipientNpub ?? envelope.data?.recipientPubkey,
-        title: envelope.title,
-      });
+      const notificationTitle =
+        reminderCopy?.title ??
+        buildPushNotificationTitle({
+          contactName: senderContactName,
+          senderPubkey: decryptedMessage?.senderPub,
+          recipientIdentifier:
+            envelope.data?.recipientNpub ?? envelope.data?.recipientPubkey,
+          title: envelope.title,
+        });
       const options: NotificationOptions = {
         badge: "/pwa-192x192.png",
         body: notificationBody,

@@ -23,7 +23,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "auth.loggedOut":
     "User confirmed logout. Every open tab reloads and the first one to boot deletes everything the site stored on this device: the Evolu databases, IndexedDB (including this inspector buffer), localStorage, caches and the service worker. The payload says whether Evolu was connected, i.e. whether unsynced data may have been lost.",
   "recurring.remindersSynced":
-    "The app told the push service when to remind this identity of upcoming recurring payments (the notice window before each next due time), or failed to. The server stores only the times, never amounts or recipients; a reminder arrives as a push when Linky is closed.",
+    "The app told the push service when to remind this identity of upcoming recurring payments (each next due time), or failed to. The server stores only the times, never notes, amounts or recipients; the notes due at each time stay on the device, and the reminder arrives as a push only when no Linky window is open.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "conversations.archived":
@@ -228,8 +228,6 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A receive.resumeDeferred pass ended with an error instead of a result, usually because the wallet runtime shut down mid-pass. Nothing about the kept tokens changed beyond what earlier rows show; the next pass retries them.",
   "melt.historyResolved":
     "The app updated a pending Lightning payment in the transaction history after melt.resume settled it — to paid (amount and fee) or failed. The quote link connects it to the melt rows.",
-  "recurring.claimed":
-    "This device claimed an upcoming recurring payment: it wrote its device id and the due time to the row and notified the user. The device the synced claim names shows the countdown and pays after a short claim window; the claim never decides whether money moves, the run's envelope at the mint does. takeover means the previous claimant went away.",
   "recurring.run":
     "One attempt at a recurring payment on this device: it opened the run's envelope (keyed by payment id and runIndex) at the order's mint, asked the mint about it and delivered it. status paid (delivered false: the envelope was already spent, e.g. by another device; a token counts as delivered once a relay accepted its message), waiting (a melt of it is in flight, or its token message is still queued), busy (another tab holds it, or a melt record does; retried after the retry delay), unfunded (the balance covered the amount but not the swap fee; handled like waiting for funds), mixed (part of it spent; needs the user) or failed with the error. The operation link joins it to the linkshu envelope.* rows.",
   "recurring.skipped":
@@ -239,7 +237,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "recurring.waitingForRates":
     "A recurring payment fixed in a fiat currency is due but no exchange rate is available to turn it into sats; the scheduler retries on the next pass. Reported once per due time.",
   "recurring.updated":
-    "The user edited a recurring payment: amount, interval, recipient, or next payment date. The payload carries the new values and the previous ones; any claim for the old due time was dropped.",
+    "The user edited a recurring payment: amount, interval, recipient, or next payment date. The payload carries the new values and the previous ones.",
   "recurring.waitingForFunds":
     "A recurring payment is due but the balance at its mint is below its amount and the mint holds no envelope for the run; the scheduler keeps retrying until the grace window closes. Reported once per due time.",
   "recurring.envelopesRecovered":

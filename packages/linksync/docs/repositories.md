@@ -92,7 +92,7 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 
 `deleted` returns every removed payment with its last `mintUrl`, `rail` and `progress`, so the app can settle the envelope a removed payment left at its mint. A payment that moved to a newer shard is not in it: only the newest copy of each id counts.
 
-`unit`, `intervalUnit`, `rail`, `progress` and `lastRunStatus` stay strings here; their values, the schedule math, the run keys and the claim between devices belong to `@linky-fit/recurring-payment`, whose `readRecurringPaymentOrder` validates a record into an order.
+`unit`, `intervalUnit`, `rail`, `progress` and `lastRunStatus` stay strings here; their values, the schedule math and the run keys belong to `@linky-fit/recurring-payment`, whose `readRecurringPaymentOrder` validates a record into an order.
 
 ## Identity
 

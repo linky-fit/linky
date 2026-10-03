@@ -34,8 +34,6 @@ export const de = {
   recurringScheduledSection: "Geplant",
   recurringHistorySection: "Verlauf",
   recurringInsufficientFundsHint: "geringes Guthaben",
-  recurringNotifyBody:
-    "{amount} {unit} an {name} geht in {minutes} Min. raus. Öffne Linky, um sie abzubrechen.",
   recurringSentBody: "{amount} {unit} an {name} gesendet.",
   recurringFailedBody:
     "Senden von {amount} {unit} an {name} ist fehlgeschlagen. Es wird erneut versucht.",

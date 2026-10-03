@@ -34,8 +34,6 @@ export const en = {
   recurringScheduledSection: "Scheduled",
   recurringHistorySection: "History",
   recurringInsufficientFundsHint: "low balance",
-  recurringNotifyBody:
-    "{amount} {unit} to {name} goes out in {minutes} min. Open Linky to cancel it.",
   recurringSentBody: "Sent {amount} {unit} to {name}.",
   recurringFailedBody:
     "Sending {amount} {unit} to {name} failed. It will be retried.",

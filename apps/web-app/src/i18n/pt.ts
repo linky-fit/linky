@@ -36,8 +36,6 @@ export const pt = {
   recurringScheduledSection: "Agendados",
   recurringHistorySection: "Histórico",
   recurringInsufficientFundsHint: "saldo baixo",
-  recurringNotifyBody:
-    "{amount} {unit} para {name} saem em {minutes} min. Abra o Linky para cancelar.",
   recurringSentBody: "{amount} {unit} enviados a {name}.",
   recurringFailedBody:
     "O envio de {amount} {unit} a {name} falhou. Vamos tentar de novo.",

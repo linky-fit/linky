@@ -1,11 +1,11 @@
 import { expect } from "@playwright/test";
-import { readBalanceSat } from "./helpers/appState";
+import { readBalanceSat, relaunchApp } from "./helpers/appState";
 import { FIXTURE_AMOUNT_SAT } from "./helpers/network";
 import {
   addLightningContact,
-  claimOrder,
   dateTimeLocal,
   detailValue,
+  dueAt,
   dueDialog,
   enterAmount,
   expectPaidHistory,
@@ -44,7 +44,7 @@ test("the countdown's Pay consumes one period and history links back to the paym
   await expect(detailValue(a.page, "Paid from")).toHaveText(MINT_HOST);
   expect((await readOrder(a.page)).rail).toBe("cashu");
   await test.step("show the countdown in the visible app", async () =>
-    waitForCountdown(a.page, await claimOrder(a.page)));
+    waitForCountdown(a.page, await dueAt(a.page)));
   await test.step("press Pay and receive the sats after mint fees", async () => {
     await dueDialog(a.page)
       .getByRole("button", { name: "Pay", exact: true })
@@ -81,11 +81,9 @@ for (const action of ["countdown expires", "Cancel this payment"]) {
       await openForm(a.page);
     });
     const hash = await saveOrder(a.page);
-    const sendAt =
-      await test.step("wait for the persisted claim and its notice window", () =>
-        claimOrder(a.page));
-    await test.step("show the countdown in the visible app", () =>
-      waitForCountdown(a.page, sendAt));
+    const due = await dueAt(a.page);
+    await test.step("show the countdown at the due time", () =>
+      waitForCountdown(a.page, due));
     await test.step(action, async () => {
       const appearedAt = Date.now();
       if (action === "Cancel this payment") {
@@ -96,7 +94,7 @@ for (const action of ["countdown expires", "Cancel this payment"]) {
         await expect(detailValue(a.page, "Last payment")).toContainText(
           "skipped",
         );
-        expect((await readOrder(a.page)).nextDueAtSec).toBeGreaterThan(sendAt);
+        expect((await readOrder(a.page)).nextDueAtSec).toBeGreaterThan(due);
         await a.page.goto("/#wallet/transactions");
         await expect(a.page.getByTestId("recurring-order-card")).toHaveCount(1);
         await expect(
@@ -138,7 +136,7 @@ test("a recurring payment's note reaches the contact and both histories", async 
   await saveOrder(a.page);
   await expect(detailValue(a.page, "Note")).toHaveText(note);
   await test.step("let the countdown pay it", async () => {
-    await waitForCountdown(a.page, await claimOrder(a.page));
+    await waitForCountdown(a.page, await dueAt(a.page));
     await expect
       .poll(async () => (await readOrder(a.page)).runCount, {
         timeout: 15_000,
@@ -163,6 +161,34 @@ test("a recurring payment's note reaches the contact and both histories", async 
   });
 });
 
+test("an overdue payment goes out right after the app launches", async ({
+  bootAccount,
+}) => {
+  const a = await bootAccount("A", { hidden: true });
+  const b = await bootAccount("B");
+  await test.step("fund A and create a payment", async () => {
+    await fundAndConnect(a, b);
+    await openForm(a.page);
+  });
+  const hash = await saveOrder(
+    a.page,
+    ORDER_SAT,
+    new Date(Date.now() + 120_000),
+  );
+  const due = await dueAt(a.page);
+  await test.step("keep the app closed past the due time", () =>
+    relaunchApp(a.page, "/#wallet", () => waitUntil(due + 20)));
+  await test.step("the launched app pays it without waiting", async () => {
+    await expect
+      .poll(async () => (await readOrder(a.page)).runCount, {
+        timeout: 15_000,
+      })
+      .toBe(1);
+    await expectReceived(b.page);
+    await expectPaidHistory(a.page, hash);
+  });
+});
+
 test("insufficient funds warns once and retries after a top-up", async ({
   bootAccount,
 }) => {
@@ -173,7 +199,7 @@ test("insufficient funds warns once and retries after a top-up", async ({
     await openForm(a.page);
   });
   const hash = await saveOrder(a.page);
-  const sendAt = await claimOrder(a.page);
+  const due = await dueAt(a.page);
   await test.step("due payment waits for funds without paying", async () => {
     await a.page.goto("/#wallet/transactions");
     await expect(
@@ -181,7 +207,7 @@ test("insufficient funds warns once and retries after a top-up", async ({
         .getByTestId("recurring-order-card")
         .getByTestId("recurring-underfunded-hint"),
     ).toHaveText("low balance");
-    await waitUntil(sendAt);
+    await waitUntil(due);
     await triggerSchedulerPass(a.page);
     const toast = a.page.getByText(
       `Not enough funds at ${MINT_HOST} for a recurring payment right now. It will be retried.`,
@@ -211,7 +237,7 @@ test("insufficient funds warns once and retries after a top-up", async ({
   });
 });
 
-test("two devices sync the claim and pay only once in the background", async ({
+test("two background devices pay a due run only once", async ({
   bootAccount,
 }) => {
   const a = await bootAccount("A", { hidden: true });
@@ -226,30 +252,9 @@ test("two devices sync the claim and pay only once in the background", async ({
     await openForm(a.page);
   });
   const hash = await saveOrder(a.page);
-  await test.step("both devices list the payment and converge on one claim", async () => {
-    await expect(a2.page.getByTestId("recurring-order-card")).toHaveCount(1);
-    await Promise.all([
-      triggerSchedulerPass(a.page),
-      triggerSchedulerPass(a2.page),
-    ]);
-    await claimOrder(a.page);
-    await expect
-      .poll(async () => {
-        const [first, second] = await Promise.all([
-          readOrder(a.page),
-          readOrder(a2.page),
-        ]);
-        return (
-          first.claimDeviceId !== null &&
-          first.claimDeviceId === second.claimDeviceId &&
-          first.claimAtSec === second.claimAtSec
-        );
-      })
-      .toBe(true);
-  });
-  await test.step("the winning device sends silently, once", async () => {
-    const sendAt = await claimOrder(a.page);
-    await waitUntil(sendAt);
+  await expect(a2.page.getByTestId("recurring-order-card")).toHaveCount(1);
+  await test.step("both devices send silently at the due time, once", async () => {
+    await waitUntil(await dueAt(a.page));
     await Promise.all([
       triggerSchedulerPass(a.page),
       triggerSchedulerPass(a2.page),
@@ -289,11 +294,9 @@ test("two devices sync the claim and pay only once in the background", async ({
 test("two devices paying the same run at once pay it only once", async ({
   bootAccount,
 }) => {
-  // One device id makes both devices act on the claim and count down the same run.
-  const deviceId = "shared-device";
-  const a = await bootAccount("A", { deviceId });
+  const a = await bootAccount("A");
   const b = await bootAccount("B");
-  const a2 = await bootAccount("A2", { identity: a.identity, deviceId });
+  const a2 = await bootAccount("A2", { identity: a.identity });
   await test.step("fund and sync both payer devices", async () => {
     await fundAndConnect(a, b);
     await expect
@@ -305,20 +308,10 @@ test("two devices paying the same run at once pay it only once", async ({
   const hash = await saveOrder(a.page);
   await test.step("both devices count down the same run", async () => {
     await expect(a2.page.getByTestId("recurring-order-card")).toHaveCount(1);
-    await claimOrder(a.page);
-    await expect
-      .poll(async () => {
-        const [first, second] = await Promise.all([
-          readOrder(a.page),
-          readOrder(a2.page),
-        ]);
-        return first.claimAtSec === second.claimAtSec;
-      })
-      .toBe(true);
-    const sendAt = await claimOrder(a.page);
+    const due = await dueAt(a.page);
     await Promise.all([
-      waitForCountdown(a.page, sendAt),
-      waitForCountdown(a2.page, sendAt),
+      waitForCountdown(a.page, due),
+      waitForCountdown(a2.page, due),
     ]);
   });
   await test.step("both devices press Pay at the same moment", async () => {
@@ -367,7 +360,7 @@ test("a contact with only a Lightning address is paid by melting the envelope", 
   const hash = await saveOrder(a.page);
   expect((await readOrder(a.page)).rail).toBe("lightning");
   await test.step("the countdown's Pay pays the contact's invoice once", async () => {
-    await waitForCountdown(a.page, await claimOrder(a.page));
+    await waitForCountdown(a.page, await dueAt(a.page));
     await dueDialog(a.page)
       .getByRole("button", { name: "Pay", exact: true })
       .click();
@@ -408,7 +401,7 @@ test("deleting a Lightning payment returns its undelivered envelope", async ({
   });
   const hash = await saveOrder(a.page);
   await test.step("the countdown's Pay funds the envelope but cannot get an invoice", async () => {
-    await waitForCountdown(a.page, await claimOrder(a.page));
+    await waitForCountdown(a.page, await dueAt(a.page));
     await dueDialog(a.page)
       .getByRole("button", { name: "Pay", exact: true })
       .click();
@@ -449,13 +442,13 @@ test("pause suppresses a due run and resume advances it into the future", async 
   await fundAndConnect(a, b);
   await openForm(a.page);
   await saveOrder(a.page);
-  const sendAt = await claimOrder(a.page);
-  await test.step("pause a claimed payment before its due time", async () => {
+  const due = await dueAt(a.page);
+  await test.step("pause a payment before its due time", async () => {
     await a.page.getByRole("button", { name: "Pause", exact: true }).click();
     await expect(
       a.page.getByRole("button", { name: "Resume", exact: true }),
     ).toBeVisible();
-    await waitUntil(sendAt + 1);
+    await waitUntil(due + 1);
     await triggerSchedulerPass(a.page);
     await a.page.waitForTimeout(2_000);
     await expect(dueDialog(a.page)).toBeHidden();
@@ -483,7 +476,7 @@ test("pause suppresses a due run and resume advances it into the future", async 
   });
 });
 
-test("editing amount and date clears an in-flight claim", async ({
+test("editing amount and date moves a payment that was about to go out", async ({
   bootAccount,
 }) => {
   const a = await bootAccount("A");
@@ -491,9 +484,9 @@ test("editing amount and date clears an in-flight claim", async ({
   await fundAndConnect(a, b);
   await openForm(a.page);
   const hash = await saveOrder(a.page);
-  const sendAt = await claimOrder(a.page);
+  const due = await dueAt(a.page);
   const newDate = new Date(Date.now() + 3_600_000);
-  await test.step("edit the claimed payment and verify its new values", async () => {
+  await test.step("edit the payment and verify its new values", async () => {
     await a.page.getByRole("button", { name: "Edit", exact: true }).click();
     await a.page
       .getByRole("button", { name: "Clear form", exact: true })
@@ -521,7 +514,6 @@ test("editing amount and date clears an in-flight claim", async ({
     await expect
       .poll(async () => (await readOrder(a.page)).nextDueAtSec)
       .toBe(nextMinute);
-    expect((await readOrder(a.page)).claimDeviceId).toBeNull();
     await a.page.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(a.page).toHaveURL(/\/edit$/);
     await expect(
@@ -529,8 +521,8 @@ test("editing amount and date clears an in-flight claim", async ({
     ).toHaveValue(dateTimeLocal(newDate));
     await a.page.goto(`/${hash}`);
   });
-  await test.step("the old claim's send time passes without sending the old amount", async () => {
-    await waitUntil(sendAt + 1);
+  await test.step("the old due time passes without sending the old amount", async () => {
+    await waitUntil(due + 1);
     await triggerSchedulerPass(a.page);
     await a.page.waitForTimeout(2_000);
     await expect(dueDialog(a.page)).toBeHidden();
@@ -634,7 +626,7 @@ test("fiat recurring amount converts, shows approximate sats and pays", async ({
     await expect(card).toContainText(`~${FIXTURE_AMOUNT_SAT} sat`);
   });
   await test.step("pay the fiat amount at the fixture's 40 sat per CZK rate", async () => {
-    await waitForCountdown(a.page, await claimOrder(a.page));
+    await waitForCountdown(a.page, await dueAt(a.page));
     await dueDialog(a.page)
       .getByRole("button", { name: "Pay", exact: true })
       .click();

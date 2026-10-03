@@ -56,20 +56,6 @@ const positiveOrNull = (value: number | null): PositiveInt | null =>
 export const recurringPaymentUpdate = (
   patch: RecurringPaymentPatch,
 ): RepositoryPatch => ({
-  ...(patch.claimAtSec !== undefined
-    ? { claimAtSec: positiveOrNull(patch.claimAtSec) }
-    : {}),
-  ...(patch.claimDeviceId !== undefined
-    ? {
-        claimDeviceId:
-          patch.claimDeviceId === null
-            ? null
-            : NonEmptyString100.orThrow(patch.claimDeviceId),
-      }
-    : {}),
-  ...(patch.claimDueAtSec !== undefined
-    ? { claimDueAtSec: positiveOrNull(patch.claimDueAtSec) }
-    : {}),
   ...(patch.lastRunAtSec !== undefined
     ? { lastRunAtSec: positiveOrNull(patch.lastRunAtSec) }
     : {}),
