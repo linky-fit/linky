@@ -425,12 +425,10 @@ test("deleting a Lightning payment returns its undelivered envelope", async ({
       .click();
     await expect(a.page).toHaveURL(/#wallet\/transactions$/);
     await a.page.goto("/#wallet");
+    // The release's fresh proofs land one by one, so wait for all of them.
     await expect
       .poll(() => readBalanceSat(a.page), { timeout: 60_000 })
-      .toBeGreaterThan(FUNDING_SAT - ORDER_SAT);
-    expect(await readBalanceSat(a.page)).toBeGreaterThanOrEqual(
-      FUNDING_SAT - MAX_FEE_SAT,
-    );
+      .toBeGreaterThanOrEqual(FUNDING_SAT - MAX_FEE_SAT);
   });
 });
 

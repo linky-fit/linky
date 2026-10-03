@@ -107,7 +107,8 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
 
 export const FUNDING_SAT = 100;
 export const ORDER_SAT = 10;
-// The envelope swap and the receiver each pay the mint's input fee.
+// The envelope swap and whoever spends the envelope (the receiver, or a
+// release back to the balance) each pay the mint's input fee.
 export const MAX_FEE_SAT = 2;
 /** The dev stack's default mint, which new recurring payments are bound to. */
 export const MINT_HOST = new URL(mintUrl).host;
