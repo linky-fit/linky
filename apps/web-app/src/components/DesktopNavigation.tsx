@@ -4,7 +4,10 @@ import {
   useAppShellActions,
   useAppShellCore,
 } from "../app/context/AppShellContexts";
-import { getDesktopRouteSection } from "../app/routes/desktopRouteSection";
+import {
+  getDesktopRouteSection,
+  getDesktopSectionRoute,
+} from "../app/routes/desktopRouteSection";
 import { navigateTo } from "../hooks/useRouting";
 import { formatShortNpub } from "../utils/formatting";
 
@@ -34,12 +37,15 @@ export function DesktopNavigation(): React.ReactElement {
       items={[
         { value: "contacts", label: t("contactsTitle"), icon: "Users" },
         { value: "wallet", label: t("wallet"), icon: "Wallet" },
+        { value: "proxy", label: t("proxyPayments"), icon: "HandCoins" },
       ]}
       footerItems={[
         { value: "settings", label: t("settings"), icon: "Settings" },
       ]}
       value={getDesktopRouteSection(state.route)}
-      onValueChange={(route) => navigateTo({ route })}
+      onValueChange={(section) =>
+        navigateTo({ route: getDesktopSectionRoute(section) })
+      }
     />
   );
 }

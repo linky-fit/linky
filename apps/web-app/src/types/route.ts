@@ -36,7 +36,7 @@ export type Route =
   | { kind: "settingsUnits" }
   | { kind: "settingsReceiveMethod" }
   | { kind: "settingsMasterKeys" }
-  | { kind: "settingsProxyPayments" }
+  | { kind: "proxyPayments" }
   | { kind: "advanced" }
   | { kind: "advancedAutoPayLimit" }
   | { kind: "advancedInspector" }
@@ -97,8 +97,9 @@ export const parseRouteFromHash = (): Route => {
     return { kind: "settingsReceiveMethod" };
   }
   if (hash === "#settings/master-keys") return { kind: "settingsMasterKeys" };
-  if (hash === "#settings/proxy-payments") {
-    return { kind: "settingsProxyPayments" };
+  // The old settings hash stays parseable for links already shared.
+  if (hash === "#proxy" || hash === "#settings/proxy-payments") {
+    return { kind: "proxyPayments" };
   }
   if (hash === "#advanced") return { kind: "advanced" };
   if (hash === "#advanced/auto-pay-limit") {

@@ -179,7 +179,7 @@ const bootAccount = async (
  * signed by the test; the settings page itself is only checked to exist.
  */
 const advertiseCzk = async (account: Account): Promise<void> => {
-  await account.page.goto("/#settings/proxy-payments");
+  await account.page.goto("/#proxy");
   const czkSwitch = account.page.getByRole("switch", {
     name: "Payments in CZK",
   });

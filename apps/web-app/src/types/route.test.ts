@@ -68,8 +68,11 @@ describe("parseRouteFromHash", () => {
     replaceHash("#settings/master-keys");
     expect(parseRouteFromHash()).toEqual({ kind: "settingsMasterKeys" });
 
+    replaceHash("#proxy");
+    expect(parseRouteFromHash()).toEqual({ kind: "proxyPayments" });
+
     replaceHash("#settings/proxy-payments");
-    expect(parseRouteFromHash()).toEqual({ kind: "settingsProxyPayments" });
+    expect(parseRouteFromHash()).toEqual({ kind: "proxyPayments" });
   });
 
   it("parses the manual bank payment entry before the payload routes", () => {
