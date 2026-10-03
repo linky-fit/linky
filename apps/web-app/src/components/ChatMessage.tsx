@@ -23,6 +23,7 @@ import {
   bankPaymentOfferStatusTones,
   formatRemainingTime,
   getBankPaymentOfferStatusLabel,
+  getUnmatchedBankPaymentOfferStatus,
 } from "../app/lib/bankPaymentOfferLabels";
 import {
   BANK_PAYMENT_OFFER_PHASE_TTL_SEC,
@@ -296,9 +297,14 @@ function ChatMessageComponent({
   const bankOfferDisplayAmount = bankPaymentOfferInfo?.amountSat
     ? formatDisplayedAmountText(bankPaymentOfferInfo.amountSat)
     : (bankPaymentOfferInfo?.amountText ?? "");
+  const unmatchedBankOfferStatus = bankPaymentOfferInfo
+    ? getUnmatchedBankPaymentOfferStatus(bankPaymentOfferInfo)
+    : null;
+  const bankOfferStatus =
+    unmatchedBankOfferStatus ?? bankPaymentOfferInfo?.status ?? null;
   const bankOfferDescription = bankPaymentOfferInfo
     ? getBankPaymentOfferDescription(
-        bankPaymentOfferInfo.status,
+        bankOfferStatus ?? bankPaymentOfferInfo.status,
         bankOfferDisplayAmount,
         isOut,
         t,
@@ -708,17 +714,19 @@ function ChatMessageComponent({
   const bankOfferCard = bankPaymentOfferInfo ? (
     <PaymentCard
       testID="chat-bank-payment-offer-card"
-      status={bankPaymentOfferInfo.status}
+      status={bankOfferStatus ?? bankPaymentOfferInfo.status}
       title={t("bankPaymentOfferTitle")}
       statusLabel={getBankPaymentOfferStatusLabel(
-        bankPaymentOfferInfo.status,
+        bankOfferStatus ?? bankPaymentOfferInfo.status,
         !isOut,
         t,
       )}
       amount={
-        bankPaymentOfferInfo.amountSat
-          ? paymentCardAmount(bankPaymentOfferInfo.amountSat)
-          : { value: bankPaymentOfferInfo.amountText }
+        unmatchedBankOfferStatus
+          ? null
+          : bankPaymentOfferInfo.amountSat
+            ? paymentCardAmount(bankPaymentOfferInfo.amountSat)
+            : { value: bankPaymentOfferInfo.amountText }
       }
     >
       {bankOfferDescription ? (
@@ -993,7 +1001,8 @@ interface PaymentCardProps {
   status: keyof typeof statusTones;
   title: string;
   statusLabel: string;
-  amount: PaymentCardAmount;
+  /** Null hides the amount, e.g. for a proxy payment this peer did not pay. */
+  amount: PaymentCardAmount | null;
   children: React.ReactNode;
 }
 
@@ -1011,9 +1020,11 @@ function PaymentCard({
         <Text eyebrow>{title}</Text>
         <Pill size="sm" label={statusLabel} tone={statusTones[status]} />
       </Row>
-      <Row>
-        <Amount size="md" value={amount.value} unit={amount.unit} />
-      </Row>
+      {amount ? (
+        <Row>
+          <Amount size="md" value={amount.value} unit={amount.unit} />
+        </Row>
+      ) : null}
       {children}
     </Stack>
   );
