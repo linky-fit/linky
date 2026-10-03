@@ -138,4 +138,20 @@ describe("applyProfileWatchEvent contact-row policy", () => {
     );
     expect(contactPatches()).toEqual([]);
   });
+
+  it("fills a new row from the cache when the watch repeats a cached fact", () => {
+    saveCachedProfile(
+      NPUB,
+      metadata({ lud16: "vitor@ln.example", name: "Vitor" }),
+      100,
+    );
+    const { contactPatches, ctx } = makeCtx([{ id: c1, npub: NPUB }]);
+    applyProfileWatchEvent(
+      profileUpdated({ lud16: "vitor@ln.example", name: "Vitor" }, 100),
+      ctx,
+    );
+    expect(contactPatches()).toEqual([
+      { id: c1, lnAddress: "vitor@ln.example", name: "Vitor" },
+    ]);
+  });
 });
