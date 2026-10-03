@@ -200,7 +200,7 @@ test("the Evolu wait status reserves space below the mobile navigation", async (
   });
   const header = await page.getByRole("banner").boundingBox();
   const banner = await status.boundingBox();
-  const content = await page.getByTestId("main-swipe").boundingBox();
+  const content = await page.getByTestId("page-frame").boundingBox();
   await testInfo.attach("Evolu wait layout bounds", {
     body: JSON.stringify({ header, banner, content }),
     contentType: "application/json",

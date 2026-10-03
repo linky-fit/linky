@@ -19,8 +19,6 @@ export {
   Text,
 } from "./layout";
 export type { SectionProps } from "./layout";
-export { Pager } from "./pager";
-export type { PagerProps } from "./pager";
 export { Icon } from "./icons";
 export { icons } from "./icon-set";
 export type { IconName, IconProps, IconSize } from "./icons";

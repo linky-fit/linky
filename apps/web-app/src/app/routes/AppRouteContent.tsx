@@ -8,7 +8,7 @@ import {
   Stack,
 } from "@linky-fit/ui";
 import React from "react";
-import { BottomTabBar } from "../../components/BottomTabBar";
+import { BottomTabBar, type BottomTabKey } from "../../components/BottomTabBar";
 import { DesktopNavigation } from "../../components/DesktopNavigation";
 import { PageBody } from "../../components/PageBody";
 import { ScanModal } from "../../components/ScanModal";
@@ -60,17 +60,18 @@ import {
   RecurringPaymentPage,
   TransactionsPage,
 } from "../../pages";
+import type { Route } from "../../types/route";
 import {
   useAppShellCore,
   useMoneyRoutes,
   usePeopleRoutes,
 } from "../context/AppShellContexts";
 import {
+  ContactsPane,
   DesktopContactsPane,
-  DesktopWalletPane,
-  MainSwipeContent,
-  type MainSwipeRouteProps,
-} from "./MainSwipeContent";
+  WalletPane,
+  type MainTabRouteProps,
+} from "./MainTabPanes";
 import {
   getDesktopRouteSection,
   isDesktopSectionRoot,
@@ -103,8 +104,8 @@ export interface MoneyRoutesProps {
   topupProps: React.ComponentProps<typeof TopupPage>;
 }
 
-export interface MainSwipeRoutesProps {
-  mainSwipeProps: MainSwipeRouteProps;
+export interface MainTabRoutesProps {
+  mainTabProps: MainTabRouteProps;
 }
 
 const assertNever = (route: never): never => {
@@ -118,8 +119,9 @@ const RoutePage = (): React.ReactElement => {
 
   switch (route.kind) {
     case "contacts":
+      return <ContactsPane />;
     case "wallet":
-      return <MainSwipeContent />;
+      return <WalletPane />;
     case "settings":
     case "advanced":
       return <AdvancedPage />;
@@ -238,7 +240,13 @@ interface PageFrameProps {
 
 /** Positioned so a floating action button stays in its corner while the page scrolls. */
 const PageFrame = ({ children, fill }: PageFrameProps): React.ReactElement => (
-  <Stack flex={1} minHeight={0} gap="$none" position="relative">
+  <Stack
+    testID="page-frame"
+    flex={1}
+    minHeight={0}
+    gap="$none"
+    position="relative"
+  >
     {fill ? (
       children
     ) : (
@@ -249,32 +257,29 @@ const PageFrame = ({ children, fill }: PageFrameProps): React.ReactElement => (
   </Stack>
 );
 
+const getBottomTab = (route: Route): BottomTabKey | null => {
+  switch (route.kind) {
+    case "contacts":
+    case "wallet":
+    case "settings":
+    case "profile":
+      return route.kind;
+    case "proxyPayments":
+      return "proxy";
+    default:
+      return null;
+  }
+};
+
 const PhoneRouteContent = (): React.ReactElement => {
   const { route, t } = useAppShellCore();
-
-  if (route.kind === "contacts" || route.kind === "wallet") {
-    return <MainSwipeContent />;
-  }
-
-  const tab =
-    route.kind === "settings" || route.kind === "profile"
-      ? route.kind
-      : route.kind === "proxyPayments"
-        ? "proxy"
-        : null;
+  const tab = getBottomTab(route);
   return (
     <>
       <PageFrame fill={route.kind === "chat"}>
         <RoutePage />
       </PageFrame>
-      {tab ? (
-        <BottomTabBar
-          activeTab={tab}
-          contactsLabel={t("contactsTitle")}
-          t={t}
-          walletLabel={t("wallet")}
-        />
-      ) : null}
+      {tab ? <BottomTabBar activeTab={tab} t={t} /> : null}
     </>
   );
 };
@@ -321,7 +326,7 @@ export const AppRouteContent = (): React.ReactElement => {
             {section === "contacts" ? (
               <DesktopContactsPane />
             ) : section === "wallet" ? (
-              <DesktopWalletPane />
+              <WalletPane />
             ) : section === "proxy" ? (
               <ProxyPaymentsPage />
             ) : (

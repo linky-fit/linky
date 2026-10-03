@@ -35,18 +35,6 @@ export const layout: Section = {
         </UI.Card>
       </UI.Stack>
     ),
-    Pager: () => (
-      <UI.Stack height="$qr">
-        <UI.Pager activePage={0}>
-          <UI.Card>
-            <UI.Text>Swipe to the second page</UI.Text>
-          </UI.Card>
-          <UI.Card>
-            <UI.Text>Second page</UI.Text>
-          </UI.Card>
-        </UI.Pager>
-      </UI.Stack>
-    ),
     Section: () => (
       <UI.Section title="A section">
         <UI.Text>Related content</UI.Text>
