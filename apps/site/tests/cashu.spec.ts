@@ -51,16 +51,16 @@ test("an unlisted mint advertising simulated Lightning cannot consume a token", 
     localStorage.setItem("linky.display_currency.v1", "sat");
   });
   await page.goto("/cashu/");
-  await page.locator("#cashu-token-input").fill(token);
-  await page.locator(".cashu-form button[type=submit]").click();
-  await expect(page.locator(".cashu-token-amount")).toContainText("64");
+  await page.getByLabel("Cashu token").fill(token);
+  await page.getByRole("button", { name: "Show token" }).click();
+  await expect(page.getByTestId("cashu-token-amount")).toContainText("64");
   await page.getByRole("button", { name: /Show options/ }).click();
-  await page.locator("#cashu-ln-address").fill("alice@site-lnurl.example");
-  await page.locator(".cashu-redeem-form button[type=submit]").click();
-  await expect(page.locator(".cashu-status-error")).toContainText(
+  await page.getByLabel("Lightning address").fill("alice@site-lnurl.example");
+  await page.getByRole("button", { name: "Redeem to address" }).click();
+  await expect(page.getByRole("alert")).toContainText(
     "cannot send a real Lightning payment",
   );
-  await expect(page.locator(".cashu-success-title")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Success" })).toHaveCount(0);
   expect(invoiceRequests).toBe(0);
   expect(meltRequests).toBe(0);
   const states = await source.checkProofsStates(decoded.proofs);
@@ -157,27 +157,27 @@ for (const mode of [
       );
     }
     await page.goto("/cashu/");
-    await page.locator("#cashu-token-input").fill(token);
-    await page.locator(".cashu-form button[type=submit]").click();
-    await expect(page.locator(".cashu-token-amount")).toContainText("64");
+    await page.getByLabel("Cashu token").fill(token);
+    await page.getByRole("button", { name: "Show token" }).click();
+    await expect(page.getByTestId("cashu-token-amount")).toContainText("64");
     await page
       .getByRole("button", { name: /Show options|Další možnosti/ })
       .click();
-    await page.locator("#cashu-ln-address").fill("alice@site-lnurl.example");
-    await page.locator(".cashu-redeem-form button[type=submit]").click();
+    await page.getByLabel("Lightning address").fill("alice@site-lnurl.example");
+    await page.getByRole("button", { name: "Redeem to address" }).click();
     if (mode === "interrupted" || mode === "swap-interrupted") {
       await expect.poll(() => interrupted, { timeout: 20_000 }).toBe(true);
       const invoiceCount = paidQuotes.length;
       await page.reload();
       reloaded = true;
-      await expect(page.locator(".cashu-token-amount")).not.toContainText(
-        "0 sat",
+      await expect(page.getByTestId("cashu-token-amount")).not.toHaveText(
+        /^0\s*sat$/,
       );
       await page
         .getByRole("button", { name: /Show options|Další možnosti/ })
         .click();
       await page
-        .locator("#cashu-ln-address")
+        .getByLabel("Lightning address")
         .fill(
           mode === "interrupted"
             ? "different@site-lnurl.example"
@@ -187,21 +187,21 @@ for (const mode of [
         // The paid melt's inputs are only known spent once NUT-07 answers;
         // an unreachable check must not complete the payment with them as change.
         blockStateChecks = true;
-        await page.locator(".cashu-redeem-form button[type=submit]").click();
-        await expect(page.locator(".cashu-status-error")).toContainText(
+        await page.getByRole("button", { name: "Redeem to address" }).click();
+        await expect(page.getByRole("alert")).toContainText(
           "Could not recover payment change",
         );
         blockStateChecks = false;
       }
-      await page.locator(".cashu-redeem-form button[type=submit]").click();
-      await expect(page.locator(".cashu-success-address")).toContainText(
+      await page.getByRole("button", { name: "Redeem to address" }).click();
+      await expect(page.getByTestId("cashu-success")).toContainText(
         "alice@site-lnurl.example",
         { timeout: 45_000 },
       );
       if (mode === "interrupted") expect(paidQuotes).toHaveLength(invoiceCount);
       expect(meltCalls).toBe(1);
     }
-    await expect(page.locator(".cashu-success-title")).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Success" })).toBeVisible({
       timeout: 45_000,
     });
     expect(paidQuotes.length).toBeGreaterThan(0);
@@ -218,6 +218,6 @@ for (const mode of [
       expect(paidQuotes.length).toBeGreaterThan(1);
     }
     await page.reload();
-    await expect(page.locator("#cashu-token-input")).toBeVisible();
+    await expect(page.getByLabel("Cashu token")).toBeVisible();
   });
 }

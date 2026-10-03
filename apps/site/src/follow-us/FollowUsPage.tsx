@@ -1,3 +1,13 @@
+import {
+  Button,
+  Card,
+  Image,
+  ListRow,
+  opacity,
+  Row,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { copyTextToClipboard } from "../clipboard";
 import { SiteLayout, type SiteLayoutCopy } from "../SiteLayout";
@@ -70,21 +80,33 @@ function SocialLink({ action, detail, href, iconSrc, title }: SocialLinkProps) {
   const opensNewTab = href.startsWith("https://");
 
   return (
-    <div className="follow-link">
-      <a
-        className="follow-link-main"
-        href={href}
-        target={opensNewTab ? "_blank" : undefined}
-        rel={opensNewTab ? "noreferrer" : undefined}
+    <Row gap="$md">
+      <Stack
+        flex={1}
+        render={
+          <a
+            href={href}
+            target={opensNewTab ? "_blank" : undefined}
+            rel={opensNewTab ? "noreferrer" : undefined}
+          />
+        }
+        hoverStyle={{ opacity: opacity.dimmed }}
       >
-        <img className="follow-link-icon" src={iconSrc} alt="" />
-        <span className="follow-link-text">
-          <span className="follow-link-title">{title}</span>
-          <span className="follow-link-detail">{detail}</span>
-        </span>
-      </a>
+        <ListRow
+          leading={
+            <Image src={iconSrc} width="$iconXl" height="$iconXl" aria-hidden />
+          }
+          title={title}
+          description={
+            <Text variant="caption" color="$colorMuted" wordWrap="break-word">
+              {detail}
+            </Text>
+          }
+          chevron={!action}
+        />
+      </Stack>
       {action}
-    </div>
+    </Row>
   );
 }
 
@@ -104,15 +126,15 @@ function CopyButton({ copiedLabel, copyLabel, value }: CopyButtonProps) {
   }, [copied]);
 
   return (
-    <button
-      className="follow-copy"
-      type="button"
-      onClick={() => {
+    <Button
+      variant="secondary"
+      size="sm"
+      onPress={() => {
         void copyTextToClipboard(value).then(setCopied);
       }}
     >
       {copied ? copiedLabel : copyLabel}
-    </button>
+    </Button>
   );
 }
 
@@ -126,11 +148,25 @@ function FollowUsPage() {
 
   return (
     <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
-      <section className="follow-section">
-        <p className="eyebrow">{activeCopy.eyebrow}</p>
-        <h1>{activeCopy.title}</h1>
-
-        <div className="follow-links">
+      <Stack
+        width="100%"
+        maxWidth="$contentWidth"
+        alignSelf="center"
+        gap="$xxl"
+        paddingVertical="$xxl"
+      >
+        <Stack gap="$sm">
+          <Text eyebrow>{activeCopy.eyebrow}</Text>
+          <Text
+            variant="display"
+            color="$colorStrong"
+            role="heading"
+            aria-level={1}
+          >
+            {activeCopy.title}
+          </Text>
+        </Stack>
+        <Card outlined>
           <SocialLink
             href="https://x.com/LinkyFit"
             iconSrc="/x.svg"
@@ -156,8 +192,8 @@ function FollowUsPage() {
               />
             }
           />
-        </div>
-      </section>
+        </Card>
+      </Stack>
     </SiteLayout>
   );
 }
