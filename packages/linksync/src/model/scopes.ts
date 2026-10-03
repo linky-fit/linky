@@ -53,6 +53,12 @@ export const linkyScopes = {
     rotation: rotation(220),
     forget: { keepNewest: 4 },
   }),
+  // A few awards a month: one shard holds years of them.
+  supporter: shardScope({
+    tables: ["supporterAward"],
+    rotation: null,
+    forget: "never",
+  }),
 };
 
 export type LinkyScopes = typeof linkyScopes;

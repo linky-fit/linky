@@ -15,6 +15,8 @@ const settingSchemas = {
   allowTestMints: Flag,
   /** The display currencies the user enabled; the app drops ones it does not know. */
   displayCurrencies: Schema.parseJson(Schema.Array(Schema.String)),
+  /** Which supporter badge the user publishes; absent means the tier. */
+  supporterBadgeDisplay: Schema.Literal("tier", "generic", "hide"),
 };
 
 export type SettingKey = keyof typeof settingSchemas;

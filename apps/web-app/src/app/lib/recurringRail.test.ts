@@ -9,6 +9,13 @@ describe("pickRecurringRail", () => {
     expect(pickRecurringRail(both, false)).toBe("lightning");
   });
 
+  it("pays Linky Bot on Cashu even while paying with Cashu is off", () => {
+    expect(pickRecurringRail({ npub: "npub1bot" }, false, "npub1bot")).toBe(
+      "cashu",
+    );
+    expect(pickRecurringRail(both, false, "npub1bot")).toBe("lightning");
+  });
+
   it("refuses a contact it cannot pay", () => {
     expect(pickRecurringRail({ npub: "npub1bob" }, false)).toBeNull();
     expect(pickRecurringRail({ lnAddress: " " }, true)).toBeNull();

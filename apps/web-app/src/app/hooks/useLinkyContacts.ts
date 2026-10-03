@@ -7,72 +7,106 @@ import {
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
 import { FEEDBACK_CONTACT_NPUB } from "../../utils/constants";
+import { linkyBotNpub } from "../lib/supporter";
 import { runWrite } from "../lib/storeWrite";
 import type { ContactNameRowLike } from "../types/appTypes";
 import type { Translate } from "../../i18n";
 
-type FeedbackContactRow = ContactNameRowLike & {
+type LinkyContactRow = ContactNameRowLike & {
   id: ContactId;
   npub?: string | null | undefined;
 };
 
-interface UseFeedbackContactParams<TContact extends FeedbackContactRow> {
+interface UseLinkyContactsParams<TContact extends LinkyContactRow> {
   contacts: readonly TContact[];
   contactsRepository: Pick<ContactsRepository, "insert" | "update">;
   pushToast: (message: string) => void;
   t: Translate;
 }
 
-export const useFeedbackContact = <TContact extends FeedbackContactRow>({
+interface PendingOpen<TContact> {
+  npub: string;
+  open: (contact: TContact) => void;
+}
+
+/**
+ * Opens Linky's own identities: the Linky contact for feedback and Linky Bot
+ * for donations. A missing one is added first and opened once its row is read
+ * back.
+ */
+export const useLinkyContacts = <TContact extends LinkyContactRow>({
   contacts,
   contactsRepository,
   pushToast,
   t,
-}: UseFeedbackContactParams<TContact>) => {
-  const openFeedbackContactPendingRef = React.useRef(false);
+}: UseLinkyContactsParams<TContact>) => {
+  const pendingRef = React.useRef<PendingOpen<TContact> | null>(null);
 
-  const openFeedbackContact = React.useCallback(() => {
-    const targetNpub = FEEDBACK_CONTACT_NPUB;
-    const existing = contacts.find(
-      (contact) => (contact.npub ?? "").trim() === targetNpub,
-    );
+  const findByNpub = React.useCallback(
+    (npub: string) =>
+      contacts.find((contact) => (contact.npub ?? "").trim() === npub),
+    [contacts],
+  );
 
-    if (existing) {
-      if ((existing.name ?? "") === "Feedback") {
-        void runWrite(contactsRepository.update(existing.id, { name: null }));
+  const openByNpub = React.useCallback(
+    (pending: PendingOpen<TContact>) => {
+      const existing = findByNpub(pending.npub);
+      if (existing) {
+        pendingRef.current = null;
+        pending.open(existing);
+        return;
       }
-      openFeedbackContactPendingRef.current = false;
-      navigateTo({ route: "chat", id: existing.id });
-      return;
-    }
 
-    openFeedbackContactPendingRef.current = true;
-    void runWrite(
-      contactsRepository.insert({
-        id: createId<"Contact">(),
-        npub: NonEmptyString1000.orThrow(targetNpub),
-      }),
-    ).then((outcome) => {
-      if (outcome.ok) return;
-      openFeedbackContactPendingRef.current = false;
-      pushToast(`${t("errorPrefix")}: ${outcome.error}`);
-    });
-  }, [contacts, contactsRepository, pushToast, t]);
+      pendingRef.current = pending;
+      void runWrite(
+        contactsRepository.insert({
+          id: createId<"Contact">(),
+          npub: NonEmptyString1000.orThrow(pending.npub),
+        }),
+      ).then((outcome) => {
+        if (outcome.ok) return;
+        pendingRef.current = null;
+        pushToast(`${t("errorPrefix")}: ${outcome.error}`);
+      });
+    },
+    [contactsRepository, findByNpub, pushToast, t],
+  );
 
   React.useEffect(() => {
-    if (!openFeedbackContactPendingRef.current) return;
-
-    const targetNpub = FEEDBACK_CONTACT_NPUB;
-    const existing = contacts.find(
-      (contact) => (contact.npub ?? "").trim() === targetNpub,
-    );
+    const pending = pendingRef.current;
+    if (!pending) return;
+    const existing = findByNpub(pending.npub);
     if (!existing) return;
+    pendingRef.current = null;
+    pending.open(existing);
+  }, [findByNpub]);
 
-    openFeedbackContactPendingRef.current = false;
-    navigateTo({ route: "chat", id: existing.id });
-  }, [contacts]);
+  const openFeedbackContact = React.useCallback(
+    () =>
+      openByNpub({
+        npub: FEEDBACK_CONTACT_NPUB,
+        open: (contact) => {
+          if ((contact.name ?? "") === "Feedback") {
+            void runWrite(
+              contactsRepository.update(contact.id, { name: null }),
+            );
+          }
+          navigateTo({ route: "chat", id: contact.id });
+        },
+      }),
+    [contactsRepository, openByNpub],
+  );
 
-  return {
-    openFeedbackContact,
-  };
+  const openDonate = React.useMemo(() => {
+    const npub = linkyBotNpub;
+    if (npub === null) return null;
+    return () =>
+      openByNpub({
+        npub,
+        open: (contact) =>
+          navigateTo({ route: "contactDonate", id: contact.id }),
+      });
+  }, [openByNpub]);
+
+  return { openDonate, openFeedbackContact };
 };

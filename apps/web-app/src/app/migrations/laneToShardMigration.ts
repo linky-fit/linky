@@ -243,6 +243,8 @@ const REQUIRED_COLUMNS: {
     "rail",
     "progress",
   ],
+  // Never ingested from a lane either.
+  supporterAward: ["eventJson", "badge", "awardedAtSec"],
 };
 
 // The overload types the picked row against the package schema; the

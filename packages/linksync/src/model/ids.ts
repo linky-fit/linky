@@ -3,8 +3,9 @@ import {
   type MessageId,
   type ReactionId,
   type SettingId,
+  type SupporterAwardId,
 } from "@linky-fit/domain";
-import type { Pubkey, RumorId } from "@linky-fit/linkstr";
+import type { EventId, Pubkey, RumorId } from "@linky-fit/linkstr";
 import type { SettingKey } from "./settings";
 
 export * from "@linky-fit/domain";
@@ -30,3 +31,7 @@ export const settingIdFor = (key: SettingKey): SettingId =>
 /** Each Nostr identity's inbox cursor is one setting row, shared by every device. */
 export const inboxCursorSettingIdFor = (pubkey: Pubkey): SettingId =>
   createIdFromString<"Setting">(`setting/inboxCursor/${pubkey}`);
+
+/** A supporter badge is one row on every device that stores it, whichever received it. */
+export const supporterAwardIdFor = (awardEventId: EventId): SupporterAwardId =>
+  createIdFromString<"SupporterAward">(`supporterAward/${awardEventId}`);

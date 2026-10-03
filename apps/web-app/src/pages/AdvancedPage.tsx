@@ -25,6 +25,10 @@ import {
   useRelayHealth,
 } from "../app/hooks/useRelayHealth";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
+import {
+  SUPPORTER_BADGE_DISPLAY_LABEL_KEYS,
+  useSupporterBadgeDisplay,
+} from "../app/hooks/useSupporterBadgeDisplay";
 
 import { useColorModePreference } from "../hooks/useColorMode";
 import { navigateTo } from "../hooks/useRouting";
@@ -78,6 +82,7 @@ export function AdvancedPage(): React.ReactElement {
     toggleShowProfileQrOnTilt,
   } = useAppShellActions();
   const notifications = usePushNotificationsSetting();
+  const supporterBadge = useSupporterBadgeDisplay();
   const colorModePreference = useColorModePreference();
   const [armedSecurityAction, setArmedSecurityAction] = useState<
     "copyNostr" | "pasteNostr" | null
@@ -210,6 +215,14 @@ export function AdvancedPage(): React.ReactElement {
         )}
         {linkRow("Bitcoin", t("unit"), () =>
           navigateTo({ route: "settingsUnits" }),
+        )}
+        {linkRow(
+          "HeartHandshake",
+          t("supporterBadgeDisplay"),
+          () => navigateTo({ route: "settingsSupporterBadge" }),
+          valueText(
+            t(SUPPORTER_BADGE_DISPLAY_LABEL_KEYS[supporterBadge.display]),
+          ),
         )}
         {linkRow("MessageCircle", t("feedback"), openFeedbackContact)}
         {/* Electron has no Web Push service; the running desktop app notifies. */}

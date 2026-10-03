@@ -36,6 +36,7 @@ export type Route =
   | { kind: "settingsUnits" }
   | { kind: "settingsReceiveMethod" }
   | { kind: "settingsMasterKeys" }
+  | { kind: "settingsSupporterBadge" }
   | { kind: "proxyPayments" }
   | { kind: "advanced" }
   | { kind: "advancedAutoPayLimit" }
@@ -78,6 +79,7 @@ export type Route =
   | { kind: "contact"; id: ContactId }
   | { kind: "contactEdit"; id: ContactId }
   | { kind: "contactPay"; id: ContactId }
+  | { kind: "contactDonate"; id: ContactId }
   | { kind: "bankPaymentOffer"; chatId: string; offerId: string }
   | { kind: "chat"; id: string };
 
@@ -97,6 +99,9 @@ export const parseRouteFromHash = (): Route => {
     return { kind: "settingsReceiveMethod" };
   }
   if (hash === "#settings/master-keys") return { kind: "settingsMasterKeys" };
+  if (hash === "#settings/supporter-badge") {
+    return { kind: "settingsSupporterBadge" };
+  }
   // The old settings hash stays parseable for links already shared.
   if (hash === "#proxy" || hash === "#settings/proxy-payments") {
     return { kind: "proxyPayments" };
@@ -225,6 +230,7 @@ export const parseRouteFromHash = (): Route => {
       if (!id) return { kind: "wallet" };
       if (sub === "edit") return { kind: "contactEdit", id };
       if (sub === "pay") return { kind: "contactPay", id };
+      if (sub === "donate") return { kind: "contactDonate", id };
       return { kind: "contact", id };
     }
   }

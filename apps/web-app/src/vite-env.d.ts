@@ -13,6 +13,12 @@ interface ImportMetaEnv {
   readonly VITE_NPUB_CASH_DISABLED?: string;
   readonly VITE_PUSH_SERVER_URL?: string;
   readonly VITE_NOTIFICATION_SERVER_URL?: string;
+  /** Overrides the Linky Bot npub from `@linky-fit/supporter`, e.g. the local dev identity. */
+  readonly VITE_LINKY_BOT_NPUB?: string;
+  /** Comma-separated mints a supporter payment may come from; overrides `@linky-fit/supporter`. */
+  readonly VITE_SUPPORTER_ACCEPTED_MINTS?: string;
+  /** Dev and E2E only: how long a supporter award counts, in seconds. */
+  readonly VITE_SUPPORTER_VALIDITY_SECONDS?: string;
   /** "1" installs the Playwright test hooks (`window.__linkyE2E`) in a production build. */
   readonly VITE_E2E?: string;
 }

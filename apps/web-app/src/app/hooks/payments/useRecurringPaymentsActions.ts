@@ -3,6 +3,7 @@ import {
   NonEmptyString100,
   NonEmptyString1000,
   PositiveInt,
+  type RecurringPaymentId,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
 import {
@@ -29,8 +30,16 @@ import type { RecurringPaymentsScheduler } from "./useRecurringPaymentsScheduler
 
 export type { RecurringPaymentInput } from "../../lib/recurringPaymentStore";
 
+export interface NewRecurringPaymentInput extends RecurringPaymentInput {
+  /** The mint every run is paid from; the default mint without one. */
+  mintUrl?: string;
+}
+
 export interface RecurringPaymentsActions {
-  createRecurringPayment: (input: RecurringPaymentInput) => Promise<boolean>;
+  /** The new payment's id; null when it was refused or not stored. */
+  createRecurringPayment: (
+    input: NewRecurringPaymentInput,
+  ) => Promise<RecurringPaymentId | null>;
   pendingRecurringPaymentDeleteId: string | null;
   requestDeleteRecurringPayment: (
     order: RecurringPaymentOrder,
@@ -107,20 +116,26 @@ export const useRecurringPaymentsActions = ({
   }, [pushToast, t]);
 
   const createRecurringPayment = React.useCallback(
-    async (input: RecurringPaymentInput): Promise<boolean> => {
+    async ({
+      mintUrl = defaultMintUrl,
+      ...input
+    }: NewRecurringPaymentInput): Promise<RecurringPaymentId | null> => {
       const contactId = readContactId(input.contactId);
-      if (contactId === null) return false;
+      if (contactId === null) return null;
       const rail = pickRecurringRail(
         findContact(contactId),
         payWithCashuEnabled,
       );
-      if (rail === null) return refuseRecipient();
+      if (rail === null) {
+        refuseRecipient();
+        return null;
+      }
       const id = createId<"RecurringPayment">();
       const outcome = await runWrite(
         repository.insert({
           id,
           createdAtSec: PositiveInt.orThrow(nowSeconds()),
-          mintUrl: NonEmptyString1000.orThrow(defaultMintUrl),
+          mintUrl: NonEmptyString1000.orThrow(mintUrl),
           rail: NonEmptyString100.orThrow(rail),
           progress: NonEmptyString1000.orThrow(
             recurringProgressColumn({
@@ -131,7 +146,10 @@ export const useRecurringPaymentsActions = ({
           ...recurringPaymentColumns(input, contactId),
         }),
       );
-      if (!outcome.ok) return reportWriteFailure(outcome.error);
+      if (!outcome.ok) {
+        reportWriteFailure(outcome.error);
+        return null;
+      }
       reportAppLog({
         tag: "recurring.created",
         summary: "recurring payment created",
@@ -141,11 +159,11 @@ export const useRecurringPaymentsActions = ({
           firstDueAtSec: input.firstDueAtSec,
           interval: input.interval,
           note: input.note,
-          mintUrl: defaultMintUrl,
+          mintUrl,
           rail,
         },
       });
-      return true;
+      return id;
     },
     [
       defaultMintUrl,

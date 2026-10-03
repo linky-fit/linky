@@ -104,7 +104,7 @@ import {
 } from "../messages/useSendChatMessage";
 import { useSendReaction } from "../messages/useSendReaction";
 import { useContactsDomain } from "../useContactsDomain";
-import { useFeedbackContact } from "../useFeedbackContact";
+import { useLinkyContacts } from "../useLinkyContacts";
 import { useLinkstrConfigSync } from "../useLinkstrConfigSync";
 import {
   fetchAndCacheProfiles,
@@ -1310,9 +1310,9 @@ export const useContactsMessagingComposition = ({
     void archiveContact(editingId);
   }, [archiveContact, editingId]);
 
-  const { openFeedbackContact } = useFeedbackContact<(typeof contacts)[number]>(
-    { contacts, contactsRepository, pushToast, t },
-  );
+  const { openDonate, openFeedbackContact } = useLinkyContacts<
+    (typeof contacts)[number]
+  >({ contacts, contactsRepository, pushToast, t });
 
   // The in-flight set keeps the effect from repeating the write before the
   // restored row is read back.
@@ -2057,6 +2057,7 @@ export const useContactsMessagingComposition = ({
     onReplyToChatMessage,
     openContactDetail,
     openContactPay,
+    openDonate,
     openFeedbackContact,
     openNewContactPage,
     openNpubMessageContact,

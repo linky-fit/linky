@@ -33,6 +33,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "settingsUnits":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
+    case "settingsSupporterBadge":
     case "advanced":
     case "advancedAutoPayLimit":
     case "advancedInspector":
@@ -63,6 +64,7 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "contact":
     case "contactEdit":
     case "contactPay":
+    case "contactDonate":
     case "bankPaymentOffer":
     case "chat":
     case "profile":
@@ -95,6 +97,7 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "settingsUnits":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
+    case "settingsSupporterBadge":
     case "advancedAutoPayLimit":
     case "advancedInspector":
     case "mints":
@@ -115,6 +118,7 @@ export const getDesktopActiveContactId = (route: Route): string | null => {
     case "contact":
     case "contactEdit":
     case "contactPay":
+    case "contactDonate":
       return route.id;
 
     case "chat":

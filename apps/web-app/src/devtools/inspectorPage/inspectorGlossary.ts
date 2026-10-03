@@ -208,6 +208,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "linkshu priced moving an amount between mints: a mint quote at the target and a melt quote for its invoice at the source, plus the source's input fee allowance. Nothing is paid; both quotes expire unused. A following autoswap.claim with the same mints performs the move.",
   "settings.allowTestMints":
     'The user switched the synced "Allow test mints" setting. Off hides test-mint balances, mint lists and chat tokens and refuses new test-mint tokens; stored test-mint proofs stay untouched.',
+  "settings.supporterBadgeDisplay":
+    "The user chose which supporter badge contacts see: the tier, the generic Supporter badge, or none. It is a synced setting; themes stay unlocked whatever it says.",
+  "supporter.donateStarted":
+    "The user confirmed a donation to Linky Bot on the donate screen. The payload gives the amount in sat, the tier it reaches (null below Bronze), the mint it is paid from and whether it is monthly. A monthly one continues with recurring.created and the first recurring.run; a single one with the Cashu payment to the contact link.",
+  "recurring.created":
+    "The user created a recurring payment. The payload gives the amount, interval, first due time, the mint every run is paid from and the rail every run is delivered on; the recurring payment and contact links identify it.",
   "settings.displayCurrencies":
     "The user enabled or disabled a display currency in Settings. The list is a synced setting, so other devices follow it; which enabled currency is shown stays per device.",
   LightningFeeProbed:

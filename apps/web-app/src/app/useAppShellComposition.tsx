@@ -505,6 +505,7 @@ export const useAppShellComposition = ({
     onReplyToChatMessage,
     openContactDetail,
     openContactPay,
+    openDonate,
     openFeedbackContact,
     openNewContactPage,
     openNpubMessageContact,
@@ -786,6 +787,7 @@ export const useAppShellComposition = ({
     walletWarningApplies,
     walletWarningDismissed,
     recurringPaymentsContext,
+    supporterPayments,
   } = useCashuWalletComposition({
     contactPayBackToChatRef,
     copyText,
@@ -1455,6 +1457,7 @@ export const useAppShellComposition = ({
       onReact: onReactToChatMessage,
       onReply: onReplyToChatMessage,
       openContactPay,
+      openDonate,
       searchNewContact,
       payAmount,
       payLightningInvoiceWithCashu,
@@ -1503,6 +1506,12 @@ export const useAppShellComposition = ({
       writeCurrentNpubToNfc,
     },
     buildPeopleRouteProps,
+  );
+
+  const { mintBalances, payContactFromMint } = supporterPayments;
+  const supporterContext = React.useMemo(
+    () => ({ mintBalances, openDonate, payContactFromMint }),
+    [mintBalances, openDonate, payContactFromMint],
   );
 
   const { mainSwipeRouteProps } = useRoutingViewComposition({
@@ -1919,6 +1928,7 @@ export const useAppShellComposition = ({
     mintSettingsContext,
     recurringPaymentsContext,
     relaySettingsContext,
+    supporterContext,
     t,
     toasts,
   };

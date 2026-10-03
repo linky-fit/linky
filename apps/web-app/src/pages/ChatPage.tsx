@@ -133,6 +133,8 @@ interface ChatPageProps {
     returnToChat?: boolean,
     intent?: "pay" | "request",
   ) => void;
+  /** Opens the donate screen; null while Donate pays the Linky contact. */
+  openDonate: (() => void) | null;
   payWithCashuEnabled: boolean;
   reactionsByMessageId: Map<string, LocalNostrReaction[]>;
   replyContext: ReplyContext | null;
@@ -610,6 +612,8 @@ interface ChatComposerProps {
   onCancelEdit: ChatPageProps["onCancelEdit"];
   onCancelReply: ChatPageProps["onCancelReply"];
   openContactPay: ChatPageProps["openContactPay"];
+  /** Set on the Linky contact once Linky Bot is configured: Donate opens the donate screen. */
+  openDonate: ChatPageProps["openDonate"];
   replyContext: ReplyContext | null;
   replyPreviewText: string;
   selectedContact: Contact;
@@ -641,6 +645,7 @@ export const ChatComposer = memo(function ChatComposer({
   onCancelEdit,
   onCancelReply,
   openContactPay,
+  openDonate,
   replyContext,
   replyPreviewText,
   selectedContact,
@@ -876,7 +881,7 @@ export const ChatComposer = memo(function ChatComposer({
           ) : null
         }
         footer={
-          canPayThisContact ? (
+          canPayThisContact || openDonate ? (
             <Row gap="$sm">
               {canRequestThisContact ? (
                 <Button
@@ -896,9 +901,13 @@ export const ChatComposer = memo(function ChatComposer({
                 flex={1}
                 variant="secondary"
                 icon={isFeedbackContact ? "HeartHandshake" : "HandCoins"}
-                onPress={() => openContactPay(selectedContact.id, true)}
-                disabled={cashuIsBusy || !canStartPay}
-                tooltip={!canStartPay ? t("payInsufficient") : undefined}
+                onPress={
+                  openDonate ?? (() => openContactPay(selectedContact.id, true))
+                }
+                disabled={cashuIsBusy || (!openDonate && !canStartPay)}
+                tooltip={
+                  !openDonate && !canStartPay ? t("payInsufficient") : undefined
+                }
                 data-guide="chat-pay"
               >
                 {isFeedbackContact ? t("donate") : t("pay")}
@@ -1168,6 +1177,7 @@ export const ChatPage: FC<ChatPageProps> = ({
   onReact,
   onReply,
   openContactPay,
+  openDonate,
   payWithCashuEnabled,
   reactionsByMessageId,
   replyContext,
@@ -1334,6 +1344,7 @@ export const ChatPage: FC<ChatPageProps> = ({
         onCancelEdit={onCancelEdit}
         onCancelReply={onCancelReply}
         openContactPay={openContactPay}
+        openDonate={isFeedbackContact ? openDonate : null}
         replyContext={replyContext}
         replyPreviewText={replyPreviewText}
         selectedContact={selectedContact}

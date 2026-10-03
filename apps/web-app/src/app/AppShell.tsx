@@ -15,6 +15,7 @@ import {
   type AppShellRouteContextValue,
 } from "./context/AppShellContexts";
 import { RecurringPaymentsProvider } from "./context/RecurringPaymentsContext";
+import { SupporterProvider } from "./context/SupporterContext";
 import { useCurrentNsec } from "./hooks/useCurrentNsec";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
@@ -68,6 +69,7 @@ const AuthenticatedAppShell = ({
     pendingCashuContactSend,
     recurringPaymentsContext,
     relaySettingsContext,
+    supporterContext,
     t,
     toasts,
   } = useAppShellComposition({ currentNsec, setCurrentNsec });
@@ -114,9 +116,11 @@ const AuthenticatedAppShell = ({
         routes={routeContextValue}
       >
         <RecurringPaymentsProvider value={recurringPaymentsContext}>
-          <AuthenticatedLayout>
-            <AppRouteContent />
-          </AuthenticatedLayout>
+          <SupporterProvider value={supporterContext}>
+            <AuthenticatedLayout>
+              <AppRouteContent />
+            </AuthenticatedLayout>
+          </SupporterProvider>
         </RecurringPaymentsProvider>
       </AppShellContextsProvider>
     </AppFrame>

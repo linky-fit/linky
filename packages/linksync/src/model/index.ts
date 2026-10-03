@@ -14,6 +14,7 @@ export type {
   RecurringPaymentRow,
   SettingRow,
   ShardPointerRow,
+  SupporterAwardRow,
   TransactionRow,
 } from "./schema";
 export {

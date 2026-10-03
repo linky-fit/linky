@@ -40,6 +40,8 @@ interface ContactPageProps {
   feedbackContactNpub: string;
   nostrPictureByNpub: Record<string, string | null>;
   openContactPay: (id: ContactId) => void;
+  /** Opens the donate screen; null while Donate pays the Linky contact. */
+  openDonate: (() => void) | null;
   payWithCashuEnabled: boolean;
   restoreArchivedContact: () => void;
   selectedContact: Contact | null;
@@ -92,6 +94,7 @@ export const ContactPage: FC<ContactPageProps> = ({
   feedbackContactNpub,
   nostrPictureByNpub,
   openContactPay,
+  openDonate,
   payWithCashuEnabled,
   restoreArchivedContact,
   selectedContact,
@@ -122,6 +125,7 @@ export const ContactPage: FC<ContactPageProps> = ({
     hasLightningAddress || (payWithCashuEnabled && canMessage);
   const canStartPay = cashuBalance > 0 && canPayThisContact;
   const isFeedbackContact = npub === feedbackContactNpub;
+  const donate = isFeedbackContact ? openDonate : null;
   const isArchivedContact = Number(selectedContact.archivedAtSec ?? 0) > 0;
   const payLabel = isFeedbackContact ? t("donate") : t("pay");
   const messageLabel = isFeedbackContact ? t("feedback") : t("sendMessage");
@@ -189,7 +193,11 @@ export const ContactPage: FC<ContactPageProps> = ({
         </Button>
       ) : null}
 
-      {canPayThisContact && (
+      {donate ? (
+        <Button icon="HeartHandshake" onPress={donate}>
+          {payLabel}
+        </Button>
+      ) : canPayThisContact ? (
         <Button
           icon={isFeedbackContact ? "HeartHandshake" : "HandCoins"}
           onPress={() => openContactPay(contactId)}
@@ -199,7 +207,7 @@ export const ContactPage: FC<ContactPageProps> = ({
         >
           {payLabel}
         </Button>
-      )}
+      ) : null}
 
       {canMessage && (
         <Button

@@ -16,6 +16,14 @@ export type {
   RecurringPaymentRecord,
   RecurringPaymentsRepository,
 } from "./recurringPayments";
+export {
+  makeSupporterAwardsRepository,
+  normalizeSupporterAward,
+} from "./supporterAwards";
+export type {
+  SupporterAwardRecord,
+  SupporterAwardsRepository,
+} from "./supporterAwards";
 export { tableRepository } from "./tableRepository";
 export type { TableOf, TableRepository } from "./tableRepository";
 export {

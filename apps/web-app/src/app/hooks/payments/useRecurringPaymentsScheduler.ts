@@ -91,6 +91,8 @@ export interface RecurringPaymentsScheduler {
   confirmDueNow: () => Promise<void>;
   /** Skip the confirmed-due payment's period; the schedule moves to the next due time. */
   cancelDue: () => Promise<void>;
+  /** Pays an order's pending run at once, without the countdown, e.g. the first run the user just confirmed; whether it was paid. */
+  payNow: (orderId: RecurringPaymentId) => Promise<boolean>;
 }
 
 interface UseRecurringPaymentsSchedulerParams {
@@ -638,21 +640,25 @@ export const useRecurringPaymentsScheduler = ({
   );
 
   /**
-   * Pays the countdown's run outside the planner. A run whose envelope is
-   * known funded pays its amount; any other needs the order's amount in sats.
+   * Pays one run of an order outside the planner, without a countdown. A run
+   * whose envelope is known funded pays its amount; any other needs the
+   * order's amount in sats.
    */
-  const runConfirmed = React.useCallback(
-    async (pending: RecurringDueConfirmation): Promise<RecurringRunOutcome> => {
+  const runOnDemand = React.useCallback(
+    async (
+      orderId: RecurringPaymentId,
+      runOf: (order: RecurringPaymentOrder) => RecurringRun,
+    ): Promise<RecurringRunOutcome> => {
       if (tickInFlightRef.current) await tickInFlightRef.current;
       setDueConfirmation((current) =>
-        current?.orderId === pending.orderId ? null : current,
+        current?.orderId === orderId ? null : current,
       );
       const pass = inTabLock(async (): Promise<RecurringRunOutcome> => {
         const order = (await loadOrders()).find(
-          (candidate) => candidate.id === pending.orderId,
+          (candidate) => candidate.id === orderId,
         );
         if (!order) return "missing";
-        const run = plannedRun(pending, order);
+        const run = runOf(order);
         const amountSat =
           fundedEnvelopeSatRef.current.get(runKey(run)) ??
           recurringAmountSat(order.amount, latest.current.fiatRates);
@@ -670,6 +676,28 @@ export const useRecurringPaymentsScheduler = ({
       return pass;
     },
     [executeRun, latest, loadOrders],
+  );
+
+  const reportBusy = React.useCallback(
+    (outcome: RecurringRunOutcome): void => {
+      if (outcome === "busy") {
+        latest.current.pushToast(latest.current.t("recurringWalletBusy"));
+      }
+    },
+    [latest],
+  );
+
+  const payNow = React.useCallback(
+    async (orderId: RecurringPaymentId): Promise<boolean> => {
+      const outcome = await runOnDemand(orderId, (order) => ({
+        order,
+        runIndex: order.schedule.runCount,
+        dueAtSec: order.schedule.nextDueAtSec,
+      }));
+      reportBusy(outcome);
+      return outcome === "paid";
+    },
+    [reportBusy, runOnDemand],
   );
 
   const notifyOnce = React.useCallback(
@@ -924,11 +952,10 @@ export const useRecurringPaymentsScheduler = ({
     const pending = dueConfirmationRef.current;
     if (pending === null) return;
     setDueConfirmation(null);
-    const outcome = await runConfirmed(pending);
-    if (outcome === "busy") {
-      latest.current.pushToast(latest.current.t("recurringWalletBusy"));
-    }
-  }, [dueConfirmationRef, latest, runConfirmed]);
+    reportBusy(
+      await runOnDemand(pending.orderId, (order) => plannedRun(pending, order)),
+    );
+  }, [dueConfirmationRef, reportBusy, runOnDemand]);
 
   /** Whether the countdown's run already went out (or is going out) from its envelope. */
   const isRunOut = React.useCallback(
@@ -1010,5 +1037,6 @@ export const useRecurringPaymentsScheduler = ({
     dueConfirmation,
     confirmDueNow,
     cancelDue,
+    payNow,
   };
 };

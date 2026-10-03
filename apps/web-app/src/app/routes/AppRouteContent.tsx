@@ -53,6 +53,8 @@ import {
   PushDebugPage,
   SettingsPage,
   SpdPaymentPage,
+  SupporterBadgePage,
+  SupporterDonatePage,
   TopupInvoicePage,
   TopupNoAmountPage,
   TopupPage,
@@ -133,6 +135,8 @@ const RoutePage = (): React.ReactElement => {
       return <ReceiveMethodPage />;
     case "settingsMasterKeys":
       return <MasterKeysPage />;
+    case "settingsSupporterBadge":
+      return <SupporterBadgePage />;
     case "proxyPayments":
       return <ProxyPaymentsPage />;
     case "advancedAutoPayLimit":
@@ -203,6 +207,8 @@ const RoutePage = (): React.ReactElement => {
       return <ContactPage {...peopleRoutes.contactProps} />;
     case "contactPay":
       return <ContactPayPage {...peopleRoutes.contactPayProps} />;
+    case "contactDonate":
+      return <SupporterDonatePage contactId={route.id} />;
     case "lnAddressPay":
       return <LnAddressPayPage {...moneyRoutes.lnAddressPayProps} />;
     case "manualPay":

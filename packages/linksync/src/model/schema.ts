@@ -20,6 +20,7 @@ import {
   RecurringPaymentId,
   SettingId,
   ShardPointerId,
+  SupporterAwardId,
   TransactionId,
 } from "@linky-fit/domain";
 
@@ -245,6 +246,17 @@ export const LinkySchema = {
     error: nullOr(NonEmptyString1000),
     pendingLabel: nullOr(NonEmptyString100),
   },
+  /** Supporter scope: a supporter badge Linky Bot awarded the user. */
+  supporterAward: {
+    // `supporterAwardIdFor(event id)`.
+    id: SupporterAwardId,
+    // The signed NIP-58 award (kind 8) as JSON, kept to verify and publish as-is.
+    eventJson: NonEmptyString,
+    // "bronze" | "silver" | "gold" | "diamond" | "generic": the badge it awards.
+    badge: NonEmptyString100,
+    // The award's created_at, the start date its validity counts from.
+    awardedAtSec: PositiveInt,
+  },
 } satisfies EvoluSchema;
 
 /** The column value types of an Evolu schema, the shape the shard store reads and writes. */
@@ -271,6 +283,7 @@ export type CashuProofRow = Row<LinkyDbSchema["cashuProof"]>;
 export type CashuOperationRow = Row<LinkyDbSchema["cashuOperation"]>;
 export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
 export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
+export type SupporterAwardRow = Row<LinkyDbSchema["supporterAward"]>;
 
 const columnNames = <Table extends Record<string, unknown>>(
   table: Table,
@@ -291,4 +304,5 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   cashuOperation: columnNames(LinkySchema.cashuOperation),
   transaction: columnNames(LinkySchema.transaction),
   recurringPayment: columnNames(LinkySchema.recurringPayment),
+  supporterAward: columnNames(LinkySchema.supporterAward),
 };

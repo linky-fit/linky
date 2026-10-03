@@ -57,6 +57,7 @@ export const resolveBackAction = (
     case "settingsUnits":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
+    case "settingsSupporterBadge":
     case "advancedAutoPayLimit":
     case "advancedInspector":
     case "mints":
@@ -138,7 +139,8 @@ export const resolveBackAction = (
     case "contact":
       return closeContactDetail;
 
-    case "contactEdit": {
+    case "contactEdit":
+    case "contactDonate": {
       const contactId = route.id;
       return () => navigateTo({ route: "contact", id: contactId });
     }
@@ -220,6 +222,7 @@ const SHOWS_MENU_BUTTON: Record<
   cashuProofs: false,
   contactEdit: false,
   contactPay: true,
+  contactDonate: false,
   contacts: false,
   chatStorage: false,
   evoluCurrentData: false,
@@ -240,6 +243,7 @@ const SHOWS_MENU_BUTTON: Record<
   settingsLanguage: false,
   settingsAppearance: false,
   settingsMasterKeys: false,
+  settingsSupporterBadge: false,
   proxyPayments: false,
   settingsReceiveMethod: false,
   settingsUnits: false,
@@ -392,6 +396,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   contactEdit: "contactEditTitle",
   contactNew: "newContact",
   contactPay: "contactPayTitle",
+  contactDonate: "donate",
   contacts: "contactsTitle",
   chatStorage: "chatStorage",
   evoluCurrentData: "evoluData",
@@ -414,6 +419,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   settingsLanguage: "language",
   settingsAppearance: "appearance",
   settingsMasterKeys: "masterKeys",
+  settingsSupporterBadge: "supporterBadgeDisplay",
   proxyPayments: "proxyPayments",
   settingsReceiveMethod: "receiveMethod",
   settingsUnits: "unit",

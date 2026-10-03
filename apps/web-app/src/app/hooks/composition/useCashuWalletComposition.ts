@@ -2626,6 +2626,7 @@ export const useCashuWalletComposition = ({
       mintBalanceSat: (mintUrl: string) =>
         walletBalances.perMint.find((entry) => entry.mint === mintUrl)
           ?.amount ?? 0,
+      payNow: recurringScheduler.payNow,
     }),
     [
       recurringDefaultMintUrl,
@@ -2633,8 +2634,41 @@ export const useCashuWalletComposition = ({
       recurringScheduler.cancelDue,
       recurringScheduler.confirmDueNow,
       recurringScheduler.dueConfirmation,
+      recurringScheduler.payNow,
       walletBalances.perMint,
     ],
+  );
+
+  const payContactFromMint = React.useCallback(
+    async ({
+      amountSat,
+      contactId,
+      mint,
+    }: {
+      amountSat: number;
+      contactId: ContactId;
+      mint: string;
+    }): Promise<boolean> => {
+      if (cashuIsBusy) return false;
+      const contact = contacts.find((candidate) => candidate.id === contactId);
+      if (!contact) {
+        setStatus(t("contactNotFound"));
+        return false;
+      }
+      setCashuIsBusy(true);
+      try {
+        const result = await payContactWithCashuMessage({
+          amountSat,
+          contact,
+          mint,
+          openChat: false,
+        });
+        return result.ok;
+      } finally {
+        setCashuIsBusy(false);
+      }
+    },
+    [cashuIsBusy, contacts, payContactWithCashuMessage, setStatus, t],
   );
 
   const knownTransferTexts = React.useMemo(
@@ -2672,6 +2706,10 @@ export const useCashuWalletComposition = ({
 
   return {
     recurringPaymentsContext,
+    supporterPayments: {
+      mintBalances: walletBalances.perMint,
+      payContactFromMint,
+    },
     reclaimCashuTransfer,
     cashuTransferLifecycle,
     // Backup export and the Nostr bootstrap snapshot need every proof,

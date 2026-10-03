@@ -1028,6 +1028,26 @@ describe("useRecurringPaymentsScheduler", () => {
       await view.unmount();
     });
 
+    it("pays a run before its due time without a countdown on demand", async () => {
+      const view = await mount(
+        {},
+        { dependencies: { isVisible: () => true, nowSec: () => DUE - 60 } },
+      );
+      expect(view.envelopes().open).not.toHaveBeenCalled();
+
+      let paid = false;
+      await act(async () => {
+        paid = await view.scheduler().payNow(ORDER_ID);
+      });
+      await settle();
+
+      expect(paid).toBe(true);
+      expect(view.envelopes().open).toHaveBeenCalledTimes(1);
+      expect(view.row()).toMatchObject({ lastRunStatus: "paid", runCount: 1 });
+      expect(view.scheduler().dueConfirmation).toBeNull();
+      await view.unmount();
+    });
+
     it("tells the user when another context holds the envelope on confirm", async () => {
       const view = await mount(
         {},

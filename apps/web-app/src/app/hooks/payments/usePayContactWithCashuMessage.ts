@@ -130,6 +130,10 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       logCompletedOnly?: boolean;
       /** Travels as the token's memo and is kept as the transaction note. */
       memo?: string | null;
+      /** Pays from this mint only; without one the wallet picks it. */
+      mint?: string;
+      /** Whether a notified payment opens the chat; true without it. */
+      openChat?: boolean;
       paymentNoticeContext?: PaymentNoticeContext;
       paymentNoticeOfferId?: string;
       paymentRequestId?: string | null;
@@ -143,6 +147,8 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         fromQueue,
         logCompletedOnly = false,
         memo,
+        mint: pinnedMint,
+        openChat = true,
         paymentNoticeContext,
         paymentNoticeOfferId,
         paymentRequestId,
@@ -199,7 +205,8 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
 
       const isOffline =
         typeof navigator !== "undefined" && navigator.onLine === false;
-      if (isOffline) {
+      // A queued payment cannot keep a pinned mint.
+      if (isOffline && pinnedMint === undefined) {
         const displayName =
           (contact.name ?? "").trim() ||
           (contact.lnAddress ?? "").trim() ||
@@ -277,11 +284,13 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
         };
       }
 
-      const mint = selectSendMintForAmount(
-        walletMintBalances,
-        normalizeMintUrl(defaultMintUrl ?? ""),
-        amountSat,
-      );
+      const mint =
+        pinnedMint ??
+        selectSendMintForAmount(
+          walletMintBalances,
+          normalizeMintUrl(defaultMintUrl ?? ""),
+          amountSat,
+        );
       if (mint === null) {
         if (notify) setStatus(t("payInsufficient"));
         return {
@@ -484,7 +493,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
           );
           safeLocalStorageSet(CONTACTS_ONBOARDING_HAS_PAID_STORAGE_KEY, "1");
           setContactsOnboardingHasPaid(true);
-          navigateTo({ id: contactId, route: "chat" });
+          if (openChat) navigateTo({ id: contactId, route: "chat" });
         }
 
         return { ok: true, queued: publishing.hasPendingMessages };

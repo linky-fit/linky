@@ -6,7 +6,7 @@ import type { RecurringPaymentsScheduler } from "../hooks/payments/useRecurringP
 export type RecurringPaymentsContextValue = RecurringPaymentsActions &
   Pick<
     RecurringPaymentsScheduler,
-    "cancelDue" | "confirmDueNow" | "dueConfirmation"
+    "cancelDue" | "confirmDueNow" | "dueConfirmation" | "payNow"
   > & {
     /** The mint a new payment is bound to. */
     defaultMintUrl: string;

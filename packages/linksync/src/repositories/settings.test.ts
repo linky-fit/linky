@@ -24,8 +24,9 @@ describe("settings repository", () => {
     const settings = makeSettingsRepository(store);
     runNow(settings.set("allowTestMints", false));
     runNow(settings.set("displayCurrencies", ["CZK"]));
+    runNow(settings.set("supporterBadgeDisplay", "generic"));
     const values = runNow(db.readTable("setting")).map((row) => row.value);
-    expect(values).toEqual(expect.arrayContaining(["0", '["CZK"]']));
+    expect(values).toEqual(expect.arrayContaining(["0", '["CZK"]', "generic"]));
     expect(runNow(settings.get("allowTestMints"))).toBe(false);
     expect(runNow(settings.get("displayCurrencies"))).toEqual(["CZK"]);
   });

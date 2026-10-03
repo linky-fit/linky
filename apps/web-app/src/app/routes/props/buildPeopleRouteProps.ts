@@ -71,6 +71,7 @@ interface BuildPeopleRoutePropsParams {
   onReact: PeopleRoutesProps["chatProps"]["onReact"];
   onReply: PeopleRoutesProps["chatProps"]["onReply"];
   openContactPay: PeopleRoutesProps["chatProps"]["openContactPay"];
+  openDonate: PeopleRoutesProps["chatProps"]["openDonate"];
   ownedLightningAddresses: PeopleRoutesProps["profileProps"]["ownedLightningAddresses"];
   payAmount: PeopleRoutesProps["contactPayProps"]["payAmount"];
   payLightningInvoiceWithCashu: PeopleRoutesProps["profileProps"]["payLightningInvoiceWithCashu"];
@@ -182,6 +183,7 @@ export const buildPeopleRouteProps = ({
   onReact,
   onReply,
   openContactPay,
+  openDonate,
   ownedLightningAddresses,
   payAmount,
   payLightningInvoiceWithCashu,
@@ -284,6 +286,7 @@ export const buildPeopleRouteProps = ({
       sendChatImage,
       sendChatMessage,
       openContactPay,
+      openDonate,
       onOpenNpubContact,
       onPayPaymentRequest,
       onDeclinePaymentRequest,
@@ -342,6 +345,7 @@ export const buildPeopleRouteProps = ({
       payWithCashuEnabled,
       feedbackContactNpub,
       openContactPay,
+      openDonate,
       restoreArchivedContact: restoreSelectedContact,
       statusText: selectedContactStatusText,
       t,

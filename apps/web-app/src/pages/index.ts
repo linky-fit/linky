@@ -37,6 +37,8 @@ export { ProxyPaymentsPage } from "./ProxyPaymentsPage";
 export { PushDebugPage } from "./PushDebugPage";
 export { SettingsPage } from "./SettingsPage";
 export { SpdPaymentPage } from "./SpdPaymentPage";
+export { SupporterBadgePage } from "./SupporterBadgePage";
+export { SupporterDonatePage } from "./SupporterDonatePage";
 export { TopupInvoicePage } from "./TopupInvoicePage";
 export { TopupNoAmountPage } from "./TopupNoAmountPage";
 export { TopupPage } from "./TopupPage";

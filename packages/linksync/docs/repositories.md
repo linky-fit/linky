@@ -94,6 +94,12 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 
 `unit`, `intervalUnit`, `rail`, `progress` and `lastRunStatus` stay strings here; their values, the schedule math and the run keys belong to `@linky-fit/recurring-payment`, whose `readRecurringPaymentOrder` validates a record into an order.
 
+## Supporter awards
+
+`makeSupporterAwardsRepository(store)` over `supporterAward` in the `supporter` scope: one fixed shard, never forgotten. A row is a supporter badge Linky Bot awarded the user: `eventJson` is the signed NIP-58 award (kind 8) to verify and publish as-is, `badge` the badge it awards (`bronze`, `silver`, `gold`, `diamond` or `generic`) and `awardedAtSec` its `created_at`, the start date its validity counts from. `all` returns `SupporterAwardRecord`s with all three present; a row still arriving column by column is skipped (`normalizeSupporterAward`).
+
+Store an award with `insertIfAbsent` under `supporterAwardIdFor(eventId)`, so every device that receives or syncs it keeps one row. Verifying the award and the validity rule are the consumer's (`@linky-fit/linkstr`, `@linky-fit/supporter`); this package stores the text.
+
 ## Identity
 
 `makeIdentityRepository(store)` mirrors the active Nostr key in the `identity` scope (one fixed shard, never forgotten) so another device can adopt it. `set` upserts the one row `activeNostrIdentityId`; `current` is the newest row by `updatedAt`, or `null`. `switchedAtSec` is the cutoff after which older incoming events are ignored following a custom override. The row carries the `nsec`; keep it out of logs.
@@ -101,6 +107,8 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 ## Settings
 
 `makeSettingsRepository(store)`: small synced values in the app owner, one row per key (`settingIdFor(key)`). Only keys registered in `LinkySettings` compile; each key's schema maps its typed value to the stored text. `get` returns the decoded value, or `null` when the row is absent or holds text the schema rejects; `set` encodes the value and dies when the text is empty or over 1000 characters; `remove` is a no-op when absent. Shard pointers share the scope but have their own table; never write them through settings.
+
+`supporterBadgeDisplay` is which supporter badge the user publishes: `tier`, `generic` or `hide`; absent means `tier`.
 
 A new setting is a new `LinkySettings` entry. Keys and encodings are synced data that older app versions on other devices read, so never rename a key or change its encoding; add a new key instead.
 

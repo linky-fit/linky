@@ -87,6 +87,7 @@ type NavigationAction =
   | { route: "contactEdit"; id: ContactId }
   | { route: "contactNew" }
   | { route: "contactPay"; id: ContactId }
+  | { route: "contactDonate"; id: ContactId }
   | { route: "contacts" }
   | { route: "evoluCurrentData" }
   | { route: "evoluData" }
@@ -112,6 +113,7 @@ type NavigationAction =
   | { route: "settingsLanguage" }
   | { route: "settingsAppearance" }
   | { route: "settingsMasterKeys" }
+  | { route: "settingsSupporterBadge" }
   | { route: "proxyPayments" }
   | { route: "settingsUnits" }
   | { route: "settingsReceiveMethod" }
@@ -150,6 +152,9 @@ export const navigateTo = (action: NavigationAction): void => {
     case "settingsMasterKeys":
       window.location.assign("#settings/master-keys");
       break;
+    case "settingsSupporterBadge":
+      window.location.assign("#settings/supporter-badge");
+      break;
     case "proxyPayments":
       window.location.assign("#proxy");
       break;
@@ -187,6 +192,11 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "contactPay":
       window.location.assign(`#contact/${encodeURIComponent(action.id)}/pay`);
+      break;
+    case "contactDonate":
+      window.location.assign(
+        `#contact/${encodeURIComponent(action.id)}/donate`,
+      );
       break;
     case "chat":
       window.location.assign(`#chat/${encodeURIComponent(action.id)}`);

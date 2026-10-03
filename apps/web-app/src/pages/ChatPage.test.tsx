@@ -39,6 +39,7 @@ const setup = async (overrides: Partial<Props> = {}) => {
     onCancelEdit: vi.fn(),
     onCancelReply: vi.fn(),
     openContactPay: vi.fn(),
+    openDonate: null,
     replyContext: null,
     replyPreviewText: "",
     selectedContact: { id: "contact" },
