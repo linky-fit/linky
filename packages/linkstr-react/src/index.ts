@@ -16,4 +16,5 @@ export * from "./reactions";
 export * from "./relayHealth";
 export * from "./relayLists";
 export * from "./seenReceipts";
+export * from "./supporterBadges";
 export * from "./runtime";

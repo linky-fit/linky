@@ -63,6 +63,19 @@ export * from "./reactions/Reactions";
 export * from "./seenReceipts/domain";
 export * from "./seenReceipts/events";
 export * from "./seenReceipts/SeenReceipts";
+export {
+  BADGE_AWARD_KIND,
+  BADGE_DEFINITION_KIND,
+  PROFILE_BADGES_D,
+  PROFILE_BADGES_KIND,
+  SUPPORTER_RESULT_KIND,
+  SUPPORTER_RESULT_VALUE,
+  supporterBadgeAddress,
+  verifySupporterAward,
+} from "./supporterBadges/codec";
+export * from "./supporterBadges/domain";
+export * from "./supporterBadges/events";
+export * from "./supporterBadges/SupporterBadges";
 export * from "./relayHealth/observeTransport";
 export * from "./relayHealth/RelayHealth";
 export * from "./relayLists/domain";

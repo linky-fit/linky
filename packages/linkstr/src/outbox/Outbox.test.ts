@@ -20,7 +20,13 @@ import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
 import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import {
+  SupporterResultDraft,
+  SupporterResultReceipt,
+} from "../supporterBadges/domain";
+import { SupporterBadges } from "../supporterBadges/SupporterBadges";
+import {
   eventually,
+  hasPushMarker,
   makeIdentity,
   recipientOf,
   stubWrapTransport,
@@ -55,6 +61,7 @@ const outboxLayer = (
       Chat.Default,
       Reactions.Default,
       PaymentTelemetry.Default,
+      SupporterBadges.Default,
       Layer.succeed(OutboxStore, store),
     ]),
     Layer.provide([
@@ -199,6 +206,49 @@ describe("Outbox", () => {
       expect(rumor.created_at).toBe(first.sentAt);
     }
     expect(stored.every((job) => job.state._tag === "awaiting-ack")).toBe(true);
+  });
+
+  it("retries a supporter result until a relay accepts its single push-marked wrap", async () => {
+    const published: Array<SignedWrapEvent> = [];
+    const behavior = { accept: false };
+    const tokenMessageId = RumorId.make("cd".repeat(32));
+
+    const { enqueued, result } = await runOutbox(
+      outboxLayer(alice, makeStore(), stubTransport(published, behavior)),
+      Effect.gen(function* () {
+        const outbox = yield* Outbox;
+        const enqueued = yield* outbox.enqueue(
+          {
+            _tag: "supporterResult",
+            draft: new SupporterResultDraft({
+              to: bob.pubkey,
+              tokenMessageId,
+              result: { status: "thanks" },
+            }),
+          },
+          OutboxRef.make("payment:1"),
+        );
+        yield* eventually(() => published.length >= 1);
+        behavior.accept = true;
+        const result = yield* Stream.runHead(outbox.results);
+        return { enqueued, result };
+      }),
+    );
+
+    const terminal = Option.getOrThrow(result);
+    assert(terminal._tag === "OutboxJobSucceeded");
+    assert(terminal.receipt instanceof SupporterResultReceipt);
+    expect(terminal.receipt.rumorId).toBe(enqueued.rumorId);
+    expect(published.length).toBeGreaterThanOrEqual(2);
+    expect(published.every((wrap) => recipientOf(wrap) === bob.pubkey)).toBe(
+      true,
+    );
+    expect(published.every(hasPushMarker)).toBe(true);
+    const rumors = rumorsForBob(published);
+    expect(new Set(rumors.map((rumor) => rumor.id))).toEqual(
+      new Set([enqueued.rumorId]),
+    );
+    expect(rumors[0]?.tags).toContainEqual(["e", tokenMessageId]);
   });
 
   it("re-emits unacked terminals on rebuild and forgets them after ack", async () => {

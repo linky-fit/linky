@@ -13,6 +13,10 @@ import {
   PaymentTelemetryReceipt,
 } from "../paymentTelemetry/domain";
 import { ReactionDraft, ReactionReceipt } from "../reactions/domain";
+import {
+  SupporterResultDraft,
+  SupporterResultReceipt,
+} from "../supporterBadges/domain";
 
 export const OutboxJobId = Schema.NonEmptyTrimmedString.pipe(
   Schema.brand("OutboxJobId"),
@@ -59,6 +63,11 @@ export const PaymentTelemetryOperation = Schema.TaggedStruct(
 );
 export type PaymentTelemetryOperation = typeof PaymentTelemetryOperation.Type;
 
+export const SupporterResultOperation = Schema.TaggedStruct("supporterResult", {
+  draft: SupporterResultDraft,
+});
+export type SupporterResultOperation = typeof SupporterResultOperation.Type;
+
 // A new durable send needs its service in composition.ts's Outbox.Default provide list; layer inputs are inferred.
 export const OutboxOperation = Schema.Union(
   ChatTextOperation,
@@ -67,6 +76,7 @@ export const OutboxOperation = Schema.Union(
   ChatEditOperation,
   ReactionOperation,
   PaymentTelemetryOperation,
+  SupporterResultOperation,
 );
 export type OutboxOperation = typeof OutboxOperation.Type;
 
@@ -97,6 +107,7 @@ export const OutboxReceipt = Schema.Union(
   MessageEditReceipt,
   ReactionReceipt,
   PaymentTelemetryReceipt,
+  SupporterResultReceipt,
 );
 export type OutboxReceipt = typeof OutboxReceipt.Type;
 
@@ -161,6 +172,8 @@ const receiptTagOf = (
       return "ReactionReceipt";
     case "paymentTelemetry":
       return "PaymentTelemetryReceipt";
+    case "supporterResult":
+      return "SupporterResultReceipt";
   }
 };
 

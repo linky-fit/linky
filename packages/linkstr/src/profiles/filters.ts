@@ -1,6 +1,10 @@
 import type { Filter } from "nostr-tools";
 import type { Pubkey } from "../domain/primitives";
 import { chunkAuthors } from "../internal/authorChunks";
+import {
+  PROFILE_BADGES_D,
+  PROFILE_BADGES_KIND,
+} from "../supporterBadges/codec";
 import { PROFILE_KIND, STATUS_KIND } from "./codec";
 
 /**
@@ -15,3 +19,12 @@ export const profileFilters = (authors: ReadonlyArray<Pubkey>): Array<Filter> =>
       authors: chunk,
     })),
   );
+
+export const profileBadgesFilters = (
+  authors: ReadonlyArray<Pubkey>,
+): Array<Filter> =>
+  chunkAuthors(authors).map((chunk) => ({
+    kinds: [PROFILE_BADGES_KIND],
+    authors: chunk,
+    "#d": [PROFILE_BADGES_D],
+  }));

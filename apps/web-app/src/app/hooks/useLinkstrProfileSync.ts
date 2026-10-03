@@ -243,8 +243,14 @@ export const applyProfileWatchEvent = (
 ): void => {
   const npub = encodePubkeyToNpub(event.pubkey);
   if (!npub) return;
-  if (event._tag === "ProfileUpdated") applyProfileUpdated(npub, event, ctx);
-  else applyStatusUpdated(npub, event, ctx);
+  switch (event._tag) {
+    case "ProfileUpdated":
+      return applyProfileUpdated(npub, event, ctx);
+    case "StatusUpdated":
+      return applyStatusUpdated(npub, event, ctx);
+    case "SupporterBadgesUpdated":
+      return;
+  }
 };
 
 interface UseLinkstrProfileSyncParams extends ProfileSyncContext {

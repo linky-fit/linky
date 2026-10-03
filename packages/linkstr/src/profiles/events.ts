@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { EventId, Pubkey, UnixSeconds } from "../domain/primitives";
+import { SupporterAward } from "../supporterBadges/domain";
 import { ProfileMetadata } from "./domain";
 
 /**
@@ -27,7 +28,25 @@ export class StatusUpdated extends Schema.TaggedClass<StatusUpdated>()(
   },
 ) {}
 
-export const ProfileWatchEvent = Schema.Union(ProfileUpdated, StatusUpdated);
+/**
+ * The supporter badges `pubkey` publishes in its newest profile badges event,
+ * each award verified against the issuer the watch was given. Empty when the
+ * event names none.
+ */
+export class SupporterBadgesUpdated extends Schema.TaggedClass<SupporterBadgesUpdated>()(
+  "SupporterBadgesUpdated",
+  {
+    pubkey: Pubkey,
+    awards: Schema.Array(SupporterAward),
+    updatedAt: UnixSeconds,
+  },
+) {}
+
+export const ProfileWatchEvent = Schema.Union(
+  ProfileUpdated,
+  StatusUpdated,
+  SupporterBadgesUpdated,
+);
 export type ProfileWatchEvent = typeof ProfileWatchEvent.Type;
 
 export const ProfileDropReason = Schema.Literal(
@@ -39,6 +58,13 @@ export const ProfileDropReason = Schema.Literal(
   "other-d-tag",
   "expired",
   "stale",
+  "not-an-award",
+  "wrong-issuer",
+  "wrong-supporter",
+  "not-a-supporter-badge",
+  "award-mismatch",
+  "award-missing",
+  "awards-unreachable",
 );
 export type ProfileDropReason = typeof ProfileDropReason.Type;
 

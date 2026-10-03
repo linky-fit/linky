@@ -31,6 +31,9 @@ import { encodeReactionRumor } from "../reactions/codec";
 import { ReactionDraft } from "../reactions/domain";
 import { Reactions } from "../reactions/Reactions";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
+import { encodeSupporterResultRumor } from "../supporterBadges/codec";
+import { SupporterResultDraft } from "../supporterBadges/domain";
+import { SupporterBadges } from "../supporterBadges/SupporterBadges";
 import {
   EnqueueReceipt,
   OutboxJobFailed,
@@ -93,6 +96,15 @@ const normalizeOperation = (
         _tag: operation._tag,
         draft: new ReactionDraft({ ...operation.draft, clientId, sentAt }),
       };
+    case "supporterResult":
+      return {
+        _tag: operation._tag,
+        draft: new SupporterResultDraft({
+          ...operation.draft,
+          clientId,
+          sentAt,
+        }),
+      };
   }
 };
 
@@ -113,6 +125,13 @@ const encodeOperationRumor = (
       return encodeEditRumor(operation.draft, author, sentAt, clientId);
     case "reaction":
       return encodeReactionRumor(operation.draft, author, sentAt, clientId);
+    case "supporterResult":
+      return encodeSupporterResultRumor(
+        operation.draft,
+        author,
+        sentAt,
+        clientId,
+      );
   }
 };
 
@@ -130,7 +149,8 @@ const isOnlineEventTarget = (value: unknown): value is OnlineEventTarget =>
   typeof value.removeEventListener === "function";
 
 /**
- * Durable send queue over the Chat, Reactions and PaymentTelemetry verticals.
+ * Durable send queue over the Chat, Reactions, PaymentTelemetry and
+ * SupporterBadges verticals.
  * `enqueue` persists
  * a normalized job and precomputes its rumor, so the returned `rumorId` is
  * what every delivery retry publishes; one worker per lane delivers jobs
@@ -149,6 +169,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
     const chat = yield* Chat;
     const reactions = yield* Reactions;
     const paymentTelemetry = yield* PaymentTelemetry;
+    const supporterBadges = yield* SupporterBadges;
     const identity = yield* LinkstrIdentity;
     const inspector = yield* Inspector.orNoop;
 
@@ -200,6 +221,8 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
             operation.draft,
             operation.recipient,
           );
+        case "supporterResult":
+          return supporterBadges.sendResult(operation.draft);
       }
     };
 

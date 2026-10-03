@@ -2,16 +2,26 @@ import { Duration, Effect, Either, Option, Queue, Stream } from "effect";
 import type { Scope } from "effect";
 import type { Filter } from "nostr-tools";
 import { NoReadRelaysConfigured } from "../domain/errors";
-import type { Pubkey, RelayUrl } from "../domain/primitives";
+import type { EventId, Pubkey, RelayUrl } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { ProfileWatchRouted } from "../inspector/events";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import { firstTagValue } from "../internal/nostrEvent";
 import { decodeVerifiedPlainEvent } from "../internal/plainEvent";
+import { fetchRawEvents } from "../internal/plainFetch";
 import { resubscribeForever } from "../internal/resubscribe";
 import { nowSeconds } from "../internal/time";
 import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import {
+  BADGE_AWARD_KIND,
+  PROFILE_BADGES_D,
+  PROFILE_BADGES_KIND,
+  supporterBadgeAddress,
+  supporterBadgeEntries,
+  verifySupporterAward,
+} from "../supporterBadges/codec";
+import type { SupporterAward } from "../supporterBadges/domain";
 import {
   decodeProfileEvent,
   decodeStatusEvent,
@@ -19,16 +29,24 @@ import {
   STATUS_D_GENERAL,
   STATUS_KIND,
 } from "./codec";
-import { ProfileEventDropped } from "./events";
+import { ProfileEventDropped, SupporterBadgesUpdated } from "./events";
 import type { ProfileDropReason, ProfileWatchEvent } from "./events";
-import { profileFilters } from "./filters";
+import { profileBadgesFilters, profileFilters } from "./filters";
 
 export interface ProfileWatchOptions {
   /** Base delay of the per-relay resubscribe backoff. */
   readonly resubscribeDelay?: Duration.Duration;
+  /**
+   * Also watch profile badges (kind 30008) and emit `SupporterBadgesUpdated`
+   * with the supporter badges this pubkey issued.
+   */
+  readonly supporterBadgeIssuer?: Pubkey;
 }
 
 const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
+
+/** A silent relay must not hold back a contact's badges for long. */
+const AWARD_FETCH_PER_RELAY_TIMEOUT = Duration.seconds(4);
 
 /**
  * Long-lived profile subscription: one kind 0 and one kind 30315 filter per
@@ -36,7 +54,9 @@ const DEFAULT_RESUBSCRIBE_DELAY = Duration.seconds(5);
  * `AUTHOR_FILTER_LIMIT` so no filter exceeds what relays accept. Newest-wins
  * per (pubkey, kind) — in-session only, so a lagging relay can never
  * downgrade what a faster one already delivered; kind 30315 tracks the
- * `d=general` slot only. `watch` is a scoped resource; watching a different
+ * `d=general` slot only. With a supporter badge issuer, kind 30008 events
+ * run through their own pipeline, so fetching their awards never delays
+ * profiles. `watch` is a scoped resource; watching a different
  * set means closing the scope and calling it again (the react boundary does
  * exactly that).
  */
@@ -63,31 +83,111 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
           const resubscribeDelay =
             options?.resubscribeDelay ?? DEFAULT_RESUBSCRIBE_DELAY;
 
-          const watched = new Set<Pubkey>(pubkeys);
-          const filters = profileFilters([...watched]);
-          const rawEvents = yield* Effect.acquireRelease(
-            Queue.unbounded<unknown>(),
-            Queue.shutdown,
-          );
+          const issuer = options?.supporterBadgeIssuer;
 
-          const keepSubscribed = (relay: RelayUrl, filter: Filter) =>
-            resubscribeForever(
-              transport.subscribe(relay, filter, (event) => {
-                Queue.unsafeOffer(rawEvents, event);
-              }),
-              resubscribeDelay,
-            );
-          yield* Effect.forEach(relays, (relay) =>
-            Effect.forEach(filters, (filter) =>
-              Effect.forkScoped(keepSubscribed(relay, filter)),
-            ),
-          );
+          const watched = new Set<Pubkey>(pubkeys);
+          const subscribeAll = (filters: ReadonlyArray<Filter>) =>
+            Effect.gen(function* () {
+              const rawEvents = yield* Effect.acquireRelease(
+                Queue.unbounded<unknown>(),
+                Queue.shutdown,
+              );
+              const keepSubscribed = (relay: RelayUrl, filter: Filter) =>
+                resubscribeForever(
+                  transport.subscribe(relay, filter, (event) => {
+                    Queue.unsafeOffer(rawEvents, event);
+                  }),
+                  resubscribeDelay,
+                );
+              yield* Effect.forEach(relays, (relay) =>
+                Effect.forEach(filters, (filter) =>
+                  Effect.forkScoped(keepSubscribed(relay, filter)),
+                ),
+              );
+              return rawEvents;
+            });
 
           const newestSeen = new Map<string, number>();
           const isStale = (event: SignedPlainEvent): boolean => {
             const best = newestSeen.get(`${event.pubkey}:${event.kind}`);
             return best !== undefined && event.created_at <= best;
           };
+
+          const dropped = (
+            eventId: EventId | null,
+            kind: number | null,
+            reason: ProfileDropReason,
+          ): void =>
+            inspector.emit(
+              () =>
+                new ProfileWatchRouted(
+                  {
+                    eventId,
+                    kind,
+                    event: new ProfileEventDropped({ eventId, reason }),
+                  },
+                  { disableValidation: true },
+                ),
+            );
+
+          const verifiedSupporterBadges = (
+            event: SignedPlainEvent,
+            badgeIssuer: Pubkey,
+          ): Effect.Effect<
+            Either.Either<SupporterBadgesUpdated, ProfileDropReason>
+          > =>
+            Effect.gen(function* () {
+              const entries = supporterBadgeEntries(event.tags, badgeIssuer);
+              const fetched =
+                entries.length === 0
+                  ? Either.right([])
+                  : yield* Effect.either(
+                      Effect.map(
+                        fetchRawEvents(
+                          transport,
+                          relays,
+                          {
+                            ids: entries.map(({ awardId }) => awardId),
+                            kinds: [BADGE_AWARD_KIND],
+                            authors: [badgeIssuer],
+                          },
+                          { perRelayTimeout: AWARD_FETCH_PER_RELAY_TIMEOUT },
+                        ),
+                        ({ events }) => events,
+                      ),
+                    );
+              if (Either.isLeft(fetched))
+                return Either.left("awards-unreachable");
+              const awards: Array<SupporterAward> = [];
+              for (const { address, awardId } of entries) {
+                const raw = fetched.right.find(({ id }) => id === awardId);
+                const verified: Either.Either<
+                  SupporterAward,
+                  ProfileDropReason
+                > =
+                  raw === undefined
+                    ? Either.left("award-missing")
+                    : Either.filterOrLeft(
+                        verifySupporterAward(raw, badgeIssuer, event.pubkey),
+                        (award) =>
+                          supporterBadgeAddress(badgeIssuer, award.badge) ===
+                          address,
+                        (): ProfileDropReason => "award-mismatch",
+                      );
+                Either.match(verified, {
+                  onLeft: (reason) =>
+                    dropped(awardId, BADGE_AWARD_KIND, reason),
+                  onRight: (award) => awards.push(award),
+                });
+              }
+              return Either.right(
+                new SupporterBadgesUpdated({
+                  pubkey: event.pubkey,
+                  awards,
+                  updatedAt: event.created_at,
+                }),
+              );
+            });
 
           const route = (
             event: SignedPlainEvent,
@@ -110,6 +210,15 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
                   if (isStale(event)) return Either.left("stale");
                   return decodeStatusEvent(event, yield* nowSeconds);
                 }
+                case PROFILE_BADGES_KIND: {
+                  if (issuer === undefined)
+                    return Either.left("unsupported-kind");
+                  if (firstTagValue(event.tags, "d") !== PROFILE_BADGES_D) {
+                    return Either.left("other-d-tag");
+                  }
+                  if (isStale(event)) return Either.left("stale");
+                  return yield* verifiedSupporterBadges(event, issuer);
+                }
                 default:
                   return Either.left("unsupported-kind");
               }
@@ -121,40 +230,14 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
             Either.match(decodeVerifiedPlainEvent(raw), {
               onLeft: (reason) =>
                 Effect.sync(() => {
-                  inspector.emit(
-                    () =>
-                      new ProfileWatchRouted(
-                        {
-                          eventId: null,
-                          kind: null,
-                          event: new ProfileEventDropped({
-                            eventId: null,
-                            reason,
-                          }),
-                        },
-                        { disableValidation: true },
-                      ),
-                  );
+                  dropped(null, null, reason);
                   return Option.none<ProfileWatchEvent>();
                 }),
               onRight: (event) =>
                 Effect.map(route(event), (routed) =>
                   Either.match(routed, {
                     onLeft: (reason) => {
-                      inspector.emit(
-                        () =>
-                          new ProfileWatchRouted(
-                            {
-                              eventId: event.id,
-                              kind: event.kind,
-                              event: new ProfileEventDropped({
-                                eventId: event.id,
-                                reason,
-                              }),
-                            },
-                            { disableValidation: true },
-                          ),
-                      );
+                      dropped(event.id, event.kind, reason);
                       return Option.none<ProfileWatchEvent>();
                     },
                     onRight: (fact) => {
@@ -179,9 +262,18 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
                 ),
             });
 
-          return Stream.fromQueue(rawEvents).pipe(
-            Stream.mapEffect(processRaw),
-            Stream.filterMap((event) => event),
+          const routed = (rawEvents: Queue.Dequeue<unknown>) =>
+            Stream.fromQueue(rawEvents).pipe(
+              Stream.mapEffect(processRaw),
+              Stream.filterMap((event) => event),
+            );
+          const profiles = routed(
+            yield* subscribeAll(profileFilters([...watched])),
+          );
+          if (issuer === undefined) return profiles;
+          return Stream.merge(
+            profiles,
+            routed(yield* subscribeAll(profileBadgesFilters([...watched]))),
           );
         });
 

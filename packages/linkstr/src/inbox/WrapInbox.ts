@@ -39,6 +39,7 @@ import type { SeenReceiptInboxEvent } from "../seenReceipts/events";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
 import { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import type { SupporterResultInboxEvent } from "../supporterBadges/events";
 import { decodeWrapEvent } from "./decodeWrapEvent";
 import { InboxCursorStore } from "./InboxCursorStore";
 import { WrapDropped } from "./events";
@@ -50,6 +51,7 @@ export type WrapInboxEvent =
   | ChatInboxEvent
   | PaymentNoticeInboxEvent
   | SeenReceiptInboxEvent
+  | SupporterResultInboxEvent
   | WrapDropped;
 
 /**

@@ -321,6 +321,7 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
         case "OwnSeenReceiptConfirmed":
           applyOwnSeenReceiptConfirmed(event, seenReceiptCtx);
           return NO_WRITE;
+        case "SupporterResultReceived":
         case "WrapDropped":
           return NO_WRITE;
       }

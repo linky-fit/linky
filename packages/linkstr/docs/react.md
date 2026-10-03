@@ -24,22 +24,26 @@ const exit = await retract(
 if (Exit.isFailure(exit)) console.warn(Cause.pretty(exit.cause)); // e.g. LinkstrNotConfigured
 ```
 
-| Atom                                               | Operation                                                                            |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `enqueueOutboxAtom`                                | `Outbox.enqueue` (`{ op, ref }`)                                                     |
-| `enqueuePaymentTelemetryAtom`                      | `Outbox.enqueueTelemetry` (`{ draft, recipient, ref }`)                              |
-| `outboxResultsHandlerAtom`, `outboxResultsAtom`    | Register `{ onResult }`, then mount to consume and ack completed outbox jobs         |
-| `retractReactionAtom`                              | `Reactions.retract`                                                                  |
-| `sendSeenReceiptAtom`                              | `SeenReceipts.send`                                                                  |
-| `sendPaymentNoticeAtom`                            | `PaymentNotices.send`                                                                |
-| `sendBankOfferAtom`                                | `BankOffers.send`                                                                    |
-| `publishProfileAtom`, `publishStatusAtom`          | `Profiles.publishProfile`, `Profiles.publishStatus`                                  |
-| `fetchProfileAtom`, `fetchProfilesAtom`            | `Profiles.fetchProfile`, `Profiles.fetchProfiles`                                    |
-| `republishOwnProfileAtom`                          | `Profiles.republishOwnProfile`                                                       |
-| `discoverActiveProfilesAtom`, `searchProfilesAtom` | `Profiles.discoverActiveProfiles`, `Profiles.searchProfiles` (`{ query, options? }`) |
-| `publishRelayListsAtom`, `fetchOwnRelayListsAtom`  | `RelayLists.publishRelayLists`, `RelayLists.fetchOwnRelayLists`                      |
-| `publishMuteListAtom`, `fetchOwnMuteListAtom`      | `MuteList.publishMuteList`, `MuteList.fetchOwnMuteList`                              |
-| `fetchWrapEventAtom`                               | `WrapInbox.fetchWrapEvent` (`{ wrapId, extraRelays? }`)                              |
+| Atom                                                         | Operation                                                                                            |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `enqueueOutboxAtom`                                          | `Outbox.enqueue` (`{ op, ref }`)                                                                     |
+| `enqueuePaymentTelemetryAtom`                                | `Outbox.enqueueTelemetry` (`{ draft, recipient, ref }`)                                              |
+| `outboxResultsHandlerAtom`, `outboxResultsAtom`              | Register `{ onResult }`, then mount to consume and ack completed outbox jobs                         |
+| `retractReactionAtom`                                        | `Reactions.retract`                                                                                  |
+| `sendSeenReceiptAtom`                                        | `SeenReceipts.send`                                                                                  |
+| `sendPaymentNoticeAtom`                                      | `PaymentNotices.send`                                                                                |
+| `sendBankOfferAtom`                                          | `BankOffers.send`                                                                                    |
+| `publishProfileAtom`, `publishStatusAtom`                    | `Profiles.publishProfile`, `Profiles.publishStatus`                                                  |
+| `fetchProfileAtom`, `fetchProfilesAtom`                      | `Profiles.fetchProfile`, `Profiles.fetchProfiles`                                                    |
+| `republishOwnProfileAtom`                                    | `Profiles.republishOwnProfile`                                                                       |
+| `discoverActiveProfilesAtom`, `searchProfilesAtom`           | `Profiles.discoverActiveProfiles`, `Profiles.searchProfiles` (`{ query, options? }`)                 |
+| `publishRelayListsAtom`, `fetchOwnRelayListsAtom`            | `RelayLists.publishRelayLists`, `RelayLists.fetchOwnRelayLists`                                      |
+| `publishMuteListAtom`, `fetchOwnMuteListAtom`                | `MuteList.publishMuteList`, `MuteList.fetchOwnMuteList`                                              |
+| `fetchWrapEventAtom`                                         | `WrapInbox.fetchWrapEvent` (`{ wrapId, extraRelays? }`)                                              |
+| `publishBadgeDefinitionAtom`, `fetchOwnBadgeDefinitionsAtom` | `SupporterBadges.publishBadgeDefinition`, `SupporterBadges.fetchOwnBadgeDefinitions`                 |
+| `signSupporterAwardsAtom`                                    | `SupporterBadges.signAwards` (`{ supporter, tier, awardedAt }`)                                      |
+| `sendSupporterResultAtom`                                    | `SupporterBadges.sendResult`                                                                         |
+| `publishProfileBadgeAtom`, `fetchOwnProfileBadgesAtom`       | `SupporterBadges.publishProfileBadge` (`{ issuer, award }`), `SupporterBadges.fetchOwnProfileBadges` |
 
 Chat sends and reaction adds go through `enqueueOutboxAtom` ([outbox.md](./outbox.md)); there is no `sendTextAtom`.
 
@@ -97,7 +101,7 @@ For manual registration, set `outboxResultsHandlerAtom` to `{ onResult }` and mo
 
 ## Profile watch
 
-`watchedProfilesAtom` (the pubkey set), `profileWatchHandlerAtom` (`{ onEvent }`) and `profileWatchAtom` follow the inbox pattern: set the handler once (through a ref, as above), mount `profileWatchAtom`, and set `watchedProfilesAtom` whenever the set changes; that resubscribes without rebuilding the runtime. Swapping the handler object also reopens the subscriptions. Facts are in [plain-events.md](./plain-events.md#watching).
+`watchedProfilesAtom` (the pubkey set), `profileWatchHandlerAtom` (`{ onEvent, options? }`, where `options` goes to `ProfileWatch.watch`, e.g. `supporterBadgeIssuer`) and `profileWatchAtom` follow the inbox pattern: set the handler once (through a ref, as above), mount `profileWatchAtom`, and set `watchedProfilesAtom` whenever the set changes; that resubscribes without rebuilding the runtime. Swapping the handler object also reopens the subscriptions. Facts are in [plain-events.md](./plain-events.md#watching).
 
 ## Relay health and inspector
 

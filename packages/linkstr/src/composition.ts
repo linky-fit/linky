@@ -14,6 +14,7 @@ import { ProfileWatch } from "./profiles/ProfileWatch";
 import { Reactions } from "./reactions/Reactions";
 import { RelayLists } from "./relayLists/RelayLists";
 import { SeenReceipts } from "./seenReceipts/SeenReceipts";
+import { SupporterBadges } from "./supporterBadges/SupporterBadges";
 import { LinkstrIdentity } from "./services/LinkstrIdentity";
 import type { NostrTransport } from "./services/NostrTransport";
 import { RelayPolicy } from "./services/RelayPolicy";
@@ -48,6 +49,7 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
         Chat.Default,
         Reactions.Default,
         PaymentTelemetry.Default,
+        SupporterBadges.Default,
         config.outboxStore ?? OutboxStore.inMemory,
       ]),
     ),
@@ -55,6 +57,7 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
     PaymentTelemetry.Default,
     Reactions.Default,
     SeenReceipts.Default,
+    SupporterBadges.Default,
     WrapInbox.Default.pipe(
       Layer.provide(config.inboxCursorStore ?? InboxCursorStore.inMemory),
     ),

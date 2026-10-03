@@ -46,14 +46,15 @@ The backfill starts at the cursor minus the two-day backdate margin, but never m
 
 `event` is a `WrapInboxEvent`. Dispatch on `_tag`:
 
-| Vertical        | Peer-authored fact                   | Own echo                                         |
-| --------------- | ------------------------------------ | ------------------------------------------------ |
-| Chat            | `ChatMessageReceived`                | `OwnChatMessageConfirmed`                        |
-| Reactions       | `ReactionAdded`, `ReactionRetracted` | `OwnReactionConfirmed`, `OwnRetractionConfirmed` |
-| Payment notices | `PaymentNoticeReceived`              | none                                             |
-| Bank offers     | `BankOfferSnapshotReceived`          | `OwnBankOfferSnapshotConfirmed`                  |
-| Seen receipts   | `SeenReceiptReceived`                | `OwnSeenReceiptConfirmed`                        |
-| (any)           | `WrapDropped`                        |                                                  |
+| Vertical         | Peer-authored fact                   | Own echo                                         |
+| ---------------- | ------------------------------------ | ------------------------------------------------ |
+| Chat             | `ChatMessageReceived`                | `OwnChatMessageConfirmed`                        |
+| Reactions        | `ReactionAdded`, `ReactionRetracted` | `OwnReactionConfirmed`, `OwnRetractionConfirmed` |
+| Payment notices  | `PaymentNoticeReceived`              | none                                             |
+| Bank offers      | `BankOfferSnapshotReceived`          | `OwnBankOfferSnapshotConfirmed`                  |
+| Seen receipts    | `SeenReceiptReceived`                | `OwnSeenReceiptConfirmed`                        |
+| Supporter badges | `SupporterResultReceived`            | none                                             |
+| (any)            | `WrapDropped`                        |                                                  |
 
 Peer facts carry `from`; own echoes carry `to` (the peer). Chat facts also carry a nullable `clientId`: on an own echo it reconciles an optimistic local row, on a peer message it dedups one message the sender published twice. A `switch (event._tag)` or effect's `Match.tag` dispatches; `Match.tagsExhaustive` makes the compiler demand a branch per tag. Run one consumer per process and hand each vertical's tags to its own handler (each vertical guide has one).
 
@@ -76,6 +77,7 @@ Before a wrap becomes a fact its outer signature is verified, it is decrypted, t
 | `invalid-reaction`, `invalid-retraction`                                              | reactions codec rejected it ([reactions.md](./reactions.md#receiving))              |
 | `invalid-seen-receipt`                                                                | seen-receipts codec rejected it ([seen-receipts.md](./seen-receipts.md#receiving))  |
 | `invalid-notice`, `invalid-bank-offer`                                                | payment-kinds codec rejected it ([payment-kinds.md](./payment-kinds.md))            |
+| `invalid-supporter-result`                                                            | supporter-result codec rejected it ([supporter-badges.md](./supporter-badges.md))   |
 
 Drops are facts too: log them, count them, but never treat one as an error.
 
@@ -106,7 +108,7 @@ const cursorStoreFor = (pubkey: Pubkey) =>
 
 ## Dedupe
 
-Wraps are deduped across relays by wrap id while the id is in a bounded cache of the last 4096 authenticated wraps. Only authenticated wraps enter it, so a tampered copy from one relay cannot suppress the honest copy from another. Cache eviction, resubscribes and restarts can replay the same rumor, so every fact is idempotent by its rumor id (`messageId`, `reactionId`, `snapshotId`, `receiptId`): apply "insert if absent" and reconcile own echoes by `clientId`.
+Wraps are deduped across relays by wrap id while the id is in a bounded cache of the last 4096 authenticated wraps. Only authenticated wraps enter it, so a tampered copy from one relay cannot suppress the honest copy from another. Cache eviction, resubscribes and restarts can replay the same rumor, so every fact is idempotent by its rumor id (`messageId`, `reactionId`, `snapshotId`, `receiptId`, `resultId`): apply "insert if absent" and reconcile own echoes by `clientId`.
 
 ## `fetchWrapEvent` for notification opens
 

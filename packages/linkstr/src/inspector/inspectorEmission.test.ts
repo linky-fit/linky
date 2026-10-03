@@ -1,4 +1,4 @@
-import { Effect, Fiber, Layer, Stream } from "effect";
+import { Effect, Either, Fiber, Layer, Stream } from "effect";
 import { generateSecretKey, getPublicKey } from "nostr-tools";
 import { nsecEncode } from "nostr-tools/nip19";
 import {
@@ -13,7 +13,13 @@ import {
   TokenMessageDraft,
 } from "../chat/domain";
 import { linkstrServices } from "../composition";
-import { ClientId, Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
+import {
+  ClientId,
+  Pubkey,
+  RelayUrl,
+  RumorId,
+  UnixSeconds,
+} from "../domain/primitives";
 import { WrapInbox } from "../inbox/WrapInbox";
 import { wrapRumorFor } from "../internal/giftWrap";
 import { OutboxRef } from "../outbox/domain";
@@ -21,6 +27,12 @@ import { Outbox } from "../outbox/Outbox";
 import { observeTransport } from "../relayHealth/observeTransport";
 import { RelayHealth } from "../relayHealth/RelayHealth";
 import { NostrTransport, RelayPublishResult } from "../services/NostrTransport";
+import { verifySupporterAward } from "../supporterBadges/codec";
+import {
+  BadgeDefinition,
+  SupporterResultDraft,
+} from "../supporterBadges/domain";
+import { SupporterBadges } from "../supporterBadges/SupporterBadges";
 import type { NostrTransportService } from "../services/NostrTransport";
 import { makeIdentity } from "../testing";
 import type { InspectorEvent } from "./events";
@@ -297,6 +309,94 @@ const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
 
   return Effect.runPromise(Effect.scoped(Effect.provide(program, layer)));
 };
+
+const collectSupporterBadgeEmissions = (): Promise<InspectorEvent[]> => {
+  const transport = Layer.succeed(NostrTransport, {
+    publish: (relays) =>
+      Effect.succeed(
+        relays.map(
+          (relayUrl) =>
+            new RelayPublishResult({
+              relay: relayUrl,
+              accepted: true,
+              detail: null,
+            }),
+        ),
+      ),
+    subscribe: () => Effect.never,
+    fetch: () => Effect.succeed([]),
+  });
+  const layer = linkstrServices({
+    ...identityConfig,
+    readRelays: [relay],
+    writeRelays: [relay],
+    transport: inspectTransport(observeTransport(transport)),
+  }).pipe(
+    Layer.provideMerge(Inspector.live),
+    Layer.provideMerge(RelayHealth.live),
+  );
+
+  const program = Effect.gen(function* () {
+    const inspector = yield* Inspector;
+    const collected: InspectorEvent[] = [];
+    const consumer = yield* Stream.runForEach(inspector.events, (event) =>
+      Effect.sync(() => {
+        collected.push(event);
+      }),
+    ).pipe(Effect.fork);
+
+    const badges = yield* SupporterBadges;
+    yield* badges.publishBadgeDefinition(
+      new BadgeDefinition({
+        badge: "gold",
+        name: "Gold supporter",
+        description: "",
+        image: "https://linky.test/gold.png",
+        thumb: "https://linky.test/gold-thumb.png",
+      }),
+    );
+    yield* badges.fetchOwnBadgeDefinitions();
+    const awards = yield* badges.signAwards(
+      peer,
+      "gold",
+      UnixSeconds.make(1_790_000_000),
+    );
+    yield* badges.sendResult(
+      new SupporterResultDraft({
+        to: peer,
+        tokenMessageId: RumorId.make("cd".repeat(32)),
+        result: { status: "issued", tier: "gold", awards },
+      }),
+    );
+    yield* badges.publishProfileBadge(
+      me.pubkey,
+      Either.getOrThrow(verifySupporterAward(awards[0], me.pubkey, peer)),
+    );
+    yield* badges.fetchOwnProfileBadges();
+    yield* Effect.sleep("20 millis");
+    yield* Fiber.interrupt(consumer);
+    return collected;
+  });
+
+  return Effect.runPromise(Effect.scoped(Effect.provide(program, layer)));
+};
+
+describe("inspector emission for supporter badges", () => {
+  it("emits every supporter badge operation without key material", async () => {
+    const collected = await collectSupporterBadgeEmissions();
+    expectNoIdentitySecrets(collected);
+    expect(collected.map(eventLabel)).toEqual(
+      expect.arrayContaining([
+        "PlainOperationSucceeded:supporterBadges.publishDefinition",
+        "PlainOperationSucceeded:supporterBadges.fetchOwnDefinitions",
+        "PlainOperationSucceeded:supporterBadges.signAwards",
+        "OperationSucceeded:supporterBadges.sendResult",
+        "PlainOperationSucceeded:supporterBadges.publishProfileBadge",
+        "PlainOperationSucceeded:supporterBadges.fetchOwnProfileBadges",
+      ]),
+    );
+  });
+});
 
 describe("inspector emission never carries cashu tokens", () => {
   it("redacts the token on every send, outbox, and inbox row", async () => {

@@ -70,6 +70,7 @@ const inboxPeerPubkey = (event: WrapInboxEvent): string | null => {
     case "PaymentNoticeReceived":
     case "BankOfferSnapshotReceived":
     case "SeenReceiptReceived":
+    case "SupporterResultReceived":
       return event.from;
     case "OwnChatMessageConfirmed":
     case "OwnBankOfferSnapshotConfirmed":

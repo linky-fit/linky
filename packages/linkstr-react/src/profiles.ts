@@ -4,6 +4,7 @@ import type {
   DiscoverActiveProfilesOptions,
   ProfileMetadata,
   ProfileWatchEvent,
+  ProfileWatchOptions,
   Pubkey,
   SearchProfilesOptions,
   StatusDraft,
@@ -18,6 +19,8 @@ export const watchedProfilesAtom = Atom.make<ReadonlyArray<Pubkey>>([]);
  * setter's updater-form interpretation of function values. */
 export interface ProfileWatchHandler {
   readonly onEvent: (event: ProfileWatchEvent) => void;
+  /** Passed to `ProfileWatch.watch`, e.g. `supporterBadgeIssuer`. */
+  readonly options?: ProfileWatchOptions;
 }
 
 export const profileWatchHandlerAtom = Atom.make<ProfileWatchHandler | null>(
@@ -36,7 +39,7 @@ export const profileWatchAtom = linkstrRuntimeAtom.atom((get) => {
   return Stream.unwrapScoped(
     Effect.gen(function* () {
       const profileWatch = yield* ProfileWatch;
-      const facts = yield* profileWatch.watch(pubkeys);
+      const facts = yield* profileWatch.watch(pubkeys, handler.options);
       return Stream.tap(facts, (event) =>
         Effect.sync(() => handler.onEvent(event)),
       );

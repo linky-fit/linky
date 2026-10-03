@@ -22,6 +22,7 @@ Gift-wrapped (private, kind 1059 on the wire):
 Plain (public, signed and published unwrapped):
 
 - [Plain events](./plain-events.md): profiles and status, relay lists, mute list
+- [Supporter badges](./supporter-badges.md): NIP-58 badge definitions, awards and profile badges, plus the gift-wrapped supporter result that delivers awards
 
 Never published:
 
@@ -39,22 +40,26 @@ Machinery:
 
 Every event kind the package produces. Wrapped kinds travel inside a kind 1059 gift wrap; "push" says whether the recipient copy carries the `["linky", "push"]` marker.
 
-| Kind  | What                                      | Wrapped | Push                | Guide                                                    |
-| ----- | ----------------------------------------- | ------- | ------------------- | -------------------------------------------------------- |
-| 14    | chat text, cashu token, edit              | yes     | text yes, others no | [chat.md](./chat.md#wire-format)                         |
-| 15    | chat image or PDF                         | yes     | yes                 | [chat.md](./chat.md#wire-format)                         |
-| 7     | reaction                                  | yes     | no                  | [reactions.md](./reactions.md#wire-format)               |
-| 5     | reaction retraction                       | yes     | no                  | [reactions.md](./reactions.md#wire-format)               |
-| 24133 | payment notice                            | yes     | yes                 | [payment-kinds.md](./payment-kinds.md#payment-notices)   |
-| 24134 | payment telemetry                         | yes     | no                  | [payment-kinds.md](./payment-kinds.md#payment-telemetry) |
-| 24135 | bank payment offer snapshot               | yes     | per status          | [payment-kinds.md](./payment-kinds.md#bank-offers)       |
-| 24136 | seen receipt                              | yes     | no                  | [seen-receipts.md](./seen-receipts.md#wire-format)       |
-| 0     | profile metadata                          | no      | n/a                 | [plain-events.md](./plain-events.md#profiles-and-status) |
-| 30315 | status                                    | no      | n/a                 | [plain-events.md](./plain-events.md#profiles-and-status) |
-| 10000 | mute list                                 | no      | n/a                 | [plain-events.md](./plain-events.md#mute-list)           |
-| 10002 | relay list                                | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
-| 10050 | DM relay list                             | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
-| 24242 | Blossom upload auth (never published)     | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
-| 27235 | NIP-98 auth, push proof (never published) | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
+| Kind  | What                                             | Wrapped | Push                | Guide                                                    |
+| ----- | ------------------------------------------------ | ------- | ------------------- | -------------------------------------------------------- |
+| 14    | chat text, cashu token, edit                     | yes     | text yes, others no | [chat.md](./chat.md#wire-format)                         |
+| 15    | chat image or PDF                                | yes     | yes                 | [chat.md](./chat.md#wire-format)                         |
+| 7     | reaction                                         | yes     | no                  | [reactions.md](./reactions.md#wire-format)               |
+| 5     | reaction retraction                              | yes     | no                  | [reactions.md](./reactions.md#wire-format)               |
+| 24133 | payment notice                                   | yes     | yes                 | [payment-kinds.md](./payment-kinds.md#payment-notices)   |
+| 24134 | payment telemetry                                | yes     | no                  | [payment-kinds.md](./payment-kinds.md#payment-telemetry) |
+| 24135 | bank payment offer snapshot                      | yes     | per status          | [payment-kinds.md](./payment-kinds.md#bank-offers)       |
+| 24136 | seen receipt                                     | yes     | no                  | [seen-receipts.md](./seen-receipts.md#wire-format)       |
+| 24137 | supporter result                                 | yes     | yes                 | [supporter-badges.md](./supporter-badges.md#wire-format) |
+| 0     | profile metadata                                 | no      | n/a                 | [plain-events.md](./plain-events.md#profiles-and-status) |
+| 30315 | status                                           | no      | n/a                 | [plain-events.md](./plain-events.md#profiles-and-status) |
+| 10000 | mute list                                        | no      | n/a                 | [plain-events.md](./plain-events.md#mute-list)           |
+| 10002 | relay list                                       | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
+| 10050 | DM relay list                                    | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
+| 8     | badge award (signed, published by the supporter) | no      | n/a                 | [supporter-badges.md](./supporter-badges.md#wire-format) |
+| 30008 | profile badges                                   | no      | n/a                 | [supporter-badges.md](./supporter-badges.md#wire-format) |
+| 30009 | badge definition                                 | no      | n/a                 | [supporter-badges.md](./supporter-badges.md#wire-format) |
+| 24242 | Blossom upload auth (never published)            | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
+| 27235 | NIP-98 auth, push proof (never published)        | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
 
 Tag order, content schemas and the conventions shared by all kinds are in [Concepts, wire conventions](./concepts.md#wire-conventions).

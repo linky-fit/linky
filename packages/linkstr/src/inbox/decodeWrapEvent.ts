@@ -20,6 +20,10 @@ import {
   SEEN_RECEIPT_KIND,
 } from "../seenReceipts/codec";
 import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
+import {
+  decodeSupporterResultRumor,
+  SUPPORTER_RESULT_KIND,
+} from "../supporterBadges/codec";
 import { authenticateWrap } from "./authenticateWrap";
 import { WrapDropped } from "./events";
 import type { WrapInboxEvent } from "./WrapInbox";
@@ -66,6 +70,11 @@ const routeRumor = (
       });
     case BANK_OFFER_KIND:
       return Either.match(decodeBankOfferRumor(rumor, identity.pubkey), {
+        onLeft: (reason) => new WrapDropped({ wrapId: wrap.id, reason }),
+        onRight: (event) => event,
+      });
+    case SUPPORTER_RESULT_KIND:
+      return Either.match(decodeSupporterResultRumor(rumor, identity.pubkey), {
         onLeft: (reason) => new WrapDropped({ wrapId: wrap.id, reason }),
         onRight: (event) => event,
       });

@@ -1,6 +1,6 @@
 # Plain events
 
-Three verticals publish plain signed events, not gift wraps: anyone can read them, they replace the previous event of their kind on relays, and they are fetched or watched rather than received through the inbox. Every publish signs with the configured identity, goes to every write relay concurrently, and returns a `PlainEventReceipt` with one `RelayPublishResult` per relay. Errors are in [the shared table](./concepts.md#errors).
+Three verticals publish plain signed events, not gift wraps (NIP-58 supporter badges are plain events too, in [their own guide](./supporter-badges.md)): anyone can read them, they replace the previous event of their kind on relays, and they are fetched or watched rather than received through the inbox. Every publish signs with the configured identity, goes to every write relay concurrently, and returns a `PlainEventReceipt` with one `RelayPublishResult` per relay. Errors are in [the shared table](./concepts.md#errors).
 
 ## Profiles and status
 
@@ -45,7 +45,7 @@ Decoding kind 0 is tolerant: unknown fields are ignored, non-string values dropp
 
 ### Watching
 
-`ProfileWatch.watch(pubkeys, options?)` returns a scoped `Stream<ProfileWatchEvent>` of `ProfileUpdated` and `StatusUpdated` facts; closing the scope tears down the relay subscriptions. Newest wins per `(pubkey, kind)` within the session; older or expired events are dropped and only visible to the inspector as `ProfileEventDropped` ([diagnostics.md](./diagnostics.md)).
+`ProfileWatch.watch(pubkeys, options?)` returns a scoped `Stream<ProfileWatchEvent>` of `ProfileUpdated` and `StatusUpdated` facts, plus `SupporterBadgesUpdated` when `options.supporterBadgeIssuer` is set ([supporter-badges.md](./supporter-badges.md#contacts-verifying-badges)); closing the scope tears down the relay subscriptions. Newest wins per `(pubkey, kind)` within the session; older or expired events are dropped and only visible to the inspector as `ProfileEventDropped` ([diagnostics.md](./diagnostics.md)).
 
 ```ts
 import { Effect, Stream } from "effect";

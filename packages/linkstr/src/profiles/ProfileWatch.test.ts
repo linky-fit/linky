@@ -53,6 +53,8 @@ interface FakeSubscription {
 
 const watchTransport = (
   subscriptions: Array<FakeSubscription>,
+  fetch: NostrTransportService["fetch"] = () =>
+    Effect.die("fetch not under test"),
 ): NostrTransportService => ({
   publish: () => Effect.die("publish not under test"),
   subscribe: (relay, filter, onEvent) =>
@@ -60,7 +62,7 @@ const watchTransport = (
       subscriptions.push({ relay, filter, onEvent });
       return Effect.never;
     }),
-  fetch: () => Effect.die("fetch not under test"),
+  fetch,
 });
 
 interface WatchContext {
@@ -69,9 +71,15 @@ interface WatchContext {
   readonly inspected: Array<InspectorEvent>;
 }
 
+interface SupporterBadgeWatch {
+  readonly issuer: Pubkey;
+  readonly fetch: NostrTransportService["fetch"];
+}
+
 const withWatch = <A>(
   pubkeys: ReadonlyArray<Pubkey>,
   body: (context: WatchContext) => Effect.Effect<A, Error>,
+  badges?: SupporterBadgeWatch,
 ): Promise<A> => {
   const subscriptions: Array<FakeSubscription> = [];
   const facts: Array<ProfileWatchEvent> = [];
@@ -84,12 +92,17 @@ const withWatch = <A>(
       ),
     );
     const profileWatch = yield* ProfileWatch;
-    const stream = yield* profileWatch.watch(pubkeys);
+    const stream = yield* profileWatch.watch(
+      pubkeys,
+      badges === undefined ? {} : { supporterBadgeIssuer: badges.issuer },
+    );
     yield* Effect.forkScoped(
       Stream.runForEach(stream, (fact) => Effect.sync(() => facts.push(fact))),
     );
     const expectedSubscriptions =
-      Math.ceil(new Set(pubkeys).size / AUTHOR_FILTER_LIMIT) * 2 * 2;
+      Math.ceil(new Set(pubkeys).size / AUTHOR_FILTER_LIMIT) *
+      (badges === undefined ? 2 : 3) *
+      2;
     yield* eventually(() => subscriptions.length === expectedSubscriptions);
     return yield* body({ subscriptions, facts, inspected });
   }).pipe(
@@ -98,7 +111,10 @@ const withWatch = <A>(
       ProfileWatch.Default.pipe(
         Layer.provideMerge(
           Layer.mergeAll(
-            Layer.succeed(NostrTransport, watchTransport(subscriptions)),
+            Layer.succeed(
+              NostrTransport,
+              watchTransport(subscriptions, badges?.fetch),
+            ),
             RelayPolicy.fixed({
               readRelays: [relayA, relayB],
               writeRelays: [],
@@ -300,6 +316,129 @@ describe("ProfileWatch", () => {
 });
 
 describe("ProfileWatch without read relays", () => {
+  describe("with a supporter badge issuer", () => {
+    const bot = makeIdentity();
+    const stranger = makeIdentity();
+
+    const award = (badge: string, signer = bot) =>
+      finalizeEvent(
+        {
+          kind: 8,
+          tags: [
+            ["a", `30009:${bot.pubkey}:${badge}`],
+            ["p", alice.pubkey],
+          ],
+          content: "",
+          created_at: base,
+        },
+        signer.secretKey,
+      );
+    const gold = award("linky-supporter-gold");
+    const generic = award("linky-supporter");
+    const forged = award("linky-supporter-diamond", stranger);
+    const profileBadges = (
+      createdAt: number,
+      pairs: ReadonlyArray<readonly [string, NostrToolsEvent]>,
+    ) =>
+      finalizeEvent(
+        {
+          kind: 30008,
+          tags: [
+            ["d", "profile_badges"],
+            ...pairs.flatMap(([badge, event]) => [
+              ["a", `30009:${bot.pubkey}:${badge}`],
+              ["e", event.id],
+            ]),
+          ],
+          content: "",
+          created_at: createdAt,
+        },
+        alice.secretKey,
+      );
+
+    it("pairs profile badges with their verified awards, newest wins", () => {
+      const fetched: Array<Filter> = [];
+      return withWatch(
+        [alice.pubkey],
+        ({ facts, inspected, subscriptions }) =>
+          Effect.gen(function* () {
+            const badgeSubscriptions = subscriptions.filter(({ filter }) =>
+              filter.kinds?.includes(30008),
+            );
+            expect(badgeSubscriptions.map(({ filter }) => filter)).toEqual([
+              {
+                kinds: [30008],
+                authors: [alice.pubkey],
+                "#d": ["profile_badges"],
+              },
+              {
+                kinds: [30008],
+                authors: [alice.pubkey],
+                "#d": ["profile_badges"],
+              },
+            ]);
+
+            badgeSubscriptions[0]?.onEvent(
+              profileBadges(base + 10, [
+                ["linky-supporter-gold", gold],
+                ["linky-supporter", generic],
+                ["linky-supporter-silver", gold],
+                ["linky-supporter-diamond", forged],
+              ]),
+            );
+            yield* eventually(() => facts.length === 1);
+            expect(facts[0]).toEqual(
+              expect.objectContaining({
+                _tag: "SupporterBadgesUpdated",
+                pubkey: alice.pubkey,
+                updatedAt: base + 10,
+                awards: [
+                  expect.objectContaining({
+                    badge: "gold",
+                    awardedAt: base,
+                  }),
+                  expect.objectContaining({ badge: "generic" }),
+                ],
+              }),
+            );
+            expect(fetched[0]).toEqual(
+              expect.objectContaining({
+                kinds: [8],
+                authors: [bot.pubkey],
+              }),
+            );
+            expect(droppedWith(inspected).map(({ reason }) => reason)).toEqual([
+              "award-mismatch",
+              "award-missing",
+            ]);
+
+            // Older and equal events are stale; a newer one without Linky
+            // entries clears the badges without fetching.
+            badgeSubscriptions[1]?.onEvent(profileBadges(base + 5, []));
+            badgeSubscriptions[1]?.onEvent(profileBadges(base + 20, []));
+            yield* eventually(() => facts.length === 2);
+            expect(facts[1]).toEqual(
+              expect.objectContaining({
+                _tag: "SupporterBadgesUpdated",
+                awards: [],
+                updatedAt: base + 20,
+              }),
+            );
+            expect(fetched).toHaveLength(2);
+          }),
+        {
+          issuer: bot.pubkey,
+          fetch: (_relay, filter) =>
+            Effect.sync(() => {
+              fetched.push(filter);
+              // The forged award is not served: a relay honours `authors`.
+              return [gold, generic];
+            }),
+        },
+      );
+    });
+  });
+
   it("fails with NoReadRelaysConfigured", async () => {
     const exit = await Effect.runPromiseExit(
       Effect.scoped(

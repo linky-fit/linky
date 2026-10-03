@@ -26,6 +26,7 @@ import { Rumor } from "../internal/nostrEvent";
 import type { NostrTags } from "../internal/nostrEvent";
 import { encodePaymentNoticeRumor } from "../paymentNotices/codec";
 import { PaymentNoticeDraft } from "../paymentNotices/domain";
+import { signPlainEvent } from "../internal/plainEvent";
 import { encodeReactionRumor } from "../reactions/codec";
 import { Emoji, ReactionDraft } from "../reactions/domain";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
@@ -36,6 +37,11 @@ import {
 } from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
+import {
+  awardTemplate,
+  encodeSupporterResultRumor,
+} from "../supporterBadges/codec";
+import { SupporterResultDraft } from "../supporterBadges/domain";
 import { eventually, FakeRelay, makeIdentity, poolFor } from "../testing";
 import { InboxCursorStore } from "./InboxCursorStore";
 import {
@@ -118,6 +124,33 @@ const bankOfferWrap = (own: boolean, invalid = false) => {
   );
   const rumor = invalid ? withRumorContent(encoded, "{}") : encoded;
   return wrapRumorFor(rumor, author.secretKey, alice.pubkey);
+};
+
+const tokenMessageId = RumorId.make("cd".repeat(32));
+const signedAward = (badge: "gold" | "generic") =>
+  signPlainEvent(
+    awardTemplate(bob.pubkey, badge, alice.pubkey),
+    sentAt,
+    bob.secretKey,
+  );
+const supporterResultWrap = () => {
+  const rumor = encodeSupporterResultRumor(
+    new SupporterResultDraft({
+      to: alice.pubkey,
+      tokenMessageId,
+      result: {
+        status: "issued",
+        tier: "gold",
+        awards: [signedAward("gold"), signedAward("generic")],
+      },
+    }),
+    bob.pubkey,
+    sentAt,
+    ClientId.make("supporter-result-client"),
+  );
+  return wrapRumorFor(rumor, bob.secretKey, alice.pubkey, {
+    pushMarker: true,
+  });
 };
 
 /** Two wraps whose randomized NIP-59 timestamps differ, oldest first. */
@@ -744,6 +777,35 @@ describe("WrapInbox", () => {
             from: bob.pubkey,
             context: null,
             offerId: null,
+            sentAt,
+          }),
+        );
+      }),
+    );
+  });
+
+  it("routes a wrapped kind-24137 rumor to SupporterResultReceived", async () => {
+    const fakeA = new FakeRelay();
+    const wrap = supporterResultWrap();
+
+    await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
+      Effect.gen(function* () {
+        yield* eventually(() => fakeA.subscriptions.length === 1);
+        fakeA.emit(wrap);
+        yield* eventually(() => collected.length === 1);
+        expect(collected[0]?.event).toEqual(
+          expect.objectContaining({
+            _tag: "SupporterResultReceived",
+            from: bob.pubkey,
+            tokenMessageId,
+            result: expect.objectContaining({
+              status: "issued",
+              tier: "gold",
+              awards: [
+                expect.objectContaining({ kind: 8, pubkey: bob.pubkey }),
+                expect.objectContaining({ kind: 8, pubkey: bob.pubkey }),
+              ],
+            }),
             sentAt,
           }),
         );
