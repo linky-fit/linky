@@ -2,8 +2,7 @@ import {
   GENERIC_MINT_ICON_DATA_URL,
   isLightningAddress,
 } from "@linky-fit/linkshu";
-import { SiteFooter } from "../SiteFooter";
-import { SiteHeaderMenu } from "../SiteHeaderMenu";
+import { SiteLayout } from "../SiteLayout";
 import { useCashuPage } from "./useCashuPage";
 function CashuPage() {
   const {
@@ -36,24 +35,7 @@ function CashuPage() {
   } = useCashuPage();
 
   return (
-    <main className="cashu-shell">
-      <div className="site-backdrop" aria-hidden="true" />
-
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Linky home">
-          <span className="brand-mark">
-            <img className="brand-logo" src="/icon.svg" alt="Linky" />
-          </span>
-          <span className="brand-word">Linky</span>
-        </a>
-
-        <SiteHeaderMenu
-          copy={activeCopy}
-          locale={locale}
-          onLocaleChange={setLocale}
-        />
-      </header>
-
+    <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
       {redeemSuccess ? (
         <section className="cashu-token-view">
           <div className="cashu-panel cashu-panel-highlight cashu-success-panel">
@@ -277,12 +259,7 @@ function CashuPage() {
           </div>
         </section>
       )}
-
-      <SiteFooter
-        followUsLabel={activeCopy.followUsLabel}
-        privacyLabel={activeCopy.privacyLabel}
-      />
-    </main>
+    </SiteLayout>
   );
 }
 export default CashuPage;
