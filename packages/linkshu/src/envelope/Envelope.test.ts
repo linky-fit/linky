@@ -47,7 +47,13 @@ import { recordingInspector } from "../testing/inspector";
 import { amountIn, seedProofs } from "../testing/inventory";
 import { freshStorage } from "../testing/storage";
 import type { Storage } from "../testing/storage";
-import { EnvelopeMeltDraft, EnvelopeOpenDraft, EnvelopeRef } from "./domain";
+import { decodeTokenText, parseTokenText } from "../token/codec";
+import {
+  EnvelopeMeltDraft,
+  EnvelopeOpenDraft,
+  EnvelopeRef,
+  EnvelopeSendDraft,
+} from "./domain";
 import { Envelope } from "./Envelope";
 import { withEnvelopeLease } from "./internal/envelopes";
 
@@ -586,6 +592,31 @@ describe("Envelope.send", () => {
     const { proofs, operations } = await first.inventory();
     expect(amountIn(proofs, "handedOut")).toBe(10);
     expect(envelopeOperation(operations)?.status).toBe("issued");
+  });
+
+  it("carries the memo on the same proofs, the same text for the same memo", async () => {
+    const fakeMint = makeFakeMint();
+    const first = makeDevice(fakeMint, { name: "a" });
+    const second = makeDevice(fakeMint, { name: "b" });
+    await first.fund(32);
+    await first.open(10);
+    await second.open(10);
+    const sendWithMemo = (device: typeof first, memo: string) =>
+      device.run(
+        Effect.flatMap(Envelope, (envelope) =>
+          envelope.send(new EnvelopeSendDraft({ mint, key, memo })),
+        ),
+      );
+
+    const plain = await sendOf(first);
+    const rent = await sendWithMemo(first, "Rent");
+
+    expect(parseTokenText(rent.tokenText)?.memo).toBe("Rent");
+    expect(decodeTokenText(rent.tokenText)?.proofs).toEqual(
+      decodeTokenText(plain.tokenText)?.proofs,
+    );
+    expect(rent.operationId).toBe(plain.operationId);
+    expect(await sendWithMemo(second, "Rent")).toEqual(rent);
   });
 
   it("fails EnvelopeNotFound for a key not opened here", async () => {

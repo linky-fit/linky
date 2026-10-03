@@ -37,6 +37,7 @@ import {
   nextFullHourSec,
 } from "../app/lib/recurringPaymentDisplay";
 import { AmountKeypad } from "../components/AmountKeypad";
+import { PaymentNoteInput } from "../components/PaymentNoteInput";
 import { RecurringContactAvatar } from "../components/RecurringContactAvatar";
 import { useAmountInputKeypad } from "../components/useAmountInputKeypad";
 import { navigateTo } from "../hooks/useRouting";
@@ -64,6 +65,7 @@ interface FormInitial {
   contactId: string;
   firstRunSec: number | null;
   frequency: Frequency;
+  note: string;
   /** Set when the form was opened from a completed payment. */
   repeatsPayment: boolean;
 }
@@ -81,6 +83,7 @@ const readPrefillFromHash = (): FormInitial => {
     contactId,
     firstRunSec: null,
     frequency: "month",
+    note: "",
     repeatsPayment: Boolean(contactId) && amount > 0,
   };
 };
@@ -114,6 +117,7 @@ export function RecurringPaymentFormPage({
       frequency: isFrequency(order.schedule.interval.unit)
         ? order.schedule.interval.unit
         : "month",
+      note: order.note ?? "",
       repeatsPayment: false,
     };
     // The form takes its initial values once; later rate or order changes
@@ -154,6 +158,7 @@ function RecurringPaymentForm({
   const [contactId, setContactId] = React.useState(initial.contactId);
   const [search, setSearch] = React.useState("");
   const [amount, setAmount] = React.useState(initial.amountSat);
+  const [note, setNote] = React.useState(initial.note);
   const [frequency, setFrequency] = React.useState<Frequency>(
     initial.frequency,
   );
@@ -263,6 +268,7 @@ function RecurringPaymentForm({
       contactId: contact.id,
       firstDueAtSec: firstRunSec,
       interval,
+      note: note.trim() || null,
     };
     setIsSaving(true);
     try {
@@ -298,7 +304,11 @@ function RecurringPaymentForm({
         </Stack>
       </Row>
 
-      <AmountKeypad amount={amount} input={amountInput} />
+      <AmountKeypad
+        amount={amount}
+        input={amountInput}
+        below={<PaymentNoteInput onChange={setNote} t={t} value={note} />}
+      />
 
       <Stack gap="$xs">
         <Text variant="label">{t("recurringFrequencyLabel")}</Text>

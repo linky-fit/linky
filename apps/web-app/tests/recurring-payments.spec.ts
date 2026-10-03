@@ -124,6 +124,45 @@ for (const action of ["countdown expires", "Cancel this payment"]) {
   });
 }
 
+test("a recurring payment's note reaches the contact and both histories", async ({
+  bootAccount,
+}) => {
+  const note = "Rent for October";
+  const a = await bootAccount("A");
+  const b = await bootAccount("B");
+  await test.step("create a Cashu payment with a note", async () => {
+    await fundAndConnect(a, b);
+    await openForm(a.page);
+    await a.page.getByRole("textbox", { name: "Note", exact: true }).fill(note);
+  });
+  await saveOrder(a.page);
+  await expect(detailValue(a.page, "Note")).toHaveText(note);
+  await test.step("let the countdown pay it", async () => {
+    await waitForCountdown(a.page, await claimOrder(a.page));
+    await expect
+      .poll(async () => (await readOrder(a.page)).runCount, {
+        timeout: 15_000,
+      })
+      .toBe(1);
+    await expectReceived(b.page);
+  });
+  await test.step("the payer's history row shows the note", async () => {
+    await a.page.goto("/#wallet/transactions");
+    await expect(a.page.getByTestId("recurring-order-note")).toHaveText(note);
+    await expect(
+      a.page
+        .getByTestId("transaction-card")
+        .filter({ has: a.page.getByTestId("transaction-recurring-pill") }),
+    ).toContainText(note);
+  });
+  await test.step("the contact's received payment shows the note", async () => {
+    await b.page.goto("/#wallet/transactions");
+    await expect(
+      b.page.getByTestId("transaction-card").filter({ hasText: note }),
+    ).toHaveCount(1);
+  });
+});
+
 test("insufficient funds warns once and retries after a top-up", async ({
   bootAccount,
 }) => {

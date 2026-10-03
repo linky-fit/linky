@@ -29,6 +29,7 @@ export const recurringOrderFixture = (
   mintUrl: MINT,
   rail: "cashu",
   amount: { amount: 100, unit: "sat" },
+  note: null,
   schedule: {
     anchorAtSec: DUE,
     interval: { unit: "hour", count: 6 },
@@ -54,6 +55,7 @@ export const recurringColumnsFixture = (
   rail: "cashu",
   amount: 100,
   unit: "sat",
+  note: null,
   intervalUnit: "hour",
   intervalCount: 6,
   anchorAtSec: DUE,

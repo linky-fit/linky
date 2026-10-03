@@ -119,6 +119,8 @@ export const LinkySchema = {
     amount: PositiveInt,
     // "sat" | "czk" | "eur" | "chf" | "usd" | "brl"
     unit: NonEmptyString100,
+    // Carried by every run as its token memo or LUD-12 comment; editable.
+    note: nullOr(NonEmptyString1000),
     // "hour" | "day" | "week" | "month", multiplied by intervalCount.
     intervalUnit: NonEmptyString100,
     intervalCount: PositiveInt,

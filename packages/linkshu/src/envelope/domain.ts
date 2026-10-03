@@ -27,6 +27,15 @@ export class EnvelopeRef extends Schema.Class<EnvelopeRef>("EnvelopeRef")({
   key: EnvelopeKey,
 }) {}
 
+export class EnvelopeSendDraft extends Schema.Class<EnvelopeSendDraft>(
+  "EnvelopeSendDraft",
+)({
+  mint: MintUrl,
+  key: EnvelopeKey,
+  /** The returned text's NUT-00 memo; the proofs stay the same. */
+  memo: Schema.optional(Schema.NonEmptyString),
+}) {}
+
 export class EnvelopeOpenDraft extends Schema.Class<EnvelopeOpenDraft>(
   "EnvelopeOpenDraft",
 )({

@@ -52,6 +52,7 @@ import type {
   EnvelopeOpenError,
   EnvelopeRef,
   EnvelopeReleaseError,
+  EnvelopeSendDraft,
   EnvelopeSendError,
   EnvelopeStateError,
   EnvelopeStatus,
@@ -327,18 +328,20 @@ export class Envelope extends Effect.Service<Envelope>()("linkshu/Envelope", {
       );
 
     /**
-     * The envelope as token text; its proofs become `handedOut`. Every
-     * device produces the same text, and sending it again returns it again,
-     * also after a crash halfway through.
+     * The envelope as token text, carrying `memo`; its proofs become
+     * `handedOut`. Every device produces the same text for the same memo,
+     * and sending it again returns it again, also after a crash halfway
+     * through.
      */
     const send = (
-      ref: EnvelopeRef,
+      draft: EnvelopeSendDraft,
     ): Effect.Effect<EnvelopeToken, EnvelopeSendError> =>
       withEnvelopeLease(
         kv,
-        ref,
+        draft,
       )(
         Effect.gen(function* () {
+          const ref = { mint: draft.mint, key: draft.key };
           const envelope = yield* findLocal(ref);
           if (envelope === null) return yield* new EnvelopeNotFound(ref);
           const proofs = yield* proofStore.loadAll;
@@ -360,9 +363,18 @@ export class Envelope extends Effect.Service<Envelope>()("linkshu/Envelope", {
               "envelope-send",
             );
           }
+          const withMemo =
+            draft.memo === undefined
+              ? null
+              : encodeProofs({
+                  mint: draft.mint,
+                  unit: sat,
+                  memo: draft.memo,
+                  proofs: envelope.proofs,
+                });
           return new EnvelopeToken({
             operationId: operation.id,
-            tokenText: envelope.tokenText,
+            tokenText: withMemo?.tokenText ?? envelope.tokenText,
             amount: operation.amount,
           });
         }),
@@ -370,7 +382,7 @@ export class Envelope extends Effect.Service<Envelope>()("linkshu/Envelope", {
         inspectOperationWith(
           inspector,
           "envelope.send",
-          { mint: ref.mint, key: ref.key },
+          { mint: draft.mint, key: draft.key },
           redactReceipt,
         ),
       );

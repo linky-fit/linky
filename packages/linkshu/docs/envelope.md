@@ -68,7 +68,7 @@ The counter scan of [restore.md](./restore.md) cannot see envelopes: their outpu
 
 ### `send`
 
-`send(ref)` returns the envelope as an `EnvelopeToken`: its proofs become `handedOut` and the operation `issued`. The text is the same on every device, and sending again returns it again. A send that stopped halfway (proofs `handedOut`, operation still `pending`, after a crash or a sync that mixed two devices' writes) is finished by the next one, which returns the same text. The recipient pays the mint's input fee when redeeming it. An envelope that is not open here (never opened, already melted, spent or released, or held by a melt) fails with `EnvelopeNotFound`.
+`send(draft)` takes an `EnvelopeSendDraft` (`mint`, `key`, optional `memo`) and returns the envelope as an `EnvelopeToken`: its proofs become `handedOut` and the operation `issued`. A `memo` travels as the text's NUT-00 memo over the same proofs, so the text is the same on every device that passes the same memo, and sending again returns it again. A different memo gives a different text for the same proofs; the recipient can redeem either, once. A send that stopped halfway (proofs `handedOut`, operation still `pending`, after a crash or a sync that mixed two devices' writes) is finished by the next one, which returns the same text. The recipient pays the mint's input fee when redeeming it. An envelope that is not open here (never opened, already melted, spent or released, or held by a melt) fails with `EnvelopeNotFound`.
 
 ### Melting
 

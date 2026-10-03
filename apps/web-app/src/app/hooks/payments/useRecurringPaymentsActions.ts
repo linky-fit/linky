@@ -140,6 +140,7 @@ export const useRecurringPaymentsActions = ({
           amount: input.amount,
           firstDueAtSec: input.firstDueAtSec,
           interval: input.interval,
+          note: input.note,
           mintUrl: defaultMintUrl,
           rail,
         },
@@ -168,6 +169,7 @@ export const useRecurringPaymentsActions = ({
       }
       const outcome = await runWrite(
         repository.update(order.id, {
+          note: null,
           ...recurringPaymentColumns(input, contactId),
           ...recurringPaymentUpdate(editPatch(order, input.firstDueAtSec)),
         }),
@@ -181,6 +183,7 @@ export const useRecurringPaymentsActions = ({
           amount: input.amount,
           firstDueAtSec: input.firstDueAtSec,
           interval: input.interval,
+          note: input.note,
           previous: {
             amount: order.amount,
             contactId: order.contactId,
