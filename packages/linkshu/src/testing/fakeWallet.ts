@@ -51,6 +51,7 @@ export const fakeWallet = (
   },
   on: { mintQuoteUpdates: notUnderTest },
   createMintQuoteBolt11: notUnderTest,
+  createLockedMintQuote: notUnderTest,
   checkMintQuoteBolt11: notUnderTest,
   mintProofsBolt11: notUnderTest,
   createMeltQuoteBolt11: notUnderTest,

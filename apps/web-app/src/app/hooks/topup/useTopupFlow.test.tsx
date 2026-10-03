@@ -46,6 +46,7 @@ const topupQuote = (quoteId = "quote-1"): TopupQuote =>
     amount: Amount.make(21),
     invoice: Bolt11Invoice.make(INVOICE),
     expiresAt: null,
+    locked: false,
   });
 
 const topupReceipt = (quote: TopupQuote): TopupReceipt =>
