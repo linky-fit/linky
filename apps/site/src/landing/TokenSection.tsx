@@ -10,7 +10,14 @@ import {
   Text,
   useMedia,
 } from "@linky-fit/ui";
-import { opacity, shadow, size, space, themes } from "@linky-fit/ui/tokens";
+import {
+  opacity,
+  shadow,
+  size,
+  space,
+  themes,
+  zIndex,
+} from "@linky-fit/ui/tokens";
 import { Fragment, type ReactNode } from "react";
 import { useColorMode } from "../colorMode";
 import type { LandingCopy, TokenSectionCopy } from "./copy";
@@ -98,11 +105,49 @@ function NfcMock() {
   );
 }
 
+// Brand glyphs from Simple Icons (CC0), recolored white.
+const messengerApps = [
+  { name: "Messenger", slug: "messenger", color: "#0866FF" },
+  { name: "Signal", slug: "signal", color: "#3B45FD" },
+  { name: "WhatsApp", slug: "whatsapp", color: "#25D366" },
+  { name: "Telegram", slug: "telegram", color: "#26A5E4" },
+  { name: "iMessage", slug: "imessage", color: "#34DA50" },
+];
+
+function MessengerLogos() {
+  return (
+    <Row gap="$sm">
+      {messengerApps.map(({ name, slug, color }) => (
+        <Stack
+          key={slug}
+          width="$iconXl"
+          height="$iconXl"
+          borderRadius="$control"
+          style={{ backgroundColor: color }}
+          alignItems="center"
+          justifyContent="center"
+        >
+          <img
+            src={`/brands/${slug}.svg`}
+            alt={name}
+            width={size.iconLg}
+            height={size.iconLg}
+          />
+        </Stack>
+      ))}
+    </Row>
+  );
+}
+
 const destinations = [
-  { caption: "messenger", Mock: MessengerMock },
+  { caption: "messenger", Mock: MessengerMock, Logos: MessengerLogos },
   { caption: "qrCode", Mock: QrMock },
   { caption: "nfcCard", Mock: NfcMock },
-] satisfies { caption: keyof TokenSectionCopy; Mock: () => ReactNode }[];
+] satisfies {
+  caption: keyof TokenSectionCopy;
+  Mock: () => ReactNode;
+  Logos?: () => ReactNode;
+}[];
 
 const pulseGap = 0.8;
 const pointKey = ({ x, y }: Point) => `${x}-${y}`;
@@ -156,7 +201,11 @@ function Connectors({
           key={pointKey(point)}
           aria-hidden
           className="landing-node"
-          style={{ left: percent(point.x), top: percent(point.y) }}
+          style={{
+            left: percent(point.x),
+            top: percent(point.y),
+            zIndex: zIndex.raised,
+          }}
         >
           <Stack
             width="$dot"
@@ -187,7 +236,7 @@ function WideStage({ copy }: { copy: TokenSectionCopy }) {
         <Connectors from={{ x: 0, y: 50 }} to={slotCenters} />
       </Stack>
       <Stack width="$sheetWidth" gap="$none">
-        {destinations.map(({ caption, Mock }, index) => (
+        {destinations.map(({ caption, Mock, Logos }, index) => (
           <Row key={caption} flex={1} alignItems="center" gap="$none">
             <div className="landing-handoff-item" style={appearDelay(index)}>
               <Row alignItems="center" gap="$xl">
@@ -196,9 +245,12 @@ function WideStage({ copy }: { copy: TokenSectionCopy }) {
                     <Mock />
                   </div>
                 </Stack>
-                <Text variant="title" color="$colorStrong" flex={1}>
-                  {copy[caption]}
-                </Text>
+                <Stack flex={1} gap="$md" alignItems="flex-start">
+                  <Text variant="title" color="$colorStrong">
+                    {copy[caption]}
+                  </Text>
+                  {Logos && <Logos />}
+                </Stack>
               </Row>
             </div>
           </Row>
@@ -217,9 +269,15 @@ function CompactStage({ copy }: { copy: TokenSectionCopy }) {
           <Phone screen="token-share" width="$qr" />
         </div>
       </Stack>
-      {destinations.map(({ caption, Mock }, index) => (
+      {destinations.map(({ caption, Mock, Logos }, index) => (
         <Fragment key={caption}>
-          <Stack width="100%" height="$row" position="relative" gap="$none">
+          <Stack
+            width="100%"
+            height="$row"
+            marginTop={index ? "$xxl" : "$none"}
+            position="relative"
+            gap="$none"
+          >
             <Connectors
               from={{ x: 50, y: 0 }}
               to={[{ x: 50, y: 100 }]}
@@ -231,9 +289,12 @@ function CompactStage({ copy }: { copy: TokenSectionCopy }) {
               <div inert>
                 <Mock />
               </div>
-              <Text variant="title" color="$colorStrong" textAlign="center">
-                {copy[caption]}
-              </Text>
+              <Stack alignItems="center" gap="$md">
+                <Text variant="title" color="$colorStrong" textAlign="center">
+                  {copy[caption]}
+                </Text>
+                {Logos && <Logos />}
+              </Stack>
             </Stack>
           </div>
         </Fragment>

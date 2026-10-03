@@ -8,7 +8,6 @@ import {
   TopBar,
   type IconName,
 } from "@linky-fit/ui";
-import { space } from "@linky-fit/ui/tokens";
 import type { ComponentProps } from "react";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
@@ -88,22 +87,6 @@ export function DemoBody(props: ComponentProps<typeof Stack>) {
       paddingHorizontal="$xl"
       overflow="hidden"
       {...props}
-    />
-  );
-}
-
-/** An accent wash behind the list row that follows it, e.g. one that just changed. */
-export function RowHighlight({ className }: { className: string }) {
-  return (
-    <Stack
-      className={className}
-      position="absolute"
-      top="$none"
-      bottom="$none"
-      left={-space.md}
-      right={-space.md}
-      borderRadius="$control"
-      backgroundColor="$accentSoft"
     />
   );
 }

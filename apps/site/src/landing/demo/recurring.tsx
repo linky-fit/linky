@@ -8,10 +8,9 @@ import {
   Stack,
   Text,
 } from "@linky-fit/ui";
-import { DemoBody, DemoTopBar, RowHighlight } from "./chrome";
+import { DemoBody, DemoTopBar } from "./chrome";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
-import { enter, useCues } from "./playback";
 
 const topup = "Topup via invoice";
 
@@ -117,24 +116,7 @@ function PaymentRow({ who, note, date, pill, amount, incoming }: Payment) {
   );
 }
 
-// One cue per row as they cascade in, then the next payment lights up.
-const rowCues = [...scheduled, ...history].map((_, index) => 150 + index * 90);
-const listCues = [...rowCues, 1200];
-
 export function RecurringListScreen() {
-  const passed = useCues(listCues);
-  const row = (index: number, payment: Payment, highlight = false) => (
-    <Stack
-      key={payment.date}
-      position="relative"
-      className={enter(passed > index)}
-    >
-      {highlight && passed > rowCues.length ? (
-        <RowHighlight className="demo-glow" />
-      ) : null}
-      <PaymentRow {...payment} />
-    </Stack>
-  );
   return (
     <>
       <DemoTopBar
@@ -145,16 +127,16 @@ export function RecurringListScreen() {
       <DemoBody paddingTop="$sm">
         <Section title="Scheduled">
           <Stack gap="$xs">
-            {scheduled.map((payment, index) =>
-              row(index, payment, index === 0),
-            )}
+            {scheduled.map((payment) => (
+              <PaymentRow key={payment.date} {...payment} />
+            ))}
           </Stack>
         </Section>
         <Section title="History">
           <Stack gap="$xs">
-            {history.map((payment, index) =>
-              row(scheduled.length + index, payment),
-            )}
+            {history.map((payment) => (
+              <PaymentRow key={payment.date} {...payment} />
+            ))}
           </Stack>
         </Section>
         <Stack position="absolute" right="$xl" bottom="$xxxl">

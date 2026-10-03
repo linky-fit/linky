@@ -85,7 +85,7 @@ export const overlays: Section = {
     },
     SuccessOverlay: () => {
       const [open, setOpen] = useState<
-        "success" | "received" | "sending" | null
+        "success" | "received" | "sending" | "contained" | null
       >(null);
       const close = () => setOpen(null);
       return (
@@ -100,7 +100,31 @@ export const overlays: Section = {
             <UI.Button variant="secondary" onPress={() => setOpen("sending")}>
               Open sending
             </UI.Button>
+            <UI.Button variant="secondary" onPress={() => setOpen("contained")}>
+              Open contained
+            </UI.Button>
           </UI.Row>
+          <UI.Card
+            outlined
+            position="relative"
+            height="$device"
+            overflow="hidden"
+            justifyContent="center"
+            alignItems="center"
+          >
+            <UI.Text color="$colorMuted">Positioned parent</UI.Text>
+            {open === "contained" ? (
+              <UI.SuccessOverlay
+                title="Received"
+                amount="21,000"
+                unit="sat"
+                avatar={{ name: "Alex Rivers", uri: sampleImage }}
+                direction="in"
+                contained
+                onDismiss={close}
+              />
+            ) : null}
+          </UI.Card>
           {open === "success" ? (
             <UI.SuccessOverlay
               title="Payment complete"

@@ -179,6 +179,8 @@ export interface SuccessOverlayProps {
   direction?: "in" | "out" | undefined;
   /** The payment is still in flight: a spinner waits where the direction arrow appears once it settles. */
   pending?: boolean | undefined;
+  /** Renders in place, filling the nearest positioned parent, instead of portaling over the whole app. */
+  contained?: boolean | undefined;
   onDismiss?: (() => void) | undefined;
 }
 
@@ -190,127 +192,128 @@ export function SuccessOverlay({
   avatar,
   direction,
   pending = false,
+  contained = false,
   onDismiss,
 }: SuccessOverlayProps) {
-  return (
-    <Portal zIndex="$overlay">
-      <Pressable
-        position="absolute"
-        inset={0}
-        cursor="default"
-        justifyContent="center"
-        padding="$lg"
-        backgroundColor="$scrim"
-        role="status"
-        aria-live="assertive"
-        // The portal host turns pointer events off for everything inside it.
-        pointerEvents="auto"
-        onPress={onDismiss}
+  const overlay = (
+    <Pressable
+      position="absolute"
+      inset={0}
+      zIndex="$overlay"
+      cursor="default"
+      justifyContent="center"
+      padding="$lg"
+      backgroundColor="$scrim"
+      role="status"
+      aria-live="assertive"
+      // The portal host turns pointer events off for everything inside it.
+      pointerEvents="auto"
+      onPress={onDismiss}
+    >
+      <Stack
+        alignItems="center"
+        gap="$md"
+        width="100%"
+        maxWidth="$sheetWidth"
+        padding="$xxl"
+        borderRadius="$card"
+        backgroundColor="$surface"
+        boxShadow={shadow.floating}
+        transition="slow"
+        enterStyle={{ opacity: 0, scale: enterScale.pop }}
       >
-        <Stack
-          alignItems="center"
-          gap="$md"
-          width="100%"
-          maxWidth="$sheetWidth"
-          padding="$xxl"
-          borderRadius="$card"
-          backgroundColor="$surface"
-          boxShadow={shadow.floating}
-          transition="slow"
-          enterStyle={{ opacity: 0, scale: enterScale.pop }}
-        >
-          <View position="relative">
-            {avatar ? (
-              <Avatar name={avatar.name} uri={avatar.uri} size="lg" />
-            ) : (
-              <View
-                width="$hero"
-                height="$hero"
-                borderRadius="$pill"
-                borderWidth={border.emphasis}
-                borderColor={pending ? "$borderColor" : "$accent"}
-                backgroundColor={pending ? "$neutralSoft" : "$accentSoft"}
-                alignItems="center"
-                justifyContent="center"
-              >
-                {pending ? (
-                  <Icon
-                    name={direction === "in" ? "ArrowDown" : "ArrowUp"}
-                    size="xl"
-                    color="$warning"
-                  />
-                ) : (
-                  <Icon name="Check" size="xl" color="$accent" />
-                )}
-              </View>
-            )}
-            {/* Keyed so the badges never share an instance: `transition` adds hooks. */}
-            {pending ? (
-              <View
-                key="pending"
-                position="absolute"
-                right={0}
-                bottom={0}
-                width="$controlSm"
-                height="$controlSm"
-                borderRadius="$pill"
-                backgroundColor="$surface"
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Spinner />
-              </View>
-            ) : direction ? (
-              <View
-                key={direction}
-                position="absolute"
-                right={0}
-                bottom={0}
-                width="$controlSm"
-                height="$controlSm"
-                borderRadius="$pill"
-                borderWidth={border.focus}
-                borderColor="$surface"
-                backgroundColor={direction === "out" ? "$warning" : "$accent"}
-                alignItems="center"
-                justifyContent="center"
-                transition="slow"
-                enterStyle={{
-                  opacity: 0,
-                  scale: enterScale.pop,
-                  y: direction === "out" ? space.lg : -space.xxxl,
-                }}
-              >
-                <Icon
-                  name={direction === "out" ? "ArrowUp" : "ArrowDown"}
-                  size="sm"
-                  color="$colorStrong"
-                />
-              </View>
-            ) : null}
-          </View>
-          {avatar?.name ? (
-            <Text
-              variant="label"
-              fontWeight="$regular"
-              color="$colorMuted"
-              textAlign="center"
-              numberOfLines={1}
+        <View position="relative">
+          {avatar ? (
+            <Avatar name={avatar.name} uri={avatar.uri} size="lg" />
+          ) : (
+            <View
+              width="$hero"
+              height="$hero"
+              borderRadius="$pill"
+              borderWidth={border.emphasis}
+              borderColor={pending ? "$borderColor" : "$accent"}
+              backgroundColor={pending ? "$neutralSoft" : "$accentSoft"}
+              alignItems="center"
+              justifyContent="center"
             >
-              {avatar.name}
-            </Text>
+              {pending ? (
+                <Icon
+                  name={direction === "in" ? "ArrowDown" : "ArrowUp"}
+                  size="xl"
+                  color="$warning"
+                />
+              ) : (
+                <Icon name="Check" size="xl" color="$accent" />
+              )}
+            </View>
+          )}
+          {/* Keyed so the badges never share an instance: `transition` adds hooks. */}
+          {pending ? (
+            <View
+              key="pending"
+              position="absolute"
+              right={0}
+              bottom={0}
+              width="$controlSm"
+              height="$controlSm"
+              borderRadius="$pill"
+              backgroundColor="$surface"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Spinner />
+            </View>
+          ) : direction ? (
+            <View
+              key={direction}
+              position="absolute"
+              right={0}
+              bottom={0}
+              width="$controlSm"
+              height="$controlSm"
+              borderRadius="$pill"
+              borderWidth={border.focus}
+              borderColor="$surface"
+              backgroundColor={direction === "out" ? "$warning" : "$accent"}
+              alignItems="center"
+              justifyContent="center"
+              transition="slow"
+              enterStyle={{
+                opacity: 0,
+                scale: enterScale.pop,
+                y: direction === "out" ? space.lg : -space.xxxl,
+              }}
+            >
+              <Icon
+                name={direction === "out" ? "ArrowUp" : "ArrowDown"}
+                size="sm"
+                color="$colorStrong"
+              />
+            </View>
           ) : null}
-          <Text variant="heading" textAlign="center">
-            {title}
+        </View>
+        {avatar?.name ? (
+          <Text
+            variant="label"
+            fontWeight="$regular"
+            color="$colorMuted"
+            textAlign="center"
+            numberOfLines={1}
+          >
+            {avatar.name}
           </Text>
-          {amount ? <Amount value={amount} unit={unit} size="md" /> : null}
-          {detail ? (
-            <Text color="$colorSubtle" textAlign="center">
-              {detail}
-            </Text>
-          ) : null}
-        </Stack>
-      </Pressable>
-    </Portal>
+        ) : null}
+        <Text variant="heading" textAlign="center">
+          {title}
+        </Text>
+        {amount ? <Amount value={amount} unit={unit} size="md" /> : null}
+        {detail ? (
+          <Text color="$colorSubtle" textAlign="center">
+            {detail}
+          </Text>
+        ) : null}
+      </Stack>
+    </Pressable>
   );
+  return contained ? overlay : <Portal zIndex="$overlay">{overlay}</Portal>;
 }

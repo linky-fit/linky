@@ -11,38 +11,39 @@ import {
   Stack,
   Text,
 } from "@linky-fit/ui";
-import { DemoBody, DemoTabBar, DemoTopBar, RowHighlight } from "./chrome";
+import { mintIcon } from "./chat";
+import { DemoBody, DemoTabBar, DemoTopBar } from "./chrome";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
-import { enter, useCountUp, useCues } from "./playback";
 
 interface Conversation {
   person: Person;
   preview: string;
+  /** The last message is a token of this amount, shown as a pill instead of the preview. */
+  token?: string;
   time: string;
   outgoing?: boolean;
   unread?: boolean;
 }
 
-const pinnedBefore: Conversation = {
-  person: "Eva Stone",
-  preview: "Here’s the playlist for Saturday",
-  time: "06:12 PM",
-  outgoing: true,
+const pinned: Conversation = {
+  person: "Mia Novak",
+  preview: "Deal! See you Tuesday 💛",
+  time: "06:41 PM",
 };
 
-const pinnedAfter: Conversation = {
-  person: "Eva Stone",
-  preview: "Thanks for the playlist 🎶",
+const pinnedPaid: Conversation = {
+  ...pinned,
+  token: "21,000 sat",
   time: "06:42 PM",
   unread: true,
 };
 
 const proxyPayments: Conversation[] = [
   {
-    person: "Mia Novak",
-    preview: "Deal! See you Tuesday 💛",
-    time: "06:41 PM",
+    person: "Eva Stone",
+    preview: "Thanks for the playlist 🎶",
+    time: "06:12 PM",
     unread: true,
   },
 ];
@@ -79,30 +80,39 @@ const conversations: Conversation[] = [
 function Contact({
   person,
   preview,
+  token,
   time,
   outgoing,
   unread,
-  previewClassName = "",
-}: Conversation & { previewClassName?: string }) {
+}: Conversation) {
   return (
     <ContactRow
       name={person}
       avatarUri={avatarUri(person)}
       preview={
-        <Row key={preview} gap="$xs" className={previewClassName}>
+        <Row gap="$xs">
           <Icon
             name={outgoing ? "ArrowUpRight" : "ArrowDownRight"}
             size="sm"
             color="$colorMuted"
           />
-          <Text
-            variant="caption"
-            color="$colorMuted"
-            numberOfLines={1}
-            flexShrink={1}
-          >
-            {preview}
-          </Text>
+          {token ? (
+            <Pill
+              size="sm"
+              tone="accent"
+              label={token}
+              leading={<Avatar name="Mint" uri={mintIcon} size="xs" />}
+            />
+          ) : (
+            <Text
+              variant="caption"
+              color="$colorMuted"
+              numberOfLines={1}
+              flexShrink={1}
+            >
+              {preview}
+            </Text>
+          )}
         </Row>
       }
       time={time}
@@ -120,22 +130,14 @@ const contactList = (list: Conversation[]) => (
   </Stack>
 );
 
-const contactsCues = [1400];
-
-export function ContactsScreen() {
-  const updated = useCues(contactsCues) > 0;
+/** The contacts list; `paid` puts Mia's incoming payment on her pinned row. */
+export function ContactsScreen({ paid = false }: { paid?: boolean }) {
   return (
     <>
       <DemoTopBar title="Contacts" trailing="Filter" />
       <DemoBody position="relative">
         <Stack gap="$xs" paddingTop="$xxxl">
-          <Stack position="relative" className={updated ? "demo-unread" : ""}>
-            {updated ? <RowHighlight className="demo-flash" /> : null}
-            <Contact
-              {...(updated ? pinnedAfter : pinnedBefore)}
-              previewClassName={updated ? "demo-in" : ""}
-            />
-          </Stack>
+          <Contact {...(paid ? pinnedPaid : pinned)} />
           <Section title="Proxy payments">{contactList(proxyPayments)}</Section>
           <Section title="Conversations">{contactList(conversations)}</Section>
         </Stack>
@@ -175,13 +177,7 @@ function WalletAction({
   );
 }
 
-const received = 21_000;
-const balance = 409_996;
-const walletCues = [1000];
-
 export function WalletScreen() {
-  const shown = useCues(walletCues) > 0;
-  const value = useCountUp(balance - received, balance, 1100, 1100);
   return (
     <>
       <DemoTopBar title="Wallet" />
@@ -193,26 +189,7 @@ export function WalletScreen() {
           gap="$xxl"
           paddingBottom="$huge"
         >
-          <Stack alignItems="center" gap="$md">
-            <Amount
-              value={Math.round(value).toLocaleString("en-US")}
-              unit="sat"
-              size="lg"
-            />
-            <Stack className={enter(shown, "demo-pop")}>
-              <Pill
-                tone="accent"
-                label={`+${received.toLocaleString("en-US")} sat`}
-                leading={
-                  <Avatar
-                    name="Mia Novak"
-                    uri={avatarUri("Mia Novak")}
-                    size="xs"
-                  />
-                }
-              />
-            </Stack>
-          </Stack>
+          <Amount value="409,996" unit="sat" size="lg" />
           <Row marginTop="$md">
             <WalletAction icon="ArrowDownRight" label="Receive" />
             <WalletAction icon="ArrowUpRight" label="Send" />
