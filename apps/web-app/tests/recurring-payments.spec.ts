@@ -30,7 +30,7 @@ import { topUp } from "./helpers/wallet";
 test.describe.configure({ mode: "parallel" });
 test.use({ actionTimeout: 20_000 });
 
-test("pay now consumes one period and history links back to the payment", async ({
+test("the countdown's Pay consumes one period and history links back to the payment", async ({
   bootAccount,
 }) => {
   const a = await bootAccount("A");
@@ -43,8 +43,12 @@ test("pay now consumes one period and history links back to the payment", async 
     });
   await expect(detailValue(a.page, "Paid from")).toHaveText(MINT_HOST);
   expect((await readOrder(a.page)).rail).toBe("cashu");
-  await test.step("pay now and receive the sats after mint fees", async () => {
-    await a.page.getByRole("button", { name: "Pay", exact: true }).click();
+  await test.step("show the countdown in the visible app", async () =>
+    waitForCountdown(a.page, await claimOrder(a.page)));
+  await test.step("press Pay and receive the sats after mint fees", async () => {
+    await dueDialog(a.page)
+      .getByRole("button", { name: "Pay", exact: true })
+      .click();
     await expect(
       a.page.getByRole("status").filter({ hasText: /Sent\s*10\s*sat/ }),
     ).toBeVisible({ timeout: 60_000 });
@@ -68,7 +72,7 @@ test("pay now consumes one period and history links back to the payment", async 
   });
 });
 
-for (const action of ["Pay", "countdown expires", "Cancel this payment"]) {
+for (const action of ["countdown expires", "Cancel this payment"]) {
   test(`due countdown: ${action}`, async ({ bootAccount }) => {
     const a = await bootAccount("A");
     const b = await bootAccount("B");
@@ -84,12 +88,10 @@ for (const action of ["Pay", "countdown expires", "Cancel this payment"]) {
       waitForCountdown(a.page, sendAt));
     await test.step(action, async () => {
       const appearedAt = Date.now();
-      if (action !== "countdown expires") {
+      if (action === "Cancel this payment") {
         await dueDialog(a.page)
           .getByRole("button", { name: action, exact: true })
           .click();
-      }
-      if (action === "Cancel this payment") {
         await expect(dueDialog(a.page)).toBeHidden();
         await expect(detailValue(a.page, "Last payment")).toContainText(
           "skipped",
@@ -107,16 +109,14 @@ for (const action of ["Pay", "countdown expires", "Cancel this payment"]) {
         expect(await readBalanceSat(a.page)).toBe(FUNDING_SAT);
         expect(await readBalanceSat(b.page)).toBe(0);
       } else {
-        if (action === "countdown expires") {
-          await expect
-            .poll(async () => (await readOrder(a.page)).runCount, {
-              timeout: 15_000,
-              intervals: [200],
-            })
-            .toBe(1);
-          expect(Date.now() - appearedAt).toBeGreaterThanOrEqual(8_000);
-          expect(Date.now() - appearedAt).toBeLessThan(15_000);
-        }
+        await expect
+          .poll(async () => (await readOrder(a.page)).runCount, {
+            timeout: 15_000,
+            intervals: [200],
+          })
+          .toBe(1);
+        expect(Date.now() - appearedAt).toBeGreaterThanOrEqual(8_000);
+        expect(Date.now() - appearedAt).toBeLessThan(15_000);
         await expectReceived(b.page);
         await expectPaidHistory(a.page, hash);
       }
@@ -250,26 +250,41 @@ test("two devices sync the claim and pay only once in the background", async ({
 test("two devices paying the same run at once pay it only once", async ({
   bootAccount,
 }) => {
-  const a = await bootAccount("A");
+  // One device id makes both devices act on the claim and count down the same run.
+  const deviceId = "shared-device";
+  const a = await bootAccount("A", { deviceId });
   const b = await bootAccount("B");
-  const a2 = await bootAccount("A2", { identity: a.identity });
+  const a2 = await bootAccount("A2", { identity: a.identity, deviceId });
   await test.step("fund and sync both payer devices", async () => {
     await fundAndConnect(a, b);
     await expect
       .poll(() => readBalanceSat(a2.page), { timeout: 60_000 })
       .toBe(FUNDING_SAT);
+    await a2.page.goto("/#wallet/transactions");
     await openForm(a.page);
   });
-  const hash = await saveOrder(
-    a.page,
-    ORDER_SAT,
-    new Date(Date.now() + 3_600_000),
-  );
+  const hash = await saveOrder(a.page);
+  await test.step("both devices count down the same run", async () => {
+    await expect(a2.page.getByTestId("recurring-order-card")).toHaveCount(1);
+    await claimOrder(a.page);
+    await expect
+      .poll(async () => {
+        const [first, second] = await Promise.all([
+          readOrder(a.page),
+          readOrder(a2.page),
+        ]);
+        return first.claimAtSec === second.claimAtSec;
+      })
+      .toBe(true);
+    const sendAt = await claimOrder(a.page);
+    await Promise.all([
+      waitForCountdown(a.page, sendAt),
+      waitForCountdown(a2.page, sendAt),
+    ]);
+  });
   await test.step("both devices press Pay at the same moment", async () => {
-    await a2.page.goto(`/${hash}`);
     const pay = (page: typeof a.page) =>
-      page.getByRole("button", { name: "Pay", exact: true });
-    await expect(pay(a2.page)).toBeEnabled();
+      dueDialog(page).getByRole("button", { name: "Pay", exact: true });
     await Promise.all([pay(a.page).click(), pay(a2.page).click()]);
   });
   await test.step("the contact receives one payment and both devices agree", async () => {
@@ -310,14 +325,13 @@ test("a contact with only a Lightning address is paid by melting the envelope", 
     await addLightningContact(a.page);
     await openForm(a.page);
   });
-  const hash = await saveOrder(
-    a.page,
-    ORDER_SAT,
-    new Date(Date.now() + 3_600_000),
-  );
+  const hash = await saveOrder(a.page);
   expect((await readOrder(a.page)).rail).toBe("lightning");
-  await test.step("pay now pays the contact's invoice once", async () => {
-    await a.page.getByRole("button", { name: "Pay", exact: true }).click();
+  await test.step("the countdown's Pay pays the contact's invoice once", async () => {
+    await waitForCountdown(a.page, await claimOrder(a.page));
+    await dueDialog(a.page)
+      .getByRole("button", { name: "Pay", exact: true })
+      .click();
     await expect(
       a.page
         .getByRole("status")
@@ -353,13 +367,12 @@ test("deleting a Lightning payment returns its undelivered envelope", async ({
     await addLightningContact(a.page);
     await openForm(a.page);
   });
-  const hash = await saveOrder(
-    a.page,
-    ORDER_SAT,
-    new Date(Date.now() + 3_600_000),
-  );
-  await test.step("pay now funds the envelope but cannot get an invoice", async () => {
-    await a.page.getByRole("button", { name: "Pay", exact: true }).click();
+  const hash = await saveOrder(a.page);
+  await test.step("the countdown's Pay funds the envelope but cannot get an invoice", async () => {
+    await waitForCountdown(a.page, await claimOrder(a.page));
+    await dueDialog(a.page)
+      .getByRole("button", { name: "Pay", exact: true })
+      .click();
     await expect(
       a.page.getByText("The recurring payment failed. It will be retried.", {
         exact: true,
@@ -487,12 +500,6 @@ test("editing amount and date clears an in-flight claim", async ({
     await a.page.goto("/#wallet");
     expect(await readBalanceSat(a.page)).toBe(FUNDING_SAT);
   });
-  await test.step("paying the edited order sends the new amount", async () => {
-    await a.page.goto(`/${hash}`);
-    await a.page.getByRole("button", { name: "Pay", exact: true }).click();
-    await expectReceived(b.page, 20);
-    await expectPaidHistory(a.page, hash);
-  });
 });
 
 test("delete requires two taps and removes the scheduled card", async ({
@@ -573,7 +580,7 @@ test("fiat recurring amount converts, shows approximate sats and pays", async ({
     await a.page.getByTitle("Switch unit", { exact: true }).click();
     await expect(a.page.getByTestId("amount-display")).toContainText("CZK");
   });
-  const hash = await saveOrder(a.page, 1, new Date(Date.now() + 3_600_000));
+  const hash = await saveOrder(a.page, 1);
   await test.step("verify the fixed fiat amount and its sat side", async () => {
     expect(await readOrder(a.page)).toMatchObject({
       amount: 100,
@@ -588,8 +595,10 @@ test("fiat recurring amount converts, shows approximate sats and pays", async ({
     await expect(card).toContainText(`~${FIXTURE_AMOUNT_SAT} sat`);
   });
   await test.step("pay the fiat amount at the fixture's 40 sat per CZK rate", async () => {
-    await a.page.getByTestId("recurring-order-card").click();
-    await a.page.getByRole("button", { name: "Pay", exact: true }).click();
+    await waitForCountdown(a.page, await claimOrder(a.page));
+    await dueDialog(a.page)
+      .getByRole("button", { name: "Pay", exact: true })
+      .click();
     await expectReceived(b.page, FIXTURE_AMOUNT_SAT);
     await expectPaidHistory(a.page, hash);
     await a.page.getByRole("button", { name: "Edit", exact: true }).click();

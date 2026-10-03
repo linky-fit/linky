@@ -38,23 +38,15 @@ interface RecurringPaymentPageProps {
 export function RecurringPaymentPage({
   id,
 }: RecurringPaymentPageProps): React.ReactElement | null {
-  const {
-    cashuIsBusy,
-    displayCurrency,
-    fiatRates,
-    formatDisplayedAmountParts,
-    lang,
-    t,
-  } = useAppShellCore();
+  const { displayCurrency, fiatRates, formatDisplayedAmountParts, lang, t } =
+    useAppShellCore();
   const {
     pendingRecurringPaymentDeleteId,
     requestDeleteRecurringPayment,
-    runRecurringPaymentNow,
     setRecurringPaymentPaused,
   } = useRecurringPaymentsContext();
   const orders = useRecurringPaymentOrders();
   const contacts = useRecurringContactSummaries();
-  const [isRunning, setIsRunning] = React.useState(false);
   const order = orders.find((candidate) => candidate.id === id) ?? null;
   const dateFormatter = React.useMemo(
     () =>
@@ -91,15 +83,6 @@ export function RecurringPaymentPage({
     lang,
     t,
   );
-
-  const payNow = async (): Promise<void> => {
-    setIsRunning(true);
-    try {
-      await runRecurringPaymentNow(order);
-    } finally {
-      setIsRunning(false);
-    }
-  };
 
   return (
     <Stack gap="$lg">
@@ -166,16 +149,6 @@ export function RecurringPaymentPage({
       </Stack>
 
       <Stack gap="$sm">
-        {state === "active" ? (
-          <Button
-            icon="Send"
-            loading={isRunning}
-            disabled={cashuIsBusy || isRunning}
-            onPress={() => void payNow()}
-          >
-            {t("recurringRunNow")}
-          </Button>
-        ) : null}
         <Button
           variant="secondary"
           icon={state === "paused" ? "Play" : "Pause"}

@@ -2614,7 +2614,6 @@ export const useCashuWalletComposition = ({
     pushToast,
     repository: recurringPaymentsRepository,
     runNow: recurringScheduler.runNow,
-    runOrderNow: recurringScheduler.runOrderNow,
     t,
   });
   const recurringPaymentsContext = React.useMemo(

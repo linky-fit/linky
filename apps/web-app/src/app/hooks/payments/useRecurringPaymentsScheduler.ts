@@ -71,12 +71,7 @@ export const RECURRING_TICK_INTERVAL_MS = 15_000;
 /** Tabs share the device id, so each would act on the same claim. */
 const RECURRING_TAB_LOCK = "linky.recurringPayments";
 
-export type RecurringRunOutcome =
-  | "paid"
-  | "failed"
-  | "waiting"
-  | "busy"
-  | "missing";
+type RecurringRunOutcome = "paid" | "failed" | "waiting" | "busy" | "missing";
 
 /** A due payment waiting for the in-app countdown to end (or the user to decide). */
 export interface RecurringDueConfirmation {
@@ -94,11 +89,6 @@ export interface RecurringPaymentsScheduler {
   runNow: () => Promise<void>;
   /** Checks every order's current envelope again, as after a wallet restore. */
   recoverEnvelopes: () => Promise<void>;
-  /**
-   * Pay one payment right away, skipping its notice window and paying its
-   * pending period. `busy` means another tab or device is working on it.
-   */
-  runOrderNow: (orderId: RecurringPaymentId) => Promise<RecurringRunOutcome>;
   dueConfirmation: RecurringDueConfirmation | null;
   /** Pay the confirmed-due payment now instead of waiting the countdown out. */
   confirmDueNow: () => Promise<void>;
@@ -243,23 +233,15 @@ const isCheckDue = (
 const isPaymentOut = (status: EnvelopeStatus): boolean =>
   status === "spent" || status === "pending";
 
-/** Picks the run an on-demand payment pays, from the order as it is stored now. */
-type PickRun = (order: RecurringPaymentOrder) => RecurringRun;
-
-const nextRun: PickRun = (order) => ({
-  order,
-  runIndex: order.schedule.runCount,
-  dueAtSec: order.schedule.nextDueAtSec,
-});
-
 /** The countdown's own run, never the latest count: if another tab paid it, its spent envelope settles it. */
-const plannedRun =
-  (pending: RecurringDueConfirmation): PickRun =>
-  (order) => ({
-    order,
-    runIndex: pending.runIndex,
-    dueAtSec: pending.dueAtSec,
-  });
+const plannedRun = (
+  pending: RecurringDueConfirmation,
+  order: RecurringPaymentOrder,
+): RecurringRun => ({
+  order,
+  runIndex: pending.runIndex,
+  dueAtSec: pending.dueAtSec,
+});
 
 const onDemand = (
   run: RecurringRun,
@@ -676,7 +658,7 @@ export const useRecurringPaymentsScheduler = ({
     [],
   );
 
-  /** The one path every payment takes: scheduler, countdown and "Pay now". */
+  /** The one path every payment takes: scheduler, countdown and envelope recovery. */
   const executeRun = React.useCallback(
     async (action: RecurringRunAction): Promise<RecurringRunOutcome> => {
       const { envelopes, logPaymentEvent, sendTokenMessage } = latest.current;
@@ -697,24 +679,21 @@ export const useRecurringPaymentsScheduler = ({
   );
 
   /**
-   * Pays the run `pickRun` picks, outside the planner. A run whose envelope
-   * is known funded pays its amount; any other needs the order's amount in sats.
+   * Pays the countdown's run outside the planner. A run whose envelope is
+   * known funded pays its amount; any other needs the order's amount in sats.
    */
-  const runOrder = React.useCallback(
-    async (
-      orderId: RecurringPaymentId,
-      pickRun: PickRun,
-    ): Promise<RecurringRunOutcome> => {
+  const runConfirmed = React.useCallback(
+    async (pending: RecurringDueConfirmation): Promise<RecurringRunOutcome> => {
       if (tickInFlightRef.current) await tickInFlightRef.current;
       setDueConfirmation((current) =>
-        current?.orderId === orderId ? null : current,
+        current?.orderId === pending.orderId ? null : current,
       );
       const pass = inTabLock(async (): Promise<RecurringRunOutcome> => {
         const order = (await loadOrders()).find(
-          (candidate) => candidate.id === orderId,
+          (candidate) => candidate.id === pending.orderId,
         );
         if (!order) return "missing";
-        const run = pickRun(order);
+        const run = plannedRun(pending, order);
         const amountSat =
           fundedEnvelopeSatRef.current.get(runKey(run)) ??
           recurringAmountSat(order.amount, latest.current.fiatRates);
@@ -733,11 +712,6 @@ export const useRecurringPaymentsScheduler = ({
       return pass;
     },
     [deviceId, executeRun, latest, loadOrders, nowSec, patchOrder],
-  );
-
-  const runOrderNow = React.useCallback(
-    (orderId: RecurringPaymentId) => runOrder(orderId, nextRun),
-    [runOrder],
   );
 
   const notifyOnce = React.useCallback(
@@ -998,11 +972,11 @@ export const useRecurringPaymentsScheduler = ({
     const pending = dueConfirmationRef.current;
     if (pending === null) return;
     setDueConfirmation(null);
-    const outcome = await runOrder(pending.orderId, plannedRun(pending));
+    const outcome = await runConfirmed(pending);
     if (outcome === "busy") {
       latest.current.pushToast(latest.current.t("recurringWalletBusy"));
     }
-  }, [dueConfirmationRef, latest, runOrder]);
+  }, [dueConfirmationRef, latest, runConfirmed]);
 
   /** Whether the countdown's run already went out (or is going out) from its envelope. */
   const isRunOut = React.useCallback(
@@ -1027,7 +1001,7 @@ export const useRecurringPaymentsScheduler = ({
       if (order.schedule.runCount !== pending.runIndex) return "tooLate";
       if (await isRunOut({ order, runIndex: pending.runIndex })) {
         await executeRun(
-          onDemand(plannedRun(pending)(order), pending.amountSat),
+          onDemand(plannedRun(pending, order), pending.amountSat),
         );
         return "tooLate";
       }
@@ -1081,7 +1055,6 @@ export const useRecurringPaymentsScheduler = ({
   return {
     runNow: tick,
     recoverEnvelopes,
-    runOrderNow,
     dueConfirmation,
     confirmDueNow,
     cancelDue,
