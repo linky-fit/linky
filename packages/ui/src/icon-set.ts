@@ -68,6 +68,7 @@ import {
   Pause,
   Pencil,
   PencilLine,
+  PhoneOff,
   Pipette,
   Play,
   Plus,
@@ -122,6 +123,21 @@ const Request = createLucideIcon("Request", [
   ["path", { d: "m4.8 15.8 4.4 4.4M19.2 15.8l-4.4 4.4", key: "cuffs" }],
 ]);
 
+// Lucide's Mail and IdCard crossed out like its PhoneOff; Lucide ships neither.
+const MailOff = createLucideIcon("MailOff", [
+  ["path", { d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", key: "flap" }],
+  ["rect", { x: "2", y: "4", width: "20", height: "16", rx: "2", key: "body" }],
+  ["path", { d: "M22 2 2 22", key: "slash" }],
+]);
+
+const IdCardOff = createLucideIcon("IdCardOff", [
+  ["path", { d: "M16 10h2M16 14h2", key: "lines" }],
+  ["path", { d: "M6.17 15a3 3 0 0 1 5.66 0", key: "shoulders" }],
+  ["circle", { cx: "9", cy: "11", r: "2", key: "head" }],
+  ["rect", { x: "2", y: "5", width: "20", height: "14", rx: "2", key: "card" }],
+  ["path", { d: "M22 2 2 22", key: "slash" }],
+]);
+
 export const icons = {
   Archive,
   ArchiveRestore,
@@ -169,6 +185,7 @@ export const icons = {
   Glasses,
   HandCoins,
   HeartHandshake,
+  IdCardOff,
   ImagePlus,
   Images,
   ImageUp,
@@ -180,6 +197,7 @@ export const icons = {
   Lock,
   LockOpen,
   LogOut,
+  MailOff,
   Maximize,
   Minimize,
   MessageCircle,
@@ -191,6 +209,7 @@ export const icons = {
   Pause,
   Pencil,
   PencilLine,
+  PhoneOff,
   Pipette,
   Play,
   Plus,

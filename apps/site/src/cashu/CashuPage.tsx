@@ -2,8 +2,91 @@ import {
   GENERIC_MINT_ICON_DATA_URL,
   isLightningAddress,
 } from "@linky-fit/linkshu";
+import {
+  Amount,
+  Avatar,
+  Button,
+  Card,
+  Divider,
+  Form,
+  Icon,
+  LoadingState,
+  Notice,
+  opacity,
+  Pill,
+  Pressable,
+  QRCode,
+  Row,
+  Stack,
+  SubmitButton,
+  Text,
+  TextField,
+  useMedia,
+  type IconName,
+} from "@linky-fit/ui";
+import type { ReactNode } from "react";
 import { SiteLayout } from "../SiteLayout";
 import { useCashuPage } from "./useCashuPage";
+
+function PageColumn({ children }: { children: ReactNode }) {
+  return (
+    <Stack
+      width="100%"
+      maxWidth="$contentWidth"
+      alignSelf="center"
+      gap="$xxl"
+      paddingVertical="$xxl"
+    >
+      {children}
+    </Stack>
+  );
+}
+
+function PageCard({
+  children,
+  testID,
+}: {
+  children: ReactNode;
+  testID?: string;
+}) {
+  return (
+    <Card
+      outlined
+      testID={testID}
+      gap="$lg"
+      padding="$xxl"
+      $compact={{ padding: "$lg" }}
+    >
+      {children}
+    </Card>
+  );
+}
+
+function OptionColumn({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: IconName;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <Stack gap="$md" $wide={{ flex: 1 }}>
+      <Row gap="$sm">
+        <Icon name={icon} color="$colorMuted" />
+        <Text variant="title" color="$colorStrong">
+          {title}
+        </Text>
+      </Row>
+      <Text color="$colorMuted">{description}</Text>
+      {children}
+    </Stack>
+  );
+}
+
 function CashuPage() {
   const {
     locale,
@@ -23,243 +106,229 @@ function CashuPage() {
     setIsAdditionalOptionsVisible,
     mintIconSrc,
     setMintIconSrc,
-    tokenQr,
+    tokenFitsQr,
     activeCopy,
     tokenErrorMessage,
-    displayedTokenAmountText,
+    displayedTokenAmount,
     cycleDisplayCurrency,
     handleInspectSubmit,
     handleRedeemSubmit,
     handleCopyToken,
     handleOpenInWallet,
   } = useCashuPage();
+  const { wide } = useMedia();
+
+  const successView = redeemSuccess ? (
+    <PageCard testID="cashu-success">
+      <Stack alignItems="center" gap="$md">
+        <Stack
+          width="$controlLg"
+          height="$controlLg"
+          borderRadius="$pill"
+          backgroundColor="$accentSoft"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Icon name="Check" size="lg" color="$accentText" />
+        </Stack>
+        <Text
+          variant="heading"
+          color="$colorStrong"
+          role="heading"
+          aria-level={1}
+        >
+          {activeCopy.redeemConfirmed}
+        </Text>
+        <Text color="$colorMuted" textAlign="center">
+          {activeCopy.redeemSuccessAddress.replace(
+            "{address}",
+            redeemSuccess.lightningAddress,
+          )}
+        </Text>
+      </Stack>
+    </PageCard>
+  ) : null;
+
+  const entryView = (
+    <>
+      <Stack gap="$sm">
+        <Text eyebrow>Cashu</Text>
+        <Text
+          variant={wide ? "display" : "heading"}
+          color="$colorStrong"
+          role="heading"
+          aria-level={1}
+        >
+          {activeCopy.pageTitle}
+        </Text>
+        <Text color="$colorMuted">{activeCopy.subtitle}</Text>
+      </Stack>
+      <PageCard>
+        <Form onSubmit={handleInspectSubmit} gap="$lg">
+          <TextField
+            id="cashu-token-input"
+            label={activeCopy.tokenLabel}
+            multiline
+            minHeight="$column"
+            value={tokenInput}
+            onChangeText={setTokenInput}
+            placeholder="cashuA..."
+            spellCheck={false}
+            error={tokenErrorMessage ?? undefined}
+          />
+          <SubmitButton
+            alignSelf="flex-start"
+            $compact={{ alignSelf: "stretch" }}
+          >
+            {activeCopy.showTokenButton}
+          </SubmitButton>
+        </Form>
+      </PageCard>
+    </>
+  );
+
+  const tokenDetails = isInspecting ? (
+    <LoadingState label={activeCopy.loadingToken} />
+  ) : tokenState && !tokenState.isValid ? (
+    <Row gap="$sm" flexWrap="wrap">
+      <Pill label={activeCopy.statusSpent} tone="danger" />
+      <Text color="$colorMuted">{activeCopy.spentInfo}</Text>
+    </Row>
+  ) : tokenState ? (
+    <>
+      <Text color="$colorMuted">{activeCopy.payoutIntro}</Text>
+      <Button
+        variant="accent"
+        size="sm"
+        alignSelf="flex-start"
+        aria-expanded={isAdditionalOptionsVisible}
+        onPress={() => setIsAdditionalOptionsVisible((visible) => !visible)}
+      >
+        {isAdditionalOptionsVisible
+          ? activeCopy.collapseOptionsLabel
+          : activeCopy.expandOptionsLabel}
+      </Button>
+      {isAdditionalOptionsVisible ? (
+        <>
+          <Divider />
+          <Stack gap="$xxl" $wide={{ flexDirection: "row" }}>
+            <OptionColumn
+              icon="Zap"
+              title={activeCopy.lightningAddressLabel}
+              description={activeCopy.lightningOptionDescription}
+            >
+              <Form onSubmit={() => void handleRedeemSubmit()}>
+                <TextField
+                  id="cashu-ln-address"
+                  label={activeCopy.lightningAddressLabel}
+                  hideLabel
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={lightningAddress}
+                  onChangeText={(value) => {
+                    setLightningAddress(value);
+                    if (redeemError) setRedeemError(null);
+                  }}
+                  placeholder={activeCopy.lightningAddressPlaceholder}
+                />
+                <SubmitButton
+                  variant="secondary"
+                  loading={isRedeeming}
+                  disabled={!isLightningAddress(lightningAddress.trim())}
+                >
+                  {isRedeeming ? activeCopy.redeeming : activeCopy.redeemButton}
+                </SubmitButton>
+                {redeemError ? (
+                  <Notice tone="danger" title={redeemError} />
+                ) : null}
+              </Form>
+            </OptionColumn>
+            <Divider $wide={{ display: "none" }} />
+            <OptionColumn
+              icon="Bean"
+              title={activeCopy.cashuLabel}
+              description={activeCopy.cashuOptionDescription}
+            >
+              {tokenFitsQr ? (
+                <QRCode
+                  value={activeToken}
+                  accessibilityLabel={activeCopy.cashuLabel}
+                  tooltip={activeCopy.cashuLabel}
+                  onPress={() => void handleCopyToken()}
+                />
+              ) : null}
+            </OptionColumn>
+          </Stack>
+        </>
+      ) : null}
+    </>
+  ) : tokenErrorMessage ? (
+    <Notice tone="danger" title={tokenErrorMessage} />
+  ) : (
+    <Text color="$colorMuted">{activeCopy.noTokenLoaded}</Text>
+  );
+
+  const tokenView = (
+    <PageCard>
+      <Text eyebrow>Cashu</Text>
+      <Row
+        justifyContent="space-between"
+        gap="$lg"
+        $compact={{ flexDirection: "column", alignItems: "stretch" }}
+      >
+        <Row gap="$md">
+          {tokenState ? (
+            <Avatar
+              name={tokenState.mintHost}
+              uri={mintIconSrc}
+              onError={() => setMintIconSrc(GENERIC_MINT_ICON_DATA_URL)}
+            />
+          ) : null}
+          <Stack gap="$xxs">
+            <Pressable
+              testID="cashu-token-amount"
+              aria-label={activeCopy.currencyLabel}
+              tooltip={activeCopy.currencyLabel}
+              onPress={cycleDisplayCurrency}
+              gap="$sm"
+              alignSelf="flex-start"
+              opacity={tokenState && !tokenState.isValid ? opacity.dimmed : 1}
+            >
+              <Amount
+                value={displayedTokenAmount.value}
+                unit={displayedTokenAmount.unit}
+              />
+              <Icon name="Repeat" size="sm" color="$colorMuted" />
+            </Pressable>
+            {tokenState?.mintHost ? (
+              <Text variant="label" color="$colorMuted">
+                {tokenState.mintHost}
+              </Text>
+            ) : null}
+          </Stack>
+        </Row>
+        {tokenState?.isValid && !isInspecting ? (
+          <Button
+            icon="Send"
+            tooltip={activeCopy.openInWalletLabel}
+            onPress={handleOpenInWallet}
+          >
+            {activeCopy.linkyPrimaryAction}
+          </Button>
+        ) : null}
+      </Row>
+      {tokenDetails}
+    </PageCard>
+  );
 
   return (
     <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
-      {redeemSuccess ? (
-        <section className="cashu-token-view">
-          <div className="cashu-panel cashu-panel-highlight cashu-success-panel">
-            <div className="cashu-success-check" aria-hidden="true">
-              ✓
-            </div>
-            <p className="cashu-success-title">{activeCopy.redeemConfirmed}</p>
-            <p className="cashu-success-address">
-              {activeCopy.redeemSuccessAddress.replace(
-                "{address}",
-                redeemSuccess.lightningAddress,
-              )}
-            </p>
-          </div>
-        </section>
-      ) : !activeToken ? (
-        <section className="cashu-entry">
-          <div className="cashu-panel">
-            <p className="cashu-page-kicker">Cashu</p>
-            <h1>{activeCopy.pageTitle}</h1>
-            <p className="lede">{activeCopy.subtitle}</p>
-
-            <form className="cashu-form" onSubmit={handleInspectSubmit}>
-              <label className="cashu-label" htmlFor="cashu-token-input">
-                {activeCopy.tokenLabel}
-              </label>
-              <textarea
-                id="cashu-token-input"
-                className="cashu-textarea"
-                value={tokenInput}
-                onChange={(event) => setTokenInput(event.target.value)}
-                placeholder="cashuA..."
-                rows={5}
-                spellCheck={false}
-              />
-              <div className="cashu-actions">
-                <button className="primary-cta is-single" type="submit">
-                  {activeCopy.showTokenButton}
-                </button>
-              </div>
-            </form>
-
-            {tokenErrorMessage ? (
-              <p className="cashu-status cashu-status-error">
-                {tokenErrorMessage}
-              </p>
-            ) : null}
-          </div>
-        </section>
-      ) : (
-        <section className="cashu-token-view">
-          <div className="cashu-panel cashu-panel-highlight">
-            <p className="cashu-page-kicker">Cashu</p>
-            <div className="cashu-token-header">
-              <div className="cashu-mint-chip">
-                {tokenState?.iconUrl ? (
-                  <img
-                    className="cashu-mint-icon"
-                    src={mintIconSrc}
-                    alt=""
-                    onError={() => {
-                      setMintIconSrc(GENERIC_MINT_ICON_DATA_URL);
-                    }}
-                  />
-                ) : null}
-                <div className="cashu-token-copy">
-                  <h1>
-                    <button
-                      type="button"
-                      className={
-                        tokenState?.isValid
-                          ? "cashu-token-amount"
-                          : "cashu-token-amount is-spent"
-                      }
-                      aria-label={activeCopy.currencyLabel}
-                      title={activeCopy.currencyLabel}
-                      onClick={cycleDisplayCurrency}
-                    >
-                      {displayedTokenAmountText}
-                    </button>
-                  </h1>
-                  {tokenState?.mintHost ? (
-                    <p className="cashu-mint-subtle">{tokenState.mintHost}</p>
-                  ) : null}
-                </div>
-              </div>
-
-              {tokenState?.isValid && !isInspecting ? (
-                <button
-                  type="button"
-                  className="primary-cta is-single cashu-header-cta"
-                  aria-label={activeCopy.openInWalletLabel}
-                  title={activeCopy.openInWalletLabel}
-                  onClick={handleOpenInWallet}
-                >
-                  {activeCopy.linkyPrimaryAction}
-                </button>
-              ) : null}
-            </div>
-
-            {isInspecting ? (
-              <p className="cashu-status">{activeCopy.loadingToken}</p>
-            ) : tokenState ? (
-              <>
-                {!tokenState.isValid ? (
-                  <>
-                    <p className="cashu-spent-badge">
-                      {activeCopy.statusSpent}
-                    </p>
-                    <p className="cashu-status">{activeCopy.spentInfo}</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="cashu-status">{activeCopy.payoutIntro}</p>
-
-                    <div className="cashu-primary-actions">
-                      <button
-                        type="button"
-                        className="cashu-text-button"
-                        onClick={() => {
-                          setIsAdditionalOptionsVisible((prev) => !prev);
-                        }}
-                        aria-expanded={isAdditionalOptionsVisible}
-                      >
-                        {isAdditionalOptionsVisible
-                          ? activeCopy.collapseOptionsLabel
-                          : activeCopy.expandOptionsLabel}
-                      </button>
-                    </div>
-
-                    {isAdditionalOptionsVisible ? (
-                      <div className="cashu-additional-options">
-                        <div className="cashu-option-column">
-                          <p className="cashu-label cashu-option-title">
-                            {activeCopy.lightningAddressLabel}
-                          </p>
-                          <p className="cashu-option-description">
-                            {activeCopy.lightningOptionDescription}
-                          </p>
-                          <form
-                            className="cashu-form cashu-redeem-form"
-                            onSubmit={handleRedeemSubmit}
-                          >
-                            <input
-                              id="cashu-ln-address"
-                              className="cashu-input"
-                              type="text"
-                              inputMode="email"
-                              autoCapitalize="none"
-                              autoCorrect="off"
-                              value={lightningAddress}
-                              onChange={(event) => {
-                                setLightningAddress(event.target.value);
-                                if (redeemError) {
-                                  setRedeemError(null);
-                                }
-                              }}
-                              placeholder={
-                                activeCopy.lightningAddressPlaceholder
-                              }
-                              aria-label={activeCopy.lightningAddressLabel}
-                            />
-                            <button
-                              className="secondary-cta"
-                              type="submit"
-                              disabled={
-                                !tokenState.isValid ||
-                                isRedeeming ||
-                                !isLightningAddress(lightningAddress.trim())
-                              }
-                            >
-                              {isRedeeming
-                                ? activeCopy.redeeming
-                                : activeCopy.redeemButton}
-                            </button>
-                            {redeemError ? (
-                              <p className="cashu-status cashu-status-error">
-                                {redeemError}
-                              </p>
-                            ) : null}
-                          </form>
-                        </div>
-
-                        <div className="cashu-option-column cashu-option-column-qr">
-                          <p className="cashu-label cashu-option-title">
-                            {activeCopy.cashuLabel}
-                          </p>
-                          <p className="cashu-option-description">
-                            {activeCopy.cashuOptionDescription}
-                          </p>
-                          {tokenQr ? (
-                            <button
-                              type="button"
-                              className="cashu-qr-button"
-                              onClick={() => {
-                                void handleCopyToken();
-                              }}
-                              aria-label={activeCopy.cashuLabel}
-                              title={activeCopy.cashuLabel}
-                            >
-                              <img
-                                className="cashu-token-qr"
-                                src={tokenQr}
-                                alt="Cashu token QR"
-                              />
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ) : null}
-                  </>
-                )}
-              </>
-            ) : tokenErrorMessage ? (
-              <p className="cashu-status cashu-status-error">
-                {tokenErrorMessage}
-              </p>
-            ) : (
-              <p className="cashu-status">{activeCopy.noTokenLoaded}</p>
-            )}
-          </div>
-        </section>
-      )}
+      <PageColumn>
+        {successView ?? (activeToken ? tokenView : entryView)}
+      </PageColumn>
     </SiteLayout>
   );
 }
+
 export default CashuPage;

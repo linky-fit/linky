@@ -108,12 +108,17 @@ function PrivacyPage() {
         width="100%"
         maxWidth="$contentWidth"
         alignSelf="center"
-        gap="$lg"
+        gap="$xxl"
         paddingVertical="$xxl"
       >
         <Stack gap="$sm">
           <Text eyebrow>{activeCopy.eyebrow}</Text>
-          <Text variant="display" role="heading" aria-level={1}>
+          <Text
+            variant="display"
+            color="$colorStrong"
+            role="heading"
+            aria-level={1}
+          >
             {activeCopy.title}
           </Text>
         </Stack>
@@ -122,8 +127,13 @@ function PrivacyPage() {
             {paragraph}
           </Text>
         ))}
-        <Stack id="how-to-delete-your-data" gap="$lg" paddingTop="$lg">
-          <Text variant="heading" role="heading" aria-level={2}>
+        <Stack id="how-to-delete-your-data" gap="$xxl" paddingTop="$lg">
+          <Text
+            variant="heading"
+            color="$colorStrong"
+            role="heading"
+            aria-level={2}
+          >
             {activeCopy.deleteTitle}
           </Text>
           {activeCopy.deleteParagraphs.map((paragraph) => (
