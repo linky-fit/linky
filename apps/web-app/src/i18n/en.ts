@@ -114,7 +114,7 @@ export const en = {
   recurringRunNow: "Pay",
   recurringNotFound: "Recurring payment not found.",
   recurringOnlyWhileOpen:
-    "Any of your devices running Linky sends the payment, also in the background. You are notified a minute ahead; with the app open you see a countdown and can pay right away or cancel.",
+    "Any of your devices running Linky sends the payment, also in the background. If none has sent it a minute after it is due, you get a reminder to open Linky; with the app open you see a countdown and can pay right away or cancel.",
   recurringRepeatAction: "Repeat regularly",
   showTransactions: "Show transactions",
   feedback: "Feedback",
