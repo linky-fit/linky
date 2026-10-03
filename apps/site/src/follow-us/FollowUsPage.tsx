@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { copyTextToClipboard } from "../clipboard";
-import { SiteFooter } from "../SiteFooter";
-import { SiteHeaderMenu, type SiteHeaderMenuCopy } from "../SiteHeaderMenu";
+import { SiteLayout, type SiteLayoutCopy } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
 import { useSiteLocale } from "../useSiteLocale";
 
@@ -9,14 +8,12 @@ const nostrNpub =
   "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
 const nostrUri = `nostr:${nostrNpub}`;
 
-interface FollowUsCopy extends SiteHeaderMenuCopy {
+interface FollowUsCopy extends SiteLayoutCopy {
   eyebrow: string;
   title: string;
   starLabel: string;
   copyLabel: string;
   copiedLabel: string;
-  followUsLabel: string;
-  privacyLabel: string;
 }
 
 const copy: Record<SiteLocale, FollowUsCopy> = {
@@ -128,24 +125,7 @@ function FollowUsPage() {
   }, [activeCopy.title]);
 
   return (
-    <main className="follow-shell">
-      <div className="site-backdrop" aria-hidden="true" />
-
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Linky home">
-          <span className="brand-mark">
-            <img className="brand-logo" src="/icon.svg" alt="Linky" />
-          </span>
-          <span className="brand-word">Linky</span>
-        </a>
-
-        <SiteHeaderMenu
-          copy={activeCopy}
-          locale={locale}
-          onLocaleChange={setLocale}
-        />
-      </header>
-
+    <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
       <section className="follow-section">
         <p className="eyebrow">{activeCopy.eyebrow}</p>
         <h1>{activeCopy.title}</h1>
@@ -178,12 +158,7 @@ function FollowUsPage() {
           />
         </div>
       </section>
-
-      <SiteFooter
-        followUsLabel={activeCopy.followUsLabel}
-        privacyLabel={activeCopy.privacyLabel}
-      />
-    </main>
+    </SiteLayout>
   );
 }
 

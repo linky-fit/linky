@@ -21,9 +21,13 @@
     "qrcode": "^1.5.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-native": "0.86.3",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "0.21.3",
     "undici": "^7.22.0",
     "@linky-fit/linkshu": "workspace:*",
     "@linky-fit/linkstr": "workspace:*",
+    "@linky-fit/ui": "workspace:*",
     "effect": "^3.19.19",
     "@noble/hashes": "^2.0.1"
   },

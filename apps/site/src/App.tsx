@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SiteFooter } from "./SiteFooter";
-import { SiteHeaderMenu } from "./SiteHeaderMenu";
+import { SiteLayout } from "./SiteLayout";
 import type { SiteLocale } from "./sitePreferences";
 import { useSiteLocale } from "./useSiteLocale";
 
@@ -296,20 +295,7 @@ function AppCta({
 function App() {
   const [locale, setLocale] = useSiteLocale();
   const [ctaMode, setCtaMode] = useState<CtaMode>(getDefaultCtaMode);
-  const [brandIsCompact, setBrandIsCompact] = useState(false);
   const activeCopy = useMemo(() => copy[locale], [locale]);
-
-  useEffect(() => {
-    const updateBrand = () => {
-      setBrandIsCompact(window.scrollY > 72);
-    };
-
-    updateBrand();
-    window.addEventListener("scroll", updateBrand, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", updateBrand);
-    };
-  }, []);
 
   const handlePrimaryAction = () => {
     if (ctaMode === "google-play" && /android/i.test(navigator.userAgent)) {
@@ -323,32 +309,7 @@ function App() {
   };
 
   return (
-    <main className="site-shell">
-      <div className="site-backdrop" aria-hidden="true" />
-
-      <header className="topbar">
-        <a
-          className={
-            brandIsCompact
-              ? "brand brand-floating is-compact"
-              : "brand brand-floating"
-          }
-          href="/"
-          aria-label="Linky home"
-        >
-          <span className="brand-mark">
-            <img className="brand-logo" src="/icon.svg" alt="Linky" />
-          </span>
-          <span className="brand-word">Linky</span>
-        </a>
-
-        <SiteHeaderMenu
-          copy={activeCopy}
-          locale={locale}
-          onLocaleChange={setLocale}
-        />
-      </header>
-
+    <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
       <section className="hero">
         <div className="hero-copy">
           <div className="hero-intro">
@@ -400,11 +361,6 @@ function App() {
             />
           </div>
         </div>
-
-        <SiteFooter
-          followUsLabel={activeCopy.followUsLabel}
-          privacyLabel={activeCopy.privacyLabel}
-        />
       </section>
 
       <div className="floating-cta">
@@ -421,7 +377,7 @@ function App() {
           onSelectMode={setCtaMode}
         />
       </div>
-    </main>
+    </SiteLayout>
   );
 }
 

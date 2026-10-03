@@ -1,4 +1,4 @@
-@import "./assets/manrope/manrope.css";
+@import "@linky-fit/ui/manrope.css";
 
 :root {
   /* Painted before the JS bundle loads, so these repeat themes.dark and themes.light of @linky-fit/ui. */

@@ -53,7 +53,7 @@ import { linkyUi } from "@linky-fit/ui/vite";
 export default defineConfig({ plugins: [linkyUi(), react()] });
 ```
 
-On the web, register `Manrope` with `@font-face` for weights 400, 600 and 700; the font stack falls back to `system-ui`.
+On the web, import `@linky-fit/ui/manrope.css` once (from CSS or JS); it registers self-hosted `Manrope` for weights 400, 600 and 700, and the font stack falls back to `system-ui`. Publish `fonts/manrope/OFL.txt` with the app, e.g. at `public/licenses/Manrope-OFL.txt`.
 
 ## Tokens and themes
 
