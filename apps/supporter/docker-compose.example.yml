@@ -1,0 +1,26 @@
+services:
+  supporter:
+    image: ghcr.io/your-org/linky-supporter:latest
+    container_name: linky-supporter
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8788:8788"
+    env_file:
+      - ./.env.production
+    environment:
+      SUPPORTER_PORT: "8788"
+      SUPPORTER_STORAGE_PATH: /data/linky-supporter.sqlite
+    volumes:
+      - linky_supporter_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:8788/health >/dev/null || exit 1",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  linky_supporter_data:

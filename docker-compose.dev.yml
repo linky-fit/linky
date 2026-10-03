@@ -111,6 +111,46 @@ services:
       <<: *cashu-mint-environment
       MINT_PRIVATE_KEY: LOCAL_DEV_ONLY_TARGET_MINT_KEY
 
+  # Linky Bot (apps/supporter) with the committed dev seed, accepting the dev
+  # mint and testnut. Tokens name the mint as the browser sees it
+  # (http://localhost:<mint port>) and relay lists must name loopback relays,
+  # so inside the container those localhost ports forward to the relay and the
+  # mint: the service uses exactly the URLs the browser uses. To work on the
+  # service itself, stop this container and run
+  # `bun run --filter @linky-fit/supporter-service dev`.
+  supporter:
+    # scripts/e2e.sh tags it per checkout so worktrees never run each other's build.
+    image: ${LINKY_E2E_SUPPORTER_IMAGE:-linky-supporter}
+    build:
+      context: .
+      dockerfile: apps/supporter/Dockerfile
+      target: dev
+    # Rebuild on every `up`; layer caching keeps it a no-op until code changes.
+    pull_policy: build
+    env_file: apps/supporter/.env.development
+    environment:
+      SUPPORTER_STORAGE_PATH: /data/linky-supporter.sqlite
+      SUPPORTER_RELAYS: ws://localhost:${LINKY_E2E_NOSTR_PORT:-7777}
+      SUPPORTER_ACCEPTED_MINTS: http://localhost:${LINKY_E2E_MINT_PORT:-3338},https://testnut.cashu.space
+      SUPPORTER_FORWARD_PORTS: ${LINKY_E2E_NOSTR_PORT:-7777}=nostr-relay:8080 ${LINKY_E2E_MINT_PORT:-3338}=cashu-mint:3338
+    volumes:
+      - supporter-data:/data
+    depends_on:
+      nostr-relay:
+        condition: service_healthy
+      cashu-mint:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:8788/health >/dev/null || exit 1",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 3s
+
   # Production build of the web app for the `local-stack` Playwright project;
   # not used by `bun run dev`. Endpoints are build args because Vite inlines
   # import.meta.env; the browser runs on the host, so these are host-published
@@ -131,6 +171,9 @@ services:
         VITE_PUSH_SERVER_URL: http://localhost:8787
         # Installs window.__linkyE2E, the seed/read hooks the Playwright suites use.
         VITE_E2E: "1"
+        # The dev Linky Bot run by the `supporter` service (apps/supporter/.env.development).
+        VITE_LINKY_BOT_NPUB: npub1yagmakxydfdeqpfeun3qryk8r38mrwp6apuyaf3j3qdupc5vkjhsjg0qg2
+        VITE_SUPPORTER_ACCEPTED_MINTS: http://localhost:${LINKY_E2E_MINT_PORT:-3338},https://testnut.cashu.space
     ports:
       - "${LINKY_E2E_WEB_PORT:-5176}:80"
     healthcheck:
@@ -146,3 +189,4 @@ volumes:
   evolu-relay-quota-data:
   cashu-mint-data:
   cashu-mint-target-data:
+  supporter-data:

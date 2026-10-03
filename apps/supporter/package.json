@@ -1,24 +1,24 @@
 {
-  "name": "@linky-fit/linkshu-cli",
+  "name": "@linky-fit/supporter-service",
   "private": true,
   "version": "0.1.0",
   "license": "0BSD",
   "type": "module",
-  "bin": {
-    "linkshu": "./src/index.ts"
-  },
-  "exports": {
-    "./commands": "./src/commands.ts"
-  },
   "scripts": {
+    "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "eslint": "eslint --fix .",
     "prettier": "prettier --write .",
     "test": "bun test",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@linky-fit/identity": "workspace:*",
     "@linky-fit/linkshu": "workspace:*",
+    "@linky-fit/linkshu-cli": "workspace:*",
+    "@linky-fit/linkstr": "workspace:*",
+    "@linky-fit/supporter": "workspace:*",
     "effect": "^3.19.19"
   },
   "devDependencies": {

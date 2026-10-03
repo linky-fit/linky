@@ -13,16 +13,17 @@ const workspaces = readJson("package.json").workspaces.flatMap((pattern) => {
     .filter((workspace) => existsSync(join(root, workspace, "package.json")));
 });
 
-test.each(["docker/web-app/Dockerfile", "apps/push/Dockerfile"])(
-  "%s copies every workspace manifest before bun install",
-  (dockerfile) => {
-    const missing = workspaces.filter(
-      (workspace) =>
-        !read(dockerfile).includes(`COPY ${workspace}/package.json `),
-    );
-    expect(missing).toEqual([]);
-  },
-);
+test.each([
+  "docker/web-app/Dockerfile",
+  "apps/push/Dockerfile",
+  "apps/supporter/Dockerfile",
+])("%s copies every workspace manifest before bun install", (dockerfile) => {
+  const missing = workspaces.filter(
+    (workspace) =>
+      !read(dockerfile).includes(`COPY ${workspace}/package.json `),
+  );
+  expect(missing).toEqual([]);
+});
 
 test("the evolu relay pins the web app's @evolu/common version", () => {
   const installed = ["apps/web-app/node_modules", "node_modules"]

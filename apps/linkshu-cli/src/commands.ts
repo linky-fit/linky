@@ -85,7 +85,7 @@ const summarize: Effect.Effect<void, never, LinkshuServices> = Effect.gen(
   },
 );
 
-const balance: Command = summarize;
+export const balance: Command = summarize;
 
 /** No amount means "finish whatever an earlier run left stranded". */
 const topup = (mint: MintUrl, operands: ReadonlyArray<string>): Command =>

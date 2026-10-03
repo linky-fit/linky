@@ -42,6 +42,10 @@ export const SUPPORTER_ACCEPTED_MINTS: ReadonlyArray<string> = PRODUCTION_MINTS;
 /** The production Linky Bot identity; null until it is launched. */
 export const LINKY_BOT_NPUB: string | null = null;
 
+/** The Linky contact, where feedback goes; Linky Bot points other messages here. */
+export const LINKY_CONTACT_NPUB =
+  "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
+
 const GRACE_SECONDS = 7 * 24 * 60 * 60;
 
 /**

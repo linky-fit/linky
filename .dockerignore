@@ -13,3 +13,5 @@ coverage
 **/test-results
 **/playwright-report
 **/.inspector
+apps/push/data
+apps/supporter/data

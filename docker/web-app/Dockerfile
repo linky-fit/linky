@@ -18,6 +18,7 @@ COPY apps/linkshu-cli/package.json apps/linkshu-cli/
 COPY apps/native-shell/package.json apps/native-shell/
 COPY apps/push/package.json apps/push/
 COPY apps/site/package.json apps/site/
+COPY apps/supporter/package.json apps/supporter/
 COPY apps/ui-book/package.json apps/ui-book/
 COPY apps/web-app/package.json apps/web-app/
 COPY packages/config/package.json packages/config/
@@ -43,13 +44,20 @@ ARG VITE_MAIN_MINT_URL
 ARG VITE_NPUB_CASH_DISABLED
 ARG VITE_PUSH_SERVER_URL
 ARG VITE_E2E
+# Supporter overrides for the local stack; empty means the shared defaults.
+ARG VITE_LINKY_BOT_NPUB
+ARG VITE_SUPPORTER_ACCEPTED_MINTS
+ARG VITE_SUPPORTER_VALIDITY_SECONDS
 ENV VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=$VITE_ALLOW_INSECURE_LOCALHOST_RELAYS \
     VITE_NOSTR_RELAYS=$VITE_NOSTR_RELAYS \
     VITE_EVOLU_SERVER_URLS=$VITE_EVOLU_SERVER_URLS \
     VITE_MAIN_MINT_URL=$VITE_MAIN_MINT_URL \
     VITE_NPUB_CASH_DISABLED=$VITE_NPUB_CASH_DISABLED \
     VITE_PUSH_SERVER_URL=$VITE_PUSH_SERVER_URL \
-    VITE_E2E=$VITE_E2E
+    VITE_E2E=$VITE_E2E \
+    VITE_LINKY_BOT_NPUB=$VITE_LINKY_BOT_NPUB \
+    VITE_SUPPORTER_ACCEPTED_MINTS=$VITE_SUPPORTER_ACCEPTED_MINTS \
+    VITE_SUPPORTER_VALIDITY_SECONDS=$VITE_SUPPORTER_VALIDITY_SECONDS
 
 WORKDIR /app/apps/web-app
 # Sourcemaps keep Playwright traces readable; passed on the CLI so this test

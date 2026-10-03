@@ -5,6 +5,7 @@ logs
 node_modules
 dist
 apps/push/data
+apps/supporter/data
 dist-ssr
 dev-dist
 test-results

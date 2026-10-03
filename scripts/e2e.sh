@@ -13,6 +13,7 @@ port=$((20000 + slot * 10))
 
 export COMPOSE_PROJECT_NAME="$name-e2e"
 export LINKY_E2E_WEB_IMAGE="linky-web-app:$name"
+export LINKY_E2E_SUPPORTER_IMAGE="linky-supporter:$name"
 export LINKY_E2E_WEB_PORT=$port
 export LINKY_E2E_NOSTR_PORT=$((port + 1))
 export LINKY_E2E_EVOLU_PORT=$((port + 2))
