@@ -124,6 +124,9 @@ interface ProfileSyncContext {
   setNostrStatusByNpub: SetByNpub<string>;
 }
 
+const isContactFormRoute = (routeKind: string): boolean =>
+  routeKind === "contactEdit" || routeKind === "contactNew";
+
 const syncContactsFromProfile = (
   npub: string,
   metadata: ProfileMetadata,
@@ -131,9 +134,7 @@ const syncContactsFromProfile = (
   ctx: ProfileSyncContext,
 ): void => {
   // Never rewrite rows under an open contact form.
-  if (ctx.routeKind === "contactEdit" || ctx.routeKind === "contactNew") {
-    return;
-  }
+  if (isContactFormRoute(ctx.routeKind)) return;
 
   const bestName = getBestNostrName(metadata) ?? "";
   const profileLn = getContactPublicProfile(npub, metadata).lnAddress;
@@ -199,7 +200,11 @@ const applyProfileUpdated = (
   ctx: ProfileSyncContext,
 ): void => {
   const cached = loadCachedProfile(npub);
-  if (cached && fact.updatedAt <= cached.updatedAt) return;
+  if (cached && fact.updatedAt <= cached.updatedAt) {
+    // A one-shot fetch may have cached this fact before a new contact's row existed.
+    syncContactsFromProfile(npub, cached.metadata, cached.metadata, ctx);
+    return;
+  }
   saveCachedProfile(npub, fact.metadata, fact.updatedAt);
 
   ctx.setNostrMetadataByNpub((prev) => ({ ...prev, [npub]: fact.metadata }));
@@ -278,7 +283,8 @@ export const useLinkstrProfileSync = ({
     void republishOwnProfile();
   }, [enabled, republishOwnProfile, writeRelaysKey]);
 
-  const { contacts } = context;
+  const { contacts, routeKind } = context;
+  const contactFormOpen = isContactFormRoute(routeKind);
   const {
     setNostrMetadataByNpub,
     setNostrPictureByNpub,
@@ -328,8 +334,10 @@ export const useLinkstrProfileSync = ({
   // Reconcile contact rows against the cached profiles: watch events fire
   // only for strictly newer facts, so a row that fell out of step with an
   // already-cached profile (new contact, or a sync-policy change) would
-  // otherwise stay stale until the peer republishes. Writes only on diffs.
+  // otherwise stay stale until the peer republishes. Rows skipped under an
+  // open contact form are reconciled once it closes. Writes only on diffs.
   React.useEffect(() => {
+    if (contactFormOpen) return;
     for (const npub of watchedNpubs) {
       const cachedProfile = loadCachedProfile(npub);
       if (!cachedProfile) continue;
@@ -340,7 +348,7 @@ export const useLinkstrProfileSync = ({
         contextRef.current,
       );
     }
-  }, [watchedNpubs]);
+  }, [contactFormOpen, watchedNpubs]);
 
   React.useEffect(() => {
     let cancelled = false;
