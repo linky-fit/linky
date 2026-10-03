@@ -12,9 +12,6 @@ export type Screen =
   | "token-share"
   | "wallet";
 
-export const screenSrc = (screen: Screen, mode: string) =>
-  `/screens/${screen}-${mode}.webp`;
-
 export interface Feature {
   title: string;
   description: string;
@@ -27,6 +24,8 @@ export interface LandingCopy extends SiteLayoutCopy {
   titleAccent: string;
   subtitle: string;
   ctaLabels: Record<CtaMode, string>;
+  showOthersLabel: string;
+  getAppTitle: string;
   uspSectionTitle: string;
   features: Feature[];
   closingSectionTitle: string;
@@ -50,6 +49,13 @@ const languageLabels = {
 export const copy: Record<SiteLocale, LandingCopy> = {
   cs: {
     ...languageLabels,
+    downloadLabel: "Stáhnout aplikaci",
+    appearanceLabel: "Vzhled",
+    appearanceAuto: "Automaticky",
+    appearanceLight: "Světlý",
+    appearanceDark: "Tmavý",
+    showOthersLabel: "Zobrazit další",
+    getAppTitle: "Stáhněte si aplikaci",
     switchLabel: "Jazyk",
     title: "Budujte svou bitcoinovou síť",
     titleAccent: "bitcoinovou",
@@ -99,6 +105,13 @@ export const copy: Record<SiteLocale, LandingCopy> = {
   },
   en: {
     ...languageLabels,
+    downloadLabel: "Download the app",
+    appearanceLabel: "Appearance",
+    appearanceAuto: "Automatic",
+    appearanceLight: "Light",
+    appearanceDark: "Dark",
+    showOthersLabel: "Show others",
+    getAppTitle: "Get the app",
     switchLabel: "Language",
     title: "Build your bitcoin network",
     titleAccent: "bitcoin",
@@ -148,6 +161,13 @@ export const copy: Record<SiteLocale, LandingCopy> = {
   },
   de: {
     ...languageLabels,
+    downloadLabel: "App herunterladen",
+    appearanceLabel: "Darstellung",
+    appearanceAuto: "Automatisch",
+    appearanceLight: "Hell",
+    appearanceDark: "Dunkel",
+    showOthersLabel: "Weitere anzeigen",
+    getAppTitle: "Hol dir die App",
     switchLabel: "Sprache",
     title: "Baue dein Bitcoin-Netzwerk auf",
     titleAccent: "Bitcoin-Netzwerk",

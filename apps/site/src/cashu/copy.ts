@@ -1,5 +1,7 @@
+import type { SiteLayoutCopy } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
-interface LocaleCopy {
+
+interface LocaleCopy extends SiteLayoutCopy {
   cashuLabel: string;
   cashuOptionDescription: string;
   collapseOptionsLabel: string;
@@ -71,6 +73,11 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     subtitle:
       "Vložte existující cashu token a vytvořte odkaz, který můžete poslat svému známému.",
     switchLabel: "Jazyk",
+    downloadLabel: "Stáhnout aplikaci",
+    appearanceLabel: "Vzhled",
+    appearanceAuto: "Automaticky",
+    appearanceLight: "Světlý",
+    appearanceDark: "Tmavý",
     tokenLabel: "Cashu token",
     validUnknown: "Nepodařilo se načíst token.",
   },
@@ -109,6 +116,11 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     subtitle:
       "Paste an existing Cashu token and create a link to redeem bitcoin to a lightning address.",
     switchLabel: "Language",
+    downloadLabel: "Download the app",
+    appearanceLabel: "Appearance",
+    appearanceAuto: "Automatic",
+    appearanceLight: "Light",
+    appearanceDark: "Dark",
     tokenLabel: "Cashu token",
     validUnknown: "Could not load the token.",
   },
@@ -149,6 +161,11 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     subtitle:
       "Füge einen vorhandenen Cashu-Token ein und erstelle einen Link, über den Bitcoin an eine Lightning-Adresse ausgezahlt werden können.",
     switchLabel: "Sprache",
+    downloadLabel: "App herunterladen",
+    appearanceLabel: "Darstellung",
+    appearanceAuto: "Automatisch",
+    appearanceLight: "Hell",
+    appearanceDark: "Dunkel",
     tokenLabel: "Cashu-Token",
     validUnknown: "Der Token konnte nicht geladen werden.",
   },

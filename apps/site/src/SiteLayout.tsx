@@ -1,8 +1,25 @@
-import { BrandMark, Row, SelectField, Stack, Text } from "@linky-fit/ui";
+import {
+  BrandMark,
+  Button,
+  IconButton,
+  ListRow,
+  Row,
+  Sheet,
+  Stack,
+  Text,
+  useMedia,
+  type IconName,
+} from "@linky-fit/ui";
 import { themes } from "@linky-fit/ui/tokens";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import {
+  colorModePreferences,
+  setColorModePreference,
+  useColorMode,
+  useColorModePreference,
+  type ColorModePreference,
+} from "./colorMode";
 import type { SiteLocale } from "./sitePreferences";
-import { useSystemColorMode } from "./useSystemColorMode";
 
 export interface SiteLayoutCopy {
   czechLabel: string;
@@ -11,7 +28,26 @@ export interface SiteLayoutCopy {
   switchLabel: string;
   followUsLabel: string;
   privacyLabel: string;
+  downloadLabel: string;
+  appearanceLabel: string;
+  appearanceAuto: string;
+  appearanceLight: string;
+  appearanceDark: string;
 }
+
+const colorModeIcons = {
+  auto: "Monitor",
+  light: "Sun",
+  dark: "Moon",
+} as const satisfies Record<ColorModePreference, IconName>;
+
+const nextColorModePreference = (current: ColorModePreference) =>
+  colorModePreferences[
+    (colorModePreferences.indexOf(current) + 1) % colorModePreferences.length
+  ] ?? "auto";
+
+// Pressable renders a button; this keeps the download control a real link.
+const downloadLink = { render: <a href="/#download" />, role: "link" } as const;
 
 interface SiteLayoutProps {
   copy: SiteLayoutCopy;
@@ -39,7 +75,22 @@ export function SiteLayout({
   onLocaleChange,
   children,
 }: SiteLayoutProps) {
-  const mode = useSystemColorMode();
+  const mode = useColorMode();
+  const colorModePreference = useColorModePreference();
+  const { wide } = useMedia();
+  const [languageSheetIsOpen, setLanguageSheetIsOpen] = useState(false);
+  const colorModeLabel = `${copy.appearanceLabel}: ${
+    {
+      auto: copy.appearanceAuto,
+      light: copy.appearanceLight,
+      dark: copy.appearanceDark,
+    }[colorModePreference]
+  }`;
+  const languages: [SiteLocale, string][] = [
+    ["cs", copy.czechLabel],
+    ["de", copy.germanLabel],
+    ["en", copy.englishLabel],
+  ];
   return (
     <Stack flexGrow={1} gap="$none" backgroundColor="$background">
       <header
@@ -59,19 +110,46 @@ export function SiteLayout({
             <BrandMark size="iconXl" />
             <Text variant="title">Linky</Text>
           </Row>
-          <Stack width="$column">
-            <SelectField
-              label={copy.switchLabel}
-              hideLabel
-              value={locale}
-              options={[
-                { value: "cs", label: copy.czechLabel },
-                { value: "de", label: copy.germanLabel },
-                { value: "en", label: copy.englishLabel },
-              ]}
-              onValueChange={onLocaleChange}
+          <Row gap="$xs" alignItems="center">
+            {wide ? (
+              <Button
+                {...downloadLink}
+                size="sm"
+                variant="accent"
+                icon="Download"
+                marginRight="$sm"
+              >
+                {copy.downloadLabel}
+              </Button>
+            ) : (
+              <IconButton
+                {...downloadLink}
+                icon="Download"
+                size="sm"
+                variant="accent"
+                accessibilityLabel={copy.downloadLabel}
+                tooltip={copy.downloadLabel}
+              />
+            )}
+            <IconButton
+              icon="Languages"
+              size="sm"
+              accessibilityLabel={copy.switchLabel}
+              tooltip={copy.switchLabel}
+              onPress={() => setLanguageSheetIsOpen(true)}
             />
-          </Stack>
+            <IconButton
+              icon={colorModeIcons[colorModePreference]}
+              size="sm"
+              accessibilityLabel={colorModeLabel}
+              tooltip={colorModeLabel}
+              onPress={() =>
+                setColorModePreference(
+                  nextColorModePreference(colorModePreference),
+                )
+              }
+            />
+          </Row>
         </Row>
       </header>
       <Stack
@@ -91,6 +169,26 @@ export function SiteLayout({
           <FooterLink href="/privacy.html">{copy.privacyLabel}</FooterLink>
         </Row>
       </Stack>
+      <Sheet
+        open={languageSheetIsOpen}
+        onOpenChange={setLanguageSheetIsOpen}
+        title={copy.switchLabel}
+      >
+        <Stack>
+          {languages.map(([option, label]) => (
+            <ListRow
+              key={option}
+              title={label}
+              selected={locale === option}
+              chevron={false}
+              onPress={() => {
+                onLocaleChange(option);
+                setLanguageSheetIsOpen(false);
+              }}
+            />
+          ))}
+        </Stack>
+      </Sheet>
     </Stack>
   );
 }
