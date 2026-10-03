@@ -22,36 +22,16 @@ const TAB_ROUTE = {
 } as const;
 
 interface BottomTabBarProps {
-  activeTab: BottomTabKey | null;
-  /** Swipe progress from contacts (0) to wallet (1); the nearer tab is active. */
-  activeProgress?: number;
-  contactsLabel: string;
-  onTabChange?: (tab: "contacts" | "wallet") => void;
+  activeTab: BottomTabKey;
   t: Translate;
-  walletLabel: string;
 }
 
 export function BottomTabBar({
   activeTab,
-  activeProgress,
-  contactsLabel,
-  onTabChange,
   t,
-  walletLabel,
 }: BottomTabBarProps): React.ReactElement {
   const { currentNpub, effectiveProfileName, effectiveProfilePicture } =
     useAppShellCore();
-
-  const swipeProgress =
-    activeProgress === undefined
-      ? undefined
-      : Math.min(1, Math.max(0, activeProgress));
-  const value =
-    swipeProgress === undefined
-      ? (activeTab ?? undefined)
-      : swipeProgress >= 0.5
-        ? "wallet"
-        : "contacts";
 
   const items: NavItem<BottomTabKey>[] = [
     {
@@ -69,8 +49,8 @@ export function BottomTabBar({
         />
       ),
     },
-    { value: "contacts", label: contactsLabel, icon: "Users" },
-    { value: "wallet", label: walletLabel, icon: "Wallet" },
+    { value: "contacts", label: t("contactsTitle"), icon: "Users" },
+    { value: "wallet", label: t("wallet"), icon: "Wallet" },
     { value: "proxy", label: t("proxyPayments"), icon: "HandCoins" },
     {
       value: "settings",
@@ -82,10 +62,6 @@ export function BottomTabBar({
 
   const changeTab = (tab: BottomTabKey) => {
     if (tab === activeTab) return;
-    if (onTabChange && (tab === "contacts" || tab === "wallet")) {
-      onTabChange(tab);
-      return;
-    }
     navigateTo({ route: TAB_ROUTE[tab] });
   };
 
@@ -94,14 +70,8 @@ export function BottomTabBar({
       <TabBar
         accessibilityLabel={t("list")}
         items={items}
-        value={value}
+        value={activeTab}
         onValueChange={changeTab}
-        indicatorPosition={
-          swipeProgress === undefined
-            ? undefined
-            : items.findIndex((item) => item.value === "contacts") +
-              swipeProgress
-        }
       />
     </Stack>
   );

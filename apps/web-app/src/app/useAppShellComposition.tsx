@@ -64,7 +64,6 @@ import { useRoutingViewComposition } from "./hooks/composition/useRoutingViewCom
 import { useScanNativeComposition } from "./hooks/composition/useScanNativeComposition";
 import { useSystemSettingsComposition } from "./hooks/composition/useSystemSettingsComposition";
 import { useMainMenuState } from "./hooks/layout/useMainMenuState";
-import { useMainSwipeNavigation } from "./hooks/layout/useMainSwipeNavigation";
 import { useNativeBackHandler } from "./hooks/layout/useNativeBackHandler";
 import { isUnknownContactId } from "./hooks/messages/contactIdentity";
 import { useChatMessageEffects } from "./hooks/messages/useChatMessageEffects";
@@ -178,8 +177,6 @@ export const useAppShellComposition = ({
   const [status, setStatus] = useState<string | null>(null);
   const importDataFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const mainSwipeRef = React.useRef<HTMLDivElement | null>(null);
-  const mainSwipeScrollTimerRef = React.useRef<number | null>(null);
   const { allowedDisplayCurrencies, toggleAllowedDisplayCurrency } =
     useAllowedDisplayCurrencies();
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>(() =>
@@ -859,15 +856,6 @@ export const useAppShellComposition = ({
     showProfileQrOnTiltEnabled,
   });
 
-  const isMainSwipeRoute = route.kind === "contacts" || route.kind === "wallet";
-
-  const { commitMainSwipe } = useMainSwipeNavigation({
-    isMainSwipeRoute,
-    mainSwipeRef,
-    mainSwipeScrollTimerRef,
-    routeKind: route.kind,
-  });
-
   const {
     closeLnurlAuthConfirmation,
     confirmLnurlAuth,
@@ -1022,7 +1010,7 @@ export const useAppShellComposition = ({
     ],
   );
 
-  const renderMainSwipeContactCard = React.useCallback(
+  const renderMainTabContactCard = React.useCallback(
     (contact: ContactRowLike): React.ReactNode => {
       const id = (contact.id ?? "").trim();
       if (!id) return null;
@@ -1505,9 +1493,9 @@ export const useAppShellComposition = ({
     buildPeopleRouteProps,
   );
 
-  const { mainSwipeRouteProps } = useRoutingViewComposition({
+  const { mainTabRouteProps } = useRoutingViewComposition({
     groupNamesCount: groupNames.length,
-    mainSwipeRouteBuilderInput: {
+    mainTabRouteBuilderInput: {
       activeBankPaymentOfferContacts,
       activeGroup,
       cashuTotalBalance,
@@ -1520,12 +1508,10 @@ export const useAppShellComposition = ({
       conversationsLabel,
       dismissContactsOnboarding,
       dismissWalletWarning,
-      handleMainSwipeTabChange: commitMainSwipe,
-      mainSwipeRef,
       openNewContactPage,
       openWalletScan,
       otherContactsLabel,
-      renderContactCard: renderMainSwipeContactCard,
+      renderContactCard: renderMainTabContactCard,
       route,
       scanIsOpen,
       setActiveGroup,
@@ -1905,9 +1891,8 @@ export const useAppShellComposition = ({
     displayUnit,
     formatDisplayedAmountParts,
     formatDisplayedAmountText,
-    isMainSwipeRoute,
     lang,
-    mainSwipeRouteProps,
+    mainTabRouteProps,
     moneyRouteProps,
     peopleRouteProps,
     pendingCashuContactSend,

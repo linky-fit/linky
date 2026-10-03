@@ -1,45 +1,42 @@
-import type { MainSwipeRoutesProps } from "../../routes/AppRouteContent";
+import type { MainTabRoutesProps } from "../../routes/AppRouteContent";
 import { useMemoizedRouteBuilder } from "./useMemoizedRouteBundle";
 
-type MainSwipeRouteBuilderInput = Omit<
-  MainSwipeRoutesProps["mainSwipeProps"],
-  "bottomTabActive" | "showGroupFilter" | "showNoGroupFilter"
+type MainTabRouteBuilderInput = Omit<
+  MainTabRoutesProps["mainTabProps"],
+  "showGroupFilter" | "showNoGroupFilter"
 >;
 
 interface UseRoutingViewCompositionParams {
   groupNamesCount: number;
-  mainSwipeRouteBuilderInput: MainSwipeRouteBuilderInput;
+  mainTabRouteBuilderInput: MainTabRouteBuilderInput;
   statusFilterCount: number;
   ungroupedCount: number;
 }
 
 interface RoutingViewCompositionResult {
-  mainSwipeRouteProps: MainSwipeRoutesProps;
+  mainTabRouteProps: MainTabRoutesProps;
 }
 
 export const useRoutingViewComposition = ({
   groupNamesCount,
-  mainSwipeRouteBuilderInput,
+  mainTabRouteBuilderInput,
   statusFilterCount,
   ungroupedCount,
 }: UseRoutingViewCompositionParams): RoutingViewCompositionResult => {
-  const routeKind = mainSwipeRouteBuilderInput.route.kind;
+  const routeKind = mainTabRouteBuilderInput.route.kind;
   const showGroupFilter =
     routeKind === "contacts" &&
     (groupNamesCount + statusFilterCount > 0 || ungroupedCount > 0);
-  const bottomTabActive =
-    routeKind === "contacts" || routeKind === "wallet" ? routeKind : null;
 
   const routeBuilderInput = {
-    ...mainSwipeRouteBuilderInput,
-    bottomTabActive,
+    ...mainTabRouteBuilderInput,
     showGroupFilter,
   };
 
   return {
-    mainSwipeRouteProps: useMemoizedRouteBuilder(
+    mainTabRouteProps: useMemoizedRouteBuilder(
       routeBuilderInput,
-      (mainSwipeProps) => ({ mainSwipeProps }),
+      (mainTabProps) => ({ mainTabProps }),
     ),
   };
 };

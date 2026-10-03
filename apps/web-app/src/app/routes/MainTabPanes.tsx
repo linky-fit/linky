@@ -1,8 +1,6 @@
-import { Pager, Stack } from "@linky-fit/ui";
+import { Stack } from "@linky-fit/ui";
 import React from "react";
-import { BottomTabBar } from "../../components/BottomTabBar";
 import { ContactsChecklist } from "../../components/ContactsChecklist";
-import { PageBody } from "../../components/PageBody";
 import {
   FloatingActionButton,
   floatingActionButtonClearance,
@@ -12,8 +10,7 @@ import { ContactsPage } from "../../pages/ContactsPage";
 import { WalletPage } from "../../pages/WalletPage";
 import type { Route } from "../../types/route";
 import { nowSeconds } from "../../utils/time";
-import { useMainSwipeRoutes } from "../context/AppShellContexts";
-import { useMainSwipeProgress } from "../lib/mainSwipeProgressStore";
+import { useMainTabRoutes } from "../context/AppShellContexts";
 import type { ContactRowLike, ContactsGuideKey } from "../types/appTypes";
 
 type ActiveBankPaymentOfferContacts = (nowSec: number) => {
@@ -21,9 +18,8 @@ type ActiveBankPaymentOfferContacts = (nowSec: number) => {
   nextExpiryAtSec: number | null;
 };
 
-export interface MainSwipeRouteProps {
+export interface MainTabRouteProps {
   activeGroup: string | null;
-  bottomTabActive: "contacts" | "wallet" | null;
   cashuTotalBalance: number;
   activeBankPaymentOfferContacts: ActiveBankPaymentOfferContacts;
   contactsOnboardingCelebrating: boolean;
@@ -39,8 +35,6 @@ export interface MainSwipeRouteProps {
   contactFilterOptions: Array<{ count: number; label: string; value: string }>;
   conversationsLabel: string;
   dismissContactsOnboarding: () => void;
-  handleMainSwipeTabChange: (target: "contacts" | "wallet") => void;
-  mainSwipeRef: React.RefObject<HTMLDivElement | null>;
   openNewContactPage: () => void;
   openWalletScan: () => void;
   otherContactsLabel: string;
@@ -78,7 +72,7 @@ interface VisibleContactSections {
 
 const useVisibleContactSections = (
   activeBankPaymentOfferContacts: ActiveBankPaymentOfferContacts,
-  visibleContacts: MainSwipeRouteProps["visibleContacts"],
+  visibleContacts: MainTabRouteProps["visibleContacts"],
 ): VisibleContactSections => {
   const [nowSec, setNowSec] = React.useState(() => nowSeconds());
   const activeOffers = React.useMemo(
@@ -120,62 +114,12 @@ const useVisibleContactSections = (
   }, [activeOffers.contactIds, visibleContacts]);
 };
 
-// Read swipe progress here, so a drag re-renders only the tab bar and the FAB.
-interface MainSwipeBottomTabBarProps {
-  activeTab: "contacts" | "wallet" | null;
-  contactsLabel: string;
-  onTabChange: (tab: "contacts" | "wallet") => void;
-  t: Translate;
-  walletLabel: string;
-}
-
-const MainSwipeBottomTabBar = ({
-  activeTab,
-  contactsLabel,
-  onTabChange,
-  t,
-  walletLabel,
-}: MainSwipeBottomTabBarProps): React.ReactElement => {
-  const { progress } = useMainSwipeProgress();
-  return (
-    <BottomTabBar
-      activeTab={activeTab}
-      activeProgress={progress}
-      contactsLabel={contactsLabel}
-      onTabChange={onTabChange}
-      t={t}
-      walletLabel={walletLabel}
-    />
-  );
-};
-
-interface MainSwipeFabProps {
-  label: string;
-  onPress: () => void;
-}
-
-const MainSwipeFab = ({
-  label,
-  onPress,
-}: MainSwipeFabProps): React.ReactElement => {
-  const { progress } = useMainSwipeProgress();
-  return (
-    <FloatingActionButton
-      icon="UserPlus"
-      label={label}
-      onPress={onPress}
-      hidden={progress >= 0.5}
-      guide="contact-add-button"
-    />
-  );
-};
-
-const ContactsPane = ({
+const ContactsContent = ({
   filterAlwaysOpen,
 }: {
   filterAlwaysOpen: boolean;
 }): React.ReactElement => {
-  const { mainSwipeProps } = useMainSwipeRoutes();
+  const { mainTabProps } = useMainTabRoutes();
   const {
     activeBankPaymentOfferContacts,
     activeGroup,
@@ -196,7 +140,7 @@ const ContactsPane = ({
     startContactsGuide,
     t,
     visibleContacts,
-  } = mainSwipeProps;
+  } = mainTabProps;
   const visibleContactSections = useVisibleContactSections(
     activeBankPaymentOfferContacts,
     visibleContacts,
@@ -240,8 +184,36 @@ const ContactsPane = ({
   );
 };
 
-const WalletPane = (): React.ReactElement => {
-  const { mainSwipeProps } = useMainSwipeRoutes();
+const AddContactButton = (): React.ReactElement => {
+  const { mainTabProps } = useMainTabRoutes();
+  return (
+    <FloatingActionButton
+      icon="UserPlus"
+      label={mainTabProps.t("addContact")}
+      onPress={mainTabProps.openNewContactPage}
+      guide="contact-add-button"
+    />
+  );
+};
+
+export const ContactsPane = (): React.ReactElement => (
+  <>
+    <Stack paddingBottom={floatingActionButtonClearance}>
+      <ContactsContent filterAlwaysOpen={false} />
+    </Stack>
+    <AddContactButton />
+  </>
+);
+
+export const DesktopContactsPane = (): React.ReactElement => (
+  <>
+    <ContactsContent filterAlwaysOpen />
+    <AddContactButton />
+  </>
+);
+
+export const WalletPane = (): React.ReactElement => {
+  const { mainTabProps } = useMainTabRoutes();
   const {
     cashuTotalBalance,
     dismissWalletWarning,
@@ -249,7 +221,7 @@ const WalletPane = (): React.ReactElement => {
     scanIsOpen,
     showWalletWarning,
     t,
-  } = mainSwipeProps;
+  } = mainTabProps;
 
   return (
     <WalletPage
@@ -262,68 +234,3 @@ const WalletPane = (): React.ReactElement => {
     />
   );
 };
-
-/** Phone: contacts and wallet side by side, swiped between above the tab bar. */
-export const MainSwipeContent = (): React.ReactElement => {
-  const { mainSwipeProps } = useMainSwipeRoutes();
-  const {
-    bottomTabActive,
-    handleMainSwipeTabChange,
-    mainSwipeRef,
-    openNewContactPage,
-    route,
-    t,
-  } = mainSwipeProps;
-
-  return (
-    <>
-      <Stack
-        testID="main-swipe"
-        flex={1}
-        minHeight={0}
-        gap="$none"
-        position="relative"
-      >
-        <Pager
-          scrollRef={mainSwipeRef}
-          activePage={route.kind === "wallet" ? 1 : 0}
-        >
-          <PageBody
-            flex={undefined}
-            flexGrow={1}
-            paddingBottom={floatingActionButtonClearance}
-          >
-            <ContactsPane filterAlwaysOpen={false} />
-          </PageBody>
-          <PageBody>
-            <WalletPane />
-          </PageBody>
-        </Pager>
-        <MainSwipeFab label={t("addContact")} onPress={openNewContactPage} />
-      </Stack>
-      <MainSwipeBottomTabBar
-        activeTab={bottomTabActive}
-        contactsLabel={t("contactsTitle")}
-        onTabChange={handleMainSwipeTabChange}
-        t={t}
-        walletLabel={t("wallet")}
-      />
-    </>
-  );
-};
-
-export const DesktopContactsPane = (): React.ReactElement => {
-  const { mainSwipeProps } = useMainSwipeRoutes();
-  return (
-    <>
-      <ContactsPane filterAlwaysOpen />
-      <FloatingActionButton
-        icon="UserPlus"
-        label={mainSwipeProps.t("addContact")}
-        onPress={mainSwipeProps.openNewContactPage}
-      />
-    </>
-  );
-};
-
-export const DesktopWalletPane = WalletPane;

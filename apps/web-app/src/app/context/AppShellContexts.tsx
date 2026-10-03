@@ -16,7 +16,7 @@ import type {
 import type { LightningInvoicePreview } from "@linky-fit/linkshu";
 import type { CashuPaymentRequestMessageInfo } from "../lib/paymentRequestMessage";
 import type {
-  MainSwipeRoutesProps,
+  MainTabRoutesProps,
   MoneyRoutesProps,
   PeopleRoutesProps,
 } from "../routes/AppRouteContent";
@@ -211,7 +211,7 @@ export interface AppShellActionsContextValue {
 }
 
 export interface AppShellRouteContextValue {
-  mainSwipeRoutes: MainSwipeRoutesProps;
+  mainTabRoutes: MainTabRoutesProps;
   moneyRoutes: MoneyRoutesProps;
   peopleRoutes: PeopleRoutesProps;
 }
@@ -291,5 +291,5 @@ export const usePeopleRoutes = (): PeopleRoutesProps =>
 export const useMoneyRoutes = (): MoneyRoutesProps =>
   useAppShellRouteContext().moneyRoutes;
 
-export const useMainSwipeRoutes = (): MainSwipeRoutesProps =>
-  useAppShellRouteContext().mainSwipeRoutes;
+export const useMainTabRoutes = (): MainTabRoutesProps =>
+  useAppShellRouteContext().mainTabRoutes;

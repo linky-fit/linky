@@ -17,7 +17,9 @@ const logins = [
       await page.getByRole("button", { name: "Create a profile" }).click();
       await page.getByRole("button", { name: "Continue" }).click();
       await page.getByRole("button", { name: "Confirm profile" }).click();
-      await expect(page.getByLabel("Available balance")).toBeVisible();
+      await expect(
+        page.locator("[data-guide='contact-add-button']"),
+      ).toBeVisible();
     },
   },
   {

@@ -61,7 +61,7 @@ const AuthenticatedAppShell = ({
     dismissToast,
     evoluSettingsContext,
     formatDisplayedAmountText,
-    mainSwipeRouteProps,
+    mainTabRouteProps,
     mintSettingsContext,
     moneyRouteProps,
     peopleRouteProps,
@@ -78,11 +78,11 @@ const AuthenticatedAppShell = ({
 
   const routeContextValue = React.useMemo<AppShellRouteContextValue>(
     () => ({
-      mainSwipeRoutes: mainSwipeRouteProps,
+      mainTabRoutes: mainTabRouteProps,
       moneyRoutes: moneyRouteProps,
       peopleRoutes: peopleRouteProps,
     }),
-    [mainSwipeRouteProps, moneyRouteProps, peopleRouteProps],
+    [mainTabRouteProps, moneyRouteProps, peopleRouteProps],
   );
 
   return (

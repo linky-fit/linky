@@ -8,8 +8,6 @@ interface FloatingActionButtonProps {
   icon: IconName;
   label: string;
   onPress: () => void;
-  /** Fades the button out, e.g. while the page it belongs to is swiped away. */
-  hidden?: boolean;
   guide?: string;
 }
 
@@ -18,7 +16,6 @@ export function FloatingActionButton({
   icon,
   label,
   onPress,
-  hidden = false,
   guide,
 }: FloatingActionButtonProps) {
   const { wide } = useMedia();
@@ -28,9 +25,6 @@ export function FloatingActionButton({
       right={wide ? "$xxl" : "$xl"}
       bottom={wide ? "$xxl" : "$xxxl"}
       zIndex="$sticky"
-      opacity={hidden ? 0 : 1}
-      aria-hidden={hidden}
-      transition="base"
       data-safe-area={wide ? undefined : "bottom"}
     >
       <IconButton
@@ -39,8 +33,6 @@ export function FloatingActionButton({
         variant="primary"
         size="lg"
         onPress={onPress}
-        disabled={hidden}
-        pointerEvents={hidden ? "none" : "auto"}
         data-guide={guide}
         tooltip={label}
       />

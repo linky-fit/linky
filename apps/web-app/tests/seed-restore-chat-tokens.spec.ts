@@ -143,6 +143,7 @@ const bootRestored = async (
       localStorage.removeItem("linky.evoluServers.disabled.v1");
     });
     await device.page.reload();
+    await device.page.goto("/#wallet");
     await waitForNetworkReady(device.page);
   };
   return { ...device, mintAnswers, mintCalls, releaseEvolu };

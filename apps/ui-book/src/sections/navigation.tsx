@@ -32,24 +32,12 @@ export const navigation: Section = {
     TabBar: () => {
       const [tab, setTab] = useState("contacts");
       return (
-        <UI.Stack>
-          <UI.TabBar
-            accessibilityLabel="Example tabs"
-            items={navItems}
-            value={tab}
-            onValueChange={setTab}
-          />
-          <UI.Text variant="caption" color="$colorMuted">
-            Mid-swipe indicator
-          </UI.Text>
-          <UI.TabBar
-            accessibilityLabel="Example tabs mid-swipe"
-            items={navItems}
-            value={tab}
-            onValueChange={setTab}
-            indicatorPosition={0.5}
-          />
-        </UI.Stack>
+        <UI.TabBar
+          accessibilityLabel="Example tabs"
+          items={navItems}
+          value={tab}
+          onValueChange={setTab}
+        />
       );
     },
     NavigationRail: () => {

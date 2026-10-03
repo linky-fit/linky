@@ -66,8 +66,6 @@ export interface TabBarProps<T extends string> {
   items: readonly NavItem<T>[];
   value: T | undefined;
   onValueChange: (value: T) => void;
-  /** Fractional item index the indicator sits at, e.g. while swiping between tabs; defaults to the selected item. */
-  indicatorPosition?: number | undefined;
 }
 
 /** The bar of main sections docked at the bottom of phone screens; tabs show icons and use labels as their names. */
@@ -76,10 +74,8 @@ export function TabBar<T extends string>({
   items,
   value,
   onValueChange,
-  indicatorPosition,
 }: TabBarProps<T>) {
-  const position =
-    indicatorPosition ?? items.findIndex((item) => item.value === value);
+  const position = items.findIndex((item) => item.value === value);
   const share = 100 / items.length;
   return (
     <Row
