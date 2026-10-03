@@ -7,6 +7,7 @@ export interface MintIcon {
 
 import { isTestMintUrl as sharedIsTestMintUrl } from "@linky-fit/linkshu";
 import { GENERIC_MINT_ICON_DATA_URL } from "@linky-fit/linkshu";
+import { PRODUCTION_MINTS } from "@linky-fit/supporter";
 export {
   GENERIC_MINT_ICON_DATA_URL,
   getMintIconOverride,
@@ -18,14 +19,9 @@ export const FALLBACK_PRODUCTION_MINT_URL = "https://cashu.cz";
 
 export const MAIN_MINT_URL = envMainMintUrl || FALLBACK_PRODUCTION_MINT_URL;
 
-// An explicit development mint keeps preset discovery and recovery local.
-export const PRODUCTION_MINTS = [
-  FALLBACK_PRODUCTION_MINT_URL,
-  "https://mint.minibits.cash/Bitcoin",
-  "https://kashu.me",
-  "https://cashu.21m.lol",
-];
+export { PRODUCTION_MINTS };
 
+// An explicit development mint keeps preset discovery and recovery local.
 export const PRESET_MINTS = envMainMintUrl
   ? [envMainMintUrl]
   : [

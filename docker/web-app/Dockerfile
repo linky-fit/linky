@@ -30,6 +30,7 @@ COPY packages/domain/package.json packages/domain/
 COPY packages/proxy-payment/package.json packages/proxy-payment/
 COPY packages/ui/package.json packages/ui/
 COPY packages/recurring-payment/package.json packages/recurring-payment/
+COPY packages/supporter/package.json packages/supporter/
 COPY tools/nostr-error-tracker/package.json tools/nostr-error-tracker/
 RUN bun install --frozen-lockfile
 

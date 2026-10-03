@@ -272,6 +272,24 @@ _Avoid_: execution, instance, occurrence
 How every run of a recurring payment reaches the contact, chosen once when it is created: a token sent over Nostr (Cashu) or a melt paying their Lightning address (Lightning).
 _Avoid_: payment method, channel
 
+## Supporters
+
+**Supporter**:
+A user who pays Linky Bot a monthly amount and gets perks for it.
+_Avoid_: donator, donor, patron, subscriber
+
+**Supporter tier**:
+The perk level one payment reaches: Bronze, Silver, Gold or Diamond. A higher tier includes the perks of every lower one.
+_Avoid_: plan, level, membership
+
+**Supporter badge**:
+A badge award signed by Linky Bot that names the supporter, the tier (or no tier, for the generic badge) and the start date. Clients decide how long it counts.
+_Avoid_: certificate, proof, attestation
+
+**Linky Bot**:
+The identity that receives supporter payments, signs supporter badges and answers other messages with a pointer to the Linky contact; only the supporter service runs it.
+_Avoid_: donation account, Linky Supporters, Linky wallet
+
 ## Sync and devices
 
 **Device**:

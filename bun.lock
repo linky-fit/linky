@@ -154,6 +154,7 @@
         "@linky-fit/proxy-payment": "workspace:*",
         "@linky-fit/recurring-payment": "workspace:*",
         "@linky-fit/site": "workspace:*",
+        "@linky-fit/supporter": "workspace:*",
         "@linky-fit/ui": "workspace:*",
         "@noble/hashes": "^1.5.0",
         "@scure/base": "^2.0.0",
@@ -372,6 +373,18 @@
         "@linky-fit/domain": "workspace:*",
         "effect": "^3.19.19",
       },
+      "devDependencies": {
+        "@linky-fit/config": "workspace:*",
+        "@types/node": "^24.10.1",
+        "eslint": "^9.39.1",
+        "prettier": "^3.4.2",
+        "typescript": "~5.9.3",
+        "vitest": "^4.0.18",
+      },
+    },
+    "packages/supporter": {
+      "name": "@linky-fit/supporter",
+      "version": "0.1.0",
       "devDependencies": {
         "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
@@ -1030,6 +1043,8 @@
     "@linky-fit/recurring-payment": ["@linky-fit/recurring-payment@workspace:packages/recurring-payment"],
 
     "@linky-fit/site": ["@linky-fit/site@workspace:apps/site"],
+
+    "@linky-fit/supporter": ["@linky-fit/supporter@workspace:packages/supporter"],
 
     "@linky-fit/ui": ["@linky-fit/ui@workspace:packages/ui"],
 
