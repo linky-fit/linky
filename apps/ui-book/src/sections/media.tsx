@@ -6,6 +6,16 @@ import { sampleImage } from "../sample-image";
 export const media: Section = {
   title: "Media",
   entries: {
+    DeviceFrame: () => (
+      <UI.DeviceFrame alignSelf="center" aria-label="Phone">
+        <UI.Image
+          src={sampleImage}
+          width="100%"
+          height="100%"
+          objectFit="cover"
+        />
+      </UI.DeviceFrame>
+    ),
     MediaFrame: () => (
       <UI.Stack>
         <UI.MediaFrame

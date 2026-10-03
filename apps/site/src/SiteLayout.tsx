@@ -1,6 +1,8 @@
 import { BrandMark, Row, SelectField, Stack, Text } from "@linky-fit/ui";
+import { themes } from "@linky-fit/ui/tokens";
 import type { ReactNode } from "react";
 import type { SiteLocale } from "./sitePreferences";
+import { useSystemColorMode } from "./useSystemColorMode";
 
 export interface SiteLayoutCopy {
   czechLabel: string;
@@ -37,20 +39,21 @@ export function SiteLayout({
   onLocaleChange,
   children,
 }: SiteLayoutProps) {
+  const mode = useSystemColorMode();
   return (
     <Stack flexGrow={1} gap="$none" backgroundColor="$background">
-      <Stack
-        flexGrow={1}
-        width="100%"
-        maxWidth="$appWidth"
-        alignSelf="center"
-        paddingHorizontal="$xl"
-        gap="$none"
+      <header
+        className="site-header"
+        // Translucent page color, so content scrolls under the blurred header.
+        style={{ backgroundColor: `${themes[mode].background}cc` }}
       >
         <Row
-          render="header"
           justifyContent="space-between"
-          paddingVertical="$lg"
+          width="100%"
+          maxWidth="$appWidth"
+          alignSelf="center"
+          paddingHorizontal="$xl"
+          paddingVertical="$md"
         >
           <Row render={<a href="/" aria-label="Linky home" />} gap="$sm">
             <BrandMark size="iconXl" />
@@ -70,6 +73,15 @@ export function SiteLayout({
             />
           </Stack>
         </Row>
+      </header>
+      <Stack
+        flexGrow={1}
+        width="100%"
+        maxWidth="$appWidth"
+        alignSelf="center"
+        paddingHorizontal="$xl"
+        gap="$none"
+      >
         <Stack render="main" flexGrow={1} gap="$none">
           {children}
         </Stack>

@@ -63,6 +63,7 @@ export const radius = {
   control: 12,
   card: 16,
   sheet: 24,
+  device: 48,
   pill: 999,
 };
 
@@ -81,6 +82,7 @@ export const size = {
   row: 64,
   hero: 112,
   column: 160,
+  device: 300,
   brandHero: 220,
   qr: 240,
   sheetWidth: 520,
@@ -92,7 +94,7 @@ export const border = { hairline: 1, emphasis: 2, focus: 3 };
 
 export const iconStroke = 2;
 
-export const letterSpacing = { eyebrow: 1 };
+export const letterSpacing = { eyebrow: 1, headline: -2 };
 
 export const opacity = { disabled: 0.5, dimmed: 0.8 };
 
@@ -140,6 +142,7 @@ export const typography = {
     heading: 22,
     display: 32,
     amount: 48,
+    headline: 80,
   },
   lineHeight: {
     caption: 16,
@@ -149,6 +152,7 @@ export const typography = {
     heading: 28,
     display: 40,
     amount: 52,
+    headline: 84,
   },
   weight: {
     caption: "regular",
@@ -158,6 +162,7 @@ export const typography = {
     heading: "bold",
     display: "bold",
     amount: "bold",
+    headline: "bold",
   },
 } as const satisfies {
   size: object;
@@ -203,6 +208,7 @@ const dark = {
   infoText: palette.sky300,
   qrBackground: palette.white,
   qrForeground: palette.slate950,
+  bezel: palette.slate800,
 };
 
 export type ThemeColors = typeof dark;
@@ -242,6 +248,7 @@ const light: ThemeColors = {
   infoText: palette.sky800,
   qrBackground: palette.white,
   qrForeground: palette.slate950,
+  bezel: palette.slate950,
 };
 
 export const themes = { dark, light };
