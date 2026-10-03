@@ -25,10 +25,6 @@
   animation: landing-float 7s ease-in-out infinite;
 }
 
-.landing-float-late {
-  animation: landing-float 8s ease-in-out -3s infinite;
-}
-
 @keyframes landing-float {
   50% {
     transform: translateY(-14px);
@@ -210,7 +206,6 @@
 @media (prefers-reduced-motion: reduce) {
   .landing-rise,
   .landing-float,
-  .landing-float-late,
   .landing-pulse,
   .landing-scan,
   .landing-ripple {

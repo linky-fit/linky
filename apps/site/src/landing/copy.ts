@@ -111,7 +111,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     },
     closingSectionTitle: "Soukromí",
     closingSectionDescription:
-      "Uživatelé nepotřebují telefonní číslo, e-mail ani žádné doklady.",
+      "Nepotřebujete telefonní číslo, e-mail ani žádné doklady.",
     closingImageAlt:
       "Ukázka soukromého používání aplikace Linky bez osobních údajů",
   },
@@ -170,7 +170,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     },
     closingSectionTitle: "Privacy",
     closingSectionDescription:
-      "Users do not need a phone number, email address, or any identity documents.",
+      "You don't need a phone number, email address, or any identity documents.",
     closingImageAlt:
       "Preview of private Linky usage without personal information",
   },
@@ -229,7 +229,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     },
     closingSectionTitle: "Datenschutz",
     closingSectionDescription:
-      "Nutzer benötigen weder Telefonnummer noch E-Mail-Adresse oder Ausweisdokumente.",
+      "Du brauchst weder Telefonnummer noch E-Mail-Adresse oder Ausweisdokumente.",
     closingImageAlt:
       "Vorschau der privaten Linky-Nutzung ohne persönliche Daten",
   },

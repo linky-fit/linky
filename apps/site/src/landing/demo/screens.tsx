@@ -1,9 +1,10 @@
 import { Stack } from "@linky-fit/ui";
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { useState, type ComponentType, type ReactNode, type Ref } from "react";
 import type { Screen } from "../copy";
 import { ChatPaymentScreen, ChatRequestScreen } from "./chat";
 import { ContactsScreen, WalletScreen } from "./home";
 import { ProxyOfferScreen } from "./proxy";
+import { useInView } from "./playback";
 import { RecurringListScreen } from "./recurring";
 import { TokenShareScreen } from "./token";
 
@@ -17,20 +18,26 @@ const demoScreens: Record<Screen, ComponentType> = {
   "token-share": TokenShareScreen,
 };
 
-function useInView() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setInView(entry?.isIntersecting ?? false),
-      { threshold: 0.5 },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-  return { ref, inView };
+/** The app's surface under the phone's status bar. */
+export function DemoSurface({
+  ref,
+  children,
+}: {
+  ref?: Ref<HTMLDivElement>;
+  children: ReactNode;
+}) {
+  return (
+    <div ref={ref} className="demo-screen">
+      <Stack
+        flex={1}
+        gap="$none"
+        paddingTop="$huge"
+        backgroundColor="$background"
+      >
+        {children}
+      </Stack>
+    </div>
+  );
 }
 
 /** A demo screen that replays its animations whenever it comes into view while `active`. */
@@ -49,15 +56,8 @@ export function DemoScreen({
   }
   const Demo = demoScreens[screen];
   return (
-    <div ref={ref} className="demo-screen">
-      <Stack
-        flex={1}
-        gap="$none"
-        paddingTop="$huge"
-        backgroundColor="$background"
-      >
-        <Demo key={run.count} />
-      </Stack>
-    </div>
+    <DemoSurface ref={ref}>
+      <Demo key={run.count} />
+    </DemoSurface>
   );
 }
