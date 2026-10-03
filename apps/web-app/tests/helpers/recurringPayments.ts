@@ -316,10 +316,14 @@ export const expectReceived = async (
   page: Page,
   sats = ORDER_SAT,
 ): Promise<number> => {
-  await expect
-    .poll(() => readBalanceSat(page), { timeout: 60_000 })
-    .toBeGreaterThanOrEqual(sats - MAX_FEE_SAT);
-  const balance = await readBalanceSat(page);
+  let balance = 0;
+  // A receive stores its proofs one by one, so wait for the balance to settle.
+  await expect(async () => {
+    balance = await readBalanceSat(page);
+    expect(balance).toBeGreaterThanOrEqual(sats - MAX_FEE_SAT);
+    await page.waitForTimeout(2_000);
+    expect(await readBalanceSat(page)).toBe(balance);
+  }).toPass({ timeout: 60_000 });
   expect(balance).toBeLessThan(sats);
   return balance;
 };
