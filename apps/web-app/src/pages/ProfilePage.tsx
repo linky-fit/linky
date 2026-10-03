@@ -9,6 +9,9 @@ import {
   Stack,
   Text,
   TextField,
+  size,
+  space,
+  useMedia,
 } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
@@ -111,6 +114,7 @@ export function ProfilePage({
   writeCurrentNpubToNfc,
 }: ProfilePageProps): React.ReactElement {
   const { formatDisplayedAmountParts, t } = useAppShellCore();
+  const { wide } = useMedia();
   const [inlineClaimError, setInlineClaimError] = React.useState<string | null>(
     null,
   );
@@ -327,8 +331,36 @@ export function ProfilePage({
     inlineClaimPreview !== null &&
     inlineClaimPreview.username === unregisteredOwnLightningAddress?.username;
 
+  const saveButton = (
+    <Button icon="Save" onPress={() => void saveProfileEdits()}>
+      {t("saveChanges")}
+    </Button>
+  );
+  const saveAction = wide ? (
+    saveButton
+  ) : (
+    <Stack
+      position="fixed"
+      bottom="$none"
+      left="$none"
+      right="$none"
+      backgroundColor="$background"
+      zIndex="$sticky"
+      data-safe-area="bottom"
+    >
+      <Stack paddingHorizontal="$xl" paddingVertical="$lg">
+        {saveButton}
+      </Stack>
+    </Stack>
+  );
+
   return (
-    <PageCard backgroundColor="$transparent">
+    <PageCard
+      backgroundColor="$transparent"
+      marginBottom={
+        !wide && canSaveProfileEdits ? size.control + space.lg * 2 : undefined
+      }
+    >
       <ProfileAvatarEditor
         currentNpub={currentNpub}
         shuffleProfileAvatar={shuffleProfileAvatar}
@@ -413,11 +445,7 @@ export function ProfilePage({
         placeholder={t("status")}
       />
 
-      {canSaveProfileEdits ? (
-        <Button icon="Save" onPress={() => void saveProfileEdits()}>
-          {t("saveChanges")}
-        </Button>
-      ) : null}
+      {canSaveProfileEdits ? saveAction : null}
     </PageCard>
   );
 }
