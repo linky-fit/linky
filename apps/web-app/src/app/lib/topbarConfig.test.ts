@@ -49,6 +49,9 @@ describe("resolveBackAction", () => {
   it("returns null on root screens so the app can exit", () => {
     expect(resolveBackAction({ kind: "contacts" }, baseContext)).toBeNull();
     expect(resolveBackAction({ kind: "wallet" }, baseContext)).toBeNull();
+    expect(
+      resolveBackAction({ kind: "proxyPayments" }, baseContext),
+    ).toBeNull();
   });
 
   it("walks settings sub-pages back up to settings", () => {
@@ -56,10 +59,7 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "settingsUnits" })).toBe("#settings");
     expect(backHashFor({ kind: "settingsReceiveMethod" })).toBe("#settings");
     expect(backHashFor({ kind: "settingsMasterKeys" })).toBe("#settings");
-    expect(backHashFor({ kind: "settingsProxyPayments" })).toBe("#settings");
-    expect(backHashFor({ kind: "bankPaymentNew" })).toBe(
-      "#settings/proxy-payments",
-    );
+    expect(backHashFor({ kind: "bankPaymentNew" })).toBe("#proxy");
     expect(backHashFor({ kind: "advancedAutoPayLimit" })).toBe("#settings");
     expect(backHashFor({ kind: "advancedInspector" })).toBe("#settings");
     expect(backHashFor({ kind: "advancedInspectorTimeline" })).toBe(

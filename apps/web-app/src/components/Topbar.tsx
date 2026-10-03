@@ -10,6 +10,7 @@ import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import {
   getDesktopRouteSection,
+  getDesktopSectionRoute,
   isDesktopSectionEntryRoute,
 } from "../app/routes/desktopRouteSection";
 import type { TopbarButton } from "../app/types/appTypes";
@@ -52,7 +53,9 @@ export function Topbar({
         icon: "X",
         label: t("close"),
         onClick: () =>
-          navigateTo({ route: getDesktopRouteSection(state.route) }),
+          navigateTo({
+            route: getDesktopSectionRoute(getDesktopRouteSection(state.route)),
+          }),
       }
     : state.route.kind === "cashuTokenEmit"
       ? {

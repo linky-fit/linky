@@ -131,7 +131,7 @@ const RoutePage = (): React.ReactElement => {
       return <ReceiveMethodPage />;
     case "settingsMasterKeys":
       return <MasterKeysPage />;
-    case "settingsProxyPayments":
+    case "proxyPayments":
       return <ProxyPaymentsPage />;
     case "advancedAutoPayLimit":
       return <AdvancedAutoPayLimitPage />;
@@ -247,7 +247,11 @@ const PhoneRouteContent = (): React.ReactElement => {
   }
 
   const tab =
-    route.kind === "settings" || route.kind === "profile" ? route.kind : null;
+    route.kind === "settings" || route.kind === "profile"
+      ? route.kind
+      : route.kind === "proxyPayments"
+        ? "proxy"
+        : null;
   return (
     <>
       <PageFrame fill={route.kind === "chat"}>
@@ -308,6 +312,8 @@ export const AppRouteContent = (): React.ReactElement => {
               <DesktopContactsPane />
             ) : section === "wallet" ? (
               <DesktopWalletPane />
+            ) : section === "proxy" ? (
+              <ProxyPaymentsPage />
             ) : (
               <AdvancedPage />
             )}

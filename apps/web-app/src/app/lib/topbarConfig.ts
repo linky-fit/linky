@@ -57,7 +57,6 @@ export const resolveBackAction = (
     case "settingsUnits":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
-    case "settingsProxyPayments":
     case "advancedAutoPayLimit":
     case "advancedInspector":
     case "mints":
@@ -66,7 +65,7 @@ export const resolveBackAction = (
       return () => navigateTo({ route: "settings" });
 
     case "bankPaymentNew":
-      return () => navigateTo({ route: "settingsProxyPayments" });
+      return () => navigateTo({ route: "proxyPayments" });
 
     case "advancedInspectorTimeline":
     case "advancedPushDebug":
@@ -158,6 +157,7 @@ export const resolveBackAction = (
     // Root screens: nothing above them.
     case "contacts":
     case "wallet":
+    case "proxyPayments":
       return null;
   }
 };
@@ -234,7 +234,7 @@ const SHOWS_MENU_BUTTON: Record<
   settingsLanguage: false,
   settingsAppearance: false,
   settingsMasterKeys: false,
-  settingsProxyPayments: false,
+  proxyPayments: false,
   settingsReceiveMethod: false,
   settingsUnits: false,
   topupInvoice: false,
@@ -396,7 +396,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   settingsLanguage: "language",
   settingsAppearance: "appearance",
   settingsMasterKeys: "masterKeys",
-  settingsProxyPayments: "proxyPayments",
+  proxyPayments: "proxyPayments",
   settingsReceiveMethod: "receiveMethod",
   settingsUnits: "unit",
   topup: "topupTitle",

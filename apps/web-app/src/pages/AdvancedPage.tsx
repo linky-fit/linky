@@ -239,9 +239,6 @@ export function AdvancedPage(): React.ReactElement {
       <Divider />
 
       <Section title={t("settingsPayments")}>
-        {linkRow("HandCoins", t("proxyPayments"), () =>
-          navigateTo({ route: "settingsProxyPayments" }),
-        )}
         {linkRow(
           "QrCode",
           t("receiveMethod"),

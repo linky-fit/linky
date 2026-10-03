@@ -6,7 +6,20 @@ import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { formatShortNpub } from "../utils/formatting";
 
-export type BottomTabKey = "profile" | "contacts" | "wallet" | "settings";
+export type BottomTabKey =
+  | "profile"
+  | "contacts"
+  | "wallet"
+  | "proxy"
+  | "settings";
+
+const TAB_ROUTE = {
+  contacts: "contacts",
+  profile: "profile",
+  proxy: "proxyPayments",
+  settings: "settings",
+  wallet: "wallet",
+} as const;
 
 interface BottomTabBarProps {
   activeTab: BottomTabKey | null;
@@ -58,6 +71,7 @@ export function BottomTabBar({
     },
     { value: "contacts", label: contactsLabel, icon: "Users" },
     { value: "wallet", label: walletLabel, icon: "Wallet" },
+    { value: "proxy", label: t("proxyPayments"), icon: "HandCoins" },
     {
       value: "settings",
       label: t("settings"),
@@ -72,7 +86,7 @@ export function BottomTabBar({
       onTabChange(tab);
       return;
     }
-    navigateTo({ route: tab });
+    navigateTo({ route: TAB_ROUTE[tab] });
   };
 
   return (

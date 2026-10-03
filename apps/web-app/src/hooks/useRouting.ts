@@ -112,7 +112,7 @@ type NavigationAction =
   | { route: "settingsLanguage" }
   | { route: "settingsAppearance" }
   | { route: "settingsMasterKeys" }
-  | { route: "settingsProxyPayments" }
+  | { route: "proxyPayments" }
   | { route: "settingsUnits" }
   | { route: "settingsReceiveMethod" }
   | { route: "transactions" }
@@ -144,8 +144,8 @@ export const navigateTo = (action: NavigationAction): void => {
     case "settingsMasterKeys":
       window.location.assign("#settings/master-keys");
       break;
-    case "settingsProxyPayments":
-      window.location.assign("#settings/proxy-payments");
+    case "proxyPayments":
+      window.location.assign("#proxy");
       break;
     case "advanced":
       window.location.assign("#advanced");

@@ -155,7 +155,7 @@ export interface NavigationRailProps<T extends string> {
   header?: ReactNode;
 }
 
-/** The full-height column of main sections on wide screens. */
+/** The full-height column of main sections on wide screens; like the TabBar it shows icons only, with labels as names and tooltips. */
 export function NavigationRail<T extends string>({
   accessibilityLabel,
   items,
@@ -171,6 +171,8 @@ export function NavigationRail<T extends string>({
       <Pressable
         key={item.value}
         aria-current={active ? "page" : undefined}
+        aria-label={item.label}
+        tooltip={item.label}
         testID={item.testID}
         disabled={item.disabled}
         onPress={() => onValueChange(item.value)}
@@ -190,9 +192,6 @@ export function NavigationRail<T extends string>({
           (item.icon ? (
             <Icon name={item.icon} size="lg" color={color} />
           ) : null)}
-        <Text variant="caption" bold color={color} numberOfLines={1}>
-          {item.label}
-        </Text>
       </Pressable>
     );
   };
