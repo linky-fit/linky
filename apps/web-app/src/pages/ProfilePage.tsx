@@ -273,7 +273,12 @@ export function ProfilePage({
   if (!isProfileEditing) {
     const displayName = effectiveProfileName ?? formatShortNpub(currentNpub);
     return (
-      <PageCard elevated testID="profile-detail" alignItems="center" gap="$sm">
+      <PageCard
+        backgroundColor="$transparent"
+        testID="profile-detail"
+        alignItems="center"
+        gap="$sm"
+      >
         <Avatar
           name={displayName}
           uri={effectiveProfilePicture ?? undefined}
@@ -324,7 +329,7 @@ export function ProfilePage({
     inlineClaimPreview.username === unregisteredOwnLightningAddress?.username;
 
   return (
-    <PageCard>
+    <PageCard backgroundColor="$transparent">
       <ProfileAvatarEditor
         currentNpub={currentNpub}
         cycleProfileAvatarControl={cycleProfileAvatarControl}
