@@ -4,12 +4,10 @@ import type {
 } from "@linky-fit/linksync";
 import type { EnvelopeState, EnvelopeStatus } from "@linky-fit/linkshu";
 import {
-  claimPatch,
   isRecurringUnfunded,
   planRecurringPaymentTick,
   readRecurringPaymentOrder,
   RECURRING_CONFIRM_SEC,
-  RECURRING_NOTICE_SEC,
   RECURRING_RUN_RETRY_DELAY_SEC,
   recurringAmountSat,
   recurringEnvelopeKey,
@@ -41,7 +39,6 @@ import { formatShortNpub } from "../../../utils/formatting";
 import { formatMintHost } from "../../../utils/mint";
 import { withTabLockIfFree } from "../../../utils/storage";
 import { nowSeconds } from "../../../utils/time";
-import { getDeviceId } from "../../lib/deviceId";
 import {
   paidOverlayContact,
   type PaidOverlayDetails,
@@ -65,10 +62,10 @@ import {
 } from "./payRecurringRun";
 import type { SendTokenMessage } from "./useSendTokenMessage";
 
-/** Short enough that a payment goes out within seconds of its send time. */
+/** Short enough that a payment goes out within seconds of its due time. */
 export const RECURRING_TICK_INTERVAL_MS = 15_000;
 
-/** Tabs share the device id, so each would act on the same claim. */
+/** One pass at a time across tabs, so a payment shows one countdown and one set of notifications. */
 const RECURRING_TAB_LOCK = "linky.recurringPayments";
 
 type RecurringRunOutcome = "paid" | "failed" | "waiting" | "busy" | "missing";
@@ -102,7 +99,7 @@ interface UseRecurringPaymentsSchedulerParams {
   envelopes: CashuEnvelopes | null;
   fiatRates: FiatRates | null;
   formatDisplayedAmountParts: (amountSat: number) => DisplayAmountParts;
-  /** Whether the account's data has arrived; the scheduler claims and pays nothing before. */
+  /** Whether the account's data has arrived; the scheduler pays nothing before. */
   hydrated: boolean;
   logPaymentEvent: (event: LoggedPaymentEventParams) => void;
   maybeShowPwaNotification: (
@@ -118,7 +115,6 @@ interface UseRecurringPaymentsSchedulerParams {
   showPaidOverlay: (title: string, details: PaidOverlayDetails) => void;
   t: Translate;
   dependencies?: {
-    deviceId?: string;
     /** Whether the user is looking at Linky; a visible app asks before paying. */
     isVisible?: () => boolean;
     nowSec?: () => number;
@@ -252,16 +248,14 @@ const onDemand = (
 });
 
 /**
- * Runs recurring payments on whichever device is online. Before a payment is
- * due (or as soon as an overdue one is noticed) a device claims it on the row
- * and notifies the user. When the notice window ends the device named by the
- * claim pays it: silently when Linky is in the background, after a short
- * in-app countdown with pay-now and cancel when it is visible. The claim only
- * decides who notifies; the run's envelope at the order's mint keeps any
- * number of devices and tabs from paying it twice. A run whose envelope the
- * mint already signed needs no balance, rate or countdown. Each pass first
- * walks the envelopes of every order not checked yet this session, live
- * ones and deleted ones, and settles those of deleted orders.
+ * Runs recurring payments on every device that is online. A payment goes out
+ * at its due time, an overdue one on the first pass after launch: silently
+ * when Linky is in the background, after a short in-app countdown with
+ * pay-now and cancel when it is visible. The run's envelope at the order's
+ * mint keeps any number of devices and tabs from paying it twice. A run whose
+ * envelope the mint already signed needs no balance, rate or countdown. Each
+ * pass first walks the envelopes of every order not checked yet this session,
+ * live ones and deleted ones, and settles those of deleted orders.
  */
 export const useRecurringPaymentsScheduler = ({
   contacts,
@@ -296,7 +290,6 @@ export const useRecurringPaymentsScheduler = ({
   const enabled = envelopes !== null && hydrated;
   const nowSec = dependencies?.nowSec ?? nowSeconds;
   const isVisible = dependencies?.isVisible ?? documentIsVisible;
-  const deviceId = dependencies?.deviceId ?? getDeviceId();
   const tickIntervalMs =
     dependencies?.tickIntervalMs ?? RECURRING_TICK_INTERVAL_MS;
   const tickInFlightRef = React.useRef<Promise<void> | null>(null);
@@ -384,40 +377,6 @@ export const useRecurringPaymentsScheduler = ({
         .catch(() => undefined);
     },
     [findContact, formatAmount, latest],
-  );
-
-  const claimOrder = React.useCallback(
-    async (
-      action: Extract<RecurringTickAction, { kind: "claim" }>,
-    ): Promise<void> => {
-      const { order, dueAtSec, takeover } = action;
-      const now = nowSec();
-      await patchOrder(order, claimPatch(deviceId, now, dueAtSec));
-      const minutes = Math.max(
-        1,
-        Math.ceil((Math.max(dueAtSec, now + RECURRING_NOTICE_SEC) - now) / 60),
-      );
-      notifyOrder(
-        order,
-        orderAmountSat(order),
-        latest.current
-          .t("recurringNotifyBody")
-          .replace("{minutes}", String(minutes)),
-        `recurring:${order.id}:${dueAtSec}`,
-      );
-      reportAppLog({
-        tag: "recurring.claimed",
-        summary: `recurring payment claimed${takeover ? " (takeover)" : ""}`,
-        links: orderLinks(order),
-        payload: {
-          deviceId,
-          dueAtSec,
-          previousClaim: order.claim,
-          takeover,
-        },
-      });
-    },
-    [deviceId, latest, notifyOrder, nowSec, orderAmountSat, patchOrder],
   );
 
   const notifySkipped = React.useCallback(
@@ -703,7 +662,6 @@ export const useRecurringPaymentsScheduler = ({
           );
           return "failed";
         }
-        await patchOrder(order, claimPatch(deviceId, nowSec(), run.dueAtSec));
         return executeRun(onDemand(run, amountSat));
       }).finally(() => {
         tickInFlightRef.current = null;
@@ -711,7 +669,7 @@ export const useRecurringPaymentsScheduler = ({
       tickInFlightRef.current = pass.then(() => undefined);
       return pass;
     },
-    [deviceId, executeRun, latest, loadOrders, nowSec, patchOrder],
+    [executeRun, latest, loadOrders],
   );
 
   const notifyOnce = React.useCallback(
@@ -874,7 +832,6 @@ export const useRecurringPaymentsScheduler = ({
         // The rows read before recovery paid these are stale until the next pass.
         orders: orders.filter((order) => !paidInRecovery.has(order.id)),
         nowSec: now,
-        deviceId,
         balanceSatByMint: new Map(
           latest.current.mintBalances.map(({ mint, amount }) => [mint, amount]),
         ),
@@ -887,9 +844,6 @@ export const useRecurringPaymentsScheduler = ({
       for (const planned of actions) {
         const action = (await fundedRun(planned)) ?? planned;
         switch (action.kind) {
-          case "claim":
-            await claimOrder(action);
-            break;
           case "skip":
             await skipPeriod(action);
             break;
@@ -947,8 +901,6 @@ export const useRecurringPaymentsScheduler = ({
     tickInFlightRef.current = pass;
     return pass;
   }, [
-    claimOrder,
-    deviceId,
     dueConfirmationRef,
     executeRun,
     fundedRun,

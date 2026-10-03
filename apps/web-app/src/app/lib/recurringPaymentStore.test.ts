@@ -40,9 +40,6 @@ const record = (
   lastRunAtSec: null,
   lastRunStatus: null,
   pausedAtSec: null,
-  claimDeviceId: null,
-  claimAtSec: null,
-  claimDueAtSec: null,
   ...overrides,
 });
 
@@ -66,7 +63,6 @@ describe("readRecurringPaymentOrder", () => {
       },
       lastRunAtSec: null,
       lastRunStatus: null,
-      claim: null,
     });
   });
 
@@ -77,12 +73,9 @@ describe("readRecurringPaymentOrder", () => {
     expect(order?.amount).toEqual({ amount: 15_050, unit: "czk" });
   });
 
-  it("reads a complete claim, the run count and a known run status", () => {
+  it("reads the run count and a known run status", () => {
     const order = readRecurringPaymentOrder(
       record({
-        claimDeviceId: NonEmptyString100.orThrow("device-a"),
-        claimAtSec: PositiveInt.orThrow(1_702_592_100),
-        claimDueAtSec: PositiveInt.orThrow(1_702_592_400),
         lastRunStatus: NonEmptyString100.orThrow("paid"),
         progress: recurringProgressColumn({
           runCount: 3,
@@ -90,23 +83,16 @@ describe("readRecurringPaymentOrder", () => {
         }),
       }),
     );
-    expect(order?.claim).toEqual({
-      deviceId: "device-a",
-      atSec: 1_702_592_100,
-      dueAtSec: 1_702_592_400,
-    });
     expect(order?.lastRunStatus).toBe("paid");
     expect(order?.schedule.runCount).toBe(3);
   });
 
-  it("ignores a partial claim and an unknown run status", () => {
+  it("ignores an unknown run status", () => {
     const order = readRecurringPaymentOrder(
       record({
-        claimDeviceId: NonEmptyString100.orThrow("device-a"),
         lastRunStatus: NonEmptyString100.orThrow("teleported"),
       }),
     );
-    expect(order?.claim).toBeNull();
     expect(order?.lastRunStatus).toBeNull();
   });
 

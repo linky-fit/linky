@@ -34,8 +34,6 @@ interface BootOptions {
   identity?: SeedIdentity;
   hidden?: boolean;
   fiat?: boolean;
-  /** Devices booted with one id all act on its claim. */
-  deviceId?: string;
 }
 type BootAccount = (label: string, options?: BootOptions) => Promise<Account>;
 
@@ -60,7 +58,7 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
         await setBaseStorage(page);
         await setSeedLoginStorage(page, identity);
         await page.addInitScript(
-          ({ hidden, fiat, deviceId }) => {
+          ({ hidden, fiat }) => {
             Object.defineProperty(document, "visibilityState", {
               configurable: true,
               get: () => (hidden ? "hidden" : "visible"),
@@ -74,12 +72,10 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
                 "linky.display_allowed_currencies.v1",
                 JSON.stringify(["sat", "czk"]),
               );
-            if (deviceId) localStorage.setItem("linky.device_id.v1", deviceId);
           },
           {
             hidden: options.hidden ?? false,
             fiat: options.fiat ?? false,
-            deviceId: options.deviceId ?? null,
           },
         );
         await stubFiatRates(page);
@@ -183,8 +179,6 @@ const OrderState = Schema.Struct({
   progress: Schema.parseJson(
     Schema.Struct({ runCount: Schema.Number, nextDueAtSec: Schema.Number }),
   ),
-  claimAtSec: Schema.NullOr(Schema.Number),
-  claimDeviceId: Schema.NullOr(Schema.String),
   lastRunStatus: Schema.NullOr(Schema.String),
 });
 
@@ -290,15 +284,8 @@ export const triggerSchedulerPass = async (page: Page): Promise<void> => {
   });
 };
 
-export const claimOrder = async (page: Page): Promise<number> => {
-  await triggerSchedulerPass(page);
-  await expect
-    .poll(async () => (await readOrder(page)).claimAtSec)
-    .not.toBeNull();
-  const order = await readOrder(page);
-  if (order.claimAtSec === null) throw new Error("Order was not claimed");
-  return Math.max(order.nextDueAtSec, order.claimAtSec + 60);
-};
+export const dueAt = async (page: Page): Promise<number> =>
+  (await readOrder(page)).nextDueAtSec;
 
 export const waitUntil = async (epochSec: number): Promise<void> => {
   await expect
@@ -314,9 +301,9 @@ export const dueDialog = (page: Page) =>
 
 export const waitForCountdown = async (
   page: Page,
-  sendAt: number,
+  dueAtSec: number,
 ): Promise<void> => {
-  await waitUntil(sendAt);
+  await waitUntil(dueAtSec);
   await triggerSchedulerPass(page);
   await expect(dueDialog(page)).toBeVisible();
   await expect(dueDialog(page)).toContainText(

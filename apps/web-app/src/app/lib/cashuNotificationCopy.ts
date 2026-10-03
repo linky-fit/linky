@@ -31,20 +31,66 @@ export const getChatAttachmentCopyForLanguage = (
   return kind === "pdf" ? "PDF" : "Image";
 };
 
+interface RecurringReminderCopy {
+  named: (note: string) => string;
+  unnamed: string;
+  several: (count: number) => string;
+  body: string;
+  severalBody: string;
+}
+
+const RECURRING_REMINDER_COPY = {
+  cs: {
+    named: (note) => `Připraveno k odeslání: ${note}`,
+    unnamed: "Platba je připravena k odeslání",
+    several: (count) =>
+      `Připraveno k odeslání: ${count} ${count < 5 ? "platby" : "plateb"}`,
+    body: "Otevřete aplikaci a odešlete platbu.",
+    severalBody: "Otevřete aplikaci a odešlete platby.",
+  },
+  de: {
+    named: (note) => `Bereit zum Senden: ${note}`,
+    unnamed: "Zahlung bereit zum Senden",
+    several: (count) => `${count} Zahlungen bereit zum Senden`,
+    body: "Öffne die App, um die Zahlung zu senden.",
+    severalBody: "Öffne die App, um die Zahlungen zu senden.",
+  },
+  pt: {
+    named: (note) => `Pronto para enviar: ${note}`,
+    unnamed: "Pagamento pronto para enviar",
+    several: (count) => `${count} pagamentos prontos para enviar`,
+    body: "Abra o app para enviar o pagamento.",
+    severalBody: "Abra o app para enviar os pagamentos.",
+  },
+  en: {
+    named: (note) => `Ready to send ${note}`,
+    unnamed: "Ready to send payment",
+    several: (count) => `Ready to send ${count} payments`,
+    body: "Open the app to send the payment.",
+    severalBody: "Open the app to send the payments.",
+  },
+} satisfies Record<string, RecurringReminderCopy>;
+
+const reminderCopyFor = (
+  language: string | null | undefined,
+): RecurringReminderCopy => {
+  const normalized = (language ?? "").trim().toLowerCase();
+  if (normalized.startsWith("cs")) return RECURRING_REMINDER_COPY.cs;
+  if (normalized.startsWith("de")) return RECURRING_REMINDER_COPY.de;
+  if (normalized.startsWith("pt")) return RECURRING_REMINDER_COPY.pt;
+  return RECURRING_REMINDER_COPY.en;
+};
+
+/** The nudge for the payments due at one reminder time, named by their notes when this device stored them. */
 export const getRecurringReminderCopyForLanguage = (
   language: string | null | undefined,
-): string => {
-  const normalized = (language ?? "").trim().toLowerCase();
-  if (normalized.startsWith("cs")) {
-    return "Pravidelná platba je připravena. Otevřete Linky a odešlete ji.";
-  }
-  if (normalized.startsWith("de")) {
-    return "Eine wiederkehrende Zahlung ist bereit. Öffne Linky, um sie zu senden.";
-  }
-  if (normalized.startsWith("pt")) {
-    return "Um pagamento recorrente está pronto. Abra o Linky para enviá-lo.";
-  }
-  return "A recurring payment is ready. Open Linky to send it.";
+  notes: ReadonlyArray<string | null> | null,
+): { title: string; body: string } => {
+  const copy = reminderCopyFor(language);
+  const count = notes?.length ?? 0;
+  if (count > 1) return { title: copy.several(count), body: copy.severalBody };
+  const note = notes?.[0];
+  return { title: note ? copy.named(note) : copy.unnamed, body: copy.body };
 };
 
 export const getBankPaymentReimbursementCopyForLanguage = (

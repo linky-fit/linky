@@ -45,16 +45,6 @@ export const recurringProgressColumn = (progress: RecurringProgress): string =>
 const readProgress = (column: string): RecurringProgress | null =>
   Option.getOrNull(Schema.decodeUnknownOption(ProgressJson)(column));
 
-/**
- * Which device shows the countdown and notifies for the upcoming due time, as
- * last written to the row. It never decides whether money moves.
- */
-export interface RecurringPaymentClaim {
-  deviceId: string;
-  atSec: number;
-  dueAtSec: number;
-}
-
 /** A recurring payment as the planner and the UI see it. */
 export interface RecurringPaymentOrder {
   id: RecurringPaymentId;
@@ -70,7 +60,6 @@ export interface RecurringPaymentOrder {
   schedule: RecurringScheduleState;
   lastRunAtSec: number | null;
   lastRunStatus: RecurringPaymentRunStatus | null;
-  claim: RecurringPaymentClaim | null;
 }
 
 /** The stored columns an order is read from, before any validation. */
@@ -92,28 +81,7 @@ export interface RecurringPaymentColumns {
   lastRunAtSec: number | null;
   lastRunStatus: string | null;
   pausedAtSec: number | null;
-  claimDeviceId: string | null;
-  claimAtSec: number | null;
-  claimDueAtSec: number | null;
 }
-
-const readClaim = (
-  columns: RecurringPaymentColumns,
-): RecurringPaymentClaim | null => {
-  const deviceId = columns.claimDeviceId?.trim() ?? "";
-  if (
-    !deviceId ||
-    columns.claimAtSec === null ||
-    columns.claimDueAtSec === null
-  ) {
-    return null;
-  }
-  return {
-    deviceId,
-    atSec: columns.claimAtSec,
-    dueAtSec: columns.claimDueAtSec,
-  };
-};
 
 /** Null for rows this build cannot act on (unknown rail, interval or amount unit, unreadable progress). */
 export const readRecurringPaymentOrder = (
@@ -143,7 +111,6 @@ export const readRecurringPaymentOrder = (
     lastRunStatus: isRecurringPaymentRunStatus(columns.lastRunStatus)
       ? columns.lastRunStatus
       : null,
-    claim: readClaim(columns),
   };
 };
 

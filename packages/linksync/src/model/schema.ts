@@ -135,11 +135,6 @@ export const LinkySchema = {
     // "paid" | "failed" | "skipped"
     lastRunStatus: nullOr(NonEmptyString100),
     pausedAtSec: nullOr(PositiveInt),
-    // Which device shows the countdown and notifies for the upcoming due
-    // time; the mint, not the claim, keeps a run from being paid twice.
-    claimDeviceId: nullOr(NonEmptyString100),
-    claimAtSec: nullOr(PositiveInt),
-    claimDueAtSec: nullOr(PositiveInt),
   },
   /** Messages scope: one chat and its read cursors. */
   conversation: {

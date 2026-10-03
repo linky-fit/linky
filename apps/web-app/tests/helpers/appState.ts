@@ -76,6 +76,22 @@ export const waitForNetworkReady = async (page: Page): Promise<void> => {
   });
 };
 
+/** Closes the app, runs `whileClosed`, then opens `path`; the relaunch does not count as a reload. */
+export const relaunchApp = async (
+  page: Page,
+  path: string,
+  whileClosed: () => Promise<void>,
+): Promise<void> => {
+  await page.evaluate(
+    (key) => sessionStorage.setItem(key, "0"),
+    LOAD_COUNTER_KEY,
+  );
+  await page.goto("about:blank");
+  await whileClosed();
+  await page.goto(path);
+  await waitForNetworkReady(page);
+};
+
 export const readBalanceSat = async (page: Page): Promise<number> => {
   const balance = page.getByLabel("Available balance");
   await expect(balance).toBeVisible();

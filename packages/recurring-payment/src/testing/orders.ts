@@ -19,7 +19,7 @@ export const HOUR = 3600;
 export const DUE = 1_800_000_000;
 export const MINT = "https://mint.example";
 
-/** A 6-hourly sat payment over Cashu from `MINT` due at `DUE`, unclaimed, never run. */
+/** A 6-hourly sat payment over Cashu from `MINT` due at `DUE`, never run. */
 export const recurringOrderFixture = (
   overrides: Partial<RecurringPaymentOrder> = {},
 ): RecurringPaymentOrder => ({
@@ -40,7 +40,6 @@ export const recurringOrderFixture = (
   },
   lastRunAtSec: null,
   lastRunStatus: null,
-  claim: null,
   ...overrides,
 });
 
@@ -64,8 +63,5 @@ export const recurringColumnsFixture = (
   lastRunAtSec: null,
   lastRunStatus: null,
   pausedAtSec: null,
-  claimDeviceId: null,
-  claimAtSec: null,
-  claimDueAtSec: null,
   ...overrides,
 });

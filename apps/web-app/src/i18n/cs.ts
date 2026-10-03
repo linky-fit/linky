@@ -33,8 +33,6 @@ export const cs = {
   recurringScheduledSection: "Naplánované",
   recurringHistorySection: "Historie",
   recurringInsufficientFundsHint: "nízký zůstatek",
-  recurringNotifyBody:
-    "{amount} {unit} pro {name} odejde za {minutes} min. Otevřete Linky, pokud ji chcete zrušit.",
   recurringSentBody: "{amount} {unit} pro {name} odesláno.",
   recurringFailedBody:
     "Odeslání {amount} {unit} pro {name} se nezdařilo. Zkusím to znovu.",

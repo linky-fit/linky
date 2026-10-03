@@ -8,9 +8,6 @@ import type { RecurringRun } from "./tick";
 
 /** The columns one state change writes; the app brands them for its store. */
 export interface RecurringPaymentPatch {
-  claimAtSec?: number | null;
-  claimDeviceId?: string | null;
-  claimDueAtSec?: number | null;
   lastRunAtSec?: number | null;
   lastRunStatus?: RecurringPaymentRunStatus;
   pausedAtSec?: number | null;
@@ -29,30 +26,11 @@ const movedDuePatch = (
   }),
 });
 
-/** This device shows the countdown for the due time and notifies the user. */
-export const claimPatch = (
-  deviceId: string,
-  nowSec: number,
-  dueAtSec: number,
-): RecurringPaymentPatch => ({
-  claimDeviceId: deviceId,
-  claimAtSec: nowSec,
-  claimDueAtSec: dueAtSec,
-});
-
-/**
- * After an edit of the schedule: the new first due time starts a new grid,
- * the count stays, and an in-flight claim no longer applies.
- */
+/** After an edit of the schedule: the new first due time starts a new grid and the count stays. */
 export const editPatch = (
   order: RecurringPaymentOrder,
   firstDueAtSec: number,
-): RecurringPaymentPatch => ({
-  ...movedDuePatch(order, firstDueAtSec),
-  claimAtSec: null,
-  claimDeviceId: null,
-  claimDueAtSec: null,
-});
+): RecurringPaymentPatch => movedDuePatch(order, firstDueAtSec);
 
 /** Missed periods are not paid retroactively, and a pending one paid early is consumed. */
 const nextDueAfterRun = (

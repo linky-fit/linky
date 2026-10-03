@@ -272,10 +272,6 @@ _Avoid_: execution, instance, occurrence
 How every run of a recurring payment reaches the contact, chosen once when it is created: a token sent over Nostr (Cashu) or a melt paying their Lightning address (Lightning).
 _Avoid_: payment method, channel
 
-**Claim**:
-The mark a device writes on a recurring payment before a due time, naming the device that shows the countdown and notifications; it never decides whether money moves.
-_Avoid_: lock, lease, reservation
-
 ## Sync and devices
 
 **Device**:
