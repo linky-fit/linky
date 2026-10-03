@@ -120,7 +120,7 @@ export const pt = {
   recurringRunNow: "Pagar",
   recurringNotFound: "Pagamento recorrente não encontrado.",
   recurringOnlyWhileOpen:
-    "Qualquer aparelho seu com o Linky em execução envia o pagamento, também em segundo plano. Você recebe um aviso um minuto antes; com o aplicativo aberto, vê uma contagem regressiva e pode pagar na hora ou cancelar.",
+    "Qualquer aparelho seu com o Linky em execução envia o pagamento, também em segundo plano. Se nenhum o enviar até um minuto após o vencimento, você recebe um lembrete para abrir o Linky; com o aplicativo aberto, vê uma contagem regressiva e pode pagar na hora ou cancelar.",
   recurringRepeatAction: "Repetir regularmente",
   showTransactions: "Mostrar transações",
   feedback: "Feedback",
