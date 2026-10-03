@@ -126,6 +126,9 @@ export function RecurringPaymentPage({
       </Stack>
 
       <Stack gap="$none">
+        {order.note ? (
+          <ListRow title={t("paymentNoteLabel")} value={order.note} />
+        ) : null}
         {state === "active" ? (
           <ListRow
             title={t("recurringNextRun")}

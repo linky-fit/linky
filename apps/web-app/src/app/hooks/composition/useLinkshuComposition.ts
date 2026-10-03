@@ -6,6 +6,7 @@ import {
   EnvelopeMeltDraft,
   EnvelopeOpenDraft,
   EnvelopeRef,
+  EnvelopeSendDraft,
   FeeProbe,
   FeeProbeDraft,
   linkshuServices,
@@ -175,7 +176,7 @@ export interface CashuEnvelopes {
     ref: CashuEnvelopeRef,
   ) => Promise<Either.Either<EnvelopeState, EnvelopeStateError>>;
   readonly send: (
-    ref: CashuEnvelopeRef,
+    args: CashuEnvelopeRef & { readonly memo: string | null },
   ) => Promise<Either.Either<EnvelopeToken, EnvelopeSendError>>;
   readonly melt: (
     args: CashuEnvelopeRef & { readonly invoice: string },
@@ -355,6 +356,7 @@ const decodePaidQuoteDraft = Schema.decodeUnknownSync(PaidQuoteDraft);
 const decodeEnvelopeRef = Schema.decodeUnknownSync(EnvelopeRef);
 const decodeEnvelopeOpenDraft = Schema.decodeUnknownSync(EnvelopeOpenDraft);
 const decodeEnvelopeMeltDraft = Schema.decodeUnknownSync(EnvelopeMeltDraft);
+const decodeEnvelopeSendDraft = Schema.decodeUnknownSync(EnvelopeSendDraft);
 
 /**
  * NUT-20 quotes are locked to the nostr key: topups lock new quotes to it,
@@ -710,8 +712,17 @@ export const useLinkshuComposition = ({
         ),
       state: (ref) =>
         withEnvelope(ref, (envelope, decoded) => envelope.state(decoded)),
-      send: (ref) =>
-        withEnvelope(ref, (envelope, decoded) => envelope.send(decoded)),
+      send: ({ mint, key, memo }) =>
+        runEither(
+          Effect.suspend(() => {
+            const draft = decodeEnvelopeSendDraft({
+              mint,
+              key,
+              ...(memo === null ? {} : { memo }),
+            });
+            return Effect.flatMap(Envelope, (envelope) => envelope.send(draft));
+          }),
+        ),
       melt: ({ mint, key, invoice }) =>
         runEither(
           Effect.suspend(() => {

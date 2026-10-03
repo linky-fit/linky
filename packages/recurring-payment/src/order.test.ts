@@ -34,6 +34,13 @@ describe("readRecurringPaymentOrder", () => {
     expect(order?.rail).toBe("lightning");
   });
 
+  it("reads the note, without surrounding whitespace", () => {
+    expect(
+      readRecurringPaymentOrder(recurringColumnsFixture({ note: " Rent " }))
+        ?.note,
+    ).toBe("Rent");
+  });
+
   it("reads a complete claim, the progress and a known run status", () => {
     const order = readRecurringPaymentOrder(
       recurringColumnsFixture({

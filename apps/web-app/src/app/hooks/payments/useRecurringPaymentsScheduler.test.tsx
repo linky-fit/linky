@@ -184,6 +184,7 @@ interface RowOverrides {
   lastRunAtSec?: number;
   lastRunStatus?: string;
   nextDueAtSec?: number;
+  note?: string;
   rail?: RecurringRail;
   runCount?: number;
   unit?: string;
@@ -208,6 +209,9 @@ const insertOrder = (
       anchorAtSec: int(DUE),
       timeZone: text("UTC"),
       progress: progressColumn(overrides.runCount ?? 0, nextDueAtSec),
+      ...(overrides.note === undefined
+        ? {}
+        : { note: NonEmptyString1000.orThrow(overrides.note) }),
       ...(overrides.lastRunAtSec === undefined
         ? {}
         : { lastRunAtSec: int(overrides.lastRunAtSec) }),
@@ -382,7 +386,10 @@ describe("useRecurringPaymentsScheduler", () => {
       ...firstRef,
       amountSat: 100,
     });
-    expect(view.envelopes().send).toHaveBeenCalledWith(firstRef);
+    expect(view.envelopes().send).toHaveBeenCalledWith({
+      ...firstRef,
+      memo: null,
+    });
     expect(view.params.sendTokenMessage).toHaveBeenCalledWith({
       amount: 100,
       clientId: expect.any(String),
@@ -413,6 +420,38 @@ describe("useRecurringPaymentsScheduler", () => {
       contact: { name: "Alice", npub: "npub1alice" },
     });
     expect(view.scheduler().dueConfirmation).toBeNull();
+    await view.unmount();
+  });
+
+  it("carries the order's note as the token memo and the history note", async () => {
+    const view = await mount({ ...claimedBy("device-a"), note: "Rent" });
+
+    expect(view.envelopes().send).toHaveBeenCalledWith({
+      ...firstRef,
+      memo: "Rent",
+    });
+    expect(view.params.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "cashu_chat", note: "Rent" }),
+    );
+    await view.unmount();
+  });
+
+  it("carries the order's note as the LUD-12 comment and the history note", async () => {
+    const view = await mount({
+      ...claimedBy("device-a"),
+      contactId: LIGHTNING_CONTACT_ID,
+      note: "Rent",
+      rail: "lightning",
+    });
+
+    expect(fetchLnurlInvoiceMock).toHaveBeenCalledWith(
+      "bob@example.com",
+      100,
+      "Rent",
+    );
+    expect(view.params.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "lightning_address", note: "Rent" }),
+    );
     await view.unmount();
   });
 
@@ -457,7 +496,10 @@ describe("useRecurringPaymentsScheduler", () => {
     await replacement.runNow();
 
     expect(opened(replacement)).toEqual([keyOf(0)]);
-    expect(replacement.envelopes().send).toHaveBeenCalledWith(firstRef);
+    expect(replacement.envelopes().send).toHaveBeenCalledWith({
+      ...firstRef,
+      memo: null,
+    });
     expect(replacement.params.sendTokenMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         clientId: vi.mocked(first.params.sendTokenMessage).mock.calls[0][0]
@@ -520,7 +562,11 @@ describe("useRecurringPaymentsScheduler", () => {
       rail: "lightning",
     });
 
-    expect(fetchLnurlInvoiceMock).toHaveBeenCalledWith("bob@example.com", 100);
+    expect(fetchLnurlInvoiceMock).toHaveBeenCalledWith(
+      "bob@example.com",
+      100,
+      undefined,
+    );
     expect(view.envelopes().melt).toHaveBeenCalledWith({
       ...firstRef,
       invoice: "lnbc-mock-100",
@@ -1309,7 +1355,10 @@ describe("useRecurringPaymentsScheduler", () => {
       await view.runNow();
 
       expect(view.envelopes().release).not.toHaveBeenCalled();
-      expect(view.envelopes().send).toHaveBeenCalledWith(firstRef);
+      expect(view.envelopes().send).toHaveBeenCalledWith({
+        ...firstRef,
+        memo: null,
+      });
       expect(view.params.sendTokenMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           contactNpub: "npub1alice",
@@ -1358,7 +1407,10 @@ describe("useRecurringPaymentsScheduler", () => {
       await view.setParams({ contacts: [nostrContact, lightningContact] });
       now += RECURRING_RUN_RETRY_DELAY_SEC;
       await view.runNow();
-      expect(view.envelopes().send).toHaveBeenCalledWith(firstRef);
+      expect(view.envelopes().send).toHaveBeenCalledWith({
+        ...firstRef,
+        memo: null,
+      });
       expect(view.params.sendTokenMessage).toHaveBeenCalledWith(
         expect.objectContaining({ contactNpub: "npub1alice" }),
       );

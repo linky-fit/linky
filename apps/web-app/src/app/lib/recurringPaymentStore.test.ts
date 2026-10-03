@@ -10,6 +10,7 @@ import {
   readRecurringPaymentOrder,
   recurringProgressColumn,
 } from "@linky-fit/recurring-payment";
+import { recurringPaymentColumns } from "./recurringPaymentStore";
 
 const { appOwner } = makeTestLinkyStore();
 
@@ -27,6 +28,7 @@ const record = (
   rail: "cashu",
   amount: PositiveInt.orThrow(21_000),
   unit: "sat",
+  note: null,
   intervalUnit: "month",
   intervalCount: PositiveInt.orThrow(1),
   anchorAtSec: PositiveInt.orThrow(1_700_000_000),
@@ -53,6 +55,7 @@ describe("readRecurringPaymentOrder", () => {
       mintUrl: "https://mint.example",
       rail: "cashu",
       amount: { amount: 21_000, unit: "sat" },
+      note: null,
       schedule: {
         anchorAtSec: 1_700_000_000,
         interval: { unit: "month", count: 1 },
@@ -114,5 +117,24 @@ describe("readRecurringPaymentOrder", () => {
     ["unknown amount unit", { unit: "gold" }],
   ])("rejects a record with %s", (_label, overrides) => {
     expect(readRecurringPaymentOrder(record(overrides))).toBeNull();
+  });
+});
+
+describe("recurringPaymentColumns", () => {
+  const input = {
+    amount: { amount: 21, unit: "sat" as const },
+    contactId: contactIdFor("contact-1"),
+    firstDueAtSec: 1_702_592_400,
+    interval: { unit: "month" as const, count: 1 },
+  };
+
+  it("writes the note and omits a missing one", () => {
+    const contactId = contactIdFor("contact-1");
+    expect(
+      recurringPaymentColumns({ ...input, note: "Rent" }, contactId).note,
+    ).toBe("Rent");
+    expect(
+      recurringPaymentColumns({ ...input, note: null }, contactId),
+    ).not.toHaveProperty("note");
   });
 });

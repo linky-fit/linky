@@ -138,7 +138,10 @@ const sendToken = async (
   run: RecurringRun,
   npub: string,
 ): Promise<RecurringRunResult> => {
-  const token = await deps.envelopes.send(runEnvelopeRef(run));
+  const token = await deps.envelopes.send({
+    ...runEnvelopeRef(run),
+    memo: run.order.note,
+  });
   if (Either.isLeft(token)) return errorResult(token.left, null);
   const { amount, operationId, tokenText } = token.right;
   const delivery = await deps.sendTokenMessage({
@@ -159,6 +162,7 @@ const sendToken = async (
     fee: null,
     method: "cashu_chat",
     mint: run.order.mintUrl,
+    note: run.order.note,
     phase: "complete",
     status: "ok",
     transactionId: transactionIdForOperation(operationId),
@@ -176,7 +180,13 @@ const meltToAddress = async (
 ): Promise<RecurringRunResult> => {
   let invoice: string;
   try {
-    invoice = (await fetchLnurlInvoiceForTarget(lnAddress, amountSat)).pr;
+    invoice = (
+      await fetchLnurlInvoiceForTarget(
+        lnAddress,
+        amountSat,
+        run.order.note ?? undefined,
+      )
+    ).pr;
   } catch (error) {
     return failed(
       getUnknownErrorMessage(error, "invoice fetch failed"),
@@ -200,6 +210,7 @@ const meltToAddress = async (
       fee: null,
       method: "lightning_address",
       mint: error.mint,
+      note: run.order.note,
       phase: "melt",
       status: "ok",
       transactionId: transactionIdForOperation(error.operationId),
@@ -216,6 +227,7 @@ const meltToAddress = async (
     fee: receipt.feePaid,
     method: "lightning_address",
     mint: receipt.mint,
+    note: run.order.note,
     phase: "complete",
     status: "ok",
     transactionId: transactionIdForQuote("melt", receipt.mint, receipt.quoteId),

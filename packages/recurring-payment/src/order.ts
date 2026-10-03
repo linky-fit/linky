@@ -65,6 +65,8 @@ export interface RecurringPaymentOrder {
   /** Every run is delivered this way, whatever the contact looks like today. */
   rail: RecurringRail;
   amount: RecurringAmount;
+  /** Every run carries the order's current note to the contact and into the history. */
+  note: string | null;
   schedule: RecurringScheduleState;
   lastRunAtSec: number | null;
   lastRunStatus: RecurringPaymentRunStatus | null;
@@ -80,6 +82,7 @@ export interface RecurringPaymentColumns {
   rail: string;
   amount: number;
   unit: string;
+  note: string | null;
   intervalUnit: string;
   intervalCount: number;
   anchorAtSec: number;
@@ -128,6 +131,7 @@ export const readRecurringPaymentOrder = (
     mintUrl: columns.mintUrl,
     rail: columns.rail,
     amount: { amount: columns.amount, unit: columns.unit },
+    note: columns.note?.trim() || null,
     schedule: {
       anchorAtSec: columns.anchorAtSec,
       interval: { unit: columns.intervalUnit, count: columns.intervalCount },

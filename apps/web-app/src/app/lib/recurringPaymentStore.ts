@@ -18,15 +18,23 @@ export interface RecurringPaymentInput {
   /** The next due time; also the anchor every later due time is counted from. */
   firstDueAtSec: number;
   interval: RecurringInterval;
+  /** Trimmed; null without one. */
+  note: string | null;
 }
 
 type RepositoryPatch = Parameters<RecurringPaymentsRepository["update"]>[1];
 
-/** The schedule and amount columns a form writes; the due time goes into `progress` through a patch. */
+/**
+ * The schedule, amount and note columns a form writes, without an empty
+ * note; the due time goes into `progress` through a patch.
+ */
 export const recurringPaymentColumns = (
   input: RecurringPaymentInput,
   contactId: ContactId,
 ) => ({
+  ...(input.note === null
+    ? {}
+    : { note: NonEmptyString1000.orThrow(input.note) }),
   contactId,
   amount: PositiveInt.orThrow(input.amount.amount),
   unit: NonEmptyString100.orThrow(input.amount.unit),

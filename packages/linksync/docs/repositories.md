@@ -88,7 +88,7 @@ A row's id says which event it records, so writing the same event again (a retry
 
 `progress` holds the count of paid runs and the pending due time as one JSON value, so last-writer-wins sync always leaves a count and a due time that one write made together. The count is also the index of the next run, which names the run at the mint. Write it only as `@linky-fit/recurring-payment` encodes it (`recurringProgressColumn` and the transition patches); this package stores the text.
 
-Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `mintUrl` is the mint every run is paid from and `rail` (`cashu` or `lightning`) how every run reaches the contact; nothing updates either afterwards, so a payment that should change them is removed and created again.
+Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `mintUrl` is the mint every run is paid from and `rail` (`cashu` or `lightning`) how every run reaches the contact; nothing updates either afterwards, so a payment that should change them is removed and created again. `note` is optional and editable; write it only when the user typed one.
 
 `deleted` returns every removed payment with its last `mintUrl`, `rail` and `progress`, so the app can settle the envelope a removed payment left at its mint. A payment that moved to a newer shard is not in it: only the newest copy of each id counts.
 

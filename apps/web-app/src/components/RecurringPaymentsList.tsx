@@ -82,32 +82,44 @@ export const RecurringPaymentsList: FC = () => {
               }
               title={recurringRecipientLabel(order, contacts)}
               description={
-                <Row gap="$sm" flexWrap="wrap" alignItems="center">
-                  <Text variant="caption" color="$colorMuted">
-                    {state === "paused"
-                      ? t("recurringStatusPaused")
-                      : dateFormatter.format(
-                          new Date(order.schedule.nextDueAtSec * 1000),
-                        )}
-                  </Text>
-                  <Pill
-                    size="sm"
-                    tone="neutral"
-                    label={describeRecurringInterval(
-                      order.schedule.interval,
-                      t,
-                    )}
-                  />
-                  {underfunded ? (
+                <Stack gap="$xxs">
+                  {order.note ? (
                     <Text
                       variant="caption"
-                      color="$warningText"
-                      testID="recurring-underfunded-hint"
+                      color="$colorSubtle"
+                      numberOfLines={1}
+                      testID="recurring-order-note"
                     >
-                      {t("recurringInsufficientFundsHint")}
+                      {order.note}
                     </Text>
                   ) : null}
-                </Row>
+                  <Row gap="$sm" flexWrap="wrap" alignItems="center">
+                    <Text variant="caption" color="$colorMuted">
+                      {state === "paused"
+                        ? t("recurringStatusPaused")
+                        : dateFormatter.format(
+                            new Date(order.schedule.nextDueAtSec * 1000),
+                          )}
+                    </Text>
+                    <Pill
+                      size="sm"
+                      tone="neutral"
+                      label={describeRecurringInterval(
+                        order.schedule.interval,
+                        t,
+                      )}
+                    />
+                    {underfunded ? (
+                      <Text
+                        variant="caption"
+                        color="$warningText"
+                        testID="recurring-underfunded-hint"
+                      >
+                        {t("recurringInsufficientFundsHint")}
+                      </Text>
+                    ) : null}
+                  </Row>
+                </Stack>
               }
               trailing={
                 <Stack alignItems="flex-end" gap="$xxs">
