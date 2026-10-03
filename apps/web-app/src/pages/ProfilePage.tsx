@@ -13,7 +13,6 @@ import {
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { ProfileAvatarEditor } from "../components/ProfileAvatarEditor";
-import type { AvatarEditorControlId } from "../derivedProfile";
 import { parseProfileGeneralStatus } from "../nostrStatus";
 import type { FilePickerHandle } from "../utils/pickFile";
 import {
@@ -43,7 +42,7 @@ interface ProfilePageProps {
   canWriteToNfc: boolean;
   copyText: (text: string) => Promise<void>;
   currentNpub: string | null;
-  cycleProfileAvatarControl: (controlId: AvatarEditorControlId) => void;
+  shuffleProfileAvatar: () => void;
   derivedProfile: DerivedProfile | null;
   effectiveMyLightningAddress: string | null;
   effectiveProfileName: string | null;
@@ -81,7 +80,7 @@ export function ProfilePage({
   canWriteToNfc,
   copyText,
   currentNpub,
-  cycleProfileAvatarControl,
+  shuffleProfileAvatar,
   derivedProfile,
   effectiveMyLightningAddress,
   effectiveProfileName,
@@ -327,7 +326,7 @@ export function ProfilePage({
     <PageCard>
       <ProfileAvatarEditor
         currentNpub={currentNpub}
-        cycleProfileAvatarControl={cycleProfileAvatarControl}
+        shuffleProfileAvatar={shuffleProfileAvatar}
         effectiveProfileName={effectiveProfileName}
         effectiveProfilePicture={effectiveProfilePicture}
         onPickProfilePhoto={onPickProfilePhoto}

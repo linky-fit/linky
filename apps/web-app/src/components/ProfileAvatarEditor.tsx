@@ -1,15 +1,13 @@
-import { Avatar, Stack } from "@linky-fit/ui";
+import { Avatar, Icon, OptionTile, Row, Stack } from "@linky-fit/ui";
 import React from "react";
-import type { AvatarEditorControlId } from "../derivedProfile";
 import type { Translate } from "../i18n";
 import { formatShortNpub } from "../utils/formatting";
 import type { FilePickerHandle } from "../utils/pickFile";
-import { AvatarControlGrid } from "./AvatarControlGrid";
 import { AvatarPhotoInput } from "./AvatarPhotoInput";
 
 interface ProfileAvatarEditorProps {
   currentNpub: string;
-  cycleProfileAvatarControl: (controlId: AvatarEditorControlId) => void;
+  shuffleProfileAvatar: () => void;
   effectiveProfileName: string | null;
   effectiveProfilePicture: string | null;
   onProfilePhotoError: (error: unknown) => void;
@@ -25,7 +23,7 @@ interface ProfileAvatarEditorProps {
 
 export function ProfileAvatarEditor({
   currentNpub,
-  cycleProfileAvatarControl,
+  shuffleProfileAvatar,
   effectiveProfileName,
   effectiveProfilePicture,
   onProfilePhotoError,
@@ -61,15 +59,32 @@ export function ProfileAvatarEditor({
         t={t}
       />
 
-      <AvatarControlGrid
-        custom={{
-          isSelected: profileSelectedPictureKind === "custom",
-          onPick: onPickProfilePhoto,
-          pictureUrl: profileCustomPictureUrl,
-        }}
-        onCycle={cycleProfileAvatarControl}
-        t={t}
-      />
+      <Row gap="$sm" alignItems="stretch">
+        <OptionTile
+          flex={1}
+          icon="RefreshCcw"
+          label={t("shuffleAvatar")}
+          selected={profileSelectedPictureKind === "generated"}
+          onPress={shuffleProfileAvatar}
+        />
+        <OptionTile
+          flex={1}
+          label={t("profileUploadPhoto")}
+          leading={
+            profileCustomPictureUrl ? (
+              <Avatar
+                name={t("profileUploadPhoto")}
+                uri={profileCustomPictureUrl}
+                size="sm"
+              />
+            ) : (
+              <Icon name="Plus" size="lg" />
+            )
+          }
+          selected={profileSelectedPictureKind === "custom"}
+          onPress={onPickProfilePhoto}
+        />
+      </Row>
     </Stack>
   );
 }

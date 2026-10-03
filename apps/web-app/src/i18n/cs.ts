@@ -69,9 +69,9 @@ export const cs = {
   onboardingCreate: "Vytvořit profil",
   onboardingCreateHint: "Nepotřebuješ telefon ani e-mail.",
   onboardingReturn: "Už mám profil",
-  onboardingReturnHintShort: "Přihlásíš se svými 20 slovy.",
   onboardingInvalidSeed: "Neplatné SLIP-39 klíče.",
   onboardingCreateFailed: "Nepodařilo se vytvořit účet.",
+  onboardingReturnTitle: "Vítej zpět",
   onboardingReturnIntro:
     "Zde si můžete obnovit svůj účet nebo jej používat současně na více zařízeních. Pokud již účet máte, přejděte do pokročilého nastavení, zkopírujte své klíče a následně je sem vložte.",
   onboardingReturnHint: "Zadejte svých 20 slov.",
@@ -90,9 +90,8 @@ export const cs = {
   onboardingNameHint: "Napiš jméno, podle kterého tě kamarádi poznají.",
   onboardingPictureTitle: "Jak tě uvidí ostatní?",
   onboardingTakePhoto: "Vyfotit se",
-  onboardingCreateAvatar: "Upravit avatara",
+  shuffleAvatar: "Nový avatar",
   onboardingCapturePhoto: "Vyfotit",
-  onboardingAvatarGridLabel: "Úpravy avatara",
   onboardingAvatarRequired: "Vyberte avatar nebo nahrajte vlastní fotku.",
   onboardingBackupSave: "Uložit do hesel",
   onboardingBackupSaveRequested:

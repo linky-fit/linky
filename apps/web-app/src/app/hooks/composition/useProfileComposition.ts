@@ -77,7 +77,7 @@ export const useProfileComposition = ({
     myProfileLnAddress ?? defaultLightningAddress;
 
   const {
-    cycleProfileAvatarControl,
+    shuffleProfileAvatar,
     isProfileEditing,
     onPickProfilePhoto,
     onProfilePhotoError,
@@ -192,7 +192,7 @@ export const useProfileComposition = ({
   }, []);
 
   return {
-    cycleProfileAvatarControl,
+    shuffleProfileAvatar,
     derivedProfile,
     effectiveMyLightningAddress,
     effectiveProfileName,

@@ -1,9 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from "react";
-import type {
-  AvatarEditorControlId,
-  DerivedProfileDefaults,
-} from "../../derivedProfile";
+import type { DerivedProfileDefaults } from "../../derivedProfile";
 import type { ContactId } from "../../evolu";
 import type { ScanDiagnostics } from "../hooks/useGuideScannerDomain";
 import type { Lang } from "../../i18n";
@@ -164,7 +161,7 @@ export interface AppShellActionsContextValue {
   copyText: (text: string) => Promise<void>;
   cycleScanCamera: () => void;
   cycleDisplayCurrency: () => void;
-  cycleProfileAvatarControl: (controlId: AvatarEditorControlId) => void;
+  shuffleProfileAvatar: () => void;
   onPickProfilePhoto: () => void;
   onProfilePhotoError: (error: unknown) => void;
   onProfilePhotoSelected: (dataUrl: string) => void;

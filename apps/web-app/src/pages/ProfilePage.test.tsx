@@ -41,7 +41,7 @@ const props: React.ComponentProps<typeof ProfilePage> = {
   canWriteToNfc: false,
   copyText: async () => {},
   currentNpub: "npub1test",
-  cycleProfileAvatarControl: () => {},
+  shuffleProfileAvatar: () => {},
   derivedProfile: null,
   effectiveMyLightningAddress: null,
   effectiveProfileName: null,

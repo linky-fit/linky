@@ -123,7 +123,7 @@ const UnauthenticatedAppShell = () => {
   const {
     confirmPendingOnboardingProfile,
     createNewAccount,
-    cyclePendingOnboardingAvatarControl,
+    shufflePendingOnboardingAvatar,
     dismissToast,
     lang,
     onboardingIsBusy,
@@ -135,7 +135,6 @@ const UnauthenticatedAppShell = () => {
     pasteReturningSlip39FromClipboard,
     pickPendingOnboardingPhoto,
     savePendingOnboardingBackupToPasswordManager,
-    selectPendingOnboardingGeneratedAvatar,
     selectReturningSlip39Suggestion,
     setLang,
     setOnboardingStep,
@@ -173,14 +172,9 @@ const UnauthenticatedAppShell = () => {
           onPendingOnboardingPhotoSelected={onPendingOnboardingPhotoSelected}
           setOnboardingStep={setOnboardingStep}
           createNewAccount={createNewAccount}
-          cyclePendingOnboardingAvatarControl={
-            cyclePendingOnboardingAvatarControl
-          }
+          shufflePendingOnboardingAvatar={shufflePendingOnboardingAvatar}
           pasteReturningSlip39FromClipboard={pasteReturningSlip39FromClipboard}
           pickPendingOnboardingPhoto={pickPendingOnboardingPhoto}
-          selectPendingOnboardingGeneratedAvatar={
-            selectPendingOnboardingGeneratedAvatar
-          }
           selectReturningSlip39Suggestion={selectReturningSlip39Suggestion}
           savePendingOnboardingBackupToPasswordManager={
             savePendingOnboardingBackupToPasswordManager

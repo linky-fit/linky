@@ -30,8 +30,7 @@ export const useUnauthenticatedAppShellComposition = () => {
   return {
     confirmPendingOnboardingProfile: onboarding.confirmPendingOnboardingProfile,
     createNewAccount: onboarding.createNewAccount,
-    cyclePendingOnboardingAvatarControl:
-      onboarding.cyclePendingOnboardingAvatarControl,
+    shufflePendingOnboardingAvatar: onboarding.shufflePendingOnboardingAvatar,
     dismissToast,
     lang,
     onboardingIsBusy: onboarding.onboardingIsBusy,
@@ -46,8 +45,6 @@ export const useUnauthenticatedAppShellComposition = () => {
     pickPendingOnboardingPhoto: onboarding.pickPendingOnboardingPhoto,
     savePendingOnboardingBackupToPasswordManager:
       onboarding.savePendingOnboardingBackupToPasswordManager,
-    selectPendingOnboardingGeneratedAvatar:
-      onboarding.selectPendingOnboardingGeneratedAvatar,
     selectReturningSlip39Suggestion: onboarding.selectReturningSlip39Suggestion,
     setLang,
     setOnboardingStep: onboarding.setOnboardingStep,

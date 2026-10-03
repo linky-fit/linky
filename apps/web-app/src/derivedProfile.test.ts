@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  cycleGeneratedAvatar,
+  buildLoreleiAvatarUrl,
   deriveDefaultLightningAddress,
   deriveDefaultProfile,
-  deriveGeneratedAvatar,
   omitSyntheticContactLightningAddress,
   parseDefaultLightningAddressNpub,
 } from "./derivedProfile";
@@ -63,18 +62,26 @@ describe("derivedProfile lightning address defaults", () => {
 });
 
 describe("derivedProfile avatar defaults", () => {
-  it("starts generated avatars without facial hair", () => {
-    const generated = deriveGeneratedAvatar("npub1alice");
-    const url = new URL(generated.pictureUrl);
+  it("builds a hosted lorelei URL with only the seed and background palette", () => {
+    const seed = "avatar seed&value";
+    const url = new URL(buildLoreleiAvatarUrl(seed));
 
-    expect(url.searchParams.get("facialHairProbability")).toBe("0");
+    expect(url.origin).toBe("https://api.dicebear.com");
+    expect(url.pathname).toBe("/9.x/lorelei/svg");
+    expect([...url.searchParams.entries()]).toEqual([
+      ["seed", seed],
+      ["backgroundColor", "b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf"],
+    ]);
   });
 
-  it("shows facial hair on the first beard edit", () => {
-    const generated = deriveGeneratedAvatar("npub1alice");
-    const edited = cycleGeneratedAvatar(generated.selection, "facialHair");
-    const url = new URL(edited.pictureUrl);
+  it("derives the same default avatar from the same npub", () => {
+    const expected = buildLoreleiAvatarUrl("npub1alice");
 
-    expect(url.searchParams.get("facialHairProbability")).toBe("100");
+    expect(deriveDefaultProfile("npub1alice").pictureUrl).toBe(expected);
+    expect(deriveDefaultProfile(" npub1alice ", "cs").pictureUrl).toBe(
+      expected,
+    );
+    expect(deriveDefaultProfile("npub1alice").pictureUrl).toBe(expected);
+    expect(deriveDefaultProfile("npub1bob").pictureUrl).not.toBe(expected);
   });
 });

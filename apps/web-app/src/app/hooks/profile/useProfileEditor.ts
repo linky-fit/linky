@@ -6,12 +6,7 @@ import {
 } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
-import {
-  cycleGeneratedAvatar,
-  deriveGeneratedAvatar,
-  type AvatarEditorControlId,
-  type DerivedAvatarSelection,
-} from "../../../derivedProfile";
+import { buildLoreleiAvatarUrl } from "../../../derivedProfile";
 import { navigateTo } from "../../../hooks/useRouting";
 import {
   buildProfileGeneralStatus,
@@ -90,9 +85,6 @@ export const useProfileEditor = ({
   const [profileEditLnAddress, setProfileEditLnAddress] = React.useState("");
   const [profileEditStatus, setProfileEditStatus] = React.useState("");
   const [profileEditPicture, setProfileEditPicture] = React.useState("");
-  const [, setProfileAvatarSelection] = React.useState<DerivedAvatarSelection>(
-    () => deriveGeneratedAvatar("linky").selection,
-  );
   const [profileCustomPictureUrl, setProfileCustomPictureUrl] =
     React.useState("");
   const [profileSelectedPictureKind, setProfileSelectedPictureKind] =
@@ -125,13 +117,12 @@ export const useProfileEditor = ({
       ""
     ).trim();
 
-    const generatedAvatar = deriveGeneratedAvatar(currentNpub ?? initialName);
-    const initialPicture = metaPic || generatedAvatar.pictureUrl;
+    const generatedPicture = buildLoreleiAvatarUrl(currentNpub ?? initialName);
+    const initialPicture = metaPic || generatedPicture;
     const customPicture =
-      metaPic && metaPic !== generatedAvatar.pictureUrl ? metaPic : "";
+      metaPic && metaPic !== generatedPicture ? metaPic : "";
     const initialStatus = parseProfileGeneralStatus(myProfileStatus).text ?? "";
 
-    setProfileAvatarSelection(generatedAvatar.selection);
     setProfileCustomPictureUrl(customPicture);
     setProfileSelectedPictureKind(customPicture ? "custom" : "generated");
     setProfileEditName(initialName);
@@ -459,17 +450,10 @@ export const useProfileEditor = ({
     profilePhotoInputRef.current?.pick();
   }, []);
 
-  const cycleProfileAvatarControl = React.useCallback(
-    (controlId: AvatarEditorControlId) => {
-      setProfileAvatarSelection((currentSelection) => {
-        const nextAvatar = cycleGeneratedAvatar(currentSelection, controlId);
-        setProfileSelectedPictureKind("generated");
-        setProfileEditPicture(nextAvatar.pictureUrl);
-        return nextAvatar.selection;
-      });
-    },
-    [],
-  );
+  const shuffleProfileAvatar = React.useCallback(() => {
+    setProfileSelectedPictureKind("generated");
+    setProfileEditPicture(buildLoreleiAvatarUrl(crypto.randomUUID()));
+  }, []);
 
   const onProfilePhotoSelected = React.useCallback((dataUrl: string) => {
     setProfileCustomPictureUrl(dataUrl);
@@ -485,7 +469,7 @@ export const useProfileEditor = ({
   );
 
   return {
-    cycleProfileAvatarControl,
+    shuffleProfileAvatar,
     isProfileEditing,
     onPickProfilePhoto,
     onProfilePhotoError,

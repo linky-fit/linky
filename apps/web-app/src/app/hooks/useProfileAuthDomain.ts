@@ -9,11 +9,8 @@ import {
 } from "@linky-fit/linksync";
 import React from "react";
 import {
-  cycleGeneratedAvatar,
+  buildLoreleiAvatarUrl,
   deriveDefaultProfile,
-  deriveGeneratedAvatar,
-  type AvatarEditorControlId,
-  type DerivedGeneratedAvatar,
 } from "../../derivedProfile";
 import {
   decodeNsec,
@@ -76,9 +73,7 @@ import type { I18nKey, Translate } from "../../i18n";
 type NostrIdentitySource = "custom" | "derived";
 
 export interface PendingOnboardingProfile {
-  customPictureUrl: string | null;
   error: string | null;
-  generatedAvatar: DerivedGeneratedAvatar;
   kind: "profile";
   name: string;
   npub: string;
@@ -152,10 +147,7 @@ interface UseProfileAuthDomainResult {
   requestLogout: (options: { evoluConnected: boolean }) => void;
   savePendingOnboardingBackupToPasswordManager: () => Promise<void>;
   seedMnemonic: string | null;
-  cyclePendingOnboardingAvatarControl: (
-    controlId: AvatarEditorControlId,
-  ) => void;
-  selectPendingOnboardingGeneratedAvatar: () => void;
+  shufflePendingOnboardingAvatar: () => void;
   selectReturningSlip39Suggestion: (value: string) => void;
   cashuSeedMnemonic: string | null;
   slip39Seed: string | null;
@@ -658,8 +650,6 @@ export const useProfileAuthDomain = ({
         error: null,
       });
 
-      const generatedAvatar = deriveGeneratedAvatar(npub);
-
       setOnboardingStep({
         kind: "preparing",
         step: 2,
@@ -669,13 +659,11 @@ export const useProfileAuthDomain = ({
 
       setOnboardingStep({
         kind: "profile",
-        customPictureUrl: null,
         error: null,
-        generatedAvatar,
         name: defaults.name,
         npub,
         nsec: normalizedNsec,
-        pictureUrl: generatedAvatar.pictureUrl || defaults.pictureUrl,
+        pictureUrl: defaults.pictureUrl,
         selectedPictureKind: "generated",
         slip39Seed: slip39,
       });
@@ -695,31 +683,12 @@ export const useProfileAuthDomain = ({
     [updatePendingOnboardingProfile],
   );
 
-  const cyclePendingOnboardingAvatarControl = React.useCallback(
-    (controlId: AvatarEditorControlId) => {
-      updatePendingOnboardingProfile((current) => {
-        const nextGeneratedAvatar = cycleGeneratedAvatar(
-          current.generatedAvatar.selection,
-          controlId,
-        );
-
-        return {
-          ...current,
-          error: null,
-          generatedAvatar: nextGeneratedAvatar,
-          pictureUrl: nextGeneratedAvatar.pictureUrl,
-          selectedPictureKind: "generated",
-        };
-      });
-    },
-    [updatePendingOnboardingProfile],
-  );
-
-  const selectPendingOnboardingGeneratedAvatar = React.useCallback(() => {
+  const shufflePendingOnboardingAvatar = React.useCallback(() => {
+    const pictureUrl = buildLoreleiAvatarUrl(crypto.randomUUID());
     updatePendingOnboardingProfile((current) => ({
       ...current,
       error: null,
-      pictureUrl: current.generatedAvatar.pictureUrl,
+      pictureUrl,
       selectedPictureKind: "generated",
     }));
   }, [updatePendingOnboardingProfile]);
@@ -732,7 +701,6 @@ export const useProfileAuthDomain = ({
     (pictureUrl: string) => {
       updatePendingOnboardingProfile((current) => ({
         ...current,
-        customPictureUrl: pictureUrl,
         error: null,
         pictureUrl,
         selectedPictureKind: "custom",
@@ -1087,8 +1055,7 @@ export const useProfileAuthDomain = ({
     requestPasteNostrKeys,
     requestLogout,
     savePendingOnboardingBackupToPasswordManager,
-    cyclePendingOnboardingAvatarControl,
-    selectPendingOnboardingGeneratedAvatar,
+    shufflePendingOnboardingAvatar,
     selectReturningSlip39Suggestion,
     cashuSeedMnemonic,
     seedMnemonic,

@@ -28,7 +28,7 @@ interface BuildPeopleRoutePropsParams {
   >["contacts"];
   copyText: PeopleRoutesProps["profileProps"]["copyText"];
   currentNpub: PeopleRoutesProps["profileProps"]["currentNpub"];
-  cycleProfileAvatarControl: PeopleRoutesProps["profileProps"]["cycleProfileAvatarControl"];
+  shuffleProfileAvatar: PeopleRoutesProps["profileProps"]["shuffleProfileAvatar"];
   derivedProfile: PeopleRoutesProps["profileProps"]["derivedProfile"];
   displayUnit: PeopleRoutesProps["contactPayProps"]["displayUnit"];
   editingId: PeopleRoutesProps["contactEditProps"]["editingId"];
@@ -141,7 +141,7 @@ export const buildPeopleRouteProps = ({
   contacts,
   copyText,
   currentNpub,
-  cycleProfileAvatarControl,
+  shuffleProfileAvatar,
   derivedProfile,
   displayUnit,
   editingId,
@@ -352,7 +352,7 @@ export const buildPeopleRouteProps = ({
       cashuIsBusy,
       canWriteToNfc: canWriteNfc,
       currentNpub,
-      cycleProfileAvatarControl,
+      shuffleProfileAvatar,
       isProfileEditing,
       profileCustomPictureUrl,
       profileEditPicture,

@@ -72,9 +72,9 @@ export const pt = {
   onboardingCreate: "Criar um perfil",
   onboardingCreateHint: "Sem telefone nem e-mail.",
   onboardingReturn: "Já tenho um perfil",
-  onboardingReturnHintShort: "Entre com suas 20 palavras.",
   onboardingInvalidSeed: "Chaves SLIP-39 inválidas.",
   onboardingCreateFailed: "Falha ao criar a conta.",
+  onboardingReturnTitle: "Bem-vindo de volta",
   onboardingReturnIntro:
     "Digite suas 20 palavras SLIP-39. Você pode digitá-las manualmente ou colá-las aqui.",
   onboardingReturnHint:
@@ -94,9 +94,8 @@ export const pt = {
   onboardingNameHint: "Digite o nome pelo qual seus amigos reconhecem você.",
   onboardingPictureTitle: "Como os outros vão ver você?",
   onboardingTakePhoto: "Tirar uma foto",
-  onboardingCreateAvatar: "Editar avatar",
+  shuffleAvatar: "Novo avatar",
   onboardingCapturePhoto: "Capturar",
-  onboardingAvatarGridLabel: "Editor de avatar",
   onboardingAvatarRequired: "Escolha um avatar ou envie sua própria foto.",
   onboardingBackupSave: "Salvar nas senhas",
   onboardingBackupSaveRequested:
