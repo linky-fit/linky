@@ -1,6 +1,10 @@
 import { EventId, SignedPlainEvent, UnixSeconds } from "@linky-fit/linkstr";
 import { beforeEach, describe, expect, it, spyOn } from "bun:test";
-import { createPaymentPipeline, tokenHashOf } from "./pipeline";
+import {
+  createPaymentPipeline,
+  MINT_REJECTION_GRACE_MS,
+  tokenHashOf,
+} from "./pipeline";
 import type {
   ReceiveOutcome,
   ResultDelivery,
@@ -33,8 +37,8 @@ const setup = (outcomes: ReceiveOutcome[] = ["received"]) => {
   const signed: Array<[string, string, number]> = [];
   const state = {
     stillDeferred: new Set<TokenHash>(),
-    recorded: new Map<TokenHash, string>(),
     failNextSend: false,
+    nowMs: NOW_MS,
   };
   const wallet: SupporterWallet = {
     receive: (text) => {
@@ -42,7 +46,6 @@ const setup = (outcomes: ReceiveOutcome[] = ["received"]) => {
       return Promise.resolve(outcomes.shift() ?? "received");
     },
     resumeDeferred: () => Promise.resolve(state.stillDeferred),
-    findTokenText: (hash) => Promise.resolve(state.recorded.get(hash) ?? null),
   };
   const messenger: SupporterMessenger = {
     signAwards: (supporter, tier, awardedAt) => {
@@ -66,7 +69,7 @@ const setup = (outcomes: ReceiveOutcome[] = ["received"]) => {
     wallet,
     messenger,
     acceptedMints: [TEST_MINT],
-    nowMs: () => NOW_MS,
+    nowMs: () => state.nowMs,
   });
   const pay = (token: string, rumor = "1") =>
     pipeline.handleToken({ from: sender, rumorId: testRumorId(rumor), token });
@@ -204,7 +207,6 @@ describe("payment pipeline", () => {
     await pay(token);
     expect(storage.findPayment(hash)?.state).toBe("deferred");
 
-    state.recorded.set(hash, token);
     state.stillDeferred = new Set([hash]);
     await pipeline.retryUnfinished();
     expect(received).toHaveLength(1);
@@ -218,20 +220,41 @@ describe("payment pipeline", () => {
     expect(storage.findPayment(hash)?.state).toBe("ready");
   });
 
-  it("resumes a payment interrupted before its result from the wallet's record", async () => {
-    const { pay, pipeline, state, received, delivered } = setup(["retry"]);
+  it("receives a token again on the retry pass from the stored payment", async () => {
+    const { pay, pipeline, storage, received, delivered } = setup([
+      "retry",
+      "retry",
+    ]);
     const token = tokenText(5_000);
     await pay(token);
     expect(delivered).toEqual([]);
+    expect(storage.findPayment(tokenHashOf(token))?.state).toBe("receiving");
 
     await pipeline.retryUnfinished();
-    expect(received).toHaveLength(1);
-
-    state.recorded.set(tokenHashOf(token), token);
     await pipeline.retryUnfinished();
-    expect(received).toHaveLength(2);
+    expect(received).toEqual([token, token, token]);
     expect(delivered.map((delivery) => delivery.result.status)).toEqual([
       "issued",
+    ]);
+  });
+
+  it("refuses a token the mint still rejects once the grace period is over", async () => {
+    const { pay, pipeline, state, received, delivered } = setup([
+      "rejected",
+      "rejected",
+      "rejected",
+    ]);
+    await pay(tokenText(5_000));
+    state.nowMs = NOW_MS + MINT_REJECTION_GRACE_MS - 1;
+    await pipeline.retryUnfinished();
+    expect(delivered).toEqual([]);
+
+    state.nowMs = NOW_MS + MINT_REJECTION_GRACE_MS;
+    await pipeline.retryUnfinished();
+    await pipeline.retryUnfinished();
+    expect(received).toHaveLength(3);
+    expect(delivered.map((delivery) => delivery.result)).toEqual([
+      { status: "refused", reason: "invalid_token" },
     ]);
   });
 

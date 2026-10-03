@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { Redacted } from "effect";
 import { join } from "node:path";
 import { Payment, SupporterStorage, TokenHash } from "./storage";
 import { testPubkey, testRumorId, withTempDir } from "./testSupport";
@@ -9,6 +10,7 @@ const payment = new Payment({
   tokenHash: hash,
   sender: testPubkey(1),
   rumorId: testRumorId("b"),
+  tokenText: Redacted.make("cashuBtoken"),
   amount: 5_000,
   tier: "bronze",
   state: "receiving",
@@ -31,7 +33,11 @@ describe("SupporterStorage payments", () => {
       first.close();
 
       const reopened = new SupporterStorage(path);
-      expect(reopened.findPayment(hash)).toEqual(
+      const found = reopened.findPayment(hash);
+      expect(found === null ? null : Redacted.value(found.tokenText)).toBe(
+        "cashuBtoken",
+      );
+      expect(found).toEqual(
         new Payment({
           ...payment,
           state: "ready",

@@ -268,6 +268,20 @@ describe("SupporterBadges profile badges", () => {
     expect(published[0]?.tags).toEqual([["d", "profile_badges"]]);
   });
 
+  it("dates the rewrite after the list it replaces, even within the same second", async () => {
+    const published: Array<SignedPlainEvent> = [];
+    const replaced = Math.floor(Date.now() / 1000) + 60;
+    const exit = await runAs(
+      supporter,
+      fetching(published, () => Effect.succeed([profileBadges([], replaced)])),
+      Effect.flatMap(SupporterBadges, (badges) =>
+        badges.publishProfileBadge(bot.pubkey, null),
+      ),
+    );
+    assert(Exit.isSuccess(exit));
+    expect(published[0]?.created_at).toBe(replaced + 1);
+  });
+
   it("publishes nothing while a silent relay may hold the only list", async () => {
     const published: Array<SignedPlainEvent> = [];
     const exit = await runAs(

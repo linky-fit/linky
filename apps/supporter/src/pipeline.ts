@@ -10,6 +10,7 @@ import type {
 } from "@linky-fit/linkstr";
 import { supporterTierForAmount } from "@linky-fit/supporter";
 import type { SupporterTier } from "@linky-fit/supporter";
+import { Redacted } from "effect";
 import { createHash } from "node:crypto";
 import { logInfo, logWarn, shortPubkey } from "./log";
 import { Payment, TokenHash } from "./storage";
@@ -25,12 +26,14 @@ export interface TokenMessage {
  * `received`: the wallet holds the token, now or from an earlier receive;
  * `deferred`: its mint is down, the wallet keeps it for `resumeDeferred`;
  * `retry`: a transient failure, receive the token again later;
+ * `rejected`: the mint refused the receive, which a rate limit also causes;
  * `spent`: someone else received it; `invalid`: it is not a usable token.
  */
 export type ReceiveOutcome =
   | "received"
   | "deferred"
   | "retry"
+  | "rejected"
   | "spent"
   | "invalid";
 
@@ -38,8 +41,6 @@ export interface SupporterWallet {
   readonly receive: (tokenText: string) => Promise<ReceiveOutcome>;
   /** Retries deferred receives; returns the tokens whose mint is still down. */
   readonly resumeDeferred: () => Promise<ReadonlySet<TokenHash>>;
-  /** The text of a token the wallet recorded, so a crashed payment can resume. */
-  readonly findTokenText: (tokenHash: TokenHash) => Promise<string | null>;
 }
 
 export interface ResultDelivery {
@@ -71,6 +72,9 @@ export interface PaymentPipelineDeps {
   readonly acceptedMints: ReadonlyArray<MintUrl>;
   readonly nowMs?: () => number;
 }
+
+/** How long a mint may keep rejecting a token before the payment is refused. */
+export const MINT_REJECTION_GRACE_MS = 6 * 60 * 60 * 1000;
 
 export const tokenHashOf = (tokenText: string): TokenHash =>
   TokenHash.make(
@@ -130,8 +134,10 @@ export const createPaymentPipeline = (deps: PaymentPipelineDeps) => {
     return { status: "issued", tier: payment.tier, awards };
   };
 
-  const settle = async (payment: Payment, tokenText: string) => {
-    const outcome = await deps.wallet.receive(tokenText);
+  const settle = async (payment: Payment) => {
+    const outcome = await deps.wallet.receive(
+      Redacted.value(payment.tokenText),
+    );
     logInfo(`${describe(payment)} receive=${outcome}`);
     switch (outcome) {
       case "received":
@@ -146,6 +152,9 @@ export const createPaymentPipeline = (deps: PaymentPipelineDeps) => {
           { state: "deferred" },
           now(),
         );
+      case "rejected":
+        if (now() - payment.createdAt < MINT_REJECTION_GRACE_MS) return;
+        return conclude(payment, refused("invalid_token"));
       case "retry":
         return;
     }
@@ -163,7 +172,7 @@ export const createPaymentPipeline = (deps: PaymentPipelineDeps) => {
       const tokenHash = tokenHashOf(message.token);
       const known = deps.payments.findPayment(tokenHash);
       if (known !== null) {
-        if (known.result === null) return settle(known, message.token);
+        if (known.result === null) return settle(known);
         if (known.state === "ready") return deliver(known, known.result);
         return;
       }
@@ -174,6 +183,7 @@ export const createPaymentPipeline = (deps: PaymentPipelineDeps) => {
         tokenHash,
         sender: message.from,
         rumorId: message.rumorId,
+        tokenText: Redacted.make(message.token),
         amount,
         tier:
           refusal === null && amount !== null
@@ -187,7 +197,7 @@ export const createPaymentPipeline = (deps: PaymentPipelineDeps) => {
       deps.payments.insertPayment(payment);
       logInfo(`${describe(payment)} recorded amount=${amount ?? "?"}`);
       return refusal === null
-        ? settle(payment, message.token)
+        ? settle(payment)
         : conclude(payment, refused(refusal));
     });
 
@@ -206,10 +216,7 @@ export const createPaymentPipeline = (deps: PaymentPipelineDeps) => {
             await deliver(payment, payment.result);
             continue;
           }
-          if (stillDeferred.has(payment.tokenHash)) continue;
-          const tokenText = await deps.wallet.findTokenText(payment.tokenHash);
-          // Not recorded by the wallet yet: the inbox replays the message.
-          if (tokenText !== null) await settle(payment, tokenText);
+          if (!stillDeferred.has(payment.tokenHash)) await settle(payment);
         } catch (error) {
           logWarn(`${describe(payment)} retry failed`, error);
         }

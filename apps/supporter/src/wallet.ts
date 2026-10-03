@@ -56,8 +56,10 @@ const receive = (raw: string) =>
       case "TokenParseFailed":
       case "AmountConsumedByFee":
         return "invalid";
-      case "MintUnreachable":
       case "MintRejected":
+        logWarn("mint rejected the receive", error);
+        return "rejected";
+      case "MintUnreachable":
       case "CounterLockTimeout":
         logWarn("receive will be retried", error);
         return "retry";
@@ -101,14 +103,4 @@ export const createLinkshuWallet = (
 ): SupporterWallet => ({
   receive: (raw): Promise<ReceiveOutcome> => runtime.runPromise(receive(raw)),
   resumeDeferred: () => runtime.runPromise(resumeDeferred),
-  findTokenText: (tokenHash) =>
-    runtime.runPromise(
-      Effect.map(
-        recordedTokenTexts,
-        (recorded) =>
-          recorded.find(
-            (operation) => tokenHashOf(operation.text) === tokenHash,
-          )?.text ?? null,
-      ),
-    ),
 });

@@ -141,15 +141,15 @@ Drop reason on the inbox: `invalid-supporter-result` (missing `linky` tag, not p
 
 1. fetches your newest kind 30008 `d=profile_badges` event from every read and write relay, failing with `SomeRelaysUnanswered` when none was found while a relay did not answer, because a publish would replace a list you have not seen;
 2. publishes the award event unchanged to your write relays, so contacts can fetch it (skipped when hiding);
-3. publishes a new kind 30008 that drops every pair whose `a` names a `linky-supporter*` definition of `issuer`, keeps every other tag in order and the content, and appends the award's `a` + `e` pair.
+3. publishes a new kind 30008 that drops every pair whose `a` names a `linky-supporter*` definition of `issuer`, keeps every other tag in order and the content, and appends the award's `a` + `e` pair. Its `created_at` is now, or one second after the fetched list when that is not older, so relays always replace the list.
 
 It returns the `PlainEventReceipt` of the kind 30008. `fetchOwnProfileBadges()` returns the newest list as `FetchedProfileBadges` (its `a` + `e` pairs as `entries`), or `null` when every relay answered and none holds one.
 
 ## Contacts: verifying badges
 
-Pass `supporterBadgeIssuer` to `ProfileWatch.watch` ([plain-events.md](./plain-events.md#watching)). The watch then also subscribes to kind 30008 `d=profile_badges` of the watched pubkeys, on the same relays as kind 0. For the newest event per pubkey it fetches the paired kind 8 events by id from the read relays (4 s per relay), verifies each with `verifySupporterAward` and checks that the award's `a` tag is the one the pair names. It then emits `SupporterBadgesUpdated` with `pubkey`, the verified `awards` and `updatedAt`, the profile badges' `created_at`. An event without supporter badges of the issuer emits an empty `awards` list, which means the contact shows none.
+Pass `supporterBadgeIssuer` to `ProfileWatch.watch` ([plain-events.md](./plain-events.md#watching)). The watch then also subscribes to kind 30008 `d=profile_badges` of the watched pubkeys, on the same relays as kind 0. For the newest event per pubkey it fetches the paired kind 8 events by id from the read relays (4 s per relay), verifies each with `verifySupporterAward` and checks that the award's `a` tag is the one the pair names; of several copies of one award, the first that passes counts. It then emits `SupporterBadgesUpdated` with `pubkey`, the verified `awards` and `updatedAt`, the profile badges' `created_at`. An event without supporter badges of the issuer emits an empty `awards` list, which means the contact shows none.
 
-Awards that fail surface only to the inspector, as `ProfileEventDropped` with the award's id and the verification reason, `award-mismatch` or `award-missing`. When no relay answers the award fetch, the event is dropped as `awards-unreachable` and a later copy of it is tried again.
+Awards that fail surface only to the inspector, as `ProfileEventDropped` with the award's id and the verification reason, `award-mismatch` or `award-missing`. When no relay answers the award fetch, or an award is missing while some relay did not answer, the event is dropped as `awards-unreachable` and a later copy of it is tried again.
 
 ## Wire format
 

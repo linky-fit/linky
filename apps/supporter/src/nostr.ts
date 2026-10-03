@@ -22,7 +22,7 @@ import type {
 import { LINKY_CONTACT_NPUB } from "@linky-fit/supporter";
 import { Effect, ManagedRuntime, Option, Schema, Stream } from "effect";
 import type { BotIdentity } from "./identity";
-import { logInfo, logWarn, shortPubkey } from "./log";
+import { logInfo, logWarn } from "./log";
 import type { SupporterMessenger } from "./pipeline";
 import { TokenHash } from "./storage";
 
@@ -191,7 +191,7 @@ export const sendAutoReply =
               content: MessageText.make(AUTO_REPLY_TEXT),
             }),
           },
-          OutboxRef.make(`auto-reply:${shortPubkey(to)}:${day}`),
+          OutboxRef.make(`auto-reply:${to}:${day}`),
         ),
       ).pipe(Effect.asVoid),
     );

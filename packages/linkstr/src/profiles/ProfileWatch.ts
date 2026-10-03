@@ -140,40 +140,48 @@ export class ProfileWatch extends Effect.Service<ProfileWatch>()(
               const entries = supporterBadgeEntries(event.tags, badgeIssuer);
               const fetched =
                 entries.length === 0
-                  ? Either.right([])
+                  ? Either.right({ events: [], failures: [] })
                   : yield* Effect.either(
-                      Effect.map(
-                        fetchRawEvents(
-                          transport,
-                          relays,
-                          {
-                            ids: entries.map(({ awardId }) => awardId),
-                            kinds: [BADGE_AWARD_KIND],
-                            authors: [badgeIssuer],
-                          },
-                          { perRelayTimeout: AWARD_FETCH_PER_RELAY_TIMEOUT },
-                        ),
-                        ({ events }) => events,
+                      fetchRawEvents(
+                        transport,
+                        relays,
+                        {
+                          ids: entries.map(({ awardId }) => awardId),
+                          kinds: [BADGE_AWARD_KIND],
+                          authors: [badgeIssuer],
+                        },
+                        { perRelayTimeout: AWARD_FETCH_PER_RELAY_TIMEOUT },
                       ),
                     );
               if (Either.isLeft(fetched))
                 return Either.left("awards-unreachable");
+              const { events, failures } = fetched.right;
+              const copiesOf = (awardId: EventId) =>
+                events.filter(({ id }) => id === awardId);
+              // A relay that did not answer may hold the missing award.
+              if (
+                failures.length > 0 &&
+                entries.some(({ awardId }) => copiesOf(awardId).length === 0)
+              )
+                return Either.left("awards-unreachable");
               const awards: Array<SupporterAward> = [];
               for (const { address, awardId } of entries) {
-                const raw = fetched.right.find(({ id }) => id === awardId);
+                const attempts = copiesOf(awardId).map((raw) =>
+                  Either.filterOrLeft(
+                    verifySupporterAward(raw, badgeIssuer, event.pubkey),
+                    (award) =>
+                      supporterBadgeAddress(badgeIssuer, award.badge) ===
+                      address,
+                    (): ProfileDropReason => "award-mismatch",
+                  ),
+                );
                 const verified: Either.Either<
                   SupporterAward,
                   ProfileDropReason
                 > =
-                  raw === undefined
-                    ? Either.left("award-missing")
-                    : Either.filterOrLeft(
-                        verifySupporterAward(raw, badgeIssuer, event.pubkey),
-                        (award) =>
-                          supporterBadgeAddress(badgeIssuer, award.badge) ===
-                          address,
-                        (): ProfileDropReason => "award-mismatch",
-                      );
+                  attempts.find(Either.isRight) ??
+                  attempts[0] ??
+                  Either.left("award-missing");
                 Either.match(verified, {
                   onLeft: (reason) =>
                     dropped(awardId, BADGE_AWARD_KIND, reason),

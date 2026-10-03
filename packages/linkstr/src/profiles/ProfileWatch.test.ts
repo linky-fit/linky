@@ -6,7 +6,7 @@ import type { Pubkey } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { InspectorEvent } from "../inspector/events";
 import { AUTHOR_FILTER_LIMIT } from "../internal/authorChunks";
-import { NostrTransport } from "../services/NostrTransport";
+import { NostrTransport, RelayUnreachable } from "../services/NostrTransport";
 import type { NostrTransportService } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
@@ -437,6 +437,74 @@ describe("ProfileWatch without read relays", () => {
         },
       );
     });
+
+    it("retries the badges while a silent relay may hold a missing award", () => {
+      let relayBAnswers = false;
+      return withWatch(
+        [alice.pubkey],
+        ({ facts, inspected, subscriptions }) =>
+          Effect.gen(function* () {
+            const badgeSubscription = subscriptions.find(({ filter }) =>
+              filter.kinds?.includes(30008),
+            );
+            const badges = profileBadges(base + 10, [
+              ["linky-supporter-gold", gold],
+            ]);
+            badgeSubscription?.onEvent(badges);
+            yield* eventually(() => droppedWith(inspected).length === 1);
+            expect(droppedWith(inspected)[0]?.reason).toBe(
+              "awards-unreachable",
+            );
+            expect(facts).toEqual([]);
+
+            relayBAnswers = true;
+            badgeSubscription?.onEvent(badges);
+            yield* eventually(() => facts.length === 1);
+            expect(facts[0]).toEqual(
+              expect.objectContaining({
+                awards: [expect.objectContaining({ badge: "gold" })],
+              }),
+            );
+          }),
+        {
+          issuer: bot.pubkey,
+          fetch: (relay) =>
+            relay === relayA
+              ? Effect.succeed([])
+              : relayBAnswers
+                ? Effect.succeed([gold])
+                : Effect.fail(
+                    new RelayUnreachable({ relay, detail: "timed out" }),
+                  ),
+        },
+      );
+    });
+
+    it("keeps an award when one relay serves a tampered copy", () =>
+      withWatch(
+        [alice.pubkey],
+        ({ facts, subscriptions }) =>
+          Effect.gen(function* () {
+            subscriptions
+              .find(({ filter }) => filter.kinds?.includes(30008))
+              ?.onEvent(
+                profileBadges(base + 10, [["linky-supporter-gold", gold]]),
+              );
+            yield* eventually(() => facts.length === 1);
+            expect(facts[0]).toEqual(
+              expect.objectContaining({
+                awards: [expect.objectContaining({ badge: "gold" })],
+              }),
+            );
+          }),
+        {
+          issuer: bot.pubkey,
+          fetch: (relay) =>
+            Effect.succeed(
+              relay === relayA ? [{ ...gold, content: "tampered" }] : [gold],
+            ),
+        },
+      ));
   });
 
   it("fails with NoReadRelaysConfigured", async () => {

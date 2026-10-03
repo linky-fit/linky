@@ -6,7 +6,7 @@ import {
 } from "@linky-fit/linkstr";
 import type { StringStorage } from "@linky-fit/linkstr";
 import { Database } from "bun:sqlite";
-import { Schema } from "effect";
+import { Redacted, Schema } from "effect";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -35,6 +35,8 @@ const PaymentFields = {
   tokenHash: TokenHash,
   sender: Pubkey,
   rumorId: RumorId,
+  /** The token itself, so a retry can receive it again; it spends like cash. */
+  tokenText: Schema.Redacted(Schema.String),
   /** The token's face value in sat, before the mint's fee; null when unreadable. */
   amount: Schema.NullOr(Schema.Int),
   tier: Schema.NullOr(SupporterTier),
@@ -73,8 +75,8 @@ export interface PaymentStore {
 }
 
 const PAYMENT_COLUMNS = `
-  token_hash AS tokenHash, sender, rumor_id AS rumorId, amount, tier, state,
-  result, created_at AS createdAt, updated_at AS updatedAt
+  token_hash AS tokenHash, sender, rumor_id AS rumorId, token_text AS tokenText,
+  amount, tier, state, result, created_at AS createdAt, updated_at AS updatedAt
 `;
 
 /**
@@ -117,6 +119,7 @@ export class SupporterStorage implements PaymentStore {
         token_hash TEXT PRIMARY KEY,
         sender TEXT NOT NULL,
         rumor_id TEXT NOT NULL,
+        token_text TEXT NOT NULL,
         amount INTEGER,
         tier TEXT,
         state TEXT NOT NULL,
@@ -165,13 +168,15 @@ export class SupporterStorage implements PaymentStore {
     this.db
       .query(
         `INSERT INTO payments (
-          token_hash, sender, rumor_id, amount, tier, state, result, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          token_hash, sender, rumor_id, token_text, amount, tier, state, result,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         payment.tokenHash,
         payment.sender,
         payment.rumorId,
+        Redacted.value(payment.tokenText),
         payment.amount,
         payment.tier,
         payment.state,

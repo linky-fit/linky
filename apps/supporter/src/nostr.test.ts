@@ -60,7 +60,7 @@ describe("supporter result refs", () => {
   it("name the payment they answer and nothing else", () => {
     expect(tokenHashOfRef(supporterResultRef(tokenHash))).toBe(tokenHash);
     expect(
-      tokenHashOfRef(OutboxRef.make("auto-reply:npub1…:2026-10-03")),
+      tokenHashOfRef(OutboxRef.make(`auto-reply:${"a".repeat(64)}:2026-10-03`)),
     ).toBeNull();
     expect(
       tokenHashOfRef(OutboxRef.make(`supporter-result:${"x".repeat(64)}`)),

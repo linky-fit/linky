@@ -256,15 +256,19 @@ export class SupporterBadges extends Effect.Service<SupporterBadges>()(
         Effect.gen(function* () {
           const newest = yield* fetchNewestProfileBadges;
           if (award !== null) yield* publishAward(award.event);
-          const receipt = yield* deliverPlainEvent(context, {
-            kind: PROFILE_BADGES_KIND,
-            tags: rewriteProfileBadgeTags(
-              newest?.tags ?? [["d", PROFILE_BADGES_D]],
-              issuer,
-              award,
-            ),
-            content: newest?.content ?? "",
-          });
+          const receipt = yield* deliverPlainEvent(
+            context,
+            {
+              kind: PROFILE_BADGES_KIND,
+              tags: rewriteProfileBadgeTags(
+                newest?.tags ?? [["d", PROFILE_BADGES_D]],
+                issuer,
+                award,
+              ),
+              content: newest?.content ?? "",
+            },
+            newest?.created_at,
+          );
           const eventIds: Array<EventId> =
             award === null
               ? [receipt.eventId]

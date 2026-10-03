@@ -34,6 +34,7 @@ const text = (content: string) => new TextBody({ text: content });
 
 const setup = () => {
   const storage = new SupporterStorage(":memory:");
+  const clock = { nowMs: OCT_3 * 1000 };
   const tokens: TokenMessage[] = [];
   const replies: Array<[Pubkey, string]> = [];
   const handle = createInboxHandler({
@@ -46,8 +47,9 @@ const setup = () => {
       replies.push([to, day]);
       return Promise.resolve();
     },
+    nowMs: () => clock.nowMs,
   });
-  return { handle, tokens, replies };
+  return { handle, tokens, replies, clock };
 };
 
 beforeEach(() => {
@@ -65,16 +67,18 @@ describe("inbox handler", () => {
     expect(replies).toEqual([]);
   });
 
-  it("auto-replies once per sender and day, replays included", async () => {
-    const { handle, replies } = setup();
+  it("auto-replies once per sender and service day, whatever sentAt claims", async () => {
+    const { handle, replies, clock } = setup();
     await handle(message(text("hi")));
     await handle(message(text("hello again")));
-    await handle(message(text("hi"), { from: testPubkey(2) }));
     await handle(
-      message(text("next day"), {
+      message(text("claims tomorrow"), {
         sentAt: UnixSeconds.make(OCT_3 + 24 * 60 * 60),
       }),
     );
+    await handle(message(text("hi"), { from: testPubkey(2) }));
+    clock.nowMs += 24 * 60 * 60 * 1000;
+    await handle(message(text("next day")));
     expect(replies).toEqual([
       [testPubkey(1), "2026-10-03"],
       [testPubkey(2), "2026-10-03"],

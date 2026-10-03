@@ -58,7 +58,7 @@ describe("isSupporterAwardValid", () => {
     );
   });
 
-  it("rejects an award dated in the future", () => {
-    expect(isSupporterAwardValid(awardedAt, awardedAt - 1)).toBe(false);
+  it("counts an award dated ahead of a lagging device clock", () => {
+    expect(isSupporterAwardValid(awardedAt, awardedAt - 60)).toBe(true);
   });
 });

@@ -8,17 +8,17 @@ The only device of Linky Bot, the identity that receives supporter payments. A l
 - A token message (`ChatMessageReceived` with a `TokenBody`) is a payment:
   1. Deduplicated on the SHA-256 of the token text, not on the rumor, because two devices of one sender can publish the same token. A known token with a stored result gets that result queued again unless it is still in the outbox or already delivered; nothing else happens.
   2. A token from a mint outside `SUPPORTER_ACCEPTED_MINTS`, in a unit other than sat, or unreadable is refused (`mint_not_accepted`, `invalid_token`) without receiving it.
-  3. The payment is recorded as `receiving` before linkshu is called, so a crash resumes from the row.
-  4. Receive. A spent token counts as received when linkshu holds a finished receive of it (the service received it before a crash), else it is refused `token_spent`. A token whose mint is down stays `deferred`; every minute the service runs `Receive.resumeDeferred` and finishes the payments whose receive completed.
+  3. The payment is recorded as `receiving`, with the token text, before linkshu is called, so a crash or a failed receive resumes from the row.
+  4. Receive. A spent token counts as received when linkshu holds a finished receive of it (the service received it before a crash), else it is refused `token_spent`. A token whose mint is down stays `deferred`; every minute the service runs `Receive.resumeDeferred` and finishes the payments whose receive completed. Any other unfinished receive is tried again every minute; a token the mint still rejects (`MintRejected`) 6 hours after it arrived is refused `invalid_token`.
   5. The tier comes from the token's amount before the mint's fee, so Linky pays the fees. Below Bronze the result is `thanks`; otherwise linkstr's `SupporterBadges.signAwards` signs the tiered and the generic award, dated now.
   6. The result is stored on the row (`ready`) and queued as a `supporterResult` outbox job whose ref names the token hash, so it is never queued twice. The outbox retries until a relay accepts the wrap, then the row becomes `delivered`.
-- Text and file messages get one auto-reply per sender and day pointing to the Linky contact. Payment notices are ignored.
+- Text and file messages get one auto-reply per sender and UTC day of the service's clock pointing to the Linky contact. Payment notices are ignored.
 
 Logs never contain the seed, keys, token text or award JSON, and pubkeys appear shortened.
 
 ## Storage
 
-One SQLite file (`SUPPORTER_STORAGE_PATH`, WAL) holds linkshu's key-value store, proofs and operations, linkstr's outbox and inbox cursor, the `payments` table (token hash, sender, rumor id, amount, tier, state, result JSON, timestamps) and the auto-reply log. If the volume is lost, `Restore` (NUT-09) from the seed recovers the proofs.
+One SQLite file (`SUPPORTER_STORAGE_PATH`, WAL) holds linkshu's key-value store, proofs and operations, linkstr's outbox and inbox cursor, the `payments` table (token hash, sender, rumor id, token text, amount, tier, state, result JSON, timestamps) and the auto-reply log. If the volume is lost, `Restore` (NUT-09) from the seed recovers the proofs.
 
 ## Run
 

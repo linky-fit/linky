@@ -72,6 +72,4 @@ export const isSupporterAwardValid = (
   awardedAtSec: number,
   nowSec: number,
   validitySeconds?: number,
-): boolean =>
-  awardedAtSec <= nowSec &&
-  supporterAwardExpiresAt(awardedAtSec, validitySeconds) > nowSec;
+): boolean => supporterAwardExpiresAt(awardedAtSec, validitySeconds) > nowSec;
