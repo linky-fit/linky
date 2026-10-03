@@ -37,6 +37,7 @@ const WalletAction = ({
     icon={icon}
     flexDirection="column"
     width="$column"
+    flexShrink={1}
     paddingVertical="$xl"
     disabled={disabled}
     onPress={onPress}
@@ -79,7 +80,7 @@ export const WalletPage: React.FC<WalletPageProps> = React.memo(
             />
             <WalletPendingReceives />
           </Stack>
-          <Row marginTop="$xxl">
+          <Row marginTop="$xxl" maxWidth="100%">
             <WalletAction
               icon="ArrowDownRight"
               label={t("walletReceive")}

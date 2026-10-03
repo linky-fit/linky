@@ -21,5 +21,7 @@ type PageBodyProps = ComponentProps<typeof Stack> & {
 
 /** A page's content inside the app gutter. */
 export const PageBody = ({ gutter = "page", ...props }: PageBodyProps) => (
-  <Stack flex={1} {...gutters[gutter]} {...props} />
+  <Stack testID="page-scroll" flex={1} minHeight={0} overflowY="auto">
+    <Stack flexGrow={1} {...gutters[gutter]} {...props} />
+  </Stack>
 );
