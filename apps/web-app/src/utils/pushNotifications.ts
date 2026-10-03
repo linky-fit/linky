@@ -129,21 +129,6 @@ export function setPushNotificationsDisabledByUser(disabled: boolean): void {
   safeLocalStorageRemove(PUSH_NOTIFICATIONS_DISABLED_STORAGE_KEY);
 }
 
-/** Whether this install registered push for the identity, on the web or natively. */
-export function isPushRegisteredForIdentity(currentNsec: string): boolean {
-  let pubkey: string;
-  try {
-    pubkey = derivePushIdentity(currentNsec).pubkey;
-  } catch {
-    return false;
-  }
-  const store = isNativePlatform()
-    ? nativeRegistrationStore
-    : pwaRegistrationStore;
-  const registration = store.read();
-  return registration.id !== null && registration.pubkey === pubkey;
-}
-
 /**
  * Tells the push service when to remind this identity of upcoming recurring
  * payments. The whole set is replaced on every call; the server learns only

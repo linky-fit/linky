@@ -504,12 +504,11 @@ self.addEventListener("push", (event) => {
     (async () => {
       const clientList = await getWindowClients();
       const isReminder = data.type === RECURRING_REMINDER_TYPE;
-      // An open app, even hidden, sends due recurring payments by itself.
-      const shouldSuppressNotification = isReminder
-        ? clientList.length > 0
-        : hasVisibleWindowClient(clientList);
+      // A running app cancels its reminders, so one that arrives always shows.
+      const shouldSuppressNotification =
+        !isReminder && hasVisibleWindowClient(clientList);
       if (shouldSuppressNotification) {
-        logSw("notification suppressed because an app client is open", {
+        logSw("notification suppressed because app client is visible", {
           data,
           tag: data.outerEventId ?? "linky-inbox",
         });

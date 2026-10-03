@@ -23,7 +23,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "auth.loggedOut":
     "User confirmed logout. Every open tab reloads and the first one to boot deletes everything the site stored on this device: the Evolu databases, IndexedDB (including this inspector buffer), localStorage, caches and the service worker. The payload says whether Evolu was connected, i.e. whether unsynced data may have been lost.",
   "recurring.remindersSynced":
-    "The app told the push service when to remind this identity of upcoming recurring payments (each next due time), or failed to. The server stores only the times, never notes, amounts or recipients; the notes due at each time stay on the device, and the reminder arrives as a push only when no Linky window is open.",
+    "The app told the push service when to remind this identity of upcoming recurring payments (a minute after each due time still ahead), or failed to. It syncs again when a due time passes, which cancels that reminder because this running app sends the payment. The server stores only the times, never notes, amounts or recipients; the notes due at each time stay on the device.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
   "conversations.archived":

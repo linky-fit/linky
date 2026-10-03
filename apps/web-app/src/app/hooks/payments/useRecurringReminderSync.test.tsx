@@ -1,5 +1,9 @@
-import type { RecurringPaymentOrder } from "@linky-fit/recurring-payment";
+import {
+  RECURRING_REMINDER_GRACE_SEC,
+  type RecurringPaymentOrder,
+} from "@linky-fit/recurring-payment";
 import { generateSecretKey } from "nostr-tools";
+import { act } from "react";
 import { nsecEncode } from "nostr-tools/nip19";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -14,6 +18,7 @@ import { useRecurringReminderSync } from "./useRecurringReminderSync";
 type Params = Parameters<typeof useRecurringReminderSync>[0];
 
 const NSEC = nsecEncode(generateSecretKey());
+const GRACE = RECURRING_REMINDER_GRACE_SEC;
 
 const rent = recurringOrderFixture({ note: "Rent" });
 const unnamed = recurringOrderFixture({ id: recurringPaymentIdFor("rp-2") });
@@ -28,13 +33,8 @@ const Probe = ({ params }: { params: Params }) => {
   return null;
 };
 
-const mount = async (
-  orders: ReadonlyArray<RecurringPaymentOrder>,
-  registered = true,
-) => {
+const mount = async (orders: ReadonlyArray<RecurringPaymentOrder>) => {
   const dependencies = {
-    isPushRegisteredForIdentity: () => registered,
-    nowSec: () => DUE - HOUR,
     storeReminderNotes: vi.fn(async () => {}),
     syncRecurringReminders: vi.fn(async () => ({ success: true })),
   };
@@ -58,6 +58,7 @@ const mount = async (
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.setSystemTime((DUE - HOUR) * 1000);
 });
 
 afterEach(() => {
@@ -66,18 +67,18 @@ afterEach(() => {
 });
 
 describe("useRecurringReminderSync", () => {
-  it("syncs only the due times and keeps the notes due at each on the device", async () => {
+  it("syncs only the reminder times and keeps the notes due at each on the device", async () => {
     const view = await mount([rent, unnamed, gym]);
     await vi.waitFor(() =>
       expect(view.syncRecurringReminders).toHaveBeenCalledWith(NSEC, [
-        DUE,
-        DUE + HOUR,
+        DUE + GRACE,
+        DUE + HOUR + GRACE,
       ]),
     );
     expect(view.storeReminderNotes).toHaveBeenCalledWith(
       new Map([
-        [DUE, ["Rent", null]],
-        [DUE + HOUR, ["Gym"]],
+        [DUE + GRACE, ["Rent", null]],
+        [DUE + HOUR + GRACE, ["Gym"]],
       ]),
     );
     await view.unmount();
@@ -94,8 +95,8 @@ describe("useRecurringReminderSync", () => {
     await vi.waitFor(() =>
       expect(view.storeReminderNotes).toHaveBeenLastCalledWith(
         new Map([
-          [DUE, ["Rent October"]],
-          [DUE + HOUR, ["Gym"]],
+          [DUE + GRACE, ["Rent October"]],
+          [DUE + HOUR + GRACE, ["Gym"]],
         ]),
       ),
     );
@@ -103,11 +104,30 @@ describe("useRecurringReminderSync", () => {
     await view.unmount();
   });
 
-  it("does nothing while this install has no push registration", async () => {
-    const view = await mount([rent], false);
+  it("syncs without push registration", async () => {
+    const view = await mount([rent]);
+    await vi.waitFor(() =>
+      expect(view.syncRecurringReminders).toHaveBeenCalledWith(NSEC, [
+        DUE + GRACE,
+      ]),
+    );
+    await view.unmount();
+  });
+
+  it("resyncs when a due time passes, well inside the grace", async () => {
+    const view = await mount([rent, gym]);
+    await vi.waitFor(() =>
+      expect(view.syncRecurringReminders).toHaveBeenCalledTimes(1),
+    );
+
+    await act(() => vi.advanceTimersByTimeAsync(HOUR * 1000));
     await view.settle();
-    expect(view.storeReminderNotes).not.toHaveBeenCalled();
-    expect(view.syncRecurringReminders).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(view.syncRecurringReminders).toHaveBeenLastCalledWith(NSEC, [
+        DUE + HOUR + GRACE,
+      ]),
+    );
+    expect(Date.now()).toBeLessThan((DUE + GRACE) * 1000);
     await view.unmount();
   });
 });
