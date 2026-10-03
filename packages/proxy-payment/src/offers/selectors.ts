@@ -272,17 +272,17 @@ const bankPaymentOfferOutcome = (
  */
 export const recentBankPaymentOfferOutcomesByPeer = (
   offers: readonly BankPaymentOffer[],
-  me: string,
+  me: Pubkey,
   nowSec: number,
   limit: number,
-): ReadonlyMap<string, readonly BankPaymentOfferOutcome[]> => {
-  const byPeer = new Map<string, BankPaymentOffer[]>();
+): ReadonlyMap<Pubkey, readonly BankPaymentOfferOutcome[]> => {
+  const byPeer = new Map<Pubkey, BankPaymentOffer[]>();
   for (const offer of ownOffers(offers, me)) {
     const group = byPeer.get(offer.peer) ?? [];
     group.push(offer);
     byPeer.set(offer.peer, group);
   }
-  const outcomes = new Map<string, BankPaymentOfferOutcome[]>();
+  const outcomes = new Map<Pubkey, BankPaymentOfferOutcome[]>();
   for (const [peer, group] of byPeer) {
     const recent: BankPaymentOfferOutcome[] = [];
     for (const offer of group.sort(byCreatedAtDesc)) {
