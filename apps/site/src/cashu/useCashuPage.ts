@@ -19,7 +19,6 @@ import {
   RedeemError,
 } from "./wallet";
 import type { TokenSnapshot } from "./wallet";
-import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -47,12 +46,19 @@ interface RedeemSuccessState {
   lightningAddress: string;
 }
 
+interface DisplayAmount {
+  value: string;
+  unit: string;
+}
+
 type FiatDisplayCurrency = Exclude<SiteDisplayCurrency, "btc" | "sat">;
 
 const satsPerBtc = 100_000_000;
 const linkyWebAppUrl = "https://app.linky.fit";
 const nativeLaunchFallbackDelayMs = 700;
 const pwaLaunchFallbackDelayMs = 1600;
+// Byte capacity of a version 40 QR code at level M, the level the ui QRCode uses.
+const qrByteCapacity = 2331;
 
 const fiatDisplay: Record<
   FiatDisplayCurrency,
@@ -96,13 +102,13 @@ const formatCashuDisplayAmount = (
   displayCurrency: SiteDisplayCurrency,
   fiatRates: SiteFiatRates | null,
   lang: SiteLocale,
-): string => {
+): DisplayAmount => {
   const normalizedAmount = Number.isFinite(amountSat)
     ? Math.max(0, Math.trunc(amountSat))
     : 0;
 
   if (displayCurrency === "btc") {
-    return `${formatInteger(normalizedAmount, lang)} ₿`;
+    return { value: formatInteger(normalizedAmount, lang), unit: "₿" };
   }
 
   if (displayCurrency !== "sat" && fiatRates) {
@@ -111,10 +117,13 @@ const formatCashuDisplayAmount = (
       (normalizedAmount / satsPerBtc) * fiatRates[rate],
     );
     const approxPrefix = normalizedAmount > 0 ? "~" : "";
-    return `${approxPrefix}${formatInteger(fiatValue, lang)} ${label}`;
+    return {
+      value: `${approxPrefix}${formatInteger(fiatValue, lang)}`,
+      unit: label,
+    };
   }
 
-  return `${formatInteger(normalizedAmount, lang)} sat`;
+  return { value: formatInteger(normalizedAmount, lang), unit: "sat" };
 };
 
 interface LinkyWalletImportTargets {
@@ -299,7 +308,6 @@ export function useCashuPage() {
   const [isAdditionalOptionsVisible, setIsAdditionalOptionsVisible] =
     useState(false);
   const [mintIconSrc, setMintIconSrc] = useState(GENERIC_MINT_ICON_DATA_URL);
-  const [tokenQr, setTokenQr] = useState<string | null>(null);
   const redeemSubmitLockedRef = useRef(false);
   const activeCopy = useMemo(() => copy[locale], [locale]);
   const tokenErrorMessage =
@@ -309,19 +317,21 @@ export function useCashuPage() {
       : tokenError?.code === "unknown"
         ? activeCopy.validUnknown
         : null);
-  const displayedTokenAmount = tokenState?.isValid
+  const tokenAmountSat = tokenState?.isValid
     ? (tokenState.amount ?? 0)
     : (tokenState?.totalAmount ?? 0);
-  const displayedTokenAmountText = useMemo(
+  const displayedTokenAmount = useMemo(
     () =>
       formatCashuDisplayAmount(
-        displayedTokenAmount,
+        tokenAmountSat,
         displayCurrency,
         fiatRates,
         locale,
       ),
-    [displayCurrency, displayedTokenAmount, fiatRates, locale],
+    [displayCurrency, tokenAmountSat, fiatRates, locale],
   );
+  const tokenFitsQr =
+    new TextEncoder().encode(activeToken).length <= qrByteCapacity;
   const cycleDisplayCurrency = () => {
     const currentIndex = siteDisplayCurrencies.indexOf(displayCurrency);
     const nextIndex = (currentIndex + 1) % siteDisplayCurrencies.length;
@@ -393,7 +403,6 @@ export function useCashuPage() {
       setIsAdditionalOptionsVisible(false);
       setRedeemSuccess(null);
       setRedeemError(null);
-      setTokenQr(null);
       redeemSubmitLockedRef.current = false;
 
       if (next.source === "search" && next.token) {
@@ -408,40 +417,6 @@ export function useCashuPage() {
       window.removeEventListener("hashchange", syncFromUrl);
     };
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const generateQr = async () => {
-      if (!activeToken.trim() || !isAdditionalOptionsVisible) {
-        setTokenQr(null);
-        return;
-      }
-
-      try {
-        const QRCode = await import("qrcode");
-        const qr = await QRCode.toDataURL(activeToken, {
-          errorCorrectionLevel: "M",
-          margin: 1,
-          width: 420,
-        });
-
-        if (!cancelled) {
-          setTokenQr(qr);
-        }
-      } catch {
-        if (!cancelled) {
-          setTokenQr(null);
-        }
-      }
-    };
-
-    void generateQr();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeToken, isAdditionalOptionsVisible]);
 
   useEffect(() => {
     const trimmedToken = activeToken.trim();
@@ -488,8 +463,7 @@ export function useCashuPage() {
     };
   }, [activeToken]);
 
-  const handleInspectSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleInspectSubmit = () => {
     const trimmedToken = tokenInput.trim();
     replaceHashToken(trimmedToken);
     setActiveToken(trimmedToken);
@@ -498,8 +472,7 @@ export function useCashuPage() {
     redeemSubmitLockedRef.current = false;
   };
 
-  const handleRedeemSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleRedeemSubmit = async () => {
     if (redeemSubmitLockedRef.current) {
       return;
     }
@@ -604,10 +577,10 @@ export function useCashuPage() {
     setIsAdditionalOptionsVisible,
     mintIconSrc,
     setMintIconSrc,
-    tokenQr,
+    tokenFitsQr,
     activeCopy,
     tokenErrorMessage,
-    displayedTokenAmountText,
+    displayedTokenAmount,
     cycleDisplayCurrency,
     handleInspectSubmit,
     handleRedeemSubmit,

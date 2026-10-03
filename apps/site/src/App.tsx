@@ -1,4 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Button,
+  Card,
+  Icon,
+  Image,
+  Row,
+  SelectField,
+  Stack,
+  Text,
+  useMedia,
+} from "@linky-fit/ui";
+import { useState } from "react";
 import { SiteLayout } from "./SiteLayout";
 import type { SiteLocale } from "./sitePreferences";
 import { useSiteLocale } from "./useSiteLocale";
@@ -194,10 +205,6 @@ const copy: Record<SiteLocale, LocaleCopy> = {
   },
 };
 
-const isNodeTarget = (value: EventTarget | null): value is Node => {
-  return value instanceof Node;
-};
-
 const getDefaultCtaMode = (): CtaMode => {
   if (typeof navigator === "undefined") {
     return "web";
@@ -210,173 +217,147 @@ const getDefaultCtaMode = (): CtaMode => {
   return isAndroid && isMobile ? "google-play" : "web";
 };
 
-interface AppCtaProps {
-  ctaMenuLabel: string;
-  ctaMode: CtaMode;
-  labels: Record<CtaMode, string>;
-  onPrimaryAction: () => void;
-  onSelectMode: (mode: CtaMode) => void;
-}
+const launchApp = (mode: CtaMode) => {
+  if (mode === "google-play" && /android/i.test(navigator.userAgent)) {
+    window.location.assign(
+      `intent://play.google.com/store/apps/details?id=fit.linky.app#Intent;scheme=https;package=com.android.vending;S.browser_fallback_url=${encodeURIComponent(ctaUrls.web)};end`,
+    );
+    return;
+  }
 
-function AppCta({
-  ctaMenuLabel,
-  ctaMode,
-  labels,
-  onPrimaryAction,
-  onSelectMode,
-}: AppCtaProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const ctaMenuRef = useRef<HTMLDivElement | null>(null);
+  window.open(ctaUrls[mode], "_blank", "noopener,noreferrer");
+};
 
-  useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!isNodeTarget(event.target)) {
-        setMenuOpen(false);
-        return;
-      }
+function AppLaunch({ copy, wide }: { copy: LocaleCopy; wide: boolean }) {
+  const [mode, setMode] = useState<CtaMode>(getDefaultCtaMode);
+  const labels: Record<CtaMode, string> = {
+    "android-apk": copy.androidApkCta,
+    "google-play": copy.googlePlayCta,
+    web: copy.webCta,
+    zapstore: copy.zapstoreCta,
+  };
+  const launchButton = (
+    <Button icon="ArrowUpRight" onPress={() => launchApp(mode)}>
+      {labels[mode]}
+    </Button>
+  );
+  const modePicker = (
+    <SelectField
+      label={copy.ctaMenuLabel}
+      value={mode}
+      options={ctaModes.map((value) => ({ value, label: labels[value] }))}
+      onValueChange={setMode}
+    />
+  );
 
-      if (!ctaMenuRef.current?.contains(event.target)) {
-        setMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-    };
-  }, []);
-
-  return (
-    <div className="cta-row" ref={ctaMenuRef}>
-      <div className="cta-group">
-        <button className="primary-cta" type="button" onClick={onPrimaryAction}>
-          {labels[ctaMode]}
-        </button>
-        <button
-          className={menuOpen ? "cta-toggle is-open" : "cta-toggle"}
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          aria-label={ctaMenuLabel}
-          onClick={() => setMenuOpen((value) => !value)}
-        >
-          <span className="cta-toggle-icon" aria-hidden="true">
-            ▾
-          </span>
-        </button>
-
-        {menuOpen ? (
-          <div className="cta-menu" role="menu">
-            {ctaModes.map((mode) => (
-              <button
-                key={mode}
-                className={
-                  ctaMode === mode ? "cta-option is-selected" : "cta-option"
-                }
-                type="button"
-                role="menuitemradio"
-                aria-checked={ctaMode === mode}
-                onClick={() => {
-                  onSelectMode(mode);
-                  setMenuOpen(false);
-                }}
-              >
-                <span className="cta-option-label">{labels[mode]}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
+  return wide ? (
+    <Row gap="$lg" alignItems="flex-end" maxWidth="$sheetWidth">
+      <Stack flex={1}>{launchButton}</Stack>
+      <Stack flex={1}>{modePicker}</Stack>
+    </Row>
+  ) : (
+    <Stack gap="$md">
+      {modePicker}
+      {launchButton}
+    </Stack>
   );
 }
 
 function App() {
   const [locale, setLocale] = useSiteLocale();
-  const [ctaMode, setCtaMode] = useState<CtaMode>(getDefaultCtaMode);
-  const activeCopy = useMemo(() => copy[locale], [locale]);
-
-  const handlePrimaryAction = () => {
-    if (ctaMode === "google-play" && /android/i.test(navigator.userAgent)) {
-      window.location.assign(
-        `intent://play.google.com/store/apps/details?id=fit.linky.app#Intent;scheme=https;package=com.android.vending;S.browser_fallback_url=${encodeURIComponent(ctaUrls.web)};end`,
-      );
-      return;
-    }
-
-    window.open(ctaUrls[ctaMode], "_blank", "noopener,noreferrer");
-  };
+  const { wide } = useMedia();
+  const activeCopy = copy[locale];
+  const Columns = wide ? Row : Stack;
 
   return (
     <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
-      <section className="hero">
-        <div className="hero-copy">
-          <div className="hero-intro">
-            <h1>{activeCopy.title}</h1>
-            <p className="lede">{activeCopy.subtitle}</p>
-          </div>
+      <Stack gap="$huge" paddingTop="$xxl" paddingBottom="$huge">
+        <Columns gap={wide ? "$huge" : "$xxxl"}>
+          <Stack flex={wide ? 1 : undefined} gap="$xxl">
+            <Stack gap="$lg">
+              <Text
+                variant={wide ? "amount" : "display"}
+                color="$colorStrong"
+                role="heading"
+                aria-level={1}
+              >
+                {activeCopy.title}
+              </Text>
+              <Text color="$colorMuted">{activeCopy.subtitle}</Text>
+            </Stack>
+            <AppLaunch copy={activeCopy} wide={wide} />
+          </Stack>
+          <Image
+            flex={wide ? 1 : undefined}
+            src="/app_in_hand.png"
+            alt={activeCopy.heroImageAlt}
+            width="100%"
+            height={wide ? "$sheetWidth" : "$qr"}
+            objectFit="contain"
+          />
+        </Columns>
 
-          <div className="hero-visual">
-            <img
-              className="hero-image"
-              src="/app_in_hand.png"
-              alt={activeCopy.heroImageAlt}
-            />
-          </div>
-        </div>
-      </section>
+        <Stack gap="$xxl">
+          <Text
+            variant="display"
+            color="$colorStrong"
+            role="heading"
+            aria-level={2}
+          >
+            {activeCopy.uspSectionTitle}
+          </Text>
+          <Columns gap={wide ? "$xxl" : "$lg"} alignItems="stretch">
+            {activeCopy.uspItems.map((item) => (
+              <Card key={item.title} outlined flex={wide ? 1 : undefined}>
+                <Image
+                  src={item.imageSrc}
+                  alt={item.imageAlt}
+                  width="100%"
+                  height="$qr"
+                  objectFit="contain"
+                />
+                <Text
+                  variant="title"
+                  color="$colorStrong"
+                  role="heading"
+                  aria-level={3}
+                >
+                  {item.title}
+                </Text>
+                <Text color="$colorMuted">{item.description}</Text>
+              </Card>
+            ))}
+          </Columns>
+        </Stack>
 
-      <section className="usp-section" aria-label={activeCopy.uspSectionTitle}>
-        <h2 className="usp-section-title">{activeCopy.uspSectionTitle}</h2>
-        <div className="usp-grid">
-          {activeCopy.uspItems.map((item) => {
-            return (
-              <article key={item.title} className="usp-card">
-                <div className="usp-card-media">
-                  <img src={item.imageSrc} alt={item.imageAlt} />
-                </div>
-                <div className="usp-card-copy">
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="footer-section">
-        <div className="closing-section">
-          <div className="closing-copy">
-            <h2>{activeCopy.closingSectionTitle}</h2>
-            <p>{activeCopy.closingSectionDescription}</p>
-          </div>
-
-          <div className="closing-visual">
-            <img
-              className="closing-image"
-              src="/not_personal.svg"
-              alt={activeCopy.closingImageAlt}
-            />
-          </div>
-        </div>
-      </section>
-
-      <div className="floating-cta">
-        <AppCta
-          ctaMenuLabel={activeCopy.ctaMenuLabel}
-          ctaMode={ctaMode}
-          labels={{
-            "android-apk": activeCopy.androidApkCta,
-            "google-play": activeCopy.googlePlayCta,
-            web: activeCopy.webCta,
-            zapstore: activeCopy.zapstoreCta,
-          }}
-          onPrimaryAction={handlePrimaryAction}
-          onSelectMode={setCtaMode}
-        />
-      </div>
+        <Card outlined padding={wide ? "$xxl" : "$lg"}>
+          <Columns gap="$xxl" alignItems={wide ? "center" : "stretch"}>
+            <Stack flex={wide ? 1 : undefined} gap="$sm">
+              <Text
+                variant={wide ? "display" : "heading"}
+                color="$colorStrong"
+                role="heading"
+                aria-level={2}
+              >
+                {activeCopy.closingSectionTitle}
+              </Text>
+              <Text color="$colorMuted">
+                {activeCopy.closingSectionDescription}
+              </Text>
+            </Stack>
+            <Row
+              gap="$xxl"
+              justifyContent="center"
+              role="img"
+              aria-label={activeCopy.closingImageAlt}
+            >
+              <Icon name="PhoneOff" size="xl" color="$colorStrong" />
+              <Icon name="MailOff" size="xl" color="$colorStrong" />
+              <Icon name="IdCardOff" size="xl" color="$colorStrong" />
+            </Row>
+          </Columns>
+        </Card>
+      </Stack>
     </SiteLayout>
   );
 }
