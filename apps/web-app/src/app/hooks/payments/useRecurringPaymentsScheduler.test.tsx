@@ -24,10 +24,10 @@ import {
   NonEmptyString1000,
   normalizeRecurringPayment,
   PositiveInt,
-  type RecurringPaymentId,
   type RecurringPaymentsRepository,
 } from "@linky-fit/linksync";
 import {
+  RECURRING_CLAIM_TAKEOVER_SEC,
   RECURRING_CONFIRM_SEC,
   RECURRING_NOTICE_SEC,
   RECURRING_RUN_RETRY_DELAY_SEC,
@@ -164,6 +164,16 @@ const makeEnvelopes = (
 });
 
 const envelopeKeyOf = (runIndex: number) => EnvelopeKey.make(keyOf(runIndex));
+
+/** Envelopes whose first run another context holds. */
+const heldEnvelopes = () =>
+  makeEnvelopes(fakeMint(), {
+    open: vi.fn(async () =>
+      Either.left(
+        new EnvelopeBusy({ mint: MintUrl.make(MINT), key: envelopeKeyOf(0) }),
+      ),
+    ),
+  });
 
 interface RowOverrides {
   amount?: number;
@@ -327,14 +337,6 @@ const mount = async (
       });
       await settle();
     },
-    runOrderNow: async (id: RecurringPaymentId) => {
-      let outcome: string | null = null;
-      await act(async () => {
-        outcome = await current().runOrderNow(id);
-      });
-      await settle();
-      return outcome;
-    },
   };
 };
 
@@ -437,6 +439,7 @@ describe("useRecurringPaymentsScheduler", () => {
     expect(first.params.showPaidOverlay).not.toHaveBeenCalled();
     await first.unmount();
 
+    let now = NOW + RECURRING_CLAIM_TAKEOVER_SEC;
     const replacement = await mount(
       null,
       {
@@ -444,12 +447,14 @@ describe("useRecurringPaymentsScheduler", () => {
         dependencies: {
           deviceId: "device-b",
           isVisible: () => false,
-          nowSec: () => NOW,
+          nowSec: () => now,
         },
       },
       first.repository,
     );
-    expect(await replacement.runOrderNow(ORDER_ID)).toBe("paid");
+    expect(replacement.row()).toMatchObject({ claimDeviceId: "device-b" });
+    now += RECURRING_NOTICE_SEC;
+    await replacement.runNow();
 
     expect(opened(replacement)).toEqual([keyOf(0)]);
     expect(replacement.envelopes().send).toHaveBeenCalledWith(firstRef);
@@ -495,27 +500,17 @@ describe("useRecurringPaymentsScheduler", () => {
     await paying.unmount();
   });
 
-  it("delivers a funded fiat envelope without an exchange rate, also on demand", async () => {
-    const czk = { amount: 15_000, unit: "czk" };
-    const funded = () => makeEnvelopes(fakeMint({ 0: "unspent" }));
-    const scheduled = await mount(
-      { ...czk, ...claimedBy("device-a") },
-      { envelopes: funded() },
+  it("delivers a funded fiat envelope without an exchange rate", async () => {
+    const view = await mount(
+      { ...claimedBy("device-a"), amount: 15_000, unit: "czk" },
+      { envelopes: makeEnvelopes(fakeMint({ 0: "unspent" })) },
     );
-    expect(scheduled.envelopes().send).toHaveBeenCalledTimes(1);
-    expect(scheduled.row()).toMatchObject({ lastRunStatus: "paid" });
-    expect(scheduled.params.pushToast).not.toHaveBeenCalledWith(
+    expect(view.envelopes().send).toHaveBeenCalledTimes(1);
+    expect(view.row()).toMatchObject({ lastRunStatus: "paid" });
+    expect(view.params.pushToast).not.toHaveBeenCalledWith(
       "recurringWaitingForRates",
     );
-    await scheduled.unmount();
-
-    const onDemand = await mount(
-      { ...czk, nextDueAtSec: DUE + 5 * HOUR },
-      { envelopes: funded() },
-    );
-    expect(await onDemand.runOrderNow(ORDER_ID)).toBe("paid");
-    expect(onDemand.envelopes().send).toHaveBeenCalledTimes(1);
-    await onDemand.unmount();
+    await view.unmount();
   });
 
   it("melts the envelope for an invoice of its amount on the Lightning rail", async () => {
@@ -648,20 +643,11 @@ describe("useRecurringPaymentsScheduler", () => {
 
   it("writes nothing while another context holds the envelope", async () => {
     const view = await mount(claimedBy("device-a"), {
-      envelopes: makeEnvelopes(fakeMint(), {
-        open: vi.fn(async () =>
-          Either.left(
-            new EnvelopeBusy({
-              mint: MintUrl.make(MINT),
-              key: envelopeKeyOf(0),
-            }),
-          ),
-        ),
-      }),
+      envelopes: heldEnvelopes(),
     });
 
+    expect(view.envelopes().open).toHaveBeenCalledTimes(1);
     expect(view.row()).toMatchObject({ lastRunStatus: null, runCount: 0 });
-    expect(await view.runOrderNow(ORDER_ID)).toBe("busy");
     await view.unmount();
   });
 
@@ -975,26 +961,6 @@ describe("useRecurringPaymentsScheduler", () => {
     await view.unmount();
   });
 
-  it("pays on demand, claiming it and consuming the pending period", async () => {
-    const future = DUE + 5 * HOUR; // not inside the notice window yet
-    const view = await mount({ nextDueAtSec: future });
-    expect(view.row()).toMatchObject({ claimDeviceId: null });
-
-    const outcome = await view.runOrderNow(ORDER_ID);
-    expect(outcome).toBe("paid");
-    expect(view.row()).toMatchObject({
-      claimDeviceId: "device-a",
-      claimAtSec: NOW,
-      claimDueAtSec: future,
-      lastRunStatus: "paid",
-      // The pending slot is consumed: next is the one after it.
-      nextDueAtSec: future + HOUR,
-      runCount: 1,
-    });
-    expect(view.envelopes().open).toHaveBeenCalledTimes(1);
-    await view.unmount();
-  });
-
   it("does nothing while the runtime is not composed", async () => {
     const view = await mount({}, { envelopes: null });
     expect(view.row()).toMatchObject({ claimDeviceId: null });
@@ -1043,6 +1009,21 @@ describe("useRecurringPaymentsScheduler", () => {
       expect(view.envelopes().open).toHaveBeenCalledTimes(1);
       expect(view.row()).toMatchObject({ lastRunStatus: "paid", runCount: 1 });
       expect(view.scheduler().dueConfirmation).toBeNull();
+      await view.unmount();
+    });
+
+    it("tells the user when another context holds the envelope on confirm", async () => {
+      const view = await mount(claimedBy("device-a"), {
+        dependencies: visible,
+        envelopes: heldEnvelopes(),
+      });
+      await act(async () => {
+        await view.scheduler().confirmDueNow();
+      });
+      await settle();
+
+      expect(view.params.pushToast).toHaveBeenCalledWith("recurringWalletBusy");
+      expect(view.row()).toMatchObject({ lastRunStatus: null, runCount: 0 });
       await view.unmount();
     });
 

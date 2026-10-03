@@ -34,6 +34,8 @@ interface BootOptions {
   identity?: SeedIdentity;
   hidden?: boolean;
   fiat?: boolean;
+  /** Devices booted with one id all act on its claim. */
+  deviceId?: string;
 }
 type BootAccount = (label: string, options?: BootOptions) => Promise<Account>;
 
@@ -58,7 +60,7 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
         await setBaseStorage(page);
         await setSeedLoginStorage(page, identity);
         await page.addInitScript(
-          ({ hidden, fiat }) => {
+          ({ hidden, fiat, deviceId }) => {
             Object.defineProperty(document, "visibilityState", {
               configurable: true,
               get: () => (hidden ? "hidden" : "visible"),
@@ -72,8 +74,13 @@ export const test = base.extend<{ bootAccount: BootAccount }>({
                 "linky.display_allowed_currencies.v1",
                 JSON.stringify(["sat", "czk"]),
               );
+            if (deviceId) localStorage.setItem("linky.device_id.v1", deviceId);
           },
-          { hidden: options.hidden ?? false, fiat: options.fiat ?? false },
+          {
+            hidden: options.hidden ?? false,
+            fiat: options.fiat ?? false,
+            deviceId: options.deviceId ?? null,
+          },
         );
         await stubFiatRates(page);
         await stubThirdPartyAssets(page);

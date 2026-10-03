@@ -35,7 +35,6 @@ export interface RecurringPaymentsActions {
   requestDeleteRecurringPayment: (
     order: RecurringPaymentOrder,
   ) => Promise<boolean>;
-  runRecurringPaymentNow: (order: RecurringPaymentOrder) => Promise<void>;
   setRecurringPaymentPaused: (
     order: RecurringPaymentOrder,
     paused: boolean,
@@ -56,7 +55,6 @@ interface UseRecurringPaymentsActionsParams {
   repository: RecurringPaymentsRepository;
   /** A scheduler pass; it settles the envelope of a payment just deleted. */
   runNow: RecurringPaymentsScheduler["runNow"];
-  runOrderNow: RecurringPaymentsScheduler["runOrderNow"];
   t: Translate;
 }
 
@@ -74,7 +72,6 @@ export const useRecurringPaymentsActions = ({
   pushToast,
   repository,
   runNow,
-  runOrderNow,
   t,
 }: UseRecurringPaymentsActionsParams): RecurringPaymentsActions => {
   const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(
@@ -243,19 +240,10 @@ export const useRecurringPaymentsActions = ({
     [pendingDeleteId, reportWriteFailure, repository, runNow],
   );
 
-  const runRecurringPaymentNow = React.useCallback(
-    async (order: RecurringPaymentOrder): Promise<void> => {
-      const outcome = await runOrderNow(order.id);
-      if (outcome === "busy") pushToast(t("recurringWalletBusy"));
-    },
-    [pushToast, runOrderNow, t],
-  );
-
   return {
     createRecurringPayment,
     pendingRecurringPaymentDeleteId: pendingDeleteId,
     requestDeleteRecurringPayment,
-    runRecurringPaymentNow,
     setRecurringPaymentPaused,
     updateRecurringPayment,
   };
