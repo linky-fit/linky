@@ -22,6 +22,7 @@ const LOCAL_STACK_SPECS = [
   "**/mint-management.spec.ts",
   "**/password-manager-save.spec.ts",
   "**/profile-tilt-permission.spec.ts",
+  "**/profile-edit.spec.ts",
   "**/spayd-response.spec.ts",
   "**/security-policy.spec.ts",
   "**/seed-restore-chat-tokens.spec.ts",
