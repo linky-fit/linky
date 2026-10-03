@@ -9,19 +9,18 @@ import {
   Pill,
   Progress,
   Row,
-  SuccessOverlay,
   Stack,
   Stepper,
   Switch,
   Text,
   type Tone,
 } from "@linky-fit/ui";
-import { border } from "@linky-fit/ui/tokens";
-import type { ComponentProps, ComponentType } from "react";
+import type { ComponentType } from "react";
 import { DemoBody, DemoTabBar, DemoTopBar } from "./chrome";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
-import { useCues } from "./playback";
+import { useCues, useFlow } from "./playback";
+import { FlowScenes, PaymentOverlay, Tap, type FlowScene } from "./flow";
 import { ScanScene } from "./proxyScan";
 import "./proxyFlow.css";
 
@@ -49,35 +48,8 @@ const cues = {
 
 type Cue = keyof typeof cues;
 
-const cueOrder = Object.keys(cues);
-const cueTimes = Object.values(cues);
-
 /** Whether a cue of the flow has passed. */
 type At = (cue: Cue) => boolean;
-
-/** A press target that shows a touch when `on` turns true. */
-function Tap({
-  on,
-  children,
-  ...props
-}: { on: boolean } & ComponentProps<typeof Stack>) {
-  return (
-    <Stack position="relative" className={on ? "proxy-press" : ""} {...props}>
-      {children}
-      {on ? (
-        <Stack
-          className="proxy-tap"
-          width="$controlLg"
-          height="$controlLg"
-          borderRadius="$pill"
-          borderWidth={border.emphasis}
-          borderColor="$surface"
-          backgroundColor="$colorMuted"
-        />
-      ) : null}
-    </Stack>
-  );
-}
 
 const payers: { currency: string; people: Person[] }[] = [
   { currency: "CZK", people: ["Alex Rivers", "Mia Novak", "Tomas Berg"] },
@@ -311,25 +283,14 @@ function useCountdown(from: number) {
 function SendingOverlay({ at }: { at: At }) {
   const sent = at("sent");
   return (
-    <Stack
-      className={at("dismissed") ? "proxy-overlay-out" : "proxy-fade-in"}
-      position="absolute"
-      zIndex="$overlay"
-      top="$none"
-      bottom="$none"
-      left="$none"
-      right="$none"
-    >
-      <SuccessOverlay
-        contained
-        title={sent ? "Sent" : "Sending…"}
-        amount="21,000"
-        unit="sat"
-        avatar={{ name: "Alex Rivers", uri: avatarUri("Alex Rivers") }}
-        direction="out"
-        pending={!sent}
-      />
-    </Stack>
+    <PaymentOverlay
+      title={sent ? "Sent" : "Sending…"}
+      amount="21,000"
+      person="Alex Rivers"
+      direction="out"
+      pending={!sent}
+      hidden={at("dismissed")}
+    />
   );
 }
 
@@ -432,39 +393,26 @@ function ScanStep({ at }: { at: At }) {
   return <ScanScene locked={at("locked")} />;
 }
 
-const scenes: { Scene: ComponentType<{ at: At }>; enter: string }[] = [
-  { Scene: HubScene, enter: "" },
-  { Scene: ScanStep, enter: "proxy-modal-in" },
-  { Scene: BankScene, enter: "proxy-push-in" },
-  { Scene: OfferScene, enter: "proxy-push-in" },
+const scenes: {
+  Scene: ComponentType<{ at: At }>;
+  enter?: FlowScene["enter"];
+}[] = [
+  { Scene: HubScene },
+  { Scene: ScanStep, enter: "modal" },
+  { Scene: BankScene, enter: "push" },
+  { Scene: OfferScene, enter: "push" },
 ];
 
 /** The offerer's whole proxy payment, from scanning the bank QR to paying the payer. */
 export function ProxyOfferScreen() {
-  const passed = useCues(cueTimes);
-  const at: At = (cue) => passed > cueOrder.indexOf(cue);
-  const current = [at("scan"), at("bank"), at("offer")].filter(Boolean).length;
-  const pushed = scenes[current]?.enter === "proxy-push-in";
+  const at = useFlow(cues);
   return (
-    <Stack flex={1} position="relative" overflow="hidden">
-      {scenes.map(({ Scene, enter }, index) =>
-        index === current || index === current - 1 ? (
-          <Stack
-            key={index}
-            className={`proxy-scene ${
-              index === current ? enter : pushed ? "proxy-push-out" : ""
-            }`}
-            position="absolute"
-            top="$none"
-            bottom="$none"
-            left="$none"
-            right="$none"
-            backgroundColor="$background"
-          >
-            <Scene at={at} />
-          </Stack>
-        ) : null,
-      )}
-    </Stack>
+    <FlowScenes
+      current={[at("scan"), at("bank"), at("offer")].filter(Boolean).length}
+      scenes={scenes.map(({ Scene, enter }) => ({
+        node: <Scene at={at} />,
+        enter,
+      }))}
+    />
   );
 }

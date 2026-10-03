@@ -1,7 +1,8 @@
 import { Stack } from "@linky-fit/ui";
 import { useState, type ComponentType, type ReactNode, type Ref } from "react";
 import type { Screen } from "../copy";
-import { ChatPaymentScreen, ChatRequestScreen } from "./chat";
+import { ChatPayFlowScreen } from "./chatPay";
+import { ChatRequestFlowScreen } from "./chatRequest";
 import { ContactsScreen, WalletScreen } from "./home";
 import { ProxyOfferScreen } from "./proxy";
 import { useInView } from "./playback";
@@ -9,8 +10,8 @@ import { RecurringListScreen } from "./recurring";
 import { TokenShareScreen } from "./token";
 
 const demoScreens: Record<Screen, ComponentType> = {
-  "chat-payment": ChatPaymentScreen,
-  "chat-request": ChatRequestScreen,
+  "chat-payment": ChatPayFlowScreen,
+  "chat-request": ChatRequestFlowScreen,
   contacts: ContactsScreen,
   wallet: WalletScreen,
   "proxy-offer": ProxyOfferScreen,

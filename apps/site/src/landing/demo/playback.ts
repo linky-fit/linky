@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export const reducedMotion = window.matchMedia(
   "(prefers-reduced-motion: reduce)",
@@ -32,4 +32,12 @@ export function useInView() {
     return () => observer.disconnect();
   }, []);
   return { ref, inView };
+}
+
+/** Plays named cues (ms after mount, in time order) and tells whether one has passed. */
+export function useFlow<Cue extends string>(cues: Record<Cue, number>) {
+  const order = Object.keys(cues);
+  const times = useMemo(() => Object.values<number>(cues), [cues]);
+  const passed = useCues(times);
+  return (cue: Cue) => passed > order.indexOf(cue);
 }

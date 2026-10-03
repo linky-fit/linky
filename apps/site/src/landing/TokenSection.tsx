@@ -312,20 +312,15 @@ export function TokenSection({ copy }: { copy: LandingCopy }) {
     <Stack gap="$huge" paddingVertical="$huge">
       <Reveal>
         <Stack alignItems="center" gap="$lg">
-          <Stack alignItems="center" gap="$sm">
-            <Text eyebrow color="$accent">
-              {section.eyebrow}
-            </Text>
-            <Text
-              variant={wide ? "amount" : "display"}
-              color="$colorStrong"
-              textAlign="center"
-              role="heading"
-              aria-level={2}
-            >
-              {section.title}
-            </Text>
-          </Stack>
+          <Text
+            variant={wide ? "amount" : "display"}
+            color="$colorStrong"
+            textAlign="center"
+            role="heading"
+            aria-level={2}
+          >
+            {section.title}
+          </Text>
           <Text
             variant="title"
             fontWeight="$regular"

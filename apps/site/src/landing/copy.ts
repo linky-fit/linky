@@ -19,7 +19,6 @@ export interface Feature {
 }
 
 export interface TokenSectionCopy {
-  eyebrow: string;
   title: string;
   description: string;
   messenger: string;
@@ -33,12 +32,11 @@ export interface LandingCopy extends SiteLayoutCopy {
   titleAccent: string;
   subtitle: string;
   ctaLabels: Record<CtaMode, string>;
-  showOthersLabel: string;
+  showAllLabel: string;
   getAppTitle: string;
-  uspSectionTitle: string;
+  featuresTitle: string;
   features: Feature[];
   tokenSection: TokenSectionCopy;
-  closingSectionTitle: string;
   closingSectionDescription: string;
   closingImageAlt: string;
 }
@@ -63,7 +61,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     appearanceAuto: "Automaticky",
     appearanceLight: "Světlý",
     appearanceDark: "Tmavý",
-    showOthersLabel: "Zobrazit další",
+    showAllLabel: "Zobrazit vše",
     getAppTitle: "Stáhněte si aplikaci",
     switchLabel: "Jazyk",
     title: "Budujte svou bitcoinovou síť",
@@ -73,7 +71,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     ctaLabels: { ...ctaLabels, web: "Webová aplikace" },
     privacyLabel: "Ochrana soukromí",
     followUsLabel: "Sledujte nás",
-    uspSectionTitle: "Proč Linky",
+    featuresTitle: "Funkce",
     features: [
       {
         title: "Posílejte bitcoin stejně jako zprávu",
@@ -101,7 +99,6 @@ export const copy: Record<SiteLocale, LandingCopy> = {
       },
     ],
     tokenSection: {
-      eyebrow: "Cashu token",
       title: "Bitcoin i pro lidi bez Linky",
       description:
         "Platbu můžete připravit i pro někoho, kdo ještě žádnou peněženku nemá. Linky mu ji pomůže jednoduše převzít.",
@@ -109,7 +106,6 @@ export const copy: Record<SiteLocale, LandingCopy> = {
       qrCode: "Ukažte QR kód",
       nfcCard: "Nebo předejte NFC kartu",
     },
-    closingSectionTitle: "Soukromí",
     closingSectionDescription:
       "Nepotřebujete telefonní číslo, e-mail ani žádné doklady.",
     closingImageAlt:
@@ -122,7 +118,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     appearanceAuto: "Automatic",
     appearanceLight: "Light",
     appearanceDark: "Dark",
-    showOthersLabel: "Show others",
+    showAllLabel: "Show all",
     getAppTitle: "Get the app",
     switchLabel: "Language",
     title: "Build your bitcoin network",
@@ -132,7 +128,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     ctaLabels,
     privacyLabel: "Privacy Policy",
     followUsLabel: "Follow us",
-    uspSectionTitle: "Why Linky",
+    featuresTitle: "Features",
     features: [
       {
         title: "Send bitcoin like a message",
@@ -160,7 +156,6 @@ export const copy: Record<SiteLocale, LandingCopy> = {
       },
     ],
     tokenSection: {
-      eyebrow: "Cashu token",
       title: "Bitcoin for people without Linky",
       description:
         "You can prepare a payment for someone who does not have a wallet yet. Linky makes the handoff simple.",
@@ -168,7 +163,6 @@ export const copy: Record<SiteLocale, LandingCopy> = {
       qrCode: "Show a QR code",
       nfcCard: "Or hand over an NFC card",
     },
-    closingSectionTitle: "Privacy",
     closingSectionDescription:
       "You don't need a phone number, email address, or any identity documents.",
     closingImageAlt:
@@ -181,7 +175,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     appearanceAuto: "Automatisch",
     appearanceLight: "Hell",
     appearanceDark: "Dunkel",
-    showOthersLabel: "Weitere anzeigen",
+    showAllLabel: "Alle anzeigen",
     getAppTitle: "Hol dir die App",
     switchLabel: "Sprache",
     title: "Baue dein Bitcoin-Netzwerk auf",
@@ -191,7 +185,7 @@ export const copy: Record<SiteLocale, LandingCopy> = {
     ctaLabels: { ...ctaLabels, web: "Web-App" },
     privacyLabel: "Datenschutz",
     followUsLabel: "Folge uns",
-    uspSectionTitle: "Warum Linky",
+    featuresTitle: "Funktionen",
     features: [
       {
         title: "Sende Bitcoin wie eine Nachricht",
@@ -219,7 +213,6 @@ export const copy: Record<SiteLocale, LandingCopy> = {
       },
     ],
     tokenSection: {
-      eyebrow: "Cashu-Token",
       title: "Bitcoin für Menschen ohne Linky",
       description:
         "Du kannst eine Zahlung für jemanden vorbereiten, der noch keine Wallet hat. Linky macht die Übergabe einfach.",
@@ -227,7 +220,6 @@ export const copy: Record<SiteLocale, LandingCopy> = {
       qrCode: "Zeig einen QR-Code",
       nfcCard: "Oder gib eine NFC-Karte weiter",
     },
-    closingSectionTitle: "Datenschutz",
     closingSectionDescription:
       "Du brauchst weder Telefonnummer noch E-Mail-Adresse oder Ausweisdokumente.",
     closingImageAlt:

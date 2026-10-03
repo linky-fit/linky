@@ -16,39 +16,22 @@ export function Privacy({ copy }: { copy: LandingCopy }) {
   const { wide } = useMedia();
   return (
     <Reveal>
-      <Stack alignItems="center" gap="$lg" paddingVertical="$xxxl">
-        <Row gap="$md" role="img" aria-label={copy.closingImageAlt}>
+      <Stack alignItems="center" gap="$xl" paddingVertical="$xxxl">
+        <Row gap="$xxl" role="img" aria-label={copy.closingImageAlt}>
           {notNeeded.map((icon) => (
-            <Stack
-              key={icon}
-              width="$controlLg"
-              height="$controlLg"
-              borderRadius="$pill"
-              alignItems="center"
-              justifyContent="center"
-              backgroundColor="$surface"
-              borderWidth={1}
-              borderColor="$borderColor"
-            >
-              <Icon name={icon} size="md" color="$accent" />
-            </Stack>
+            <Icon key={icon} name={icon} size="lg" color="$accent" />
           ))}
         </Row>
-        <Stack alignItems="center" gap="$sm">
-          <Text eyebrow color="$accent">
-            {copy.closingSectionTitle}
-          </Text>
-          <Text
-            variant={wide ? "display" : "heading"}
-            color="$colorStrong"
-            textAlign="center"
-            maxWidth="$contentWidth"
-            role="heading"
-            aria-level={2}
-          >
-            {copy.closingSectionDescription}
-          </Text>
-        </Stack>
+        <Text
+          variant={wide ? "display" : "heading"}
+          color="$colorStrong"
+          textAlign="center"
+          maxWidth="$contentWidth"
+          role="heading"
+          aria-level={2}
+        >
+          {copy.closingSectionDescription}
+        </Text>
       </Stack>
     </Reveal>
   );
@@ -61,17 +44,11 @@ export function ClosingCta({ copy }: { copy: LandingCopy }) {
       <Reveal>
         <Stack
           position="relative"
-          overflow="hidden"
           alignItems="center"
           gap="$xxxl"
           paddingVertical="$huge"
-          paddingHorizontal={wide ? "$huge" : "$xl"}
-          borderRadius="$sheet"
-          backgroundColor="$surface"
-          borderWidth={1}
-          borderColor="$borderColor"
         >
-          <Glow size="70%" top="0%" left="50%" />
+          <Glow size="40%" top="30%" left="50%" />
           <BrandMark size="hero" />
           <Text
             variant={wide ? "amount" : "display"}

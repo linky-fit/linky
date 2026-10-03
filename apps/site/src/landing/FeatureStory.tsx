@@ -136,7 +136,7 @@ export function FeatureStory({ copy }: { copy: LandingCopy }) {
           role="heading"
           aria-level={2}
         >
-          {copy.uspSectionTitle}
+          {copy.featuresTitle}
         </Text>
       </Reveal>
       {wide ? (

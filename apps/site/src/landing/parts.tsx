@@ -64,7 +64,7 @@ export function AppLaunch({
   copy,
   centered = false,
 }: {
-  copy: Pick<LandingCopy, "ctaLabels" | "showOthersLabel">;
+  copy: Pick<LandingCopy, "ctaLabels" | "showAllLabel">;
   centered?: boolean;
 }) {
   const [{ primary, secondary, others }] = useState(() =>
@@ -108,7 +108,7 @@ export function AppLaunch({
             color="$colorMuted"
             hoverStyle={{ color: "$color" }}
           >
-            {copy.showOthersLabel}
+            {copy.showAllLabel}
           </Text>
           <Icon name="ChevronDown" size="sm" color="$colorMuted" />
         </Pressable>

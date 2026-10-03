@@ -1,0 +1,111 @@
+/* Each scene stacks its own sticky bars, so they stay under the scene above. */
+.flow-scene {
+  isolation: isolate;
+}
+
+.flow-fade-in {
+  animation: flow-fade-in 220ms ease-out both;
+}
+
+@keyframes flow-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.flow-modal-in {
+  animation: flow-modal-in 260ms ease-out both;
+}
+
+@keyframes flow-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.flow-push-in {
+  animation: flow-push-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  box-shadow: -12px 0 32px rgb(0 0 0 / 12%);
+}
+
+@keyframes flow-push-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+.flow-push-out {
+  animation: flow-push-out 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes flow-push-out {
+  to {
+    transform: translateX(-30%);
+  }
+}
+
+/* A touch as screen recordings show it: lands, presses, lifts. */
+.flow-tap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: flow-tap 650ms ease-out both;
+}
+
+@keyframes flow-tap {
+  0% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+  25% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  45% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+.flow-press {
+  animation: flow-press 300ms ease-out 100ms;
+}
+
+@keyframes flow-press {
+  40% {
+    transform: scale(0.96);
+  }
+}
+
+.flow-overlay-out {
+  animation: flow-overlay-out 260ms ease-in both;
+}
+
+@keyframes flow-overlay-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-fade-in,
+  .flow-modal-in,
+  .flow-push-in,
+  .flow-push-out,
+  .flow-press {
+    animation: none;
+  }
+
+  .flow-tap {
+    display: none;
+  }
+}

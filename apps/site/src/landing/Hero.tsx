@@ -1,25 +1,9 @@
-import {
-  Avatar,
-  AvatarGroup,
-  Card,
-  DeviceFrame,
-  Row,
-  Stack,
-  SuccessOverlay,
-  Text,
-  useMedia,
-  type DeviceFrameProps,
-  type Tone,
-} from "@linky-fit/ui";
+import { Avatar, Row, Stack, Text, useMedia, type Tone } from "@linky-fit/ui";
 import { themes } from "@linky-fit/ui/tokens";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useColorMode } from "../colorMode";
 import type { LandingCopy } from "./copy";
-import { ContactsScreen } from "./demo/home";
 import { avatarUri, type Person } from "./demo/people";
-import { reducedMotion, useInView } from "./demo/playback";
-import { ScaledScreen } from "./demo/ScaledScreen";
-import { DemoSurface } from "./demo/screens";
 import { AppLaunch, Glow, Phone, Pulse } from "./parts";
 import { percent, type Point } from "./stage";
 
@@ -100,69 +84,6 @@ function Network() {
   );
 }
 
-function NetworkCard() {
-  return (
-    <Card elevated outlined padding="$md">
-      <AvatarGroup
-        people={nodes.map(({ name }) => ({ name, uri: avatarUri(name) }))}
-        max={4}
-        size="sm"
-      />
-    </Card>
-  );
-}
-
-const firstPaymentMs = 2000;
-const paymentEveryMs = 5000;
-// As long as the app shows its paid overlay.
-const overlayMs = 2000;
-
-/** Mia's payment arrives shortly after the phone comes into view, then again every few seconds. */
-function usePayments(inView: boolean) {
-  const [paid, setPaid] = useState(false);
-  const [showing, setShowing] = useState(false);
-  useEffect(() => {
-    if (!inView || reducedMotion) return;
-    let timer = setTimeout(function receive() {
-      setPaid(true);
-      setShowing(true);
-      timer = setTimeout(receive, paymentEveryMs);
-    }, firstPaymentMs);
-    return () => clearTimeout(timer);
-  }, [inView]);
-  useEffect(() => {
-    if (!showing) return;
-    const timer = setTimeout(() => setShowing(false), overlayMs);
-    return () => clearTimeout(timer);
-  }, [showing]);
-  return { paid, showing };
-}
-
-/** The contacts screen receiving Mia's payments with the app's paid overlay. */
-function ReceivingPhone({ width }: Pick<DeviceFrameProps, "width">) {
-  const { ref, inView } = useInView();
-  const { paid, showing } = usePayments(inView);
-  return (
-    <DeviceFrame width={width}>
-      <ScaledScreen>
-        <DemoSurface ref={ref}>
-          <ContactsScreen paid={paid} />
-          {showing ? (
-            <SuccessOverlay
-              contained
-              title="Received"
-              amount="21,000"
-              unit="sat"
-              avatar={{ name: "Mia Novak", uri: avatarUri("Mia Novak") }}
-              direction="in"
-            />
-          ) : null}
-        </DemoSurface>
-      </ScaledScreen>
-    </DeviceFrame>
-  );
-}
-
 /** Places a piece of the stage at percent offsets, which the strict style props reject. */
 function Placed({
   children,
@@ -195,13 +116,8 @@ function Stage({ wide }: { wide: boolean }) {
         <Phone screen="wallet" width={wide ? "$qr" : "$column"} />
       </Placed>
       <Placed right="4%" top="2%" className="landing-tilt">
-        <ReceivingPhone width={wide ? "$device" : "$qr"} />
+        <Phone screen="contacts" width={wide ? "$device" : "$qr"} />
       </Placed>
-      {wide ? (
-        <Placed left="-4%" bottom="14%" className="landing-float">
-          <NetworkCard />
-        </Placed>
-      ) : null}
     </Stack>
   );
 }

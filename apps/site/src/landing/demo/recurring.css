@@ -1,0 +1,70 @@
+/* Scrolls the form to its end: the top edge moves to the bottom, then the form lifts by its own height. */
+.recurring-form {
+  top: 0;
+  transition:
+    top 800ms cubic-bezier(0.4, 0, 0.2, 1),
+    translate 800ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.recurring-form.recurring-form-end {
+  top: 100%;
+  translate: 0 -100%;
+}
+
+/* Going back: the form slides off to the right over the list. */
+.recurring-pop-out {
+  animation: recurring-pop-out 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  box-shadow: -12px 0 32px rgb(0 0 0 / 12%);
+}
+
+@keyframes recurring-pop-out {
+  to {
+    transform: translateX(100%);
+    visibility: hidden;
+  }
+}
+
+.recurring-pop-under {
+  animation: recurring-pop-under 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes recurring-pop-under {
+  from {
+    transform: translateX(-30%);
+  }
+}
+
+/* Clips only vertically, so the row's highlight still reaches into the gutter. */
+.recurring-added {
+  clip-path: inset(0 -24px);
+  animation: recurring-added 450ms cubic-bezier(0.2, 0.8, 0.2, 1) 500ms both;
+}
+
+@keyframes recurring-added {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: 96px;
+    opacity: 1;
+  }
+}
+
+.recurring-highlight {
+  animation: flow-fade-in 600ms ease-out 700ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .recurring-form,
+  .recurring-pop-under,
+  .recurring-added,
+  .recurring-highlight {
+    transition: none;
+    animation: none;
+  }
+
+  .recurring-pop-out {
+    display: none;
+  }
+}
