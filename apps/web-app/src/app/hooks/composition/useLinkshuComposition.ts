@@ -314,8 +314,9 @@ const decodeTopupDraft = Schema.decodeUnknownSync(TopupDraft);
 const decodePaidQuoteDraft = Schema.decodeUnknownSync(PaidQuoteDraft);
 
 /**
- * NUT-20 locked quotes from npub.cash are bound to the nostr key, so the
- * same secret unlocks them. It reaches linkshu only as a mint-call argument.
+ * NUT-20 quotes are locked to the nostr key: topups lock new quotes to it,
+ * npub.cash locks its quotes to it, and the same secret unlocks both after a
+ * restart. It reaches linkshu only as a mint-call argument.
  */
 const quoteLockingKeyOf = (nsec: string | null): QuoteLockingKey | null => {
   if (!nsec) return null;
@@ -505,7 +506,7 @@ export const useLinkshuComposition = ({
             ...(description ? { description } : {}),
           });
           return Effect.flatMap(Topup, (topup) =>
-            Scope.extend(topup.start(draft), topupScope),
+            Scope.extend(topup.start(draft, lockingOptions), topupScope),
           );
         }).pipe(Effect.map(toHandle)),
       );

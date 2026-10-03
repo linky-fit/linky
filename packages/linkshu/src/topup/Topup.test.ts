@@ -72,6 +72,8 @@ const quoteResponse = (
 interface FakeWalletArgs {
   /** The quote `start` creates; defaults to a fresh unpaid one. */
   readonly created?: MintQuoteBolt11Response;
+  /** What the mint advertises; by default the wallet has no info to read. */
+  readonly mintInfo?: GetInfoResponse;
   /** One entry per `checkMintQuoteBolt11` call; the last one repeats. */
   readonly states: ReadonlyArray<MintQuoteBolt11Response>;
   /** Replaces the state sequence entirely when set. */
@@ -87,12 +89,24 @@ const makeWallet = (args: FakeWalletArgs) => {
   const mintCounters: number[] = [];
   const mintConfigs: Array<MintProofsConfig | undefined> = [];
   const restoreCalls: Array<{ start: number; count: number }> = [];
+  const lockedTo: string[] = [];
+  const { mintInfo } = args;
   let checks = 0;
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
     checkProofsStates: answerProofStates(),
+    ...(mintInfo === undefined
+      ? {}
+      : { getMintInfo: () => new CashuMintInfo(mintInfo) }),
     createMintQuoteBolt11: () =>
       Promise.resolve(args.created ?? quoteResponse("UNPAID")),
+    createLockedMintQuote: (_amount, pubkey) => {
+      lockedTo.push(pubkey);
+      return Promise.resolve({
+        ...(args.created ?? quoteResponse("UNPAID")),
+        pubkey,
+      });
+    },
     checkMintQuoteBolt11: () => {
       if (args.check !== undefined) return args.check();
       const response =
@@ -117,8 +131,20 @@ const makeWallet = (args: FakeWalletArgs) => {
         : Promise.reject(new Error("restore unavailable"));
     },
   });
-  return { wallet, mintCounters, mintConfigs, restoreCalls };
+  return { wallet, mintCounters, mintConfigs, restoreCalls, lockedTo };
 };
+
+const mintInfoWithNut20 = (supported: boolean): GetInfoResponse => ({
+  name: "Mint",
+  pubkey: "02" + "ab".repeat(32),
+  version: "Nutshell/0.16.0",
+  contact: [],
+  nuts: {
+    "4": { methods: [], disabled: false },
+    "5": { methods: [], disabled: false },
+    "20": { supported },
+  },
+});
 
 /** One runtime over the given storage — a second one models a restart. */
 const makeHarness = (wallet: LoadedWallet, storage: Storage) => {
@@ -1165,5 +1191,117 @@ describe("Topup.adopt", () => {
         storage.kv.listKeys(LEGACY_PENDING_TOPUP_KEY_PREFIX),
       ),
     ).toEqual([]);
+  });
+});
+
+describe("Topup.start with a locking key", () => {
+  /** The compressed secp256k1 pubkey of `lockingKey`. */
+  const lockingPubkey =
+    "0381aaadc8a5e83f4576df823cf22a5b1969cf704a0d5f6f68bd757410c9917aac";
+  const nut20MintInfo = mintInfoWithNut20(true);
+
+  const startLockedAndAwait = Effect.gen(function* () {
+    const topup = yield* Topup;
+    const handle = yield* topup.start(draft, { lockingKey });
+    return { quote: handle.quote, receipt: yield* handle.result };
+  });
+
+  it("locks the quote to the key's pubkey where the mint supports NUT-20", async () => {
+    const storage = freshStorage();
+    const { wallet, lockedTo, mintConfigs } = makeWallet({
+      mintInfo: nut20MintInfo,
+      states: [quoteResponse("PAID")],
+    });
+    const { run, events } = makeHarness(wallet, storage);
+
+    const exit = await run(startLockedAndAwait);
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.quote.locked).toBe(true);
+    expect(exit.value.receipt.amount).toBe(16);
+    expect(lockedTo).toEqual([lockingPubkey]);
+    expect(mintConfigs).toEqual([{ privkey: lockingKey }]);
+    expect(await onlyTopup(storage)).toMatchObject({
+      status: "done",
+      locked: true,
+    });
+    expect(JSON.stringify(events)).not.toContain(lockingKey);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        _tag: "OperationSucceeded",
+        name: "topup.start",
+        result: expect.objectContaining({ locked: true }),
+      }),
+    );
+  });
+
+  it("falls back to an unlocked quote when the mint lacks NUT-20", async () => {
+    const storage = freshStorage();
+    const { wallet, lockedTo, mintConfigs } = makeWallet({
+      mintInfo: mintInfoWithNut20(false),
+      states: [quoteResponse("PAID")],
+    });
+
+    const exit = await makeHarness(wallet, storage).run(startLockedAndAwait);
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.quote.locked).toBe(false);
+    expect(lockedTo).toEqual([]);
+    expect(mintConfigs).toEqual([undefined]);
+    expect((await onlyTopup(storage)).locked).toBe(false);
+  });
+
+  it("stays unlocked without a key, whatever the mint supports", async () => {
+    const storage = freshStorage();
+    const { wallet, lockedTo } = makeWallet({
+      mintInfo: nut20MintInfo,
+      states: [quoteResponse("PAID")],
+    });
+
+    const exit = await makeHarness(wallet, storage).run(startAndAwait);
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.quote.locked).toBe(false);
+    expect(lockedTo).toEqual([]);
+  });
+
+  it("mints a locked quote after a restart only when the key comes back", async () => {
+    const storage = freshStorage();
+    const first = makeWallet({
+      mintInfo: nut20MintInfo,
+      states: [quoteResponse("UNPAID")],
+    });
+    const started = await makeHarness(first.wallet, storage).run(
+      Effect.flatMap(Topup, (topup) => topup.start(draft, { lockingKey })),
+    );
+    assert(Exit.isSuccess(started));
+    expect(await pendingTopups(storage)).toMatchObject([{ locked: true }]);
+
+    const keyless = makeWallet({ states: [quoteResponse("PAID")] });
+    const stuck = await makeHarness(keyless.wallet, storage).run(
+      Effect.gen(function* () {
+        const handles = yield* (yield* Topup).resumePending();
+        const first = handles[0];
+        return first === undefined ? null : yield* Effect.either(first.result);
+      }),
+    );
+    assert(Exit.isSuccess(stuck));
+    assert(stuck.value?._tag === "Left");
+    expect(stuck.value.left._tag).toBe("MintRejected");
+    expect(keyless.mintCounters).toEqual([]);
+    expect(await pendingTopups(storage)).toHaveLength(1);
+
+    const resuming = makeWallet({ states: [quoteResponse("PAID")] });
+    const resumed = await makeHarness(resuming.wallet, storage).run(
+      Effect.gen(function* () {
+        const handles = yield* (yield* Topup).resumePending({ lockingKey });
+        const first = handles[0];
+        return first === undefined ? null : yield* first.result;
+      }),
+    );
+    assert(Exit.isSuccess(resumed));
+    expect(resumed.value?.amount).toBe(16);
+    expect(resuming.mintConfigs).toEqual([{ privkey: lockingKey }]);
+    expect((await onlyTopup(storage)).status).toBe("done");
   });
 });

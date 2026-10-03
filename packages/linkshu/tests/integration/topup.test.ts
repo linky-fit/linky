@@ -26,6 +26,15 @@ import {
   randomSeed,
 } from "./helpers";
 
+const secp256k1Keypair = () => {
+  const ecdh = createECDH("secp256k1");
+  ecdh.generateKeys();
+  return {
+    privkey: QuoteLockingKey.make(ecdh.getPrivateKey("hex").padStart(64, "0")),
+    pubkey: ecdh.getPublicKey("hex", "compressed"),
+  };
+};
+
 describe("topup vertical against the local mint", () => {
   it("drives quote, poll, and mint into available proofs", async () => {
     const { proofs, operations, layers } = durableStorage();
@@ -65,6 +74,36 @@ describe("topup vertical against the local mint", () => {
       quoteId: quote.quoteId,
     });
     expect(await pendingOperations(operations, "topup")).toEqual([]);
+  });
+
+  it("locks the quote with NUT-20 and mints it with the key", async () => {
+    const { proofs, operations, layers } = durableStorage();
+    const { privkey, pubkey } = secp256k1Keypair();
+
+    const { quote, receipt } = await runLinkshu(
+      { bip39Seed: randomSeed(), ...layers },
+      Effect.scoped(
+        Effect.gen(function* () {
+          const handle = yield* (yield* Topup).start(
+            new TopupDraft({ mint: mintUrl, amount: Amount.make(48) }),
+            { lockingKey: privkey },
+          );
+          return { quote: handle.quote, receipt: yield* handle.result };
+        }),
+      ),
+    );
+
+    expect(quote.locked).toBe(true);
+    const wallet = await loadMintWallet();
+    const atMint = await wallet.checkMintQuoteBolt11(quote.quoteId);
+    expect(atMint.pubkey).toBe(pubkey);
+    expect(atMint.state).toBe("ISSUED");
+
+    expect(receipt.amount).toBe(48);
+    expect(availableTotalOf(await Effect.runPromise(proofs.loadAll))).toBe(48);
+    expect(await Effect.runPromise(operations.loadAll)).toMatchObject([
+      { kind: "topup", status: "done", locked: true },
+    ]);
   });
 
   it("resumes a topup interrupted after quote creation and spends the result", async () => {
@@ -177,17 +216,6 @@ describe("adopting externally paid quotes against the local mint", () => {
     const wallet = new Wallet(new Mint(mintUrl), { unit: "sat" });
     await wallet.loadMint();
     return wallet;
-  };
-
-  const secp256k1Keypair = () => {
-    const ecdh = createECDH("secp256k1");
-    ecdh.generateKeys();
-    return {
-      privkey: QuoteLockingKey.make(
-        ecdh.getPrivateKey("hex").padStart(64, "0"),
-      ),
-      pubkey: ecdh.getPublicKey("hex", "compressed"),
-    };
   };
 
   const draftOf = (

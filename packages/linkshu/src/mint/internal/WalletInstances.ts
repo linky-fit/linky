@@ -83,6 +83,11 @@ export interface LoadedWallet {
     amount: AmountLike,
     description?: string,
   ): Promise<MintQuoteBolt11Response>;
+  createLockedMintQuote(
+    amount: AmountLike,
+    pubkey: string,
+    description?: string,
+  ): Promise<MintQuoteBolt11Response>;
   checkMintQuoteBolt11(quote: string): Promise<MintQuoteBolt11Response>;
   mintProofsBolt11(
     amount: AmountLike,

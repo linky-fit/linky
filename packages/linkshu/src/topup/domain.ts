@@ -33,6 +33,8 @@ export class TopupQuote extends Schema.Class<TopupQuote>("TopupQuote")({
   amount: Amount,
   invoice: Bolt11Invoice,
   expiresAt: Schema.NullOr(UnixSeconds),
+  /** NUT-20: only the wallet that holds the locking key can mint it. */
+  locked: Schema.Boolean,
 }) {}
 
 export class TopupReceipt extends Schema.Class<TopupReceipt>("TopupReceipt")({
@@ -77,7 +79,10 @@ export const QuoteLockingKey = Schema.String.pipe(
 export type QuoteLockingKey = typeof QuoteLockingKey.Type;
 
 export interface TopupLockingOptions {
-  /** Unlocks NUT-20 locked quotes; a locked record without it is rejected. */
+  /**
+   * `start` locks new quotes to it where the mint supports NUT-20; `resumePending`
+   * and `adopt` unlock locked quotes with it, and reject a locked record without it.
+   */
   readonly lockingKey?: QuoteLockingKey | undefined;
 }
 

@@ -1,4 +1,6 @@
 import type { MintProofsConfig } from "@cashu/cashu-ts";
+import { getPubKeyFromPrivKey } from "@cashu/cashu-ts";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { Duration, Effect, Either, Fiber } from "effect";
 import type { Scope } from "effect";
 import {
@@ -36,6 +38,7 @@ import { ProofStore } from "../ports/ProofStore";
 import { TopupQuote, TopupReceipt } from "./domain";
 import type {
   PaidQuoteDraft,
+  QuoteLockingKey,
   TopupAdoptError,
   TopupDraft,
   TopupError,
@@ -61,7 +64,20 @@ const quoteOf = (pending: PendingTopup): TopupQuote =>
     amount: pending.amount,
     invoice: pending.invoice,
     expiresAt: pending.expiresAt,
+    locked: pending.locked,
   });
+
+const supportsLockedMintQuotes = (wallet: LoadedWallet): boolean => {
+  try {
+    return wallet.getMintInfo().isSupported(20).supported;
+  } catch {
+    return false;
+  }
+};
+
+/** The compressed secp256k1 pubkey a NUT-20 quote is locked to. */
+const lockingPubkeyOf = (lockingKey: QuoteLockingKey): string =>
+  bytesToHex(getPubKeyFromPrivKey(hexToBytes(lockingKey)));
 
 /**
  * A locked quote can only be minted with its key, so a record missing it is
@@ -266,9 +282,12 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
     /**
      * The record is persisted before the handle exists, so the invoice the
      * caller can act on is always one the package can finish or resume.
+     * With a locking key the quote is locked to its pubkey (NUT-20) where
+     * the mint supports it, so the quote id alone cannot mint it.
      */
     const start = (
       draft: TopupDraft,
+      options: TopupLockingOptions = {},
     ): Effect.Effect<
       TopupHandle,
       MintUnreachable | MintRejected,
@@ -284,8 +303,19 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
           wallet.getMintInfo().supportsNut04Description("bolt11", sat)
             ? draft.description
             : undefined;
+        const lockingPubkey =
+          options.lockingKey !== undefined && supportsLockedMintQuotes(wallet)
+            ? lockingPubkeyOf(options.lockingKey)
+            : null;
         const raw = yield* Effect.tryPromise({
-          try: () => wallet.createMintQuoteBolt11(draft.amount, description),
+          try: () =>
+            lockingPubkey === null
+              ? wallet.createMintQuoteBolt11(draft.amount, description)
+              : wallet.createLockedMintQuote(
+                  draft.amount,
+                  lockingPubkey,
+                  description,
+                ),
           catch: (error) => classifyMintError(draft.mint, error),
         });
         const quote = yield* decodeMintQuote(draft.mint, raw);
@@ -299,10 +329,10 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
           expiresAt: quote.expiresAt,
           createdAt: UnixSeconds.make(yield* nowSeconds),
           counter: null,
-          locked: false,
+          locked: lockingPubkey !== null,
         });
         emitQuoteState(inspector, "topup", pending, quote.state);
-        return yield* handleFor(pending, {});
+        return yield* handleFor(pending, options);
       }).pipe(
         inspectOperationWith(
           inspector,
@@ -313,6 +343,7 @@ export class Topup extends Effect.Service<Topup>()("linkshu/Topup", {
             mint: handle.quote.mint,
             amount: handle.quote.amount,
             expiresAt: handle.quote.expiresAt,
+            locked: handle.quote.locked,
           }),
         ),
       );
