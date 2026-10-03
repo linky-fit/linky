@@ -24,7 +24,7 @@ import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
 import { useRecurringPaymentOrders } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { useSupporterAwardRecords } from "../app/hooks/useLinksync";
 import {
-  activeSupporterOrder,
+  supporterRecurringPayment,
   SUPPORTER_TIER_LABEL_KEYS,
   supporterPaymentMints,
   supporterThemesFor,
@@ -59,10 +59,9 @@ export function SupporterDonatePage({
   const { createRecurringPayment, payNow } = useRecurringPaymentsContext();
   const { mintBalances, payContactFromMint } = useSupporterContext();
   const hasAwards = useSupporterAwardRecords().length > 0;
-  const runningOrder = activeSupporterOrder(
+  const runningOrder = supporterRecurringPayment(
     useRecurringPaymentOrders(),
     contactId,
-    nowSeconds(),
   );
 
   const [amountText, setAmountText] = React.useState(

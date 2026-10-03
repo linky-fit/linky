@@ -140,7 +140,7 @@ export const pt = {
   donateMonthlySetUp:
     "Pagamento mensal configurado. O primeiro pagamento está a caminho.",
   donateMonthlyRunning:
-    "Você já apoia o Linky todo mês. Altere o valor ou a mint nesse pagamento recorrente.",
+    "Você já tem um pagamento mensal para o Linky. Altere, pause ou retome por lá.",
   donateShowMonthly: "Mostrar pagamento recorrente",
   donateThanks: "Obrigado! Seu selo chega na conversa com o Linky Bot.",
   supporterResultIssued: "Obrigado! Seu selo {tier} está guardado.",

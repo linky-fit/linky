@@ -131,7 +131,7 @@ export const cs = {
   donateConfirmOnce: "Přispět jednou",
   donateMonthlySetUp: "Měsíční platba je nastavená. První platba je na cestě.",
   donateMonthlyRunning:
-    "Linky už podporujete každý měsíc. Částku nebo mint změníte v této pravidelné platbě.",
+    "Linky už posíláte pravidelnou měsíční platbu. Změníte, pozastavíte nebo obnovíte ji tam.",
   donateShowMonthly: "Zobrazit pravidelnou platbu",
   donateThanks: "Děkujeme! Odznak dorazí do konverzace s Linky Botem.",
   supporterResultIssued: "Děkujeme! Váš odznak {tier} je uložený.",

@@ -1,5 +1,6 @@
 import {
   InboxCursorStore,
+  isPubkey,
   linkstrServices,
   makeNostrTransportSimplePool,
   MessageText,
@@ -22,7 +23,7 @@ import type {
 import { LINKY_CONTACT_NPUB } from "@linky-fit/supporter";
 import { Effect, ManagedRuntime, Option, Schema, Stream } from "effect";
 import type { BotIdentity } from "./identity";
-import { logInfo, logWarn } from "./log";
+import { logInfo, logWarn, shortPubkey } from "./log";
 import type { SupporterMessenger } from "./pipeline";
 import { TokenHash } from "./storage";
 
@@ -99,10 +100,18 @@ export const runInbox = (
     ),
   );
 
+/** Auto-reply refs hold the full recipient pubkey; logs show it shortened. */
+const loggableRef = (ref: OutboxRef): string => {
+  const [kind, to, day] = ref.split(":");
+  return kind === "auto-reply" && to !== undefined && isPubkey(to)
+    ? `auto-reply:${shortPubkey(to)}:${day}`
+    : ref;
+};
+
 const describeOutboxResult = (result: OutboxResult): string =>
   result._tag === "OutboxJobSucceeded"
-    ? `outbox delivered ref=${result.ref}`
-    : `outbox gave up ref=${result.ref} reason=${result.reason}`;
+    ? `outbox delivered ref=${loggableRef(result.ref)}`
+    : `outbox gave up ref=${loggableRef(result.ref)} reason=${result.reason}`;
 
 /**
  * Logs completed outbox jobs, reports each accepted one to `onSucceeded` and
@@ -126,7 +135,9 @@ export const consumeOutboxResults = (
           ),
           Effect.zipRight(outbox.ack(result.jobId)),
           Effect.catchAll((error) =>
-            Effect.sync(() => logWarn(`outbox result ${result.ref}`, error)),
+            Effect.sync(() =>
+              logWarn(`outbox result ${loggableRef(result.ref)}`, error),
+            ),
           ),
         ),
       ),

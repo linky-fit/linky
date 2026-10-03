@@ -135,7 +135,7 @@ export const en = {
   donateMonthlySetUp:
     "Monthly payment set up. The first payment is on its way.",
   donateMonthlyRunning:
-    "You already support Linky every month. Change the amount or mint in that recurring payment.",
+    "You already have a monthly payment to Linky. Change, pause or resume it there.",
   donateShowMonthly: "Show recurring payment",
   donateThanks:
     "Thank you! Your badge arrives in the conversation with Linky Bot.",

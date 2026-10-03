@@ -141,7 +141,7 @@ export const de = {
   donateMonthlySetUp:
     "Monatliche Zahlung eingerichtet. Die erste Zahlung ist unterwegs.",
   donateMonthlyRunning:
-    "Du unterstützt Linky bereits jeden Monat. Betrag oder Mint änderst du in dieser wiederkehrenden Zahlung.",
+    "Du hast bereits eine monatliche Zahlung an Linky. Ändere, pausiere oder setze sie dort fort.",
   donateShowMonthly: "Wiederkehrende Zahlung anzeigen",
   donateThanks:
     "Danke! Dein Abzeichen kommt in der Unterhaltung mit Linky Bot an.",

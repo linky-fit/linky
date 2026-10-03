@@ -6,7 +6,7 @@ import {
   recurringPaymentIdFor,
 } from "../../testUtils/recurringOrders";
 import {
-  activeSupporterOrder,
+  supporterRecurringPayment,
   supporterPaymentMints,
   supporterThemesFor,
 } from "./supporter";
@@ -61,7 +61,7 @@ describe("supporterPaymentMints", () => {
   });
 });
 
-describe("activeSupporterOrder", () => {
+describe("supporterRecurringPayment", () => {
   const bot = contactIdFor("linky-bot");
   const paused = recurringOrderFixture({
     id: recurringPaymentIdFor("paused"),
@@ -71,18 +71,14 @@ describe("activeSupporterOrder", () => {
   const toSomeoneElse = recurringOrderFixture({
     id: recurringPaymentIdFor("other"),
   });
-  const active = recurringOrderFixture({
-    id: recurringPaymentIdFor("active"),
-    contactId: bot,
+
+  it("finds a recurring payment to Linky Bot even while it is paused", () => {
+    expect(supporterRecurringPayment([toSomeoneElse, paused], bot)).toBe(
+      paused,
+    );
   });
 
-  it("finds the active recurring payment to Linky Bot", () => {
-    expect(
-      activeSupporterOrder([paused, toSomeoneElse, active], bot, DUE),
-    ).toBe(active);
-  });
-
-  it("ignores paused payments and payments to other contacts", () => {
-    expect(activeSupporterOrder([paused, toSomeoneElse], bot, DUE)).toBeNull();
+  it("ignores payments to other contacts", () => {
+    expect(supporterRecurringPayment([toSomeoneElse], bot)).toBeNull();
   });
 });
