@@ -21,16 +21,6 @@
   }
 }
 
-.landing-float {
-  animation: landing-float 7s ease-in-out infinite;
-}
-
-@keyframes landing-float {
-  50% {
-    transform: translateY(-14px);
-  }
-}
-
 .landing-tilt {
   transform: perspective(1800px) rotateY(-14deg) rotateX(6deg) rotateZ(2deg);
   transition: transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -205,7 +195,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .landing-rise,
-  .landing-float,
   .landing-pulse,
   .landing-scan,
   .landing-ripple {

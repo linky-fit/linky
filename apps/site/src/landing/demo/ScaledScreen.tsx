@@ -84,7 +84,7 @@ function StatusBar() {
       top="$none"
       left="$none"
       right="$none"
-      height="$huge"
+      height="$avatar"
       gap="$none"
     >
       <Stack flex={1} alignItems="center">

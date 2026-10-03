@@ -29,11 +29,6 @@ interface Conversation {
 const pinned: Conversation = {
   person: "Mia Novak",
   preview: "Deal! See you Tuesday 💛",
-  time: "06:41 PM",
-};
-
-const pinnedPaid: Conversation = {
-  ...pinned,
   token: "21,000 sat",
   time: "06:42 PM",
   unread: true,
@@ -130,14 +125,13 @@ const contactList = (list: Conversation[]) => (
   </Stack>
 );
 
-/** The contacts list; `paid` puts Mia's incoming payment on her pinned row. */
-export function ContactsScreen({ paid = false }: { paid?: boolean }) {
+export function ContactsScreen() {
   return (
     <>
       <DemoTopBar title="Contacts" trailing="Filter" />
       <DemoBody position="relative">
         <Stack gap="$xs" paddingTop="$xxxl">
-          <Contact {...(paid ? pinnedPaid : pinned)} />
+          <Contact {...pinned} />
           <Section title="Proxy payments">{contactList(proxyPayments)}</Section>
           <Section title="Conversations">{contactList(conversations)}</Section>
         </Stack>
