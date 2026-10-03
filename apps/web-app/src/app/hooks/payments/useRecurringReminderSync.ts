@@ -1,5 +1,6 @@
 import { identityFromNsec } from "@linky-fit/linkstr";
 import {
+  RECURRING_REMINDER_GRACE_SEC,
   reminderNotesFor,
   reminderTimesFor,
   type RecurringPaymentOrder,
@@ -20,14 +21,14 @@ import { nowSeconds } from "../../../utils/time";
 const SYNC_DEBOUNCE_MS = 2_000;
 /** Re-send an unchanged set this often so a server that lost it recovers. */
 const RESYNC_AFTER_MS = 12 * 60 * 60 * 1000;
+/** setTimeout fires at once for a longer delay. */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
 interface UseRecurringReminderSyncParams {
   currentNsec: string | null;
   enabled: boolean;
   orders: ReadonlyArray<RecurringPaymentOrder>;
   dependencies?: {
-    isPushRegisteredForIdentity?: (currentNsec: string) => boolean;
-    nowSec?: () => number;
     storeReminderNotes?: (notes: RecurringReminderNotes) => Promise<void>;
     syncRecurringReminders?: (
       currentNsec: string,
@@ -50,11 +51,12 @@ const readSynced = (storageKey: string): SyncedRemindersRecord | null => {
 };
 
 /**
- * Keeps the push service's reminder set for this identity equal to the
- * upcoming due times, so a closed app gets a push when a payment is due, and
- * stores the notes due at each time on the device for the service worker to
- * name them. Only runs when this install has push registered; the server sees
- * times, never notes, amounts or recipients.
+ * Keeps the push service's reminder set for this identity equal to the due
+ * times still ahead (plus the grace), and stores the notes due at each time on
+ * the device for the service worker to name them. When a due time passes, this
+ * running app sends the payment and drops its reminder from the set, so only a
+ * run no running app handled nudges the user. Every device syncs, with push
+ * registered or not; the server sees times, never notes, amounts or recipients.
  */
 export const useRecurringReminderSync = ({
   currentNsec,
@@ -62,19 +64,27 @@ export const useRecurringReminderSync = ({
   enabled,
   orders,
 }: UseRecurringReminderSyncParams): void => {
-  const nowSec = dependencies?.nowSec ?? nowSeconds;
+  const [nowSec, setNowSec] = React.useState(nowSeconds);
   const reminders = React.useMemo(
-    () => {
-      const now = nowSec();
-      return {
-        times: reminderTimesFor(orders, now),
-        notes: reminderNotesFor(orders, now),
-      };
-    },
-    // Order changes are what matter; the clock only trims past times.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orders],
+    () => ({
+      times: reminderTimesFor(orders, nowSec),
+      notes: reminderNotesFor(orders, nowSec),
+    }),
+    [nowSec, orders],
   );
+  const nextNotifyAtSec = reminders.times[0];
+
+  React.useEffect(() => {
+    if (nextNotifyAtSec === undefined) return;
+    const dueInMs =
+      (nextNotifyAtSec - RECURRING_REMINDER_GRACE_SEC) * 1000 - Date.now();
+    const timeout = window.setTimeout(
+      () => setNowSec(nowSeconds()),
+      Math.min(dueInMs, MAX_TIMEOUT_MS),
+    );
+    return () => window.clearTimeout(timeout);
+  }, [nextNotifyAtSec, nowSec]);
+
   const timesKey = reminders.times.join(",");
   const notesKey = JSON.stringify([...reminders.notes]);
   const latestReminders = useLatest(reminders);
@@ -84,14 +94,11 @@ export const useRecurringReminderSync = ({
     let cancelled = false;
     const timeout = window.setTimeout(() => {
       void (async () => {
-        const { isPushRegisteredForIdentity, syncRecurringReminders } =
+        const { syncRecurringReminders } =
           await import("../../../utils/pushNotifications");
-        const isRegistered =
-          dependencies?.isPushRegisteredForIdentity ??
-          isPushRegisteredForIdentity;
         const sync =
           dependencies?.syncRecurringReminders ?? syncRecurringReminders;
-        if (cancelled || !isRegistered(currentNsec)) return;
+        if (cancelled) return;
 
         const { times: notifyAtSecs, notes } = latestReminders.current;
         const syncedKey = notifyAtSecs.join(",");

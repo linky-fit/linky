@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_SYNCED_REMINDERS,
+  RECURRING_REMINDER_GRACE_SEC,
   reminderNotesFor,
   reminderTimesFor,
 } from "./reminders";
@@ -11,8 +12,10 @@ import {
   recurringPaymentIdFor,
 } from "./testing/orders";
 
+const GRACE = RECURRING_REMINDER_GRACE_SEC;
+
 describe("reminderTimesFor", () => {
-  it("notifies once at each unpaused next due time, soonest first", () => {
+  it("notifies once a grace after each unpaused next due time, soonest first", () => {
     const later = recurringOrderFixture({
       id: recurringPaymentIdFor("rp-2"),
       schedule: {
@@ -35,11 +38,14 @@ describe("reminderTimesFor", () => {
         [later, paused, recurringOrderFixture(), sameTime],
         DUE - 2 * HOUR,
       ),
-    ).toEqual([DUE, DUE + HOUR]);
+    ).toEqual([DUE + GRACE, DUE + HOUR + GRACE]);
   });
 
-  it("drops times already past and caps the set", () => {
-    expect(reminderTimesFor([recurringOrderFixture()], DUE + 1)).toEqual([]);
+  it("drops an order once its due time arrives and caps the set", () => {
+    expect(reminderTimesFor([recurringOrderFixture()], DUE - 1)).toEqual([
+      DUE + GRACE,
+    ]);
+    expect(reminderTimesFor([recurringOrderFixture()], DUE)).toEqual([]);
     const many = Array.from({ length: MAX_SYNCED_REMINDERS + 5 }, (_, index) =>
       recurringOrderFixture({
         id: recurringPaymentIdFor(`rp-${index}`),
@@ -81,15 +87,15 @@ describe("reminderNotesFor", () => {
       reminderNotesFor([rent, unnamed, later, paused], DUE - HOUR),
     ).toEqual(
       new Map([
-        [DUE, ["Rent", null]],
-        [DUE + HOUR, ["Gym"]],
+        [DUE + GRACE, ["Rent", null]],
+        [DUE + HOUR + GRACE, ["Gym"]],
       ]),
     );
   });
 
-  it("leaves out times already past", () => {
+  it("leaves out orders already due", () => {
     expect(
-      reminderNotesFor([recurringOrderFixture({ note: "Rent" })], DUE + 1),
+      reminderNotesFor([recurringOrderFixture({ note: "Rent" })], DUE),
     ).toEqual(new Map());
   });
 });
