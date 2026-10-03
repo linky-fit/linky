@@ -276,7 +276,11 @@ describe("SpdPaymentPage offer recipients", () => {
             id: "contact-a",
             name: "Alice",
             npub: "npub1alice",
-            recentBankPaymentOfferOutcomes: ["unaccepted", "settled", "canceled"],
+            recentBankPaymentOfferOutcomes: [
+              "unaccepted",
+              "settled",
+              "canceled",
+            ],
           },
           { id: "contact-b", name: "Bob", npub: "npub1bob" },
         ]}
@@ -532,6 +536,101 @@ describe("SpdPaymentPage manual entry", () => {
     expect(navigateTo).toHaveBeenCalledWith({
       route: "bankPayment",
       spdPayload: "SPD*1.0*CC:EUR*AM:12.50*ACC:CZ5855000000001265098001",
+    });
+  });
+
+  it("shows the Pix form without an error when BRL is picked on an empty form", async () => {
+    const { container } = await renderIntoDocument(
+      <SpdPaymentPage
+        cashuBalanceAfterMelt={100_000}
+        initialOfferContactCount={1}
+        initialOfferDelaySec={0}
+        isEditing={true}
+        isManualEntry={true}
+        offerContacts={[]}
+        onRequestReimbursement={async () => null}
+        spdPayload=""
+      />,
+    );
+    const currency = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="spdPaymentCurrency"]',
+    );
+    if (!currency) throw new Error("currency select missing");
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(currency, "BRL");
+      currency.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.querySelector("#bank-payment-field-CITY")).not.toBeNull();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("switches to a Pix form for BRL and keeps the typed amount", async () => {
+    const { container } = await renderIntoDocument(
+      <SpdPaymentPage
+        cashuBalanceAfterMelt={100_000}
+        initialOfferContactCount={1}
+        initialOfferDelaySec={0}
+        isEditing={true}
+        isManualEntry={true}
+        offerContacts={[]}
+        onRequestReimbursement={async () => null}
+        spdPayload=""
+      />,
+    );
+    const field = (key: string) =>
+      container.querySelector<HTMLInputElement>(`#bank-payment-field-${key}`);
+    const amount = field("AM");
+    if (!amount) throw new Error("amount input missing");
+    await act(async () => {
+      setInputValue(amount, "45");
+    });
+
+    const currency = container.querySelector<HTMLSelectElement>(
+      'select[aria-label="spdPaymentCurrency"]',
+    );
+    if (!currency) throw new Error("currency select missing");
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(currency, "BRL");
+      currency.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(field("AM")?.value).toBe("45");
+    expect(field("X-VS")).toBeNull();
+    expect(field("CITY")).not.toBeNull();
+    expect(container.textContent).toContain("spdPaymentPixKey");
+
+    for (const [key, value] of [
+      ["RN", "Bob"],
+      ["CITY", "Rio"],
+      ["ACC", "+5511999998888"],
+    ] as const) {
+      const input = field(key);
+      if (!input) throw new Error(`${key} input missing`);
+      await act(async () => {
+        setInputValue(input, value);
+      });
+    }
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+
+    const confirm = buttonByText(container, "spdPaymentEditConfirm");
+    if (!confirm) throw new Error("confirm button missing");
+    expect(isDisabled(confirm)).toBe(false);
+    await act(async () => {
+      confirm.click();
+    });
+    expect(navigateTo).toHaveBeenCalledWith({
+      route: "bankPayment",
+      spdPayload: expect.stringContaining(
+        "br.gov.bcb.pix0114+5511999998888520400005303986540545.005802BR5903Bob6003Rio6207",
+      ),
     });
   });
 });

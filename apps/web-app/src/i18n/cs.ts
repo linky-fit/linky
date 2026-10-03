@@ -735,6 +735,7 @@ export const cs = {
   spdPaymentRecipient: "Příjemce",
   spdPaymentAccount: "Účet",
   spdPaymentPixKey: "Klíč Pix",
+  spdPaymentCity: "Město",
   spdPaymentBic: "BIC / SWIFT",
   spdPaymentReference: "Reference platby",
   spdPaymentAmount: "Částka",
@@ -748,6 +749,8 @@ export const cs = {
   spdPaymentEditInvalid: "Upravené údaje platby nejsou platné.",
   spdPaymentInvalidAccount: "Neplatné číslo účtu.",
   spdPaymentInvalidBic: "Neplatný BIC / SWIFT.",
+  spdPaymentInvalidCity:
+    "Město smí mít jen písmena bez diakritiky, nejvýše 15 znaků.",
   spdPaymentInvalidMessage:
     "Zpráva se musí vejít do kódu Pix: jen písmena bez diakritiky a kratší.",
   spdPaymentInvalidRecipient:

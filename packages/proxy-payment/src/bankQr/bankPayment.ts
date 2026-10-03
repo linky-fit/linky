@@ -239,6 +239,7 @@ const PIX_CURRENCY_CODE = "986";
 const PIX_TXID_PATTERN = /^[A-Za-z0-9]{1,25}$/;
 const PIX_EMPTY_TXID = "***";
 const PIX_RECIPIENT_MAX_LENGTH = 25;
+const PIX_CITY_MAX_LENGTH = 15;
 const PIX_KEY_MAX_LENGTH = 77;
 const EMV_VALUE_MAX_LENGTH = 99;
 
@@ -346,6 +347,7 @@ const parsePixPayment = (input: string): BankPayment => {
       ACC: getEmvTagValue(account, "25") || getEmvTagValue(account, "01"),
       AM: amount,
       CC: "BRL",
+      CITY: getEmvTagValue(tags, "60"),
       MSG: getEmvTagValue(account, "02"),
       RF: reference === PIX_EMPTY_TXID ? undefined : reference,
       RN: getEmvTagValue(tags, "59"),
@@ -393,7 +395,7 @@ export const BANK_PAYMENT_OFFER_CURRENCIES = ["CZK", "EUR", "BRL"] as const;
 export type BankPaymentOfferCurrency =
   (typeof BANK_PAYMENT_OFFER_CURRENCIES)[number];
 
-const isBankPaymentOfferCurrency = (
+export const isBankPaymentOfferCurrency = (
   value: string,
 ): value is BankPaymentOfferCurrency =>
   BANK_PAYMENT_OFFER_CURRENCIES.some((currency) => currency === value);
@@ -411,6 +413,7 @@ export type BankPaymentFieldKey =
   | "ACC"
   | "AM"
   | "BIC"
+  | "CITY"
   | "DT"
   | "MSG"
   | "RF"
@@ -452,10 +455,44 @@ const PAYME_EDITABLE_FIELD_KEYS: readonly BankPaymentFieldKey[] = [
 
 const PIX_EDITABLE_FIELD_KEYS: readonly BankPaymentFieldKey[] = [
   "RN",
+  "CITY",
   "ACC",
   "RF",
   "MSG",
 ];
+
+// Pix needs no account tag until the key is typed, so this parses only once
+// the form is filled in; the GUI, currency, country and empty txid are fixed.
+const BLANK_PIX_PAYLOAD = (() => {
+  const body = serializeEmvTags([
+    { id: "00", value: "01" },
+    { id: "26", value: serializeEmvTags([{ id: "00", value: PIX_GUI }]) },
+    { id: "52", value: "0000" },
+    { id: "53", value: PIX_CURRENCY_CODE },
+    { id: "58", value: "BR" },
+    {
+      id: "62",
+      value: serializeEmvTags([{ id: "05", value: PIX_EMPTY_TXID }]),
+    },
+  ]);
+  return `${body}6304${crc16Ccitt(`${body}6304`)}`;
+})();
+
+/**
+ * The payment a manual entry starts from: it carries only the currency, so it
+ * does not parse until `updateBankPaymentFields` fills in the account and
+ * whatever else its format requires. BRL is a Pix code, the others SPD.
+ */
+export const createBlankBankPayment = (
+  currency: BankPaymentOfferCurrency,
+): BankPayment =>
+  currency === "BRL"
+    ? { fields: { CC: "BRL" }, format: "pix", payload: BLANK_PIX_PAYLOAD }
+    : {
+        fields: { CC: currency },
+        format: "spd",
+        payload: `SPD*1.0*CC:${currency}`,
+      };
 
 // Fields a user may change before forwarding the payment, in display order.
 // The amount is edited separately; the currency stays fixed because it
@@ -529,6 +566,13 @@ const normalizePixField = (key: string, value: string): string => {
       return normalizePixKey(value);
     case "AM":
       return normalizeBankPaymentAmount(value);
+    case "CITY": {
+      const city = normalizePixText(value, "bank-payment-invalid-city");
+      if (city.length > PIX_CITY_MAX_LENGTH) {
+        throw new Error("bank-payment-invalid-city");
+      }
+      return city;
+    }
     case "MSG":
       return normalizePixText(value, "bank-payment-invalid-message");
     case "RF": {
@@ -736,6 +780,7 @@ const serializePixPayment = (
   const accountTag = tags.find(isPixMerchantAccountTag);
   if (!accountTag) throw new Error("bank-payment-invalid-pix");
   if (!fields["RN"]) throw new Error("bank-payment-invalid-recipient");
+  if (!fields["CITY"]) throw new Error("bank-payment-invalid-city");
 
   const keySubtagId = account.some((subtag) => subtag.id === "25")
     ? "25"
@@ -756,6 +801,7 @@ const serializePixPayment = (
     [accountTag.id, serializeEmvTags(nextAccount)],
     ["54", amount],
     ["59", fields["RN"]],
+    ["60", fields["CITY"]],
     ["62", serializeEmvTags(additionalData)],
     ["63", ""],
   ];

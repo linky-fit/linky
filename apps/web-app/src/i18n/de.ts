@@ -737,6 +737,7 @@ export const de = {
   spdPaymentRecipient: "Empfänger",
   spdPaymentAccount: "Konto",
   spdPaymentPixKey: "Pix-Schlüssel",
+  spdPaymentCity: "Stadt",
   spdPaymentAmount: "Betrag",
   spdPaymentVariableSymbol: "Variables Symbol",
   spdPaymentSpecificSymbol: "Spezifisches Symbol",
@@ -748,6 +749,8 @@ export const de = {
   spdPaymentEditInvalid: "Die bearbeiteten Zahlungsangaben sind ungültig.",
   spdPaymentInvalidAccount: "Ungültige Kontonummer.",
   spdPaymentInvalidBic: "Ungültiger BIC / SWIFT.",
+  spdPaymentInvalidCity:
+    "Die Stadt darf nur Buchstaben ohne Akzente haben, höchstens 15 Zeichen.",
   spdPaymentInvalidMessage:
     "Die Nachricht muss in einen Pix-Code passen: nur einfache Buchstaben und kürzer.",
   spdPaymentInvalidRecipient:

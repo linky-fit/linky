@@ -20,7 +20,10 @@ import { useFiatRates } from "../app/hooks/useFiatRates";
 import {
   BANK_PAYMENT_OFFER_MAX_STAGGER_DELAY_SEC,
   BANK_PAYMENT_OFFER_MIN_STAGGER_DELAY_SEC,
+  BANK_PAYMENT_OFFER_CURRENCIES,
   BANK_PAYMENT_OFFER_STAGGER_DELAY_STEP_SEC,
+  createBlankBankPayment,
+  isBankPaymentOfferCurrency,
   type BankPayment,
   type BankPaymentFieldKey,
   type BankPaymentFormat,
@@ -84,19 +87,6 @@ const toDateInputValue = (value: string): string =>
     : "";
 
 const fromDateInputValue = (value: string): string => value.replace(/-/g, "");
-
-const MANUAL_BANK_PAYMENT_CURRENCIES: readonly BankPaymentOfferCurrency[] = [
-  "CZK",
-  "EUR",
-];
-
-// A manual entry starts from an empty SPD payment; it stays unparseable (no
-// account) until the form is filled in, which shows as a field error.
-const createManualBankPayment = (): BankPayment => ({
-  fields: { CC: "CZK" },
-  format: "spd",
-  payload: "SPD*1.0*CC:CZK",
-});
 
 const getOfferContactKey = (contact: ContactRowLike): string => {
   const id = (contact.id ?? "").trim();
@@ -183,6 +173,7 @@ const FIELD_LABEL_KEYS: Record<BankPaymentFieldKey, I18nKey> = {
   ACC: "spdPaymentAccount",
   AM: "spdPaymentAmount",
   BIC: "spdPaymentBic",
+  CITY: "spdPaymentCity",
   DT: "spdPaymentDueDate",
   MSG: "spdPaymentMessage",
   RF: "spdPaymentReference",
@@ -246,6 +237,7 @@ const EDIT_ERRORS: Record<string, BankPaymentEditError> = {
     key: "spdPaymentInvalidAmount",
   },
   "bank-payment-invalid-bic": { field: "BIC", key: "spdPaymentInvalidBic" },
+  "bank-payment-invalid-city": { field: "CITY", key: "spdPaymentInvalidCity" },
   "bank-payment-invalid-message": {
     field: "MSG",
     key: "spdPaymentInvalidMessage",
@@ -306,12 +298,16 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
   const [offerDelaySec, setOfferDelaySec] = React.useState<number>(() =>
     clampOfferDelaySec(initialOfferDelaySec),
   );
+  // A manual entry's currency picks its format (Pix for BRL), so it lives
+  // outside the draft fields that are keyed by the blank payment it produces.
+  const [manualCurrency, setManualCurrency] =
+    React.useState<BankPaymentOfferCurrency>("CZK");
   const payment = React.useMemo(
     () =>
       isManualEntry
-        ? createManualBankPayment()
+        ? createBlankBankPayment(manualCurrency)
         : tryParseBankPayment(spdPayload),
-    [isManualEntry, spdPayload],
+    [isManualEntry, manualCurrency, spdPayload],
   );
   const [edits, setEdits] = React.useState<BankPaymentEdits | null>(null);
   // Edits belong to the payload they were started from; a new scan drops them.
@@ -405,6 +401,28 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
         payload: payment.payload,
       };
     });
+  // Switching the currency swaps the blank payment; the typed values the new
+  // format also has move over instead of starting the form again.
+  const changeManualCurrency = (code: string) => {
+    if (!isBankPaymentOfferCurrency(code) || code === manualCurrency) return;
+    const next = createBlankBankPayment(code);
+    const nextDraft = createDraftFields(next);
+    setEdits((current) => {
+      const carried = Object.entries(current?.draft ?? {}).filter(
+        ([key, value]) => key !== "CC" && key in nextDraft && value,
+      );
+      // Nothing typed yet means no draft, so the empty form is not an error.
+      return {
+        confirmed: null,
+        draft:
+          carried.length === 0
+            ? null
+            : { ...nextDraft, ...Object.fromEntries(carried) },
+        payload: next.payload,
+      };
+    });
+    setManualCurrency(code);
+  };
   const confirmEdits = () => {
     if (!activePayment) return;
     // A manual entry becomes a regular bank payment route, so the confirmed
@@ -487,11 +505,11 @@ export const SpdPaymentPage: React.FC<SpdPaymentPageProps> = ({
             <SelectField
               label={t("spdPaymentCurrency")}
               value={currencyCode}
-              options={MANUAL_BANK_PAYMENT_CURRENCIES.map((code) => ({
+              options={BANK_PAYMENT_OFFER_CURRENCIES.map((code) => ({
                 label: code,
                 value: code,
               }))}
-              onValueChange={(code) => updateDraftField("CC", code)}
+              onValueChange={changeManualCurrency}
             />
           ) : null}
           {["AM" as const, ...editableKeys].map((key) => {

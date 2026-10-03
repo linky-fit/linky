@@ -727,6 +727,7 @@ export const en = {
   spdPaymentRecipient: "Recipient",
   spdPaymentAccount: "Account",
   spdPaymentPixKey: "Pix key",
+  spdPaymentCity: "City",
   spdPaymentBic: "BIC / SWIFT",
   spdPaymentReference: "Payment reference",
   spdPaymentAmount: "Amount",
@@ -740,6 +741,8 @@ export const en = {
   spdPaymentEditInvalid: "The edited payment details are not valid.",
   spdPaymentInvalidAccount: "Invalid account number.",
   spdPaymentInvalidBic: "Invalid BIC / SWIFT.",
+  spdPaymentInvalidCity:
+    "The city may only use plain letters, at most 15 characters.",
   spdPaymentInvalidMessage:
     "The message must fit a Pix code: plain letters only, and shorter.",
   spdPaymentInvalidRecipient:
