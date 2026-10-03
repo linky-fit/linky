@@ -149,5 +149,10 @@ export const layout: Section = {
         <UI.BrandMark />
       </UI.Row>
     ),
+    BrandHero: () => (
+      <UI.Stack paddingVertical="$huge">
+        <UI.BrandHero />
+      </UI.Stack>
+    ),
   },
 };

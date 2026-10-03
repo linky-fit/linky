@@ -24,7 +24,7 @@ export type { PagerProps } from "./pager";
 export { Icon } from "./icons";
 export { icons } from "./icon-set";
 export type { IconName, IconProps, IconSize } from "./icons";
-export { BrandMark } from "./brand-mark";
+export { BrandHero, BrandMark } from "./brand-mark";
 export type { BrandMarkProps } from "./brand-mark";
 
 // Controls and fields

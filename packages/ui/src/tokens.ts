@@ -81,6 +81,7 @@ export const size = {
   row: 64,
   hero: 112,
   column: 160,
+  brandHero: 220,
   qr: 240,
   sheetWidth: 520,
   contentWidth: 720,
