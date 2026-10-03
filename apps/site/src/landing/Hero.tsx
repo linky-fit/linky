@@ -14,12 +14,11 @@ import type { CSSProperties, ReactNode } from "react";
 import { useColorMode } from "../colorMode";
 import type { LandingCopy } from "./copy";
 import { avatarUri, type Person } from "./demo/people";
-import { AppLaunch, Glow, Phone } from "./parts";
+import { AppLaunch, Glow, Phone, Pulse } from "./parts";
+import { percent, type Point } from "./stage";
 
-interface NetworkNode {
+interface NetworkNode extends Point {
   name: Person;
-  x: number;
-  y: number;
   indicator?: Tone;
 }
 
@@ -37,11 +36,8 @@ const nodes: NetworkNode[] = [
 ];
 const pulses = [0, 3, 6, 2, 4];
 
-const percent = (value: number) => `${value}%`;
-
 function Network() {
-  const mode = useColorMode();
-  const { accent, borderColorHover } = themes[mode];
+  const { borderColorHover } = themes[useColorMode()];
   return (
     <>
       <svg
@@ -75,24 +71,9 @@ function Network() {
       </svg>
       {pulses.map((nodeIndex, order) => {
         const node = nodes[nodeIndex];
-        if (!node) return null;
-        const style: CSSProperties & Record<`--${string}`, string> = {
-          "--from-x": percent(node.x),
-          "--from-y": percent(node.y),
-          "--to-x": percent(hub.x),
-          "--to-y": percent(hub.y),
-          animationDelay: `${order * 0.7}s`,
-          background: accent,
-          boxShadow: `0 0 12px 2px ${accent}`,
-        };
-        return (
-          <div
-            key={node.name}
-            aria-hidden
-            className="landing-pulse"
-            style={style}
-          />
-        );
+        return node ? (
+          <Pulse key={node.name} from={node} to={hub} delay={order * 0.7} />
+        ) : null;
       })}
       {nodes.map((node) => (
         <div

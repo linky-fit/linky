@@ -1,7 +1,7 @@
 import type { SiteLayoutCopy } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
 
-export type CtaMode = "android-apk" | "google-play" | "web" | "zapstore";
+export type CtaMode = "google-play" | "web" | "zapstore";
 
 export type Screen =
   | "chat-payment"
@@ -18,6 +18,15 @@ export interface Feature {
   screen: Screen;
 }
 
+export interface TokenSectionCopy {
+  eyebrow: string;
+  title: string;
+  description: string;
+  messenger: string;
+  qrCode: string;
+  nfcCard: string;
+}
+
 export interface LandingCopy extends SiteLayoutCopy {
   title: string;
   /** The part of `title` set in the accent color. */
@@ -28,13 +37,13 @@ export interface LandingCopy extends SiteLayoutCopy {
   getAppTitle: string;
   uspSectionTitle: string;
   features: Feature[];
+  tokenSection: TokenSectionCopy;
   closingSectionTitle: string;
   closingSectionDescription: string;
   closingImageAlt: string;
 }
 
 const ctaLabels: Record<CtaMode, string> = {
-  "android-apk": "Android APK",
   "google-play": "Google Play",
   web: "Web app",
   zapstore: "Zapstore",
@@ -90,13 +99,16 @@ export const copy: Record<SiteLocale, LandingCopy> = {
           "Posílejte kontaktu pevnou částku denně, týdně nebo měsíčně. Linky odešle každou platbu včas, dokud ji nepozastavíte.",
         screen: "recurring-list",
       },
-      {
-        title: "Pošlete bitcoin i lidem bez peněženky",
-        description:
-          "Platbu můžete připravit i pro někoho, kdo ještě žádnou peněženku nemá. Linky mu ji pomůže jednoduše převzít.",
-        screen: "token-share",
-      },
     ],
+    tokenSection: {
+      eyebrow: "Cashu token",
+      title: "Bitcoin i pro lidi bez Linky",
+      description:
+        "Platbu můžete připravit i pro někoho, kdo ještě žádnou peněženku nemá. Linky mu ji pomůže jednoduše převzít.",
+      messenger: "Vložte ho do jakékoliv aplikace na zprávy",
+      qrCode: "Ukažte QR kód",
+      nfcCard: "Nebo předejte NFC kartu",
+    },
     closingSectionTitle: "Soukromí",
     closingSectionDescription:
       "Uživatelé nepotřebují telefonní číslo, e-mail ani žádné doklady.",
@@ -146,13 +158,16 @@ export const copy: Record<SiteLocale, LandingCopy> = {
           "Send a contact a fixed amount daily, weekly or monthly. Linky sends every payment on time until you pause it.",
         screen: "recurring-list",
       },
-      {
-        title: "Send bitcoin even to people without a wallet",
-        description:
-          "You can prepare a payment for someone who does not have a wallet yet. Linky makes the handoff simple.",
-        screen: "token-share",
-      },
     ],
+    tokenSection: {
+      eyebrow: "Cashu token",
+      title: "Bitcoin for people without Linky",
+      description:
+        "You can prepare a payment for someone who does not have a wallet yet. Linky makes the handoff simple.",
+      messenger: "Paste it into any messenger",
+      qrCode: "Show a QR code",
+      nfcCard: "Or hand over an NFC card",
+    },
     closingSectionTitle: "Privacy",
     closingSectionDescription:
       "Users do not need a phone number, email address, or any identity documents.",
@@ -202,13 +217,16 @@ export const copy: Record<SiteLocale, LandingCopy> = {
           "Sende einem Kontakt täglich, wöchentlich oder monatlich einen festen Betrag. Linky schickt jede Zahlung pünktlich, bis du sie pausierst.",
         screen: "recurring-list",
       },
-      {
-        title: "Sende Bitcoin auch an Menschen ohne Wallet",
-        description:
-          "Du kannst eine Zahlung für jemanden vorbereiten, der noch keine Wallet hat. Linky macht die Übergabe einfach.",
-        screen: "token-share",
-      },
     ],
+    tokenSection: {
+      eyebrow: "Cashu-Token",
+      title: "Bitcoin für Menschen ohne Linky",
+      description:
+        "Du kannst eine Zahlung für jemanden vorbereiten, der noch keine Wallet hat. Linky macht die Übergabe einfach.",
+      messenger: "Füge ihn in einen beliebigen Messenger ein",
+      qrCode: "Zeig einen QR-Code",
+      nfcCard: "Oder gib eine NFC-Karte weiter",
+    },
     closingSectionTitle: "Datenschutz",
     closingSectionDescription:
       "Nutzer benötigen weder Telefonnummer noch E-Mail-Adresse oder Ausweisdokumente.",
