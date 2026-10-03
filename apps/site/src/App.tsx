@@ -5,6 +5,7 @@ import { copy } from "./landing/copy";
 import { FeatureStory } from "./landing/FeatureStory";
 import { Hero } from "./landing/Hero";
 import "./landing/landing.css";
+import { TokenSection } from "./landing/TokenSection";
 import { useSiteLocale } from "./useSiteLocale";
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
       <Stack gap="$huge">
         <Hero copy={activeCopy} />
         <FeatureStory copy={activeCopy} />
+        <TokenSection copy={activeCopy} />
         <Privacy copy={activeCopy} />
         <ClosingCta copy={activeCopy} />
       </Stack>

@@ -1,17 +1,20 @@
 import {
   Amount,
+  Avatar,
   Button,
   ContactRow,
   Icon,
   IconButton,
+  Pill,
   Row,
   Section,
   Stack,
   Text,
 } from "@linky-fit/ui";
-import { DemoBody, DemoTabBar, DemoTopBar } from "./chrome";
+import { DemoBody, DemoTabBar, DemoTopBar, RowHighlight } from "./chrome";
 import { noop } from "./noop";
 import { avatarUri, type Person } from "./people";
+import { enter, useCountUp, useCues } from "./playback";
 
 interface Conversation {
   person: Person;
@@ -21,14 +24,19 @@ interface Conversation {
   unread?: boolean;
 }
 
-const pinned: Conversation[] = [
-  {
-    person: "Eva Stone",
-    preview: "Thanks for the playlist 🎶",
-    time: "06:42 PM",
-    unread: true,
-  },
-];
+const pinnedBefore: Conversation = {
+  person: "Eva Stone",
+  preview: "Here’s the playlist for Saturday",
+  time: "06:12 PM",
+  outgoing: true,
+};
+
+const pinnedAfter: Conversation = {
+  person: "Eva Stone",
+  preview: "Thanks for the playlist 🎶",
+  time: "06:42 PM",
+  unread: true,
+};
 
 const proxyPayments: Conversation[] = [
   {
@@ -68,13 +76,20 @@ const conversations: Conversation[] = [
   { person: "Tomas Berg", preview: "Climbing on Thursday? 🧗", time: "Oct 1" },
 ];
 
-function Contact({ person, preview, time, outgoing, unread }: Conversation) {
+function Contact({
+  person,
+  preview,
+  time,
+  outgoing,
+  unread,
+  previewClassName = "",
+}: Conversation & { previewClassName?: string }) {
   return (
     <ContactRow
       name={person}
       avatarUri={avatarUri(person)}
       preview={
-        <Row gap="$xs">
+        <Row key={preview} gap="$xs" className={previewClassName}>
           <Icon
             name={outgoing ? "ArrowUpRight" : "ArrowDownRight"}
             size="sm"
@@ -105,13 +120,22 @@ const contactList = (list: Conversation[]) => (
   </Stack>
 );
 
+const contactsCues = [1400];
+
 export function ContactsScreen() {
+  const updated = useCues(contactsCues) > 0;
   return (
     <>
       <DemoTopBar title="Contacts" trailing="Filter" />
       <DemoBody position="relative">
         <Stack gap="$xs" paddingTop="$xxxl">
-          {contactList(pinned)}
+          <Stack position="relative" className={updated ? "demo-unread" : ""}>
+            {updated ? <RowHighlight className="demo-flash" /> : null}
+            <Contact
+              {...(updated ? pinnedAfter : pinnedBefore)}
+              previewClassName={updated ? "demo-in" : ""}
+            />
+          </Stack>
           <Section title="Proxy payments">{contactList(proxyPayments)}</Section>
           <Section title="Conversations">{contactList(conversations)}</Section>
         </Stack>
@@ -151,7 +175,13 @@ function WalletAction({
   );
 }
 
+const received = 21_000;
+const balance = 409_996;
+const walletCues = [1000];
+
 export function WalletScreen() {
+  const shown = useCues(walletCues) > 0;
+  const value = useCountUp(balance - received, balance, 1100, 1100);
   return (
     <>
       <DemoTopBar title="Wallet" />
@@ -163,8 +193,27 @@ export function WalletScreen() {
           gap="$xxl"
           paddingBottom="$huge"
         >
-          <Amount value="409,996" unit="sat" size="lg" />
-          <Row marginTop="$xxl">
+          <Stack alignItems="center" gap="$md">
+            <Amount
+              value={Math.round(value).toLocaleString("en-US")}
+              unit="sat"
+              size="lg"
+            />
+            <Stack className={enter(shown, "demo-pop")}>
+              <Pill
+                tone="accent"
+                label={`+${received.toLocaleString("en-US")} sat`}
+                leading={
+                  <Avatar
+                    name="Mia Novak"
+                    uri={avatarUri("Mia Novak")}
+                    size="xs"
+                  />
+                }
+              />
+            </Stack>
+          </Stack>
+          <Row marginTop="$md">
             <WalletAction icon="ArrowDownRight" label="Receive" />
             <WalletAction icon="ArrowUpRight" label="Send" />
           </Row>

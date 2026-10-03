@@ -2,7 +2,7 @@ import { DeviceFrame, Row, Stack, Text, useMedia } from "@linky-fit/ui";
 import { useEffect, useRef, useState } from "react";
 import type { Feature, LandingCopy } from "./copy";
 import { ScaledScreen } from "./demo/ScaledScreen";
-import { demoScreens } from "./demo/screens";
+import { DemoScreen } from "./demo/screens";
 import { Glow, Phone, Reveal } from "./parts";
 
 const stepNumber = (index: number) => String(index + 1).padStart(2, "0");
@@ -68,9 +68,8 @@ function StickyStory({ features }: { features: Feature[] }) {
           <Row justifyContent="center" position="relative" gap="$xxl">
             <Glow size="140%" top="50%" left="50%" />
             <DeviceFrame width="$device">
-              {features.map((feature, index) => {
-                const DemoScreen = demoScreens[feature.screen];
-                return (
+              <ScaledScreen>
+                {features.map((feature, index) => (
                   <div
                     key={feature.screen}
                     className={
@@ -79,12 +78,13 @@ function StickyStory({ features }: { features: Feature[] }) {
                         : "landing-screen"
                     }
                   >
-                    <ScaledScreen>
-                      <DemoScreen />
-                    </ScaledScreen>
+                    <DemoScreen
+                      screen={feature.screen}
+                      active={index === active}
+                    />
                   </div>
-                );
-              })}
+                ))}
+              </ScaledScreen>
             </DeviceFrame>
             <Stack gap="$sm" aria-hidden>
               {features.map((feature, index) => (

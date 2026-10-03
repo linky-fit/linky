@@ -10,11 +10,12 @@ import {
   type IconName,
 } from "@linky-fit/ui";
 import { themes } from "@linky-fit/ui/tokens";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { useColorMode } from "../colorMode";
 import type { CtaMode, LandingCopy, Screen } from "./copy";
 import { ScaledScreen } from "./demo/ScaledScreen";
-import { demoScreens } from "./demo/screens";
+import { DemoScreen } from "./demo/screens";
+import { percent, useInView, type Point } from "./stage";
 
 interface PlatformCtas {
   primary: CtaMode;
@@ -25,25 +26,22 @@ interface PlatformCtas {
 const androidCtas: PlatformCtas = {
   primary: "google-play",
   secondary: ["zapstore"],
-  others: ["web", "android-apk"],
+  others: ["web"],
 };
 
 const defaultCtas: PlatformCtas = {
   primary: "web",
   secondary: [],
-  others: ["google-play", "zapstore", "android-apk"],
+  others: ["google-play", "zapstore"],
 };
 
 const ctaIcons: Record<CtaMode, IconName> = {
-  "android-apk": "Download",
   "google-play": "Play",
   web: "Monitor",
   zapstore: "Zap",
 };
 
 const ctaUrls: Record<CtaMode, string> = {
-  "android-apk":
-    "https://github.com/hynek-jina/linky/releases/latest/download/linky.apk",
   "google-play": "https://play.google.com/store/apps/details?id=fit.linky.app",
   web: "https://app.linky.fit",
   zapstore: "https://zapstore.dev/apps/fit.linky.app",
@@ -147,16 +145,41 @@ export function Glow({
   );
 }
 
+/** A spark of accent light travelling from one percent position to another. */
+export function Pulse({
+  from,
+  to,
+  delay,
+  duration,
+}: {
+  from: Point;
+  to: Point;
+  delay: number;
+  duration?: number;
+}) {
+  const { accent } = themes[useColorMode()];
+  const style: CSSProperties & Record<`--${string}`, string> = {
+    "--from-x": percent(from.x),
+    "--from-y": percent(from.y),
+    "--to-x": percent(to.x),
+    "--to-y": percent(to.y),
+    animationDelay: `${delay}s`,
+    animationDuration: duration ? `${duration}s` : undefined,
+    background: accent,
+    boxShadow: `0 0 12px 2px ${accent}`,
+  };
+  return <div aria-hidden className="landing-pulse" style={style} />;
+}
+
 /** A live app screen in a phone. */
 export function Phone({
   screen,
   ...props
 }: Omit<DeviceFrameProps, "children"> & { screen: Screen }) {
-  const DemoScreen = demoScreens[screen];
   return (
     <DeviceFrame {...props}>
       <ScaledScreen>
-        <DemoScreen />
+        <DemoScreen screen={screen} />
       </ScaledScreen>
     </DeviceFrame>
   );
@@ -164,22 +187,7 @@ export function Phone({
 
 /** Fades its content in the first time it scrolls into view. */
 export function Reveal({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry?.isIntersecting) return;
-        setVisible(true);
-        observer.disconnect();
-      },
-      { threshold: 0.15 },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+  const { ref, visible } = useInView();
   return (
     <div
       ref={ref}
