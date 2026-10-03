@@ -655,7 +655,9 @@ export const cs = {
     "Tento prohlížeč nedokáže zabránit tomu, aby bankovní údaje poslal dalšímu kontaktu i jiný otevřený panel Linky. Zavřete ostatní panely Linky nebo aktualizujte prohlížeč.",
   spdPaymentSingleTabContinue: "Přesto pokračovat",
   spdPaymentNoOfferContact: "Není komu nabídku poslat",
-  spdPaymentLastResponseTime: "Minule {time}",
+  spdPaymentOutcomeSettled: "Zaplatil",
+  spdPaymentOutcomeCanceled: "Přijal, pak zrušeno",
+  spdPaymentOutcomeUnaccepted: "Nepřijal",
   bankPaymentOfferTitle: "Nabídka platby",
   bankPaymentOfferStatusOffered: "Nabídnuto",
   bankPaymentOfferStatusQueued: "Ve frontě",
@@ -733,6 +735,7 @@ export const cs = {
   spdPaymentRecipient: "Příjemce",
   spdPaymentAccount: "Účet",
   spdPaymentPixKey: "Klíč Pix",
+  spdPaymentCity: "Město",
   spdPaymentBic: "BIC / SWIFT",
   spdPaymentReference: "Reference platby",
   spdPaymentAmount: "Částka",
@@ -746,6 +749,8 @@ export const cs = {
   spdPaymentEditInvalid: "Upravené údaje platby nejsou platné.",
   spdPaymentInvalidAccount: "Neplatné číslo účtu.",
   spdPaymentInvalidBic: "Neplatný BIC / SWIFT.",
+  spdPaymentInvalidCity:
+    "Město smí mít jen písmena bez diakritiky, nejvýše 15 znaků.",
   spdPaymentInvalidMessage:
     "Zpráva se musí vejít do kódu Pix: jen písmena bez diakritiky a kratší.",
   spdPaymentInvalidRecipient:

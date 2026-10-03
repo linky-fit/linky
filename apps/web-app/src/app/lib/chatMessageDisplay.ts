@@ -2,7 +2,10 @@ import type { Translate } from "../../i18n";
 import { formatShortNpub, previewTokenText } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
-import { getBankPaymentOfferStatusLabel } from "./bankPaymentOfferLabels";
+import {
+  getBankPaymentOfferStatusLabel,
+  getUnmatchedBankPaymentOfferStatus,
+} from "./bankPaymentOfferLabels";
 import {
   parseCashuPaymentRequestMessage,
   parseLinkyPaymentRequestDeclineMessage,
@@ -56,11 +59,12 @@ export const formatChatMessagePreviewText = ({
           : "bankPaymentOfferPreviewIncoming";
       return t(key).replace("{amount}", bankPaymentOffer.amountText);
     }
-    if (bankPaymentOffer.status === "canceled") {
+    const unmatched = getUnmatchedBankPaymentOfferStatus(bankPaymentOffer);
+    if (unmatched === "canceled") {
       return t("bankPaymentOfferPreviewCanceled");
     }
 
-    return `${t("bankPaymentOfferTitle")}: ${getBankPaymentOfferStatusLabel(bankPaymentOffer.status, false, t)}`;
+    return `${t("bankPaymentOfferTitle")}: ${getBankPaymentOfferStatusLabel(unmatched ?? bankPaymentOffer.status, false, t)}`;
   }
 
   const paymentRequest = parseCashuPaymentRequestMessage(content);

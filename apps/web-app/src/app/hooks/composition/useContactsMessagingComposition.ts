@@ -557,7 +557,7 @@ export const useContactsMessagingComposition = ({
     chatMessagesWithBankPaymentOffers,
     getBankPaymentOfferForSettlement,
     isBankPaymentOfferCanceled,
-    lastBankPaymentOfferResponseSecByContactId,
+    recentBankPaymentOfferOutcomesByContactId,
     requestBankPaymentOffer,
     respondToBankPaymentOfferWithGroupState,
   } = useBankPaymentOffers({
@@ -1097,17 +1097,17 @@ export const useContactsMessagingComposition = ({
       return [
         {
           ...contact,
-          lastBankPaymentResponseSec:
-            lastBankPaymentOfferResponseSecByContactId.get(
-              (contact.id ?? "").trim(),
-            ) ?? null,
           pictureUrl: nostrPictureByNpub[normalizedNpub] ?? null,
+          recentBankPaymentOfferOutcomes:
+            recentBankPaymentOfferOutcomesByContactId.get(
+              (contact.id ?? "").trim(),
+            ) ?? [],
         },
       ];
     });
   }, [
     bankPaymentOfferCurrency,
-    lastBankPaymentOfferResponseSecByContactId,
+    recentBankPaymentOfferOutcomesByContactId,
     nostrPictureByNpub,
     nostrStatusByNpub,
     visibleContacts.pinned,

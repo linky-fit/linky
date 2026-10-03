@@ -653,7 +653,9 @@ export const de = {
     "Dieser Browser kann nicht verhindern, dass ein anderer offener Linky-Tab die Bankdaten zusätzlich an einen zweiten Kontakt sendet. Schließe andere Linky-Tabs oder aktualisiere deinen Browser.",
   spdPaymentSingleTabContinue: "Trotzdem fortfahren",
   spdPaymentNoOfferContact: "Kein Kontakt für dieses Angebot",
-  spdPaymentLastResponseTime: "Letztes Mal {time}",
+  spdPaymentOutcomeSettled: "Bezahlt",
+  spdPaymentOutcomeCanceled: "Angenommen, dann abgebrochen",
+  spdPaymentOutcomeUnaccepted: "Nicht angenommen",
   bankPaymentOfferTitle: "Zahlungsangebot",
   bankPaymentOfferStatusOffered: "Angeboten",
   bankPaymentOfferStatusQueued: "In der Warteschlange",
@@ -735,6 +737,7 @@ export const de = {
   spdPaymentRecipient: "Empfänger",
   spdPaymentAccount: "Konto",
   spdPaymentPixKey: "Pix-Schlüssel",
+  spdPaymentCity: "Stadt",
   spdPaymentAmount: "Betrag",
   spdPaymentVariableSymbol: "Variables Symbol",
   spdPaymentSpecificSymbol: "Spezifisches Symbol",
@@ -746,6 +749,8 @@ export const de = {
   spdPaymentEditInvalid: "Die bearbeiteten Zahlungsangaben sind ungültig.",
   spdPaymentInvalidAccount: "Ungültige Kontonummer.",
   spdPaymentInvalidBic: "Ungültiger BIC / SWIFT.",
+  spdPaymentInvalidCity:
+    "Die Stadt darf nur Buchstaben ohne Akzente haben, höchstens 15 Zeichen.",
   spdPaymentInvalidMessage:
     "Die Nachricht muss in einen Pix-Code passen: nur einfache Buchstaben und kürzer.",
   spdPaymentInvalidRecipient:

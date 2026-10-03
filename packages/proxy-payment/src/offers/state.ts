@@ -8,6 +8,8 @@ import {
   findBankPaymentOffer,
   isBankPaymentOfferExpired,
   offerUpdatedAtSec,
+  showsBankPaymentOfferAcceptance,
+  showsBankPaymentOfferBankDetails,
   type BankPaymentOffer,
 } from "./offer";
 import {
@@ -68,6 +70,44 @@ const withPending = (
     event,
   ].slice(-MAX_PENDING_SNAPSHOTS),
 });
+
+type OfferMilestones = Pick<
+  BankPaymentOffer,
+  "acceptedAtSec" | "bankDetailsSentAtSec"
+>;
+
+// Each milestone keeps the first send time that proved it; a later status
+// never takes it back.
+const offerMilestones = (
+  known: OfferMilestones | null,
+  info: Pick<BankPaymentOffer, "bankPaidAtSec" | "status">,
+  sentAt: number,
+): OfferMilestones => ({
+  acceptedAtSec:
+    known?.acceptedAtSec ??
+    (showsBankPaymentOfferAcceptance(info) ? sentAt : null),
+  bankDetailsSentAtSec:
+    known?.bankDetailsSentAtSec ??
+    (showsBankPaymentOfferBankDetails(info) ? sentAt : null),
+});
+
+// A stale snapshot still proves how far the peer got; the thread remembers
+// that without changing its status or notifying anyone.
+const withMilestones = (
+  state: BankPaymentOfferState,
+  known: BankPaymentOffer,
+  info: Pick<BankPaymentOffer, "bankPaidAtSec" | "status">,
+  sentAt: number,
+): BankPaymentOfferState => {
+  const milestones = offerMilestones(known, info, sentAt);
+  return milestones.acceptedAtSec === known.acceptedAtSec &&
+    milestones.bankDetailsSentAtSec === known.bankDetailsSentAtSec
+    ? state
+    : {
+        ...state,
+        offers: upsertOffer(state.offers, { ...known, ...milestones }),
+      };
+};
 
 // Snapshot and receipt paths share this check; new staleness rules belong here.
 const isStaleFor = (
@@ -144,7 +184,17 @@ export const applyBankPaymentOfferSnapshot = (
   ) {
     return { accepted: [], state: withPending(state, event) };
   }
-  if (known && isStaleFor(known, event, isOfferer)) return unchanged;
+  if (known && isStaleFor(known, event, isOfferer)) {
+    return {
+      accepted: [],
+      state: withMilestones(
+        state,
+        known,
+        { bankPaidAtSec: event.bankPaidAtSec, status: event.status },
+        event.sentAt,
+      ),
+    };
+  }
 
   const content = bankOfferContentFromSnapshot({
     ...event,
@@ -172,6 +222,7 @@ export const applyBankPaymentOfferSnapshot = (
 
   const offer: BankPaymentOffer = {
     ...info,
+    ...offerMilestones(known, info, event.sentAt),
     clientId: event.clientId,
     content,
     createdAtSec: known
@@ -223,10 +274,14 @@ export const applyBankPaymentOfferReceipt = (
     known &&
     isStaleFor(known, receipt, isOffererBankPaymentOfferStatus(info.status))
   ) {
-    return { offer: known, state };
+    return {
+      offer: known,
+      state: withMilestones(state, known, info, receipt.sentAt),
+    };
   }
   const offer: BankPaymentOffer = {
     ...info,
+    ...offerMilestones(known, info, receipt.sentAt),
     clientId: receipt.clientId,
     content: receipt.content,
     createdAtSec: known

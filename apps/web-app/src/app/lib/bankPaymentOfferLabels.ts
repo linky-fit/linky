@@ -1,4 +1,7 @@
-import type { BankOfferStatus } from "@linky-fit/proxy-payment";
+import type {
+  BankOfferStatus,
+  BankPaymentOfferInfo,
+} from "@linky-fit/proxy-payment";
 import type { Tone } from "@linky-fit/ui";
 import type { Translate } from "../../i18n";
 
@@ -24,6 +27,21 @@ export const bankPaymentOfferStatusTones: Record<BankOfferStatus, Tone> = {
   declined: "neutral",
   offered: "warning",
   settled: "accent",
+};
+
+/**
+ * A thread this peer did not end up paying is shown only as taken by someone
+ * else or canceled, without its amount; the offerer settles the whole group,
+ * so a settled thread without a bank payment is a losing one.
+ */
+export const getUnmatchedBankPaymentOfferStatus = (
+  info: Pick<BankPaymentOfferInfo, "bankPaidAtSec" | "status">,
+): "accepted_by_other" | "canceled" | null => {
+  if (info.status === "accepted_by_other") return "accepted_by_other";
+  if (info.bankPaidAtSec !== null) return null;
+  if (info.status === "canceled") return "canceled";
+  if (info.status === "settled") return "accepted_by_other";
+  return null;
 };
 
 export const getBankPaymentOfferStatusLabel = (

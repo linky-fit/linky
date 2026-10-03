@@ -206,7 +206,9 @@ describe("notifyBankOfferSnapshot", () => {
   const offer = (
     status: BankPaymentOffer["status"] = "offered",
   ): BankPaymentOffer => ({
+    acceptedAtSec: null,
     amountSat: 40_000,
+    bankDetailsSentAtSec: null,
     amountText: "500 Kč",
     bankPaidAtSec: null,
     clientId: null,

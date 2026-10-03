@@ -10,8 +10,6 @@ import {
   Switch,
   Text,
 } from "@linky-fit/ui";
-
-import type { IconName } from "@linky-fit/ui";
 import React from "react";
 import {
   useAppShellActions,
@@ -30,12 +28,6 @@ const CURRENCY_LABEL_KEYS: Record<ProfileStatusCurrency, I18nKey> = {
   BRL: "proxyPaymentsProvideBrl",
   CZK: "proxyPaymentsProvideCzk",
   EUR: "proxyPaymentsProvideEur",
-};
-// Brazilian transfers go through Pix, which is addressed by a key.
-const CURRENCY_ICONS: Record<ProfileStatusCurrency, IconName> = {
-  BRL: "KeyRound",
-  CZK: "Banknote",
-  EUR: "Euro",
 };
 
 function PayerRow({
@@ -170,7 +162,13 @@ export function ProxyPaymentsPage(): React.ReactElement {
         {PROFILE_STATUS_CURRENCIES.map((currency) => (
           <ListRow
             key={currency}
-            icon={CURRENCY_ICONS[currency]}
+            leading={
+              // Same box as PayerRow, wide enough that the titles line up
+              // behind pills of different widths.
+              <Stack minWidth="$control">
+                <Pill label={currency} size="sm" />
+              </Stack>
+            }
             title={t(CURRENCY_LABEL_KEYS[currency])}
             trailing={
               <Switch

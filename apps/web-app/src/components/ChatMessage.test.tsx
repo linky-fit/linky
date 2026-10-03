@@ -459,4 +459,61 @@ describe("ChatMessage bank payment offer actions", () => {
 
     expect(onSettleBankPaymentOffer).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    ["accepted_by_other", null, "bankPaymentOfferStatusAcceptedByOther"],
+    ["canceled", null, "bankPaymentOfferStatusCanceled"],
+    ["settled", null, "bankPaymentOfferStatusAcceptedByOther"],
+  ] as const)(
+    "hides the amount of a %s offer this peer did not pay",
+    async (status, bankPaidAtSec, statusLabel) => {
+      const container = await renderChatMessage("offer", {
+        bankPaymentOfferInfo: {
+          amountSat: 10,
+          amountText: "10 sat",
+          bankPaidAtSec,
+          expiresAtSec: null,
+          extensionSec: null,
+          initiatedAtSec: 1_699_999_900,
+          offerId: "offer-1",
+          offererPublicKey: "offerer-pubkey",
+          spdPayload: null,
+          status,
+          statusUpdatedAtSec: 1_700_000_000,
+          text: "offer",
+        },
+        direction: "out",
+      });
+      const card = container.querySelector(
+        '[data-testid="chat-bank-payment-offer-card"]',
+      );
+      expect(card?.textContent).toContain(statusLabel);
+      expect(card?.textContent).not.toContain("10");
+    },
+  );
+
+  it("keeps the amount of a settled offer this peer paid", async () => {
+    const container = await renderChatMessage("offer", {
+      bankPaymentOfferInfo: {
+        amountSat: 10,
+        amountText: "10 sat",
+        bankPaidAtSec: 1_700_000_000,
+        expiresAtSec: null,
+        extensionSec: null,
+        initiatedAtSec: 1_699_999_900,
+        offerId: "offer-1",
+        offererPublicKey: "offerer-pubkey",
+        spdPayload: null,
+        status: "settled",
+        statusUpdatedAtSec: 1_700_000_100,
+        text: "offer",
+      },
+      direction: "out",
+    });
+    const card = container.querySelector(
+      '[data-testid="chat-bank-payment-offer-card"]',
+    );
+    expect(card?.textContent).toContain("bankPaymentOfferStatusSettled");
+    expect(card?.textContent).toContain("10");
+  });
 });

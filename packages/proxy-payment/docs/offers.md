@@ -26,7 +26,7 @@ for (const { offer, event: snapshot } of accepted) notify(offer, snapshot);
 state = applyBankPaymentOfferReceipt(state, peerPubkey, receipt).state;
 ```
 
-A thread is the decoded content (`BankPaymentOfferInfo`) plus its identity on the wire; `decodeBankPaymentOffer(content)` reads the content JSON back, lenient about every optional field.
+A thread is the decoded content (`BankPaymentOfferInfo`) plus its identity on the wire and two milestones a later cancellation or another winner does not erase: `acceptedAtSec`, the first evidence seen that the peer accepted it (`showsBankPaymentOfferAcceptance`), and `bankDetailsSentAtSec`, the first evidence that the peer received the bank details (`showsBankPaymentOfferBankDetails`); `decodeBankPaymentOffer(content)` reads the content JSON back, lenient about every optional field.
 
 ## Authorization
 
@@ -40,6 +40,8 @@ A thread is the decoded content (`BankPaymentOfferInfo`) plus its identity on th
 - the status is not terminal and either the offer already ended for another peer or the phase has expired (`isBankPaymentOfferExpired`).
 
 A payer snapshot with no known thread, or `bank_paid` before `bank_details_sent`, waits in `pending` (at most 256, oldest dropped) and is replayed in `sentAt` order once the offerer's snapshot for that peer is accepted. Payer copies never change `expiresAtSec`, `extensionSec` or `spdPayload`; those stay as the offerer sent them, and `bankPaidAtSec` is stamped from the payer's `sentAt`.
+
+A stale snapshot or receipt still stamps the milestones it proves (`acceptedAtSec`, `bankDetailsSentAtSec`) on a thread that lacks them, without changing its status or being reported as accepted.
 
 The offerer's `accepted_by_other` overrides a pending `accepted` regardless of timestamp, for incoming snapshots, self copies and send receipts alike: a recipient can accept after the offerer chose someone else but before that decision reaches them, and the later acceptance must not hide it.
 
@@ -62,6 +64,7 @@ All selectors take `state.offers` and are pure; the consumer's effects run on th
 - `ownBankPaymentOfferExpiries(offers, me, nowSec)`: per own offer, the deadline of its most advanced phase; the consumer cancels the whole group then.
 - `bankPaymentOfferGroupResponses(offers, offerId, "canceled" | "settled")`: the threads a whole-offer status must still reach (never canceling a settled thread) and the single peer that gets the push for a cancellation.
 - `lastBankPaymentOfferResponseSecByPeer(offers, me)`: how long each peer took on my most recent offer they paid.
+- `recentBankPaymentOfferOutcomesByPeer(offers, me, nowSec, limit)`: for each peer, the `BankPaymentOfferOutcome` of my last `limit` ended (terminal or expired) offers to them, oldest first: `settled` when they paid, `canceled` when they held the bank details but the thread ended unsettled, `unaccepted` when they never accepted. A live offer and an acceptance that lost to another peer or whose group was canceled before any bank details are left out.
 
 ## Drafts
 

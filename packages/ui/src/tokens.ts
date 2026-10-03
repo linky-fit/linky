@@ -172,6 +172,8 @@ const dark = {
   backgroundPress: palette.slate800,
   surface: palette.slate925,
   surfaceRaised: palette.slate800,
+  // A quiet solid for status marks: dimmer than text, so it reads as "nothing happened".
+  neutral: palette.slate500,
   neutralSoft: alpha(palette.slate400, 0.18),
   color: palette.slate200,
   colorStrong: palette.slate50,
@@ -210,6 +212,7 @@ const light: ThemeColors = {
   backgroundPress: palette.slate300,
   surface: palette.white,
   surfaceRaised: palette.slate200,
+  neutral: palette.slate400,
   neutralSoft: alpha(palette.slate500, 0.14),
   color: palette.slate900,
   colorStrong: palette.slate950,

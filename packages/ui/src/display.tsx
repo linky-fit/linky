@@ -166,8 +166,6 @@ export function StatusDot({ tone, accessibilityLabel }: StatusDotProps) {
       height="$dot"
       flexShrink={0}
       borderRadius="$pill"
-      borderWidth={border.hairline}
-      borderColor="$borderColorHover"
       backgroundColor={toneColors[tone].solid}
     />
   );

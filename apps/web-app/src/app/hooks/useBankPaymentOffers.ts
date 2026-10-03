@@ -25,9 +25,10 @@ import {
   hasPendingBankPaymentOfferResponderWork,
   isBankPaymentOfferCanceled,
   isBankPaymentOfferStaggerQueueOpen,
-  lastBankPaymentOfferResponseSecByPeer,
   ownBankPaymentOfferExpiries,
+  recentBankPaymentOfferOutcomesByPeer,
   type AppliedBankPaymentOfferSnapshot,
+  type BankPaymentOfferOutcome,
   type BankOfferStatus,
   type BankPaymentOffer,
   type BankPaymentOfferResponseOptions,
@@ -74,6 +75,8 @@ import {
 } from "./messages/contactIdentity";
 
 const RESPONDER_RETRY_MS = 30_000;
+// Three dots say how a contact has been doing lately; more would be noise.
+const RECENT_OFFER_OUTCOMES = 3;
 const STAGGER_RETRY_MS = 5_000;
 
 interface UseBankPaymentOffersParams {
@@ -804,15 +807,17 @@ export const useBankPaymentOffers = ({
     [contactIdFor, offers],
   );
 
-  const lastBankPaymentOfferResponseSecByContactId = React.useMemo(() => {
-    const byContactId = new Map<string, number>();
+  const recentBankPaymentOfferOutcomesByContactId = React.useMemo(() => {
+    const byContactId = new Map<string, readonly BankPaymentOfferOutcome[]>();
     if (!myPubHex) return byContactId;
-    for (const [peer, sec] of lastBankPaymentOfferResponseSecByPeer(
+    for (const [peer, outcomes] of recentBankPaymentOfferOutcomesByPeer(
       offers,
       myPubHex,
+      nowSeconds(),
+      RECENT_OFFER_OUTCOMES,
     )) {
       const contactId = contactIdFor(peer);
-      if (contactId) byContactId.set(contactId, sec);
+      if (contactId) byContactId.set(contactId, outcomes);
     }
     return byContactId;
   }, [contactIdFor, myPubHex, offers]);
@@ -829,7 +834,7 @@ export const useBankPaymentOffers = ({
       (offerId: string) => isBankPaymentOfferCanceled(offers, offerId.trim()),
       [offers],
     ),
-    lastBankPaymentOfferResponseSecByContactId,
+    recentBankPaymentOfferOutcomesByContactId,
     requestBankPaymentOffer,
     respondToBankPaymentOfferWithGroupState,
   };

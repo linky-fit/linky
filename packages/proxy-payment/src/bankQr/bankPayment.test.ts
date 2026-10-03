@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CurrencyCode, encode, PaymentOptions } from "bysquare/pay";
 import {
+  createBlankBankPayment,
   getBankPaymentOfferCurrency,
   isBankPaymentPayload,
   parseBankPayment,
@@ -418,6 +419,7 @@ describe("pixPayment", () => {
       ACC: "123e4567-e12b-12d1-a456-426655440000",
       AM: "10.00",
       CC: "BRL",
+      CITY: "BRASILIA",
       RN: "Fulano de Tal",
     });
     expect(isBankPaymentPayload(PIX_STATIC)).toBe(true);
@@ -431,6 +433,7 @@ describe("pixPayment", () => {
       ACC: "alice@exemplo.com.br",
       AM: "1234.56",
       CC: "BRL",
+      CITY: "SAO PAULO",
       MSG: "Almoco de hoje",
       RF: "ALM2026",
       RN: "Alice Pereira",
@@ -492,6 +495,7 @@ describe("pixPayment", () => {
       ACC: "123e4567-e12b-12d1-a456-426655440000",
       AM: "12.50",
       CC: "BRL",
+      CITY: "BRASILIA",
       MSG: "Cafe & bolo",
       RF: "FAT42",
       RN: "Joao da Silva",
@@ -511,6 +515,46 @@ describe("pixPayment", () => {
     );
     expect(updated.fields["ACC"]).toBe("qr.exemplo.com.br/pix/v2/cobv/outro");
     expect(updated.fields["AM"]).toBeUndefined();
+  });
+
+  it("builds a Pix code from a blank manual entry once key, name and city are typed", () => {
+    const blank = createBlankBankPayment("BRL");
+    expect(blank.format).toBe("pix");
+    expect(tryParseBankPayment(blank.payload)).toBeNull();
+    expect(() => updateBankPaymentFields(blank, { AM: "10" })).toThrow(
+      "bank-payment-invalid-recipient",
+    );
+    expect(() =>
+      updateBankPaymentFields(blank, { AM: "10", RN: "Bob" }),
+    ).toThrow("bank-payment-invalid-city");
+    expect(() =>
+      updateBankPaymentFields(blank, {
+        AM: "10",
+        CITY: "A city name that is too long",
+        RN: "Bob",
+      }),
+    ).toThrow("bank-payment-invalid-city");
+
+    const filled = updateBankPaymentFields(blank, {
+      ACC: "+5511999998888",
+      AM: "45",
+      CITY: "Rio",
+      RN: "Bob",
+    });
+    expect(filled.payload).toContain("540545.005802BR5903Bob6003Rio6207");
+    expect(parseBankPayment(filled.payload).fields).toEqual(filled.fields);
+    expect(filled.fields).toEqual({
+      ACC: "+5511999998888",
+      AM: "45.00",
+      CC: "BRL",
+      CITY: "Rio",
+      RN: "Bob",
+    });
+    expect(createBlankBankPayment("EUR")).toEqual({
+      fields: { CC: "EUR" },
+      format: "spd",
+      payload: "SPD*1.0*CC:EUR",
+    });
   });
 
   it("rejects edits a Pix code cannot carry", () => {

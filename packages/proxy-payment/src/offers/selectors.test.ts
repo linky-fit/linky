@@ -8,6 +8,7 @@ import {
   hasPendingBankPaymentOfferResponderWork,
   lastBankPaymentOfferResponseSecByPeer,
   ownBankPaymentOfferExpiries,
+  recentBankPaymentOfferOutcomesByPeer,
 } from "./selectors";
 import {
   applyBankPaymentOfferSnapshot,
@@ -194,5 +195,92 @@ describe("lastBankPaymentOfferResponseSecByPeer", () => {
     expect(durations.get(payer)).toBe(125);
     expect(durations.get(other)).toBe(30);
     expect(lastBankPaymentOfferResponseSecByPeer(offers, payer).size).toBe(0);
+  });
+});
+
+describe("recentBankPaymentOfferOutcomesByPeer", () => {
+  type Step =
+    | "accepted"
+    | "accepted_by_other"
+    | "bank_details_sent"
+    | "bank_paid"
+    | "canceled"
+    | "declined"
+    | "settled";
+  const fromPayer = new Set<Step>(["accepted", "bank_paid", "declined"]);
+  const thread = (
+    offerId: string,
+    peer: typeof payer,
+    startedAt: number,
+    steps: readonly Step[],
+  ) => [
+    snapshot("offered", true, {
+      offerId: BankOfferId.make(offerId),
+      from: peer,
+      initiatedAtSec: at(startedAt),
+      sentAt: at(startedAt),
+    }),
+    ...steps.map((status, index) =>
+      snapshot(status, !fromPayer.has(status), {
+        offerId: BankOfferId.make(offerId),
+        from: peer,
+        initiatedAtSec: at(startedAt),
+        sentAt: at(startedAt + index + 1),
+      }),
+    ),
+  ];
+
+  it("reports the last ended offers per peer, oldest first, capped", () => {
+    const offers = book(
+      ...thread("offer-a", payer, 0, ["declined"]),
+      ...thread("offer-b", payer, 100, [
+        "accepted",
+        "bank_details_sent",
+        "bank_paid",
+        "settled",
+      ]),
+      ...thread("offer-c", payer, 200, [
+        "accepted",
+        "bank_details_sent",
+        "canceled",
+      ]),
+      ...thread("offer-d", payer, 300, ["accepted_by_other"]),
+      ...thread("offer-e", payer, 400, []),
+      ...thread("offer-f", other, 500, ["accepted", "accepted_by_other"]),
+      ...thread("offer-g", other, 600, ["accepted", "canceled"]),
+      ...thread("offer-h", other, 700, [
+        "accepted",
+        "bank_details_sent",
+        "bank_paid",
+        "canceled",
+      ]),
+    );
+    const outcomes = recentBankPaymentOfferOutcomesByPeer(
+      offers,
+      me,
+      START + 710,
+      3,
+    );
+    expect(outcomes.get(payer)).toEqual([
+      "canceled",
+      "unaccepted",
+      "unaccepted",
+    ]);
+    expect(outcomes.get(other)).toEqual(["canceled"]);
+    expect(
+      recentBankPaymentOfferOutcomesByPeer(offers, payer, START, 3).size,
+    ).toBe(0);
+  });
+
+  it("counts an expired offer as unaccepted and ignores a live one", () => {
+    const offers = book(...thread("offer-a", payer, 0, []));
+    expect(
+      recentBankPaymentOfferOutcomesByPeer(offers, me, START + 10, 3).size,
+    ).toBe(0);
+    expect(
+      recentBankPaymentOfferOutcomesByPeer(offers, me, START + 300, 3).get(
+        payer,
+      ),
+    ).toEqual(["unaccepted"]);
   });
 });

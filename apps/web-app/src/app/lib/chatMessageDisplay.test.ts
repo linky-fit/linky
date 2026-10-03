@@ -17,9 +17,13 @@ const translatePreview = (key: string): string => {
   }
 };
 
-const createOfferContent = (status: "canceled" | "offered"): string =>
+const createOfferContent = (
+  status: "canceled" | "offered" | "settled",
+  bankPaidAtSec: number | null = null,
+): string =>
   createLinkyBankPaymentOfferEvent({
     amountText: "123 Kč",
+    bankPaidAtSec,
     clientId: `client-${status}`,
     createdAt: 1_700_000_000,
     recipientPublicKey: getPublicKey(createSecretKey(2)),
@@ -48,5 +52,21 @@ describe("formatChatMessagePreviewText", () => {
         t: translatePreview,
       }),
     ).toBe("Zrušená proxy platba");
+  });
+
+  it("previews a settled offer this peer did not pay as taken by someone else", () => {
+    const preview = (bankPaidAtSec: number | null) =>
+      formatChatMessagePreviewText({
+        content: createOfferContent("settled", bankPaidAtSec),
+        direction: "out",
+        formatDisplayedAmountText: (amount) => `${amount} sat`,
+        t: translatePreview,
+      });
+    expect(preview(null)).toBe(
+      "bankPaymentOfferTitle: bankPaymentOfferStatusAcceptedByOther",
+    );
+    expect(preview(1_700_000_050)).toBe(
+      "bankPaymentOfferTitle: bankPaymentOfferStatusSettled",
+    );
   });
 });
