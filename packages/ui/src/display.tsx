@@ -4,15 +4,24 @@ import { Image, View, styled } from "tamagui";
 import { Pressable } from "./controls";
 import { Row, Stack, Text } from "./layout";
 import { toneColors } from "./styles";
-import type { TextVariant, Tone } from "./tokens";
+import { SupporterBadge } from "./supporter-badge";
+import type { SupporterBadgeProps } from "./supporter-badge";
+import type { SupporterBadgeKind, TextVariant, Tone } from "./tokens";
 import { border, space } from "./tokens";
 
 const avatarSizes = {
-  xs: { box: "$iconLg", text: "caption" },
-  sm: { box: "$controlSm", text: "caption" },
-  md: { box: "$avatar", text: "label" },
-  lg: { box: "$hero", text: "display" },
-} as const satisfies Record<string, { box: `$${string}`; text: TextVariant }>;
+  xs: { box: "$iconLg", text: "caption", badge: "dot" },
+  sm: { box: "$controlSm", text: "caption", badge: "dot" },
+  md: { box: "$avatar", text: "label", badge: "iconSm" },
+  lg: { box: "$hero", text: "display", badge: "controlSm" },
+} as const satisfies Record<
+  string,
+  {
+    box: `$${string}`;
+    text: TextVariant;
+    badge: NonNullable<SupporterBadgeProps["size"]>;
+  }
+>;
 
 export type AvatarSize = keyof typeof avatarSizes;
 
@@ -38,6 +47,8 @@ export interface AvatarProps {
   onError?: ((uri: string) => void) | undefined;
   /** Fills the circle with the raised surface, so it stands out against its ring, e.g. in an `AvatarGroup`. */
   raised?: boolean | undefined;
+  /** Shows the supporter badge on the bottom-right edge. */
+  supporter?: SupporterBadgeKind | undefined;
 }
 
 export function Avatar({
@@ -48,6 +59,7 @@ export function Avatar({
   fallback,
   onError,
   raised = false,
+  supporter,
 }: AvatarProps) {
   const dimensions = avatarSizes[size];
   const [failedUri, setFailedUri] = useState<string>();
@@ -95,6 +107,19 @@ export function Avatar({
           backgroundColor={toneColors[indicator].solid}
           aria-hidden
         />
+      ) : null}
+      {supporter ? (
+        <View
+          position="absolute"
+          bottom={0}
+          right={0}
+          borderRadius="$pill"
+          borderWidth={border.emphasis}
+          borderColor="$background"
+          testID="avatar-supporter-badge"
+        >
+          <SupporterBadge kind={supporter} size={dimensions.badge} />
+        </View>
       ) : null}
     </View>
   );

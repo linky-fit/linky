@@ -56,6 +56,7 @@ export const lists: Section = {
             avatarName="Alex Rivers"
             status="On a hike"
             badge="unknown"
+            supporter="gold"
             preview={<UI.Pill label="120 sats" size="sm" />}
             onPress={() => setSelected(!selected)}
           />

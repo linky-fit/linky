@@ -26,6 +26,8 @@ export { icons } from "./icon-set";
 export type { IconName, IconProps, IconSize } from "./icons";
 export { BrandHero, BrandMark } from "./brand-mark";
 export type { BrandMarkProps } from "./brand-mark";
+export { SupporterBadge } from "./supporter-badge";
+export type { SupporterBadgeProps } from "./supporter-badge";
 
 // Controls and fields
 export {

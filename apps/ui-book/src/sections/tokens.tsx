@@ -5,38 +5,90 @@ import type { Section } from "../section";
 const lineHeight = (token: string) =>
   Object.entries(UI.typography.lineHeight).find(([key]) => key === token)?.[1];
 
+const paletteHighlights = [
+  "background",
+  "surface",
+  "color",
+  "accent",
+  "accentSoft",
+] as const satisfies (keyof UI.ThemeColors)[];
+
+const swatch = (color: string, border: string) => ({
+  backgroundColor: color,
+  width: UI.size.control,
+  height: UI.size.controlSm,
+  borderRadius: UI.radius.sm,
+  borderWidth: UI.border.hairline,
+  borderColor: border,
+});
+
 export const tokens: Section = {
   title: "Tokens",
   entries: {
-    "Token scales": ({ mode }) => (
+    "Token scales": ({ mode, palette }) => (
       <UI.Stack gap="$xxl">
-        {Object.entries(UI.themes).map(([theme, colors]) => (
-          <UI.Stack key={theme} gap="$sm">
-            <UI.Text variant="label">{theme} colors</UI.Text>
-            {Object.entries(colors).map(([token, color]) => (
-              <UI.Row key={token} gap="$sm">
+        <UI.Stack gap="$sm">
+          <UI.Text variant="label">Palettes in {mode} mode</UI.Text>
+          {UI.THEME_PALETTES.map((name) => (
+            <UI.Row key={name} gap="$sm">
+              {paletteHighlights.map((token) => (
                 <View
-                  style={{
-                    backgroundColor: color,
-                    width: UI.size.control,
-                    height: UI.size.controlSm,
-                    borderRadius: UI.radius.sm,
-                    borderWidth: UI.border.hairline,
-                    borderColor: UI.themes[mode].borderColor,
-                  }}
+                  key={token}
+                  style={swatch(
+                    UI.palettes[name][mode][token],
+                    UI.palettes[palette][mode].borderColor,
+                  )}
                 />
-                <UI.Stack flex={1} gap="$none">
-                  <UI.Text variant="caption" bold>
-                    {token}
-                  </UI.Text>
-                  <UI.Text variant="caption" mono color="$colorMuted">
-                    {color}
-                  </UI.Text>
-                </UI.Stack>
-              </UI.Row>
-            ))}
+              ))}
+              <UI.Text variant="caption" bold>
+                {name}
+              </UI.Text>
+            </UI.Row>
+          ))}
+        </UI.Stack>
+        {UI.COLOR_MODES.map((colorMode) => (
+          <UI.Stack key={colorMode} gap="$sm">
+            <UI.Text variant="label">
+              {palette} {colorMode} colors
+            </UI.Text>
+            {Object.entries(UI.palettes[palette][colorMode]).map(
+              ([token, color]) => (
+                <UI.Row key={token} gap="$sm">
+                  <View
+                    style={swatch(
+                      color,
+                      UI.palettes[palette][mode].borderColor,
+                    )}
+                  />
+                  <UI.Stack flex={1} gap="$none">
+                    <UI.Text variant="caption" bold>
+                      {token}
+                    </UI.Text>
+                    <UI.Text variant="caption" mono color="$colorMuted">
+                      {color}
+                    </UI.Text>
+                  </UI.Stack>
+                </UI.Row>
+              ),
+            )}
           </UI.Stack>
         ))}
+        <UI.Stack gap="$sm">
+          <UI.Text variant="label">Supporter badge colors</UI.Text>
+          {UI.SUPPORTER_BADGE_KINDS.map((kind) => (
+            <UI.Row key={kind} gap="$sm">
+              {Object.values(UI.supporterBadgeColors[kind]).map((color) => (
+                <View
+                  key={color}
+                  style={swatch(color, UI.palettes[palette][mode].borderColor)}
+                />
+              ))}
+              <UI.Text variant="caption" bold>
+                {kind}
+              </UI.Text>
+            </UI.Row>
+          ))}
+        </UI.Stack>
         {Object.entries({
           space: UI.space,
           radius: UI.radius,

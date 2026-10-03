@@ -1,4 +1,4 @@
-import { themes, type ColorMode } from "@linky-fit/ui/tokens";
+import { palettes, type ColorMode } from "@linky-fit/ui/tokens";
 import type { I18nKey } from "../i18n";
 import { safeLocalStorageGet, safeLocalStorageSet } from "./storage";
 
@@ -63,5 +63,5 @@ export const applyColorModeToDocument = (mode: ColorMode): void => {
   document.documentElement.dataset.colorMode = mode;
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", themes[mode].background);
+    ?.setAttribute("content", palettes.default[mode].background);
 };

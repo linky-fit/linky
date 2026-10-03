@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { radius, size, space, themes, zIndex } from "./tokens";
+import { palettes, radius, size, space, zIndex } from "./tokens";
 
 type Rgb = readonly number[];
 
@@ -33,10 +33,17 @@ const contrast = (foreground: string, background: string, page: string) => {
   return (light + 0.05) / (dark + 0.05);
 };
 
-describe("themes", () => {
-  it("define the same keys in light and dark", () => {
-    expect(Object.keys(themes.light).sort()).toEqual(
-      Object.keys(themes.dark).sort(),
+const variants = Object.entries(palettes).flatMap(([palette, modes]) =>
+  Object.entries(modes).map(([mode, theme]) => ({
+    name: `${palette} ${mode}`,
+    theme,
+  })),
+);
+
+describe("palettes", () => {
+  it.each(variants)("$name has the default dark keys", ({ theme }) => {
+    expect(Object.keys(theme).sort()).toEqual(
+      Object.keys(palettes.default.dark).sort(),
     );
   });
 
@@ -44,41 +51,40 @@ describe("themes", () => {
   it.each(Object.entries({ space, size, radius, zIndex }))(
     "share no key with the %s tokens",
     (_group, tokens) => {
-      const shared = Object.keys(tokens).filter((key) => key in themes.dark);
+      const shared = Object.keys(tokens).filter(
+        (key) => key in palettes.default.dark,
+      );
       expect(shared).toEqual([]);
     },
   );
 
-  it.each(Object.entries(themes))("%s uses only hex colors", (_mode, theme) => {
+  it.each(variants)("$name uses only hex colors", ({ theme }) => {
     for (const value of Object.values(theme)) {
       expect(value).toMatch(/^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/);
     }
   });
 });
 
-describe.each(Object.entries(themes))(
-  "%s theme text contrast",
-  (_mode, theme) => {
-    it.each([
-      ["body on page", theme.color, theme.background],
-      ["body on surface", theme.color, theme.surface],
-      ["body on raised surface", theme.color, theme.surfaceRaised],
-      ["subtle on surface", theme.colorSubtle, theme.surface],
-      ["muted on page", theme.colorMuted, theme.background],
-      ["muted on surface", theme.colorMuted, theme.surface],
-      ["primary action", theme.onAccent, theme.accent],
-      ["primary action pressed", theme.onAccent, theme.accentPress],
-      ["danger action", theme.onDanger, theme.danger],
-      ["accent text on accent soft", theme.accentText, theme.accentSoft],
-      ["danger text on danger soft", theme.dangerText, theme.dangerSoft],
-      ["warning text on warning soft", theme.warningText, theme.warningSoft],
-      ["info text on info soft", theme.infoText, theme.infoSoft],
-      ["body on incoming message", theme.color, theme.neutralSoft],
-      ["body on outgoing message", theme.color, theme.accentSoft],
-    ])("keeps %s readable (WCAG AA)", (_name, foreground, background) => {
-      expect(
-        contrast(foreground, background, theme.background),
-      ).toBeGreaterThanOrEqual(4.5);
-    });
-  },
-);
+describe.each(variants)("$name text contrast", ({ theme }) => {
+  it.each([
+    ["body on page", theme.color, theme.background],
+    ["body on surface", theme.color, theme.surface],
+    ["body on raised surface", theme.color, theme.surfaceRaised],
+    ["subtle on surface", theme.colorSubtle, theme.surface],
+    ["muted on page", theme.colorMuted, theme.background],
+    ["muted on surface", theme.colorMuted, theme.surface],
+    ["primary action", theme.onAccent, theme.accent],
+    ["primary action pressed", theme.onAccent, theme.accentPress],
+    ["danger action", theme.onDanger, theme.danger],
+    ["accent text on accent soft", theme.accentText, theme.accentSoft],
+    ["danger text on danger soft", theme.dangerText, theme.dangerSoft],
+    ["warning text on warning soft", theme.warningText, theme.warningSoft],
+    ["info text on info soft", theme.infoText, theme.infoSoft],
+    ["body on incoming message", theme.color, theme.neutralSoft],
+    ["body on outgoing message", theme.color, theme.accentSoft],
+  ])("keeps %s readable (WCAG AA)", (_name, foreground, background) => {
+    expect(
+      contrast(foreground, background, theme.background),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});

@@ -7,18 +7,27 @@ import { componentSections, tokens } from "./sections";
 
 export default function App() {
   const [mode, setMode] = useState<UI.ColorMode>("light");
+  const [palette, setPalette] = useState<UI.ThemePalette>("default");
   const [loaded, error] = useBookFonts();
   return (
     <SafeAreaProvider>
-      <UI.UIProvider mode={mode}>
+      <UI.UIProvider mode={mode} palette={palette}>
         <StatusBar style={mode === "dark" ? "light" : "dark"} />
         <SafeAreaView
-          style={{ flex: 1, backgroundColor: UI.themes[mode].background }}
+          style={{
+            flex: 1,
+            backgroundColor: UI.palettes[palette][mode].background,
+          }}
         >
           {error ? (
             <UI.Text>Could not load Manrope: {error.message}</UI.Text>
           ) : loaded ? (
-            <Book mode={mode} onModeChange={setMode} />
+            <Book
+              mode={mode}
+              onModeChange={setMode}
+              palette={palette}
+              onPaletteChange={setPalette}
+            />
           ) : (
             <UI.LoadingState label="Loading fonts" />
           )}
@@ -31,9 +40,13 @@ export default function App() {
 function Book({
   mode,
   onModeChange,
+  palette,
+  onPaletteChange,
 }: {
   mode: UI.ColorMode;
   onModeChange: (mode: UI.ColorMode) => void;
+  palette: UI.ThemePalette;
+  onPaletteChange: (palette: UI.ThemePalette) => void;
 }) {
   return (
     <UI.ScrollView flex={1} keyboardShouldPersistTaps="handled">
@@ -54,11 +67,20 @@ function Book({
               onValueChange={(dark) => onModeChange(dark ? "dark" : "light")}
             />
           </UI.Row>
+          <UI.SelectField
+            label="Palette"
+            value={palette}
+            options={UI.THEME_PALETTES.map((value) => ({
+              value,
+              label: value,
+            }))}
+            onValueChange={onPaletteChange}
+          />
           <UI.Text color="$colorMuted">
             Every element, grouped by category. Fictional data, local state.
           </UI.Text>
           <UI.Text variant="caption" color="$colorMuted">
-            {mode === "dark" ? "Dark" : "Light"} mode ·{" "}
+            {mode === "dark" ? "Dark" : "Light"} mode · {palette} palette ·{" "}
             {componentSections.reduce(
               (count, section) => count + Object.keys(section.entries).length,
               0,
@@ -80,7 +102,7 @@ function Book({
                 <UI.Text variant="label" role="heading" color="$colorMuted">
                   {name}
                 </UI.Text>
-                <Example mode={mode} />
+                <Example mode={mode} palette={palette} />
                 <UI.Divider marginTop="$sm" />
               </UI.Stack>
             ))}

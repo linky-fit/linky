@@ -48,7 +48,7 @@ describe("colorMode", () => {
 
   it("paints the document and browser chrome with the theme background", async () => {
     const { applyColorModeToDocument } = await loadColorMode();
-    const { themes } = await import("@linky-fit/ui/tokens");
+    const { palettes } = await import("@linky-fit/ui/tokens");
     const meta = document.createElement("meta");
     meta.name = "theme-color";
     document.head.append(meta);
@@ -56,7 +56,7 @@ describe("colorMode", () => {
     applyColorModeToDocument("light");
 
     expect(document.documentElement.dataset.colorMode).toBe("light");
-    expect(meta.content).toBe(themes.light.background);
+    expect(meta.content).toBe(palettes.default.light.background);
     meta.remove();
   });
 });

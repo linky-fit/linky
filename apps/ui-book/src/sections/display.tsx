@@ -4,12 +4,14 @@ import type { Section } from "../section";
 import { sampleImage } from "../sample-image";
 import { tones } from "../sample-data";
 
+const avatarSizes = ["xs", "sm", "md", "lg"] satisfies UI.AvatarSize[];
+
 export const display: Section = {
   title: "Display",
   entries: {
     Avatar: () => (
       <UI.Row flexWrap="wrap">
-        {(["xs", "sm", "md", "lg"] satisfies UI.AvatarSize[]).map((size) => (
+        {avatarSizes.map((size) => (
           <UI.Avatar
             key={size}
             name="Alex Rivers"
@@ -20,6 +22,36 @@ export const display: Section = {
         <UI.Avatar name="Color study" uri={sampleImage} />
         <UI.Avatar name="Alex Rivers" fallback="🦊" />
         <UI.Avatar name="Alex Rivers" raised />
+        {UI.SUPPORTER_BADGE_KINDS.map((kind) => (
+          <UI.Row key={kind} width="100%" alignItems="flex-end">
+            {avatarSizes.map((size) => (
+              <UI.Avatar
+                key={size}
+                name="Alex Rivers"
+                uri={sampleImage}
+                size={size}
+                supporter={kind}
+              />
+            ))}
+            <UI.Text variant="caption" color="$colorMuted">
+              {kind}
+            </UI.Text>
+          </UI.Row>
+        ))}
+      </UI.Row>
+    ),
+    SupporterBadge: () => (
+      <UI.Row flexWrap="wrap">
+        {UI.SUPPORTER_BADGE_KINDS.map((kind) => (
+          <UI.SupporterBadge
+            key={kind}
+            kind={kind}
+            accessibilityLabel={`${kind} supporter`}
+          />
+        ))}
+        {UI.SUPPORTER_BADGE_KINDS.map((kind) => (
+          <UI.SupporterBadge key={kind} kind={kind} size="iconXl" />
+        ))}
       </UI.Row>
     ),
     AvatarGroup: () => (

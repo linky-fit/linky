@@ -3,15 +3,31 @@ import { createFont, createTamagui, createTokens } from "tamagui";
 import { animations } from "./animations";
 import {
   breakpoint,
+  COLOR_MODES,
   fontFamily,
   fontWeight,
+  palettes,
   radius,
   size,
   space,
-  themes,
+  THEME_PALETTES,
   typography,
   zIndex,
 } from "./tokens";
+import type { ColorMode, ThemePalette } from "./tokens";
+
+/** Premium palettes are sub-themes of the color mode, e.g. `dark_gold`. */
+export const themeName = (palette: ThemePalette, mode: ColorMode) =>
+  palette === "default" ? mode : `${mode}_${palette}`;
+
+const themes = Object.fromEntries(
+  THEME_PALETTES.flatMap((palette) =>
+    COLOR_MODES.map((mode) => [
+      themeName(palette, mode),
+      palettes[palette][mode],
+    ]),
+  ),
+);
 
 const withDefault = <T extends Record<string, number | string>>(
   scale: T,

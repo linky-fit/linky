@@ -4,8 +4,10 @@ import type { Section } from "../section";
 export const setup: Section = {
   title: "Setup",
   entries: {
-    UIProvider: ({ mode }) => (
-      <UI.Text>Provides the {mode} theme, fonts and animations.</UI.Text>
+    UIProvider: ({ mode, palette }) => (
+      <UI.Text>
+        Provides the {palette} palette in {mode} mode, fonts and animations.
+      </UI.Text>
     ),
     Theme: ({ mode }) => (
       <UI.Theme name={mode === "light" ? "dark" : "light"}>

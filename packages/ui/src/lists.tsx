@@ -5,6 +5,7 @@ import { Icon } from "./icons";
 import type { IconName } from "./icons";
 import { Row, Stack, Text } from "./layout";
 import { space } from "./tokens";
+import type { SupporterBadgeKind } from "./tokens";
 
 export interface ListRowProps {
   title: ReactNode;
@@ -131,6 +132,7 @@ export interface ContactRowProps {
   preview?: ReactNode;
   time?: string | undefined;
   unread?: boolean | undefined;
+  supporter?: SupporterBadgeKind | undefined;
   /** A short tag after the name, e.g. "unknown". */
   badge?: string | undefined;
   selected?: boolean | undefined;
@@ -146,6 +148,7 @@ export function ContactRow({
   preview,
   time,
   unread,
+  supporter,
   badge,
   selected,
   onPress,
@@ -158,6 +161,7 @@ export function ContactRow({
           name={avatarName ?? name}
           uri={avatarUri}
           indicator={unread ? "accent" : undefined}
+          supporter={supporter}
         />
       }
       title={

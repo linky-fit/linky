@@ -7,10 +7,10 @@ import { registerSW } from "virtual:pwa-register";
 import {
   fontFamily,
   fontWeight,
+  palettes,
   radius,
   size,
   space,
-  themes,
   typography,
   zIndex,
 } from "@linky-fit/ui/tokens";
@@ -554,7 +554,7 @@ const getBootErrorText = () => {
   };
 };
 
-const bootTheme = themes[getColorMode()];
+const bootTheme = palettes.default[getColorMode()];
 
 const bootFont = (
   variant: TextVariant,
