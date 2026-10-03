@@ -10,6 +10,7 @@ import {
   TopupReceipt,
 } from "@linky-fit/linkshu";
 import { Either } from "effect";
+import { nip19 } from "nostr-tools";
 import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
@@ -26,10 +27,17 @@ vi.mock("../../../hooks/useRouting", () => ({
   navigateTo: navigateToMock,
 }));
 
+import { parseCashuPaymentRequestMessage } from "../../lib/paymentRequestMessage";
 import { useTopupFlow } from "./useTopupFlow";
 
 const MINT_URL = "https://mint.example";
 const INVOICE = "lnbc2100n1pfakeinvoice";
+// parseCashuPaymentRequestMessage checks the pubkey is on-curve, so this is
+// getPublicKey of the all-ones secret key.
+const RECIPIENT_NPROFILE = nip19.nprofileEncode({
+  pubkey: "1b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f",
+  relays: ["wss://relay.example"],
+});
 
 const topupQuote = (quoteId = "quote-1"): TopupQuote =>
   new TopupQuote({
@@ -78,12 +86,14 @@ interface SetupOptions {
   resumePendingCashuTopups?: ResumePendingCashuTopups;
   routeKind?: Route["kind"];
   startCashuTopup?: StartCashuTopup;
+  topupRecipientNprofile?: string | null;
 }
 
 const setup = async ({
   resumePendingCashuTopups,
   routeKind = "topupInvoice",
   startCashuTopup,
+  topupRecipientNprofile = null,
 }: SetupOptions) => {
   const flowRef: { current: Flow | null } = { current: null };
   const setRouteKindRef: {
@@ -110,7 +120,7 @@ const setup = async ({
       startCashuTopup: startCashuTopup ?? null,
       t: (key) => key,
       topupPaidNavTimerRef,
-      topupRecipientNprofile: null,
+      topupRecipientNprofile,
     });
     React.useEffect(() => {
       flowRef.current = flow;
@@ -200,6 +210,31 @@ describe("useTopupFlow", () => {
     expect(harness.flow().topupAmount).toBe("");
     // The finalized quote never restarts even though the route is unchanged.
     expect(start).toHaveBeenCalledTimes(1);
+    await harness.unmount();
+  });
+
+  it("keeps the quote id out of the cashu request in the QR", async () => {
+    // An unlocked quote is mintable by its id alone (NUT-04), so the QR and
+    // copied payload must not carry it.
+    const quote = topupQuote();
+    const harness = await setup({
+      startCashuTopup: vi.fn<StartCashuTopup>(async () =>
+        Either.right(deferredHandle(quote).handle),
+      ),
+      topupRecipientNprofile: RECIPIENT_NPROFILE,
+    });
+
+    await act(async () => {
+      harness.flow().setTopupAmount("21");
+    });
+
+    await waitFor(() => {
+      expect(harness.flow().topupInvoiceCashuRequest).not.toBeNull();
+    });
+    const request = harness.flow().topupInvoiceCashuRequest ?? "";
+    expect(parseCashuPaymentRequestMessage(request)?.requestId).toBeNull();
+    expect(request).not.toContain(quote.quoteId);
+    expect(harness.flow().topupInvoiceQrPayload).not.toContain(quote.quoteId);
     await harness.unmount();
   });
 

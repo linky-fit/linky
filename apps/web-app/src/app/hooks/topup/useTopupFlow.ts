@@ -322,7 +322,6 @@ export const useTopupFlow = ({
           description: activeTopup.note,
           mintUrls: [activeTopup.mint],
           recipientNprofile: topupRecipientNprofile,
-          requestId: activeTopup.quote.quoteId,
         })
       : null;
     const payload = cashuRequest
