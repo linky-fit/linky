@@ -7,6 +7,12 @@ import {
 
 /** The authenticated state of one offer thread: one offer id with one peer. */
 export interface BankPaymentOffer extends BankPaymentOfferInfo {
+  /** Send time of the first evidence seen that the peer accepted this thread,
+   * kept once later statuses (a cancellation, another winner) replace it. */
+  acceptedAtSec: number | null;
+  /** Send time of the first evidence seen that the peer received the bank
+   * details, kept the same way; the peer was the chosen payer from then on. */
+  bankDetailsSentAtSec: number | null;
   clientId: string | null;
   /** The encoded snapshot JSON, byte for byte what the wire carried. */
   content: string;
@@ -57,6 +63,23 @@ export const bankPaymentOfferBankPaidAtSec = (
 ): number | null =>
   offer.bankPaidAtSec ??
   (offer.status === "bank_paid" ? offer.statusUpdatedAtSec : null);
+
+/** A snapshot whose status or payment stamp proves the peer accepted the offer. */
+export const showsBankPaymentOfferAcceptance = (
+  info: Pick<BankPaymentOfferInfo, "bankPaidAtSec" | "status">,
+): boolean =>
+  info.status === "accepted" ||
+  info.status === "bank_details_sent" ||
+  info.status === "bank_paid" ||
+  info.bankPaidAtSec !== null;
+
+/** A snapshot whose status or payment stamp proves the peer holds the bank details. */
+export const showsBankPaymentOfferBankDetails = (
+  info: Pick<BankPaymentOfferInfo, "bankPaidAtSec" | "status">,
+): boolean =>
+  info.status === "bank_details_sent" ||
+  info.status === "bank_paid" ||
+  info.bankPaidAtSec !== null;
 
 /** Seconds from the offer's initiation to the payer's bank payment. */
 export const bankPaymentOfferResponseDurationSec = (

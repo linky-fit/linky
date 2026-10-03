@@ -279,6 +279,71 @@ describe("applyBankPaymentOfferSnapshot", () => {
     ).toHaveLength(1);
   });
 
+  it("remembers that the peer accepted once the offerer picked someone else", () => {
+    const book = new Book();
+    book.apply(snapshot("offered", true));
+    book.apply(snapshot("offered", true, { from: other }));
+    book.apply(
+      snapshot("accepted", false, { sentAt: UnixSeconds.make(START + 5) }),
+    );
+    book.apply(
+      snapshot("accepted_by_other", true, {
+        sentAt: UnixSeconds.make(START + 6),
+      }),
+    );
+    book.apply(
+      snapshot("canceled", true, {
+        from: other,
+        sentAt: UnixSeconds.make(START + 7),
+      }),
+    );
+    expect(
+      book.state.offers.map((offer) => [offer.peer, offer.acceptedAtSec]),
+    ).toEqual([
+      [payer, START + 5],
+      [other, null],
+    ]);
+  });
+
+  it("remembers when the peer received the bank details once the offer is canceled", () => {
+    const book = new Book();
+    book.apply(snapshot("offered", true));
+    book.apply(
+      snapshot("accepted", false, { sentAt: UnixSeconds.make(START + 5) }),
+    );
+    book.apply(
+      snapshot("bank_details_sent", true, {
+        sentAt: UnixSeconds.make(START + 6),
+      }),
+    );
+    book.apply(
+      snapshot("canceled", true, { sentAt: UnixSeconds.make(START + 400) }),
+    );
+    expect(book.state.offers[0]).toMatchObject({
+      acceptedAtSec: START + 5,
+      bankDetailsSentAtSec: START + 6,
+      status: "canceled",
+    });
+  });
+
+  it("records a stale acceptance replayed after the offerer's decision", () => {
+    const book = new Book();
+    book.apply(
+      snapshot("accepted_by_other", true, {
+        sentAt: UnixSeconds.make(START + 6),
+      }),
+    );
+    expect(
+      book.apply(
+        snapshot("accepted", false, { sentAt: UnixSeconds.make(START + 5) }),
+      ),
+    ).toEqual([]);
+    expect(book.state.offers[0]).toMatchObject({
+      acceptedAtSec: START + 5,
+      status: "accepted_by_other",
+    });
+  });
+
   it("drops snapshots whose phase already expired", () => {
     const book = new Book();
     expect(book.apply(snapshot("offered", true), START + 300)).toEqual([]);

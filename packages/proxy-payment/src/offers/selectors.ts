@@ -230,6 +230,72 @@ export const bankPaymentOfferGroupResponses = (
   };
 };
 
+const byCreatedAtDesc = (left: BankPaymentOffer, right: BankPaymentOffer) =>
+  right.createdAtSec - left.createdAtSec ||
+  right.offerId.localeCompare(left.offerId);
+
+const hasBankPaymentOfferEnded = (
+  offer: BankPaymentOffer,
+  nowSec: number,
+): boolean =>
+  isTerminalBankPaymentOfferStatus(offer.status) ||
+  isBankPaymentOfferExpired(offer, offer.createdAtSec, nowSec);
+
+/** How one of my ended offers went for one peer. */
+export type BankPaymentOfferOutcome =
+  /** The peer never accepted it: declined, ignored, or ended before they did. */
+  | "unaccepted"
+  /** The peer held the bank details, yet the thread ended unsettled. */
+  | "canceled"
+  /** The peer paid the transfer and the offer settled. */
+  | "settled";
+
+const bankPaymentOfferOutcome = (
+  offer: BankPaymentOffer,
+): BankPaymentOfferOutcome | null => {
+  if (
+    offer.status === "settled" &&
+    bankPaymentOfferBankPaidAtSec(offer) !== null
+  ) {
+    return "settled";
+  }
+  if (offer.bankDetailsSentAtSec !== null) return "canceled";
+  // An acceptance that lost to a faster peer, or a backup whose group was
+  // canceled, says nothing about this peer.
+  return offer.acceptedAtSec === null ? "unaccepted" : null;
+};
+
+/**
+ * The outcomes of my last `limit` ended offers to each peer, oldest first.
+ * A live offer and a losing acceptance are left out; a peer with no ended
+ * offer is absent.
+ */
+export const recentBankPaymentOfferOutcomesByPeer = (
+  offers: readonly BankPaymentOffer[],
+  me: string,
+  nowSec: number,
+  limit: number,
+): ReadonlyMap<string, readonly BankPaymentOfferOutcome[]> => {
+  const byPeer = new Map<string, BankPaymentOffer[]>();
+  for (const offer of ownOffers(offers, me)) {
+    const group = byPeer.get(offer.peer) ?? [];
+    group.push(offer);
+    byPeer.set(offer.peer, group);
+  }
+  const outcomes = new Map<string, BankPaymentOfferOutcome[]>();
+  for (const [peer, group] of byPeer) {
+    const recent: BankPaymentOfferOutcome[] = [];
+    for (const offer of group.sort(byCreatedAtDesc)) {
+      if (recent.length >= limit) break;
+      if (!hasBankPaymentOfferEnded(offer, nowSec)) continue;
+      const outcome = bankPaymentOfferOutcome(offer);
+      if (outcome) recent.unshift(outcome);
+    }
+    if (recent.length > 0) outcomes.set(peer, recent);
+  }
+  return outcomes;
+};
+
 /** Seconds each peer needed to pay my most recent offer they completed. */
 export const lastBankPaymentOfferResponseSecByPeer = (
   offers: readonly BankPaymentOffer[],

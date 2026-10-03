@@ -28,7 +28,7 @@ export const toneColors: Record<
   neutral: {
     background: "$neutralSoft",
     color: "$colorSubtle",
-    solid: "$colorMuted",
+    solid: "$neutral",
   },
   accent: { background: "$accentSoft", color: "$accentText", solid: "$accent" },
   warning: {

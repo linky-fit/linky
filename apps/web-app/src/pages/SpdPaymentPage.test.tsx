@@ -68,9 +68,6 @@ const translate = (key: string): string => {
   if (key === "spdPaymentRequestReimbursementCountOther") {
     return "Ask {count} contacts to pay";
   }
-  if (key === "spdPaymentLastResponseTime") {
-    return "Last time {time}";
-  }
   return key;
 };
 
@@ -266,7 +263,7 @@ describe("SpdPaymentPage offer recipients", () => {
     );
   });
 
-  it("shows each candidate's last payment response in minutes and seconds", async () => {
+  it("shows each candidate's recent offer outcomes as dots", async () => {
     const { container } = await renderIntoDocument(
       <SpdPaymentPage
         cashuBalanceAfterMelt={100_000}
@@ -277,9 +274,9 @@ describe("SpdPaymentPage offer recipients", () => {
         offerContacts={[
           {
             id: "contact-a",
-            lastBankPaymentResponseSec: 125,
             name: "Alice",
             npub: "npub1alice",
+            recentBankPaymentOfferOutcomes: ["unaccepted", "settled", "canceled"],
           },
           { id: "contact-b", name: "Bob", npub: "npub1bob" },
         ]}
@@ -288,9 +285,17 @@ describe("SpdPaymentPage offer recipients", () => {
       />,
     );
 
-    const candidates = byTestId(container, "bank-payment-offer-contact");
-    expect(candidates[0]?.textContent).toContain("Last time 02:05");
-    expect(candidates[1]?.textContent).not.toContain("Last time");
+    const rows = byTestId(container, "bank-payment-offer-contact-outcomes");
+    expect(rows).toHaveLength(1);
+    expect(
+      Array.from(rows[0]?.querySelectorAll('[role="img"]') ?? [], (dot) =>
+        dot.getAttribute("aria-label"),
+      ),
+    ).toEqual([
+      "spdPaymentOutcomeUnaccepted",
+      "spdPaymentOutcomeSettled",
+      "spdPaymentOutcomeCanceled",
+    ]);
   });
 
   const renderEditable = async (

@@ -6,6 +6,7 @@ import {
   Row,
   SelectField,
   Stack,
+  StatusDot,
   Stepper,
   Text,
   TextField,
@@ -24,6 +25,7 @@ import {
   type BankPaymentFieldKey,
   type BankPaymentFormat,
   type BankPaymentOfferCurrency,
+  type BankPaymentOfferOutcome,
   formatDomesticBankAccount,
   getBankPaymentEditableFieldKeys,
   tryParseBankPayment,
@@ -43,8 +45,9 @@ interface SpdPaymentPageProps {
   isEditing: boolean;
   isManualEntry: boolean;
   offerContacts: readonly (ContactRowLike & {
-    lastBankPaymentResponseSec?: number | null;
     pictureUrl?: string | null;
+    /** How my last offers to this contact went, oldest first. */
+    recentBankPaymentOfferOutcomes?: readonly BankPaymentOfferOutcome[];
   })[];
   onRequestReimbursement: (args: {
     amountSat: number | null;
@@ -117,11 +120,13 @@ const clampOfferDelaySec = (value: number): number => {
   );
 };
 
-const formatResponseDuration = (durationSec: number): string => {
-  const safeDurationSec = Math.max(0, Math.trunc(durationSec));
-  const minutes = Math.floor(safeDurationSec / 60);
-  const seconds = safeDurationSec % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+const OUTCOME_DOTS: Record<
+  BankPaymentOfferOutcome,
+  { label: I18nKey; tone: "accent" | "danger" | "neutral" }
+> = {
+  canceled: { label: "spdPaymentOutcomeCanceled", tone: "danger" },
+  settled: { label: "spdPaymentOutcomeSettled", tone: "accent" },
+  unaccepted: { label: "spdPaymentOutcomeUnaccepted", tone: "neutral" },
 };
 
 const getRateForCurrency = (
@@ -638,7 +643,7 @@ const OfferContactTile = ({
   const name = (contact.name ?? "").trim();
   const npub = (contact.npub ?? "").trim();
   const pictureUrl = (contact.pictureUrl ?? "").trim();
-  const responseSec = contact.lastBankPaymentResponseSec;
+  const outcomes = contact.recentBankPaymentOfferOutcomes ?? [];
   const isSelected = order !== null;
   return (
     <OptionTile
@@ -675,15 +680,20 @@ const OfferContactTile = ({
         </Stack>
       }
     >
-      {typeof responseSec === "number" &&
-      Number.isFinite(responseSec) &&
-      responseSec >= 0 ? (
-        <Text variant="caption" color="$colorMuted" textAlign="center">
-          {t("spdPaymentLastResponseTime").replace(
-            "{time}",
-            formatResponseDuration(responseSec),
-          )}
-        </Text>
+      {outcomes.length > 0 ? (
+        <Row
+          testID="bank-payment-offer-contact-outcomes"
+          gap="$xs"
+          justifyContent="center"
+        >
+          {outcomes.map((outcome, index) => (
+            <StatusDot
+              key={index}
+              tone={OUTCOME_DOTS[outcome].tone}
+              accessibilityLabel={t(OUTCOME_DOTS[outcome].label)}
+            />
+          ))}
+        </Row>
       ) : null}
     </OptionTile>
   );
