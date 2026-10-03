@@ -207,6 +207,12 @@ export const useProfileEditor = ({
   const unregisteredOwnLightningAddress = React.useMemo(() => {
     if (!ownLightningAddressInputCandidate) return null;
     if (
+      ownLightningAddressInputCandidate.lightningAddress ===
+      effectiveMyLightningAddress?.trim().toLowerCase()
+    ) {
+      return null;
+    }
+    if (
       ownLightningAddressMatchesCurrentIdentity(
         ownLightningAddressInputCandidate,
       )
@@ -215,6 +221,7 @@ export const useProfileEditor = ({
     }
     return ownLightningAddressInputCandidate;
   }, [
+    effectiveMyLightningAddress,
     ownLightningAddressInputCandidate,
     ownLightningAddressMatchesCurrentIdentity,
   ]);
