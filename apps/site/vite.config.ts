@@ -1,3 +1,4 @@
+import { linkyUi } from "@linky-fit/ui/vite";
 import react from "@vitejs/plugin-react-swc";
 import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -94,5 +95,5 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(readRootPackageVersion()),
   },
-  plugins: [react(), trailingSlashRedirect(), lnurlProxy()],
+  plugins: [linkyUi(), react(), trailingSlashRedirect(), lnurlProxy()],
 });
