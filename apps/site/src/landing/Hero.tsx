@@ -11,12 +11,13 @@ import {
 } from "@linky-fit/ui";
 import { themes } from "@linky-fit/ui/tokens";
 import type { CSSProperties, ReactNode } from "react";
-import { useSystemColorMode } from "../useSystemColorMode";
+import { useColorMode } from "../colorMode";
 import type { LandingCopy } from "./copy";
+import { avatarUri, type Person } from "./demo/people";
 import { AppLaunch, Glow, Phone } from "./parts";
 
 interface NetworkNode {
-  name: string;
+  name: Person;
   x: number;
   y: number;
   indicator?: Tone;
@@ -39,7 +40,7 @@ const pulses = [0, 3, 6, 2, 4];
 const percent = (value: number) => `${value}%`;
 
 function Network() {
-  const mode = useSystemColorMode();
+  const mode = useColorMode();
   const { accent, borderColorHover } = themes[mode];
   return (
     <>
@@ -102,9 +103,9 @@ function Network() {
         >
           <Avatar
             name={node.name}
+            uri={avatarUri(node.name)}
             size="sm"
             indicator={node.indicator}
-            raised
           />
         </div>
       ))}
@@ -116,7 +117,7 @@ function PaymentCard() {
   return (
     <Card elevated outlined padding="$md" gap="$xs" minWidth="$column">
       <Row gap="$sm">
-        <Avatar name="Mia Novak" size="sm" raised />
+        <Avatar name="Mia Novak" uri={avatarUri("Mia Novak")} size="sm" />
         <Text variant="caption" color="$colorMuted">
           Mia Novak
         </Text>
@@ -130,7 +131,7 @@ function NetworkCard() {
   return (
     <Card elevated outlined padding="$md">
       <AvatarGroup
-        people={nodes.map(({ name }) => ({ name }))}
+        people={nodes.map(({ name }) => ({ name, uri: avatarUri(name) }))}
         max={4}
         size="sm"
       />
@@ -221,7 +222,7 @@ export function Hero({ copy }: { copy: LandingCopy }) {
           {copy.subtitle}
         </Text>
         <Stack className="landing-rise landing-delay-2">
-          <AppLaunch labels={copy.ctaLabels} />
+          <AppLaunch copy={copy} />
         </Stack>
       </Stack>
       <Stack

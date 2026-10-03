@@ -1,22 +1,38 @@
 import {
   Button,
   DeviceFrame,
-  Image,
+  Icon,
+  Pressable,
   Row,
+  Stack,
+  Text,
   type DeviceFrameProps,
   type IconName,
 } from "@linky-fit/ui";
 import { themes } from "@linky-fit/ui/tokens";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useSystemColorMode } from "../useSystemColorMode";
-import { screenSrc, type CtaMode, type Screen } from "./copy";
+import { useColorMode } from "../colorMode";
+import type { CtaMode, LandingCopy, Screen } from "./copy";
+import { ScaledScreen } from "./demo/ScaledScreen";
+import { demoScreens } from "./demo/screens";
 
-const ctaModes: readonly CtaMode[] = [
-  "web",
-  "google-play",
-  "android-apk",
-  "zapstore",
-];
+interface PlatformCtas {
+  primary: CtaMode;
+  secondary: CtaMode[];
+  others: CtaMode[];
+}
+
+const androidCtas: PlatformCtas = {
+  primary: "google-play",
+  secondary: ["zapstore"],
+  others: ["web", "android-apk"],
+};
+
+const defaultCtas: PlatformCtas = {
+  primary: "web",
+  secondary: [],
+  others: ["google-play", "zapstore", "android-apk"],
+};
 
 const ctaIcons: Record<CtaMode, IconName> = {
   "android-apk": "Download",
@@ -33,15 +49,10 @@ const ctaUrls: Record<CtaMode, string> = {
   zapstore: "https://zapstore.dev/apps/fit.linky.app",
 };
 
-const defaultCtaMode = (): CtaMode => {
-  const userAgent = navigator.userAgent.toLowerCase();
-  return userAgent.includes("android") && userAgent.includes("mobile")
-    ? "google-play"
-    : "web";
-};
+const isAndroid = () => /android/i.test(navigator.userAgent);
 
 const launchApp = (mode: CtaMode) => {
-  if (mode === "google-play" && /android/i.test(navigator.userAgent)) {
+  if (mode === "google-play" && isAndroid()) {
     window.location.assign(
       `intent://play.google.com/store/apps/details?id=fit.linky.app#Intent;scheme=https;package=com.android.vending;S.browser_fallback_url=${encodeURIComponent(ctaUrls.web)};end`,
     );
@@ -50,41 +61,61 @@ const launchApp = (mode: CtaMode) => {
   window.open(ctaUrls[mode], "_blank", "noopener,noreferrer");
 };
 
-/** The recommended platform as the primary action, the others beside it. */
+/** The platform's recommended apps, with the other platforms one tap away. */
 export function AppLaunch({
-  labels,
+  copy,
   centered = false,
 }: {
-  labels: Record<CtaMode, string>;
+  copy: Pick<LandingCopy, "ctaLabels" | "showOthersLabel">;
   centered?: boolean;
 }) {
-  const [primary] = useState(defaultCtaMode);
+  const [{ primary, secondary, others }] = useState(() =>
+    isAndroid() ? androidCtas : defaultCtas,
+  );
+  const [showOthers, setShowOthers] = useState(false);
   return (
-    <Row
-      gap="$sm"
-      flexWrap="wrap"
-      justifyContent={centered ? "center" : "flex-start"}
-    >
-      <Button
-        icon="ArrowUpRight"
-        paddingHorizontal="$xxl"
-        onPress={() => launchApp(primary)}
+    <Stack gap="$lg" alignItems={centered ? "center" : "flex-start"}>
+      <Row
+        gap="$sm"
+        flexWrap="wrap"
+        justifyContent={centered ? "center" : "flex-start"}
       >
-        {labels[primary]}
-      </Button>
-      {ctaModes
-        .filter((mode) => mode !== primary)
-        .map((mode) => (
+        <Button
+          icon={ctaIcons[primary]}
+          paddingHorizontal="$xxl"
+          onPress={() => launchApp(primary)}
+        >
+          {copy.ctaLabels[primary]}
+        </Button>
+        {[...secondary, ...(showOthers ? others : [])].map((mode) => (
           <Button
             key={mode}
             variant="secondary"
             icon={ctaIcons[mode]}
             onPress={() => launchApp(mode)}
           >
-            {labels[mode]}
+            {copy.ctaLabels[mode]}
           </Button>
         ))}
-    </Row>
+      </Row>
+      {showOthers ? null : (
+        <Pressable
+          gap="$xs"
+          paddingVertical="$xs"
+          borderRadius="$sm"
+          onPress={() => setShowOthers(true)}
+        >
+          <Text
+            variant="label"
+            color="$colorMuted"
+            hoverStyle={{ color: "$color" }}
+          >
+            {copy.showOthersLabel}
+          </Text>
+          <Icon name="ChevronDown" size="sm" color="$colorMuted" />
+        </Pressable>
+      )}
+    </Stack>
   );
 }
 
@@ -98,7 +129,7 @@ export function Glow({
   top: string;
   left: string;
 }) {
-  const mode = useSystemColorMode();
+  const mode = useColorMode();
   return (
     <div
       aria-hidden
@@ -116,21 +147,17 @@ export function Glow({
   );
 }
 
-/** An app screenshot in a phone, matching the page's color mode. */
+/** A live app screen in a phone. */
 export function Phone({
   screen,
   ...props
 }: Omit<DeviceFrameProps, "children"> & { screen: Screen }) {
-  const mode = useSystemColorMode();
+  const DemoScreen = demoScreens[screen];
   return (
     <DeviceFrame {...props}>
-      <Image
-        src={screenSrc(screen, mode)}
-        alt=""
-        width="100%"
-        height="100%"
-        objectFit="cover"
-      />
+      <ScaledScreen>
+        <DemoScreen />
+      </ScaledScreen>
     </DeviceFrame>
   );
 }

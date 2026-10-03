@@ -1,8 +1,8 @@
-import { DeviceFrame, Image, Row, Stack, Text, useMedia } from "@linky-fit/ui";
+import { DeviceFrame, Row, Stack, Text, useMedia } from "@linky-fit/ui";
 import { useEffect, useRef, useState } from "react";
-import { useSystemColorMode } from "../useSystemColorMode";
 import type { Feature, LandingCopy } from "./copy";
-import { screenSrc } from "./copy";
+import { ScaledScreen } from "./demo/ScaledScreen";
+import { demoScreens } from "./demo/screens";
 import { Glow, Phone, Reveal } from "./parts";
 
 const stepNumber = (index: number) => String(index + 1).padStart(2, "0");
@@ -45,7 +45,6 @@ function useActiveStep(count: number) {
 }
 
 function StickyStory({ features }: { features: Feature[] }) {
-  const mode = useSystemColorMode();
   const { steps, active } = useActiveStep(features.length);
   return (
     <Row alignItems="flex-start" gap="$huge">
@@ -69,24 +68,23 @@ function StickyStory({ features }: { features: Feature[] }) {
           <Row justifyContent="center" position="relative" gap="$xxl">
             <Glow size="140%" top="50%" left="50%" />
             <DeviceFrame width="$device">
-              {features.map((feature, index) => (
-                <div
-                  key={feature.screen}
-                  className={
-                    index === active
-                      ? "landing-screen is-active"
-                      : "landing-screen"
-                  }
-                >
-                  <Image
-                    src={screenSrc(feature.screen, mode)}
-                    alt=""
-                    width="100%"
-                    height="100%"
-                    objectFit="cover"
-                  />
-                </div>
-              ))}
+              {features.map((feature, index) => {
+                const DemoScreen = demoScreens[feature.screen];
+                return (
+                  <div
+                    key={feature.screen}
+                    className={
+                      index === active
+                        ? "landing-screen is-active"
+                        : "landing-screen"
+                    }
+                  >
+                    <ScaledScreen>
+                      <DemoScreen />
+                    </ScaledScreen>
+                  </div>
+                );
+              })}
             </DeviceFrame>
             <Stack gap="$sm" aria-hidden>
               {features.map((feature, index) => (

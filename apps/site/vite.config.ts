@@ -1,3 +1,4 @@
+import { themes } from "@linky-fit/ui/tokens";
 import { linkyUi } from "@linky-fit/ui/vite";
 import react from "@vitejs/plugin-react-swc";
 import { readFileSync } from "node:fs";
@@ -42,6 +43,26 @@ const trailingSlashRedirect = (): Plugin => ({
       },
     );
   },
+});
+
+// Mirrors src/colorMode.ts, so every page paints its first frame in the stored color mode.
+const colorModeBootScript = (): Plugin => ({
+  name: "color-mode-boot-script",
+  transformIndexHtml: () => [
+    {
+      tag: "script",
+      injectTo: "head",
+      children: `try {
+  const stored = localStorage.getItem("linky.color_mode");
+  const mode = stored === "light" || stored === "dark" ? stored
+    : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  const background = ${JSON.stringify({ light: themes.light.background, dark: themes.dark.background })}[mode];
+  document.documentElement.style.colorScheme = mode;
+  document.documentElement.style.backgroundColor = background;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);
+} catch {}`,
+    },
+  ],
 });
 
 const lnurlProxy = (): Plugin => ({
@@ -95,5 +116,11 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(readRootPackageVersion()),
   },
-  plugins: [linkyUi(), react(), trailingSlashRedirect(), lnurlProxy()],
+  plugins: [
+    linkyUi(),
+    react(),
+    colorModeBootScript(),
+    trailingSlashRedirect(),
+    lnurlProxy(),
+  ],
 });

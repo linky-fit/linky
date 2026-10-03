@@ -3,7 +3,7 @@ import { themes, type ColorMode } from "@linky-fit/ui/tokens";
 import "@linky-fit/ui/manrope.css";
 import { useLayoutEffect, type ReactNode } from "react";
 import "./reset.css";
-import { useSystemColorMode } from "./useSystemColorMode";
+import { useColorMode } from "./colorMode";
 
 const applyColorModeToDocument = (mode: ColorMode) => {
   const { background, color } = themes[mode];
@@ -17,7 +17,7 @@ const applyColorModeToDocument = (mode: ColorMode) => {
 };
 
 export function SiteRoot({ children }: { children: ReactNode }) {
-  const mode = useSystemColorMode();
+  const mode = useColorMode();
   useLayoutEffect(() => applyColorModeToDocument(mode), [mode]);
   return <UIProvider mode={mode}>{children}</UIProvider>;
 }
