@@ -6,8 +6,9 @@ import type {
   PanResponderGestureState,
 } from "react-native";
 import { Image, ScrollView, View } from "tamagui";
+import type { GetProps } from "tamagui";
 import { Stack } from "./layout";
-import { border, size, space } from "./tokens";
+import { border, radius, shadow, size, space } from "./tokens";
 
 export interface MediaFrameProps {
   accessibilityLabel: string;
@@ -37,6 +38,37 @@ export function MediaFrame({
       backgroundColor="$neutralSoft"
     >
       {children}
+    </Stack>
+  );
+}
+
+export type DeviceFrameProps = GetProps<typeof Stack> & {
+  /** The screen, e.g. a screenshot that fills the frame. */
+  children: ReactNode;
+};
+
+/** A phone around a screen, for showing the app in context; `$device` wide unless sized. */
+export function DeviceFrame({ children, ...props }: DeviceFrameProps) {
+  return (
+    <Stack
+      width="$device"
+      padding="$sm"
+      borderRadius="$device"
+      backgroundColor="$bezel"
+      borderWidth={border.hairline}
+      borderColor="$borderColorHover"
+      boxShadow={shadow.floating}
+      {...props}
+    >
+      <Stack
+        position="relative"
+        aspectRatio={390 / 844}
+        overflow="hidden"
+        borderRadius={radius.device - space.sm}
+        backgroundColor="$background"
+      >
+        {children}
+      </Stack>
     </Stack>
   );
 }
