@@ -119,7 +119,7 @@ export const de = {
   recurringRunNow: "Zahlen",
   recurringNotFound: "Wiederkehrende Zahlung nicht gefunden.",
   recurringOnlyWhileOpen:
-    "Jedes deiner Geräte, auf dem Linky läuft, sendet die Zahlung, auch im Hintergrund. Eine Minute vorher wirst du benachrichtigt; bei geöffneter App siehst du einen Countdown und kannst sofort zahlen oder abbrechen.",
+    "Jedes deiner Geräte, auf dem Linky läuft, sendet die Zahlung, auch im Hintergrund. Hat es eine Minute nach Fälligkeit keines gesendet, erinnern wir dich, Linky zu öffnen; bei geöffneter App siehst du einen Countdown und kannst sofort zahlen oder abbrechen.",
   recurringRepeatAction: "Regelmäßig wiederholen",
   showTransactions: "Transaktionen anzeigen",
   feedback: "Feedback",
