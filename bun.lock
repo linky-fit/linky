@@ -135,7 +135,7 @@
     },
     "apps/web-app": {
       "name": "@linky-fit/web-app",
-      "version": "26.10.1",
+      "version": "26.10.2",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
         "@capacitor/core": "^7.4.3",
@@ -251,7 +251,7 @@
     },
     "packages/linkshu": {
       "name": "@linky-fit/linkshu",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
         "@noble/hashes": "^2.0.1",
@@ -273,7 +273,7 @@
     },
     "packages/linkstr": {
       "name": "@linky-fit/linkstr",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
         "@noble/curves": "^1.4.1",
