@@ -65,7 +65,7 @@ export const unlockedSupporterTier = (
 ): SupporterTier | null =>
   highestTier(validBadges(awards, nowSec, validitySeconds));
 
-/** The badge the display setting publishes, as `profileBadgeAward` picks it. */
+/** The badge the display setting publishes, the newest valid one of its kind, as `profileBadgeAward` picks it. */
 export const publishedSupporterBadge = (
   awards: ReadonlyArray<SupporterAwardStamp>,
   display: SettingValues["supporterBadgeDisplay"],
@@ -73,7 +73,16 @@ export const publishedSupporterBadge = (
   validitySeconds?: number,
 ): SupporterBadgeType | null => {
   if (display === "hide") return null;
-  const badges = validBadges(awards, nowSec, validitySeconds);
-  if (display === "tier") return highestTier(badges);
-  return badges.includes("generic") ? "generic" : null;
+  const newest = awards
+    .filter(
+      ({ awardedAt, badge }) =>
+        (badge === "generic") === (display === "generic") &&
+        isSupporterAwardValid(awardedAt, nowSec, validitySeconds),
+    )
+    .reduce<SupporterAwardStamp | null>(
+      (best, award) =>
+        best === null || award.awardedAt > best.awardedAt ? award : best,
+      null,
+    );
+  return newest?.badge ?? null;
 };

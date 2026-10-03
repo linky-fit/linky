@@ -26,12 +26,7 @@ import {
   safeLocalStorageSet,
 } from "../../utils/storage";
 import { nowSeconds } from "../../utils/time";
-import {
-  allWrites,
-  NO_WRITE,
-  runWrite,
-  type WriteOutcome,
-} from "../lib/storeWrite";
+import { NO_WRITE, runWrite, type WriteOutcome } from "../lib/storeWrite";
 import {
   linkyBotPubkey,
   SUPPORTER_TIER_LABEL_KEYS,
@@ -256,6 +251,11 @@ export const useSupporterBadges = (params: UseSupporterBadgesParams) => {
         },
       });
 
+      if (outcome.kind === "issued") {
+        const stored = await storeAwards(event, outcome.awards);
+        if (!stored.ok) return stored;
+      }
+
       const text = t(supporterResultNotice(outcome)).replace(
         "{tier}",
         outcome.kind === "issued"
@@ -282,24 +282,28 @@ export const useSupporterBadges = (params: UseSupporterBadgesParams) => {
 
       if (outcome.kind === "refused" && outcome.reason === "mint_not_accepted")
         await reclaimToken(event, delivery);
-      return allWrites([
-        noticeWritten,
-        outcome.kind === "issued"
-          ? storeAwards(event, outcome.awards)
-          : NO_WRITE,
-      ]);
+      return noticeWritten;
     },
     [latest, me, reclaimToken, storeAwards],
   );
 
   const publishBadge = React.useCallback(
     async (issuer: Pubkey, supporter: Pubkey): Promise<boolean> => {
-      const [records, display] = await Effect.runPromise(
+      const stored = await Effect.runPromiseExit(
         Effect.all([
           awardsRepository.all,
           settingsRepository.get("supporterBadgeDisplay"),
         ]),
       );
+      if (Exit.isFailure(stored)) {
+        reportAppLog({
+          tag: "supporter.badgePublishFailed",
+          summary: `supporter badge not published: ${failureMessage(stored.cause)}`,
+          payload: { stage: "read-awards" },
+        });
+        return false;
+      }
+      const [records, display] = stored.value;
       const award = profileBadgeAward(records, display ?? "tier", {
         issuer,
         me: supporter,

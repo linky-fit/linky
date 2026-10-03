@@ -113,9 +113,12 @@ test("a Bronze donation unlocks the Bronze theme and shows its badge to contacts
         .click();
       await expect(
         a.page.getByText(
-          "Thank you! Your badge arrives in the conversation with Linky Bot.",
+          "Monthly payment set up. The first payment is on its way.",
         ),
       ).toBeVisible({ timeout: 60_000 });
+      await expect(
+        a.page.getByRole("button", { name: "Donate monthly", exact: true }),
+      ).toBeDisabled();
       return id;
     });
 

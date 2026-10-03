@@ -138,6 +138,11 @@ export const de = {
     "Eine wiederkehrende Zahlung, die du jederzeit beenden kannst.",
   donateConfirmMonthly: "Monatlich spenden",
   donateConfirmOnce: "Einmal spenden",
+  donateMonthlySetUp:
+    "Monatliche Zahlung eingerichtet. Die erste Zahlung ist unterwegs.",
+  donateMonthlyRunning:
+    "Du unterstützt Linky bereits jeden Monat. Betrag oder Mint änderst du in dieser wiederkehrenden Zahlung.",
+  donateShowMonthly: "Wiederkehrende Zahlung anzeigen",
   donateThanks:
     "Danke! Dein Abzeichen kommt in der Unterhaltung mit Linky Bot an.",
   supporterResultIssued: "Danke! Dein {tier}-Abzeichen ist gespeichert.",

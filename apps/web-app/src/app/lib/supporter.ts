@@ -5,7 +5,12 @@ import {
   supporterTierIncludes,
   type SupporterTier,
 } from "@linky-fit/supporter";
+import type { ContactId } from "@linky-fit/linksync";
 import { decodeNpub, type Pubkey } from "@linky-fit/linkstr";
+import {
+  recurringOrderState,
+  type RecurringPaymentOrder,
+} from "@linky-fit/recurring-payment";
 import type { I18nKey } from "../../i18n";
 import { isHiddenTestMint, normalizeMintUrl } from "../../utils/mint";
 import type { SendMintBalance } from "./paymentMintSelection";
@@ -72,3 +77,15 @@ export const supporterPaymentMints = (
         !isHiddenTestMint(mint, allowTestMints),
     )
     .sort((a, b) => b.amount - a.amount);
+
+/** The active recurring payment to Linky Bot; a monthly donation while one runs would pay twice. */
+export const activeSupporterOrder = (
+  orders: ReadonlyArray<RecurringPaymentOrder>,
+  linkyBotContactId: ContactId,
+  nowSec: number,
+): RecurringPaymentOrder | null =>
+  orders.find(
+    (order) =>
+      order.contactId === linkyBotContactId &&
+      recurringOrderState(order, nowSec) === "active",
+  ) ?? null;

@@ -1,4 +1,4 @@
-import type { ContactId } from "@linky-fit/linksync";
+import type { ContactId, RecurringPaymentId } from "@linky-fit/linksync";
 import {
   SUPPORTER_TIER_AMOUNTS,
   SUPPORTER_TIERS,
@@ -21,8 +21,10 @@ import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
 import { useSupporterContext } from "../app/context/SupporterContext";
 import { useMintSettingsContext } from "../app/context/SystemSettingsContexts";
+import { useRecurringPaymentOrders } from "../app/hooks/payments/useRecurringPaymentOrders";
 import { useSupporterAwardRecords } from "../app/hooks/useLinksync";
 import {
+  activeSupporterOrder,
   SUPPORTER_TIER_LABEL_KEYS,
   supporterPaymentMints,
   supporterThemesFor,
@@ -57,6 +59,11 @@ export function SupporterDonatePage({
   const { createRecurringPayment, payNow } = useRecurringPaymentsContext();
   const { mintBalances, payContactFromMint } = useSupporterContext();
   const hasAwards = useSupporterAwardRecords().length > 0;
+  const runningOrder = activeSupporterOrder(
+    useRecurringPaymentOrders(),
+    contactId,
+    nowSeconds(),
+  );
 
   const [amountText, setAmountText] = React.useState(
     String(SUPPORTER_TIER_AMOUNTS.bronze),
@@ -65,6 +72,10 @@ export function SupporterDonatePage({
   const [monthly, setMonthly] = React.useState(true);
   const [isPaying, setIsPaying] = React.useState(false);
   const [donated, setDonated] = React.useState(false);
+  const [createdOrderId, setCreatedOrderId] =
+    React.useState<RecurringPaymentId | null>(null);
+  const monthlyOrderId = createdOrderId ?? runningOrder?.id ?? null;
+  const blockedByMonthly = monthly && monthlyOrderId !== null;
 
   const amountSat = readAmountSat(amountText);
   const tier = supporterTierForAmount(amountSat);
@@ -77,7 +88,8 @@ export function SupporterDonatePage({
   const tierLabel = (value: SupporterTier) =>
     t(SUPPORTER_TIER_LABEL_KEYS[value]);
 
-  const payMonthly = async (fromMint: string): Promise<boolean> => {
+  /** The order alone sets the donation up: the scheduler retries a first run `payNow` could not pay. */
+  const payMonthly = async (fromMint: string): Promise<void> => {
     const id = await createRecurringPayment({
       amount: { amount: amountSat, unit: "sat" },
       contactId,
@@ -86,11 +98,13 @@ export function SupporterDonatePage({
       mintUrl: fromMint,
       note: null,
     });
-    return id !== null && (await payNow(id));
+    if (id === null) return;
+    setCreatedOrderId(id);
+    await payNow(id);
   };
 
   const donate = async (): Promise<void> => {
-    if (mint === null || amountSat <= 0) return;
+    if (mint === null || amountSat <= 0 || blockedByMonthly) return;
     reportAppLog({
       tag: "supporter.donateStarted",
       summary: `${monthly ? "monthly" : "single"} donation of ${amountSat} sat started`,
@@ -99,10 +113,9 @@ export function SupporterDonatePage({
     });
     setIsPaying(true);
     try {
-      const paid = monthly
-        ? await payMonthly(mint)
-        : await payContactFromMint({ amountSat, contactId, mint });
-      if (paid) setDonated(true);
+      if (monthly) await payMonthly(mint);
+      else if (await payContactFromMint({ amountSat, contactId, mint }))
+        setDonated(true);
     } finally {
       setIsPaying(false);
     }
@@ -182,7 +195,21 @@ export function SupporterDonatePage({
           />
         }
       />
-      {monthly ? (
+      {monthly && monthlyOrderId !== null ? (
+        <Notice
+          tone="accent"
+          title={t(
+            createdOrderId === null
+              ? "donateMonthlyRunning"
+              : "donateMonthlySetUp",
+          )}
+          action={{
+            label: t("donateShowMonthly"),
+            onPress: () =>
+              navigateTo({ route: "recurringPayment", id: monthlyOrderId }),
+          }}
+        />
+      ) : monthly ? (
         <Text variant="caption" color="$colorMuted">
           {t("recurringOnlyWhileOpen")}
         </Text>
@@ -191,7 +218,13 @@ export function SupporterDonatePage({
       <Button
         icon="HeartHandshake"
         loading={isPaying}
-        disabled={mint === null || amountSat <= 0 || cashuIsBusy || isPaying}
+        disabled={
+          mint === null ||
+          amountSat <= 0 ||
+          blockedByMonthly ||
+          cashuIsBusy ||
+          isPaying
+        }
         onPress={() => void donate()}
       >
         {monthly ? t("donateConfirmMonthly") : t("donateConfirmOnce")}
@@ -199,7 +232,7 @@ export function SupporterDonatePage({
 
       {donated ? <Notice tone="accent" title={t("donateThanks")} /> : null}
 
-      {donated || hasAwards ? (
+      {donated || createdOrderId !== null || hasAwards ? (
         <Section title={t("supporterBadgeDisplay")}>
           <SupporterBadgeDisplayOptions />
         </Section>

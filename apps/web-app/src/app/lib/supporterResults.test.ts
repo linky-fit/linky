@@ -110,17 +110,16 @@ describe("readSupporterResult", () => {
 describe("profileBadgeAward", () => {
   const context = { issuer: bot, me, nowSec: NOW };
 
-  it("shows the highest valid tier, then the newest", () => {
+  it("shows the newest valid tiered award, whatever its tier", () => {
     const records = [
-      record("bronze", NOW - DAY),
       record("gold", NOW - 10 * DAY),
+      record("bronze", NOW - DAY),
       record("gold", NOW - 5 * DAY),
-      record("diamond", NOW - 60 * DAY),
-      record("generic", NOW - DAY),
+      record("generic", NOW),
     ];
     const award = profileBadgeAward(records, "tier", context);
-    expect(award?.badge).toBe("gold");
-    expect(award?.awardedAt).toBe(NOW - 5 * DAY);
+    expect(award?.badge).toBe("bronze");
+    expect(award?.awardedAt).toBe(NOW - DAY);
   });
 
   it("shows the newest valid generic award, or none", () => {

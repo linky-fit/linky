@@ -9,7 +9,10 @@ import {
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useSupporterContext } from "../app/context/SupporterContext";
-import { SUPPORTER_TIER_LABEL_KEYS } from "../app/lib/supporter";
+import {
+  linkyBotPubkey,
+  SUPPORTER_TIER_LABEL_KEYS,
+} from "../app/lib/supporter";
 import { reportAppLog } from "../devtools/inspector/appLog";
 import { useColorModePreference } from "../hooks/useColorMode";
 import {
@@ -56,36 +59,41 @@ export function AppearancePage(): React.ReactElement {
           />
         ))}
       </Section>
-      <Section title={t("appearanceTheme")}>
-        {THEME_PALETTES.map((option) => {
-          const tier = paletteUnlockTier(option);
-          const title = tier
-            ? t(SUPPORTER_TIER_LABEL_KEYS[tier])
-            : t("appearanceThemeDefault");
-          const unlocked = isPaletteUnlocked(option, unlockedTier);
-          return (
-            <ListRow
-              key={option}
-              icon={tier ? undefined : "Palette"}
-              leading={tier ? <SupporterBadge kind={tier} size="icon" /> : null}
-              title={title}
-              description={
-                unlocked
-                  ? undefined
-                  : t("appearanceThemeLocked").replace("{tier}", title)
-              }
-              selected={palette === option}
-              onPress={
-                unlocked
-                  ? () => selectPalette(option)
-                  : (openDonate ?? undefined)
-              }
-              chevron={!unlocked && openDonate !== null}
-              disabled={!unlocked && openDonate === null}
-            />
-          );
-        })}
-      </Section>
+      {/* Until Linky Bot launches no palette can be unlocked, so Default is the only theme. */}
+      {linkyBotPubkey === null ? null : (
+        <Section title={t("appearanceTheme")}>
+          {THEME_PALETTES.map((option) => {
+            const tier = paletteUnlockTier(option);
+            const title = tier
+              ? t(SUPPORTER_TIER_LABEL_KEYS[tier])
+              : t("appearanceThemeDefault");
+            const unlocked = isPaletteUnlocked(option, unlockedTier);
+            return (
+              <ListRow
+                key={option}
+                icon={tier ? undefined : "Palette"}
+                leading={
+                  tier ? <SupporterBadge kind={tier} size="icon" /> : null
+                }
+                title={title}
+                description={
+                  unlocked
+                    ? undefined
+                    : t("appearanceThemeLocked").replace("{tier}", title)
+                }
+                selected={palette === option}
+                onPress={
+                  unlocked
+                    ? () => selectPalette(option)
+                    : (openDonate ?? undefined)
+                }
+                chevron={!unlocked && openDonate !== null}
+                disabled={!unlocked && openDonate === null}
+              />
+            );
+          })}
+        </Section>
+      )}
     </Stack>
   );
 }

@@ -82,8 +82,8 @@ describe("publishedSupporterBadge", () => {
     { badge: "generic", awardedAt: newest },
   ];
 
-  it("publishes the highest valid award of the chosen kind", () => {
-    expect(publishedSupporterBadge(awards, "tier", now)).toBe("gold");
+  it("publishes the newest valid award of the chosen kind", () => {
+    expect(publishedSupporterBadge(awards, "tier", now)).toBe("bronze");
     expect(publishedSupporterBadge(awards, "generic", now)).toBe("generic");
   });
 

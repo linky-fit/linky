@@ -137,6 +137,11 @@ export const pt = {
     "Um pagamento recorrente que você pode cancelar a qualquer momento.",
   donateConfirmMonthly: "Doar mensalmente",
   donateConfirmOnce: "Doar uma vez",
+  donateMonthlySetUp:
+    "Pagamento mensal configurado. O primeiro pagamento está a caminho.",
+  donateMonthlyRunning:
+    "Você já apoia o Linky todo mês. Altere o valor ou a mint nesse pagamento recorrente.",
+  donateShowMonthly: "Mostrar pagamento recorrente",
   donateThanks: "Obrigado! Seu selo chega na conversa com o Linky Bot.",
   supporterResultIssued: "Obrigado! Seu selo {tier} está guardado.",
   supporterResultUnverified:

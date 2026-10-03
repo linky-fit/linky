@@ -132,6 +132,11 @@ export const en = {
   donateMonthlyHint: "A recurring payment you can cancel at any time.",
   donateConfirmMonthly: "Donate monthly",
   donateConfirmOnce: "Donate once",
+  donateMonthlySetUp:
+    "Monthly payment set up. The first payment is on its way.",
+  donateMonthlyRunning:
+    "You already support Linky every month. Change the amount or mint in that recurring payment.",
+  donateShowMonthly: "Show recurring payment",
   donateThanks:
     "Thank you! Your badge arrives in the conversation with Linky Bot.",
   supporterResultIssued: "Thank you! Your {tier} badge is stored.",

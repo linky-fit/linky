@@ -9,7 +9,7 @@ import {
   type SupporterTier,
 } from "@linky-fit/linkstr";
 import type { SettingValues, SupporterAwardRecord } from "@linky-fit/linksync";
-import { isSupporterAwardValid, SUPPORTER_TIERS } from "@linky-fit/supporter";
+import { isSupporterAwardValid } from "@linky-fit/supporter";
 import { Either, Schema } from "effect";
 import type { I18nKey } from "../../i18n";
 
@@ -79,9 +79,6 @@ export const encodeAwardEvent: (event: SignedPlainEvent) => string =
 
 const decodeAwardEvent = Schema.decodeUnknownEither(AwardEventJson);
 
-const tierRank = (badge: string): number =>
-  SUPPORTER_TIERS.findIndex((tier) => tier === badge);
-
 interface ProfileBadgeContext {
   readonly issuer: Pubkey;
   readonly me: Pubkey;
@@ -90,8 +87,8 @@ interface ProfileBadgeContext {
 }
 
 /**
- * The award the profile shows for `display`: a valid award of the chosen
- * kind, the highest tier first and then the newest; null shows none.
+ * The award the profile shows for `display`: the newest valid award of the
+ * chosen kind; null shows none.
  */
 export const profileBadgeAward = (
   records: ReadonlyArray<
@@ -107,11 +104,7 @@ export const profileBadgeAward = (
         (record.badge === "generic") === (display === "generic") &&
         isSupporterAwardValid(record.awardedAtSec, nowSec, validitySeconds),
     )
-    .sort(
-      (a, b) =>
-        tierRank(b.badge) - tierRank(a.badge) ||
-        b.awardedAtSec - a.awardedAtSec,
-    );
+    .sort((a, b) => b.awardedAtSec - a.awardedAtSec);
   for (const record of candidates) {
     const event = decodeAwardEvent(record.eventJson);
     if (Either.isLeft(event)) continue;

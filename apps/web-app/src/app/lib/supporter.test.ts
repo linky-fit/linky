@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { supporterPaymentMints, supporterThemesFor } from "./supporter";
+import {
+  contactIdFor,
+  DUE,
+  recurringOrderFixture,
+  recurringPaymentIdFor,
+} from "../../testUtils/recurringOrders";
+import {
+  activeSupporterOrder,
+  supporterPaymentMints,
+  supporterThemesFor,
+} from "./supporter";
 
 describe("supporterThemesFor", () => {
   it("unlocks the tier's theme and every lower one", () => {
@@ -48,5 +58,31 @@ describe("supporterPaymentMints", () => {
         accepted,
       ),
     ).toEqual([]);
+  });
+});
+
+describe("activeSupporterOrder", () => {
+  const bot = contactIdFor("linky-bot");
+  const paused = recurringOrderFixture({
+    id: recurringPaymentIdFor("paused"),
+    contactId: bot,
+    schedule: { ...recurringOrderFixture().schedule, pausedAtSec: DUE },
+  });
+  const toSomeoneElse = recurringOrderFixture({
+    id: recurringPaymentIdFor("other"),
+  });
+  const active = recurringOrderFixture({
+    id: recurringPaymentIdFor("active"),
+    contactId: bot,
+  });
+
+  it("finds the active recurring payment to Linky Bot", () => {
+    expect(
+      activeSupporterOrder([paused, toSomeoneElse, active], bot, DUE),
+    ).toBe(active);
+  });
+
+  it("ignores paused payments and payments to other contacts", () => {
+    expect(activeSupporterOrder([paused, toSomeoneElse], bot, DUE)).toBeNull();
   });
 });
