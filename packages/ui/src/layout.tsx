@@ -36,6 +36,10 @@ export const Text = styled(TamaguiText, {
       heading: textVariant("heading"),
       display: textVariant("display"),
       amount: textVariant("amount"),
+      headline: {
+        ...textVariant("headline"),
+        letterSpacing: letterSpacing.headline,
+      },
     },
     bold: { true: { fontWeight: "$bold" } },
     mono: { true: { fontFamily: "$mono" } },

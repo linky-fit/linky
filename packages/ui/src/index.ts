@@ -150,8 +150,14 @@ export type {
   MessageComposerFrameProps,
   ReplyPreviewProps,
 } from "./messaging";
-export { DocumentPages, ImageCropPreview, MediaFrame } from "./media";
+export {
+  DeviceFrame,
+  DocumentPages,
+  ImageCropPreview,
+  MediaFrame,
+} from "./media";
 export type {
+  DeviceFrameProps,
   DocumentPage,
   ImageCropCenter,
   ImageCropPreviewProps,
