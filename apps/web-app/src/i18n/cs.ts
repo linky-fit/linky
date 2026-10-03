@@ -113,7 +113,7 @@ export const cs = {
   recurringRunNow: "Zaplatit",
   recurringNotFound: "Pravidelná platba nenalezena.",
   recurringOnlyWhileOpen:
-    "Platbu odešle kterékoli vaše zařízení, na kterém běží Linky, i na pozadí. Minutu předem dostanete upozornění; při otevřené aplikaci uvidíte odpočet a můžete platbu odeslat hned nebo zrušit.",
+    "Platbu odešle kterékoli vaše zařízení, na kterém běží Linky, i na pozadí. Pokud ji žádné neodešle do minuty po splatnosti, dostanete připomínku, abyste Linky otevřeli; při otevřené aplikaci uvidíte odpočet a můžete platbu odeslat hned nebo zrušit.",
   recurringRepeatAction: "Opakovat pravidelně",
   showTransactions: "Ukázat transakce",
   feedback: "Zpětná vazba",
