@@ -13,6 +13,7 @@ import {
   getDesktopSectionRoute,
   isDesktopSectionEntryRoute,
 } from "../app/routes/desktopRouteSection";
+import { useContactSupporterBadge } from "../app/hooks/useContactSupporterBadge";
 import type { TopbarButton } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
@@ -45,6 +46,8 @@ export function Topbar({
 }: TopbarProps): React.ReactElement {
   const state = useAppShellCore();
   const { chatTopbarContact, nostrPictureByNpub, t, topbarTitle } = state;
+  const chatNpub = normalizeNpubIdentifier(chatTopbarContact?.npub ?? "");
+  const chatSupporter = useContactSupporterBadge(chatNpub || null);
 
   const desktopTopbar: TopbarButton | null = isDesktopSectionEntryRoute(
     state.route,
@@ -75,7 +78,6 @@ export function Topbar({
         const contactId = chatTopbarContact.contactId;
         const contactName = (chatTopbarContact.name ?? "").trim();
         const name = contactName || t("messagesTitle");
-        const npub = normalizeNpubIdentifier(chatTopbarContact.npub ?? "");
         return (
           <Pressable
             gap="$sm"
@@ -87,8 +89,11 @@ export function Topbar({
           >
             <Avatar
               name={contactName}
-              uri={(npub ? nostrPictureByNpub[npub] : null) ?? undefined}
+              uri={
+                (chatNpub ? nostrPictureByNpub[chatNpub] : null) ?? undefined
+              }
               size="sm"
+              supporter={chatSupporter}
             />
             <Text variant="label" bold color="$colorSubtle" numberOfLines={1}>
               {name}

@@ -10,6 +10,7 @@ import {
 import React, { type ReactNode } from "react";
 import { getInitialLang, translations } from "./i18n";
 import { getColorMode } from "./utils/colorMode";
+import { getThemePalette } from "./utils/themePalette";
 import {
   downloadBootDiagnostics,
   formatBootError,
@@ -49,7 +50,7 @@ export class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       const text = translations[getInitialLang()];
       return (
-        <UIProvider mode={getColorMode()}>
+        <UIProvider mode={getColorMode()} palette={getThemePalette()}>
           <ScrollView height="100%">
             <Stack padding="$xxxl">
               <Text variant="heading">{text.appCrashed}</Text>

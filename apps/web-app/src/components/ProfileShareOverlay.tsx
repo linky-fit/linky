@@ -1,8 +1,9 @@
-import { Avatar, Dialog, QRCode, Stack, Text } from "@linky-fit/ui";
+import { Dialog, QRCode, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import type { Translate } from "../i18n";
 import { formatShortNpub } from "../utils/formatting";
 import { optimizeCaseInsensitiveQrPayload } from "../utils/qrPayload";
+import { OwnAvatar } from "./OwnSupporter";
 
 interface ProfileShareOverlayProps {
   name: string | null;
@@ -53,7 +54,11 @@ export function ProfileShareOverlay({
           alignItems="center"
           rotate={screenUpsideDown ? "0deg" : "180deg"}
         >
-          <Avatar name={displayName} uri={pictureUrl ?? undefined} size="lg" />
+          <OwnAvatar
+            name={displayName}
+            uri={pictureUrl ?? undefined}
+            size="lg"
+          />
           <Text variant="display" textAlign="center">
             {displayName}
           </Text>

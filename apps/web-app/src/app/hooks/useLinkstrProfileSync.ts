@@ -38,7 +38,9 @@ import {
 import { getBestNostrName } from "../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../utils/nostrNpub";
 import { getContactPublicProfile } from "../lib/contactProfile";
+import { applySupporterBadgesUpdated } from "../lib/contactSupporterAwards";
 import { runWrite } from "../lib/storeWrite";
+import { linkyBotPubkey } from "../lib/supporter";
 import type { ContactRowLike } from "../types/appTypes";
 
 const decodeNpubToPubkey = (npub: string): Pubkey | null => {
@@ -249,7 +251,7 @@ export const applyProfileWatchEvent = (
     case "StatusUpdated":
       return applyStatusUpdated(npub, event, ctx);
     case "SupporterBadgesUpdated":
-      return;
+      return applySupporterBadgesUpdated(npub, event);
   }
 };
 
@@ -259,9 +261,10 @@ interface UseLinkstrProfileSyncParams extends ProfileSyncContext {
 }
 
 /**
- * Watches kind 0/30315 for every contact plus the own pubkey through the
- * linkstr `ProfileWatch`, feeding the v2 caches, the per-npub UI maps, and
- * the contact-row name/lnAddress policy. Seeds the maps from cache so a
+ * Watches kind 0/30315 (and Linky Bot's supporter badges, once configured)
+ * for every contact plus the own pubkey through the linkstr `ProfileWatch`,
+ * feeding the v2 caches, the per-npub UI maps, and the contact-row
+ * name/lnAddress policy. Seeds the maps from cache so a
  * fresh launch renders instantly.
  */
 export const useLinkstrProfileSync = ({
@@ -327,6 +330,9 @@ export const useLinkstrProfileSync = ({
     // subscriptions, so per-render context is reached through a ref.
     setProfileWatchHandler({
       onEvent: (event) => applyProfileWatchEvent(event, contextRef.current),
+      ...(linkyBotPubkey
+        ? { options: { supporterBadgeIssuer: linkyBotPubkey } }
+        : {}),
     });
     return () => setProfileWatchHandler(null);
   }, [enabled, setProfileWatchHandler]);

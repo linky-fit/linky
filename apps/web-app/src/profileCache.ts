@@ -1,4 +1,4 @@
-import { ProfileMetadata } from "@linky-fit/linkstr";
+import { ProfileMetadata, SupporterBadgeType } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import {
   safeLocalStorageGetJson,
@@ -14,6 +14,7 @@ import { isHttpUrl } from "./utils/validation";
 
 const PROFILE_PREFIX = "linky_nostr_profile_v2:";
 const STATUS_PREFIX = "linky_nostr_status_v2:";
+const SUPPORTER_AWARDS_PREFIX = "linky.nostr_supporter_awards:";
 
 const CachedProfile = Schema.Struct({
   metadata: ProfileMetadata,
@@ -56,6 +57,31 @@ export const saveCachedStatus = (
   updatedAt: number,
 ): void => {
   safeLocalStorageSetJson(STATUS_PREFIX + npub, { content, updatedAt });
+};
+
+const CachedSupporterAwards = Schema.Struct({
+  /** Awards already verified against Linky Bot; validity is checked when shown. */
+  awards: Schema.Array(
+    Schema.Struct({ badge: SupporterBadgeType, awardedAt: Schema.Number }),
+  ),
+  updatedAt: Schema.Number,
+});
+type CachedSupporterAwards = typeof CachedSupporterAwards.Type;
+
+export const loadCachedSupporterAwards = (
+  npub: string,
+): CachedSupporterAwards | null =>
+  safeLocalStorageGetJson(
+    SUPPORTER_AWARDS_PREFIX + npub,
+    Schema.NullOr(CachedSupporterAwards),
+    null,
+  );
+
+export const saveCachedSupporterAwards = (
+  npub: string,
+  cached: CachedSupporterAwards,
+): void => {
+  safeLocalStorageSetJson(SUPPORTER_AWARDS_PREFIX + npub, cached);
 };
 
 const isDataImageUrl = (value: string): boolean => {

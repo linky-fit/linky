@@ -27,6 +27,10 @@ vi.mock("../app/context/AppShellContexts", () => ({
 vi.mock("../components/ProfileAvatarEditor", () => ({
   ProfileAvatarEditor: () => null,
 }));
+vi.mock("../components/OwnSupporter", () => ({
+  OwnAvatar: () => null,
+  OwnSupporterLine: () => null,
+}));
 
 const pay = vi
   .fn<(invoice: string) => Promise<boolean>>()

@@ -1,7 +1,7 @@
 @import "./assets/manrope/manrope.css";
 
 :root {
-  /* Painted before the JS bundle loads, so these repeat themes.dark and themes.light of @linky-fit/ui. */
+  /* Painted before the JS bundle loads, so these and the data-theme blocks repeat the palettes of @linky-fit/ui. */
   --app-flat-bg: #020617;
   --app-color: #e2e8f0;
   --app-accent: #2dd4bf;
@@ -32,6 +32,54 @@
   --app-color: #0f172a;
   --app-accent: #0f766e;
   color-scheme: light;
+}
+
+:root[data-theme="bronze"] {
+  --app-flat-bg: #160f0c;
+  --app-color: #e9dbcd;
+  --app-accent: #df9d6e;
+}
+
+:root[data-theme="bronze"][data-color-mode="light"] {
+  --app-flat-bg: #f7f0e9;
+  --app-color: #2c2019;
+  --app-accent: #94552f;
+}
+
+:root[data-theme="silver"] {
+  --app-flat-bg: #10161c;
+  --app-color: #dce6ed;
+  --app-accent: #a5c2dd;
+}
+
+:root[data-theme="silver"][data-color-mode="light"] {
+  --app-flat-bg: #eff4f7;
+  --app-color: #1b2832;
+  --app-accent: #416a8d;
+}
+
+:root[data-theme="gold"] {
+  --app-flat-bg: #161208;
+  --app-color: #ece4cc;
+  --app-accent: #e1c767;
+}
+
+:root[data-theme="gold"][data-color-mode="light"] {
+  --app-flat-bg: #f8f4e7;
+  --app-color: #2c2515;
+  --app-accent: #8a6508;
+}
+
+:root[data-theme="diamond"] {
+  --app-flat-bg: #111022;
+  --app-color: #e3e2f4;
+  --app-accent: #96d9f0;
+}
+
+:root[data-theme="diamond"][data-color-mode="light"] {
+  --app-flat-bg: #f2f1fc;
+  --app-color: #23223f;
+  --app-accent: #5152a4;
 }
 
 html,

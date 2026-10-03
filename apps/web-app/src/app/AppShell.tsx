@@ -17,6 +17,7 @@ import {
 import { RecurringPaymentsProvider } from "./context/RecurringPaymentsContext";
 import { SupporterProvider } from "./context/SupporterContext";
 import { useCurrentNsec } from "./hooks/useCurrentNsec";
+import { useSupporterThemeUnlock } from "./hooks/useOwnSupporterPerks";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
 import { useAppShellComposition } from "./useAppShellComposition";
@@ -73,6 +74,7 @@ const AuthenticatedAppShell = ({
     t,
     toasts,
   } = useAppShellComposition({ currentNsec, setCurrentNsec });
+  useSupporterThemeUnlock();
 
   const coreContextValue: AppShellCoreContextValue = appState;
 

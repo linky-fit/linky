@@ -21,8 +21,10 @@
 
     <title>Linky</title>
     <script>
-      // Mirrors getColorMode in src/utils/colorMode.ts so the first paint already has the right colors.
+      // Mirrors getColorMode in src/utils/colorMode.ts and getThemePalette in src/utils/themePalette.ts so the first paint already has the right colors.
       try {
+        const theme = localStorage.getItem("linky.theme");
+        if (theme) document.documentElement.dataset.theme = theme;
         const preference = localStorage.getItem("linky.color_mode");
         const light =
           preference === "light" ||

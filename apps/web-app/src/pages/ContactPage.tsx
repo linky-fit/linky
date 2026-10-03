@@ -9,6 +9,7 @@ import {
 } from "@linky-fit/ui";
 import { useEffect, useState, type FC } from "react";
 
+import { useContactSupporterBadge } from "../app/hooks/useContactSupporterBadge";
 import type { ContactId } from "../evolu";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
@@ -22,6 +23,7 @@ import {
 import { resolveVerifiedNip05Identifier } from "../utils/nostrNip05";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { PageCard } from "../components/PageCard";
+import { SupporterLine } from "../components/SupporterLine";
 
 interface Contact {
   archivedAtSec?: number | string | null;
@@ -106,6 +108,7 @@ export const ContactPage: FC<ContactPageProps> = ({
   const verifiedNip05 = useVerifiedNip05(
     selectedLnAddress ? selectedNpub : null,
   );
+  const supporter = useContactSupporterBadge(selectedNpub || null);
   if (!selectedContact) {
     return <EmptyState title={t("contactNotFound")} />;
   }
@@ -136,10 +139,16 @@ export const ContactPage: FC<ContactPageProps> = ({
   return (
     <PageCard elevated>
       <Stack alignItems="center" gap="$sm">
-        <Avatar name={name} uri={url ?? undefined} size="lg" />
+        <Avatar
+          name={name}
+          uri={url ?? undefined}
+          size="lg"
+          supporter={supporter}
+        />
         <Text variant="display" textAlign="center" numberOfLines={2}>
           {contactName}
         </Text>
+        <SupporterLine kind={supporter} t={t} />
         {contactStatus ? (
           <Text variant="label" color="$colorMuted" textAlign="center">
             {contactStatus}

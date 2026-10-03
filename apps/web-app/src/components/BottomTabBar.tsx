@@ -1,10 +1,11 @@
-import { Avatar, Stack, TabBar } from "@linky-fit/ui";
+import { Stack, TabBar } from "@linky-fit/ui";
 import type { NavItem } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
 import { formatShortNpub } from "../utils/formatting";
+import { OwnAvatar } from "./OwnSupporter";
 
 export type BottomTabKey =
   | "profile"
@@ -59,7 +60,7 @@ export function BottomTabBar({
       label: t("profile"),
       testID: "profile-qr-button",
       leading: (
-        <Avatar
+        <OwnAvatar
           name={
             effectiveProfileName ??
             (currentNpub ? formatShortNpub(currentNpub) : "?")

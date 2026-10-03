@@ -1,4 +1,4 @@
-import { Avatar, NavigationRail, Pressable } from "@linky-fit/ui";
+import { NavigationRail, Pressable } from "@linky-fit/ui";
 import React from "react";
 import {
   useAppShellActions,
@@ -10,6 +10,7 @@ import {
 } from "../app/routes/desktopRouteSection";
 import { navigateTo } from "../hooks/useRouting";
 import { formatShortNpub } from "../utils/formatting";
+import { OwnAvatar } from "./OwnSupporter";
 
 export function DesktopNavigation(): React.ReactElement {
   const actions = useAppShellActions();
@@ -25,7 +26,7 @@ export function DesktopNavigation(): React.ReactElement {
           aria-label={t("profile")}
           onPress={actions.openProfileQr}
         >
-          <Avatar
+          <OwnAvatar
             name={
               state.effectiveProfileName ??
               (state.currentNpub ? formatShortNpub(state.currentNpub) : "?")

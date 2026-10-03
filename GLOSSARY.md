@@ -286,6 +286,10 @@ _Avoid_: plan, level, membership
 A badge award signed by Linky Bot that names the supporter, the tier (or no tier, for the generic badge) and the start date. Clients decide how long it counts.
 _Avoid_: certificate, proof, attestation
 
+**Theme**:
+A palette of app colors with a light and a dark variant that follows the color mode. Default is free; each supporter tier unlocks the theme of the same name and every lower one.
+_Avoid_: skin, color scheme
+
 **Linky Bot**:
 The identity that receives supporter payments, signs supporter badges and answers other messages with a pointer to the Linky contact; only the supporter service runs it.
 _Avoid_: donation account, Linky Supporters, Linky wallet

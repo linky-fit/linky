@@ -1,21 +1,38 @@
-import { palettes } from "@linky-fit/ui/tokens";
+import {
+  COLOR_MODES,
+  palettes,
+  THEME_PALETTES,
+  type ColorMode,
+  type ThemePalette,
+} from "@linky-fit/ui/tokens";
 import { describe, expect, it } from "vitest";
 import css from "./index.css?raw";
 
-const { dark, light } = palettes.default;
+const selector = (palette: ThemePalette, mode: ColorMode): string => {
+  const theme = palette === "default" ? "" : `[data-theme="${palette}"]`;
+  const colorMode = mode === "light" ? '[data-color-mode="light"]' : "";
+  return `:root${theme}${colorMode}`;
+};
 
-const lightBlock = css.slice(css.indexOf(':root[data-color-mode="light"]'));
+const ruleBody = (ruleSelector: string): string => {
+  const start = css.indexOf(`\n${ruleSelector} {`);
+  expect(start, ruleSelector).toBeGreaterThanOrEqual(0);
+  return css.slice(start, css.indexOf("}", start));
+};
 
 describe("index.css", () => {
-  it("repeats the dark theme colors it paints before the JS bundle loads", () => {
-    expect(css).toContain(`--app-flat-bg: ${dark.background};`);
-    expect(css).toContain(`--app-color: ${dark.color};`);
-    expect(css).toContain(`--app-accent: ${dark.accent};`);
-  });
-
-  it("repeats the light theme colors under the light color mode", () => {
-    expect(lightBlock).toContain(`--app-flat-bg: ${light.background};`);
-    expect(lightBlock).toContain(`--app-color: ${light.color};`);
-    expect(lightBlock).toContain(`--app-accent: ${light.accent};`);
-  });
+  it.each(
+    THEME_PALETTES.flatMap((palette) =>
+      COLOR_MODES.map((mode): [ThemePalette, ColorMode] => [palette, mode]),
+    ),
+  )(
+    "repeats the %s %s colors it paints before the JS bundle loads",
+    (palette, mode) => {
+      const body = ruleBody(selector(palette, mode));
+      const colors = palettes[palette][mode];
+      expect(body).toContain(`--app-flat-bg: ${colors.background};`);
+      expect(body).toContain(`--app-color: ${colors.color};`);
+      expect(body).toContain(`--app-accent: ${colors.accent};`);
+    },
+  );
 });

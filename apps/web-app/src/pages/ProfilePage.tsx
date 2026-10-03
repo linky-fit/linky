@@ -1,6 +1,5 @@
 import { nowSeconds } from "../utils/time";
 import {
-  Avatar,
   Button,
   EmptyState,
   IconButton,
@@ -12,6 +11,7 @@ import {
 } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { OwnAvatar, OwnSupporterLine } from "../components/OwnSupporter";
 import { ProfileAvatarEditor } from "../components/ProfileAvatarEditor";
 import { parseProfileGeneralStatus } from "../nostrStatus";
 import type { FilePickerHandle } from "../utils/pickFile";
@@ -278,7 +278,7 @@ export function ProfilePage({
         alignItems="center"
         gap="$sm"
       >
-        <Avatar
+        <OwnAvatar
           name={displayName}
           uri={effectiveProfilePicture ?? undefined}
           size="lg"
@@ -286,6 +286,7 @@ export function ProfilePage({
         <Text variant="display" textAlign="center">
           {displayName}
         </Text>
+        <OwnSupporterLine t={t} />
         <QRCode
           value={optimizeCaseInsensitiveQrPayload(currentNpub)}
           accessibilityLabel={t("copy")}

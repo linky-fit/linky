@@ -1,4 +1,4 @@
-import { palettes, type ColorMode } from "@linky-fit/ui/tokens";
+import type { ColorMode } from "@linky-fit/ui/tokens";
 import type { I18nKey } from "../i18n";
 import { safeLocalStorageGet, safeLocalStorageSet } from "./storage";
 
@@ -56,12 +56,4 @@ export const subscribeColorMode = (listener: () => void): (() => void) => {
     listeners.delete(listener);
     query?.removeEventListener("change", listener);
   };
-};
-
-/** Syncs the CSS painted outside React (index.css, browser chrome) with `mode`. */
-export const applyColorModeToDocument = (mode: ColorMode): void => {
-  document.documentElement.dataset.colorMode = mode;
-  document
-    .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", palettes.default[mode].background);
 };

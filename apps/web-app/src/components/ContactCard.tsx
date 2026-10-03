@@ -2,6 +2,7 @@ import { ContactRow, Row, Stack, Text } from "@linky-fit/ui";
 import type { MintIcon } from "../utils/mint";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useContactSupporterBadge } from "../app/hooks/useContactSupporterBadge";
 import { formatChatMessagePreviewText } from "../app/lib/chatMessageDisplay";
 import { hasMessageEntityPreview } from "../app/lib/messageEntityPreview";
 import type { CashuTokenMessageInfo } from "../app/lib/tokenMessageInfo";
@@ -9,6 +10,7 @@ import type { ContactRowLike, LocalNostrMessage } from "../app/types/appTypes";
 import { parseProfileGeneralStatus } from "../nostrStatus";
 import { getContactName } from "../utils/contactName";
 import { formatContactMessageTimestamp } from "../utils/formatting";
+import { normalizeNpubIdentifier } from "../utils/nostrNpub";
 import { CashuTokenPill } from "./CashuTokenPill";
 import type { NpubMessageContactInfo } from "./ChatMessage";
 import {
@@ -52,6 +54,9 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
     isUnknownContact = false,
   }) => {
     const { formatDisplayedAmountText, t } = useAppShellCore();
+    const supporter = useContactSupporterBadge(
+      normalizeNpubIdentifier(contact.npub ?? "") || null,
+    );
     // The offered currencies belong on the contact's page, not in the list.
     const contactStatus = parseProfileGeneralStatus(statusText).text;
     const lastText = (lastMessage?.content ?? "").trim();
@@ -112,6 +117,7 @@ export const ContactCard: React.FC<ContactCardProps> = React.memo(
           name={nameLabel}
           avatarName={getContactName(contact) || nameLabel}
           avatarUri={avatarUrl ?? undefined}
+          supporter={supporter}
           status={contactStatus || undefined}
           preview={previewContent}
           time={lastTime || undefined}
