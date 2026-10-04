@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/p/:id",
+      "destination": "/api/profile?id=:id"
+    },
+    {
       "source": "/.well-known/lnurlp/:user",
       "destination": "/api/lnurlp/:user"
     },

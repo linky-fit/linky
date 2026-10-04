@@ -29,6 +29,7 @@ import {
   type SiteLocale,
 } from "../sitePreferences";
 import { copyTextToClipboard } from "../clipboard";
+import { linkyWebAppUrl } from "../linkyWebApp";
 import { useSiteLocale } from "../useSiteLocale";
 import { forwardCashuTokenPrivately } from "./paymentTelemetry";
 import {
@@ -54,7 +55,6 @@ interface DisplayAmount {
 type FiatDisplayCurrency = Exclude<SiteDisplayCurrency, "btc" | "sat">;
 
 const satsPerBtc = 100_000_000;
-const linkyWebAppUrl = "https://app.linky.fit";
 const nativeLaunchFallbackDelayMs = 700;
 const pwaLaunchFallbackDelayMs = 1600;
 // Byte capacity of a version 40 QR code at level M, the level the ui QRCode uses.

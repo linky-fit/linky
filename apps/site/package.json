@@ -28,7 +28,8 @@
     "@linky-fit/linkstr": "workspace:*",
     "@linky-fit/ui": "workspace:*",
     "effect": "^3.19.19",
-    "@noble/hashes": "^2.0.1"
+    "@noble/hashes": "^2.0.1",
+    "nostr-tools": "^2.25.2"
   },
   "devDependencies": {
     "@linky-fit/config": "workspace:*",
