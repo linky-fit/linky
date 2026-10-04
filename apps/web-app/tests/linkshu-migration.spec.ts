@@ -10,12 +10,10 @@
  * `linky.lastAcceptedCashuToken.v1` leftover. Then launches the app and
  * asserts the one-time migration renamed the counter/cursor byte-for-byte
  * into linkshu's keys, converted the pending records so linkshu's resume
- * path claims both quotes into balance, retired the legacy keys it owns
- * (seen-mints arrays stay — the mints UI still reads them), and that a
- * top-up (balance) and a Lightning invoice payment both work with
- * derivation continuing from the migrated counter slot. A mid-test reload
- * proves the migrated state and balance survive a relaunch without
- * re-running the migration.
+ * path claims both quotes into balance, and retired the legacy keys it owns
+ * (seen-mints arrays stay — the mints UI still reads them). Top-up and melt
+ * after a restart are covered by linkshu's mint integration tests, and the
+ * migration's idempotence by linkshuStorageMigration.test.ts.
  *
  * Needs the docker stack up — see playwright.config.ts.
  *
@@ -42,25 +40,16 @@ import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
 import {
   fundToken,
   mintUrl,
-  targetMintUrl,
 } from "../../../packages/linkshu/tests/integration/helpers";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
-import { topUp } from "./helpers/wallet";
 
 /** VITE_MAIN_MINT_URL baked into the e2e image (docker-compose.dev.yml). */
 const MINT_URL = mintUrl;
-const TARGET_MINT_URL = targetMintUrl;
 const UNIT = "sat";
 
-const FUNDING_SAT = 100;
-const INVOICE_SAT = 21;
-/** Seeded pending records; their sum stays below FUNDING_SAT so the topup
- * step's balance poll cannot pass on the resumed claims alone. */
 const PENDING_TOPUP_SAT = 53;
 const PENDING_AUTOSWAP_SAT = 21;
-/** input_fee_ppk: 100 on the dev mint plus the melt fee reserve. */
-const MAX_PAYMENT_FEE_SAT = 3;
 /** An `accepted` token row of the pre-inventory backup format. */
 const LEGACY_ROW_SAT = 16;
 
@@ -144,9 +133,8 @@ const fetchActiveSatKeysetId = async (
 const createMintQuote = async (
   request: APIRequestContext,
   amountSat: number,
-  mintUrl = MINT_URL,
 ): Promise<{ invoice: string; quoteId: string }> => {
-  const response = await request.post(`${mintUrl}/v1/mint/quote/bolt11`, {
+  const response = await request.post(`${MINT_URL}/v1/mint/quote/bolt11`, {
     data: { amount: amountSat, unit: UNIT },
   });
   expect(response.ok(), "mint quote request").toBe(true);
@@ -167,12 +155,6 @@ const createMintQuote = async (
   }
   return { invoice, quoteId };
 };
-
-const createMintInvoice = async (
-  request: APIRequestContext,
-  amountSat: number,
-): Promise<string> =>
-  (await createMintQuote(request, amountSat, TARGET_MINT_URL)).invoice;
 
 const readStorage = (page: Page, key: string): Promise<string | null> =>
   page.evaluate((storageKey) => localStorage.getItem(storageKey), key);
@@ -365,62 +347,6 @@ test("legacy cashu storage migrates and the wallet keeps working", async ({
           { timeout: 60_000 },
         )
         .toBeNull();
-    });
-
-    await test.step("top-up derives from the migrated counter", async () => {
-      await topUp(page, FUNDING_SAT);
-      await expect
-        .poll(() => readBalanceSat(page), { timeout: 60_000 })
-        .toBe(FUNDING_SAT + PENDING_TOPUP_SAT + PENDING_AUTOSWAP_SAT);
-
-      // Minting consumed deterministic slots starting at the migrated value.
-      const counter = Number(await readStorage(page, linkshu.counter));
-      expect(counter).toBeGreaterThan(Number(LEGACY_COUNTER_VALUE));
-    });
-
-    const balanceBeforeReload = await readBalanceSat(page);
-    let counterBeforeReload = "";
-
-    await test.step("relaunch keeps the migrated state and balance", async () => {
-      counterBeforeReload = String(await readStorage(page, linkshu.counter));
-
-      await page.reload();
-      await waitForNetworkReady(page);
-      await expectNoBootErrorPanel(page, "M");
-
-      await expect
-        .poll(() => readBalanceSat(page), { timeout: 60_000 })
-        .toBe(balanceBeforeReload);
-
-      expect(await readStorage(page, MIGRATION_DONE_KEY)).toBe("1");
-      expect(await readStorage(page, linkshu.counter)).toBe(
-        counterBeforeReload,
-      );
-      expect(await readStorage(page, legacy.counter)).toBeNull();
-      expect(await readStorage(page, legacy.cursor)).toBeNull();
-    });
-
-    await test.step("a Lightning payment succeeds after the migration", async () => {
-      const invoice = await createMintInvoice(request, INVOICE_SAT);
-
-      await page.goto("/#wallet/pay");
-      const input = page.locator("#manual-pay-input");
-      await input.fill(invoice);
-      await input.press("Enter");
-
-      // INVOICE_SAT is under the default auto-pay limit, so the payment runs
-      // without a confirmation step; the balance drop is the settlement.
-      await expect
-        .poll(() => readBalanceSat(page), { timeout: 60_000 })
-        .toBeLessThanOrEqual(balanceBeforeReload - INVOICE_SAT);
-
-      // Melt change lands as its own row, so poll past any transient dip
-      // before pinning the fee upper bound.
-      await expect
-        .poll(() => readBalanceSat(page), { timeout: 60_000 })
-        .toBeGreaterThanOrEqual(
-          balanceBeforeReload - INVOICE_SAT - MAX_PAYMENT_FEE_SAT,
-        );
     });
 
     await test.step("a pre-inventory backup's token rows land in the inventory without a swap", async () => {

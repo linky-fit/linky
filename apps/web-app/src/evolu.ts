@@ -710,7 +710,7 @@ const appScopes = {
 export const setE2eMessagesRotation = (enabled: boolean): void => {
   if (import.meta.env.VITE_E2E !== "1") throw new Error("E2E build required");
   appScopes.messages.rotation = enabled
-    ? { maxBytes: 256 * 1024, maxMutations: 30, cooldownMs: 0 }
+    ? { maxBytes: 256 * 1024, maxMutations: 8, cooldownMs: 0 }
     : linkyScopes.messages.rotation;
 };
 

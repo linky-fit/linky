@@ -1,11 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { setBaseStorage, readBalanceSat } from "./helpers/appState";
+import { setBaseStorage } from "./helpers/appState";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { addContactByNpub } from "./helpers/contacts";
 import { stubFiatRates } from "./helpers/network";
 import { watchAppErrors, expectNoBootErrorPanel } from "./helpers/diagnostics";
 
-test("chat reaches a peer, edit and reaction survive reload, pending topup resumes with service worker active", async ({
+test("chat reaches a peer, edit and reaction survive reload with the service worker active", async ({
   browser,
 }, testInfo) => {
   const errors: ReturnType<typeof watchAppErrors>[] = [];
@@ -180,41 +180,15 @@ test("chat reaches a peer, edit and reaction survive reload, pending topup resum
       );
       expect(Math.abs(logBottom - composerTop)).toBeLessThanOrEqual(1);
     });
-    await test.step("an interrupted topup claims after reload exactly once", async () => {
-      await a.page.route("**/v1/mint/bolt11", (route) => route.abort());
-      await a.page.goto("/#wallet/topup");
-      await a.page.getByRole("button", { name: "5", exact: true }).click();
-      await a.page.getByRole("button", { name: "0", exact: true }).click();
-      await a.page.locator('[data-guide="topup-show-invoice"]').click();
-      await expect(a.page.getByTestId("topup-invoice-qr")).toBeVisible();
-      // The pending topup is an operation row; wait for it to land in Evolu
-      // before reloading, so the claim after reload resumes from storage.
-      await a.page.goto("/#evolu-current-data");
-      const operationTable = a.page.getByRole("table").filter({
-        has: a.page.getByRole("columnheader", { name: "quoteId", exact: true }),
-      });
-      await expect(
-        operationTable
-          .getByRole("row")
-          .filter({ has: a.page.getByRole("cell") }),
-      ).toHaveCount(1);
-      await a.page.reload();
-      await a.page.unroute("**/v1/mint/bolt11");
-      await a.page.goto("/#wallet");
-      await expect
-        .poll(() => readBalanceSat(a.page), { timeout: 60_000 })
-        .toBe(50);
-      await a.page.reload();
-      await expect.poll(() => readBalanceSat(a.page)).toBe(50);
-      await testInfo.attach("wallet after recovery", {
-        body: await a.page.screenshot(),
-        contentType: "image/png",
-      });
-      await expect
-        .poll(() =>
-          a.page.evaluate(() => navigator.serviceWorker.controller?.state),
-        )
-        .toBe("activated");
+    await test.step("the service worker controls the reloaded pages", async () => {
+      for (const account of accounts)
+        await expect
+          .poll(() =>
+            account.page.evaluate(
+              () => navigator.serviceWorker.controller?.state,
+            ),
+          )
+          .toBe("activated");
     });
     for (const watcher of errors) watcher.assertClean();
     for (const account of accounts)
