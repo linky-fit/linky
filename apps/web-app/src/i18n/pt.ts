@@ -998,6 +998,8 @@ export const pt = {
   cashuShareMessageWithAmount: "Enviando {amount} {url}",
   uploadToNfc: "Gravar em NFC",
   uploadProfileToNfc: "Gravar na tag",
+  shareProfile: "Compartilhar perfil",
+  sharedProfileGreeting: "Oi 👋",
   nfcWriteUnsupported: "Gravação NFC não está disponível neste aparelho.",
   nfcWriteDisabled: "O NFC está desligado neste aparelho.",
   nfcWriteBusy: "Outra gravação NFC já está em andamento.",

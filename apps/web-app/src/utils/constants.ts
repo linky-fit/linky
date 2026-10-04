@@ -54,6 +54,9 @@ export const ARCHIVED_CONTACTS_FILTER = "__linky_archived_contacts__";
 export const PENDING_DEEP_LINK_TEXT_STORAGE_KEY =
   "linky.pendingDeepLinkText.v1";
 
+export const PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY =
+  "linky.pending_shared_profile_npub";
+
 export const WALLET_WARNING_BALANCE_THRESHOLD_SAT = 500_000;
 export const WALLET_WARNING_DISMISSED_STORAGE_KEY =
   "linky.wallet_hardware_support_banner_dismissed.v1";

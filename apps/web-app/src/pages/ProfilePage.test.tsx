@@ -73,6 +73,7 @@ const props: React.ComponentProps<typeof ProfilePage> = {
   setProfileEditLnAddress: () => {},
   setProfileEditName: () => {},
   setProfileEditStatus: () => {},
+  shareText: async () => {},
   writeCurrentNpubToNfc: async () => {},
 };
 let rendered: RenderedElement | undefined;

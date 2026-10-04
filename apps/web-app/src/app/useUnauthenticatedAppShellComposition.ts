@@ -2,7 +2,11 @@ import type { ProfileMetadata } from "@linky-fit/linkstr";
 import React from "react";
 import { useToasts } from "../hooks/useToasts";
 import { takeNostrConnectHashLink } from "../nostrConnect";
-import { PENDING_DEEP_LINK_TEXT_STORAGE_KEY } from "../utils/constants";
+import { takeAddContactHashLink } from "../sharedProfileLink";
+import {
+  PENDING_DEEP_LINK_TEXT_STORAGE_KEY,
+  PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY,
+} from "../utils/constants";
 import { safeLocalStorageSet } from "../utils/storage";
 import type { IdentityChangeMessageSource } from "./lib/identityChangeMessage";
 import { useAppLanguage } from "./hooks/useAppLanguage";
@@ -12,12 +16,19 @@ export const useUnauthenticatedAppShellComposition = () => {
   const { dismissToast, pushToast, toasts } = useToasts();
   const { lang, setLang, t } = useAppLanguage();
 
-  // The signed-in shell reads the pending text on mount, so a web link opened
-  // before onboarding asks to log in right after it.
+  // The signed-in shell reads the pending links on mount, so a web link opened
+  // before onboarding runs right after it.
   React.useEffect(() => {
     const nostrConnectUri = takeNostrConnectHashLink();
     if (nostrConnectUri) {
       safeLocalStorageSet(PENDING_DEEP_LINK_TEXT_STORAGE_KEY, nostrConnectUri);
+    }
+    const sharedProfileNpub = takeAddContactHashLink();
+    if (sharedProfileNpub) {
+      safeLocalStorageSet(
+        PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY,
+        sharedProfileNpub,
+      );
     }
   }, []);
 

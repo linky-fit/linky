@@ -114,6 +114,7 @@ interface BuildPeopleRoutePropsParams {
   setProfileEditLnAddress: PeopleRoutesProps["profileProps"]["setProfileEditLnAddress"];
   setProfileEditName: PeopleRoutesProps["profileProps"]["setProfileEditName"];
   setProfileEditStatus: PeopleRoutesProps["profileProps"]["setProfileEditStatus"];
+  shareText: PeopleRoutesProps["profileProps"]["shareText"];
   t: Translate;
   writeCurrentNpubToNfc: PeopleRoutesProps["profileProps"]["writeCurrentNpubToNfc"];
 }
@@ -222,6 +223,7 @@ export const buildPeopleRouteProps = ({
   setProfileEditLnAddress,
   setProfileEditName,
   setProfileEditStatus,
+  shareText,
   t,
   writeCurrentNpubToNfc,
 }: BuildPeopleRoutePropsParams): PeopleRoutesProps => {
@@ -381,6 +383,7 @@ export const buildPeopleRouteProps = ({
       ownedLightningAddresses,
       saveProfileEdits,
       copyText,
+      shareText,
       writeCurrentNpubToNfc,
     },
   };

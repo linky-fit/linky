@@ -42,6 +42,11 @@ export const buildCashuShareUrl = (rawToken: string): string | null => {
   return `https://linky.fit/cashu/#${encodeURIComponent(token)}`;
 };
 
+const PROFILE_SHARE_URL = /^https:\/\/linky\.fit\/p\/([^/?#]+)\/?$/i;
+
+export const buildProfileShareUrl = (npubOrName: string): string =>
+  `https://linky.fit/p/${encodeURIComponent(npubOrName)}`;
+
 const extractNpubFromCandidate = (value: string): string | null => {
   const trimmed = normalizeCandidate(value);
   if (!trimmed) return null;
@@ -204,6 +209,17 @@ export const parseNativeDeepLinkUrl = (
 
   if (CASHU_SCHEME_PREFIX.test(normalizedRawUrl)) {
     return parseCashuDeepLinkUrl(normalizedRawUrl);
+  }
+
+  const sharedNpub = normalizeStrictNpub(
+    PROFILE_SHARE_URL.exec(normalizedRawUrl)?.[1] ?? "",
+  );
+  if (sharedNpub) {
+    return {
+      kind: "scan-text",
+      rawUrl: normalizedRawUrl,
+      text: `nostr:${sharedNpub}`,
+    };
   }
 
   if (NOSTR_CONNECT_SCHEME_PREFIX.test(normalizedRawUrl)) {

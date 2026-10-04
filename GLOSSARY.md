@@ -28,6 +28,10 @@ _Avoid_: user info, card
 A person the user saved, known by their public key.
 _Avoid_: friend, buddy, user
 
+**Profile link**:
+A `linky.fit/p/<name or npub>` page the user shares; opening it in Linky saves the user as a contact and opens the conversation, after onboarding if needed.
+_Avoid_: invite link, share link
+
 **Override**:
 A contact field the user set by hand, which the peer's profile no longer changes.
 _Avoid_: custom name, alias
