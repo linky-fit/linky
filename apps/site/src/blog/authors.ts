@@ -7,4 +7,6 @@ export const hynek: Author = {
     en: "Founder of the Czech Jednadvacet community, product manager at Trezor and founder of Linky. Works mainly on bitcoin adoption.",
     cs: "Zakladatel české Jednadvacet, produkťák v Trezoru a zakladatel projektu Linky. Pracuje především na adopci bitcoinu.",
   },
+  nostr: "npub1lz8xv2dnyryrk4vswkcgf52vqqzruqwuyp53s7pvusx4fef9fh2s7hh86s",
+  x: "HynekJina",
 };
