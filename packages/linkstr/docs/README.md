@@ -22,6 +22,7 @@ Gift-wrapped (private, kind 1059 on the wire):
 Plain (public, signed and published unwrapped):
 
 - [Plain events](./plain-events.md): profiles and status, relay lists, mute list
+- [Nostr Connect login](./nostr-connect.md): one NIP-46 `nostrconnect://` login as the remote signer
 
 Never published:
 
@@ -37,7 +38,7 @@ Machinery:
 
 ## Kind index
 
-Every event kind the package produces. Wrapped kinds travel inside a kind 1059 gift wrap; "push" says whether the recipient copy carries the `["linky", "push"]` marker.
+Every event kind the package produces. Wrapped kinds travel inside a kind 1059 gift wrap; "push" says whether the recipient copy carries the `["linky", "push"]` marker. 24133 appears twice: the payment-notice rumor only ever travels inside a gift wrap, the plain NIP-46 event never does, so the two never collide.
 
 | Kind  | What                                      | Wrapped | Push                | Guide                                                    |
 | ----- | ----------------------------------------- | ------- | ------------------- | -------------------------------------------------------- |
@@ -54,6 +55,7 @@ Every event kind the package produces. Wrapped kinds travel inside a kind 1059 g
 | 10000 | mute list                                 | no      | n/a                 | [plain-events.md](./plain-events.md#mute-list)           |
 | 10002 | relay list                                | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
 | 10050 | DM relay list                             | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
+| 24133 | NIP-46 Nostr Connect message (ephemeral)  | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#wire-format)       |
 | 24242 | Blossom upload auth (never published)     | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
 | 27235 | NIP-98 auth, push proof (never published) | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
 
