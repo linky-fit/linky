@@ -131,6 +131,19 @@ export default defineConfig([
     rules: { "linky-ui/ui-only": ["error", { allow: ["video"] }] },
   },
   {
+    files: ["tests/**/*.ts"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          property: "waitForTimeout",
+          message:
+            "Wait on observable state with expect, expect.poll or toPass; the writing-tests skill covers the exception.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/devtools/e2e/**"],
     rules: { "no-restricted-properties": "off" },
   },

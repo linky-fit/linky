@@ -256,6 +256,7 @@ test("a seed restore does not re-accept chat tokens the old device received", as
     await expect
       .poll(() => restored.mintAnswers.length, { timeout: 60_000 })
       .toBeGreaterThanOrEqual(TOKEN_SATS.length);
+    // eslint-disable-next-line no-restricted-properties -- proves no replayed token is re-accepted after the mint answers
     await restored.page.waitForTimeout(SETTLE_MS);
 
     expect(
