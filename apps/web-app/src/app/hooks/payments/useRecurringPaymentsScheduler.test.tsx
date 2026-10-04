@@ -754,6 +754,18 @@ describe("useRecurringPaymentsScheduler", () => {
     await view.unmount();
   });
 
+  it("pays a payment that waited for funds on the first pass after a top-up", async () => {
+    const view = await mount({ amount: 500 }, { mintBalances: [] });
+    expect(view.envelopes().open).not.toHaveBeenCalled();
+
+    await view.setParams({ mintBalances: [{ mint: MINT, amount: 1_000 }] });
+    await view.runNow();
+
+    expect(opened(view)).toEqual([keyOf(0)]);
+    expect(view.row()).toMatchObject({ runCount: 1, lastRunStatus: "paid" });
+    await view.unmount();
+  });
+
   it("waits for funds when the balance covers the amount but not the fee", async () => {
     const view = await mount(
       {},
