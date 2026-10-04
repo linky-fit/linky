@@ -13,6 +13,7 @@ import {
   absolutePreviewImages,
   deploymentOrigin,
 } from "./build/previewImages.js";
+import { loadSharedProfile, renderProfilePage } from "./api/_profilePage.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,6 +122,39 @@ const lnurlProxy = (): Plugin => ({
   },
 });
 
+// Stands in for the `/p/:id` rewrite to `api/profile.ts` in `vercel.json`.
+const sharedProfilePages = (): Plugin => {
+  const middleware =
+    (loadTemplate: (url: string) => Promise<string>) =>
+    async (req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
+      const url = new URL(req.url ?? "", `http://${req.headers.host}`);
+      const id = /^\/p\/([^/]+)$/.exec(url.pathname)?.[1];
+      if (!id) return next();
+      const profile = await loadSharedProfile(decodeURIComponent(id));
+      const template = await loadTemplate(url.pathname);
+      res.statusCode = profile ? 200 : 404;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.end(renderProfilePage(template, profile, url.href));
+    };
+  const readTemplate = (root: string) =>
+    readFileSync(path.resolve(root, "p/index.html"), "utf8");
+  return {
+    name: "shared-profile-pages",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(
+        middleware((url) =>
+          server.transformIndexHtml(url, readTemplate(__dirname)),
+        ),
+      );
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(
+        middleware(async () => readTemplate(path.resolve(__dirname, "dist"))),
+      );
+    },
+  };
+};
+
 export default defineConfig({
   build: {
     rollupOptions: {
@@ -131,6 +165,7 @@ export default defineConfig({
         followUs: path.resolve(__dirname, "follow-us/index.html"),
         main: path.resolve(__dirname, "index.html"),
         privacy: path.resolve(__dirname, "privacy.html"),
+        profile: path.resolve(__dirname, "p/index.html"),
       },
     },
   },
@@ -144,5 +179,6 @@ export default defineConfig({
     previewImages(),
     trailingSlashRedirect(),
     lnurlProxy(),
+    sharedProfilePages(),
   ],
 });
