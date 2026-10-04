@@ -1,6 +1,7 @@
 import {
   CashuOperationId,
   ContactId,
+  KeryxSubscriptionId,
   RecurringPaymentId,
 } from "@linky-fit/linksync";
 import { UNKNOWN_CONTACT_ID_PREFIX } from "../utils/constants";
@@ -36,6 +37,9 @@ export type Route =
   | { kind: "settingsUnits" }
   | { kind: "settingsReceiveMethod" }
   | { kind: "settingsMasterKeys" }
+  | { kind: "keryxCompanyNew" }
+  | { kind: "keryxCompany"; id: KeryxSubscriptionId }
+  | { kind: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
   | { kind: "proxyPayments" }
   | { kind: "advanced" }
   | { kind: "advancedAutoPayLimit" }
@@ -97,6 +101,18 @@ export const parseRouteFromHash = (): Route => {
     return { kind: "settingsReceiveMethod" };
   }
   if (hash === "#settings/master-keys") return { kind: "settingsMasterKeys" };
+  if (hash === "#settings/keryx/new") return { kind: "keryxCompanyNew" };
+  const keryxPrefix = "#settings/keryx/";
+  if (hash.startsWith(keryxPrefix)) {
+    const [rawId, rawKey] = hash.slice(keryxPrefix.length).split("/");
+    const id = KeryxSubscriptionId.fromUnknown(decodeSegment(rawId ?? ""));
+    const key = decodeSegment(rawKey ?? "");
+    if (id.ok) {
+      return key
+        ? { kind: "keryxAnnouncement", id: id.value, key }
+        : { kind: "keryxCompany", id: id.value };
+    }
+  }
   // The old settings hash stays parseable for links already shared.
   if (hash === "#proxy" || hash === "#settings/proxy-payments") {
     return { kind: "proxyPayments" };

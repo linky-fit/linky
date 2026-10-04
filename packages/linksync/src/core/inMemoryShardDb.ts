@@ -69,10 +69,7 @@ export const makeInMemoryShardDb = <S extends DbSchema>(
     const rows = tableRows(mutation.table);
     const key = rowKey(mutation.ownerId, mutation.row.id);
     const previous = rows.get(key);
-    const { isDeleted, ...columns } =
-      mutation.kind === "update"
-        ? mutation.row
-        : { ...mutation.row, isDeleted: undefined };
+    const { isDeleted, ...columns } = mutation.row;
     const system = {
       ownerId: mutation.ownerId,
       createdAt: previous?.createdAt ?? nowIso,

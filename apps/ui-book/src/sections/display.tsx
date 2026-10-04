@@ -19,6 +19,7 @@ export const display: Section = {
         ))}
         <UI.Avatar name="Color study" uri={sampleImage} />
         <UI.Avatar name="Alex Rivers" fallback="🦊" />
+        <UI.Avatar name="Acme Inc." icon="Building" />
         <UI.Avatar name="Alex Rivers" raised />
       </UI.Row>
     ),

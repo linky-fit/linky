@@ -44,6 +44,20 @@ export const media: Section = {
         </UI.Stack>
       </UI.Stack>
     ),
+    SandboxedHtml: () => (
+      <UI.Stack>
+        <UI.SandboxedHtml
+          title="Announcement"
+          height={160}
+          html={
+            '<h3>Firmware 2.8 is out</h3><p>Update from the device menu. <a href="https://example.com/notes">Release notes</a></p>'
+          }
+        />
+        <UI.Text variant="caption" color="$colorMuted">
+          Web only: scripts, same-origin access and remote media stay blocked
+        </UI.Text>
+      </UI.Stack>
+    ),
     CameraPreview: () => {
       const [camera, setCamera] = useState<MediaStream | null>(null);
       const video = useRef<HTMLVideoElement>(null);

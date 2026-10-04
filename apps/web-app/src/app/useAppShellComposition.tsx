@@ -1562,6 +1562,7 @@ export const useAppShellComposition = ({
       importDataFileInputRef,
       lightningInvoiceAutoPayLimit,
       logoutArmed,
+      openScan,
       payWithCashuEnabled,
       pushToast,
       receiveMethod,

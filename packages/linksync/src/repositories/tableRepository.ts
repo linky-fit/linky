@@ -18,7 +18,7 @@ export type TableOf<Scope extends LinkyScope> =
 export interface TableRepository<C extends Columns> {
   readonly all: Effect.Effect<ReadonlyArray<Row<C>>>;
   readonly byId: (id: C["id"]) => Effect.Effect<Row<C> | null>;
-  /** Writes into the active shard, then runs `maybeRotate`. */
+  /** Writes a live row into the active shard, reviving a removed copy there, then runs `maybeRotate`. */
   readonly insert: (row: WriteRow<C>) => Effect.Effect<void, ShardDbError>;
   /**
    * `insert` unless a visible shard holds a copy with the row's id, live or
@@ -87,7 +87,8 @@ export const tableRepository = <
       Effect.map(store.copiesOf(scope, table, id), ([newest]) =>
         newest === undefined || newest.isDeleted === 1 ? null : newest,
       ),
-    insert: (row) => rotateAfter(store.insert(scope, table, row)),
+    insert: (row) =>
+      rotateAfter(store.insert(scope, table, row, { revive: true })),
     insertIfAbsent: (row) => ifAbsent(row.id, store.insert(scope, table, row)),
     removeIfAbsent: (row) =>
       ifAbsent(row.id, store.insertRemoved(scope, table, row)),

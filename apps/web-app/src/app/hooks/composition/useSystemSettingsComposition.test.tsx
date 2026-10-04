@@ -32,6 +32,7 @@ const createAdvancedSettings = (
   importDataFileInputRef: React.createRef<HTMLInputElement>(),
   lightningInvoiceAutoPayLimit: 1,
   logoutArmed: false,
+  openScan: noop,
   payWithCashuEnabled: true,
   pushToast,
   receiveMethod: "universal",

@@ -10,6 +10,7 @@ import {
 import type {
   Columns,
   DbSchema,
+  Mutation,
   Patch,
   Row,
   ShardDb,
@@ -117,7 +118,10 @@ export interface ShardStore<
     table: T,
     id: S[T]["id"],
   ) => Effect.Effect<ReadonlyArray<Row<S[T]>>>;
-  /** Writes the row into the active shard. */
+  /**
+   * Writes the row's columns into the active shard. A tombstone there stays
+   * unless `revive` is set, so a row fetched again cannot undo a removal.
+   */
   readonly insert: <
     Scope extends keyof R & string,
     T extends TableOf<R, Scope>,
@@ -125,6 +129,7 @@ export interface ShardStore<
     scope: Scope,
     table: T,
     row: WriteRow<S[T]>,
+    options?: { readonly revive?: boolean },
   ) => Effect.Effect<void, ShardDbError>;
   /**
    * Writes the columns given into the active shard as a tombstone: the
@@ -439,7 +444,7 @@ export const createShardStore = <
   const upsertInto = (
     table: string,
     ownerId: OwnerId,
-    row: Columns,
+    row: Mutation["row"],
   ): Effect.Effect<void, ShardDbError> =>
     db.mutate([{ kind: "upsert", table, ownerId, row }]);
 
@@ -842,12 +847,16 @@ export const createShardStore = <
     rows,
     copies,
     copiesOf,
-    insert: (scope, table, row) =>
+    insert: (scope, table, row, options) =>
       Effect.gen(function* () {
         yield* beforeWrite;
         yield* retainBeforeWrite(scope);
         const owner = yield* activeOwner(scope);
-        yield* upsertInto(table, owner.id, row);
+        yield* upsertInto(
+          table,
+          owner.id,
+          options?.revive === true ? { ...row, isDeleted: false } : row,
+        );
       }),
     insertRemoved: (scope, table, row) =>
       Effect.gen(function* () {

@@ -126,6 +126,8 @@ export interface ContactRowProps {
   /** The name the avatar initials come from, when `name` carries more, e.g. a disambiguating suffix. */
   avatarName?: string | undefined;
   avatarUri?: string | undefined;
+  /** Shown in the avatar instead of initials without a photo. */
+  avatarIcon?: IconName | undefined;
   /** The contact's own short status, muted after the name. */
   status?: string | undefined;
   preview?: ReactNode;
@@ -142,6 +144,7 @@ export function ContactRow({
   name,
   avatarName,
   avatarUri,
+  avatarIcon,
   status,
   preview,
   time,
@@ -157,6 +160,7 @@ export function ContactRow({
         <Avatar
           name={avatarName ?? name}
           uri={avatarUri}
+          icon={avatarIcon}
           indicator={unread ? "accent" : undefined}
         />
       }

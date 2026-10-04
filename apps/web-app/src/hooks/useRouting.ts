@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { KeryxSubscriptionId } from "@linky-fit/linksync";
 import type { CashuOperationId, ContactId } from "../evolu";
 import {
   safeSessionStorageGet,
@@ -112,6 +113,9 @@ type NavigationAction =
   | { route: "settingsLanguage" }
   | { route: "settingsAppearance" }
   | { route: "settingsMasterKeys" }
+  | { route: "keryxCompanyNew" }
+  | { route: "keryxCompany"; id: KeryxSubscriptionId }
+  | { route: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
   | { route: "proxyPayments" }
   | { route: "settingsUnits" }
   | { route: "settingsReceiveMethod" }
@@ -149,6 +153,19 @@ export const navigateTo = (action: NavigationAction): void => {
       break;
     case "settingsMasterKeys":
       window.location.assign("#settings/master-keys");
+      break;
+    case "keryxCompanyNew":
+      window.location.assign("#settings/keryx/new");
+      break;
+    case "keryxCompany":
+      window.location.assign(
+        `#settings/keryx/${encodeURIComponent(action.id)}`,
+      );
+      break;
+    case "keryxAnnouncement":
+      window.location.assign(
+        `#settings/keryx/${encodeURIComponent(action.id)}/${encodeURIComponent(action.key)}`,
+      );
       break;
     case "proxyPayments":
       window.location.assign("#proxy");

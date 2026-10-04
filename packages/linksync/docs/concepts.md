@@ -15,6 +15,7 @@ A scope is one kind of data with one storage policy. `meta` lives in the Evolu `
 | `unknownSenders` | `ShardOwner` `["unknownSenders", n]` | `unknownSenderMessage`                | 256 KiB or 160 mutations | keep newest 2 |
 | `cashu`          | `ShardOwner` `["cashu", n]`          | `cashuProof`, `cashuOperation`        | 256 KiB or 170 mutations | never         |
 | `transactions`   | `ShardOwner` `["transactions", n]`   | `transaction`                         | 256 KiB or 220 mutations | keep newest 4 |
+| `keryx`          | `ShardOwner` `["keryx", n]`          | `keryxSubscription`                   | 256 KiB or 220 mutations | never         |
 
 A shard rotates once its Evolu history holds `SHARD_MAX_BYTES` (256 KiB) of column values or the scope's mutation count, whichever comes first, with `SHARD_ROTATION_COOLDOWN_MS` (60 s) between rotations of one scope. The byte threshold is a quarter of the official Evolu relay's 1 MB per-owner quota, leaving room for encryption and per-row overhead. Rotation moves a pointer; nothing is copied.
 
@@ -26,7 +27,7 @@ Money truth is the proofs and operations, never forgotten; the transaction histo
 
 ## How a row moves
 
-- `insert` writes into the active shard of the scope (the shard the pointer names, or index 0).
+- `insert` writes into the active shard of the scope (the shard the pointer names, or index 0). A repository's `insert` also marks the row live, reviving a removed copy; `insertIfAbsent` and `ingest` write only the columns, so a removal from another device that syncs later still wins.
 - `update` of a row in the active shard patches it in place. Update of a row in an older shard copies the whole row, patch applied, into the active shard and tombstones the copy where it was. Retired shards therefore receive at most tombstones.
 - `remove` tombstones the row where it lives; nothing is copied.
 - `insertRemoved` writes a tombstone into the active shard for a row that has not arrived yet, so a later insert of that id can be refused. It carries only the columns given.
@@ -55,6 +56,7 @@ Copy-on-write identity is the row `id`. These ids are deterministic, so every de
 | `directConversationIdFor` | the contact id                      | every device derives one conversation per contact                                                    |
 | `nostrMessageIdFor`       | the message's rumor id              | a message fetched again stays one row, in either message table                                       |
 | `nostrReactionIdFor`      | the reaction's rumor id and reactor | a reaction fetched again stays one row; a removal stored first applies only to its author's reaction |
+| `keryxSubscriptionIdFor`  | the company's join origin           | pairing a company on two devices lands on one row                                                    |
 | `settingIdFor`            | the key                             | one row per key                                                                                      |
 | `activeNostrIdentityId`   | constant                            | one mirrored identity row                                                                            |
 | `shardPointerId`          | the scope name                      | one pointer row per scope, upserted by every device                                                  |

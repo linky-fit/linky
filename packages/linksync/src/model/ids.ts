@@ -1,5 +1,6 @@
 import {
   createIdFromString,
+  type KeryxSubscriptionId,
   type MessageId,
   type ReactionId,
   type SettingId,
@@ -30,3 +31,7 @@ export const settingIdFor = (key: SettingKey): SettingId =>
 /** Each Nostr identity's inbox cursor is one setting row, shared by every device. */
 export const inboxCursorSettingIdFor = (pubkey: Pubkey): SettingId =>
   createIdFromString<"Setting">(`setting/inboxCursor/${pubkey}`);
+
+/** Pairing a company's join origin on any device lands on one subscription row. */
+export const keryxSubscriptionIdFor = (origin: string): KeryxSubscriptionId =>
+  createIdFromString<"KeryxSubscription">(`keryxSubscription/${origin}`);

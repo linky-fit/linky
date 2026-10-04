@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Image, View, styled } from "tamagui";
 import { Pressable } from "./controls";
+import { Icon } from "./icons";
+import type { IconName, IconSize } from "./icons";
 import { Row, Stack, Text } from "./layout";
 import { toneColors } from "./styles";
 import type { TextVariant, Tone } from "./tokens";
@@ -15,6 +17,13 @@ const avatarSizes = {
 } as const satisfies Record<string, { box: `$${string}`; text: TextVariant }>;
 
 export type AvatarSize = keyof typeof avatarSizes;
+
+const avatarIconSizes = {
+  xs: "sm",
+  sm: "sm",
+  md: "lg",
+  lg: "xl",
+} as const satisfies Record<AvatarSize, IconSize>;
 
 const initials = (name: string) =>
   name
@@ -34,6 +43,8 @@ export interface AvatarProps {
   indicator?: Tone | undefined;
   /** Shown instead of the initials without a photo, e.g. an emoji or a letter. */
   fallback?: string | undefined;
+  /** An icon instead of the initials without a photo, e.g. for a company without a logo. */
+  icon?: IconName | undefined;
   /** Gets the photo uri that failed to load, e.g. to try another source. */
   onError?: ((uri: string) => void) | undefined;
   /** Fills the circle with the raised surface, so it stands out against its ring, e.g. in an `AvatarGroup`. */
@@ -46,6 +57,7 @@ export function Avatar({
   size = "md",
   indicator,
   fallback,
+  icon,
   onError,
   raised = false,
 }: AvatarProps) {
@@ -76,6 +88,8 @@ export function Avatar({
               onError?.(uri);
             }}
           />
+        ) : icon ? (
+          <Icon name={icon} size={avatarIconSizes[size]} color="$accentText" />
         ) : glyph === null ? null : (
           <Text variant={dimensions.text} bold color="$accentText">
             {glyph}

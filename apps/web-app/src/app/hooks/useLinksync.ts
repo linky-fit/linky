@@ -4,6 +4,7 @@ import {
   makeConversationsRepository,
   makeIdentityRepository,
   makeInboxCursorsRepository,
+  makeKeryxSubscriptionsRepository,
   makeRecurringPaymentsRepository,
   makeSettingsRepository,
   makeTransactionsRepository,
@@ -15,6 +16,8 @@ import {
   type ConversationsRepository,
   type IdentityRepository,
   type InboxCursorsRepository,
+  type KeryxSubscriptionRecord,
+  type KeryxSubscriptionsRepository,
   type LinkyScope,
   type LinkyStore,
   type MessageRow,
@@ -139,6 +142,19 @@ export const useRecurringPaymentsRepository =
 export const useRecurringPaymentRecords =
   (): ReadonlyArray<RecurringPaymentRecord> =>
     useRepositoryRows(useRecurringPaymentsRepository());
+
+export const useKeryxSubscriptionsRepository =
+  (): KeryxSubscriptionsRepository => {
+    const store = useLinkyStore();
+    return React.useMemo(
+      () => makeKeryxSubscriptionsRepository(store),
+      [store],
+    );
+  };
+
+export const useKeryxSubscriptionRows =
+  (): ReadonlyArray<KeryxSubscriptionRecord> =>
+    useRepositoryRows(useKeryxSubscriptionsRepository());
 
 /** linkshu's stores over the cashu shards; the wallet runtime is built on it. */
 export const useWalletRepository = (): WalletRepository => {

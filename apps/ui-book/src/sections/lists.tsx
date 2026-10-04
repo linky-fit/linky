@@ -59,6 +59,16 @@ export const lists: Section = {
             preview={<UI.Pill label="120 sats" size="sm" />}
             onPress={() => setSelected(!selected)}
           />
+          <UI.ContactRow
+            name="Acme Inc."
+            avatarIcon="Building"
+            preview={
+              <UI.Text variant="caption" mono color="$colorMuted">
+                https://acme.example
+              </UI.Text>
+            }
+            onPress={() => setSelected(!selected)}
+          />
         </UI.Stack>
       );
     },

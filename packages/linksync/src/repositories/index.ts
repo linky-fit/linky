@@ -5,6 +5,11 @@ export type { ConversationsRepository, PeerSeenWindow } from "./conversations";
 export { makeIdentityRepository } from "./identity";
 export type { IdentityRepository } from "./identity";
 export { makeInboxCursorsRepository } from "./inboxCursors";
+export { makeKeryxSubscriptionsRepository } from "./keryxSubscriptions";
+export type {
+  KeryxSubscriptionRecord,
+  KeryxSubscriptionsRepository,
+} from "./keryxSubscriptions";
 export type { InboxCursorsRepository } from "./inboxCursors";
 export { makeSettingsRepository } from "./settings";
 export type { SettingsRepository } from "./settings";

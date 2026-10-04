@@ -243,6 +243,14 @@ const REQUIRED_COLUMNS: {
     "rail",
     "progress",
   ],
+  // Never ingested from a lane: no legacy version wrote Keryx subscriptions.
+  keryxSubscription: [
+    "origin",
+    "trustJson",
+    "identityJson",
+    "channelsJson",
+    "pairedAtSec",
+  ],
 };
 
 // The overload types the picked row against the package schema; the
