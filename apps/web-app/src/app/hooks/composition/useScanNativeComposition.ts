@@ -37,6 +37,8 @@ import { useContactsOnboardingProgress } from "../guide/useContactsOnboardingPro
 import { buildUnknownContactId } from "../messages/contactIdentity";
 import type { DispatchInboxEvent } from "../messages/useLinkstrInboxSync";
 import type { LnurlAuthResult } from "../useLnurlAuth";
+import type { NostrConnectLoginResult } from "../useNostrConnectLogin";
+import { takeNostrConnectHashLink } from "../../../nostrConnect";
 import { isAnimatedQrFrame } from "../../../utils/animatedQr";
 import { useGuideScannerDomain } from "../useGuideScannerDomain";
 import { useScannedTextHandler } from "../useScannedTextHandler";
@@ -112,6 +114,7 @@ interface UseScanNativeCompositionParams {
   persistContactsOnboardingDismissed: () => void;
   pushToast: (message: string) => void;
   requestLnurlAuthConfirmation: LnurlAuthResult["requestLnurlAuthConfirmation"];
+  requestNostrConnectLoginConfirmation: NostrConnectLoginResult["requestNostrConnectLoginConfirmation"];
   route: ReturnType<typeof useRouting>;
   saveCashuFromText: CashuWalletCompositionResult["saveCashuFromText"];
   setPendingLightningInvoiceConfirmation: CashuWalletCompositionResult["setPendingLightningInvoiceConfirmation"];
@@ -146,6 +149,7 @@ export const useScanNativeComposition = ({
   persistContactsOnboardingDismissed,
   pushToast,
   requestLnurlAuthConfirmation,
+  requestNostrConnectLoginConfirmation,
   route,
   saveCashuFromText,
   setPendingLightningInvoiceConfirmation,
@@ -607,6 +611,7 @@ export const useScanNativeComposition = ({
     requestLightningInvoiceConfirmation: setPendingLightningInvoiceConfirmation,
     requestLnurlAuthConfirmation,
     requestLnurlWithdrawConfirmation: setPendingLnurlWithdrawConfirmation,
+    requestNostrConnectLoginConfirmation,
     saveCashuFromText,
     scanAcceptsBankPayment:
       scanEntryPoint === "send" || route.kind === "manualPay",
@@ -743,6 +748,18 @@ export const useScanNativeComposition = ({
       window.removeEventListener(NATIVE_PUSH_ACTION_EVENT, onNotificationOpen);
     };
   }, [nostrBootstrapReady, openNotificationChat]);
+
+  // An open app gets a web link as a hash change, not a fresh load.
+  React.useEffect(() => {
+    const acceptNostrConnectHashLink = () => {
+      const uri = takeNostrConnectHashLink();
+      if (uri) updatePendingDeepLinkText(uri);
+    };
+    acceptNostrConnectHashLink();
+    window.addEventListener("hashchange", acceptNostrConnectHashLink);
+    return () =>
+      window.removeEventListener("hashchange", acceptNostrConnectHashLink);
+  }, [updatePendingDeepLinkText]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {

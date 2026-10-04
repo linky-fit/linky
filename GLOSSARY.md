@@ -228,6 +228,10 @@ _Avoid_: spending limit, confirmation threshold
 Linky signing the user into another website with a key derived from their identity.
 _Avoid_: Lightning login, wallet login
 
+**Nostr Connect login**:
+Linky signing the user into another website with their identity in one NIP-46 exchange, started by scanning or opening the site's `nostrconnect://` link; nothing stays connected afterwards.
+_Avoid_: nostr login, remote signer session, bunker login
+
 ## Proxy payments
 
 **Proxy payment**:

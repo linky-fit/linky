@@ -1,15 +1,8 @@
-import {
-  Button,
-  Dialog,
-  Icon,
-  Stack,
-  Text,
-  border,
-  enterScale,
-} from "@linky-fit/ui";
+import { Button, Dialog, Stack, Text, enterScale } from "@linky-fit/ui";
 import React from "react";
 import type { I18nKey, Translate } from "../i18n";
 import type { LnurlAuthAction, LnurlAuthPreview } from "../lnurlAuth";
+import { LoginIconRing } from "./LoginIconRing";
 
 const DONE_TITLE_KEY_BY_ACTION: Record<LnurlAuthAction, I18nKey> = {
   auth: "lnurlAuthDoneAuth",
@@ -76,17 +69,8 @@ export function LnurlAuthModal({
         transition="slow"
         enterStyle={isDone ? pop : null}
       >
-        <Stack
-          width="$hero"
-          height="$hero"
-          alignItems="center"
-          justifyContent="center"
-          borderRadius="$pill"
-          borderWidth={border.emphasis}
-          borderColor="$accent"
-          marginBottom="$sm"
-        >
-          <Icon name={isDone ? "LockOpen" : "Lock"} size="xl" color="$accent" />
+        <Stack marginBottom="$sm">
+          <LoginIconRing icon={isDone ? "LockOpen" : "Lock"} />
         </Stack>
         {isDone ? (
           <>

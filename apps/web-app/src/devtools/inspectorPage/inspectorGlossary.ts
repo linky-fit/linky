@@ -148,6 +148,12 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The user approved an LNURL-auth request and the domain confirmed the login. Linky signed the challenge with a linking key derived per domain from the active Nostr key; the session itself lives at the domain, not in the app.",
   "lnurlAuth.failed":
     "An approved LNURL-auth request did not end in a confirmed login — the domain rejected it (expired challenge, unknown key), answered with something other than OK, or the callback never completed. The payload carries the reason shown to the user.",
+  "nostrConnectLogin.requested":
+    "A scanned, pasted or opened nostrconnect:// URI was recognized and put in front of the user; nothing is sent to the site until they approve it. The site's name and URL in the payload are its own unverified claims, and the pubkey link is the site's one-off client key.",
+  "nostrConnectLogin.approved":
+    "The user approved a Nostr Connect login and the NIP-46 exchange finished: Linky acked the connect, answered get_public_key and signed at most one login event (signedKind) with the identity key. No session is kept.",
+  "nostrConnectLogin.failed":
+    "An approved Nostr Connect login did not finish — the site never answered, asked for a signature other than a login, or no relay accepted the replies. The payload carries the error tag; the URI secret is never logged.",
   "relayList.publishFailed":
     "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
   "relayList.syncFailed":

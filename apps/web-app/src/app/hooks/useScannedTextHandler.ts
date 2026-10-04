@@ -6,6 +6,10 @@ import { ContactId } from "../../evoluIds";
 import { navigateTo } from "../../hooks/useRouting";
 import { parseLnurlAuthTarget } from "../../lnurlAuth";
 import {
+  parseNostrConnectUri,
+  type NostrConnectRequest,
+} from "../../nostrConnect";
+import {
   fetchLnurlWithdrawPreview,
   isLightningAddress,
   isLnurlPayTarget,
@@ -52,6 +56,7 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   requestLnurlWithdrawConfirmation: (
     preview: import("../../lnurlPay").LnurlWithdrawPreview,
   ) => void;
+  requestNostrConnectLoginConfirmation: (request: NostrConnectRequest) => void;
   saveCashuFromText: (
     text: string,
     options?: { navigateToTokens?: boolean; navigateToWallet?: boolean },
@@ -76,6 +81,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
   requestLightningInvoiceConfirmation,
   requestLnurlAuthConfirmation,
   requestLnurlWithdrawConfirmation,
+  requestNostrConnectLoginConfirmation,
   saveCashuFromText,
   scanAcceptsBankPayment,
   scanEntryPoint,
@@ -89,6 +95,13 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
 
       const parsedDeepLink = parseNativeDeepLinkUrl(raw);
       let scanText = (parsedDeepLink?.text ?? raw).trim();
+
+      const nostrConnect = parseNostrConnectUri(scanText);
+      if (nostrConnect) {
+        closeScan();
+        requestNostrConnectLoginConfirmation(nostrConnect);
+        return;
+      }
 
       // BIP 321 / BIP 21 — unified `bitcoin:` URI. The address part is
       // onchain (Linky doesn't settle onchain) so we promote the best
@@ -323,6 +336,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       requestLightningInvoiceConfirmation,
       requestLnurlAuthConfirmation,
       requestLnurlWithdrawConfirmation,
+      requestNostrConnectLoginConfirmation,
       saveCashuFromText,
       scanAcceptsBankPayment,
       scanEntryPoint,

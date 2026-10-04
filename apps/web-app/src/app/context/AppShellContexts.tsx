@@ -6,6 +6,7 @@ import type { ScanDiagnostics } from "../hooks/useGuideScannerDomain";
 import type { Lang } from "../../i18n";
 import type { LnurlAuthPreview } from "../../lnurlAuth";
 import type { LnurlWithdrawPreview } from "../../lnurlPay";
+import type { NostrConnectRequest } from "../../nostrConnect";
 import type { ProfileStatusCurrency } from "../../nostrStatus";
 import type { Route } from "../../types/route";
 import type {
@@ -97,6 +98,7 @@ export interface AppShellCoreContextValue {
   } | null;
   pendingLnurlAuthConfirmation: LnurlAuthPreview | null;
   pendingLnurlWithdrawConfirmation: LnurlWithdrawPreview | null;
+  pendingNostrConnectLoginConfirmation: NostrConnectRequest | null;
   pendingLightningInvoiceConfirmation: LightningInvoicePreview | null;
   pendingCashuPaymentRequestConfirmation: CashuPaymentRequestMessageInfo | null;
   postPaySaveContact: {
@@ -139,6 +141,8 @@ export interface AppShellCoreContextValue {
   lnurlAuthIsBusy: boolean;
   lnurlAuthIsDone: boolean;
   lnurlWithdrawIsBusy: boolean;
+  nostrConnectLoginIsBusy: boolean;
+  nostrConnectLoginIsDone: boolean;
 }
 
 export interface AppShellActionsContextValue {
@@ -148,11 +152,13 @@ export interface AppShellActionsContextValue {
   closeShareOptions: () => void;
   closeLnurlAuthConfirmation: () => void;
   closeLnurlWithdrawConfirmation: () => void;
+  closeNostrConnectLoginConfirmation: () => void;
   closeLightningInvoiceConfirmation: () => void;
   closeScan: () => void;
   confirmPaymentMintMelt: () => Promise<void>;
   confirmLnurlAuth: () => Promise<void>;
   confirmLnurlWithdraw: () => Promise<void>;
+  confirmNostrConnectLogin: () => Promise<void>;
   confirmLightningInvoicePayment: () => Promise<void>;
   closeCashuPaymentRequestConfirmation: () => void;
   confirmCashuPaymentRequest: () => Promise<void>;
