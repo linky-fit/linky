@@ -40,6 +40,8 @@ interface UseScannedTextHandlerParams<TContact extends ContactRowLike> {
   contacts: readonly TContact[];
   currentNpub: string | null;
   extractCashuTokenFromText: (text: string) => string | null;
+  /** Keryx is experimental; while off, join URLs fall through to the other flows. */
+  keryxEnabled: boolean;
   contactsRepository: Pick<ContactsRepository, "insert">;
   lightningInvoiceAutoPayLimit: number;
   onContactIdentifierScanned: ((identifier: string) => Promise<void>) | null;
@@ -73,6 +75,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
   contacts,
   currentNpub,
   extractCashuTokenFromText,
+  keryxEnabled,
   contactsRepository,
   lightningInvoiceAutoPayLimit,
   onContactIdentifierScanned,
@@ -104,7 +107,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
         return;
       }
 
-      if (isKeryxJoinUrl(scanText)) {
+      if (keryxEnabled && isKeryxJoinUrl(scanText)) {
         closeScan();
         offerKeryxJoin(scanText);
         return;
@@ -336,6 +339,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       contacts,
       currentNpub,
       extractCashuTokenFromText,
+      keryxEnabled,
       contactsRepository,
       lightningInvoiceAutoPayLimit,
       onContactIdentifierScanned,

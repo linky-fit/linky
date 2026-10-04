@@ -19,7 +19,10 @@ describe("desktopRouteSection", () => {
     expect(getDesktopRouteSection({ kind: "keryxCompanyNew" })).toBe(
       "settings",
     );
-    expect(isDesktopSectionEntryRoute({ kind: "keryxCompany", id })).toBe(true);
+    expect(isDesktopSectionEntryRoute({ kind: "keryxCompanies" })).toBe(true);
+    expect(isDesktopSectionEntryRoute({ kind: "keryxCompany", id })).toBe(
+      false,
+    );
     expect(
       isDesktopSectionEntryRoute({ kind: "keryxAnnouncement", id, key: "a" }),
     ).toBe(false);

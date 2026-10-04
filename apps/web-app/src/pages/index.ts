@@ -21,6 +21,7 @@ export { EvoluServerPage } from "./EvoluServerPage";
 export { EvoluServersPage } from "./EvoluServersPage";
 export { InspectorSettingsPage } from "./InspectorSettingsPage";
 export { KeryxAnnouncementPage } from "./KeryxAnnouncementPage";
+export { KeryxCompaniesPage } from "./KeryxCompaniesPage";
 export { KeryxCompanyNewPage } from "./KeryxCompanyNewPage";
 export { KeryxCompanyPage } from "./KeryxCompanyPage";
 export { LnAddressPayPage } from "./LnAddressPayPage";

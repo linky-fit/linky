@@ -9,6 +9,8 @@ export const cs = {
   settingsNetwork: "Síť",
   settingsSecurity: "Zabezpečení",
   settingsDebug: "Debug",
+  settingsExperimental: "Experimentální",
+  experimentalFeatures: "Experimentální funkce",
   nostrInspector: "Inspector",
   nostrInspectorLogs: "Ukládat logy inspectoru",
   nostrInspectorLogsStats:
@@ -1129,7 +1131,8 @@ export const cs = {
     "Chybí uložený mnemonic (nelze vyčistit Evolu storage).",
 
   // Keryx
-  keryxSection: "Keryx",
+  keryxNewsletters: "Newslettery (Keryx)",
+  keryxNewslettersTitle: "Newslettery",
   keryxAddCompany: "Přidat firmu",
   keryxCompany: "Firma",
   keryxAnnouncement: "Oznámení",

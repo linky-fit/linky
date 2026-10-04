@@ -10,6 +10,8 @@ export const de = {
   settingsNetwork: "Netzwerk",
   settingsSecurity: "Sicherheit",
   settingsDebug: "Debug",
+  settingsExperimental: "Experimentell",
+  experimentalFeatures: "Experimentelle Funktionen",
   nostrInspector: "Inspektor",
   nostrInspectorLogs: "Inspektorprotokolle sammeln",
   nostrInspectorLogsStats: "{count} Zeilen · {size} · älteste Zeile {age} alt",
@@ -1136,7 +1138,8 @@ export const de = {
     "Gespeicherte Mnemonik fehlt (Evolu-Speicher kann nicht geleert werden).",
 
   // Keryx
-  keryxSection: "Keryx",
+  keryxNewsletters: "Newsletter (Keryx)",
+  keryxNewslettersTitle: "Newsletter",
   keryxAddCompany: "Firma hinzufügen",
   keryxCompany: "Firma",
   keryxAnnouncement: "Mitteilung",

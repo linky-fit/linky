@@ -1,15 +1,16 @@
-import { ListRow, Section } from "@linky-fit/ui";
+import { ListRow, Stack } from "@linky-fit/ui";
+import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useKeryx, useRefreshOnOpen } from "../app/hooks/useKeryx";
+import { KeryxCompanyRow } from "../components/KeryxCompany";
 import { navigateTo } from "../hooks/useRouting";
-import { KeryxCompanyRow } from "./KeryxCompany";
 
-export function KeryxSettingsSection() {
+export function KeryxCompaniesPage(): React.ReactElement {
   const { t } = useAppShellCore();
   const { companies, refresh } = useKeryx();
   useRefreshOnOpen(companies, refresh);
   return (
-    <Section title={t("keryxSection")}>
+    <Stack>
       {companies.map(({ id, subscription }) => (
         <KeryxCompanyRow
           key={id}
@@ -24,6 +25,6 @@ export function KeryxSettingsSection() {
         testID="keryx-add-company"
         onPress={() => navigateTo({ route: "keryxCompanyNew" })}
       />
-    </Section>
+    </Stack>
   );
 }

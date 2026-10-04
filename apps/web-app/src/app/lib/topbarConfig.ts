@@ -57,8 +57,7 @@ export const resolveBackAction = (
     case "settingsUnits":
     case "settingsReceiveMethod":
     case "settingsMasterKeys":
-    case "keryxCompanyNew":
-    case "keryxCompany":
+    case "keryxCompanies":
     case "advancedAutoPayLimit":
     case "advancedInspector":
     case "mints":
@@ -79,6 +78,10 @@ export const resolveBackAction = (
 
     case "profileEdit":
       return () => navigateTo({ route: "profile" });
+
+    case "keryxCompanyNew":
+    case "keryxCompany":
+      return () => navigateTo({ route: "keryxCompanies" });
 
     case "keryxAnnouncement": {
       const companyId = route.id;
@@ -235,6 +238,7 @@ const SHOWS_MENU_BUTTON: Record<
   evoluServer: true,
   evoluServerNew: true,
   keryxAnnouncement: false,
+  keryxCompanies: false,
   keryxCompany: false,
   keryxCompanyNew: false,
   lnAddressPay: true,
@@ -411,6 +415,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   evoluServerNew: "evoluAddServerLabel",
   evoluServers: "evoluServers",
   keryxAnnouncement: "keryxAnnouncement",
+  keryxCompanies: "keryxNewslettersTitle",
   keryxCompany: "keryxCompany",
   keryxCompanyNew: "keryxAddCompany",
   lnAddressPay: "pay",

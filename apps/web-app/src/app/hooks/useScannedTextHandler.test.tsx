@@ -48,11 +48,13 @@ const setup = async ({
   contacts = [],
   currentNpub = null,
   cashuIsBusy = false,
+  keryxEnabled = true,
 }: {
   autoPayLimit?: number;
   contacts?: ScanParams["contacts"];
   currentNpub?: string | null;
   cashuIsBusy?: boolean;
+  keryxEnabled?: boolean;
 } = {}) => {
   const requestLnurlAuthConfirmation = vi.fn<(p: LnurlAuthPreview) => void>();
   const requestLnurlWithdrawConfirmation = vi.fn();
@@ -83,6 +85,7 @@ const setup = async ({
       contactsRepository: { insert: () => Effect.void },
       currentNpub,
       extractCashuTokenFromText: () => null,
+      keryxEnabled,
       lightningInvoiceAutoPayLimit: autoPayLimit,
       onContactIdentifierScanned: null,
       openScannedContactPendingNpubRef: { current: null },
@@ -218,6 +221,16 @@ describe("scanned Keryx join URLs", () => {
 
     expect(window.location.hash).toBe("#settings/keryx/new");
     expect(takeKeryxJoinOffer()).toBe(join);
+  });
+
+  it("ignores join URLs while experimental features are off", async () => {
+    window.location.hash = "#contacts";
+    const scan = await setup({ keryxEnabled: false });
+
+    await scan.handle("https://acme.example/join?p=eyJ2IjoxfQ");
+
+    expect(window.location.hash).toBe("#contacts");
+    expect(takeKeryxJoinOffer()).toBeNull();
   });
 
   it("leaves other HTTPS URLs to the LNURL flows", () => {

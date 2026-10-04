@@ -11,6 +11,8 @@ export const en = {
   settingsNetwork: "Network",
   settingsSecurity: "Security",
   settingsDebug: "Debug",
+  settingsExperimental: "Experimental",
+  experimentalFeatures: "Experimental features",
   nostrInspector: "Inspector",
   nostrInspectorLogs: "Collect inspector logs",
   nostrInspectorLogsStats: "{count} rows · {size} · oldest row {age} old",
@@ -1123,7 +1125,8 @@ export const en = {
     "Missing stored mnemonic (cannot clear Evolu storage).",
 
   // Keryx
-  keryxSection: "Keryx",
+  keryxNewsletters: "Newsletters (Keryx)",
+  keryxNewslettersTitle: "Newsletters",
   keryxAddCompany: "Add company",
   keryxCompany: "Company",
   keryxAnnouncement: "Announcement",

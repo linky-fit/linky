@@ -32,8 +32,11 @@ describe("parseRouteFromHash", () => {
     });
   });
 
-  it("parses the Keryx company, announcement and add company routes", () => {
+  it("parses the Keryx companies, company, announcement and add company routes", () => {
     const id = keryxSubscriptionIdFor("https://acme.example");
+    replaceHash("#settings/keryx");
+    expect(parseRouteFromHash()).toEqual({ kind: "keryxCompanies" });
+
     replaceHash("#settings/keryx/new");
     expect(parseRouteFromHash()).toEqual({ kind: "keryxCompanyNew" });
 

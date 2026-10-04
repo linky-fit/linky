@@ -12,6 +12,8 @@ export const pt = {
   settingsNetwork: "Rede",
   settingsSecurity: "Segurança",
   settingsDebug: "Depuração",
+  settingsExperimental: "Experimental",
+  experimentalFeatures: "Recursos experimentais",
   nostrInspector: "Inspetor",
   nostrInspectorLogs: "Coletar registros do inspetor",
   nostrInspectorLogsStats:
@@ -1140,7 +1142,8 @@ export const pt = {
     "Mnemônico gravado ausente (não é possível limpar o armazenamento Evolu).",
 
   // Keryx
-  keryxSection: "Keryx",
+  keryxNewsletters: "Newsletters (Keryx)",
+  keryxNewslettersTitle: "Newsletters",
   keryxAddCompany: "Adicionar empresa",
   keryxCompany: "Empresa",
   keryxAnnouncement: "Comunicado",
