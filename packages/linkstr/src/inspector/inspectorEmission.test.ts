@@ -1,5 +1,7 @@
 import { Effect, Fiber, Layer, Stream } from "effect";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
+import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
+import type { Event as NostrToolsEvent } from "nostr-tools";
+import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
 import { nsecEncode } from "nostr-tools/nip19";
 import {
   encodeImageMessageRumor,
@@ -16,6 +18,8 @@ import { linkstrServices } from "../composition";
 import { ClientId, Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { WrapInbox } from "../inbox/WrapInbox";
 import { wrapRumorFor } from "../internal/giftWrap";
+import { NostrConnectRequest } from "../nostrConnect/domain";
+import { NostrConnect } from "../nostrConnect/NostrConnect";
 import { OutboxRef } from "../outbox/domain";
 import { Outbox } from "../outbox/Outbox";
 import { observeTransport } from "../relayHealth/observeTransport";
@@ -387,5 +391,111 @@ describe("inspector emission through the outbox send path", () => {
     expect(labels).toContain("PlainOperationSucceeded:outbox.job");
     expect(labels).toContain("OperationSucceeded:chat.sendText");
     expect(labels.filter((label) => label === "WirePublished")).toHaveLength(2);
+  });
+});
+
+const loginSecret = "nostr-connect-login-secret";
+
+const collectNostrConnectEmissions = (): Promise<InspectorEvent[]> => {
+  const site = makeIdentity();
+  const siteKey = getConversationKey(site.secretKey, me.pubkey);
+  const listeners: Array<(event: NostrToolsEvent) => void> = [];
+  const signRequest = finalizeEvent(
+    {
+      kind: 24133,
+      tags: [["p", me.pubkey]],
+      content: encrypt(
+        JSON.stringify({
+          id: "sign",
+          method: "sign_event",
+          params: [
+            JSON.stringify({
+              kind: 27235,
+              content: "",
+              tags: [["u", "https://site.test/login"]],
+            }),
+          ],
+        }),
+        siteKey,
+      ),
+      created_at: Math.floor(Date.now() / 1000),
+    },
+    site.secretKey,
+  );
+  const transport = Layer.succeed(NostrTransport, {
+    publish: (relays, event) =>
+      Effect.sync(() => {
+        const reply = decrypt(event.content, siteKey);
+        if (reply.includes(loginSecret)) {
+          for (const listener of listeners) listener(signRequest);
+        }
+        return relays.map(
+          (relayUrl) =>
+            new RelayPublishResult({
+              relay: relayUrl,
+              accepted: true,
+              detail: null,
+            }),
+        );
+      }),
+    subscribe: (_relay, _filter, onEvent, options) =>
+      Effect.sync(() => {
+        listeners.push(onEvent);
+        options?.onEose?.();
+      }).pipe(Effect.andThen(Effect.never)),
+    fetch: () => Effect.succeed([]),
+  });
+  const layer = linkstrServices({
+    ...identityConfig,
+    readRelays: [relay],
+    writeRelays: [relay],
+    transport: inspectTransport(observeTransport(transport)),
+  }).pipe(
+    Layer.provideMerge(Inspector.live),
+    Layer.provideMerge(RelayHealth.live),
+  );
+
+  const program = Effect.gen(function* () {
+    const inspector = yield* Inspector;
+    const collected: InspectorEvent[] = [];
+    const consumer = yield* Stream.runForEach(inspector.events, (event) =>
+      Effect.sync(() => {
+        collected.push(event);
+      }),
+    ).pipe(Effect.fork);
+    const connect = yield* NostrConnect;
+    yield* connect.login(
+      new NostrConnectRequest({
+        clientPubkey: site.pubkey,
+        relays: [relay],
+        secret: loginSecret,
+        perms: [],
+        name: null,
+        url: "https://site.test",
+        image: null,
+      }),
+    );
+    yield* Effect.sleep("20 millis");
+    yield* Fiber.interrupt(consumer);
+    return collected;
+  });
+
+  return Effect.runPromise(Effect.scoped(Effect.provide(program, layer)));
+};
+
+describe("inspector emission never carries the nostr connect secret", () => {
+  it("keeps the login secret out of operation and wire rows", async () => {
+    const collected = await collectNostrConnectEmissions();
+    expectNoIdentitySecrets(collected);
+    const labels = collected.map(eventLabel);
+    expect(labels).toContain("PlainOperationSucceeded:nostrConnect.login");
+    expect(
+      labels.filter((label) => label === "WirePlainPublished"),
+    ).toHaveLength(2);
+    for (const event of collected) {
+      expect(JSON.stringify(event), eventLabel(event)).not.toContain(
+        loginSecret,
+      );
+    }
   });
 });

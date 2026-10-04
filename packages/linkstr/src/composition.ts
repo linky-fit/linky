@@ -5,6 +5,7 @@ import type { NostrSecretKey, RelayUrl } from "./domain/primitives";
 import { InboxCursorStore } from "./inbox/InboxCursorStore";
 import { WrapInbox } from "./inbox/WrapInbox";
 import { MuteList } from "./muteList/MuteList";
+import { NostrConnect } from "./nostrConnect/NostrConnect";
 import { Outbox } from "./outbox/Outbox";
 import { OutboxStore } from "./outbox/OutboxStore";
 import { PaymentNotices } from "./paymentNotices/PaymentNotices";
@@ -62,6 +63,7 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
     ProfileWatch.Default,
     RelayLists.Default,
     MuteList.Default,
+    NostrConnect.Default,
   ).pipe(
     Layer.provideMerge(
       Layer.mergeAll(

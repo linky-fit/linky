@@ -8,6 +8,7 @@ export * from "./errors";
 export * from "./inbox";
 export * from "./inspector";
 export * from "./muteList";
+export * from "./nostrConnect";
 export * from "./outbox";
 export * from "./paymentNotices";
 export * from "./paymentTelemetry";
