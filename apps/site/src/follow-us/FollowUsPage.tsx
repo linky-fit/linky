@@ -10,7 +10,7 @@ import {
 } from "@linky-fit/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { copyTextToClipboard } from "../clipboard";
-import { SiteLayout, type SiteLayoutCopy } from "../SiteLayout";
+import { SiteLayout } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
 import { useSiteLocale } from "../useSiteLocale";
 
@@ -18,7 +18,7 @@ const nostrNpub =
   "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
 const nostrUri = `nostr:${nostrNpub}`;
 
-interface FollowUsCopy extends SiteLayoutCopy {
+interface FollowUsCopy {
   eyebrow: string;
   title: string;
   starLabel: string;
@@ -28,58 +28,25 @@ interface FollowUsCopy extends SiteLayoutCopy {
 
 const copy: Record<SiteLocale, FollowUsCopy> = {
   cs: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Jazyk",
-    downloadLabel: "Stáhnout aplikaci",
-    appearanceLabel: "Vzhled",
-    appearanceAuto: "Automaticky",
-    appearanceLight: "Světlý",
-    appearanceDark: "Tmavý",
     eyebrow: "Zůstaňme v kontaktu",
     title: "Sledujte Linky",
     starLabel: "Dejte nám hvězdičku",
     copyLabel: "Kopírovat",
     copiedLabel: "Zkopírováno",
-    followUsLabel: "Sledujte nás",
-    privacyLabel: "Ochrana soukromí",
   },
   en: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Language",
-    downloadLabel: "Download the app",
-    appearanceLabel: "Appearance",
-    appearanceAuto: "Automatic",
-    appearanceLight: "Light",
-    appearanceDark: "Dark",
     eyebrow: "Stay in touch",
     title: "Follow Linky",
     starLabel: "Give us a star",
     copyLabel: "Copy",
     copiedLabel: "Copied",
-    followUsLabel: "Follow us",
-    privacyLabel: "Privacy Policy",
   },
   de: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Sprache",
-    downloadLabel: "App herunterladen",
-    appearanceLabel: "Darstellung",
-    appearanceAuto: "Automatisch",
-    appearanceLight: "Hell",
-    appearanceDark: "Dunkel",
     eyebrow: "Bleib in Kontakt",
     title: "Folge Linky",
     starLabel: "Gib uns einen Stern",
     copyLabel: "Kopieren",
     copiedLabel: "Kopiert",
-    followUsLabel: "Folge uns",
-    privacyLabel: "Datenschutz",
   },
 };
 
@@ -162,7 +129,7 @@ function FollowUsPage() {
   }, [activeCopy.title]);
 
   return (
-    <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
+    <SiteLayout locale={locale} onLocaleChange={setLocale}>
       <Stack
         width="100%"
         maxWidth="$contentWidth"

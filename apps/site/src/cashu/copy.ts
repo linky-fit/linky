@@ -1,16 +1,11 @@
-import type { SiteLayoutCopy } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
 
-interface LocaleCopy extends SiteLayoutCopy {
+interface LocaleCopy {
   cashuLabel: string;
   cashuOptionDescription: string;
   collapseOptionsLabel: string;
-  czechLabel: string;
   currencyLabel: string;
   expandOptionsLabel: string;
-  followUsLabel: string;
-  englishLabel: string;
-  germanLabel: string;
   invalidToken: string;
   linkyPrimaryAction: string;
   lightningAddressLabel: string;
@@ -21,7 +16,6 @@ interface LocaleCopy extends SiteLayoutCopy {
   openInWalletLabel: string;
   pageTitle: string;
   payoutIntro: string;
-  privacyLabel: string;
   redeemButton: string;
   redeemConfirmed: string;
   redeemFailed: string;
@@ -32,7 +26,6 @@ interface LocaleCopy extends SiteLayoutCopy {
   spentInfo: string;
   statusSpent: string;
   subtitle: string;
-  switchLabel: string;
   tokenLabel: string;
   validUnknown: string;
 }
@@ -42,12 +35,8 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     cashuLabel: "Cashu",
     cashuOptionDescription: "Nascanujte kód vaší cashu peněženkou",
     collapseOptionsLabel: "Skrýt možnosti ↑",
-    czechLabel: "Čeština",
     currencyLabel: "Jednotky",
     expandOptionsLabel: "Další možnosti ↓",
-    followUsLabel: "Sledujte nás",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
     invalidToken: "Utraceno",
     linkyPrimaryAction: "Vyzvednout v Linky",
     lightningAddressLabel: "Lightning adresa",
@@ -60,7 +49,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     pageTitle: "Vytvoř odkaz pro vyzvednutí bitcoinu na lightning adresu",
     payoutIntro:
       "Někdo vám posílá bitcoin. Vyzvednout si ho můžete v aplikaci Linky nebo jakékoliv lightning peněžence",
-    privacyLabel: "Ochrana soukromí",
     redeemButton: "Vybrat na adresu",
     redeemConfirmed: "Hotovo",
     redeemFailed: "Vyzvednutí se nepodařilo.",
@@ -72,12 +60,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     statusSpent: "Utraceno",
     subtitle:
       "Vložte existující cashu token a vytvořte odkaz, který můžete poslat svému známému.",
-    switchLabel: "Jazyk",
-    downloadLabel: "Stáhnout aplikaci",
-    appearanceLabel: "Vzhled",
-    appearanceAuto: "Automaticky",
-    appearanceLight: "Světlý",
-    appearanceDark: "Tmavý",
     tokenLabel: "Cashu token",
     validUnknown: "Nepodařilo se načíst token.",
   },
@@ -85,12 +67,8 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     cashuLabel: "Cashu",
     cashuOptionDescription: "Scan the code with your Cashu wallet",
     collapseOptionsLabel: "Hide options ↑",
-    czechLabel: "Čeština",
     currencyLabel: "Units",
     expandOptionsLabel: "Show options ↓",
-    followUsLabel: "Follow us",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
     invalidToken: "Spent",
     linkyPrimaryAction: "Redeem in Linky",
     lightningAddressLabel: "Lightning address",
@@ -103,7 +81,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     pageTitle: "Create a link to redeem bitcoin to a lightning address",
     payoutIntro:
       "Someone is sending you bitcoin. You can redeem it in the Linky app or in any Lightning wallet.",
-    privacyLabel: "Privacy Policy",
     redeemButton: "Redeem to address",
     redeemConfirmed: "Success",
     redeemFailed: "Redeem failed.",
@@ -115,12 +92,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     statusSpent: "Spent",
     subtitle:
       "Paste an existing Cashu token and create a link to redeem bitcoin to a lightning address.",
-    switchLabel: "Language",
-    downloadLabel: "Download the app",
-    appearanceLabel: "Appearance",
-    appearanceAuto: "Automatic",
-    appearanceLight: "Light",
-    appearanceDark: "Dark",
     tokenLabel: "Cashu token",
     validUnknown: "Could not load the token.",
   },
@@ -128,12 +99,8 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     cashuLabel: "Cashu",
     cashuOptionDescription: "Scanne den Code mit deiner Cashu-Wallet",
     collapseOptionsLabel: "Optionen ausblenden ↑",
-    czechLabel: "Čeština",
     currencyLabel: "Einheiten",
     expandOptionsLabel: "Weitere Optionen ↓",
-    followUsLabel: "Folge uns",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
     invalidToken: "Ausgegeben",
     linkyPrimaryAction: "In Linky einlösen",
     lightningAddressLabel: "Lightning-Adresse",
@@ -148,7 +115,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
       "Erstelle einen Link zum Einlösen von Bitcoin an eine Lightning-Adresse",
     payoutIntro:
       "Jemand sendet dir Bitcoin. Du kannst sie in der Linky-App oder jeder Lightning-Wallet einlösen.",
-    privacyLabel: "Datenschutz",
     redeemButton: "An Adresse auszahlen",
     redeemConfirmed: "Erledigt",
     redeemFailed: "Einlösen fehlgeschlagen.",
@@ -160,12 +126,6 @@ export const copy: Record<SiteLocale, LocaleCopy> = {
     statusSpent: "Ausgegeben",
     subtitle:
       "Füge einen vorhandenen Cashu-Token ein und erstelle einen Link, über den Bitcoin an eine Lightning-Adresse ausgezahlt werden können.",
-    switchLabel: "Sprache",
-    downloadLabel: "App herunterladen",
-    appearanceLabel: "Darstellung",
-    appearanceAuto: "Automatisch",
-    appearanceLight: "Hell",
-    appearanceDark: "Dunkel",
     tokenLabel: "Cashu-Token",
     validUnknown: "Der Token konnte nicht geladen werden.",
   },
