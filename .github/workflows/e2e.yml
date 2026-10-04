@@ -93,12 +93,18 @@ jobs:
       - name: Verify Evolu relay quota and log privacy
         run: docker run --rm -v "$PWD/docker/evolu-relay/relay.test.js:/app/relay.test.js:ro" linky-evolu-relay npm test
 
+      # The site suite (mostly its own vite build) runs alongside the web-app suite.
       - name: Run e2e tests
-        working-directory: apps/web-app
-        run: bunx playwright test --project=local-stack
-
-      - name: Run site redemption and recovery tests
-        run: bun run --filter @linky-fit/site test:e2e
+        run: |
+          bun run --filter @linky-fit/site test:e2e &> /tmp/site-e2e.log &
+          site=$!
+          status=0
+          (cd apps/web-app && bunx playwright test --project=local-stack) || status=$?
+          wait "$site" || status=$?
+          echo "::group::Site redemption and recovery tests"
+          cat /tmp/site-e2e.log
+          echo "::endgroup::"
+          exit "$status"
 
       - name: Dump service logs
         if: failure()
