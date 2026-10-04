@@ -143,6 +143,37 @@ describe("OutboxStore.fromStringStorage", () => {
     expect(job.state.result).toBeInstanceOf(OutboxJobFailed);
   });
 
+  it("loads a telemetry job persisted before the draft had a flow", () => {
+    const storage = stubStorage();
+    run(
+      buildStore(OutboxStore.fromStringStorage(storage, storageKey)).insert(
+        new StoredOutboxJob({
+          ...makeJob("job-1"),
+          operation: {
+            _tag: "paymentTelemetry",
+            draft: telemetryDraft,
+            recipient: pubkey,
+          },
+        }),
+      ),
+    );
+    const stored = JSON.parse(storage.map.get(storageKey) ?? "[]") as Array<{
+      operation: { draft: Record<string, unknown> };
+    }>;
+    for (const job of stored) delete job.operation.draft.flow;
+    storage.map.set(storageKey, JSON.stringify(stored));
+
+    const jobs = run(
+      buildStore(OutboxStore.fromStringStorage(storage, storageKey)).loadAll,
+    );
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.operation).toEqual({
+      _tag: "paymentTelemetry",
+      draft: telemetryDraft,
+      recipient: pubkey,
+    });
+  });
+
   it("treats an unreadable stored value as empty", () => {
     const storage = stubStorage();
     storage.map.set(storageKey, "not json at all");

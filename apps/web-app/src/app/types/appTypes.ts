@@ -9,6 +9,7 @@ import type {
   Pubkey,
   PaymentTelemetryAppRuntime,
   PaymentTelemetryDevicePlatform,
+  PaymentTelemetryFlow,
 } from "@linky-fit/linkstr";
 import type { JsonValue } from "../../types/json";
 
@@ -54,6 +55,8 @@ interface PaymentEventFields {
   direction: "in" | "out";
   error?: string | null;
   fee?: number | null;
+  /** The Linky flow the payment belongs to; left out for an ordinary payment. */
+  flow?: PaymentTelemetryFlow | null;
   method?: PaymentTelemetryMethod | null;
   mint?: string | null;
   /** The payment's note: bolt11 description, token memo, LNURL comment or request description. */
@@ -80,6 +83,7 @@ export interface LocalPaymentTelemetryEvent {
   errorCode: string | null;
   errorDetail: string | null;
   feeBucket: string | null;
+  flow?: PaymentTelemetryFlow | null;
   id: string;
   method: PaymentTelemetryMethod;
   mint: string | null;

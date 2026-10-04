@@ -524,6 +524,43 @@ describe("usePayContactWithCashuMessage", () => {
     await act(async () => harness.root.unmount());
   });
 
+  it("reports the sats of a bank offer as a proxy payment, other sends as none", async () => {
+    const sendCashuToken = vi.fn<SendCashuToken>(async () =>
+      Either.right(sendReceipt),
+    );
+    enqueueOutboxMock.mockImplementation(async (input) =>
+      Exit.succeed(
+        enqueueReceipt(input.op.draft.clientId ?? fallbackClientId, input.ref),
+      ),
+    );
+    sendPaymentNoticeMock.mockImplementation(async (draft) =>
+      Exit.succeed(noticeReceipt(draft.clientId ?? fallbackClientId)),
+    );
+    const harness = await setup({ sendCashuToken });
+    const contact = { id: CONTACT_ID, name: "Alice", npub: contactNpub };
+
+    await act(async () => {
+      await harness.getPay()?.({
+        amountSat: 600,
+        contact,
+        paymentNoticeContext: "bank_payment_offer",
+        paymentNoticeOfferId: "offer-1",
+      });
+    });
+    expect(harness.logPaymentEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ flow: "proxy", status: "ok" }),
+    );
+
+    await act(async () => {
+      await harness.getPay()?.({ amountSat: 600, contact });
+    });
+    expect(harness.logPaymentEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ flow: null, status: "ok" }),
+    );
+
+    await act(async () => harness.root.unmount());
+  });
+
   it("holds the offline queue and success overlay until its placeholder is stored", async () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
     let resolveStored!: (outcome: WriteOutcome) => void;

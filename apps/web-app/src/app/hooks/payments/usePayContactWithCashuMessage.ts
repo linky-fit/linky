@@ -152,6 +152,9 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       } = args;
       const notify = !fromQueue;
       const note = (memo ?? "").trim() || null;
+      // Settling a bank offer is the sats leg of a proxy payment.
+      const flow =
+        paymentNoticeContext === "bank_payment_offer" ? "proxy" : null;
       if (isPaymentAuthorized && !isPaymentAuthorized()) {
         setStatus(t("payApprovalChanged"));
         return {
@@ -313,6 +316,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
             direction: "out",
             error,
             fee: null,
+            flow,
             method: "cashu_chat",
             mint: mintUrl,
             phase,
@@ -449,6 +453,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
             direction: "out",
             error: null,
             fee: null,
+            flow,
             method: "cashu_chat",
             mint: receipt.mint,
             note,

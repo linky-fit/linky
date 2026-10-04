@@ -66,6 +66,7 @@ describe("parseReport", () => {
       mint: payload.mint,
       amountBucket: payload.amountBucket,
       feeBucket: null,
+      flow: null,
       errorCode: payload.errorCode,
       errorDetail: payload.errorDetail,
       appVersion: payload.appVersion,
@@ -74,6 +75,12 @@ describe("parseReport", () => {
       appRuntime: payload.appRuntime,
       rawContent: content,
     });
+  });
+
+  it("keeps the flow of a recurring or proxy payment", () => {
+    expect(
+      parseReport(JSON.stringify({ ...payload, flow: "proxy" }), metadata),
+    ).toMatchObject({ flow: "proxy" });
   });
 
   it.each(["ok", "declined"])("excludes %s outcomes", (status) => {
