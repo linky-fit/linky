@@ -13,7 +13,7 @@ function App() {
   const activeCopy = copy[locale];
 
   return (
-    <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
+    <SiteLayout locale={locale} onLocaleChange={setLocale}>
       <Stack gap="$huge">
         <Hero copy={activeCopy} />
         <FeatureStory copy={activeCopy} />

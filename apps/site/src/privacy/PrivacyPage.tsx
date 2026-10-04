@@ -1,10 +1,10 @@
 import { Stack, Text } from "@linky-fit/ui";
 import { useEffect } from "react";
-import { SiteLayout, type SiteLayoutCopy } from "../SiteLayout";
+import { SiteLayout } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
 import { useSiteLocale } from "../useSiteLocale";
 
-interface PrivacyCopy extends SiteLayoutCopy {
+interface PrivacyCopy {
   documentTitle: string;
   eyebrow: string;
   title: string;
@@ -15,17 +15,6 @@ interface PrivacyCopy extends SiteLayoutCopy {
 
 const copy: Record<SiteLocale, PrivacyCopy> = {
   cs: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Jazyk",
-    downloadLabel: "Stáhnout aplikaci",
-    appearanceLabel: "Vzhled",
-    appearanceAuto: "Automaticky",
-    appearanceLight: "Světlý",
-    appearanceDark: "Tmavý",
-    followUsLabel: "Sledujte nás",
-    privacyLabel: "Ochrana soukromí",
     documentTitle: "Linky Ochrana soukromí",
     eyebrow: "Ochrana soukromí",
     title: "Ochrana soukromí",
@@ -46,17 +35,6 @@ const copy: Record<SiteLocale, PrivacyCopy> = {
     ],
   },
   en: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Language",
-    downloadLabel: "Download the app",
-    appearanceLabel: "Appearance",
-    appearanceAuto: "Automatic",
-    appearanceLight: "Light",
-    appearanceDark: "Dark",
-    followUsLabel: "Follow us",
-    privacyLabel: "Privacy Policy",
     documentTitle: "Linky Privacy Policy",
     eyebrow: "Privacy Policy",
     title: "Privacy Policy",
@@ -77,17 +55,6 @@ const copy: Record<SiteLocale, PrivacyCopy> = {
     ],
   },
   de: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Sprache",
-    downloadLabel: "App herunterladen",
-    appearanceLabel: "Darstellung",
-    appearanceAuto: "Automatisch",
-    appearanceLight: "Hell",
-    appearanceDark: "Dunkel",
-    followUsLabel: "Folge uns",
-    privacyLabel: "Datenschutz",
     documentTitle: "Linky Datenschutz",
     eyebrow: "Datenschutz",
     title: "Datenschutzerklärung",
@@ -118,7 +85,7 @@ function PrivacyPage() {
   }, [activeCopy.documentTitle]);
 
   return (
-    <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
+    <SiteLayout locale={locale} onLocaleChange={setLocale}>
       <Stack
         width="100%"
         maxWidth="$contentWidth"

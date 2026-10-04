@@ -323,7 +323,7 @@ function CashuPage() {
   );
 
   return (
-    <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
+    <SiteLayout locale={locale} onLocaleChange={setLocale}>
       <PageColumn>
         {successView ?? (activeToken ? tokenView : entryView)}
       </PageColumn>

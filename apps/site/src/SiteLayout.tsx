@@ -21,19 +21,47 @@ import {
 } from "./colorMode";
 import type { SiteLocale } from "./sitePreferences";
 
-export interface SiteLayoutCopy {
-  czechLabel: string;
-  englishLabel: string;
-  germanLabel: string;
-  switchLabel: string;
-  followUsLabel: string;
-  privacyLabel: string;
-  downloadLabel: string;
-  appearanceLabel: string;
-  appearanceAuto: string;
-  appearanceLight: string;
-  appearanceDark: string;
-}
+const languageLabels = {
+  czechLabel: "Čeština",
+  englishLabel: "English",
+  germanLabel: "Deutsch",
+};
+
+const copy = {
+  cs: {
+    ...languageLabels,
+    switchLabel: "Jazyk",
+    followUsLabel: "Sledujte nás",
+    privacyLabel: "Ochrana soukromí",
+    downloadLabel: "Stáhnout aplikaci",
+    appearanceLabel: "Vzhled",
+    appearanceAuto: "Automaticky",
+    appearanceLight: "Světlý",
+    appearanceDark: "Tmavý",
+  },
+  en: {
+    ...languageLabels,
+    switchLabel: "Language",
+    followUsLabel: "Follow us",
+    privacyLabel: "Privacy Policy",
+    downloadLabel: "Download the app",
+    appearanceLabel: "Appearance",
+    appearanceAuto: "Automatic",
+    appearanceLight: "Light",
+    appearanceDark: "Dark",
+  },
+  de: {
+    ...languageLabels,
+    switchLabel: "Sprache",
+    followUsLabel: "Folge uns",
+    privacyLabel: "Datenschutz",
+    downloadLabel: "App herunterladen",
+    appearanceLabel: "Darstellung",
+    appearanceAuto: "Automatisch",
+    appearanceLight: "Hell",
+    appearanceDark: "Dunkel",
+  },
+} satisfies Record<SiteLocale, Record<string, string>>;
 
 const colorModeIcons = {
   auto: "Monitor",
@@ -50,7 +78,6 @@ const nextColorModePreference = (current: ColorModePreference) =>
 const downloadLink = { render: <a href="/#download" />, role: "link" } as const;
 
 interface SiteLayoutProps {
-  copy: SiteLayoutCopy;
   locale: SiteLocale;
   onLocaleChange: (locale: SiteLocale) => void;
   children: ReactNode;
@@ -70,26 +97,26 @@ function FooterLink({ href, children }: { href: string; children: string }) {
 }
 
 export function SiteLayout({
-  copy,
   locale,
   onLocaleChange,
   children,
 }: SiteLayoutProps) {
+  const activeCopy = copy[locale];
   const mode = useColorMode();
   const colorModePreference = useColorModePreference();
   const { wide } = useMedia();
   const [languageSheetIsOpen, setLanguageSheetIsOpen] = useState(false);
-  const colorModeLabel = `${copy.appearanceLabel}: ${
+  const colorModeLabel = `${activeCopy.appearanceLabel}: ${
     {
-      auto: copy.appearanceAuto,
-      light: copy.appearanceLight,
-      dark: copy.appearanceDark,
+      auto: activeCopy.appearanceAuto,
+      light: activeCopy.appearanceLight,
+      dark: activeCopy.appearanceDark,
     }[colorModePreference]
   }`;
   const languages: [SiteLocale, string][] = [
-    ["cs", copy.czechLabel],
-    ["de", copy.germanLabel],
-    ["en", copy.englishLabel],
+    ["cs", activeCopy.czechLabel],
+    ["de", activeCopy.germanLabel],
+    ["en", activeCopy.englishLabel],
   ];
   return (
     <Stack flexGrow={1} gap="$none" backgroundColor="$background">
@@ -119,7 +146,7 @@ export function SiteLayout({
                 icon="Download"
                 marginRight="$sm"
               >
-                {copy.downloadLabel}
+                {activeCopy.downloadLabel}
               </Button>
             ) : (
               <IconButton
@@ -127,15 +154,15 @@ export function SiteLayout({
                 icon="Download"
                 size="sm"
                 variant="accent"
-                accessibilityLabel={copy.downloadLabel}
-                tooltip={copy.downloadLabel}
+                accessibilityLabel={activeCopy.downloadLabel}
+                tooltip={activeCopy.downloadLabel}
               />
             )}
             <IconButton
               icon="Languages"
               size="sm"
-              accessibilityLabel={copy.switchLabel}
-              tooltip={copy.switchLabel}
+              accessibilityLabel={activeCopy.switchLabel}
+              tooltip={activeCopy.switchLabel}
               onPress={() => setLanguageSheetIsOpen(true)}
             />
             <IconButton
@@ -165,14 +192,16 @@ export function SiteLayout({
         </Stack>
         <Row render="footer" gap="$lg" flexWrap="wrap" paddingVertical="$xl">
           <FooterLink href="/cashu/">Cashu</FooterLink>
-          <FooterLink href="/follow-us/">{copy.followUsLabel}</FooterLink>
-          <FooterLink href="/privacy.html">{copy.privacyLabel}</FooterLink>
+          <FooterLink href="/follow-us/">{activeCopy.followUsLabel}</FooterLink>
+          <FooterLink href="/privacy.html">
+            {activeCopy.privacyLabel}
+          </FooterLink>
         </Row>
       </Stack>
       <Sheet
         open={languageSheetIsOpen}
         onOpenChange={setLanguageSheetIsOpen}
-        title={copy.switchLabel}
+        title={activeCopy.switchLabel}
       >
         <Stack>
           {languages.map(([option, label]) => (

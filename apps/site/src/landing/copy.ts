@@ -1,4 +1,3 @@
-import type { SiteLayoutCopy } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
 
 export type CtaMode = "google-play" | "web" | "zapstore";
@@ -26,7 +25,7 @@ export interface TokenSectionCopy {
   nfcCard: string;
 }
 
-export interface LandingCopy extends SiteLayoutCopy {
+export interface LandingCopy {
   title: string;
   /** The part of `title` set in the accent color. */
   titleAccent: string;
@@ -47,30 +46,15 @@ const ctaLabels: Record<CtaMode, string> = {
   zapstore: "Zapstore",
 };
 
-const languageLabels = {
-  czechLabel: "Čeština",
-  englishLabel: "English",
-  germanLabel: "Deutsch",
-};
-
 export const copy: Record<SiteLocale, LandingCopy> = {
   cs: {
-    ...languageLabels,
-    downloadLabel: "Stáhnout aplikaci",
-    appearanceLabel: "Vzhled",
-    appearanceAuto: "Automaticky",
-    appearanceLight: "Světlý",
-    appearanceDark: "Tmavý",
     showAllLabel: "Zobrazit vše",
     getAppTitle: "Stáhněte si aplikaci",
-    switchLabel: "Jazyk",
     title: "Budujte svou bitcoinovou síť",
     titleAccent: "bitcoinovou",
     subtitle:
       "Každou platbou vytváříte a posilujete vztahy s lidmi kolem sebe. S Linky posíláte bitcoin stejně jednoduše jako běžnou zprávu - svým blízkým i komukoliv dalšímu.",
     ctaLabels: { ...ctaLabels, web: "Webová aplikace" },
-    privacyLabel: "Ochrana soukromí",
-    followUsLabel: "Sledujte nás",
     featuresTitle: "Funkce",
     features: [
       {
@@ -112,22 +96,13 @@ export const copy: Record<SiteLocale, LandingCopy> = {
       "Ukázka soukromého používání aplikace Linky bez osobních údajů",
   },
   en: {
-    ...languageLabels,
-    downloadLabel: "Download the app",
-    appearanceLabel: "Appearance",
-    appearanceAuto: "Automatic",
-    appearanceLight: "Light",
-    appearanceDark: "Dark",
     showAllLabel: "Show all",
     getAppTitle: "Get the app",
-    switchLabel: "Language",
     title: "Build your bitcoin network",
     titleAccent: "bitcoin",
     subtitle:
       "Every payment helps you grow and strengthen your network of people. With Linky, you send bitcoin as easily as a message - to friends, family, or anyone else.",
     ctaLabels,
-    privacyLabel: "Privacy Policy",
-    followUsLabel: "Follow us",
     featuresTitle: "Features",
     features: [
       {
@@ -169,22 +144,13 @@ export const copy: Record<SiteLocale, LandingCopy> = {
       "Preview of private Linky usage without personal information",
   },
   de: {
-    ...languageLabels,
-    downloadLabel: "App herunterladen",
-    appearanceLabel: "Darstellung",
-    appearanceAuto: "Automatisch",
-    appearanceLight: "Hell",
-    appearanceDark: "Dunkel",
     showAllLabel: "Alle anzeigen",
     getAppTitle: "Hol dir die App",
-    switchLabel: "Sprache",
     title: "Baue dein Bitcoin-Netzwerk auf",
     titleAccent: "Bitcoin-Netzwerk",
     subtitle:
       "Mit jeder Zahlung wächst dein Netzwerk und deine Beziehungen werden stärker. Mit Linky sendest du Bitcoin so einfach wie eine Nachricht – an Freunde, Familie oder alle anderen.",
     ctaLabels: { ...ctaLabels, web: "Web-App" },
-    privacyLabel: "Datenschutz",
-    followUsLabel: "Folge uns",
     featuresTitle: "Funktionen",
     features: [
       {
