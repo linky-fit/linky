@@ -8,6 +8,9 @@ export interface Author {
   name: string;
   avatar: string;
   bio: Localized<string>;
+  nostr?: string;
+  /** The X handle without the `@`. */
+  x?: string;
 }
 
 export interface ArticleTranslation {

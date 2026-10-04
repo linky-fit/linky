@@ -1,12 +1,78 @@
-import { Avatar, Button, Card, Image, Row, Stack, Text } from "@linky-fit/ui";
+import {
+  Avatar,
+  Button,
+  Divider,
+  Image,
+  opacity,
+  Row,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import { useEffect } from "react";
 import { SiteLayout } from "../SiteLayout";
 import { useSiteLocale } from "../useSiteLocale";
-import { translateArticle } from "./article";
+import { translateArticle, type Author } from "./article";
 import type { articles } from "./articles";
 import { copy } from "./copy";
 
 const blogLink = { render: <a href="/blog/" />, role: "link" } as const;
+
+function AuthorProfile({
+  author,
+  bio,
+  label,
+}: {
+  author: Author;
+  bio: string;
+  label: string;
+}) {
+  const socials = [
+    ...(author.nostr
+      ? [
+          {
+            name: "Nostr",
+            icon: "/nostr.svg",
+            href: `https://njump.me/${author.nostr}`,
+          },
+        ]
+      : []),
+    ...(author.x
+      ? [{ name: "X", icon: "/x.svg", href: `https://x.com/${author.x}` }]
+      : []),
+  ];
+  return (
+    <Stack alignItems="center" gap="$md">
+      <Avatar name={author.name} uri={author.avatar} size="lg" />
+      <Stack alignItems="center" gap="$xs">
+        <Text eyebrow>{label}</Text>
+        <Text variant="heading" color="$colorStrong">
+          {author.name}
+        </Text>
+      </Stack>
+      <Text color="$colorMuted" textAlign="center" maxWidth="$sheetWidth">
+        {bio}
+      </Text>
+      <Row gap="$md">
+        {socials.map(({ name, icon, href }) => (
+          <Stack
+            key={name}
+            render={
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`${author.name} · ${name}`}
+              />
+            }
+            hoverStyle={{ opacity: opacity.dimmed }}
+          >
+            <Image src={icon} width="$iconXl" height="$iconXl" aria-hidden />
+          </Stack>
+        ))}
+      </Row>
+    </Stack>
+  );
+}
 
 function ArticlePage({ article }: { article: (typeof articles)[number] }) {
   const [locale, setLocale] = useSiteLocale();
@@ -65,18 +131,12 @@ function ArticlePage({ article }: { article: (typeof articles)[number] }) {
           borderRadius="$card"
         />
         <Body />
-        <Card outlined marginTop="$xxl">
-          <Row alignItems="flex-start">
-            <Avatar name={author.name} uri={author.avatar} />
-            <Stack flex={1} gap="$xs">
-              <Text eyebrow>{activeCopy.writtenByLabel}</Text>
-              <Text variant="title" color="$colorStrong">
-                {author.name}
-              </Text>
-              <Text color="$colorMuted">{bio}</Text>
-            </Stack>
-          </Row>
-        </Card>
+        <Divider marginVertical="$xxl" />
+        <AuthorProfile
+          author={author}
+          bio={bio}
+          label={activeCopy.writtenByLabel}
+        />
       </Stack>
     </SiteLayout>
   );
