@@ -4,7 +4,7 @@ One repository per scope, each built over a `LinkyStore`. A repository returns r
 
 ## `TableRepository`
 
-`tableRepository(store, scope, table)` is the shape every repository is or extends: `all`, `byId`, `insert`, `insertIfAbsent`, `removeIfAbsent`, `update`, `remove`, `maybeRotate` and `subscribe`. `insert` takes `id` plus the non-nullable columns; nullable ones may be omitted, and it overwrites the active shard's copy of that id. `insertIfAbsent` writes only when no visible shard holds a copy of the id, live or tombstoned, and returns whether it wrote: use it for a deterministic id whose row may since have been updated or removed. `removeIfAbsent` records the removal of a row that has not arrived: unless a visible shard holds a copy of the id, it writes the columns given as a tombstone, required ones optional, so a later `insertIfAbsent` of the id is refused. `update` is copy-on-write; `update` and `remove` fail with `RowNotFound` for an id no visible shard holds. Column values are Evolu's branded types (`NonEmptyString1000`, `PositiveInt`, `SqliteBoolean`, ...), re-exported from the package entry.
+`tableRepository(store, scope, table)` is the shape every repository is or extends: `all`, `byId`, `insert`, `insertIfAbsent`, `removeIfAbsent`, `update`, `remove`, `maybeRotate` and `subscribe`. `insert` takes `id` plus the non-nullable columns; nullable ones may be omitted, and it overwrites the active shard's copy of that id, reviving a removed one: use it for a user action. `insertIfAbsent` writes only when no visible shard holds a copy of the id, live or tombstoned, and returns whether it wrote; it writes the columns without marking the row live, so a removal on another device that has not synced yet still wins. Use it for a deterministic id whose row may since have been updated or removed. `removeIfAbsent` records the removal of a row that has not arrived: unless a visible shard holds a copy of the id, it writes the columns given as a tombstone, required ones optional, so a later `insertIfAbsent` of the id is refused. `update` is copy-on-write; `update` and `remove` fail with `RowNotFound` for an id no visible shard holds. Column values are Evolu's branded types (`NonEmptyString1000`, `PositiveInt`, `SqliteBoolean`, ...), re-exported from the package entry.
 
 Every write ends with the rotation check. A pointer write the port rejects does not fail the row write: the repository logs it and the next write repeats the check, so chained writes are never left halfway over bookkeeping.
 
@@ -93,6 +93,15 @@ Insert `mintUrl`, `rail` and the initial `progress` with every new payment. `min
 `deleted` returns every removed payment with its last `mintUrl`, `rail` and `progress`, so the app can settle the envelope a removed payment left at its mint. A payment that moved to a newer shard is not in it: only the newest copy of each id counts.
 
 `unit`, `intervalUnit`, `rail`, `progress` and `lastRunStatus` stay strings here; their values, the schedule math and the run keys belong to `@linky-fit/recurring-payment`, whose `readRecurringPaymentOrder` validates a record into an order.
+
+## Keryx subscriptions
+
+`makeKeryxSubscriptionsRepository(store)` over `keryxSubscription` in the `keryx` scope, which is never forgotten: one row per company the user paired with, keyed by `keryxSubscriptionIdFor(origin)`, so pairing the same join origin on two devices lands on one row. Pass the join origin as the Keryx protocol canonicalizes it; another spelling derives another id. Announcements are not stored here; each device fetches and caches them itself. `all` returns `KeryxSubscriptionRecord`s, whose origin, trust, identity, channels and pairing time are present; a row still arriving column by column is skipped.
+
+- Pairing is `insert`. Pairing an origin again after `remove`, or again after a rebrand, overwrites its row; write `privateFeedsJson` as `null` when the new pairing has no private feed, so the earlier pairing's feeds do not come back.
+- Changing channels, private feeds or the acknowledged identity is `update`, and only a user action changes them. A refresh writes back only `trustJson`, and only trust it has just verified from the network.
+
+The JSON columns hold the Keryx protocol package's Schemas, encoded with `Schema.parseJson`: `trustJson` a `CompanyTrust`, `identityJson` the acknowledged `CompanyIdentity`, `channelsJson` the subscribed public channel names and `privateFeedsJson` the private feeds' capability URLs. A feed's sync state (version, closed) is per device and not stored here, so a device refreshing from an old copy of the row cannot drop a feed another device added. This package stores the columns as given; decoding and verification belong to the Keryx package. `privateFeedsJson` holds capability URLs; keep it out of logs.
 
 ## Identity
 

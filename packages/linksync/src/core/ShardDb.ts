@@ -54,19 +54,12 @@ export interface OwnerUsage {
   readonly bytes: number;
 }
 
-export type Mutation =
-  | {
-      readonly kind: "upsert";
-      readonly table: string;
-      readonly ownerId: OwnerId;
-      readonly row: Columns;
-    }
-  | {
-      readonly kind: "update";
-      readonly table: string;
-      readonly ownerId: OwnerId;
-      readonly row: Columns & { readonly isDeleted?: boolean };
-    };
+export interface Mutation {
+  readonly kind: "upsert" | "update";
+  readonly table: string;
+  readonly ownerId: OwnerId;
+  readonly row: Columns & { readonly isDeleted?: boolean };
+}
 
 export class ShardDbError extends Schema.TaggedError<ShardDbError>()(
   "ShardDbError",

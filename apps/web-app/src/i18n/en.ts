@@ -1121,4 +1121,48 @@ export const en = {
   // Error and UI strings
   evoluWipeStorageFailed:
     "Missing stored mnemonic (cannot clear Evolu storage).",
+
+  // Keryx
+  keryxSection: "Keryx",
+  keryxAddCompany: "Add company",
+  keryxCompany: "Company",
+  keryxAnnouncement: "Announcement",
+  keryxJoinUrlLabel: "Company join link",
+  keryxScanQr: "Scan QR code",
+  keryxJoinUrlInvalid: "This is not a company join link.",
+  keryxJoinVersionUnsupported:
+    "This code needs a newer version of Linky. Update Linky and scan it again.",
+  keryxConfirmOriginTitle: "Is this the company's web address?",
+  keryxConfirmOriginHint:
+    "Continue only if you recognize this exact address. Everything the company sends you will be checked against it.",
+  keryxPairing: "Verifying the company…",
+  keryxPairFailed: "Couldn't verify this company. Try again later.",
+  keryxLiteModeUnsupported:
+    "This company publishes in a format Linky doesn't support yet.",
+  keryxChannels: "Channels",
+  keryxPrivateFeeds: "Private feeds",
+  keryxPrivateFeedAutoSubscribed: "Subscribed automatically, only for you",
+  keryxSubscribe: "Subscribe",
+  keryxConsentHint: "Choose what you want to receive from this company.",
+  keryxNoAnnouncements: "No announcements yet",
+  keryxAnnouncements: "Announcements",
+  keryxRemoveCompany: "Remove company",
+  keryxRemoveArmedHint: "Tap once more to remove the company.",
+  keryxSuspendedTitle: "This company's identity changed",
+  keryxSuspendedBody:
+    "This can mean the company's website or signing keys were compromised. Messages are not shown.",
+  keryxRebrandedTitle: "The company changed its name",
+  keryxRebrandedBody:
+    "It now calls itself “{name}”. Its messages stay hidden until you scan a fresh QR code from the company and pair again.",
+  keryxRepair: "Scan a new QR code",
+  keryxLogoChanged: "The company changed its logo.",
+  keryxLogoAcknowledge: "Accept new logo",
+  keryxRefresh: "Refresh",
+  keryxRefreshFailed: "Couldn't refresh. Showing saved announcements.",
+  keryxFooter: "This channel will never ask you for a password, seed, or code.",
+  keryxPrivate: "Private",
+  keryxAttachments: "Attachments",
+  keryxMediaUnavailable:
+    "The file didn't match what the company signed, so it wasn't opened.",
+  keryxNotFound: "Not found",
 } satisfies Record<keyof typeof cs, string>;

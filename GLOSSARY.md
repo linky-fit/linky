@@ -276,6 +276,40 @@ _Avoid_: execution, instance, occurrence
 How every run of a recurring payment reaches the contact, chosen once when it is created: a token sent over Nostr (Cashu) or a melt paying their Lightning address (Lightning).
 _Avoid_: payment method, channel
 
+## Keryx
+
+**Keryx**:
+The protocol through which companies broadcast signed announcements to the user; Linky is a Keryx client.
+_Avoid_: newsletter, company messaging
+
+**Company**:
+A Keryx publisher, known by the join origin the user confirmed when pairing; its name and logo are self-asserted, so the origin always shows beside them.
+_Avoid_: publisher, brand, sender, contact
+
+**Join origin**:
+The company's web origin whose `/.well-known/keryx/` anchors its trust; it is the one thing the user confirms.
+_Avoid_: domain, company URL
+
+**Pairing**:
+Adding a company by scanning or pasting its join URL, confirming the join origin and choosing channels.
+_Avoid_: subscribing, connecting, following
+
+**Channel**:
+One stream of a company's announcements the user can subscribe to, such as security alerts or news.
+_Avoid_: topic, feed, list
+
+**Private feed**:
+A channel addressed to the user alone through a secret capability URL, such as an order's delivery tracking.
+_Avoid_: personal channel, order feed
+
+**Announcement**:
+One signed item a company published in a channel or private feed; it is shown only if it verifies.
+_Avoid_: message, post, notification
+
+**Suspended**:
+A company whose signing keys no longer chain to the pinned root; nothing it publishes is shown and the only offered action is removing it.
+_Avoid_: blocked, untrusted, compromised
+
 ## Sync and devices
 
 **Device**:
@@ -299,7 +333,7 @@ State that stays on one device and never syncs, such as wallet counters.
 _Avoid_: local-only, cached
 
 **Scope**:
-One kind of synced data with its own storage policy: identity, contacts, messages, unknown senders, wallet or transactions.
+One kind of synced data with its own storage policy: identity, contacts, messages, unknown senders, wallet, transactions or Keryx subscriptions.
 _Avoid_: lane, category, bucket
 
 **Shard**:

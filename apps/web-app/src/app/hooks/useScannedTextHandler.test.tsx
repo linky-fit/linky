@@ -20,6 +20,7 @@ import {
   type CashuPaymentRequestMessageInfo,
 } from "../lib/paymentRequestMessage";
 import { encodeBase64Url } from "../../utils/base64";
+import { isKeryxJoinUrl, takeKeryxJoinOffer } from "../lib/keryxJoinOffer";
 
 const K1 = "b".repeat(64);
 const LOGIN_URL = `https://example.com/lnurl-auth?tag=login&k1=${K1}&action=login`;
@@ -205,6 +206,24 @@ describe("scanned Nostr Connect logins", () => {
     await scan.handle(`nostrconnect://${CLIENT}?secret=s3cr3t`);
 
     expect(scan.requestNostrConnectLoginConfirmation).not.toHaveBeenCalled();
+  });
+});
+
+describe("scanned Keryx join URLs", () => {
+  it("hands the join URL to Add company without putting it in the route", async () => {
+    const scan = await setup();
+    const join = "https://acme.example/join?p=eyJ2IjoxfQ";
+
+    await scan.handle(join);
+
+    expect(window.location.hash).toBe("#settings/keryx/new");
+    expect(takeKeryxJoinOffer()).toBe(join);
+  });
+
+  it("leaves other HTTPS URLs to the LNURL flows", () => {
+    expect(isKeryxJoinUrl(PAY_URL)).toBe(false);
+    expect(isKeryxJoinUrl("https://acme.example/join/")).toBe(true);
+    expect(isKeryxJoinUrl("http://acme.example/join")).toBe(false);
   });
 });
 

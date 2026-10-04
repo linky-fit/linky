@@ -6,6 +6,7 @@ export type {
   ContactRow,
   ConversationRow,
   InferDbSchema,
+  KeryxSubscriptionRow,
   LinkyDbSchema,
   LinkyTable,
   MessageRow,

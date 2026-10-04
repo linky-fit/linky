@@ -1138,4 +1138,50 @@ export const pt = {
   // Error and UI strings
   evoluWipeStorageFailed:
     "Mnemônico gravado ausente (não é possível limpar o armazenamento Evolu).",
+
+  // Keryx
+  keryxSection: "Keryx",
+  keryxAddCompany: "Adicionar empresa",
+  keryxCompany: "Empresa",
+  keryxAnnouncement: "Comunicado",
+  keryxJoinUrlLabel: "Link de adesão da empresa",
+  keryxScanQr: "Escanear código QR",
+  keryxJoinUrlInvalid: "Este não é um link de adesão de empresa.",
+  keryxJoinVersionUnsupported:
+    "Este código precisa de uma versão mais recente do Linky. Atualize o Linky e escaneie novamente.",
+  keryxConfirmOriginTitle: "Este é o endereço web da empresa?",
+  keryxConfirmOriginHint:
+    "Continue apenas se reconhecer exatamente este endereço. Tudo o que a empresa lhe enviar será verificado com base nele.",
+  keryxPairing: "Verificando a empresa…",
+  keryxPairFailed:
+    "Não foi possível verificar esta empresa. Tente novamente mais tarde.",
+  keryxLiteModeUnsupported:
+    "Esta empresa publica em um formato que o Linky ainda não suporta.",
+  keryxChannels: "Canais",
+  keryxPrivateFeeds: "Canais privados",
+  keryxPrivateFeedAutoSubscribed: "Assinado automaticamente, só para você",
+  keryxSubscribe: "Assinar",
+  keryxConsentHint: "Escolha o que deseja receber desta empresa.",
+  keryxNoAnnouncements: "Ainda não há comunicados",
+  keryxAnnouncements: "Comunicados",
+  keryxRemoveCompany: "Remover empresa",
+  keryxRemoveArmedHint: "Toque mais uma vez para remover a empresa.",
+  keryxSuspendedTitle: "A identidade desta empresa mudou",
+  keryxSuspendedBody:
+    "Isso pode significar que o site ou as chaves de assinatura da empresa foram comprometidos. As mensagens não são exibidas.",
+  keryxRebrandedTitle: "A empresa mudou de nome",
+  keryxRebrandedBody:
+    "Agora ela se chama “{name}”. As mensagens dela ficam ocultas até você escanear um novo código QR da empresa e emparelhar de novo.",
+  keryxRepair: "Escanear um novo código QR",
+  keryxLogoChanged: "A empresa mudou o logotipo.",
+  keryxLogoAcknowledge: "Aceitar novo logotipo",
+  keryxRefresh: "Atualizar",
+  keryxRefreshFailed:
+    "Não foi possível atualizar. Mostrando comunicados salvos.",
+  keryxFooter: "Este canal nunca vai pedir sua senha, seed ou código.",
+  keryxPrivate: "Privado",
+  keryxAttachments: "Anexos",
+  keryxMediaUnavailable:
+    "O arquivo não corresponde ao que a empresa assinou, por isso não foi aberto.",
+  keryxNotFound: "Não encontrado",
 } satisfies Record<keyof typeof cs, string>;

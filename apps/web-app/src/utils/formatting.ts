@@ -124,6 +124,11 @@ const getDateTimeFormatter = (
   return formatter;
 };
 
+export const formatDate = (iso: string, lang?: string): string =>
+  new Date(iso).toLocaleDateString(normalizeLocale(lang), {
+    dateStyle: "medium",
+  });
+
 export const formatInteger = (value: number, lang?: string): string => {
   const locale = normalizeLocale(lang);
   let formatter = numberFormatters.get(locale);

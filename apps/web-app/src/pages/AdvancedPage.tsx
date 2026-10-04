@@ -26,6 +26,7 @@ import {
 } from "../app/hooks/useRelayHealth";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
 
+import { KeryxSettingsSection } from "../components/KeryxSettingsSection";
 import { useColorModePreference } from "../hooks/useColorMode";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
@@ -366,6 +367,10 @@ export function AdvancedPage(): React.ReactElement {
           }
         />
       </Section>
+
+      <Divider />
+
+      <KeryxSettingsSection />
 
       <Text
         variant="caption"

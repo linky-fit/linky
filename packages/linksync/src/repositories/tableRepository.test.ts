@@ -1,5 +1,10 @@
 import { Effect, Logger, LogLevel } from "effect";
-import { makeInMemoryShardDb, ShardDbError, type ShardDb } from "../core";
+import {
+  makeInMemoryShardDb,
+  ShardDbError,
+  type Mutation,
+  type ShardDb,
+} from "../core";
 import { createId } from "@linky-fit/domain";
 import { linkyTableColumns, type LinkyDbSchema } from "../model/schema";
 import { createLinkyStore } from "../model/store";
@@ -46,6 +51,19 @@ describe("tableRepository", () => {
     expect(runNow(store.activeIndex("contacts"))).toBe(0);
   });
 
+  it("revives a removed row on insert", () => {
+    const { store } = linkyStore();
+    const contacts = tableRepository(store, "contacts", "contact");
+    const contact = {
+      id: createId<"Contact">(),
+      name: NonEmptyString1000.orThrow("Alice"),
+    };
+    runNow(contacts.insert(contact));
+    runNow(contacts.remove(contact.id));
+    runNow(contacts.insert(contact));
+    expect(runNow(contacts.byId(contact.id))).toMatchObject(contact);
+  });
+
   describe("insertIfAbsent", () => {
     const rumorId = RumorId.make("ab".repeat(32));
     const message = (content: string) => ({
@@ -72,6 +90,25 @@ describe("tableRepository", () => {
       expect(runNow(messages.all).map((row) => row.content)).toEqual([
         "hi, edited",
       ]);
+    });
+
+    it("writes columns only, so a removal synced later still wins", () => {
+      const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns);
+      const sent: Mutation[] = [];
+      const store = createLinkyStore(
+        {
+          ...db,
+          mutate: (mutations) => {
+            sent.push(...mutations);
+            return db.mutate(mutations);
+          },
+        },
+        testAppOwner(),
+      );
+      runNow(messagesOf(store).insertIfAbsent(message("hi")));
+      const written = sent.filter((m) => m.table === "message");
+      expect(written).toHaveLength(1);
+      expect(written[0]?.row).not.toHaveProperty("isDeleted");
     });
 
     it("does not revive a removed row", () => {

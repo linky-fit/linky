@@ -14,6 +14,7 @@ import {
   CashuProofId,
   ContactId,
   ConversationId,
+  KeryxSubscriptionId,
   MessageId,
   NostrIdentityId,
   ReactionId,
@@ -245,6 +246,22 @@ export const LinkySchema = {
     error: nullOr(NonEmptyString1000),
     pendingLabel: nullOr(NonEmptyString100),
   },
+  /** Keryx scope: the user's pairing with one company, shared by every device. */
+  keryxSubscription: {
+    // `keryxSubscriptionIdFor(origin)`, so pairing on two devices lands on one row.
+    id: KeryxSubscriptionId,
+    // The join origin: ASCII scheme + host[:port], no trailing slash.
+    origin: NonEmptyString1000,
+    // Keryx `CompanyTrust` JSON: the pinned root and the metadata versions seen.
+    trustJson: NonEmptyString,
+    // Keryx `CompanyIdentity` JSON the user acknowledged; an inline logo can be long.
+    identityJson: NonEmptyString,
+    // JSON array of the subscribed public channel names; may be `[]`.
+    channelsJson: NonEmptyString1000,
+    // JSON array of private feed capability URLs, which are secrets; per-feed sync state stays on each device.
+    privateFeedsJson: nullOr(NonEmptyString),
+    pairedAtSec: PositiveInt,
+  },
 } satisfies EvoluSchema;
 
 /** The column value types of an Evolu schema, the shape the shard store reads and writes. */
@@ -271,6 +288,7 @@ export type CashuProofRow = Row<LinkyDbSchema["cashuProof"]>;
 export type CashuOperationRow = Row<LinkyDbSchema["cashuOperation"]>;
 export type TransactionRow = Row<LinkyDbSchema["transaction"]>;
 export type RecurringPaymentRow = Row<LinkyDbSchema["recurringPayment"]>;
+export type KeryxSubscriptionRow = Row<LinkyDbSchema["keryxSubscription"]>;
 
 const columnNames = <Table extends Record<string, unknown>>(
   table: Table,
@@ -291,4 +309,5 @@ export const linkyTableColumns: TableColumns<LinkyDbSchema> = {
   cashuOperation: columnNames(LinkySchema.cashuOperation),
   transaction: columnNames(LinkySchema.transaction),
   recurringPayment: columnNames(LinkySchema.recurringPayment),
+  keryxSubscription: columnNames(LinkySchema.keryxSubscription),
 };

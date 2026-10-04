@@ -44,6 +44,7 @@ const USER_TABLES = [
   "nostrReaction",
   "transaction",
   "recurringPayment",
+  "keryxSubscription",
 ];
 const SYSTEM_TABLES = ["ownerMeta", "shardPointer", "setting"];
 

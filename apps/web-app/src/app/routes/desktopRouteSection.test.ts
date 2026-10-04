@@ -1,3 +1,4 @@
+import { createIdFromString } from "@linky-fit/linksync";
 import { describe, expect, it } from "vitest";
 import {
   getDesktopActiveContactId,
@@ -11,6 +12,17 @@ describe("desktopRouteSection", () => {
     expect(getDesktopRouteSection({ kind: "cashuTokens" })).toBe("settings");
     expect(getDesktopRouteSection({ kind: "cashuTokenNew" })).toBe("settings");
     expect(getDesktopRouteSection({ kind: "cashuTokenEmit" })).toBe("settings");
+  });
+
+  it("keeps Keryx companies in settings", () => {
+    const id = createIdFromString<"KeryxSubscription">("company-1");
+    expect(getDesktopRouteSection({ kind: "keryxCompanyNew" })).toBe(
+      "settings",
+    );
+    expect(isDesktopSectionEntryRoute({ kind: "keryxCompany", id })).toBe(true);
+    expect(
+      isDesktopSectionEntryRoute({ kind: "keryxAnnouncement", id, key: "a" }),
+    ).toBe(false);
   });
 
   it("only expands the section roots across the detail area", () => {

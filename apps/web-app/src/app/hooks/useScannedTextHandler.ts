@@ -30,6 +30,7 @@ import {
   parseCashuPaymentRequestMessage,
   type CashuPaymentRequestMessageInfo,
 } from "../lib/paymentRequestMessage";
+import { isKeryxJoinUrl, offerKeryxJoin } from "../lib/keryxJoinOffer";
 import { runWrite } from "../lib/storeWrite";
 import type { ContactRowLike } from "../types/appTypes";
 import type { Translate } from "../../i18n";
@@ -100,6 +101,12 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       if (nostrConnect) {
         closeScan();
         requestNostrConnectLoginConfirmation(nostrConnect);
+        return;
+      }
+
+      if (isKeryxJoinUrl(scanText)) {
+        closeScan();
+        offerKeryxJoin(scanText);
         return;
       }
 
