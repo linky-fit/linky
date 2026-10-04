@@ -40,9 +40,44 @@ const disableOpfs = async (page: Page) => {
   });
 };
 
+/** Counts React commits through the DevTools hook, which production React also calls. */
+const countReactCommits = (page: Page) =>
+  page.addInitScript(() => {
+    Reflect.set(window, "e2eReactCommits", 0);
+    Reflect.set(window, "__REACT_DEVTOOLS_GLOBAL_HOOK__", {
+      supportsFiber: true,
+      inject: () => 1,
+      onCommitFiberRoot: () =>
+        Reflect.set(
+          window,
+          "e2eReactCommits",
+          Number(Reflect.get(window, "e2eReactCommits")) + 1,
+        ),
+    });
+  });
+
+/** A render loop commits without pause; a settled screen goes a whole poll interval without one. */
+const expectRendersToSettle = async (page: Page) => {
+  const commits = () =>
+    page.evaluate(() => Number(Reflect.get(window, "e2eReactCommits")));
+  let previous = await commits();
+  expect(previous, "the DevTools hook saw no React commit").toBeGreaterThan(0);
+  await expect
+    .poll(
+      async () => {
+        const current = await commits();
+        const settled = current === previous;
+        previous = current;
+        return settled;
+      },
+      { intervals: [250] },
+    )
+    .toBe(true);
+};
+
 const createContactAndOpenChat = async (
   page: Page,
-  addButtonName = "Add",
+  labels = { add: "Add", saved: "Contact saved." },
 ): Promise<string> => {
   await page.goto("/#");
   await page.locator("[data-guide='contact-add-button']").first().click();
@@ -53,11 +88,14 @@ const createContactAndOpenChat = async (
   await searchInput.fill(CONTACT_NPUB);
   await searchInput.press("Enter");
   await expect(
-    page.getByRole("button", { name: addButtonName, exact: true }),
+    page.getByRole("button", { name: labels.add, exact: true }),
   ).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: addButtonName, exact: true }).click();
+  await page.getByRole("button", { name: labels.add, exact: true }).click();
 
   await page.waitForURL(/#(?:contacts)?$/, { timeout: 20_000 });
+  await expect(
+    page.locator('[aria-live="polite"]').getByText(labels.saved),
+  ).toBeVisible();
   const contactCards = page.locator("[data-guide='contact-card']");
   await expect
     .poll(async () => contactCards.count(), { timeout: 20_000 })
@@ -73,43 +111,25 @@ const createContactAndOpenChat = async (
   return decodeURIComponent(contactMatch[1]);
 };
 
-test("keeps unauthenticated auth gating without render loops", async ({
+test("gates a signed-out wallet without render loops and restores from SLIP-39", async ({
   page,
 }) => {
-  const maximumDepthErrors: string[] = [];
-  page.on("console", (message) => {
-    if (
-      message.type() === "error" &&
-      message.text().includes("Maximum update depth exceeded")
-    ) {
-      maximumDepthErrors.push(message.text());
-    }
-  });
+  const errors = watchAppErrors(page, "signed out");
+  const slip39Share = await Effect.runPromise(createSlip39Share());
   await setBaseStorage(page);
+  await countReactCommits(page);
+  await page.setViewportSize({ ...MOBILE_VIEWPORT });
 
   await page.goto("/#wallet");
-
   await expect(
     page.getByRole("button", { name: "Create a profile" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "I already have a profile" }),
   ).toBeVisible();
   await expect(page.locator("[data-guide='contact-add-button']")).toHaveCount(
     0,
   );
-  await page.waitForTimeout(3_000);
-  expect(maximumDepthErrors).toEqual([]);
-});
+  await expectRendersToSettle(page);
+  errors.assertClean();
 
-test("restores an account from SLIP-39 without getting stuck", async ({
-  page,
-}) => {
-  const slip39Share = await Effect.runPromise(createSlip39Share());
-  await setBaseStorage(page);
-  await page.setViewportSize({ ...MOBILE_VIEWPORT });
-
-  await page.goto("/#wallet");
   await page.getByRole("button", { name: "I already have a profile" }).click();
   await page.getByLabel("Keys").fill(slip39Share);
   const reloadFinished = page.waitForEvent("load");
@@ -149,105 +169,6 @@ test("restores an account when private browsing disables OPFS", async ({
   await expect(page.getByLabel("Available balance")).toBeVisible({
     timeout: 30_000,
   });
-});
-
-test("preserves route parity and critical handlers", async ({ page }) => {
-  await setAuthenticatedStorage(page);
-  await page.setViewportSize({ ...MOBILE_VIEWPORT });
-
-  await page.goto("/#");
-  await expect(
-    page.locator("[data-guide='contact-add-button']").first(),
-  ).toBeVisible();
-
-  await page.getByRole("tab", { name: "Wallet" }).click();
-  await page.waitForURL(/#wallet$/, { timeout: 10_000 });
-  await expect(page.getByLabel("Available balance")).toBeVisible();
-
-  await page.goto("/#profile");
-  await page.waitForURL(/#profile$/, { timeout: 10_000 });
-  await expect(page.getByTestId("profile-detail")).toBeVisible();
-
-  await page.goto("/#");
-  await page.getByRole("tab", { name: "Settings" }).click();
-  await page.waitForURL(/#settings$/, { timeout: 10_000 });
-  await expect(page.getByRole("button", { name: /^Mint\b/ })).toBeVisible();
-
-  await page.goto("/#");
-  await page.locator("[data-guide='contact-add-button']").first().click();
-  await page.waitForURL(/#contact\/new$/, { timeout: 10_000 });
-
-  await page.locator("[data-guide='scan-contact-button']").click();
-  const scanDialog = page.getByRole("dialog", { name: "Add contact" });
-  await expect(scanDialog).toBeVisible();
-  await scanDialog.getByRole("button", { name: "Close" }).click();
-  await expect(page.getByRole("dialog", { name: "Add contact" })).toHaveCount(
-    0,
-  );
-
-  const searchInput = page.locator("[data-guide='contact-search-input']");
-  await expect(searchInput).toBeVisible();
-  await searchInput.fill(CONTACT_NPUB);
-  await searchInput.press("Enter");
-  await expect(
-    page.getByRole("button", { name: "Add", exact: true }),
-  ).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-
-  await page.waitForURL(/#(?:contacts)?$/, { timeout: 10_000 });
-  await expect(
-    page.locator('[aria-live="polite"]').getByText("Contact saved"),
-  ).toBeVisible();
-
-  const contactCards = page.locator("[data-guide='contact-card']");
-  await expect
-    .poll(async () => contactCards.count(), { timeout: 20_000 })
-    .toBeGreaterThan(0);
-
-  await contactCards.first().click();
-  await page.waitForURL(/#chat\/[^/]+$/, { timeout: 10_000 });
-  await expect(page.locator("[data-guide='chat-input']")).toBeVisible();
-
-  const contactUrl = new URL(page.url());
-  const contactMatch = contactUrl.hash.match(/^#chat\/([^/]+)$/);
-  if (!contactMatch?.[1]) {
-    throw new Error(`Could not parse contact id from ${contactUrl.hash}`);
-  }
-  const contactId = decodeURIComponent(contactMatch[1]);
-
-  await page.goto(`/#contact/${encodeURIComponent(contactId)}`);
-  await page.waitForURL(
-    new RegExp(`#contact/${encodeURIComponent(contactId)}$`),
-    {
-      timeout: 10_000,
-    },
-  );
-  await expect(page.locator("[data-guide='contact-message']")).toBeVisible();
-  await expect(page.locator("[data-guide='contact-pay']")).toBeVisible();
-
-  await page.locator("[data-guide='contact-message']").click();
-  await page.waitForURL(new RegExp(`#chat/${contactId}$`), { timeout: 10_000 });
-  await expect(page.locator("[data-guide='chat-input']")).toBeVisible();
-
-  await page.getByRole("banner").getByRole("button", { name: "Close" }).click();
-  await page.waitForURL(/#(?:contacts)?$/, { timeout: 10_000 });
-  await page.getByRole("tab", { name: "Wallet" }).click();
-  await page.waitForURL(/#wallet$/, { timeout: 10_000 });
-  await expect(page.getByLabel("Available balance")).toBeVisible();
-
-  await page.goto(`/#contact/${encodeURIComponent(contactId)}/pay`);
-  await page.waitForURL(
-    new RegExp(`#contact/${encodeURIComponent(contactId)}/pay$`),
-    {
-      timeout: 10_000,
-    },
-  );
-
-  await page.getByRole("button", { name: "1", exact: true }).click();
-  await page.getByRole("button", { name: "0", exact: true }).click();
-  const paySend = page.locator("[data-guide='pay-send']");
-  await expect(paySend).toBeVisible();
-  await expect(paySend).toBeDisabled();
 });
 
 test("supports chat reply, edit, reaction toggle, and copy actions", async ({
@@ -357,17 +278,46 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
   const title = banner.getByRole("heading");
   const close = banner.getByRole("button", { name: "Schließen", exact: true });
 
-  await test.step("save a contact so diagnostic tables contain real changes", async () => {
-    await createContactAndOpenChat(page, "Hinzufügen");
+  const contactId =
+    await test.step("open and close the scanner, then save a contact so diagnostic tables contain real changes", async () => {
+      await page.goto("/#contact/new");
+      await page.locator("[data-guide='scan-contact-button']").click();
+      const scanDialog = page.getByRole("dialog", {
+        name: "Kontakt hinzufügen",
+      });
+      await expect(scanDialog).toBeVisible();
+      await scanDialog.getByRole("button", { name: "Schließen" }).click();
+      await expect(scanDialog).toHaveCount(0);
+      return createContactAndOpenChat(page, {
+        add: "Hinzufügen",
+        saved: "Kontakt gespeichert.",
+      });
+    });
+
+  await test.step("open the contact's pay, detail and chat routes", async () => {
+    const contactPath = `#contact/${encodeURIComponent(contactId)}`;
+    await page.goto(`/${contactPath}/pay`);
+    await page.getByRole("button", { name: "1", exact: true }).click();
+    await page.getByRole("button", { name: "0", exact: true }).click();
+    const paySend = page.locator("[data-guide='pay-send']");
+    await expect(paySend).toBeVisible();
+    await expect(paySend).toBeDisabled();
+
+    await page.goto(`/${contactPath}`);
+    await expect(page.locator("[data-guide='contact-pay']")).toBeVisible();
+    await page.locator("[data-guide='contact-message']").click();
+    await expect(page).toHaveURL(new RegExp(`#chat/${contactId}$`));
+    await expect(page.locator("[data-guide='chat-input']")).toBeVisible();
+    await close.click();
+    await expect(page).toHaveURL(/#(?:contacts)?$/);
   });
 
   await test.step("open German settings from the bottom navigation and inspect the mint", async () => {
-    await page.goto("/#wallet");
+    const tabs = page.getByRole("tablist");
+    await tabs.getByRole("tab", { name: "Wallet", exact: true }).click();
+    await expect(page).toHaveURL(/#wallet$/);
     await expect(page.getByLabel("Verfügbares Guthaben")).toBeVisible();
-    await page
-      .getByRole("tablist")
-      .getByRole("tab", { name: "Einstellungen", exact: true })
-      .click();
+    await tabs.getByRole("tab", { name: "Einstellungen", exact: true }).click();
     await expect(page).toHaveURL(/#settings$/);
     await expect(title).toHaveAccessibleName("Einstellungen");
     for (const name of [

@@ -32,7 +32,10 @@ for (const scenario of [
       }
     });
 
-    await page.goto("/password-save.html");
+    await page.route("**/spayd-host", (route) =>
+      route.fulfill({ contentType: "text/html", body: "<!doctype html>" }),
+    );
+    await page.goto("/spayd-host");
     await page.evaluate(
       async ({ key, value }) => {
         localStorage.setItem(key, value);
