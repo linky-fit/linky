@@ -1,6 +1,5 @@
-import { createContactNameFormatter } from "../../../utils/contactName";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
-import { decodeNpub, identityFromNsec, UnixSeconds } from "@linky-fit/linkstr";
+import { identityFromNsec, UnixSeconds } from "@linky-fit/linkstr";
 import type {
   BankOfferInboxEvent,
   InboxDelivery,
@@ -17,11 +16,9 @@ import {
 import React from "react";
 import type { PushToastOptions } from "../../../hooks/useToasts";
 import { isBlockedPubkey } from "../../lib/blockList";
-import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import type {
   AppendLocalNostrMessage,
   AppendLocalNostrReaction,
-  ContactNameRowLike,
   LocalNostrMessage,
   LocalNostrReaction,
   PaymentLogData,
@@ -35,6 +32,10 @@ import {
   type ChatInboxContext,
 } from "./chatInbox";
 import { buildUnknownContactId, normalizePubkeyHex } from "./contactIdentity";
+import {
+  buildContactIndex,
+  type InboxContactRowLike,
+} from "./inboxContactIndex";
 import {
   notifyBankOfferSnapshot,
   handlePaymentNoticeReceived,
@@ -58,7 +59,6 @@ import {
   getInitialNostrIdentitySource,
   getInitialNostrIdentitySwitchedAtSec,
 } from "../../../utils/storage";
-import { trimString } from "../../../utils/validation";
 import { nowSeconds } from "../../../utils/time";
 import { allWrites, NO_WRITE, type WriteOutcome } from "../../lib/storeWrite";
 import type { Translate } from "../../../i18n";
@@ -69,33 +69,6 @@ const INBOX_BACKFILL_SINCE_SEC = 3 * 24 * 60 * 60;
 const deriveMyPubkey = (currentNsec: string | null): Pubkey | null => {
   if (!currentNsec) return null;
   return identityFromNsec(currentNsec.trim())?.pubkey ?? null;
-};
-
-type InboxContactRowLike = ContactNameRowLike & {
-  npub?: string | null | undefined;
-  nameSetByUser?: number | null | undefined;
-};
-
-const buildContactIndex = (
-  contacts: readonly InboxContactRowLike[],
-): Map<string, InboxContact> => {
-  const contactByPubkey = new Map<string, InboxContact>();
-  const formatName = createContactNameFormatter(contacts);
-  // Archived contacts stay in the index: their incoming messages land on the
-  // contact itself, which then restores it from the archive.
-  for (const contact of contacts) {
-    const npub = normalizeNpubIdentifier(contact.npub ?? "");
-    if (!npub) continue;
-    const pubkey = decodeNpub(npub);
-    const id = trimString(contact.id);
-    if (!pubkey || !id) continue;
-    contactByPubkey.set(pubkey, {
-      id,
-      name: formatName(contact) || null,
-      npub,
-    });
-  }
-  return contactByPubkey;
 };
 
 interface UseLinkstrInboxSyncParams {
