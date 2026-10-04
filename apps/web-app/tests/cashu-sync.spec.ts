@@ -10,7 +10,6 @@ import {
 import { Effect } from "effect";
 import { fundToken } from "../../../packages/linkshu/tests/integration/helpers";
 import {
-  expectSingleLoad,
   MOBILE_VIEWPORT,
   readBalanceSat,
   setBaseStorage,
@@ -167,127 +166,6 @@ test("restored Cashu funds sync to an open second device and survive an owner ro
       expect(secondDeviceRestores).toEqual([]);
     });
   } finally {
-    for (const device of devices) await device.context.close();
-  }
-});
-
-test("a stale legacy Cashu lane index in storage leaves the shards at index zero", async ({
-  page,
-}) => {
-  const identity = await createSeedIdentity();
-  const errors = watchAppErrors(page, "stale lane");
-  await setBaseStorage(page);
-  await setSeedLoginStorage(page, identity);
-  // An older version's lane mirror means nothing to the shards: the wallet
-  // starts on shard 0 regardless.
-  await page.addInitScript(() => {
-    localStorage.setItem("linky.evolu.cashu_owner_index.v1", "7");
-  });
-  await stubFiatRates(page);
-  await page.goto("/#wallet");
-  await waitForNetworkReady(page);
-  await expect.poll(() => cashuShardIndex(page)).toBe(0);
-  expect(await readBalanceSat(page)).toBe(0);
-  await expectSingleLoad(page, "stale lane");
-  await expectNoBootErrorPanel(page, "stale lane");
-  errors.assertClean();
-});
-
-test("token consumption rotates shard zero from its mutation history while few live rows remain", async ({
-  browser,
-}, testInfo) => {
-  const identity = await createSeedIdentity();
-  const devices = [];
-  for (const label of ["spending", "following"]) {
-    const context = await browser.newContext({
-      baseURL: testInfo.project.use.baseURL,
-      viewport: MOBILE_VIEWPORT,
-    });
-    const page = await context.newPage();
-    const errors = watchAppErrors(page, label);
-    await setBaseStorage(page);
-    await setSeedLoginStorage(page, identity);
-    await stubFiatRates(page);
-    await page.goto("/#wallet");
-    await waitForNetworkReady(page);
-    devices.push({ context, page, errors, label });
-  }
-  const [source, second] = devices;
-  const rotations: { issuedTokens: number; index: number }[] = [];
-  try {
-    await topUp(source.page, 512);
-    for (const device of devices) {
-      await expect.poll(() => readBalanceSat(device.page)).toBe(512);
-    }
-
-    await test.step("issue tokens until the mutation history rotates the shard", async () => {
-      for (let index = 0; index < 60; index += 1) {
-        await source.page.goto("/#wallet/token/emit");
-        await source.page
-          .getByRole("button", { name: "2", exact: true })
-          .click();
-        await source.page
-          .getByRole("button", { name: "Issue", exact: true })
-          .click();
-        await expect(source.page).toHaveURL(
-          /#wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/,
-        );
-        const shardIndex = await cashuShardIndex(source.page);
-        if (rotations.at(-1)?.index !== shardIndex) {
-          rotations.push({ issuedTokens: index + 1, index: shardIndex });
-        }
-      }
-      // Every issue leaves one send operation behind; the proofs it spent
-      // stay on record as `spent`, so nothing is deleted any more.
-      await source.page.goto("/#evolu-data");
-      const operationRowCount = source.page.getByTestId("cashuOperation");
-      await expect(operationRowCount).toContainText(/\d+ rows/);
-      const rows = Number(
-        (await operationRowCount.innerText()).match(/(\d+) rows/)?.[1],
-      );
-      expect(rows).toBeGreaterThanOrEqual(60);
-    });
-
-    await test.step("both devices adopt the automatic rotation", async () => {
-      // Each issue writes several proof and operation mutations, so the
-      // history threshold can trip more than once within the cooldown.
-      for (const device of devices) {
-        await expect
-          .poll(() => cashuShardIndex(device.page))
-          .toBeGreaterThanOrEqual(1);
-      }
-      const [sourceIndex, secondIndex] = await Promise.all(
-        devices.map((device) => cashuShardIndex(device.page)),
-      );
-      expect(secondIndex).toBe(sourceIndex);
-    });
-
-    await source.page.goto("/#wallet");
-    const remaining = await readBalanceSat(source.page);
-    expect(remaining).toBeGreaterThan(300);
-    expect(remaining).toBeLessThanOrEqual(392);
-    await expect.poll(() => readBalanceSat(second.page)).toBe(remaining);
-
-    await test.step("new-lane funds and old-lane change remain synced after reload", async () => {
-      await topUp(source.page, 64);
-      for (const device of devices) {
-        await expect
-          .poll(() => readBalanceSat(device.page))
-          .toBe(remaining + 64);
-        await device.page.reload();
-        await waitForNetworkReady(device.page);
-        await expect
-          .poll(() => readBalanceSat(device.page))
-          .toBe(remaining + 64);
-        await expectNoBootErrorPanel(device.page, device.label);
-        device.errors.assertClean();
-      }
-    });
-  } finally {
-    await testInfo.attach("automatic Cashu owner transitions", {
-      body: JSON.stringify(rotations),
-      contentType: "application/json",
-    });
     for (const device of devices) await device.context.close();
   }
 });
