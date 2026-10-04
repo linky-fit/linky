@@ -150,16 +150,16 @@ export const openForm = async (page: Page): Promise<void> => {
   await page.getByTestId("recurring-picker-contact").click();
 };
 
+/** Saves the open form; its first payment stays hours ahead until `makeDue` moves it. */
 export const saveOrder = async (
   page: Page,
   amount = ORDER_SAT,
-  firstRun = new Date(Date.now() + 60_000),
 ): Promise<string> => {
   await enterAmount(page, amount);
   await page.getByRole("radio", { name: "Daily", exact: true }).click();
   await page
     .getByLabel("First payment", { exact: true })
-    .fill(dateTimeLocal(firstRun));
+    .fill(dateTimeLocal(new Date(Date.now() + 2 * 3_600_000)));
   await page
     .getByRole("button", { name: "Set up recurring payment", exact: true })
     .click();
@@ -285,8 +285,23 @@ export const triggerSchedulerPass = async (page: Page): Promise<void> => {
   });
 };
 
-export const dueAt = async (page: Page): Promise<number> =>
-  (await readOrder(page)).nextDueAtSec;
+export const nowSec = (): number => Math.floor(Date.now() / 1000);
+
+/** Restarts the one recurring payment's schedule at `atSec` (default: now) on this device. */
+export const makeDue = async (
+  page: Page,
+  atSec = nowSec(),
+): Promise<number> => {
+  const { id } = await readOrder(page);
+  await page.evaluate(
+    ([id, atSec]) => {
+      if (!window.__linkyE2E) throw new Error("Missing __linkyE2E");
+      return window.__linkyE2E.makeRecurringDue(id, atSec);
+    },
+    [id, atSec] as const,
+  );
+  return atSec;
+};
 
 export const waitUntil = async (epochSec: number): Promise<void> => {
   await expect
@@ -300,11 +315,9 @@ export const waitUntil = async (epochSec: number): Promise<void> => {
 export const dueDialog = (page: Page) =>
   page.getByRole("dialog", { name: "Scheduled payment", exact: true });
 
-export const waitForCountdown = async (
-  page: Page,
-  dueAtSec: number,
-): Promise<void> => {
-  await waitUntil(dueAtSec);
+/** Makes the payment due now and waits for the visible app's countdown. */
+export const showCountdown = async (page: Page): Promise<void> => {
+  await makeDue(page);
   await triggerSchedulerPass(page);
   await expect(dueDialog(page)).toBeVisible();
   await expect(dueDialog(page)).toContainText(
@@ -312,20 +325,31 @@ export const waitForCountdown = async (
   );
 };
 
+const IncomingRow = Schema.Struct({
+  direction: Schema.Literal("in"),
+  status: Schema.Literal("ok"),
+  amount: Schema.Number,
+});
+
+/** Waits for the contact's one incoming payment to be stored and returns what arrived after fees. */
 export const expectReceived = async (
   page: Page,
   sats = ORDER_SAT,
 ): Promise<number> => {
-  let balance = 0;
-  // A receive stores its proofs one by one, so wait for the balance to settle.
+  let received = 0;
   await expect(async () => {
-    balance = await readBalanceSat(page);
-    expect(balance).toBeGreaterThanOrEqual(sats - MAX_FEE_SAT);
-    await page.waitForTimeout(2_000);
-    expect(await readBalanceSat(page)).toBe(balance);
+    const rows = await page.evaluate(async () => {
+      if (!window.__linkyE2E) throw new Error("Missing __linkyE2E");
+      return window.__linkyE2E.shardRows("transactions", "transaction");
+    });
+    const incoming = rows.filter(Schema.is(IncomingRow));
+    expect(incoming).toHaveLength(1);
+    received = incoming[0]?.amount ?? 0;
   }).toPass({ timeout: 60_000 });
-  expect(balance).toBeLessThan(sats);
-  return balance;
+  expect(received).toBeGreaterThanOrEqual(sats - MAX_FEE_SAT);
+  expect(received).toBeLessThan(sats);
+  await expect.poll(() => readBalanceSat(page)).toBe(received);
+  return received;
 };
 
 /** A detail row's value, which the row labels with its title. */

@@ -5,14 +5,21 @@ import {
   createId,
   directConversationIdFor,
   linkyScopes,
+  makeRecurringPaymentsRepository,
   mergeShardRows,
   OwnerId,
+  PositiveInt,
   type LinkyScope,
   type LinkyTable,
 } from "@linky-fit/linksync";
 import { LeaseId } from "@linky-fit/linkshu";
 import { createEvoluShardDb } from "@linky-fit/linksync/evolu";
+import {
+  editPatch,
+  readRecurringPaymentOrder,
+} from "@linky-fit/recurring-payment";
 import { Effect } from "effect";
+import { recurringPaymentUpdate } from "../../app/lib/recurringPaymentStore";
 import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
 import {
   evolu,
@@ -69,6 +76,8 @@ export interface LinkyE2eHooks {
     ttlMs: number,
   ) => Promise<string | null>;
   readonly releaseLease: (key: string, lease: string) => Promise<void>;
+  /** Restarts a recurring payment's schedule at `atSec`, as an edit would, but without the form's no-past rule. */
+  readonly makeRecurringDue: (id: string, atSec: number) => Promise<void>;
 }
 
 declare global {
@@ -174,5 +183,18 @@ export const installLinkyE2eHooks = (): void => {
       Effect.runPromise(walletStore.tryAcquireLease(key, ttlMs)),
     releaseLease: (key, lease) =>
       Effect.runPromise(walletStore.releaseLease(key, LeaseId.make(lease))),
+    makeRecurringDue: async (id, atSec) => {
+      const payments = makeRecurringPaymentsRepository(await getLinkyStore());
+      const order = (await Effect.runPromise(payments.all))
+        .map(readRecurringPaymentOrder)
+        .find((candidate) => candidate?.id === id);
+      if (!order) throw new Error(`unknown recurring payment ${id}`);
+      await Effect.runPromise(
+        payments.update(order.id, {
+          anchorAtSec: PositiveInt.orThrow(atSec),
+          ...recurringPaymentUpdate(editPatch(order, atSec)),
+        }),
+      );
+    },
   };
 };
