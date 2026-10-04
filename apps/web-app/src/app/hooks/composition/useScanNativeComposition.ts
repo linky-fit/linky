@@ -40,6 +40,7 @@ import type { LnurlAuthResult } from "../useLnurlAuth";
 import type { NostrConnectLoginResult } from "../useNostrConnectLogin";
 import { takeNostrConnectHashLink } from "../../../nostrConnect";
 import { isAnimatedQrFrame } from "../../../utils/animatedQr";
+import { useExperimentalFeatures } from "../useExperimentalFeatures";
 import { useGuideScannerDomain } from "../useGuideScannerDomain";
 import { useScannedTextHandler } from "../useScannedTextHandler";
 import {
@@ -596,12 +597,14 @@ export const useScanNativeComposition = ({
     [addNewContactFromIdentifier],
   );
 
+  const { experimentalFeatures } = useExperimentalFeatures();
   const handleScannedText = useScannedTextHandler<(typeof contacts)[number]>({
     closeScan,
     contacts,
     contactsRepository,
     currentNpub,
     extractCashuTokenFromText,
+    keryxEnabled: experimentalFeatures,
     lightningInvoiceAutoPayLimit,
     onContactIdentifierScanned:
       route.kind === "contactNew" ? handleContactIdentifierScanned : null,

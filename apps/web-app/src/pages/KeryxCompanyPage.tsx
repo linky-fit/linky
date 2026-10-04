@@ -58,7 +58,7 @@ export function KeryxCompanyPage({
   const remove = () =>
     removal.confirm(() => {
       void keryx.remove(company).then((outcome) => {
-        if (outcome.ok) navigateTo({ route: "settings" });
+        if (outcome.ok) navigateTo({ route: "keryxCompanies" });
         else pushToast(outcome.error);
       });
     });

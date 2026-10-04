@@ -280,7 +280,15 @@ _Avoid_: payment method, channel
 
 **Keryx**:
 The protocol through which companies broadcast signed announcements to the user; Linky is a Keryx client.
-_Avoid_: newsletter, company messaging
+_Avoid_: company messaging
+
+**Newsletters**:
+Keryx's name in the app: the experimental Settings page listing the companies the user paired.
+_Avoid_: message board, inbox, feed
+
+**Experimental features**:
+A synced switch in Settings that shows features not yet ready for everyone, such as newsletters.
+_Avoid_: beta, labs, dev mode
 
 **Company**:
 A Keryx publisher, known by the join origin the user confirmed when pairing; its name and logo are self-asserted, so the origin always shows beside them.

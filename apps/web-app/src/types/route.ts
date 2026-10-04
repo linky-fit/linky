@@ -37,6 +37,7 @@ export type Route =
   | { kind: "settingsUnits" }
   | { kind: "settingsReceiveMethod" }
   | { kind: "settingsMasterKeys" }
+  | { kind: "keryxCompanies" }
   | { kind: "keryxCompanyNew" }
   | { kind: "keryxCompany"; id: KeryxSubscriptionId }
   | { kind: "keryxAnnouncement"; id: KeryxSubscriptionId; key: string }
@@ -101,6 +102,7 @@ export const parseRouteFromHash = (): Route => {
     return { kind: "settingsReceiveMethod" };
   }
   if (hash === "#settings/master-keys") return { kind: "settingsMasterKeys" };
+  if (hash === "#settings/keryx") return { kind: "keryxCompanies" };
   if (hash === "#settings/keryx/new") return { kind: "keryxCompanyNew" };
   const keryxPrefix = "#settings/keryx/";
   if (hash.startsWith(keryxPrefix)) {

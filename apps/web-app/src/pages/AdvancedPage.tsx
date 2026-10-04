@@ -24,9 +24,9 @@ import {
   overallRelayStatus,
   useRelayHealth,
 } from "../app/hooks/useRelayHealth";
+import { useExperimentalFeatures } from "../app/hooks/useExperimentalFeatures";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
 
-import { KeryxSettingsSection } from "../components/KeryxSettingsSection";
 import { useColorModePreference } from "../hooks/useColorMode";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
@@ -62,6 +62,8 @@ export function AdvancedPage(): React.ReactElement {
     setPayWithCashuEnabled,
   } = useAdvancedSettingsContext();
   const { allowTestMints, setAllowTestMints } = useMintSettingsContext();
+  const { experimentalFeatures, setExperimentalFeatures } =
+    useExperimentalFeatures();
   const relayHealth = useRelayHealth();
   const connectedRelayCount = countConnectedRelays(relayUrls, relayHealth);
   const nostrRelayOverallStatus = overallRelayStatus(relayUrls, relayHealth);
@@ -323,6 +325,15 @@ export function AdvancedPage(): React.ReactElement {
         {linkRow("Bug", t("nostrInspector"), () =>
           navigateTo({ route: "advancedInspector" }),
         )}
+        {toggleRow(
+          "FlaskConical",
+          t("experimentalFeatures"),
+          experimentalFeatures,
+          (checked) =>
+            void setExperimentalFeatures(checked).then((outcome) => {
+              if (!outcome.ok) pushToast(outcome.error);
+            }),
+        )}
       </Section>
 
       <Divider />
@@ -368,9 +379,16 @@ export function AdvancedPage(): React.ReactElement {
         />
       </Section>
 
-      <Divider />
-
-      <KeryxSettingsSection />
+      {experimentalFeatures ? (
+        <>
+          <Divider />
+          <Section title={t("settingsExperimental")}>
+            {linkRow("Megaphone", t("keryxNewsletters"), () =>
+              navigateTo({ route: "keryxCompanies" }),
+            )}
+          </Section>
+        </>
+      ) : null}
 
       <Text
         variant="caption"

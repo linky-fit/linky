@@ -37,6 +37,7 @@ import {
   EvoluServersPage,
   InspectorSettingsPage,
   KeryxAnnouncementPage,
+  KeryxCompaniesPage,
   KeryxCompanyNewPage,
   KeryxCompanyPage,
   LanguagePage,
@@ -138,6 +139,8 @@ const RoutePage = (): React.ReactElement => {
       return <ReceiveMethodPage />;
     case "settingsMasterKeys":
       return <MasterKeysPage />;
+    case "keryxCompanies":
+      return <KeryxCompaniesPage />;
     case "keryxCompanyNew":
       return <KeryxCompanyNewPage />;
     case "keryxCompany":

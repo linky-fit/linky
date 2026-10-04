@@ -75,10 +75,11 @@ describe("resolveBackAction", () => {
     expect(backHashFor({ kind: "chatStorage" })).toBe("#evolu-servers");
   });
 
-  it("walks Keryx pages back to the company and then settings", () => {
+  it("walks Keryx pages back through the company list to settings", () => {
     const id = createIdFromString<"KeryxSubscription">("company-1");
-    expect(backHashFor({ kind: "keryxCompanyNew" })).toBe("#settings");
-    expect(backHashFor({ kind: "keryxCompany", id })).toBe("#settings");
+    expect(backHashFor({ kind: "keryxCompanies" })).toBe("#settings");
+    expect(backHashFor({ kind: "keryxCompanyNew" })).toBe("#settings/keryx");
+    expect(backHashFor({ kind: "keryxCompany", id })).toBe("#settings/keryx");
     expect(backHashFor({ kind: "keryxAnnouncement", id, key: "news/a" })).toBe(
       `#settings/keryx/${id}`,
     );
