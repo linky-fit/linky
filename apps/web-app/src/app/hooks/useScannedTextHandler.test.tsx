@@ -20,6 +20,7 @@ import {
   type CashuPaymentRequestMessageInfo,
 } from "../lib/paymentRequestMessage";
 import { encodeBase64Url } from "../../utils/base64";
+import { optimizeCaseInsensitiveQrPayload } from "../../utils/qrPayload";
 import { isKeryxJoinUrl, takeKeryxJoinOffer } from "../lib/keryxJoinOffer";
 
 const K1 = "b".repeat(64);
@@ -67,6 +68,10 @@ const setup = async ({
     .fn<(invoice: string) => Promise<boolean>>()
     .mockResolvedValue(true);
   const requestLightningInvoiceConfirmation = vi.fn();
+  const insertContact = vi.fn<ScanParams["contactsRepository"]["insert"]>(
+    () => Effect.void,
+  );
+  const setStatus = vi.fn<ScanParams["setStatus"]>();
   const handlerRef: { current: ScannedTextHandler | null } = { current: null };
   const confirmationRef: {
     current: ReturnType<typeof useCashuPaymentRequestConfirmation> | null;
@@ -82,7 +87,7 @@ const setup = async ({
     const handle = useScannedTextHandler({
       closeScan: () => undefined,
       contacts,
-      contactsRepository: { insert: () => Effect.void },
+      contactsRepository: { insert: insertContact },
       currentNpub,
       extractCashuTokenFromText: () => null,
       keryxEnabled,
@@ -98,7 +103,7 @@ const setup = async ({
       saveCashuFromText: async () => undefined,
       scanAcceptsBankPayment: false,
       scanEntryPoint: null,
-      setStatus: () => undefined,
+      setStatus,
       t: translateToKey,
     });
 
@@ -123,6 +128,8 @@ const setup = async ({
       if (!confirmation) throw new Error("confirmation hook did not mount");
       return confirmation;
     },
+    insertContact,
+    setStatus,
     runCashuPaymentRequest,
     payLightningInvoiceWithCashu,
     requestLightningInvoiceConfirmation,
@@ -237,6 +244,37 @@ describe("scanned Keryx join URLs", () => {
     expect(isKeryxJoinUrl(PAY_URL)).toBe(false);
     expect(isKeryxJoinUrl("https://acme.example/join/")).toBe(true);
     expect(isKeryxJoinUrl("http://acme.example/join")).toBe(false);
+  });
+});
+
+describe("scanned Profile QR with an uppercase npub", () => {
+  const npub = encodeNpub(makeIdentity().pubkey);
+  const qrPayload = optimizeCaseInsensitiveQrPayload(npub);
+
+  it("recognises the user's own QR", async () => {
+    const scan = await setup({ currentNpub: npub });
+    await scan.handle(qrPayload);
+
+    expect(scan.setStatus).toHaveBeenCalledWith("contactIsYou");
+    expect(scan.insertContact).not.toHaveBeenCalled();
+  });
+
+  it("opens the existing contact instead of duplicating it", async () => {
+    const id = createId<"Contact">();
+    const scan = await setup({ contacts: [{ id, name: "Bob", npub }] });
+    await scan.handle(qrPayload);
+
+    expect(scan.setStatus).toHaveBeenCalledWith("contactExists");
+    expect(scan.insertContact).not.toHaveBeenCalled();
+  });
+
+  it("saves a new contact with the lowercase npub", async () => {
+    const scan = await setup();
+    await scan.handle(qrPayload);
+
+    expect(scan.insertContact).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ npub }),
+    );
   });
 });
 
