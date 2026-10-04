@@ -1,42 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
-const LOCAL_STACK_SPECS = [
-  "**/boot-recovery.spec.ts",
-  "**/browser-compat.spec.ts",
-  "**/sqlite-crash-recovery.spec.ts",
-  "**/appshell-parity.spec.ts",
-  "**/shards.spec.ts",
-  "**/wallet-lease.spec.ts",
-  "**/lane-migration.spec.ts",
-  "**/private-attachments.spec.ts",
-  "**/chat-payment-request.spec.ts",
-  "**/chat-recovery.spec.ts",
-  "**/evolu-sync.spec.ts",
-  "**/evolu-servers.spec.ts",
-  "**/evolu-quota-recovery.spec.ts",
-  "**/cashu-sync.spec.ts",
-  "**/proxy-payment.spec.ts",
-  "**/recurring-payments.spec.ts",
-  "**/issued-token-to-contact.spec.ts",
-  "**/linkshu-migration.spec.ts",
-  "**/mint-management.spec.ts",
-  "**/password-manager-save.spec.ts",
-  "**/profile-tilt-permission.spec.ts",
-  "**/profile-edit.spec.ts",
-  "**/spayd-response.spec.ts",
-  "**/security-policy.spec.ts",
-  "**/seed-restore-chat-tokens.spec.ts",
-  "**/receive-deferred.spec.ts",
-  "**/receive-deferred-actions.spec.ts",
-  "**/restore.spec.ts",
-  "**/new-account.spec.ts",
-  "**/lightning-address-identity.spec.ts",
-  "**/duplicate-contact-routing.spec.ts",
-];
-
 export default defineConfig({
   testDir: "./tests",
   testMatch: "**/*.spec.ts",
+  fullyParallel: true,
+  workers: process.env.CI ? 4 : undefined,
   timeout: 120000,
   use: {
     headless: true,
@@ -48,7 +16,6 @@ export default defineConfig({
       // production build. Deliberately no webServer — compose owns the app;
       // `bun run e2e` (scripts/e2e.sh) starts it and runs this project.
       name: "local-stack",
-      testMatch: LOCAL_STACK_SPECS,
       // Three cold app boots plus a full offer state machine; the slowest test
       // takes about a minute in CI.
       timeout: 150_000,

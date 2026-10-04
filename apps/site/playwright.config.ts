@@ -6,7 +6,7 @@ const nostrPort = process.env.LINKY_E2E_NOSTR_PORT ?? 7777;
 export default defineConfig({
   testDir: "./tests",
   timeout: 60_000,
-  workers: 1,
+  fullyParallel: true,
   use: {
     baseURL: `http://localhost:${port}`,
     trace: "retain-on-failure",
