@@ -1051,6 +1051,22 @@ export const de = {
   lnurlAuthDoneHint: "Du kannst zur Website zurückkehren.",
   lnurlAuthFailed: "LNURL-Anmeldung fehlgeschlagen",
   lnurlAuthUnavailable: "Für die Anmeldung muss die Identität entsperrt sein.",
+  nostrConnectLoginConfirm: "Anmelden",
+  nostrConnectLoginWaiting: "Warte auf die Website…",
+  nostrConnectLoginUnknownSite: "Unbekannte Website",
+  nostrConnectLoginUnverified: "Nicht verifiziert",
+  nostrConnectLoginAs: "Anmelden als",
+  nostrConnectLoginShares:
+    "Die Website erhält deinen öffentlichen Schlüssel und eine einmalige Anmeldesignatur. Sie kann nicht in deinem Namen posten und deine Nachrichten nicht lesen.",
+  nostrConnectLoginDone: "Bei {site} angemeldet",
+  nostrConnectLoginDoneHint: "Du kannst zur Website zurückkehren.",
+  nostrConnectLoginFailed: "Nostr-Connect-Anmeldung fehlgeschlagen",
+  nostrConnectLoginTimedOut: "Die Website hat nicht geantwortet.",
+  nostrConnectLoginRefused: "Linky signiert nur Anmeldeanfragen.",
+  nostrConnectLoginUnreachable:
+    "Die Relays der Website waren nicht erreichbar.",
+  nostrConnectLoginUnavailable:
+    "Für die Anmeldung muss die Identität entsperrt sein.",
   lnurlWithdrawPreparing: "Auszahlung wird vorbereitet…",
   lnurlWithdrawPending: "Die Auszahlung wartet auf den Eingang in der Wallet.",
   lnurlWithdrawFailed: "LNURLw-Auszahlung fehlgeschlagen",

@@ -74,6 +74,7 @@ import { useAppPreferences } from "./hooks/useAppPreferences";
 import { useTopDownTilt } from "./hooks/useTopDownTilt";
 import { useFiatRates } from "./hooks/useFiatRates";
 import { useLnurlAuth } from "./hooks/useLnurlAuth";
+import { useNostrConnectLogin } from "./hooks/useNostrConnectLogin";
 import {
   useContactsRepository,
   useConversationsRepository,
@@ -865,6 +866,15 @@ export const useAppShellComposition = ({
     requestLnurlAuthConfirmation,
   } = useLnurlAuth({ currentNsec, setStatus, t });
 
+  const {
+    closeNostrConnectLoginConfirmation,
+    confirmNostrConnectLogin,
+    nostrConnectLoginIsBusy,
+    nostrConnectLoginIsDone,
+    pendingNostrConnectLoginConfirmation,
+    requestNostrConnectLoginConfirmation,
+  } = useNostrConnectLogin({ setStatus, t });
+
   const { navigateToMainReturn, openMenu } = useMainMenuState({ route });
 
   const {
@@ -933,6 +943,7 @@ export const useAppShellComposition = ({
     persistContactsOnboardingDismissed,
     pushToast,
     requestLnurlAuthConfirmation,
+    requestNostrConnectLoginConfirmation,
     route,
     saveCashuFromText,
     setPendingLightningInvoiceConfirmation,
@@ -1122,9 +1133,14 @@ export const useAppShellComposition = ({
     }
     // The paid overlay hides every confirmation below it and clears itself when
     // the payment ends, so there is nothing for back to dismiss while it is up.
-    if (paidOverlayIsOpen || lnurlAuthIsDone) return null;
+    if (paidOverlayIsOpen || lnurlAuthIsDone || nostrConnectLoginIsDone) {
+      return null;
+    }
     if (pendingPaymentMintMeltConfirmation) {
       return closePaymentMintMeltConfirmation;
+    }
+    if (pendingNostrConnectLoginConfirmation) {
+      return closeNostrConnectLoginConfirmation;
     }
     if (pendingLnurlAuthConfirmation) return closeLnurlAuthConfirmation;
     if (pendingLnurlWithdrawConfirmation) {
@@ -1658,6 +1674,7 @@ export const useAppShellComposition = ({
       pendingPaymentMintMeltConfirmation,
       pendingLnurlAuthConfirmation,
       pendingLnurlWithdrawConfirmation,
+      pendingNostrConnectLoginConfirmation,
       pendingLightningInvoiceConfirmation,
       pendingCashuPaymentRequestConfirmation,
       postPaySaveContact,
@@ -1693,6 +1710,8 @@ export const useAppShellComposition = ({
       lnurlAuthIsBusy,
       lnurlAuthIsDone,
       lnurlWithdrawIsBusy,
+      nostrConnectLoginIsBusy,
+      nostrConnectLoginIsDone,
     }),
     [
       allowedDisplayCurrencies,
@@ -1727,6 +1746,8 @@ export const useAppShellComposition = ({
       lnurlAuthIsDone,
       lnurlWithdrawIsBusy,
       myProfileStatus,
+      nostrConnectLoginIsBusy,
+      nostrConnectLoginIsDone,
       nfcWritePromptKind,
       nostrPictureByNpub,
       paidOverlayDetails,
@@ -1737,6 +1758,7 @@ export const useAppShellComposition = ({
       pendingCashuPaymentRequestConfirmation,
       pendingLnurlAuthConfirmation,
       pendingLnurlWithdrawConfirmation,
+      pendingNostrConnectLoginConfirmation,
       pendingPaymentMintMeltConfirmation,
       postPaySaveContact,
       profileCustomPictureUrl,
@@ -1777,6 +1799,7 @@ export const useAppShellComposition = ({
       closeProfileShareOverlay,
       closeLnurlAuthConfirmation,
       closeLnurlWithdrawConfirmation,
+      closeNostrConnectLoginConfirmation,
       closeShareOptions,
       closeLightningInvoiceConfirmation,
       closeScan,
@@ -1784,6 +1807,7 @@ export const useAppShellComposition = ({
       confirmPaymentMintMelt,
       confirmLnurlAuth,
       confirmLnurlWithdraw,
+      confirmNostrConnectLogin,
       confirmLightningInvoicePayment,
       confirmCashuPaymentRequest,
       contactsGuideNav: stableContactsGuideNav,
@@ -1831,6 +1855,7 @@ export const useAppShellComposition = ({
       closeLightningInvoiceConfirmation,
       closeLnurlAuthConfirmation,
       closeLnurlWithdrawConfirmation,
+      closeNostrConnectLoginConfirmation,
       closePaymentMintMeltConfirmation,
       closeProfileShareOverlay,
       closeScan,
@@ -1840,6 +1865,7 @@ export const useAppShellComposition = ({
       confirmCashuPaymentRequest,
       confirmLnurlAuth,
       confirmLnurlWithdraw,
+      confirmNostrConnectLogin,
       confirmPaymentMintMelt,
       stableContactsGuideNav,
       copyShareOptionsText,

@@ -1,4 +1,8 @@
-import { encodeNprofile, encodeNpub } from "@linky-fit/linkstr";
+import {
+  encodeNprofile,
+  encodeNpub,
+  type NostrConnectRequest,
+} from "@linky-fit/linkstr";
 import { createId } from "@linky-fit/linksync";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { encode } from "cbor-x";
@@ -51,6 +55,8 @@ const setup = async ({
 } = {}) => {
   const requestLnurlAuthConfirmation = vi.fn<(p: LnurlAuthPreview) => void>();
   const requestLnurlWithdrawConfirmation = vi.fn();
+  const requestNostrConnectLoginConfirmation =
+    vi.fn<(request: NostrConnectRequest) => void>();
   const runCashuPaymentRequest = vi
     .fn<(request: CashuPaymentRequestMessageInfo) => Promise<void>>()
     .mockResolvedValue(undefined);
@@ -84,6 +90,7 @@ const setup = async ({
       requestLightningInvoiceConfirmation,
       requestLnurlAuthConfirmation,
       requestLnurlWithdrawConfirmation,
+      requestNostrConnectLoginConfirmation,
       saveCashuFromText: async () => undefined,
       scanAcceptsBankPayment: false,
       scanEntryPoint: null,
@@ -117,6 +124,7 @@ const setup = async ({
     requestLightningInvoiceConfirmation,
     requestLnurlAuthConfirmation,
     requestLnurlWithdrawConfirmation,
+    requestNostrConnectLoginConfirmation,
   };
 };
 
@@ -168,6 +176,35 @@ describe("scanned LNURL-auth targets", () => {
     expect(scan.requestLnurlAuthConfirmation).not.toHaveBeenCalled();
     expect(fetchSpy).toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+});
+
+describe("scanned Nostr Connect logins", () => {
+  const CLIENT = makeIdentity().pubkey;
+  const NOSTR_CONNECT_URI = `nostrconnect://${CLIENT}?relay=wss%3A%2F%2Frelay.example.com&secret=s3cr3t&name=Example&url=https%3A%2F%2Fexample.com`;
+
+  it.each([
+    ["scanned", NOSTR_CONNECT_URI],
+    ["pasted with whitespace", `  ${NOSTR_CONNECT_URI}\n`],
+  ])("asks to log in for a %s nostrconnect URI", async (_, text) => {
+    const scan = await setup();
+
+    await scan.handle(text);
+
+    expect(scan.requestNostrConnectLoginConfirmation).toHaveBeenCalledOnce();
+    const request =
+      scan.requestNostrConnectLoginConfirmation.mock.calls[0]?.[0];
+    expect(request?.clientPubkey).toBe(CLIENT);
+    expect(request?.name).toBe("Example");
+    expect(request?.url).toBe("https://example.com");
+  });
+
+  it("rejects a nostrconnect URI without relays as unsupported", async () => {
+    const scan = await setup();
+
+    await scan.handle(`nostrconnect://${CLIENT}?secret=s3cr3t`);
+
+    expect(scan.requestNostrConnectLoginConfirmation).not.toHaveBeenCalled();
   });
 });
 
