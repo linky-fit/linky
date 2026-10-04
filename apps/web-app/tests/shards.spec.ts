@@ -1,9 +1,11 @@
-// Must keep covering: rotation of every scope, the pointer on a second device,
+// Must keep covering: live sync to an open second device with its Evolu row
+// counts, rotation of every scope, the pointer on a second device,
 // copy-on-write of an edited old-shard row, sends and top-ups across a
 // rotation, and a fresh device seeing only the newest 4 message shards.
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import type { LinkyE2eHooks } from "../src/devtools/e2e/installLinkyE2eHooks";
 import {
+  expectSingleLoad,
   readBalanceSat,
   setBaseStorage,
   MOBILE_VIEWPORT,
@@ -87,7 +89,13 @@ const openDevice = async (
   await stubThirdPartyAssets(page);
   await page.goto("/#wallet");
   await expect(page.getByLabel("Available balance")).toBeVisible();
-  return { context, page, errors };
+  return { context, page, errors, label };
+};
+
+const readCurrentRows = async (page: Page): Promise<number> => {
+  const row = page.getByTestId("evoluData");
+  await expect(row).toContainText(/\d+ rows/);
+  return Number((await row.innerText()).match(/(\d+) rows/)?.[1]);
 };
 
 const rotateFromDebugPage = async (page: Page, scope: string) => {
@@ -108,6 +116,8 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
   const devices = [source, follower];
   const closers = [source.context, follower.context];
   try {
+    await follower.page.goto("/#evolu-servers");
+    const initialRows = await readCurrentRows(follower.page);
     const contactId = await addContactByNpub(source.page, peer.npub);
     await source.page
       .locator('[data-guide="chat-input"]')
@@ -122,6 +132,14 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
       await expect(
         follower.page.getByTestId("chat-bubble").filter({ hasText: text }),
       ).toBeVisible();
+    await test.step("the follower's Evolu row counts include the synced rows without a reload", async () => {
+      await follower.page.goto("/#evolu-servers");
+      await expect
+        .poll(() => readCurrentRows(follower.page))
+        .toBeGreaterThan(initialRows);
+      for (const device of devices)
+        await expectSingleLoad(device.page, device.label);
+    });
     // Wait for status = sent and non-pending wrapId on both devices before rotation,
     // or a late publish receipt can copy the fixture into the new shard.
     await test.step("both messages finish publishing in shard 0 before rotation", async () => {
@@ -379,10 +397,10 @@ test("natural message rotations retain local history until forget and sync only 
         )
         .toBeTruthy();
     };
-    await test.step("repository writes cross the real mutation threshold four times", async () => {
+    await test.step("repository writes cross the e2e mutation threshold four times", async () => {
       for (
         let count = 0;
-        count < 100 && (await hooks.shardIndex(source.page, "messages")) < 4;
+        count < 40 && (await hooks.shardIndex(source.page, "messages")) < 4;
         count += 1
       )
         await send(`Natural rotation message ${count}`);

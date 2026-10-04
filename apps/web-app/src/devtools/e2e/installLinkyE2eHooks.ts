@@ -7,12 +7,10 @@ import {
   linkyScopes,
   makeRecurringPaymentsRepository,
   mergeShardRows,
-  OwnerId,
   PositiveInt,
   type LinkyScope,
   type LinkyTable,
 } from "@linky-fit/linksync";
-import { LeaseId } from "@linky-fit/linkshu";
 import { createEvoluShardDb } from "@linky-fit/linksync/evolu";
 import {
   editPatch,
@@ -54,10 +52,6 @@ export interface LinkyE2eHooks {
     scope: string,
     table: string,
   ) => Promise<ReadonlyArray<Readonly<Record<string, unknown>>>>;
-  /** Proof rows under one owner, including legacy copies and tombstones. */
-  readonly ownerProofRows: (
-    ownerId: string,
-  ) => Promise<ReadonlyArray<Readonly<Record<string, unknown>>>>;
   /** The owner id of one shard of a scope, whether or not it is visible. */
   readonly shardOwnerId: (scope: string, index: number) => Promise<string>;
   /** Unsubscribes the shards outside every forgettable scope's window. */
@@ -75,7 +69,6 @@ export interface LinkyE2eHooks {
     key: string,
     ttlMs: number,
   ) => Promise<string | null>;
-  readonly releaseLease: (key: string, lease: string) => Promise<void>;
   /** Restarts a recurring payment's schedule at `atSec`, as an edit would, but without the form's no-past rule. */
   readonly makeRecurringDue: (id: string, atSec: number) => Promise<void>;
 }
@@ -135,14 +128,6 @@ export const installLinkyE2eHooks = (): void => {
         return owner.id;
       }),
     upsert,
-    ownerProofRows: async (ownerId) => {
-      const owner = OwnerId.fromUnknown(ownerId);
-      if (!owner.ok) throw new Error("invalid owner id");
-      const rows = await Effect.runPromise(db.readTable("cashuProof"));
-      return rows
-        .filter((row) => row.ownerId === owner.value)
-        .map((row) => Object.fromEntries(Object.entries(row)));
-    },
     shardRows: async (scope, table) => {
       if (!isScope(scope)) throw new Error(`unknown scope ${scope}`);
       if (!isShardTable(scope, table))
@@ -181,8 +166,6 @@ export const installLinkyE2eHooks = (): void => {
     activeNostrIdentityId,
     tryAcquireLease: (key, ttlMs) =>
       Effect.runPromise(walletStore.tryAcquireLease(key, ttlMs)),
-    releaseLease: (key, lease) =>
-      Effect.runPromise(walletStore.releaseLease(key, LeaseId.make(lease))),
     makeRecurringDue: async (id, atSec) => {
       const payments = makeRecurringPaymentsRepository(await getLinkyStore());
       const order = (await Effect.runPromise(payments.all))
