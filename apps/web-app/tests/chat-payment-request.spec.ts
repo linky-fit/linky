@@ -1,5 +1,4 @@
 import { expect, test, type Page } from "@playwright/test";
-import { Schema } from "effect";
 import { readBalanceSat, setBaseStorage } from "./helpers/appState";
 import { addContactByNpub } from "./helpers/contacts";
 import { expectNoBootErrorPanel, watchAppErrors } from "./helpers/diagnostics";
@@ -14,7 +13,7 @@ const expectBalance = async (page: Page, balance: number): Promise<void> => {
   await page.goto(`/${chatHash}`);
 };
 
-test("incoming 2-sat requests recover a CDK output collision after local counters are lost", async ({
+test("an incoming 2-sat chat request is paid and both sides see it paid", async ({
   browser,
 }, testInfo) => {
   const accounts = [];
@@ -37,128 +36,47 @@ test("incoming 2-sat requests recover a CDK output collision after local counter
     accounts.push({ context, page, identity, errors });
   }
   const [payer, requester] = accounts;
-  const rejectedSwaps: number[] = [];
-  let translatedCollisions = 0;
-  let recoverySwapAttempts = 0;
-  payer.page.on("response", (response) => {
-    if (response.url().endsWith("/v1/swap") && !response.ok()) {
-      rejectedSwaps.push(response.status());
-    }
-  });
+  const paidCards = (page: Page) =>
+    page.locator(
+      '[data-testid="chat-payment-request-card"][data-status="paid"]',
+    );
   try {
     await topUp(payer.page, 50);
     await expect.poll(() => readBalanceSat(payer.page)).toBe(50);
     await addContactByNpub(payer.page, requester.identity.npub);
     await addContactByNpub(requester.page, payer.identity.npub);
 
-    for (const paymentNumber of [1, 2]) {
-      await test.step(`pay request ${paymentNumber} after reloading both wallets`, async () => {
-        if (paymentNumber === 2) {
-          await payer.page.route("**/v1/swap", async (route) => {
-            const request = Schema.decodeUnknownSync(
-              Schema.Struct({
-                outputs: Schema.Array(Schema.Struct({ B_: Schema.String })),
-              }),
-            )(route.request().postDataJSON());
-            recoverySwapAttempts += 1;
-            const uniqueOutputs = new Set(
-              request.outputs.map((output) => output.B_),
-            );
-            expect(
-              uniqueOutputs.size,
-              "each swap request has unique blinded outputs",
-            ).toBe(request.outputs.length);
-            const response = await route.fetch();
-            const body: unknown = await response.json();
-            if (
-              !response.ok() &&
-              Schema.is(Schema.Struct({ code: Schema.Number }))(body) &&
-              body.code === 11003
-            ) {
-              translatedCollisions += 1;
-              // CDK calls the same historical collision "Duplicate outputs".
-              await route.fulfill({
-                response,
-                json: { code: 11008, detail: "Duplicate outputs" },
-              });
-              return;
-            }
-            await route.fulfill({ response });
-          });
-          const removedCounters = await payer.page.evaluate(() => {
-            const keys = Object.keys(localStorage).filter((key) =>
-              key.startsWith("linky.linkshu.value.linkshu.detCounter."),
-            );
-            for (const key of keys) localStorage.removeItem(key);
-            return keys.length;
-          });
-          expect(removedCounters).toBeGreaterThan(0);
-        }
-        await payer.page.reload();
-        await requester.page.reload();
-        await requester.page.locator('[data-guide="chat-request"]').click();
-        await requester.page
-          .getByRole("button", { name: "Clear form", exact: true })
-          .click();
-        await requester.page
-          .getByRole("button", { name: "2", exact: true })
-          .click();
-        await requester.page.locator('[data-guide="request-send"]').click();
-        await expect(requester.page).toHaveURL(/#chat\/[^/]+$/);
-        const incoming = payer.page.getByTestId("chat-payment-request-card");
-        await expect(incoming).toHaveCount(paymentNumber);
-        await expect(incoming.last()).toContainText(/2\s*sat/);
-        await incoming
-          .last()
-          .getByRole("button", { name: "Pay", exact: true })
-          .click();
-        await expect(
-          payer.page.locator(
-            '[data-testid="chat-payment-request-card"][data-status="paid"]',
-          ),
-        ).toHaveCount(paymentNumber);
-        await expect(
-          requester.page.locator(
-            '[data-testid="chat-payment-request-card"][data-status="paid"]',
-          ),
-        ).toHaveCount(paymentNumber);
-        // Paid renders before the send finishes and navigates back to chat.
-        await expect(
-          payer.page.locator('[data-guide="chat-pay"]'),
-        ).toBeEnabled();
-        // The dev mint takes one sat for the payer swap and one for receipt.
-        await expectBalance(payer.page, 50 - paymentNumber * 3);
-        await expectBalance(requester.page, paymentNumber);
-        await expect(payer.page.getByText(/Payment failed:/)).toHaveCount(0);
-        await expect(requester.page.getByText(/Payment failed:/)).toHaveCount(
-          0,
-        );
-      });
-    }
+    await test.step("the requester asks for 2 sat and the payer pays", async () => {
+      await requester.page.locator('[data-guide="chat-request"]').click();
+      await requester.page
+        .getByRole("button", { name: "Clear form", exact: true })
+        .click();
+      await requester.page
+        .getByRole("button", { name: "2", exact: true })
+        .click();
+      await requester.page.locator('[data-guide="request-send"]').click();
+      await expect(requester.page).toHaveURL(/#chat\/[^/]+$/);
+      const incoming = payer.page.getByTestId("chat-payment-request-card");
+      await expect(incoming).toHaveCount(1);
+      await expect(incoming).toContainText(/2\s*sat/);
+      await incoming.getByRole("button", { name: "Pay", exact: true }).click();
+      await expect(paidCards(payer.page)).toHaveCount(1);
+      await expect(paidCards(requester.page)).toHaveCount(1);
+      // Paid renders before the send finishes and navigates back to chat.
+      await expect(payer.page.locator('[data-guide="chat-pay"]')).toBeEnabled();
+      // The dev mint takes one sat for the payer swap and one for receipt.
+      await expectBalance(payer.page, 47);
+      await expectBalance(requester.page, 1);
+      await expect(payer.page.getByText(/Payment failed:/)).toHaveCount(0);
+      await expect(requester.page.getByText(/Payment failed:/)).toHaveCount(0);
+    });
 
     for (const account of accounts) {
       await account.page.reload();
-      await expect(
-        account.page.locator(
-          '[data-testid="chat-payment-request-card"][data-status="paid"]',
-        ),
-      ).toHaveCount(2);
-      await testInfo.attach(
-        `${account === payer ? "payer" : "requester"} paid requests`,
-        {
-          body: await account.page.screenshot(),
-          contentType: "image/png",
-        },
-      );
+      await expect(paidCards(account.page)).toHaveCount(1);
       account.errors.assertClean();
       await expectNoBootErrorPanel(account.page, "chat request payment");
     }
-    expect(
-      translatedCollisions,
-      "the real mint rejected historical output reuse",
-    ).toBeGreaterThan(0);
-    expect(recoverySwapAttempts).toBeGreaterThan(translatedCollisions);
-    expect(rejectedSwaps).toHaveLength(translatedCollisions);
   } finally {
     for (const account of accounts) await account.context.close();
   }

@@ -492,6 +492,13 @@ describe("runLaneToShardMigration", () => {
     expect(written).toEqual([]);
   });
 
+  it("starts the shards at index zero whatever lane index an older version left in storage", async () => {
+    localStorage.setItem("linky.evolu.cashu_owner_index.v1", "7");
+    const { run, store } = setup();
+    await run({});
+    expect(Effect.runSync(store.activeIndex("cashu"))).toBe(0);
+  });
+
   it("re-ingests a lane row updated after the first run and leaves shard edits alone", async () => {
     const { run, store, rows } = setup();
     const peer = contact(laneA, { name: text("First") });

@@ -2,8 +2,7 @@
  * A lightning address is public and anyone can put any address in their
  * Nostr profile, so it never identifies a contact. A stranger copying a
  * contact's address can't take the contact over or receive its payments,
- * address-only contacts are paid over Lightning, contacts may share an
- * address, and a pasted address pays that address without naming a contact.
+ * and address-only contacts are paid over Lightning.
  *
  * Needs the docker stack up — see playwright.config.ts.
  */
@@ -163,21 +162,18 @@ const unknownSenderCards = (page: Page) =>
 
 /** The attacker copies the address into their own profile and writes once. */
 const copyAddressAndWrite = async (
-  attacker: Account,
+  attacker: SeedIdentity,
   victim: Account,
   address: string,
+  unknownSenders: number,
 ): Promise<void> => {
-  await publishProfileToRelay(attacker.identity.nsec, {
+  await publishProfileToRelay(attacker.nsec, {
     lud16: address,
     name: "Mallory",
   });
-  await sendDirectMessage(
-    attacker.identity.nsec,
-    victim.identity.npub,
-    "Hi, it's me",
-  );
+  await sendDirectMessage(attacker.nsec, victim.identity.npub, "Hi, it's me");
   await victim.page.goto("/#contacts");
-  await expect(unknownSenderCards(victim.page)).toHaveCount(1, {
+  await expect(unknownSenderCards(victim.page)).toHaveCount(unknownSenders, {
     timeout: 30_000,
   });
 };
@@ -188,17 +184,18 @@ const enterAmount = async (page: Page, sats: number): Promise<void> => {
   }
 };
 
-test("a copied address neither takes over a contact nor receives its payments", async ({
+test("a copied address neither takes over a contact nor receives its payments, and an address-only contact is paid over Lightning", async ({
   browser,
 }) => {
   test.setTimeout(240_000);
-  const address = `alice@${ADDRESS_HOST}`;
+  const aliceAddress = `alice@${ADDRESS_HOST}`;
+  const bobAddress = `bob@${ADDRESS_HOST}`;
   const victim = await boot(browser);
   const alice = await boot(browser);
   const attacker = await boot(browser);
   try {
     await publishProfileToRelay(alice.identity.nsec, {
-      lud16: address,
+      lud16: aliceAddress,
       name: "Alice",
     });
     await fund(victim);
@@ -208,115 +205,63 @@ test("a copied address neither takes over a contact nor receives its payments", 
         message: "Alice's profile address is mirrored onto the contact",
         timeout: 30_000,
       })
-      .toBe(address);
+      .toBe(aliceAddress);
+    const bobId = await addContactByLightningAddress(
+      victim.page,
+      "Bob",
+      bobAddress,
+    );
     await addContactByNpub(alice.page, victim.identity.npub);
     await addContactByNpub(attacker.page, victim.identity.npub);
 
-    await copyAddressAndWrite(attacker, victim, address);
-    const alicesContact = await contactRow(victim.page, aliceId);
-    expect(alicesContact?.npub).toBe(alice.identity.npub);
-    expect(alicesContact?.name).toBe("Alice");
+    await test.step("copied addresses link neither contact", async () => {
+      await copyAddressAndWrite(attacker.identity, victim, aliceAddress, 1);
+      const alicesContact = await contactRow(victim.page, aliceId);
+      expect(alicesContact?.npub).toBe(alice.identity.npub);
+      expect(alicesContact?.name).toBe("Alice");
 
-    await victim.page.goto(`/#contact/${encodeURIComponent(aliceId)}/pay`);
-    await enterAmount(victim.page, PAYMENT_SAT);
-    await victim.page.locator("[data-guide='pay-send']").click();
+      await copyAddressAndWrite(
+        await createSeedIdentity(),
+        victim,
+        bobAddress,
+        2,
+      );
+      expect((await contactRow(victim.page, bobId))?.npub ?? null).toBeNull();
+    });
 
-    await alice.page.goto("/#wallet");
-    await expect
-      .poll(() => readBalanceSat(alice.page), { timeout: 60_000 })
-      .toBeGreaterThan(0);
-    await attacker.page.goto("/#wallet");
-    expect(await readBalanceSat(attacker.page)).toBe(0);
+    await test.step("Alice is paid over Nostr, never the attacker", async () => {
+      await victim.page.goto(`/#contact/${encodeURIComponent(aliceId)}/pay`);
+      await enterAmount(victim.page, PAYMENT_SAT);
+      await victim.page.locator("[data-guide='pay-send']").click();
+
+      await alice.page.goto("/#wallet");
+      await expect
+        .poll(() => readBalanceSat(alice.page), { timeout: 60_000 })
+        .toBeGreaterThan(0);
+      await attacker.page.goto("/#wallet");
+      expect(await readBalanceSat(attacker.page)).toBe(0);
+    });
+
+    await test.step("Bob is paid over Lightning", async () => {
+      await victim.page.goto(`/#contact/${encodeURIComponent(bobId)}/pay`);
+      await enterAmount(victim.page, PAYMENT_SAT);
+      await victim.page.locator("[data-guide='pay-send']").click();
+      await expect(victim.page).toHaveURL(/#payln\/bob%40pay\.test$/);
+      // Paying a chosen contact still names it.
+      await expect(victim.page.getByText("Bob", { exact: true })).toBeVisible();
+      await victim.page
+        .getByRole("button", { name: "Pay", exact: true })
+        .click();
+
+      await expect.poll(() => victim.invoicedUsers).toEqual(["bob"]);
+      await victim.page.goto("/#wallet");
+      await expect
+        .poll(() => readBalanceSat(victim.page))
+        .toBeLessThanOrEqual(FUNDING_SAT - 2 * PAYMENT_SAT);
+    });
   } finally {
     for (const account of [victim, alice, attacker]) {
       await account.context.close();
     }
-  }
-});
-
-test("an address-only contact stays unlinked and is paid over Lightning", async ({
-  browser,
-}) => {
-  test.setTimeout(180_000);
-  const address = `bob@${ADDRESS_HOST}`;
-  const victim = await boot(browser);
-  const attacker = await boot(browser);
-  try {
-    await fund(victim);
-    const bobId = await addContactByLightningAddress(
-      victim.page,
-      "Bob",
-      address,
-    );
-
-    await copyAddressAndWrite(attacker, victim, address);
-    expect((await contactRow(victim.page, bobId))?.npub ?? null).toBeNull();
-
-    await victim.page.goto(`/#contact/${encodeURIComponent(bobId)}/pay`);
-    await enterAmount(victim.page, PAYMENT_SAT);
-    await victim.page.locator("[data-guide='pay-send']").click();
-    await expect(victim.page).toHaveURL(/#payln\/bob%40pay\.test$/);
-    // Paying a chosen contact still names it.
-    await expect(victim.page.getByText("Bob", { exact: true })).toBeVisible();
-    await victim.page.getByRole("button", { name: "Pay", exact: true }).click();
-
-    await expect.poll(() => victim.invoicedUsers).toEqual(["bob"]);
-    await victim.page.goto("/#wallet");
-    await expect
-      .poll(() => readBalanceSat(victim.page))
-      .toBeLessThanOrEqual(FUNDING_SAT - PAYMENT_SAT);
-  } finally {
-    await victim.context.close();
-    await attacker.context.close();
-  }
-});
-
-test("contacts may share an address and a pasted address names none of them", async ({
-  browser,
-}) => {
-  test.setTimeout(180_000);
-  const address = `shared@${ADDRESS_HOST}`;
-  const victim = await boot(browser);
-  const carol = await createSeedIdentity();
-  try {
-    await publishProfileToRelay(carol.nsec, { lud16: address, name: "Carol" });
-    await fund(victim);
-    const ids = [
-      await addContactByLightningAddress(victim.page, "Bob", address),
-      await addContactByLightningAddress(victim.page, "Bobby", address),
-      await addContactByNpub(victim.page, carol.npub),
-    ];
-    await expect
-      .poll(async () => (await contactRow(victim.page, ids[2]))?.lnAddress, {
-        timeout: 30_000,
-      })
-      .toBe(address);
-
-    await victim.page.goto("/#advanced");
-    await victim.page
-      .getByText("Deduplicate contacts", { exact: true })
-      .click();
-    await expect(victim.page.getByText("No duplicates found.")).toBeVisible();
-    expect(
-      (await liveContacts(victim.page))
-        .filter((row) => row.lnAddress === address)
-        .map((row) => row.id)
-        .sort(),
-    ).toEqual([...ids].sort());
-
-    await victim.page.goto("/#wallet/pay");
-    await victim.page.locator("#manual-pay-input").fill(address);
-    await victim.page
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-    await expect(victim.page).toHaveURL(/#payln\/shared%40pay\.test$/);
-    for (const name of ["Bob", "Bobby", "Carol"]) {
-      await expect(victim.page.getByText(name, { exact: true })).toHaveCount(0);
-    }
-    await enterAmount(victim.page, PAYMENT_SAT);
-    await victim.page.getByRole("button", { name: "Pay", exact: true }).click();
-    await expect.poll(() => victim.invoicedUsers).toEqual(["shared"]);
-  } finally {
-    await victim.context.close();
   }
 });

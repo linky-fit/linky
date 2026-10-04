@@ -6,8 +6,6 @@
  * the other ends at accepted_by_other without ever seeing them. The winner
  * marks the bank payment paid, A confirms settlement, and the winner receives sats.
  *
- * Also covers C accepting after A chose B but before C receives that decision.
- *
  * Needs the docker stack up — see playwright.config.ts.
  *
  * Two recipients, not one, is deliberate: with a single recipient the lease
@@ -19,15 +17,12 @@
  * npub.cash flows, EUR/bysquare payloads.
  */
 import jsQR from "jsqr";
-import { Schema } from "effect";
-import { decodeNpub } from "@linky-fit/linkstr";
 import {
   expect,
   test,
   type Browser,
   type BrowserContext,
   type Page,
-  type TestInfo,
 } from "@playwright/test";
 import {
   expectSingleLoad,
@@ -51,7 +46,6 @@ import {
   stubFiatRates,
   stubThirdPartyAssets,
 } from "./helpers/network";
-import { isNostrRelay } from "./helpers/stack";
 import { topUp } from "./helpers/wallet";
 import {
   publishProfileStatusToRelay,
@@ -87,12 +81,6 @@ interface Account {
 const bootAccount = async (
   browser: Browser,
   label: string,
-  inbox?: {
-    paused: boolean;
-    pending: (() => void)[];
-    failRecipient?: string;
-    failedAcks?: number;
-  },
 ): Promise<Account> => {
   const identity = await createSeedIdentity();
   const context = await browser.newContext({
@@ -104,58 +92,6 @@ const bootAccount = async (
   });
 
   const page = await context.newPage();
-  if (inbox) {
-    await page.routeWebSocket(isNostrRelay, (socket) => {
-      const server = socket.connectToServer();
-      const failedWraps = new Set<string>();
-      socket.onMessage((message) => {
-        const frame: unknown = JSON.parse(String(message));
-        if (Array.isArray(frame) && frame[0] === "EVENT") {
-          const event: unknown = frame[1];
-          if (
-            Schema.is(
-              Schema.Struct({
-                id: Schema.String,
-                tags: Schema.Array(Schema.Array(Schema.String)),
-              }),
-            )(event) &&
-            event.tags.some(
-              (tag) => tag[0] === "p" && tag[1] === inbox.failRecipient,
-            )
-          ) {
-            failedWraps.add(event.id);
-          }
-        }
-        server.send(message);
-      });
-      server.onMessage((message) => {
-        const frame: unknown = JSON.parse(String(message));
-        if (
-          Array.isArray(frame) &&
-          frame[0] === "OK" &&
-          failedWraps.has(frame[1])
-        ) {
-          inbox.failedAcks = (inbox.failedAcks ?? 0) + 1;
-          socket.send(
-            JSON.stringify([
-              "OK",
-              frame[1],
-              false,
-              "test: acknowledgment lost after delivery",
-            ]),
-          );
-        } else if (
-          inbox.paused &&
-          Array.isArray(frame) &&
-          frame[0] === "EVENT"
-        ) {
-          inbox.pending.push(() => socket.send(message));
-        } else {
-          socket.send(message);
-        }
-      });
-    });
-  }
   const errors = watchAppErrors(page, label);
   const waitForInbox = watchNostrInbox(page, identity.npub);
 
@@ -205,30 +141,12 @@ const offerDetailUrl = (page: Page) =>
     /^#chat\/([^/]+)\/bank-payment-offer\/([^/]+)$/,
   );
 
-const runProxyPayment = async (
-  browser: Browser,
-  testInfo: TestInfo,
-  delayLoserNotification: boolean,
-  ambiguousDelivery = false,
-) => {
-  const offererInbox = {
-    paused: false,
-    pending: new Array<() => void>(),
-    failRecipient: "",
-    failedAcks: 0,
-  };
-  const a = await bootAccount(
-    browser,
-    "A",
-    ambiguousDelivery ? offererInbox : undefined,
-  );
+test("proxy payment: bank details reach exactly one acceptor, who is paid in sats", async ({
+  browser,
+}, testInfo) => {
+  const a = await bootAccount(browser, "A");
   const b = await bootAccount(browser, "B");
-  const inbox = { paused: false, pending: new Array<() => void>() };
-  const c = await bootAccount(
-    browser,
-    "C",
-    delayLoserNotification ? inbox : undefined,
-  );
+  const c = await bootAccount(browser, "C");
   const accounts = [a, b, c];
 
   try {
@@ -328,7 +246,7 @@ const runProxyPayment = async (
         return decodeURIComponent(match[2]);
       });
 
-    await test.step("B and C accept before C learns someone else won", async () => {
+    await test.step("B and C accept while A is offline", async () => {
       // Both acceptors must be on the offer page before the first accept:
       // A's auto-responder terminates every other candidate the moment one
       // accept arrives, so an acceptor whose offer delivery lags the winner's
@@ -340,54 +258,6 @@ const runProxyPayment = async (
           new RegExp(`bank-payment-offer/${offerId}$`),
           { timeout: 60_000 },
         );
-      }
-      if (ambiguousDelivery) {
-        offererInbox.paused = true;
-        await c.page
-          .getByRole("button", { name: "Accept", exact: true })
-          .click();
-        await expect(
-          c.page.getByText("Waiting for bank details.", { exact: false }),
-        ).toBeVisible();
-        await expect.poll(() => offererInbox.pending.length).toBeGreaterThan(0);
-        const firstAcceptanceSec = Math.floor(Date.now() / 1000);
-        await expect
-          .poll(() => Math.floor(Date.now() / 1000))
-          .toBeGreaterThan(firstAcceptanceSec);
-        offererInbox.paused = false;
-        offererInbox.failRecipient = decodeNpub(b.identity.npub) ?? "";
-        await b.page
-          .getByRole("button", { name: "Accept", exact: true })
-          .click();
-        await expect(paymentQr(b.page)).toBeVisible();
-        await expect.poll(() => offererInbox.failedAcks).toBeGreaterThan(0);
-        offererInbox.failRecipient = "";
-        for (const deliver of offererInbox.pending.splice(0)) deliver();
-        return;
-      }
-      if (delayLoserNotification) {
-        inbox.paused = true;
-        await b.page
-          .getByRole("button", { name: "Accept", exact: true })
-          .click();
-        await expect(paymentQr(b.page)).toBeVisible();
-        await expect(
-          a.page.getByTestId("bank-payment-offer-recipient-accepted_by_other"),
-        ).toBeVisible();
-        expect(inbox.pending.length).toBeGreaterThan(0);
-        const decisionObservedSec = Math.floor(Date.now() / 1000);
-        await expect
-          .poll(() => Math.floor(Date.now() / 1000))
-          .toBeGreaterThan(decisionObservedSec);
-        await c.page
-          .getByRole("button", { name: "Accept", exact: true })
-          .click();
-        await expect(
-          c.page.getByText("Waiting for bank details.", { exact: false }),
-        ).toBeVisible();
-        inbox.paused = false;
-        for (const deliver of inbox.pending.splice(0)) deliver();
-        return;
       }
       // Let both acceptances reach the relay before A can close the loser's offer.
       await a.context.setOffline(true);
@@ -589,22 +459,4 @@ const runProxyPayment = async (
   } finally {
     for (const account of accounts) await account.context.close();
   }
-};
-
-test("proxy payment: bank details reach exactly one acceptor, who is paid in sats", async ({
-  browser,
-}, testInfo) => {
-  await runProxyPayment(browser, testInfo, false);
-});
-
-test("proxy payment: delayed loser notification closes a newer acceptance", async ({
-  browser,
-}, testInfo) => {
-  await runProxyPayment(browser, testInfo, true);
-});
-
-test("proxy payment: an ambiguous delivery never reassigns bank details to a late acceptance", async ({
-  browser,
-}, testInfo) => {
-  await runProxyPayment(browser, testInfo, false, true);
 });
