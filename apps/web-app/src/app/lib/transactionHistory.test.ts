@@ -10,7 +10,11 @@ import type { TransactionRecord } from "@linky-fit/linksync";
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { TransactionId } from "../../evoluIds";
-import { buildTransactionHistory } from "./transactionHistory";
+import {
+  buildTransactionHistory,
+  readRepeatablePayment,
+  type TransactionItem,
+} from "./transactionHistory";
 
 const ownerId = OwnerId.orThrow("AAAAAAAAAAAAAAAAAAAAAA");
 const makeRow = (
@@ -262,5 +266,49 @@ describe("buildTransactionHistory", () => {
       [later.id, "duplicate"],
       [first.id, null],
     ]);
+  });
+});
+
+describe("readRepeatablePayment", () => {
+  const contactId = "contact-1";
+  const contacts = new Map([
+    [contactId, { lnAddress: null, npub: "npub1alice" }],
+  ]);
+  const item = (overrides: Partial<TransactionItem> = {}): TransactionItem => ({
+    amount: 10,
+    category: "cashu",
+    contactId,
+    createdAtSec: 1_700_000_000,
+    details: null,
+    direction: "out",
+    error: null,
+    fee: null,
+    hiddenReason: null,
+    id: "tx-1",
+    isReturned: false,
+    method: "cashu_chat",
+    mint: null,
+    note: null,
+    pendingLabel: null,
+    status: "ok",
+    unit: "sat",
+    ...overrides,
+  });
+
+  it("offers a completed sat payment to a saved contact for repeating", () => {
+    expect(readRepeatablePayment(item(), contacts)).toEqual({
+      amountSat: 10,
+      contactId,
+    });
+  });
+
+  it.each<[string, Partial<TransactionItem>]>([
+    ["an incoming payment", { direction: "in" }],
+    ["a failed payment", { status: "error" }],
+    ["a fiat amount", { unit: "czk" }],
+    ["an invoice payment", { method: "lightning_invoice" }],
+    ["an unknown contact", { contactId: "contact-2" }],
+  ])("offers nothing for %s", (_name, overrides) => {
+    expect(readRepeatablePayment(item(overrides), contacts)).toBeNull();
   });
 });

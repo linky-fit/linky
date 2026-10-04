@@ -6,6 +6,7 @@ import {
   isPaymentRequestTransaction,
   buildTransactionHistory,
   deriveDeclinedRequestIds,
+  readRepeatablePayment,
 } from "../app/lib/transactionHistory";
 import {
   Avatar,
@@ -166,25 +167,6 @@ interface TransactionCardProps {
   t: Translate;
   tokenByReferenceId: ReadonlyMap<string, string>;
 }
-
-/**
- * A completed outgoing payment to a saved contact that can be turned into a
- * recurring payment with the same recipient and amount.
- */
-const readRepeatablePayment = (
-  item: TransactionItem,
-  contactsById: ReadonlyMap<string, ContactSummary>,
-): { amountSat: number; contactId: string } | null => {
-  if (item.direction !== "out" || item.status !== "ok") return null;
-  if (item.amount === null || (item.unit && item.unit !== "sat")) return null;
-  if (item.method !== "cashu_chat" && item.method !== "lightning_address") {
-    return null;
-  }
-  if (!item.contactId) return null;
-  const contact = contactsById.get(item.contactId);
-  if (!contact || (!contact.npub && !contact.lnAddress)) return null;
-  return { amountSat: item.amount, contactId: item.contactId };
-};
 
 const TransactionCardView = ({
   buildDetailEntries,
