@@ -754,7 +754,11 @@ public class MainActivity extends BridgeActivity {
 		}
 
 		String lower = normalized.toLowerCase();
-		if (lower.startsWith("nostr://") || lower.startsWith("cashu://")) {
+		if (
+			lower.startsWith("nostr://") ||
+			lower.startsWith("cashu://") ||
+			lower.startsWith("nostrconnect://")
+		) {
 			return normalized;
 		}
 

@@ -4,6 +4,7 @@
     <string name="title_activity_main">Linky</string>
     <string name="cashu_url_scheme">cashu</string>
     <string name="nostr_url_scheme">nostr</string>
+    <string name="nostrconnect_url_scheme">nostrconnect</string>
     <string name="package_name">fit.linky.app</string>
     <string name="push_notification_channel_id">linky_messages</string>
     <string name="push_notification_channel_name">Linky messages</string>

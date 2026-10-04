@@ -10,6 +10,7 @@ interface NativeDeepLinkScanText {
 
 const NOSTR_SCHEME_PREFIX = /^nostr:(\/\/)?/i;
 const CASHU_SCHEME_PREFIX = /^cashu:(\/\/)?/i;
+const NOSTR_CONNECT_SCHEME_PREFIX = /^nostrconnect:/i;
 
 const normalizeCandidate = (value: string): string => {
   return safeDecodeURIComponent(value).trim();
@@ -203,6 +204,14 @@ export const parseNativeDeepLinkUrl = (
 
   if (CASHU_SCHEME_PREFIX.test(normalizedRawUrl)) {
     return parseCashuDeepLinkUrl(normalizedRawUrl);
+  }
+
+  if (NOSTR_CONNECT_SCHEME_PREFIX.test(normalizedRawUrl)) {
+    return {
+      kind: "scan-text",
+      rawUrl: normalizedRawUrl,
+      text: normalizedRawUrl,
+    };
   }
 
   return null;

@@ -206,6 +206,22 @@ describe("parseNativeDeepLinkUrl", () => {
     });
   });
 
+  it("forwards a nostrconnect URI untouched, query included", () => {
+    const uri = `nostrconnect://${"b".repeat(64)}?relay=wss%3A%2F%2Frelay.example.com&secret=s3cr3t&perms=sign_event%3A22242&name=Example&url=https%3A%2F%2Fexample.com`;
+
+    expect(parseNativeDeepLinkUrl(`  ${uri}\n`)).toEqual({
+      kind: "scan-text",
+      rawUrl: uri,
+      text: uri,
+    });
+  });
+
+  it("accepts the nostrconnect: form without slashes", () => {
+    const uri = `NostrConnect:${"b".repeat(64)}?relay=wss%3A%2F%2Frelay.example.com`;
+
+    expect(parseNativeDeepLinkUrl(uri)?.text).toBe(uri);
+  });
+
   it("rejects unsupported or malformed deep links", () => {
     expect(parseNativeDeepLinkUrl("https://example.com")).toBeNull();
     expect(parseNativeDeepLinkUrl("nostr://wallet")).toBeNull();
