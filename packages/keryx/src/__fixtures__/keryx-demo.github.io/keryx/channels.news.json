@@ -1,0 +1,56 @@
+{
+	"signatures": [
+		{
+			"keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+			"sig": "02b1d1ded23d612ef8cb151bd624265cf5da4384b3aa9ee916f0cac87f321ece6a23f69ea13639db9cbe197d97256c11fb4a8dc9f9ba97d50d3686c00c34550f"
+		}
+	],
+	"signed": {
+		"_type": "targets",
+		"delegations": {
+			"keys": {},
+			"roles": []
+		},
+		"expires": "2027-03-23T13:45:26Z",
+		"spec_version": "1.0.31",
+		"targets": {
+			"channels/news/msg-2026-05-11-quantum-deadline.json": {
+				"hashes": {
+					"sha256": "070bc8c896d4a97916cf134cb455effc5c508e34d0d33d928eca2dd4d02fa3ec"
+				},
+				"length": 1031
+			},
+			"channels/news/msg-2026-05-28-stablecoin-yield.json": {
+				"hashes": {
+					"sha256": "17d5383332d6b52b78b753ed8c9f7a78a7f42569367267bfba54a9e36e52ecf2"
+				},
+				"length": 1019
+			},
+			"channels/news/msg-2026-06-30-suite-sync.json": {
+				"hashes": {
+					"sha256": "7223c4e1ee6ce8ba051ae9561256b3404652ddc128ad5f8b39c95cb24feead36"
+				},
+				"length": 1218
+			},
+			"channels/news/msg-2026-07-28-self-custody-matters-cs.json": {
+				"hashes": {
+					"sha256": "f3752e891bcf7cb65f415ea7075b0e97ea6f796ac5175560bb27dd622ad83d94"
+				},
+				"length": 1029
+			},
+			"channels/news/msg-2026-07-28-self-custody-matters-en.json": {
+				"hashes": {
+					"sha256": "8b12db8c9874add4e29e7009e302d0bd686196815338f9b6f92f5f4daac5d946"
+				},
+				"length": 1022
+			},
+			"channels/news/zdravim-dejva.json": {
+				"hashes": {
+					"sha256": "209f1cbe7b52503dda488323d8dd2dabaf4cb7ed50f32c79702d98f0d31250fe"
+				},
+				"length": 118155
+			}
+		},
+		"version": 8
+	}
+}

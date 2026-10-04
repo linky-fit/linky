@@ -1,0 +1,67 @@
+{
+	"signatures": [
+		{
+			"keyid": "d2c6852ab34ed6e8da980638f416f628ec3ad4a718725eb258c7d8eb606d7913",
+			"sig": "5e335455abbf0547aa77d26c40e4d72da62bf3d6ccccf1e9e8321257ee7da7f6cdc43bc685be215596e11c958c29c66948d07117137eb08a452a5fe5526add07"
+		},
+		{
+			"keyid": "10c4c3af5867ba98a45c3603e881a4ede3ef5c7cfe0fd1de2a37018eef8b8577",
+			"sig": "aec65abf340b00d840eaa9850374ed9ad854a41371ecdf1d01f80b5a308aee7000640cac025e50ff7655bab45bc5f456eec70521f5ea620d0baa1b658f727f0e"
+		}
+	],
+	"signed": {
+		"_type": "root",
+		"consistent_snapshot": false,
+		"custom": {
+			"mode": "full",
+			"repo_base": "https://keryx-demo.github.io/keryx/"
+		},
+		"expires": "2036-09-18T22:15:06Z",
+		"keys": {
+			"10c4c3af5867ba98a45c3603e881a4ede3ef5c7cfe0fd1de2a37018eef8b8577": {
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "fbda2c140f313dcb56dea01b6a6b4d5ac37d33e3362563ef483ce2f42d1f75ff"
+				},
+				"name": "master-1790028906-5d62d983",
+				"scheme": "ed25519"
+			},
+			"b0b39f0854671ca0563f05b5c4476c7b4fe7f8970658eeb2e77e4d3127b8c6c2": {
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "e9623a0556ac1a959d052b0d22bebc80302974062a94318fb513b639b911b772"
+				},
+				"name": "ops",
+				"scheme": "ed25519"
+			}
+		},
+		"roles": {
+			"root": {
+				"keyids": [
+					"10c4c3af5867ba98a45c3603e881a4ede3ef5c7cfe0fd1de2a37018eef8b8577"
+				],
+				"threshold": 1
+			},
+			"snapshot": {
+				"keyids": [
+					"b0b39f0854671ca0563f05b5c4476c7b4fe7f8970658eeb2e77e4d3127b8c6c2"
+				],
+				"threshold": 1
+			},
+			"targets": {
+				"keyids": [
+					"10c4c3af5867ba98a45c3603e881a4ede3ef5c7cfe0fd1de2a37018eef8b8577"
+				],
+				"threshold": 1
+			},
+			"timestamp": {
+				"keyids": [
+					"b0b39f0854671ca0563f05b5c4476c7b4fe7f8970658eeb2e77e4d3127b8c6c2"
+				],
+				"threshold": 1
+			}
+		},
+		"spec_version": "1.0.31",
+		"version": 2
+	}
+}

@@ -1,0 +1,28 @@
+{
+  "content_html": "<p>Podvodníci se opět vydávají za Trezor a masově útočí na uživatele. Trik je “vyrobená naléhavost”: e-mail, který vypadá oficiálně a nutí vás jednat okamžitě.</p><p>Řešení je jednoduché: <strong>zálohu své peněženky nikdy nikomu nesdělujte.</strong> Červené vlajky: falešné odkazy na aktualizace, falešná zařízení, falešné weby a výsledky vyhledávání, cílený phishing a výhrůžky “zablokováním” — hardwarovou peněženku nelze na dálku zablokovat.</p>",
+  "date_published": "2026-03-25T15:00:00Z",
+  "id": "msg-2026-03-25-how-crypto-is-stolen-cs",
+  "image": "https://keryx-demo.github.io/media/img/howstolen.jpg",
+  "image_sha256": "b4516640b5244dafb1cfbb885a00af08bbd77fc9b7fbdca333c4cfbd7696456e",
+  "language": "cs",
+  "sig": [
+    {
+      "keyid": "11a712905c1733c0d98261f9d37c682205c776f03206b536ef154ec261a95e7a",
+      "sig": "QZ4sfJm3Bs6u07AurnSVD1VC-dcOxsV2jmEPJ2B1cLeSLsWaqvpv4O7WYapexbIXKaDm0CnZXuDzoSjhNBY-CA"
+    },
+    {
+      "keyid": "00fed46d76cadf9994982834a51b31b001577787eccf47118c019d605463f34b",
+      "sig": "56-6VQRZhiLBaAfAi-Yib_pzXV23YMW_kdCPOkh5i5DdNwjAWUkOR9hkmbeiJMY6vLnJAz_oXXErZpJmIW9xBg"
+    },
+    {
+      "keyid": "06d993c2391c0a7108b5abf3c3ca4c4221465a651b0e235cee221f2f691c174f",
+      "sig": "5g-YcDQJrdU1VUuUgVzhOypBg9ps_18G-RAfISl8cAPrYyHfgr3KDPERp2k4Nqab8yYAZbwZlqxM1CpwPmy5Dw"
+    }
+  ],
+  "tags": [
+    "phishing",
+    "self-custody",
+    "cs"
+  ],
+  "title": "Takto se krade nejvíc kryptoměn"
+}

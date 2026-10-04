@@ -15,6 +15,7 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 ## Invariants
 
 - Owner ids, table names and shard indexes belong in `@linky-fit/linksync`, Nostr wire shapes in `@linky-fit/linkstr`, cashu state transitions in `@linky-fit/linkshu`
+- Keryx protocol verification belongs in `@linky-fit/keryx`
 - UI elements, icons and design tokens belong in `@linky-fit/ui`; a missing element is added there, with an entry in `apps/ui-book`
 - Funds move between mints only on an explicit user action; changing the default mint moves nothing, and one payment uses one mint
 - Quote ids and proofs go straight from the wallet to the mint, never through Linky infrastructure
@@ -35,7 +36,7 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 
 ## Package docs
 
-`packages/*/docs/` are consumer guides for linkshu, linkstr (with linkstr-react), linksync, proxy-payment and recurring-payment. Read the guide before using or changing a package. A change to an exported surface or documented behavior rewrites the affected guide in the same commit, so it describes only current behavior. Guides cover what to call, in which order, what it guarantees and how to recover from its errors; exported types and their doc comments are the reference, so guides leave field lists, `src/` paths and change history to the code and git.
+`packages/*/docs/` are consumer guides for keryx, linkshu, linkstr (with linkstr-react), linksync, proxy-payment and recurring-payment. Read the guide before using or changing a package. A change to an exported surface or documented behavior rewrites the affected guide in the same commit, so it describes only current behavior. Guides cover what to call, in which order, what it guarantees and how to recover from its errors; exported types and their doc comments are the reference, so guides leave field lists, `src/` paths and change history to the code and git.
 
 ## Versions
 

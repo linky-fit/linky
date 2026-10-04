@@ -1,0 +1,24 @@
+{
+  "content_html": "<p>A hardware wallet is only as trustworthy as what you can verify on it. The screen is the part you trust: review every transaction on the device before signing. Anything less is blind trust.</p>",
+  "date_published": "2026-05-12T09:00:00Z",
+  "id": "msg-2026-05-12-wallet-screen",
+  "image": "https://keryx-demo.github.io/media/img/screen.jpg",
+  "image_sha256": "b7f621a983bcb06ea566af00e1a51ef78425c6a19c4007b30313da6e17371cc2",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "dbdd78df841087acd1793c381d73f14e13f32eebe8c47bdd915a67f12856eb92",
+      "sig": "cW92poGBQ3abSHlzXkPwtJcaM20RUkB8bUr-v_54bLVlOZVxQJiDWhvDqjjNIwZE96vh594dthiOLUuc8XCdAg"
+    },
+    {
+      "keyid": "dbdd78df841087acd1793c381d73f14e13f32eebe8c47bdd915a67f12856eb92",
+      "sig": "cW92poGBQ3abSHlzXkPwtJcaM20RUkB8bUr-v_54bLVlOZVxQJiDWhvDqjjNIwZE96vh594dthiOLUuc8XCdAg"
+    }
+  ],
+  "tags": [
+    "self-custody",
+    "security",
+    "en"
+  ],
+  "title": "Why your hardware wallet needs a screen"
+}

@@ -1,0 +1,24 @@
+{
+  "content_html": "<p>Self-custody means your keys, your coins. A practical guide to moving off exchanges onto a hardware wallet, setting up a backup, and why “not your keys, not your coins” is more than a slogan.</p>",
+  "date_published": "2026-03-17T09:00:00Z",
+  "id": "msg-2026-03-17-own-your-coins",
+  "image": "https://keryx-demo.github.io/media/img/selfcustody.jpg",
+  "image_sha256": "bad7a2eed3b4565a65d8824f527ff6acff5af0d9a955a65d0b2a8ff7b24d3270",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "dbdd78df841087acd1793c381d73f14e13f32eebe8c47bdd915a67f12856eb92",
+      "sig": "uq2vhfjjLhq4c3vO90s6hr9yjhur_rgMcf_emlPNIlerpEijP95_kRza5uYrwvUmBrJ7w7mzkWFEYQGusThGBg"
+    },
+    {
+      "keyid": "dbdd78df841087acd1793c381d73f14e13f32eebe8c47bdd915a67f12856eb92",
+      "sig": "uq2vhfjjLhq4c3vO90s6hr9yjhur_rgMcf_emlPNIlerpEijP95_kRza5uYrwvUmBrJ7w7mzkWFEYQGusThGBg"
+    }
+  ],
+  "tags": [
+    "self-custody",
+    "security",
+    "en"
+  ],
+  "title": "Own your coins 100%: A quick guide to self-custody"
+}

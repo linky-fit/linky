@@ -1,0 +1,28 @@
+{
+  "content_html": "<p>Scammers are impersonating Trezor in a massive blast to users. The trick here is all about “manufactured urgency”: an official-looking email that insists you act right now, betting you'll panic and hand over total control of your wallet.</p><p>The solution is simple: <strong>never, under any circumstances, share your wallet backup with anyone.</strong> Red flags: fake update links, fake devices, fake websites and search results, targeted phishing, and threats of “blocking” — a hardware wallet cannot be blocked remotely.</p>",
+  "date_published": "2026-03-25T14:00:00Z",
+  "id": "msg-2026-03-25-how-crypto-is-stolen-en",
+  "image": "https://keryx-demo.github.io/media/img/howstolen.jpg",
+  "image_sha256": "b4516640b5244dafb1cfbb885a00af08bbd77fc9b7fbdca333c4cfbd7696456e",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "11a712905c1733c0d98261f9d37c682205c776f03206b536ef154ec261a95e7a",
+      "sig": "cfSHNeazReFaJNSxejZmJjWL1vLMSgt1m5Cqqe75lGDSm74ag0YbqDKYvbTAvoniWGqrqiOOb1LQfTwO-M5aDA"
+    },
+    {
+      "keyid": "00fed46d76cadf9994982834a51b31b001577787eccf47118c019d605463f34b",
+      "sig": "Udq6lS-Pw9RU4_kvhBgy72HE1beO2oKkaByIsQ-TT0Gb6w8RnVarfGDzTM9vrwNrNp3HFiFqUI7J5Ef6NPHVCQ"
+    },
+    {
+      "keyid": "06d993c2391c0a7108b5abf3c3ca4c4221465a651b0e235cee221f2f691c174f",
+      "sig": "jYF5D5wTB5Vb53u1tOfYZg_lR6AosLggjlGK8elDhZQnommVCXa52p1sozR-1xettzjNuZkCW19BHoQoCDA8Ag"
+    }
+  ],
+  "tags": [
+    "phishing",
+    "self-custody",
+    "en"
+  ],
+  "title": "This is the way most crypto is stolen"
+}

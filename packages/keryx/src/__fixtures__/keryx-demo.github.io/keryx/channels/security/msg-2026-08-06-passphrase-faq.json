@@ -1,0 +1,28 @@
+{
+  "content_html": "<p>The passphrase is a sharp tool. Used carefully, it adds real security to your wallet. Used carelessly, it's one of the fastest ways to lose access to your own crypto.</p><p><strong>Passphrases cannot be changed or removed.</strong> If you lose yours, you lose access to the funds in that wallet. Write it down, store it safely, test it before you send anything significant.</p>",
+  "date_published": "2026-08-06T09:00:00Z",
+  "id": "msg-2026-08-06-passphrase-faq",
+  "image": "https://keryx-demo.github.io/media/img/passphrase.jpg",
+  "image_sha256": "9e3a62ae4f93469d204aaa467a7c166bc471d82ee8e54cc2f52c5c522e3e2dea",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "11a712905c1733c0d98261f9d37c682205c776f03206b536ef154ec261a95e7a",
+      "sig": "VdYwsquKetiVGRxYgsJpjKU7NSr7HQRMBKjNJ92ljwa4BkmCEwIbV1qd__38m5SUGJ8hhtKv3p5j5syqX3g8DQ"
+    },
+    {
+      "keyid": "00fed46d76cadf9994982834a51b31b001577787eccf47118c019d605463f34b",
+      "sig": "iuLBbVPl8gye8iGU2GLft2zxJisqVrxdMqmb70OVNYwC1Pd6M1qOdD0ksoQ4na0y3kacqAxWgvnnR1muxu8TCw"
+    },
+    {
+      "keyid": "06d993c2391c0a7108b5abf3c3ca4c4221465a651b0e235cee221f2f691c174f",
+      "sig": "9NS7Tz2fVi9hEl74kzNkNJxotwSxQI_hSCTG1OXbKrBtpBqsktrhEEOJZFkD3bZTfiRihTAtVhopzRtkEC-6DA"
+    }
+  ],
+  "tags": [
+    "security",
+    "self-custody",
+    "en"
+  ],
+  "title": "Passphrase FAQ: What every passphrase user should know"
+}

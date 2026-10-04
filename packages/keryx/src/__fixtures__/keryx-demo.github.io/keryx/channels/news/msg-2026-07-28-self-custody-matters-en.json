@@ -1,0 +1,24 @@
+{
+  "content_html": "<p>Exchange failures keep proving the same lesson: if you don't control the keys, you don't control the coins. Why self-custody is the only guarantee, and how a hardware wallet makes it practical.</p>",
+  "date_published": "2026-07-28T09:00:00Z",
+  "id": "msg-2026-07-28-self-custody-matters-en",
+  "image": "https://keryx-demo.github.io/media/img/selfcustody26.jpg",
+  "image_sha256": "1861b41ec99712238cfb8d9bf0a63017aa0b80c5323ba8a5aa0632d62108cf54",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+      "sig": "lvyBPa5ASfsbDAHu_8P8e8wG8yf-hV0LM-qkaqVU9T-HziB4dd2HEVKMas3U6q_XW8amr78JGK2RxI4JQk6QBg"
+    },
+    {
+      "keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+      "sig": "lvyBPa5ASfsbDAHu_8P8e8wG8yf-hV0LM-qkaqVU9T-HziB4dd2HEVKMas3U6q_XW8amr78JGK2RxI4JQk6QBg"
+    }
+  ],
+  "tags": [
+    "self-custody",
+    "bitcoin",
+    "en"
+  ],
+  "title": "Why self-custody matters more than ever"
+}

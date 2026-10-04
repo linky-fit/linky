@@ -1,0 +1,25 @@
+{
+  "content_html": "<p>Following the recent Coldcard disclosure: Trezor hardware wallets are not affected. Here is what the vulnerability was, why it does not apply to our devices, and what we still recommend.</p>",
+  "date_published": "2026-08-05T16:00:00Z",
+  "id": "msg-2026-08-05-coldcard",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "11a712905c1733c0d98261f9d37c682205c776f03206b536ef154ec261a95e7a",
+      "sig": "P4j0byAYlYUpfptG7CuoAQ8ouiB_CdVfM_pSJElzTBWkO4V88iuhc3XN8Ak75_q_7F4usoqS7y7Ry_QVDcwIDw"
+    },
+    {
+      "keyid": "00fed46d76cadf9994982834a51b31b001577787eccf47118c019d605463f34b",
+      "sig": "2QyoNJ6vzaymj0gomba7eGbVPttsu_ao87Qp34_losTaq9cfvJWzRS9lzFE_PvX3H5jcifg4LlC0EDO5R3seBw"
+    },
+    {
+      "keyid": "06d993c2391c0a7108b5abf3c3ca4c4221465a651b0e235cee221f2f691c174f",
+      "sig": "FC_p02Cz8XYMIY9K1OYFGNnnkc5IQHRCH0NYejKr_GkdE7T4xRvdB8XlCyx12PKEY3K6jXw7YeBvQAQznEEQDQ"
+    }
+  ],
+  "tags": [
+    "security",
+    "en"
+  ],
+  "title": "Coldcard vulnerability: Trezor devices are not affected"
+}
