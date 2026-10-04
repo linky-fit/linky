@@ -36,6 +36,14 @@
 				<string>cashu</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>fit.linky.app.nostrconnect</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>nostrconnect</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>

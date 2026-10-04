@@ -248,7 +248,7 @@ final class LinkyNfcPlugin: CAPPlugin, CAPBridgedPlugin, NFCNDEFReaderSessionDel
         }
 
         let lowercased = normalized.lowercased()
-        guard lowercased.hasPrefix("nostr://") || lowercased.hasPrefix("cashu://") else {
+        guard ["nostr://", "cashu://", "nostrconnect://"].contains(where: lowercased.hasPrefix) else {
             return nil
         }
 

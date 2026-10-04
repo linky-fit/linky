@@ -88,7 +88,7 @@ Android:
 - Push: Capacitor Push Notifications + FCM. Data-only messages are rendered by `LinkyFirebaseMessagingService`, so notifications show while the app is closed. Needs `android/app/google-services.json`.
 - Encrypted secret storage for identity material (`LinkySecretStorageBridge`).
 - Native QR scanning when WebKit camera APIs are unavailable.
-- `nostr://` and `cashu://` URLs are forwarded to the web app: `nostr://npub...` opens or creates the contact, `cashu://cashu...` imports the token.
+- `nostr://`, `cashu://` and `nostrconnect://` URLs are forwarded to the web app: `nostr://npub...` opens or creates the contact, `cashu://cashu...` imports the token, `nostrconnect://...` is handed over whole as a Nostr Connect login request.
 - NFC: reads NDEF URI and `text/plain` records with those schemes; writes `cashu://cashu...` from token detail and `nostr://npub...` from the profile.
 - File export (data backup, chat images and PDFs) writes to the app cache and opens the share sheet.
 
