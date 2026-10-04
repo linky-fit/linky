@@ -9,6 +9,10 @@ import type { Plugin, ViteDevServer } from "vite";
 import { defineConfig } from "vite";
 import { parseJsonObject } from "./api/_npubcash.js";
 import lnurlpHandler from "./api/lnurlp.js";
+import {
+  absolutePreviewImages,
+  deploymentOrigin,
+} from "./build/previewImages.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,6 +57,12 @@ const blogArticleInputs = Object.fromEntries(
       path.resolve(__dirname, "blog", name, "index.html"),
     ]),
 );
+
+const previewImages = (): Plugin => ({
+  name: "absolute-preview-images",
+  transformIndexHtml: (html) =>
+    absolutePreviewImages(html, deploymentOrigin(process.env)),
+});
 
 // Mirrors src/colorMode.ts, so every page paints its first frame in the stored color mode.
 const colorModeBootScript = (): Plugin => ({
@@ -131,6 +141,7 @@ export default defineConfig({
     linkyUi(),
     react(),
     colorModeBootScript(),
+    previewImages(),
     trailingSlashRedirect(),
     lnurlProxy(),
   ],
