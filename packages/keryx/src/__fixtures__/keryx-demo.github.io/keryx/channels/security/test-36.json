@@ -1,0 +1,26 @@
+{
+  "content_html": "<p>Test 36 — published by publish.sh at 2026-09-26T15:00:15Z.</p>",
+  "date_published": "2026-09-26T15:00:15Z",
+  "id": "test-36",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "11a712905c1733c0d98261f9d37c682205c776f03206b536ef154ec261a95e7a",
+      "sig": "LwayuZvM03QKMloQWUHDa4NHQfOInvsvmK80TARryAVTE4wswLhq4QUplRc6EISok8vOKBRe-xqYsdvE6NTcBg"
+    },
+    {
+      "keyid": "00fed46d76cadf9994982834a51b31b001577787eccf47118c019d605463f34b",
+      "sig": "lJcqxtfKYN8KvNW9SJOuEpvAEnMtcUmAxcVOu0SCR0NzZVJT6LRxJdt42Pky5asHEjWQBbSWdZRf1y34Llt0CQ"
+    },
+    {
+      "keyid": "06d993c2391c0a7108b5abf3c3ca4c4221465a651b0e235cee221f2f691c174f",
+      "sig": "1g7ODJozLmuqkYWu2LrTvB7-YR0yWjKxdScuaH2BvQV_8GqyZ16Sx_L3JuOKY8Zudf3nfnWQqe5zLo1C7YE6Cw"
+    }
+  ],
+  "tags": [
+    "demo",
+    "security",
+    "en"
+  ],
+  "title": "Test 36"
+}

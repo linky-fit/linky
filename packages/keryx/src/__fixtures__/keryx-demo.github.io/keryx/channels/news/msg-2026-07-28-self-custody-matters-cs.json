@@ -1,0 +1,24 @@
+{
+  "content_html": "<p>Selhání burz stále dokazují jedno: pokud nekontrolujete klíče, nekontrolujete mince. Proč je self-custody jedinou zárukou — a jak ji hardwarová peněženka dělá praktickou.</p>",
+  "date_published": "2026-07-28T10:00:00Z",
+  "id": "msg-2026-07-28-self-custody-matters-cs",
+  "image": "https://keryx-demo.github.io/media/img/selfcustody26.jpg",
+  "image_sha256": "1861b41ec99712238cfb8d9bf0a63017aa0b80c5323ba8a5aa0632d62108cf54",
+  "language": "cs",
+  "sig": [
+    {
+      "keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+      "sig": "eZK0WziOnwrgii1l3D4YyHtw3KoSfmQI_NXM4lQHV3MPdKA2--rXS1TIQoa2XZNTaa1b_KPe10nS139VtBz_Bg"
+    },
+    {
+      "keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+      "sig": "eZK0WziOnwrgii1l3D4YyHtw3KoSfmQI_NXM4lQHV3MPdKA2--rXS1TIQoa2XZNTaa1b_KPe10nS139VtBz_Bg"
+    }
+  ],
+  "tags": [
+    "self-custody",
+    "bitcoin",
+    "cs"
+  ],
+  "title": "Proč je self-custody důležitější než kdy dřív"
+}

@@ -1,0 +1,32 @@
+{
+	"signatures": [
+		{
+			"keyid": "dbdd78df841087acd1793c381d73f14e13f32eebe8c47bdd915a67f12856eb92",
+			"sig": "02c7d8f852a49c8a488425a7d95053f51072fc5128dfd4dccc532c78c248ea103ce5c58e901298c6ad3affab74770a2c5f92be773e8c637f915ba339d9760a05"
+		}
+	],
+	"signed": {
+		"_type": "targets",
+		"delegations": {
+			"keys": {},
+			"roles": []
+		},
+		"expires": "2027-03-20T13:35:31Z",
+		"spec_version": "1.0.31",
+		"targets": {
+			"channels/insights/msg-2026-03-17-own-your-coins.json": {
+				"hashes": {
+					"sha256": "1d997ca36b2166cb60324fadc1b3b7aa143c78a57bf9c0e5b019bf47a23676f6"
+				},
+				"length": 1025
+			},
+			"channels/insights/msg-2026-05-12-wallet-screen.json": {
+				"hashes": {
+					"sha256": "03ee6078780b7fc004a9e27f27eef39ed6b22beaf656c2eb655f56c8a03c5955"
+				},
+				"length": 1002
+			}
+		},
+		"version": 3
+	}
+}

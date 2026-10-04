@@ -1,0 +1,28 @@
+{
+  "content_html": "<p>This item was created, signed and published with the publisher CLI, then announced by a relay wake-up.</p><p>If you can read it in the app after the notification, every step of the cycle worked.</p>",
+  "date_published": "2026-09-22T00:00:00Z",
+  "id": "live-demo-2026-09-22",
+  "image": "https://keryx-demo.github.io/media/img/howstolen.jpg",
+  "image_sha256": "b4516640b5244dafb1cfbb885a00af08bbd77fc9b7fbdca333c4cfbd7696456e",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "11a712905c1733c0d98261f9d37c682205c776f03206b536ef154ec261a95e7a",
+      "sig": "VgKQjm1DUh6OFSRQBpOpMwE8s467-miFMg-j_Ki9Nz2iTSzAKA4DdgjP_lFUmiVUVwsdrDgDVHbpUk6qhbh4Aw"
+    },
+    {
+      "keyid": "00fed46d76cadf9994982834a51b31b001577787eccf47118c019d605463f34b",
+      "sig": "jf2jHGcY-DxP5MYQss4UElqsespyJ8Z3_SBwqa6ZvopRnkkhsgyfgO-t3ASWQEmxXLab74MR4JVFZf5kApQrBg"
+    },
+    {
+      "keyid": "06d993c2391c0a7108b5abf3c3ca4c4221465a651b0e235cee221f2f691c174f",
+      "sig": "oq0QMY9Yal1Ex6t8z3oglrLnmluVsM_jeWuhW2nRyAYRCvmEH1oSJXtyyyHBuGv2rt8GV_bx7yamRpSOAdBUDg"
+    }
+  ],
+  "tags": [
+    "demo",
+    "security",
+    "en"
+  ],
+  "title": "Live end-to-end demo: the whole wake-up cycle works"
+}

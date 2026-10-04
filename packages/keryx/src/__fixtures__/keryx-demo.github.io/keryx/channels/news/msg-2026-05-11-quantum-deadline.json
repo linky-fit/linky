@@ -1,0 +1,24 @@
+{
+  "content_html": "<p>Google's updated quantum-computing timeline has the crypto world talking. Here's what it actually means for your bitcoin today — and why the answer is preparation, not panic.</p>",
+  "date_published": "2026-05-11T08:00:00Z",
+  "id": "msg-2026-05-11-quantum-deadline",
+  "image": "https://keryx-demo.github.io/media/img/quantum.jpg",
+  "image_sha256": "b37abee0b7493347cd6603fd13b0f25b204871af83c8282996bba95d1c1e505e",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+      "sig": "7t8BIr-uUFKFuPjj21mrak0RPwDhL77IODcgpH39yKUSb7ErLM-ElOcG7DAj0iLsLjMh6MV4_NKr--EmbtwdAw"
+    },
+    {
+      "keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+      "sig": "7t8BIr-uUFKFuPjj21mrak0RPwDhL77IODcgpH39yKUSb7ErLM-ElOcG7DAj0iLsLjMh6MV4_NKr--EmbtwdAw"
+    }
+  ],
+  "tags": [
+    "bitcoin",
+    "security",
+    "en"
+  ],
+  "title": "Google just changed the quantum deadline. Here's what it means for your bitcoin…"
+}

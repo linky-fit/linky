@@ -1,0 +1,33 @@
+{
+  "name": "@linky-fit/keryx",
+  "private": true,
+  "version": "0.1.0",
+  "license": "0BSD",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "eslint": "eslint --fix .",
+    "prettier": "prettier --write .",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "capture-fixtures": "bun scripts/captureFixtures.ts"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^2.0.1",
+    "effect": "^3.19.19"
+  },
+  "devDependencies": {
+    "@linky-fit/config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "description": "Keryx client: signed one-way company broadcasts over HTTPS, verified with TUF and Ed25519."
+}

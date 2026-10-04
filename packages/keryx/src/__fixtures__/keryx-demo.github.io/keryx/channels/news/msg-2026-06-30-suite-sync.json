@@ -1,0 +1,25 @@
+{
+  "content_html": "<p>Suite Sync is now live in Trezor Suite on desktop and mobile. Your wallet labels are encrypted on your device using keys derived from your wallet backup, synced across every device you use, and stored on Trezor's own open-source server — not Google's or Dropbox's.</p><p>Migration from legacy labeling is a single action, and advanced users can self-host to remove any dependency on Trezor.</p>",
+  "date_published": "2026-06-30T12:00:00Z",
+  "id": "msg-2026-06-30-suite-sync",
+  "image": "https://keryx-demo.github.io/media/img/suitesync.jpg",
+  "image_sha256": "3d23c41c3ef0b5aa50c0e0d80e19ce8912582a3b25c82be6536d504ee5e9089a",
+  "language": "en",
+  "sig": [
+    {
+      "keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+      "sig": "Zr0KBjzNiWnvyXNxY3fISdPLk5_kup0DuSjaLh2vUMBJED0AI_VNeHHGhDx8X40LA44sv5t3r4XriJsO2l-uBg"
+    },
+    {
+      "keyid": "9a16ed2235074ac9cfe6feafed23aec8474fe84831973ee4441ad10b294af83c",
+      "sig": "Zr0KBjzNiWnvyXNxY3fISdPLk5_kup0DuSjaLh2vUMBJED0AI_VNeHHGhDx8X40LA44sv5t3r4XriJsO2l-uBg"
+    }
+  ],
+  "tags": [
+    "trezor-suite",
+    "privacy",
+    "product",
+    "en"
+  ],
+  "title": "Permissionless storage with Suite Sync"
+}

@@ -1,0 +1,7 @@
+Order summary for Trezor order #2026-0841.
+
+Carrier: DHL Express
+Tracking number: DHL-8491-2203-77
+Estimated delivery: 3-5 business days
+
+This is demo data only - not an invoice.

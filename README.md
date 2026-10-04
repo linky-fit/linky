@@ -32,6 +32,7 @@ Packages:
 - [`packages/linksync`](./packages/linksync/README.md): synced storage (Evolu schema, repositories, shards); guides in [`docs/`](./packages/linksync/docs/)
 - [`packages/proxy-payment`](./packages/proxy-payment/README.md): proxy bank payments (bank QR parsing, offer rules); guides in [`docs/`](./packages/proxy-payment/docs/)
 - [`packages/recurring-payment`](./packages/recurring-payment/README.md): recurring payments (schedule math, the planner, claims between devices); guides in [`docs/`](./packages/recurring-payment/docs/)
+- [`packages/keryx`](./packages/keryx/README.md): Keryx client (join URLs, pairing, TUF and item verification for company announcements); guide in [`docs/keryx.md`](./packages/keryx/docs/keryx.md)
 - [`packages/ui`](./packages/ui/README.md): Tamagui design system for Expo and the web (react-native-web)
 - `packages/domain`: the branded ids every package and the app share
 - `packages/identity`: key derivation (SLIP-39, Nostr, LNURL auth) shared by the app and the error tracker

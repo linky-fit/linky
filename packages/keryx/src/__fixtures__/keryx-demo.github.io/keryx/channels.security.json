@@ -1,0 +1,116 @@
+{
+	"signatures": [
+		{
+			"keyid": "06d993c2391c0a7108b5abf3c3ca4c4221465a651b0e235cee221f2f691c174f",
+			"sig": "8d1d0fdb0963253d312f9b44d5d7f711630cf60522d6699579eafb2c30242a804b663e68ea914b610b2be6bb7c1889725ca8d0e21febfa60e6362c367c8dd20d"
+		}
+	],
+	"signed": {
+		"_type": "targets",
+		"delegations": {
+			"keys": {},
+			"roles": []
+		},
+		"expires": "2027-03-26T21:49:37Z",
+		"spec_version": "1.0.31",
+		"targets": {
+			"channels/security/live-demo-2026-09-22.json": {
+				"hashes": {
+					"sha256": "8f44e79ab0a183c8b0ae08d8cfb806ac615b88535db6c7aba1a14230a5bf202b"
+				},
+				"length": 1204
+			},
+			"channels/security/msg-2026-03-18-phishing-attacks.json": {
+				"hashes": {
+					"sha256": "f84217bd9a88362049f6ae74f7f1800e361455afad11a50e9355e1a82d957838"
+				},
+				"length": 1381
+			},
+			"channels/security/msg-2026-03-25-how-crypto-is-stolen-cs.json": {
+				"hashes": {
+					"sha256": "b2c98bbd83442fff9891731a3de81f16e5357c7e6d663bc6e029b0d7b8d2fa1c"
+				},
+				"length": 1523
+			},
+			"channels/security/msg-2026-03-25-how-crypto-is-stolen-en.json": {
+				"hashes": {
+					"sha256": "43873ff80e71fe6f780dfdb827a41ba90c97f1284313de930290d64085c18ed3"
+				},
+				"length": 1557
+			},
+			"channels/security/msg-2026-08-05-coldcard.json": {
+				"hashes": {
+					"sha256": "d6fd2768a1e2068739a97cf6811ceb46f2705500856e5b4a35417f2602fb1d33"
+				},
+				"length": 1038
+			},
+			"channels/security/msg-2026-08-06-passphrase-faq.json": {
+				"hashes": {
+					"sha256": "e9f2578d65751ec6617d70f949e8df427e88c1d76a1779201e5750553ba0470b"
+				},
+				"length": 1404
+			},
+			"channels/security/test-33.json": {
+				"hashes": {
+					"sha256": "8761c73e52650d34be1f4eb0da8149cf3f9654ee6e45314e5c40d163c314522c"
+				},
+				"length": 860
+			},
+			"channels/security/test-34.json": {
+				"hashes": {
+					"sha256": "7a7b6cbd9bc4308fae6fb43106fe0b6db55bbaac7689db26b64cce633503849b"
+				},
+				"length": 860
+			},
+			"channels/security/test-35.json": {
+				"hashes": {
+					"sha256": "1c6bae038c46f4591ccafd34b21c53c8133eba5ce7430ea928030a1426093de2"
+				},
+				"length": 860
+			},
+			"channels/security/test-36.json": {
+				"hashes": {
+					"sha256": "9c897080253f029aba659df49f71f2d4aa9c8d2022636c6ee431e6bf5ec58913"
+				},
+				"length": 860
+			},
+			"channels/security/test-37.json": {
+				"hashes": {
+					"sha256": "4fc16368345873414db3e5c1022526f4c031ebb5f6a5471401b1c7ac5fecc9ed"
+				},
+				"length": 860
+			},
+			"channels/security/test-38.json": {
+				"hashes": {
+					"sha256": "08a8157788ed08645eeada8324416ac5675c0908af7660d1107b3496e20efb48"
+				},
+				"length": 860
+			},
+			"channels/security/test-39.json": {
+				"hashes": {
+					"sha256": "d880524d44b06228ca895a587e0a5fff7fb687c4bb91ea07483d0b3486985010"
+				},
+				"length": 860
+			},
+			"channels/security/test-40.json": {
+				"hashes": {
+					"sha256": "1bf5594a32603ecc7dea089f6f9346a3d0374e9aa7903ee5a3e80bf5412be07f"
+				},
+				"length": 860
+			},
+			"channels/security/test-41.json": {
+				"hashes": {
+					"sha256": "3c36f1f287c6439875c4104bc2c4ea7f8a9373a7c089da80cf06224ac8581655"
+				},
+				"length": 860
+			},
+			"channels/security/test-42.json": {
+				"hashes": {
+					"sha256": "e908937dece3a7ac5ccb1b0e498245281262a7aed0482f562dd33b0c1fcce418"
+				},
+				"length": 860
+			}
+		},
+		"version": 79
+	}
+}

@@ -1,0 +1,63 @@
+{
+	"signatures": [
+		{
+			"keyid": "d2c6852ab34ed6e8da980638f416f628ec3ad4a718725eb258c7d8eb606d7913",
+			"sig": "d4586a716b1a0a5ff70bc0bfadd99dc6356e1fd71ec53483be1f8cda13309ff42f2ea64989587f1ad212e44afd2999d1439cc94466b346fcfae5a40173f36e05"
+		}
+	],
+	"signed": {
+		"_type": "root",
+		"consistent_snapshot": false,
+		"custom": {
+			"mode": "full",
+			"repo_base": "https://keryx-demo.github.io/keryx/"
+		},
+		"expires": "2028-09-20T13:35:31Z",
+		"keys": {
+			"b0b39f0854671ca0563f05b5c4476c7b4fe7f8970658eeb2e77e4d3127b8c6c2": {
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "e9623a0556ac1a959d052b0d22bebc80302974062a94318fb513b639b911b772"
+				},
+				"name": "ops",
+				"scheme": "ed25519"
+			},
+			"d2c6852ab34ed6e8da980638f416f628ec3ad4a718725eb258c7d8eb606d7913": {
+				"keytype": "ed25519",
+				"keyval": {
+					"public": "9d15fb5c67ab411d2bf2aada442c17ef1135d9ee44ce88c311f65d81150384cb"
+				},
+				"name": "master",
+				"scheme": "ed25519"
+			}
+		},
+		"roles": {
+			"root": {
+				"keyids": [
+					"d2c6852ab34ed6e8da980638f416f628ec3ad4a718725eb258c7d8eb606d7913"
+				],
+				"threshold": 1
+			},
+			"snapshot": {
+				"keyids": [
+					"b0b39f0854671ca0563f05b5c4476c7b4fe7f8970658eeb2e77e4d3127b8c6c2"
+				],
+				"threshold": 1
+			},
+			"targets": {
+				"keyids": [
+					"d2c6852ab34ed6e8da980638f416f628ec3ad4a718725eb258c7d8eb606d7913"
+				],
+				"threshold": 1
+			},
+			"timestamp": {
+				"keyids": [
+					"b0b39f0854671ca0563f05b5c4476c7b4fe7f8970658eeb2e77e4d3127b8c6c2"
+				],
+				"threshold": 1
+			}
+		},
+		"spec_version": "1.0.31",
+		"version": 1
+	}
+}
