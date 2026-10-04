@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import vercel from "../vercel.json" with { type: "json" };
 import { setBaseStorage } from "./helpers/appState";
@@ -39,34 +38,19 @@ test("security headers cover the shell, assets, WASM and errors", async ({
   }
 });
 
-test("built CSP covers every script, blocks injected code and allows local services", async ({
+// Script hashing and the policy text are covered by server/contentSecurityPolicy.test.ts.
+test("built CSP leads the document, blocks injected code and allows local services", async ({
   page,
 }) => {
   await setBaseStorage(page);
   await page.goto("/");
-  const { policy, firstTag, scripts } = await page.evaluate(async () => ({
-    policy:
-      document
-        .querySelector('meta[http-equiv="Content-Security-Policy"]')
-        ?.getAttribute("content") ?? "",
-    // The served document, because Tamagui and react-native-web prepend style tags at runtime.
-    firstTag: new DOMParser()
+  // The served document, because Tamagui and react-native-web prepend style tags at runtime.
+  const firstTag = await page.evaluate(async () =>
+    new DOMParser()
       .parseFromString(await (await fetch("/")).text(), "text/html")
       .head.firstElementChild?.getAttribute("http-equiv"),
-    scripts: Array.from(
-      document.querySelectorAll("script:not([src])"),
-      (script) => script.textContent,
-    ),
-  }));
+  );
   expect(firstTag).toBe("Content-Security-Policy");
-  expect(scripts.length).toBeGreaterThan(0);
-  for (const script of scripts) {
-    expect(policy).toContain(
-      `'sha256-${createHash("sha256").update(script).digest("base64")}'`,
-    );
-  }
-  expect(policy).not.toContain("fonts.googleapis.com");
-  expect(policy).not.toContain("fonts.gstatic.com");
 
   const violations = await page.evaluate(async () => {
     const violations: string[] = [];

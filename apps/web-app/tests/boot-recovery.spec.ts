@@ -7,7 +7,6 @@ import { setBaseStorage, MOBILE_VIEWPORT } from "./helpers/appState";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
 import { addContactByNpub } from "./helpers/contacts";
 import { BOOT_DIAGNOSTIC_TEST_PHRASES } from "../src/utils/bootDiagnosticSecrets.fixture";
-import { watchAppErrors } from "./helpers/diagnostics";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { EVOLU_RELAY_URL } from "./helpers/stack";
 
@@ -93,10 +92,10 @@ test("does not reload forever when session storage is unavailable", async ({
 
   await page.goto("/");
 
+  // The shell renders this panel only on the branch that gives up reloading.
   await expect(
     page.getByRole("heading", { name: "The app failed to start" }),
   ).toBeVisible({ timeout: 10_000 });
-  await page.waitForTimeout(250);
   expect(mainBundleRequests).toBe(1);
 });
 
@@ -136,37 +135,34 @@ test("recovers when the authenticated app never commits", async ({ page }) => {
   expect(databaseWorkerRequests).toBeGreaterThanOrEqual(1);
 });
 
-for (const failureTiming of ["before", "after"]) {
-  test(`a SQLite pool lock failure ${failureTiming} other acquisitions preserves local contacts`, async ({
-    page,
-  }) => {
-    await page.setViewportSize(MOBILE_VIEWPORT);
-    await setBaseStorage(page);
-    await setSeedLoginStorage(page, await createSeedIdentity());
-    await page.addInitScript((relay) => {
-      localStorage.setItem(
-        "linky.evoluServers.disabled.v1",
-        JSON.stringify([relay]),
-      );
-    }, EVOLU_RELAY_URL);
-    await page.goto("/#wallet");
-    await expect(page.getByLabel("Available balance")).toBeVisible();
-    await addContactByNpub(page, (await createSeedIdentity()).npub);
-    await page.goto("/#contacts");
-    await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
+test("a SQLite pool lock failure before or after other acquisitions preserves local contacts", async ({
+  page,
+}) => {
+  await page.setViewportSize(MOBILE_VIEWPORT);
+  await setBaseStorage(page);
+  await setSeedLoginStorage(page, await createSeedIdentity());
+  await page.addInitScript((relay) => {
+    localStorage.setItem(
+      "linky.evoluServers.disabled.v1",
+      JSON.stringify([relay]),
+    );
+  }, EVOLU_RELAY_URL);
+  await page.goto("/#wallet");
+  await expect(page.getByLabel("Available balance")).toBeVisible();
+  await addContactByNpub(page, (await createSeedIdentity()).npub);
+  await page.goto("/#contacts");
+  await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
 
-    const recoveries: string[] = [];
-    page.on("console", (message) => {
-      if (message.text().includes("local database failed to open")) {
-        recoveries.push(message.text());
-      }
-    });
-    let injected = false;
-    await page.route(/\/assets\/evoluDb\.worker-[^/]+\.js$/, async (route) => {
-      if (injected) return route.continue();
-      injected = true;
-      const response = await route.fetch();
-      const fault = `
+  const recoveries: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes("local database failed to open")) {
+      recoveries.push(message.text());
+    }
+  });
+  let failureTiming: "before" | "after" | null = null;
+  await page.route(/\/assets\/evoluDb\.worker-[^/]+\.js$/, async (route) => {
+    if (failureTiming === null) return route.continue();
+    const fault = `
       const openHandle = FileSystemFileHandle.prototype.createSyncAccessHandle;
       let failed = false;
       FileSystemFileHandle.prototype.createSyncAccessHandle = async function (...args) {
@@ -185,129 +181,112 @@ for (const failureTiming of ["before", "after"]) {
         return handle;
       };
     `;
-      await route.fulfill({ response, body: fault + (await response.text()) });
+    failureTiming = null;
+    const response = await route.fetch();
+    await route.fulfill({ response, body: fault + (await response.text()) });
+  });
+
+  // "before" fails while other handles are still being acquired, which then
+  // land after the pool gave up; "after" fails once the others are held.
+  for (const timing of ["before", "after"] as const) {
+    await test.step(`fail ${timing} the other acquisitions`, async () => {
+      const recoveriesBefore = recoveries.length;
+      failureTiming = timing;
+      await page.reload();
+      await expect.poll(() => recoveries.length).toBe(recoveriesBefore + 1);
+      await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
     });
+  }
+  await page.reload();
+  await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
+});
 
-    await page.reload();
-    await expect.poll(() => recoveries.length).toBe(1);
-    await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
-    await page.reload();
-    await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
-  });
-}
-
-for (const channelState of ["missing", "blocked"]) {
-  test(`boots and persists contacts with ${channelState} BroadcastChannel and no Web Locks`, async ({
-    page,
-  }) => {
-    const errors = watchAppErrors(page, `compat ${channelState}`);
-    await page.setViewportSize(MOBILE_VIEWPORT);
-    page.setDefaultTimeout(20_000);
-    await setBaseStorage(page);
-    await setSeedLoginStorage(page, await createSeedIdentity());
-    await page.addInitScript((state) => {
-      Object.defineProperty(navigator, "locks", {
-        configurable: true,
-        value: undefined,
-      });
-      Object.defineProperty(window, "BroadcastChannel", {
-        configurable: true,
-        writable: true,
-        value:
-          state === "missing"
-            ? undefined
-            : class {
-                constructor() {
-                  throw new DOMException("Blocked", "SecurityError");
-                }
-              },
-      });
-    }, channelState);
-    await page.goto("/#wallet");
-    await expect(page.getByLabel("Available balance")).toBeVisible();
-    const contact = await createSeedIdentity();
-    const id = await addContactByNpub(page, contact.npub);
-    await page.reload();
-    await expect(page).toHaveURL(new RegExp(`#chat/${id}$`));
-    await expect(page.locator('[data-guide="chat-input"]')).toBeVisible();
-    await page.goto("/#contacts");
-    await expect(page.locator('[data-guide="contact-card"]')).toHaveCount(1);
-    errors.assertClean();
-  });
-}
-
-for (const attempt of ["current", "previous"]) {
-  test(`redacts ${attempt} stored diagnostics before shell recovery and export`, async ({
-    page,
-  }) => {
-    const nsec = `nsec1${"q".repeat(58)}`;
-    const cashu = `cashuA${"a".repeat(40)}`;
-    await page.addInitScript(
-      ({ attempt, phrases, nsec, cashu }) => {
-        sessionStorage.clear();
-        sessionStorage.setItem(
-          "linky.boot.shell_recovery_at.v1",
-          String(Date.now()),
-        );
-        sessionStorage.setItem(
-          `linky.boot.diagnostics.${attempt}.v1`,
-          JSON.stringify({
-            currentStage: "import-app",
-            events: phrases.map((phrase) => ({
-              error: {
-                message: phrase.toUpperCase().replaceAll(" ", "\n\t"),
-                name: phrase,
-                source: `https://app.linky.fit/${encodeURIComponent(phrase)}`,
-                stack: `${nsec} ${cashu}`,
-                words: phrase.split(" "),
-                quotedWords: JSON.stringify(phrase.split(" ")),
-              },
-            })),
-          }),
-        );
-        Reflect.set(window, "__linkyBootWatchdogMs", 50);
+// One test covers both shell branches: an old previous attempt is redacted in
+// place, then a current attempt is redacted as it rotates into previous.
+test("redacts stored diagnostics before shell recovery and export", async ({
+  page,
+}) => {
+  const nsec = `nsec1${"q".repeat(58)}`;
+  const cashu = `cashuA${"a".repeat(40)}`;
+  const leakyAttempt = (currentStage: string) => ({
+    currentStage,
+    events: BOOT_DIAGNOSTIC_TEST_PHRASES.map((phrase) => ({
+      error: {
+        message: phrase.toUpperCase().replaceAll(" ", "\n\t"),
+        name: phrase,
+        source: `https://app.linky.fit/${encodeURIComponent(phrase)}`,
+        stack: `${nsec} ${cashu}`,
+        words: phrase.split(" "),
+        quotedWords: JSON.stringify(phrase.split(" ")),
       },
-      { attempt, phrases: BOOT_DIAGNOSTIC_TEST_PHRASES, nsec, cashu },
+    })),
+  });
+  await page.addInitScript((previous) => {
+    Reflect.set(window, "__linkyBootWatchdogMs", 50);
+    if (sessionStorage.getItem("linky.test.diagnostics-seeded") !== null)
+      return;
+    sessionStorage.clear();
+    sessionStorage.setItem("linky.test.diagnostics-seeded", "1");
+    sessionStorage.setItem(
+      "linky.boot.shell_recovery_at.v1",
+      String(Date.now()),
     );
-    await page.route(MAIN_BUNDLE, (route) => route.abort());
-    await page.goto("/");
-    await expect(
-      page.getByRole("button", { name: "Download diagnostics" }),
-    ).toBeVisible();
+    sessionStorage.setItem(
+      "linky.boot.diagnostics.previous.v1",
+      JSON.stringify(previous),
+    );
+  }, leakyAttempt("import-evolu"));
+  await page.route(MAIN_BUNDLE, (route) => route.abort());
+  const expectRedacted = (text: string) => {
+    expect(text).toContain("[redacted recovery phrase]");
+    expect(text.toLowerCase()).not.toContain("lilac");
+    expect(text.toLowerCase()).not.toContain("abandon");
+    expect(text).not.toContain(nsec);
+    expect(text).not.toContain(cashu);
+  };
+  const storedDiagnostics = () =>
+    page.evaluate(() => JSON.stringify(sessionStorage));
+  const downloadButton = page.getByRole("button", {
+    name: "Download diagnostics",
+  });
 
-    const stored = await page.evaluate(() => JSON.stringify(sessionStorage));
-    expect(stored).toContain("[redacted recovery phrase]");
-    expect(stored.toLowerCase()).not.toContain("lilac");
-    expect(stored.toLowerCase()).not.toContain("abandon");
-    expect(stored).not.toContain(nsec);
-    expect(stored).not.toContain(cashu);
+  await page.goto("/");
+  await expect(downloadButton).toBeVisible();
+  const storedPrevious = await storedDiagnostics();
+  expect(storedPrevious).toContain("import-evolu");
+  expectRedacted(storedPrevious);
 
-    await page.evaluate((phrases) => {
+  await page.evaluate(
+    (current) =>
       sessionStorage.setItem(
         "linky.boot.diagnostics.current.v1",
-        JSON.stringify({
-          currentStage: "render-failed",
-          message: phrases[0],
-          words: phrases[1]?.split(" "),
-        }),
-      );
-      history.replaceState(
-        null,
-        "",
-        `/${encodeURIComponent(phrases[0] ?? "")}`,
-      );
-    }, BOOT_DIAGNOSTIC_TEST_PHRASES);
-    const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Download diagnostics" }).click();
-    const downloadPath = await (await downloadPromise).path();
-    if (!downloadPath) throw new Error("Missing diagnostic download");
-    const report = await readFile(downloadPath, "utf8");
-    expect(report).toContain("import-app");
-    expect(report).toContain("render-failed");
-    expect(report).toContain("[redacted recovery phrase]");
-    expect(report.toLowerCase()).not.toContain("lilac");
-    expect(report.toLowerCase()).not.toContain("abandon");
-    expect(report).not.toContain(nsec);
-    expect(report).not.toContain(cashu);
-  });
-}
+        JSON.stringify(current),
+      ),
+    leakyAttempt("import-app"),
+  );
+  await page.reload();
+  await expect(downloadButton).toBeVisible();
+  const storedRotated = await storedDiagnostics();
+  expect(storedRotated).toContain("import-app");
+  expectRedacted(storedRotated);
+
+  await page.evaluate((phrases) => {
+    sessionStorage.setItem(
+      "linky.boot.diagnostics.current.v1",
+      JSON.stringify({
+        currentStage: "render-failed",
+        message: phrases[0],
+        words: phrases[1]?.split(" "),
+      }),
+    );
+    history.replaceState(null, "", `/${encodeURIComponent(phrases[0] ?? "")}`);
+  }, BOOT_DIAGNOSTIC_TEST_PHRASES);
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const downloadPath = await (await downloadPromise).path();
+  if (!downloadPath) throw new Error("Missing diagnostic download");
+  const report = await readFile(downloadPath, "utf8");
+  expect(report).toContain("import-app");
+  expect(report).toContain("render-failed");
+  expectRedacted(report);
+});

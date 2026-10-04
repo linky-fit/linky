@@ -101,6 +101,13 @@ describe("password manager seed backup", () => {
     expect(vault.size).toBe(2);
   });
 
+  it("reports unsupported without storing when PasswordCredential is missing", async () => {
+    vi.stubGlobal("PasswordCredential", undefined);
+
+    expect(await save(firstSeed)).toBe("unsupported");
+    expect(navigator.credentials.store).not.toHaveBeenCalled();
+  });
+
   it("does not save an invalid seed under a name-based fallback", async () => {
     expect(await save("invalid seed")).toBe("failed");
     expect(vault.size).toBe(0);
