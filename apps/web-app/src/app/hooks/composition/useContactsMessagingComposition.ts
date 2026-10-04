@@ -1,4 +1,5 @@
 import { useSaveNpubContact } from "../contacts/useSaveNpubContact";
+import { useSharedProfileLink } from "../contacts/useSharedProfileLink";
 import {
   useAccountHydrated,
   useMessagesVisibleSinceSec,
@@ -631,6 +632,15 @@ export const useContactsMessagingComposition = ({
     unknownNameByNpub,
     lang,
     setStatus,
+    t,
+  });
+
+  useSharedProfileLink({
+    accountHydrated,
+    contacts,
+    currentNpub,
+    saveNpubContact,
+    setChatDraft,
     t,
   });
 

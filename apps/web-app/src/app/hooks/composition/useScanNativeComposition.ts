@@ -958,6 +958,7 @@ export const useScanNativeComposition = ({
     scanIsOpen,
     scanVideoRef,
     shareCashuTokenText,
+    shareText,
     shareOptionsText,
     shareOptionsViaEmail,
     shareOptionsViaSms,

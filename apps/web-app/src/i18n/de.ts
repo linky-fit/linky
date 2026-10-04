@@ -997,6 +997,8 @@ export const de = {
   cashuShareMessageWithAmount: "{amount} senden {url}",
   uploadToNfc: "Auf NFC schreiben",
   uploadProfileToNfc: "Auf Tag schreiben",
+  shareProfile: "Profil teilen",
+  sharedProfileGreeting: "Hallo 👋",
   nfcWriteUnsupported: "NFC-Schreiben ist auf diesem Gerät nicht verfügbar.",
   nfcWriteDisabled: "NFC ist auf diesem Gerät ausgeschaltet.",
   nfcWriteBusy: "Ein anderer NFC-Schreibvorgang läuft bereits.",

@@ -94,6 +94,8 @@ export const parseRouteFromHash = (): Route => {
   if (hash === "") return { kind: "wallet" };
   if (hash === "#") return { kind: "contacts" };
   if (hash === "#contacts") return { kind: "contacts" };
+  // The shared-profile link is taken out of the hash once the app starts.
+  if (hash.startsWith("#add/")) return { kind: "contacts" };
   if (hash === "#settings") return { kind: "settings" };
   if (hash === "#settings/language") return { kind: "settingsLanguage" };
   if (hash === "#settings/appearance") return { kind: "settingsAppearance" };

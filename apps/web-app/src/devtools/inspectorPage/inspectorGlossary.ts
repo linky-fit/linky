@@ -48,6 +48,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The app told the push service when to remind this identity of upcoming recurring payments (a minute after each due time still ahead), or failed to. It syncs again when a due time passes, which cancels that reminder because this running app sends the payment. The server stores only the times, never notes, amounts or recipients; the notes due at each time stay on the device.",
   "contacts.npubSaved":
     "A Nostr contact was saved after the duplicate check. The contact link identifies the new row; the insert itself runs in the background.",
+  "contacts.sharedProfileOpened":
+    "A profile link (`#add/<npub>` from a linky.fit profile page) was opened once the account hydrated. The contact link identifies the saved or already existing contact whose conversation opens next; created tells which.",
   "conversations.archived":
     "User archived a contact's chat: the contact row (contacts scope) records the archive time and the conversation's read cursor moves there. The contact and conversation links identify both rows.",
   "unknownSenders.messageStored":

@@ -22,7 +22,8 @@ import {
   formatShortLightningAddress,
   formatShortNpub,
 } from "../utils/formatting";
-import { optimizeCaseInsensitiveQrPayload } from "../utils/qrPayload";
+import { buildOwnProfileShareUrl } from "../sharedProfileLink";
+import { buildProfileShareUrl } from "../utils/deepLinks";
 import {
   type Nip98AuthHeaderFactory,
   type OwnLightningAddressInputCandidate,
@@ -73,6 +74,7 @@ interface ProfilePageProps {
   setProfileEditLnAddress: (value: string) => void;
   setProfileEditName: (value: string) => void;
   setProfileEditStatus: (value: string) => void;
+  shareText: (text: string) => Promise<void>;
   writeCurrentNpubToNfc: () => Promise<void>;
 }
 
@@ -111,6 +113,7 @@ export function ProfilePage({
   setProfileEditLnAddress,
   setProfileEditName,
   setProfileEditStatus,
+  shareText,
   writeCurrentNpubToNfc,
 }: ProfilePageProps): React.ReactElement {
   const { formatDisplayedAmountParts, t } = useAppShellCore();
@@ -275,6 +278,11 @@ export function ProfilePage({
 
   if (!isProfileEditing) {
     const displayName = effectiveProfileName ?? formatShortNpub(currentNpub);
+    const shareUrl = buildOwnProfileShareUrl(
+      currentNpub,
+      effectiveMyLightningAddress,
+      ownedLightningAddresses,
+    );
     return (
       <PageCard
         backgroundColor="$transparent"
@@ -291,12 +299,20 @@ export function ProfilePage({
           {displayName}
         </Text>
         <QRCode
-          value={optimizeCaseInsensitiveQrPayload(currentNpub)}
+          value={buildProfileShareUrl(currentNpub)}
           accessibilityLabel={t("copy")}
           tooltip={t("copy")}
           badge="Copy"
-          onPress={() => void copyText(currentNpub)}
+          onPress={() => void copyText(shareUrl)}
         />
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="Share2"
+          onPress={() => void shareText(shareUrl)}
+        >
+          {t("shareProfile")}
+        </Button>
         {canWriteToNfc ? (
           <Button
             variant="secondary"
