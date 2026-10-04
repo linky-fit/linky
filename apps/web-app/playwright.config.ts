@@ -31,6 +31,7 @@ const LOCAL_STACK_SPECS = [
   "**/restore.spec.ts",
   "**/new-account.spec.ts",
   "**/lightning-address-identity.spec.ts",
+  "**/duplicate-contact-routing.spec.ts",
 ];
 
 export default defineConfig({

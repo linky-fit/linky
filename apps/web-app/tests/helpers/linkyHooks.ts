@@ -56,3 +56,24 @@ export const shardIndexes = async (
       row.index,
     ]),
   );
+
+export const createRowId = (page: Page): Promise<string> =>
+  page.evaluate(() => {
+    if (!window.__linkyE2E) throw new Error("test hooks missing");
+    return window.__linkyE2E.createId();
+  });
+
+/** A raw Evolu upsert under the given owner, bypassing the app's repositories. */
+export const upsertRow = (
+  page: Page,
+  table: string,
+  row: Row,
+  ownerId: string,
+): Promise<void> =>
+  page.evaluate(
+    ({ table, row, ownerId }) => {
+      if (!window.__linkyE2E) throw new Error("test hooks missing");
+      return window.__linkyE2E.upsert(table, row, ownerId);
+    },
+    { table, row, ownerId },
+  );
