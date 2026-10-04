@@ -58,6 +58,17 @@ export const media: Section = {
         </UI.Text>
       </UI.Stack>
     ),
+    VideoEmbed: () => (
+      <UI.Stack>
+        <UI.VideoEmbed
+          title="Example video"
+          src="https://www.youtube-nocookie.com/embed/9zRPQu2SOec"
+        />
+        <UI.Text variant="caption" color="$colorMuted">
+          Web only: native renders nothing
+        </UI.Text>
+      </UI.Stack>
+    ),
     CameraPreview: () => {
       const [camera, setCamera] = useState<MediaStream | null>(null);
       const video = useRef<HTMLVideoElement>(null);

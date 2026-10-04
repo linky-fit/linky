@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  Anchor,
   ScrollView,
   Separator,
   styled,
@@ -54,6 +55,49 @@ export const Text = styled(TamaguiText, {
     },
   } as const,
 });
+
+export interface TextLinkProps {
+  href: string;
+  children: ReactNode;
+}
+
+/** A link inside body text; links to other sites open in a new tab on the web. */
+export function TextLink({ href, children }: TextLinkProps) {
+  const external = /^https?:/u.test(href);
+  return (
+    <Anchor
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      color="$accentText"
+      textDecorationLine="underline"
+      fontFamily="$body"
+      {...textVariant("body")}
+      hoverStyle={{ color: "$accentHover" }}
+    >
+      {children}
+    </Anchor>
+  );
+}
+
+export interface BulletListProps {
+  items: readonly ReactNode[];
+}
+
+/** A bulleted list of body text, e.g. the points of an article. */
+export function BulletList({ items }: BulletListProps) {
+  return (
+    <Stack render="ul" gap="$xs" margin="$none" padding="$none">
+      {items.map((item, index) => (
+        <Row key={index} render="li" gap="$sm" alignItems="flex-start">
+          <Text color="$colorMuted" aria-hidden>
+            •
+          </Text>
+          <Text flex={1}>{item}</Text>
+        </Row>
+      ))}
+    </Stack>
+  );
+}
 
 export const Card = styled(YStack, {
   name: "Card",

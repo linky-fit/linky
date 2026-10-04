@@ -69,6 +69,26 @@ export const layout: Section = {
         <UI.Text eyebrow>Eyebrow</UI.Text>
       </UI.Stack>
     ),
+    TextLink: () => (
+      <UI.Text>
+        Read the{" "}
+        <UI.TextLink href="https://example.com/notes">
+          release notes
+        </UI.TextLink>{" "}
+        before updating.
+      </UI.Text>
+    ),
+    BulletList: () => (
+      <UI.BulletList
+        items={[
+          "Cashu for bitcoin",
+          "Nostr for messages",
+          <>
+            <UI.Text bold>Evolu</UI.Text> for data
+          </>,
+        ]}
+      />
+    ),
     ScrollView: () => (
       <UI.ScrollView horizontal>
         <UI.Row>

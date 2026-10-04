@@ -6,6 +6,7 @@ export { Theme, useMedia } from "tamagui";
 
 // Layout and type
 export {
+  BulletList,
   Card,
   Divider,
   Image,
@@ -17,8 +18,9 @@ export {
   Spacer,
   Stack,
   Text,
+  TextLink,
 } from "./layout";
-export type { SectionProps } from "./layout";
+export type { BulletListProps, SectionProps, TextLinkProps } from "./layout";
 export { Icon } from "./icons";
 export { icons } from "./icon-set";
 export type { IconName, IconProps, IconSize } from "./icons";
@@ -165,5 +167,7 @@ export type {
 } from "./media";
 export { CameraPreview } from "./camera-preview";
 export { SandboxedHtml } from "./sandboxed-html";
+export { VideoEmbed } from "./video-embed";
+export type { VideoEmbedProps } from "./video-embed";
 export type { SandboxedHtmlProps } from "./sandboxed-html";
 export type { CameraPreviewProps } from "./camera-preview";
