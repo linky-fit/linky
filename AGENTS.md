@@ -33,6 +33,7 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 - New browser storage names use the `linky.` prefix; existing names are frozen, because renaming one needs a page and service-worker migration
 - English everywhere except localized UI copy, fixed wire text and test fixtures whose Czech input is the point of the test
 - Comments explain unidiomatic code, in one line where possible. A comment that restates the code or justifies an overcomplicated design means the code should be simplified
+- Test each behavior at the lowest layer that catches it; Playwright covers only the wiring between real pieces. The `writing-tests` skill picks the layer
 
 ## Package docs
 

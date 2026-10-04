@@ -20,6 +20,6 @@ Run every Playwright suite through `bun run e2e`. It starts a Docker stack owned
 
 Traces are kept only for failing tests: `bunx playwright show-trace apps/web-app/test-results/<test>/trace.zip`.
 
-The full web-app suite takes about two minutes. A test that runs into the 150 s test timeout is hanging: find the wait that never resolves and leave the timeouts as they are.
+The full web-app suite takes about five minutes on CI. A test that runs into the 150 s test timeout is hanging: find the wait that never resolves and leave the timeouts as they are.
 
 Specs take stack endpoints from `apps/web-app/tests/helpers/stack.ts` and the mint URLs from `packages/linkshu/tests/integration/helpers.ts`; a literal `localhost` port only works on CI's default stack.

@@ -302,6 +302,7 @@ test("a token discarded on one device stays discarded when another device replay
           .getByTestId("cashu-token-pill")
           .and(restored.page.getByLabel(/already spent/)),
       ).toBeVisible({ timeout: 60_000 });
+      // eslint-disable-next-line no-restricted-properties -- proves no late re-receive follows the spent mark
       await restored.page.waitForTimeout(SETTLE_MS);
       await restored.page.goto("/#wallet");
       expect(await operationRows(restored.page)).toEqual([
