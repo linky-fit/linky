@@ -1,5 +1,5 @@
 import { NonEmptyString1000 } from "@linky-fit/linksync";
-import { decodeNpub } from "@linky-fit/linkstr";
+import { decodeNpub, encodeNpub } from "@linky-fit/linkstr";
 import { createId, type ContactsRepository } from "@linky-fit/linksync";
 import React from "react";
 import { ContactId } from "../../evoluIds";
@@ -197,8 +197,9 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
       try {
         const pubkey = decodeNpub(normalized);
         if (pubkey) {
+          const npub = encodeNpub(pubkey);
           const ownNpub = (currentNpub ?? "").trim();
-          if (ownNpub && ownNpub === normalized) {
+          if (ownNpub && ownNpub === npub) {
             setStatus(t("contactIsYou"));
             closeScan();
             navigateTo({ route: "profile" });
@@ -206,12 +207,12 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           }
 
           const already = contacts.some(
-            (contact) => (contact.npub ?? "").trim() === normalized,
+            (contact) => (contact.npub ?? "").trim() === npub,
           );
           if (already) {
             setStatus(t("contactExists"));
             const existing = contacts.find(
-              (contact) => (contact.npub ?? "").trim() === normalized,
+              (contact) => (contact.npub ?? "").trim() === npub,
             );
             closeScan();
             if (existing?.id) {
@@ -224,7 +225,7 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           }
 
           if (scanEntryPoint === "contacts" && onContactIdentifierScanned) {
-            await onContactIdentifierScanned(normalized);
+            await onContactIdentifierScanned(npub);
             closeScan();
             return;
           }
@@ -232,13 +233,13 @@ export const useScannedTextHandler = <TContact extends ContactRowLike>({
           const result = await runWrite(
             contactsRepository.insert({
               id: createId<"Contact">(),
-              npub: NonEmptyString1000.orThrow(normalized),
+              npub: NonEmptyString1000.orThrow(npub),
             }),
           );
 
           if (result.ok) {
             setStatus(t("contactSaved"));
-            openScannedContactPendingNpubRef.current = normalized;
+            openScannedContactPendingNpubRef.current = npub;
           } else setStatus(`${t("errorPrefix")}: ${result.error}`);
 
           closeScan();
