@@ -16,5 +16,7 @@ export default defineConfig({
     command: `VITE_ALLOW_INSECURE_LOCALHOST_RELAYS=1 VITE_NOSTR_RELAYS=ws://localhost:${nostrPort} VITE_ALLOW_TEST_MINT=1 bun run build && bun run preview --host localhost --port ${port}`,
     url: `http://localhost:${port}/cashu/`,
     reuseExistingServer: false,
+    // CI builds the site while the web-app suite holds the CPU.
+    timeout: 240_000,
   },
 });
