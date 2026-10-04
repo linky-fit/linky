@@ -31,6 +31,7 @@ const copy = {
   cs: {
     ...languageLabels,
     switchLabel: "Jazyk",
+    blogLabel: "Blog",
     followUsLabel: "Sledujte nás",
     privacyLabel: "Ochrana soukromí",
     downloadLabel: "Stáhnout aplikaci",
@@ -42,6 +43,7 @@ const copy = {
   en: {
     ...languageLabels,
     switchLabel: "Language",
+    blogLabel: "Blog",
     followUsLabel: "Follow us",
     privacyLabel: "Privacy Policy",
     downloadLabel: "Download the app",
@@ -53,6 +55,7 @@ const copy = {
   de: {
     ...languageLabels,
     switchLabel: "Sprache",
+    blogLabel: "Blog",
     followUsLabel: "Folge uns",
     privacyLabel: "Datenschutz",
     downloadLabel: "App herunterladen",
@@ -138,6 +141,14 @@ export function SiteLayout({
             <Text variant="title">Linky</Text>
           </Row>
           <Row gap="$xs" alignItems="center">
+            <Button
+              render={<a href="/blog/" />}
+              role="link"
+              size="sm"
+              variant="ghost"
+            >
+              {activeCopy.blogLabel}
+            </Button>
             {wide ? (
               <Button
                 {...downloadLink}
@@ -191,6 +202,7 @@ export function SiteLayout({
           {children}
         </Stack>
         <Row render="footer" gap="$lg" flexWrap="wrap" paddingVertical="$xl">
+          <FooterLink href="/blog/">{activeCopy.blogLabel}</FooterLink>
           <FooterLink href="/cashu/">Cashu</FooterLink>
           <FooterLink href="/follow-us/">{activeCopy.followUsLabel}</FooterLink>
           <FooterLink href="/privacy.html">

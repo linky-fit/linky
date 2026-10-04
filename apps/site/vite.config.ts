@@ -1,7 +1,7 @@
 import { themes } from "@linky-fit/ui/tokens";
 import { linkyUi } from "@linky-fit/ui/vite";
 import react from "@vitejs/plugin-react-swc";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +32,7 @@ const trailingSlashRedirect = (): Plugin => ({
     server.middlewares.use(
       (req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
         const url = req.url ?? "";
-        if (url === "/cashu" || url === "/follow-us") {
+        if (/^\/(cashu|follow-us|blog(\/[\w-]+)?)$/u.test(url)) {
           res.statusCode = 302;
           res.setHeader("Location", `${url}/`);
           res.end();
@@ -44,6 +44,15 @@ const trailingSlashRedirect = (): Plugin => ({
     );
   },
 });
+
+const blogArticleInputs = Object.fromEntries(
+  readdirSync(path.resolve(__dirname, "blog"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map(({ name }) => [
+      `blog/${name}`,
+      path.resolve(__dirname, "blog", name, "index.html"),
+    ]),
+);
 
 // Mirrors src/colorMode.ts, so every page paints its first frame in the stored color mode.
 const colorModeBootScript = (): Plugin => ({
@@ -106,6 +115,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        ...blogArticleInputs,
+        blog: path.resolve(__dirname, "blog/index.html"),
         cashu: path.resolve(__dirname, "cashu/index.html"),
         followUs: path.resolve(__dirname, "follow-us/index.html"),
         main: path.resolve(__dirname, "index.html"),
