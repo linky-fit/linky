@@ -1,3 +1,4 @@
+import { Stack } from "@linky-fit/ui";
 import React from "react";
 import {
   useAppShellActions,
@@ -38,7 +39,6 @@ export function AuthenticatedLayout({
   return (
     <>
       {isDesktopSplitView ? null : <Topbar />}
-      <NetworkStatusLine />
 
       {state.contactsGuide && state.contactsGuideActiveStep?.step ? (
         <ContactsGuideOverlay
@@ -55,6 +55,11 @@ export function AuthenticatedLayout({
       ) : null}
 
       {children}
+      {isDesktopSplitView ? (
+        <Stack position="absolute" left={0} right={0} bottom={0}>
+          <NetworkStatusLine />
+        </Stack>
+      ) : null}
 
       {!isDesktopSplitView && state.scanIsOpen ? <ScanModal /> : null}
 

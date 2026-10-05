@@ -1,5 +1,5 @@
-import { Stack, TopEdgeStatus } from "@linky-fit/ui";
-import type { Tone, TopEdgeStatusItem } from "@linky-fit/ui";
+import { EdgeLineStatus } from "@linky-fit/ui";
+import type { EdgeLineStatusItem, Tone } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useNetworkStatus } from "../app/hooks/useNetworkStatus";
@@ -12,10 +12,12 @@ import type {
 import type { I18nKey, Translate } from "../i18n";
 
 const summary = {
-  synced: { tone: "accent", labelKey: "networkSynced" },
   syncing: { tone: "warning", labelKey: "networkSyncing" },
   offline: { tone: "danger", labelKey: "networkOffline" },
-} as const satisfies Record<NetworkStatus, { tone: Tone; labelKey: I18nKey }>;
+} as const satisfies Record<
+  Exclude<NetworkStatus, "synced">,
+  { tone: Tone; labelKey: I18nKey }
+>;
 
 interface PhaseLine {
   tone: Tone;
@@ -51,14 +53,14 @@ const lineOf = (
   t: Translate,
   { labelKey, ...line }: PhaseLine,
   { connected, total }: { connected: number; total: number },
-): TopEdgeStatusItem => ({
+): EdgeLineStatusItem => ({
   ...line,
   label: t(labelKey)
     .replace("{connected}", String(connected))
     .replace("{total}", String(total)),
 });
 
-const itemsOf = (t: Translate, report: NetworkReport): TopEdgeStatusItem[] =>
+const itemsOf = (t: Translate, report: NetworkReport): EdgeLineStatusItem[] =>
   report.online
     ? [
         lineOf(t, nostrLines[report.nostr.phase], report.nostr),
@@ -66,40 +68,18 @@ const itemsOf = (t: Translate, report: NetworkReport): TopEdgeStatusItem[] =>
       ]
     : [{ tone: "danger", label: t("networkNoInternet") }];
 
-/** How long the line stays green after syncing finished, before it fades out. */
-const SYNCED_FLASH_MS = 1_500;
-
-/** The network state as a line along the window's top edge, with what each relay side is doing behind its handle. */
-export function NetworkStatusLine(): React.ReactElement {
+/** A line that says Linky is still syncing or offline, with what each relay side is doing on hover or press; nothing once all is synced. The caller places it on the edge it belongs to. */
+export function NetworkStatusLine(): React.ReactElement | null {
   const { t } = useAppShellCore();
   const report = useNetworkStatus();
+  if (report.status === "synced") return null;
   const { tone, labelKey } = summary[report.status];
-  const [quiet, setQuiet] = React.useState(false);
-  React.useEffect(() => {
-    const synced = report.status === "synced";
-    const timer = window.setTimeout(
-      () => setQuiet(synced),
-      synced ? SYNCED_FLASH_MS : 0,
-    );
-    return () => window.clearTimeout(timer);
-  }, [report.status]);
   return (
-    <Stack
-      position="absolute"
-      top={0}
-      left={0}
-      right={0}
-      zIndex="$overlay"
-      pointerEvents="box-none"
-      data-safe-area="top"
-    >
-      <TopEdgeStatus
-        tone={tone}
-        label={t(labelKey)}
-        items={itemsOf(t, report)}
-        busy={report.status === "syncing"}
-        quiet={quiet}
-      />
-    </Stack>
+    <EdgeLineStatus
+      tone={tone}
+      label={t(labelKey)}
+      items={itemsOf(t, report)}
+      busy={report.status === "syncing"}
+    />
   );
 }

@@ -9,6 +9,7 @@ import {
 } from "@linky-fit/ui";
 import React from "react";
 import { BottomTabBar, type BottomTabKey } from "../../components/BottomTabBar";
+import { NetworkStatusLine } from "../../components/NetworkStatusLine";
 import { DesktopNavigation } from "../../components/DesktopNavigation";
 import { PageBody } from "../../components/PageBody";
 import { ScanModal } from "../../components/ScanModal";
@@ -284,6 +285,7 @@ const PhoneRouteContent = (): React.ReactElement => {
       <PageFrame fill={route.kind === "chat"}>
         <RoutePage />
       </PageFrame>
+      <NetworkStatusLine />
       {tab ? <BottomTabBar activeTab={tab} t={t} /> : null}
     </>
   );

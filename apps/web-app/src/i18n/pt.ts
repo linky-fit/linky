@@ -316,7 +316,6 @@ export const pt = {
   relayStatusLabel: "Status",
   relayRecommended: "Recomendado",
   relayRecommendedNote: "Recomendado pelo Linky, por isso fica configurado.",
-  networkSynced: "Sincronizado",
   networkSyncing: "Sincronizando…",
   networkOffline: "Sem conexão",
   networkNoInternet: "Sem conexão de rede",

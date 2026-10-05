@@ -11,7 +11,7 @@ import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
 import { toneColors, toneIcons } from "./styles";
 import type { Tone } from "./tokens";
-import { border, enterScale, opacity, shadow, space } from "./tokens";
+import { border, enterScale, shadow, space } from "./tokens";
 
 export interface NoticeProps {
   title: string;
@@ -277,22 +277,20 @@ export function EmptyState({
   );
 }
 
-export interface TopEdgeStatusItem {
+export interface EdgeLineStatusItem {
   label: string;
   tone: Tone;
   /** Shows a spinner instead of the dot while the step is under way. */
   busy?: boolean | undefined;
 }
 
-export interface TopEdgeStatusProps {
-  /** Colors the line and the handle, which `label` names. */
+export interface EdgeLineStatusProps {
+  /** Colors the line, which `label` names. */
   tone: Tone;
   label: string;
-  items: readonly TopEdgeStatusItem[];
+  items: readonly EdgeLineStatusItem[];
   /** Slides a segment along the line while the state is in progress. */
   busy?: boolean | undefined;
-  /** Fades the line out and dims the handle, e.g. once all is well. */
-  quiet?: boolean | undefined;
 }
 
 const SWEEP_MS = 1_400;
@@ -331,70 +329,54 @@ function SweepingSegment({ color }: { color: ColorTokens }) {
 }
 
 /**
- * A hairline across the top of the window that reports a background state,
- * with a small handle hanging from its middle; hovering or pressing the
- * handle opens a panel with the details below it. The caller positions it.
+ * A hairline that reports a background state along the edge it is placed on;
+ * hovering or pressing anywhere near it opens a panel with the details above
+ * it. It takes no layout space: the caller places it where the line belongs.
  */
-export function TopEdgeStatus({
+export function EdgeLineStatus({
   tone,
   label,
   items,
   busy = false,
-  quiet = false,
-}: TopEdgeStatusProps) {
+}: EdgeLineStatusProps) {
   const [open, setOpen] = useState<"hover" | "press" | null>(null);
   const { solid, background } = toneColors[tone];
   return (
-    <Stack pointerEvents="box-none">
+    <View position="relative" height={0} zIndex="$overlay">
       {open === "press" ? (
         <Stack position="fixed" inset={0} onPress={() => setOpen(null)} />
       ) : null}
       <View
-        position="relative"
+        position="absolute"
+        left={0}
+        right={0}
+        bottom={0}
         height={border.emphasis}
         overflow="hidden"
         backgroundColor={busy ? background : solid}
-        opacity={quiet ? 0 : 1}
-        transition="slow"
         {...(busy ? { role: "progressbar", "aria-label": label } : {})}
       >
         {busy ? <SweepingSegment color={solid} /> : null}
       </View>
-      {/* Positioned, so it paints above the fixed backdrop before it. */}
       <Stack
-        position="relative"
-        alignSelf="center"
+        position="absolute"
+        left={0}
+        right={0}
+        bottom={0}
         alignItems="center"
+        pointerEvents="box-none"
         onMouseEnter={() => setOpen((current) => current ?? "hover")}
         onMouseLeave={() =>
           setOpen((current) => (current === "hover" ? null : current))
         }
       >
-        <Pressable
-          aria-label={label}
-          aria-expanded={open !== null}
-          paddingHorizontal="$md"
-          paddingBottom="$sm"
-          onPress={() =>
-            setOpen((current) => (current === "press" ? null : "press"))
-          }
-        >
-          <View
-            width="$iconLg"
-            height={space.xs}
-            borderBottomLeftRadius="$pill"
-            borderBottomRightRadius="$pill"
-            backgroundColor={quiet ? "$neutral" : solid}
-            opacity={quiet ? opacity.disabled : 1}
-            transition="slow"
-          />
-        </Pressable>
         {open ? (
           <Stack
             role="status"
             aria-live="polite"
             gap="$xs"
             maxWidth="$device"
+            marginBottom="$sm"
             paddingVertical="$sm"
             paddingHorizontal="$md"
             borderRadius="$control"
@@ -403,7 +385,7 @@ export function TopEdgeStatus({
             backgroundColor="$surface"
             boxShadow={shadow.raised}
             transition="base"
-            enterStyle={{ opacity: 0, scale: enterScale.subtle, y: -space.sm }}
+            enterStyle={{ opacity: 0, scale: enterScale.subtle, y: space.sm }}
           >
             {items.map((item) => (
               <Row key={item.label} gap="$sm" alignItems="center">
@@ -424,7 +406,16 @@ export function TopEdgeStatus({
             ))}
           </Stack>
         ) : null}
+        <Pressable
+          aria-label={label}
+          aria-expanded={open !== null}
+          width="100%"
+          height={space.lg}
+          onPress={() =>
+            setOpen((current) => (current === "press" ? null : "press"))
+          }
+        />
       </Stack>
-    </Stack>
+    </View>
   );
 }

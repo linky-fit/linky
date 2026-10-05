@@ -307,7 +307,6 @@ export const cs = {
   relayStatusLabel: "Stav",
   relayRecommended: "Doporučený",
   relayRecommendedNote: "Doporučuje ho Linky, proto zůstává nastavený.",
-  networkSynced: "Synchronizováno",
   networkSyncing: "Synchronizace…",
   networkOffline: "Bez připojení",
   networkNoInternet: "Bez připojení k síti",

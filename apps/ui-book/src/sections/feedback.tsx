@@ -60,9 +60,9 @@ export const feedback: Section = {
       </UI.Row>
     ),
     LoadingState: () => <UI.LoadingState label="Loading contacts" />,
-    TopEdgeStatus: () => (
-      <UI.Stack gap="$xxl">
-        <UI.TopEdgeStatus
+    EdgeLineStatus: () => (
+      <UI.Stack gap="$xxl" paddingTop="$huge">
+        <UI.EdgeLineStatus
           busy
           tone="warning"
           label="Syncing…"
@@ -75,16 +75,10 @@ export const feedback: Section = {
             },
           ]}
         />
-        <UI.TopEdgeStatus
+        <UI.EdgeLineStatus
           tone="danger"
           label="No connection"
           items={[{ label: "No network connection", tone: "danger" }]}
-        />
-        <UI.TopEdgeStatus
-          quiet
-          tone="accent"
-          label="Synced"
-          items={[{ label: "Nostr up to date", tone: "accent" }]}
         />
       </UI.Stack>
     ),

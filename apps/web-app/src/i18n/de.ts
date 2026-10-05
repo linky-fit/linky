@@ -318,7 +318,6 @@ export const de = {
   relayStatusLabel: "Status",
   relayRecommended: "Empfohlen",
   relayRecommendedNote: "Von Linky empfohlen, daher bleibt es eingerichtet.",
-  networkSynced: "Synchronisiert",
   networkSyncing: "Synchronisiere…",
   networkOffline: "Keine Verbindung",
   networkNoInternet: "Keine Netzwerkverbindung",

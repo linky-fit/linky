@@ -90,7 +90,7 @@ test("an unknown sender's message reaches a device that has no Nostr relay, and 
   }
 });
 
-test("the network line turns synced once the relays delivered, and shows no connection without an Evolu relay", async ({
+test("the network line disappears once the relays delivered, and shows no connection without an Evolu relay", async ({
   browser,
 }, testInfo) => {
   const identity = await createSeedIdentity();
@@ -116,15 +116,12 @@ test("the network line turns synced once the relays delivered, and shows no conn
 
   const connected = await open(false);
   try {
-    const tab = connected.page.getByRole("button", { name: "Synced" });
-    await expect(tab).toBeVisible({ timeout: 30_000 });
-    await tab.click();
-    await expect(connected.page.getByRole("status")).toContainText(
-      "Nostr up to date (1/1 relays)",
-    );
-    await expect(connected.page.getByRole("status")).toContainText(
-      "Evolu up to date (1/1 relays)",
-    );
+    await expect.poll(() => isHydrated(connected.page)).toBe(true);
+    await expect(
+      connected.page.getByRole("button", {
+        name: /^(Syncing…|No connection)$/,
+      }),
+    ).toHaveCount(0, { timeout: 30_000 });
   } finally {
     await connected.context.close();
   }

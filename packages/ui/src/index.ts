@@ -95,7 +95,7 @@ export {
   StatusLine,
   Toast,
   ToastStack,
-  TopEdgeStatus,
+  EdgeLineStatus,
 } from "./feedback";
 export type {
   EmptyStateProps,
@@ -103,8 +103,8 @@ export type {
   ProgressProps,
   StatusLineProps,
   ToastProps,
-  TopEdgeStatusItem,
-  TopEdgeStatusProps,
+  EdgeLineStatusItem,
+  EdgeLineStatusProps,
 } from "./feedback";
 export { Spinner } from "./spinner";
 export type { SpinnerProps } from "./spinner";
