@@ -4,8 +4,10 @@ name: Release · app
 # the v<version> tag through `gh release create`, and tags created with the
 # workflow token do not trigger workflows again. The tag trigger covers manually
 # pushed tags; when such a tag already exists, the branch push skips so only one
-# run publishes a given version. Once the release exists, the web app ships by
-# moving the `production` branch, which Vercel deploys to app.linky.fit.
+# run publishes a given version. A manual run started from a tag republishes it,
+# so every job tests and builds the commit it ships. Once the release exists, the
+# web app ships by moving the `production` branch, which Vercel deploys to
+# app.linky.fit.
 on:
   push:
     branches:
@@ -15,14 +17,10 @@ on:
     paths:
       - package.json
   workflow_dispatch:
-    inputs:
-      tag_name:
-        description: "Git tag / release name (for example v26.1.0)"
-        required: true
-        type: string
 
+# One release at a time, so an older release can't move `production` back.
 concurrency:
-  group: release-app-${{ github.event.inputs.tag_name || github.ref_name }}
+  group: release-app
   cancel-in-progress: false
 
 jobs:
@@ -38,18 +36,14 @@ jobs:
 
       - name: Resolve release tag
         id: metadata
-        env:
-          REQUESTED_RELEASE_TAG: ${{ inputs.tag_name }}
         run: |
           publish=true
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            release_tag="$REQUESTED_RELEASE_TAG"
-          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             release_tag="$GITHUB_REF_NAME"
           else
             release_tag="v$(jq -r .version package.json)"
             if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null; then
-              echo "Tag $release_tag already exists; the tag push owns this release."
+              echo "Tag $release_tag already exists; run the workflow from that tag to republish it."
               publish=false
             fi
           fi
@@ -161,9 +155,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    concurrency:
-      group: web-production
-      cancel-in-progress: false
 
     steps:
       - name: Checkout release tag

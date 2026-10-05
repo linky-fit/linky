@@ -40,7 +40,9 @@ Branch from the release tag, fix, bump `version`, push a `v<version>` tag. The t
 
 ## Rollback
 
-Use Instant Rollback in Vercel, or run `Release · app` manually with an older tag. The rollback only lasts until the next release moves `production`.
+Use Instant Rollback in Vercel. It lasts until the next release moves `production`.
+
+To publish a release again, run `Release · app` from its tag (Run workflow → Use workflow from → the tag). Every job then tests and builds that tag's commit; a run started from a branch never republishes an existing tag.
 
 ## Compatibility
 
