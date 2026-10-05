@@ -141,14 +141,6 @@ export function SiteLayout({
             <Text variant="title">Linky</Text>
           </Row>
           <Row gap="$xs" alignItems="center">
-            <Button
-              render={<a href="/blog/" />}
-              role="link"
-              size="sm"
-              variant="ghost"
-            >
-              {activeCopy.blogLabel}
-            </Button>
             {wide ? (
               <Button
                 {...downloadLink}
