@@ -1,4 +1,3 @@
-import { Stack } from "@linky-fit/ui";
 import React from "react";
 import {
   useAppShellActions,
@@ -11,7 +10,7 @@ import { LightningInvoiceConfirmModal } from "./LightningInvoiceConfirmModal";
 import { CashuPaymentRequestConfirmModal } from "./CashuPaymentRequestConfirmModal";
 import { LnurlAuthModal } from "./LnurlAuthModal";
 import { LnurlWithdrawConfirmModal } from "./LnurlWithdrawConfirmModal";
-import { NetworkStatusLine } from "./NetworkStatusLine";
+import { NetworkStatusGlow } from "./NetworkStatusGlow";
 import { NfcWriteModal } from "./NfcWriteModal";
 import { NostrConnectLoginModal } from "./NostrConnectLoginModal";
 import { PaidOverlay } from "./PaidOverlay";
@@ -55,11 +54,7 @@ export function AuthenticatedLayout({
       ) : null}
 
       {children}
-      {isDesktopSplitView ? (
-        <Stack position="absolute" left={0} right={0} bottom={0}>
-          <NetworkStatusLine />
-        </Stack>
-      ) : null}
+      <NetworkStatusGlow />
 
       {!isDesktopSplitView && state.scanIsOpen ? <ScanModal /> : null}
 

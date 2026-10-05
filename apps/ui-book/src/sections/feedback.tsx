@@ -60,27 +60,32 @@ export const feedback: Section = {
       </UI.Row>
     ),
     LoadingState: () => <UI.LoadingState label="Loading contacts" />,
-    EdgeLineStatus: () => (
-      <UI.Stack gap="$xxl" paddingTop="$huge">
-        <UI.EdgeLineStatus
-          busy
-          tone="warning"
-          label="Syncing…"
-          items={[
-            { label: "Connected to 2 Nostr relays", tone: "accent" },
-            {
-              label: "Scanning Nostr for messages",
-              tone: "warning",
-              busy: true,
-            },
-          ]}
-        />
-        <UI.EdgeLineStatus
-          tone="danger"
-          label="No connection"
-          items={[{ label: "No network connection", tone: "danger" }]}
-        />
-      </UI.Stack>
+    CornerGlowStatus: () => (
+      <UI.Row gap="$lg">
+        {(
+          [
+            ["warning", "Syncing…", true],
+            ["danger", "No connection", false],
+          ] as const
+        ).map(([tone, label, busy]) => (
+          <UI.Stack
+            key={tone}
+            position="relative"
+            width="$column"
+            height="$column"
+            borderRadius="$card"
+            overflow="hidden"
+            backgroundColor="$surface"
+          >
+            <UI.CornerGlowStatus
+              busy={busy}
+              tone={tone}
+              label={label}
+              items={[{ label: "Scanning Nostr for messages", tone, busy }]}
+            />
+          </UI.Stack>
+        ))}
+      </UI.Row>
     ),
     StatusLine: () => (
       <UI.Stack>

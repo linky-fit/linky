@@ -1,5 +1,5 @@
-import { EdgeLineStatus } from "@linky-fit/ui";
-import type { EdgeLineStatusItem, Tone } from "@linky-fit/ui";
+import { CornerGlowStatus } from "@linky-fit/ui";
+import type { CornerGlowStatusItem, Tone } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useNetworkStatus } from "../app/hooks/useNetworkStatus";
@@ -53,14 +53,17 @@ const lineOf = (
   t: Translate,
   { labelKey, ...line }: PhaseLine,
   { connected, total }: { connected: number; total: number },
-): EdgeLineStatusItem => ({
+): CornerGlowStatusItem => ({
   ...line,
   label: t(labelKey)
     .replace("{connected}", String(connected))
     .replace("{total}", String(total)),
 });
 
-const itemsOf = (t: Translate, report: NetworkReport): EdgeLineStatusItem[] =>
+const itemsOf = (
+  t: Translate,
+  report: NetworkReport,
+): CornerGlowStatusItem[] =>
   report.online
     ? [
         lineOf(t, nostrLines[report.nostr.phase], report.nostr),
@@ -68,14 +71,14 @@ const itemsOf = (t: Translate, report: NetworkReport): EdgeLineStatusItem[] =>
       ]
     : [{ tone: "danger", label: t("networkNoInternet") }];
 
-/** A line that says Linky is still syncing or offline, with what each relay side is doing on hover or press; nothing once all is synced. The caller places it on the edge it belongs to. */
-export function NetworkStatusLine(): React.ReactElement | null {
+/** A glow in the window's bottom-right corner while Linky is still syncing or offline, with what each relay side is doing on hover or press; nothing once all is synced. */
+export function NetworkStatusGlow(): React.ReactElement | null {
   const { t } = useAppShellCore();
   const report = useNetworkStatus();
   if (report.status === "synced") return null;
   const { tone, labelKey } = summary[report.status];
   return (
-    <EdgeLineStatus
+    <CornerGlowStatus
       tone={tone}
       label={t(labelKey)}
       items={itemsOf(t, report)}

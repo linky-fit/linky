@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Animated, Easing } from "react-native";
 import { View } from "tamagui";
-import type { ColorTokens } from "tamagui";
 import { Button, IconButton, Pressable } from "./controls";
 import type { LabeledAction } from "./controls";
 import { Icon } from "./icons";
@@ -11,7 +10,7 @@ import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
 import { toneColors, toneIcons } from "./styles";
 import type { Tone } from "./tokens";
-import { border, enterScale, shadow, space } from "./tokens";
+import { border, enterScale, opacity, shadow, space } from "./tokens";
 
 export interface NoticeProps {
   title: string;
@@ -277,93 +276,90 @@ export function EmptyState({
   );
 }
 
-export interface EdgeLineStatusItem {
+export interface CornerGlowStatusItem {
   label: string;
   tone: Tone;
   /** Shows a spinner instead of the dot while the step is under way. */
   busy?: boolean | undefined;
 }
 
-export interface EdgeLineStatusProps {
-  /** Colors the line, which `label` names. */
+export interface CornerGlowStatusProps {
+  /** Colors the glow, which `label` names. */
   tone: Tone;
   label: string;
-  items: readonly EdgeLineStatusItem[];
-  /** Slides a segment along the line while the state is in progress. */
+  items: readonly CornerGlowStatusItem[];
+  /** Pulses the glow while the state is in progress. */
   busy?: boolean | undefined;
 }
 
-const SWEEP_MS = 1_400;
+const PULSE_MS = 1_000;
+const GLOW = { blur: space.xl, spread: space.sm };
 
-/** A third of the line that sweeps across it, back to front, forever. */
-function SweepingSegment({ color }: { color: ColorTokens }) {
-  const [progress] = useState(() => new Animated.Value(0));
+/** Fades its child between dim and full, forever. */
+function Pulse({ children }: { children: ReactNode }) {
+  const [level] = useState(() => new Animated.Value(1));
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: SWEEP_MS,
+    const fade = (toValue: number) =>
+      Animated.timing(level, {
+        toValue,
+        duration: PULSE_MS,
         easing: Easing.inOut(Easing.ease),
         useNativeDriver: false,
-      }),
+      });
+    const loop = Animated.loop(
+      Animated.sequence([fade(opacity.disabled), fade(1)]),
     );
     loop.start();
     return () => loop.stop();
-  }, [progress]);
+  }, [level]);
   return (
-    <Animated.View
-      style={{
-        position: "absolute",
-        top: 0,
-        bottom: 0,
-        width: "33%",
-        left: progress.interpolate({
-          inputRange: [0, 1],
-          outputRange: ["-33%", "100%"],
-        }),
-      }}
-    >
-      <View flex={1} backgroundColor={color} />
+    <Animated.View style={{ position: "absolute", inset: 0, opacity: level }}>
+      {children}
     </Animated.View>
   );
 }
 
 /**
- * A hairline that reports a background state along the edge it is placed on;
- * hovering or pressing anywhere near it opens a panel with the details above
- * it. It takes no layout space: the caller places it where the line belongs.
+ * A soft glow peeking out of the bottom-right corner of its positioned
+ * container, which reports a background state; hovering or pressing the
+ * corner opens a panel with the details above it.
  */
-export function EdgeLineStatus({
+export function CornerGlowStatus({
   tone,
   label,
   items,
   busy = false,
-}: EdgeLineStatusProps) {
+}: CornerGlowStatusProps) {
   const [open, setOpen] = useState<"hover" | "press" | null>(null);
-  const { solid, background } = toneColors[tone];
+  const { solid } = toneColors[tone];
+  const glow = (
+    <View
+      position="absolute"
+      right={-space.md}
+      bottom={-space.md}
+      width="$iconLg"
+      height="$iconLg"
+      borderRadius="$pill"
+      backgroundColor={solid}
+      boxShadow={`0px 0px ${GLOW.blur}px ${GLOW.spread}px ${solid}`}
+    />
+  );
   return (
-    <View position="relative" height={0} zIndex="$overlay">
+    <>
       {open === "press" ? (
-        <Stack position="fixed" inset={0} onPress={() => setOpen(null)} />
+        <Stack
+          position="absolute"
+          inset={0}
+          zIndex="$overlay"
+          onPress={() => setOpen(null)}
+        />
       ) : null}
-      <View
-        position="absolute"
-        left={0}
-        right={0}
-        bottom={0}
-        height={border.emphasis}
-        overflow="hidden"
-        backgroundColor={busy ? background : solid}
-        {...(busy ? { role: "progressbar", "aria-label": label } : {})}
-      >
-        {busy ? <SweepingSegment color={solid} /> : null}
-      </View>
       <Stack
         position="absolute"
-        left={0}
         right={0}
         bottom={0}
-        alignItems="center"
+        zIndex="$overlay"
+        alignItems="flex-end"
         pointerEvents="box-none"
         onMouseEnter={() => setOpen((current) => current ?? "hover")}
         onMouseLeave={() =>
@@ -376,7 +372,7 @@ export function EdgeLineStatus({
             aria-live="polite"
             gap="$xs"
             maxWidth="$device"
-            marginBottom="$sm"
+            marginRight="$md"
             paddingVertical="$sm"
             paddingHorizontal="$md"
             borderRadius="$control"
@@ -409,13 +405,16 @@ export function EdgeLineStatus({
         <Pressable
           aria-label={label}
           aria-expanded={open !== null}
-          width="100%"
-          height={space.lg}
+          width="$control"
+          height="$control"
+          overflow="hidden"
           onPress={() =>
             setOpen((current) => (current === "press" ? null : "press"))
           }
-        />
+        >
+          {busy ? <Pulse>{glow}</Pulse> : glow}
+        </Pressable>
       </Stack>
-    </View>
+    </>
   );
 }

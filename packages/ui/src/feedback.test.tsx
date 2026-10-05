@@ -1,7 +1,7 @@
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "../test/render";
-import { EdgeLineStatus, Progress, StatusLine } from "./feedback";
+import { CornerGlowStatus, Progress, StatusLine } from "./feedback";
 
 const progressbar = async (element: React.ReactElement) => {
   const bar = (await render(element)).querySelector("[role=progressbar]");
@@ -37,10 +37,10 @@ describe("StatusLine", () => {
   });
 });
 
-describe("EdgeLineStatus", () => {
+describe("CornerGlowStatus", () => {
   it("opens its details on press and closes on the next press", async () => {
     const view = await render(
-      <EdgeLineStatus
+      <CornerGlowStatus
         busy
         tone="warning"
         label="Syncing"
