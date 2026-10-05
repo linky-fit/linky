@@ -1,63 +1,106 @@
 # Releases
 
-The web app has two channels. Both run against production relays, Evolu servers, mints and the push server, so the same account works on either.
+How each Linky target ships, what you do for it, and how to recover when a run fails.
 
-| Channel | Source                                         | Domain                  |
-| ------- | ---------------------------------------------- | ----------------------- |
-| Nightly | every push to `main`                           | `nightly.app.linky.fit` |
-| Prod    | the `production` branch, moved by each release | `app.linky.fit`         |
+| Target                                                 | Ships                                  | You do                              |
+| ------------------------------------------------------ | -------------------------------------- | ----------------------------------- |
+| Nightly `nightly.app.linky.fit`                        | every push to `main`                   | nothing                             |
+| App: `app.linky.fit`, Google Play, macOS DMG, Zapstore | a new version merged to `main`         | [release PR](#app)                  |
+| Site `linky.fit`                                       | every push to `main`, after its checks | nothing                             |
+| Error tracker                                          | every push to `main`, after its checks | nothing                             |
+| Push server `push.linky.fit`                           | a manual run                           | [run Release · push](#push-server)  |
+| npm `@linky-fit/linkshu`, `@linky-fit/linkstr`         | a `packages-v*` tag                    | [version PR and tag](#npm-packages) |
 
-The desktop shell loads `app.linky.fit`, so it follows prod.
+The desktop shell loads `app.linky.fit`, so it follows the app release.
 
-## What ships when
+## CI gates every release
 
-| Service                           | Ships                                            | Gated by                                                     |
-| --------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
-| Web app, Android, macOS, Zapstore | a release                                        | the release commit's `CI` run                                |
-| Site `linky.fit`                  | every push to `main`                             | Vercel Deployment Checks `lint`, `unit-tests` and `site-e2e` |
-| Error tracker                     | every push to `main`                             | Vercel Deployment Checks `lint` and `unit-tests`             |
-| Push server `push.linky.fit`      | a manual run of `release-push.yml` on `main`     | the `CI` run of `main`'s head                                |
-| npm packages                      | a `packages-v*` tag ([guide](./npm-releases.md)) | the tagged commit's `CI` run                                 |
+`ci.yml` runs every check once per commit, on pull requests and on pushes to `main` and `hotfix/**`. The `main` ruleset requires its six checks: `lint` (typecheck, ESLint and Prettier for the whole repo), `unit-tests` (every workspace), `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
 
-`lint` typechecks, lints and formats the whole repo; `unit-tests` runs the unit tests of every workspace. Both run on every push, without path filters, because a Deployment Check that never reports blocks the deploy.
+Release workflows run no tests. They ship a commit only after `.github/actions/require-ci` confirms that all six checks succeeded on it, so a release always ships code its CI run tested.
 
-The site, the error tracker and the push server ship ahead of the web app, so their APIs must keep working with the last release as well as with nightly.
+## App
 
-## Workflows
+One release ships the web app to `app.linky.fit`, the Android app to Google Play (internal and beta tracks) and GitHub Releases, the macOS DMG and Zapstore. Versions are CalVer `YY.M.MICRO`; MICRO restarts at 1 each month.
 
-`ci.yml` holds every check and runs once per commit, on pull requests and on pushes to `main` and `hotfix/**`. `release-*` workflows run no tests: they ship a commit only after `.github/actions/require-ci` confirms that all six required checks succeeded on it.
+### Release
 
-## Shipping a release
+1. On a branch from `main`, move the `[Unreleased]` entries in `CHANGELOG.md` under `## [<version>] - <date>`, `en-US` first, then `cs-CZ`. Each language becomes the Google Play notes and must stay within 500 characters; `apps/native-shell/scripts/extract-release-notes.sh v<version> /tmp/notes <locale>` checks it. Leave an empty `## [Unreleased]` above.
+2. Set `version` to the new version in the root `package.json`, `apps/web-app/package.json` and the `apps/web-app` entry of `bun.lock`, which `bun install` leaves alone.
+3. Open a PR and merge it once its checks pass.
 
-1. Move the `[Unreleased]` entries in `CHANGELOG.md` under the new version; `[Unreleased]` describes what nightly has on top of prod.
-2. Bump `version` in the root `package.json` and `apps/web-app/package.json`, and in the `apps/web-app` entry of `bun.lock`, which `bun install` leaves alone. Merge to `main`.
+`CI` runs on the merged commit. When it succeeds, `release-app.yml` starts, confirms the six checks, and, because `v<version>` has no tag yet:
 
-`release-app.yml` starts when `CI` succeeds on that commit and stops unless its version has no tag yet. It then creates the `v<version>` tag and GitHub release, publishes Android, macOS and Zapstore, and force-pushes `production` to the tag, which Vercel deploys to `app.linky.fit`. If `CI` fails, nothing ships; re-run the failed jobs, and the release starts once they pass.
+1. `publish` builds the APK and AAB and creates the `v<version>` tag and GitHub release on that commit.
+2. In parallel: `web-production` moves `production` to the tag and Vercel deploys `app.linky.fit`; `google-play`, `macos` and `zapstore` publish.
 
-## Hotfix
+Every other push to `main` also starts `release-app.yml`; it stops after `resolve` because its version is already tagged. Settings > Advanced on `app.linky.fit` shows the new version once the deploy finishes; installed PWAs update through their update prompt.
 
-Branch `hotfix/<name>` from the release tag, fix, bump `version` and push the branch. `CI` runs on it, and once it passes, `release-app.yml` ships it like any release. Cherry-pick the fix to `main` as well, or the next release drops it.
+### When a run fails
 
-## Rollback
+- `CI` fails: nothing ships. Fix it on `main` or re-run the failed jobs; the release starts when `CI` passes.
+- A job fails before `publish` creates the tag: re-run the failed jobs.
+- A job fails after the tag exists: fix the cause outside the code (a secret, an environment, a store setting) and re-run the failed jobs. The tag can't move, so a code fix ships as a new version, through a [hotfix](#hotfix) if `main` isn't ready.
+- To publish an existing tag again after its run is gone, run `Release · app` from the tag (Run workflow → Use workflow from → `v<version>`). A run started from a branch never republishes an existing tag.
 
-Use Instant Rollback in Vercel. It lasts until the next release moves `production`.
+### Hotfix
 
-To publish a release again, run `Release · app` from its tag (Run workflow → Use workflow from → the tag). Every job then builds that tag's commit; a run started from a branch never republishes an existing tag.
+1. Create `hotfix/<name>` from the release tag.
+2. Commit the fix, bump `version` as in a release, and push the branch.
+3. `CI` runs on the branch; once it passes, `release-app.yml` ships it.
+4. Cherry-pick the fix to `main`, or the next release drops it.
 
-## Compatibility
+Don't open a PR from a hotfix branch; the push already runs `CI`, and a PR would run it twice.
 
-A nightly device writes to the same Evolu owner, Nostr relays and mints as prod devices, for as long as a release cycle lasts. Whatever nightly writes must stay readable by the last release.
+### Rollback
 
-A new origin has its own local storage, so nightly starts empty: restore from the seed, and it joins the account as one more device.
+Use Instant Rollback in the Vercel web-app project. It lasts until the next release moves `production`. Google Play and Zapstore have no rollback; ship a hotfix instead.
+
+## Nightly
+
+Every push to `main` deploys to `nightly.app.linky.fit` right away, against production relays, Evolu servers, mints and the push server. Settings > Advanced shows `<last release> nightly (<sha>)`.
+
+A nightly device writes to the same Evolu owner, Nostr relays and mints as prod devices for a whole release cycle, so whatever nightly writes must stay readable by the last release. Nightly is a separate origin with its own local storage: restore from the seed, and it joins the account as one more device.
+
+## Site and error tracker
+
+Every push to `main` builds both on Vercel, and each goes live once its Deployment Checks pass on that commit: `lint`, `unit-tests` and `site-e2e` for the site, `lint` and `unit-tests` for the error tracker. A failing check keeps the previous deployment live; the next passing push replaces it.
+
+They ship ahead of the app, so their APIs must keep working with the last app release as well as with nightly.
+
+## Push server
+
+1. Wait until `CI` has passed on `main`'s head.
+2. Actions → `Release · push` → Run workflow on `main`. From any other branch every job is skipped.
+
+The run confirms the six checks on that commit, builds `ghcr.io/linky-fit/linky-push` as `:latest` and `sha-<commit>`, and deploys it over SSH, restarting only the `push` service. It fails unless the server reports the commit it built and `/health` answers. A failed run leaves the previous container running; fix the cause and run it again.
+
+Like the site, the push server ships ahead of the app and must keep working with the last app release.
+
+## npm packages
+
+`@linky-fit/linkshu` and `@linky-fit/linkstr` share one SemVer version and publish together; [npm-releases.md](./npm-releases.md) has the details.
+
+1. Set the same `version` in both packages' `package.json` and in their `bun.lock` entries, and merge to `main`.
+2. Once `CI` has passed on the merged commit, tag it and push the tag:
+
+   ```bash
+   git fetch origin
+   git tag packages-v<version> origin/main
+   git push origin packages-v<version>
+   ```
+
+`release-npm.yml` confirms the six checks on the tagged commit and publishes the tarballs that commit's `CI` run built. If one package fails after the other published, re-run the failed jobs. Tags can't be moved or deleted and npm never reuses a version, so a release that can't be fixed by a re-run needs the next version.
 
 ## Vercel and GitHub setup
 
-- Web-app project: production branch `production` with domain `app.linky.fit`, and no Deployment Checks, because `release-app.yml` already gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
+- Web-app project: production branch `production` with domain `app.linky.fit` and no Deployment Checks, because `release-app.yml` gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
 - Site project: Deployment Checks `lint`, `unit-tests` and `site-e2e`.
 - Error tracker project: Deployment Checks `lint` and `unit-tests`.
-- The `zapstore` environment admits `main` and `v*` tags, so a release run started from a tag can publish.
-- Tags `v*` and `packages-v*` have a ruleset that restricts updates and deletions. Creation stays open, because the release creates `v<version>` with `GITHUB_TOKEN`, which can't bypass rulesets.
 - The `main` ruleset requires `lint`, `unit-tests`, `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
 - The `production` branch has a ruleset that restricts updates and deletions, with the `Linky releases` GitHub App as the only bypass. `release-app.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `Production` environment, which admits only `main` and `v*` tags (a release started by `CI` runs in `main`'s context, hotfixes included); `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
+- Tags `v*` and `packages-v*` have a ruleset that restricts updates and deletions. Creation stays open, because the release creates `v<version>` with `GITHUB_TOKEN`.
+- The `zapstore` environment admits `main` and `v*` tags, so a release run started from a tag can publish.
+- npm: the trusted publisher of both packages names `release-npm.yml`.
 
 Pull requests keep their preview deployments.
