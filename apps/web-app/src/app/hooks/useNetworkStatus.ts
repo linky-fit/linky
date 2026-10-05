@@ -10,85 +10,116 @@ import { reportAppLog } from "../../devtools/inspector/appLog";
 import { EVOLU_SERVER_URLS, useEvoluRelayStatuses } from "../../evolu";
 import { useOnline } from "../../hooks/useOnline";
 import { useAccountHydrated } from "./useLinksync";
-import { overallRelayStatus, useRelayHealth } from "./useRelayHealth";
+import {
+  countConnectedRelays,
+  overallRelayStatus,
+  useRelayHealth,
+} from "./useRelayHealth";
 import type { RelayDotState } from "./useRelayHealth";
 
 export type NetworkStatus = "offline" | "syncing" | "synced";
 
-/** Leaving "synced" waits this long, so a short sync round or reconnect does not flash the dot. */
+export type EvoluPhase =
+  | "unconfigured"
+  | "unreachable"
+  | "connecting"
+  | "syncing"
+  | "synced";
+
+export type NostrPhase =
+  | "unconfigured"
+  | "unreachable"
+  | "connecting"
+  | "scanning"
+  | "synced";
+
+interface Side<P> {
+  phase: P;
+  connected: number;
+  total: number;
+}
+
+export interface NetworkReport {
+  status: NetworkStatus;
+  online: boolean;
+  evolu: Side<EvoluPhase>;
+  nostr: Side<NostrPhase>;
+}
+
+/** Leaving "synced" waits this long, so a short sync round or reconnect does not flash the tab. */
 const UNSETTLED_AFTER_MS = 1_000;
 
-const severity: Record<NetworkStatus, number> = {
-  synced: 0,
-  syncing: 1,
-  offline: 2,
-};
+const isOpen = (status: EvoluRelayStatus | undefined) =>
+  status === "syncing" || status === "synced";
 
-const evoluStatus = (
+export const evoluPhase = (
   relays: ReadonlyArray<EvoluRelayStatus | undefined>,
   hydrated: boolean,
-): NetworkStatus => {
-  if (relays.some((status) => status === "syncing" || status === "synced"))
+): EvoluPhase => {
+  if (relays.length === 0) return "unconfigured";
+  if (relays.some(isOpen))
     return hydrated && !relays.includes("syncing") ? "synced" : "syncing";
   return relays.some(
     (status) => status === undefined || status === "connecting",
   )
-    ? "syncing"
-    : "offline";
+    ? "connecting"
+    : "unreachable";
 };
 
-const nostrStatus = (
+export const nostrPhase = (
+  relayCount: number,
   relays: RelayDotState,
   backfilling: boolean,
+): NostrPhase => {
+  if (relayCount === 0) return "unconfigured";
+  if (relays === "disconnected") return "unreachable";
+  if (relays === "checking") return "connecting";
+  return backfilling ? "scanning" : "synced";
+};
+
+/** Offline when the browser is or either side reaches no relay, syncing while either still connects or delivers stored data. */
+export const networkStatusOf = (
+  online: boolean,
+  evolu: EvoluPhase,
+  nostr: NostrPhase,
 ): NetworkStatus => {
-  if (relays === "disconnected") return "offline";
-  return relays === "checking" || backfilling ? "syncing" : "synced";
+  const phases: ReadonlyArray<EvoluPhase | NostrPhase> = [evolu, nostr];
+  if (
+    !online ||
+    phases.some((phase) => phase === "unconfigured" || phase === "unreachable")
+  )
+    return "offline";
+  return phases.every((phase) => phase === "synced") ? "synced" : "syncing";
 };
 
-interface NetworkInputs {
-  online: boolean;
-  evoluRelays: ReadonlyArray<EvoluRelayStatus | undefined>;
-  hydrated: boolean;
-  nostrRelays: RelayDotState;
-  backfilling: boolean;
-}
-
-/** The worse of Evolu and Nostr: offline when either reaches no relay, syncing while either still delivers stored data. */
-export const deriveNetworkStatus = ({
-  online,
-  evoluRelays,
-  hydrated,
-  nostrRelays,
-  backfilling,
-}: NetworkInputs): NetworkStatus => {
-  if (!online) return "offline";
-  const evolu = evoluStatus(evoluRelays, hydrated);
-  const nostr = nostrStatus(nostrRelays, backfilling);
-  return severity[evolu] >= severity[nostr] ? evolu : nostr;
-};
-
-/** Whether the device reaches its Evolu and Nostr relays and has received what they hold. */
-export const useNetworkStatus = (): NetworkStatus => {
+/** Whether the device reaches its Evolu and Nostr relays and has received what they hold, and what each side is doing. */
+export const useNetworkStatus = (): NetworkReport => {
   const online = useOnline();
   const evoluStatuses = useEvoluRelayStatuses();
   const hydrated = useAccountHydrated();
   const readRelays = useAtomValue(linkstrConfigAtom)?.readRelays ?? [];
   const relayHealth = useRelayHealth();
   const backfillingResult = useAtomValue(inboxBackfillingAtom);
+  const backfilling =
+    !Result.isSuccess(backfillingResult) || backfillingResult.value;
 
-  const inputs: NetworkInputs = {
-    online,
-    evoluRelays: EVOLU_SERVER_URLS.map((url) => evoluStatuses[url]),
-    hydrated,
-    nostrRelays: overallRelayStatus([...readRelays], relayHealth),
-    backfilling:
-      !Result.isSuccess(backfillingResult) || backfillingResult.value,
+  const evoluRelays = EVOLU_SERVER_URLS.map((url) => evoluStatuses[url]);
+  const evolu: Side<EvoluPhase> = {
+    phase: evoluPhase(evoluRelays, hydrated),
+    connected: evoluRelays.filter(isOpen).length,
+    total: evoluRelays.length,
   };
-  const status = deriveNetworkStatus(inputs);
-  const latestInputs = React.useRef(inputs);
-  React.useEffect(() => {
-    latestInputs.current = inputs;
-  });
+  const nostrUrls = [...readRelays];
+  const nostr: Side<NostrPhase> = {
+    phase: nostrPhase(
+      nostrUrls.length,
+      overallRelayStatus(nostrUrls, relayHealth),
+      backfilling,
+    ),
+    connected: countConnectedRelays(nostrUrls, relayHealth),
+    total: nostrUrls.length,
+  };
+  const status = networkStatusOf(online, evolu.phase, nostr.phase);
 
   const [shown, setShown] = React.useState(status);
   React.useEffect(() => {
@@ -99,13 +130,19 @@ export const useNetworkStatus = (): NetworkStatus => {
     return () => window.clearTimeout(timer);
   }, [status]);
 
+  const report: NetworkReport = { status: shown, online, evolu, nostr };
+  const latestContext = React.useRef({ report, hydrated, backfilling });
   React.useEffect(() => {
+    latestContext.current = { report, hydrated, backfilling };
+  });
+  React.useEffect(() => {
+    const { report, hydrated, backfilling } = latestContext.current;
     reportAppLog({
       tag: "network.statusChanged",
       summary: `Network status is ${shown}`,
-      payload: { status: shown, ...latestInputs.current },
+      payload: { ...report, hydrated, backfilling },
     });
   }, [shown]);
 
-  return shown;
+  return report;
 };

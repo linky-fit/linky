@@ -5,75 +5,66 @@ vi.mock("../../evolu", () => ({
   useEvoluRelayStatuses: () => ({}),
 }));
 
-import { deriveNetworkStatus } from "./useNetworkStatus";
+import { evoluPhase, networkStatusOf, nostrPhase } from "./useNetworkStatus";
 
-const synced = {
-  online: true,
-  evoluRelays: ["synced", "unreachable"],
-  hydrated: true,
-  nostrRelays: "connected",
-  backfilling: false,
-} as const;
-
-describe("deriveNetworkStatus", () => {
+describe("evoluPhase", () => {
   it.each([
-    { case: "every side caught up", change: {}, status: "synced" },
+    { relays: [], hydrated: true, phase: "unconfigured" },
+    { relays: ["unreachable"], hydrated: true, phase: "unreachable" },
     {
-      case: "the browser offline",
-      change: { online: false },
-      status: "offline",
+      relays: ["connecting", "unreachable"],
+      hydrated: true,
+      phase: "connecting",
+    },
+    { relays: [undefined], hydrated: true, phase: "connecting" },
+    { relays: ["synced", "syncing"], hydrated: true, phase: "syncing" },
+    { relays: ["synced"], hydrated: false, phase: "syncing" },
+    { relays: ["synced", "unreachable"], hydrated: true, phase: "synced" },
+  ] as const)(
+    "is $phase with relays $relays and hydrated $hydrated",
+    ({ relays, hydrated, phase }) => {
+      expect(evoluPhase(relays, hydrated)).toBe(phase);
+    },
+  );
+});
+
+describe("nostrPhase", () => {
+  it.each([
+    {
+      count: 0,
+      relays: "connected",
+      backfilling: false,
+      phase: "unconfigured",
     },
     {
-      case: "no Evolu relay configured",
-      change: { evoluRelays: [] },
-      status: "offline",
+      count: 2,
+      relays: "disconnected",
+      backfilling: false,
+      phase: "unreachable",
     },
-    {
-      case: "every Evolu relay unreachable",
-      change: { evoluRelays: ["unreachable"] },
-      status: "offline",
+    { count: 2, relays: "checking", backfilling: true, phase: "connecting" },
+    { count: 2, relays: "connected", backfilling: true, phase: "scanning" },
+    { count: 2, relays: "connected", backfilling: false, phase: "synced" },
+  ] as const)(
+    "is $phase with $count $relays relays and backfilling $backfilling",
+    ({ count, relays, backfilling, phase }) => {
+      expect(nostrPhase(count, relays, backfilling)).toBe(phase);
     },
-    {
-      case: "an Evolu relay still connecting",
-      change: { evoluRelays: ["connecting", "unreachable"] },
-      status: "syncing",
+  );
+});
+
+describe("networkStatusOf", () => {
+  it.each([
+    { online: true, evolu: "synced", nostr: "synced", status: "synced" },
+    { online: false, evolu: "synced", nostr: "synced", status: "offline" },
+    { online: true, evolu: "syncing", nostr: "synced", status: "syncing" },
+    { online: true, evolu: "synced", nostr: "scanning", status: "syncing" },
+    { online: true, evolu: "unconfigured", nostr: "synced", status: "offline" },
+    { online: true, evolu: "syncing", nostr: "unreachable", status: "offline" },
+  ] as const)(
+    "is $status with Evolu $evolu and Nostr $nostr, online $online",
+    ({ online, evolu, nostr, status }) => {
+      expect(networkStatusOf(online, evolu, nostr)).toBe(status);
     },
-    {
-      case: "an Evolu relay not yet opened",
-      change: { evoluRelays: [undefined] },
-      status: "syncing",
-    },
-    {
-      case: "an Evolu relay with unanswered requests",
-      change: { evoluRelays: ["synced", "syncing"] },
-      status: "syncing",
-    },
-    {
-      case: "the account not hydrated",
-      change: { hydrated: false },
-      status: "syncing",
-    },
-    {
-      case: "no Nostr relay reachable",
-      change: { nostrRelays: "disconnected" },
-      status: "offline",
-    },
-    {
-      case: "Nostr relays still connecting",
-      change: { nostrRelays: "checking" },
-      status: "syncing",
-    },
-    {
-      case: "the inbox still backfilling",
-      change: { backfilling: true },
-      status: "syncing",
-    },
-    {
-      case: "Nostr offline while Evolu syncs",
-      change: { nostrRelays: "disconnected", hydrated: false },
-      status: "offline",
-    },
-  ] as const)("is $status with $case", ({ change, status }) => {
-    expect(deriveNetworkStatus({ ...synced, ...change })).toBe(status);
-  });
+  );
 });

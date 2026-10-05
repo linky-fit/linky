@@ -90,7 +90,7 @@ test("an unknown sender's message reaches a device that has no Nostr relay, and 
   }
 });
 
-test("the network dot turns synced once the relays delivered, and shows no connection without an Evolu relay", async ({
+test("the network tab turns synced once the relays delivered, and shows no connection without an Evolu relay", async ({
   browser,
 }, testInfo) => {
   const identity = await createSeedIdentity();
@@ -116,18 +116,29 @@ test("the network dot turns synced once the relays delivered, and shows no conne
 
   const connected = await open(false);
   try {
-    await expect(
-      connected.page.getByRole("button", { name: "Synced" }),
-    ).toBeVisible({ timeout: 30_000 });
+    const tab = connected.page.getByRole("button", { name: "Synced" });
+    await expect(tab).toBeVisible({ timeout: 30_000 });
+    await tab.click();
+    await expect(connected.page.getByRole("status")).toContainText(
+      "Nostr up to date (1/1 relays)",
+    );
+    await expect(connected.page.getByRole("status")).toContainText(
+      "Evolu up to date (1/1 relays)",
+    );
+    await connected.page.getByRole("button", { name: "Relays" }).click();
+    await expect(connected.page).toHaveURL(/#relays$/);
   } finally {
     await connected.context.close();
   }
 
   const disconnected = await open(true);
   try {
-    await expect(
-      disconnected.page.getByRole("button", { name: "No connection" }),
-    ).toBeVisible();
+    await disconnected.page
+      .getByRole("button", { name: "No connection" })
+      .click();
+    await expect(disconnected.page.getByRole("status")).toContainText(
+      "No active Evolu relay",
+    );
   } finally {
     await disconnected.context.close();
   }
