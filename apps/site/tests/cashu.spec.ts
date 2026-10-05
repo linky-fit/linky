@@ -188,8 +188,10 @@ for (const mode of [
         // an unreachable check must not complete the payment with them as change.
         blockStateChecks = true;
         await page.getByRole("button", { name: "Redeem to address" }).click();
+        // The mint restore runs before the blocked check; on CI it takes about 5s.
         await expect(page.getByRole("alert")).toContainText(
           "Could not recover payment change",
+          { timeout: 20_000 },
         );
         blockStateChecks = false;
       }
