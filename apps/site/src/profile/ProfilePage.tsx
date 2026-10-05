@@ -23,7 +23,6 @@ import {
 interface ProfileCopy {
   openInLinky: string;
   provides: string;
-  addHint: string;
   notFound: string;
   notFoundDetail: string;
 }
@@ -32,24 +31,18 @@ const copy: Record<SiteLocale, ProfileCopy> = {
   cs: {
     openInLinky: "Otevřít v Linky",
     provides: "Poskytne",
-    addHint:
-      "Linky přidá {name} do vašich kontaktů. Linky ještě nemáte? Nejdřív si během chvilky založíte účet.",
     notFound: "Profil nenalezen",
     notFoundDetail: "Zkontrolujte odkaz, který jste dostali.",
   },
   en: {
     openInLinky: "Open in Linky",
     provides: "Provides",
-    addHint:
-      "Linky adds {name} to your contacts. New to Linky? You'll set up an account in a few seconds first.",
     notFound: "Profile not found",
     notFoundDetail: "Check the link you received.",
   },
   de: {
     openInLinky: "In Linky öffnen",
     provides: "Bietet",
-    addHint:
-      "Linky fügt {name} zu deinen Kontakten hinzu. Neu bei Linky? Du legst vorher in wenigen Sekunden ein Konto an.",
     notFound: "Profil nicht gefunden",
     notFoundDetail: "Prüfe den Link, den du bekommen hast.",
   },
@@ -110,20 +103,13 @@ function ProfileView({
           {profile.about}
         </Text>
       ) : null}
-      <Stack alignSelf="stretch" alignItems="center" gap="$sm">
-        <Button
-          icon="MessageCircle"
-          alignSelf="stretch"
-          onPress={() =>
-            window.location.assign(buildAddContactUrl(profile.npub))
-          }
-        >
-          {copy.openInLinky}
-        </Button>
-        <Text variant="caption" color="$colorMuted" textAlign="center">
-          {copy.addHint.replace("{name}", name)}
-        </Text>
-      </Stack>
+      <Button
+        icon="MessageCircle"
+        alignSelf="stretch"
+        onPress={() => window.location.assign(buildAddContactUrl(profile.npub))}
+      >
+        {copy.openInLinky}
+      </Button>
     </Stack>
   );
 }
