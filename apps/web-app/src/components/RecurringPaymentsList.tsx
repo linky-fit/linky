@@ -20,10 +20,7 @@ import {
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
-import {
-  formatRecurringAmountText,
-  recurringAmountSecondaryText,
-} from "../app/lib/recurringAmount";
+import { formatRecurringAmountText } from "../app/lib/recurringAmount";
 import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeLocale } from "../utils/formatting";
@@ -62,12 +59,6 @@ export const RecurringPaymentsList: FC = () => {
           state === "active" &&
           amountSat !== null &&
           mintBalanceSat(order.mintUrl) < amountSat;
-        const secondaryAmount = recurringAmountSecondaryText(
-          order.amount,
-          fiatRates,
-          lang,
-          t,
-        );
         return (
           <Stack
             key={order.id}
@@ -122,21 +113,14 @@ export const RecurringPaymentsList: FC = () => {
                 </Stack>
               }
               trailing={
-                <Stack alignItems="flex-end" gap="$xxs">
-                  <Text variant="label" bold color="$dangerText">
-                    {formatRecurringAmountText(order.amount, {
-                      displayCurrency,
-                      fiatRates,
-                      formatSat: formatDisplayedAmountParts,
-                      lang,
-                    })}
-                  </Text>
-                  {secondaryAmount ? (
-                    <Text variant="caption" color="$colorMuted">
-                      {secondaryAmount}
-                    </Text>
-                  ) : null}
-                </Stack>
+                <Text variant="label" bold color="$dangerText">
+                  {formatRecurringAmountText(order.amount, {
+                    displayCurrency,
+                    fiatRates,
+                    formatSat: formatDisplayedAmountParts,
+                    lang,
+                  })}
+                </Text>
               }
               chevron={false}
               onPress={() =>

@@ -48,10 +48,6 @@ export const en = {
   recurringSkippedRecipientBody:
     "Skipped {amount} {unit}: the recipient cannot be paid.",
   recurringDueTitle: "Scheduled payment",
-  recurringDueReady: "The recurring payment is ready.",
-  recurringDueReadyDaily: "The daily recurring payment is ready.",
-  recurringDueReadyWeekly: "The weekly recurring payment is ready.",
-  recurringDueReadyMonthly: "The monthly recurring payment is ready.",
   recurringDueCancel: "Cancel this payment",
   recurringCancelledToast:
     "Payment cancelled. The next one goes out on its next date.",
@@ -101,7 +97,6 @@ export const en = {
   recurringEveryNDays: "every {count} days",
   recurringEveryNWeeks: "every {count} weeks",
   recurringEveryNMonths: "every {count} months",
-  recurringApproxSat: "~{amount} sat",
   recurringNextRun: "Next payment",
   recurringLastRun: "Last payment",
   recurringRunsCount: "Payments made",
