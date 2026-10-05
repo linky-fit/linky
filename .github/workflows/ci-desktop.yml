@@ -1,13 +1,13 @@
-name: Desktop
+name: CI · desktop
 
 on:
   pull_request:
     paths:
       - apps/desktop/**
-      - .github/workflows/desktop.yml
+      - .github/workflows/ci-desktop.yml
 
 jobs:
-  build:
+  desktop-dmg:
     runs-on: macos-15
 
     steps:

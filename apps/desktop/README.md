@@ -28,6 +28,6 @@ Developer ID signing and notarization would allow in-place updates (electron-upd
 
 ## Releases
 
-The `macos` job in `.github/workflows/android-apk-release.yml` builds the DMG after the release exists and uploads `linky-mac-arm64.dmg` to it. `.github/workflows/desktop.yml` builds it for pull requests that touch `apps/desktop` and keeps the DMG as a workflow artifact.
+The `macos` job in `.github/workflows/release-app.yml` builds the DMG after the release exists and uploads `linky-mac-arm64.dmg` to it. `.github/workflows/ci-desktop.yml` builds it for pull requests that touch `apps/desktop` and keeps the DMG as a workflow artifact.
 
 The app name and `appId` (`fit.linky.desktop`) decide where Electron keeps the local Evolu data (`~/Library/Application Support/Linky`); renaming either strands existing users' data.

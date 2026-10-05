@@ -1,4 +1,4 @@
-name: Release
+name: Release · app
 
 # A release normally starts from the version-bump push to main; that run creates
 # the v<version> tag through `gh release create`, and tags created with the
@@ -22,7 +22,7 @@ on:
         type: string
 
 concurrency:
-  group: android-apk-release-${{ github.event.inputs.tag_name || github.ref_name }}
+  group: release-app-${{ github.event.inputs.tag_name || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -62,18 +62,18 @@ jobs:
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
 
+  checks:
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true'
+    uses: ./.github/workflows/ci-checks.yml
+
   e2e:
     needs: resolve
     if: needs.resolve.outputs.publish == 'true'
-    uses: ./.github/workflows/e2e.yml
-
-  tests:
-    needs: resolve
-    if: needs.resolve.outputs.publish == 'true'
-    uses: ./.github/workflows/tests.yml
+    uses: ./.github/workflows/ci-e2e.yml
 
   publish:
-    needs: [resolve, e2e, tests]
+    needs: [resolve, checks, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -115,10 +115,6 @@ jobs:
           upload-store-password: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
           upload-key-alias: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           upload-key-password: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
-
-      # check-code fixes what it can, so a diff means main was not lint-clean.
-      - name: Run checks
-        run: bun run check-code && git diff --exit-code
 
       - name: Build Android release APK
         run: bun run native:apk:release

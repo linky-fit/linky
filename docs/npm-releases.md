@@ -1,6 +1,6 @@
 # npm releases
 
-`@linky-fit/linkshu` and `@linky-fit/linkstr` publish together from this repository with one shared SemVer version, independent of the app's CalVer. `@linky-fit/linkstr-react` stays private. `.github/workflows/npm-packages.yml` runs the checks, builds ESM and declarations, installs the tarballs in a temporary project, exercises Node and Chromium consumers, and publishes those same tarballs through npm trusted publishing (no `NPM_TOKEN`; public releases get provenance).
+`@linky-fit/linkshu` and `@linky-fit/linkstr` publish together from this repository with one shared SemVer version, independent of the app's CalVer. `@linky-fit/linkstr-react` stays private. The `npm-packages` check in `.github/workflows/ci-checks.yml` builds ESM and declarations, installs the tarballs in a temporary project and exercises Node and Chromium consumers; `.github/workflows/release-npm.yml` reruns every check on a `packages-v*` tag and publishes those same tarballs through npm trusted publishing (no `NPM_TOKEN`; public releases get provenance).
 
 ## Releasing
 
@@ -19,6 +19,8 @@ While the version is 0.x, a breaking change to an export or documented behavior 
 One tag publishes both libraries. The workflow rejects mismatched package versions, tags that do not match the shared version, commits outside `main` history, and prerelease versions. A tag created with `GITHUB_TOKEN` from another workflow does not trigger it; push the tag by hand or with a separately authorized identity.
 
 Each package publishes in its own job. If one fails after the other succeeded, use **Re-run failed jobs** to retry only that package. npm versions are immutable: never rerun a successful publish and never tag a version that was already published.
+
+The npm trusted publisher of both packages names `release-npm.yml`; renaming that file breaks publishing until both packages on npmjs.com name the new one.
 
 ## Local verification
 
