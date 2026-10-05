@@ -154,13 +154,15 @@ jobs:
     needs: [resolve, publish]
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
+      # The production ruleset lets only deploy keys push; GITHUB_TOKEN can't bypass rulesets.
       - name: Checkout release tag
         uses: actions/checkout@v5
         with:
           ref: ${{ needs.resolve.outputs.release_tag }}
+          ssh-key: ${{ secrets.PRODUCTION_DEPLOY_KEY }}
 
       # Forced, because a hotfix tag cut outside main is not an ancestor of the
       # next release.

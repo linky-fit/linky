@@ -56,6 +56,6 @@ A new origin has its own local storage, so nightly starts empty: restore from th
 - Site project: Deployment Checks `lint`, `unit-tests` and `site-e2e`.
 - Error tracker project: Deployment Checks `lint` and `unit-tests`.
 - The `main` ruleset requires `lint`, `unit-tests`, `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
-- The `production` branch has a ruleset that lets only GitHub Actions push to it.
+- The `production` branch has a ruleset that restricts updates and deletions, with deploy keys as the only bypass. `release-app.yml` pushes with the `PRODUCTION_DEPLOY_KEY` secret, the private half of a write deploy key; `GITHUB_TOKEN` can't bypass rulesets.
 
 Pull requests keep their preview deployments.
