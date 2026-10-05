@@ -39,7 +39,7 @@ GitHub Releases publish it at `https://github.com/linky-fit/linky/releases/lates
 
 ## Android release AAB
 
-`versionName` is the workspace version from the root `package.json`. `versionCode` is `major * 10000 + minor * 100 + patch` locally; CI sets `LINKY_ANDROID_VERSION_CODE` to `200000000 + run_number`. Override either for one build:
+`versionName` is the workspace version from the root `package.json`. `versionCode` is `major * 10000 + minor * 100 + patch` locally; CI sets `LINKY_ANDROID_VERSION_CODE` to `200000100 + run_number`. Override either for one build:
 
 ```bash
 export LINKY_ANDROID_VERSION_NAME=26.1.0

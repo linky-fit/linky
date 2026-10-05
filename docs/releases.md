@@ -30,9 +30,9 @@ The site, the error tracker and the push server ship ahead of the web app, so th
 ## Shipping a release
 
 1. Move the `[Unreleased]` entries in `CHANGELOG.md` under the new version; `[Unreleased]` describes what nightly has on top of prod.
-2. Bump `version` in the root `package.json` and merge to `main`.
+2. Bump `version` in the root `package.json` and `apps/web-app/package.json`, and in the `apps/web-app` entry of `bun.lock`, which `bun install` leaves alone. Merge to `main`.
 
-`release-app.yml` starts when `CI` succeeds on that commit and skips unless its version has no tag yet. It then creates the `v<version>` tag and GitHub release, publish Android, macOS and Zapstore and force-push `production` to the tag, which Vercel deploys to `app.linky.fit`.
+`release-app.yml` starts when `CI` succeeds on that commit and stops unless its version has no tag yet. It then creates the `v<version>` tag and GitHub release, publishes Android, macOS and Zapstore, and force-pushes `production` to the tag, which Vercel deploys to `app.linky.fit`. If `CI` fails, nothing ships; re-run the failed jobs, and the release starts once they pass.
 
 ## Hotfix
 
@@ -56,6 +56,7 @@ A new origin has its own local storage, so nightly starts empty: restore from th
 - Site project: Deployment Checks `lint`, `unit-tests` and `site-e2e`.
 - Error tracker project: Deployment Checks `lint` and `unit-tests`.
 - The `zapstore` environment admits `main` and `v*` tags, so a release run started from a tag can publish.
+- Tags `v*` and `packages-v*` have a ruleset that restricts updates and deletions. Creation stays open, because the release creates `v<version>` with `GITHUB_TOKEN`, which can't bypass rulesets.
 - The `main` ruleset requires `lint`, `unit-tests`, `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
 - The `production` branch has a ruleset that restricts updates and deletions, with the `Linky releases` GitHub App as the only bypass. `release-app.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `Production` environment, which admits only `main` and `v*` tags (a release started by `CI` runs in `main`'s context, hotfixes included); `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
 
