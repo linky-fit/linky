@@ -10,7 +10,7 @@ import {
   Text,
 } from "@linky-fit/ui";
 import { useEffect } from "react";
-import { SiteLayout, type SiteLayoutCopy } from "../SiteLayout";
+import { SiteLayout } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
 import { useSiteLocale } from "../useSiteLocale";
 import {
@@ -20,7 +20,7 @@ import {
   type SharedProfile,
 } from "./sharedProfile";
 
-interface ProfileCopy extends SiteLayoutCopy {
+interface ProfileCopy {
   openInLinky: string;
   provides: string;
   addHint: string;
@@ -28,51 +28,8 @@ interface ProfileCopy extends SiteLayoutCopy {
   notFoundDetail: string;
 }
 
-const layoutCopy: Record<SiteLocale, SiteLayoutCopy> = {
-  cs: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Jazyk",
-    downloadLabel: "Stáhnout aplikaci",
-    appearanceLabel: "Vzhled",
-    appearanceAuto: "Automaticky",
-    appearanceLight: "Světlý",
-    appearanceDark: "Tmavý",
-    followUsLabel: "Sledujte nás",
-    privacyLabel: "Ochrana soukromí",
-  },
-  en: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Language",
-    downloadLabel: "Download the app",
-    appearanceLabel: "Appearance",
-    appearanceAuto: "Automatic",
-    appearanceLight: "Light",
-    appearanceDark: "Dark",
-    followUsLabel: "Follow us",
-    privacyLabel: "Privacy Policy",
-  },
-  de: {
-    czechLabel: "Čeština",
-    englishLabel: "English",
-    germanLabel: "Deutsch",
-    switchLabel: "Sprache",
-    downloadLabel: "App herunterladen",
-    appearanceLabel: "Darstellung",
-    appearanceAuto: "Automatisch",
-    appearanceLight: "Hell",
-    appearanceDark: "Dunkel",
-    followUsLabel: "Folge uns",
-    privacyLabel: "Datenschutz",
-  },
-};
-
 const copy: Record<SiteLocale, ProfileCopy> = {
   cs: {
-    ...layoutCopy.cs,
     openInLinky: "Otevřít v Linky",
     provides: "Poskytne",
     addHint:
@@ -81,7 +38,6 @@ const copy: Record<SiteLocale, ProfileCopy> = {
     notFoundDetail: "Zkontrolujte odkaz, který jste dostali.",
   },
   en: {
-    ...layoutCopy.en,
     openInLinky: "Open in Linky",
     provides: "Provides",
     addHint:
@@ -90,7 +46,6 @@ const copy: Record<SiteLocale, ProfileCopy> = {
     notFoundDetail: "Check the link you received.",
   },
   de: {
-    ...layoutCopy.de,
     openInLinky: "In Linky öffnen",
     provides: "Bietet",
     addHint:
@@ -184,7 +139,7 @@ function ProfilePage() {
   }, [activeCopy.notFound]);
 
   return (
-    <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
+    <SiteLayout locale={locale} onLocaleChange={setLocale}>
       <Stack
         width="100%"
         maxWidth="$sheetWidth"
