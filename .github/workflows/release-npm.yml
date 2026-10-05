@@ -1,0 +1,49 @@
+name: Release · npm
+
+on:
+  push:
+    tags: ["packages-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci-checks.yml
+
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [linkshu, linkstr]
+    concurrency:
+      group: npm-publish-${{ matrix.package }}-${{ github.ref_name }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-packages
+          path: dist/npm
+      - name: Publish the tested tarball from main history
+        env:
+          PACKAGE: ${{ matrix.package }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./packages/linkshu/package.json').version")
+          test "$RELEASE_TAG" = "packages-v$version"
+          git merge-base --is-ancestor HEAD origin/main
+          npm publish "dist/npm/linky-fit-$PACKAGE-$version.tgz" --access public --ignore-scripts

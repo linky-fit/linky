@@ -140,7 +140,7 @@
     },
     "apps/web-app": {
       "name": "@linky-fit/web-app",
-      "version": "26.10.2",
+      "version": "26.10.3",
       "dependencies": {
         "@capacitor/clipboard": "^7.0.0",
         "@capacitor/core": "^7.4.3",

@@ -1,10 +1,13 @@
-name: Release
+name: Release · app
 
 # A release normally starts from the version-bump push to main; that run creates
 # the v<version> tag through `gh release create`, and tags created with the
 # workflow token do not trigger workflows again. The tag trigger covers manually
 # pushed tags; when such a tag already exists, the branch push skips so only one
-# run publishes a given version.
+# run publishes a given version. A manual run started from a tag republishes it,
+# so every job tests and builds the commit it ships. Once the release exists, the
+# web app ships by moving the `production` branch, which Vercel deploys to
+# app.linky.fit.
 on:
   push:
     branches:
@@ -14,14 +17,10 @@ on:
     paths:
       - package.json
   workflow_dispatch:
-    inputs:
-      tag_name:
-        description: "Git tag / release name (for example v26.1.0)"
-        required: true
-        type: string
 
+# One release at a time, so an older release can't move `production` back.
 concurrency:
-  group: android-apk-release-${{ github.event.inputs.tag_name || github.ref_name }}
+  group: release-app
   cancel-in-progress: false
 
 jobs:
@@ -37,18 +36,14 @@ jobs:
 
       - name: Resolve release tag
         id: metadata
-        env:
-          REQUESTED_RELEASE_TAG: ${{ inputs.tag_name }}
         run: |
           publish=true
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            release_tag="$REQUESTED_RELEASE_TAG"
-          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             release_tag="$GITHUB_REF_NAME"
           else
             release_tag="v$(jq -r .version package.json)"
             if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null; then
-              echo "Tag $release_tag already exists; the tag push owns this release."
+              echo "Tag $release_tag already exists; run the workflow from that tag to republish it."
               publish=false
             fi
           fi
@@ -61,13 +56,18 @@ jobs:
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
 
+  checks:
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true'
+    uses: ./.github/workflows/ci-checks.yml
+
   e2e:
     needs: resolve
     if: needs.resolve.outputs.publish == 'true'
-    uses: ./.github/workflows/e2e.yml
+    uses: ./.github/workflows/ci-e2e.yml
 
   publish:
-    needs: [resolve, e2e]
+    needs: [resolve, checks, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -110,9 +110,6 @@ jobs:
           upload-key-alias: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           upload-key-password: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
 
-      - name: Run checks
-        run: bun run check-code
-
       - name: Build Android release APK
         run: bun run native:apk:release
 
@@ -151,6 +148,36 @@ jobs:
               --notes-file "$RELEASE_NOTES_PATH" \
               --target "$GITHUB_SHA"
           fi
+
+  web-production:
+    name: Ship the web app to production
+    needs: [resolve, publish]
+    runs-on: ubuntu-latest
+    # Holds the release app's credentials and admits only main and v* tags.
+    environment: Production
+    permissions:
+      contents: read
+
+    steps:
+      # The production ruleset lets only this app push; GITHUB_TOKEN can't bypass rulesets.
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Checkout release tag
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.release_tag }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      # Forced, because a hotfix tag cut outside main is not an ancestor of the
+      # next release.
+      - name: Move the production branch to the release
+        run: git push --force origin HEAD:refs/heads/production
 
   google-play:
     name: Publish to Google Play open testing
