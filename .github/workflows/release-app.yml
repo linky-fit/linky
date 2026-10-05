@@ -154,7 +154,7 @@ jobs:
     needs: [resolve, publish]
     runs-on: ubuntu-latest
     # Holds the release app's credentials and admits only main and v* tags.
-    environment: release
+    environment: Production
     permissions:
       contents: read
 

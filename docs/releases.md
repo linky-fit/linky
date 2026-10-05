@@ -56,6 +56,6 @@ A new origin has its own local storage, so nightly starts empty: restore from th
 - Site project: Deployment Checks `lint`, `unit-tests` and `site-e2e`.
 - Error tracker project: Deployment Checks `lint` and `unit-tests`.
 - The `main` ruleset requires `lint`, `unit-tests`, `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
-- The `production` branch has a ruleset that restricts updates and deletions, with the Linky release GitHub App as the only bypass. `release-app.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `release` environment, which admits only `main` and `v*` tags; `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
+- The `production` branch has a ruleset that restricts updates and deletions, with the Linky release GitHub App as the only bypass. `release-app.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `Production` environment, which admits only `main` and `v*` tags; `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
 
 Pull requests keep their preview deployments.
