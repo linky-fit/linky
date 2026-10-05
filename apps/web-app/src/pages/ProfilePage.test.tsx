@@ -172,3 +172,35 @@ describe("username purchase approval", () => {
     );
   });
 });
+
+describe("sharing the profile", () => {
+  it("copies the profile link when the device cannot share", async () => {
+    const copyText = vi.fn(async () => {});
+    const shareText = vi.fn(
+      async (_text: string, whenUnavailable?: () => Promise<void>) => {
+        await whenUnavailable?.();
+      },
+    );
+    rendered = await renderIntoDocument(
+      <ProfilePage
+        {...props}
+        isProfileEditing={false}
+        copyText={copyText}
+        shareText={shareText}
+      />,
+    );
+    const share = Array.from(
+      rendered.container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.includes("shareProfile"));
+    await act(async () => {
+      share?.click();
+    });
+    expect(shareText).toHaveBeenCalledWith(
+      "https://linky.fit/p/npub1test",
+      expect.any(Function),
+    );
+    expect(copyText).toHaveBeenCalledExactlyOnceWith(
+      "https://linky.fit/p/npub1test",
+    );
+  });
+});
