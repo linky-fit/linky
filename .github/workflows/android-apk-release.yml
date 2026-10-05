@@ -4,7 +4,8 @@ name: Release
 # the v<version> tag through `gh release create`, and tags created with the
 # workflow token do not trigger workflows again. The tag trigger covers manually
 # pushed tags; when such a tag already exists, the branch push skips so only one
-# run publishes a given version.
+# run publishes a given version. Once the release exists, the web app ships by
+# moving the `production` branch, which Vercel deploys to app.linky.fit.
 on:
   push:
     branches:
@@ -151,6 +152,27 @@ jobs:
               --notes-file "$RELEASE_NOTES_PATH" \
               --target "$GITHUB_SHA"
           fi
+
+  web-production:
+    name: Ship the web app to production
+    needs: [resolve, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: web-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.release_tag }}
+
+      # Forced, because a hotfix tag cut outside main is not an ancestor of the
+      # next release.
+      - name: Move the production branch to the release
+        run: git push --force origin HEAD:refs/heads/production
 
   google-play:
     name: Publish to Google Play open testing
