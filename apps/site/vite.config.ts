@@ -13,7 +13,11 @@ import {
   absolutePreviewImages,
   deploymentOrigin,
 } from "./build/previewImages.js";
-import { loadSharedProfile, renderProfilePage } from "./api/_profilePage.js";
+import {
+  loadProfilePicture,
+  loadSharedProfile,
+  renderProfilePage,
+} from "./api/_profilePage.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -122,14 +126,22 @@ const lnurlProxy = (): Plugin => ({
   },
 });
 
-// Stands in for the `/p/:id` rewrite to `api/profile.ts` in `vercel.json`.
+// Stands in for the `/p/:id` rewrites to `api/profile.ts` and `api/profile-picture.ts` in `vercel.json`.
 const sharedProfilePages = (): Plugin => {
   const middleware =
     (loadTemplate: (url: string) => Promise<string>) =>
     async (req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
       const url = new URL(req.url ?? "", `http://${req.headers.host}`);
-      const id = /^\/p\/([^/]+)$/.exec(url.pathname)?.[1];
+      const [, id, picturePath] =
+        /^\/p\/([^/]+)(\/picture)?$/.exec(url.pathname) ?? [];
       if (!id) return next();
+      if (picturePath) {
+        const picture = await loadProfilePicture(decodeURIComponent(id));
+        res.statusCode = picture ? 200 : 404;
+        if (picture) res.setHeader("Content-Type", picture.contentType);
+        res.end(picture?.bytes);
+        return;
+      }
       const profile = await loadSharedProfile(decodeURIComponent(id));
       const template = await loadTemplate(url.pathname);
       res.statusCode = profile ? 200 : 404;
