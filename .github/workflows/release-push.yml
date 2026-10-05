@@ -73,6 +73,10 @@ jobs:
   deploy:
     needs: image
     runs-on: ubuntu-latest
+    # Records each deploy as a GitHub deployment, which the README badge shows.
+    environment:
+      name: push
+      url: https://push.linky.fit
 
     steps:
       - name: Deploy to push.linky.fit
