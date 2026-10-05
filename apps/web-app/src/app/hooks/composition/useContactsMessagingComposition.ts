@@ -638,6 +638,7 @@ export const useContactsMessagingComposition = ({
   useSharedProfileLink({
     accountHydrated,
     contacts,
+    contactsRepository,
     currentNpub,
     saveNpubContact,
     setChatDraft,

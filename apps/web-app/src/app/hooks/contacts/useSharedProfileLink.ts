@@ -1,4 +1,5 @@
 import type { ContactId } from "@linky-fit/linksync";
+import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -16,6 +17,9 @@ import type { useSaveNpubContact } from "./useSaveNpubContact";
 interface UseSharedProfileLinkParams {
   accountHydrated: boolean;
   contacts: readonly { id: ContactId }[];
+  contactsRepository: {
+    all: Effect.Effect<readonly { id: ContactId; npub: string | null }[]>;
+  };
   currentNpub: string | null;
   saveNpubContact: ReturnType<typeof useSaveNpubContact>;
   setChatDraft: (value: string) => void;
@@ -25,12 +29,14 @@ interface UseSharedProfileLinkParams {
 /**
  * Opens a linky.fit profile link (`#add/<npub>`): saves the peer as a contact
  * and opens the conversation with a greeting drafted. A link opened before
- * onboarding waits in storage; every link waits for hydration, so a restored
- * account finds the contact it already has instead of adding a duplicate.
+ * onboarding waits in storage; every link waits for hydration and then looks
+ * the peer up in the stored contacts, so an account finds the contact it
+ * already has instead of adding a duplicate.
  */
 export const useSharedProfileLink = ({
   accountHydrated,
   contacts,
+  contactsRepository,
   currentNpub,
   saveNpubContact,
   setChatDraft,
@@ -64,20 +70,30 @@ export const useSharedProfileLink = ({
       navigateTo({ route: "profile" });
       return;
     }
-    const saved = saveNpubContact(pendingNpub);
-    if (!saved) return;
-    if (saved.created) setChatDraft(t("sharedProfileGreeting"));
-    reportAppLog({
-      tag: "contacts.sharedProfileOpened",
-      summary: saved.created
-        ? "Opened a shared profile link and saved the contact"
-        : "Opened a shared profile link of an existing contact",
-      links: { contact: saved.contact.id },
-      payload: { npub: saved.npub, created: saved.created },
+    // Rendered contacts arrive a read after hydration, so a fresh load would miss the stored peer.
+    void Effect.runPromise(contactsRepository.all).then((storedContacts) => {
+      const existing = storedContacts.find(
+        (contact) =>
+          normalizeNpubIdentifier(contact.npub ?? "") === pendingNpub,
+      );
+      const saved = existing
+        ? { contact: existing, created: false, npub: pendingNpub }
+        : saveNpubContact(pendingNpub);
+      if (!saved) return;
+      if (saved.created) setChatDraft(t("sharedProfileGreeting"));
+      reportAppLog({
+        tag: "contacts.sharedProfileOpened",
+        summary: saved.created
+          ? "Opened a shared profile link and saved the contact"
+          : "Opened a shared profile link of an existing contact",
+        links: { contact: saved.contact.id },
+        payload: { npub: saved.npub, created: saved.created },
+      });
+      setOpeningContactId(saved.contact.id);
     });
-    setOpeningContactId(saved.contact.id);
   }, [
     accountHydrated,
+    contactsRepository,
     currentNpub,
     pendingNpub,
     saveNpubContact,

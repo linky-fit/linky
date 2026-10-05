@@ -1,6 +1,7 @@
 import { encodeNpub } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { createId } from "@linky-fit/linksync";
+import { Effect } from "effect";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -22,6 +23,7 @@ const contactId = createId<"Contact">();
 const makeParams = (overrides: Partial<Params> = {}): Params => ({
   accountHydrated: true,
   contacts: [],
+  contactsRepository: { all: Effect.succeed([]) },
   currentNpub: ownNpub,
   saveNpubContact: vi.fn((npub: string) => ({
     contact: { id: contactId, npub },
@@ -79,6 +81,24 @@ describe("opening a shared profile link", () => {
 
     await view.rerender(<Probe {...params} accountHydrated />);
     expect(params.saveNpubContact).toHaveBeenCalledWith(peerNpub);
+    await view.unmount();
+  });
+
+  it("opens the stored contact before the rendered contacts include it", async () => {
+    const params = makeParams({
+      contactsRepository: {
+        all: Effect.succeed([{ id: contactId, npub: peerNpub }]),
+      },
+    });
+    const view = await renderIntoDocument(<Probe {...params} />);
+    await openHashLink(`#add/${peerNpub}`);
+
+    expect(params.saveNpubContact).not.toHaveBeenCalled();
+    expect(params.setChatDraft).not.toHaveBeenCalled();
+    expect(navigateTo).not.toHaveBeenCalled();
+
+    await view.rerender(<Probe {...params} contacts={[{ id: contactId }]} />);
+    expect(navigateTo).toHaveBeenCalledWith({ route: "chat", id: contactId });
     await view.unmount();
   });
 
