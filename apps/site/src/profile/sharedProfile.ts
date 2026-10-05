@@ -8,6 +8,8 @@ const SharedProfile = Schema.parseJson(
       name: Schema.NullOr(Schema.String),
       picture: Schema.NullOr(Schema.String),
       about: Schema.NullOr(Schema.String),
+      lightningAddress: Schema.NullOr(Schema.String),
+      status: Schema.NullOr(Schema.String),
     }),
   ),
 );
