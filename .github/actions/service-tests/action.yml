@@ -1,0 +1,31 @@
+name: Service tests
+description: Typecheck a service and run its unit tests together with the unit tests of every package
+
+inputs:
+  workspace:
+    description: Workspace name of the service, for example @linky-fit/site
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.3.9
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+
+    - name: Typecheck ${{ inputs.workspace }}
+      shell: bash
+      run: bun run --filter "$WORKSPACE" typecheck
+      env:
+        WORKSPACE: ${{ inputs.workspace }}
+
+    - name: Test ${{ inputs.workspace }} and packages
+      shell: bash
+      run: bun run --filter "$WORKSPACE" --filter './packages/*' test
+      env:
+        WORKSPACE: ${{ inputs.workspace }}

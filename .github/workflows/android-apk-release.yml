@@ -67,8 +67,13 @@ jobs:
     if: needs.resolve.outputs.publish == 'true'
     uses: ./.github/workflows/e2e.yml
 
+  tests:
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true'
+    uses: ./.github/workflows/tests.yml
+
   publish:
-    needs: [resolve, e2e]
+    needs: [resolve, e2e, tests]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -111,8 +116,9 @@ jobs:
           upload-key-alias: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           upload-key-password: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
 
+      # check-code fixes what it can, so a diff means main was not lint-clean.
       - name: Run checks
-        run: bun run check-code
+        run: bun run check-code && git diff --exit-code
 
       - name: Build Android release APK
         run: bun run native:apk:release

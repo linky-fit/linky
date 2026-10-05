@@ -1,8 +1,7 @@
 name: E2E
 
-# Runs on pull requests and every push to main (Vercel Deployment Checks reads the
-# `e2e` check to gate production promotion) and as a reusable job for the
-# Android release workflow.
+# Runs on pull requests, on every push to main (Vercel gates linky.fit on the
+# `site-e2e` check) and as part of the release, which ships app.linky.fit.
 on:
   pull_request:
   push:
@@ -62,7 +61,7 @@ jobs:
 
       # Previously ran inside the web-app image build; here it overlaps the
       # background image prep while still failing the `e2e` check that gates
-      # deploys.
+      # releases.
       - name: Typecheck web app
         run: bun run --filter @linky-fit/web-app typecheck
 
@@ -93,18 +92,9 @@ jobs:
       - name: Verify Evolu relay quota and log privacy
         run: docker run --rm -v "$PWD/docker/evolu-relay/relay.test.js:/app/relay.test.js:ro" linky-evolu-relay npm test
 
-      # The site suite (mostly its own vite build) runs alongside the web-app suite.
       - name: Run e2e tests
-        run: |
-          bun run --filter @linky-fit/site test:e2e &> /tmp/site-e2e.log &
-          site=$!
-          status=0
-          (cd apps/web-app && bunx playwright test --project=local-stack) || status=$?
-          wait "$site" || status=$?
-          echo "::group::Site redemption and recovery tests"
-          cat /tmp/site-e2e.log
-          echo "::endgroup::"
-          exit "$status"
+        working-directory: apps/web-app
+        run: bunx playwright test --project=local-stack
 
       - name: Dump service logs
         if: failure()
@@ -115,7 +105,54 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: e2e-test-results
-          path: |
-            apps/web-app/test-results/
-            apps/site/test-results/
+          path: apps/web-app/test-results/
+          retention-days: 7
+
+  site-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Start relay and mints
+        run: docker compose -f docker-compose.dev.yml --profile e2e up -d --wait nostr-relay cashu-mint cashu-mint-target
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Resolve Playwright version
+        id: playwright-version
+        working-directory: apps/site
+        run: echo "version=$(bunx playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        working-directory: apps/site
+        run: bunx playwright install --with-deps --only-shell chromium
+
+      - name: Run site e2e tests
+        run: bun run --filter @linky-fit/site test:e2e
+
+      - name: Dump service logs
+        if: failure()
+        run: docker compose -f docker-compose.dev.yml --profile e2e logs nostr-relay cashu-mint cashu-mint-target
+
+      - name: Upload traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: site-e2e-test-results
+          path: apps/site/test-results/
           retention-days: 7
