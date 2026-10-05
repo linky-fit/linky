@@ -1,0 +1,28 @@
+name: Require CI
+description: Fail unless every required CI check succeeded on a commit
+
+inputs:
+  sha:
+    description: Commit that is about to ship
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check required CI results
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        set -euo pipefail
+        failed=0
+        for check in lint unit-tests linkshu-integration npm-packages app-e2e site-e2e; do
+          result=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=$check" \
+            --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.started_at) | last | "\(.status) \(.conclusion)"')
+          if [[ "$result" != "completed success" ]]; then
+            echo "::error::$check on $SHA is ${result/null null/missing}"
+            failed=1
+          fi
+        done
+        exit "$failed"

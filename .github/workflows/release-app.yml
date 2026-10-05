@@ -1,47 +1,50 @@
 name: Release · app
 
-# A release normally starts from the version-bump push to main; that run creates
-# the v<version> tag through `gh release create`, and tags created with the
-# workflow token do not trigger workflows again. The tag trigger covers manually
-# pushed tags; when such a tag already exists, the branch push skips so only one
-# run publishes a given version. A manual run started from a tag republishes it,
-# so every job tests and builds the commit it ships. Once the release exists, the
-# web app ships by moving the `production` branch, which Vercel deploys to
-# app.linky.fit.
+# Starts when CI succeeds on a push to main or a hotfix/** branch, and ships the
+# commit CI tested once its version has no tag yet: `publish` creates the
+# v<version> tag and GitHub release, and the web app ships by moving the
+# `production` branch, which Vercel deploys to app.linky.fit. A manual run
+# started from a tag republishes that tag. workflow_run jobs run in main's
+# context, so every checkout names the release commit explicitly.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches:
       - main
-    tags:
-      - "v*"
-    paths:
-      - package.json
+      - "hotfix/**"
   workflow_dispatch:
-
-# One release at a time, so an older release can't move `production` back.
-concurrency:
-  group: release-app
-  cancel-in-progress: false
 
 jobs:
   resolve:
+    # Pushes only: a pull request from a fork can name its branch hotfix/**.
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
     outputs:
       release_tag: ${{ steps.metadata.outputs.release_tag }}
       publish: ${{ steps.metadata.outputs.publish }}
+      sha: ${{ steps.metadata.outputs.sha }}
 
     steps:
+      # The workflow's own commit, which carries require-ci even when an older
+      # hotfix commit does not.
       - name: Checkout
         uses: actions/checkout@v5
 
       - name: Resolve release tag
         id: metadata
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           publish=true
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF_TYPE" == "tag" ]]; then
             release_tag="$GITHUB_REF_NAME"
           else
-            release_tag="v$(jq -r .version package.json)"
+            git fetch --quiet --depth 1 origin "$SHA"
+            release_tag="v$(git show "$SHA:package.json" | jq -r .version)"
             if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null; then
               echo "Tag $release_tag already exists; run the workflow from that tag to republish it."
               publish=false
@@ -53,31 +56,39 @@ jobs:
             exit 1
           fi
 
-          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          {
+            echo "release_tag=$release_tag"
+            echo "publish=$publish"
+            echo "sha=$SHA"
+          } >> "$GITHUB_OUTPUT"
 
-  checks:
-    needs: resolve
-    if: needs.resolve.outputs.publish == 'true'
-    uses: ./.github/workflows/ci-checks.yml
-
-  e2e:
-    needs: resolve
-    if: needs.resolve.outputs.publish == 'true'
-    uses: ./.github/workflows/ci-e2e.yml
+      - name: Require passing CI on the release commit
+        if: steps.metadata.outputs.publish == 'true'
+        uses: ./.github/actions/require-ci
+        with:
+          sha: ${{ steps.metadata.outputs.sha }}
 
   publish:
-    needs: [resolve, checks, e2e]
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    # Every push to main starts this workflow, so only real releases queue here
+    # and a no-op run can't replace a pending one.
+    concurrency:
+      group: release-app
+      cancel-in-progress: false
     permissions:
       contents: write
     env:
       RELEASE_TAG: ${{ needs.resolve.outputs.release_tag }}
+      RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
       APK_PATH: apps/native-shell/android/app/build/outputs/apk/release/app-release.apk
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -146,7 +157,7 @@ jobs:
             gh release create "$RELEASE_TAG" "$APK_UPLOAD_PATH" \
               --title "Linky $RELEASE_TAG" \
               --notes-file "$RELEASE_NOTES_PATH" \
-              --target "$GITHUB_SHA"
+              --target "$RELEASE_SHA"
           fi
 
   web-production:
@@ -155,6 +166,10 @@ jobs:
     runs-on: ubuntu-latest
     # Holds the release app's credentials and admits only main and v* tags.
     environment: Production
+    # Releases publish one at a time, so production moves in release order.
+    concurrency:
+      group: web-production
+      cancel-in-progress: false
     permissions:
       contents: read
 
@@ -194,6 +209,8 @@ jobs:
     steps:
       - name: Checkout release notes
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Download signed AAB
         uses: actions/download-artifact@v8
@@ -232,6 +249,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -251,19 +270,22 @@ jobs:
 
   zapstore:
     name: Publish to Zapstore
-    needs: publish
+    needs: [resolve, publish]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: zapstore
     permissions:
       contents: read
     env:
+      RELEASE_SHA: ${{ needs.resolve.outputs.sha }}
       ZSP_VERSION: 0.4.14
       ZSP_LINUX_AMD64_SHA256: f655a6c253a0aff6c6768dd24c65fb12aafe9cd2e48d35605e623adf54aaddb2
 
     steps:
       - name: Checkout Zapstore metadata
         uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Download signed APK
         uses: actions/download-artifact@v8
@@ -293,4 +315,4 @@ jobs:
           "$RUNNER_TEMP/zsp" publish zapstore.yaml \
             --quiet \
             --skip-preview \
-            --commit "$GITHUB_SHA"
+            --commit "$RELEASE_SHA"
