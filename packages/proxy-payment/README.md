@@ -15,5 +15,5 @@ The package parses and re-encodes bank QRs and holds the offer rules: a reducer 
 
 The exported types are the reference; the guides state the guarantees.
 
-- [Offers](./docs/offers.md): applying snapshots and receipts, authorization, selectors, drafts, stagger scheduling
+- [Offers](./docs/offers.md): applying snapshots and receipts, authorization, selectors, drafts, stagger scheduling, the currencies a profile status advertises
 - [Bank QR](./docs/bank-qr.md): parsing and re-encoding SPD, EPC, PAY by square, payme and Pix payments, editing, account normalization, decoding bounds

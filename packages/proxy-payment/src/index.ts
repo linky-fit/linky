@@ -8,3 +8,4 @@ export * from "./offers/selectors";
 export * from "./offers/stagger";
 export * from "./offers/state";
 export * from "./offers/status";
+export * from "./offers/profileStatus";
