@@ -7,12 +7,13 @@
 While the version is 0.x, a breaking change to an export or documented behavior is a minor bump and anything else a patch. Pull requests leave `version` alone and state their SemVer effect; the bump happens here.
 
 1. Set the same `version` in `packages/linkshu/package.json` and `packages/linkstr/package.json`.
-2. Run `bun install` so `bun.lock` picks up the workspace version metadata.
+2. Set the same version in the `packages/linkshu` and `packages/linkstr` entries of `bun.lock`; `bun install` leaves workspace versions there alone.
 3. Merge the version and the matching documentation changes into `main`.
-4. Tag that commit and push the tag:
+4. Tag the merged commit on `main` and push the tag:
 
    ```bash
-   git tag packages-v0.1.1
+   git fetch origin
+   git tag packages-v0.1.1 origin/main
    git push origin packages-v0.1.1
    ```
 
