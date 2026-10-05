@@ -1,8 +1,7 @@
 name: CI · checks
 
-# Runs on pull requests, on every push to main (the Vercel projects released from
-# main gate production on their service check) and as part of the app and npm
-# releases.
+# Runs on pull requests, on every push to main (the site and the error tracker
+# gate production on `lint` and `unit-tests`) and as part of every release.
 on:
   push:
     branches:
@@ -121,26 +120,3 @@ jobs:
           name: npm-packages
           path: dist/npm/*.tgz
           if-no-files-found: error
-
-  service:
-    name: ${{ matrix.check }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - check: site
-            workspace: "@linky-fit/site"
-          - check: error-tracker
-            workspace: "@linky-fit/nostr-error-tracker"
-          - check: push
-            workspace: "@linky-fit/push"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Run service tests
-        uses: ./.github/actions/service-tests
-        with:
-          workspace: ${{ matrix.workspace }}

@@ -11,15 +11,15 @@ The desktop shell loads `app.linky.fit`, so it follows prod.
 
 ## What ships when
 
-| Service                           | Ships                                            | Gated by                                                   |
-| --------------------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
-| Web app, Android, macOS, Zapstore | a release                                        | `release-app.yml`: all of `ci-checks.yml` and `ci-e2e.yml` |
-| Site `linky.fit`                  | every push to `main`                             | Vercel Deployment Checks `site` and `site-e2e`             |
-| Error tracker                     | every push to `main`                             | Vercel Deployment Check `error-tracker`                    |
-| Push server `push.linky.fit`      | a manual run of `release-push.yml` on `main`     | its `checks` job, the same steps as the `push` check       |
-| npm packages                      | a `packages-v*` tag ([guide](./npm-releases.md)) | `release-npm.yml`: all of `ci-checks.yml`                  |
+| Service                           | Ships                                            | Gated by                                                     |
+| --------------------------------- | ------------------------------------------------ | ------------------------------------------------------------ |
+| Web app, Android, macOS, Zapstore | a release                                        | `release-app.yml`: all of `ci-checks.yml` and `ci-e2e.yml`   |
+| Site `linky.fit`                  | every push to `main`                             | Vercel Deployment Checks `lint`, `unit-tests` and `site-e2e` |
+| Error tracker                     | every push to `main`                             | Vercel Deployment Checks `lint` and `unit-tests`             |
+| Push server `push.linky.fit`      | a manual run of `release-push.yml` on `main`     | `release-push.yml`: all of `ci-checks.yml`                   |
+| npm packages                      | a `packages-v*` tag ([guide](./npm-releases.md)) | `release-npm.yml`: all of `ci-checks.yml`                    |
 
-Each service check (`site`, `error-tracker`, `push`) lints and typechecks the whole repo and runs the service's unit tests plus the unit tests of every package. These checks run on every push, without path filters, because a Deployment Check that never reports blocks the deploy.
+`lint` typechecks, lints and formats the whole repo; `unit-tests` runs the unit tests of every workspace. Both run on every push, without path filters, because a Deployment Check that never reports blocks the deploy.
 
 The site, the error tracker and the push server ship ahead of the web app, so their APIs must keep working with the last release as well as with nightly.
 
@@ -51,9 +51,9 @@ A new origin has its own local storage, so nightly starts empty: restore from th
 ## Vercel and GitHub setup
 
 - Web-app project: production branch `production` with domain `app.linky.fit`, and no Deployment Checks, because `release-app.yml` already gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
-- Site project: Deployment Checks `site` and `site-e2e`.
-- Error tracker project: Deployment Check `error-tracker`.
-- The `main` ruleset requires `lint`, `unit-tests`, `linkshu-integration`, `npm-packages`, `site`, `error-tracker`, `push`, `app-e2e` and `site-e2e`.
+- Site project: Deployment Checks `lint`, `unit-tests` and `site-e2e`.
+- Error tracker project: Deployment Checks `lint` and `unit-tests`.
+- The `main` ruleset requires `lint`, `unit-tests`, `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
 - The `production` branch has a ruleset that lets only GitHub Actions push to it.
 
 Pull requests keep their preview deployments.
