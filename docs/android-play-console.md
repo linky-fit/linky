@@ -1,6 +1,6 @@
 # Android Play Console CI
 
-Versioned Android releases (a version change in `package.json` on `main`, a manually pushed `v*` tag or a manual run of the `Release` workflow) upload the signed AAB to Google Play on the `internal` and `beta` (Open testing) tracks and the APK to GitHub Releases. An ordinary push to `main` does not publish a Play build. The workflow lives in [.github/workflows/android-apk-release.yml](../.github/workflows/android-apk-release.yml); CI sets `versionCode = 200000000 + github.run_number` in [android-release-setup](../.github/actions/android-release-setup/action.yml). Keep the release workflow's file name so the counter continues.
+Versioned Android releases (a version change in `package.json` on `main`, a manually pushed `v*` tag or a manual run of the `Release · app` workflow) upload the signed AAB to Google Play on the `internal` and `beta` (Open testing) tracks and the APK to GitHub Releases. An ordinary push to `main` does not publish a Play build. The workflow lives in [.github/workflows/release-app.yml](../.github/workflows/release-app.yml); CI sets `versionCode = 200000100 + github.run_number` in [android-release-setup](../.github/actions/android-release-setup/action.yml). Renaming the workflow file restarts `run_number`, so a rename must raise the offset past the last version code.
 
 ## Prepare Google Play Console
 

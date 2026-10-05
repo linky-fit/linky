@@ -1,6 +1,6 @@
 # Zapstore publishing
 
-The `zapstore` job in `.github/workflows/android-apk-release.yml` publishes the same signed `linky.apk` the release workflow uploads to GitHub Releases: a clean runner downloads it, verifies the pinned `zsp` binary checksum and runs `zsp publish zapstore.yaml`. The job needs the `ZAPSTORE_NSEC` environment secret and fails, without printing anything, when the secret is missing or is not an `nsec`.
+The `zapstore` job in `.github/workflows/release-app.yml` publishes the same signed `linky.apk` the release workflow uploads to GitHub Releases: a clean runner downloads it, verifies the pinned `zsp` binary checksum and runs `zsp publish zapstore.yaml`. The job needs the `ZAPSTORE_NSEC` environment secret and fails, without printing anything, when the secret is missing or is not an `nsec`.
 
 ## One-time setup
 

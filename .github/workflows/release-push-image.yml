@@ -1,4 +1,4 @@
-name: Push Image
+name: Release · push image
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     tags:
       - "push-v*"
     paths:
-      - ".github/workflows/push-image.yml"
+      - ".github/workflows/release-push-image.yml"
       - ".dockerignore"
       - "apps/push/**"
       - "bun.lock"

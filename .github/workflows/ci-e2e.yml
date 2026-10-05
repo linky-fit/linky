@@ -1,7 +1,7 @@
-name: E2E
+name: CI · e2e
 
 # Runs on pull requests, on every push to main (Vercel gates linky.fit on the
-# `site-e2e` check) and as part of the release, which ships app.linky.fit.
+# `site-e2e` check) and as part of the app release.
 on:
   pull_request:
   push:

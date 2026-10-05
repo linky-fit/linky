@@ -1,4 +1,4 @@
-name: Deploy Push Server
+name: Deploy · push server
 
 on:
   workflow_dispatch:

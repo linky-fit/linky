@@ -4,7 +4,7 @@ Capacitor shell that bundles `apps/web-app/dist` and ships it as:
 
 - Android debug APK (`fit.linky.app.debug`, "Linky Dev", installs next to the production app)
 - Android release APK, published as `linky.apk` on GitHub Releases
-- Android AAB, uploaded to Google Play internal and open testing by `.github/workflows/android-apk-release.yml` (see [Play setup](../../docs/android-play-console.md))
+- Android AAB, uploaded to Google Play internal and open testing by `.github/workflows/release-app.yml` (see [Play setup](../../docs/android-play-console.md))
 - iOS project (no App Store release pipeline yet)
 
 Android builds need JDK 17. The `native:*` scripts select it through `scripts/with-java17.sh` and run `scripts/patch-android-java.sh`, which rewrites the Java 21 compile options Capacitor 7 generates back to 17.
