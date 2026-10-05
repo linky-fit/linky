@@ -56,7 +56,11 @@ const LocalPaymentTelemetryEventSchema = Schema.Struct({
     "swap",
     "unknown",
   ),
-  flow: Schema.optional(Schema.NullOr(Schema.Literal("recurring", "proxy"))),
+  paymentType: Schema.optional(
+    Schema.NullOr(
+      Schema.Literal("contact", "lightning", "proxy", "recurring", "request"),
+    ),
+  ),
   appVersion: Schema.String,
   appHost: Schema.optional(Schema.NullOr(Schema.String)),
   appRuntime: Schema.optional(
@@ -113,7 +117,7 @@ const toPaymentTelemetryDraft = (
     status: item.status,
     method: item.method,
     phase: item.phase,
-    flow: item.flow ?? null,
+    paymentType: item.paymentType ?? null,
     mint: item.mint,
     amountBucket: item.amountBucket,
     feeBucket: item.feeBucket,

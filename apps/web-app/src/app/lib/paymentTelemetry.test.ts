@@ -86,7 +86,7 @@ describe("createLocalPaymentTelemetryEvent", () => {
     });
   });
 
-  it("keeps the payment's flow and has none by default", () => {
+  it("keeps the payment type and has none by default", () => {
     const event = {
       direction: "out",
       status: "error",
@@ -97,13 +97,13 @@ describe("createLocalPaymentTelemetryEvent", () => {
 
     expect(
       createLocalPaymentTelemetryEvent(event, 1_700_000_000),
-    ).toMatchObject({ flow: null });
+    ).toMatchObject({ paymentType: null });
     expect(
       createLocalPaymentTelemetryEvent(
-        { ...event, flow: "proxy" },
+        { ...event, paymentType: "proxy" },
         1_700_000_000,
       ),
-    ).toMatchObject({ flow: "proxy" });
+    ).toMatchObject({ paymentType: "proxy" });
   });
 
   it("marks expected payment denials as declined", () => {

@@ -524,7 +524,7 @@ describe("usePayContactWithCashuMessage", () => {
     await act(async () => harness.root.unmount());
   });
 
-  it("reports the sats of a bank offer as a proxy payment, other sends as none", async () => {
+  it("types a send as proxy for a bank offer, request for a payment request, contact otherwise", async () => {
     const sendCashuToken = vi.fn<SendCashuToken>(async () =>
       Either.right(sendReceipt),
     );
@@ -548,14 +548,25 @@ describe("usePayContactWithCashuMessage", () => {
       });
     });
     expect(harness.logPaymentEvent).toHaveBeenLastCalledWith(
-      expect.objectContaining({ flow: "proxy", status: "ok" }),
+      expect.objectContaining({ paymentType: "proxy", status: "ok" }),
+    );
+
+    await act(async () => {
+      await harness.getPay()?.({
+        amountSat: 600,
+        contact,
+        paymentRequestId: "request-1",
+      });
+    });
+    expect(harness.logPaymentEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ paymentType: "request", status: "ok" }),
     );
 
     await act(async () => {
       await harness.getPay()?.({ amountSat: 600, contact });
     });
     expect(harness.logPaymentEvent).toHaveBeenLastCalledWith(
-      expect.objectContaining({ flow: null, status: "ok" }),
+      expect.objectContaining({ paymentType: "contact", status: "ok" }),
     );
 
     await act(async () => harness.root.unmount());

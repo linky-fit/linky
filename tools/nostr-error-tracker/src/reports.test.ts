@@ -66,7 +66,7 @@ describe("parseReport", () => {
       mint: payload.mint,
       amountBucket: payload.amountBucket,
       feeBucket: null,
-      flow: null,
+      paymentType: null,
       errorCode: payload.errorCode,
       errorDetail: payload.errorDetail,
       appVersion: payload.appVersion,
@@ -77,10 +77,13 @@ describe("parseReport", () => {
     });
   });
 
-  it("keeps the flow of a recurring or proxy payment", () => {
+  it("keeps the payment type", () => {
     expect(
-      parseReport(JSON.stringify({ ...payload, flow: "proxy" }), metadata),
-    ).toMatchObject({ flow: "proxy" });
+      parseReport(
+        JSON.stringify({ ...payload, paymentType: "proxy" }),
+        metadata,
+      ),
+    ).toMatchObject({ paymentType: "proxy" });
   });
 
   it.each(["ok", "declined"])("excludes %s outcomes", (status) => {

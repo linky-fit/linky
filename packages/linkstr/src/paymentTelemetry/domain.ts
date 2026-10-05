@@ -30,9 +30,20 @@ export const PaymentTelemetryPhase = Schema.Literal(
 );
 export type PaymentTelemetryPhase = typeof PaymentTelemetryPhase.Type;
 
-/** Which Linky flow a payment belongs to; an ordinary payment has none. */
-export const PaymentTelemetryFlow = Schema.Literal("recurring", "proxy");
-export type PaymentTelemetryFlow = typeof PaymentTelemetryFlow.Type;
+/**
+ * What kind of payment went out: to a contact, a Lightning invoice or
+ * address outside a contact, the sats of a proxy payment, a run of a
+ * recurring payment, or a paid payment request. Receives have none.
+ */
+export const PaymentTelemetryPaymentType = Schema.Literal(
+  "contact",
+  "lightning",
+  "proxy",
+  "recurring",
+  "request",
+);
+export type PaymentTelemetryPaymentType =
+  typeof PaymentTelemetryPaymentType.Type;
 
 export const PaymentTelemetryDevicePlatform = Schema.Literal(
   "android",
@@ -63,7 +74,7 @@ export class PaymentTelemetryDraft extends Schema.Class<PaymentTelemetryDraft>(
   method: PaymentTelemetryMethod,
   phase: PaymentTelemetryPhase,
   // Optional on the wire so outbox jobs persisted before the field decode.
-  flow: Schema.optionalWith(Schema.NullOr(PaymentTelemetryFlow), {
+  paymentType: Schema.optionalWith(Schema.NullOr(PaymentTelemetryPaymentType), {
     default: () => null,
   }),
   mint: Schema.NullOr(Schema.String),

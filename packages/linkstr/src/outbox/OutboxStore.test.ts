@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Predicate, Schema } from "effect";
 import { generateSecretKey, getPublicKey } from "nostr-tools";
 import {
   CashuTokenText,
@@ -143,7 +143,7 @@ describe("OutboxStore.fromStringStorage", () => {
     expect(job.state.result).toBeInstanceOf(OutboxJobFailed);
   });
 
-  it("loads a telemetry job persisted before the draft had a flow", () => {
+  it("loads a telemetry job persisted before the draft had a payment type", () => {
     const storage = stubStorage();
     run(
       buildStore(OutboxStore.fromStringStorage(storage, storageKey)).insert(
@@ -157,10 +157,18 @@ describe("OutboxStore.fromStringStorage", () => {
         }),
       ),
     );
-    const stored = JSON.parse(storage.map.get(storageKey) ?? "[]") as Array<{
-      operation: { draft: Record<string, unknown> };
-    }>;
-    for (const job of stored) delete job.operation.draft.flow;
+    const stored = Schema.decodeUnknownSync(Schema.Array(Schema.Unknown))(
+      JSON.parse(storage.map.get(storageKey) ?? "[]"),
+    );
+    for (const job of stored) {
+      if (
+        Predicate.isRecord(job) &&
+        Predicate.isRecord(job.operation) &&
+        Predicate.isRecord(job.operation.draft)
+      ) {
+        delete job.operation.draft.paymentType;
+      }
+    }
     storage.map.set(storageKey, JSON.stringify(stored));
 
     const jobs = run(

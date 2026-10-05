@@ -9,9 +9,11 @@ import type {
   Pubkey,
   PaymentTelemetryAppRuntime,
   PaymentTelemetryDevicePlatform,
-  PaymentTelemetryFlow,
+  PaymentTelemetryPaymentType,
 } from "@linky-fit/linkstr";
 import type { JsonValue } from "../../types/json";
+
+export type { PaymentTelemetryPaymentType };
 
 export type PaymentTelemetryStatus = "declined" | "error" | "ok";
 
@@ -55,12 +57,12 @@ interface PaymentEventFields {
   direction: "in" | "out";
   error?: string | null;
   fee?: number | null;
-  /** The Linky flow the payment belongs to; left out for an ordinary payment. */
-  flow?: PaymentTelemetryFlow | null;
   method?: PaymentTelemetryMethod | null;
   mint?: string | null;
   /** The payment's note: bolt11 description, token memo, LNURL comment or request description. */
   note?: string | null;
+  /** What kind of payment went out; left out for receives, restores and top-ups. */
+  paymentType?: PaymentTelemetryPaymentType | null;
   phase?: PaymentTelemetryPhase | null;
   unit?: string | null;
 }
@@ -83,10 +85,10 @@ export interface LocalPaymentTelemetryEvent {
   errorCode: string | null;
   errorDetail: string | null;
   feeBucket: string | null;
-  flow?: PaymentTelemetryFlow | null;
   id: string;
   method: PaymentTelemetryMethod;
   mint: string | null;
+  paymentType?: PaymentTelemetryPaymentType | null;
   phase: PaymentTelemetryPhase;
   status: PaymentTelemetryStatus;
 }

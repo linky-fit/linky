@@ -1208,6 +1208,7 @@ export const useCashuWalletComposition = ({
           error,
           contactId: null,
           method: "cashu_chat",
+          paymentType: "request",
           phase,
         });
       };
@@ -1325,6 +1326,7 @@ export const useCashuWalletComposition = ({
           error: null,
           contactId: null,
           method: "cashu_chat",
+          paymentType: "request",
           phase: "complete",
         });
 
@@ -2003,6 +2005,7 @@ export const useCashuWalletComposition = ({
           method: "cashu_chat",
           mint: tokenMeta.mint,
           note: transactionNote,
+          paymentType: "contact",
           phase,
           status: "ok",
           transactionId: transactionIdForOperation(tokenId),

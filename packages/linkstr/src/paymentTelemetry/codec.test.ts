@@ -49,7 +49,7 @@ describe("payment telemetry rumor encoding", () => {
       status: "error",
       method: "lightning_address",
       phase: "melt",
-      flow: null,
+      paymentType: null,
       mint: "https://mint.example/Bitcoin",
       amountBucket: "lte_1000",
       feeBucket: null,
@@ -63,14 +63,16 @@ describe("payment telemetry rumor encoding", () => {
     expect(rumor.id).toBe(getEventHash(rumor));
   });
 
-  it("names the flow a recurring or proxy payment belongs to", () => {
+  it("names the kind of payment that went out", () => {
     const rumor = encodePaymentTelemetryRumor(
-      new PaymentTelemetryDraft({ ...draft, flow: "recurring" }),
+      new PaymentTelemetryDraft({ ...draft, paymentType: "recurring" }),
       author,
       recipient,
       sentAt,
     );
 
-    expect(JSON.parse(rumor.content)).toMatchObject({ flow: "recurring" });
+    expect(JSON.parse(rumor.content)).toMatchObject({
+      paymentType: "recurring",
+    });
   });
 });

@@ -411,8 +411,8 @@ describe("useRecurringPaymentsScheduler", () => {
     });
     expect(view.params.logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        flow: "recurring",
         method: "cashu_chat",
+        paymentType: "recurring",
         note: "Rent",
       }),
     );
@@ -433,8 +433,8 @@ describe("useRecurringPaymentsScheduler", () => {
     );
     expect(view.params.logPaymentEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        flow: "recurring",
         method: "lightning_address",
+        paymentType: "recurring",
         note: "Rent",
       }),
     );

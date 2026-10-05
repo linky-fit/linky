@@ -19,8 +19,8 @@ export interface ErrorReport extends ReportMetadata {
   mint: string | null;
   amountBucket: string | null;
   feeBucket: string | null;
-  /** `recurring` or `proxy`; null for an ordinary payment or a report from before the field. */
-  flow: string | null;
+  /** contact, lightning, proxy, recurring or request; null for receives and for reports from before the field. */
+  paymentType: string | null;
   errorCode: string | null;
   errorDetail: string | null;
   appVersion: string | null;
@@ -66,7 +66,7 @@ const reportSchema = Schema.Struct({
   mint: optionalText,
   amountBucket: optionalText,
   feeBucket: optionalText,
-  flow: optionalText,
+  paymentType: optionalText,
   errorCode: optionalText,
   errorDetail: optionalText,
   appVersion: optionalText,
@@ -112,7 +112,7 @@ export function parseReport(
     mint: textOrNull(value.mint),
     amountBucket: textOrNull(value.amountBucket),
     feeBucket: textOrNull(value.feeBucket),
-    flow: textOrNull(value.flow),
+    paymentType: textOrNull(value.paymentType),
     errorCode: textOrNull(value.errorCode),
     errorDetail: value.errorDetail ?? null,
     appVersion: textOrNull(value.appVersion),
@@ -210,7 +210,7 @@ export function filterReports(
         report.errorDetail,
         report.method,
         report.phase,
-        report.flow,
+        report.paymentType,
         report.appHost,
         report.mint,
         report.appVersion,

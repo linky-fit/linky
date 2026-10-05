@@ -38,6 +38,7 @@ import type {
   ContactPayRowLike,
   LoggedPaymentEventParams,
   PaymentTelemetryMethod,
+  PaymentTelemetryPaymentType,
 } from "../types/appTypes";
 import type { JsonValue } from "../../types/json";
 import type { MeltCashuInvoice } from "./composition/useLinkshuComposition";
@@ -134,6 +135,7 @@ export const useLightningPaymentsDomain = ({
     (
       pending: PaymentPending,
       method: PaymentTelemetryMethod,
+      paymentType: PaymentTelemetryPaymentType,
       details: Record<string, JsonValue>,
       contactId: string | null,
       note: string | null,
@@ -151,6 +153,7 @@ export const useLightningPaymentsDomain = ({
         error: null,
         contactId,
         method,
+        paymentType,
         phase: "melt",
       });
       setStatus(t("payPending"));
@@ -200,6 +203,7 @@ export const useLightningPaymentsDomain = ({
             recordPendingMelt(
               outcome.left.pending,
               "lightning_invoice",
+              "lightning",
               invoiceDetails,
               null,
               note,
@@ -217,6 +221,7 @@ export const useLightningPaymentsDomain = ({
             error: outcome.left.message,
             contactId: null,
             method: "lightning_invoice",
+            paymentType: "lightning",
             phase: "melt",
           });
           setStatus(`${t("payFailed")}: ${outcome.left.message}`);
@@ -241,6 +246,7 @@ export const useLightningPaymentsDomain = ({
           error: null,
           contactId: null,
           method: "lightning_invoice",
+          paymentType: "lightning",
           phase: "complete",
         });
 
@@ -292,6 +298,9 @@ export const useLightningPaymentsDomain = ({
       // The LUD-12 comment is the note; an invoice description stands in
       // when there is none.
       const commentNote = (comment ?? "").trim() || null;
+      const paymentType: PaymentTelemetryPaymentType = contact
+        ? "contact"
+        : "lightning";
       if (!paymentTarget) return false;
       if (!Number.isFinite(amountSat) || amountSat <= 0) {
         setStatus(`${t("errorPrefix")}: ${t("payInvalidAmount")}`);
@@ -394,6 +403,7 @@ export const useLightningPaymentsDomain = ({
               recordPendingMelt(
                 outcome.left.pending,
                 "lightning_address",
+                paymentType,
                 {
                   lightningAddress: paidLightningAddress,
                   lightningInvoice: attemptInvoice,
@@ -452,6 +462,7 @@ export const useLightningPaymentsDomain = ({
             error: null,
             contactId: contact?.id ?? null,
             method: "lightning_address",
+            paymentType,
             phase: "complete",
           });
 
@@ -514,6 +525,7 @@ export const useLightningPaymentsDomain = ({
           error: finalErrorMessage,
           contactId: contact?.id ?? null,
           method: "lightning_address",
+          paymentType,
           phase: finalErrorMint ? "melt" : "invoice_fetch",
         });
         setStatus(`${t("payFailed")}: ${finalErrorMessage}`);

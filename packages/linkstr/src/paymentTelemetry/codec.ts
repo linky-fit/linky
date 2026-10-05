@@ -28,7 +28,7 @@ export const encodePaymentTelemetryRumor = (
       status: draft.status,
       method: draft.method,
       phase: draft.phase,
-      flow: draft.flow,
+      paymentType: draft.paymentType,
       mint: draft.mint,
       amountBucket: draft.amountBucket,
       feeBucket: draft.feeBucket,
