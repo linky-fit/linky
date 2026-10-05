@@ -90,7 +90,7 @@ test("an unknown sender's message reaches a device that has no Nostr relay, and 
   }
 });
 
-test("the network tab turns synced once the relays delivered, and shows no connection without an Evolu relay", async ({
+test("the network line turns synced once the relays delivered, and shows no connection without an Evolu relay", async ({
   browser,
 }, testInfo) => {
   const identity = await createSeedIdentity();

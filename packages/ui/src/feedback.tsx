@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { Animated, Easing } from "react-native";
 import { View } from "tamagui";
+import type { ColorTokens } from "tamagui";
 import { Button, IconButton, Pressable } from "./controls";
 import type { LabeledAction } from "./controls";
 import { Icon } from "./icons";
@@ -275,48 +277,124 @@ export function EmptyState({
   );
 }
 
-export interface EdgeStatusItem {
+export interface TopEdgeStatusItem {
   label: string;
   tone: Tone;
   /** Shows a spinner instead of the dot while the step is under way. */
   busy?: boolean | undefined;
 }
 
-export interface EdgeStatusProps {
-  /** Colors the tab, which `label` names. */
+export interface TopEdgeStatusProps {
+  /** Colors the line and the handle, which `label` names. */
   tone: Tone;
   label: string;
-  items: readonly EdgeStatusItem[];
+  items: readonly TopEdgeStatusItem[];
+  /** Slides a segment along the line while the state is in progress. */
+  busy?: boolean | undefined;
+  /** Fades the line out and dims the handle, e.g. once all is well. */
+  quiet?: boolean | undefined;
+}
+
+const SWEEP_MS = 1_400;
+
+/** A third of the line that sweeps across it, back to front, forever. */
+function SweepingSegment({ color }: { color: ColorTokens }) {
+  const [progress] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: SWEEP_MS,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: false,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [progress]);
+  return (
+    <Animated.View
+      style={{
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        width: "33%",
+        left: progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["-33%", "100%"],
+        }),
+      }}
+    >
+      <View flex={1} backgroundColor={color} />
+    </Animated.View>
+  );
 }
 
 /**
- * A small half-disc tab that reports a background state from the window's
- * left edge; hovering or pressing it opens a panel with the details above it.
- * The caller positions it.
+ * A hairline across the top of the window that reports a background state,
+ * with a small handle hanging from its middle; hovering or pressing the
+ * handle opens a panel with the details below it. The caller positions it.
  */
-export function EdgeStatus({ tone, label, items }: EdgeStatusProps) {
+export function TopEdgeStatus({
+  tone,
+  label,
+  items,
+  busy = false,
+  quiet = false,
+}: TopEdgeStatusProps) {
   const [open, setOpen] = useState<"hover" | "press" | null>(null);
+  const { solid, background } = toneColors[tone];
   return (
-    <>
+    <Stack pointerEvents="box-none">
       {open === "press" ? (
         <Stack position="fixed" inset={0} onPress={() => setOpen(null)} />
       ) : null}
+      <View
+        position="relative"
+        height={border.emphasis}
+        overflow="hidden"
+        backgroundColor={busy ? background : solid}
+        opacity={quiet ? 0 : 1}
+        transition="slow"
+        {...(busy ? { role: "progressbar", "aria-label": label } : {})}
+      >
+        {busy ? <SweepingSegment color={solid} /> : null}
+      </View>
       {/* Positioned, so it paints above the fixed backdrop before it. */}
       <Stack
         position="relative"
-        alignItems="flex-start"
+        alignSelf="center"
+        alignItems="center"
         onMouseEnter={() => setOpen((current) => current ?? "hover")}
         onMouseLeave={() =>
           setOpen((current) => (current === "hover" ? null : current))
         }
       >
+        <Pressable
+          aria-label={label}
+          aria-expanded={open !== null}
+          paddingHorizontal="$md"
+          paddingBottom="$sm"
+          onPress={() =>
+            setOpen((current) => (current === "press" ? null : "press"))
+          }
+        >
+          <View
+            width="$iconLg"
+            height={space.xs}
+            borderBottomLeftRadius="$pill"
+            borderBottomRightRadius="$pill"
+            backgroundColor={quiet ? "$neutral" : solid}
+            opacity={quiet ? opacity.disabled : 1}
+            transition="slow"
+          />
+        </Pressable>
         {open ? (
           <Stack
             role="status"
             aria-live="polite"
             gap="$xs"
             maxWidth="$device"
-            marginLeft="$sm"
             paddingVertical="$sm"
             paddingHorizontal="$md"
             borderRadius="$control"
@@ -325,7 +403,7 @@ export function EdgeStatus({ tone, label, items }: EdgeStatusProps) {
             backgroundColor="$surface"
             boxShadow={shadow.raised}
             transition="base"
-            enterStyle={{ opacity: 0, scale: enterScale.subtle, y: space.sm }}
+            enterStyle={{ opacity: 0, scale: enterScale.subtle, y: -space.sm }}
           >
             {items.map((item) => (
               <Row key={item.label} gap="$sm" alignItems="center">
@@ -346,25 +424,7 @@ export function EdgeStatus({ tone, label, items }: EdgeStatusProps) {
             ))}
           </Stack>
         ) : null}
-        <Pressable
-          aria-label={label}
-          aria-expanded={open !== null}
-          paddingRight="$md"
-          paddingVertical="$md"
-          onPress={() =>
-            setOpen((current) => (current === "press" ? null : "press"))
-          }
-        >
-          <View
-            width={space.xs}
-            height={space.sm}
-            borderTopRightRadius="$pill"
-            borderBottomRightRadius="$pill"
-            backgroundColor={toneColors[tone].solid}
-            opacity={opacity.disabled}
-          />
-        </Pressable>
       </Stack>
-    </>
+    </Stack>
   );
 }

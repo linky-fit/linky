@@ -1,7 +1,7 @@
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "../test/render";
-import { EdgeStatus, Progress, StatusLine } from "./feedback";
+import { Progress, StatusLine, TopEdgeStatus } from "./feedback";
 
 const progressbar = async (element: React.ReactElement) => {
   const bar = (await render(element)).querySelector("[role=progressbar]");
@@ -37,10 +37,11 @@ describe("StatusLine", () => {
   });
 });
 
-describe("EdgeStatus", () => {
+describe("TopEdgeStatus", () => {
   it("opens its details on press and closes on the next press", async () => {
     const view = await render(
-      <EdgeStatus
+      <TopEdgeStatus
+        busy
         tone="warning"
         label="Syncing"
         items={[
@@ -49,7 +50,7 @@ describe("EdgeStatus", () => {
         ]}
       />,
     );
-    const tab = view.querySelector<HTMLElement>("[aria-label=Syncing]");
+    const tab = view.querySelector<HTMLElement>("button[aria-label=Syncing]");
     expect(view.querySelector("[role=status]")).toBeNull();
     await act(async () => tab?.click());
     expect(tab?.getAttribute("aria-expanded")).toBe("true");

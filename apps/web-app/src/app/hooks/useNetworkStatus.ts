@@ -66,11 +66,13 @@ export const evoluPhase = (
     : "unreachable";
 };
 
+/** `relayCount` is null until Linky has loaded the identity's relay list. */
 export const nostrPhase = (
-  relayCount: number,
+  relayCount: number | null,
   relays: RelayDotState,
   backfilling: boolean,
 ): NostrPhase => {
+  if (relayCount === null) return "connecting";
   if (relayCount === 0) return "unconfigured";
   if (relays === "disconnected") return "unreachable";
   if (relays === "checking") return "connecting";
@@ -97,7 +99,7 @@ export const useNetworkStatus = (): NetworkReport => {
   const online = useOnline();
   const evoluStatuses = useEvoluRelayStatuses();
   const hydrated = useAccountHydrated();
-  const readRelays = useAtomValue(linkstrConfigAtom)?.readRelays ?? [];
+  const linkstrConfig = useAtomValue(linkstrConfigAtom);
   const relayHealth = useRelayHealth();
   const backfillingResult = useAtomValue(inboxBackfillingAtom);
   const backfilling =
@@ -109,10 +111,10 @@ export const useNetworkStatus = (): NetworkReport => {
     connected: evoluRelays.filter(isOpen).length,
     total: evoluRelays.length,
   };
-  const nostrUrls = [...readRelays];
+  const nostrUrls = [...(linkstrConfig?.readRelays ?? [])];
   const nostr: Side<NostrPhase> = {
     phase: nostrPhase(
-      nostrUrls.length,
+      linkstrConfig === null ? null : nostrUrls.length,
       overallRelayStatus(nostrUrls, relayHealth),
       backfilling,
     ),

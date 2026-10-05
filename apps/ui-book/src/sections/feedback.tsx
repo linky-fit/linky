@@ -60,9 +60,10 @@ export const feedback: Section = {
       </UI.Row>
     ),
     LoadingState: () => <UI.LoadingState label="Loading contacts" />,
-    EdgeStatus: () => (
-      <UI.Row>
-        <UI.EdgeStatus
+    TopEdgeStatus: () => (
+      <UI.Stack gap="$xxl">
+        <UI.TopEdgeStatus
+          busy
           tone="warning"
           label="Syncing…"
           items={[
@@ -72,14 +73,20 @@ export const feedback: Section = {
               tone: "warning",
               busy: true,
             },
-            {
-              label: "Syncing your data from Evolu",
-              tone: "warning",
-              busy: true,
-            },
           ]}
         />
-      </UI.Row>
+        <UI.TopEdgeStatus
+          tone="danger"
+          label="No connection"
+          items={[{ label: "No network connection", tone: "danger" }]}
+        />
+        <UI.TopEdgeStatus
+          quiet
+          tone="accent"
+          label="Synced"
+          items={[{ label: "Nostr up to date", tone: "accent" }]}
+        />
+      </UI.Stack>
     ),
     StatusLine: () => (
       <UI.Stack>

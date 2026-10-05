@@ -43,6 +43,12 @@ describe("nostrPhase", () => {
       phase: "unreachable",
     },
     { count: 2, relays: "checking", backfilling: true, phase: "connecting" },
+    {
+      count: null,
+      relays: "disconnected",
+      backfilling: true,
+      phase: "connecting",
+    },
     { count: 2, relays: "connected", backfilling: true, phase: "scanning" },
     { count: 2, relays: "connected", backfilling: false, phase: "synced" },
   ] as const)(

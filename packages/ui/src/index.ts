@@ -88,7 +88,6 @@ export type {
 
 // Feedback and overlays
 export {
-  EdgeStatus,
   EmptyState,
   LoadingState,
   Notice,
@@ -96,15 +95,16 @@ export {
   StatusLine,
   Toast,
   ToastStack,
+  TopEdgeStatus,
 } from "./feedback";
 export type {
-  EdgeStatusItem,
-  EdgeStatusProps,
   EmptyStateProps,
   NoticeProps,
   ProgressProps,
   StatusLineProps,
   ToastProps,
+  TopEdgeStatusItem,
+  TopEdgeStatusProps,
 } from "./feedback";
 export { Spinner } from "./spinner";
 export type { SpinnerProps } from "./spinner";

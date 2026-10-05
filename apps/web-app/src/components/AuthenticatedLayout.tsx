@@ -10,7 +10,7 @@ import { LightningInvoiceConfirmModal } from "./LightningInvoiceConfirmModal";
 import { CashuPaymentRequestConfirmModal } from "./CashuPaymentRequestConfirmModal";
 import { LnurlAuthModal } from "./LnurlAuthModal";
 import { LnurlWithdrawConfirmModal } from "./LnurlWithdrawConfirmModal";
-import { NetworkStatusEdge } from "./NetworkStatusEdge";
+import { NetworkStatusLine } from "./NetworkStatusLine";
 import { NfcWriteModal } from "./NfcWriteModal";
 import { NostrConnectLoginModal } from "./NostrConnectLoginModal";
 import { PaidOverlay } from "./PaidOverlay";
@@ -38,7 +38,7 @@ export function AuthenticatedLayout({
   return (
     <>
       {isDesktopSplitView ? null : <Topbar />}
-      <NetworkStatusEdge />
+      <NetworkStatusLine />
 
       {state.contactsGuide && state.contactsGuideActiveStep?.step ? (
         <ContactsGuideOverlay
