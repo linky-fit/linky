@@ -61,7 +61,7 @@ export const feedback: Section = {
     ),
     LoadingState: () => <UI.LoadingState label="Loading contacts" />,
     EdgeStatus: () => (
-      <UI.Row justifyContent="flex-end">
+      <UI.Row>
         <UI.EdgeStatus
           tone="warning"
           label="Syncing…"
@@ -78,7 +78,6 @@ export const feedback: Section = {
               busy: true,
             },
           ]}
-          action={{ label: "Relays", onPress: () => {} }}
         />
       </UI.Row>
     ),

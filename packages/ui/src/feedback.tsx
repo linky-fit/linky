@@ -9,7 +9,7 @@ import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
 import { toneColors, toneIcons } from "./styles";
 import type { Tone } from "./tokens";
-import { border, enterScale, shadow, space } from "./tokens";
+import { border, enterScale, opacity, shadow, space } from "./tokens";
 
 export interface NoticeProps {
   title: string;
@@ -283,19 +283,18 @@ export interface EdgeStatusItem {
 }
 
 export interface EdgeStatusProps {
-  /** Colors the tab; the panel's heading and the tab's name. */
+  /** Colors the tab, which `label` names. */
   tone: Tone;
   label: string;
   items: readonly EdgeStatusItem[];
-  action?: LabeledAction | undefined;
 }
 
 /**
- * A half-disc tab that reports a background state from the window's right
- * edge; hovering or pressing it opens a panel with the details above it. The
- * caller positions it.
+ * A small half-disc tab that reports a background state from the window's
+ * left edge; hovering or pressing it opens a panel with the details above it.
+ * The caller positions it.
  */
-export function EdgeStatus({ tone, label, items, action }: EdgeStatusProps) {
+export function EdgeStatus({ tone, label, items }: EdgeStatusProps) {
   const [open, setOpen] = useState<"hover" | "press" | null>(null);
   return (
     <>
@@ -305,7 +304,7 @@ export function EdgeStatus({ tone, label, items, action }: EdgeStatusProps) {
       {/* Positioned, so it paints above the fixed backdrop before it. */}
       <Stack
         position="relative"
-        alignItems="flex-end"
+        alignItems="flex-start"
         onMouseEnter={() => setOpen((current) => current ?? "hover")}
         onMouseLeave={() =>
           setOpen((current) => (current === "hover" ? null : current))
@@ -315,22 +314,19 @@ export function EdgeStatus({ tone, label, items, action }: EdgeStatusProps) {
           <Stack
             role="status"
             aria-live="polite"
-            gap="$sm"
-            width="$device"
-            marginRight="$md"
-            marginBottom="$sm"
-            padding="$lg"
-            borderRadius="$card"
+            gap="$xs"
+            maxWidth="$device"
+            marginLeft="$sm"
+            paddingVertical="$sm"
+            paddingHorizontal="$md"
+            borderRadius="$control"
             borderWidth={border.hairline}
             borderColor="$borderColor"
             backgroundColor="$surface"
             boxShadow={shadow.raised}
             transition="base"
-            enterStyle={{ opacity: 0, scale: enterScale.subtle, y: space.md }}
+            enterStyle={{ opacity: 0, scale: enterScale.subtle, y: space.sm }}
           >
-            <Text variant="label" bold>
-              {label}
-            </Text>
             {items.map((item) => (
               <Row key={item.label} gap="$sm" alignItems="center">
                 {item.busy ? (
@@ -343,33 +339,29 @@ export function EdgeStatus({ tone, label, items, action }: EdgeStatusProps) {
                     backgroundColor={toneColors[item.tone].solid}
                   />
                 )}
-                <Text variant="caption" color="$colorSubtle" flex={1}>
+                <Text variant="caption" color="$colorSubtle">
                   {item.label}
                 </Text>
               </Row>
             ))}
-            {action ? (
-              <Button size="sm" variant="secondary" onPress={action.onPress}>
-                {action.label}
-              </Button>
-            ) : null}
           </Stack>
         ) : null}
         <Pressable
           aria-label={label}
           aria-expanded={open !== null}
-          paddingLeft="$md"
+          paddingRight="$md"
           paddingVertical="$md"
           onPress={() =>
             setOpen((current) => (current === "press" ? null : "press"))
           }
         >
           <View
-            width="$dot"
-            height="$iconSm"
-            borderTopLeftRadius="$pill"
-            borderBottomLeftRadius="$pill"
+            width={space.xs}
+            height={space.sm}
+            borderTopRightRadius="$pill"
+            borderBottomRightRadius="$pill"
             backgroundColor={toneColors[tone].solid}
+            opacity={opacity.disabled}
           />
         </Pressable>
       </Stack>

@@ -10,7 +10,6 @@ import type {
   NostrPhase,
 } from "../app/hooks/useNetworkStatus";
 import type { I18nKey, Translate } from "../i18n";
-import { navigateTo } from "../hooks/useRouting";
 
 const summary = {
   synced: { tone: "accent", labelKey: "networkSynced" },
@@ -67,7 +66,7 @@ const itemsOf = (t: Translate, report: NetworkReport): EdgeStatusItem[] =>
       ]
     : [{ tone: "danger", label: t("networkNoInternet") }];
 
-/** The network state on the window's bottom-right edge, with what each relay side is doing on hover or press. */
+/** The network state on the window's bottom-left edge, with what each relay side is doing on hover or press. */
 export function NetworkStatusEdge(): React.ReactElement {
   const { t } = useAppShellCore();
   const report = useNetworkStatus();
@@ -75,20 +74,12 @@ export function NetworkStatusEdge(): React.ReactElement {
   return (
     <Stack
       position="absolute"
-      right={0}
+      left={0}
       bottom={0}
       zIndex="$overlay"
       data-safe-area="bottom"
     >
-      <EdgeStatus
-        tone={tone}
-        label={t(labelKey)}
-        items={itemsOf(t, report)}
-        action={{
-          label: t("relays"),
-          onPress: () => navigateTo({ route: "relays" }),
-        }}
-      />
+      <EdgeStatus tone={tone} label={t(labelKey)} items={itemsOf(t, report)} />
     </Stack>
   );
 }

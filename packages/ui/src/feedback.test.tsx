@@ -54,7 +54,7 @@ describe("EdgeStatus", () => {
     await act(async () => tab?.click());
     expect(tab?.getAttribute("aria-expanded")).toBe("true");
     expect(view.querySelector("[role=status]")?.textContent).toBe(
-      "SyncingScanning NostrEvolu synced",
+      "Scanning NostrEvolu synced",
     );
     await act(async () => tab?.click());
     expect(view.querySelector("[role=status]")).toBeNull();

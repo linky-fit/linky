@@ -125,8 +125,6 @@ test("the network tab turns synced once the relays delivered, and shows no conne
     await expect(connected.page.getByRole("status")).toContainText(
       "Evolu up to date (1/1 relays)",
     );
-    await connected.page.getByRole("button", { name: "Relays" }).click();
-    await expect(connected.page).toHaveURL(/#relays$/);
   } finally {
     await connected.context.close();
   }
