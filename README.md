@@ -1,6 +1,6 @@
 # Linky
 
-Linky is a mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu payments. Data lives in Evolu (SQLite) on the device and syncs between devices through an Evolu relay. The app runs at `app.linky.fit` and as an Android app. `apps/site/` is the public website `linky.fit`, with the `/cashu/` token redemption page.
+Linky is a mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu payments. Data lives in Evolu (SQLite) on the device and syncs between devices through an Evolu relay. The app runs at `app.linky.fit` and as an Android app; `nightly.app.linky.fit` runs `main` ahead of the last release (see [`docs/releases.md`](./docs/releases.md)). `apps/site/` is the public website `linky.fit`, with the `/cashu/` token redemption page.
 
 ## Development
 
