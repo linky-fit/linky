@@ -103,7 +103,7 @@ test("adding a relay with capacity syncs quota-rejected token history and spent 
           /#wallet\/token\/(?!emit$)[A-Za-z0-9_-]+$/,
         );
       }
-      await source.page.goto("/#evolu-servers");
+      await source.page.goto("/#relays");
       await expect(source.page.getByRole("alert")).toContainText(
         "Sync storage limit reached",
       );

@@ -69,11 +69,10 @@ export type Route =
   | { kind: "cashuTokenNew" }
   | { kind: "cashuTokenEmit" }
   | { kind: "cashuToken"; id: CashuOperationId }
-  | { kind: "nostrRelays" }
+  | { kind: "relays" }
   | { kind: "nostrRelay"; id: string }
   | { kind: "nostrRelayNew" }
   | { kind: "chatStorage" }
-  | { kind: "evoluServers" }
   | { kind: "evoluServer"; id: string }
   | { kind: "evoluServerNew" }
   | { kind: "evoluData" }
@@ -196,7 +195,12 @@ export const parseRouteFromHash = (): Route => {
     if (id) return { kind: "cashuToken", id };
   }
 
-  if (hash === "#nostr-relays") return { kind: "nostrRelays" };
+  if (
+    hash === "#relays" ||
+    hash === "#nostr-relays" ||
+    hash === "#evolu-servers"
+  )
+    return { kind: "relays" };
   if (hash === "#nostr-relay/new") return { kind: "nostrRelayNew" };
 
   const relayPrefix = "#nostr-relay/";
@@ -204,7 +208,6 @@ export const parseRouteFromHash = (): Route => {
   if (relayId) return { kind: "nostrRelay", id: relayId };
 
   if (hash === "#advanced/chat-storage") return { kind: "chatStorage" };
-  if (hash === "#evolu-servers") return { kind: "evoluServers" };
   if (hash === "#evolu-data") return { kind: "evoluData" };
   if (hash === "#evolu-current-data") return { kind: "evoluCurrentData" };
   if (hash === "#evolu-history-data") return { kind: "evoluHistoryData" };

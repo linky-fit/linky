@@ -1,4 +1,4 @@
-import { Avatar, NavigationRail, Pressable } from "@linky-fit/ui";
+import { Avatar, NavigationRail, Pressable, Stack } from "@linky-fit/ui";
 import React from "react";
 import {
   useAppShellActions,
@@ -10,6 +10,7 @@ import {
 } from "../app/routes/desktopRouteSection";
 import { navigateTo } from "../hooks/useRouting";
 import { formatShortNpub } from "../utils/formatting";
+import { NetworkStatusDot } from "./NetworkStatusDot";
 
 export function DesktopNavigation(): React.ReactElement {
   const actions = useAppShellActions();
@@ -20,19 +21,22 @@ export function DesktopNavigation(): React.ReactElement {
     <NavigationRail
       accessibilityLabel={t("menu")}
       header={
-        <Pressable
-          borderRadius="$pill"
-          aria-label={t("profile")}
-          onPress={actions.openProfileQr}
-        >
-          <Avatar
-            name={
-              state.effectiveProfileName ??
-              (state.currentNpub ? formatShortNpub(state.currentNpub) : "?")
-            }
-            uri={state.effectiveProfilePicture ?? undefined}
-          />
-        </Pressable>
+        <Stack alignItems="center" gap="$xs">
+          <Pressable
+            borderRadius="$pill"
+            aria-label={t("profile")}
+            onPress={actions.openProfileQr}
+          >
+            <Avatar
+              name={
+                state.effectiveProfileName ??
+                (state.currentNpub ? formatShortNpub(state.currentNpub) : "?")
+              }
+              uri={state.effectiveProfilePicture ?? undefined}
+            />
+          </Pressable>
+          <NetworkStatusDot />
+        </Stack>
       }
       items={[
         { value: "contacts", label: t("contactsTitle"), icon: "Users" },

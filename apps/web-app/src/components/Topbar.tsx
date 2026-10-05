@@ -2,6 +2,7 @@ import {
   Avatar,
   IconButton,
   Pressable,
+  Row,
   Stack,
   Text,
   TopBar,
@@ -16,6 +17,7 @@ import {
 import type { TopbarButton } from "../app/types/appTypes";
 import { navigateTo } from "../hooks/useRouting";
 import { normalizeNpubIdentifier } from "../utils/nostrNpub";
+import { NetworkStatusDot } from "./NetworkStatusDot";
 
 interface TopbarProps {
   /** Renders the static header of the desktop detail pane. */
@@ -102,14 +104,19 @@ export function Topbar({
     ...(topbarTitle ? { title: topbarTitle } : {}),
     content: chatContent,
     leading: topbar ? <TopbarAction button={topbar} /> : null,
-    trailing: topbarRight ? (
-      <TopbarAction
-        button={topbarRight}
-        {...(topbarRight.icon === "ScanLine"
-          ? { guide: "scan-contact-button" }
-          : {})}
-      />
-    ) : null,
+    trailing: (
+      <Row alignItems="center">
+        {desktopDetail ? null : <NetworkStatusDot />}
+        {topbarRight ? (
+          <TopbarAction
+            button={topbarRight}
+            {...(topbarRight.icon === "ScanLine"
+              ? { guide: "scan-contact-button" }
+              : {})}
+          />
+        ) : null}
+      </Row>
+    ),
   };
 
   return desktopDetail ? (

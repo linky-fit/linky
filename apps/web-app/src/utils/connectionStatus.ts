@@ -15,6 +15,17 @@ export const connectionStatus = {
   disconnected: { tone: "danger", labelKey: "relayStateUnreachable" },
 } as const satisfies Record<ConnectionState, StatusStyle>;
 
+const connectionSeverity: Record<ConnectionState, number> = {
+  connected: 0,
+  checking: 1,
+  disconnected: 2,
+};
+
+export const worseConnectionState = (
+  a: ConnectionState,
+  b: ConnectionState,
+): ConnectionState => (connectionSeverity[a] >= connectionSeverity[b] ? a : b);
+
 export type EvoluSyncState =
   | "synced"
   | "syncing"

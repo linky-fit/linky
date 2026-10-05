@@ -79,7 +79,7 @@ const storedLists = (relays = [custom], dmRelays = relays) => [
 const mount = async (
   transport: NostrTransportService,
   networkEnabled = true,
-  route: Route = { kind: "nostrRelays" },
+  route: Route = { kind: "relays" },
 ) => {
   const registry = Registry.make();
   registries.push(registry);

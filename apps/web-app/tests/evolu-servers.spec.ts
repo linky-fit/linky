@@ -16,7 +16,7 @@ test("recommended relays stay configured while the user's own relays come and go
   await page.addInitScript(() =>
     localStorage.setItem("linky.inspector_enabled", "true"),
   );
-  await page.goto("/#evolu-servers");
+  await page.goto("/#relays");
   const rows = page.getByTestId("evolu-server-list").getByRole("button");
   const recommended = rows.filter({ hasText: EVOLU_RELAY_URL });
   const custom = rows.filter({ hasText: "wss://sync.example.com" });
@@ -36,7 +36,7 @@ test("recommended relays stay configured while the user's own relays come and go
     page.getByRole("button", { name: "Remove server", exact: true }),
   ).toHaveCount(0);
   await page.getByRole("switch", { name: "Offline", exact: true }).click();
-  await page.goto("/#evolu-servers");
+  await page.goto("/#relays");
   await expect(noBackupWarning).toBeVisible();
   await page.reload();
   await expect(noBackupWarning).toBeVisible();
@@ -58,7 +58,7 @@ test("recommended relays stay configured while the user's own relays come and go
       .getByText("Updated Evolu servers; reload required", { exact: true })
       .first(),
   ).toBeVisible();
-  await page.goto("/#evolu-servers");
+  await page.goto("/#relays");
   await page.reload();
   await expect(rows).toHaveCount(2);
 
@@ -68,7 +68,7 @@ test("recommended relays stay configured while the user's own relays come and go
       .getByRole("button", { name: "Remove server", exact: true })
       .click();
   }
-  await expect(page).toHaveURL(/#evolu-servers$/);
+  await expect(page).toHaveURL(/#relays$/);
   await page.reload();
   await expect(rows).toHaveCount(1);
   await expect(recommended).toBeVisible();

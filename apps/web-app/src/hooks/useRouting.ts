@@ -95,7 +95,6 @@ type NavigationAction =
   | { route: "evoluServer"; id: string }
   | { route: "evoluServerNew" }
   | { route: "chatStorage" }
-  | { route: "evoluServers" }
   | { route: "lnAddressPay"; lnAddress: string }
   | { route: "manualPay" }
   | { route: "bankPayment"; spdPayload: string; editing?: boolean }
@@ -106,7 +105,7 @@ type NavigationAction =
   | { route: "mintNew" }
   | { route: "nostrRelay"; id: string }
   | { route: "nostrRelayNew" }
-  | { route: "nostrRelays" }
+  | { route: "relays" }
   | { route: "profile" }
   | { route: "profileEdit" }
   | { route: "settings" }
@@ -292,8 +291,8 @@ export const navigateTo = (action: NavigationAction): void => {
     case "profileEdit":
       window.location.assign("#profile/edit");
       break;
-    case "nostrRelays":
-      window.location.assign("#nostr-relays");
+    case "relays":
+      window.location.assign("#relays");
       break;
     case "nostrRelay":
       window.location.assign(`#nostr-relay/${encodeURIComponent(action.id)}`);
@@ -304,9 +303,6 @@ export const navigateTo = (action: NavigationAction): void => {
     case "chatStorage":
       window.location.assign("#advanced/chat-storage");
       return;
-    case "evoluServers":
-      window.location.assign("#evolu-servers");
-      break;
     case "evoluData":
       window.location.assign("#evolu-data");
       break;

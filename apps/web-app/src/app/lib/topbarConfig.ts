@@ -61,8 +61,7 @@ export const resolveBackAction = (
     case "advancedAutoPayLimit":
     case "advancedInspector":
     case "mints":
-    case "nostrRelays":
-    case "evoluServers":
+    case "relays":
       return () => navigateTo({ route: "settings" });
 
     case "bankPaymentNew":
@@ -135,14 +134,12 @@ export const resolveBackAction = (
 
     case "nostrRelay":
     case "nostrRelayNew":
-      return () => navigateTo({ route: "nostrRelays" });
-
     case "evoluServer":
     case "evoluServerNew":
     case "chatStorage":
     case "evoluCurrentData":
     case "evoluHistoryData":
-      return () => navigateTo({ route: "evoluServers" });
+      return () => navigateTo({ route: "relays" });
 
     case "contactNew":
     case "contact":
@@ -209,10 +206,7 @@ export const buildTopbar = ({
 // Routes whose right button is decided above are narrowed away before the
 // lookup, so adding a route kind forces a decision here.
 const SHOWS_MENU_BUTTON: Record<
-  Exclude<
-    Route["kind"],
-    "chat" | "contact" | "contactNew" | "evoluServers" | "nostrRelays" | "topup"
-  >,
+  Exclude<Route["kind"], "chat" | "contact" | "contactNew" | "topup">,
   boolean
 > = {
   advanced: false,
@@ -248,6 +242,7 @@ const SHOWS_MENU_BUTTON: Record<
   mints: false,
   nostrRelay: true,
   nostrRelayNew: true,
+  relays: false,
   profile: false,
   profileEdit: false,
   settings: false,
@@ -298,22 +293,6 @@ export const buildTopbarRight = ({
           : "transactionsShowHidden",
       ),
       onClick: toggleHiddenTransactions,
-    };
-  }
-
-  if (route.kind === "nostrRelays") {
-    return {
-      icon: "Plus",
-      label: t("addRelay"),
-      onClick: () => navigateTo({ route: "nostrRelayNew" }),
-    };
-  }
-
-  if (route.kind === "evoluServers") {
-    return {
-      icon: "Plus",
-      label: t("evoluAddServerLabel"),
-      onClick: () => navigateTo({ route: "evoluServerNew" }),
     };
   }
 
@@ -413,7 +392,6 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   evoluHistoryData: "evoluHistory",
   evoluServer: "evoluServer",
   evoluServerNew: "evoluAddServerLabel",
-  evoluServers: "evoluServers",
   keryxAnnouncement: "keryxAnnouncement",
   keryxCompanies: "keryxNewslettersTitle",
   keryxCompany: "keryxCompany",
@@ -425,7 +403,7 @@ const TOPBAR_TITLE_KEY: Record<Route["kind"], I18nKey> = {
   mints: "mints",
   nostrRelay: "nostrRelay",
   nostrRelayNew: "addRelay",
-  nostrRelays: "nostrRelays",
+  relays: "relays",
   profile: "profile",
   profileEdit: "profile",
   settings: "settings",

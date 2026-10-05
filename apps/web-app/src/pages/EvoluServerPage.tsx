@@ -48,7 +48,7 @@ export function EvoluServerPage(): React.ReactElement {
     saveEvoluServerUrls(
       evoluServerUrls.filter((u) => u.toLowerCase() !== url.toLowerCase()),
     );
-    navigateTo({ route: "evoluServers" });
+    navigateTo({ route: "relays" });
   };
   return (
     <Stack gap="$lg">

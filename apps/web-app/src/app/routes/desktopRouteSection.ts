@@ -45,11 +45,10 @@ export const getDesktopRouteSection = (route: Route): DesktopRouteSection => {
     case "mints":
     case "mintNew":
     case "mint":
-    case "nostrRelays":
+    case "relays":
     case "nostrRelay":
     case "nostrRelayNew":
     case "chatStorage":
-    case "evoluServers":
     case "evoluServer":
     case "evoluServerNew":
     case "evoluData":
@@ -103,9 +102,8 @@ export const isDesktopSectionEntryRoute = (route: Route): boolean => {
     case "advancedAutoPayLimit":
     case "advancedInspector":
     case "mints":
-    case "nostrRelays":
+    case "relays":
     case "chatStorage":
-    case "evoluServers":
     case "evoluData":
     case "cashuTokens":
       return true;

@@ -116,7 +116,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
   const devices = [source, follower];
   const closers = [source.context, follower.context];
   try {
-    await follower.page.goto("/#evolu-servers");
+    await follower.page.goto("/#relays");
     const initialRows = await readCurrentRows(follower.page);
     const contactId = await addContactByNpub(source.page, peer.npub);
     await source.page
@@ -133,7 +133,7 @@ test("shard rotations keep old rows, copy edited rows forward, sync new writes, 
         follower.page.getByTestId("chat-bubble").filter({ hasText: text }),
       ).toBeVisible();
     await test.step("the follower's Evolu row counts include the synced rows without a reload", async () => {
-      await follower.page.goto("/#evolu-servers");
+      await follower.page.goto("/#relays");
       await expect
         .poll(() => readCurrentRows(follower.page))
         .toBeGreaterThan(initialRows);

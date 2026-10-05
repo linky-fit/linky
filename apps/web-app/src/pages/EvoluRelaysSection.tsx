@@ -18,7 +18,7 @@ import { navigateTo } from "../hooks/useRouting";
 import { formatEvoluRowCount } from "../utils/evoluRowCount";
 import { EvoluReloadNotice } from "./EvoluReloadNotice";
 import { EvoluSyncErrorNotice } from "./EvoluSyncErrorNotice";
-export function EvoluServersPage(): React.ReactElement {
+export function EvoluRelaysSection(): React.ReactElement {
   const {
     clearDatabaseArmed,
     evoluHasError,
@@ -43,48 +43,54 @@ export function EvoluServersPage(): React.ReactElement {
   );
   return (
     <Stack gap="$lg">
-      <EvoluSyncErrorNotice />
-      <EvoluReloadNotice />
-      {evoluServerUrls.every(isEvoluServerOffline) && (
-        <Notice tone="accent" title={t("evoluNoBackupWarning")} />
-      )}
-      {/* Server list */}
-      {evoluServerUrls.length === 0 ? (
-        <EmptyState title={t("evoluServersEmpty")} />
-      ) : (
-        <Stack testID="evolu-server-list" gap="$xs">
-          {evoluServerUrls.map((url) => {
-            const status =
-              evoluSyncStatus[
-                deriveEvoluServerState({
-                  evoluHasError,
-                  isOffline: isEvoluServerOffline(url),
-                  state: evoluServerStatusByUrl[url],
-                  syncOwnerId,
-                })
-              ];
-            return (
-              <ListRow
-                key={url}
-                title={url}
-                description={
-                  isEvoluServerRecommended(url) ? (
-                    <Pill size="sm" label={t("relayRecommended")} />
-                  ) : undefined
-                }
-                value={t(status.labelKey)}
-                trailing={
-                  <StatusDot
-                    tone={status.tone}
-                    accessibilityLabel={t(status.labelKey)}
-                  />
-                }
-                onPress={() => navigateTo({ route: "evoluServer", id: url })}
-              />
-            );
-          })}
-        </Stack>
-      )}
+      <Section title="Evolu">
+        <EvoluSyncErrorNotice />
+        <EvoluReloadNotice />
+        {evoluServerUrls.every(isEvoluServerOffline) && (
+          <Notice tone="accent" title={t("evoluNoBackupWarning")} />
+        )}
+        {evoluServerUrls.length === 0 ? (
+          <EmptyState title={t("evoluServersEmpty")} />
+        ) : (
+          <Stack testID="evolu-server-list" gap="$xs">
+            {evoluServerUrls.map((url) => {
+              const status =
+                evoluSyncStatus[
+                  deriveEvoluServerState({
+                    evoluHasError,
+                    isOffline: isEvoluServerOffline(url),
+                    state: evoluServerStatusByUrl[url],
+                    syncOwnerId,
+                  })
+                ];
+              return (
+                <ListRow
+                  key={url}
+                  title={url}
+                  description={
+                    isEvoluServerRecommended(url) ? (
+                      <Pill size="sm" label={t("relayRecommended")} />
+                    ) : undefined
+                  }
+                  value={t(status.labelKey)}
+                  trailing={
+                    <StatusDot
+                      tone={status.tone}
+                      accessibilityLabel={t(status.labelKey)}
+                    />
+                  }
+                  onPress={() => navigateTo({ route: "evoluServer", id: url })}
+                />
+              );
+            })}
+          </Stack>
+        )}
+        <ListRow
+          icon="Plus"
+          title={t("evoluAddServerLabel")}
+          onPress={() => navigateTo({ route: "evoluServerNew" })}
+        />
+      </Section>
 
       <Button
         onPress={requestClearDatabase}

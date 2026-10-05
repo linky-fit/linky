@@ -321,7 +321,7 @@ export const useAppShellComposition = ({
 
   const evoluDbInfo = useEvoluDatabaseInfoState({
     enabled:
-      route.kind === "evoluServers" ||
+      route.kind === "relays" ||
       route.kind === "evoluServer" ||
       route.kind === "evoluServerNew" ||
       route.kind === "evoluData" ||
