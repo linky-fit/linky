@@ -74,7 +74,10 @@ interface ProfilePageProps {
   setProfileEditLnAddress: (value: string) => void;
   setProfileEditName: (value: string) => void;
   setProfileEditStatus: (value: string) => void;
-  shareText: (text: string) => Promise<void>;
+  shareText: (
+    text: string,
+    whenUnavailable?: () => Promise<void>,
+  ) => Promise<void>;
   writeCurrentNpubToNfc: () => Promise<void>;
 }
 
@@ -309,7 +312,7 @@ export function ProfilePage({
           variant="secondary"
           size="sm"
           icon="Share2"
-          onPress={() => void shareText(shareUrl)}
+          onPress={() => void shareText(shareUrl, () => copyText(shareUrl))}
         >
           {t("shareProfile")}
         </Button>

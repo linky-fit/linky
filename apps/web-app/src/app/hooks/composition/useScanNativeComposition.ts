@@ -315,7 +315,7 @@ export const useScanNativeComposition = ({
   }, [openShareOptionsUrl, shareOptionsText]);
 
   const shareText = React.useCallback(
-    async (value: string) => {
+    async (value: string, whenUnavailable?: () => Promise<void>) => {
       const text = value.trim();
       if (!text) {
         pushToast(t("errorPrefix"));
@@ -364,7 +364,8 @@ export const useScanNativeComposition = ({
         }
       }
 
-      pushToast(t("shareUnavailable"));
+      if (whenUnavailable) await whenUnavailable();
+      else pushToast(t("shareUnavailable"));
     },
     [pushToast, t],
   );
