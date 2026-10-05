@@ -101,6 +101,7 @@ Like the site, the push server ships ahead of the app and must keep working with
 - The `production` branch has a ruleset that restricts updates and deletions, with the `Linky releases` GitHub App as the only bypass. `release-app.yml` pushes with that app's token, whose credentials (variable `RELEASE_APP_CLIENT_ID`, secret `RELEASE_APP_PRIVATE_KEY`) live in the `Production` environment, which admits only `main` and `v*` tags (a release started by `CI` runs in `main`'s context, hotfixes included); `GITHUB_TOKEN` can't bypass rulesets, and the organization blocks deploy keys.
 - Tags `v*` and `packages-v*` have a ruleset that restricts updates and deletions. Creation stays open, because the release creates `v<version>` with `GITHUB_TOKEN`.
 - The `zapstore` environment admits `main` and `v*` tags, so a release run started from a tag can publish.
-- npm: the trusted publisher of both packages names `release-npm.yml`.
+- npm: the trusted publisher of both packages names `release-npm.yml`, with no environment or the `npm` environment.
+- The README badges read GitHub deployments: `Production` (app release), `Production – linky-website` (Vercel), `push` (`release-push.yml`) and `npm` (`release-npm.yml`). A job using an environment records a deployment, and GitHub creates the `push` and `npm` environments on their first run.
 
 Pull requests keep their preview deployments.

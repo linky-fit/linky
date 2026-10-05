@@ -34,6 +34,8 @@ jobs:
   publish:
     needs: ci-passed
     runs-on: ubuntu-latest
+    # Records each publish as a GitHub deployment, which the README badge shows.
+    environment: npm
     strategy:
       fail-fast: false
       matrix:
