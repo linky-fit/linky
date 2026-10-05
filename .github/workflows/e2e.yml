@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  e2e:
+  app-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -60,7 +60,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       # Previously ran inside the web-app image build; here it overlaps the
-      # background image prep while still failing the `e2e` check that gates
+      # background image prep while still failing the `app-e2e` check that gates
       # releases.
       - name: Typecheck web app
         run: bun run --filter @linky-fit/web-app typecheck
@@ -104,7 +104,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-test-results
+          name: app-e2e-test-results
           path: apps/web-app/test-results/
           retention-days: 7
 

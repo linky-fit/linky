@@ -49,7 +49,7 @@ A new origin has its own local storage, so nightly starts empty: restore from th
 - Web-app project: production branch `production` with domain `app.linky.fit`, and no Deployment Checks, because the `Release` workflow already gates it. Custom Environment `nightly` tracks `main` with domain `nightly.app.linky.fit`, the same environment variables as Production and no Deployment Protection on its domain.
 - Site project: Deployment Checks `site` and `site-e2e`.
 - Error tracker project: Deployment Check `error-tracker`.
-- The `main` ruleset requires `e2e`, `site-e2e`, `unit-tests`, `linkshu-integration`, `check`, `site`, `error-tracker` and `push`.
+- The `main` ruleset requires `app-e2e`, `site-e2e`, `unit-tests`, `linkshu-integration`, `check`, `site`, `error-tracker` and `push`.
 - The `production` branch has a ruleset that lets only GitHub Actions push to it.
 
 Pull requests keep their preview deployments.
