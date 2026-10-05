@@ -120,6 +120,7 @@ export const createLocalPaymentTelemetryEvent = (
     }),
     method: asTelemetryMethod(event.method),
     phase: asTelemetryPhase(event.phase),
+    paymentType: event.paymentType ?? null,
     mint: normalizePaymentTelemetryMint(event.mint),
     amountBucket: bucketPositiveNumber(event.amount, AMOUNT_BUCKETS),
     feeBucket: bucketPositiveNumber(event.fee, FEE_BUCKETS),

@@ -340,6 +340,7 @@ function IssueDetails({
     ["App host", known(report.appHost)],
     ["Method", report.method],
     ["Phase", report.phase],
+    ["Payment type", report.paymentType ? label(report.paymentType) : "None"],
     ["Direction", report.direction === "in" ? "Incoming" : "Outgoing"],
     ["Mint", known(report.mint)],
     ["Amount bucket", known(report.amountBucket)],

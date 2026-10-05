@@ -410,7 +410,11 @@ describe("useRecurringPaymentsScheduler", () => {
       memo: "Rent",
     });
     expect(view.params.logPaymentEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ method: "cashu_chat", note: "Rent" }),
+      expect.objectContaining({
+        method: "cashu_chat",
+        paymentType: "recurring",
+        note: "Rent",
+      }),
     );
     await view.unmount();
   });
@@ -428,7 +432,11 @@ describe("useRecurringPaymentsScheduler", () => {
       "Rent",
     );
     expect(view.params.logPaymentEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ method: "lightning_address", note: "Rent" }),
+      expect.objectContaining({
+        method: "lightning_address",
+        paymentType: "recurring",
+        note: "Rent",
+      }),
     );
     await view.unmount();
   });

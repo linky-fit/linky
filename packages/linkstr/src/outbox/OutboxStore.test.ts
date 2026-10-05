@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Predicate, Schema } from "effect";
 import { generateSecretKey, getPublicKey } from "nostr-tools";
 import {
   CashuTokenText,
@@ -141,6 +141,45 @@ describe("OutboxStore.fromStringStorage", () => {
     expect(job?.state._tag).toBe("awaiting-ack");
     if (job?.state._tag !== "awaiting-ack") return;
     expect(job.state.result).toBeInstanceOf(OutboxJobFailed);
+  });
+
+  it("loads a telemetry job persisted before the draft had a payment type", () => {
+    const storage = stubStorage();
+    run(
+      buildStore(OutboxStore.fromStringStorage(storage, storageKey)).insert(
+        new StoredOutboxJob({
+          ...makeJob("job-1"),
+          operation: {
+            _tag: "paymentTelemetry",
+            draft: telemetryDraft,
+            recipient: pubkey,
+          },
+        }),
+      ),
+    );
+    const stored = Schema.decodeUnknownSync(Schema.Array(Schema.Unknown))(
+      JSON.parse(storage.map.get(storageKey) ?? "[]"),
+    );
+    for (const job of stored) {
+      if (
+        Predicate.isRecord(job) &&
+        Predicate.isRecord(job.operation) &&
+        Predicate.isRecord(job.operation.draft)
+      ) {
+        delete job.operation.draft.paymentType;
+      }
+    }
+    storage.map.set(storageKey, JSON.stringify(stored));
+
+    const jobs = run(
+      buildStore(OutboxStore.fromStringStorage(storage, storageKey)).loadAll,
+    );
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.operation).toEqual({
+      _tag: "paymentTelemetry",
+      draft: telemetryDraft,
+      recipient: pubkey,
+    });
   });
 
   it("treats an unreadable stored value as empty", () => {

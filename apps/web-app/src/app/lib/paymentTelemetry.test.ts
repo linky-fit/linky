@@ -86,6 +86,26 @@ describe("createLocalPaymentTelemetryEvent", () => {
     });
   });
 
+  it("keeps the payment type and has none by default", () => {
+    const event = {
+      direction: "out",
+      status: "error",
+      method: "cashu_chat",
+      phase: "publish",
+      error: "relay closed",
+    } as const;
+
+    expect(
+      createLocalPaymentTelemetryEvent(event, 1_700_000_000),
+    ).toMatchObject({ paymentType: null });
+    expect(
+      createLocalPaymentTelemetryEvent(
+        { ...event, paymentType: "proxy" },
+        1_700_000_000,
+      ),
+    ).toMatchObject({ paymentType: "proxy" });
+  });
+
   it("marks expected payment denials as declined", () => {
     expect(
       createLocalPaymentTelemetryEvent(

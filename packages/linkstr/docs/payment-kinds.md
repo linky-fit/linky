@@ -68,6 +68,7 @@ const report = new PaymentTelemetryDraft({
   status: "ok",
   method: "lightning_invoice",
   phase: "complete",
+  paymentType: null,
   mint: "https://mint.example",
   amountBucket: "lte_1000",
   feeBucket: "lte_5",
@@ -86,9 +87,9 @@ const publishOnce = Effect.flatMap(PaymentTelemetry, (telemetry) =>
 
 For durable delivery use `Outbox.enqueueTelemetry(draft, recipient, ref)` (`enqueuePaymentTelemetryAtom` in React): it retries with backoff on the outbox's background lane, so a failing report never delays chat sends, and returns an `OutboxJobId` rather than an `EnqueueReceipt`, because each attempt mints a new author and so a new rumor id ([outbox.md](./outbox.md)).
 
-`createdAtSec` is when the payment event happened, not when it was sent. `classifyPaymentErrorCode(message)` maps a raw error string to a stable `errorCode`; `detectTelemetryEnvironment(facts)` is pure and turns browser facts into `{ devicePlatform, appRuntime }`; `PAYMENT_ANALYTICS_RECIPIENT_NPUB` is Linky's collector.
+`createdAtSec` is when the payment event happened, not when it was sent. `paymentType` says what kind of payment went out: `contact` for a payment to a contact on either rail, `lightning` for an invoice or Lightning address paid outside a contact, `proxy` for the sats of a proxy payment, `recurring` for a run of a recurring payment, `request` for a paid payment request; receives, restores and top-ups carry `null`. It may be left out of the draft. `classifyPaymentErrorCode(message)` maps a raw error string to a stable `errorCode`; `detectTelemetryEnvironment(facts)` is pure and turns browser facts into `{ devicePlatform, appRuntime }`; `PAYMENT_ANALYTICS_RECIPIENT_NPUB` is Linky's collector.
 
-Linkstr guarantees the transport side of anonymity (ephemeral author, no self copy, no push marker, addressed to the collector only). The draft is the only channel left: keep `id` random, report buckets rather than amounts, keep identifiers and invoice or token text out of `errorDetail`, and do not add fields; the wire is `v: 1`.
+Linkstr guarantees the transport side of anonymity (ephemeral author, no self copy, no push marker, addressed to the collector only). The draft is the only channel left: keep `id` random, report buckets rather than amounts, keep identifiers and invoice or token text out of `errorDetail`, and add no field that narrows down who paid; the wire stays `v: 1`, so a field added later (such as `paymentType`) is nullable and readers tolerate its absence.
 
 ### Wire format
 
@@ -103,6 +104,7 @@ Kind 24134. Tags, in order: `p` collector, `client` (the draft `id`), `["linky",
   "status": "…",
   "method": "…",
   "phase": "…",
+  "paymentType": null,
   "mint": null,
   "amountBucket": "…",
   "feeBucket": "…",

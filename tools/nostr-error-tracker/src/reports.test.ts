@@ -66,6 +66,7 @@ describe("parseReport", () => {
       mint: payload.mint,
       amountBucket: payload.amountBucket,
       feeBucket: null,
+      paymentType: null,
       errorCode: payload.errorCode,
       errorDetail: payload.errorDetail,
       appVersion: payload.appVersion,
@@ -74,6 +75,15 @@ describe("parseReport", () => {
       appRuntime: payload.appRuntime,
       rawContent: content,
     });
+  });
+
+  it("keeps the payment type", () => {
+    expect(
+      parseReport(
+        JSON.stringify({ ...payload, paymentType: "proxy" }),
+        metadata,
+      ),
+    ).toMatchObject({ paymentType: "proxy" });
   });
 
   it.each(["ok", "declined"])("excludes %s outcomes", (status) => {

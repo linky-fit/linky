@@ -30,6 +30,21 @@ export const PaymentTelemetryPhase = Schema.Literal(
 );
 export type PaymentTelemetryPhase = typeof PaymentTelemetryPhase.Type;
 
+/**
+ * What kind of payment went out: to a contact, a Lightning invoice or
+ * address outside a contact, the sats of a proxy payment, a run of a
+ * recurring payment, or a paid payment request. Receives have none.
+ */
+export const PaymentTelemetryPaymentType = Schema.Literal(
+  "contact",
+  "lightning",
+  "proxy",
+  "recurring",
+  "request",
+);
+export type PaymentTelemetryPaymentType =
+  typeof PaymentTelemetryPaymentType.Type;
+
 export const PaymentTelemetryDevicePlatform = Schema.Literal(
   "android",
   "iphone",
@@ -58,6 +73,10 @@ export class PaymentTelemetryDraft extends Schema.Class<PaymentTelemetryDraft>(
   status: PaymentTelemetryStatus,
   method: PaymentTelemetryMethod,
   phase: PaymentTelemetryPhase,
+  // Optional on the wire so outbox jobs persisted before the field decode.
+  paymentType: Schema.optionalWith(Schema.NullOr(PaymentTelemetryPaymentType), {
+    default: () => null,
+  }),
   mint: Schema.NullOr(Schema.String),
   amountBucket: Schema.NullOr(Schema.String),
   feeBucket: Schema.NullOr(Schema.String),

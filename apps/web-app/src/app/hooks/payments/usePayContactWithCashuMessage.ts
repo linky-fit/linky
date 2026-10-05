@@ -36,6 +36,7 @@ import type {
   LoggedPaymentEventParams,
   PaymentLogData,
   UpdateLocalNostrMessage,
+  PaymentTelemetryPaymentType,
 } from "../../types/appTypes";
 import type {
   CashuTransferLifecycle,
@@ -152,6 +153,14 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
       } = args;
       const notify = !fromQueue;
       const note = (memo ?? "").trim() || null;
+      // Settling a bank offer is the sats leg of a proxy payment; a request
+      // id means the contact asked for this payment.
+      const paymentType: PaymentTelemetryPaymentType =
+        paymentNoticeContext === "bank_payment_offer"
+          ? "proxy"
+          : paymentRequestId
+            ? "request"
+            : "contact";
       if (isPaymentAuthorized && !isPaymentAuthorized()) {
         setStatus(t("payApprovalChanged"));
         return {
@@ -315,6 +324,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
             fee: null,
             method: "cashu_chat",
             mint: mintUrl,
+            paymentType,
             phase,
             status: "error",
             unit: "sat",
@@ -452,6 +462,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
             method: "cashu_chat",
             mint: receipt.mint,
             note,
+            paymentType,
             phase: publishing.hasPendingMessages ? "publish" : "complete",
             status: "ok",
             transactionId: transactionIdForOperation(receipt.operationId),

@@ -154,6 +154,7 @@ describe("payLightningInvoiceWithCashu", () => {
         fee: 1,
         method: "lightning_invoice",
         mint: MINT_URL,
+        paymentType: "lightning",
         phase: "complete",
         status: "ok",
       }),
@@ -254,6 +255,7 @@ describe("payLightningAddressWithCashu", () => {
           meltQuoteId: "quote-1",
         },
         method: "lightning_address",
+        paymentType: "lightning",
         phase: "melt",
         status: "ok",
       }),
@@ -290,6 +292,35 @@ describe("payLightningAddressWithCashu", () => {
       expect.objectContaining({
         method: "lightning_address",
         note: "thanks!",
+        status: "ok",
+      }),
+    );
+    await act(async () => harness.root.unmount());
+  });
+
+  it("types a contact's Lightning address as a payment to the contact", async () => {
+    fetchLnurlInvoiceForTargetMock.mockResolvedValue({
+      lightningAddress: "alice@example.com",
+      pr: "lnbc-mock-invoice",
+      successAction: null,
+    });
+    const melt = vi.fn<MeltCashuInvoice>(async () =>
+      Either.right(meltReceipt(40)),
+    );
+    const harness = await setup({ meltCashuInvoice: melt });
+
+    const paid = await harness.payments.payLightningAddressWithCashu(
+      "alice@example.com",
+      40,
+      { id: "contact-1", lnAddress: "alice@example.com", name: "Alice" },
+    );
+
+    expect(paid).toBe(true);
+    expect(harness.logPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contactId: "contact-1",
+        method: "lightning_address",
+        paymentType: "contact",
         status: "ok",
       }),
     );
