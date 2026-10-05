@@ -92,6 +92,8 @@ const recipientRows = (container: HTMLElement) =>
 const paymentFields = (container: HTMLElement) =>
   container.querySelector('[data-testid="bank-payment-fields"]');
 
+const unmounts: (() => Promise<void>)[] = [];
+
 interface RenderOfferOptions extends Partial<PageProps> {
   status?: BankOfferStatus;
 }
@@ -101,7 +103,7 @@ const renderOffer = async ({
   status = "offered",
   ...overrides
 }: RenderOfferOptions = {}) => {
-  const { container } = await renderIntoDocument(
+  const { container, unmount } = await renderIntoDocument(
     <BankPaymentOfferDetailPage
       bankPaymentOfferMessages={[createOfferMessage(status)]}
       chatId="contact-1"
@@ -116,11 +118,13 @@ const renderOffer = async ({
       {...overrides}
     />,
   );
+  unmounts.push(unmount);
   return container;
 };
 
 describe("BankPaymentOfferDetailPage", () => {
-  afterEach(() => {
+  afterEach(async () => {
+    for (const unmount of unmounts.splice(0)) await unmount();
     document.body.innerHTML = "";
     window.location.hash = "";
     localStorage.clear();
