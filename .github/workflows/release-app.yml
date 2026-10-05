@@ -153,6 +153,8 @@ jobs:
     name: Ship the web app to production
     needs: [resolve, publish]
     runs-on: ubuntu-latest
+    # Holds the release app's credentials and admits only main and v* tags.
+    environment: release
     permissions:
       contents: read
 
