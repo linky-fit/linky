@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as UI from "@linky-fit/ui";
 import type { Section } from "../section";
 import { tones } from "../sample-data";
+
+const COUNTDOWN_SEC = 10;
 
 export const feedback: Section = {
   title: "Feedback",
@@ -66,18 +68,35 @@ export const feedback: Section = {
         <UI.StatusLine rounded label="Synced a moment ago." />
       </UI.Stack>
     ),
-    Progress: () => (
-      <UI.Stack>
-        <UI.Progress value={0.4} accessibilityLabel="Progress 40 percent" />
-        <UI.Progress value={1} tone="info" accessibilityLabel="Complete" />
-        <UI.Progress
-          value={2}
-          max={3}
-          segments={3}
-          accessibilityLabel="Step 2 of 3"
-        />
-      </UI.Stack>
-    ),
+    Progress: () => {
+      // Ticks once a second like the app's payment countdown; the fill glides between ticks.
+      const [elapsed, setElapsed] = useState(0);
+      useEffect(() => {
+        const interval = setInterval(
+          () => setElapsed((value) => (value + 1) % (COUNTDOWN_SEC + 1)),
+          1000,
+        );
+        return () => clearInterval(interval);
+      }, []);
+      return (
+        <UI.Stack>
+          <UI.Progress value={0.4} accessibilityLabel="Progress 40 percent" />
+          <UI.Progress value={1} tone="info" accessibilityLabel="Complete" />
+          <UI.Progress
+            value={2}
+            max={3}
+            segments={3}
+            accessibilityLabel="Step 2 of 3"
+          />
+          <UI.Progress
+            value={elapsed + 1}
+            max={COUNTDOWN_SEC}
+            transition="countdown"
+            accessibilityLabel={`Pays in ${COUNTDOWN_SEC - elapsed} seconds`}
+          />
+        </UI.Stack>
+      );
+    },
     EmptyState: () => (
       <UI.EmptyState
         icon="Users"
