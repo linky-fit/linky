@@ -1,7 +1,7 @@
 {
   "name": "@linky-fit/web-app",
   "private": true,
-  "version": "26.10.2",
+  "version": "26.10.3",
   "license": "0BSD",
   "type": "module",
   "scripts": {

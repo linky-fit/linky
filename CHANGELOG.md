@@ -12,6 +12,24 @@ používá také v Google Play a musí se vejít do 500 znaků na jazyk.
 
 ## [Unreleased]
 
+## [26.10.3] - 2026-10-05
+
+### en-US
+
+- Log into websites with your Nostr identity: scan or open a nostrconnect:// link and confirm.
+- A shared profile link (linky.fit/p/…) opens the person as a contact and a chat; Profile has a Share button.
+- Experimental: follow company announcements (Keryx) from Settings.
+- Messages from a contact saved twice stay in one chat; a scanned profile QR finds the existing contact.
+- Fixed profile editing with a custom identity and wallet buttons on small screens.
+
+### cs-CZ
+
+- Přihlášení na weby přes Nostr identitu: naskenujte nebo otevřete odkaz nostrconnect:// a potvrďte.
+- Sdílený odkaz na profil (linky.fit/p/…) otevře osobu jako kontakt i chat; v Profilu je tlačítko Sdílet.
+- Experimentální: odběr oznámení firem (Keryx) z Nastavení.
+- Zprávy od kontaktu uloženého dvakrát zůstávají v jednom chatu; naskenovaný QR profilu najde existující kontakt.
+- Opravena úprava profilu s vlastní identitou a tlačítka peněženky na malých displejích.
+
 ## [26.10.2] - 2026-10-03
 
 ### en-US
