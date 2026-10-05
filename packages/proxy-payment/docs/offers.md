@@ -73,3 +73,7 @@ All selectors take `state.offers` and are pure; the consumer's effects run on th
 ## Stagger
 
 `bankPaymentOfferStaggerQueue({ peers, delaySec, firstSentAtSec, ... })` turns the recipients after the first one into a `BankPaymentOfferStaggerRecord` (a `Schema`, persistable), or `null` for no peers: each peer is due at `firstSentAtSec + (index + 1) * delaySec` and the queue expires with the first send's phase. `bankPaymentOfferStaggerDue(record, offers, nowSec)` splits due peers into `send` and `alreadyOffered` (another tab sent it) and reports `nextDueAtSec`. `isBankPaymentOfferStaggerRecordExpired(record, nowSec)` treats a future `createdAtSec` as expired too. `isBankPaymentOfferStaggerQueueOpen(record, offers)` is false once any recipient moved past `offered`/`declined`; the consumer then drops the queue.
+
+## Advertised currencies
+
+A user advertises the currencies they pay in for friends in their general status (kind 30315, `d=general`). `buildProfileGeneralStatus({ text, currencies })` writes the free text and, on the last line, the selected `PROFILE_STATUS_CURRENCIES` in their canonical order. `parseProfileGeneralStatus(status)` returns `{ text, currencies }`; a last line that is not a currency list stays part of the text. Legacy `BTC` and `USD` entries parse and are dropped.
