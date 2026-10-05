@@ -1,5 +1,6 @@
 import { Option, Schema } from "effect";
 import { nip19 } from "nostr-tools";
+import type { Event } from "nostr-tools";
 import { SimplePool } from "nostr-tools/pool";
 import recommendedRelays from "../public/recommended-relays.json" with { type: "json" };
 import { getNpubcashBaseUrl } from "./_npubcash.js";
@@ -10,6 +11,9 @@ export interface SharedProfile {
   name: string | null;
   picture: string | null;
   about: string | null;
+  lightningAddress: string | null;
+  /** The raw general status (kind 30315, `d=general`); the page parses it. */
+  status: string | null;
 }
 
 const PROFILE_FETCH_TIMEOUT_MS = 2500;
@@ -28,6 +32,7 @@ const ProfileContent = Schema.parseJson(
     display_name: Schema.optional(Schema.Unknown),
     picture: Schema.optional(Schema.Unknown),
     about: Schema.optional(Schema.Unknown),
+    lud16: Schema.optional(Schema.Unknown),
   }),
 );
 
@@ -61,19 +66,29 @@ export const resolveProfilePubkey = async (
   return NIP05_NAME.test(value) ? lookupLinkyName(value) : null;
 };
 
-const fetchProfileContent = async (pubkey: string) => {
+const isExpired = (event: Event): boolean => {
+  const expiration = Number(
+    event.tags.find(([name]) => name === "expiration")?.[1],
+  );
+  return expiration > 0 && expiration * 1000 <= Date.now();
+};
+
+const fetchProfileEvents = async (pubkey: string) => {
   const pool = new SimplePool();
+  const params = { maxWait: PROFILE_FETCH_TIMEOUT_MS };
   try {
-    const event = await pool.get(
-      recommendedRelays.nostr,
-      { kinds: [0], authors: [pubkey] },
-      { maxWait: PROFILE_FETCH_TIMEOUT_MS },
-    );
-    return event
-      ? Option.getOrNull(
-          Schema.decodeUnknownOption(ProfileContent)(event.content),
-        )
-      : null;
+    return await Promise.all([
+      pool.get(
+        recommendedRelays.nostr,
+        { kinds: [0], authors: [pubkey] },
+        params,
+      ),
+      pool.get(
+        recommendedRelays.nostr,
+        { kinds: [30315], authors: [pubkey], "#d": ["general"] },
+        params,
+      ),
+    ]);
   } finally {
     pool.destroy();
   }
@@ -84,13 +99,23 @@ export const loadSharedProfile = async (
 ): Promise<SharedProfile | null> => {
   const pubkey = await resolveProfilePubkey(id).catch(() => null);
   if (!pubkey) return null;
-  const content = await fetchProfileContent(pubkey).catch(() => null);
+  const [profileEvent, statusEvent] = await fetchProfileEvents(pubkey).catch(
+    () => [null, null],
+  );
+  const content = profileEvent
+    ? Option.getOrNull(
+        Schema.decodeUnknownOption(ProfileContent)(profileEvent.content),
+      )
+    : null;
   const picture = text(content?.picture);
   return {
     npub: nip19.npubEncode(pubkey),
     name: text(content?.display_name) ?? text(content?.name),
     picture: picture?.startsWith("https://") ? picture : null,
     about: text(content?.about),
+    lightningAddress: text(content?.lud16),
+    status:
+      statusEvent && !isExpired(statusEvent) ? text(statusEvent.content) : null,
   };
 };
 

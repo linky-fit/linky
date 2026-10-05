@@ -84,6 +84,7 @@
       "dependencies": {
         "@linky-fit/linkshu": "workspace:*",
         "@linky-fit/linkstr": "workspace:*",
+        "@linky-fit/proxy-payment": "workspace:*",
         "@linky-fit/ui": "workspace:*",
         "@noble/hashes": "^2.0.1",
         "effect": "^3.19.19",

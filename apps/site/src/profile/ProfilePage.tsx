@@ -1,4 +1,14 @@
-import { Avatar, Button, Card, EmptyState, Stack, Text } from "@linky-fit/ui";
+import { parseProfileGeneralStatus } from "@linky-fit/proxy-payment";
+import {
+  Avatar,
+  Button,
+  EmptyState,
+  Icon,
+  Pill,
+  Row,
+  Stack,
+  Text,
+} from "@linky-fit/ui";
 import { useEffect } from "react";
 import { SiteLayout, type SiteLayoutCopy } from "../SiteLayout";
 import type { SiteLocale } from "../sitePreferences";
@@ -7,10 +17,12 @@ import {
   buildAddContactUrl,
   formatShortNpub,
   readSharedProfile,
+  type SharedProfile,
 } from "./sharedProfile";
 
 interface ProfileCopy extends SiteLayoutCopy {
   openInLinky: string;
+  provides: string;
   addHint: string;
   notFound: string;
   notFoundDetail: string;
@@ -62,6 +74,7 @@ const copy: Record<SiteLocale, ProfileCopy> = {
   cs: {
     ...layoutCopy.cs,
     openInLinky: "Otevřít v Linky",
+    provides: "Poskytne",
     addHint:
       "Linky přidá {name} do vašich kontaktů. Linky ještě nemáte? Nejdřív si během chvilky založíte účet.",
     notFound: "Profil nenalezen",
@@ -70,6 +83,7 @@ const copy: Record<SiteLocale, ProfileCopy> = {
   en: {
     ...layoutCopy.en,
     openInLinky: "Open in Linky",
+    provides: "Provides",
     addHint:
       "Linky adds {name} to your contacts. New to Linky? You'll set up an account in a few seconds first.",
     notFound: "Profile not found",
@@ -78,6 +92,7 @@ const copy: Record<SiteLocale, ProfileCopy> = {
   de: {
     ...layoutCopy.de,
     openInLinky: "In Linky öffnen",
+    provides: "Bietet",
     addHint:
       "Linky fügt {name} zu deinen Kontakten hinzu. Neu bei Linky? Du legst vorher in wenigen Sekunden ein Konto an.",
     notFound: "Profil nicht gefunden",
@@ -86,60 +101,98 @@ const copy: Record<SiteLocale, ProfileCopy> = {
 };
 
 const profile = readSharedProfile();
+const status = parseProfileGeneralStatus(profile?.status);
+
+function ProfileView({
+  copy,
+  profile,
+}: {
+  copy: ProfileCopy;
+  profile: SharedProfile;
+}) {
+  const name = profile.name ?? formatShortNpub(profile.npub);
+  return (
+    <Stack testID="shared-profile" alignItems="center" gap="$xxl">
+      <Stack alignItems="center" gap="$md">
+        <Avatar name={name} uri={profile.picture ?? undefined} size="lg" />
+        <Stack alignItems="center" gap="$xs">
+          <Text
+            variant="display"
+            color="$colorStrong"
+            textAlign="center"
+            role="heading"
+            aria-level={1}
+          >
+            {name}
+          </Text>
+          {profile.lightningAddress ? (
+            <Row gap="$xs">
+              <Icon name="Zap" size="sm" color="$colorMuted" />
+              <Text variant="label" color="$colorMuted">
+                {profile.lightningAddress}
+              </Text>
+            </Row>
+          ) : null}
+        </Stack>
+        {status.text ? (
+          <Text variant="title" color="$color" textAlign="center">
+            {status.text}
+          </Text>
+        ) : null}
+        {status.currencies.length > 0 ? (
+          <Row gap="$sm" flexWrap="wrap" justifyContent="center">
+            <Text variant="label" color="$colorMuted">
+              {copy.provides}
+            </Text>
+            {status.currencies.map((currency) => (
+              <Pill key={currency} label={currency} tone="accent" size="sm" />
+            ))}
+          </Row>
+        ) : null}
+      </Stack>
+      {profile.about ? (
+        <Text color="$colorMuted" textAlign="center">
+          {profile.about}
+        </Text>
+      ) : null}
+      <Stack alignSelf="stretch" alignItems="center" gap="$sm">
+        <Button
+          icon="MessageCircle"
+          alignSelf="stretch"
+          onPress={() =>
+            window.location.assign(buildAddContactUrl(profile.npub))
+          }
+        >
+          {copy.openInLinky}
+        </Button>
+        <Text variant="caption" color="$colorMuted" textAlign="center">
+          {copy.addHint.replace("{name}", name)}
+        </Text>
+      </Stack>
+    </Stack>
+  );
+}
 
 function ProfilePage() {
   const [locale, setLocale] = useSiteLocale();
   const activeCopy = copy[locale];
-  const name = profile ? (profile.name ?? formatShortNpub(profile.npub)) : "";
 
   useEffect(() => {
-    document.title = profile ? `${name} · Linky` : activeCopy.notFound;
-  }, [activeCopy.notFound, name]);
+    document.title = profile
+      ? `${profile.name ?? formatShortNpub(profile.npub)} · Linky`
+      : activeCopy.notFound;
+  }, [activeCopy.notFound]);
 
   return (
     <SiteLayout copy={activeCopy} locale={locale} onLocaleChange={setLocale}>
       <Stack
         width="100%"
-        maxWidth="$contentWidth"
+        maxWidth="$sheetWidth"
         alignSelf="center"
-        paddingVertical="$xxl"
+        paddingVertical="$huge"
       >
         {profile ? (
-          <Card
-            outlined
-            testID="shared-profile"
-            alignItems="center"
-            gap="$lg"
-            padding="$xxl"
-            $compact={{ padding: "$lg" }}
-          >
-            <Avatar name={name} uri={profile.picture ?? undefined} size="lg" />
-            <Text
-              variant="display"
-              color="$colorStrong"
-              textAlign="center"
-              role="heading"
-              aria-level={1}
-            >
-              {name}
-            </Text>
-            {profile.about ? (
-              <Text color="$colorMuted" textAlign="center">
-                {profile.about}
-              </Text>
-            ) : null}
-            <Button
-              icon="MessageCircle"
-              onPress={() =>
-                window.location.assign(buildAddContactUrl(profile.npub))
-              }
-            >
-              {activeCopy.openInLinky}
-            </Button>
-            <Text variant="caption" color="$colorMuted" textAlign="center">
-              {activeCopy.addHint.replace("{name}", name)}
-            </Text>
-          </Card>
+          <ProfileView copy={activeCopy} profile={profile} />
         ) : (
           <EmptyState
             icon="UserRound"

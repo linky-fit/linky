@@ -4,6 +4,7 @@ import { renderProfilePage, resolveProfilePubkey } from "./_profilePage";
 const NPUB = "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
 const TEMPLATE =
   "<html><head><title>Linky</title></head><body><div id=root></div></body></html>";
+const EMPTY = { lightningAddress: null, status: null };
 const PAGE_URL = `https://linky.fit/p/${NPUB}`;
 
 describe("resolveProfilePubkey", () => {
@@ -25,6 +26,7 @@ describe("renderProfilePage", () => {
     const html = renderProfilePage(
       TEMPLATE,
       {
+        ...EMPTY,
         npub: NPUB,
         name: 'Eve "</script><script>alert(1)</script>',
         picture: null,
@@ -36,7 +38,7 @@ describe("renderProfilePage", () => {
     expect(html).toContain(
       "<title>Eve &quot;&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt; on Linky</title>",
     );
-    expect(html).toContain('{"npub":"');
+    expect(html).toContain('"npub":"npub1');
     expect(html).toContain("\\u003c/script>");
   });
 
@@ -44,6 +46,7 @@ describe("renderProfilePage", () => {
     const html = renderProfilePage(
       TEMPLATE,
       {
+        ...EMPTY,
         npub: NPUB,
         name: "Dave",
         picture: "https://api.dicebear.com/9.x/lorelei/svg?seed=dave",
@@ -62,7 +65,13 @@ describe("renderProfilePage", () => {
   it("keeps replacement patterns in profile text literal", () => {
     const html = renderProfilePage(
       TEMPLATE,
-      { npub: NPUB, name: "$& $'", picture: null, about: null },
+      {
+        ...EMPTY,
+        npub: NPUB,
+        name: "$& $'",
+        picture: null,
+        about: null,
+      },
       PAGE_URL,
     );
     expect(html).toContain("<title>$&amp; $&#39; on Linky</title>");
