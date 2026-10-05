@@ -34,7 +34,7 @@ import {
   connectionStatus,
   type ConnectionState,
 } from "../utils/connectionStatus";
-import { isDesktopShell } from "../platform/runtime";
+import { isDesktopShell, isNightlyOrigin } from "../platform/runtime";
 import { COLOR_MODE_PREFERENCE_LABEL_KEYS } from "../utils/colorMode";
 import { pickFile } from "../utils/pickFile";
 import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
@@ -88,9 +88,13 @@ export function AdvancedPage(): React.ReactElement {
   const armTimeoutRef = useRef<number | null>(null);
   const hasSeedMnemonic = (seedMnemonic ?? "").trim().length > 0;
   const hasCurrentNsec = (currentNsec ?? "").trim().length > 0;
-  const appVersionLabel = __APP_COMMIT_SHA__
-    ? `${__APP_VERSION__} (${__APP_COMMIT_SHA__})`
-    : `${__APP_VERSION__}`;
+  const appVersionLabel = [
+    __APP_VERSION__,
+    isNightlyOrigin() ? "nightly" : "",
+    __APP_COMMIT_SHA__ ? `(${__APP_COMMIT_SHA__})` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const getAutoPayLimitLabel = useCallback(
     (limit: number) => {

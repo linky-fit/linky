@@ -92,3 +92,7 @@ export const getTelemetryAppRuntime = (): PaymentTelemetryAppRuntime =>
 
 export const getTelemetryDevicePlatform = (): PaymentTelemetryDevicePlatform =>
   getTelemetryEnvironment().devicePlatform;
+
+export const isNightlyOrigin = (): boolean =>
+  typeof window !== "undefined" &&
+  window.location.hostname.startsWith("nightly.");
