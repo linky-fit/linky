@@ -157,12 +157,20 @@ jobs:
       contents: read
 
     steps:
-      # The production ruleset lets only deploy keys push; GITHUB_TOKEN can't bypass rulesets.
+      # The production ruleset lets only this app push; GITHUB_TOKEN can't bypass rulesets.
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
       - name: Checkout release tag
         uses: actions/checkout@v5
         with:
           ref: ${{ needs.resolve.outputs.release_tag }}
-          ssh-key: ${{ secrets.PRODUCTION_DEPLOY_KEY }}
+          token: ${{ steps.app-token.outputs.token }}
 
       # Forced, because a hotfix tag cut outside main is not an ancestor of the
       # next release.
