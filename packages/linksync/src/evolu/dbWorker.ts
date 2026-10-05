@@ -46,8 +46,25 @@ export interface OwnerSyncFailed {
   readonly endsRound: boolean;
 }
 
+/** `syncing` while the open socket has a request the relay has not answered; `unreachable` once a socket closed or failed until it opens again. */
+export type EvoluRelayStatus =
+  | "connecting"
+  | "syncing"
+  | "synced"
+  | "unreachable";
+
+/** Every relay socket's status, keyed by relay url. */
+export interface RelayStatuses {
+  readonly type: "linksync.relayStatuses";
+  readonly statuses: Readonly<Record<string, EvoluRelayStatus>>;
+}
+
 export type PageMessage = DbWorkerInput | OwnersSyncedRequest;
-export type WorkerMessage = DbWorkerOutput | OwnersSynced | OwnerSyncFailed;
+export type WorkerMessage =
+  | DbWorkerOutput
+  | OwnersSynced
+  | OwnerSyncFailed
+  | RelayStatuses;
 
 interface ProtocolHeader {
   readonly ownerId: OwnerId;
@@ -78,27 +95,67 @@ const errorName = (errorCode: number | null): string =>
     ([, code]) => code === errorCode,
   )?.[0] ?? String(errorCode);
 
-/** Evolu's `createWebSocket`, reporting each owner whose reconciliation with the relay finished, and each protocol error. */
+interface OwnerSyncReporters {
+  readonly onSynced: (ownerId: OwnerId) => void;
+  readonly onFailed?: (
+    ownerId: OwnerId,
+    error: string,
+    endsRound: boolean,
+  ) => void;
+  readonly onRelayStatus?: (url: string, status: EvoluRelayStatus) => void;
+}
+
+/** Evolu's `createWebSocket`, reporting each owner whose reconciliation with the relay finished, each protocol error and each change of the relay's status. */
 export const reportOwnerSync =
   (
     createWebSocket: CreateWebSocket,
-    onSynced: (ownerId: OwnerId) => void,
-    onFailed: (
-      ownerId: OwnerId,
-      error: string,
-      endsRound: boolean,
-    ) => void = () => {},
+    {
+      onSynced,
+      onFailed = () => {},
+      onRelayStatus = () => {},
+    }: OwnerSyncReporters,
   ): CreateWebSocket =>
   (url, options = {}) => {
     const unanswered = new Map<OwnerId, number>();
     const answeredWithoutError = new Set<OwnerId>();
+    let isOpen = false;
+    let hasFailed = false;
+    let status: EvoluRelayStatus = "connecting";
+    onRelayStatus(url, status);
+    const reportStatus = () => {
+      const next: EvoluRelayStatus = isOpen
+        ? [...unanswered.values()].some((count) => count > 0)
+          ? "syncing"
+          : "synced"
+        : hasFailed
+          ? "unreachable"
+          : "connecting";
+      if (next === status) return;
+      status = next;
+      onRelayStatus(url, next);
+    };
+    const reportClosed = () => {
+      isOpen = false;
+      hasFailed = true;
+      reportStatus();
+    };
     const socket = createWebSocket(url, {
       ...options,
       onOpen: () => {
         // A request sent before a reconnect is never answered; Evolu syncs every owner again on open.
         unanswered.clear();
         answeredWithoutError.clear();
+        isOpen = true;
         options.onOpen?.();
+        reportStatus();
+      },
+      onClose: (event) => {
+        reportClosed();
+        options.onClose?.(event);
+      },
+      onError: (error) => {
+        reportClosed();
+        options.onError?.(error);
       },
       onMessage: (data) => {
         options.onMessage?.(data);
@@ -119,6 +176,7 @@ export const reportOwnerSync =
         }
         setTimeout(() => {
           if ((unanswered.get(ownerId) ?? 0) === 0) onSynced(ownerId);
+          reportStatus();
         }, 0);
       },
     });
@@ -128,11 +186,13 @@ export const reportOwnerSync =
         const result = socket.send(data);
         const header =
           result.ok && data instanceof Uint8Array ? readHeader(data) : null;
-        if (header?.messageType === MessageType.Request)
+        if (header?.messageType === MessageType.Request) {
           unanswered.set(
             header.ownerId,
             (unanswered.get(header.ownerId) ?? 0) + 1,
           );
+          reportStatus();
+        }
         return result;
       },
     };
@@ -149,7 +209,8 @@ export interface DbWorkerScope {
 
 /**
  * Runs Evolu's database worker in `scope` and reports the owners whose sync
- * round with a relay finished, and every protocol error a relay answered; an
+ * round with a relay finished, every protocol error a relay answered and each
+ * relay's status; an
  * owner without a relay to sync with counts as synced once used. Pair it with
  * `trackOwnerSync` on the page. A separate
  * entry (`@linky-fit/linksync/evolu/worker`) keeps the store out of the worker bundle.
@@ -167,24 +228,34 @@ export const runOwnerSyncDbWorker = (
     synced.add(ownerId);
     report([ownerId]);
   };
+  const relayStatuses: Record<string, EvoluRelayStatus> = {};
+  const reportRelayStatuses = () =>
+    scope.postMessage({
+      type: "linksync.relayStatuses",
+      statuses: { ...relayStatuses },
+    });
   const dbWorker = createDbWorkerForPlatform({
     ...deps,
-    createWebSocket: reportOwnerSync(
-      deps.createWebSocket,
-      markSynced,
-      (ownerId, error, endsRound) =>
+    createWebSocket: reportOwnerSync(deps.createWebSocket, {
+      onSynced: markSynced,
+      onFailed: (ownerId, error, endsRound) =>
         scope.postMessage({
           type: "linksync.ownerSyncFailed",
           ownerId,
           error,
           endsRound,
         }),
-    ),
+      onRelayStatus: (url, status) => {
+        relayStatuses[url] = status;
+        reportRelayStatuses();
+      },
+    }),
   });
   dbWorker.onMessage((message) => scope.postMessage(message));
   scope.addEventListener("message", ({ data }) => {
     if (data.type === "linksync.ownersSyncedRequest") {
       report([...synced]);
+      reportRelayStatuses();
       return;
     }
     if (data.type === "init") relayCount = data.config.transports.length;

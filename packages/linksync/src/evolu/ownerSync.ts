@@ -1,6 +1,11 @@
 import type { OwnerId, SimpleName, Worker } from "@evolu/common";
 import type { CreateDbWorker } from "@evolu/common/local-first";
-import type { OwnerSyncFailed, PageMessage, WorkerMessage } from "./dbWorker";
+import type {
+  EvoluRelayStatus,
+  OwnerSyncFailed,
+  PageMessage,
+  WorkerMessage,
+} from "./dbWorker";
 
 export type OwnerSyncFailure = Omit<OwnerSyncFailed, "type">;
 
@@ -12,6 +17,9 @@ export interface OwnerSync {
   readonly subscribeFailures: (
     listener: (failure: OwnerSyncFailure) => void,
   ) => () => void;
+  /** Each relay socket's latest status, keyed by relay url; empty until the worker opened one. */
+  readonly relayStatuses: () => Readonly<Record<string, EvoluRelayStatus>>;
+  readonly subscribeRelayStatuses: (listener: () => void) => () => void;
 }
 
 /**
@@ -29,6 +37,16 @@ export const trackOwnerSync = (
   const synced = new Set<OwnerId>();
   const listeners = new Set<() => void>();
   const failureListeners = new Set<(failure: OwnerSyncFailure) => void>();
+  let relayStatuses: Readonly<Record<string, EvoluRelayStatus>> = {};
+  const relayStatusListeners = new Set<() => void>();
+  const listen =
+    <L>(set: Set<L>) =>
+    (listener: L) => {
+      set.add(listener);
+      return () => {
+        set.delete(listener);
+      };
+    };
   return {
     createDbWorker: (name) => {
       const worker = createWorker(name);
@@ -39,6 +57,11 @@ export const trackOwnerSync = (
           worker.onMessage((message) => {
             if (message.type === "linksync.ownerSyncFailed") {
               for (const listener of failureListeners) listener(message);
+              return;
+            }
+            if (message.type === "linksync.relayStatuses") {
+              relayStatuses = message.statuses;
+              for (const listener of relayStatusListeners) listener();
               return;
             }
             if (message.type !== "linksync.ownersSynced") {
@@ -54,18 +77,10 @@ export const trackOwnerSync = (
     },
     ownerSync: {
       syncedOwners: () => synced,
-      subscribe: (listener) => {
-        listeners.add(listener);
-        return () => {
-          listeners.delete(listener);
-        };
-      },
-      subscribeFailures: (listener) => {
-        failureListeners.add(listener);
-        return () => {
-          failureListeners.delete(listener);
-        };
-      },
+      subscribe: listen(listeners),
+      subscribeFailures: listen(failureListeners),
+      relayStatuses: () => relayStatuses,
+      subscribeRelayStatuses: listen(relayStatusListeners),
     },
   };
 };
