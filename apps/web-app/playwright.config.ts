@@ -4,7 +4,8 @@ export default defineConfig({
   testDir: "./tests",
   testMatch: "**/*.spec.ts",
   fullyParallel: true,
-  workers: process.env.CI ? 4 : undefined,
+  // The 4-vCPU runner also hosts the Docker stack and the site suite; 4 workers starved relay round trips.
+  workers: process.env.CI ? 3 : undefined,
   timeout: 120000,
   use: {
     headless: true,
