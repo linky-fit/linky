@@ -11,13 +11,13 @@ The desktop shell loads `app.linky.fit`, so it follows prod.
 
 ## What ships when
 
-| Service                           | Ships                                            | Gated by                                                                |
-| --------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
-| Web app, Android, macOS, Zapstore | a release                                        | `release-app.yml`: all of `ci-checks.yml` and `ci-e2e.yml`              |
-| Site `linky.fit`                  | every push to `main`                             | Vercel Deployment Checks `site` and `site-e2e`                          |
-| Error tracker                     | every push to `main`                             | Vercel Deployment Check `error-tracker`                                 |
-| Push image `linky-push:latest`    | a push to `main` that touches `apps/push`        | the `test` job in `release-push-image.yml`; `deploy-push.yml` is manual |
-| npm packages                      | a `packages-v*` tag ([guide](./npm-releases.md)) | `release-npm.yml`: all of `ci-checks.yml`                               |
+| Service                           | Ships                                            | Gated by                                                   |
+| --------------------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| Web app, Android, macOS, Zapstore | a release                                        | `release-app.yml`: all of `ci-checks.yml` and `ci-e2e.yml` |
+| Site `linky.fit`                  | every push to `main`                             | Vercel Deployment Checks `site` and `site-e2e`             |
+| Error tracker                     | every push to `main`                             | Vercel Deployment Check `error-tracker`                    |
+| Push server `push.linky.fit`      | a manual run of `release-push.yml` on `main`     | its `checks` job, the same steps as the `push` check       |
+| npm packages                      | a `packages-v*` tag ([guide](./npm-releases.md)) | `release-npm.yml`: all of `ci-checks.yml`                  |
 
 Each service check (`site`, `error-tracker`, `push`) lints and typechecks the whole repo and runs the service's unit tests plus the unit tests of every package. These checks run on every push, without path filters, because a Deployment Check that never reports blocks the deploy.
 
@@ -25,7 +25,7 @@ The site, the error tracker and the push server ship ahead of the web app, so th
 
 ## Workflows
 
-`ci-*` workflows hold every check and run on pull requests and pushes to `main`. `release-*` and `deploy-*` workflows ship something and gate on the same checks instead of defining their own.
+`ci-*` workflows hold every check and run on pull requests and pushes to `main`. `release-*` workflows ship something and gate on the same checks instead of defining their own.
 
 ## Shipping a release
 
