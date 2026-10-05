@@ -1323,4 +1323,47 @@ describe("WrapInbox backfill", () => {
         }),
     );
   });
+
+  it("reports backfilling until every read relay finished its walk, and again once closed", async () => {
+    const fakeA = new FakeRelay();
+    const fakeB = new FakeRelay();
+
+    await Effect.gen(function* () {
+      const inbox = yield* WrapInbox;
+      const states: Array<boolean> = [];
+      yield* Effect.forkScoped(
+        Stream.runForEach(inbox.backfilling, (state) =>
+          Effect.sync(() => states.push(state)),
+        ),
+      );
+      const scope = yield* Scope.make();
+      yield* inbox
+        .open({ resubscribeDelay: Duration.millis(10) })
+        .pipe(Scope.extend(scope));
+      yield* eventually(
+        () =>
+          fakeA.subscriptions.length === 1 && fakeB.subscriptions.length === 1,
+      );
+
+      fakeA.eose();
+      yield* Effect.sleep(Duration.millis(20));
+      expect(states).toEqual([true]);
+
+      fakeB.eose();
+      yield* eventually(() => states.at(-1) === false);
+
+      yield* Scope.close(scope, Exit.void);
+      yield* eventually(() => states.at(-1) === true);
+      expect(states).toEqual([true, false, true]);
+    }).pipe(
+      Effect.scoped,
+      Effect.provide(
+        dependenciesFor([
+          [relayA, fakeA],
+          [relayB, fakeB],
+        ]),
+      ),
+      Effect.runPromise,
+    );
+  });
 });

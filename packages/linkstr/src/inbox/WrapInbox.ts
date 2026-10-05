@@ -8,6 +8,7 @@ import {
   Queue,
   Schema,
   Stream,
+  SubscriptionRef,
 } from "effect";
 import type { Scope } from "effect";
 import type { Filter } from "nostr-tools";
@@ -132,7 +133,7 @@ const wrapIdOf = (raw: unknown): WrapId | null =>
  * truncate the backfill. The cursor is loaded from and checkpointed to
  * `InboxCursorStore`, and only moves once no read relay has a walk left to
  * finish (or has failed too often) and the consumer has confirmed every
- * delivered wrap.
+ * delivered wrap. `backfilling` tells whether a walk is still running.
  */
 export class WrapInbox extends Effect.Service<WrapInbox>()(
   "linkstr/WrapInbox",
@@ -143,6 +144,15 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
       const relayPolicy = yield* RelayPolicy;
       const cursorStore = yield* InboxCursorStore;
       const inspector = yield* Inspector.orNoop;
+      const backfilling = yield* SubscriptionRef.make(true);
+      const setBackfilling = (value: boolean): void =>
+        Effect.runSync(
+          Effect.flatMap(SubscriptionRef.get(backfilling), (current) =>
+            current === value
+              ? Effect.void
+              : SubscriptionRef.set(backfilling, value),
+          ),
+        );
 
       const fetchWrapEvent = (
         wrapId: WrapId,
@@ -220,10 +230,12 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
           // read relay starts here, so one that is slow to answer holds too.
           const walking = new Set<RelayUrl>(relays);
           const unresolvedBoundaries = new Map<RelayUrl, number>();
+          const reportWalking = (): void => setBackfilling(walking.size > 0);
           let closed = false;
           yield* Effect.addFinalizer(() =>
             Effect.sync(() => {
               closed = true;
+              setBackfilling(true);
             }),
           );
           const rawWraps = yield* Effect.acquireRelease(
@@ -287,6 +299,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
           const walkBack = (relay: RelayUrl) =>
             Effect.gen(function* () {
               walking.add(relay);
+              reportWalking();
               const delivered = new Set<string>();
               let until: number | null = null;
               let limit = BACKFILL_PAGE_LIMIT;
@@ -338,6 +351,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
                 unresolvedBoundaries.set(relay, unresolvedBoundary);
               else unresolvedBoundaries.delete(relay);
               walking.delete(relay);
+              reportWalking();
               yield* advanceWhenSettled;
             });
 
@@ -381,6 +395,7 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
               failedAttempts++;
               if (failedAttempts < MAX_FAILED_WALK_ATTEMPTS) return Effect.void;
               walking.delete(relay);
+              reportWalking();
               inspector.emit(
                 () =>
                   new InboxWalkGivenUp(
@@ -474,7 +489,12 @@ export class WrapInbox extends Effect.Service<WrapInbox>()(
           return { events };
         });
 
-      return { fetchWrapEvent, open } as const;
+      return {
+        fetchWrapEvent,
+        open,
+        /** Emits whether the open inbox still walks a read relay's stored wraps, then every change; true while no inbox is open. */
+        backfilling: backfilling.changes,
+      } as const;
     }),
   },
 ) {}

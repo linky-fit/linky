@@ -89,6 +89,7 @@ export const useInboxSync = (
 - Return the promise of what the handler stores; the event is acked when it resolves. A rejection leaves it unacked (`InboxEventUnconfirmed`).
 - `since` only matters on a first session with an empty cursor store ([inbox.md](./inbox.md#the-cursor-and-inboxcursorstore)).
 - `fetchWrapEventAtom` is the one-shot counterpart for notification opens.
+- `inboxBackfillingAtom` is `Result<boolean>` mirroring `WrapInbox.backfilling` ([inbox.md](./inbox.md#backfill)); it reads true until the mounted inbox has finished every relay's walk.
 
 ## Outbox
 

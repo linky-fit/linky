@@ -97,3 +97,8 @@ export const wrapInboxAtom = linkstrRuntimeAtom.atom((get) => {
     }),
   );
 });
+
+/** Whether the inbox still walks a read relay's stored wraps; true while it is closed. */
+export const inboxBackfillingAtom = linkstrRuntimeAtom.atom(() =>
+  Stream.unwrap(Effect.map(WrapInbox, (inbox) => inbox.backfilling)),
+);
