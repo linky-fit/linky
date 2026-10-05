@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { View } from "tamagui";
 import { Button, IconButton, Pressable } from "./controls";
@@ -8,7 +9,7 @@ import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
 import { toneColors, toneIcons } from "./styles";
 import type { Tone } from "./tokens";
-import { border, shadow } from "./tokens";
+import { border, enterScale, shadow, space } from "./tokens";
 
 export interface NoticeProps {
   title: string;
@@ -271,5 +272,107 @@ export function EmptyState({
       ) : null}
       {action}
     </Stack>
+  );
+}
+
+export interface EdgeStatusItem {
+  label: string;
+  tone: Tone;
+  /** Shows a spinner instead of the dot while the step is under way. */
+  busy?: boolean | undefined;
+}
+
+export interface EdgeStatusProps {
+  /** Colors the tab; the panel's heading and the tab's name. */
+  tone: Tone;
+  label: string;
+  items: readonly EdgeStatusItem[];
+  action?: LabeledAction | undefined;
+}
+
+/**
+ * A half-disc tab that reports a background state from the window's right
+ * edge; hovering or pressing it opens a panel with the details above it. The
+ * caller positions it.
+ */
+export function EdgeStatus({ tone, label, items, action }: EdgeStatusProps) {
+  const [open, setOpen] = useState<"hover" | "press" | null>(null);
+  return (
+    <>
+      {open === "press" ? (
+        <Stack position="fixed" inset={0} onPress={() => setOpen(null)} />
+      ) : null}
+      {/* Positioned, so it paints above the fixed backdrop before it. */}
+      <Stack
+        position="relative"
+        alignItems="flex-end"
+        onMouseEnter={() => setOpen((current) => current ?? "hover")}
+        onMouseLeave={() =>
+          setOpen((current) => (current === "hover" ? null : current))
+        }
+      >
+        {open ? (
+          <Stack
+            role="status"
+            aria-live="polite"
+            gap="$sm"
+            width="$device"
+            marginRight="$md"
+            marginBottom="$sm"
+            padding="$lg"
+            borderRadius="$card"
+            borderWidth={border.hairline}
+            borderColor="$borderColor"
+            backgroundColor="$surface"
+            boxShadow={shadow.raised}
+            transition="base"
+            enterStyle={{ opacity: 0, scale: enterScale.subtle, y: space.md }}
+          >
+            <Text variant="label" bold>
+              {label}
+            </Text>
+            {items.map((item) => (
+              <Row key={item.label} gap="$sm" alignItems="center">
+                {item.busy ? (
+                  <Spinner color="$colorMuted" />
+                ) : (
+                  <View
+                    width="$dot"
+                    height="$dot"
+                    borderRadius="$pill"
+                    backgroundColor={toneColors[item.tone].solid}
+                  />
+                )}
+                <Text variant="caption" color="$colorSubtle" flex={1}>
+                  {item.label}
+                </Text>
+              </Row>
+            ))}
+            {action ? (
+              <Button size="sm" variant="secondary" onPress={action.onPress}>
+                {action.label}
+              </Button>
+            ) : null}
+          </Stack>
+        ) : null}
+        <Pressable
+          aria-label={label}
+          aria-expanded={open !== null}
+          paddingLeft="$md"
+          paddingVertical="$md"
+          onPress={() =>
+            setOpen((current) => (current === "press" ? null : "press"))
+          }
+        >
+          <View
+            width="$dot"
+            height="$iconSm"
+            borderTopLeftRadius="$pill"
+            borderBottomLeftRadius="$pill"
+            backgroundColor={toneColors[tone].solid}
+          />
+        </Pressable>
+      </Stack>
+    </>
   );
 }

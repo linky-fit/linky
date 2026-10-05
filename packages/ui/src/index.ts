@@ -88,6 +88,7 @@ export type {
 
 // Feedback and overlays
 export {
+  EdgeStatus,
   EmptyState,
   LoadingState,
   Notice,
@@ -97,6 +98,8 @@ export {
   ToastStack,
 } from "./feedback";
 export type {
+  EdgeStatusItem,
+  EdgeStatusProps,
   EmptyStateProps,
   NoticeProps,
   ProgressProps,

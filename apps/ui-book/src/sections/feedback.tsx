@@ -60,6 +60,28 @@ export const feedback: Section = {
       </UI.Row>
     ),
     LoadingState: () => <UI.LoadingState label="Loading contacts" />,
+    EdgeStatus: () => (
+      <UI.Row justifyContent="flex-end">
+        <UI.EdgeStatus
+          tone="warning"
+          label="Syncing…"
+          items={[
+            { label: "Connected to 2 Nostr relays", tone: "accent" },
+            {
+              label: "Scanning Nostr for messages",
+              tone: "warning",
+              busy: true,
+            },
+            {
+              label: "Syncing your data from Evolu",
+              tone: "warning",
+              busy: true,
+            },
+          ]}
+          action={{ label: "Relays", onPress: () => {} }}
+        />
+      </UI.Row>
+    ),
     StatusLine: () => (
       <UI.Stack>
         <UI.StatusLine busy label="Waiting for the Evolu relay." />
