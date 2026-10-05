@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/p/:id/picture",
+      "destination": "/api/profile-picture?id=:id"
+    },
+    {
       "source": "/p/:id",
       "destination": "/api/profile?id=:id"
     },

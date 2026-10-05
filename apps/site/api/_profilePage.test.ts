@@ -1,11 +1,28 @@
-import { describe, expect, it } from "vitest";
-import { renderProfilePage, resolveProfilePubkey } from "./_profilePage";
+import { describe, expect, it, vi } from "vitest";
+import {
+  loadProfilePicture,
+  loadSharedProfile,
+  renderProfilePage,
+  resolveProfilePubkey,
+} from "./_profilePage";
+
+const relayProfile = vi.hoisted(() => ({ picture: "" }));
+vi.mock("nostr-tools/pool", () => ({
+  SimplePool: class {
+    get = async (_relays: string[], filter: { kinds: number[] }) =>
+      filter.kinds.includes(0)
+        ? { content: JSON.stringify(relayProfile), tags: [] }
+        : null;
+    destroy = () => {};
+  },
+}));
 
 const NPUB = "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
 const TEMPLATE =
   "<html><head><title>Linky</title></head><body><div id=root></div></body></html>";
 const EMPTY = { lightningAddress: null, status: null };
 const PAGE_URL = `https://linky.fit/p/${NPUB}`;
+const JPEG_DATA_URL = "data:image/jpeg;base64,/9j/4AAQ";
 
 describe("resolveProfilePubkey", () => {
   it("decodes an npub in any case without a lookup", async () => {
@@ -18,6 +35,25 @@ describe("resolveProfilePubkey", () => {
   it("rejects an invalid npub and a malformed name", async () => {
     expect(await resolveProfilePubkey(`${NPUB.slice(0, -1)}x`)).toBeNull();
     expect(await resolveProfilePubkey("no spaces")).toBeNull();
+  });
+});
+
+describe("profile picture", () => {
+  it("keeps a photo stored as a data URL and serves its bytes", async () => {
+    relayProfile.picture = JPEG_DATA_URL;
+    expect((await loadSharedProfile(NPUB))?.picture).toBe(JPEG_DATA_URL);
+    expect(await loadProfilePicture(NPUB)).toEqual({
+      contentType: "image/jpeg",
+      bytes: Buffer.from("/9j/4AAQ", "base64"),
+    });
+  });
+
+  it("drops a picture the page can't show safely", async () => {
+    relayProfile.picture = "http://example.com/me.jpg";
+    expect((await loadSharedProfile(NPUB))?.picture).toBeNull();
+    relayProfile.picture = "data:text/html;base64,PHNjcmlwdD4=";
+    expect((await loadSharedProfile(NPUB))?.picture).toBeNull();
+    expect(await loadProfilePicture(NPUB)).toBeNull();
   });
 });
 
@@ -60,6 +96,24 @@ describe("renderProfilePage", () => {
     expect(html).toContain(
       '<meta property="og:description" content="Builder" />',
     );
+  });
+
+  it("points the preview at the served picture for a data-URL photo", () => {
+    const html = renderProfilePage(
+      TEMPLATE,
+      {
+        ...EMPTY,
+        npub: NPUB,
+        name: "Dave",
+        picture: JPEG_DATA_URL,
+        about: null,
+      },
+      PAGE_URL,
+    );
+    expect(html).toContain(
+      `<meta property="og:image" content="${PAGE_URL}/picture" />`,
+    );
+    expect(html).toContain(`"picture":"${JPEG_DATA_URL}"`);
   });
 
   it("keeps replacement patterns in profile text literal", () => {

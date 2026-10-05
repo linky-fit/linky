@@ -19,6 +19,9 @@ export interface SharedProfile {
 const PROFILE_FETCH_TIMEOUT_MS = 2500;
 const NIP05_NAME = /^[a-z0-9._-]{1,64}$/;
 const FALLBACK_IMAGE_URL = "https://app.linky.fit/pwa-512x512.png";
+// Linky stores a photo the user takes or uploads in the profile as a JPEG data URL.
+const DATA_IMAGE =
+  /^data:(image\/(?:jpeg|png|webp|gif));base64,([a-z0-9+/]+=*)$/i;
 
 const Nip05Names = Schema.parseJson(
   Schema.Struct({
@@ -108,10 +111,12 @@ export const loadSharedProfile = async (
       )
     : null;
   const picture = text(content?.picture);
+  const showsPicture =
+    picture?.startsWith("https://") || DATA_IMAGE.test(picture ?? "");
   return {
     npub: nip19.npubEncode(pubkey),
     name: text(content?.display_name) ?? text(content?.name),
-    picture: picture?.startsWith("https://") ? picture : null,
+    picture: showsPicture ? picture : null,
     about: text(content?.about),
     lightningAddress: text(content?.lud16),
     status:
@@ -127,11 +132,25 @@ const escapeHtml = (value: string): string =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-// Link previews don't render SVG, and Linky's generated avatars are DiceBear SVGs.
-const previewImageUrl = (picture: string | null): string =>
-  picture?.startsWith("https://api.dicebear.com/")
+/** The profile's data-URL picture as bytes, which `/p/<id>/picture` serves to link previews. */
+export const loadProfilePicture = async (
+  id: string,
+): Promise<{ contentType: string; bytes: Buffer } | null> => {
+  const profile = await loadSharedProfile(id);
+  const match = DATA_IMAGE.exec(profile?.picture ?? "");
+  return match
+    ? { contentType: match[1], bytes: Buffer.from(match[2], "base64") }
+    : null;
+};
+
+// Link previews render neither data URLs nor SVG, and Linky's generated avatars are DiceBear SVGs.
+const previewImageUrl = (picture: string | null, pageUrl: string): string => {
+  if (!picture) return FALLBACK_IMAGE_URL;
+  if (picture.startsWith("data:")) return `${pageUrl}/picture`;
+  return picture.startsWith("https://api.dicebear.com/")
     ? picture.replace(/\/svg(\?|$)/, "/png$1")
-    : (picture ?? FALLBACK_IMAGE_URL);
+    : picture;
+};
 
 /** Puts the link-preview tags and the profile the page renders into the `/p/` page. */
 export const renderProfilePage = (
@@ -149,7 +168,7 @@ export const renderProfilePage = (
     "og:site_name": "Linky",
     "og:title": title,
     "og:description": description.slice(0, 300),
-    "og:image": previewImageUrl(profile?.picture ?? null),
+    "og:image": previewImageUrl(profile?.picture ?? null, pageUrl),
     "og:url": pageUrl,
     "twitter:card": "summary",
   };
