@@ -1,5 +1,5 @@
 name: Service tests
-description: Typecheck a service and run its unit tests together with the unit tests of every package
+description: Lint and typecheck the whole repo, then run a service's unit tests together with the unit tests of every package
 
 inputs:
   workspace:
@@ -18,11 +18,10 @@ runs:
       shell: bash
       run: bun install --frozen-lockfile
 
-    - name: Typecheck ${{ inputs.workspace }}
+    # check-code fixes what it can, so a diff means the code was not lint-clean.
+    - name: Typecheck, lint and format
       shell: bash
-      run: bun run --filter "$WORKSPACE" typecheck
-      env:
-        WORKSPACE: ${{ inputs.workspace }}
+      run: bun run check-code && git diff --exit-code
 
     - name: Test ${{ inputs.workspace }} and packages
       shell: bash
