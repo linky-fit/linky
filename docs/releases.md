@@ -19,7 +19,7 @@ The desktop shell loads `app.linky.fit`, so it follows prod.
 | Push image `linky-push:latest`    | a push to `main` that touches `apps/push`        | the `test` job in `release-push-image.yml`; `deploy-push.yml` is manual |
 | npm packages                      | a `packages-v*` tag ([guide](./npm-releases.md)) | `release-npm.yml`: all of `ci-checks.yml`                               |
 
-Each service check (`site`, `error-tracker`, `push`) typechecks the service and runs its unit tests plus the unit tests of every package. These checks run on every push, without path filters, because a Deployment Check that never reports blocks the deploy.
+Each service check (`site`, `error-tracker`, `push`) lints and typechecks the whole repo and runs the service's unit tests plus the unit tests of every package. These checks run on every push, without path filters, because a Deployment Check that never reports blocks the deploy.
 
 The site, the error tracker and the push server ship ahead of the web app, so their APIs must keep working with the last release as well as with nightly.
 
