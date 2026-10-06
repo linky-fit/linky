@@ -13,7 +13,19 @@ concurrency:
 jobs:
   checks:
     if: github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/ci-checks.yml
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Require passing CI on the commit
+        uses: ./.github/actions/require-ci
+        with:
+          sha: ${{ github.sha }}
 
   image:
     needs: checks
@@ -61,6 +73,10 @@ jobs:
   deploy:
     needs: image
     runs-on: ubuntu-latest
+    # Records each deploy as a GitHub deployment, which the README badge shows.
+    environment:
+      name: push
+      url: https://push.linky.fit
 
     steps:
       - name: Deploy to push.linky.fit

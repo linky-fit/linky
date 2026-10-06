@@ -8,12 +8,34 @@ permissions:
   contents: read
 
 jobs:
-  checks:
-    uses: ./.github/workflows/ci-checks.yml
+  ci-passed:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+      actions: read
+    outputs:
+      run_id: ${{ steps.ci-run.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Require passing CI on the tagged commit
+        uses: ./.github/actions/require-ci
+        with:
+          sha: ${{ github.sha }}
+      - name: Find the CI run that built the tarballs
+        id: ci-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push&status=success" --jq '.workflow_runs[0].id // empty')
+          test -n "$run_id"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
   publish:
-    needs: checks
+    needs: ci-passed
     runs-on: ubuntu-latest
+    # Records each publish as a GitHub deployment, which the README badge shows.
+    environment: npm
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +45,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
       - uses: actions/checkout@v5
@@ -36,6 +59,8 @@ jobs:
         with:
           name: npm-packages
           path: dist/npm
+          run-id: ${{ needs.ci-passed.outputs.run_id }}
+          github-token: ${{ github.token }}
       - name: Publish the tested tarball from main history
         env:
           PACKAGE: ${{ matrix.package }}

@@ -1,0 +1,43 @@
+name: Require CI
+description: Wait for the required CI checks on a commit and fail unless all of them succeeded
+
+inputs:
+  sha:
+    description: Commit that is about to ship
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check required CI results
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        set -euo pipefail
+        deadline=$((SECONDS + 45 * 60))
+        while :; do
+          pending="" failed=""
+          for check in lint unit-tests linkshu-integration npm-packages app-e2e site-e2e; do
+            result=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=$check" \
+              --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.started_at) | last | "\(.status) \(.conclusion)"')
+            case "$result" in
+              "completed success") ;;
+              "completed "*) failed+="$check is ${result#completed }"$'\n' ;;
+              "null null") pending+="$check is missing"$'\n' ;;
+              *) pending+="$check is ${result% *}"$'\n' ;;
+            esac
+          done
+          if [[ -z "$failed$pending" ]]; then
+            exit 0
+          fi
+          if [[ -n "$failed" ]] || ((SECONDS > deadline)); then
+            while IFS= read -r problem; do
+              if [[ -n "$problem" ]]; then echo "::error::$problem on $SHA"; fi
+            done <<< "$failed$pending"
+            exit 1
+          fi
+          echo "Waiting: $(tr '\n' ' ' <<< "$pending")"
+          sleep 30
+        done

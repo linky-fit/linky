@@ -1,5 +1,5 @@
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { renderPdfPages } from "../app/lib/pdfPreview";
 import {
@@ -59,10 +59,6 @@ describe("PrivateFileBubble", () => {
   beforeEach(() => {
     renderMock.mockClear();
     decryptMock.mockClear();
-  });
-
-  afterEach(() => {
-    document.body.innerHTML = "";
   });
 
   it("shows the first page as preview without save/share buttons", async () => {

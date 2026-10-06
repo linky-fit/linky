@@ -1,5 +1,13 @@
 # Linky
 
+[![Release](https://img.shields.io/github/v/release/linky-fit/linky?label=release)](https://github.com/linky-fit/linky/releases/latest)
+[![app.linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/Production?label=app.linky.fit)](https://github.com/linky-fit/linky/deployments/Production)
+[![linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/Production%20%E2%80%93%20linky-website?label=linky.fit)](https://github.com/linky-fit/linky/deployments/Production%20%E2%80%93%20linky-website)
+[![push.linky.fit](https://img.shields.io/github/deployments/linky-fit/linky/push?label=push.linky.fit)](https://github.com/linky-fit/linky/deployments/push)
+[![@linky-fit/linkshu](https://img.shields.io/npm/v/@linky-fit/linkshu?label=%40linky-fit%2Flinkshu)](https://www.npmjs.com/package/@linky-fit/linkshu)
+[![@linky-fit/linkstr](https://img.shields.io/npm/v/@linky-fit/linkstr?label=%40linky-fit%2Flinkstr)](https://www.npmjs.com/package/@linky-fit/linkstr)
+[![npm release](https://img.shields.io/github/deployments/linky-fit/linky/npm?label=npm%20release)](https://github.com/linky-fit/linky/deployments/npm)
+
 Linky is a mobile-first PWA for contacts, private Nostr messaging and Lightning/Cashu payments. Data lives in Evolu (SQLite) on the device and syncs between devices through an Evolu relay. The app runs at `app.linky.fit` and as an Android app; `nightly.app.linky.fit` runs `main` ahead of the last release (see [`docs/releases.md`](./docs/releases.md)). `apps/site/` is the public website `linky.fit`, with the `/cashu/` token redemption page.
 
 ## Development
@@ -39,7 +47,6 @@ Packages:
 - `packages/config`: shared eslint, prettier, tsconfig and npm packaging
 
 `@linky-fit/linkshu` and `@linky-fit/linkstr` publish to npm together; see [`docs/npm-releases.md`](./docs/npm-releases.md).
-
 
 Further reading:
 

@@ -10,3 +10,12 @@ export const hynek: Author = {
   nostr: "npub1lz8xv2dnyryrk4vswkcgf52vqqzruqwuyp53s7pvusx4fef9fh2s7hh86s",
   x: "HynekJina",
 };
+
+export const linkyTeam: Author = {
+  name: "Linky team",
+  avatar: "/icon.svg",
+  bio: {
+    en: "The people building Linky.",
+    cs: "Lidé, kteří staví Linky.",
+  },
+};

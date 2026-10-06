@@ -6,6 +6,8 @@ export type Screen =
   | "chat-payment"
   | "chat-request"
   | "contacts"
+  | "profile-open"
+  | "profile-share"
   | "proxy-offer"
   | "recurring-list"
   | "token-share"
