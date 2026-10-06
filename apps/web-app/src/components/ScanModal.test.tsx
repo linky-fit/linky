@@ -92,7 +92,6 @@ const press = async (element: HTMLElement | undefined) => {
 
 describe("ScanModal", () => {
   afterEach(() => {
-    document.body.innerHTML = "";
     mockNavigate.mockReset();
   });
 
