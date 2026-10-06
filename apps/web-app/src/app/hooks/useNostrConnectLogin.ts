@@ -116,7 +116,11 @@ export const useNostrConnectLogin = ({
         tag: "nostrConnectLogin.approved",
         summary: `Nostr Connect login sent to ${site ?? "an unnamed site"}`,
         links,
-        payload: { ...payload, signedKind: exit.value.signedKind },
+        payload: {
+          ...payload,
+          signedKind: exit.value.signedKind,
+          authorizedDevice: exit.value.authorizedDevice,
+        },
       });
       return;
     }

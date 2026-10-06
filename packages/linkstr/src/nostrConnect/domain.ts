@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { RelayRejection } from "../domain/delivery";
-import { Pubkey, RelayUrl } from "../domain/primitives";
+import { EventId, Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
+import { SignedPlainEvent } from "../internal/nostrEvent";
 import { RelayPublishResult } from "../services/NostrTransport";
 
 /** A parsed `nostrconnect://` URI: a site asking the identity to log it in. */
@@ -25,6 +26,22 @@ export class NostrConnectLoginReceipt extends Schema.Class<NostrConnectLoginRece
   clientPubkey: Pubkey,
   /** Null when the client only asked for the public key. */
   signedKind: Schema.NullOr(Schema.Number),
+  /** The device key a signed device authorization names; null otherwise. */
+  authorizedDevice: Schema.NullOr(Pubkey),
+}) {}
+
+/** A verified kind 24138 event: `author` lets `device` act for it in `app`. */
+export class DeviceAuthorization extends Schema.Class<DeviceAuthorization>(
+  "DeviceAuthorization",
+)({
+  eventId: EventId,
+  author: Pubkey,
+  device: Pubkey,
+  /** The app name the user approved, as the app's link stated it. */
+  app: Schema.String,
+  createdAt: UnixSeconds,
+  /** The signed event, for embedding and re-verifying elsewhere. */
+  event: SignedPlainEvent,
 }) {}
 
 /** No relay accepted the connect ack or a later reply, so the site never got it. */

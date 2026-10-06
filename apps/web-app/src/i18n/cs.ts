@@ -1041,10 +1041,13 @@ export const cs = {
   lnurlAuthFailed: "Přihlášení přes LNURL selhalo",
   lnurlAuthUnavailable: "Přihlášení potřebuje odemčenou identitu.",
   nostrConnectLoginConfirm: "Přihlásit",
+  nostrConnectLoginConfirmDevice: "Přihlásit a propojit zařízení",
   nostrConnectLoginWaiting: "Čekám na web…",
   nostrConnectLoginUnknownSite: "Neznámý web",
   nostrConnectLoginUnverified: "Neověřeno",
   nostrConnectLoginAs: "Přihlásit jako",
+  nostrConnectLoginLinksDevice:
+    "{site} chce také propojit jedno svoje zařízení s tebou. Podepíšeš, že to zařízení smí v {site} jednat za tebe.",
   nostrConnectLoginShares:
     "Web dostane tvůj veřejný klíč a jednorázový přihlašovací podpis. Nemůže za tebe nic zveřejňovat ani číst tvoje zprávy.",
   nostrConnectLoginDone: "Přihlášeno na {site}",

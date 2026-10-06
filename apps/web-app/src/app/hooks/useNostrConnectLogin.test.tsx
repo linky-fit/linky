@@ -77,6 +77,7 @@ describe("useNostrConnectLogin", () => {
         new NostrConnectLoginReceipt({
           clientPubkey: REQUEST.clientPubkey,
           signedKind: 22242,
+          authorizedDevice: null,
         }),
       ),
     );

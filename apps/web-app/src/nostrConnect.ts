@@ -1,6 +1,9 @@
 import type { NostrConnectRequest } from "@linky-fit/linkstr";
 import { safeDecodeURIComponent } from "./utils/url";
-export { parseNostrConnectUri } from "@linky-fit/linkstr";
+export {
+  parseNostrConnectUri,
+  requestsDeviceAuthorization,
+} from "@linky-fit/linkstr";
 export type { NostrConnectRequest } from "@linky-fit/linkstr";
 
 const NOSTR_CONNECT_URI = /^nostrconnect:/i;

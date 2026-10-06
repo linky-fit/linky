@@ -14,6 +14,7 @@ import React from "react";
 import type { Translate } from "../i18n";
 import {
   describeNostrConnectSite,
+  requestsDeviceAuthorization,
   type NostrConnectRequest,
 } from "../nostrConnect";
 import { formatShortNpub } from "../utils/formatting";
@@ -57,6 +58,7 @@ export function NostrConnectLoginModal({
   const isBusy = phase === "busy";
   const site = describeNostrConnectSite(request);
   const siteLabel = site.label ?? t("nostrConnectLoginUnknownSite");
+  const linksDevice = requestsDeviceAuthorization(request);
   const title = isDone
     ? t("nostrConnectLoginDone").replace("{site}", siteLabel)
     : siteLabel;
@@ -74,7 +76,9 @@ export function NostrConnectLoginModal({
               {t(
                 isBusy
                   ? "nostrConnectLoginWaiting"
-                  : "nostrConnectLoginConfirm",
+                  : linksDevice
+                    ? "nostrConnectLoginConfirmDevice"
+                    : "nostrConnectLoginConfirm",
               )}
             </Button>
             <Button variant="secondary" disabled={isBusy} onPress={onClose}>
@@ -134,6 +138,17 @@ export function NostrConnectLoginModal({
             </Row>
           </Stack>
           <IdentityCard identity={identity} t={t} />
+          {linksDevice ? (
+            <Row alignItems="flex-start" gap="$sm">
+              <Icon name="Smartphone" size="sm" color="$colorMuted" />
+              <Text variant="caption" color="$colorMuted" flex={1}>
+                {t("nostrConnectLoginLinksDevice").replaceAll(
+                  "{site}",
+                  siteLabel,
+                )}
+              </Text>
+            </Row>
+          ) : null}
           <Row alignItems="flex-start" gap="$sm">
             <Icon name="ShieldCheck" size="sm" color="$colorMuted" />
             <Text variant="caption" color="$colorMuted" flex={1}>

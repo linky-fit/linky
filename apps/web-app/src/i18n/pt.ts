@@ -1051,10 +1051,13 @@ export const pt = {
   lnurlAuthFailed: "O login LNURL falhou",
   lnurlAuthUnavailable: "Entrar exige uma identidade desbloqueada.",
   nostrConnectLoginConfirm: "Entrar",
+  nostrConnectLoginConfirmDevice: "Entrar e vincular dispositivo",
   nostrConnectLoginWaiting: "Aguardando o site…",
   nostrConnectLoginUnknownSite: "Site desconhecido",
   nostrConnectLoginUnverified: "Não verificado",
   nostrConnectLoginAs: "Entrar como",
+  nostrConnectLoginLinksDevice:
+    "{site} também pede para vincular um dos seus dispositivos a você. Você assina que esse dispositivo pode agir por você em {site}.",
   nostrConnectLoginShares:
     "O site recebe sua chave pública e uma assinatura de login de uso único. Ele não pode publicar em seu nome nem ler suas mensagens.",
   nostrConnectLoginDone: "Conectado a {site}",

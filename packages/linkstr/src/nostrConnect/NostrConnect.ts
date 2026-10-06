@@ -1,7 +1,7 @@
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import { Clock, Deferred, Duration, Effect, Option, Queue } from "effect";
 import { RelayRejection } from "../domain/delivery";
-import type { EventId, UnixSeconds } from "../domain/primitives";
+import type { EventId, Pubkey, UnixSeconds } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import { inspectPlainOperation } from "../internal/inspectPlainOperation";
 import { nowSeconds } from "../internal/time";
@@ -103,10 +103,14 @@ export class NostrConnect extends Effect.Service<NostrConnect>()(
       > => {
         const channel = openNostrConnectChannel(identity, request.clientPubkey);
         const published: Array<EventId> = [];
-        const receipt = (signedKind: number | null) =>
+        const receipt = (
+          signedKind: number | null,
+          authorizedDevice: Pubkey | null = null,
+        ) =>
           new NostrConnectLoginReceipt({
             clientPubkey: request.clientPubkey,
             signedKind,
+            authorizedDevice,
           });
 
         const reply = (response: NostrConnectRpcResponse, now: UnixSeconds) =>
@@ -165,7 +169,7 @@ export class NostrConnect extends Effect.Service<NostrConnect>()(
             yield* reply(response, now);
             switch (outcome._tag) {
               case "Signed":
-                return receipt(outcome.kind);
+                return receipt(outcome.kind, outcome.device);
               case "Refused":
                 return yield* new NostrConnectRequestRefused({
                   method: decoded.rpc.method,

@@ -1,8 +1,8 @@
 import { Either, Option, Schema } from "effect";
 import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
-import { RelayUrl } from "../domain/primitives";
+import { isPubkey, RelayUrl } from "../domain/primitives";
 import type { EventId, Pubkey, UnixSeconds } from "../domain/primitives";
-import { NostrTags, tagValues } from "../internal/nostrEvent";
+import { firstTagValue, NostrTags, tagValues } from "../internal/nostrEvent";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import {
   decodeVerifiedPlainEvent,
@@ -10,7 +10,7 @@ import {
 } from "../internal/plainEvent";
 import type { PlainEventTemplate } from "../internal/plainEvent";
 import type { LinkstrIdentityService } from "../services/LinkstrIdentity";
-import { NostrConnectRequest } from "./domain";
+import { DeviceAuthorization, NostrConnectRequest } from "./domain";
 
 /** NIP-46 plain event kind; payment notices share the number only inside gift wraps. */
 export const NOSTR_CONNECT_KIND = 24133;
@@ -22,6 +22,80 @@ const SIGNABLE_KINDS: ReadonlySet<number> = new Set([
   NIP98_AUTH_KIND,
   NIP42_AUTH_KIND,
 ]);
+
+/**
+ * Linky-invented kind binding the signer's key to a device key of the app
+ * the user approved; never published by the signer. Signed only on the
+ * explicit `sign_event:24138` permission, which the approval names.
+ */
+export const DEVICE_AUTHORIZATION_KIND = 24138;
+export const DEVICE_AUTHORIZATION_VALUE = "device_authorization";
+export const DEVICE_AUTHORIZATION_PERMISSION = `sign_event:${DEVICE_AUTHORIZATION_KIND}`;
+
+/** The one template a signer signs for a device authorization; nothing else rides along. */
+export const deviceAuthorizationTemplate = (args: {
+  readonly device: Pubkey;
+  /** The app's `name`, exactly as its `nostrconnect://` link states it. */
+  readonly app: string;
+}): PlainEventTemplate => ({
+  kind: DEVICE_AUTHORIZATION_KIND,
+  tags: [
+    ["linky", DEVICE_AUTHORIZATION_VALUE],
+    ["p", args.device],
+    ["app", args.app],
+  ],
+  content: "",
+});
+
+/** Whether approving the request also lets the site link one of its devices. */
+export const requestsDeviceAuthorization = (
+  request: NostrConnectRequest,
+): boolean => request.perms.includes(DEVICE_AUTHORIZATION_PERMISSION);
+
+/** What a template authorizes when it is exactly the canonical shape. */
+const authorizationOf = (
+  template: PlainEventTemplate,
+): { readonly device: Pubkey; readonly app: string } | null => {
+  const device = firstTagValue(template.tags, "p");
+  const app = firstTagValue(template.tags, "app");
+  if (device === null || !isPubkey(device) || app === null) return null;
+  const canonical = deviceAuthorizationTemplate({ device, app });
+  return template.kind === canonical.kind &&
+    template.content === canonical.content &&
+    JSON.stringify(template.tags) === JSON.stringify(canonical.tags)
+    ? { device, app }
+    : null;
+};
+
+const parseJsonOrRaw = (raw: unknown): unknown => {
+  if (typeof raw !== "string") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * A signed device authorization (or its JSON text), verified: signature,
+ * kind and exact shape. Null otherwise. Whether its author may act for the
+ * verifier is the verifier's call.
+ */
+export const verifyDeviceAuthorization = (
+  raw: unknown,
+): DeviceAuthorization | null => {
+  const event = Either.getOrNull(decodeVerifiedPlainEvent(parseJsonOrRaw(raw)));
+  if (event === null) return null;
+  const authorization = authorizationOf(event);
+  if (authorization === null) return null;
+  return new DeviceAuthorization({
+    eventId: event.id,
+    author: event.pubkey,
+    ...authorization,
+    createdAt: event.created_at,
+    event,
+  });
+};
 
 const decodeRequest = Schema.decodeUnknownOption(NostrConnectRequest);
 const isRelayUrl = Schema.is(RelayUrl);
@@ -151,6 +225,27 @@ const hostOf = (url: string): string | null => {
   }
 };
 
+const deviceAuthorizationPolicy = (
+  request: NostrConnectRequest,
+  template: PlainEventTemplate,
+): Either.Either<PlainEventTemplate, string> => {
+  // A blanket `sign_event` (or no perms) never covers it: the approval
+  // screen announces the device link only for the explicit permission.
+  if (!requestsDeviceAuthorization(request)) {
+    return Either.left(`${DEVICE_AUTHORIZATION_PERMISSION} was not requested`);
+  }
+  if (request.name === null) {
+    return Either.left("a device authorization needs the app's name");
+  }
+  const authorization = authorizationOf(template);
+  if (authorization === null) {
+    return Either.left("invalid device authorization");
+  }
+  return authorization.app === request.name
+    ? Either.right(template)
+    : Either.left("app tag does not match the approved name");
+};
+
 const signableTemplate = (
   request: NostrConnectRequest,
   param: string | undefined,
@@ -159,6 +254,9 @@ const signableTemplate = (
     const template = yield* decodeSignTemplate(param).pipe(
       Either.mapLeft(() => "invalid event template"),
     );
+    if (template.kind === DEVICE_AUTHORIZATION_KIND) {
+      return yield* deviceAuthorizationPolicy(request, template);
+    }
     if (!SIGNABLE_KINDS.has(template.kind)) {
       return yield* Either.left(`kind ${template.kind} is not allowed`);
     }
@@ -183,7 +281,12 @@ const signableTemplate = (
 export type NostrConnectOutcome =
   | { readonly _tag: "Answered" }
   | { readonly _tag: "PublicKeyShared" }
-  | { readonly _tag: "Signed"; readonly kind: number }
+  | {
+      readonly _tag: "Signed";
+      readonly kind: number;
+      /** The device a signed device authorization names; null for logins. */
+      readonly device: Pubkey | null;
+    }
   | { readonly _tag: "Refused"; readonly reason: string };
 
 export interface NostrConnectAnswer {
@@ -193,8 +296,9 @@ export interface NostrConnectAnswer {
 
 /**
  * Login policy: share the pubkey, sign only NIP-98 / NIP-42 auth events the
- * URI permits for its own site (`created_at` = `now`), refuse other
- * signatures, and answer anything else with an error the login survives.
+ * URI permits for its own site and the device authorization it explicitly
+ * asks for (`created_at` = `now`), refuse other signatures, and answer
+ * anything else with an error the login survives.
  */
 export const answerNostrConnectRequest = (
   request: NostrConnectRequest,
@@ -224,6 +328,10 @@ export const answerNostrConnectRequest = (
           return answer(JSON.stringify(event), {
             _tag: "Signed",
             kind: event.kind,
+            device:
+              event.kind === DEVICE_AUTHORIZATION_KIND
+                ? (authorizationOf(event)?.device ?? null)
+                : null,
           });
         },
       });

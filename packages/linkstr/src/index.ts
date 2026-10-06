@@ -41,9 +41,20 @@ export * from "./inspector/events";
 export * from "./inspector/Inspector";
 export * from "./inspector/inspectTransport";
 export { SignedPlainEvent } from "./internal/nostrEvent";
+export type { PlainEventTemplate } from "./internal/plainEvent";
 export type { StringStorage } from "./internal/stringStorage";
 export * from "./muteList/MuteList";
-export { NOSTR_CONNECT_KIND, parseNostrConnectUri } from "./nostrConnect/codec";
+export {
+  DEVICE_AUTHORIZATION_KIND,
+  DEVICE_AUTHORIZATION_PERMISSION,
+  deviceAuthorizationTemplate,
+  NOSTR_CONNECT_KIND,
+  parseNostrConnectUri,
+  requestsDeviceAuthorization,
+  verifyDeviceAuthorization,
+} from "./nostrConnect/codec";
+export * from "./nostrConnect/client";
+export * from "./nostrConnect/NostrConnectClient";
 export * from "./nostrConnect/domain";
 export * from "./nostrConnect/NostrConnect";
 export * from "./outbox/domain";

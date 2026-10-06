@@ -1033,10 +1033,13 @@ export const en = {
   lnurlAuthFailed: "LNURL login failed",
   lnurlAuthUnavailable: "Signing in needs an unlocked identity.",
   nostrConnectLoginConfirm: "Log in",
+  nostrConnectLoginConfirmDevice: "Log in and link device",
   nostrConnectLoginWaiting: "Waiting for the site…",
   nostrConnectLoginUnknownSite: "Unknown site",
   nostrConnectLoginUnverified: "Unverified",
   nostrConnectLoginAs: "Log in as",
+  nostrConnectLoginLinksDevice:
+    "{site} also asks to link one of its devices to you. You sign that this device may act for you in {site}.",
   nostrConnectLoginShares:
     "The site gets your public key and a one-time login signature. It can't post as you or read your messages.",
   nostrConnectLoginDone: "Logged in to {site}",

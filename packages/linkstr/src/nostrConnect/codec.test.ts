@@ -7,6 +7,9 @@ import { makeIdentity } from "../testing";
 import {
   answerNostrConnectRequest,
   decodeNostrConnectRequest,
+  DEVICE_AUTHORIZATION_PERMISSION,
+  deviceAuthorizationTemplate,
+  verifyDeviceAuthorization,
   encodeNostrConnectEvent,
   openNostrConnectChannel,
   parseNostrConnectUri,
@@ -103,7 +106,11 @@ describe("parseNostrConnectUri", () => {
 });
 
 const requestWith = (
-  fields: Partial<{ perms: Array<string>; url: string | null }> = {},
+  fields: Partial<{
+    perms: Array<string>;
+    url: string | null;
+    name: string | null;
+  }> = {},
 ) => {
   const parsed = parseNostrConnectUri(uri(`${relay}&secret=x`));
   assert(parsed !== null);
@@ -157,7 +164,11 @@ describe("answerNostrConnectRequest", () => {
       signRequest(nip98),
       now,
     );
-    expect(answer.outcome).toEqual({ _tag: "Signed", kind: 27235 });
+    expect(answer.outcome).toEqual({
+      _tag: "Signed",
+      kind: 27235,
+      device: null,
+    });
     assert("result" in answer.response);
     const event = Schema.decodeUnknownSync(Schema.parseJson(SignedPlainEvent))(
       answer.response.result,
@@ -186,7 +197,11 @@ describe("answerNostrConnectRequest", () => {
       }),
       now,
     );
-    expect(answer.outcome).toEqual({ _tag: "Signed", kind: 22242 });
+    expect(answer.outcome).toEqual({
+      _tag: "Signed",
+      kind: 22242,
+      device: null,
+    });
   });
 
   it.each([
@@ -225,6 +240,93 @@ describe("answerNostrConnectRequest", () => {
       response: { id: "r1", error: reason },
       outcome: { _tag: "Refused", reason },
     });
+  });
+});
+
+describe("device authorization signing", () => {
+  const device = makeIdentity();
+  const app = "Platit prosím";
+  const authorization = deviceAuthorizationTemplate({
+    device: device.pubkey,
+    app,
+  });
+  const allowed = { perms: [DEVICE_AUTHORIZATION_PERMISSION], name: app };
+
+  it("signs the canonical template under its explicit permission and the approved name", () => {
+    const answer = answerNostrConnectRequest(
+      requestWith(allowed),
+      me,
+      signRequest(authorization),
+      now,
+    );
+    expect(answer.outcome).toEqual({
+      _tag: "Signed",
+      kind: 24138,
+      device: device.pubkey,
+    });
+    assert("result" in answer.response);
+    expect(verifyDeviceAuthorization(answer.response.result)).toMatchObject({
+      author: me.pubkey,
+      device: device.pubkey,
+      app,
+      createdAt: now,
+    });
+  });
+
+  it.each([
+    ["no perms", { name: app, perms: [] }, authorization],
+    [
+      "a blanket sign_event",
+      { name: app, perms: ["sign_event"] },
+      authorization,
+    ],
+    [
+      "no app name",
+      { perms: [DEVICE_AUTHORIZATION_PERMISSION] },
+      authorization,
+    ],
+    [
+      "another app's name",
+      allowed,
+      deviceAuthorizationTemplate({ device: device.pubkey, app: "Other" }),
+    ],
+    ["hidden content", allowed, { ...authorization, content: "pay me" }],
+    [
+      "an extra tag",
+      allowed,
+      { ...authorization, tags: [...authorization.tags, ["u", "x"]] },
+    ],
+  ])("refuses it with %s", (_, fields, template) => {
+    const answer = answerNostrConnectRequest(
+      requestWith(fields),
+      me,
+      signRequest(template),
+      now,
+    );
+    expect(answer.outcome._tag).toBe("Refused");
+  });
+
+  it("rejects a forged or reshaped authorization", () => {
+    const answer = answerNostrConnectRequest(
+      requestWith(allowed),
+      me,
+      signRequest(authorization),
+      now,
+    );
+    assert("result" in answer.response);
+    const event = JSON.parse(answer.response.result);
+    expect(
+      verifyDeviceAuthorization({ ...event, sig: "00".repeat(64) }),
+    ).toBeNull();
+    expect(
+      verifyDeviceAuthorization(
+        finalizeEvent(
+          { ...authorization, content: "x", created_at: now },
+          me.secretKey,
+        ),
+      ),
+    ).toBeNull();
+    expect(verifyDeviceAuthorization("not json")).toBeNull();
   });
 });
 
