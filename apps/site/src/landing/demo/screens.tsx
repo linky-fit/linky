@@ -4,6 +4,7 @@ import type { Screen } from "../copy";
 import { ChatPayFlowScreen } from "./chatPay";
 import { ChatRequestFlowScreen } from "./chatRequest";
 import { ContactsScreen, WalletScreen } from "./home";
+import { ProfileOpenScreen, ProfileShareScreen } from "./profileShare";
 import { ProxyOfferScreen } from "./proxy";
 import { useInView } from "./playback";
 import { RecurringListScreen } from "./recurring";
@@ -14,6 +15,8 @@ const demoScreens: Record<Screen, ComponentType> = {
   "chat-request": ChatRequestFlowScreen,
   contacts: ContactsScreen,
   wallet: WalletScreen,
+  "profile-open": ProfileOpenScreen,
+  "profile-share": ProfileShareScreen,
   "proxy-offer": ProxyOfferScreen,
   "recurring-list": RecurringListScreen,
   "token-share": TokenShareScreen,
