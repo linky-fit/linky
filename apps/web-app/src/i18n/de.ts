@@ -1050,10 +1050,13 @@ export const de = {
   lnurlAuthFailed: "LNURL-Anmeldung fehlgeschlagen",
   lnurlAuthUnavailable: "Für die Anmeldung muss die Identität entsperrt sein.",
   nostrConnectLoginConfirm: "Anmelden",
+  nostrConnectLoginConfirmDevice: "Anmelden und Gerät verknüpfen",
   nostrConnectLoginWaiting: "Warte auf die Website…",
   nostrConnectLoginUnknownSite: "Unbekannte Website",
   nostrConnectLoginUnverified: "Nicht verifiziert",
   nostrConnectLoginAs: "Anmelden als",
+  nostrConnectLoginLinksDevice:
+    "{site} möchte außerdem eines seiner Geräte mit dir verknüpfen. Du unterschreibst, dass dieses Gerät in {site} für dich handeln darf.",
   nostrConnectLoginShares:
     "Die Website erhält deinen öffentlichen Schlüssel und eine einmalige Anmeldesignatur. Sie kann nicht in deinem Namen posten und deine Nachrichten nicht lesen.",
   nostrConnectLoginDone: "Bei {site} angemeldet",

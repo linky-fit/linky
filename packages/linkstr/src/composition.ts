@@ -8,6 +8,7 @@ import { InboxCursorStore } from "./inbox/InboxCursorStore";
 import { WrapInbox } from "./inbox/WrapInbox";
 import { MuteList } from "./muteList/MuteList";
 import { NostrConnect } from "./nostrConnect/NostrConnect";
+import { NostrConnectClient } from "./nostrConnect/NostrConnectClient";
 import { Outbox } from "./outbox/Outbox";
 import { OutboxStore } from "./outbox/OutboxStore";
 import { PaymentNotices } from "./paymentNotices/PaymentNotices";
@@ -69,6 +70,7 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
     RelayLists.Default,
     MuteList.Default,
     NostrConnect.Default,
+    NostrConnectClient.Default,
   ).pipe(
     Layer.provideMerge(
       Layer.mergeAll(

@@ -14,6 +14,7 @@ ESM with TypeScript declarations, for Node 22.14+ and browser bundlers. `@linky-
 
 - Gift-wrapped verticals (NIP-17/NIP-59): `Chat`, `Reactions`, `SeenReceipts`, `PaymentNotices`, `PaymentTelemetry`, `BankOffers`, and `AppMessages` for your app's own typed messages.
 - Plain signed events: `Profiles` and `ProfileWatch`, `RelayLists`, `MuteList`, `AppData` (NIP-78).
+- NIP-46: `NostrConnect` answers a `nostrconnect://` link as the signer; `NostrConnectClient` opens one and asks a signer to sign.
 - HTTP auth codecs, signed and never published: Blossom upload auth, NIP-98 headers, push ownership proofs.
 - Shared machinery: `WrapInbox` (the one kind-1059 subscription), `Outbox` (durable send queue with retries), `PushInbox` (wrap routing for push servers), `RelayHealth`, `Inspector` and the key codecs.
 
