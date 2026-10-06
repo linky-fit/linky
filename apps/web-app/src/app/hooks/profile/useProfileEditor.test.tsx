@@ -1,19 +1,53 @@
 import { ProfileMetadata } from "@linky-fit/linkstr";
+import { Exit } from "effect";
 import { act, useEffect } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { useProfileEditor } from "./useProfileEditor";
 
-vi.mock("@linky-fit/linkstr-react", () => ({
-  publishProfileAtom: {},
-  publishStatusAtom: {},
-  useAtomSet: () => vi.fn(),
+const mocks = vi.hoisted(() => ({
+  publishProfile: vi.fn(),
+  publishStatus: vi.fn(),
+  prepareProfilePicture: vi.fn(),
+  setMyProfilePicture: vi.fn(),
+  setStatus: vi.fn(),
 }));
 
-describe("profile address claim validation", () => {
+vi.mock("@linky-fit/linkstr-react", () => {
+  const publishProfileAtom = {};
+  return {
+    publishProfileAtom,
+    publishStatusAtom: {},
+    useAtomSet: (atom: unknown) =>
+      atom === publishProfileAtom ? mocks.publishProfile : mocks.publishStatus,
+  };
+});
+
+vi.mock("../../lib/profilePicture", () => ({
+  prepareProfilePicture: mocks.prepareProfilePicture,
+}));
+
+vi.mock("../../../profileCache", () => ({
+  cacheProfileAvatarFromUrl: vi.fn(),
+  deleteCachedProfileAvatar: vi.fn(),
+  loadCachedProfile: vi.fn(),
+  saveCachedProfile: vi.fn(),
+  saveCachedStatus: vi.fn(),
+}));
+
+describe("profile editor", () => {
   let unmount: (() => Promise<void>) | undefined;
   afterEach(async () => {
     await unmount?.();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.publishProfile.mockResolvedValue(Exit.succeed(undefined));
+    mocks.publishStatus.mockResolvedValue(Exit.succeed(undefined));
+    mocks.prepareProfilePicture.mockResolvedValue(
+      "https://blossom.primal.net/photo.jpg",
+    );
   });
 
   const setup = async (lightningAddress: string) => {
@@ -35,9 +69,9 @@ describe("profile address claim validation", () => {
         setMyProfileLnAddress: vi.fn(),
         setMyProfileMetadata: vi.fn(),
         setMyProfileName: vi.fn(),
-        setMyProfilePicture: vi.fn(),
+        setMyProfilePicture: mocks.setMyProfilePicture,
         setMyProfileStatus: vi.fn(),
-        setStatus: vi.fn(),
+        setStatus: mocks.setStatus,
         t: (key) => key,
       });
       useEffect(() => {
@@ -70,5 +104,44 @@ describe("profile address claim validation", () => {
       editor.current?.setProfileEditLnAddress(" Alice@LINKY.FIT "),
     );
     expect(editor.current?.unregisteredOwnLightningAddress).toBeNull();
+  });
+
+  it("publishes and stores the uploaded photo URL instead of the local preview", async () => {
+    const editor = await setup("alice@linky.fit");
+    const preview = "data:image/jpeg;base64,YXZhdGFy";
+    await act(async () => editor.current?.onProfilePhotoSelected(preview));
+    await act(async () => editor.current?.saveProfileEdits());
+
+    expect(mocks.prepareProfilePicture).toHaveBeenCalledWith(
+      preview,
+      "nsec1custom",
+    );
+    expect(mocks.publishProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        picture: "https://blossom.primal.net/photo.jpg",
+      }),
+    );
+    expect(mocks.setMyProfilePicture).toHaveBeenCalledWith(
+      "https://blossom.primal.net/photo.jpg",
+    );
+  });
+
+  it("keeps the published profile and edit open when the photo upload fails", async () => {
+    const editor = await setup("alice@linky.fit");
+    mocks.prepareProfilePicture.mockRejectedValueOnce(
+      new Error("upload-failed:503"),
+    );
+    await act(async () =>
+      editor.current?.onProfilePhotoSelected("data:image/jpeg;base64,YXZhdGFy"),
+    );
+    await act(async () => editor.current?.saveProfileEdits());
+
+    expect(mocks.publishProfile).not.toHaveBeenCalled();
+    expect(mocks.publishStatus).not.toHaveBeenCalled();
+    expect(mocks.setMyProfilePicture).not.toHaveBeenCalled();
+    expect(editor.current?.isProfileEditing).toBe(true);
+    expect(mocks.setStatus).toHaveBeenCalledWith(
+      expect.stringContaining("upload-failed:503"),
+    );
   });
 });

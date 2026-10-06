@@ -42,7 +42,7 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Authorization, Content-Type, X-SHA-256",
+    "Authorization, Content-Type, X-SHA-256, X-Blob-Type",
   );
   res.setHeader("Access-Control-Allow-Methods", "OPTIONS, PUT");
   res.setHeader("Cache-Control", "no-store");
@@ -57,6 +57,7 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
   }
 
   const authorization = readHeader(req.headers, "authorization");
+  const blobType = readHeader(req.headers, "x-blob-type");
   const expectedSha256 = readHeader(req.headers, "x-sha-256").toLowerCase();
   const bytes = readBodyBytes(req.body);
 
@@ -84,7 +85,9 @@ export default async function handler(req: RequestLike, res: ResponseLike) {
       method: "PUT",
       headers: {
         Authorization: authorization,
-        "Content-Type": "text/plain;charset=UTF-8",
+        "Content-Type": /^image\/(jpeg|png|webp|gif)$/.test(blobType)
+          ? blobType
+          : "text/plain;charset=UTF-8",
         "X-SHA-256": expectedSha256,
       },
       body: copyToArrayBuffer(bytes),

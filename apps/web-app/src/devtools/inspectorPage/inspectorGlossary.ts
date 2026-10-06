@@ -20,6 +20,12 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
 };
 
 const TAG_DESCRIPTIONS: Record<string, string> = {
+  "profile.pictureUploadStarted":
+    "A cropped profile photo is being uploaded publicly before publishing its URL to Nostr. The blob link is the SHA-256 of the photo bytes.",
+  "profile.pictureUploaded":
+    "The public photo upload returned an HTTPS URL and a matching SHA-256. The profile can now publish that URL.",
+  "profile.pictureUploadFailed":
+    "The public photo upload failed. The profile save stops before replacing the previously published photo.",
   "keryx.paired":
     "The user paired with a Keryx company: confirmed its join origin, chose channels and subscribed. The payload lists the chosen channels and how many private feeds a master-signed pattern authorized. The company link is the join origin, shared by every row about that company.",
   "keryx.pairFailed":

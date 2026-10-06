@@ -7,6 +7,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { Schema } from "effect";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { decodeBase64Url, encodeBase64Url } from "../../utils/base64";
+import { getBlossomUploadProxyUrl } from "../../utils/blossomUploadProxy";
 import { getUnknownErrorMessage, isRecord } from "../../utils/unknown";
 import { asNonEmptyString } from "../../utils/validation";
 import { nowSeconds } from "../../utils/time";
@@ -15,7 +16,6 @@ import type { I18nKey, Translate } from "../../i18n";
 const PRIVATE_IMAGE_MESSAGE_TYPE = "linky.private_image.v1";
 const PRIVATE_IMAGE_COMPACT_PREFIX = "linky:image:v1:";
 const BLOSSOM_UPLOAD_SERVERS = ["https://blossom.primal.net"];
-const LINKY_WEB_APP_ORIGIN = "https://app.linky.fit";
 const MAX_IMAGE_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_PDF_BYTES = 2 * 1024 * 1024;
 const PDF_FILE_TYPE = "application/pdf";
@@ -130,23 +130,6 @@ const copyToArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
   return buffer;
-};
-
-const getBlossomUploadProxyUrl = (): string => {
-  if (typeof window === "undefined") {
-    return `${LINKY_WEB_APP_ORIGIN}/api/blossom-upload`;
-  }
-
-  const { hostname, origin, protocol } = window.location;
-  const isLocalDevelopment =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "[::1]";
-  if ((protocol === "https:" || protocol === "http:") && !isLocalDevelopment) {
-    return `${origin}/api/blossom-upload`;
-  }
-
-  return `${LINKY_WEB_APP_ORIGIN}/api/blossom-upload`;
 };
 
 const readPositiveInteger = (value: unknown): number | null => {
