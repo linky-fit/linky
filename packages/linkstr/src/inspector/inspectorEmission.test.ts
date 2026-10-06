@@ -14,13 +14,17 @@ import {
   PrivateImage,
   TokenMessageDraft,
 } from "../chat/domain";
+import { encodeAppMessageRumor } from "../appMessages/codec";
+import { AppMessageDraft, AppNamespace } from "../appMessages/domain";
 import { linkstrServices } from "../composition";
 import { ClientId, Pubkey, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { WrapInbox } from "../inbox/WrapInbox";
 import { wrapRumorFor } from "../internal/giftWrap";
+import type { SignedWrapEvent } from "../internal/nostrEvent";
 import { NostrConnectRequest } from "../nostrConnect/domain";
 import { NostrConnect } from "../nostrConnect/NostrConnect";
 import { OutboxRef } from "../outbox/domain";
+import type { RumorFixedOperation } from "../outbox/domain";
 import { Outbox } from "../outbox/Outbox";
 import { observeTransport } from "../relayHealth/observeTransport";
 import { RelayHealth } from "../relayHealth/RelayHealth";
@@ -236,7 +240,11 @@ const incomingTokenWrap = wrapRumorFor(
   me.pubkey,
 );
 
-const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
+/** Enqueues `operation` and receives `incomingWrap`, like a token round trip. */
+const collectWrapEmissions = (
+  incomingWrap: SignedWrapEvent,
+  operation: RumorFixedOperation,
+): Promise<InspectorEvent[]> => {
   const transport = Layer.succeed(NostrTransport, {
     publish: (relays) =>
       Effect.succeed(
@@ -251,9 +259,9 @@ const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
       ),
     subscribe: (_relay, filter, onEvent) =>
       Effect.sync(() => {
-        if (filter.kinds?.includes(1059)) onEvent(incomingTokenWrap);
+        if (filter.kinds?.includes(1059)) onEvent(incomingWrap);
       }).pipe(Effect.andThen(Effect.never)),
-    fetch: () => Effect.succeed([incomingTokenWrap]),
+    fetch: () => Effect.succeed([incomingWrap]),
   });
   const layer = linkstrServices({
     ...identityConfig,
@@ -275,20 +283,11 @@ const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
     ).pipe(Effect.fork);
 
     const outbox = yield* Outbox;
-    yield* outbox.enqueue(
-      {
-        _tag: "chat.token",
-        draft: new TokenMessageDraft({
-          to: peer,
-          token: CashuTokenText.make(cashuToken),
-        }),
-      },
-      OutboxRef.make("emission-token-1"),
-    );
+    yield* outbox.enqueue(operation, OutboxRef.make("emission-wrap-1"));
     const inbox = yield* WrapInbox;
     const feed = yield* inbox.open({});
     yield* Stream.runHead(feed.events);
-    yield* inbox.fetchWrapEvent(incomingTokenWrap.id);
+    yield* inbox.fetchWrapEvent(incomingWrap.id);
     yield* Effect.iterate(0, {
       while: (tries) =>
         tries < 100 &&
@@ -302,6 +301,36 @@ const collectTokenEmissions = (): Promise<InspectorEvent[]> => {
   return Effect.runPromise(Effect.scoped(Effect.provide(program, layer)));
 };
 
+const collectTokenEmissions = (): Promise<InspectorEvent[]> =>
+  collectWrapEmissions(incomingTokenWrap, {
+    _tag: "chat.token",
+    draft: new TokenMessageDraft({
+      to: peer,
+      token: CashuTokenText.make(cashuToken),
+    }),
+  });
+
+const appMessageSecret = JSON.stringify({
+  type: "LockedToken",
+  token: cashuToken,
+});
+const appMessageDraft = (to: Pubkey) =>
+  new AppMessageDraft({
+    to,
+    app: AppNamespace.make("emission-test"),
+    content: appMessageSecret,
+  });
+const incomingAppMessageWrap = wrapRumorFor(
+  encodeAppMessageRumor(
+    appMessageDraft(me.pubkey),
+    sender.pubkey,
+    UnixSeconds.make(1_754_000_002),
+    ClientId.make("incoming-app-message"),
+  ),
+  sender.secretKey,
+  me.pubkey,
+);
+
 describe("inspector emission never carries cashu tokens", () => {
   it("redacts the token on every send, outbox, and inbox row", async () => {
     const collected = await collectTokenEmissions();
@@ -313,6 +342,26 @@ describe("inspector emission never carries cashu tokens", () => {
 
     for (const event of collected) {
       const serialized = JSON.stringify(event);
+      expect(serialized, eventLabel(event)).not.toContain(cashuToken);
+    }
+  });
+});
+
+describe("inspector emission never carries app message content", () => {
+  it("redacts the content on every send, outbox, and inbox row", async () => {
+    const collected = await collectWrapEmissions(incomingAppMessageWrap, {
+      _tag: "appMessage",
+      draft: appMessageDraft(peer),
+    });
+    expectNoIdentitySecrets(collected);
+    const labels = collected.map(eventLabel);
+
+    expect(labels).toContain("PlainOperationSucceeded:outbox.enqueue");
+    expect(labels).toContain("OperationSucceeded:appMessages.send");
+    expect(labels).toContain("InboxRouted");
+    for (const event of collected) {
+      const serialized = JSON.stringify(event);
+      expect(serialized, eventLabel(event)).not.toContain("LockedToken");
       expect(serialized, eventLabel(event)).not.toContain(cashuToken);
     }
   });

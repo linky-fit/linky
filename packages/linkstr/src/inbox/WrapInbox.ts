@@ -34,6 +34,7 @@ import {
   makeSeenWrapIds,
 } from "../internal/seenWrapIds";
 import type { PaymentNoticeInboxEvent } from "../paymentNotices/events";
+import type { AppMessageInboxEvent } from "../appMessages/events";
 import type { ReactionInboxEvent } from "../reactions/events";
 import type { SeenReceiptInboxEvent } from "../seenReceipts/events";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
@@ -45,6 +46,7 @@ import { WrapDropped } from "./events";
 import type { InboxDelivery } from "./events";
 
 export type WrapInboxEvent =
+  | AppMessageInboxEvent
   | BankOfferInboxEvent
   | ReactionInboxEvent
   | ChatInboxEvent

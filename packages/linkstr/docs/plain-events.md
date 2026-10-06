@@ -1,6 +1,6 @@
 # Plain events
 
-Three verticals publish plain signed events, not gift wraps: anyone can read them, they replace the previous event of their kind on relays, and they are fetched or watched rather than received through the inbox. Every publish signs with the configured identity, goes to every write relay concurrently, and returns a `PlainEventReceipt` with one `RelayPublishResult` per relay. Errors are in [the shared table](./concepts.md#errors).
+Four verticals publish plain signed events, not gift wraps: anyone can read them, they replace the previous event of their kind (and, for app data, `d` tag) on relays, and they are fetched or watched rather than received through the inbox. Every publish signs with the configured identity, goes to every write relay concurrently, and returns a `PlainEventReceipt` with one `RelayPublishResult` per relay. Errors are in [the shared table](./concepts.md#errors).
 
 ## Profiles and status
 
@@ -139,3 +139,55 @@ Kind 10000, plain and replaceable: one `["p", pubkey]` per muted contact, empty 
 ### Errors
 
 `NoRelayAcceptedEvent` (publish); the local block still applies, republish later. `AllRelaysUnreachable`, `SomeRelaysUnanswered` and `NoReadRelaysConfigured` (fetch); keep the local list and do not publish, since a publish replaces a list you have not seen.
+
+## App data (NIP-78)
+
+`AppData` publishes and reads kind 30078 events: one addressable slot per author and `d` tag (`AppDataIdentifier`), holding whatever public state your app defines. A publish replaces your previous event in that slot. Use it for state others look up by author or tag; for private messages use [app messages](./app-messages.md).
+
+```ts
+import { Effect, Stream } from "effect";
+import {
+  AppData,
+  AppDataDraft,
+  AppDataIdentifier,
+  AppDataQuery,
+  type Pubkey,
+} from "@linky-fit/linkstr";
+
+const slot = AppDataIdentifier.make("myapp:device");
+
+const announce = (employee: Pubkey, attestation: string) =>
+  Effect.flatMap(AppData, (appData) =>
+    appData.publish(
+      new AppDataDraft({
+        identifier: slot,
+        tags: [["p", employee]],
+        content: attestation,
+      }),
+    ),
+  );
+
+// Scoped: the subscriptions close with the scope.
+const watchEmployees = (employees: ReadonlyArray<Pubkey>) =>
+  Effect.gen(function* () {
+    const appData = yield* AppData;
+    const events = yield* appData.watch(
+      new AppDataQuery({ identifiers: [slot], taggedPubkeys: [...employees] }),
+    );
+    yield* Stream.runForEach(events, (event) =>
+      Effect.log(event.author, event.content),
+    );
+  });
+```
+
+`AppDataQuery` narrows by `authors`, `identifiers` (`#d`), `taggedPubkeys` (`#p`) and `since`; every given field must match. `fetch(query)` asks every read relay once (5 s each) and returns the newest event per author and `d` tag, newest first. `watch(query)` is a scoped stream over every read relay, stored events first, then live ones, resubscribing with backoff; per slot it only emits versions newer than one it already emitted. Both verify each event's signature and drop events the query did not ask for, whatever a relay sends. An `AppDataEvent` carries the decoded fields and the signed `event` itself, for embedding or re-verifying elsewhere.
+
+In React, `publishAppDataAtom` and `fetchAppDataAtom` run `publish` and `fetch`.
+
+### Wire format
+
+Kind 30078, plain and addressable: `["d", identifier]` first, then the draft's `tags` in order (a draft cannot carry a second `d` tag), and the draft's `content`. Anyone can read it.
+
+### Errors
+
+`NoRelayAcceptedEvent` (publish), `AllRelaysUnreachable` (fetch), `NoReadRelaysConfigured` (fetch, watch).

@@ -360,6 +360,32 @@ describe("chat rumor decoding", () => {
     );
   });
 
+  it("keeps a NUT-18 payment payload from another wallet as TextBody", () => {
+    const content = JSON.stringify({
+      id: "pay-1",
+      mint: "https://mint.test",
+      unit: "sat",
+      proofs: [{ id: "009a1f293253e41e", amount: 8, secret: "s", C: "02ab" }],
+    });
+    const rumor = withHash({
+      pubkey: bob.pubkey,
+      created_at: sentAt,
+      kind: 14,
+      tags: [["p", alice.pubkey]],
+      content,
+    });
+
+    expect(decodeChatRumor(rumor, alice, wrapAuthor.pubkey)).toEqual(
+      Either.right(
+        expect.objectContaining({
+          _tag: "ChatMessageReceived",
+          from: bob.pubkey,
+          body: expect.objectContaining({ _tag: "TextBody", text: content }),
+        }),
+      ),
+    );
+  });
+
   it("keeps an embedded token as TextBody", () => {
     const content = `here is ${cashuToken} thanks`;
     const rumor = withHash({

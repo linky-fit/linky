@@ -12,8 +12,15 @@ const isAttachment = (value: Record<string, unknown>): boolean =>
 const isCashuTokenField = (field: string, value: unknown): boolean =>
   field === "token" && typeof value === "string" && value.startsWith("cashu");
 
+// App message content is the app's own payload and may carry a token or keys.
+const isAppMessage = (value: Record<string, unknown>): boolean =>
+  typeof value["app"] === "string" && typeof value["content"] === "string";
+
 const redactRecord = (value: Record<string, unknown>): unknown => {
   if (isAttachment(value)) return Struct.omit(value, "key", "nonce");
+  if (isAppMessage(value)) {
+    return { ...value, content: "[redacted app message]" };
+  }
   let changed = false;
   const redacted: Record<string, unknown> = {};
   for (const [field, nested] of Object.entries(value)) {

@@ -47,7 +47,7 @@ Each vertical guide has a **Wire format** section: kind, tags in order, content,
 - **`["client", <ClientId>]`.** An idempotency key that exists before the rumor does and comes back on own echoes, so an optimistic row can be matched. It shares the tag name with NIP-89's `client` tag.
 - **`["linky", <value>]`.** Inside a rumor it names a Linky-specific kind (`payment_notice`, `payment_telemetry`, `bank_payment_offer`, `seen_receipt`) and the decoder requires it. On a wrap, `["linky", "push"]` is the plaintext push marker ([push-inbox.md](./push-inbox.md)), set only on a recipient copy; it is a deliberate, minimal metadata leak.
 - **Delivery order.** A two-copy send publishes both wraps to every write relay in parallel; token messages and bank offers publish the recipient copy first and attempt the self copy only after a relay accepted it.
-- **Kind numbers.** Linky-invented kinds are 24133–24136; each carries its own `["linky", <value>]` marker and a row in the [kind index](./README.md#kind-index).
+- **Kind numbers.** Linky-invented kinds are 24133–24137; each carries its own `["linky", <value>]` marker and a row in the [kind index](./README.md#kind-index).
 
 ## Branded primitives
 

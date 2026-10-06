@@ -27,6 +27,7 @@ import {
 } from "../testing";
 import { OutboxRef } from "./domain";
 import type { OutboxResult, RumorFixedOperation } from "./domain";
+import { AppMessages } from "../appMessages/AppMessages";
 import { Outbox } from "./Outbox";
 import { OutboxStore } from "./OutboxStore";
 import type { OutboxStoreService } from "./OutboxStore";
@@ -55,6 +56,7 @@ const outboxLayer = (
       Chat.Default,
       Reactions.Default,
       PaymentTelemetry.Default,
+      AppMessages.Default,
       Layer.succeed(OutboxStore, store),
     ]),
     Layer.provide([

@@ -1,4 +1,6 @@
 import { Layer } from "effect";
+import { AppData } from "./appData/AppData";
+import { AppMessages } from "./appMessages/AppMessages";
 import { BankOffers } from "./bankOffers/BankOffers";
 import { Chat } from "./chat/Chat";
 import type { NostrSecretKey, RelayUrl } from "./domain/primitives";
@@ -42,6 +44,8 @@ export interface LinkstrServicesConfig {
  */
 export const linkstrServices = (config: LinkstrServicesConfig) =>
   Layer.mergeAll(
+    AppData.Default,
+    AppMessages.Default,
     BankOffers.Default,
     Chat.Default,
     Outbox.Default.pipe(
@@ -49,6 +53,7 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
         Chat.Default,
         Reactions.Default,
         PaymentTelemetry.Default,
+        AppMessages.Default,
         config.outboxStore ?? OutboxStore.inMemory,
       ]),
     ),
