@@ -92,6 +92,43 @@ describe("makeRelayPoolTransport", () => {
   });
 });
 
+describe("makeRelayPoolTransport publishing one event twice", () => {
+  it("accepts both publishes although the relay answers only the latest", async () => {
+    // Like nostr-tools: a pending publish per event id; a second one replaces the first.
+    const waiting = new Map<string, (reason: string) => void>();
+    let sent = 0;
+    const pool: RelayPool = {
+      ensureRelay: async () => ({
+        publish: (published) => {
+          sent += 1;
+          return new Promise<string>((resolve) => {
+            waiting.set(published.id, resolve);
+          });
+        },
+        subscribe: subscribeUnsupported,
+      }),
+    };
+    const results = await Effect.runPromise(
+      Effect.gen(function* () {
+        const publishing = makeRelayPoolTransport(pool, {
+          publishTimeout: Duration.millis(500),
+        });
+        const first = yield* Effect.fork(publishing.publish([relayOk], event));
+        const second = yield* Effect.fork(publishing.publish([relayOk], event));
+        yield* eventually(() => waiting.has(event.id));
+        waiting.get(event.id)?.("");
+        return [yield* Fiber.join(first), yield* Fiber.join(second)];
+      }),
+    );
+
+    expect(sent).toBe(1);
+    expect(results.flat().map(({ accepted }) => accepted)).toEqual([
+      true,
+      true,
+    ]);
+  });
+});
+
 interface FakeSubscription {
   readonly params: RelaySubscriptionParams;
   closedByClient: boolean;

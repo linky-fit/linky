@@ -129,15 +129,33 @@ export const makeRelayPoolTransport = (
     });
   };
 
+  /**
+   * A nostr-tools relay keys a pending publish by event id, so publishing an
+   * event again before its OK arrives orphans the first promise, which then
+   * never settles. Callers that publish the same event twice (a retry, two
+   * screens) share the one in flight instead.
+   */
+  const inFlight = new Map<string, Promise<string>>();
+  const sendOnce = (
+    relay: RelayUrl,
+    event: SignedWrapEvent | SignedPlainEvent,
+  ): Promise<string> => {
+    const key = `${relay} ${event.id}`;
+    const pending = inFlight.get(key);
+    if (pending !== undefined) return pending;
+    const sent = ensureRelay(relay)
+      .then((connection) => connection.publish(event))
+      .finally(() => inFlight.delete(key));
+    inFlight.set(key, sent);
+    return sent;
+  };
+
   const publishToRelay = (
     relay: RelayUrl,
     event: SignedWrapEvent | SignedPlainEvent,
   ): Effect.Effect<RelayPublishResult> =>
     Effect.tryPromise({
-      try: async () => {
-        const connection = await ensureRelay(relay);
-        return await connection.publish(event);
-      },
+      try: () => sendOnce(relay, event),
       catch: (reason) => String(reason),
     }).pipe(
       Effect.timeoutFail({
