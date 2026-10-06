@@ -275,7 +275,7 @@
     },
     "packages/linkshu": {
       "name": "@linky-fit/linkshu",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
         "@noble/hashes": "^2.0.1",
@@ -297,7 +297,7 @@
     },
     "packages/linkstr": {
       "name": "@linky-fit/linkstr",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
         "@noble/curves": "^1.4.1",
