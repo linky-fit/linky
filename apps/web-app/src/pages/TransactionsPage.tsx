@@ -32,6 +32,7 @@ import {
 } from "../components/FloatingActionButton";
 import { RecurringPaymentsList } from "../components/RecurringPaymentsList";
 import { useRecurringPaymentOrders } from "../app/hooks/payments/useRecurringPaymentOrders";
+import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { readRecurringRunRef } from "@linky-fit/recurring-payment";
 import { navigateTo } from "../hooks/useRouting";
 
@@ -164,6 +165,8 @@ interface TransactionCardProps {
   item: TransactionItem;
   nostrPictureByNpub: Readonly<Record<string, string | null>>;
   onToggle: (id: string) => void;
+  /** Interval label of each live recurring payment, e.g. "monthly"; a deleted one has none. */
+  recurringIntervalById: ReadonlyMap<string, string>;
   t: Translate;
   tokenByReferenceId: ReadonlyMap<string, string>;
 }
@@ -181,6 +184,7 @@ const TransactionCardView = ({
   item,
   nostrPictureByNpub,
   onToggle,
+  recurringIntervalById,
   t,
   tokenByReferenceId,
 }: TransactionCardProps): React.ReactElement => {
@@ -253,7 +257,10 @@ const TransactionCardView = ({
                 <Pill
                   size="sm"
                   tone="neutral"
-                  label={t("recurringPaymentTitle")}
+                  label={
+                    recurringIntervalById.get(recurringPaymentId) ??
+                    t("recurringPaymentTitle")
+                  }
                   testID="transaction-recurring-pill"
                 />
               ) : null}
@@ -363,6 +370,16 @@ export function TransactionsPage(): React.ReactElement {
   const transactionRecords = useTransactionRecords();
   const recurringOrders = useRecurringPaymentOrders();
   const hasScheduled = recurringOrders.length > 0;
+  const recurringIntervalById = React.useMemo(
+    () =>
+      new Map(
+        recurringOrders.map((order) => [
+          order.id,
+          describeRecurringInterval(order.schedule.interval, t),
+        ]),
+      ),
+    [recurringOrders, t],
+  );
 
   const tokenByReferenceId = React.useMemo(() => {
     const tokens = new Map<string, string>();
@@ -733,6 +750,7 @@ export function TransactionsPage(): React.ReactElement {
                   key={item.id}
                   nostrPictureByNpub={nostrPictureByNpub}
                   onToggle={toggleExpanded}
+                  recurringIntervalById={recurringIntervalById}
                   t={t}
                   tokenByReferenceId={tokenByReferenceId}
                 />

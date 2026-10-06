@@ -50,10 +50,6 @@ export const pt = {
   recurringSkippedRecipientBody:
     "Pagamento de {amount} {unit} pulado: não é possível pagar ao destinatário.",
   recurringDueTitle: "Pagamento agendado",
-  recurringDueReady: "O pagamento recorrente está pronto.",
-  recurringDueReadyDaily: "O pagamento recorrente diário está pronto.",
-  recurringDueReadyWeekly: "O pagamento recorrente semanal está pronto.",
-  recurringDueReadyMonthly: "O pagamento recorrente mensal está pronto.",
   recurringDueCancel: "Cancelar este pagamento",
   recurringCancelledToast:
     "Pagamento cancelado. O próximo sai na data seguinte.",
@@ -105,7 +101,6 @@ export const pt = {
   recurringEveryNDays: "a cada {count} dias",
   recurringEveryNWeeks: "a cada {count} semanas",
   recurringEveryNMonths: "a cada {count} meses",
-  recurringApproxSat: "~{amount} sat",
   recurringNextRun: "Próximo pagamento",
   recurringLastRun: "Último pagamento",
   recurringRunsCount: "Pagamentos feitos",

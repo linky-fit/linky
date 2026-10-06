@@ -47,10 +47,6 @@ export const cs = {
   recurringSkippedRecipientBody:
     "Platba {amount} {unit} byla přeskočena: příjemci nelze zaplatit.",
   recurringDueTitle: "Plánovaná platba",
-  recurringDueReady: "Pravidelná platba je připravena.",
-  recurringDueReadyDaily: "Pravidelná denní platba je připravena.",
-  recurringDueReadyWeekly: "Pravidelná týdenní platba je připravena.",
-  recurringDueReadyMonthly: "Pravidelná měsíční platba je připravena.",
   recurringDueCancel: "Zrušit tuto platbu",
   recurringCancelledToast: "Platba zrušena. Další proběhne v dalším termínu.",
   recurringWaitingForFunds:
@@ -98,7 +94,6 @@ export const cs = {
   recurringEveryNDays: "každých {count} dní",
   recurringEveryNWeeks: "každých {count} týdnů",
   recurringEveryNMonths: "každých {count} měsíců",
-  recurringApproxSat: "~{amount} sat",
   recurringNextRun: "Další platba",
   recurringLastRun: "Poslední platba",
   recurringRunsCount: "Provedeno plateb",

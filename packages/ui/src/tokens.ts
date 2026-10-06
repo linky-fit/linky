@@ -106,7 +106,13 @@ export const zIndex = {
   toast: 100,
 };
 
-export const duration = { fast: 150, base: 220, slow: 420 };
+export const duration = {
+  fast: 150,
+  base: 220,
+  slow: 420,
+  /** One tick of a second-by-second countdown, so a fill bridges to the next tick. */
+  countdown: 1000,
+};
 
 export const easing = {
   standard: "ease-out",

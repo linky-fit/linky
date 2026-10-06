@@ -4,7 +4,6 @@ import { formatDisplayAmountParts } from "../../utils/displayAmounts";
 import {
   formatRecurringAmountParts,
   recurringAmountFromInput,
-  recurringAmountSecondaryText,
 } from "./recurringAmount";
 
 const rates: FiatRates = {
@@ -130,25 +129,5 @@ describe("formatRecurringAmountParts", () => {
         options("czk"),
       ),
     ).toMatchObject({ approxPrefix: "~", unitLabel: "CZK" });
-  });
-
-  it("adds the approximate sat side only for fiat payments", () => {
-    const t = (key: string) => key;
-    expect(
-      recurringAmountSecondaryText(
-        { amount: 15_000, unit: "czk" },
-        rates,
-        "en",
-        t,
-      ),
-    ).toBe("recurringApproxSat");
-    expect(
-      recurringAmountSecondaryText(
-        { amount: 7_500, unit: "sat" },
-        rates,
-        "en",
-        t,
-      ),
-    ).toBeNull();
   });
 });

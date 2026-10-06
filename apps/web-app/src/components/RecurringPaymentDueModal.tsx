@@ -1,8 +1,5 @@
-import {
-  RECURRING_CONFIRM_SEC,
-  type RecurringInterval,
-} from "@linky-fit/recurring-payment";
-import { Stack, Text } from "@linky-fit/ui";
+import { RECURRING_CONFIRM_SEC } from "@linky-fit/recurring-payment";
+import { Pill, Stack, Text } from "@linky-fit/ui";
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useRecurringPaymentsContext } from "../app/context/RecurringPaymentsContext";
@@ -12,23 +9,10 @@ import {
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
-import type { I18nKey } from "../i18n";
+import { formatRecurringAmountParts } from "../app/lib/recurringAmount";
+import { describeRecurringInterval } from "../app/lib/recurringPaymentDisplay";
 import { PaymentConfirmDialog } from "./PaymentConfirmDialog";
 import { RecurringContactAvatar } from "./RecurringContactAvatar";
-
-const readyKeyFor = (interval: RecurringInterval | null): I18nKey => {
-  if (interval === null || interval.count !== 1) return "recurringDueReady";
-  switch (interval.unit) {
-    case "day":
-      return "recurringDueReadyDaily";
-    case "week":
-      return "recurringDueReadyWeekly";
-    case "month":
-      return "recurringDueReadyMonthly";
-    case "hour":
-      return "recurringDueReady";
-  }
-};
 
 /**
  * A due recurring payment about to go out while Linky is open: the payment
@@ -37,7 +21,14 @@ const readyKeyFor = (interval: RecurringInterval | null): I18nKey => {
  * further input and the same sheet turns into the paid confirmation.
  */
 export function RecurringPaymentDueModal(): React.ReactElement | null {
-  const { cashuIsBusy, t } = useAppShellCore();
+  const {
+    cashuIsBusy,
+    displayCurrency,
+    fiatRates,
+    formatDisplayedAmountParts,
+    lang,
+    t,
+  } = useAppShellCore();
   const { cancelDue, confirmDueNow, dueConfirmation } =
     useRecurringPaymentsContext();
   const orders = useRecurringPaymentOrders();
@@ -77,9 +68,22 @@ export function RecurringPaymentDueModal(): React.ReactElement | null {
     }
   };
 
+  // The bar glides toward the next tick's value, so it is full as the payment goes out.
+  const elapsedSec = RECURRING_CONFIRM_SEC - Math.max(0, sendAtSec - nowSec);
+
   return (
     <PaymentConfirmDialog
       amountSat={dueConfirmation.amountSat}
+      amountParts={
+        order
+          ? formatRecurringAmountParts(order.amount, {
+              displayCurrency,
+              fiatRates,
+              formatSat: formatDisplayedAmountParts,
+              lang,
+            })
+          : undefined
+      }
       cancelLabel={t("recurringDueCancel")}
       closeOnBackdrop={false}
       confirmLabel={t("recurringRunNow")}
@@ -97,11 +101,30 @@ export function RecurringPaymentDueModal(): React.ReactElement | null {
       isBusy={cashuIsBusy || isDeciding}
       label={t("recurringDueTitle")}
       layout="description-first"
-      confirmProgress={
-        (RECURRING_CONFIRM_SEC - Math.max(0, sendAtSec - nowSec)) /
-        RECURRING_CONFIRM_SEC
+      confirmProgress={(elapsedSec + 1) / RECURRING_CONFIRM_SEC}
+      meta={
+        order ? (
+          <Stack alignItems="center" gap="$xs">
+            {order.note ? (
+              <Text
+                variant="caption"
+                color="$colorSubtle"
+                textAlign="center"
+                numberOfLines={2}
+                testID="recurring-due-note"
+              >
+                {order.note}
+              </Text>
+            ) : null}
+            <Pill
+              size="sm"
+              tone="neutral"
+              label={describeRecurringInterval(order.schedule.interval, t)}
+              testID="recurring-due-interval"
+            />
+          </Stack>
+        ) : undefined
       }
-      meta={t(readyKeyFor(order?.schedule.interval ?? null))}
       onClose={() => void decide(cancelDue)}
       onConfirm={() => decide(confirmDueNow)}
     />

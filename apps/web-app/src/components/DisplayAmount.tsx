@@ -14,6 +14,8 @@ interface DisplayAmountProps {
   cycles?: boolean | undefined;
   /** The keypad input in the display unit, shown as typed, e.g. with a trailing decimal point. */
   typedValue?: string | null | undefined;
+  /** Replaces the conversion of `amount`, e.g. a payment fixed in fiat shown exactly in its own currency. */
+  parts?: DisplayAmountParts | undefined;
   caption?: string | undefined;
   size?: AmountProps["size"];
   accessibilityLabel?: string | undefined;
@@ -40,6 +42,7 @@ export function DisplayAmount({
   amount,
   cycles = typeof amount === "number",
   typedValue = null,
+  parts,
   caption,
   size = "md",
   accessibilityLabel,
@@ -52,7 +55,11 @@ export function DisplayAmount({
     <Amount
       {...(typeof amount === "string"
         ? { value: amount }
-        : satAmount(formatDisplayedAmountParts(amount), typedValue, lang))}
+        : satAmount(
+            parts ?? formatDisplayedAmountParts(amount),
+            typedValue,
+            lang,
+          ))}
       caption={caption}
       size={size}
     />

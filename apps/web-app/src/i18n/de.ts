@@ -48,11 +48,6 @@ export const de = {
   recurringSkippedRecipientBody:
     "{amount} {unit} übersprungen: Der Empfänger kann nicht bezahlt werden.",
   recurringDueTitle: "Geplante Zahlung",
-  recurringDueReady: "Die wiederkehrende Zahlung ist bereit.",
-  recurringDueReadyDaily: "Die tägliche wiederkehrende Zahlung ist bereit.",
-  recurringDueReadyWeekly:
-    "Die wöchentliche wiederkehrende Zahlung ist bereit.",
-  recurringDueReadyMonthly: "Die monatliche wiederkehrende Zahlung ist bereit.",
   recurringDueCancel: "Diese Zahlung abbrechen",
   recurringCancelledToast:
     "Zahlung abgebrochen. Die nächste folgt zum nächsten Termin.",
@@ -106,7 +101,6 @@ export const de = {
   recurringEveryNDays: "alle {count} Tage",
   recurringEveryNWeeks: "alle {count} Wochen",
   recurringEveryNMonths: "alle {count} Monate",
-  recurringApproxSat: "~{amount} sat",
   recurringNextRun: "Nächste Zahlung",
   recurringLastRun: "Letzte Zahlung",
   recurringRunsCount: "Ausgeführte Zahlungen",
