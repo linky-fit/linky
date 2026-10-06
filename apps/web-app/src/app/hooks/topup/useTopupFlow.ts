@@ -6,7 +6,7 @@ import React from "react";
 import { useLatest } from "../../../hooks/useLatest";
 import { navigateTo } from "../../../hooks/useRouting";
 import type { Route } from "../../../types/route";
-import { buildBip321PaymentUri } from "../../../utils/bip321";
+import { buildBip321PaymentUri } from "@linky-fit/linkshu/payment-request";
 import type { DisplayAmountParts } from "../../../utils/displayAmounts";
 import { getLightningInvoicePreview } from "@linky-fit/linkshu";
 import { MAIN_MINT_URL, normalizeMintUrl } from "../../../utils/mint";

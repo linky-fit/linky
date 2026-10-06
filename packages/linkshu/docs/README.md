@@ -21,6 +21,7 @@ The exported types are the reference; these guides say what to call and what eac
 - [Tokens](./tokens.md): balances, send transitions, `returnToWallet`, `reclaim`, backup import, token codec
 - [Mints](./mints.md): mint info, the known-mint set, icons, Lightning fee probe
 - [Lightning utilities](./lightning-utilities.md): invoice preview, LNURL-pay/withdraw/auth, lightning addresses, fiat rates
+- [Payment requests](./payment-requests.md): NUT-18 `creqA…` requests, BIP-321 `bitcoin:` URIs, and taking a payment by Lightning or Cashu
 
 ## Integrating the package
 

@@ -6,6 +6,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     "lnurl/lightningAddress": "src/lnurl/lightningAddress.ts",
+    "paymentRequest/index": "src/paymentRequest/index.ts",
   },
   format: "esm",
   platform: "neutral",

@@ -1,5 +1,5 @@
 /**
- * BIP 321 / BIP 21 — Bitcoin URI scheme parser.
+ * BIP 321 / BIP 21 — Bitcoin URI scheme parser and builder.
  *
  * Format: `bitcoin:[<address>][?<param>=<value>(&<param>=<value>)*]`
  *
@@ -10,14 +10,24 @@
  * understand and ignore the rest. See
  * https://github.com/bitcoin/bips/blob/master/bip-0321.mediawiki.
  *
- * This module only parses the URI; routing the extracted payment leg into
- * Linky's existing flows happens in the scanned-text handler.
+ * This module only parses and builds the URI; settling the payment leg is
+ * the caller's.
  */
 
-import { isLightningAddress } from "../lnurlPay";
-import { safeDecodeURIComponent, stripLightningPrefix } from "./url";
+import {
+  isLightningAddress,
+  stripLightningPrefix,
+} from "../lnurl/lightningAddress";
 
-interface Bip321Parsed {
+const safeDecodeURIComponent = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+export interface Bip321Parsed {
   address: string | null;
   amountBtc: number | null;
   amountSat: number | null;
@@ -123,6 +133,10 @@ export const parseBip321Uri = (input: string): Bip321Parsed | null => {
   };
 };
 
+/**
+ * `bitcoin:?lightning=<bolt11>&creq=<creqA…>`, leaving out empty legs; null
+ * when both are empty.
+ */
 export const buildBip321PaymentUri = (args: {
   creq?: string | null;
   lightning?: string | null;
@@ -138,7 +152,7 @@ export const buildBip321PaymentUri = (args: {
   return query ? `bitcoin:?${query}` : null;
 };
 
-interface Bip321PayableLeg {
+export interface Bip321PayableLeg {
   kind: "cashu-request" | "lightning" | "lnurl" | "ln-address";
   value: string;
 }

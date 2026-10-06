@@ -2418,3 +2418,32 @@ describe("Receive.receive of a P2PK-locked token", () => {
     ]);
   });
 });
+
+describe("Receive.receive of a NUT-18 payment payload", () => {
+  it("receives the raw {id, mint, unit, proofs} JSON a third-party wallet sends", async () => {
+    const payload = JSON.stringify({
+      id: "pay-1",
+      mint,
+      unit: "sat",
+      proofs: sourceProofs.map((source) => ({
+        id: source.id,
+        amount: source.amount.toNumber(),
+        secret: source.secret,
+        C: source.C,
+      })),
+    });
+    const { wallet } = makeWallet({
+      receive: () => Promise.resolve(receivedProofs),
+    });
+    const exit = await makeHarness(wallet).run(receiveAndInspect(payload));
+    assert(Exit.isSuccess(exit));
+    const { receipt, proofs, operations } = exit.value;
+
+    assert(receipt._tag === "Right");
+    expect(receipt.right.amount).toBe(5);
+    expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
+    expect(operations.map((op) => [op.kind, op.status, op.amount])).toEqual([
+      ["receive", "done", 6],
+    ]);
+  });
+});

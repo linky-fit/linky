@@ -115,6 +115,21 @@ const login = async (scanned: string) => {
 
 `fetchFiatRates(signal)` fetches BTC rates from yadio.io as `FiatRates` (BRL, CHF, CZK, EUR, USD per BTC plus `fetchedAtMs`) and returns `null` on HTTP or shape errors. Cache the JSON under `FIAT_RATES_CACHE_STORAGE_KEY`, read it back with `decodeFiatRates`, and refresh when `isFiatRatesStale` says so (older than `FIAT_RATES_TTL_MS`, 10 minutes).
 
+A fiat amount converts to sats through the matching `…PerBtc` rate; rounding is yours. For an amount in Czech crowns:
+
+```ts
+import { fetchFiatRates } from "@linky-fit/linkshu";
+
+const czkToSats = async (czk: number, signal: AbortSignal) => {
+  const rates = await fetchFiatRates(signal);
+  if (rates === null) return null; // keep showing the last cached rate
+  return {
+    sats: Math.ceil((czk / rates.czkPerBtc) * 1e8),
+    rate: rates.czkPerBtc,
+  };
+};
+```
+
 ## Errors
 
 | Source                   | Failure shape                                                                               | What to do                                 |
