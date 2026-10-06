@@ -44,6 +44,7 @@ export * from "./lnurl/lnurlPay";
 export * from "./invoice/paymentAmountFallback";
 export * from "./mint/icons";
 export * from "./fiatRates";
+export * from "./paymentRequest";
 export {
   getLightningAddressRequestUrl,
   splitLightningAddress,

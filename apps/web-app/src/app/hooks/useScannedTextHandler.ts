@@ -16,7 +16,10 @@ import {
   isLnurlWithdrawTarget,
   LnurlTagMismatchError,
 } from "../../lnurlPay";
-import { parseBip321Uri, pickBip321PayableLeg } from "../../utils/bip321";
+import {
+  parseBip321Uri,
+  pickBip321PayableLeg,
+} from "@linky-fit/linkshu/payment-request";
 import { parseNativeDeepLinkUrl } from "../../utils/deepLinks";
 import {
   getLightningInvoicePreview,
