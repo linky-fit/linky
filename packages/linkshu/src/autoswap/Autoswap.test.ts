@@ -145,6 +145,7 @@ const makeMelt = (
   const quotedInvoices: string[] = [];
   const service = Melt.make({
     status: () => Effect.succeed("UNPAID"),
+    cost: () => Effect.die("not under test"),
     quote: (draft: MeltDraft) => {
       quotedInvoices.push(draft.invoice);
       return Effect.succeed(

@@ -22,6 +22,12 @@ export class MeltDraft extends Schema.Class<MeltDraft>("MeltDraft")({
   mint: MintUrl,
   invoice: Bolt11Invoice,
   quoteId: Schema.optional(QuoteId),
+  /**
+   * The most the melt may take from the balance, such as the
+   * `MeltCost.maxTotal` the user confirmed. A melt that would cost more fails
+   * with `PaymentFailed` before any proof moves.
+   */
+  maxTotal: Schema.optional(Amount),
 }) {}
 
 /** A priced melt offer — what a confirmation UI shows before paying. */
@@ -42,6 +48,27 @@ export class MeltReceipt extends Schema.Class<MeltReceipt>("MeltReceipt")({
   feePaid: NonNegativeAmount,
   /** NUT-08 change returned to the wallet as fresh `available` proofs. */
   changeAmount: NonNegativeAmount,
+  /**
+   * Cashu input fee of the swap that cut the melt inputs out of the balance,
+   * on top of `feePaid`. Zero for a melt `resumePending` settled: the swap
+   * is not recorded.
+   */
+  swapFee: Schema.optionalWith(NonNegativeAmount, {
+    default: () => NonNegativeAmount.make(0),
+  }),
+}) {}
+
+/**
+ * The most paying `quote` can take from the balance: the invoice, the
+ * Lightning fee reserve, and the cashu input fees of the swap that funds the
+ * melt (counted over every available proof at the mint) and of the melt
+ * inputs. Pass `maxTotal` to `melt` so the payment never costs more.
+ */
+export class MeltCost extends Schema.Class<MeltCost>("MeltCost")({
+  quote: MeltQuote,
+  /** Cashu input fees on top of the invoice and the fee reserve. */
+  inputFee: NonNegativeAmount,
+  maxTotal: Amount,
 }) {}
 
 /** What `resumePending` did with one persisted melt record. */
