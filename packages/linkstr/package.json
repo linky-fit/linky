@@ -1,7 +1,7 @@
 {
   "name": "@linky-fit/linkstr",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
   "license": "0BSD",
   "type": "module",
   "main": "./src/index.ts",
