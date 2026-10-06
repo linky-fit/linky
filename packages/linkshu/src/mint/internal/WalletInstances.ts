@@ -59,7 +59,11 @@ export interface LoadedWallet {
     config?: ReceiveConfig,
     outputType?: OutputType,
   ): Promise<SwapPreview>;
-  completeSwap(swapPreview: SwapPreview): Promise<SendResponse>;
+  /** `privkey` signs P2PK-locked inputs first. */
+  completeSwap(
+    swapPreview: SwapPreview,
+    privkey?: string,
+  ): Promise<SendResponse>;
   send(
     amount: AmountLike,
     proofs: ProofLike[],

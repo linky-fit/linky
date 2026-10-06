@@ -116,6 +116,28 @@ export class AmountConsumedByFee extends Schema.TaggedError<AmountConsumedByFee>
   },
 ) {}
 
+/**
+ * The token's proofs are locked (NUT-11 P2PK) and the receive was given no
+ * key, or one they are not locked to. Nothing was written; receive the text
+ * again with a key `pubkeys` names.
+ */
+export class TokenLocked extends Schema.TaggedError<TokenLocked>()(
+  "TokenLocked",
+  {
+    mint: MintUrl,
+    /** Compressed pubkeys any of whose keys could sign for the proofs. */
+    pubkeys: Schema.Array(Schema.String),
+  },
+) {}
+
+/** A send asked to lock its proofs at a mint that does not advertise NUT-11. */
+export class LockingUnsupported extends Schema.TaggedError<LockingUnsupported>()(
+  "LockingUnsupported",
+  {
+    mint: MintUrl,
+  },
+) {}
+
 export class QuoteExpired extends Schema.TaggedError<QuoteExpired>()(
   "QuoteExpired",
   {

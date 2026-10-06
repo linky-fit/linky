@@ -39,6 +39,28 @@ Pick `mint` from `Tokens.balances.perMint`; sends never cross mints. Both `token
 
 `Tokens.returnToWallet` re-receives the token, so the copy the recipient holds dies at the mint. Recovery is attempted, not guaranteed: a transient failure leaves the send for a retry ([tokens.md](./tokens.md#returntowallet)).
 
+### Locking to a key (NUT-11)
+
+Set `lockTo` to make a token only one key's holder can receive: the send proofs are P2PK outputs locked to that pubkey, and the receipt's `lockTo` repeats it. Build it with `parseP2pkPubkey(text)`, which takes a compressed hex key, an x-only hex key or an `npub` (x-only keys become the even-y `02…` point, so a Nostr key's holder can sign for them) and returns `null` for anything that is not a point on the curve.
+
+```ts
+import { Effect } from "effect";
+import { parseP2pkPubkey, Send, SendDraft } from "@linky-fit/linkshu";
+import type { Amount, MintUrl } from "@linky-fit/linkshu";
+
+const lockedFor = (mint: MintUrl, amount: Amount, ownerNpub: string) =>
+  Effect.gen(function* () {
+    const lockTo = parseP2pkPubkey(ownerNpub);
+    if (lockTo === null) return null;
+    const receipt = yield* (yield* Send).send(
+      new SendDraft({ mint, amount, produceAs: "pending", lockTo }),
+    );
+    return receipt.tokenText; // deliver it; the owner receives it with its key
+  });
+```
+
+The mint must list NUT-11 in its info (`Mints.info(mint).supportsP2pk`); otherwise the send fails with `LockingUnsupported` before anything changes. The locked outputs carry random secrets, so they use no counter slots and `Restore` cannot find them: a swap whose response is lost loses the sent amount, as any non-deterministic output would. The send is still a `send` transfer with its proofs `handedOut`, so `Validation.checkIssued` closes it once the key holder claims it; `Tokens.returnToWallet` cannot take it back without the key and fails with `TokenLocked`.
+
 ### Fees
 
 Sends are exact-amount: the recipient receives `amount`. The mint's input fee comes out of the change, so `feePaid = offered - amount - changeAmount`. If the offered proofs cannot cover `amount` plus the fee, the mint's rejection is reported as `InsufficientFunds`. There is no amount step-down in the package; the caller decides whether to retry lower.
@@ -51,6 +73,7 @@ On every failure the unspent sources stay `available`; proofs the pre-check foun
 | --------------------- | --------------------------------------------------------------------------------------- |
 | `InsufficientFunds`   | confirmed-unspent balance at `mint` is below `amount`, or the swap could not cover fees |
 | `AmountConsumedByFee` | `amount` does not exceed the input fee the recipient pays to redeem the token           |
+| `LockingUnsupported`  | `lockTo` is set and the mint does not advertise NUT-11                                  |
 
 `MintUnreachable`, `MintRejected`, and `CounterLockTimeout` are in [errors.md](./errors.md).
 

@@ -7,8 +7,10 @@ import {
   ReceiveDeferred,
   TokenAlreadyKnown,
   TokenAlreadySpent,
+  TokenLocked,
   TokenParseFailed,
 } from "../domain/errors";
+import type { P2pkUnlockingKey } from "../domain/p2pk";
 import {
   Amount,
   CurrencyUnit,
@@ -45,8 +47,17 @@ export class ReceiveReceipt extends Schema.Class<ReceiveReceipt>(
   amount: Amount,
 }) {}
 
+export interface ReceiveUnlockOptions {
+  /**
+   * Signs for inputs locked to its pubkey (NUT-11 P2PK); the received
+   * proofs are plain wallet proofs. Never persisted or logged.
+   */
+  readonly unlockingKey?: P2pkUnlockingKey | undefined;
+}
+
 export const ReceiveError = Schema.Union(
   TokenParseFailed,
+  TokenLocked,
   TokenAlreadyKnown,
   AmountConsumedByFee,
   TokenAlreadySpent,

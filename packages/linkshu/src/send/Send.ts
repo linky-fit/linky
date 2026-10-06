@@ -1,5 +1,9 @@
 import { Effect } from "effect";
-import { AmountConsumedByFee, InsufficientFunds } from "../domain/errors";
+import {
+  AmountConsumedByFee,
+  InsufficientFunds,
+  LockingUnsupported,
+} from "../domain/errors";
 import { Amount, NonNegativeAmount, UnixSeconds } from "../domain/primitives";
 import { Inspector } from "../inspector/Inspector";
 import type { CounterScope } from "../internal/counters";
@@ -25,6 +29,7 @@ import {
 import { KeyValueStore } from "../ports/KeyValueStore";
 import { NewOperation, OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
+import { supportsP2pk } from "../mint/internal/nutSupport";
 import { encodeCashuProofs } from "../token/internal/cashuProofs";
 import { SendReceipt } from "./domain";
 import type { SendDraft, SendError } from "./domain";
@@ -49,6 +54,9 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
     const send = (draft: SendDraft): Effect.Effect<SendReceipt, SendError> =>
       Effect.gen(function* () {
         const wallet = yield* instances.get(draft.mint, sat);
+        if (draft.lockTo !== undefined && !supportsP2pk(wallet)) {
+          return yield* new LockingUnsupported({ mint: draft.mint });
+        }
         const keysetId = yield* boundKeysetId(draft.mint, wallet);
         const scope: CounterScope = { mint: draft.mint, unit: sat, keysetId };
         // Whoever redeems the token pays the mint's input fee on its proofs;
@@ -86,6 +94,7 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
             amount: draft.amount,
             proofs: spendable.map(toDomainProof),
             available,
+            ...(draft.lockTo === undefined ? {} : { lockSendTo: draft.lockTo }),
           },
         );
         const sendEncoded = encodeCashuProofs({
@@ -150,6 +159,7 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
           mint: draft.mint,
           unit: sat,
           amount: sendEncoded.amount,
+          lockTo: draft.lockTo ?? null,
           changeAmount: NonNegativeAmount.make(outcome.keepAmount),
           feePaid: NonNegativeAmount.make(feePaid),
         });
@@ -161,6 +171,7 @@ export class Send extends Effect.Service<Send>()("linkshu/Send", {
             mint: draft.mint,
             amount: draft.amount,
             produceAs: draft.produceAs,
+            lockTo: draft.lockTo ?? null,
           },
           redactReceipt,
         ),
