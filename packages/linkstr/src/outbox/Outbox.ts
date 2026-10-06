@@ -1,4 +1,7 @@
 import { Cause, Duration, Effect, Exit, Option, Queue, Stream } from "effect";
+import { AppMessages } from "../appMessages/AppMessages";
+import { encodeAppMessageRumor } from "../appMessages/codec";
+import { AppMessageDraft } from "../appMessages/domain";
 import { Chat } from "../chat/Chat";
 import {
   encodeEditRumor,
@@ -93,6 +96,11 @@ const normalizeOperation = (
         _tag: operation._tag,
         draft: new ReactionDraft({ ...operation.draft, clientId, sentAt }),
       };
+    case "appMessage":
+      return {
+        _tag: operation._tag,
+        draft: new AppMessageDraft({ ...operation.draft, clientId, sentAt }),
+      };
   }
 };
 
@@ -113,6 +121,8 @@ const encodeOperationRumor = (
       return encodeEditRumor(operation.draft, author, sentAt, clientId);
     case "reaction":
       return encodeReactionRumor(operation.draft, author, sentAt, clientId);
+    case "appMessage":
+      return encodeAppMessageRumor(operation.draft, author, sentAt, clientId);
   }
 };
 
@@ -130,7 +140,8 @@ const isOnlineEventTarget = (value: unknown): value is OnlineEventTarget =>
   typeof value.removeEventListener === "function";
 
 /**
- * Durable send queue over the Chat, Reactions and PaymentTelemetry verticals.
+ * Durable send queue over the Chat, Reactions, PaymentTelemetry and
+ * AppMessages verticals.
  * `enqueue` persists
  * a normalized job and precomputes its rumor, so the returned `rumorId` is
  * what every delivery retry publishes; one worker per lane delivers jobs
@@ -149,6 +160,7 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
     const chat = yield* Chat;
     const reactions = yield* Reactions;
     const paymentTelemetry = yield* PaymentTelemetry;
+    const appMessages = yield* AppMessages;
     const identity = yield* LinkstrIdentity;
     const inspector = yield* Inspector.orNoop;
 
@@ -200,6 +212,8 @@ export class Outbox extends Effect.Service<Outbox>()("linkstr/Outbox", {
             operation.draft,
             operation.recipient,
           );
+        case "appMessage":
+          return appMessages.send(operation.draft);
       }
     };
 

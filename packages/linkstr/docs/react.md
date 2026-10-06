@@ -41,6 +41,8 @@ if (Exit.isFailure(exit)) console.warn(Cause.pretty(exit.cause)); // e.g. Linkst
 | `publishMuteListAtom`, `fetchOwnMuteListAtom`      | `MuteList.publishMuteList`, `MuteList.fetchOwnMuteList`                              |
 | `fetchWrapEventAtom`                               | `WrapInbox.fetchWrapEvent` (`{ wrapId, extraRelays? }`)                              |
 | `nostrConnectLoginAtom`                            | `NostrConnect.login` (a `NostrConnectRequest`)                                       |
+| `sendAppMessageAtom`                               | `AppMessages.send`                                                                   |
+| `publishAppDataAtom`, `fetchAppDataAtom`           | `AppData.publish`, `AppData.fetch`                                                   |
 
 Chat sends and reaction adds go through `enqueueOutboxAtom` ([outbox.md](./outbox.md)); there is no `sendTextAtom`.
 

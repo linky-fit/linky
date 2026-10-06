@@ -1,3 +1,10 @@
+export * from "./appData/AppData";
+export * from "./appData/domain";
+export { APP_DATA_KIND } from "./appData/codec";
+export * from "./appMessages/AppMessages";
+export { APP_MESSAGE_KIND, APP_MESSAGE_VALUE } from "./appMessages/codec";
+export * from "./appMessages/domain";
+export * from "./appMessages/events";
 export {
   BANK_OFFER_KIND,
   BANK_OFFER_VALUE,

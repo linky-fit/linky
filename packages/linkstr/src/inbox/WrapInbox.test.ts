@@ -12,6 +12,8 @@ import { finalizeEvent, generateSecretKey, getEventHash } from "nostr-tools";
 import { encrypt, getConversationKey } from "nostr-tools/nip44";
 import { createSeal } from "nostr-tools/nip59";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
+import { encodeAppMessageRumor } from "../appMessages/codec";
+import { AppMessageDraft, AppNamespace } from "../appMessages/domain";
 import { encodeBankOfferRumor } from "../bankOffers/codec";
 import { BankOfferDraft, BankOfferId } from "../bankOffers/domain";
 import {
@@ -98,6 +100,20 @@ const paymentNoticeWrap = () => {
   return wrapRumorFor(rumor, bob.secretKey, alice.pubkey, {
     pushMarker: true,
   });
+};
+
+const appMessageWrap = () => {
+  const rumor = encodeAppMessageRumor(
+    new AppMessageDraft({
+      to: alice.pubkey,
+      app: AppNamespace.make("platitprosim"),
+      content: '{"v":1}',
+    }),
+    bob.pubkey,
+    sentAt,
+    ClientId.make("app-client"),
+  );
+  return wrapRumorFor(rumor, bob.secretKey, alice.pubkey);
 };
 
 const bankOfferWrap = (own: boolean, invalid = false) => {
@@ -722,6 +738,29 @@ describe("WrapInbox", () => {
             _tag: "ChatMessageReceived",
             from: bob.pubkey,
             body: expect.objectContaining({ _tag: "TextBody", text: "hello" }),
+            sentAt,
+          }),
+        );
+      }),
+    );
+  });
+
+  it("routes a wrapped kind-24137 rumor to AppMessageReceived", async () => {
+    const fakeA = new FakeRelay();
+    const wrap = appMessageWrap();
+
+    await runOpen([[relayA, fakeA]], {}, ({ collected }) =>
+      Effect.gen(function* () {
+        yield* eventually(() => fakeA.subscriptions.length === 1);
+        fakeA.emit(wrap);
+        yield* eventually(() => collected.length === 1);
+        expect(collected[0]?.event).toEqual(
+          expect.objectContaining({
+            _tag: "AppMessageReceived",
+            from: bob.pubkey,
+            app: "platitprosim",
+            content: '{"v":1}',
+            clientId: "app-client",
             sentAt,
           }),
         );

@@ -91,6 +91,7 @@ In React the runtime is `linkstrRuntimeAtom`, the consumer is `useOutboxResults`
 | `chat.edit`        | `EditMessageDraft`                    | `Chat.edit`                                |
 | `reaction`         | `ReactionDraft`                       | `Reactions.react`                          |
 | `paymentTelemetry` | `PaymentTelemetryDraft` + `recipient` | `PaymentTelemetry.publishPaymentTelemetry` |
+| `appMessage`       | `AppMessageDraft`                     | `AppMessages.send`                         |
 
 `enqueueTelemetry(draft, recipient, ref)` is separate and returns only an `OutboxJobId`: telemetry is signed by a fresh key per attempt, so there is no rumor id to precompute.
 
@@ -100,7 +101,7 @@ Everything else (retractions, seen receipts, payment notices, bank offers, plain
 
 ## Retry and ordering
 
-- Delivery runs in two lanes, each **strictly FIFO**: one job at a time, in enqueue order. Chat and reaction jobs share the foreground lane; `paymentTelemetry` jobs have a background lane of their own, so a report the collector's relays keep refusing never holds back a chat send. Within a lane a job that keeps failing blocks the ones behind it.
+- Delivery runs in two lanes, each **strictly FIFO**: one job at a time, in enqueue order. Chat, reaction and app-message jobs share the foreground lane; `paymentTelemetry` jobs have a background lane of their own, so a report the collector's relays keep refusing never holds back a chat send. Within a lane a job that keeps failing blocks the ones behind it.
 - Delivery errors (`RecipientNotReached`, `NoRelayReachable`, `WrapNotDelivered`) are retried automatically: sleep 1 s, doubling to a 60 s cap, forever. You never retry a queued job yourself.
 - A new enqueue cuts the current sleep of its own lane short; a browser `online` event (when `globalThis` dispatches one) wakes both lanes.
 - Only two things end a job without success: an unexpected defect (`OutboxJobFailed` with `reason: "unexpected-error"`) and a job enqueued under another pubkey found at startup (`reason: "identity-changed"`). Jobs are never sent under a different key than they were enqueued with.

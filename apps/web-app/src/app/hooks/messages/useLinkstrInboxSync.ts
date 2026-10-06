@@ -294,6 +294,8 @@ export const useLinkstrInboxSync = (params: UseLinkstrInboxSyncParams) => {
         case "OwnSeenReceiptConfirmed":
           applyOwnSeenReceiptConfirmed(event, seenReceiptCtx);
           return NO_WRITE;
+        // Messages other apps define for themselves; Linky has none of its own.
+        case "AppMessageReceived":
         case "WrapDropped":
           return NO_WRITE;
       }
