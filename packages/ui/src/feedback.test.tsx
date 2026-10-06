@@ -1,6 +1,7 @@
+import { act } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "../test/render";
-import { Progress, StatusLine } from "./feedback";
+import { CornerGlowStatus, Progress, StatusLine } from "./feedback";
 
 const progressbar = async (element: React.ReactElement) => {
   const bar = (await render(element)).querySelector("[role=progressbar]");
@@ -33,5 +34,30 @@ describe("StatusLine", () => {
     expect(idle.querySelector("[role=progressbar]")).toBeNull();
     const busy = await render(<StatusLine label="Waiting" busy />);
     expect(busy.querySelector("[role=progressbar]")).not.toBeNull();
+  });
+});
+
+describe("CornerGlowStatus", () => {
+  it("opens its details on press and closes on the next press", async () => {
+    const view = await render(
+      <CornerGlowStatus
+        busy
+        tone="warning"
+        label="Syncing"
+        items={[
+          { label: "Scanning Nostr", tone: "warning", busy: true },
+          { label: "Evolu synced", tone: "accent" },
+        ]}
+      />,
+    );
+    const tab = view.querySelector<HTMLElement>("button[aria-label=Syncing]");
+    expect(view.querySelector("[role=status]")).toBeNull();
+    await act(async () => tab?.click());
+    expect(tab?.getAttribute("aria-expanded")).toBe("true");
+    expect(view.querySelector("[role=status]")?.textContent).toBe(
+      "Scanning NostrEvolu synced",
+    );
+    await act(async () => tab?.click());
+    expect(view.querySelector("[role=status]")).toBeNull();
   });
 });

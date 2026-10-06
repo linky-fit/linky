@@ -1,4 +1,3 @@
-import { appOwnerFromMnemonic } from "@linky-fit/linksync";
 import { test, expect, type Page } from "@playwright/test";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { createSeedIdentity, setSeedLoginStorage } from "./helpers/identity";
@@ -91,60 +90,51 @@ test("an unknown sender's message reaches a device that has no Nostr relay, and 
   }
 });
 
-test("the Evolu wait status reserves space below the mobile navigation", async ({
-  page,
+test("the network line disappears once the relays delivered, and shows no connection without an Evolu relay", async ({
+  browser,
 }, testInfo) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await setBaseStorage(page);
   const identity = await createSeedIdentity();
-  await setSeedLoginStorage(page, identity);
-  await stubFiatRates(page);
-  await page.addInitScript(
-    ({ relay, ownerId }) => {
-      localStorage.setItem(
-        `linky.shards.awaitingFirstHydration.${ownerId}`,
-        "1",
-      );
-      localStorage.setItem(
-        "linky.evoluServers.disabled.v1",
-        JSON.stringify([relay]),
-      );
-    },
-    {
-      relay: EVOLU_RELAY_URL,
-      ownerId: appOwnerFromMnemonic(identity.evoluMnemonic)!.id,
-    },
-  );
-  await page.goto("/#contacts");
-  const status = page.getByRole("status").filter({
-    hasText: "Waiting for the Evolu relay",
-  });
-  await expect(status).toBeVisible();
-  await testInfo.attach("Evolu wait status on mobile", {
-    body: await page.screenshot({
-      path: testInfo.outputPath("evolu-wait-mobile.png"),
-    }),
-    contentType: "image/png",
-  });
-  const header = await page.getByRole("banner").boundingBox();
-  const banner = await status.boundingBox();
-  const content = await page.getByTestId("page-frame").boundingBox();
-  await testInfo.attach("Evolu wait layout bounds", {
-    body: JSON.stringify({ header, banner, content }),
-    contentType: "application/json",
-  });
-  expect(header).not.toBeNull();
-  expect(banner).not.toBeNull();
-  expect(content).not.toBeNull();
-  expect(banner!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
-  expect(content!.y).toBeGreaterThanOrEqual(banner!.y + banner!.height);
-  await expect(status.getByRole("progressbar")).toBeVisible();
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await expect(page.getByTestId("desktop-layout")).toBeVisible();
-  const desktopBanner = await status.boundingBox();
-  const desktopContent = await page.getByTestId("desktop-layout").boundingBox();
-  expect(desktopContent!.y).toBeGreaterThanOrEqual(
-    desktopBanner!.y + desktopBanner!.height,
-  );
-  expect(desktopContent!.y + desktopContent!.height).toBeLessThanOrEqual(800);
+  const open = async (disableEvoluRelay: boolean) => {
+    const context = await browser.newContext({
+      baseURL: testInfo.project.use.baseURL,
+      viewport: MOBILE_VIEWPORT,
+    });
+    const page = await context.newPage();
+    await setBaseStorage(page);
+    await setSeedLoginStorage(page, identity);
+    await stubFiatRates(page);
+    if (disableEvoluRelay)
+      await page.addInitScript((relay) => {
+        localStorage.setItem(
+          "linky.evoluServers.disabled.v1",
+          JSON.stringify([relay]),
+        );
+      }, EVOLU_RELAY_URL);
+    await page.goto("/#contacts");
+    return { context, page };
+  };
+
+  const connected = await open(false);
+  try {
+    await expect.poll(() => isHydrated(connected.page)).toBe(true);
+    await expect(
+      connected.page.getByRole("button", {
+        name: /^(Syncing…|No connection)$/,
+      }),
+    ).toHaveCount(0, { timeout: 30_000 });
+  } finally {
+    await connected.context.close();
+  }
+
+  const disconnected = await open(true);
+  try {
+    await disconnected.page
+      .getByRole("button", { name: "No connection" })
+      .click();
+    await expect(disconnected.page.getByRole("status")).toContainText(
+      "No active Evolu relay",
+    );
+  } finally {
+    await disconnected.context.close();
+  }
 });

@@ -29,14 +29,14 @@ export function EvoluServerNewPage(): React.ReactElement {
       evoluServerUrls.some((u) => u.toLowerCase() === normalized.toLowerCase())
     ) {
       pushToast(t("evoluAddServerAlready"));
-      navigateTo({ route: "evoluServers" });
+      navigateTo({ route: "relays" });
       return;
     }
 
     saveEvoluServerUrls([...evoluServerUrls, normalized]);
     setNewEvoluServerUrl("");
     setStatus(t("evoluAddServerSaved"));
-    navigateTo({ route: "evoluServers" });
+    navigateTo({ route: "relays" });
   };
 
   return (

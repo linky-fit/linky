@@ -34,7 +34,6 @@ import {
   EvoluHistoryDataPage,
   EvoluServerNewPage,
   EvoluServerPage,
-  EvoluServersPage,
   InspectorSettingsPage,
   KeryxAnnouncementPage,
   KeryxCompaniesPage,
@@ -51,7 +50,7 @@ import {
   MintsPage,
   NostrRelayNewPage,
   NostrRelayPage,
-  NostrRelaysPage,
+  RelaysPage,
   ProfilePage,
   ProxyPaymentsPage,
   PushDebugPage,
@@ -171,8 +170,6 @@ const RoutePage = (): React.ReactElement => {
       return <MintDetailPage />;
     case "chatStorage":
       return <ChatStoragePage />;
-    case "evoluServers":
-      return <EvoluServersPage />;
     case "evoluCurrentData":
       return <EvoluCurrentDataPage />;
     case "evoluHistoryData":
@@ -183,8 +180,8 @@ const RoutePage = (): React.ReactElement => {
       return <EvoluServerNewPage />;
     case "evoluData":
       return <EvoluDataDetailPage />;
-    case "nostrRelays":
-      return <NostrRelaysPage />;
+    case "relays":
+      return <RelaysPage />;
     case "nostrRelayNew":
       return <NostrRelayNewPage />;
     case "nostrRelay":

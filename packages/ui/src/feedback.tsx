@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { Animated, Easing } from "react-native";
 import { View } from "tamagui";
 import { Button, IconButton, Pressable } from "./controls";
 import type { LabeledAction } from "./controls";
@@ -8,7 +10,7 @@ import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
 import { toneColors, toneIcons } from "./styles";
 import type { Tone } from "./tokens";
-import { border, shadow } from "./tokens";
+import { border, enterScale, opacity, shadow, space } from "./tokens";
 
 export interface NoticeProps {
   title: string;
@@ -271,5 +273,148 @@ export function EmptyState({
       ) : null}
       {action}
     </Stack>
+  );
+}
+
+export interface CornerGlowStatusItem {
+  label: string;
+  tone: Tone;
+  /** Shows a spinner instead of the dot while the step is under way. */
+  busy?: boolean | undefined;
+}
+
+export interface CornerGlowStatusProps {
+  /** Colors the glow, which `label` names. */
+  tone: Tone;
+  label: string;
+  items: readonly CornerGlowStatusItem[];
+  /** Pulses the glow while the state is in progress. */
+  busy?: boolean | undefined;
+}
+
+const PULSE_MS = 1_000;
+const GLOW = { blur: space.xl, spread: space.sm };
+
+/** Fades its child between dim and full, forever. */
+function Pulse({ children }: { children: ReactNode }) {
+  const [level] = useState(() => new Animated.Value(1));
+  useEffect(() => {
+    const fade = (toValue: number) =>
+      Animated.timing(level, {
+        toValue,
+        duration: PULSE_MS,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: false,
+      });
+    const loop = Animated.loop(
+      Animated.sequence([fade(opacity.disabled), fade(1)]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [level]);
+  return (
+    <Animated.View style={{ position: "absolute", inset: 0, opacity: level }}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/**
+ * A soft glow peeking out of the bottom-right corner of its positioned
+ * container, which reports a background state; hovering or pressing the
+ * corner opens a panel with the details above it.
+ */
+export function CornerGlowStatus({
+  tone,
+  label,
+  items,
+  busy = false,
+}: CornerGlowStatusProps) {
+  const [open, setOpen] = useState<"hover" | "press" | null>(null);
+  const { solid } = toneColors[tone];
+  const glow = (
+    <View
+      position="absolute"
+      right={-space.md}
+      bottom={-space.md}
+      width="$iconLg"
+      height="$iconLg"
+      borderRadius="$pill"
+      backgroundColor={solid}
+      boxShadow={`0px 0px ${GLOW.blur}px ${GLOW.spread}px ${solid}`}
+    />
+  );
+  return (
+    <>
+      {open === "press" ? (
+        <Stack
+          position="absolute"
+          inset={0}
+          zIndex="$overlay"
+          onPress={() => setOpen(null)}
+        />
+      ) : null}
+      <Stack
+        position="absolute"
+        right={0}
+        bottom={0}
+        zIndex="$overlay"
+        alignItems="flex-end"
+        pointerEvents="box-none"
+        onMouseEnter={() => setOpen((current) => current ?? "hover")}
+        onMouseLeave={() =>
+          setOpen((current) => (current === "hover" ? null : current))
+        }
+      >
+        {open ? (
+          <Stack
+            role="status"
+            aria-live="polite"
+            gap="$xs"
+            maxWidth="$device"
+            marginRight="$md"
+            paddingVertical="$sm"
+            paddingHorizontal="$md"
+            borderRadius="$control"
+            borderWidth={border.hairline}
+            borderColor="$borderColor"
+            backgroundColor="$surface"
+            boxShadow={shadow.raised}
+            transition="base"
+            enterStyle={{ opacity: 0, scale: enterScale.subtle, y: space.sm }}
+          >
+            {items.map((item) => (
+              <Row key={item.label} gap="$sm" alignItems="center">
+                {item.busy ? (
+                  <Spinner color="$colorMuted" />
+                ) : (
+                  <View
+                    width="$dot"
+                    height="$dot"
+                    borderRadius="$pill"
+                    backgroundColor={toneColors[item.tone].solid}
+                  />
+                )}
+                <Text variant="caption" color="$colorSubtle">
+                  {item.label}
+                </Text>
+              </Row>
+            ))}
+          </Stack>
+        ) : null}
+        <Pressable
+          aria-label={label}
+          aria-expanded={open !== null}
+          width="$control"
+          height="$control"
+          overflow="hidden"
+          onPress={() =>
+            setOpen((current) => (current === "press" ? null : "press"))
+          }
+        >
+          {busy ? <Pulse>{glow}</Pulse> : glow}
+        </Pressable>
+      </Stack>
+    </>
   );
 }

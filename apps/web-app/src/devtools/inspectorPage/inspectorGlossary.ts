@@ -182,6 +182,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
   "relayList.syncFailed":
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
+  "network.statusChanged":
+    "The network dot changed: offline when the browser is offline or Evolu or Nostr reaches no relay, syncing while an Evolu relay has unanswered requests, the device is not hydrated, or the Nostr inbox still walks a relay's stored wraps, synced otherwise. Leaving synced waits a second. The payload holds the inputs the status came from.",
   "evolu.serversChanged":
     "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":

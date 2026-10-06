@@ -12,7 +12,11 @@ import {
   type DbWorkerOutput,
 } from "@evolu/common/local-first";
 import { testAppOwner } from "../testing/toy";
-import { reportOwnerSync, type WorkerMessage } from "./dbWorker";
+import {
+  reportOwnerSync,
+  type EvoluRelayStatus,
+  type WorkerMessage,
+} from "./dbWorker";
 import { trackOwnerSync, type OwnerSyncFailure } from "./ownerSync";
 
 const owner = testAppOwner().id;
@@ -54,11 +58,16 @@ const relaySocket = (
   };
   const synced: OwnerId[] = [];
   const failed: Array<[OwnerId, string, boolean]> = [];
-  const socket = reportOwnerSync(
-    createWebSocket,
-    (ownerId) => synced.push(ownerId),
-    (ownerId, error, endsRound) => failed.push([ownerId, error, endsRound]),
-  )("wss://relay.example", {
+  const statuses: EvoluRelayStatus[] = [];
+  const socket = reportOwnerSync(createWebSocket, {
+    onSynced: (ownerId) => synced.push(ownerId),
+    onFailed: (ownerId, error, endsRound) =>
+      failed.push([ownerId, error, endsRound]),
+    onRelayStatus: (url, status) => {
+      expect(url).toBe("wss://relay.example");
+      statuses.push(status);
+    },
+  })("wss://relay.example", {
     onMessage: (data) => {
       if (data instanceof ArrayBuffer) evoluOnMessage(data);
     },
@@ -67,7 +76,9 @@ const relaySocket = (
     socket,
     synced,
     failed,
+    statuses,
     open: () => options.onOpen?.(),
+    close: () => options.onClose?.(new CloseEvent("close")),
     receive: (data: ArrayBuffer) => options.onMessage?.(data),
   };
 };
@@ -178,6 +189,31 @@ describe("reportOwnerSync", () => {
     expect(relay.synced).toEqual([]);
   });
 
+  it("reports the relay syncing while a request is unanswered and unreachable once closed", async () => {
+    let continued = false;
+    const relay = relaySocket(() => {
+      if (continued) return;
+      continued = true;
+      queueMicrotask(() => relay.socket.send(request(owner)));
+    });
+    expect(relay.statuses).toEqual(["connecting"]);
+    relay.open();
+    relay.socket.send(request(owner));
+    relay.receive(response(owner));
+    await macrotask();
+    expect(relay.statuses).toEqual(["connecting", "synced", "syncing"]);
+    relay.receive(response(owner));
+    await macrotask();
+    expect(relay.statuses).toEqual([
+      "connecting",
+      "synced",
+      "syncing",
+      "synced",
+    ]);
+    relay.close();
+    expect(relay.statuses.at(-1)).toBe("unreachable");
+  });
+
   it("forgets requests a reconnect left unanswered", async () => {
     const relay = relaySocket();
     relay.socket.send(request(owner));
@@ -225,6 +261,13 @@ describe("trackOwnerSync", () => {
     expect(failures).toMatchObject([
       { ownerId: other, error: "WriteKeyError", endsRound: false },
     ]);
+    deliver({
+      type: "linksync.relayStatuses",
+      statuses: { "wss://relay.example": "syncing" },
+    });
+    expect(ownerSync.relayStatuses()).toEqual({
+      "wss://relay.example": "syncing",
+    });
     expect(evoluMessages).toEqual([{ type: "refreshQueries" }]);
   });
 });

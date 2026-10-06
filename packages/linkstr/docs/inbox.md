@@ -42,6 +42,8 @@ If that boundary fills the largest page the relay has served during this walk, t
 
 The backfill starts at the cursor minus the two-day backdate margin, but never more than `MAX_BACKFILL_AGE_SECONDS` (30 days) ago; older wraps are skipped. The start is fixed when the feed opens, so every attempt on every relay walks back to the same point.
 
+`WrapInbox.backfilling` is a stream of whether the open feed still has a read relay whose walk has not finished. It emits the current value on subscription, then every change. It is true while no feed is open, turns false once every read relay has walked back or failed three attempts in a row, and turns true again when a reconnect starts a new walk. Show it as "loading" so users know missing messages may still arrive.
+
 ## The event union
 
 `event` is a `WrapInboxEvent`. Dispatch on `_tag`:

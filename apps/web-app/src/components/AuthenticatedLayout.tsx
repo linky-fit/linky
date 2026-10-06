@@ -5,12 +5,12 @@ import {
 } from "../app/context/AppShellContexts";
 import { useDesktopSplitView } from "../hooks/useDesktopSplitView";
 import { shouldRenderNativeNfcWritePrompt } from "../platform/nativeBridge";
-import { EvoluRelayWaitBanner } from "./EvoluRelayWaitBanner";
 import { ContactsGuideOverlay } from "./ContactsGuideOverlay";
 import { LightningInvoiceConfirmModal } from "./LightningInvoiceConfirmModal";
 import { CashuPaymentRequestConfirmModal } from "./CashuPaymentRequestConfirmModal";
 import { LnurlAuthModal } from "./LnurlAuthModal";
 import { LnurlWithdrawConfirmModal } from "./LnurlWithdrawConfirmModal";
+import { NetworkStatusGlow } from "./NetworkStatusGlow";
 import { NfcWriteModal } from "./NfcWriteModal";
 import { NostrConnectLoginModal } from "./NostrConnectLoginModal";
 import { PaidOverlay } from "./PaidOverlay";
@@ -38,7 +38,6 @@ export function AuthenticatedLayout({
   return (
     <>
       {isDesktopSplitView ? null : <Topbar />}
-      <EvoluRelayWaitBanner inset={isDesktopSplitView} t={state.t} />
 
       {state.contactsGuide && state.contactsGuideActiveStep?.step ? (
         <ContactsGuideOverlay
@@ -55,6 +54,7 @@ export function AuthenticatedLayout({
       ) : null}
 
       {children}
+      <NetworkStatusGlow />
 
       {!isDesktopSplitView && state.scanIsOpen ? <ScanModal /> : null}
 

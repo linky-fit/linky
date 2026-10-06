@@ -95,6 +95,7 @@ export {
   StatusLine,
   Toast,
   ToastStack,
+  CornerGlowStatus,
 } from "./feedback";
 export type {
   EmptyStateProps,
@@ -102,6 +103,8 @@ export type {
   ProgressProps,
   StatusLineProps,
   ToastProps,
+  CornerGlowStatusItem,
+  CornerGlowStatusProps,
 } from "./feedback";
 export { Spinner } from "./spinner";
 export type { SpinnerProps } from "./spinner";

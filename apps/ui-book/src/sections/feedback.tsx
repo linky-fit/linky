@@ -60,6 +60,33 @@ export const feedback: Section = {
       </UI.Row>
     ),
     LoadingState: () => <UI.LoadingState label="Loading contacts" />,
+    CornerGlowStatus: () => (
+      <UI.Row gap="$lg">
+        {(
+          [
+            ["warning", "Syncing…", true],
+            ["danger", "No connection", false],
+          ] as const
+        ).map(([tone, label, busy]) => (
+          <UI.Stack
+            key={tone}
+            position="relative"
+            width="$column"
+            height="$column"
+            borderRadius="$card"
+            overflow="hidden"
+            backgroundColor="$surface"
+          >
+            <UI.CornerGlowStatus
+              busy={busy}
+              tone={tone}
+              label={label}
+              items={[{ label: "Scanning Nostr for messages", tone, busy }]}
+            />
+          </UI.Stack>
+        ))}
+      </UI.Row>
+    ),
     StatusLine: () => (
       <UI.Stack>
         <UI.StatusLine busy label="Waiting for the Evolu relay." />

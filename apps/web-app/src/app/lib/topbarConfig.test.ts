@@ -70,9 +70,8 @@ describe("resolveBackAction", () => {
     );
     expect(backHashFor({ kind: "mints" })).toBe("#settings");
     expect(backHashFor({ kind: "mintNew" })).toBe("#advanced/mints");
-    expect(backHashFor({ kind: "nostrRelays" })).toBe("#settings");
-    expect(backHashFor({ kind: "evoluServers" })).toBe("#settings");
-    expect(backHashFor({ kind: "chatStorage" })).toBe("#evolu-servers");
+    expect(backHashFor({ kind: "relays" })).toBe("#settings");
+    expect(backHashFor({ kind: "chatStorage" })).toBe("#relays");
   });
 
   it("walks Keryx pages back through the company list to settings", () => {

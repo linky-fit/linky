@@ -344,9 +344,9 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
   });
 
   await test.step("open the local Nostr relay and return through its parent routes", async () => {
-    await page.getByRole("button", { name: /^Nostr \d+\/\d+/ }).click();
-    await expect(page).toHaveURL(/#nostr-relays$/);
-    await expect(title).toHaveAccessibleName("Nostr-Relays");
+    await page.getByRole("button", { name: /^Relays \d+\/\d+/ }).click();
+    await expect(page).toHaveURL(/#relays$/);
+    await expect(title).toHaveAccessibleName("Relays");
     await page.getByRole("button", { name: NOSTR_RELAY_URL }).click();
     await expect(page).toHaveURL(
       new RegExp(`#nostr-relay/${encodeURIComponent(NOSTR_RELAY_URL)}$`),
@@ -362,7 +362,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       page.getByRole("button", { name: "Löschen", exact: true }),
     ).toHaveCount(0);
     await close.click();
-    await expect(page).toHaveURL(/#nostr-relays$/);
+    await expect(page).toHaveURL(/#relays$/);
     await close.click();
     await expect(page).toHaveURL(/#settings$/);
   });
@@ -371,9 +371,9 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
     await expect(
       page.getByRole("button", { name: "Chat-Speicher", exact: true }),
     ).toHaveCount(0);
-    await page.getByRole("button", { name: /^Evolu \d+\/\d+/ }).click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
-    await expect(title).toHaveAccessibleName("Evolu-Server");
+    await page.getByRole("button", { name: /^Relays \d+\/\d+/ }).click();
+    await expect(page).toHaveURL(/#relays$/);
+    await expect(title).toHaveAccessibleName("Relays");
     await page.getByRole("button", { name: EVOLU_RELAY_URL }).click();
     await expect(page).toHaveURL(
       new RegExp(`#evolu-server/${encodeURIComponent(EVOLU_RELAY_URL)}$`),
@@ -385,7 +385,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       page.getByRole("switch", { name: "Offline", exact: true }),
     ).toBeVisible();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(page).toHaveURL(/#relays$/);
     await page
       .getByRole("button", { name: "Chat-Speicher", exact: true })
       .click();
@@ -401,7 +401,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       }),
     ).toBeDisabled();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(page).toHaveURL(/#relays$/);
     await page.getByText("Daten", { exact: true }).click();
     await expect(page).toHaveURL(/#evolu-current-data$/);
     await expect(title).toHaveAccessibleName("Daten");
@@ -415,7 +415,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       }),
     ).toBeVisible();
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(page).toHaveURL(/#relays$/);
     await page.getByText("Verlauf", { exact: true }).click();
     await expect(page).toHaveURL(/#evolu-history-data$/);
     await expect(title).toHaveAccessibleName("Verlauf");
@@ -425,7 +425,7 @@ test("German settings, diagnostics, and profile routes keep their labels and bac
       ).toBeVisible();
     }
     await close.click();
-    await expect(page).toHaveURL(/#evolu-servers$/);
+    await expect(page).toHaveURL(/#relays$/);
     await page.goto("/#evolu-data");
     await expect(title).toHaveAccessibleName("Speicher");
     await expect(page.getByText(/^\d+\.\d % des 1-MiB-Limits$/)).toBeVisible();

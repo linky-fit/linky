@@ -112,6 +112,8 @@ const reportedOwnerSync = () => {
       };
     },
     subscribeFailures: () => () => {},
+    relayStatuses: () => ({}),
+    subscribeRelayStatuses: () => () => {},
   };
   return {
     ownerSync,

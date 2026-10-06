@@ -32,6 +32,7 @@ import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
 import {
   connectionStatus,
+  worseConnectionState,
   type ConnectionState,
 } from "../utils/connectionStatus";
 import { isDesktopShell, isNightlyOrigin } from "../platform/runtime";
@@ -271,22 +272,12 @@ export function AdvancedPage(): React.ReactElement {
       <Section title={t("settingsNetwork")}>
         {linkRow(
           "RadioTower",
-          "Nostr",
-          () => navigateTo({ route: "nostrRelays" }),
+          t("relays"),
+          () => navigateTo({ route: "relays" }),
           connectionState(
-            connectedRelayCount,
-            relayUrls.length,
-            nostrRelayOverallStatus,
-          ),
-        )}
-        {linkRow(
-          "Cloud",
-          "Evolu",
-          () => navigateTo({ route: "evoluServers" }),
-          connectionState(
-            evoluConnectedServerCount,
-            evoluServerUrls.length,
-            evoluOverallStatus,
+            connectedRelayCount + evoluConnectedServerCount,
+            relayUrls.length + evoluServerUrls.length,
+            worseConnectionState(nostrRelayOverallStatus, evoluOverallStatus),
           ),
         )}
         {linkRow(

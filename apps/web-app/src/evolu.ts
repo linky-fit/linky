@@ -19,12 +19,20 @@ import {
 import {
   createEvoluShardDb,
   trackOwnerSync,
+  type EvoluRelayStatus,
   type UnconfirmedWrite,
 } from "@linky-fit/linksync/evolu";
 import { createSharedWebWorker, evoluWebDeps } from "@evolu/web";
 import { flushSync } from "react-dom";
 import { Effect } from "effect";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "./mnemonic";
 import {
@@ -349,7 +357,9 @@ const migrateLegacyEvoluServers = (): void => {
 
 migrateLegacyEvoluServers();
 
-const EVOLU_SERVER_URLS: ReadonlyArray<string> = getEvoluActiveServerUrls();
+/** The Evolu relays this page load syncs with; a changed list applies after a reload. */
+export const EVOLU_SERVER_URLS: ReadonlyArray<string> =
+  getEvoluActiveServerUrls();
 
 const buildEvoluTransports = (
   urls: ReadonlyArray<string>,
@@ -360,51 +370,6 @@ const EVOLU_TRANSPORTS: ReadonlyArray<{
   type: "WebSocket";
   url: string;
 }> = buildEvoluTransports(EVOLU_SERVER_URLS);
-
-const probeWebSocketConnection = (
-  url: string,
-  timeoutMs = 2500,
-): Promise<boolean> => {
-  return new Promise<boolean>((resolve) => {
-    let ws: WebSocket | null = null;
-    let done = false;
-
-    const finish = (ok: boolean) => {
-      if (done) return;
-      done = true;
-      try {
-        ws?.close();
-      } catch {
-        // ignore
-      }
-      resolve(ok);
-    };
-
-    try {
-      ws = new WebSocket(url);
-    } catch {
-      finish(false);
-      return;
-    }
-
-    const timer = window.setTimeout(() => finish(false), timeoutMs);
-
-    ws.addEventListener("open", () => {
-      window.clearTimeout(timer);
-      finish(true);
-    });
-
-    ws.addEventListener("error", () => {
-      window.clearTimeout(timer);
-      finish(false);
-    });
-
-    ws.addEventListener("close", () => {
-      window.clearTimeout(timer);
-      finish(false);
-    });
-  });
-};
 
 const CashuTokenId = Evolu.id("CashuToken");
 export type CashuTokenId = typeof CashuTokenId.Type;
@@ -534,6 +499,22 @@ const evoluWorker = trackOwnerSync((name) =>
 
 /** Which owners finished a sync round with an Evolu relay; the shard store's hydration rests on it. */
 export const ownerSync = evoluWorker.ownerSync;
+
+/** Each Evolu relay socket's live status, keyed by relay url. */
+export const useEvoluRelayStatuses = (): Readonly<
+  Record<string, EvoluRelayStatus>
+> =>
+  useSyncExternalStore(
+    ownerSync.subscribeRelayStatuses,
+    ownerSync.relayStatuses,
+  );
+
+const serverStatusOf = (
+  status: EvoluRelayStatus | undefined,
+): EvoluServerStatus => {
+  if (status === undefined || status === "connecting") return "checking";
+  return status === "unreachable" ? "disconnected" : "connected";
+};
 
 ownerSync.subscribeFailures(({ ownerId, error, endsRound }) => {
   if (!getInspectorEmissionEnabled()) return;
@@ -1247,12 +1228,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
   } as const;
 };
 
-export const useEvoluServersManager = (opts?: {
-  probeIntervalMs?: number;
-  probeTimeoutMs?: number;
-}) => {
-  const probeIntervalMs = opts?.probeIntervalMs ?? 15000;
-  const probeTimeoutMs = opts?.probeTimeoutMs ?? 3500;
+export const useEvoluServersManager = () => {
   const canRunNetworkWork = useDeferredOnlineReady();
 
   const [configuredUrls, setConfiguredUrlsState] = useState<string[]>(() => [
@@ -1261,9 +1237,7 @@ export const useEvoluServersManager = (opts?: {
   const [disabledUrls, setDisabledUrlsState] = useState<string[]>(() => [
     ...getEvoluDisabledServerUrls(),
   ]);
-  const [statusByUrl, setStatusByUrl] = useState<
-    Record<string, EvoluServerStatus>
-  >(() => ({}));
+  const relayStatuses = useEvoluRelayStatuses();
   const [reloadRequired, setReloadRequired] = useState(false);
 
   const disabledLower = useMemo(() => {
@@ -1315,67 +1289,24 @@ export const useEvoluServersManager = (opts?: {
     [refreshFromStorage],
   );
 
-  useEffect(() => {
-    if (activeUrls.length === 0) return;
-    if (!canRunNetworkWork) return;
-
-    let cancelled = false;
-
-    const run = async () => {
-      // Only urls with no known status get a visible "checking" state; known
-      // urls keep their last status during background re-probes so steady-state
-      // polls don't re-render the app when nothing changed.
-      setStatusByUrl((prev) => {
-        const missing = activeUrls.filter((url) => prev[url] === undefined);
-        if (missing.length === 0) return prev;
-        const next = { ...prev };
-        for (const url of missing) next[url] = "checking";
-        return next;
-      });
-
-      const results = await Promise.all(
-        activeUrls.map(async (url) => {
-          const ok = await probeWebSocketConnection(url, probeTimeoutMs);
-          return [url, ok] as const;
-        }),
-      );
-
-      if (cancelled) return;
-      setStatusByUrl((prev) => {
-        const changed = results.filter(
-          ([url, ok]) => prev[url] !== (ok ? "connected" : "disconnected"),
-        );
-        if (changed.length === 0) return prev;
-        const next = { ...prev };
-        for (const [url, ok] of changed)
-          next[url] = ok ? "connected" : "disconnected";
-        return next;
-      });
-    };
-
-    void run();
-    const intervalId = window.setInterval(run, probeIntervalMs);
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [activeUrls, canRunNetworkWork, probeIntervalMs, probeTimeoutMs]);
-
-  const effectiveStatusByUrl = useMemo(() => {
-    if (canRunNetworkWork) return statusByUrl;
-
-    const next = { ...statusByUrl };
-    for (const url of activeUrls) {
-      next[url] = "disconnected";
-    }
-    return next;
-  }, [activeUrls, canRunNetworkWork, statusByUrl]);
+  const statusByUrl = useMemo(
+    (): Record<string, EvoluServerStatus> =>
+      Object.fromEntries(
+        activeUrls.map((url) => [
+          url,
+          canRunNetworkWork
+            ? serverStatusOf(relayStatuses[url])
+            : "disconnected",
+        ]),
+      ),
+    [activeUrls, canRunNetworkWork, relayStatuses],
+  );
 
   return {
     configuredUrls,
     disabledUrls,
     activeUrls,
-    statusByUrl: effectiveStatusByUrl,
+    statusByUrl,
     reloadRequired,
     refreshFromStorage,
     setServerUrls,

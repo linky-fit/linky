@@ -317,7 +317,7 @@ export const useRelayDomain = ({
       (u) => relayIdentity(u) === relayIdentity(url),
     );
     if (already) {
-      navigateTo({ route: "nostrRelays" });
+      navigateTo({ route: "relays" });
       return;
     }
 
@@ -342,7 +342,7 @@ export const useRelayDomain = ({
     });
 
     setNewRelayUrl("");
-    navigateTo({ route: "nostrRelays" });
+    navigateTo({ route: "relays" });
   }, [
     currentNpub,
     newRelayUrl,
@@ -381,7 +381,7 @@ export const useRelayDomain = ({
           payload: { error: e, relayCount: nextUrls.length },
         });
       });
-      navigateTo({ route: "nostrRelays" });
+      navigateTo({ route: "relays" });
       return;
     }
 
