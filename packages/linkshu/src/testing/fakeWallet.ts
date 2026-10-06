@@ -53,6 +53,9 @@ export const fakeWallet = (
   prepareSwapToReceive: notUnderTest,
   completeSwap: notUnderTest,
   send: notUnderTest,
+  selectProofsToSend: () => {
+    throw new Error("not under test");
+  },
   checkProofsStates: notUnderTest,
   mint: {
     webSocketConnection: { onClose: () => undefined },

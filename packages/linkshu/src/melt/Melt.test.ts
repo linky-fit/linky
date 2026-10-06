@@ -5,13 +5,15 @@ import type {
   Proof as CashuProof,
   SendResponse,
 } from "@cashu/cashu-ts";
-import { Amount, MintOperationError } from "@cashu/cashu-ts";
+import { Amount, Keyset, MintOperationError } from "@cashu/cashu-ts";
 import { Effect, Exit, Layer, TestClock, TestContext } from "effect";
 import {
+  Amount as SatAmount,
   Bip39Seed,
   Bolt11Invoice,
   CurrencyUnit,
   KeysetId,
+  NonNegativeAmount,
   QuoteId,
   MintUrl,
 } from "../domain/primitives";
@@ -25,7 +27,12 @@ import type { StoredOperation } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { StoredProof } from "../ports/ProofStore";
 import { runOnTestClock } from "../testing/clock";
-import { fakeWallet, KEYSET_HEX, proof } from "../testing/fakeWallet";
+import {
+  fakeKeyChain,
+  fakeWallet,
+  KEYSET_HEX,
+  proof,
+} from "../testing/fakeWallet";
 import { recordingInspector } from "../testing/inspector";
 import {
   amountIn,
@@ -35,7 +42,7 @@ import {
 } from "../testing/inventory";
 import { freshStorage } from "../testing/storage";
 import type { Storage } from "../testing/storage";
-import { MeltDraft } from "./domain";
+import { MeltDraft, MeltQuote } from "./domain";
 import { Melt } from "./Melt";
 
 const mint = MintUrl.make("https://mint.example");
@@ -105,6 +112,8 @@ interface MeltCall {
 }
 
 interface FakeWalletArgs {
+  /** The mint's keysets as the wallet knows them; none (fee-free) by default. */
+  keysets?: Keyset[];
   quote?: () => Promise<MeltQuoteBolt11Response>;
   send?: (call: SendCall) => Promise<SendResponse>;
   melt?: (
@@ -126,6 +135,14 @@ const makeWallet = (args: FakeWalletArgs) => {
   const restoreCalls: Array<{ start: number; count: number }> = [];
   const wallet = fakeWallet({
     keysetId: KEYSET_HEX,
+    keyChain: fakeKeyChain(args.keysets ?? []),
+    // Spends every offered proof, like a selection that needs them all.
+    selectProofsToSend: (proofs) => ({
+      keep: [],
+      send: proofs.map((entry) =>
+        proof(Amount.from(entry.amount).toNumber(), entry.secret),
+      ),
+    }),
     checkProofsStates: (proofs) =>
       Promise.resolve(
         proofs.map((entry) => ({
@@ -737,6 +754,91 @@ describe("Melt.melt", () => {
         reason: "melt",
       }),
     );
+  });
+});
+
+/** The bound keyset at 100 ppk, publishing keys for powers of two. */
+const feeKeyset = (): Keyset => {
+  const keyset = new Keyset(KEYSET_HEX, "sat", true, 100);
+  const keys: Record<number, string> = {};
+  for (let amount = 1; amount <= 512; amount *= 2) {
+    keys[amount] = "02" + "ab".repeat(32);
+  }
+  keyset.keys = keys;
+  return keyset;
+};
+
+const quoted = new MeltQuote({
+  quoteId: QuoteId.make("quote-1"),
+  mint,
+  amount: SatAmount.make(10),
+  feeReserve: NonNegativeAmount.make(2),
+  expiresAt: null,
+});
+
+describe("Melt.cost", () => {
+  it("adds the input fees of the funding swap and of the melt inputs", async () => {
+    const { wallet, sendCalls } = makeWallet({ keysets: [feeKeyset()] });
+    const exit = await makeHarness(wallet).run(
+      Effect.gen(function* () {
+        yield* seedProofs(mint, [...proofsA, ...proofsB]);
+        return yield* (yield* Melt).cost(quoted);
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    // Inputs for 12 split 8+4, plus 1 for their fee: 13. The swap spends up
+    // to all three stored proofs: 1 more.
+    expect(exit.value).toMatchObject({ inputFee: 2, maxTotal: 14 });
+    expect(sendCalls).toEqual([]);
+  });
+});
+
+describe("Melt.melt with a maximum total", () => {
+  const meltWithin = (maxTotal: number) => {
+    const { wallet, sendCalls } = makeWallet({
+      keysets: [feeKeyset()],
+      send: () => Promise.resolve({ keep: [], send: swappedThirteen().send }),
+      melt: () => Promise.resolve(meltResponse("PAID", [])),
+    });
+    return makeHarness(wallet)
+      .run(
+        Effect.gen(function* () {
+          yield* seedProofs(mint, [...proofsA, ...proofsB]);
+          const receipt = yield* Effect.either(
+            (yield* Melt).melt(
+              new MeltDraft({
+                mint,
+                invoice,
+                maxTotal: SatAmount.make(maxTotal),
+              }),
+            ),
+          );
+          return { receipt, proofs: yield* (yield* ProofStore).loadAll };
+        }),
+      )
+      .then((exit) => ({ exit, sendCalls }));
+  };
+
+  it("fails before swapping when the fees would exceed it", async () => {
+    const { exit, sendCalls } = await meltWithin(13);
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("PaymentFailed");
+    expect(sendCalls).toEqual([]);
+    expect(proofsIn(exit.value.proofs, "available")).toHaveLength(3);
+  });
+
+  it("pays within it and reports the swap's fee next to the Lightning fee", async () => {
+    const { exit } = await meltWithin(14);
+    assert(Exit.isSuccess(exit));
+    assert(exit.value.receipt._tag === "Right");
+    // 14 left the balance: 1 swap fee, 13 melt inputs for a 10 sat invoice.
+    expect(exit.value.receipt.right).toMatchObject({
+      paidAmount: 10,
+      feePaid: 3,
+      swapFee: 1,
+      changeAmount: 0,
+    });
   });
 });
 
