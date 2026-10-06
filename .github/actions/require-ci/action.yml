@@ -1,5 +1,5 @@
 name: Require CI
-description: Fail unless every required CI check succeeded on a commit
+description: Wait for the required CI checks on a commit and fail unless all of them succeeded
 
 inputs:
   sha:
@@ -16,13 +16,28 @@ runs:
         SHA: ${{ inputs.sha }}
       run: |
         set -euo pipefail
-        failed=0
-        for check in lint unit-tests linkshu-integration npm-packages app-e2e site-e2e; do
-          result=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=$check" \
-            --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.started_at) | last | "\(.status) \(.conclusion)"')
-          if [[ "$result" != "completed success" ]]; then
-            echo "::error::$check on $SHA is ${result/null null/missing}"
-            failed=1
+        deadline=$((SECONDS + 45 * 60))
+        while :; do
+          pending="" failed=""
+          for check in lint unit-tests linkshu-integration npm-packages app-e2e site-e2e; do
+            result=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=$check" \
+              --jq '[.check_runs[] | select(.app.slug == "github-actions")] | sort_by(.started_at) | last | "\(.status) \(.conclusion)"')
+            case "$result" in
+              "completed success") ;;
+              "completed "*) failed+="$check is ${result#completed }"$'\n' ;;
+              "null null") pending+="$check is missing"$'\n' ;;
+              *) pending+="$check is ${result% *}"$'\n' ;;
+            esac
+          done
+          if [[ -z "$failed$pending" ]]; then
+            exit 0
           fi
+          if [[ -n "$failed" ]] || ((SECONDS > deadline)); then
+            while IFS= read -r problem; do
+              if [[ -n "$problem" ]]; then echo "::error::$problem on $SHA"; fi
+            done <<< "$failed$pending"
+            exit 1
+          fi
+          echo "Waiting: $(tr '\n' ' ' <<< "$pending")"
+          sleep 30
         done
-        exit "$failed"
