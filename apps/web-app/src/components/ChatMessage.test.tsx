@@ -1,5 +1,5 @@
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
 import { BankOfferId } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
@@ -152,10 +152,6 @@ const renderChatMessage = async (
 };
 
 describe("ChatMessage contact actions", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("adds all unique unsaved contacts from an incoming message", async () => {
     const onAddNpubContacts = vi.fn();
     const container = await renderChatMessage("npub1aaaa npub1cccc npub1aaaa", {
@@ -256,10 +252,6 @@ describe("ChatMessage image message actions", () => {
       value: share,
       writable: true,
     });
-  });
-
-  afterEach(() => {
-    document.body.innerHTML = "";
   });
 
   // The image button is pressable once its image has loaded.
@@ -381,10 +373,6 @@ describe("ChatMessage image message actions", () => {
 });
 
 describe("ChatMessage payment request card", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   const requestInfo = (
     description: string | null,
   ): CashuPaymentRequestMessageInfo => ({
@@ -423,10 +411,6 @@ describe("ChatMessage payment request card", () => {
 });
 
 describe("ChatMessage bank payment offer actions", () => {
-  afterEach(() => {
-    document.body.innerHTML = "";
-  });
-
   it("settles a paid offer from the chat card", async () => {
     const onSettleBankPaymentOffer = vi.fn(async () => undefined);
     const bankPaymentOfferInfo: BankPaymentOfferInfo = {

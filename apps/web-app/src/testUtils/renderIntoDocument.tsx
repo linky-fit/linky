@@ -1,6 +1,7 @@
 import { UIProvider } from "@linky-fit/ui";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { mountedRoots } from "./mountedRoots";
 
 export interface RenderedElement {
   container: HTMLDivElement;
@@ -20,16 +21,14 @@ export const renderIntoDocument = async (
       root.render(<UIProvider mode="dark">{next}</UIProvider>);
     });
   };
-  await rerender(element);
-  return {
-    container,
-    root,
-    rerender,
-    unmount: async () => {
-      await act(async () => {
-        root.unmount();
-      });
-      container.remove();
-    },
+  const unmount = async (): Promise<void> => {
+    mountedRoots.delete(unmount);
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
   };
+  mountedRoots.add(unmount);
+  await rerender(element);
+  return { container, root, rerender, unmount };
 };

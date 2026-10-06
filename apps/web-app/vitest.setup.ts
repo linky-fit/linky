@@ -1,4 +1,6 @@
 import { Buffer } from "buffer";
+import { afterEach } from "vitest";
+import { unmountMountedRoots } from "./src/testUtils/mountedRoots";
 
 if (typeof globalThis.Buffer === "undefined") {
   Object.defineProperty(globalThis, "Buffer", {
@@ -52,3 +54,7 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
     dispatchEvent: () => false,
   });
 }
+
+// A root left mounted keeps scheduling React work after jsdom is torn down,
+// which fails the run with "window is not defined".
+afterEach(unmountMountedRoots);
