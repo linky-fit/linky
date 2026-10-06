@@ -3,6 +3,7 @@ import {
   AmountConsumedByFee,
   CounterLockTimeout,
   InsufficientFunds,
+  LockingUnsupported,
   MintRejected,
   MintUnreachable,
 } from "../domain/errors";
@@ -14,6 +15,7 @@ import {
   OperationId,
   TokenText,
 } from "../domain/primitives";
+import { P2pkPubkey } from "../domain/p2pk";
 import { Proof } from "../token/domain";
 
 export class SendDraft extends Schema.Class<SendDraft>("SendDraft")({
@@ -26,6 +28,11 @@ export class SendDraft extends Schema.Class<SendDraft>("SendDraft")({
    * travelling out through a messenger the caller confirms separately.
    */
   produceAs: Schema.Literal("issued", "pending"),
+  /**
+   * Locks the sent proofs to this key (NUT-11 P2PK): only its secret's
+   * holder can receive the token. Build it with `parseP2pkPubkey`.
+   */
+  lockTo: Schema.optional(P2pkPubkey),
 }) {}
 
 export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({
@@ -41,6 +48,8 @@ export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({
   mint: MintUrl,
   unit: CurrencyUnit,
   amount: Amount,
+  /** The key the sent proofs are locked to; null for a bearer token. */
+  lockTo: Schema.NullOr(P2pkPubkey),
   /** Change kept after the swap; persisted as fresh `available` proofs. */
   changeAmount: NonNegativeAmount,
   feePaid: NonNegativeAmount,
@@ -49,6 +58,7 @@ export class SendReceipt extends Schema.Class<SendReceipt>("SendReceipt")({
 export const SendError = Schema.Union(
   InsufficientFunds,
   AmountConsumedByFee,
+  LockingUnsupported,
   MintUnreachable,
   MintRejected,
   CounterLockTimeout,

@@ -86,6 +86,7 @@ const sendReceipt = new SendReceipt({
   mint: MintUrl.make(MINT_URL),
   unit: CurrencyUnit.make("sat"),
   amount: Amount.make(600),
+  lockTo: null,
   changeAmount: NonNegativeAmount.make(400),
   feePaid: NonNegativeAmount.make(0),
 });

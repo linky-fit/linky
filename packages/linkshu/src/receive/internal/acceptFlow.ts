@@ -72,6 +72,8 @@ import {
 } from "../../token/internal/cashuProofs";
 import { ReceiveError, ReceiveReceipt } from "../domain";
 import type { ReceiveDraft } from "../domain";
+import type { P2pkUnlockingKey } from "../../domain/p2pk";
+import { lockedAgainst } from "./locks";
 
 const MAX_SWAP_ATTEMPTS = 5;
 /** Fallback bump (one output block) when restore cannot locate the collision. */
@@ -135,6 +137,8 @@ export interface ReceiveContext {
   readonly operationStore: OperationStoreService;
   readonly instances: WalletInstances;
   readonly inspector: InspectorService;
+  /** Signs for P2PK-locked inputs; set per call, never stored or logged. */
+  readonly unlockingKey?: P2pkUnlockingKey | null;
 }
 
 /**
@@ -204,7 +208,8 @@ const swapAtMint = (
       yield* onAttempt(counter);
       const outcome = yield* Effect.either(
         Effect.tryPromise({
-          try: () => wallet.completeSwap(preview),
+          try: () =>
+            wallet.completeSwap(preview, ctx.unlockingKey ?? undefined),
           catch: (error): unknown => error,
         }),
       );
@@ -1168,9 +1173,16 @@ const receiveFrom = (
   text: string,
   origin: Origin,
 ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
-  Effect.flatMap(parseReceivable(text), (parsed) =>
-    receiveParsed(ctx, parsed, origin).pipe(withReceiveLock(ctx.kv, parsed)),
-  );
+  Effect.flatMap(parseReceivable(text), (parsed) => {
+    const locked = lockedAgainst(
+      parsed.mint,
+      parsed.tokenText,
+      ctx.unlockingKey ?? null,
+    );
+    return locked === null
+      ? receiveParsed(ctx, parsed, origin).pipe(withReceiveLock(ctx.kv, parsed))
+      : Effect.fail(locked);
+  });
 
 /** Receives pasted or message-borne text. */
 export const receiveDraft = (

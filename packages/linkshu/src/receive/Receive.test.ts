@@ -1,5 +1,6 @@
 import type { Proof } from "@cashu/cashu-ts";
 import {
+  createP2PKsecret,
   getEncodedToken,
   HttpResponseError,
   Keyset,
@@ -17,6 +18,7 @@ import {
   TestContext,
 } from "effect";
 import { MintRejected, MintUnreachable } from "../domain/errors";
+import { P2pkUnlockingKey, p2pkPubkeyOf } from "../domain/p2pk";
 import {
   CurrencyUnit,
   KeysetId,
@@ -2334,6 +2336,84 @@ describe("Receive.receive of a text whose deferral was closed", () => {
     expect(exit.value.receipt.operationId).toBe(exit.value.interrupted.id);
     expect(kindsAndStatuses(exit.value.operations)).toEqual([
       ["deferredReceive", "done"],
+      ["receive", "done"],
+    ]);
+  });
+});
+
+describe("Receive.receive of a P2PK-locked token", () => {
+  // Secret key 1: its pubkey is the generator point.
+  const ownerKey = P2pkUnlockingKey.make("0".repeat(63) + "1");
+  const otherKey = P2pkUnlockingKey.make("0".repeat(63) + "2");
+  const lockedToken = TokenText.make(
+    getEncodedToken({
+      mint,
+      unit: "sat",
+      proofs: [
+        { ...proof(4, ""), secret: createP2PKsecret(p2pkPubkeyOf(ownerKey)) },
+        { ...proof(2, ""), secret: createP2PKsecret(p2pkPubkeyOf(ownerKey)) },
+      ],
+    }),
+  );
+  const lockedWallet = () => {
+    const configs: Array<string | undefined> = [];
+    const swap = fakeReceiveSwap(() => Promise.resolve(receivedProofs));
+    const wallet = fakeWallet({
+      checkProofsStates: answerProofStates(),
+      ...swap,
+      completeSwap: (preview, privkey) => {
+        configs.push(privkey);
+        return swap.completeSwap(preview);
+      },
+    });
+    return { wallet, configs };
+  };
+  const receiveLocked = (unlockingKey?: P2pkUnlockingKey) =>
+    Effect.gen(function* () {
+      const receive = yield* Receive;
+      const receipt = yield* Effect.either(
+        receive.receive(new ReceiveDraft({ text: lockedToken }), {
+          unlockingKey,
+        }),
+      );
+      return { receipt, ...(yield* inventory) };
+    });
+
+  it("refuses the token without a key, before writing or asking the mint", async () => {
+    const { wallet, configs } = lockedWallet();
+    const exit = await makeHarness(wallet).run(receiveLocked());
+    assert(Exit.isSuccess(exit));
+    const { receipt, proofs, operations } = exit.value;
+
+    assert(receipt._tag === "Left");
+    assert(receipt.left._tag === "TokenLocked");
+    expect(receipt.left.pubkeys).toEqual([p2pkPubkeyOf(ownerKey)]);
+    expect(configs).toEqual([]);
+    expect(proofs).toEqual([]);
+    expect(operations).toEqual([]);
+  });
+
+  it("refuses a key the proofs are not locked to", async () => {
+    const { wallet, configs } = lockedWallet();
+    const exit = await makeHarness(wallet).run(receiveLocked(otherKey));
+    assert(Exit.isSuccess(exit));
+
+    assert(exit.value.receipt._tag === "Left");
+    expect(exit.value.receipt.left._tag).toBe("TokenLocked");
+    expect(configs).toEqual([]);
+  });
+
+  it("signs the inputs with the key and stores plain proofs as balance", async () => {
+    const { wallet, configs } = lockedWallet();
+    const exit = await makeHarness(wallet).run(receiveLocked(ownerKey));
+    assert(Exit.isSuccess(exit));
+    const { receipt, proofs, operations } = exit.value;
+
+    assert(receipt._tag === "Right");
+    expect(configs).toEqual([ownerKey]);
+    expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
+    expect(proofs.every((p) => p.state === "available")).toBe(true);
+    expect(operations.map((op) => [op.kind, op.status])).toEqual([
       ["receive", "done"],
     ]);
   });

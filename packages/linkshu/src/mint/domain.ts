@@ -11,6 +11,8 @@ export class MintInfo extends Schema.Class<MintInfo>("MintInfo")({
   inputFeePpk: Schema.NullOr(Schema.Int.pipe(Schema.nonNegative())),
   /** NUT-15 multi-path payments. */
   supportsMpp: Schema.Boolean,
+  /** NUT-11 P2PK: sends may lock their proofs to a key (`SendDraft.lockTo`). */
+  supportsP2pk: Schema.Boolean,
   /** Known test URL or published metadata advertising simulated Lightning. */
   isFakeLightning: Schema.Boolean,
   iconUrl: Schema.NullOr(Schema.String),
