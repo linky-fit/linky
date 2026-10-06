@@ -17,7 +17,7 @@ While the version is 0.x, a breaking change to an export or documented behavior 
    git push origin packages-v0.1.1
    ```
 
-One tag publishes both libraries. Tag after `CI` has passed on the merged commit, and within 90 days, while its tarballs are kept. The workflow rejects mismatched package versions, tags that do not match the shared version, commits outside `main` history, and prerelease versions. A tag created with `GITHUB_TOKEN` from another workflow does not trigger it; push the tag by hand or with a separately authorized identity.
+One tag publishes both libraries. The workflow waits for `CI` on the tagged commit, so you can tag right after merging; tag within 90 days, while that run's tarballs are kept. The workflow rejects mismatched package versions, tags that do not match the shared version, commits outside `main` history, and prerelease versions. A tag created with `GITHUB_TOKEN` from another workflow does not trigger it; push the tag by hand or with a separately authorized identity.
 
 Each package publishes in its own job. If one fails after the other succeeded, use **Re-run failed jobs** to retry only that package. npm versions are immutable: never rerun a successful publish and never tag a version that was already published.
 

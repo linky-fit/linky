@@ -17,7 +17,7 @@ The desktop shell loads `app.linky.fit`, so it follows the app release.
 
 `ci.yml` runs every check once per commit, on pull requests and on pushes to `main` and `hotfix/**`. The `main` ruleset requires its six checks: `lint` (typecheck, ESLint and Prettier for the whole repo), `unit-tests` (every workspace), `linkshu-integration`, `npm-packages`, `app-e2e` and `site-e2e`.
 
-Release workflows run no tests. They ship a commit only after `.github/actions/require-ci` confirms that all six checks succeeded on it, so a release always ships code its CI run tested.
+Release workflows run no tests. They ship a commit only after `.github/actions/require-ci` confirms that all six checks succeeded on it, so a release always ships code its CI run tested. It waits up to 45 minutes for checks that are still running or not yet started, and fails as soon as one fails.
 
 ## App
 
@@ -70,10 +70,9 @@ They ship ahead of the app, so their APIs must keep working with the last app re
 
 ## Push server
 
-1. Wait until `CI` has passed on `main`'s head.
-2. Actions → `Release · push` → Run workflow on `main`. From any other branch every job is skipped.
+Actions → `Release · push` → Run workflow on `main`. From any other branch every job is skipped.
 
-The run confirms the six checks on that commit, builds `ghcr.io/linky-fit/linky-push` as `:latest` and `sha-<commit>`, and deploys it over SSH, restarting only the `push` service. It fails unless the server reports the commit it built and `/health` answers. A failed run leaves the previous container running; fix the cause and run it again.
+The run waits for `CI` on `main`'s head to finish and confirms its six checks, builds `ghcr.io/linky-fit/linky-push` as `:latest` and `sha-<commit>`, and deploys it over SSH, restarting only the `push` service. It fails unless the server reports the commit it built and `/health` answers. A failed run leaves the previous container running; fix the cause and run it again.
 
 Like the site, the push server ships ahead of the app and must keep working with the last app release.
 
@@ -82,7 +81,7 @@ Like the site, the push server ships ahead of the app and must keep working with
 `@linky-fit/linkshu` and `@linky-fit/linkstr` share one SemVer version and publish together; [npm-releases.md](./npm-releases.md) has the details.
 
 1. Set the same `version` in both packages' `package.json` and in their `bun.lock` entries, and merge to `main`.
-2. Once `CI` has passed on the merged commit, tag it and push the tag:
+2. Tag the merged commit and push the tag:
 
    ```bash
    git fetch origin
@@ -90,7 +89,7 @@ Like the site, the push server ships ahead of the app and must keep working with
    git push origin packages-v<version>
    ```
 
-`release-npm.yml` confirms the six checks on the tagged commit and publishes the tarballs that commit's `CI` run built. If one package fails after the other published, re-run the failed jobs. Tags can't be moved or deleted and npm never reuses a version, so a release that can't be fixed by a re-run needs the next version.
+`release-npm.yml` waits for `CI` on the tagged commit, confirms its six checks and publishes the tarballs that commit's `CI` run built. If one package fails after the other published, re-run the failed jobs. Tags can't be moved or deleted and npm never reuses a version, so a release that can't be fixed by a re-run needs the next version.
 
 ## Vercel and GitHub setup
 
