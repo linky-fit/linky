@@ -3,9 +3,9 @@ import { buildCashuToken } from "../testUtils/cashuToken";
 import {
   buildCashuDeepLink,
   buildCashuShareUrl,
-  buildProfileShareUrl,
   parseNativeDeepLinkUrl,
 } from "./deepLinks";
+import { buildProfileShareUrl } from "./profileShareUrl";
 
 const NPUB = "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
 

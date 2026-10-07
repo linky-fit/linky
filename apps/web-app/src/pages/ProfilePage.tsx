@@ -23,7 +23,7 @@ import {
   formatShortNpub,
 } from "../utils/formatting";
 import { buildOwnProfileShareUrl } from "../sharedProfileLink";
-import { buildProfileShareUrl } from "../utils/deepLinks";
+import { buildProfileShareUrl } from "../utils/profileShareUrl";
 import {
   type Nip98AuthHeaderFactory,
   type OwnLightningAddressInputCandidate,

@@ -38,6 +38,7 @@ import {
 } from "../../../utils/nostrNip05";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { NOSTR_SEARCH_RELAYS } from "../../../utils/nostrRelays";
+import { normalizeContactSearchQuery } from "../../../utils/profileShareUrl";
 import {
   getContactPublicProfile,
   resolveContactProfile,
@@ -689,7 +690,7 @@ export const useContactEditor = ({
     ): Promise<ContactSearchResult> => {
       if (route.kind !== "contactNew") return { kind: "empty" };
 
-      const rawQuery = (query ?? form.npub).trim();
+      const rawQuery = normalizeContactSearchQuery(query ?? form.npub);
       if (!rawQuery) return { kind: "empty" };
 
       let exact: ContactSearchCandidate | null = null;
