@@ -80,7 +80,7 @@ test("private images and PDFs reach a peer, decrypt, save and share with seen re
         return;
       }
       const body = blobs.get(request.url());
-      if (!body) throw new Error(`Unknown attachment ${request.url()}`);
+      if (!body) return route.fallback();
       await route.fulfill({ headers, body, contentType: "text/plain" });
     });
     await page.goto("/#wallet");

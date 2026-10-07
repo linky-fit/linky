@@ -68,6 +68,7 @@ import {
 } from "../../utils/storage";
 import type { FilePickerHandle } from "../../utils/pickFile";
 import { nowSeconds } from "../../utils/time";
+import { prepareProfilePicture } from "../lib/profilePicture";
 import type { I18nKey, Translate } from "../../i18n";
 
 type NostrIdentitySource = "custom" | "derived";
@@ -353,7 +354,7 @@ export const useProfileAuthDomain = ({
       const trimmedLnAddress = lnAddress.trim();
       const nip05 = getDefaultNip05IdentifierFromAddress(trimmedLnAddress);
       const trimmedName = name.trim();
-      const trimmedPicture = pictureUrl.trim();
+      const trimmedPicture = await prepareProfilePicture(pictureUrl, nsec);
       const metadata = new ProfileMetadata({
         ...(trimmedName ? { name: trimmedName, displayName: trimmedName } : {}),
         ...(trimmedLnAddress ? { lud16: trimmedLnAddress } : {}),

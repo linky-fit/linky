@@ -27,6 +27,7 @@ import {
 } from "../../../utils/npubCashUsernameClaim";
 import { isHttpUrl } from "../../../utils/validation";
 import { applyLightningAddressToProfileMetadata } from "../../lib/profileMetadata";
+import { prepareProfilePicture } from "../../lib/profilePicture";
 import type { FilePickerHandle } from "../../../utils/pickFile";
 import { nowSeconds } from "../../../utils/time";
 import type { Translate } from "../../../i18n";
@@ -267,7 +268,10 @@ export const useProfileEditor = ({
         const nextNip05 = getDefaultNip05IdentifierFromAddress(
           trimmedLightningAddress,
         );
-        const trimmedPicture = picture.trim();
+        const trimmedPicture = await prepareProfilePicture(
+          picture,
+          currentNsec,
+        );
         const trimmedStatus = status.trim();
         const nextStatus = buildProfileGeneralStatus({
           currencies: parseProfileGeneralStatus(myProfileStatus).currencies,
