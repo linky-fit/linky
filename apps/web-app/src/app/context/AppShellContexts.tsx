@@ -116,6 +116,7 @@ export interface AppShellCoreContextValue {
   profileEditPicture: string;
   profileEditStatus: string;
   profileEditsSavable: boolean;
+  profileIsSaving: boolean;
   profileStatus: string | null;
   profileStatusCurrencies: readonly ProfileStatusCurrency[];
   proxyPaymentPayerContacts: readonly ProxyPaymentPayerContact[];
