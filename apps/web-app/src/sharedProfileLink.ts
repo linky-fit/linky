@@ -1,5 +1,5 @@
 import { decodeNpub } from "@linky-fit/linkstr";
-import { buildProfileShareUrl } from "./utils/deepLinks";
+import { buildProfileShareUrl } from "./utils/profileShareUrl";
 
 const ADD_CONTACT_HASH = /^#add\/(npub1[a-z0-9]+)$/i;
 

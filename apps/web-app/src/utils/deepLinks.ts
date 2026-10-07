@@ -1,5 +1,6 @@
 import { parseTokenText } from "@linky-fit/linkshu";
 import { normalizeNpubIdentifier } from "./nostrNpub";
+import { parseProfileShareUrl } from "./profileShareUrl";
 import { safeDecodeURIComponent } from "./url";
 
 interface NativeDeepLinkScanText {
@@ -41,11 +42,6 @@ export const buildCashuShareUrl = (rawToken: string): string | null => {
   if (!token) return null;
   return `https://linky.fit/cashu/#${encodeURIComponent(token)}`;
 };
-
-const PROFILE_SHARE_URL = /^https:\/\/linky\.fit\/p\/([^/?#]+)\/?$/i;
-
-export const buildProfileShareUrl = (npubOrName: string): string =>
-  `https://linky.fit/p/${encodeURIComponent(npubOrName)}`;
 
 const extractNpubFromCandidate = (value: string): string | null => {
   const trimmed = normalizeCandidate(value);
@@ -211,14 +207,12 @@ export const parseNativeDeepLinkUrl = (
     return parseCashuDeepLinkUrl(normalizedRawUrl);
   }
 
-  const sharedNpub = normalizeStrictNpub(
-    PROFILE_SHARE_URL.exec(normalizedRawUrl)?.[1] ?? "",
-  );
-  if (sharedNpub) {
+  const sharedProfile = parseProfileShareUrl(normalizedRawUrl);
+  if (sharedProfile?.kind === "npub") {
     return {
       kind: "scan-text",
       rawUrl: normalizedRawUrl,
-      text: `nostr:${sharedNpub}`,
+      text: `nostr:${sharedProfile.npub}`,
     };
   }
 
