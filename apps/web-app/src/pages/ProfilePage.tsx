@@ -62,6 +62,7 @@ interface ProfilePageProps {
   profileEditPicture: string;
   profileEditStatus: string;
   profileEditsSavable: boolean;
+  profileIsSaving: boolean;
   unregisteredOwnLightningAddress: OwnLightningAddressInputCandidate | null;
   profileStatus: string | null;
   profilePhotoInputRef: React.RefObject<FilePickerHandle | null>;
@@ -104,6 +105,7 @@ export function ProfilePage({
   profileEditPicture,
   profileEditStatus,
   profileEditsSavable,
+  profileIsSaving,
   unregisteredOwnLightningAddress,
   profileStatus,
   profilePhotoInputRef,
@@ -351,7 +353,11 @@ export function ProfilePage({
     inlineClaimPreview.username === unregisteredOwnLightningAddress?.username;
 
   const saveButton = (
-    <Button icon="Save" onPress={() => void saveProfileEdits()}>
+    <Button
+      icon="Save"
+      loading={profileIsSaving}
+      onPress={() => void saveProfileEdits()}
+    >
       {t("saveChanges")}
     </Button>
   );

@@ -90,6 +90,10 @@ export const useProfileEditor = ({
     React.useState("");
   const [profileSelectedPictureKind, setProfileSelectedPictureKind] =
     React.useState<"custom" | "generated">("generated");
+  const [profileIsSaving, setProfileIsSaving] = React.useState(false);
+  // State lags a render behind, so a second tap during the first one's
+  // publish is turned away by the ref.
+  const profileIsSavingRef = React.useRef(false);
 
   const profilePhotoInputRef = React.useRef<FilePickerHandle | null>(null);
   const profileEditInitialRef = React.useRef<{
@@ -257,6 +261,9 @@ export const useProfileEditor = ({
       picture,
       status,
     }: PersistProfileValuesArgs): Promise<boolean> => {
+      if (profileIsSavingRef.current) return false;
+      profileIsSavingRef.current = true;
+      setProfileIsSaving(true);
       try {
         if (!currentNpub || !currentNsec) {
           setStatus(t("profileMissingNpub"));
@@ -348,6 +355,9 @@ export const useProfileEditor = ({
       } catch (error) {
         setStatus(`${t("errorPrefix")}: ${String(error ?? "unknown")}`);
         return false;
+      } finally {
+        profileIsSavingRef.current = false;
+        setProfileIsSaving(false);
       }
     },
     [
@@ -492,6 +502,7 @@ export const useProfileEditor = ({
     profileEditPicture,
     profileEditStatus,
     profileEditsSavable,
+    profileIsSaving,
     unregisteredOwnLightningAddress,
     profilePhotoInputRef,
     profileSelectedPictureKind,

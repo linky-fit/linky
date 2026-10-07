@@ -85,6 +85,7 @@ interface BuildPeopleRoutePropsParams {
   profileEditPicture: PeopleRoutesProps["profileProps"]["profileEditPicture"];
   profileEditStatus: PeopleRoutesProps["profileProps"]["profileEditStatus"];
   profileEditsSavable: PeopleRoutesProps["profileProps"]["profileEditsSavable"];
+  profileIsSaving: PeopleRoutesProps["profileProps"]["profileIsSaving"];
   unregisteredOwnLightningAddress: PeopleRoutesProps["profileProps"]["unregisteredOwnLightningAddress"];
   profileStatus: PeopleRoutesProps["profileProps"]["profileStatus"];
   profilePhotoInputRef: PeopleRoutesProps["profileProps"]["profilePhotoInputRef"];
@@ -197,6 +198,7 @@ export const buildPeopleRouteProps = ({
   profileEditPicture,
   profileEditStatus,
   profileEditsSavable,
+  profileIsSaving,
   unregisteredOwnLightningAddress,
   profileStatus,
   profilePhotoInputRef,
@@ -365,6 +367,7 @@ export const buildPeopleRouteProps = ({
       profileEditStatus,
       derivedProfile,
       profileEditsSavable,
+      profileIsSaving,
       unregisteredOwnLightningAddress,
       profileStatus,
       effectiveMyLightningAddress,

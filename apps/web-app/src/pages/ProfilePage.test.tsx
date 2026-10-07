@@ -57,6 +57,7 @@ const props: React.ComponentProps<typeof ProfilePage> = {
   profileEditPicture: "",
   profileEditStatus: "",
   profileEditsSavable: true,
+  profileIsSaving: false,
   unregisteredOwnLightningAddress: {
     issue: null,
     lightningAddress: "alice@linky.fit",

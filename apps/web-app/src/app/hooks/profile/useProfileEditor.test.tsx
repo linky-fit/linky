@@ -144,4 +144,34 @@ describe("profile editor", () => {
       expect.stringContaining("upload-failed:503"),
     );
   });
+
+  it("reports the save in flight and turns a second tap away until it settles", async () => {
+    let finishStatusPublish!: (exit: Exit.Exit<unknown>) => void;
+    mocks.publishStatus.mockImplementationOnce(
+      () =>
+        new Promise<Exit.Exit<unknown>>((resolve) => {
+          finishStatusPublish = resolve;
+        }),
+    );
+    const editor = await setup("alice@linky.fit");
+    await act(async () => editor.current?.setProfileEditName("New name"));
+    expect(editor.current?.profileIsSaving).toBe(false);
+
+    let firstSave: Promise<void> | undefined;
+    await act(async () => {
+      firstSave = editor.current?.saveProfileEdits();
+    });
+    expect(editor.current?.profileIsSaving).toBe(true);
+
+    await act(async () => editor.current?.saveProfileEdits());
+    expect(mocks.publishStatus).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      finishStatusPublish(Exit.succeed(undefined));
+      await firstSave;
+    });
+    expect(editor.current?.profileIsSaving).toBe(false);
+    expect(mocks.publishStatus).toHaveBeenCalledTimes(1);
+    expect(mocks.publishProfile).toHaveBeenCalledTimes(1);
+  });
 });
