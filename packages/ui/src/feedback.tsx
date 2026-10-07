@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { View } from "tamagui";
+import type { TransitionName } from "./animations";
 import { Button, IconButton, Pressable } from "./controls";
 import type { LabeledAction } from "./controls";
 import { Icon } from "./icons";
@@ -183,7 +184,25 @@ export interface ProgressProps {
   tone?: Tone | undefined;
   /** Splits the track into equal steps that fill whole, e.g. phases of a flow. */
   segments?: number | undefined;
+  /**
+   * Glides the fill to each new value instead of jumping, and grows it in
+   * from empty on mount; `countdown` bridges values that tick once a second.
+   */
+  transition?: TransitionName | undefined;
 }
+
+/** The fraction one painted frame late on mount, so a transitioned fill has an empty frame to grow from. */
+const useFillFraction = (fraction: number, transitions: boolean): number => {
+  const [painted, setPainted] = useState(false);
+  useEffect(() => {
+    // The first callback runs before the mount paints; the nested one after it.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => setPainted(true));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return transitions && !painted ? 0 : fraction;
+};
 
 export function Progress({
   value,
@@ -191,9 +210,11 @@ export function Progress({
   accessibilityLabel,
   tone = "accent",
   segments,
+  transition,
 }: ProgressProps) {
   const ratio = value / max;
   const fraction = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0;
+  const fillFraction = useFillFraction(fraction, transition !== undefined);
   const fill = toneColors[tone].solid;
   const a11y = {
     role: "progressbar",
@@ -228,9 +249,10 @@ export function Progress({
     >
       <View
         height="100%"
-        width={`${fraction * 100}%`}
+        width={`${fillFraction * 100}%`}
         borderRadius="$pill"
         backgroundColor={fill}
+        transition={transition ?? null}
       />
     </View>
   );

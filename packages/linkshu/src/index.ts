@@ -2,6 +2,7 @@ export * from "./autoswap/Autoswap";
 export * from "./autoswap/domain";
 export * from "./composition";
 export * from "./domain/errors";
+export * from "./domain/p2pk";
 export * from "./domain/primitives";
 export * from "./envelope/domain";
 export * from "./envelope/Envelope";
@@ -43,6 +44,7 @@ export * from "./lnurl/lnurlPay";
 export * from "./invoice/paymentAmountFallback";
 export * from "./mint/icons";
 export * from "./fiatRates";
+export * from "./paymentRequest";
 export {
   getLightningAddressRequestUrl,
   splitLightningAddress,

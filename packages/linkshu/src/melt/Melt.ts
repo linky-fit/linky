@@ -45,6 +45,7 @@ import { isRecoverableOutputCollision } from "../internal/outputCollisions";
 import {
   domainToNewProofs,
   insertProofs,
+  proofsAt,
   setProofState,
   storedSecrets,
   toDomainProof,
@@ -63,7 +64,10 @@ import {
 import type { SpendContext } from "../internal/spend";
 import { nowSeconds } from "../internal/time";
 import { sat } from "../internal/units";
-import { inputFeeForProofs } from "../mint/internal/keysetFees";
+import {
+  feeInclusiveTotal,
+  inputFeeForProofs,
+} from "../mint/internal/keysetFees";
 import {
   boundKeysetId,
   classifyMintError,
@@ -78,7 +82,7 @@ import type { StoredOperation } from "../ports/OperationStore";
 import type { StoredProof } from "../ports/ProofStore";
 import type { Proof } from "../token/domain";
 import { toDomainProofs } from "../token/internal/cashuProofs";
-import { MeltQuote, MeltReceipt, MeltResumeResult } from "./domain";
+import { MeltCost, MeltQuote, MeltReceipt, MeltResumeResult } from "./domain";
 import type { MeltDraft, MeltError } from "./domain";
 import { blankOutputCount } from "./internal/blankOutputs";
 import { meltRecords } from "./internal/meltRecords";
@@ -637,6 +641,40 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
       });
 
     /**
+     * The proofs a swap of `amount` spends, chosen up front so its input fee
+     * is known: the swap picks among these alone, so it pays at most their
+     * fee. Fails before anything moves when the inputs it mints plus that fee
+     * exceed `limit.maxTotal`.
+     */
+    const offerWithin = (
+      wallet: LoadedWallet,
+      spendable: ReadonlyArray<StoredProof>,
+      amount: number,
+      limit: { readonly maxTotal: number; readonly quoteId: QuoteId },
+      mint: MintUrl,
+    ): Effect.Effect<ReadonlyArray<StoredProof>, PaymentFailed> => {
+      const required = feeInclusiveTotal(wallet, amount);
+      const { send } = wallet.selectProofsToSend(
+        spendable.map(toDomainProof),
+        required,
+        true,
+      );
+      const chosen = new Set(send.map((proof) => proof.secret));
+      const offered = spendable.filter((proof) => chosen.has(proof.secret));
+      if (offered.length === 0) return Effect.succeed(spendable);
+      return required + inputFeeForProofs(wallet, send) > limit.maxTotal
+        ? Effect.fail(
+            new PaymentFailed({
+              mint,
+              quoteId: limit.quoteId,
+              detail:
+                "the melt would cost more than its maximum total; nothing was sent",
+            }),
+          )
+        : Effect.succeed(offered);
+    };
+
+    /**
      * Swaps `amount` out of the balance at the scope's mint, fee-inclusive:
      * melt inputs must also cover their own cashu input fee, or the mint
      * rejects them as short.
@@ -645,6 +683,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
       wallet: LoadedWallet,
       scope: CounterScope,
       amount: number,
+      limit?: { readonly maxTotal: number; readonly quoteId: QuoteId },
     ): Effect.Effect<FundedInputs, MeltError> =>
       Effect.gen(function* () {
         const spendContext = {
@@ -664,12 +703,16 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
             available: NonNegativeAmount.make(available),
           });
         }
+        const offered =
+          limit === undefined
+            ? spendable
+            : yield* offerWithin(wallet, spendable, amount, limit, scope.mint);
         const swapped = yield* swapProofsForAmount(
           { kv, inspector, wallet, scope },
           {
             amount: Amount.make(amount),
-            proofs: spendable.map(toDomainProof),
-            available,
+            proofs: offered.map(toDomainProof),
+            available: totalAmount(offered),
             includeFees: true,
           },
         );
@@ -677,7 +720,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         if (inputs === null || inputs.length === 0) {
           return yield* malformedSwapProofs(scope.mint);
         }
-        return { spendContext, spendable, swapped, inputs };
+        return { spendContext, spendable: offered, swapped, inputs };
       });
 
     /**
@@ -687,7 +730,7 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
     const holdFunded = (
       funded: FundedInputs,
       pending: PendingMelt,
-    ): Effect.Effect<void, MintRejected> =>
+    ): Effect.Effect<number, MintRejected> =>
       Effect.gen(function* () {
         const held = toNewProofs(
           funded.swapped.send,
@@ -705,6 +748,12 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           "melt-keep",
         );
         if (outcome === null) return yield* malformedSwapProofs(pending.mint);
+        // What the swap consumed beyond the inputs and change it minted.
+        return (
+          totalAmount(outcome.consumed) -
+          totalAmount(funded.inputs) -
+          totalAmount(outcome.freshKeep)
+        );
       });
 
     const createRecord = (
@@ -746,6 +795,9 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           wallet,
           scope,
           quote.amount + quote.feeReserve,
+          draft.maxTotal === undefined
+            ? undefined
+            : { maxTotal: draft.maxTotal, quoteId: quote.quoteId },
         );
         // The record, its held inputs, and the remainder all land before
         // the consumed sources are marked spent, so the funds are never
@@ -757,12 +809,16 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           funded.inputs,
           null,
         );
-        yield* holdFunded(funded, pending);
-        return yield* executeMelt({
+        const swapFee = yield* holdFunded(funded, pending);
+        const receipt = yield* executeMelt({
           wallet,
           raw,
           inputs: funded.inputs,
           pending,
+        });
+        return new MeltReceipt({
+          ...receipt,
+          swapFee: NonNegativeAmount.make(swapFee),
         });
       }).pipe(
         // The invoice never reaches the inspector; the receipt holds no secrets.
@@ -820,8 +876,13 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
             envelope.tokenText,
           );
           yield* setProofState(ctx, held, "held", "melt", pending.id);
-          if (funded !== null) yield* holdFunded(funded, pending);
-          return yield* executeMelt({ wallet, raw, inputs, pending });
+          const swapFee =
+            funded === null ? 0 : yield* holdFunded(funded, pending);
+          const receipt = yield* executeMelt({ wallet, raw, inputs, pending });
+          return new MeltReceipt({
+            ...receipt,
+            swapFee: NonNegativeAmount.make(swapFee),
+          });
         }),
       ).pipe(
         inspectOperation(inspector, "melt.meltEnvelope", {
@@ -829,6 +890,31 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
           key: draft.key,
         }),
       );
+
+    /**
+     * The most paying `priced` can take from the balance. Reads the stored
+     * `available` proofs without a NUT-07 check, so no proof changes state.
+     */
+    const cost = (
+      priced: MeltQuote,
+    ): Effect.Effect<MeltCost, MintUnreachable | MintRejected> =>
+      Effect.gen(function* () {
+        const wallet = yield* instances.get(priced.mint, sat);
+        const available = proofsAt(
+          yield* proofStore.loadAll,
+          priced.mint,
+          sat,
+        ).filter((proof) => proof.state === "available");
+        const invoiceTotal = priced.amount + priced.feeReserve;
+        const maxTotal =
+          feeInclusiveTotal(wallet, invoiceTotal) +
+          inputFeeForProofs(wallet, available.map(toDomainProof));
+        return new MeltCost({
+          quote: priced,
+          inputFee: NonNegativeAmount.make(maxTotal - invoiceTotal),
+          maxTotal: Amount.make(maxTotal),
+        });
+      }).pipe(inspectOperation(inspector, "melt.cost", { mint: priced.mint }));
 
     const status = (priced: MeltQuote) =>
       Effect.gen(function* () {
@@ -902,6 +988,13 @@ export class Melt extends Effect.Service<Melt>()("linkshu/Melt", {
         return results;
       }).pipe(inspectOperation(inspector, "melt.resumePending", {}));
 
-    return { quote, melt, meltEnvelope, status, resumePending } as const;
+    return {
+      quote,
+      cost,
+      melt,
+      meltEnvelope,
+      status,
+      resumePending,
+    } as const;
   }),
 }) {}

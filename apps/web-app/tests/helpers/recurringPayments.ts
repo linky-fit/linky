@@ -320,9 +320,9 @@ export const showCountdown = async (page: Page): Promise<void> => {
   await makeDue(page);
   await triggerSchedulerPass(page);
   await expect(dueDialog(page)).toBeVisible();
-  await expect(dueDialog(page)).toContainText(
-    "The daily recurring payment is ready.",
-  );
+  await expect(
+    dueDialog(page).getByTestId("recurring-due-interval"),
+  ).toHaveText("daily");
 };
 
 const IncomingRow = Schema.Struct({
@@ -362,7 +362,7 @@ export const expectPaidHistory = async (
 ): Promise<void> => {
   await page.goto("/#wallet/transactions");
   const pill = page.getByTestId("transaction-recurring-pill");
-  await expect(pill).toHaveCount(1);
+  await expect(pill).toHaveText("daily");
   await page.getByTestId("transaction-card").filter({ has: pill }).click();
   await page
     .getByRole("button", { name: "Recurring payment", exact: true })

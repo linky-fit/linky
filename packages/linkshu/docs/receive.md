@@ -26,9 +26,28 @@ The receipt's `tokenText` is the re-signed encoding of the proofs now in the wal
 
 Set `automatic: true` on the draft when nobody asked for this receive, such as a token in a message replayed on a device. An automatic receive treats a text whose deferred receive is closed (received, discarded with `Tokens.forget`, or failed) as `TokenAlreadyKnown` and writes nothing, so a token given up on one device stays given up on every device that has synced it. It still resumes an unfinished receive of the text. A receive the user starts takes the text in again ([deferred receives](#deferred-receives)).
 
+## Locked tokens (NUT-11)
+
+A token whose proofs are locked to a key (P2PK) needs that key's secret to be received. Pass it as `receive(draft, { unlockingKey })` (`P2pkUnlockingKey`, 64 hex): the inputs are signed with it at the swap, and the proofs stored are plain wallet proofs. Without a key, or with one the proofs are not locked to, the receive fails with `TokenLocked` (its `pubkeys` name who can sign) before anything is written or asked. Proofs whose lock has expired without a refund key need no key. The key reaches the swap only; nothing persists or logs it.
+
+```ts
+import { Effect } from "effect";
+import { Receive, ReceiveDraft } from "@linky-fit/linkshu";
+import type { P2pkUnlockingKey } from "@linky-fit/linkshu";
+
+const receiveLocked = (text: string, unlockingKey: P2pkUnlockingKey) =>
+  Effect.flatMap(Receive, (receive) =>
+    receive.receive(new ReceiveDraft({ text, automatic: true }), {
+      unlockingKey,
+    }),
+  );
+```
+
+`resumeDeferred` has no key, so a locked token deferred while its mint was down stays `pending`; receive its text again with the key to finish it.
+
 ## How it works
 
-1. Extract. `extractTokenText` finds a token inside arbitrary text: bare `cashuA…`/`cashuB…`, `cashu:`/`web+cashu:`/`lightning:`/`nostr:` schemes, URLs carrying the token in a query parameter, hash, or path, and legacy cashu.me JSON bundles.
+1. Extract. `extractTokenText` finds a token inside arbitrary text: bare `cashuA…`/`cashuB…`, `cashu:`/`web+cashu:`/`lightning:`/`nostr:` schemes, URLs carrying the token in a query parameter, hash, or path, and JSON proof bundles (`{mint, unit, proofs}`: legacy cashu.me exports and the NUT-18 payment payload other wallets send). Then a P2PK lock the given key cannot sign for ends the receive with `TokenLocked`.
 2. Take the mint's receive lease, held to the end of the receive. It is per mint, whatever keyset a context's wallet binds, so two contexts receiving one token see each other's outcome even across a keyset rotation, and a mint's deferrals are read and written in turn. Then load the mint and decode the token's proofs. The mint's keysets expand the short keyset ids of v4 text and decide dedup and the fee; when the ids do not resolve, the keysets are refreshed from the mint once. A mint that cannot be reached, refuses to load (an HTTP 4xx such as a 429 rate limit, or a captive-portal page instead of JSON), has not loaded or refreshed within 15 seconds, or binds the wallet to a keyset id that is not hex, ends the receive before anything else is written: a fresh token is deferred (below), and a receive retried through `Tokens.returnToWallet` or by receiving its text again fails with `MintUnreachable` or `MintRejected`. A token whose proofs still do not decode after a refresh names no keyset of the mint and fails `TokenParseFailed` (`undecodable`), writing nothing; a deferral of it closes `failed`.
 3. Take the counter lock of the mint's active keyset. Everything from here on runs under it as well.
 4. Dedup. The text is known when a `send` or a `done` receive carries it, when any proof secret it encodes is already in the inventory, in any state, or, to an `automatic` receive, when its deferral is closed. A match fails with `TokenAlreadyKnown` and touches nothing: swapping a token whose proofs the wallet holds would kill the stored copies. An unfinished receive of the text (`pending` or `failed`) is not a match; it is resumed in place (below).
@@ -104,6 +123,7 @@ Guide-specific tags; the rest are in [errors.md](./errors.md).
 | Tag                   | When                                                                                                                   | Operation left behind                                                                                       |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `TokenParseFailed`    | no token in the text, or it does not decode, also against the mint's keysets (`reason` says which)                     | none                                                                                                        |
+| `TokenLocked`         | the proofs are P2PK-locked and the receive was given no key, or one they are not locked to                             | none                                                                                                        |
 | `TokenAlreadyKnown`   | a send or a finished receive carries this text, its proofs are already stored, or (`automatic`) its deferral is closed | the existing one, untouched                                                                                 |
 | `AmountConsumedByFee` | the token is worth no more than the mint's input fee for its proofs                                                    | none                                                                                                        |
 | `TokenAlreadySpent`   | the mint reported the proofs spent                                                                                     | none from the state check (a resumed receive as it was); `failed` from the swap (`Tokens.forget` closes it) |

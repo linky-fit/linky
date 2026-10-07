@@ -1,4 +1,6 @@
 import { Layer } from "effect";
+import { AppData } from "./appData/AppData";
+import { AppMessages } from "./appMessages/AppMessages";
 import { BankOffers } from "./bankOffers/BankOffers";
 import { Chat } from "./chat/Chat";
 import type { NostrSecretKey, RelayUrl } from "./domain/primitives";
@@ -6,6 +8,7 @@ import { InboxCursorStore } from "./inbox/InboxCursorStore";
 import { WrapInbox } from "./inbox/WrapInbox";
 import { MuteList } from "./muteList/MuteList";
 import { NostrConnect } from "./nostrConnect/NostrConnect";
+import { NostrConnectClient } from "./nostrConnect/NostrConnectClient";
 import { Outbox } from "./outbox/Outbox";
 import { OutboxStore } from "./outbox/OutboxStore";
 import { PaymentNotices } from "./paymentNotices/PaymentNotices";
@@ -42,6 +45,8 @@ export interface LinkstrServicesConfig {
  */
 export const linkstrServices = (config: LinkstrServicesConfig) =>
   Layer.mergeAll(
+    AppData.Default,
+    AppMessages.Default,
     BankOffers.Default,
     Chat.Default,
     Outbox.Default.pipe(
@@ -49,6 +54,7 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
         Chat.Default,
         Reactions.Default,
         PaymentTelemetry.Default,
+        AppMessages.Default,
         config.outboxStore ?? OutboxStore.inMemory,
       ]),
     ),
@@ -64,6 +70,7 @@ export const linkstrServices = (config: LinkstrServicesConfig) =>
     RelayLists.Default,
     MuteList.Default,
     NostrConnect.Default,
+    NostrConnectClient.Default,
   ).pipe(
     Layer.provideMerge(
       Layer.mergeAll(

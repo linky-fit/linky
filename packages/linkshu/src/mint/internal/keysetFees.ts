@@ -64,6 +64,30 @@ const swapProofCount = (
 };
 
 /**
+ * What a fee-inclusive swap mints for `amount` (cashu-ts `includeFees`): the
+ * amount plus the input fee of spending its outputs, raised until the outputs
+ * that carry the fee also cover their own. `amount` when the split is
+ * unknown, leaving the mint to answer.
+ */
+export const feeInclusiveTotal = (
+  wallet: LoadedWallet,
+  amount: number,
+): number => {
+  const outputs = swapProofCount(wallet, amount);
+  if (outputs === null) return amount;
+  let fee = inputFeeAllowance(wallet, outputs);
+  while (
+    inputFeeAllowance(
+      wallet,
+      outputs + (fee === 0 ? 0 : (swapProofCount(wallet, fee) ?? 0)),
+    ) > fee
+  ) {
+    fee += 1;
+  }
+  return amount + fee;
+};
+
+/**
  * The input fee whoever redeems a token of `amount` pays: the fee of the
  * split a send swap produces on the bound keyset. Zero when that split is
  * unknown, leaving the mint to answer.

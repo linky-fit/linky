@@ -1,6 +1,8 @@
 # Contributing
 
-Thanks for wanting to help with Linky. Here is how to get a change merged without wasting your time or ours.
+Thanks for wanting to help with Linky. Here is how to prepare a contribution without wasting your time or ours.
+
+Right now, we have limited review capacity. Opening a PR does not create an obligation to review or merge it. We may close or defer it, ask for a smaller scope, or reimplement the idea later. Meeting this guide's requirements makes a PR eligible for deeper review; it does not guarantee acceptance.
 
 ## Open an issue first
 

@@ -8,7 +8,11 @@ import { OperationStore } from "../ports/OperationStore";
 import type { OperationPatch } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import { DeferredReceiveResult, ReceiveError } from "./domain";
-import type { ReceiveDraft, ReceiveReceipt } from "./domain";
+import type {
+  ReceiveDraft,
+  ReceiveReceipt,
+  ReceiveUnlockOptions,
+} from "./domain";
 import {
   closeDeferral,
   isPendingDeferral,
@@ -58,8 +62,12 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
 
     const receive = (
       draft: ReceiveDraft,
+      options: ReceiveUnlockOptions = {},
     ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
-      receiveDraft(ctx, draft).pipe(
+      receiveDraft(
+        { ...ctx, unlockingKey: options.unlockingKey ?? null },
+        draft,
+      ).pipe(
         // Params stay empty: the only input is token text (proof secrets).
         inspectOperationWith(
           ctx.inspector,
@@ -119,6 +127,7 @@ export class Receive extends Effect.Service<Receive>()("linkshu/Receive", {
           case "MintUnreachable":
           case "MintRejected":
           case "CounterLockTimeout":
+          case "TokenLocked": // only a receive of the text with its key finishes it
             return deferredResult(deferred, "pending");
         }
       });

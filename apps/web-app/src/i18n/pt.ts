@@ -50,10 +50,6 @@ export const pt = {
   recurringSkippedRecipientBody:
     "Pagamento de {amount} {unit} pulado: não é possível pagar ao destinatário.",
   recurringDueTitle: "Pagamento agendado",
-  recurringDueReady: "O pagamento recorrente está pronto.",
-  recurringDueReadyDaily: "O pagamento recorrente diário está pronto.",
-  recurringDueReadyWeekly: "O pagamento recorrente semanal está pronto.",
-  recurringDueReadyMonthly: "O pagamento recorrente mensal está pronto.",
   recurringDueCancel: "Cancelar este pagamento",
   recurringCancelledToast:
     "Pagamento cancelado. O próximo sai na data seguinte.",
@@ -105,7 +101,6 @@ export const pt = {
   recurringEveryNDays: "a cada {count} dias",
   recurringEveryNWeeks: "a cada {count} semanas",
   recurringEveryNMonths: "a cada {count} meses",
-  recurringApproxSat: "~{amount} sat",
   recurringNextRun: "Próximo pagamento",
   recurringLastRun: "Último pagamento",
   recurringRunsCount: "Pagamentos feitos",
@@ -1056,10 +1051,13 @@ export const pt = {
   lnurlAuthFailed: "O login LNURL falhou",
   lnurlAuthUnavailable: "Entrar exige uma identidade desbloqueada.",
   nostrConnectLoginConfirm: "Entrar",
+  nostrConnectLoginConfirmDevice: "Entrar e vincular dispositivo",
   nostrConnectLoginWaiting: "Aguardando o site…",
   nostrConnectLoginUnknownSite: "Site desconhecido",
   nostrConnectLoginUnverified: "Não verificado",
   nostrConnectLoginAs: "Entrar como",
+  nostrConnectLoginLinksDevice:
+    "{site} também pede para vincular um dos seus dispositivos a você. Você assina que esse dispositivo pode agir por você em {site}.",
   nostrConnectLoginShares:
     "O site recebe sua chave pública e uma assinatura de login de uso único. Ele não pode publicar em seu nome nem ler suas mensagens.",
   nostrConnectLoginDone: "Conectado a {site}",

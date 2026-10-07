@@ -17,10 +17,7 @@ import {
   useRecurringContactSummaries,
   useRecurringPaymentOrders,
 } from "../app/hooks/payments/useRecurringPaymentOrders";
-import {
-  formatRecurringAmountText,
-  recurringAmountSecondaryText,
-} from "../app/lib/recurringAmount";
+import { formatRecurringAmountText } from "../app/lib/recurringAmount";
 import {
   describeRecurringInterval,
   recurringLastRunLabel,
@@ -77,12 +74,6 @@ export function RecurringPaymentPage({
     formatSat: formatDisplayedAmountParts,
     lang,
   });
-  const secondaryAmount = recurringAmountSecondaryText(
-    order.amount,
-    fiatRates,
-    lang,
-    t,
-  );
 
   return (
     <Stack gap="$lg">
@@ -110,19 +101,8 @@ export function RecurringPaymentPage({
         </Row>
       </Stack>
 
-      <Stack alignItems="center" gap="$xs">
-        <Stack testID="recurring-detail-amount">
-          <Amount value={amountText} size="md" />
-        </Stack>
-        {secondaryAmount ? (
-          <Text
-            variant="caption"
-            color="$colorMuted"
-            testID="recurring-detail-amount-secondary"
-          >
-            {secondaryAmount}
-          </Text>
-        ) : null}
+      <Stack alignItems="center" testID="recurring-detail-amount">
+        <Amount value={amountText} size="md" />
       </Stack>
 
       <Stack gap="$none">

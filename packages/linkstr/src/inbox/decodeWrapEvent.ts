@@ -1,4 +1,5 @@
 import { Either } from "effect";
+import { APP_MESSAGE_KIND, decodeAppMessageRumor } from "../appMessages/codec";
 import { BANK_OFFER_KIND, decodeBankOfferRumor } from "../bankOffers/codec";
 import {
   CHAT_IMAGE_KIND,
@@ -61,6 +62,11 @@ const routeRumor = (
       });
     case SEEN_RECEIPT_KIND:
       return Either.match(decodeSeenReceiptRumor(rumor, identity.pubkey), {
+        onLeft: (reason) => new WrapDropped({ wrapId: wrap.id, reason }),
+        onRight: (event) => event,
+      });
+    case APP_MESSAGE_KIND:
+      return Either.match(decodeAppMessageRumor(rumor, identity), {
         onLeft: (reason) => new WrapDropped({ wrapId: wrap.id, reason }),
         onRight: (event) => event,
       });

@@ -309,7 +309,7 @@ test("editing amount and date saves the new values into the payment", async ({
   ).toHaveValue(dateTimeLocal(newDate));
 });
 
-test("a fiat recurring amount stays fixed in CZK and shows approximate sats", async ({
+test("a fiat recurring amount stays fixed in CZK and shows only the display unit", async ({
   bootAccount,
 }) => {
   const a = await bootAccount("A", { fiat: true });
@@ -321,17 +321,22 @@ test("a fiat recurring amount stays fixed in CZK and shows approximate sats", as
     await expect(a.page.getByTestId("amount-display")).toContainText("CZK");
   });
   await saveOrder(a.page, 1);
-  await test.step("verify the fixed fiat amount and its sat side", async () => {
+  await test.step("the amount shows exactly in CZK, and approximately in sats only when sats are selected", async () => {
     expect(await readOrder(a.page)).toMatchObject({
       amount: 100,
       unit: "czk",
     });
-    await expect(
-      a.page.getByTestId("recurring-detail-amount-secondary"),
-    ).toHaveText(`~${FIXTURE_AMOUNT_SAT} sat`);
+    await expect(a.page.getByTestId("recurring-detail-amount")).toHaveText(
+      "1 CZK",
+    );
     await a.page.goto("/#wallet/transactions");
     const card = a.page.getByTestId("recurring-order-card");
     await expect(card).toContainText("1 CZK");
+    await expect(card).not.toContainText("sat");
+    await a.page.goto("/#wallet");
+    await a.page.getByTitle("Switch unit", { exact: true }).click();
+    await a.page.goto("/#wallet/transactions");
     await expect(card).toContainText(`~${FIXTURE_AMOUNT_SAT} sat`);
+    await expect(card).not.toContainText("CZK");
   });
 });

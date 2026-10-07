@@ -1,4 +1,5 @@
 import { identity, Predicate, Schema } from "effect";
+import { AppMessageDraft, AppMessageReceipt } from "../appMessages/domain";
 import {
   ChatMessageReceipt,
   EditMessageDraft,
@@ -59,6 +60,11 @@ export const PaymentTelemetryOperation = Schema.TaggedStruct(
 );
 export type PaymentTelemetryOperation = typeof PaymentTelemetryOperation.Type;
 
+export const AppMessageOperation = Schema.TaggedStruct("appMessage", {
+  draft: AppMessageDraft,
+});
+export type AppMessageOperation = typeof AppMessageOperation.Type;
+
 // A new durable send needs its service in composition.ts's Outbox.Default provide list; layer inputs are inferred.
 export const OutboxOperation = Schema.Union(
   ChatTextOperation,
@@ -67,6 +73,7 @@ export const OutboxOperation = Schema.Union(
   ChatEditOperation,
   ReactionOperation,
   PaymentTelemetryOperation,
+  AppMessageOperation,
 );
 export type OutboxOperation = typeof OutboxOperation.Type;
 
@@ -97,6 +104,7 @@ export const OutboxReceipt = Schema.Union(
   MessageEditReceipt,
   ReactionReceipt,
   PaymentTelemetryReceipt,
+  AppMessageReceipt,
 );
 export type OutboxReceipt = typeof OutboxReceipt.Type;
 
@@ -161,6 +169,8 @@ const receiptTagOf = (
       return "ReactionReceipt";
     case "paymentTelemetry":
       return "PaymentTelemetryReceipt";
+    case "appMessage":
+      return "AppMessageReceipt";
   }
 };
 

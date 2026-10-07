@@ -48,10 +48,6 @@ export const en = {
   recurringSkippedRecipientBody:
     "Skipped {amount} {unit}: the recipient cannot be paid.",
   recurringDueTitle: "Scheduled payment",
-  recurringDueReady: "The recurring payment is ready.",
-  recurringDueReadyDaily: "The daily recurring payment is ready.",
-  recurringDueReadyWeekly: "The weekly recurring payment is ready.",
-  recurringDueReadyMonthly: "The monthly recurring payment is ready.",
   recurringDueCancel: "Cancel this payment",
   recurringCancelledToast:
     "Payment cancelled. The next one goes out on its next date.",
@@ -101,7 +97,6 @@ export const en = {
   recurringEveryNDays: "every {count} days",
   recurringEveryNWeeks: "every {count} weeks",
   recurringEveryNMonths: "every {count} months",
-  recurringApproxSat: "~{amount} sat",
   recurringNextRun: "Next payment",
   recurringLastRun: "Last payment",
   recurringRunsCount: "Payments made",
@@ -1038,10 +1033,13 @@ export const en = {
   lnurlAuthFailed: "LNURL login failed",
   lnurlAuthUnavailable: "Signing in needs an unlocked identity.",
   nostrConnectLoginConfirm: "Log in",
+  nostrConnectLoginConfirmDevice: "Log in and link device",
   nostrConnectLoginWaiting: "Waiting for the site…",
   nostrConnectLoginUnknownSite: "Unknown site",
   nostrConnectLoginUnverified: "Unverified",
   nostrConnectLoginAs: "Log in as",
+  nostrConnectLoginLinksDevice:
+    "{site} also asks to link one of its devices to you. You sign that this device may act for you in {site}.",
   nostrConnectLoginShares:
     "The site gets your public key and a one-time login signature. It can't post as you or read your messages.",
   nostrConnectLoginDone: "Logged in to {site}",

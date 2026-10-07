@@ -1,32 +1,50 @@
 # Melt
 
-`Melt` pays a bolt11 invoice from one mint's balance. Quote first to show the price, then melt with the same invoice and the quote id.
+`Melt` pays a bolt11 invoice from one mint's balance. Quote first, show the most the payment can cost, then melt with the same invoice, the quote id and that maximum.
 
 ## Example
 
 ```ts
 import { Effect } from "effect";
 import { Melt, MeltDraft } from "@linky-fit/linkshu";
-import type { Bolt11Invoice, MeltQuote, MintUrl } from "@linky-fit/linkshu";
+import type {
+  Amount,
+  Bolt11Invoice,
+  MeltQuote,
+  MintUrl,
+} from "@linky-fit/linkshu";
 
-// Step 1: price it. Touches no proof; show `amount + feeReserve` to the user.
+// Step 1: price it. Touches no proof; show `cost.maxTotal` to the user.
 const priceInvoice = (mint: MintUrl, invoice: Bolt11Invoice) =>
   Effect.gen(function* () {
     const melt = yield* Melt;
-    return yield* melt.quote(new MeltDraft({ mint, invoice }));
+    return yield* melt.cost(
+      yield* melt.quote(new MeltDraft({ mint, invoice })),
+    );
   });
 
-// Step 2: once the user confirms, pay the priced quote.
-const payQuoted = (invoice: Bolt11Invoice, quote: MeltQuote) =>
+// Step 2: once the user confirms, pay the priced quote, never above the confirmed total.
+const payQuoted = (
+  invoice: Bolt11Invoice,
+  quote: MeltQuote,
+  maxTotal: Amount,
+) =>
   Effect.gen(function* () {
     const melt = yield* Melt;
     return yield* melt.melt(
-      new MeltDraft({ mint: quote.mint, invoice, quoteId: quote.quoteId }),
+      new MeltDraft({
+        mint: quote.mint,
+        invoice,
+        quoteId: quote.quoteId,
+        maxTotal,
+      }),
     );
   });
 ```
 
-The receipt carries `paidAmount`, `feeReserve`, `feePaid` (the actual Lightning fee, may be 0), and `changeAmount` (returned as fresh `available` proofs). Omitting `quoteId` makes `melt` request a fresh quote. `status(quote)` re-reads a quote's state (`"UNPAID" | "PENDING" | "PAID" | null`) without side effects.
+`cost(quote)` returns a `MeltCost`: `maxTotal = amount + feeReserve + inputFee`, where `inputFee` is the cashu input fee (NUT-02) of the melt inputs plus that of the swap that cuts them out of the balance, counted over every `available` proof at the mint. It reads the stored proofs without a NUT-07 check, so no proof changes state. With `maxTotal` on the draft, `melt` picks the swap's proofs first and fails with `PaymentFailed` before anything moves when that swap and its inputs would cost more, which happens when the balance changed since the cost was read.
+
+The receipt carries `paidAmount`, `feeReserve`, `feePaid` (what the melt inputs lost beyond invoice and change: the Lightning fee and their input fee, may be 0), `swapFee` (the funding swap's input fee; 0 for a melt `resumePending` settled, which does not record it) and `changeAmount` (returned as fresh `available` proofs). The balance went down by `paidAmount + feePaid + swapFee`. Omitting `quoteId` makes `melt` request a fresh quote. `status(quote)` re-reads a quote's state (`"UNPAID" | "PENDING" | "PAID" | null`) without side effects.
 
 ## How it works
 

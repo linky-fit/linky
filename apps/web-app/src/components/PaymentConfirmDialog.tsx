@@ -1,9 +1,12 @@
 import { Button, Dialog, Notice, Progress, Stack, Text } from "@linky-fit/ui";
 import type { ReactNode } from "react";
+import type { DisplayAmountParts } from "../utils/displayAmounts";
 import { DisplayAmount } from "./DisplayAmount";
 
 interface PaymentConfirmDialogProps {
   amountSat: number | null;
+  /** Shown instead of converting `amountSat`, for a payment fixed in another unit. */
+  amountParts?: DisplayAmountParts | undefined;
   cancelLabel: string;
   /** False keeps a tap outside the sheet from counting as Cancel. */
   closeOnBackdrop?: boolean;
@@ -34,6 +37,7 @@ const caption = (content: ReactNode, bold = false) =>
 
 export function PaymentConfirmDialog({
   amountSat,
+  amountParts,
   cancelLabel,
   closeOnBackdrop = true,
   confirmLabel,
@@ -62,6 +66,7 @@ export function PaymentConfirmDialog({
           {confirmProgress === null ? null : (
             <Progress
               value={confirmProgress}
+              transition="countdown"
               accessibilityLabel={confirmLabel}
             />
           )}
@@ -88,7 +93,11 @@ export function PaymentConfirmDialog({
             {unknownAmountLabel}
           </Text>
         ) : (
-          <DisplayAmount amount={amountSat} accessibilityLabel={label} />
+          <DisplayAmount
+            amount={amountSat}
+            parts={amountParts}
+            accessibilityLabel={label}
+          />
         )}
         {layout === "amount-first" && description ? caption(description) : null}
         {meta ? caption(meta, true) : null}

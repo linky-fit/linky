@@ -5,7 +5,6 @@ import {
   recurringFiatValue,
   type RecurringAmount,
 } from "@linky-fit/recurring-payment";
-import type { I18nKey, Translate } from "../../i18n";
 import {
   convertSatToFiat,
   getDisplayUnitLabel,
@@ -14,7 +13,7 @@ import {
   type DisplayCurrency,
   type FiatRates,
 } from "../../utils/displayAmounts";
-import { formatInteger, normalizeLocale } from "../../utils/formatting";
+import { normalizeLocale } from "../../utils/formatting";
 
 const parseDisplayValue = (value: string): number | null => {
   const normalized = value.trim().replace(",", ".");
@@ -117,22 +116,4 @@ export const formatRecurringAmountText = (
   return [`${parts.approxPrefix}${parts.amountText}`, parts.unitLabel.trim()]
     .filter(Boolean)
     .join(" ");
-};
-
-const APPROX_SAT_KEY: I18nKey = "recurringApproxSat";
-
-/**
- * The other side of a fixed amount: the sats a fiat payment converts to right
- * now. Null for sat payments, whose fiat side the display unit already shows.
- */
-export const recurringAmountSecondaryText = (
-  amount: RecurringAmount,
-  fiatRates: FiatRates | null,
-  lang: string | undefined,
-  t: Translate,
-): string | null => {
-  if (!isFiatRecurringAmount(amount)) return null;
-  const sat = recurringAmountSat(amount, fiatRates);
-  if (sat === null) return null;
-  return t(APPROX_SAT_KEY).replace("{amount}", formatInteger(sat, lang));
 };

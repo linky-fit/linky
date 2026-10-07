@@ -1,9 +1,10 @@
-import type { OutputDataLike, SendResponse } from "@cashu/cashu-ts";
+import type { OutputDataLike, OutputType, SendResponse } from "@cashu/cashu-ts";
 import { Effect, Either } from "effect";
 import { InsufficientFunds, MintRejected } from "../domain/errors";
 import type { MintUnreachable } from "../domain/errors";
 import { NonNegativeAmount } from "../domain/primitives";
 import type { Amount, CurrencyUnit, MintUrl } from "../domain/primitives";
+import type { P2pkPubkey } from "../domain/p2pk";
 import type { InspectorService } from "../inspector/Inspector";
 import { classifyMintError } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
@@ -124,7 +125,22 @@ export interface SwapRequest {
     readonly outputs: ReadonlyArray<OutputDataLike>;
     readonly alreadySigned: Effect.Effect<boolean>;
   };
+  /**
+   * Locks the send outputs to this key (NUT-11). Their secrets are random,
+   * so they consume no counter slots and no restore finds them.
+   */
+  readonly lockSendTo?: P2pkPubkey;
 }
+
+const sendOutputType = (request: SwapRequest, counter: number): OutputType => {
+  if (request.fixedSend !== undefined) {
+    return { type: "custom", data: [...request.fixedSend.outputs] };
+  }
+  if (request.lockSendTo !== undefined) {
+    return { type: "p2pk", options: { pubkey: request.lockSendTo } };
+  }
+  return { type: "deterministic", counter };
+};
 
 /**
  * Swaps `amount` out of the offered proofs with disjoint send/keep
@@ -151,8 +167,9 @@ export const swapProofsForAmount = (
       let counter = yield* readCounter(ctx.kv, ctx.scope);
       let lastCollision: unknown = null;
       for (let attempt = 0; attempt < MAX_SWAP_ATTEMPTS; attempt += 1) {
+        const send = sendOutputType(request, counter);
         const keepCounter =
-          fixedSend === undefined ? counter + SWAP_OUTPUT_BLOCK : counter;
+          send.type === "deterministic" ? counter + SWAP_OUTPUT_BLOCK : counter;
         const outcome = yield* Effect.either(
           Effect.tryPromise({
             try: () =>
@@ -162,13 +179,7 @@ export const swapProofsForAmount = (
                 request.includeFees === true
                   ? { includeFees: true }
                   : undefined,
-                {
-                  send:
-                    fixedSend === undefined
-                      ? { type: "deterministic", counter }
-                      : { type: "custom", data: [...fixedSend.outputs] },
-                  keep: { type: "deterministic", counter: keepCounter },
-                },
+                { send, keep: { type: "deterministic", counter: keepCounter } },
               ),
             catch: (error): unknown => error,
           }),

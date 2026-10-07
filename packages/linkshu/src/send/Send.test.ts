@@ -1,5 +1,13 @@
-import type { Proof as CashuProof, SendResponse } from "@cashu/cashu-ts";
-import { Keyset, MintOperationError } from "@cashu/cashu-ts";
+import type {
+  Proof as CashuProof,
+  OutputConfig,
+  SendResponse,
+} from "@cashu/cashu-ts";
+import {
+  MintInfo as CashuMintInfo,
+  Keyset,
+  MintOperationError,
+} from "@cashu/cashu-ts";
 import { Effect, Exit, Layer } from "effect";
 import {
   Amount as SendAmount,
@@ -7,6 +15,7 @@ import {
   KeysetId,
   MintUrl,
 } from "../domain/primitives";
+import { P2pkPubkey } from "../domain/p2pk";
 import { deterministicCounterKey } from "../internal/counters";
 import { WalletInstances } from "../mint/internal/WalletInstances";
 import type { LoadedWallet } from "../mint/internal/WalletInstances";
@@ -18,7 +27,9 @@ import { OperationStore } from "../ports/OperationStore";
 import { ProofStore } from "../ports/ProofStore";
 import type { StoredProof } from "../ports/ProofStore";
 import {
+  answerProofStates,
   fakeKeyChain,
+  fakeMintInfo,
   fakeWallet,
   KEYSET_HEX,
   proof,
@@ -668,5 +679,70 @@ describe("Send.send", () => {
     );
     expect(exit).toEqual(Exit.succeed("71")); // 7 + 64 send block, no change
     expect(sendCalls[0]).toMatchObject({ sendCounter: 7, keepCounter: 71 });
+  });
+});
+
+describe("Send.send with lockTo", () => {
+  const lockTo = P2pkPubkey.make(
+    "02" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  );
+  const lockingWallet = (nut11: boolean) => {
+    const outputConfigs: Array<OutputConfig | undefined> = [];
+    const wallet = fakeWallet({
+      getMintInfo: () =>
+        new CashuMintInfo({
+          ...fakeMintInfo().cache,
+          nuts: { ...fakeMintInfo().cache.nuts, "11": { supported: nut11 } },
+        }),
+      checkProofsStates: answerProofStates(),
+      send: (_amount, _proofs, _config, outputConfig) => {
+        outputConfigs.push(outputConfig);
+        return Promise.resolve({
+          keep: [proof(8, "k1")],
+          send: [proof(4, "locked-1"), proof(1, "locked-2")],
+        });
+      },
+    });
+    return { wallet, outputConfigs };
+  };
+  const lockedDraft = new SendDraft({
+    mint,
+    amount: SendAmount.make(5),
+    produceAs: "pending",
+    lockTo,
+  });
+
+  it("swaps into outputs locked to the key and keeps the counter for change only", async () => {
+    const { wallet, outputConfigs } = lockingWallet(true);
+    const exit = await makeHarness(wallet).run(sendAndInspect(lockedDraft));
+    assert(Exit.isSuccess(exit));
+    const { receipt, proofs, counter } = exit.value;
+
+    assert(receipt._tag === "Right");
+    expect(receipt.right.lockTo).toBe(lockTo);
+    expect(outputConfigs).toEqual([
+      {
+        send: { type: "p2pk", options: { pubkey: lockTo } },
+        keep: { type: "deterministic", counter: 1 },
+      },
+    ]);
+    // Only the one fresh change output used a counter slot.
+    expect(counter).toBe("2");
+    expect(secretsOf(proofsIn(proofs, "handedOut"))).toEqual([
+      "locked-1",
+      "locked-2",
+    ]);
+  });
+
+  it("refuses a mint that does not advertise NUT-11 before touching proofs", async () => {
+    const { wallet, outputConfigs } = lockingWallet(false);
+    const exit = await makeHarness(wallet).run(sendAndInspect(lockedDraft));
+    assert(Exit.isSuccess(exit));
+    const { receipt, proofs } = exit.value;
+
+    assert(receipt._tag === "Left");
+    expect(receipt.left._tag).toBe("LockingUnsupported");
+    expect(outputConfigs).toEqual([]);
+    expect(allAvailable(proofs)).toBe(true);
   });
 });

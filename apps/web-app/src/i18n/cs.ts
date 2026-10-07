@@ -47,10 +47,6 @@ export const cs = {
   recurringSkippedRecipientBody:
     "Platba {amount} {unit} byla přeskočena: příjemci nelze zaplatit.",
   recurringDueTitle: "Plánovaná platba",
-  recurringDueReady: "Pravidelná platba je připravena.",
-  recurringDueReadyDaily: "Pravidelná denní platba je připravena.",
-  recurringDueReadyWeekly: "Pravidelná týdenní platba je připravena.",
-  recurringDueReadyMonthly: "Pravidelná měsíční platba je připravena.",
   recurringDueCancel: "Zrušit tuto platbu",
   recurringCancelledToast: "Platba zrušena. Další proběhne v dalším termínu.",
   recurringWaitingForFunds:
@@ -98,7 +94,6 @@ export const cs = {
   recurringEveryNDays: "každých {count} dní",
   recurringEveryNWeeks: "každých {count} týdnů",
   recurringEveryNMonths: "každých {count} měsíců",
-  recurringApproxSat: "~{amount} sat",
   recurringNextRun: "Další platba",
   recurringLastRun: "Poslední platba",
   recurringRunsCount: "Provedeno plateb",
@@ -1046,10 +1041,13 @@ export const cs = {
   lnurlAuthFailed: "Přihlášení přes LNURL selhalo",
   lnurlAuthUnavailable: "Přihlášení potřebuje odemčenou identitu.",
   nostrConnectLoginConfirm: "Přihlásit",
+  nostrConnectLoginConfirmDevice: "Přihlásit a propojit zařízení",
   nostrConnectLoginWaiting: "Čekám na web…",
   nostrConnectLoginUnknownSite: "Neznámý web",
   nostrConnectLoginUnverified: "Neověřeno",
   nostrConnectLoginAs: "Přihlásit jako",
+  nostrConnectLoginLinksDevice:
+    "{site} chce také propojit jedno svoje zařízení s tebou. Podepíšeš, že to zařízení smí v {site} jednat za tebe.",
   nostrConnectLoginShares:
     "Web dostane tvůj veřejný klíč a jednorázový přihlašovací podpis. Nemůže za tebe nic zveřejňovat ani číst tvoje zprávy.",
   nostrConnectLoginDone: "Přihlášeno na {site}",

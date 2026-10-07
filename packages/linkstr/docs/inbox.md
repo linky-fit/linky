@@ -76,6 +76,7 @@ Before a wrap becomes a fact its outer signature is verified, it is decrypted, t
 | `invalid-reaction`, `invalid-retraction`                                              | reactions codec rejected it ([reactions.md](./reactions.md#receiving))              |
 | `invalid-seen-receipt`                                                                | seen-receipts codec rejected it ([seen-receipts.md](./seen-receipts.md#receiving))  |
 | `invalid-notice`, `invalid-bank-offer`                                                | payment-kinds codec rejected it ([payment-kinds.md](./payment-kinds.md))            |
+| `invalid-app-message`                                                                 | app-messages codec rejected it ([app-messages.md](./app-messages.md#wire-format))   |
 
 Drops are facts too: log them, count them, but never treat one as an error.
 

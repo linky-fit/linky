@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   buildBip321PaymentUri,
   parseBip321Uri,

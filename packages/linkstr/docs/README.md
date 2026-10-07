@@ -18,11 +18,12 @@ Gift-wrapped (private, kind 1059 on the wire):
 - [Reactions](./reactions.md): emoji reactions and retractions
 - [Seen receipts](./seen-receipts.md): read-receipt window cursors
 - [Payment kinds](./payment-kinds.md): payment notices, payment telemetry, bank offers
+- [App messages](./app-messages.md): your app's own typed messages
 
 Plain (public, signed and published unwrapped):
 
-- [Plain events](./plain-events.md): profiles and status, relay lists, mute list
-- [Nostr Connect login](./nostr-connect.md): one NIP-46 `nostrconnect://` login as the remote signer
+- [Plain events](./plain-events.md): profiles and status, relay lists, mute list, NIP-78 app data
+- [Nostr Connect](./nostr-connect.md): one NIP-46 `nostrconnect://` login as the remote signer, device authorizations, and the client side that asks a signer
 
 Never published:
 
@@ -40,23 +41,26 @@ Machinery:
 
 Every event kind the package produces. Wrapped kinds travel inside a kind 1059 gift wrap; "push" says whether the recipient copy carries the `["linky", "push"]` marker. 24133 appears twice: the payment-notice rumor only ever travels inside a gift wrap, the plain NIP-46 event never does, so the two never collide.
 
-| Kind  | What                                      | Wrapped | Push                | Guide                                                    |
-| ----- | ----------------------------------------- | ------- | ------------------- | -------------------------------------------------------- |
-| 14    | chat text, cashu token, edit              | yes     | text yes, others no | [chat.md](./chat.md#wire-format)                         |
-| 15    | chat image or PDF                         | yes     | yes                 | [chat.md](./chat.md#wire-format)                         |
-| 7     | reaction                                  | yes     | no                  | [reactions.md](./reactions.md#wire-format)               |
-| 5     | reaction retraction                       | yes     | no                  | [reactions.md](./reactions.md#wire-format)               |
-| 24133 | payment notice                            | yes     | yes                 | [payment-kinds.md](./payment-kinds.md#payment-notices)   |
-| 24134 | payment telemetry                         | yes     | no                  | [payment-kinds.md](./payment-kinds.md#payment-telemetry) |
-| 24135 | bank payment offer snapshot               | yes     | per status          | [payment-kinds.md](./payment-kinds.md#bank-offers)       |
-| 24136 | seen receipt                              | yes     | no                  | [seen-receipts.md](./seen-receipts.md#wire-format)       |
-| 0     | profile metadata                          | no      | n/a                 | [plain-events.md](./plain-events.md#profiles-and-status) |
-| 30315 | status                                    | no      | n/a                 | [plain-events.md](./plain-events.md#profiles-and-status) |
-| 10000 | mute list                                 | no      | n/a                 | [plain-events.md](./plain-events.md#mute-list)           |
-| 10002 | relay list                                | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
-| 10050 | DM relay list                             | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)         |
-| 24133 | NIP-46 Nostr Connect message (ephemeral)  | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#wire-format)       |
-| 24242 | Blossom upload auth (never published)     | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
-| 27235 | NIP-98 auth, push proof (never published) | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)               |
+| Kind  | What                                      | Wrapped | Push                | Guide                                                       |
+| ----- | ----------------------------------------- | ------- | ------------------- | ----------------------------------------------------------- |
+| 14    | chat text, cashu token, edit              | yes     | text yes, others no | [chat.md](./chat.md#wire-format)                            |
+| 15    | chat image or PDF                         | yes     | yes                 | [chat.md](./chat.md#wire-format)                            |
+| 7     | reaction                                  | yes     | no                  | [reactions.md](./reactions.md#wire-format)                  |
+| 5     | reaction retraction                       | yes     | no                  | [reactions.md](./reactions.md#wire-format)                  |
+| 24133 | payment notice                            | yes     | yes                 | [payment-kinds.md](./payment-kinds.md#payment-notices)      |
+| 24134 | payment telemetry                         | yes     | no                  | [payment-kinds.md](./payment-kinds.md#payment-telemetry)    |
+| 24135 | bank payment offer snapshot               | yes     | per status          | [payment-kinds.md](./payment-kinds.md#bank-offers)          |
+| 24136 | seen receipt                              | yes     | no                  | [seen-receipts.md](./seen-receipts.md#wire-format)          |
+| 24137 | app message                               | yes     | no                  | [app-messages.md](./app-messages.md#wire-format)            |
+| 0     | profile metadata                          | no      | n/a                 | [plain-events.md](./plain-events.md#profiles-and-status)    |
+| 30315 | status                                    | no      | n/a                 | [plain-events.md](./plain-events.md#profiles-and-status)    |
+| 10000 | mute list                                 | no      | n/a                 | [plain-events.md](./plain-events.md#mute-list)              |
+| 10002 | relay list                                | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)            |
+| 10050 | DM relay list                             | no      | n/a                 | [plain-events.md](./plain-events.md#relay-lists)            |
+| 30078 | app data (NIP-78)                         | no      | n/a                 | [plain-events.md](./plain-events.md#app-data-nip-78)        |
+| 24133 | NIP-46 Nostr Connect message (ephemeral)  | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#wire-format)          |
+| 24138 | device authorization (signed, embedded)   | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#device-authorization) |
+| 24242 | Blossom upload auth (never published)     | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)                  |
+| 27235 | NIP-98 auth, push proof (never published) | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)                  |
 
 Tag order, content schemas and the conventions shared by all kinds are in [Concepts, wire conventions](./concepts.md#wire-conventions).
