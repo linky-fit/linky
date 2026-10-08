@@ -4,10 +4,12 @@ import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -17,7 +19,8 @@ import javax.crypto.spec.SecretKeySpec;
  *
  * Contact set: adv = company 0xFFFF [version, nonce, 7 x entry], scan response = company 0xFFFE
  * [version, nonce, up to 8 x entry]. Identity set: adv = company 0xFFFD [version, pubkey[0..22)],
- * scan response = company 0xFFFC [pubkey[22..32)].
+ * scan response = company 0xFFFC [pubkey[22..32)]. Cross-platform set: adv = LINKY_SERVICE_UUID, scan response =
+ * its service data [0x02] (Android); the GATT CONTACTS characteristic carries one [version, nonce, up to 170 x entry] packet.
  */
 final class BeaconCodec {
 	static final int VERSION = 1;
@@ -32,8 +35,20 @@ final class BeaconCodec {
 	static final int STATE_BUY = 1;
 	static final int STATE_SELL = 2;
 	static final long SLOT_MS = 600_000L;
+	static final UUID LINKY_SERVICE_UUID = UUID.fromString("D967055A-693F-4F5D-A9F4-4AD0CCA0FFC2");
+	static final UUID CONTACTS_CHARACTERISTIC_UUID = UUID.fromString("5A42933B-89B7-4BA1-85BA-11B4655CFABB");
+	static final UUID IDENTITY_CHARACTERISTIC_UUID = UUID.fromString("CEDFD0D0-FDDC-434C-BAF6-820E631A49BF");
+	static final byte[] ANDROID_MARKER = { 0x02 };
+	static final int APPLE_COMPANY_ID = 0x004C;
+	static final int APPLE_OVERFLOW_TYPE = 0x01;
+	static final int MAX_PACKET_BYTES = 512;
 	private static final int ENTRY_BYTES = 3;
 	private static final int HEADER_BYTES = 2;
+	private static final int MAX_PACKET_ENTRIES = (MAX_PACKET_BYTES - HEADER_BYTES) / ENTRY_BYTES;
+	private static final int OVERFLOW_AREA_BYTES = 16;
+	// Bit 40 of iOS's background overflow area belongs to OVERFLOW_MARKER_UUID 0x...0017, which the iOS app advertises.
+	private static final int LINKY_OVERFLOW_BYTE = 5;
+	private static final int LINKY_OVERFLOW_MASK = 0x01;
 	private static final int PUBKEY_BYTES = 32;
 	private static final int IDENTITY_ADV_PUBKEY_BYTES = 22;
 
@@ -72,6 +87,30 @@ final class BeaconCodec {
 			.put((byte) nonce);
 		entries.forEach(out::put);
 		return out.array();
+	}
+
+	/** The GATT contact packet: one entry per key, in the given order, capped to fit one ATT long value. */
+	static byte[] contactPacket(List<byte[]> keys, long slot, int nonce, int state) {
+		List<byte[]> entries = new ArrayList<>();
+		keys.stream().limit(MAX_PACKET_ENTRIES).forEach(key -> entries.add(entry(key, slot, nonce, state)));
+		return packet(nonce, entries);
+	}
+
+	/** A non-Android Linky peer: advertises LINKY_SERVICE_UUID without the Android service data, which the radio path covers. */
+	static boolean isHandshakePeer(Collection<UUID> serviceUuids, byte[] linkyServiceData) {
+		return serviceUuids != null && serviceUuids.contains(LINKY_SERVICE_UUID) && !Arrays.equals(linkyServiceData, ANDROID_MARKER);
+	}
+
+	/** Returns the 16-byte overflow area of Apple manufacturer data, or null when it is something else. */
+	static byte[] overflowArea(byte[] appleData) {
+		if (appleData == null || appleData.length < 1 + OVERFLOW_AREA_BYTES || appleData[0] != APPLE_OVERFLOW_TYPE) {
+			return null;
+		}
+		return Arrays.copyOfRange(appleData, 1, 1 + OVERFLOW_AREA_BYTES);
+	}
+
+	static boolean hasLinkyOverflowBit(byte[] overflowArea) {
+		return (overflowArea[LINKY_OVERFLOW_BYTE] & LINKY_OVERFLOW_MASK) != 0;
 	}
 
 	static byte[] identityAdv(byte[] pubkey) {
