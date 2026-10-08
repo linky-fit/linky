@@ -172,6 +172,22 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "A retraction arrived for a reaction this device has not stored, so a removed copy was written in its place; any device that receives the reaction later finds it removed. The rumor link is the reaction's id, the pubkey link who retracted it.",
   "blockList.muteListMerged":
     "The newest mute list was merged into this device's block list as a union: a pubkey blocked on either side stays blocked. Added lists the pubkeys the list brought; publish says the merged list goes out because the published one lacks an entry, or no relay holds one. A fetch that cannot tell whether a list exists merges nothing. The wrap link is the fetched list's event id.",
+  "beacon.started":
+    "The Bluetooth beacon service was started after the key table and trade were pushed to native code. The payload gives the contact count and the trade; keys never appear in the inspector.",
+  "beacon.stopped":
+    "The app stopped the Bluetooth beacon service: the switch went off, the permissions were lost, experimental features went off or the account closed.",
+  "beacon.keysPushed":
+    "A new beacon key table went to native code, after contacts, the block list or the message order changed. Only the contact count is logged.",
+  "beacon.tradeSet":
+    "The user changed the trade the beacon carries: buy, sell or none.",
+  "beacon.permissionChanged":
+    "The Bluetooth permission state native reports changed, after a prompt or when the app returned from system settings.",
+  "beacon.statusChanged":
+    "The native beacon service reported a new status: running, Bluetooth on or off, advertising, or an error. A service that stops on its own (notification Stop, Bluetooth gone) turns the beacon switch off.",
+  "beacon.nearbySeen":
+    "A contact's beacon or identity broadcast was received and they are now nearby. The contact link is the contact id.",
+  "beacon.nearbyExpired":
+    "A nearby contact's beacon was not received for two minutes, or the beacon stopped, so they are no longer nearby.",
   "profiles.searchProfiles":
     "Add-contact text search: a NIP-50 kind-0 query fanned out to the read relays plus the configured search relays; relays without NIP-50 answer with unrelated profiles, so only hits that match the query locally are returned (the params carry the query and limit).",
   "contacts.dedupeFailed":

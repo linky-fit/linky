@@ -3,6 +3,7 @@ import { NostrSecretKey, Pubkey } from "../domain/primitives";
 import {
   decodeNpub,
   decodeNsec,
+  deriveConversationKey,
   derivePubkey,
   encodeNpub,
   encodeNsec,
@@ -30,6 +31,15 @@ describe("identity codec", () => {
 
   it("derives the same pubkey as nostr-tools", () => {
     expect(derivePubkey(secretKey)).toBe(getPublicKey(secretKey));
+  });
+
+  it("derives the same conversation key on both sides of a pair", () => {
+    const peerSecret = NostrSecretKey.make(new Uint8Array(32).fill(2));
+    const peer = Pubkey.make(getPublicKey(peerSecret));
+
+    expect(deriveConversationKey(secretKey, peer)).toEqual(
+      deriveConversationKey(peerSecret, pubkey),
+    );
   });
 
   it("parses npub and case-insensitive raw hex", () => {

@@ -18,6 +18,8 @@ const login = (nsec: string) => {
 const peerFromInput = (raw: string) => parsePubkey(raw.trim()); // Pubkey | null
 ```
 
+`deriveConversationKey(secretKey, pubkey)` returns the 32-byte NIP-44 conversation key of a pair; both sides derive the same bytes without exchanging anything, so apps can feed it to a KDF for a pairwise secret of their own. Treat it like the secret key: never log it or put it in an inspector event.
+
 The codecs validate cryptographic keys, not just their length: `parsePubkey`, `decodeNpub`, `Pubkey.make` and `Schema.is(Pubkey)` all reject a 64-hex string that is not a point on the curve, and `NostrSecretKey` requires bytes a public key can be derived from. If you keep pubkeys as plain strings in storage, revalidate them with `Schema.is(Pubkey)` before building a draft, so a corrupt value fails at the boundary rather than inside a send or an unwrap.
 
 ## `LinkstrIdentity`

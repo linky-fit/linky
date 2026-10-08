@@ -14,6 +14,7 @@ import {
   type AppShellCoreContextValue,
   type AppShellRouteContextValue,
 } from "./context/AppShellContexts";
+import { BeaconController } from "./BeaconController";
 import { RecurringPaymentsProvider } from "./context/RecurringPaymentsContext";
 import { useCurrentNsec } from "./hooks/useCurrentNsec";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
@@ -103,6 +104,7 @@ const AuthenticatedAppShell = ({
       </TopBanners>
       <ToastNotifications toasts={toasts} dismissToast={dismissToast} />
       <InstallPwaBanner t={t} />
+      <BeaconController currentNsec={currentNsec} />
 
       <AppShellContextsProvider
         actions={actionsContextValue}

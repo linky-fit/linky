@@ -1,5 +1,6 @@
 import { Option, Schema } from "effect";
 import { getPublicKey, nip19 } from "nostr-tools";
+import { getConversationKey } from "nostr-tools/nip44";
 import { NostrSecretKey, Pubkey } from "../domain/primitives";
 
 const decodeSecretKey = Schema.decodeUnknownOption(NostrSecretKey);
@@ -32,6 +33,12 @@ export const encodeNpub = (pubkey: Pubkey): string => nip19.npubEncode(pubkey);
 
 export const derivePubkey = (secretKey: NostrSecretKey): Pubkey =>
   Pubkey.make(getPublicKey(secretKey));
+
+/** The NIP-44 conversation key both sides of a pair derive alike; key material, never log it. */
+export const deriveConversationKey = (
+  secretKey: NostrSecretKey,
+  pubkey: Pubkey,
+): Uint8Array => getConversationKey(secretKey, pubkey);
 
 export const parsePubkey = (value: string): Pubkey | null => {
   const decoded = decodeNpub(value);
