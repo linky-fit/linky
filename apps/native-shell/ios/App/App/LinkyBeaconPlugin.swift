@@ -3,11 +3,9 @@ import CoreBluetooth
 import UIKit
 import UserNotifications
 
-/// Beacon for iOS: hosts the Linky GATT service, advertises its UUID and swaps contact packets with peers over
-/// short GATT connections ("handshakes"), since iOS can neither send nor filter on manufacturer data in the background.
+/// Capacitor adapter for `BeaconEngine`: forwards calls and relays engine events to the web app.
 @objc(LinkyBeaconPlugin)
-final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDelegate, CBPeripheralManagerDelegate,
-    CBPeripheralDelegate, NotificationHandlerProtocol {
+final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, BeaconEngineListener, NotificationHandlerProtocol {
     let identifier = "LinkyBeaconPlugin"
     let jsName = "LinkyBeacon"
     let pluginMethods: [CAPPluginMethod] = [
@@ -24,6 +22,101 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
         CAPPluginMethod(name: "takeStoppedByUser", returnType: CAPPluginReturnPromise)
     ]
 
+    override public func load() {
+        bridge?.notificationRouter.localNotificationHandler = self
+        BeaconEngine.shared.listener = self
+    }
+
+    func beaconEngine(emitted event: String, data: [String: Any], retain: Bool) {
+        notifyListeners(event, data: data, retainUntilConsumed: retain)
+    }
+
+    func willPresent(notification: UNNotification) -> UNNotificationPresentationOptions {
+        BeaconEngine.shared.presentationOptions(for: notification)
+    }
+
+    func didReceive(response: UNNotificationResponse) {
+        BeaconEngine.shared.open(response)
+    }
+
+    private func onEngine(_ call: CAPPluginCall, _ action: @escaping (BeaconEngine) -> JSObject) {
+        DispatchQueue.main.async {
+            call.resolve(action(.shared))
+        }
+    }
+
+    @objc func getPermissionState(_ call: CAPPluginCall) {
+        onEngine(call) { ["state": $0.checkPermission()] }
+    }
+
+    @objc override public func requestPermissions(_ call: CAPPluginCall) {
+        onEngine(call) { $0.requestPermissions(); return [:] }
+    }
+
+    @objc func setKeys(_ call: CAPPluginCall) {
+        let contacts = (call.getArray("keys", JSObject.self) ?? []).compactMap { row -> BeaconEngine.Contact? in
+            guard let pubkey = (row["pubkey"] as? String)?.lowercased(),
+                  BeaconCodec.unhex(pubkey, length: BeaconCodec.pubkeyBytes) != nil,
+                  let key = BeaconCodec.unhex(row["beaconKeyHex"] as? String, length: 32) else {
+                return nil
+            }
+            let priority = (row["priority"] as? NSNumber)?.doubleValue ?? 0
+            return BeaconEngine.Contact(pubkey: pubkey, key: key, priority: priority, name: row["name"] as? String ?? "")
+        }
+        onEngine(call) { $0.setContacts(contacts); return [:] }
+    }
+
+    @objc func setTrade(_ call: CAPPluginCall) {
+        let trade: UInt8 = switch call.getString("trade") {
+        case "buy": BeaconCodec.stateBuy
+        case "sell": BeaconCodec.stateSell
+        default: BeaconCodec.stateNearby
+        }
+        onEngine(call) { $0.setTrade(trade); return [:] }
+    }
+
+    @objc func setIdentity(_ call: CAPPluginCall) {
+        let pubkey = BeaconCodec.unhex(call.getString("pubkey"), length: BeaconCodec.pubkeyBytes)
+        onEngine(call) { $0.identity = pubkey; return [:] }
+    }
+
+    @objc func start(_ call: CAPPluginCall) {
+        onEngine(call) { $0.start(); return [:] }
+    }
+
+    @objc func stop(_ call: CAPPluginCall) {
+        onEngine(call) { $0.stop(); return [:] }
+    }
+
+    @objc func startIdentityScan(_ call: CAPPluginCall) {
+        onEngine(call) { $0.startIdentityScan(); return [:] }
+    }
+
+    @objc func stopIdentityScan(_ call: CAPPluginCall) {
+        onEngine(call) { $0.stopIdentityScan(); return [:] }
+    }
+
+    @objc func isRunning(_ call: CAPPluginCall) {
+        onEngine(call) { ["running": $0.running] }
+    }
+
+    /// iOS has no persistent notification with a Stop action, so the user never stops the beacon outside the app.
+    @objc func takeStoppedByUser(_ call: CAPPluginCall) {
+        call.resolve(["stopped": false])
+    }
+}
+
+protocol BeaconEngineListener: AnyObject {
+    func beaconEngine(emitted event: String, data: [String: Any], retain: Bool)
+}
+
+/// Beacon for iOS: hosts the Linky GATT service, advertises its UUID and swaps contact packets with peers over
+/// short GATT connections ("handshakes"), since iOS can neither send nor filter on manufacturer data in the background.
+/// One per process, so a background relaunch can restore its Bluetooth sessions before any scene or bridge exists.
+final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManagerDelegate, CBPeripheralDelegate,
+    UNUserNotificationCenterDelegate {
+    static let shared = BeaconEngine()
+
     private static let serviceUUID = CBUUID(string: "D967055A-693F-4F5D-A9F4-4AD0CCA0FFC2")
     private static let contactsUUID = CBUUID(string: "5A42933B-89B7-4BA1-85BA-11B4655CFABB")
     private static let identityUUID = CBUUID(string: "CEDFD0D0-FDDC-434C-BAF6-820E631A49BF")
@@ -37,7 +130,7 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
     private static let maxHandshakes = 2
     private static let tickInterval: TimeInterval = 10
 
-    private struct Contact {
+    struct Contact {
         let pubkey: String
         let key: Data
         let priority: Double
@@ -64,15 +157,15 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
     private var contacts: [Contact] = []
     private var trade = BeaconCodec.stateNearby
     private var nonce = UInt8.random(in: 0...255)
-    private var identity: Data?
-    private var running = false
+    var identity: Data?
+    private(set) var running = false
     private var identityScanActive = false
     private var scanningAll = false
     private var advertiseError: String?
     private var lastStatus: [String: Any]?
     private var lastPermission: String?
     private var advertisingRequested = false
-    private var servedPackets: [UUID: Data] = [:]
+    private var servedPackets: [UUID: (packet: Data, servedAt: Date)] = [:]
     private var nearby: [String: Sighting] = [:]
     private var nearbyDirty = false
     private var notified = Set<String>()
@@ -81,12 +174,23 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
     private var handshakes: [UUID: Handshake] = [:]
     private var lastHandshake: [UUID: Date] = [:]
     private var tickTimer: Timer?
+    private var pending: [String: [String: Any]] = [:]
 
-    override public func load() {
-        bridge?.notificationRouter.localNotificationHandler = self
+    weak var listener: BeaconEngineListener? {
+        didSet {
+            replayPending()
+        }
+    }
+
+    override private init() {
+        super.init()
         let center = NotificationCenter.default
         center.addObserver(self, selector: #selector(appStateChanged), name: UIApplication.didBecomeActiveNotification, object: nil)
         center.addObserver(self, selector: #selector(appStateChanged), name: UIApplication.willResignActiveNotification, object: nil)
+        // Without a bridge (background relaunch) nobody receives notification taps; the bridge takes over once it loads.
+        if UNUserNotificationCenter.current().delegate == nil {
+            UNUserNotificationCenter.current().delegate = self
+        }
         // A background relaunch by state restoration resumes the service; keys come back when the web app pushes them.
         if UserDefaults.standard.bool(forKey: Self.runningDefaultsKey) {
             running = true
@@ -95,139 +199,84 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
         }
     }
 
-    // MARK: Plugin methods
+    // MARK: Commands
 
-    @objc func getPermissionState(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            self.lastPermission = self.permissionState
-            call.resolve(["state": self.permissionState])
+    func checkPermission() -> String {
+        lastPermission = permissionState
+        return permissionState
+    }
+
+    func requestPermissions() {
+        ensureManagers()
+        // An undecided Bluetooth prompt reports its answer through centralManagerDidUpdateState.
+        if CBManager.authorization != .notDetermined {
+            dispatchPermission(force: true)
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    func setContacts(_ next: [Contact]) {
+        contacts = next.sorted { $0.priority < $1.priority }
+        let known = Set(contacts.map(\.pubkey))
+        if nearby.keys.contains(where: { !known.contains($0) }) {
+            nearby = nearby.filter { known.contains($0.key) }
+            dispatchNearby()
         }
     }
 
-    @objc override public func requestPermissions(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            self.ensureManagers()
-            // An undecided Bluetooth prompt reports its answer through centralManagerDidUpdateState.
-            if CBManager.authorization != .notDetermined {
-                self.dispatchPermission(force: true)
-            }
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-            call.resolve([:])
+    func setTrade(_ next: UInt8) {
+        if trade != next {
+            trade = next
+            // A fresh nonce keeps one (slot, nonce) mask from ever covering two different states.
+            nonce &+= 1
         }
     }
 
-    @objc func setKeys(_ call: CAPPluginCall) {
-        let rows = call.getArray("keys", JSObject.self) ?? []
-        DispatchQueue.main.async {
-            self.contacts = rows.compactMap { row in
-                guard let pubkey = (row["pubkey"] as? String)?.lowercased(),
-                      BeaconCodec.unhex(pubkey, length: BeaconCodec.pubkeyBytes) != nil,
-                      let key = BeaconCodec.unhex(row["beaconKeyHex"] as? String, length: 32) else {
-                    return nil
-                }
-                let priority = (row["priority"] as? NSNumber)?.doubleValue ?? 0
-                return Contact(pubkey: pubkey, key: key, priority: priority, name: row["name"] as? String ?? "")
-            }.sorted { $0.priority < $1.priority }
-            let known = Set(self.contacts.map(\.pubkey))
-            if self.nearby.keys.contains(where: { !known.contains($0) }) {
-                self.nearby = self.nearby.filter { known.contains($0.key) }
-                self.dispatchNearby()
-            }
-            call.resolve([:])
+    func start() {
+        if permissionState == "granted" {
+            running = true
+            UserDefaults.standard.set(true, forKey: Self.runningDefaultsKey)
+            ensureManagers()
+            updatePeripheral()
+            updateScan()
+            updateTimer()
+        }
+        dispatchStatus(force: true)
+        dispatchNearby()
+    }
+
+    func stop() {
+        running = false
+        UserDefaults.standard.removeObject(forKey: Self.runningDefaultsKey)
+        updatePeripheral()
+        updateScan()
+        updateTimer()
+        handshakes.values.forEach { finishHandshake($0.peripheral) }
+        nearby.removeAll()
+        notified.removeAll()
+        servedPackets.removeAll()
+        dispatchStatus(force: true)
+        dispatchNearby()
+    }
+
+    func startIdentityScan() {
+        if permissionState == "granted" {
+            identityScanActive = true
+            ensureManagers()
+            updateScan()
+            updateTimer()
         }
     }
 
-    @objc func setTrade(_ call: CAPPluginCall) {
-        let next: UInt8 = switch call.getString("trade") {
-        case "buy": BeaconCodec.stateBuy
-        case "sell": BeaconCodec.stateSell
-        default: BeaconCodec.stateNearby
-        }
-        DispatchQueue.main.async {
-            if self.trade != next {
-                self.trade = next
-                // A fresh nonce keeps one (slot, nonce) mask from ever covering two different states.
-                self.nonce &+= 1
-            }
-            call.resolve([:])
-        }
+    func stopIdentityScan() {
+        identityScanActive = false
+        updateScan()
+        updateTimer()
+        identities.removeAll()
+        identityParts.removeAll()
+        dispatchIdentities()
     }
 
-    @objc func setIdentity(_ call: CAPPluginCall) {
-        let pubkey = BeaconCodec.unhex(call.getString("pubkey"), length: BeaconCodec.pubkeyBytes)
-        DispatchQueue.main.async {
-            self.identity = pubkey
-            call.resolve([:])
-        }
-    }
-
-    @objc func start(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            if self.permissionState == "granted" {
-                self.running = true
-                UserDefaults.standard.set(true, forKey: Self.runningDefaultsKey)
-                self.ensureManagers()
-                self.updatePeripheral()
-                self.updateScan()
-                self.updateTimer()
-            }
-            self.dispatchStatus(force: true)
-            self.dispatchNearby()
-            call.resolve([:])
-        }
-    }
-
-    @objc func stop(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            self.running = false
-            UserDefaults.standard.removeObject(forKey: Self.runningDefaultsKey)
-            self.updatePeripheral()
-            self.updateScan()
-            self.updateTimer()
-            self.handshakes.values.forEach { self.finishHandshake($0.peripheral) }
-            self.nearby.removeAll()
-            self.notified.removeAll()
-            self.servedPackets.removeAll()
-            self.dispatchStatus(force: true)
-            self.dispatchNearby()
-            call.resolve([:])
-        }
-    }
-
-    @objc func startIdentityScan(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            if self.permissionState == "granted" {
-                self.identityScanActive = true
-                self.ensureManagers()
-                self.updateScan()
-                self.updateTimer()
-            }
-            call.resolve([:])
-        }
-    }
-
-    @objc func stopIdentityScan(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            self.identityScanActive = false
-            self.updateScan()
-            self.updateTimer()
-            self.identities.removeAll()
-            self.identityParts.removeAll()
-            self.dispatchIdentities()
-            call.resolve([:])
-        }
-    }
-
-    @objc func isRunning(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            call.resolve(["running": self.running])
-        }
-    }
-
-    /// iOS has no persistent notification with a Stop action, so the user never stops the beacon outside the app.
-    @objc func takeStoppedByUser(_ call: CAPPluginCall) {
-        call.resolve(["stopped": false])
-    }
 
     // MARK: State
 
@@ -279,6 +328,7 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
     private func tick() {
         let now = Date()
         lastHandshake = lastHandshake.filter { now.timeIntervalSince($0.value) < Self.handshakeThrottle }
+        servedPackets = servedPackets.filter { now.timeIntervalSince($0.value.servedAt) < Self.handshakeTimeout }
         let freshNearby = nearby.filter { now.timeIntervalSince($0.value.lastSeen) < Self.nearbyTtl }
         if freshNearby.count != nearby.count || nearbyDirty {
             nearby = freshNearby
@@ -339,7 +389,7 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
             return
         }
         // Rebuilding the service while an add is pending reports didAdd twice, but advertising may start only once.
-        guard !advertisingRequested else {
+        guard running, !advertisingRequested else {
             return
         }
         advertisingRequested = true
@@ -357,8 +407,8 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
         if request.characteristic.uuid == Self.contactsUUID {
             // Long reads arrive as several requests with growing offsets, so each central must see one packet throughout.
             let central = request.central.identifier
-            value = request.offset == 0 ? ownPacket() : servedPackets[central] ?? ownPacket()
-            servedPackets[central] = value
+            value = request.offset == 0 ? ownPacket() : servedPackets[central]?.packet ?? ownPacket()
+            servedPackets[central] = (value, Date())
         } else {
             value = appActive ? identity ?? Data() : Data()
         }
@@ -597,27 +647,62 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
         )
     }
 
-    func willPresent(notification: UNNotification) -> UNNotificationPresentationOptions {
+    func presentationOptions(for notification: UNNotification) -> UNNotificationPresentationOptions {
         notification.request.identifier.hasPrefix(Self.notificationPrefix) ? [.banner, .list, .sound] : []
     }
 
-    func didReceive(response: UNNotificationResponse) {
+    func open(_ response: UNNotificationResponse) {
         let request = response.notification.request
         guard request.identifier.hasPrefix(Self.notificationPrefix),
               let pubkey = request.content.userInfo["pubkey"] as? String else {
             return
         }
-        // Retained until the web app adds its listener, which covers taps that launched the app.
-        notifyListeners("openConversation", data: ["pubkey": pubkey], retainUntilConsumed: true)
+        emit("openConversation", ["pubkey": pubkey])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler(presentationOptions(for: notification))
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        open(response)
+        completionHandler()
     }
 
     // MARK: Events
+
+    private func emit(_ event: String, _ data: [String: Any]) {
+        guard let listener else {
+            pending[event] = data
+            return
+        }
+        // A tap that launched the app arrives before the web app has added its listener.
+        listener.beaconEngine(emitted: event, data: data, retain: event == "openConversation")
+    }
+
+    /// Hands over what happened before the plugin loaded; Capacitor keeps it until the web app listens.
+    private func replayPending() {
+        guard let listener else {
+            return
+        }
+        let events = pending
+        pending.removeAll()
+        events.forEach { listener.beaconEngine(emitted: $0.key, data: $0.value, retain: true) }
+    }
 
     private func dispatchPermission(force: Bool = false) {
         let state = permissionState
         if force || state != lastPermission {
             lastPermission = state
-            notifyListeners("permission", data: ["state": state])
+            emit("permission", ["state": state])
         }
     }
 
@@ -641,7 +726,7 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
             return
         }
         lastStatus = status
-        notifyListeners("status", data: status)
+        emit("status", status)
     }
 
     private func dispatchNearby() {
@@ -653,10 +738,10 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
                 "lastSeenMs": Int(sighting.lastSeen.timeIntervalSince1970 * 1000)
             ] as [String: Any]
         }
-        notifyListeners("nearby", data: ["contacts": snapshot])
+        emit("nearby", ["contacts": snapshot])
     }
 
     private func dispatchIdentities() {
-        notifyListeners("identities", data: ["pubkeys": Array(identities.keys)])
+        emit("identities", ["pubkeys": Array(identities.keys)])
     }
 }
