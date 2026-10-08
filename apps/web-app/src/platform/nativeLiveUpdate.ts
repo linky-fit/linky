@@ -23,7 +23,10 @@ import {
   NativeRuntimeFile,
   verifyLiveUpdateManifest,
 } from "./liveUpdateManifest";
-import { readNativeBuiltinRuntimeFile } from "./nativeBridge";
+import {
+  NATIVE_RESUME_EVENT,
+  readNativeBuiltinRuntimeFile,
+} from "./nativeBridge";
 
 const RELEASE_ASSETS_URL =
   "https://github.com/linky-fit/linky/releases/latest/download";
@@ -179,7 +182,8 @@ const downloadBundle = async (
   if (response.status !== 200 || typeof response.data !== "string") {
     throw new Error(`bundle HTTP ${response.status}`);
   }
-  const zip = base64.decode(response.data);
+  // Android's CapacitorHttp returns MIME base64, wrapped every 76 characters.
+  const zip = base64.decode(response.data.replace(/\s/g, ""));
   if (bundleSha256(zip) !== manifest.sha256) {
     throw new Error("bundle sha256 does not match the manifest");
   }
@@ -282,7 +286,5 @@ export const startNativeLiveUpdates = async (): Promise<void> => {
   const check = () => void checkForUpdate(shellRuntime);
   check();
   setInterval(check, CHECK_INTERVAL_MS);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") check();
-  });
+  window.addEventListener(NATIVE_RESUME_EVENT, check);
 };

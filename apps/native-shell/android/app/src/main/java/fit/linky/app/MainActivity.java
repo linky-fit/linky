@@ -60,6 +60,7 @@ public class MainActivity extends BridgeActivity {
 	private static volatile boolean appInForeground = false;
 	private static final String EVENT_DEEP_LINK = "linky-native-deep-link";
 	private static final String EVENT_BACK_BUTTON = "linky-native-back-button";
+	private static final String EVENT_RESUME = "linky-native-resume";
 	private static final String EVENT_NOTIFICATION_OPEN = "linky-native-notification-open";
 	private static final String EVENT_NFC_WRITE = "linky-native-nfc-write";
 	private static final String EVENT_NOTIFICATION_PERMISSION = "linky-native-notification-permission";
@@ -258,6 +259,8 @@ public class MainActivity extends BridgeActivity {
 				dispatchSafeAreaInsets();
 			});
 		}
+		// The WebView keeps reporting visibilityState "visible" while the app is in the background.
+		dispatchWindowEvent(EVENT_RESUME, null);
 	}
 
 	@Override
