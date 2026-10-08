@@ -196,8 +196,14 @@ interface ContactSearchResults {
   query: string;
 }
 
+/** One secondary line: the lightning address when known, else the short npub. */
+const shortIdentity = (lnAddress: string, npub: string): string =>
+  lnAddress ? formatShortLightningAddress(lnAddress) : formatShortNpub(npub);
+
 interface SearchCandidateRowProps {
   candidate: ContactSearchCandidate;
+  /** Shows one secondary line, as the suggestion rows do. */
+  compact?: boolean;
   isSavingContact: boolean;
   onAdd: (candidate: ContactSearchCandidate) => Promise<void>;
   t: Translate;
@@ -206,6 +212,7 @@ interface SearchCandidateRowProps {
 
 function SearchCandidateRow({
   candidate,
+  compact = false,
   isSavingContact,
   onAdd,
   t,
@@ -226,16 +233,20 @@ function SearchCandidateRow({
         </Text>
       }
       description={
-        <Stack gap="$xxs">
-          {candidate.lnAddress ? (
+        compact ? (
+          shortIdentity(candidate.lnAddress, candidate.npub)
+        ) : (
+          <Stack gap="$xxs">
+            {candidate.lnAddress ? (
+              <Text variant="caption" color="$colorMuted" numberOfLines={1}>
+                {formatShortLightningAddress(candidate.lnAddress)}
+              </Text>
+            ) : null}
             <Text variant="caption" color="$colorMuted" numberOfLines={1}>
-              {formatShortLightningAddress(candidate.lnAddress)}
+              {formatShortNpub(candidate.npub)}
             </Text>
-          ) : null}
-          <Text variant="caption" color="$colorMuted" numberOfLines={1}>
-            {formatShortNpub(candidate.npub)}
-          </Text>
-        </Stack>
+          </Stack>
+        )
       }
       trailing={
         <Button
@@ -572,6 +583,7 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                 <SearchCandidateRow
                   key={candidate.npub}
                   candidate={candidate}
+                  compact
                   isSavingContact={isSavingContact}
                   onAdd={addNewContactFromSearchResult}
                   t={t}
@@ -599,8 +611,9 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
                         {displayName}
                       </Text>
                     }
-                    description={formatShortLightningAddress(
+                    description={shortIdentity(
                       suggestion.displayLnAddress,
+                      suggestion.npub,
                     )}
                     trailing={
                       <Button
