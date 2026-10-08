@@ -48,7 +48,7 @@ describe("ContactNewPage", () => {
               },
               {
                 isExactMatch: true,
-                lnAddress: "",
+                lnAddress: "dana@linky.fit",
                 name: "Dana Kral",
                 npub: encodeNpub(known),
                 pictureUrl: null,
@@ -90,6 +90,8 @@ describe("ContactNewPage", () => {
       ),
     ).toEqual(["nearby", "contactSuggestionsTitle"]);
     expect(container.textContent).toContain("Dana Kral");
+    expect(container.textContent).toContain("dana@linky.fit");
+    expect(container.textContent).not.toContain(encodeNpub(known).slice(0, 10));
     expect(container.textContent).not.toContain("Someone Else");
     expect(container.textContent).toContain(encodeNpub(unknown).slice(0, 10));
 

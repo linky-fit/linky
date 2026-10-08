@@ -55,6 +55,8 @@ export default defineConfig({ plugins: [linkyUi(), react()] });
 
 On the web, import `@linky-fit/ui/manrope.css` once (from CSS or JS); it registers self-hosted `Manrope` for weights 400, 600 and 700, and the font stack falls back to `system-ui`. Publish `fonts/manrope/OFL.txt` with the app, e.g. at `public/licenses/Manrope-OFL.txt`.
 
+A full-screen `Dialog` marks its top and bottom edges with `data-safe-area="top"` and `data-safe-area="bottom"`. On the web, give those attributes the device insets as `padding-top` and `padding-bottom`, e.g. `env(safe-area-inset-top)`; the dialog adds its own padding inside them.
+
 ## Tokens and themes
 
 All values live in `src/tokens.ts`, exported whole from the package root. `@linky-fit/ui/tokens` exports the same module without loading React or Tamagui, for code such as boot screens. Components read the values as Tamagui tokens, and so should app code:

@@ -149,14 +149,8 @@ export function Dialog({
       {title}
     </TamaguiDialog.Title>
   );
-  return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      placement={fullScreen ? "fullScreen" : "center"}
-      described={description !== undefined}
-      testID={testID}
-    >
+  const body = (
+    <>
       {hideTitle ? <VisuallyHidden>{titleText}</VisuallyHidden> : null}
       {hideTitle && !closeLabel ? null : (
         <Row justifyContent="flex-end">
@@ -191,7 +185,29 @@ export function Dialog({
         </ScrollList>
       )}
       {actions ? <Stack gap="$sm">{actions}</Stack> : null}
+    </>
+  );
+  return (
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      placement={fullScreen ? "fullScreen" : "center"}
+      described={description !== undefined}
+      testID={testID}
+    >
+      {fullScreen ? <SafeAreaEdges>{body}</SafeAreaEdges> : body}
     </Modal>
+  );
+}
+
+/** Marks the screen edges that the web app pads by the device insets (see README). */
+function SafeAreaEdges({ children }: { children: ReactNode }) {
+  return (
+    <Stack flex={1} minHeight={0} data-safe-area="top">
+      <Stack flex={1} minHeight={0} data-safe-area="bottom">
+        {children}
+      </Stack>
+    </Stack>
   );
 }
 

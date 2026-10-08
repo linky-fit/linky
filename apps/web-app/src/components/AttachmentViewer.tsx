@@ -40,13 +40,7 @@ export function AttachmentViewer({
       fullScreen
       testID="attachment-viewer"
       actions={
-        <Stack
-          gap="$sm"
-          width="100%"
-          maxWidth="$sheetWidth"
-          alignSelf="center"
-          data-safe-area="bottom"
-        >
+        <Stack gap="$sm" width="100%" maxWidth="$sheetWidth" alignSelf="center">
           {errorText ? (
             <Text
               variant="label"
@@ -73,7 +67,7 @@ export function AttachmentViewer({
         </Stack>
       }
     >
-      <Stack flex={1} minHeight={0} gap="$md" data-safe-area="top">
+      <Stack flex={1} minHeight={0} gap="$md">
         <Row width="100%" maxWidth="$contentWidth" alignSelf="center">
           <IconButton
             icon="ChevronLeft"

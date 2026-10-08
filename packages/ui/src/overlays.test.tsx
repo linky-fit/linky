@@ -30,4 +30,15 @@ describe("Dialog", () => {
     await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
     expect(document.activeElement).toBe(opener);
   });
+
+  it("marks the safe-area edges of a full-screen dialog", async () => {
+    await render(
+      <Dialog open onOpenChange={() => {}} title="Scan" fullScreen>
+        Camera
+      </Dialog>,
+    );
+    const dialog = document.querySelector("[role=dialog]");
+    expect(dialog?.querySelector("[data-safe-area=top]")).not.toBeNull();
+    expect(dialog?.querySelector("[data-safe-area=bottom]")).not.toBeNull();
+  });
 });
