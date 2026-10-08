@@ -132,6 +132,35 @@ export const bankPaymentOfferResponderSteps = (
     return { candidate, ended: false, losers, offerId, winner };
   });
 
+/** The payer this device reserved an offer's bank details for, in storage that survives a crash. */
+export interface BankPaymentOfferDetailsPin {
+  /** A relay accepted the payer's copy of the details. */
+  delivered: boolean;
+  peer: Pubkey;
+}
+
+/**
+ * The thread to send the bank details to now, or null. Without a pin it is the
+ * step's candidate, to be pinned before sending. With a pin it is only ever
+ * the pinned payer, while their details are undelivered and nobody else holds
+ * them.
+ */
+export const bankPaymentOfferDetailsRecipient = (
+  step: BankPaymentOfferResponderStep,
+  pin: BankPaymentOfferDetailsPin | null,
+): BankPaymentOffer | null => {
+  if (step.ended) return null;
+  if (!pin) return step.candidate;
+  if (pin.delivered) return null;
+  const pinned = [step.winner, step.candidate, ...step.losers].find(
+    (offer) => offer?.peer === pin.peer,
+  );
+  if (!pinned || (step.winner && step.winner !== pinned)) return null;
+  return pinned.status === "accepted" || pinned.status === "bank_details_sent"
+    ? pinned
+    : null;
+};
+
 /** True while one of my offers has a live acceptance without bank details. */
 export const hasPendingBankPaymentOfferResponderWork = (
   offers: readonly BankPaymentOffer[],

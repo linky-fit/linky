@@ -112,7 +112,9 @@ describe("BankOffers.send", () => {
 
     assert(Exit.isSuccess(exit));
     expect(exit.value.sentAt).toBe(sentAt);
-    const [recipientWrap] = published;
+    const recipientWrap = published.find(
+      (wrap) => recipientOf(wrap) === bob.pubkey,
+    );
     assert(recipientWrap !== undefined);
     const rumor = Either.getOrThrow(
       unwrapToRumor(recipientWrap, bob.secretKey),
@@ -142,12 +144,12 @@ describe("BankOffers.send", () => {
       }),
     );
 
-    expect(
-      published[0] === undefined ? undefined : hasPushMarker(published[0]),
-    ).toBe(expected);
-    expect(
-      published[1] === undefined ? undefined : hasPushMarker(published[1]),
-    ).toBe(false);
+    const pushMarked = (to: string) => {
+      const wrap = published.find((candidate) => recipientOf(candidate) === to);
+      return wrap === undefined ? undefined : hasPushMarker(wrap);
+    };
+    expect(pushMarked(bob.pubkey)).toBe(expected);
+    expect(pushMarked(alice.pubkey)).toBe(false);
   });
 
   it.each([
@@ -170,6 +172,32 @@ describe("BankOffers.send", () => {
       ).toBe(expected);
     },
   );
+
+  it("publishes bank details self-first and never without the self copy", async () => {
+    const published: Array<SignedWrapEvent> = [];
+    const sent = await runWith(
+      stubWrapTransport(published),
+      Effect.gen(function* () {
+        const bankOffers = yield* BankOffers;
+        return yield* bankOffers.send(makeDraft("bank_details_sent"));
+      }),
+    );
+    assert(Exit.isSuccess(sent));
+    expect(published.map(recipientOf)).toEqual([alice.pubkey, bob.pubkey]);
+
+    published.length = 0;
+    const refused = await runWith(
+      stubWrapTransport(published, (wrap) => recipientOf(wrap) === bob.pubkey),
+      Effect.gen(function* () {
+        const bankOffers = yield* BankOffers;
+        return yield* bankOffers.send(makeDraft("bank_details_sent"));
+      }),
+    );
+    expect(published.map(recipientOf)).toEqual([alice.pubkey]);
+    expect(refused).toEqual(
+      Exit.fail(expect.objectContaining({ _tag: "NoRelayReachable" })),
+    );
+  });
 
   it("does not publish the self copy when the recipient is rejected", async () => {
     const published: Array<SignedWrapEvent> = [];

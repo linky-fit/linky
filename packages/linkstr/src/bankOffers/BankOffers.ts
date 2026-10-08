@@ -24,7 +24,11 @@ export class BankOffers extends Effect.Service<BankOffers>()(
           encode: encodeBankOfferRumor,
           pushMarkRecipientCopy:
             draft.pushMark ?? shouldPushBankOfferStatus(draft.status),
-          order: "recipientFirst",
+          // The self copy is the relay's record of who got the bank details.
+          order:
+            draft.status === "bank_details_sent"
+              ? "selfFirst"
+              : "recipientFirst",
           receipt: (outcome, rumor) =>
             new BankOfferReceipt({
               ...outcome,

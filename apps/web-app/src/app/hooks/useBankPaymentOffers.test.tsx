@@ -17,6 +17,7 @@ import {
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { decodeBankPaymentOffer } from "@linky-fit/proxy-payment";
 import { Exit } from "effect";
+import { IDBFactory } from "fake-indexeddb";
 import { nip19 } from "nostr-tools";
 import { act, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,9 +25,9 @@ import { createLinkyBankPaymentOfferEvent } from "../../testUtils/bankPaymentOff
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import {
   readBankPaymentOfferSpdRecord,
-  markBankPaymentOfferBankDetailsSent,
   readBankPaymentOfferStaggerRecords,
   rememberBankPaymentOfferSpdPayload,
+  reserveBankPaymentOfferBankDetails,
   rememberBankPaymentOfferStaggerQueue,
 } from "../lib/bankPaymentOfferStorage";
 import type { ContactRowLike, LocalNostrMessage } from "../types/appTypes";
@@ -180,14 +181,31 @@ const setup = async (
   };
 };
 
+// fake-indexeddb runs on real macrotasks, which the fake timers leave alone.
+const settle = () =>
+  act(async () => {
+    for (let i = 0; i < 100; i++) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+  });
+
 const statusOf = (row: LocalNostrMessage | undefined) =>
   decodeBankPaymentOffer(row?.content ?? "")?.status;
 
 describe("useBankPaymentOffers", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({
+      toFake: [
+        "Date",
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+      ],
+    });
     vi.setSystemTime(NOW * 1000);
     window.localStorage.clear();
+    vi.stubGlobal("indexedDB", new IDBFactory());
     Object.defineProperty(navigator, "locks", {
       configurable: true,
       value: {
@@ -203,6 +221,7 @@ describe("useBankPaymentOffers", () => {
   afterEach(async () => {
     for (const unmount of unmounts.splice(0)) await unmount();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     sendBankOfferMock.mockReset();
     window.localStorage.clear();
   });
@@ -362,7 +381,7 @@ describe("useBankPaymentOffers", () => {
   });
 
   it("sends bank details once after an acceptance and tells the other recipient", async () => {
-    rememberBankPaymentOfferSpdPayload({
+    await rememberBankPaymentOfferSpdPayload({
       offerId: BankOfferId.make("offer-1"),
       ownerPubkey: owner.pubkey,
       spdPayload: SPD,
@@ -375,6 +394,7 @@ describe("useBankPaymentOffers", () => {
       );
       current().applyBankPaymentOfferSnapshot(snapshot("accepted"));
     });
+    await settle();
     const statuses = sendBankOfferMock.mock.calls.map(([draft]) => [
       draft.status,
       draft.to,
@@ -385,11 +405,13 @@ describe("useBankPaymentOffers", () => {
     ]);
     expect(sendBankOfferMock.mock.calls[0]?.[0].spdPayload).toBe(SPD);
     expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-1",
-        ownerPubkey: owner.pubkey,
-      })?.sentCandidateKeys,
-    ).toEqual([`offer-1:${recipient.pubkey}`]);
+      (
+        await readBankPaymentOfferSpdRecord({
+          offerId: BankOfferId.make("offer-1"),
+          ownerPubkey: owner.pubkey,
+        })
+      )?.pin,
+    ).toEqual({ delivered: true, peer: recipient.pubkey });
     expect(current().bankPaymentOfferMessages.map(statusOf)).toEqual([
       "bank_details_sent",
       "accepted_by_other",
@@ -399,7 +421,7 @@ describe("useBankPaymentOffers", () => {
   });
 
   it("sends bank details to a payer whose clock runs ahead and shows them sent", async () => {
-    rememberBankPaymentOfferSpdPayload({
+    await rememberBankPaymentOfferSpdPayload({
       offerId: BankOfferId.make("offer-1"),
       ownerPubkey: owner.pubkey,
       spdPayload: SPD,
@@ -411,6 +433,7 @@ describe("useBankPaymentOffers", () => {
         snapshot("accepted", recipient.pubkey, NOW + 5),
       );
     });
+    await settle();
     expect(sendBankOfferMock.mock.calls[0]?.[0]).toMatchObject({
       sentAt: NOW + 5,
       status: "bank_details_sent",
@@ -461,8 +484,8 @@ describe("useBankPaymentOffers", () => {
   });
 
   it("pins the first attempted recipient across a failed publish and a reordered acceptance", async () => {
-    rememberBankPaymentOfferSpdPayload({
-      offerId: "offer-1",
+    await rememberBankPaymentOfferSpdPayload({
+      offerId: BankOfferId.make("offer-1"),
       ownerPubkey: owner.pubkey,
       spdPayload: SPD,
     });
@@ -481,11 +504,13 @@ describe("useBankPaymentOffers", () => {
         snapshot("accepted", recipient.pubkey, NOW + 2),
       );
     });
+    await settle();
     await act(async () => {
       current().applyBankPaymentOfferSnapshot(
         snapshot("accepted", second.pubkey, NOW + 1),
       );
     });
+    await settle();
     const attempts = () =>
       sendBankOfferMock.mock.calls
         .filter(([draft]) => draft.status === "bank_details_sent")
@@ -510,7 +535,9 @@ describe("useBankPaymentOffers", () => {
     sendBankOfferMock.mockImplementation(async (draft) =>
       Exit.succeed(receipt(draft)),
     );
+    await settle();
     await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    await settle();
     expect(new Set(attempts())).toEqual(new Set([recipient.pubkey]));
     expect(reloaded().bankPaymentOfferMessages.map(statusOf)).toEqual([
       "bank_details_sent",
@@ -519,28 +546,13 @@ describe("useBankPaymentOffers", () => {
   });
 
   it("does not retry legacy successful-send markers without detailsSent", async () => {
-    rememberBankPaymentOfferSpdPayload({
-      offerId: "offer-1",
-      ownerPubkey: owner.pubkey,
-      spdPayload: SPD,
-    });
-    markBankPaymentOfferBankDetailsSent({
-      offerId: "offer-1",
-      candidateKey: `offer-1:${recipient.pubkey}`,
-    });
-    const key = "linky.bank_payment_offer_spd.v1.offer-1";
-    const record = readBankPaymentOfferSpdRecord({
-      offerId: "offer-1",
-      ownerPubkey: owner.pubkey,
-    });
-    if (!record) throw new Error("missing SPD record");
     localStorage.setItem(
-      key,
+      "linky.bank_payment_offer_spd.v1.offer-1",
       JSON.stringify({
-        createdAtSec: record.createdAtSec,
-        ownerPubkey: record.ownerPubkey,
-        sentCandidateKeys: record.sentCandidateKeys,
-        spdPayload: record.spdPayload,
+        createdAtSec: NOW,
+        ownerPubkey: owner.pubkey,
+        sentCandidateKeys: [`offer-1:${recipient.pubkey}`],
+        spdPayload: SPD,
       }),
     );
     const current = await setup();
@@ -548,7 +560,104 @@ describe("useBankPaymentOffers", () => {
       current().applyBankPaymentOfferSnapshot(snapshot("offered"));
       current().applyBankPaymentOfferSnapshot(snapshot("accepted"));
     });
+    await settle();
     await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    await settle();
+    expect(sendBankOfferMock).not.toHaveBeenCalled();
+  });
+
+  it("after a crash, resends only to the pinned payer whose self copy landed", async () => {
+    await rememberBankPaymentOfferSpdPayload({
+      offerId: BankOfferId.make("offer-1"),
+      ownerPubkey: owner.pubkey,
+      spdPayload: SPD,
+    });
+    // Killed after the self copy landed, before the payer's copy was confirmed.
+    await reserveBankPaymentOfferBankDetails({
+      offerId: BankOfferId.make("offer-1"),
+      ownerPubkey: owner.pubkey,
+      peer: second.pubkey,
+    });
+    const current = await setup();
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(snapshot("offered"));
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("offered", second.pubkey),
+      );
+      current().applyBankPaymentOfferSnapshot(snapshot("accepted"));
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("accepted", second.pubkey),
+      );
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("bank_details_sent", second.pubkey, NOW + 1),
+      );
+    });
+    await settle();
+    expect(
+      sendBankOfferMock.mock.calls.map(([draft]) => [draft.status, draft.to]),
+    ).toEqual([
+      ["bank_details_sent", second.pubkey],
+      ["accepted_by_other", recipient.pubkey],
+    ]);
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    await settle();
+    expect(sendBankOfferMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps retrying the pinned payer while their copy fails, and closes the others", async () => {
+    await rememberBankPaymentOfferSpdPayload({
+      offerId: BankOfferId.make("offer-1"),
+      ownerPubkey: owner.pubkey,
+      spdPayload: SPD,
+    });
+    sendBankOfferMock.mockImplementation(async (draft) =>
+      draft.status === "bank_details_sent"
+        ? Exit.fail(new Error("recipient not reached"))
+        : Exit.succeed(receipt(draft)),
+    );
+    const current = await setup();
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(snapshot("offered"));
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("offered", second.pubkey),
+      );
+      current().applyBankPaymentOfferSnapshot(snapshot("accepted"));
+    });
+    await settle();
+    // The self copy landed: its echo makes the pinned payer the winner.
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("bank_details_sent", recipient.pubkey, NOW + 1),
+      );
+    });
+    await settle();
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    await settle();
+    const sends = sendBankOfferMock.mock.calls.map(([draft]) => [
+      draft.status,
+      draft.to,
+    ]);
+    expect(sends).toContainEqual(["accepted_by_other", second.pubkey]);
+    const detailsTo = sends.flatMap(([status, to]) =>
+      status === "bank_details_sent" ? [to] : [],
+    );
+    // The first try, the retry on the echo, and the timer's retry.
+    expect(detailsTo.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(detailsTo)).toEqual(new Set([recipient.pubkey]));
+  });
+
+  it("sends no bank details without this device's record of the offer", async () => {
+    const current = await setup();
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(snapshot("offered"));
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("offered", second.pubkey),
+      );
+      current().applyBankPaymentOfferSnapshot(snapshot("accepted"));
+    });
+    await settle();
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    await settle();
     expect(sendBankOfferMock).not.toHaveBeenCalled();
   });
 

@@ -1,11 +1,13 @@
 import { BankOfferId } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import type { BankPaymentOfferStaggerRecord } from "@linky-fit/proxy-payment";
+import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  forgetBankPaymentOfferSpdPayload,
+  forgetBankPaymentOfferSpdPayloads,
   forgetBankPaymentOfferStaggerQueue,
-  markBankPaymentOfferBankDetailsSent,
+  markBankPaymentOfferBankDetailsDelivered,
+  readBankPaymentOfferIdsForSpdPayload,
   readBankPaymentOfferSpdRecord,
   readBankPaymentOfferStaggerRecords,
   rememberBankPaymentOfferSpdPayload,
@@ -15,9 +17,16 @@ import {
 } from "./bankPaymentOfferStorage";
 
 const NOW = 1_700_000_000;
+const SPD = "SPD*1.0*ACC:CZ6508000000192000145399";
+const offer1 = BankOfferId.make("offer-1");
+const ownerA = makeIdentity().pubkey;
+const ownerB = makeIdentity().pubkey;
+const pubB = makeIdentity().pubkey;
+const pubC = makeIdentity().pubkey;
 
 beforeEach(() => {
   localStorage.clear();
+  vi.stubGlobal("indexedDB", new IDBFactory());
   Object.defineProperty(navigator, "locks", {
     configurable: true,
     value: {
@@ -25,208 +34,150 @@ beforeEach(() => {
       request: async (_name: string, callback: () => unknown) => callback(),
     },
   });
-  vi.useFakeTimers();
+  // fake-indexeddb schedules with setImmediate, which must stay real.
+  vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW * 1000);
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
-describe("bank payment offer SPD payload storage", () => {
-  const remember = (offerId = "offer-1", ownerPubkey = "owner-a") =>
+describe("bank payment offer SPD record storage", () => {
+  const remember = (offerId = offer1, singleTabRiskAccepted = false) =>
     rememberBankPaymentOfferSpdPayload({
       offerId,
-      ownerPubkey,
-      spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399",
+      ownerPubkey: ownerA,
+      singleTabRiskAccepted,
+      spdPayload: SPD,
     });
+  const read = (offerId = offer1, ownerPubkey: string = ownerA) =>
+    readBankPaymentOfferSpdRecord({ offerId, ownerPubkey });
+  const reserve = (peer = pubB, ownerPubkey: string = ownerA) =>
+    reserveBankPaymentOfferBankDetails({ offerId: offer1, ownerPubkey, peer });
 
-  it("persists the payload for its owner only and forgets it on request", () => {
-    remember();
+  it("keeps the QR for its owner, finds offers by QR and forgets on request", async () => {
+    await remember();
+    expect(await read()).toMatchObject({ offerId: offer1, spdPayload: SPD });
+    expect(await read(offer1, ownerB)).toBeNull();
     expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-1",
-        ownerPubkey: "owner-a",
+      await readBankPaymentOfferIdsForSpdPayload({
+        ownerPubkey: ownerA,
+        spdPayload: SPD,
       }),
-    ).toMatchObject({
-      sentCandidateKeys: [],
-      spdPayload: expect.stringMatching(/^SPD/),
-    });
-    expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-1",
-        ownerPubkey: "owner-b",
-      }),
-    ).toBeNull();
-    forgetBankPaymentOfferSpdPayload("offer-1");
-    expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-1",
-        ownerPubkey: "owner-a",
-      }),
-    ).toBeNull();
+    ).toEqual([offer1]);
+    await forgetBankPaymentOfferSpdPayloads([offer1]);
+    expect(await read()).toBeNull();
   });
 
-  it("expires stored payloads after an hour and prunes them when remembering a new one", () => {
-    remember("offer-old");
+  it("deletes a record after an hour, so a clock moving back cannot revive it", async () => {
+    await remember();
     vi.setSystemTime((NOW + 3600) * 1000);
-    remember("offer-new");
-    expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-old",
-        ownerPubkey: "owner-a",
-      }),
-    ).toBeNull();
-    expect(
-      localStorage.getItem("linky.bank_payment_offer_spd.v1.offer-old"),
-    ).toBeNull();
-    expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-new",
-        ownerPubkey: "owner-a",
-      }),
-    ).not.toBeNull();
+    expect(await read()).toBeNull();
+    vi.setSystemTime(NOW * 1000);
+    expect(await read()).toBeNull();
   });
 
-  it("tracks sent candidate keys without duplicates and keeps offers independent", () => {
-    remember("offer-1");
-    remember("offer-2");
-    markBankPaymentOfferBankDetailsSent({
-      candidateKey: "offer-1:peer",
-      offerId: "offer-1",
+  it("pins one payer before delivery and never replaces the pin", async () => {
+    await remember();
+    expect(await reserve()).toBe(true);
+    expect((await read())?.pin).toEqual({ delivered: false, peer: pubB });
+    expect(await reserve(pubC)).toBe(false);
+    await markBankPaymentOfferBankDetailsDelivered({
+      offerId: offer1,
+      peer: pubC,
     });
-    markBankPaymentOfferBankDetailsSent({
-      candidateKey: "offer-1:peer",
-      offerId: "offer-1",
+    expect((await read())?.pin?.delivered).toBe(false);
+    await markBankPaymentOfferBankDetailsDelivered({
+      offerId: offer1,
+      peer: pubB,
     });
-    expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-1",
-        ownerPubkey: "owner-a",
-      })?.sentCandidateKeys,
-    ).toEqual(["offer-1:peer"]);
-    expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-2",
-        ownerPubkey: "owner-a",
-      })?.sentCandidateKeys,
-    ).toEqual([]);
+    expect((await read())?.pin).toEqual({ delivered: true, peer: pubB });
+    expect(await reserve()).toBe(true);
+    expect(await reserve(pubB, ownerB)).toBe(false);
   });
 
-  it("reserves one recipient before delivery and never replaces it", async () => {
-    remember();
-    const args = {
-      offerId: "offer-1",
-      ownerPubkey: "owner-a",
-      candidateKey: "offer-1:peer",
-    };
-    expect(await reserveBankPaymentOfferBankDetails(args)).toBe(true);
-    expect(readBankPaymentOfferSpdRecord(args)).toMatchObject({
-      sentCandidateKeys: [args.candidateKey],
-      detailsSent: false,
-    });
-    expect(
-      await reserveBankPaymentOfferBankDetails({
-        ...args,
-        candidateKey: "offer-1:other",
-      }),
-    ).toBe(false);
-    markBankPaymentOfferBankDetailsSent({
-      ...args,
-      candidateKey: "offer-1:other",
-    });
-    expect(readBankPaymentOfferSpdRecord(args)?.detailsSent).toBe(false);
-    markBankPaymentOfferBankDetailsSent(args);
-    expect(readBankPaymentOfferSpdRecord(args)?.detailsSent).toBe(true);
-    expect(await reserveBankPaymentOfferBankDetails(args)).toBe(true);
-    expect(
-      await reserveBankPaymentOfferBankDetails({
-        ...args,
-        ownerPubkey: "owner-b",
-      }),
-    ).toBe(false);
+  it("refuses a pin without a record, and keeps the pin of another offer apart", async () => {
+    expect(await reserve()).toBe(false);
+    await remember(BankOfferId.make("offer-2"));
+    expect(await reserve()).toBe(false);
+    expect((await read(BankOfferId.make("offer-2")))?.pin).toBeUndefined();
   });
 
-  it("does not authorize delivery if the reservation cannot be persisted", async () => {
-    remember();
-    const write = vi
-      .spyOn(Storage.prototype, "setItem")
-      .mockImplementation(() => {
-        throw new Error("quota exceeded");
-      });
-    try {
-      expect(
-        await reserveBankPaymentOfferBankDetails({
-          offerId: "offer-1",
-          ownerPubkey: "owner-a",
-          candidateKey: "offer-1:peer",
-        }),
-      ).toBe(false);
-    } finally {
-      write.mockRestore();
-    }
+  it("does not authorize delivery if the pin cannot be committed", async () => {
+    await remember();
+    vi.stubGlobal("indexedDB", {
+      open: () => {
+        throw new Error("storage unavailable");
+      },
+    });
+    await expect(reserve()).rejects.toThrow("storage unavailable");
   });
 
   it("does not authorize delivery with the single-tab lock compatibility shim", async () => {
-    remember();
+    await remember();
     Object.defineProperty(navigator, "locks", {
       configurable: true,
       value: {
         request: async (_name: string, callback: () => unknown) => callback(),
       },
     });
-    expect(
-      await reserveBankPaymentOfferBankDetails({
-        offerId: "offer-1",
-        ownerPubkey: "owner-a",
-        candidateKey: "offer-1:peer",
-      }),
-    ).toBe(false);
+    expect(await reserve()).toBe(false);
   });
 
-  it("reserves without cross-tab locks only after the user accepted the risk", async () => {
-    rememberBankPaymentOfferSpdPayload({
-      offerId: "offer-1",
-      ownerPubkey: "owner-a",
-      singleTabRiskAccepted: true,
-      spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399",
-    });
+  it("pins without cross-tab locks only after the user accepted the risk", async () => {
+    await remember(offer1, true);
     Object.defineProperty(navigator, "locks", {
       configurable: true,
       value: undefined,
     });
-    const args = {
-      offerId: "offer-1",
-      ownerPubkey: "owner-a",
-      candidateKey: "offer-1:peer",
-    };
-    expect(await reserveBankPaymentOfferBankDetails(args)).toBe(true);
-    expect(
-      await reserveBankPaymentOfferBankDetails({
-        ...args,
-        candidateKey: "offer-1:other",
-      }),
-    ).toBe(false);
+    expect(await reserve()).toBe(true);
+    expect(await reserve(pubC)).toBe(false);
   });
 
-  it("survives corrupted storage content", () => {
+  it("takes over the previous release's localStorage records with their pins", async () => {
+    const legacy = (offerId: string, fields: object) =>
+      localStorage.setItem(
+        `linky.bank_payment_offer_spd.v1.${offerId}`,
+        JSON.stringify({
+          createdAtSec: NOW,
+          ownerPubkey: ownerA,
+          spdPayload: SPD,
+          ...fields,
+        }),
+      );
+    legacy("offer-1", {
+      detailsSent: false,
+      sentCandidateKeys: [`offer-1:${pubB}`],
+    });
+    // Before detailsSent existed, a pin was only written after delivery.
+    legacy("offer-2", { sentCandidateKeys: [`offer-2:${pubC}`] });
+    legacy("offer-3", { sentCandidateKeys: [] });
+    legacy("offer-4", { sentCandidateKeys: ["offer-4:not-a-pubkey"] });
     localStorage.setItem(
-      "linky.bank_payment_offer_spd.v1.offer-1",
+      "linky.bank_payment_offer_spd.v1.offer-5",
       "{not json",
     );
+
+    expect((await read())?.pin).toEqual({ delivered: false, peer: pubB });
+    expect((await read(BankOfferId.make("offer-2")))?.pin).toEqual({
+      delivered: true,
+      peer: pubC,
+    });
+    expect(await read(BankOfferId.make("offer-3"))).toMatchObject({
+      spdPayload: SPD,
+    });
+    expect(await read(BankOfferId.make("offer-4"))).toBeNull();
+    expect(await read(BankOfferId.make("offer-5"))).toBeNull();
     expect(
-      readBankPaymentOfferSpdRecord({
-        offerId: "offer-1",
-        ownerPubkey: "owner-a",
-      }),
-    ).toBeNull();
+      Object.keys(localStorage).filter((key) =>
+        key.startsWith("linky.bank_payment_offer_spd"),
+      ),
+    ).toEqual([]);
+    expect(await reserve(pubC)).toBe(false);
   });
 });
-
-const ownerA = makeIdentity().pubkey;
-const ownerB = makeIdentity().pubkey;
-const pubB = makeIdentity().pubkey;
-const pubC = makeIdentity().pubkey;
 
 describe("bank payment offer stagger queue storage", () => {
   const record = (
