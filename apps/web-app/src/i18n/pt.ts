@@ -994,6 +994,8 @@ export const pt = {
   uploadToNfc: "Gravar em NFC",
   uploadProfileToNfc: "Gravar na tag",
   shareProfile: "Compartilhar perfil",
+  copyProfileLink: "Copiar link do perfil",
+  copyNpub: "Copiar npub",
   sharedProfileGreeting: "Oi 👋",
   nfcWriteUnsupported: "Gravação NFC não está disponível neste aparelho.",
   nfcWriteDisabled: "O NFC está desligado neste aparelho.",

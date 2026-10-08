@@ -16,6 +16,7 @@ import {
 import React from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { ProfileAvatarEditor } from "../components/ProfileAvatarEditor";
+import { ProfileShareSheet } from "../components/ProfileShareSheet";
 import { parseProfileGeneralStatus } from "../nostrStatus";
 import type { FilePickerHandle } from "../utils/pickFile";
 import {
@@ -23,7 +24,6 @@ import {
   formatShortNpub,
 } from "../utils/formatting";
 import { buildOwnProfileShareUrl } from "../sharedProfileLink";
-import { buildProfileShareUrl } from "../utils/profileShareUrl";
 import {
   type Nip98AuthHeaderFactory,
   type OwnLightningAddressInputCandidate,
@@ -75,10 +75,7 @@ interface ProfilePageProps {
   setProfileEditLnAddress: (value: string) => void;
   setProfileEditName: (value: string) => void;
   setProfileEditStatus: (value: string) => void;
-  shareText: (
-    text: string,
-    whenUnavailable?: () => Promise<void>,
-  ) => Promise<void>;
+  shareText: (text: string) => Promise<void>;
   writeCurrentNpubToNfc: () => Promise<void>;
 }
 
@@ -133,6 +130,7 @@ export function ProfilePage({
   const [inlineClaimPreview, setInlineClaimPreview] =
     React.useState<OwnLightningClaimAvailableResult | null>(null);
   const inlineClaimRequestSeqRef = React.useRef(0);
+  const [shareSheetOpen, setShareSheetOpen] = React.useState(false);
   const profileStatusText = parseProfileGeneralStatus(profileStatus).text;
   const restoreLightningAddress = React.useMemo(() => {
     for (const lightningAddress of ownedLightningAddresses) {
@@ -304,20 +302,30 @@ export function ProfilePage({
           {displayName}
         </Text>
         <QRCode
-          value={buildProfileShareUrl(currentNpub)}
+          value={currentNpub}
           accessibilityLabel={t("copy")}
           tooltip={t("copy")}
           badge="Copy"
-          onPress={() => void copyText(shareUrl)}
+          onPress={() => void copyText(currentNpub)}
         />
         <Button
           variant="secondary"
           size="sm"
           icon="Share2"
-          onPress={() => void shareText(shareUrl, () => copyText(shareUrl))}
+          onPress={() => setShareSheetOpen(true)}
         >
           {t("shareProfile")}
         </Button>
+        {shareSheetOpen ? (
+          <ProfileShareSheet
+            npub={currentNpub}
+            shareUrl={shareUrl}
+            copyText={copyText}
+            shareText={shareText}
+            onClose={() => setShareSheetOpen(false)}
+            t={t}
+          />
+        ) : null}
         {canWriteToNfc ? (
           <Button
             variant="secondary"
