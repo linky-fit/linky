@@ -19,7 +19,10 @@ import { freshClientId, inspectOperation } from "./operations";
 import type { OperationReceiptSummary } from "./operations";
 import { nowSeconds } from "./time";
 import { deliverRumorToPeer, deliverRumorToRecipient } from "./wrapDelivery";
-import type { GiftWrapDeliveryContext } from "./wrapDelivery";
+import type {
+  GiftWrapDeliveryContext,
+  WrapDeliveryOrder,
+} from "./wrapDelivery";
 
 export interface WrapSendContext extends GiftWrapDeliveryContext {
   readonly inspector: InspectorService;
@@ -70,7 +73,7 @@ export interface PeerSendSpec<Draft, Receipt> {
   readonly encode: RumorEncoder<Draft>;
   readonly receipt: (outcome: PeerSendOutcome, rumor: Rumor) => Receipt;
   readonly pushMarkRecipientCopy?: boolean;
-  readonly order?: "parallel" | "recipientFirst";
+  readonly order?: WrapDeliveryOrder;
 }
 
 /**

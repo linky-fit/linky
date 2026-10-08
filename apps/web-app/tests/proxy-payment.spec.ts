@@ -51,6 +51,7 @@ import {
 } from "./helpers/network";
 import { topUp } from "./helpers/wallet";
 import {
+  npubToHex,
   publishProfileStatusToRelay,
   waitForProfileStatusOnRelay,
   watchNostrInbox,
@@ -74,6 +75,32 @@ const FUNDING_SAT = 100;
  * receiver nets slightly less than the offered amount.
  */
 const MAX_REDEEM_FEE_SAT = 2;
+
+interface StoredSpdRecord {
+  offerId: string;
+  pin?: { delivered: boolean; peer: string };
+}
+
+/** The bank QR records the offerer's app keeps, one per offer. */
+const readSpdRecords = (page: Page): Promise<StoredSpdRecord[]> =>
+  page.evaluate(
+    () =>
+      new Promise<StoredSpdRecord[]>((resolve, reject) => {
+        const request = indexedDB.open("linky.bank_payment_offer_spd", 1);
+        request.onupgradeneeded = () =>
+          request.result.createObjectStore("offers", { keyPath: "offerId" });
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const all = db.transaction("offers").objectStore("offers").getAll();
+          all.onsuccess = () => {
+            db.close();
+            resolve(all.result);
+          };
+          all.onerror = () => reject(all.error);
+        };
+      }),
+  );
 
 interface Account {
   context: BrowserContext;
@@ -265,13 +292,10 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
       await a.page.waitForURL(new RegExp(`bank-payment-offer/${offerId}$`), {
         timeout: 60_000,
       });
-      const offeredQrs = await a.page.evaluate(
-        () =>
-          Object.keys(localStorage).filter((key) =>
-            key.startsWith("linky.bank_payment_offer_spd.v1."),
-          ).length,
-      );
-      expect(offeredQrs, "A created no second offer").toBe(1);
+      expect(
+        await readSpdRecords(a.page),
+        "A created no second offer",
+      ).toHaveLength(1);
     });
 
     await test.step("B and C accept while A is offline", async () => {
@@ -350,25 +374,15 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
         contentType: "image/png",
       });
 
-      const record = await a.page.evaluate(
-        (id) =>
-          localStorage.getItem(
-            `linky.bank_payment_offer_spd.v1.${encodeURIComponent(id)}`,
-          ),
-        offerId,
-      );
-      expect(record, "A kept an SPD record for the offer").toBeTruthy();
-      const parsed: unknown = JSON.parse(String(record));
-      const sentTo =
-        typeof parsed === "object" &&
-        parsed !== null &&
-        "sentCandidateKeys" in parsed
-          ? parsed.sentCandidateKeys
-          : undefined;
       expect(
-        Array.isArray(sentTo) ? sentTo.length : -1,
-        "bank details went to exactly one candidate",
-      ).toBe(1);
+        await readSpdRecords(a.page),
+        "A pinned the bank details to the winner and saw them delivered",
+      ).toContainEqual(
+        expect.objectContaining({
+          offerId,
+          pin: { delivered: true, peer: npubToHex(winner.identity.npub) },
+        }),
+      );
     });
 
     await test.step("the winner received the payment info intact", async () => {
@@ -471,18 +485,8 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
     await test.step("A's stored bank details are cleaned up", async () => {
       // Cleanup runs in the auto-responder effect, not inside settle, so poll.
       await expect
-        .poll(
-          () =>
-            a.page.evaluate(
-              (id) =>
-                localStorage.getItem(
-                  `linky.bank_payment_offer_spd.v1.${encodeURIComponent(id)}`,
-                ),
-              offerId,
-            ),
-          { timeout: 60_000 },
-        )
-        .toBeNull();
+        .poll(() => readSpdRecords(a.page), { timeout: 60_000 })
+        .toEqual([]);
     });
 
     for (const account of accounts) {

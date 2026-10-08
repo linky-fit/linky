@@ -1,12 +1,13 @@
-import { BankOfferId, type Pubkey } from "@linky-fit/linkstr";
+import { BankOfferId, Pubkey } from "@linky-fit/linkstr";
 import {
   BankPaymentOfferStaggerRecord,
   isBankPaymentOfferStaggerRecordExpired,
 } from "@linky-fit/proxy-payment";
-import { Schema } from "effect";
+import { Option, Schema } from "effect";
 import { NonBlankString, PositiveFiniteNumber } from "../../utils/schema";
 import {
   canLockAcrossTabs,
+  safeLocalStorageGet,
   safeLocalStorageGetJson,
   safeLocalStorageKeys,
   safeLocalStorageRemove,
@@ -18,9 +19,12 @@ import {
 import { nowSeconds } from "../../utils/time";
 
 const isBankOfferId = Schema.is(BankOfferId);
+const isPubkey = Schema.is(Pubkey);
 
 const MINIMIZED_KEY_PREFIX = "linky.bank_payment_offer_minimized.v1";
-const SPD_KEY_PREFIX = "linky.bank_payment_offer_spd.v1";
+const LEGACY_SPD_KEY_PREFIX = "linky.bank_payment_offer_spd.v1";
+const SPD_DB_NAME = "linky.bank_payment_offer_spd";
+const SPD_STORE_NAME = "offers";
 const SPD_MAX_AGE_SEC = 60 * 60;
 const STAGGER_KEY_PREFIX = "linky.bank_payment_offer_stagger.v1";
 export const BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX =
@@ -46,128 +50,199 @@ export const setBankPaymentOfferMinimized = (
   else safeSessionStorageRemove(key);
 };
 
-/** The bank QR of an offer this device created, kept until the auto-responder
- * has handed it to the winning recipient. */
+/**
+ * The bank QR of an offer this device created, kept until the auto-responder
+ * has handed it to the winning payer, and the payer it is pinned to.
+ */
 const BankPaymentOfferSpdRecord = Schema.Struct({
+  offerId: BankOfferId,
   createdAtSec: PositiveFiniteNumber,
   ownerPubkey: Schema.String,
-  sentCandidateKeys: Schema.Array(Schema.String),
-  detailsSent: Schema.optional(Schema.Boolean),
+  pin: Schema.optional(
+    Schema.Struct({ delivered: Schema.Boolean, peer: Pubkey }),
+  ),
   singleTabRiskAccepted: Schema.optional(Schema.Literal(true)),
   spdPayload: NonBlankString,
 });
 type BankPaymentOfferSpdRecord = typeof BankPaymentOfferSpdRecord.Type;
+const decodeSpdRecord = Schema.decodeUnknownOption(BankPaymentOfferSpdRecord);
 
-// One storage key per offer so concurrent tabs working on different offers
-// never overwrite each other's records.
-const spdKey = (offerId: string): string =>
-  `${SPD_KEY_PREFIX}.${encodeURIComponent(offerId)}`;
+/** What the release before IndexedDB kept in localStorage, one key per offer. */
+const LegacySpdRecord = Schema.parseJson(
+  Schema.Struct({
+    createdAtSec: PositiveFiniteNumber,
+    ownerPubkey: Schema.String,
+    sentCandidateKeys: Schema.Array(Schema.String),
+    detailsSent: Schema.optional(Schema.Boolean),
+    singleTabRiskAccepted: Schema.optional(Schema.Literal(true)),
+    spdPayload: NonBlankString,
+  }),
+);
+const decodeLegacySpdRecord = Schema.decodeUnknownOption(LegacySpdRecord);
 
 // A future createdAtSec (backward clock jump) also counts as expired so a
 // record can never outlive the intended one-hour window.
-const isExpiredSpdRecord = (
+const isLiveSpdRecord = (
   record: BankPaymentOfferSpdRecord,
   nowSec: number,
 ): boolean =>
-  record.createdAtSec > nowSec ||
-  nowSec - record.createdAtSec >= SPD_MAX_AGE_SEC;
+  record.createdAtSec <= nowSec &&
+  nowSec - record.createdAtSec < SPD_MAX_AGE_SEC;
 
-const readSpdRecordByKey = (key: string): BankPaymentOfferSpdRecord | null =>
-  safeLocalStorageGetJson(key, Schema.NullOr(BankPaymentOfferSpdRecord), null);
+const openSpdDb = (): Promise<IDBDatabase> =>
+  new Promise((resolve, reject) => {
+    const request = indexedDB.open(SPD_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(SPD_STORE_NAME, { keyPath: "offerId" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 
-const writeSpdRecord = (
-  offerId: string,
-  record: BankPaymentOfferSpdRecord,
-): void => {
-  safeLocalStorageSetJson(spdKey(offerId), record);
-};
-
-const pruneExpiredSpdRecords = (nowSec: number): void => {
-  for (const key of safeLocalStorageKeys()) {
-    if (!key.startsWith(`${SPD_KEY_PREFIX}.`)) continue;
-    const record = readSpdRecordByKey(key);
-    if (!record || isExpiredSpdRecord(record, nowSec)) {
-      safeLocalStorageRemove(key);
-    }
+/**
+ * Runs `run` in one transaction and resolves with what its returned getter
+ * reads once the transaction committed. localStorage writes are flushed
+ * asynchronously and a killed WebKit loses the last ones; a committed
+ * IndexedDB transaction survives the kill.
+ */
+const inSpdStore = async <A>(
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => () => A,
+): Promise<A> => {
+  const db = await openSpdDb();
+  try {
+    const transaction = db.transaction(SPD_STORE_NAME, mode, {
+      durability: "strict",
+    });
+    const result = run(transaction.objectStore(SPD_STORE_NAME));
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error);
+    });
+    return result();
+  } finally {
+    db.close();
   }
 };
 
-export const rememberBankPaymentOfferSpdPayload = (args: {
-  offerId: string;
+const fromLegacySpdRecord = (key: string): BankPaymentOfferSpdRecord | null => {
+  const offerId = decodeURIComponent(
+    key.slice(LEGACY_SPD_KEY_PREFIX.length + 1),
+  );
+  const legacy = Option.getOrNull(
+    decodeLegacySpdRecord(safeLocalStorageGet(key)),
+  );
+  if (!legacy || !isBankOfferId(offerId)) return null;
+  const { detailsSent, sentCandidateKeys, ...fields } = legacy;
+  const [candidateKey] = sentCandidateKeys;
+  if (candidateKey === undefined) return { ...fields, offerId };
+  const peer = candidateKey.slice(offerId.length + 1);
+  // A pin that does not name a payer cannot be honored, so the record goes.
+  return isPubkey(peer)
+    ? { ...fields, offerId, pin: { delivered: detailsSent !== false, peer } }
+    : null;
+};
+
+const legacySpdRecords = () =>
+  safeLocalStorageKeys()
+    .filter((key) => key.startsWith(`${LEGACY_SPD_KEY_PREFIX}.`))
+    .map((key) => ({ key, record: fromLegacySpdRecord(key) }));
+
+/**
+ * This device's live records of `ownerPubkey`. Deletes expired ones, so a
+ * later clock correction cannot bring them back, and takes over the records
+ * the previous release kept in localStorage.
+ */
+const readSpdRecords = async (
+  ownerPubkey: string,
+): Promise<BankPaymentOfferSpdRecord[]> => {
+  const legacy = legacySpdRecords();
+  const nowSec = nowSeconds();
+  const records = await inSpdStore("readwrite", (store) => {
+    for (const { record } of legacy) if (record) store.put(record);
+    const live: BankPaymentOfferSpdRecord[] = [];
+    const request = store.openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      const record = Option.getOrNull(decodeSpdRecord(cursor.value));
+      if (record && isLiveSpdRecord(record, nowSec)) live.push(record);
+      else cursor.delete();
+      cursor.continue();
+    };
+    return () => live;
+  });
+  for (const { key } of legacy) safeLocalStorageRemove(key);
+  return records.filter((record) => record.ownerPubkey === ownerPubkey);
+};
+
+export const rememberBankPaymentOfferSpdPayload = async (args: {
+  offerId: BankOfferId;
   ownerPubkey: string;
   singleTabRiskAccepted?: boolean;
   spdPayload: string;
-}): void => {
-  const offerId = args.offerId.trim();
+}): Promise<void> => {
   const spdPayload = args.spdPayload.trim();
-  if (!offerId || !spdPayload) return;
-
-  const nowSec = nowSeconds();
-  pruneExpiredSpdRecords(nowSec);
-  writeSpdRecord(offerId, {
-    createdAtSec: nowSec,
+  if (!spdPayload) return;
+  const record: BankPaymentOfferSpdRecord = {
+    offerId: args.offerId,
+    createdAtSec: nowSeconds(),
     ownerPubkey: args.ownerPubkey,
-    sentCandidateKeys: [],
     ...(args.singleTabRiskAccepted ? { singleTabRiskAccepted: true } : {}),
     spdPayload,
+  };
+  await inSpdStore("readwrite", (store) => {
+    store.put(record);
+    return () => undefined;
   });
 };
 
-export const readBankPaymentOfferSpdRecord = (args: {
-  offerId: string;
+export const readBankPaymentOfferSpdRecord = async (args: {
+  offerId: BankOfferId;
   ownerPubkey: string;
-}): BankPaymentOfferSpdRecord | null => {
-  const record = readSpdRecordByKey(spdKey(args.offerId));
-  if (!record) return null;
-  // Delete rather than just hide an expired record so a later clock
-  // correction cannot bring it back to life.
-  if (isExpiredSpdRecord(record, nowSeconds())) {
-    forgetBankPaymentOfferSpdPayload(args.offerId);
-    return null;
-  }
-  return record.ownerPubkey === args.ownerPubkey ? record : null;
-};
+}): Promise<BankPaymentOfferSpdRecord | null> =>
+  (await readSpdRecords(args.ownerPubkey)).find(
+    (record) => record.offerId === args.offerId,
+  ) ?? null;
 
 /** The offers this device created for one bank QR and still keeps the QR of. */
-export const readBankPaymentOfferIdsForSpdPayload = (args: {
+export const readBankPaymentOfferIdsForSpdPayload = async (args: {
   ownerPubkey: string;
   spdPayload: string;
-}): BankOfferId[] =>
-  safeLocalStorageKeys().flatMap((key) => {
-    if (!key.startsWith(`${SPD_KEY_PREFIX}.`)) return [];
-    const offerId = decodeURIComponent(key.slice(SPD_KEY_PREFIX.length + 1));
-    return isBankOfferId(offerId) &&
-      readBankPaymentOfferSpdRecord({ ...args, offerId })?.spdPayload ===
-        args.spdPayload
-      ? [offerId]
-      : [];
-  });
+}): Promise<BankOfferId[]> =>
+  (await readSpdRecords(args.ownerPubkey)).flatMap((record) =>
+    record.spdPayload === args.spdPayload ? [record.offerId] : [],
+  );
 
+/**
+ * Pins the payer who gets an offer's bank details and resolves true once the
+ * pin names `peer` and is committed, so nothing is sent before it would
+ * survive a crash. A pin is never replaced.
+ */
 export const reserveBankPaymentOfferBankDetails = async (args: {
-  candidateKey: string;
-  offerId: string;
+  offerId: BankOfferId;
   ownerPubkey: string;
+  peer: Pubkey;
 }): Promise<boolean> => {
-  const reserve = (): boolean => {
-    const record = readBankPaymentOfferSpdRecord(args);
-    if (!record) return false;
-    if (record.sentCandidateKeys.length > 0) {
-      return (
-        record.sentCandidateKeys.length === 1 &&
-        record.sentCandidateKeys[0] === args.candidateKey
-      );
-    }
-    writeSpdRecord(args.offerId, {
-      ...record,
-      sentCandidateKeys: [args.candidateKey],
-      detailsSent: false,
+  const reserve = () =>
+    inSpdStore("readwrite", (store) => {
+      let pinned: Pubkey | null = null;
+      const request = store.get(args.offerId);
+      request.onsuccess = () => {
+        const record = Option.getOrNull(decodeSpdRecord(request.result));
+        if (
+          !record ||
+          record.ownerPubkey !== args.ownerPubkey ||
+          !isLiveSpdRecord(record, nowSeconds())
+        )
+          return;
+        if (!record.pin) {
+          store.put({ ...record, pin: { delivered: false, peer: args.peer } });
+        }
+        pinned = record.pin?.peer ?? args.peer;
+      };
+      return () => pinned === args.peer;
     });
-    const saved = readBankPaymentOfferSpdRecord(args);
-    return (
-      saved?.sentCandidateKeys.length === 1 &&
-      saved.sentCandidateKeys[0] === args.candidateKey
-    );
-  };
   if (canLockAcrossTabs()) {
     return navigator.locks.request(
       `${BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.recipient.${args.offerId}`,
@@ -175,32 +250,35 @@ export const reserveBankPaymentOfferBankDetails = async (args: {
     );
   }
   return (
-    readBankPaymentOfferSpdRecord(args)?.singleTabRiskAccepted === true &&
-    reserve()
+    (await readBankPaymentOfferSpdRecord(args))?.singleTabRiskAccepted ===
+      true && reserve()
   );
 };
 
-export const markBankPaymentOfferBankDetailsSent = (args: {
-  candidateKey: string;
-  offerId: string;
-}): void => {
-  const record = readSpdRecordByKey(spdKey(args.offerId));
-  if (
-    !record ||
-    (record.sentCandidateKeys.length > 0 &&
-      (record.sentCandidateKeys.length !== 1 ||
-        record.sentCandidateKeys[0] !== args.candidateKey))
-  )
-    return;
-  writeSpdRecord(args.offerId, {
-    ...record,
-    sentCandidateKeys: [args.candidateKey],
-    detailsSent: true,
+/** Records that a relay accepted the pinned payer's copy of the bank details. */
+export const markBankPaymentOfferBankDetailsDelivered = (args: {
+  offerId: BankOfferId;
+  peer: Pubkey;
+}): Promise<void> =>
+  inSpdStore("readwrite", (store) => {
+    const request = store.get(args.offerId);
+    request.onsuccess = () => {
+      const record = Option.getOrNull(decodeSpdRecord(request.result));
+      if (record?.pin?.peer === args.peer) {
+        store.put({ ...record, pin: { delivered: true, peer: args.peer } });
+      }
+    };
+    return () => undefined;
   });
-};
 
-export const forgetBankPaymentOfferSpdPayload = (offerId: string): void => {
-  safeLocalStorageRemove(spdKey(offerId));
+export const forgetBankPaymentOfferSpdPayloads = async (
+  offerIds: readonly BankOfferId[],
+): Promise<void> => {
+  if (offerIds.length === 0) return;
+  await inSpdStore("readwrite", (store) => {
+    for (const offerId of offerIds) store.delete(offerId);
+    return () => undefined;
+  });
 };
 
 const staggerKey = (offerId: BankOfferId): string =>

@@ -15,13 +15,15 @@ import type {
 } from "../services/NostrTransport";
 import type { RelayPolicyService } from "../services/RelayPolicy";
 import { wrapRumorFor } from "./giftWrap";
-import type { Rumor } from "./nostrEvent";
+import type { Rumor, SignedWrapEvent } from "./nostrEvent";
 
 export interface GiftWrapDeliveryContext {
   readonly identity: LinkstrIdentityService;
   readonly transport: NostrTransportService;
   readonly relayPolicy: RelayPolicyService;
 }
+
+export type WrapDeliveryOrder = "parallel" | "recipientFirst" | "selfFirst";
 
 export interface DeliveredCopies {
   readonly selfCopy: WrapDelivery;
@@ -71,8 +73,10 @@ export const deliverRumorToRecipient = (
  * With `order: "recipientFirst"` the copies publish sequentially: the self
  * copy is only attempted after a relay accepted the recipient copy, for
  * rumors whose self copy must never sync a state the recipient did not
- * receive. A failure then reports the self copy as built but unattempted
- * (no accepting or rejecting relays).
+ * receive. `order: "selfFirst"` is the mirror, for rumors that must never
+ * reach the recipient without a record on the relay: the recipient copy is
+ * only attempted after a relay accepted the self copy. A copy that was never
+ * attempted is reported with no accepting or rejecting relays.
  */
 export const deliverRumorToPeer = (
   { identity, relayPolicy, transport }: GiftWrapDeliveryContext,
@@ -82,7 +86,7 @@ export const deliverRumorToPeer = (
     readonly clientId: ClientId;
     readonly sentAt: UnixSeconds;
     readonly pushMarkRecipientCopy?: boolean;
-    readonly order?: "parallel" | "recipientFirst";
+    readonly order?: WrapDeliveryOrder;
   },
 ): Effect.Effect<DeliveredCopies, RecipientNotReached | NoRelayReachable> =>
   Effect.gen(function* () {
@@ -114,41 +118,40 @@ export const deliverRumorToPeer = (
         : new NoRelayReachable(failure);
     };
 
-    if (params.order === "recipientFirst") {
-      const recipientCopy = toWrapDelivery(
-        recipientWrap.id,
-        yield* transport.publish(relays, recipientWrap),
+    const publishCopy = (wrap: SignedWrapEvent) =>
+      Effect.map(transport.publish(relays, wrap), (results) =>
+        toWrapDelivery(wrap.id, results),
       );
+    const unattempted = (wrap: SignedWrapEvent) =>
+      new WrapDelivery({ wrapId: wrap.id, acceptedBy: [], rejectedBy: [] });
+
+    if (params.order === "recipientFirst") {
+      const recipientCopy = yield* publishCopy(recipientWrap);
       if (!recipientCopy.accepted) {
-        return yield* fail({
-          selfCopy: new WrapDelivery({
-            wrapId: selfWrap.id,
-            acceptedBy: [],
-            rejectedBy: [],
-          }),
-          recipientCopy,
-        });
+        return yield* fail({ selfCopy: unattempted(selfWrap), recipientCopy });
       }
-      return {
-        selfCopy: toWrapDelivery(
-          selfWrap.id,
-          yield* transport.publish(relays, selfWrap),
-        ),
-        recipientCopy,
-      };
+      return { selfCopy: yield* publishCopy(selfWrap), recipientCopy };
     }
 
-    const [selfResults, recipientResults] = yield* Effect.all(
-      [
-        transport.publish(relays, selfWrap),
-        transport.publish(relays, recipientWrap),
-      ],
+    if (params.order === "selfFirst") {
+      const selfCopy = yield* publishCopy(selfWrap);
+      if (!selfCopy.accepted) {
+        return yield* fail({
+          selfCopy,
+          recipientCopy: unattempted(recipientWrap),
+        });
+      }
+      const recipientCopy = yield* publishCopy(recipientWrap);
+      if (!recipientCopy.accepted)
+        return yield* fail({ selfCopy, recipientCopy });
+      return { selfCopy, recipientCopy };
+    }
+
+    const [selfCopy, recipientCopy] = yield* Effect.all(
+      [publishCopy(selfWrap), publishCopy(recipientWrap)],
       { concurrency: "unbounded" },
     );
-    const copies: DeliveredCopies = {
-      selfCopy: toWrapDelivery(selfWrap.id, selfResults),
-      recipientCopy: toWrapDelivery(recipientWrap.id, recipientResults),
-    };
+    const copies: DeliveredCopies = { selfCopy, recipientCopy };
     if (copies.recipientCopy.accepted) return copies;
     return yield* fail(copies);
   });

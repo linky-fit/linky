@@ -1,5 +1,5 @@
 import { Effect, Exit } from "effect";
-import { NoRelayReachable } from "../domain/errors";
+import { NoRelayReachable, RecipientNotReached } from "../domain/errors";
 import { ClientId, RelayUrl, UnixSeconds } from "../domain/primitives";
 import type { NostrTransportService } from "../services/NostrTransport";
 import {
@@ -9,7 +9,7 @@ import {
 } from "../testing";
 import type { SignedWrapEvent } from "./nostrEvent";
 import { rumorWithHash } from "./nostrEvent";
-import { deliverRumorToPeer } from "./wrapDelivery";
+import { deliverRumorToPeer, type WrapDeliveryOrder } from "./wrapDelivery";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -41,10 +41,7 @@ const stubTransport = (
   });
 };
 
-const deliver = (
-  transport: NostrTransportService,
-  order?: "parallel" | "recipientFirst",
-) =>
+const deliver = (transport: NostrTransportService, order?: WrapDeliveryOrder) =>
   Effect.runPromiseExit(
     deliverRumorToPeer(
       {
@@ -106,6 +103,52 @@ describe("deliverRumorToPeer with order recipientFirst", () => {
     assert(Exit.isSuccess(exit));
     expect(exit.value.recipientCopy.accepted).toBe(true);
     expect(exit.value.selfCopy.accepted).toBe(false);
+  });
+});
+
+describe("deliverRumorToPeer with order selfFirst", () => {
+  it("publishes the self copy before the recipient copy", async () => {
+    const publishedRecipients: Array<string | null> = [];
+    const exit = await deliver(
+      stubTransport(publishedRecipients, () => true),
+      "selfFirst",
+    );
+
+    expect(publishedRecipients).toEqual([alice.pubkey, bob.pubkey]);
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.selfCopy.accepted).toBe(true);
+    expect(exit.value.recipientCopy.accepted).toBe(true);
+  });
+
+  it("never publishes the recipient copy when the self copy is rejected", async () => {
+    const publishedRecipients: Array<string | null> = [];
+    const exit = await deliver(
+      stubTransport(
+        publishedRecipients,
+        (recipient) => recipient === bob.pubkey,
+      ),
+      "selfFirst",
+    );
+
+    expect(publishedRecipients).toEqual([alice.pubkey]);
+    assert(Exit.isFailure(exit) && exit.cause._tag === "Fail");
+    const failure = exit.cause.error;
+    expect(failure).toBeInstanceOf(NoRelayReachable);
+    expect(failure.selfCopy.accepted).toBe(false);
+    expect(failure.recipientCopy.acceptedBy).toEqual([]);
+    expect(failure.recipientCopy.rejectedBy).toEqual([]);
+  });
+
+  it("fails with RecipientNotReached when only the self copy lands", async () => {
+    const exit = await deliver(
+      stubTransport([], (recipient) => recipient === alice.pubkey),
+      "selfFirst",
+    );
+
+    assert(Exit.isFailure(exit) && exit.cause._tag === "Fail");
+    expect(exit.cause.error).toBeInstanceOf(RecipientNotReached);
+    expect(exit.cause.error.selfCopy.accepted).toBe(true);
+    expect(exit.cause.error.recipientCopy.accepted).toBe(false);
   });
 });
 

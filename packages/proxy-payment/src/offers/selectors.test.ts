@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { me, other, payer, snapshot, START } from "../testing/offers";
 import {
   activeBankPaymentOffers,
+  bankPaymentOfferDetailsRecipient,
   bankPaymentOfferGroupResponses,
   bankPaymentOfferResponderSteps,
   hasPendingBankPaymentOfferResponderWork,
@@ -122,6 +123,85 @@ describe("bankPaymentOfferResponderSteps", () => {
     expect(bankPaymentOfferResponderSteps(offers, me)).toEqual([
       expect.objectContaining({ ended: true, offerId: "offer-1" }),
     ]);
+  });
+});
+
+describe("bankPaymentOfferDetailsRecipient", () => {
+  const recipientOf = (
+    offers: ReturnType<typeof book>,
+    pin: Parameters<typeof bankPaymentOfferDetailsRecipient>[1],
+  ) => {
+    const [step] = bankPaymentOfferResponderSteps(offers, me);
+    if (!step) throw new Error("missing step");
+    return bankPaymentOfferDetailsRecipient(step, pin)?.peer ?? null;
+  };
+  // Both accepted in the same second; the tie-break by pubkey prefers `first`.
+  const [first, last] =
+    payer.localeCompare(other) < 0 ? [payer, other] : [other, payer];
+  const bothAccepted = book(
+    snapshot("offered", true),
+    snapshot("offered", true, { from: other }),
+    snapshot("accepted", false, { from: other, sentAt: at(2) }),
+    snapshot("accepted", false, { sentAt: at(2) }),
+  );
+
+  it("picks the candidate while nobody is pinned", () => {
+    expect(recipientOf(bothAccepted, null)).toBe(first);
+  });
+
+  it("sends only to the pinned payer, even when another acceptance comes first", () => {
+    expect(recipientOf(bothAccepted, { delivered: false, peer: last })).toBe(
+      last,
+    );
+    expect(
+      recipientOf(bothAccepted, { delivered: true, peer: last }),
+    ).toBeNull();
+  });
+
+  it("resends to a pinned winner whose details were not delivered", () => {
+    const evidenced = book(
+      snapshot("offered", true),
+      snapshot("offered", true, { from: other }),
+      snapshot("accepted", false, { sentAt: at(2) }),
+      snapshot("accepted", false, { from: other, sentAt: at(2) }),
+      snapshot("bank_details_sent", true, { sentAt: at(3) }),
+    );
+    expect(recipientOf(evidenced, { delivered: false, peer: payer })).toBe(
+      payer,
+    );
+    expect(recipientOf(evidenced, { delivered: true, peer: payer })).toBeNull();
+  });
+
+  it("never picks anyone new once someone holds the details", () => {
+    const evidenced = book(
+      snapshot("offered", true),
+      snapshot("offered", true, { from: other }),
+      snapshot("accepted", false, { sentAt: at(2) }),
+      snapshot("accepted", false, { from: other, sentAt: at(2) }),
+      snapshot("bank_details_sent", true, { sentAt: at(3) }),
+    );
+    expect(recipientOf(evidenced, null)).toBeNull();
+    expect(
+      recipientOf(evidenced, { delivered: false, peer: other }),
+    ).toBeNull();
+  });
+
+  it("waits while the pinned payer has not accepted and skips a paid one", () => {
+    const pinnedOffered = book(
+      snapshot("offered", true),
+      snapshot("offered", true, { from: other }),
+      snapshot("accepted", false, { from: other, sentAt: at(2) }),
+    );
+    expect(
+      recipientOf(pinnedOffered, { delivered: false, peer: payer }),
+    ).toBeNull();
+    const paid = book(
+      snapshot("offered", true),
+      snapshot("accepted", false, { sentAt: at(2) }),
+      snapshot("bank_details_sent", true, { sentAt: at(3) }),
+      snapshot("bank_paid", false, { sentAt: at(4) }),
+    );
+    expect(recipientOf(paid, { delivered: false, peer: payer })).toBeNull();
   });
 });
 

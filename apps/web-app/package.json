@@ -72,6 +72,7 @@
     "@vitejs/plugin-basic-ssl": "^2.0.0",
     "@vitejs/plugin-react-swc": "^4.2.2",
     "eslint": "^9.39.1",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^28.1.0",
     "nostr-tools": "^2.25.2",
     "prettier": "^3.4.2",

@@ -145,7 +145,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   AppDataExportFailed:
     "The backup file could not be built or handed to the platform for a reason other than the user dismissing the share sheet.",
   "bankOffer.recipientPinned":
-    "Bank details are reserved for this recipient before publishing. Retries keep the same recipient even if delivery acknowledgments are lost or earlier acceptances arrive late.",
+    "Bank details are reserved for this recipient in IndexedDB, committed before publishing, so the choice survives the app being killed. Retries and resends after a restart keep the same recipient even if delivery acknowledgments are lost or earlier acceptances arrive late.",
   "bankOffer.liveOfferReopened":
     "The user asked to offer a bank QR that already has a live proxy payment offer from this device, so that offer was opened instead of sending a second one that would pin the bank details to another payer.",
   "bankOffer.staggerExtended":

@@ -168,7 +168,7 @@ Two roles: the **offerer** (who needs the bank payment made) and the counterpart
 
 `offerId` stays the same for every snapshot of one offer. `initiatedAtSec` defaults to `sentAt` when `status` is `offered`, `bankPaidAtSec` defaults to `sentAt` when `status` is `bank_paid`, and `statusUpdatedAtSec` is always the send time: the draft's `sentAt`, else now.
 
-Delivery is **recipient first**: the self copy is published only after a relay accepted the counterparty's copy, so your other devices never sync a status the peer did not get. Not an outbox operation; a snapshot that fails is resent by the user or your own timers.
+Delivery is **recipient first**: the self copy is published only after a relay accepted the counterparty's copy, so your other devices never sync a status the peer did not get. `bank_details_sent` is the exception and goes **self first**: the counterparty's copy is published only after a relay accepted the self copy, so the relay records who received the bank details before they leave the device, and your devices can tell after a crash that the details already have a recipient. Your devices may then hold a `bank_details_sent` the peer never got; resend the details to that same peer. Not an outbox operation; a snapshot that fails is resent by the user or your own timers.
 
 ### Wire format
 
@@ -205,4 +205,4 @@ Drop reason: `invalid-bank-offer` (wrong `linky` tag, not p-tagged to you, unpar
 
 ### Errors
 
-`NoRelayReachable` when no relay accepted the counterparty's copy; the self copy was never attempted, so `selfCopy` has empty relay lists. `RecipientNotReached` is in the signature but not produced by recipient-first delivery. Keep the previous local status and retry.
+`NoRelayReachable` when the first copy found no accepting relay; the other copy was never attempted and has empty relay lists. That is the counterparty's copy for every status except `bank_details_sent`, where it is the self copy and the peer got nothing. `RecipientNotReached` only comes from `bank_details_sent`: the self copy landed but the counterparty's did not, so resend the details to the same peer. Otherwise keep the previous local status and retry.

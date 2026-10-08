@@ -11,6 +11,7 @@ import {
   activeBankPaymentOffers,
   applyBankPaymentOfferReceipt,
   applyBankPaymentOfferSnapshot,
+  bankPaymentOfferDetailsRecipient,
   bankPaymentOfferedDraft,
   bankPaymentOfferGroupResponses,
   bankPaymentOffersOf,
@@ -61,9 +62,9 @@ import {
 import {
   BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX,
   BANK_PAYMENT_OFFER_STAGGER_LOCK_KEY_PREFIX,
-  forgetBankPaymentOfferSpdPayload,
+  forgetBankPaymentOfferSpdPayloads,
   forgetBankPaymentOfferStaggerQueue,
-  markBankPaymentOfferBankDetailsSent,
+  markBankPaymentOfferBankDetailsDelivered,
   readBankPaymentOfferIdsForSpdPayload,
   readBankPaymentOfferSpdRecord,
   readBankPaymentOfferStaggerRecords,
@@ -241,9 +242,9 @@ export const useBankPaymentOffers = ({
       try {
         if (nextStatus === "bank_details_sent") {
           const reserved = await reserveBankPaymentOfferBankDetails({
-            candidateKey: `${offer.offerId}:${offer.peer}`,
             offerId: offer.offerId,
             ownerPubkey: myPubHex ?? "",
+            peer: offer.peer,
           });
           if (!reserved) {
             setStatus(t("spdPaymentOfferFailed"));
@@ -365,14 +366,15 @@ export const useBankPaymentOffers = ({
   // Each offer pins its own payer, so a second live offer for one bank QR
   // would hand the bank details to two payers.
   const findLiveOfferForSpdPayload = React.useCallback(
-    (spdPayload: string): RequestedBankPaymentOffer | null => {
+    async (spdPayload: string): Promise<RequestedBankPaymentOffer | null> => {
       if (!myPubHex || !spdPayload) return null;
-      const nowSec = nowSeconds();
-      const staggerRecords = readBankPaymentOfferStaggerRecords(myPubHex);
-      for (const offerId of readBankPaymentOfferIdsForSpdPayload({
+      const offerIds = await readBankPaymentOfferIdsForSpdPayload({
         ownerPubkey: myPubHex,
         spdPayload,
-      })) {
+      });
+      const nowSec = nowSeconds();
+      const staggerRecords = readBankPaymentOfferStaggerRecords(myPubHex);
+      for (const offerId of offerIds) {
         const threads = bankPaymentOffersOf(stateRef.current.offers, offerId);
         const [livePeer] = activeBankPaymentOffers(threads, nowSec).peers;
         const hasQueuedPeers = staggerRecords.some(
@@ -431,7 +433,7 @@ export const useBankPaymentOffers = ({
         if (spdPayload) {
           // Persisted so the offer survives an app reload: the auto-responder
           // needs this payload when a recipient's acceptance arrives later.
-          rememberBankPaymentOfferSpdPayload({
+          await rememberBankPaymentOfferSpdPayload({
             offerId,
             ownerPubkey: myPubHex,
             singleTabRiskAccepted: args.singleTabRiskAccepted === true,
@@ -500,6 +502,31 @@ export const useBankPaymentOffers = ({
     new Map<string, Promise<RequestedBankPaymentOffer | null>>(),
   );
 
+  const openLiveOrSendNewBankPaymentOffer = React.useCallback(
+    async (
+      args: BankPaymentOfferRequest,
+      spdPayload: string,
+    ): Promise<RequestedBankPaymentOffer | null> => {
+      const live = await findLiveOfferForSpdPayload(spdPayload);
+      if (!live) return sendNewBankPaymentOffer(args, spdPayload);
+      if (getInspectorEmissionEnabled()) {
+        reportInspectorRows([
+          {
+            at: Date.now(),
+            channel: "nostr.operation",
+            tag: "bankOffer.liveOfferReopened",
+            summary:
+              "proxy payment for this bank QR is still live — opened it instead of offering it again",
+            links: { offer: live.offerId },
+            payload: { offerId: live.offerId },
+          },
+        ]);
+      }
+      return live;
+    },
+    [findLiveOfferForSpdPayload, sendNewBankPaymentOffer],
+  );
+
   // A repeated tap while the request is in flight joins it.
   const requestBankPaymentOffer = React.useCallback(
     (
@@ -509,157 +536,105 @@ export const useBankPaymentOffers = ({
       const inFlight = requestsInFlightRef.current.get(spdPayload);
       if (inFlight) return inFlight;
 
-      const live = findLiveOfferForSpdPayload(spdPayload);
-      if (live) {
-        if (getInspectorEmissionEnabled()) {
-          reportInspectorRows([
-            {
-              at: Date.now(),
-              channel: "nostr.operation",
-              tag: "bankOffer.liveOfferReopened",
-              summary:
-                "proxy payment for this bank QR is still live — opened it instead of offering it again",
-              links: { offer: live.offerId },
-              payload: { offerId: live.offerId },
-            },
-          ]);
-        }
-        return Promise.resolve(live);
-      }
-
-      const request = sendNewBankPaymentOffer(args, spdPayload).finally(() =>
-        requestsInFlightRef.current.delete(spdPayload),
-      );
+      const request = openLiveOrSendNewBankPaymentOffer(args, spdPayload)
+        .catch((error: unknown) => {
+          setStatus(
+            `${t("errorPrefix")}: ${getUnknownErrorMessage(error, "storage failed")}`,
+          );
+          return null;
+        })
+        .finally(() => requestsInFlightRef.current.delete(spdPayload));
       requestsInFlightRef.current.set(spdPayload, request);
       return request;
     },
-    [findLiveOfferForSpdPayload, sendNewBankPaymentOffer],
+    [openLiveOrSendNewBankPaymentOffer, setStatus, t],
   );
 
-  // The offerer's auto-responder: bank details go to exactly one winner,
-  // guarded by a per-offer lease lock across tabs, and everyone else who is
-  // still offered or accepted learns that someone else won.
+  // The offerer's auto-responder: bank details go to exactly one payer, pinned
+  // in storage that survives a crash before they leave, under a per-offer
+  // lease lock across tabs; everyone else who is still offered or accepted
+  // learns that someone else won.
   React.useEffect(() => {
     if (!myPubHex || offers.length === 0) return;
 
     let cancelled = false;
     let retryTimeoutId: number | undefined;
 
-    const run = async () => {
-      try {
-        for (const step of bankPaymentOfferResponderSteps(offers, myPubHex)) {
-          if (cancelled) return;
-          if (step.ended) {
-            forgetBankPaymentOfferSpdPayload(step.offerId);
-            continue;
-          }
-          const lockKey = `${BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.${step.offerId}`;
-          const closeLosers = async () => {
-            for (const loser of step.losers) {
-              await respondToOffer(loser, "accepted_by_other");
-            }
-          };
-          if (step.winner) {
-            try {
-              await withLocalStorageLeaseLock({
-                key: lockKey,
-                timeoutMs: 0,
-                fn: closeLosers,
-              });
-            } catch {
-              // Another tab is already closing the non-winning candidates.
-            }
-            continue;
-          }
-          if (!step.candidate) continue;
-          const record = readBankPaymentOfferSpdRecord({
-            offerId: step.offerId,
-            ownerPubkey: myPubHex,
-          });
-          if (
-            !record ||
-            (record.sentCandidateKeys.length > 0 &&
-              record.detailsSent !== false)
-          )
-            continue;
+    const closeLosers = async (offerId: BankOfferId) => {
+      const step = bankPaymentOfferResponderSteps(
+        stateRef.current.offers,
+        myPubHex,
+      ).find((current) => current.offerId === offerId);
+      for (const loser of step?.winner ? step.losers : []) {
+        await respondToOffer(loser, "accepted_by_other");
+      }
+    };
 
+    // Resolves true when a send failed and the pinned payer still waits.
+    const sendBankDetails = async (offerId: BankOfferId): Promise<boolean> => {
+      const record = await readBankPaymentOfferSpdRecord({
+        offerId,
+        ownerPubkey: myPubHex,
+      });
+      const step = bankPaymentOfferResponderSteps(
+        stateRef.current.offers,
+        myPubHex,
+      ).find((current) => current.offerId === offerId);
+      const recipient =
+        record && step
+          ? bankPaymentOfferDetailsRecipient(step, record.pin ?? null)
+          : null;
+      if (!record || !recipient) return false;
+      const sent = await respondToOffer(recipient, "bank_details_sent", {
+        spdPayload: record.spdPayload,
+      });
+      if (!sent) return true;
+      await markBankPaymentOfferBankDetailsDelivered({
+        offerId,
+        peer: recipient.peer,
+      });
+      return false;
+    };
+
+    const run = async () => {
+      let owed = false;
+      try {
+        const steps = bankPaymentOfferResponderSteps(offers, myPubHex);
+        await forgetBankPaymentOfferSpdPayloads(
+          steps.flatMap((step) => (step.ended ? [step.offerId] : [])),
+        );
+        for (const step of steps) {
+          if (cancelled) return;
+          if (step.ended || (!step.winner && !step.candidate)) continue;
           try {
             await withLocalStorageLeaseLock({
-              key: lockKey,
+              key: `${BANK_PAYMENT_OFFER_DETAILS_LOCK_KEY_PREFIX}.${step.offerId}`,
               timeoutMs: 0,
               fn: async () => {
-                // Re-read both storage and inbox state after acquiring the lock.
-                const locked = readBankPaymentOfferSpdRecord({
-                  offerId: step.offerId,
-                  ownerPubkey: myPubHex,
-                });
-                if (
-                  !locked ||
-                  (locked.sentCandidateKeys.length > 0 &&
-                    locked.detailsSent !== false)
-                )
-                  return;
-                const currentStep = bankPaymentOfferResponderSteps(
-                  stateRef.current.offers,
-                  myPubHex,
-                ).find((current) => current.offerId === step.offerId);
-                if (!currentStep || currentStep.ended || currentStep.winner)
-                  return;
-                const pinnedKey = locked.sentCandidateKeys[0];
-                const candidate = pinnedKey
-                  ? stateRef.current.offers.find(
-                      (offer) =>
-                        `${offer.offerId}:${offer.peer}` === pinnedKey &&
-                        offer.offererPublicKey === myPubHex &&
-                        offer.status === "accepted",
-                    )
-                  : currentStep.candidate;
-                if (!candidate) return;
-                const sent = await respondToOffer(
-                  candidate,
-                  "bank_details_sent",
-                  {
-                    spdPayload: locked.spdPayload,
-                  },
-                );
-                // Failed or ambiguous delivery retries only the pinned recipient.
-                if (!sent) return;
-                markBankPaymentOfferBankDetailsSent({
-                  candidateKey: `${step.offerId}:${candidate.peer}`,
-                  offerId: step.offerId,
-                });
-                for (const loser of bankPaymentOfferResponderSteps(
-                  stateRef.current.offers,
-                  myPubHex,
-                ).find((current) => current.offerId === step.offerId)?.losers ??
-                  []) {
-                  await respondToOffer(loser, "accepted_by_other");
-                }
+                if (await sendBankDetails(step.offerId)) owed = true;
+                await closeLosers(step.offerId);
               },
             });
           } catch {
-            // Another tab holds the send lock for this offer; let it finish.
+            // Another tab holds the send lock for this offer, or storage failed.
           }
         }
-
-        if (cancelled) return;
-        // A failed publish or a skipped lease lock leaves the state unchanged,
-        // so nothing re-runs this effect; keep retrying while an accepted
-        // entry of my own offer is still waiting for bank details.
-        if (
-          hasPendingBankPaymentOfferResponderWork(
-            offers,
-            myPubHex,
-            nowSeconds(),
-          )
-        ) {
-          retryTimeoutId = window.setTimeout(
-            () => void run(),
-            RESPONDER_RETRY_MS,
-          );
-        }
       } catch {
-        // Best effort; the sender can retry when the accepted event reappears.
+        // Best effort; the next state change or retry runs it again.
+      }
+
+      if (cancelled) return;
+      // A failed publish or a skipped lease lock leaves the state unchanged,
+      // so nothing re-runs this effect; keep retrying while an accepted
+      // entry of my own offer or a pinned payer still waits for bank details.
+      if (
+        owed ||
+        hasPendingBankPaymentOfferResponderWork(offers, myPubHex, nowSeconds())
+      ) {
+        retryTimeoutId = window.setTimeout(
+          () => void run(),
+          RESPONDER_RETRY_MS,
+        );
       }
     };
 
