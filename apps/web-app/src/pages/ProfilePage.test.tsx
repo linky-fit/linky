@@ -175,13 +175,8 @@ describe("username purchase approval", () => {
 });
 
 describe("sharing the profile", () => {
-  it("copies the profile link when the device cannot share", async () => {
+  const openShareSheet = async (shareText = vi.fn(async () => {})) => {
     const copyText = vi.fn(async () => {});
-    const shareText = vi.fn(
-      async (_text: string, whenUnavailable?: () => Promise<void>) => {
-        await whenUnavailable?.();
-      },
-    );
     rendered = await renderIntoDocument(
       <ProfilePage
         {...props}
@@ -196,12 +191,26 @@ describe("sharing the profile", () => {
     await act(async () => {
       share?.click();
     });
-    expect(shareText).toHaveBeenCalledWith(
-      "https://linky.fit/p/npub1test",
-      expect.any(Function),
-    );
-    expect(copyText).toHaveBeenCalledExactlyOnceWith(
-      "https://linky.fit/p/npub1test",
-    );
+    const action = (label: string) =>
+      Array.from(
+        document.body.querySelectorAll<HTMLElement>(
+          '[data-testid="profile-share-action"]',
+        ),
+      ).find((row) => row.textContent === label);
+    return { action, copyText };
+  };
+
+  it("copies the npub from the in-app share sheet", async () => {
+    const { action, copyText } = await openShareSheet();
+    await act(async () => {
+      action("copyNpub")?.click();
+    });
+    expect(copyText).toHaveBeenCalledExactlyOnceWith("npub1test");
+  });
+  it("offers the system share only where the device has one", async () => {
+    vi.stubGlobal("navigator", { ...navigator, share: undefined });
+    const { action } = await openShareSheet();
+    expect(action("copyProfileLink")).toBeDefined();
+    expect(action("share")).toBeUndefined();
   });
 });

@@ -984,6 +984,8 @@ export const cs = {
   uploadToNfc: "Nahrát na NFC",
   uploadProfileToNfc: "Nahrát na tag",
   shareProfile: "Sdílet profil",
+  copyProfileLink: "Kopírovat odkaz na profil",
+  copyNpub: "Kopírovat npub",
   sharedProfileGreeting: "Ahoj 👋",
   nfcWriteUnsupported: "NFC zápis není na tomto zařízení dostupný.",
   nfcWriteDisabled: "NFC je v telefonu vypnuté.",

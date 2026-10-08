@@ -976,6 +976,8 @@ export const en = {
   uploadToNfc: "Write to NFC",
   uploadProfileToNfc: "Write to tag",
   shareProfile: "Share profile",
+  copyProfileLink: "Copy profile link",
+  copyNpub: "Copy npub",
   sharedProfileGreeting: "Hi 👋",
   nfcWriteUnsupported: "NFC writing is not available on this device.",
   nfcWriteDisabled: "NFC is turned off on this device.",
