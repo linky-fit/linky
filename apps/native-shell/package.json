@@ -18,6 +18,8 @@
     "ios:add": "cap add ios",
     "ios:sync": "bun run build:web && bun scripts/write-native-runtime.ts && cap sync ios",
     "ios:open": "cap open ios",
+    "ios:test:codec": "bash ./scripts/check-ios-beacon-codec.sh",
+    "ios:device:debug": "bash ./scripts/ios-device-debug.sh",
     "typecheck": "tsc -p tsconfig.json",
     "eslint": "eslint --fix capacitor.config.ts eslint.config.js prettier.config.js scripts",
     "prettier": "prettier --write capacitor.config.ts eslint.config.js package.json prettier.config.js tsconfig.json scripts/*.ts"
