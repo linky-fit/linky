@@ -1141,6 +1141,8 @@ export const en = {
     "While Linky is open, anyone scanning nearby can see your npub, so people can add you.",
   beaconIntroBluetooth:
     "It needs Bluetooth and keeps a notification while it is on.",
+  beaconIntroBluetoothIos:
+    "It needs Bluetooth and keeps running in the background while it is on.",
   beaconTurnOn: "Turn on beacon",
   beaconNotNow: "Not now",
   otherContacts: "Other contacts",

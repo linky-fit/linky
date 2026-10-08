@@ -1156,6 +1156,8 @@ export const de = {
     "Solange Linky geöffnet ist, sieht jeder, der in der Nähe scannt, deinen npub, damit man dich hinzufügen kann.",
   beaconIntroBluetooth:
     "Braucht Bluetooth und zeigt eine Benachrichtigung, solange es an ist.",
+  beaconIntroBluetoothIos:
+    "Braucht Bluetooth und läuft im Hintergrund weiter, solange es an ist.",
   beaconTurnOn: "Beacon einschalten",
   beaconNotNow: "Nicht jetzt",
   otherContacts: "Weitere Kontakte",
