@@ -1,0 +1,311 @@
+import { base64 } from "@scure/base";
+import { strToU8, zipSync } from "fflate";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  bundleSha256,
+  signLiveUpdateManifest,
+  type LiveUpdateManifest,
+} from "./liveUpdateManifest";
+
+const TEST_SECRET_KEY = "01".repeat(32);
+const SHELL_RUNTIME = "0123456789abcdef";
+const DATA_DIR = "/data/files";
+
+const mocks = vi.hoisted(() => ({
+  httpGet: vi.fn(),
+  getServerBasePath: vi.fn(),
+  setServerBasePath: vi.fn(),
+  setServerAssetPath: vi.fn(),
+  persistServerBasePath: vi.fn(),
+  writeFile: vi.fn(),
+  rename: vi.fn(),
+  rmdir: vi.fn(),
+  readdir: vi.fn(),
+  stat: vi.fn(),
+  readBuiltinRuntime: vi.fn<() => string | null>(),
+  reportAppLog: vi.fn(),
+}));
+
+vi.mock("@capacitor/core", () => ({
+  CapacitorHttp: { get: mocks.httpGet },
+  WebView: {
+    getServerBasePath: mocks.getServerBasePath,
+    persistServerBasePath: mocks.persistServerBasePath,
+    setServerAssetPath: mocks.setServerAssetPath,
+    setServerBasePath: mocks.setServerBasePath,
+  },
+}));
+
+vi.mock("@capacitor/filesystem", () => ({
+  Directory: { Data: "DATA" },
+  Filesystem: {
+    getUri: ({ path }: { path: string }) =>
+      Promise.resolve({ uri: `file://${DATA_DIR}/${path}` }),
+    readdir: mocks.readdir,
+    rename: mocks.rename,
+    rmdir: mocks.rmdir,
+    stat: mocks.stat,
+    writeFile: mocks.writeFile,
+  },
+}));
+
+vi.mock("./nativeBridge", () => ({
+  readNativeBuiltinRuntimeFile: mocks.readBuiltinRuntime,
+}));
+
+vi.mock("../devtools/inspector/appLog", () => ({
+  reportAppLog: mocks.reportAppLog,
+}));
+
+vi.mock("./liveUpdateManifest", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("./liveUpdateManifest")>();
+  return {
+    ...original,
+    LIVE_UPDATE_PUBLIC_KEY: original.liveUpdatePublicKey("01".repeat(32)),
+  };
+});
+
+const bundle = zipSync({
+  "index.html": strToU8("<html></html>"),
+  "assets/app.js": strToU8("console.log('next')"),
+  "native-runtime.json": strToU8(JSON.stringify({ runtime: SHELL_RUNTIME })),
+});
+
+const signedManifest = (
+  overrides: Partial<Omit<LiveUpdateManifest, "signature">> = {},
+  secretKey = TEST_SECRET_KEY,
+): LiveUpdateManifest =>
+  signLiveUpdateManifest(
+    {
+      runtime: SHELL_RUNTIME,
+      version: "26.10.4",
+      url: "https://example.test/live-update.zip",
+      sha256: bundleSha256(bundle),
+      ...overrides,
+    },
+    secretKey,
+  );
+
+const serveRelease = (manifest: LiveUpdateManifest | null, zip = bundle) => {
+  mocks.httpGet.mockImplementation(({ url }: { url: string }) => {
+    if (url.endsWith(`live-update-${SHELL_RUNTIME}.json`)) {
+      return Promise.resolve(
+        manifest
+          ? { status: 200, data: JSON.stringify(manifest) }
+          : { status: 404, data: "" },
+      );
+    }
+    return Promise.resolve({ status: 200, data: base64.encode(zip) });
+  });
+};
+
+const loadModules = async () => {
+  vi.resetModules();
+  const pwaUpdate = await import("../utils/pwaUpdate");
+  const liveUpdate = await import("./nativeLiveUpdate");
+  return {
+    pwaUpdate,
+    startNativeLiveUpdates: liveUpdate.startNativeLiveUpdates,
+  };
+};
+
+const waitForCheck = () =>
+  vi.waitFor(() => {
+    expect(mocks.httpGet).toHaveBeenCalled();
+  });
+
+describe("startNativeLiveUpdates", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setInterval"] });
+    vi.stubGlobal("__APP_VERSION__", "26.10.3");
+    vi.stubEnv("DEV", false);
+    mocks.readBuiltinRuntime.mockReturnValue(
+      JSON.stringify({ runtime: SHELL_RUNTIME }),
+    );
+    mocks.getServerBasePath.mockResolvedValue({ path: "public" });
+    mocks.readdir.mockResolvedValue({ files: [] });
+    mocks.stat.mockRejectedValue(new Error("missing"));
+    mocks.rmdir.mockResolvedValue(undefined);
+    mocks.writeFile.mockResolvedValue({ uri: "" });
+    mocks.rename.mockResolvedValue(undefined);
+    mocks.setServerBasePath.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.resetAllMocks();
+  });
+
+  it("does nothing in a shell without a native runtime", async () => {
+    mocks.readBuiltinRuntime.mockReturnValue(null);
+    const { startNativeLiveUpdates } = await loadModules();
+
+    await startNativeLiveUpdates();
+
+    expect(mocks.httpGet).not.toHaveBeenCalled();
+    expect(mocks.getServerBasePath).not.toHaveBeenCalled();
+  });
+
+  it("downloads a newer signed bundle, offers it and switches the web view to it on apply", async () => {
+    serveRelease(signedManifest());
+    const unregister = vi.fn(() => Promise.resolve(true));
+    vi.stubGlobal("navigator", {
+      serviceWorker: {
+        getRegistrations: () => Promise.resolve([{ unregister }]),
+      },
+    });
+    const { pwaUpdate, startNativeLiveUpdates } = await loadModules();
+    const needRefresh: boolean[] = [];
+    pwaUpdate.subscribePwaNeedRefresh((value) => needRefresh.push(value));
+    // The update reaches the banner instead of applying itself on launch.
+    window.dispatchEvent(new Event("pointerdown"));
+
+    await startNativeLiveUpdates();
+    await vi.waitFor(() => expect(needRefresh).toEqual([false, true]));
+
+    expect(
+      mocks.writeFile.mock.calls.map(([options]) => options.path).sort(),
+    ).toEqual([
+      "live-updates/staging/assets/app.js",
+      "live-updates/staging/index.html",
+      "live-updates/staging/native-runtime.json",
+    ]);
+    expect(mocks.rename).toHaveBeenCalledWith({
+      from: "live-updates/staging",
+      to: "live-updates/26.10.4",
+      directory: "DATA",
+    });
+    expect(mocks.setServerBasePath).not.toHaveBeenCalled();
+
+    await pwaUpdate.applyPwaUpdate();
+
+    expect(unregister).toHaveBeenCalled();
+    expect(mocks.setServerBasePath).toHaveBeenCalledWith({
+      path: `${DATA_DIR}/live-updates/26.10.4`,
+    });
+  });
+
+  it("reuses a bundle downloaded earlier", async () => {
+    serveRelease(signedManifest());
+    mocks.stat.mockResolvedValue({});
+    const { pwaUpdate, startNativeLiveUpdates } = await loadModules();
+    const needRefresh: boolean[] = [];
+    pwaUpdate.subscribePwaNeedRefresh((value) => needRefresh.push(value));
+
+    await startNativeLiveUpdates();
+    await vi.waitFor(() => expect(needRefresh).toContain(true));
+
+    expect(mocks.httpGet).toHaveBeenCalledTimes(1);
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["the latest release targets another runtime", null, bundle, false],
+    [
+      "the manifest is signed with another key",
+      signedManifest({}, "02".repeat(32)),
+      bundle,
+      true,
+    ],
+    [
+      "the manifest names another runtime",
+      signedManifest({ runtime: "fedcba9876543210" }),
+      bundle,
+      true,
+    ],
+    [
+      "the version is not newer",
+      signedManifest({ version: "26.10.3" }),
+      bundle,
+      false,
+    ],
+    [
+      "the bundle does not match its hash",
+      signedManifest(),
+      zipSync({ "index.html": strToU8("tampered") }),
+      true,
+    ],
+  ])(
+    "keeps the running bundle when %s",
+    async (_, manifest, zip, reportsFailure) => {
+      serveRelease(manifest, zip);
+      const { pwaUpdate, startNativeLiveUpdates } = await loadModules();
+      const needRefresh: boolean[] = [];
+      pwaUpdate.subscribePwaNeedRefresh((value) => needRefresh.push(value));
+
+      await startNativeLiveUpdates();
+      await waitForCheck();
+      if (reportsFailure) {
+        await vi.waitFor(() =>
+          expect(mocks.reportAppLog).toHaveBeenCalledWith(
+            expect.objectContaining({ tag: "liveUpdate.failed" }),
+          ),
+        );
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(mocks.reportAppLog).not.toHaveBeenCalled();
+      }
+
+      expect(mocks.writeFile).not.toHaveBeenCalled();
+      expect(mocks.rename).not.toHaveBeenCalled();
+      expect(needRefresh).toEqual([false]);
+    },
+  );
+
+  it("keeps a live bundle that mounted and matches the shell, and prunes older downloads", async () => {
+    serveRelease(null);
+    mocks.getServerBasePath.mockResolvedValue({
+      path: `${DATA_DIR}/live-updates/26.10.3`,
+    });
+    mocks.readdir.mockResolvedValue({
+      files: [
+        { name: "26.10.2" },
+        { name: "26.10.3" },
+        { name: "26.10.5" },
+        { name: "staging" },
+      ],
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ runtime: SHELL_RUNTIME })),
+        ),
+      ),
+    );
+    const { startNativeLiveUpdates } = await loadModules();
+
+    await startNativeLiveUpdates();
+
+    expect(mocks.persistServerBasePath).toHaveBeenCalled();
+    expect(mocks.rmdir.mock.calls.map(([options]) => options.path)).toEqual([
+      "live-updates/26.10.2",
+      "live-updates/staging",
+    ]);
+    await waitForCheck();
+  });
+
+  it("returns to the built-in bundle when the running live bundle was built for another runtime", async () => {
+    mocks.getServerBasePath.mockResolvedValue({
+      path: `${DATA_DIR}/live-updates/26.10.3`,
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ runtime: "fedcba9876543210" })),
+        ),
+      ),
+    );
+    const { startNativeLiveUpdates } = await loadModules();
+
+    await startNativeLiveUpdates();
+
+    expect(mocks.setServerAssetPath).toHaveBeenCalledWith({ path: "public" });
+    expect(mocks.persistServerBasePath).not.toHaveBeenCalled();
+    expect(mocks.httpGet).not.toHaveBeenCalled();
+  });
+});
