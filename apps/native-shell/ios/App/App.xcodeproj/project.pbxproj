@@ -19,6 +19,7 @@
 		504EC3191FED796500168520 /* LinkyNfcPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3191FED79650016851F /* LinkyNfcPlugin.swift */; };
 		504EC31B1FED796500168520 /* BeaconCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC31B1FED79650016851F /* BeaconCodec.swift */; };
 		504EC31C1FED796500168520 /* LinkyBeaconPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC31C1FED79650016851F /* LinkyBeaconPlugin.swift */; };
+		504EC31D1FED796500168520 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC31D1FED79650016851F /* SceneDelegate.swift */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 /* End PBXBuildFile section */
@@ -38,6 +39,7 @@
 		504EC3191FED79650016851F /* LinkyNfcPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkyNfcPlugin.swift; sourceTree = "<group>"; };
 		504EC31B1FED79650016851F /* BeaconCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaconCodec.swift; sourceTree = "<group>"; };
 		504EC31C1FED79650016851F /* LinkyBeaconPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkyBeaconPlugin.swift; sourceTree = "<group>"; };
+		504EC31D1FED79650016851F /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		504EC31A1FED796500168520 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -94,6 +96,7 @@
 				504EC3191FED79650016851F /* LinkyNfcPlugin.swift */,
 				504EC30A1FED79650016851F /* LinkyScannerPlugin.swift */,
 				504EC3141FED796500168520 /* LinkySecretStoragePlugin.swift */,
+				504EC31D1FED79650016851F /* SceneDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -236,6 +239,7 @@
 				504EC3191FED796500168520 /* LinkyNfcPlugin.swift in Sources */,
 				504EC30A1FED796500168520 /* LinkyScannerPlugin.swift in Sources */,
 				504EC3151FED796500168520 /* LinkySecretStoragePlugin.swift in Sources */,
+				504EC31D1FED796500168520 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -384,7 +388,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 26.6.10;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
-				PRODUCT_BUNDLE_IDENTIFIER = fit.linky.app;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(LINKY_IOS_BUNDLE_ID:default=fit.linky.app)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -411,7 +415,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 26.6.10;
-				PRODUCT_BUNDLE_IDENTIFIER = fit.linky.app;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(LINKY_IOS_BUNDLE_ID:default=fit.linky.app)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

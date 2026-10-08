@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Debug build for a local device under the dev bundle id fit.linky.local (the release id fit.linky.app stays in the project).
+# Debug build for a local device under the dev bundle id fit.linky.local; LINKY_IOS_BUNDLE_ID reaches only the App target, so the Pod frameworks keep their own ids.
 set -euo pipefail
 
 : "${LINKY_IOS_TEAM:?Set LINKY_IOS_TEAM to your Apple development team id}"
@@ -9,4 +9,4 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../ios/App"
 xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
   -destination "id=$LINKY_IOS_DEVICE" -allowProvisioningUpdates \
   -allowProvisioningDeviceRegistration -derivedDataPath /tmp/linky-ios-build \
-  DEVELOPMENT_TEAM="$LINKY_IOS_TEAM" PRODUCT_BUNDLE_IDENTIFIER=fit.linky.local build
+  DEVELOPMENT_TEAM="$LINKY_IOS_TEAM" LINKY_IOS_BUNDLE_ID=fit.linky.local build
