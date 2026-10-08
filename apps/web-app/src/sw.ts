@@ -376,7 +376,11 @@ async function decryptIncomingMessageBody(
   return message;
 }
 
-precacheAndRoute(self.__WB_MANIFEST || []);
+// Capacitor's Android origin: the shell picks the bundle folder, and a precache
+// would keep serving a bundle the shell has already rolled back.
+const servesNativeShell = self.location.origin === "https://localhost";
+
+if (!servesNativeShell) precacheAndRoute(self.__WB_MANIFEST || []);
 
 registerRoute(
   ({ request }: { request: Request }) => request.destination === "image",
@@ -399,12 +403,14 @@ registerRoute(
   async ({ url }) => createSpaydResponse(url),
 );
 
-registerRoute(
-  new NavigationRoute(createHandlerBoundToURL("index.html"), {
-    // Dev inspector page and collector endpoints must reach the dev server.
-    denylist: [/^\/inspector\.html/, /^\/__inspector\//],
-  }),
-);
+if (!servesNativeShell) {
+  registerRoute(
+    new NavigationRoute(createHandlerBoundToURL("index.html"), {
+      // Dev inspector page and collector endpoints must reach the dev server.
+      denylist: [/^\/inspector\.html/, /^\/__inspector\//],
+    }),
+  );
+}
 
 // Debug entries are written in batches; lifecycle handlers hold the worker
 // open until the batch lands so a stopped worker does not lose them.
