@@ -1124,6 +1124,29 @@ export const cs = {
   proxyPaymentsNotificationsHint:
     "Pro plynulou proxy platbu je potřeba mít zapnuté notifikace.",
   proxyPaymentsNotificationsRequired: "Nejdřív je potřeba zapnout notifikace.",
+  // Nearby (beacon)
+  nearby: "V okolí",
+  nearbyBuys: "V okolí, koupí BTC",
+  nearbySells: "V okolí, prodá BTC",
+  nearbyYou: "Vy",
+  beacon: "Maják",
+  beaconStatusOff: "Vypnuto",
+  beaconStatusBroadcasting: "Vysílá kontaktům: {count}",
+  beaconStatusBluetoothOff: "Bluetooth je vypnutý",
+  beaconStatusPermissionNeeded: "Chybí oprávnění",
+  beaconTrade: "Obchod",
+  beaconTradeNone: "Žádný",
+  beaconTradeBuy: "Koupí BTC",
+  beaconTradeSell: "Prodá BTC",
+  beaconMutualOnly: "V okolí vás uvidí jen kontakty, které si uložily i vás.",
+  beaconIntroContacts:
+    "Kontakty, které si vás také uložily, uvidí, že jste poblíž, a co chcete obchodovat.",
+  beaconIntroNpub:
+    "Dokud je Linky otevřené, uvidí váš npub kdokoli, kdo skenuje okolí, aby si vás mohl přidat.",
+  beaconIntroBluetooth:
+    "Potřebuje Bluetooth a dokud je zapnutý, zobrazuje notifikaci.",
+  beaconTurnOn: "Zapnout maják",
+  beaconNotNow: "Teď ne",
   otherContacts: "Ostatní kontakty",
   today: "Dnes",
   yesterday: "Včera",

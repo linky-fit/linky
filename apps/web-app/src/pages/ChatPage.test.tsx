@@ -1,7 +1,22 @@
+import {
+  derivePubkey,
+  encodeNpub,
+  NostrSecretKey,
+  type Pubkey,
+} from "@linky-fit/linkstr";
 import { act, createRef, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../testUtils/renderIntoDocument";
-import { ChatComposer } from "./ChatPage";
+import { ChatComposer, ChatNearbyBanner } from "./ChatPage";
+
+const nearby = vi.hoisted(() => ({
+  states: new Map<string, "nearby" | "buy" | "sell">(),
+}));
+
+vi.mock("../app/hooks/useBeacon", () => ({
+  useNearbyContact: (pubkey: Pubkey | null) =>
+    (pubkey && nearby.states.get(pubkey)) ?? null,
+}));
 
 vi.mock("../app/context/AppShellContexts", () => ({
   useAppShellCore: () => ({
@@ -129,5 +144,33 @@ describe("ChatComposer", () => {
     await composer.update({ chatDraft: "", editContext: null });
     expect(composer.editor.textContent).toBe("");
     await composer.unmount();
+  });
+});
+
+describe("ChatNearbyBanner", () => {
+  const peer = derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(3)));
+  const npub = encodeNpub(peer);
+
+  afterEach(() => nearby.states.clear());
+
+  it.each([
+    ["nearby", "nearby"],
+    ["buy", "nearbyBuys"],
+    ["sell", "nearbySells"],
+  ] as const)("shows a %s peer as %s", async (state, label) => {
+    nearby.states.set(peer, state);
+    const { container, unmount } = await renderIntoDocument(
+      <ChatNearbyBanner npub={npub} t={(key) => key} />,
+    );
+    expect(container.querySelector('[role="status"]')?.textContent).toBe(label);
+    await unmount();
+  });
+
+  it("shows nothing while the peer is not nearby", async () => {
+    const { container, unmount } = await renderIntoDocument(
+      <ChatNearbyBanner npub={npub} t={(key) => key} />,
+    );
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    await unmount();
   });
 });

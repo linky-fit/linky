@@ -5,6 +5,7 @@ import {
   IconButton,
   ListRow,
   MessageComposerFrame,
+  NearbyBanner,
   Notice,
   ReplyPreview,
   Row,
@@ -21,7 +22,9 @@ import {
   useState,
   type FC,
 } from "react";
+import { parsePubkey } from "@linky-fit/linkstr";
 import { useAppShellCore } from "../app/context/AppShellContexts";
+import { useNearbyContact } from "../app/hooks/useBeacon";
 import { aggregateReactions } from "../app/hooks/messages/chatReactions";
 import type { EditChatContext } from "../app/hooks/messages/useEditChatMessage";
 import type { ReplyContext } from "../app/hooks/messages/useSendChatMessage";
@@ -1133,6 +1136,24 @@ const UnknownContactWarning = memo(function UnknownContactWarning({
   );
 });
 
+const NEARBY_BANNER_KEYS = {
+  nearby: "nearby",
+  buy: "nearbyBuys",
+  sell: "nearbySells",
+} as const;
+
+/** Edge to edge under the top bar while the peer's beacon is received. */
+export const ChatNearbyBanner = memo(function ChatNearbyBanner({
+  npub,
+  t,
+}: {
+  npub: string | null;
+  t: Translate;
+}) {
+  const state = useNearbyContact(npub ? parsePubkey(npub) : null);
+  return state ? <NearbyBanner label={t(NEARBY_BANNER_KEYS[state])} /> : null;
+});
+
 export const ChatPage: FC<ChatPageProps> = ({
   cashuBalance,
   cashuBalanceAfterMelt,
@@ -1267,6 +1288,7 @@ export const ChatPage: FC<ChatPageProps> = ({
 
   return (
     <Stack testID="chat-panel" flex={1} minHeight={0} gap="$none">
+      <ChatNearbyBanner npub={npub} t={t} />
       {isUnknownContact ? (
         <UnknownContactWarning
           onAdd={onAddUnknownContact}

@@ -100,15 +100,18 @@ const selectNearbyIdentities = (snapshot: BeaconSnapshot) =>
 export const useNearbyIdentities = (): ReadonlyArray<Pubkey> =>
   useBeaconSnapshot(selectNearbyIdentities);
 
-/** Scans for identity packets while mounted and the Bluetooth permissions are granted. */
+const selectCanScan = (snapshot: BeaconSnapshot) =>
+  snapshot.supported && snapshot.permission === "granted";
+
+/** Scans for identity packets while mounted, the beacon is supported and the Bluetooth permissions are granted. */
 export const useIdentityScan = (): void => {
-  const granted = useBeaconSnapshot(selectPermission) === "granted";
+  const canScan = useBeaconSnapshot(selectCanScan);
   React.useEffect(() => {
-    if (!granted) return;
+    if (!canScan) return;
     startNativeBeaconIdentityScan();
     return () => {
       stopNativeBeaconIdentityScan();
       clearBeaconIdentities();
     };
-  }, [granted]);
+  }, [canScan]);
 };

@@ -1135,6 +1135,30 @@ export const pt = {
   proxyPaymentsNotificationsHint:
     "Um pagamento proxy sem fricção precisa das notificações ligadas.",
   proxyPaymentsNotificationsRequired: "Ative as notificações primeiro.",
+  // Nearby (beacon)
+  nearby: "Por perto",
+  nearbyBuys: "Por perto, compra BTC",
+  nearbySells: "Por perto, vende BTC",
+  nearbyYou: "Você",
+  beacon: "Beacon",
+  beaconStatusOff: "Desligado",
+  beaconStatusBroadcasting: "Transmitindo para {count} contatos",
+  beaconStatusBluetoothOff: "Bluetooth desligado",
+  beaconStatusPermissionNeeded: "Permissão necessária",
+  beaconTrade: "Negociação",
+  beaconTradeNone: "Nenhuma",
+  beaconTradeBuy: "Compra BTC",
+  beaconTradeSell: "Vende BTC",
+  beaconMutualOnly:
+    "Só contatos que também salvaram você podem ver que você está por perto.",
+  beaconIntroContacts:
+    "Contatos que também salvaram você veem que você está por perto e o que quer negociar.",
+  beaconIntroNpub:
+    "Enquanto o Linky está aberto, qualquer pessoa escaneando por perto vê seu npub para poder adicionar você.",
+  beaconIntroBluetooth:
+    "Precisa do Bluetooth e mantém uma notificação enquanto está ligado.",
+  beaconTurnOn: "Ligar beacon",
+  beaconNotNow: "Agora não",
   otherContacts: "Outros contatos",
   today: "Hoje",
   yesterday: "Ontem",
