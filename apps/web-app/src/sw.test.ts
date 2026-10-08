@@ -40,13 +40,18 @@ vi.mock("./utils/pushDebugLog", () => ({
 vi.mock("./utils/pushContactNamesStorage", () => ({
   getStoredPushContactName: async () => null,
 }));
-vi.mock("workbox-precaching", () => ({
+const workbox = vi.hoisted(() => ({
   precacheAndRoute: vi.fn(),
+  registerRoute: vi.fn(),
+  NavigationRoute: class {},
+}));
+vi.mock("workbox-precaching", () => ({
+  precacheAndRoute: workbox.precacheAndRoute,
   createHandlerBoundToURL: vi.fn(),
 }));
 vi.mock("workbox-routing", () => ({
-  registerRoute: vi.fn(),
-  NavigationRoute: class {},
+  registerRoute: workbox.registerRoute,
+  NavigationRoute: workbox.NavigationRoute,
 }));
 vi.mock("workbox-expiration", () => ({ ExpirationPlugin: class {} }));
 vi.mock("workbox-strategies", () => ({ CacheFirst: class {} }));
@@ -91,8 +96,45 @@ beforeEach(async () => {
     clients: { matchAll, openWindow },
     registration: { showNotification },
     navigator: { language: "en" },
+    location: { origin: "https://app.linky.fit" },
   });
   await import("./sw");
+});
+
+describe("bundle routing", () => {
+  const loadWorker = async (origin: string) => {
+    vi.stubGlobal("self", { ...self, location: { origin } });
+    vi.resetModules();
+    workbox.precacheAndRoute.mockClear();
+    workbox.registerRoute.mockClear();
+    await import("./sw");
+  };
+  const routesNavigations = () =>
+    workbox.registerRoute.mock.calls.some(
+      ([route]) => route instanceof workbox.NavigationRoute,
+    );
+
+  it("precaches the bundle and serves navigations from it on the web", async () => {
+    await loadWorker("https://app.linky.fit");
+
+    expect(workbox.precacheAndRoute).toHaveBeenCalled();
+    expect(routesNavigations()).toBe(true);
+  });
+
+  it("leaves bundle selection to the Android shell but still serves SPAYD files", async () => {
+    await loadWorker("https://localhost");
+
+    expect(workbox.precacheAndRoute).not.toHaveBeenCalled();
+    expect(routesNavigations()).toBe(false);
+    const spaydUrl = new URL("https://localhost/platba.spayd?data=SPD");
+    expect(
+      workbox.registerRoute.mock.calls.some(
+        ([match]) =>
+          typeof match === "function" &&
+          match({ url: spaydUrl, request: { destination: "document" } }),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("notification relay routing", () => {
