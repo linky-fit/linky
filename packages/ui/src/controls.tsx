@@ -6,7 +6,7 @@ import type { IconName, IconSize } from "./icons";
 import { Row, Stack, Text } from "./layout";
 import { Spinner } from "./spinner";
 import { focusRing, tooltipProps } from "./styles";
-import { opacity } from "./tokens";
+import { opacity, size as sizes } from "./tokens";
 
 export type PressableProps = GetProps<typeof TamaguiButton> & {
   /** A browser tooltip on the web; ignored on native. */
@@ -477,10 +477,10 @@ export function SliderField({
           if (next !== undefined) onValueChange(next);
         }}
         height="$iconLg"
-        justifyContent="center"
       >
         <Slider.Track
           height="$track"
+          marginTop={(sizes.iconLg - sizes.track) / 2}
           borderRadius="$pill"
           backgroundColor="$neutralSoft"
         >
