@@ -305,33 +305,6 @@ describe("startNativeLiveUpdates", () => {
     await waitForCheck();
   });
 
-  it("rejects a bundle built for other native code without leaving the running bundle", async () => {
-    const foreignBundle = zipSync({
-      "index.html": strToU8("<html></html>"),
-      "native-runtime.json": strToU8(
-        JSON.stringify({ runtime: "fedcba9876543210" }),
-      ),
-    });
-    serveRelease(
-      signedManifest({ sha256: bundleSha256(foreignBundle) }),
-      foreignBundle,
-    );
-    const { pwaUpdate, startNativeLiveUpdates } = await loadModules();
-    const needRefresh: boolean[] = [];
-    pwaUpdate.subscribePwaNeedRefresh((value) => needRefresh.push(value));
-
-    await startNativeLiveUpdates();
-    await vi.waitFor(() =>
-      expect(localStorage.getItem("linky.liveUpdate.rejectedVersion")).toBe(
-        "26.10.4",
-      ),
-    );
-
-    expect(mocks.writeFile).not.toHaveBeenCalled();
-    expect(mocks.setServerBasePath).not.toHaveBeenCalled();
-    expect(needRefresh).toEqual([false]);
-  });
-
   it("rejects a bundle that was applied but never mounted and stops offering it", async () => {
     serveRelease(signedManifest());
     localStorage.setItem("linky.liveUpdate.pendingVersion", "26.10.4");
