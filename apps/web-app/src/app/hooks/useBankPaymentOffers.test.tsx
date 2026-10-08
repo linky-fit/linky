@@ -422,6 +422,44 @@ describe("useBankPaymentOffers", () => {
     expect(sendBankOfferMock).toHaveBeenCalledTimes(1);
   });
 
+  it("opens the live offer of a bank QR instead of offering it again", async () => {
+    const current = await setup();
+    const request = (spdPayload = SPD) =>
+      current().requestBankPaymentOffer({
+        amountSat: 100,
+        amountText: "250 Kč",
+        contacts,
+        spdPayload,
+      });
+    let first: Awaited<ReturnType<typeof request>> = null;
+    await act(async () => {
+      // Two taps in one task: the second joins the first request.
+      const taps = await Promise.all([request(), request()]);
+      first = taps[0];
+      expect(taps[1]).toEqual(first);
+    });
+    expect(first).toMatchObject({ chatId: "contact-1" });
+    expect(sendBankOfferMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      expect(await request()).toEqual(first);
+    });
+    expect(sendBankOfferMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      expect(await request(`${SPD}*X-VS:42`)).not.toEqual(first);
+    });
+    expect(sendBankOfferMock).toHaveBeenCalledTimes(4);
+
+    // Both offers expire and are canceled; the QR can be offered again.
+    await act(async () => vi.advanceTimersByTimeAsync(300_000));
+    sendBankOfferMock.mockClear();
+    await act(async () => {
+      expect(await request()).not.toEqual(first);
+    });
+    expect(sendBankOfferMock).toHaveBeenCalledTimes(2);
+  });
+
   it("pins the first attempted recipient across a failed publish and a reordered acceptance", async () => {
     rememberBankPaymentOfferSpdPayload({
       offerId: "offer-1",

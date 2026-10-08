@@ -1,4 +1,4 @@
-import type { BankOfferId, Pubkey } from "@linky-fit/linkstr";
+import { BankOfferId, type Pubkey } from "@linky-fit/linkstr";
 import {
   BankPaymentOfferStaggerRecord,
   isBankPaymentOfferStaggerRecordExpired,
@@ -16,6 +16,8 @@ import {
   safeSessionStorageSet,
 } from "../../utils/storage";
 import { nowSeconds } from "../../utils/time";
+
+const isBankOfferId = Schema.is(BankOfferId);
 
 const MINIMIZED_KEY_PREFIX = "linky.bank_payment_offer_minimized.v1";
 const SPD_KEY_PREFIX = "linky.bank_payment_offer_spd.v1";
@@ -125,6 +127,21 @@ export const readBankPaymentOfferSpdRecord = (args: {
   }
   return record.ownerPubkey === args.ownerPubkey ? record : null;
 };
+
+/** The offers this device created for one bank QR and still keeps the QR of. */
+export const readBankPaymentOfferIdsForSpdPayload = (args: {
+  ownerPubkey: string;
+  spdPayload: string;
+}): BankOfferId[] =>
+  safeLocalStorageKeys().flatMap((key) => {
+    if (!key.startsWith(`${SPD_KEY_PREFIX}.`)) return [];
+    const offerId = decodeURIComponent(key.slice(SPD_KEY_PREFIX.length + 1));
+    return isBankOfferId(offerId) &&
+      readBankPaymentOfferSpdRecord({ ...args, offerId })?.spdPayload ===
+        args.spdPayload
+      ? [offerId]
+      : [];
+  });
 
 export const reserveBankPaymentOfferBankDetails = async (args: {
   candidateKey: string;

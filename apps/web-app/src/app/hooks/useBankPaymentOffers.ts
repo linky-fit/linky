@@ -13,6 +13,7 @@ import {
   applyBankPaymentOfferSnapshot,
   bankPaymentOfferedDraft,
   bankPaymentOfferGroupResponses,
+  bankPaymentOffersOf,
   bankPaymentOfferResponderSteps,
   bankPaymentOfferResponseDraft,
   bankPaymentOfferStaggerDue,
@@ -63,6 +64,7 @@ import {
   forgetBankPaymentOfferSpdPayload,
   forgetBankPaymentOfferStaggerQueue,
   markBankPaymentOfferBankDetailsSent,
+  readBankPaymentOfferIdsForSpdPayload,
   readBankPaymentOfferSpdRecord,
   readBankPaymentOfferStaggerRecords,
   rememberBankPaymentOfferSpdPayload,
@@ -80,6 +82,20 @@ const RESPONDER_RETRY_MS = 30_000;
 // Three dots say how a contact has been doing lately; more would be noise.
 const RECENT_OFFER_OUTCOMES = 3;
 const STAGGER_RETRY_MS = 5_000;
+
+interface BankPaymentOfferRequest {
+  amountSat?: unknown;
+  amountText: string;
+  contacts: readonly ContactRowLike[];
+  singleTabRiskAccepted?: boolean;
+  spdPayload?: unknown;
+  staggerDelaySec?: unknown;
+}
+
+interface RequestedBankPaymentOffer {
+  chatId: string;
+  offerId: string;
+}
 
 interface UseBankPaymentOffersParams {
   chatMessages: LocalNostrMessage[];
@@ -346,22 +362,44 @@ export const useBankPaymentOffers = ({
 
   const [staggerTick, setStaggerTick] = useState(0);
 
-  const requestBankPaymentOffer = React.useCallback(
-    async (args: {
-      amountSat?: unknown;
-      amountText: string;
-      contacts: readonly ContactRowLike[];
-      singleTabRiskAccepted?: boolean;
-      spdPayload?: unknown;
-      staggerDelaySec?: unknown;
-    }): Promise<{ chatId: string; offerId: string } | null> => {
+  // Each offer pins its own payer, so a second live offer for one bank QR
+  // would hand the bank details to two payers.
+  const findLiveOfferForSpdPayload = React.useCallback(
+    (spdPayload: string): RequestedBankPaymentOffer | null => {
+      if (!myPubHex || !spdPayload) return null;
+      const nowSec = nowSeconds();
+      const staggerRecords = readBankPaymentOfferStaggerRecords(myPubHex);
+      for (const offerId of readBankPaymentOfferIdsForSpdPayload({
+        ownerPubkey: myPubHex,
+        spdPayload,
+      })) {
+        const threads = bankPaymentOffersOf(stateRef.current.offers, offerId);
+        const [livePeer] = activeBankPaymentOffers(threads, nowSec).peers;
+        const hasQueuedPeers = staggerRecords.some(
+          (record) =>
+            record.offerId === offerId &&
+            isBankPaymentOfferStaggerQueueOpen(record, threads),
+        );
+        const peer = livePeer ?? (hasQueuedPeers ? threads[0]?.peer : null);
+        const chatId = peer ? contactIdFor(peer) : null;
+        if (chatId) return { chatId, offerId };
+      }
+      return null;
+    },
+    [contactIdFor, myPubHex],
+  );
+
+  const sendNewBankPaymentOffer = React.useCallback(
+    async (
+      args: BankPaymentOfferRequest,
+      spdPayload: string,
+    ): Promise<RequestedBankPaymentOffer | null> => {
       const amountSatRaw = Number(args.amountSat ?? 0);
       const amountSat =
         Number.isFinite(amountSatRaw) && amountSatRaw > 0
           ? Math.round(amountSatRaw)
           : null;
       const amountText = args.amountText.trim();
-      const spdPayload = String(args.spdPayload ?? "").trim();
       const delaySec = clampBankPaymentOfferStaggerDelaySec(
         Number(args.staggerDelaySec ?? 0),
       );
@@ -456,6 +494,46 @@ export const useBankPaymentOffers = ({
       }
     },
     [myPubHex, pubkeyFor, sendOffered, setStatus, t],
+  );
+
+  const requestsInFlightRef = React.useRef(
+    new Map<string, Promise<RequestedBankPaymentOffer | null>>(),
+  );
+
+  // A repeated tap while the request is in flight joins it.
+  const requestBankPaymentOffer = React.useCallback(
+    (
+      args: BankPaymentOfferRequest,
+    ): Promise<RequestedBankPaymentOffer | null> => {
+      const spdPayload = String(args.spdPayload ?? "").trim();
+      const inFlight = requestsInFlightRef.current.get(spdPayload);
+      if (inFlight) return inFlight;
+
+      const live = findLiveOfferForSpdPayload(spdPayload);
+      if (live) {
+        if (getInspectorEmissionEnabled()) {
+          reportInspectorRows([
+            {
+              at: Date.now(),
+              channel: "nostr.operation",
+              tag: "bankOffer.liveOfferReopened",
+              summary:
+                "proxy payment for this bank QR is still live — opened it instead of offering it again",
+              links: { offer: live.offerId },
+              payload: { offerId: live.offerId },
+            },
+          ]);
+        }
+        return Promise.resolve(live);
+      }
+
+      const request = sendNewBankPaymentOffer(args, spdPayload).finally(() =>
+        requestsInFlightRef.current.delete(spdPayload),
+      );
+      requestsInFlightRef.current.set(spdPayload, request);
+      return request;
+    },
+    [findLiveOfferForSpdPayload, sendNewBankPaymentOffer],
   );
 
   // The offerer's auto-responder: bank details go to exactly one winner,
