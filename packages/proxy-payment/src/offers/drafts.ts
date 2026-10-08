@@ -8,7 +8,11 @@ import {
 } from "@linky-fit/linkstr";
 import { Schema } from "effect";
 import { bankPaymentOfferMessageText } from "./content";
-import { bankPaymentOfferBankPaidAtSec, type BankPaymentOffer } from "./offer";
+import {
+  bankPaymentOfferBankPaidAtSec,
+  offerUpdatedAtSec,
+  type BankPaymentOffer,
+} from "./offer";
 import { isOffererBankPaymentOfferStatus } from "./status";
 
 const isPubkey = Schema.is(Pubkey);
@@ -68,11 +72,16 @@ export interface BankPaymentOfferResponseOptions {
   withPush?: boolean;
 }
 
-/** The next snapshot of a known thread, or null when `me` may not send `nextStatus` on it. */
+/**
+ * The next snapshot of a known thread, or null when `me` may not send
+ * `nextStatus` on it. Dated no earlier than the thread's last update, so a
+ * peer whose clock runs ahead never finds the answer stale.
+ */
 export const bankPaymentOfferResponseDraft = (
   offer: BankPaymentOffer,
   nextStatus: BankOfferStatus,
   me: Pubkey,
+  nowSec: number,
   options: BankPaymentOfferResponseOptions = {},
 ): BankOfferDraft | null => {
   const offerer = offer.offererPublicKey;
@@ -104,6 +113,9 @@ export const bankPaymentOfferResponseDraft = (
   const expiresAtSec = positiveUnixSeconds(options.expiresAtSec);
   const amountSat = positiveInt(offer.amountSat);
   const spdPayload = (options.spdPayload ?? offer.spdPayload ?? "").trim();
+  const sentAt = positiveUnixSeconds(
+    Math.max(nowSec, offerUpdatedAtSec(offer)),
+  );
   return new BankOfferDraft({
     to,
     offerId: offer.offerId,
@@ -119,5 +131,6 @@ export const bankPaymentOfferResponseDraft = (
     ...(isNonEmptyTrimmedString(spdPayload) ? { spdPayload } : {}),
     ...(options.withPush === undefined ? {} : { pushMark: options.withPush }),
     clientId: newBankPaymentOfferClientId(),
+    ...(sentAt === undefined ? {} : { sentAt }),
   });
 };

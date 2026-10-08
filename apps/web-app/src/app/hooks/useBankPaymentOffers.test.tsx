@@ -115,7 +115,8 @@ const persistedRow = (
 });
 
 const receipt = (draft: BankOfferDraft): BankOfferReceipt => {
-  const sentAt = UnixSeconds.make(Math.floor(Date.now() / 1000));
+  const sentAt =
+    draft.sentAt ?? UnixSeconds.make(Math.floor(Date.now() / 1000));
   const clientId = draft.clientId ?? ClientId.make("sent-client");
   return new BankOfferReceipt({
     clientId,
@@ -395,6 +396,30 @@ describe("useBankPaymentOffers", () => {
     ]);
     await act(async () => vi.advanceTimersByTimeAsync(30_000));
     expect(sendBankOfferMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends bank details to a payer whose clock runs ahead and shows them sent", async () => {
+    rememberBankPaymentOfferSpdPayload({
+      offerId: BankOfferId.make("offer-1"),
+      ownerPubkey: owner.pubkey,
+      spdPayload: SPD,
+    });
+    const current = await setup();
+    await act(async () => {
+      current().applyBankPaymentOfferSnapshot(snapshot("offered"));
+      current().applyBankPaymentOfferSnapshot(
+        snapshot("accepted", recipient.pubkey, NOW + 5),
+      );
+    });
+    expect(sendBankOfferMock.mock.calls[0]?.[0]).toMatchObject({
+      sentAt: NOW + 5,
+      status: "bank_details_sent",
+    });
+    expect(statusOf(current().bankPaymentOfferMessages[0])).toBe(
+      "bank_details_sent",
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(sendBankOfferMock).toHaveBeenCalledTimes(1);
   });
 
   it("pins the first attempted recipient across a failed publish and a reordered acceptance", async () => {

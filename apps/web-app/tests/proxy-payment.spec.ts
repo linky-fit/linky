@@ -12,6 +12,9 @@
  * lock and the sentCandidateKeys guard are dead code, so broadcasting the bank
  * details to every acceptor would keep a one-recipient test green.
  *
+ * B's and C's clocks run a minute ahead of A's, as phone clocks drift: every
+ * acceptance is then dated after the moment A answers it.
+ *
  * Not covered: multi-relay delivery, offer expiry, src/sw.ts
  * (service workers are blocked below), multi-mint candidate ordering,
  * npub.cash flows, EUR/bysquare payloads.
@@ -60,6 +63,9 @@ import {
   SPD_VARIABLE_SYMBOL,
 } from "./fixtures/bankPaymentQr";
 
+/** Within what relays and Evolu tolerate, and longer than A takes to answer. */
+const PAYER_CLOCK_AHEAD_MS = 60_000;
+
 /** A funds this much so the offer never trips the insufficient-balance guard. */
 const FUNDING_SAT = 100;
 
@@ -81,6 +87,7 @@ interface Account {
 const bootAccount = async (
   browser: Browser,
   label: string,
+  clockAheadMs = 0,
 ): Promise<Account> => {
   const identity = await createSeedIdentity();
   const context = await browser.newContext({
@@ -90,6 +97,9 @@ const bootAccount = async (
     serviceWorkers: "block",
     viewport: { ...MOBILE_VIEWPORT },
   });
+  if (clockAheadMs) {
+    await context.clock.install({ time: Date.now() + clockAheadMs });
+  }
 
   const page = await context.newPage();
   const errors = watchAppErrors(page, label);
@@ -145,8 +155,8 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
   browser,
 }, testInfo) => {
   const a = await bootAccount(browser, "A");
-  const b = await bootAccount(browser, "B");
-  const c = await bootAccount(browser, "C");
+  const b = await bootAccount(browser, "B", PAYER_CLOCK_AHEAD_MS);
+  const c = await bootAccount(browser, "C", PAYER_CLOCK_AHEAD_MS);
   const accounts = [a, b, c];
 
   try {
@@ -296,6 +306,12 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
         const bWon = await hasBankDetails(b);
         return { loser: bWon ? c : b, winner: bWon ? b : c };
       });
+
+    await test.step("A shows the bank details sent to the winner", async () => {
+      await expect(
+        a.page.getByText("Details sent", { exact: true }),
+      ).toBeVisible({ timeout: 60_000 });
+    });
 
     await test.step("the loser never sees the bank details", async () => {
       await expect(loser.page.getByTestId("bank-payment-fields")).toHaveCount(

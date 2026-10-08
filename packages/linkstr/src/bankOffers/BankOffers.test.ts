@@ -1,5 +1,5 @@
 import { Effect, Either, Exit, Layer } from "effect";
-import { ClientId, RelayUrl } from "../domain/primitives";
+import { ClientId, RelayUrl, UnixSeconds } from "../domain/primitives";
 import { unwrapToRumor } from "../internal/giftWrap";
 import type { SignedWrapEvent } from "../internal/nostrEvent";
 import { LinkstrIdentity } from "../services/LinkstrIdentity";
@@ -93,6 +93,33 @@ describe("BankOffers.send", () => {
         statusUpdatedAtSec: exit.value.sentAt,
         initiatedAtSec: exit.value.sentAt,
       }),
+    );
+  });
+
+  it("dates the snapshot with the draft's sentAt", async () => {
+    // Ahead of this clock, as when answering a peer whose clock runs fast.
+    const sentAt = UnixSeconds.make(Math.floor(Date.now() / 1000) + 60);
+    const published: Array<SignedWrapEvent> = [];
+    const exit = await runWith(
+      stubWrapTransport(published),
+      Effect.gen(function* () {
+        const bankOffers = yield* BankOffers;
+        return yield* bankOffers.send(
+          new BankOfferDraft({ ...makeDraft("bank_details_sent"), sentAt }),
+        );
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.sentAt).toBe(sentAt);
+    const [recipientWrap] = published;
+    assert(recipientWrap !== undefined);
+    const rumor = Either.getOrThrow(
+      unwrapToRumor(recipientWrap, bob.secretKey),
+    );
+    expect(rumor.created_at).toBe(sentAt);
+    expect(JSON.parse(rumor.content)).toEqual(
+      expect.objectContaining({ statusUpdatedAtSec: sentAt }),
     );
   });
 

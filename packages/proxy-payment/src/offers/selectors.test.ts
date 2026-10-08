@@ -89,6 +89,28 @@ describe("bankPaymentOfferResponderSteps", () => {
     );
   });
 
+  it("names the recipient of a stale-dated bank-details snapshot the winner", () => {
+    // The payer's clock ran ahead: its acceptance is dated after the details.
+    const offers = book(
+      snapshot("offered", true),
+      snapshot("offered", true, { from: other }),
+      snapshot("accepted", false, { sentAt: at(5) }),
+      snapshot("bank_details_sent", true, { sentAt: at(3) }),
+      snapshot("accepted", false, { from: other, sentAt: at(4) }),
+    );
+    expect(offers.find((offer) => offer.peer === payer)).toMatchObject({
+      bankDetailsSentAtSec: START + 3,
+      status: "accepted",
+    });
+    const [step] = bankPaymentOfferResponderSteps(offers, me);
+    expect(step?.winner?.peer).toBe(payer);
+    expect(step?.candidate).toBeNull();
+    expect(step?.losers.map((offer) => offer.peer)).toEqual([other]);
+    expect(hasPendingBankPaymentOfferResponderWork(offers, me, START + 6)).toBe(
+      false,
+    );
+  });
+
   it("marks an ended offer and ignores offers of other offerers", () => {
     const offers = book(
       snapshot("settled", true),
