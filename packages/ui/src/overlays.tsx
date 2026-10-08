@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Dialog as TamaguiDialog, VisuallyHidden } from "tamagui";
+import { Dialog as TamaguiDialog, useMedia, VisuallyHidden } from "tamagui";
 import { IconButton } from "./controls";
 import { useDialogBehavior } from "./dialogBehavior";
 import { Row, ScrollList, Stack } from "./layout";
@@ -204,7 +204,7 @@ export interface SheetProps {
   children: ReactNode;
 }
 
-/** A bottom sheet for action lists and pickers; its content scrolls when it outgrows the screen. */
+/** A bottom sheet for action lists and pickers, centered on wide screens; its content scrolls when it outgrows the screen. */
 export function Sheet({
   open,
   onOpenChange,
@@ -212,6 +212,7 @@ export function Sheet({
   hideTitle = false,
   children,
 }: SheetProps) {
+  const { wide } = useMedia();
   const titleText = (
     <TamaguiDialog.Title
       fontFamily="$body"
@@ -226,7 +227,7 @@ export function Sheet({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      placement="bottom"
+      placement={wide ? "center" : "bottom"}
       described={false}
     >
       {hideTitle ? <VisuallyHidden>{titleText}</VisuallyHidden> : titleText}
