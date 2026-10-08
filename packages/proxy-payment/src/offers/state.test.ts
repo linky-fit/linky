@@ -363,7 +363,12 @@ describe("applyBankPaymentOfferReceipt", () => {
       ).state;
       const offered = received.offers[0];
       if (!offered) throw new Error("Missing received offer");
-      const draft = bankPaymentOfferResponseDraft(offered, "accepted", payer);
+      const draft = bankPaymentOfferResponseDraft(
+        offered,
+        "accepted",
+        payer,
+        START,
+      );
       if (!draft) throw new Error("Missing acceptance draft");
       const receipt = receiptFor(draft, UnixSeconds.make(START + 2));
       const decision = snapshot("accepted_by_other", false, {
@@ -406,6 +411,7 @@ describe("applyBankPaymentOfferReceipt", () => {
       offered,
       "accepted_by_other",
       me,
+      START,
     );
     if (!draft) throw new Error("Missing winner-decision draft");
     book.apply(
@@ -435,7 +441,12 @@ describe("applyBankPaymentOfferReceipt", () => {
       ).state;
       const offered = received.offers[0];
       if (!offered) throw new Error("Missing received offer");
-      const draft = bankPaymentOfferResponseDraft(offered, "accepted", payer);
+      const draft = bankPaymentOfferResponseDraft(
+        offered,
+        "accepted",
+        payer,
+        START,
+      );
       if (!draft) throw new Error("Missing acceptance draft");
 
       const withDetails = applyBankPaymentOfferSnapshot(
@@ -496,6 +507,7 @@ describe("applyBankPaymentOfferReceipt", () => {
       details,
       "bank_details_sent",
       me,
+      START,
     );
     if (!draft) throw new Error("Missing bank-details draft");
     book.apply(
@@ -511,6 +523,73 @@ describe("applyBankPaymentOfferReceipt", () => {
     expect(result.offer?.status).toBe("bank_paid");
   });
 
+  it("hands the bank details to a payer whose clock runs ahead of the offerer's", () => {
+    const acceptedAt = UnixSeconds.make(START + 3);
+    const offerer = new Book();
+    offerer.apply(snapshot("offered", true));
+    offerer.apply(snapshot("accepted", false, { sentAt: acceptedAt }));
+    const accepted = offerer.state.offers[0];
+    if (!accepted) throw new Error("Missing acceptance");
+    const draft = bankPaymentOfferResponseDraft(
+      accepted,
+      "bank_details_sent",
+      me,
+      START + 1,
+      { spdPayload: "SPD*1.0*ACC:CZ6508000000192000145399" },
+    );
+    if (!draft) throw new Error("Missing bank-details draft");
+    const sent = applyBankPaymentOfferReceipt(
+      offerer.state,
+      payer,
+      receiptFor(draft),
+    );
+    expect(sent.offer?.status).toBe("bank_details_sent");
+
+    const payerView = [
+      snapshot("offered", false, { from: me }),
+      snapshot("accepted", true, { from: me, sentAt: acceptedAt }),
+      snapshot("bank_details_sent", false, {
+        from: me,
+        sentAt: draft.sentAt ?? START,
+      }),
+    ].reduce(
+      (state, event) =>
+        applyBankPaymentOfferSnapshot(state, event, payer, START + 3).state,
+      emptyBankPaymentOfferState,
+    );
+    expect(payerView.offers[0]?.status).toBe("bank_details_sent");
+  });
+
+  it("lets a payer whose clock runs behind the offerer's accept", () => {
+    const offeredAt = UnixSeconds.make(START + 5);
+    const received = applyBankPaymentOfferSnapshot(
+      emptyBankPaymentOfferState,
+      snapshot("offered", false, { from: me, sentAt: offeredAt }),
+      payer,
+      START,
+    ).state;
+    const offered = received.offers[0];
+    if (!offered) throw new Error("Missing received offer");
+    const draft = bankPaymentOfferResponseDraft(
+      offered,
+      "accepted",
+      payer,
+      START,
+    );
+    if (!draft) throw new Error("Missing acceptance draft");
+    expect(
+      applyBankPaymentOfferReceipt(received, me, receiptFor(draft)).offer
+        ?.status,
+    ).toBe("accepted");
+
+    const offerer = new Book();
+    offerer.apply(snapshot("offered", true, { sentAt: offeredAt }));
+    offerer.apply(
+      snapshot("accepted", false, { sentAt: draft.sentAt ?? START }),
+    );
+    expect(offerer.state.offers[0]?.status).toBe("accepted");
+  });
+
   it.each<"canceled" | "settled">(["canceled", "settled"])(
     "does not reopen a %s thread even when the receipt has a later timestamp",
     (status) => {
@@ -522,6 +601,7 @@ describe("applyBankPaymentOfferReceipt", () => {
         details,
         "bank_details_sent",
         me,
+        START,
       );
       if (!draft) throw new Error("Missing bank-details draft");
       book.apply(snapshot(status, true));

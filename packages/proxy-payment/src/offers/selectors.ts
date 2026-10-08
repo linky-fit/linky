@@ -86,6 +86,11 @@ export interface BankPaymentOfferResponderStep {
   winner: BankPaymentOffer | null;
 }
 
+// The milestone, not the status: a details snapshot merged as stale (clock
+// skew) still went out, so its recipient is the winner.
+const holdsBankDetails = (offer: BankPaymentOffer): boolean =>
+  offer.bankDetailsSentAtSec !== null;
+
 export const bankPaymentOfferResponderSteps = (
   offers: readonly BankPaymentOffer[],
   me: Pubkey,
@@ -102,12 +107,12 @@ export const bankPaymentOfferResponderSteps = (
     }
     const winner =
       group
-        .filter(
-          (offer) =>
-            offer.status === "bank_details_sent" ||
-            offer.status === "bank_paid",
-        )
-        .sort(byUpdatedAt)[0] ?? null;
+        .filter(holdsBankDetails)
+        .sort(
+          (left, right) =>
+            (left.bankDetailsSentAtSec ?? 0) -
+            (right.bankDetailsSentAtSec ?? 0),
+        )[0] ?? null;
     const candidate = winner
       ? null
       : (group
@@ -135,7 +140,10 @@ export const hasPendingBankPaymentOfferResponderWork = (
 ): boolean =>
   Array.from(groupByOfferId(ownOffers(offers, me)).values()).some(
     (group) =>
-      !group.some((offer) => isWholeOfferTerminalStatus(offer.status)) &&
+      !group.some(
+        (offer) =>
+          isWholeOfferTerminalStatus(offer.status) || holdsBankDetails(offer),
+      ) &&
       group.some(
         (offer) =>
           offer.status === "accepted" &&

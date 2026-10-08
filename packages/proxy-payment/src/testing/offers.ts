@@ -73,7 +73,7 @@ const delivery = (wrapId: string) =>
 /** The receipt linkstr would return for a sent draft. */
 export const receiptFor = (
   draft: BankOfferDraft,
-  sentAt: UnixSeconds = START,
+  sentAt: UnixSeconds = draft.sentAt ?? START,
 ): BankOfferReceipt =>
   new BankOfferReceipt({
     clientId: draft.clientId ?? ClientId.make("client"),

@@ -166,7 +166,7 @@ Two roles: the **offerer** (who needs the bank payment made) and the counterpart
 
 ### Sending
 
-`offerId` stays the same for every snapshot of one offer. `initiatedAtSec` defaults to `sentAt` when `status` is `offered`, `bankPaidAtSec` defaults to `sentAt` when `status` is `bank_paid`, and `statusUpdatedAtSec` is always the send time.
+`offerId` stays the same for every snapshot of one offer. `initiatedAtSec` defaults to `sentAt` when `status` is `offered`, `bankPaidAtSec` defaults to `sentAt` when `status` is `bank_paid`, and `statusUpdatedAtSec` is always the send time: the draft's `sentAt`, else now.
 
 Delivery is **recipient first**: the self copy is published only after a relay accepted the counterparty's copy, so your other devices never sync a status the peer did not get. Not an outbox operation; a snapshot that fails is resent by the user or your own timers.
 

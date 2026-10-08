@@ -32,6 +32,7 @@ describe("bankPaymentOfferResponseDraft", () => {
       offer(["offered", true]),
       "canceled",
       me,
+      START,
     );
     expect(draft).toMatchObject({
       amountSat: 1000,
@@ -46,13 +47,23 @@ describe("bankPaymentOfferResponseDraft", () => {
 
   it("refuses statuses of the other role and lets options extend the phase", () => {
     const known = offer(["offered", true]);
-    expect(bankPaymentOfferResponseDraft(known, "accepted", me)).toBeNull();
-    expect(bankPaymentOfferResponseDraft(known, "canceled", payer)).toBeNull();
-    const extended = bankPaymentOfferResponseDraft(known, "offered", me, {
-      expiresAtSec: START + 260,
-      extensionSec: 60,
-      withPush: true,
-    });
+    expect(
+      bankPaymentOfferResponseDraft(known, "accepted", me, START),
+    ).toBeNull();
+    expect(
+      bankPaymentOfferResponseDraft(known, "canceled", payer, START),
+    ).toBeNull();
+    const extended = bankPaymentOfferResponseDraft(
+      known,
+      "offered",
+      me,
+      START,
+      {
+        expiresAtSec: START + 260,
+        extensionSec: 60,
+        withPush: true,
+      },
+    );
     expect(extended).toMatchObject({
       expiresAtSec: START + 260,
       extensionSec: 60,
@@ -60,6 +71,22 @@ describe("bankPaymentOfferResponseDraft", () => {
       text: "Potřebuji víc času (+60 s).",
     });
   });
+
+  it.each([
+    { nowSec: START - 30, sentAt: START },
+    { nowSec: START + 30, sentAt: START + 30 },
+  ])(
+    "is dated at $sentAt, never before the snapshot it answers, at now $nowSec",
+    ({ nowSec, sentAt }) => {
+      const draft = bankPaymentOfferResponseDraft(
+        offer(["offered", true]),
+        "canceled",
+        me,
+        nowSec,
+      );
+      expect(draft?.sentAt).toBe(sentAt);
+    },
+  );
 
   it("stamps the bank-paid time when the payer reports payment", () => {
     // From the payer's device: the offerer's snapshots arrive, mine are echoed.
@@ -77,11 +104,16 @@ describe("bankPaymentOfferResponseDraft", () => {
     const [details] = state.offers;
     if (!details) throw new Error("snapshot rejected");
     expect(details).toMatchObject({ peer: me, status: "bank_details_sent" });
-    const draft = bankPaymentOfferResponseDraft(details, "bank_paid", payer);
+    const draft = bankPaymentOfferResponseDraft(
+      details,
+      "bank_paid",
+      payer,
+      START,
+    );
     expect(draft).toMatchObject({ offerer: me, status: "bank_paid", to: me });
     expect(draft?.bankPaidAtSec).toBeUndefined();
     expect(
-      bankPaymentOfferResponseDraft(details, "canceled", payer),
+      bankPaymentOfferResponseDraft(details, "canceled", payer, START),
     ).toBeNull();
   });
 });

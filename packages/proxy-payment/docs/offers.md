@@ -60,7 +60,7 @@ The offerer's `accepted_by_other` overrides a pending `accepted` regardless of t
 All selectors take `state.offers` and are pure; the consumer's effects run on them.
 
 - `activeBankPaymentOffers(offers, nowSec)`: peers with a live thread of an offer that has not ended, plus the next expiry to re-render at.
-- `bankPaymentOfferResponderSteps(offers, me)`: per own offer, the `winner` who already holds the bank details, else the earliest `candidate` acceptance (ties by peer), and the `losers` still offered or accepted. The consumer sends `bank_details_sent` to the candidate and, once delivered, `accepted_by_other` to the losers. `hasPendingBankPaymentOfferResponderWork(offers, me, nowSec)` says whether an unexpired acceptance still waits for bank details.
+- `bankPaymentOfferResponderSteps(offers, me)`: per own offer, the `winner` who already holds the bank details (`bankDetailsSentAtSec`, even when that snapshot merged as stale), else the earliest `candidate` acceptance (ties by peer), and the `losers` still offered or accepted. The consumer sends `bank_details_sent` to the candidate and, once delivered, `accepted_by_other` to the losers. `hasPendingBankPaymentOfferResponderWork(offers, me, nowSec)` says whether an unexpired acceptance still waits for bank details that nobody holds yet.
 - `ownBankPaymentOfferExpiries(offers, me, nowSec)`: per own offer, the deadline of its most advanced phase; the consumer cancels the whole group then.
 - `bankPaymentOfferGroupResponses(offers, offerId, "canceled" | "settled")`: the threads a whole-offer status must still reach (never canceling a settled thread) and the single peer that gets the push for a cancellation.
 - `lastBankPaymentOfferResponseSecByPeer(offers, me)`: how long each peer took on my most recent offer they paid.
@@ -68,7 +68,7 @@ All selectors take `state.offers` and are pure; the consumer's effects run on th
 
 ## Drafts
 
-`bankPaymentOfferedDraft({ to, offerId, offerer, amountText, amountSat, expiresAtSec? })` opens a thread, or returns `null` for an invalid pubkey, offer id or empty amount. `bankPaymentOfferResponseDraft(offer, nextStatus, me, options?)` builds the next snapshot of a known thread from its authorized fields, or `null` when `me` may not send `nextStatus` on it; `options` carry an extension (`expiresAtSec`, `extensionSec`), the bank QR to hand over (`spdPayload`) and `withPush`. Both stamp a fresh `clientId` and the wire text (`bankPaymentOfferMessageText`).
+`bankPaymentOfferedDraft({ to, offerId, offerer, amountText, amountSat, expiresAtSec? })` opens a thread, or returns `null` for an invalid pubkey, offer id or empty amount. `bankPaymentOfferResponseDraft(offer, nextStatus, me, nowSec, options?)` builds the next snapshot of a known thread from its authorized fields, or `null` when `me` may not send `nextStatus` on it. It is dated (`sentAt`) at `nowSec` or the thread's last update, whichever is later, so a peer whose clock runs ahead never finds the answer older than the snapshot it answers; at the same second the staleness rank orders them. `options` carry an extension (`expiresAtSec`, `extensionSec`), the bank QR to hand over (`spdPayload`) and `withPush`. Both stamp a fresh `clientId` and the wire text (`bankPaymentOfferMessageText`).
 
 ## Stagger
 

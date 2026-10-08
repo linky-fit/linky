@@ -210,7 +210,13 @@ export const useBankPaymentOffers = ({
       options?: BankPaymentOfferResponseOptions,
     ): Promise<boolean> => {
       const draft = myPubHex
-        ? bankPaymentOfferResponseDraft(offer, nextStatus, myPubHex, options)
+        ? bankPaymentOfferResponseDraft(
+            offer,
+            nextStatus,
+            myPubHex,
+            nowSeconds(),
+            options,
+          )
         : null;
       if (!draft) {
         setStatus(t(myPubHex ? "spdPaymentOfferFailed" : "profileMissingNpub"));

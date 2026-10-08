@@ -38,6 +38,7 @@ export class BankOfferDraft extends Schema.Class<BankOfferDraft>(
   spdPayload: Schema.optional(Schema.NonEmptyTrimmedString),
   pushMark: Schema.optional(Schema.Boolean),
   clientId: Schema.optional(ClientId),
+  sentAt: Schema.optional(UnixSeconds),
 }) {}
 
 export class BankOfferReceipt extends Schema.TaggedClass<BankOfferReceipt>()(
