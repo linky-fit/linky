@@ -1,4 +1,4 @@
-export const AVATAR_SIZE_PX = 160;
+export const AVATAR_SIZE_PX = 512;
 
 export const createSquareAvatarDataUrl = async (
   file: File,

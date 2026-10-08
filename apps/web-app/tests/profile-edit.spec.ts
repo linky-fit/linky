@@ -11,6 +11,7 @@ import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import { waitForProfileStatusOnRelay } from "./helpers/relay";
 import { NOSTR_RELAY_URL } from "./helpers/stack";
+import { AVATAR_SIZE_PX } from "../src/utils/image";
 import { nowSeconds } from "../src/utils/time";
 
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
@@ -153,7 +154,7 @@ test("profile edits save after switching to a custom identity", async ({
               .locator("img")
               .evaluate((image: HTMLImageElement) => image.naturalWidth),
           )
-          .toBe(160);
+          .toBe(AVATAR_SIZE_PX);
       } finally {
         await reader.close();
       }
