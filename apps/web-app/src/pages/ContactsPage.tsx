@@ -1,7 +1,10 @@
+import { encodeNpub } from "@linky-fit/linkstr";
 import {
   Chip,
   EmptyState,
   IconButton,
+  NearbyAvatar,
+  NearbyRow,
   Row,
   ScrollList,
   ScrollView,
@@ -12,8 +15,17 @@ import {
 } from "@linky-fit/ui";
 import type { FC } from "react";
 import React from "react";
+import { useAppShellCore } from "../app/context/AppShellContexts";
+import {
+  useBeacon,
+  useBeaconSupport,
+  useNearbyContacts,
+} from "../app/hooks/useBeacon";
+import { useContactRows } from "../app/hooks/useLinksync";
 import type { ContactRowLike } from "../app/types/appTypes";
+import { navigateTo } from "../hooks/useRouting";
 import type { Translate } from "../i18n";
+import { formatShortNpub } from "../utils/formatting";
 
 interface ContactsPageProps {
   activeGroup: string | null;
@@ -37,6 +49,61 @@ interface ContactsPageProps {
   };
 }
 
+const TRADE_BADGE_KEYS = {
+  buy: "beaconTradeBuy",
+  sell: "beaconTradeSell",
+} as const;
+
+const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
+
+/** The user (while their own trade is published) and nearby contacts, trades first. */
+function NearbyContactsSection({ t }: { t: Translate }) {
+  const { trade } = useBeacon();
+  const nearby = useNearbyContacts();
+  const contactRows = useContactRows();
+  const { effectiveProfileName, effectiveProfilePicture, nostrPictureByNpub } =
+    useAppShellCore();
+
+  if (nearby.length === 0 && trade === "none") return null;
+
+  const badge = (state: "nearby" | "buy" | "sell") =>
+    state === "nearby"
+      ? {}
+      : { trade: state, badgeLabel: t(TRADE_BADGE_KEYS[state]) };
+
+  return (
+    <Section title={t("nearby")}>
+      <NearbyRow accessibilityLabel={t("nearby")}>
+        {trade === "none" ? null : (
+          <NearbyAvatar
+            name={effectiveProfileName ?? ""}
+            imageUrl={effectiveProfilePicture ?? undefined}
+            label={t("nearbyYou")}
+            isSelf
+            onPress={() => navigateTo({ route: "proxyPayments" })}
+            {...badge(trade)}
+          />
+        )}
+        {nearby.map(({ pubkey, contactId, state }) => {
+          const npub = encodeNpub(pubkey);
+          const row = contactRows.find(({ id }) => id === contactId);
+          const name = row?.name ?? formatShortNpub(npub);
+          return (
+            <NearbyAvatar
+              key={pubkey}
+              name={name}
+              imageUrl={nostrPictureByNpub[npub] ?? undefined}
+              label={firstName(name)}
+              onPress={() => navigateTo({ route: "chat", id: contactId })}
+              {...badge(state)}
+            />
+          );
+        })}
+      </NearbyRow>
+    </Section>
+  );
+}
+
 export const ContactsPage: FC<ContactsPageProps> = React.memo(
   ({
     activeGroup,
@@ -55,6 +122,7 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
     visibleContacts,
   }) => {
     const { wide } = useMedia();
+    const beaconSupported = useBeaconSupport();
     const ContactList = wide ? ScrollList : Stack;
     const totalVisible =
       visibleContacts.pinned.length +
@@ -139,20 +207,29 @@ export const ContactsPage: FC<ContactsPageProps> = React.memo(
         )}
 
         <ContactList flex={wide ? 1 : undefined}>
-          {!hasAnyContacts ? (
-            <EmptyState title={t("noContactsYet")} />
-          ) : (
-            <Stack gap="$xs">
-              {visibleContacts.pinned.length > 0 && (
-                <Stack gap="$xs">
-                  {visibleContacts.pinned.map(renderContactCard)}
-                </Stack>
-              )}
-              {renderSection(t("proxyPayments"), visibleContacts.proxyPayments)}
-              {renderSection(conversationsLabel, visibleContacts.conversations)}
-              {renderSection(otherContactsLabel, visibleContacts.others)}
-            </Stack>
-          )}
+          <Stack gap="$xs">
+            {beaconSupported ? <NearbyContactsSection t={t} /> : null}
+            {!hasAnyContacts ? (
+              <EmptyState title={t("noContactsYet")} />
+            ) : (
+              <>
+                {visibleContacts.pinned.length > 0 && (
+                  <Stack gap="$xs">
+                    {visibleContacts.pinned.map(renderContactCard)}
+                  </Stack>
+                )}
+                {renderSection(
+                  t("proxyPayments"),
+                  visibleContacts.proxyPayments,
+                )}
+                {renderSection(
+                  conversationsLabel,
+                  visibleContacts.conversations,
+                )}
+                {renderSection(otherContactsLabel, visibleContacts.others)}
+              </>
+            )}
+          </Stack>
         </ContactList>
       </>
     );

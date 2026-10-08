@@ -1,3 +1,4 @@
+import { encodeNpub, type Pubkey } from "@linky-fit/linkstr";
 import {
   Avatar,
   Button,
@@ -15,6 +16,7 @@ import {
 } from "@linky-fit/ui";
 import type { FC } from "react";
 import React from "react";
+import { useIdentityScan, useNearbyIdentities } from "../app/hooks/useBeacon";
 import { getContactQueryPrefill } from "../app/lib/contactQueryPrefill";
 
 import type { Translate } from "../i18n";
@@ -194,6 +196,104 @@ interface ContactSearchResults {
   query: string;
 }
 
+interface SearchCandidateRowProps {
+  candidate: ContactSearchCandidate;
+  isSavingContact: boolean;
+  onAdd: (candidate: ContactSearchCandidate) => Promise<void>;
+  t: Translate;
+  testID?: string;
+}
+
+function SearchCandidateRow({
+  candidate,
+  isSavingContact,
+  onAdd,
+  t,
+  testID,
+}: SearchCandidateRowProps) {
+  const displayName =
+    (candidate.name || candidate.query || "").trim() || t("contact");
+  return (
+    <ListRow
+      testID={testID}
+      selected={candidate.isExactMatch}
+      leading={
+        <Avatar name={displayName} uri={candidate.pictureUrl ?? undefined} />
+      }
+      title={
+        <Text fontWeight="$semibold" numberOfLines={1}>
+          {displayName}
+        </Text>
+      }
+      description={
+        <Stack gap="$xxs">
+          {candidate.lnAddress ? (
+            <Text variant="caption" color="$colorMuted" numberOfLines={1}>
+              {formatShortLightningAddress(candidate.lnAddress)}
+            </Text>
+          ) : null}
+          <Text variant="caption" color="$colorMuted" numberOfLines={1}>
+            {formatShortNpub(candidate.npub)}
+          </Text>
+        </Stack>
+      }
+      trailing={
+        <Button
+          icon={candidate.existingContactId ? "User" : "UserPlus"}
+          onPress={() => void onAdd(candidate)}
+          loading={isSavingContact}
+        >
+          {candidate.existingContactId ? t("openContact") : t("saveContact")}
+        </Button>
+      }
+    />
+  );
+}
+
+/** Nearby npubs as search candidates; each is looked up once, and shows as its short npub until its profile arrives. */
+const useNearbyCandidates = (
+  pubkeys: ReadonlyArray<Pubkey>,
+  searchNewContact: ContactNewPageProps["searchNewContact"],
+): ContactSearchCandidate[] => {
+  const [found, setFound] = React.useState<
+    ReadonlyMap<string, ContactSearchCandidate>
+  >(new Map());
+  const requested = React.useRef(new Set<string>());
+
+  React.useEffect(() => {
+    for (const pubkey of pubkeys) {
+      const npub = encodeNpub(pubkey);
+      if (requested.current.has(npub)) continue;
+      requested.current.add(npub);
+      void searchNewContact(npub).then((result) => {
+        const [candidate] = result.kind === "found" ? result.contacts : [];
+        if (candidate)
+          setFound((current) =>
+            new Map(current).set(npub, {
+              ...candidate,
+              isExactMatch: false,
+              query: formatShortNpub(npub),
+            }),
+          );
+      });
+    }
+  }, [pubkeys, searchNewContact]);
+
+  return pubkeys.map((pubkey) => {
+    const npub = encodeNpub(pubkey);
+    return (
+      found.get(npub) ?? {
+        isExactMatch: false,
+        lnAddress: "",
+        name: "",
+        npub,
+        pictureUrl: null,
+        query: formatShortNpub(npub),
+      }
+    );
+  });
+};
+
 interface ContactNewPageProps {
   addNewContactFromSearchResult: (
     candidate: ContactSearchCandidate,
@@ -238,6 +338,13 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
   const searchQuery = form.npub.trim();
   const showSuggestions =
     step === "search" && !searchQuery && contactSuggestions.length > 0;
+  useIdentityScan();
+  const nearbyCandidates = useNearbyCandidates(
+    useNearbyIdentities(),
+    searchNewContact,
+  );
+  const showNearby =
+    step === "search" && !searchQuery && nearbyCandidates.length > 0;
 
   React.useEffect(() => {
     searchQueryRef.current = searchQuery;
@@ -417,61 +524,16 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
 
       {searchResults ? (
         <Stack gap="$xs">
-          {searchResults.contacts.map((candidate) => {
-            const displayName =
-              (candidate.name || candidate.query || "").trim() || t("contact");
-            return (
-              <ListRow
-                key={candidate.npub}
-                testID="contact-new-search-result"
-                selected={candidate.isExactMatch}
-                leading={
-                  <Avatar
-                    name={displayName}
-                    uri={candidate.pictureUrl ?? undefined}
-                  />
-                }
-                title={
-                  <Text fontWeight="$semibold" numberOfLines={1}>
-                    {displayName}
-                  </Text>
-                }
-                description={
-                  <Stack gap="$xxs">
-                    {candidate.lnAddress ? (
-                      <Text
-                        variant="caption"
-                        color="$colorMuted"
-                        numberOfLines={1}
-                      >
-                        {formatShortLightningAddress(candidate.lnAddress)}
-                      </Text>
-                    ) : null}
-                    <Text
-                      variant="caption"
-                      color="$colorMuted"
-                      numberOfLines={1}
-                    >
-                      {formatShortNpub(candidate.npub)}
-                    </Text>
-                  </Stack>
-                }
-                trailing={
-                  <Button
-                    icon={candidate.existingContactId ? "User" : "UserPlus"}
-                    onPress={() =>
-                      void addNewContactFromSearchResult(candidate)
-                    }
-                    loading={isSavingContact}
-                  >
-                    {candidate.existingContactId
-                      ? t("openContact")
-                      : t("saveContact")}
-                  </Button>
-                }
-              />
-            );
-          })}
+          {searchResults.contacts.map((candidate) => (
+            <SearchCandidateRow
+              key={candidate.npub}
+              testID="contact-new-search-result"
+              candidate={candidate}
+              isSavingContact={isSavingContact}
+              onAdd={addNewContactFromSearchResult}
+              t={t}
+            />
+          ))}
         </Stack>
       ) : null}
 
@@ -490,43 +552,63 @@ export const ContactNewPage: FC<ContactNewPageProps> = ({
         </Button>
       ) : null}
 
-      {showSuggestions ? (
-        <Stack flexGrow={1} justifyContent="flex-end" paddingTop="$xxl">
-          <Section title={t("contactSuggestionsTitle")}>
-            {contactSuggestions.map((suggestion) => {
-              const displayName =
-                (suggestion.name || suggestion.query || "").trim() ||
-                t("contact");
-              return (
-                <ListRow
-                  key={suggestion.npub}
-                  leading={
-                    <Avatar
-                      name={displayName}
-                      uri={suggestion.pictureUrl ?? undefined}
-                    />
-                  }
-                  title={
-                    <Text fontWeight="$semibold" numberOfLines={1}>
-                      {displayName}
-                    </Text>
-                  }
-                  description={formatShortLightningAddress(
-                    suggestion.displayLnAddress,
-                  )}
-                  trailing={
-                    <Button
-                      icon="UserPlus"
-                      onPress={() => void addSuggestion(suggestion)}
-                      loading={isSavingContact}
-                    >
-                      {t("saveContact")}
-                    </Button>
-                  }
+      {showNearby || showSuggestions ? (
+        <Stack
+          flexGrow={1}
+          justifyContent="flex-end"
+          paddingTop="$xxl"
+          gap="$lg"
+        >
+          {showNearby ? (
+            <Section title={t("nearby")}>
+              {nearbyCandidates.map((candidate) => (
+                <SearchCandidateRow
+                  key={candidate.npub}
+                  candidate={candidate}
+                  isSavingContact={isSavingContact}
+                  onAdd={addNewContactFromSearchResult}
+                  t={t}
                 />
-              );
-            })}
-          </Section>
+              ))}
+            </Section>
+          ) : null}
+          {showSuggestions ? (
+            <Section title={t("contactSuggestionsTitle")}>
+              {contactSuggestions.map((suggestion) => {
+                const displayName =
+                  (suggestion.name || suggestion.query || "").trim() ||
+                  t("contact");
+                return (
+                  <ListRow
+                    key={suggestion.npub}
+                    leading={
+                      <Avatar
+                        name={displayName}
+                        uri={suggestion.pictureUrl ?? undefined}
+                      />
+                    }
+                    title={
+                      <Text fontWeight="$semibold" numberOfLines={1}>
+                        {displayName}
+                      </Text>
+                    }
+                    description={formatShortLightningAddress(
+                      suggestion.displayLnAddress,
+                    )}
+                    trailing={
+                      <Button
+                        icon="UserPlus"
+                        onPress={() => void addSuggestion(suggestion)}
+                        loading={isSavingContact}
+                      >
+                        {t("saveContact")}
+                      </Button>
+                    }
+                  />
+                );
+              })}
+            </Section>
+          ) : null}
         </Stack>
       ) : null}
     </>
