@@ -8,6 +8,11 @@ import {
   handlePwaUpdateAvailable,
   recordPwaRegistered,
 } from "../utils/pwaUpdate";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageRemove,
+  safeLocalStorageSet,
+} from "../utils/storage";
 import { getUnknownErrorMessage } from "../utils/unknown";
 import {
   bundleSha256,
@@ -25,6 +30,8 @@ const RELEASE_ASSETS_URL =
 const BUNDLES_DIR = "live-updates";
 const STAGING_DIR = `${BUNDLES_DIR}/staging`;
 const BUILTIN_ASSET_PATH = "public";
+const PENDING_VERSION_KEY = "linky.liveUpdate.pendingVersion";
+const REJECTED_VERSION_KEY = "linky.liveUpdate.rejectedVersion";
 const CHECK_INTERVAL_MS = 30 * 60_000;
 const MIN_CHECK_GAP_MS = 5 * 60_000;
 
@@ -61,16 +68,29 @@ const reportFailure = (stage: string, error: unknown): void => {
   });
 };
 
-/** Deletes downloads that are not newer than the running bundle, keeping the running one. */
+/** Stops offering a bundle that failed on this device; the next release replaces it. */
+const rejectBundle = (version: string, reason: string): void => {
+  safeLocalStorageSet(REJECTED_VERSION_KEY, version);
+  reportAppLog({
+    tag: "liveUpdate.rejected",
+    summary: `Live update ${version} rejected: ${reason}`,
+    links: { liveUpdate: version },
+    payload: { reason, version },
+  });
+};
+
+/** Deletes rejected downloads and those not newer than the running bundle, keeping the running one. */
 const pruneBundles = async (runningLive: boolean): Promise<void> => {
+  const rejected = safeLocalStorageGet(REJECTED_VERSION_KEY);
   const { files } = await Filesystem.readdir({
     path: BUNDLES_DIR,
     directory: Directory.Data,
   }).catch(() => ({ files: [] }));
   const stale = files.filter(
     ({ name }) =>
-      !(runningLive && name === __APP_VERSION__) &&
-      !isNewerVersion(name, __APP_VERSION__),
+      name === rejected ||
+      (!(runningLive && name === __APP_VERSION__) &&
+        !isNewerVersion(name, __APP_VERSION__)),
   );
   await Promise.all(
     stale.map(({ name }) =>
@@ -85,9 +105,16 @@ const pruneBundles = async (runningLive: boolean): Promise<void> => {
 
 /**
  * A live bundle starts unpersisted, so a bundle that never mounts is dropped on
- * the next launch. Once it mounts and matches the shell it is kept for later launches.
+ * the next launch, which then rejects it. Once it mounts and matches the shell
+ * it is kept for later launches.
  */
 const settleRunningBundle = async (shellRuntime: string): Promise<boolean> => {
+  const pending = safeLocalStorageGet(PENDING_VERSION_KEY);
+  safeLocalStorageRemove(PENDING_VERSION_KEY);
+  if (pending && pending !== __APP_VERSION__) {
+    rejectBundle(pending, "it never mounted");
+  }
+
   const { path } = await WebView.getServerBasePath();
   const runningLive = path === (await absolutePath(bundleDir(__APP_VERSION__)));
   if (runningLive) {
@@ -101,6 +128,7 @@ const settleRunningBundle = async (shellRuntime: string): Promise<boolean> => {
         links: { liveUpdate: __APP_VERSION__ },
         payload: { bundleRuntime, shellRuntime, version: __APP_VERSION__ },
       });
+      rejectBundle(__APP_VERSION__, "built for another native runtime");
       await WebView.setServerAssetPath({ path: BUILTIN_ASSET_PATH });
       return false;
     }
@@ -202,6 +230,7 @@ const applyBundle = async (path: string, version: string): Promise<void> => {
     links: { liveUpdate: version },
     payload: { version },
   });
+  safeLocalStorageSet(PENDING_VERSION_KEY, version);
   // The active service worker would answer the reload from its precache and keep the old bundle running.
   const registrations =
     (await navigator.serviceWorker?.getRegistrations()) ?? [];
@@ -220,7 +249,11 @@ const checkForUpdate = async (shellRuntime: string): Promise<void> => {
   lastCheckAt = Date.now();
   try {
     const manifest = await fetchManifest(shellRuntime);
-    if (!manifest || !isNewerVersion(manifest.version, __APP_VERSION__)) {
+    if (
+      !manifest ||
+      !isNewerVersion(manifest.version, __APP_VERSION__) ||
+      manifest.version === safeLocalStorageGet(REJECTED_VERSION_KEY)
+    ) {
       return;
     }
     const path = await downloadBundle(manifest);

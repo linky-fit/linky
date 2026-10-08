@@ -117,6 +117,7 @@ const waitForCheck = () =>
 
 describe("startNativeLiveUpdates", () => {
   beforeEach(() => {
+    localStorage.clear();
     vi.useFakeTimers({ toFake: ["setInterval"] });
     vi.stubGlobal("__APP_VERSION__", "26.10.3");
     vi.stubEnv("DEV", false);
@@ -182,6 +183,9 @@ describe("startNativeLiveUpdates", () => {
 
     await pwaUpdate.applyPwaUpdate();
 
+    expect(localStorage.getItem("linky.liveUpdate.pendingVersion")).toBe(
+      "26.10.4",
+    );
     expect(unregister).toHaveBeenCalled();
     expect(mocks.setServerBasePath).toHaveBeenCalledWith({
       path: `${DATA_DIR}/live-updates/26.10.4`,
@@ -257,6 +261,7 @@ describe("startNativeLiveUpdates", () => {
 
   it("keeps a live bundle that mounted and matches the shell, and prunes older downloads", async () => {
     serveRelease(null);
+    localStorage.setItem("linky.liveUpdate.pendingVersion", "26.10.3");
     mocks.getServerBasePath.mockResolvedValue({
       path: `${DATA_DIR}/live-updates/26.10.3`,
     });
@@ -281,6 +286,8 @@ describe("startNativeLiveUpdates", () => {
     await startNativeLiveUpdates();
 
     expect(mocks.persistServerBasePath).toHaveBeenCalled();
+    expect(localStorage.getItem("linky.liveUpdate.pendingVersion")).toBeNull();
+    expect(localStorage.getItem("linky.liveUpdate.rejectedVersion")).toBeNull();
     expect(mocks.rmdir.mock.calls.map(([options]) => options.path)).toEqual([
       "live-updates/26.10.2",
       "live-updates/staging",
@@ -305,7 +312,32 @@ describe("startNativeLiveUpdates", () => {
     await startNativeLiveUpdates();
 
     expect(mocks.setServerAssetPath).toHaveBeenCalledWith({ path: "public" });
+    expect(localStorage.getItem("linky.liveUpdate.rejectedVersion")).toBe(
+      "26.10.3",
+    );
     expect(mocks.persistServerBasePath).not.toHaveBeenCalled();
     expect(mocks.httpGet).not.toHaveBeenCalled();
+  });
+
+  it("rejects a bundle that was applied but never mounted and stops offering it", async () => {
+    serveRelease(signedManifest());
+    localStorage.setItem("linky.liveUpdate.pendingVersion", "26.10.4");
+    mocks.readdir.mockResolvedValue({ files: [{ name: "26.10.4" }] });
+    mocks.stat.mockResolvedValue({});
+    const { pwaUpdate, startNativeLiveUpdates } = await loadModules();
+    const needRefresh: boolean[] = [];
+    pwaUpdate.subscribePwaNeedRefresh((value) => needRefresh.push(value));
+
+    await startNativeLiveUpdates();
+    await waitForCheck();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(localStorage.getItem("linky.liveUpdate.rejectedVersion")).toBe(
+      "26.10.4",
+    );
+    expect(mocks.rmdir.mock.calls.map(([options]) => options.path)).toEqual([
+      "live-updates/26.10.4",
+    ]);
+    expect(needRefresh).toEqual([false]);
   });
 });
