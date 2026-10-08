@@ -74,6 +74,13 @@ export type {
 } from "./display";
 export { ContactRow, ListRow } from "./lists";
 export type { ContactRowProps, ListRowProps } from "./lists";
+export { NearbyAvatar, NearbyBanner, NearbyRow } from "./nearby";
+export type {
+  NearbyAvatarProps,
+  NearbyBannerProps,
+  NearbyRowProps,
+  NearbyTrade,
+} from "./nearby";
 export { DataValue } from "./data-value";
 export type { DataValueProps } from "./data-value";
 export { TimelineRow } from "./timeline-row";

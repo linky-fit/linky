@@ -7,6 +7,7 @@ import { lists } from "./lists";
 import { media } from "./media";
 import { messaging } from "./messaging";
 import { navigation } from "./navigation";
+import { nearby } from "./nearby";
 import { overlays } from "./overlays";
 import { payments } from "./payments";
 import { setup } from "./setup";
@@ -21,6 +22,7 @@ export const componentSections = [
   fields,
   display,
   lists,
+  nearby,
   feedback,
   overlays,
   navigation,
