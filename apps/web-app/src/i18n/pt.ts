@@ -1159,6 +1159,8 @@ export const pt = {
     "Enquanto o Linky está aberto, qualquer pessoa escaneando por perto vê seu npub para poder adicionar você.",
   beaconIntroBluetooth:
     "Precisa do Bluetooth e mantém uma notificação enquanto está ligado.",
+  beaconIntroBluetoothIos:
+    "Precisa do Bluetooth e continua funcionando em segundo plano enquanto está ligado.",
   beaconTurnOn: "Ligar beacon",
   beaconNotNow: "Agora não",
   otherContacts: "Outros contatos",

@@ -13,6 +13,15 @@ vi.mock("../app/hooks/useBeacon", () => ({
   useBeacon: () => beacon.current,
 }));
 
+const platform = vi.hoisted((): { target: "android" | "ios" } => ({
+  target: "android",
+}));
+
+vi.mock("../platform/runtime", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../platform/runtime")>()),
+  getPlatformTarget: () => platform.target,
+}));
+
 const makeBeacon = (overrides: Partial<UseBeacon> = {}): UseBeacon => ({
   enabled: false,
   setEnabled: vi.fn(async () => {}),
@@ -46,6 +55,7 @@ const button = (label: string) =>
 describe("NearbyBeaconSection", () => {
   afterEach(() => {
     document.body.innerHTML = "";
+    platform.target = "android";
   });
 
   it.each([
@@ -112,10 +122,20 @@ describe("NearbyBeaconSection", () => {
     await press(container.querySelector('[role="switch"]'));
     expect(beacon.current?.setEnabled).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain("beaconIntroNpub");
+    expect(document.body.textContent).toContain("beaconIntroBluetooth");
+    expect(document.body.textContent).not.toContain("beaconIntroBluetoothIos");
 
     await press(button("beaconTurnOn"));
     expect(beacon.current?.markIntroSeen).toHaveBeenCalledOnce();
     expect(beacon.current?.setEnabled).toHaveBeenCalledWith(true);
+    await unmount();
+  });
+
+  it("says on iOS that the beacon runs in the background instead of keeping a notification", async () => {
+    platform.target = "ios";
+    const { container, unmount } = await render();
+    await press(container.querySelector('[role="switch"]'));
+    expect(document.body.textContent).toContain("beaconIntroBluetoothIos");
     await unmount();
   });
 

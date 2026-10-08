@@ -6,7 +6,6 @@ import {
   type BeaconPermissionState,
   type NativeBeaconStatus,
 } from "../../platform/nativeBridge";
-import { getPlatformTarget } from "../../platform/runtime";
 import type { BeaconState } from "../lib/beaconCodec";
 import type { BeaconTrade } from "../lib/beaconSettings";
 import {
@@ -29,15 +28,11 @@ const useBeaconSnapshot = <A>(select: (snapshot: BeaconSnapshot) => A): A =>
 
 const selectPermission = (snapshot: BeaconSnapshot) => snapshot.permission;
 
-/** Experimental features on, the Android shell, and a device that can advertise. */
+/** Experimental features on and a native shell whose device can advertise; the web reports `unsupported`. */
 export const useBeaconSupport = (): boolean => {
   const { experimentalFeatures } = useExperimentalFeatures();
   const permission = useBeaconSnapshot(selectPermission);
-  return (
-    experimentalFeatures &&
-    getPlatformTarget() === "android" &&
-    permission !== "unsupported"
-  );
+  return experimentalFeatures && permission !== "unsupported";
 };
 
 const setEnabled = async (enabled: boolean): Promise<void> => {

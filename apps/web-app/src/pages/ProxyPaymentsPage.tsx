@@ -32,6 +32,7 @@ import {
   PROFILE_STATUS_CURRENCIES,
   type ProfileStatusCurrency,
 } from "../nostrStatus";
+import { getPlatformTarget } from "../platform/runtime";
 const CURRENCY_LABEL_KEYS: Record<ProfileStatusCurrency, I18nKey> = {
   BRL: "proxyPaymentsProvideBrl",
   CZK: "proxyPaymentsProvideCzk",
@@ -89,10 +90,19 @@ const beaconStatusText = (
     : t("beaconStatusBroadcastingOther").replace("{count}", String(keyCount));
 };
 
-const BEACON_INTRO_POINTS: ReadonlyArray<{ icon: IconName; key: I18nKey }> = [
+const beaconIntroPoints = (): ReadonlyArray<{
+  icon: IconName;
+  key: I18nKey;
+}> => [
   { icon: "Users", key: "beaconIntroContacts" },
   { icon: "ShieldCheck", key: "beaconIntroNpub" },
-  { icon: "Bell", key: "beaconIntroBluetooth" },
+  {
+    icon: "Bell",
+    key:
+      getPlatformTarget() === "ios"
+        ? "beaconIntroBluetoothIos"
+        : "beaconIntroBluetooth",
+  },
 ];
 
 function BeaconIntro({
@@ -136,7 +146,7 @@ function BeaconIntro({
           <Icon name="Radio" size="xl" color="$accentText" />
         </Stack>
         <Stack gap="$lg">
-          {BEACON_INTRO_POINTS.map(({ icon, key }) => (
+          {beaconIntroPoints().map(({ icon, key }) => (
             <Row key={key} gap="$md" alignItems="flex-start">
               <Icon name={icon} color="$accentText" />
               <Text flex={1} color="$colorSubtle">

@@ -1147,6 +1147,8 @@ export const cs = {
     "Dokud je Linky otevřené, uvidí váš npub kdokoli, kdo skenuje okolí, aby si vás mohl přidat.",
   beaconIntroBluetooth:
     "Potřebuje Bluetooth a dokud je zapnutý, zobrazuje notifikaci.",
+  beaconIntroBluetoothIos:
+    "Potřebuje Bluetooth a dokud je zapnutý, běží i na pozadí.",
   beaconTurnOn: "Zapnout maják",
   beaconNotNow: "Teď ne",
   otherContacts: "Ostatní kontakty",

@@ -183,7 +183,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "beacon.permissionChanged":
     "The Bluetooth permission state native reports changed, after a prompt or when the app returned from system settings.",
   "beacon.statusChanged":
-    "The native beacon service reported a new status: running, Bluetooth on or off, advertising, or an error. The notification's Stop action turns the beacon switch off, also when the app was closed at the time. With Bluetooth off the service keeps running and resumes when it comes back.",
+    "The native beacon service reported a new status: running, Bluetooth on or off, advertising, or an error. On Android, the notification's Stop action turns the beacon switch off, also when the app was closed at the time. With Bluetooth off the service keeps running and resumes when it comes back.",
   "beacon.nearbySeen":
     "A contact's beacon or identity broadcast was received and they are now nearby. The contact link is the contact id.",
   "beacon.nearbyExpired":

@@ -869,7 +869,6 @@ export interface NativeBeaconKey {
 
 interface AndroidBeaconBridge {
   getPermissionState?: () => string;
-  isRunning?: () => boolean;
   requestPermissions?: () => void;
   setIdentity?: (pubkeyHex: string) => void;
   setKeys?: (json: string) => void;
@@ -887,22 +886,102 @@ const getAndroidBeaconBridge = (): AndroidBeaconBridge | null => {
   return isRecord(value) ? value : null;
 };
 
-/** False when there is no beacon bridge or the call threw. */
+/** Plugin event name and the window event Android dispatches for it. */
+const IOS_BEACON_EVENTS = [
+  ["permission", "linky-beacon-permission"],
+  ["status", "linky-beacon-status"],
+  ["nearby", "linky-beacon-nearby"],
+  ["identities", "linky-beacon-identities"],
+  ["openConversation", "linky-beacon-open-conversation"],
+] as const;
+
+type IosBeaconEvent = (typeof IOS_BEACON_EVENTS)[number];
+
+interface IosBeaconPlugin {
+  addListener(
+    eventName: IosBeaconEvent[0],
+    listenerFunc: (data: unknown) => void,
+  ): Promise<PluginListenerHandle>;
+  getPermissionState(): Promise<{ state?: string }>;
+  requestPermissions(): Promise<void>;
+  setKeys(options: { keys: ReadonlyArray<NativeBeaconKey> }): Promise<void>;
+  setTrade(options: { trade: NativeBeaconTrade }): Promise<void>;
+  setIdentity(options: { pubkey: Pubkey }): Promise<void>;
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  startIdentityScan(): Promise<void>;
+  stopIdentityScan(): Promise<void>;
+}
+
+const LinkyBeacon = registerPlugin<IosBeaconPlugin>("LinkyBeacon");
+
+const supportsIosBeacon = (): boolean =>
+  getPlatformTarget() === "ios" && Capacitor.isPluginAvailable("LinkyBeacon");
+
+const BeaconPermissionEvent = Schema.Struct({ state: BeaconPermissionState });
+
+let iosBeaconPermission: BeaconPermissionState = "unsupported";
+
+const dispatchIosBeaconEvent = (
+  type: IosBeaconEvent[1],
+  detail: unknown,
+): void => {
+  if (
+    type === "linky-beacon-permission" &&
+    Schema.is(BeaconPermissionEvent)(detail)
+  )
+    iosBeaconPermission = detail.state;
+  window.dispatchEvent(new CustomEvent(type, { detail }));
+};
+
+const refreshIosBeaconPermission = (): void => {
+  LinkyBeacon.getPermissionState()
+    .then((result) => dispatchIosBeaconEvent("linky-beacon-permission", result))
+    .catch(() => undefined);
+};
+
+let iosBeaconListening = false;
+
+/** Starts with the first beacon listener, so the plugin keeps a tapped notification until someone can open it. */
+const listenToIosBeacon = (): void => {
+  if (iosBeaconListening || !supportsIosBeacon()) return;
+  iosBeaconListening = true;
+  for (const [pluginEvent, windowEvent] of IOS_BEACON_EVENTS)
+    LinkyBeacon.addListener(pluginEvent, (data) =>
+      dispatchIosBeaconEvent(windowEvent, data),
+    ).catch(() => undefined);
+};
+
+const warnBeaconCallFailed = (error: unknown): void => {
+  console.warn("[linky][beacon] native call failed", error);
+};
+
+/** False when there is no beacon bridge or the Android call threw; iOS failures are only logged. */
 const callBeaconBridge = (
-  call: (bridge: AndroidBeaconBridge) => void,
+  android: (bridge: AndroidBeaconBridge) => void,
+  ios: (plugin: IosBeaconPlugin) => Promise<void>,
 ): boolean => {
+  if (supportsIosBeacon()) {
+    ios(LinkyBeacon).catch(warnBeaconCallFailed);
+    return true;
+  }
   const bridge = getAndroidBeaconBridge();
   if (!bridge) return false;
   try {
-    call(bridge);
+    android(bridge);
     return true;
   } catch (error) {
-    console.warn("[linky][beacon] native call failed", error);
+    warnBeaconCallFailed(error);
     return false;
   }
 };
 
+/** On iOS the last state the plugin reported; the fresh one follows as a `linky-beacon-permission` event. */
 export const getNativeBeaconPermissionState = (): BeaconPermissionState => {
+  if (supportsIosBeacon()) {
+    refreshIosBeaconPermission();
+    return iosBeaconPermission;
+  }
   try {
     const raw = getAndroidBeaconBridge()?.getPermissionState?.();
     return Schema.is(BeaconPermissionState)(raw) ? raw : "unsupported";
@@ -911,15 +990,7 @@ export const getNativeBeaconPermissionState = (): BeaconPermissionState => {
   }
 };
 
-export const isNativeBeaconRunning = (): boolean => {
-  try {
-    return getAndroidBeaconBridge()?.isRunning?.() === true;
-  } catch {
-    return false;
-  }
-};
-
-/** Whether the notification's Stop action ran since the last call; native clears it on read. */
+/** Whether the notification's Stop action ran since the last call; native clears it on read. iOS has no such action. */
 export const takeNativeBeaconStoppedByUser = (): boolean => {
   try {
     return getAndroidBeaconBridge()?.takeStoppedByUser?.() === true;
@@ -928,32 +999,61 @@ export const takeNativeBeaconStoppedByUser = (): boolean => {
   }
 };
 
+/** iOS answers with a `permission` event; a failed request re-reads the state so the caller is not left waiting. */
 export const requestNativeBeaconPermissions = (): boolean =>
-  callBeaconBridge((bridge) => bridge.requestPermissions?.());
+  callBeaconBridge(
+    (bridge) => bridge.requestPermissions?.(),
+    (plugin) =>
+      plugin.requestPermissions().catch((error: unknown) => {
+        refreshIosBeaconPermission();
+        throw error;
+      }),
+  );
 
 export const setNativeBeaconKeys = (
   keys: ReadonlyArray<NativeBeaconKey>,
 ): boolean =>
-  callBeaconBridge((bridge) => bridge.setKeys?.(JSON.stringify(keys)));
+  callBeaconBridge(
+    (bridge) => bridge.setKeys?.(JSON.stringify(keys)),
+    (plugin) => plugin.setKeys({ keys }),
+  );
 
 /** The own pubkey the identity set broadcasts while the app is in the foreground. */
 export const setNativeBeaconIdentity = (pubkey: Pubkey): boolean =>
-  callBeaconBridge((bridge) => bridge.setIdentity?.(pubkey));
+  callBeaconBridge(
+    (bridge) => bridge.setIdentity?.(pubkey),
+    (plugin) => plugin.setIdentity({ pubkey }),
+  );
 
 export const setNativeBeaconTrade = (trade: NativeBeaconTrade): boolean =>
-  callBeaconBridge((bridge) => bridge.setTrade?.(trade));
+  callBeaconBridge(
+    (bridge) => bridge.setTrade?.(trade),
+    (plugin) => plugin.setTrade({ trade }),
+  );
 
 export const startNativeBeacon = (): boolean =>
-  callBeaconBridge((bridge) => bridge.start?.());
+  callBeaconBridge(
+    (bridge) => bridge.start?.(),
+    (plugin) => plugin.start(),
+  );
 
 export const stopNativeBeacon = (): boolean =>
-  callBeaconBridge((bridge) => bridge.stop?.());
+  callBeaconBridge(
+    (bridge) => bridge.stop?.(),
+    (plugin) => plugin.stop(),
+  );
 
 export const startNativeBeaconIdentityScan = (): boolean =>
-  callBeaconBridge((bridge) => bridge.startIdentityScan?.());
+  callBeaconBridge(
+    (bridge) => bridge.startIdentityScan?.(),
+    (plugin) => plugin.startIdentityScan(),
+  );
 
 export const stopNativeBeaconIdentityScan = (): boolean =>
-  callBeaconBridge((bridge) => bridge.stopIdentityScan?.());
+  callBeaconBridge(
+    (bridge) => bridge.stopIdentityScan?.(),
+    (plugin) => plugin.stopIdentityScan(),
+  );
 
 /** Listens to a native beacon event whose `detail` is a JSON string or the object itself. */
 const onNativeBeaconEvent = <A, I>(
@@ -970,6 +1070,7 @@ const onNativeBeaconEvent = <A, I>(
     if (Option.isSome(decoded)) listener(decoded.value);
   };
   window.addEventListener(eventName, onEvent);
+  listenToIosBeacon();
   return () => window.removeEventListener(eventName, onEvent);
 };
 
@@ -978,7 +1079,7 @@ export const onNativeBeaconPermission = (
 ) =>
   onNativeBeaconEvent(
     "linky-beacon-permission",
-    Schema.Struct({ state: BeaconPermissionState }),
+    BeaconPermissionEvent,
     ({ state }) => listener(state),
   );
 
