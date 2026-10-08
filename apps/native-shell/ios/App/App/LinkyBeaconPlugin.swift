@@ -71,7 +71,8 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
     private var advertiseError: String?
     private var lastStatus: [String: Any]?
     private var lastPermission: String?
-    private var servedPacket = Data()
+    private var advertisingRequested = false
+    private var servedPackets: [UUID: Data] = [:]
     private var nearby: [String: Sighting] = [:]
     private var nearbyDirty = false
     private var notified = Set<String>()
@@ -170,8 +171,7 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
                 self.updateScan()
                 self.updateTimer()
             }
-            self.lastStatus = nil
-            self.dispatchStatus()
+            self.dispatchStatus(force: true)
             self.dispatchNearby()
             call.resolve([:])
         }
@@ -187,7 +187,8 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
             self.handshakes.values.forEach { self.finishHandshake($0.peripheral) }
             self.nearby.removeAll()
             self.notified.removeAll()
-            self.dispatchStatus()
+            self.servedPackets.removeAll()
+            self.dispatchStatus(force: true)
             self.dispatchNearby()
             call.resolve([:])
         }
@@ -305,6 +306,7 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
         peripheralManager.stopAdvertising()
         peripheralManager.removeAllServices()
         advertiseError = nil
+        advertisingRequested = false
         guard running else {
             return
         }
@@ -336,6 +338,11 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
             dispatchStatus()
             return
         }
+        // Rebuilding the service while an add is pending reports didAdd twice, but advertising may start only once.
+        guard !advertisingRequested else {
+            return
+        }
+        advertisingRequested = true
         // In the background iOS moves these UUIDs to the overflow area, which only scans filtering on them can see.
         peripheral.startAdvertising([CBAdvertisementDataServiceUUIDsKey: [Self.serviceUUID, Self.overflowMarkerUUID]])
     }
@@ -348,11 +355,10 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveRead request: CBATTRequest) {
         let value: Data
         if request.characteristic.uuid == Self.contactsUUID {
-            // Long reads arrive as several requests with growing offsets, so they must all see the same packet.
-            if request.offset == 0 {
-                servedPacket = ownPacket()
-            }
-            value = servedPacket
+            // Long reads arrive as several requests with growing offsets, so each central must see one packet throughout.
+            let central = request.central.identifier
+            value = request.offset == 0 ? ownPacket() : servedPackets[central] ?? ownPacket()
+            servedPackets[central] = value
         } else {
             value = appActive ? identity ?? Data() : Data()
         }
@@ -615,7 +621,11 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
         }
     }
 
-    private func dispatchStatus() {
+    /// Like Android, status flows only while running, plus one forced snapshot after start() and stop().
+    private func dispatchStatus(force: Bool = false) {
+        guard running || force else {
+            return
+        }
         let error: String? = switch permissionState {
         case "unsupported": "bluetooth_unavailable"
         case "granted": advertiseError
@@ -627,7 +637,7 @@ final class LinkyBeaconPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDele
             "advertising": peripheralManager?.isAdvertising ?? false,
             "error": error ?? NSNull()
         ]
-        if let lastStatus, NSDictionary(dictionary: lastStatus).isEqual(to: status) {
+        if !force, let lastStatus, NSDictionary(dictionary: lastStatus).isEqual(to: status) {
             return
         }
         lastStatus = status
