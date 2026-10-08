@@ -3,6 +3,8 @@ import {
   registerPlugin,
   type PluginListenerHandle,
 } from "@capacitor/core";
+import { isPubkey, Pubkey } from "@linky-fit/linkstr";
+import { Option, Schema } from "effect";
 import {
   getPlatformTarget,
   getTelemetryDevicePlatform,
@@ -831,3 +833,178 @@ export const consumePendingIosNativeDeepLinkUrl = async (): Promise<
     return null;
   }
 };
+
+export const BeaconPermissionState = Schema.Literal(
+  "granted",
+  "denied",
+  "prompt",
+  "unsupported",
+);
+export type BeaconPermissionState = typeof BeaconPermissionState.Type;
+
+export type NativeBeaconTrade = "buy" | "sell" | "none";
+
+export const NativeBeaconStatus = Schema.Struct({
+  running: Schema.Boolean,
+  bluetoothOn: Schema.Boolean,
+  advertising: Schema.Boolean,
+  error: Schema.NullOr(Schema.String),
+});
+export type NativeBeaconStatus = typeof NativeBeaconStatus.Type;
+
+const NativeBeaconSighting = Schema.Struct({
+  pubkey: Pubkey,
+  state: Schema.Literal("nearby", "buy", "sell"),
+  lastSeenMs: Schema.Number,
+});
+export type NativeBeaconSighting = typeof NativeBeaconSighting.Type;
+
+/** One row of the table `setKeys` replaces; `priority` 0 is advertised first. */
+export interface NativeBeaconKey {
+  readonly pubkey: Pubkey;
+  readonly beaconKeyHex: string;
+  readonly priority: number;
+  readonly name: string;
+}
+
+interface AndroidBeaconBridge {
+  getPermissionState?: () => string;
+  isRunning?: () => boolean;
+  requestPermissions?: () => void;
+  setIdentity?: (pubkeyHex: string) => void;
+  setKeys?: (json: string) => void;
+  setTrade?: (trade: string) => void;
+  start?: () => void;
+  startIdentityScan?: () => void;
+  stop?: () => void;
+  stopIdentityScan?: () => void;
+}
+
+const getAndroidBeaconBridge = (): AndroidBeaconBridge | null => {
+  if (getPlatformTarget() !== "android") return null;
+  const value = Reflect.get(globalThis, "LinkyNativeBeacon");
+  return isRecord(value) ? value : null;
+};
+
+/** False when there is no beacon bridge or the call threw. */
+const callBeaconBridge = (
+  call: (bridge: AndroidBeaconBridge) => void,
+): boolean => {
+  const bridge = getAndroidBeaconBridge();
+  if (!bridge) return false;
+  try {
+    call(bridge);
+    return true;
+  } catch (error) {
+    console.warn("[linky][beacon] native call failed", error);
+    return false;
+  }
+};
+
+export const getNativeBeaconPermissionState = (): BeaconPermissionState => {
+  try {
+    const raw = getAndroidBeaconBridge()?.getPermissionState?.();
+    return Schema.is(BeaconPermissionState)(raw) ? raw : "unsupported";
+  } catch {
+    return "unsupported";
+  }
+};
+
+export const isNativeBeaconRunning = (): boolean => {
+  try {
+    return getAndroidBeaconBridge()?.isRunning?.() === true;
+  } catch {
+    return false;
+  }
+};
+
+export const requestNativeBeaconPermissions = (): boolean =>
+  callBeaconBridge((bridge) => bridge.requestPermissions?.());
+
+export const setNativeBeaconKeys = (
+  keys: ReadonlyArray<NativeBeaconKey>,
+): boolean =>
+  callBeaconBridge((bridge) => bridge.setKeys?.(JSON.stringify(keys)));
+
+/** The own pubkey the identity set broadcasts while the app is in the foreground. */
+export const setNativeBeaconIdentity = (pubkey: Pubkey): boolean =>
+  callBeaconBridge((bridge) => bridge.setIdentity?.(pubkey));
+
+export const setNativeBeaconTrade = (trade: NativeBeaconTrade): boolean =>
+  callBeaconBridge((bridge) => bridge.setTrade?.(trade));
+
+export const startNativeBeacon = (): boolean =>
+  callBeaconBridge((bridge) => bridge.start?.());
+
+export const stopNativeBeacon = (): boolean =>
+  callBeaconBridge((bridge) => bridge.stop?.());
+
+export const startNativeBeaconIdentityScan = (): boolean =>
+  callBeaconBridge((bridge) => bridge.startIdentityScan?.());
+
+export const stopNativeBeaconIdentityScan = (): boolean =>
+  callBeaconBridge((bridge) => bridge.stopIdentityScan?.());
+
+/** Listens to a native beacon event whose `detail` is a JSON string or the object itself. */
+const onNativeBeaconEvent = <A, I>(
+  eventName: string,
+  schema: Schema.Schema<A, I>,
+  listener: (value: A) => void,
+): (() => void) => {
+  const decode = Schema.decodeUnknownOption(
+    Schema.Union(Schema.parseJson(schema), schema),
+  );
+  const onEvent: EventListener = (event) => {
+    if (!(event instanceof CustomEvent)) return;
+    const decoded = decode(event.detail);
+    if (Option.isSome(decoded)) listener(decoded.value);
+  };
+  window.addEventListener(eventName, onEvent);
+  return () => window.removeEventListener(eventName, onEvent);
+};
+
+export const onNativeBeaconPermission = (
+  listener: (state: BeaconPermissionState) => void,
+) =>
+  onNativeBeaconEvent(
+    "linky-beacon-permission",
+    Schema.Struct({ state: BeaconPermissionState }),
+    ({ state }) => listener(state),
+  );
+
+export const onNativeBeaconStatus = (
+  listener: (status: NativeBeaconStatus) => void,
+) => onNativeBeaconEvent("linky-beacon-status", NativeBeaconStatus, listener);
+
+export const onNativeBeaconNearby = (
+  listener: (contacts: ReadonlyArray<NativeBeaconSighting>) => void,
+) =>
+  onNativeBeaconEvent(
+    "linky-beacon-nearby",
+    Schema.Struct({ contacts: Schema.Array(NativeBeaconSighting) }),
+    ({ contacts }) => listener(contacts),
+  );
+
+/** Identity packets come from anyone, so a malformed pubkey is dropped rather than failing the snapshot. */
+export const onNativeBeaconIdentities = (
+  listener: (pubkeys: ReadonlyArray<Pubkey>) => void,
+) =>
+  onNativeBeaconEvent(
+    "linky-beacon-identities",
+    Schema.Struct({ pubkeys: Schema.Array(Schema.String) }),
+    ({ pubkeys }) =>
+      listener(
+        [...new Set(pubkeys.map((pubkey) => pubkey.toLowerCase()))].filter(
+          isPubkey,
+        ),
+      ),
+  );
+
+export const onNativeBeaconOpenConversation = (
+  listener: (pubkey: Pubkey) => void,
+) =>
+  onNativeBeaconEvent(
+    "linky-beacon-open-conversation",
+    Schema.Struct({ pubkey: Pubkey }),
+    ({ pubkey }) => listener(pubkey),
+  );

@@ -266,6 +266,20 @@ _Avoid_: drip, throttle
 The end of an offer in which the payer paid the bank transfer and the offerer paid them; **canceled** is the other way an offer ends for everyone.
 _Avoid_: completed, finished, done
 
+## Nearby
+
+**Beacon**:
+The Bluetooth broadcast a device runs for the user's contacts while the beacon switch is on; it tells mutual contacts that the user is nearby and may carry a trade.
+_Avoid_: presence, advertisement
+
+**Nearby**:
+A mutual contact whose beacon this device received in the last two minutes.
+_Avoid_: in range, close by, presence
+
+**Trade**:
+The buy or sell intent, without an amount, that a beacon can carry; shown as "Buys BTC" or "Sells BTC".
+_Avoid_: offer (taken by proxy payments), bid, listing
+
 ## Recurring payments
 
 **Recurring payment**:
