@@ -58,13 +58,14 @@ const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
 /** The user (while their own trade is published) and nearby contacts, trades first. */
 function NearbyContactsSection({ t }: { t: Translate }) {
-  const { trade } = useBeacon();
+  const { enabled, status, trade } = useBeacon();
+  const ownTrade = enabled && status.running ? trade : "none";
   const nearby = useNearbyContacts();
   const contactRows = useContactRows();
   const { effectiveProfileName, effectiveProfilePicture, nostrPictureByNpub } =
     useAppShellCore();
 
-  if (nearby.length === 0 && trade === "none") return null;
+  if (nearby.length === 0 && ownTrade === "none") return null;
 
   const badge = (state: "nearby" | "buy" | "sell") =>
     state === "nearby"
@@ -74,14 +75,14 @@ function NearbyContactsSection({ t }: { t: Translate }) {
   return (
     <Section title={t("nearby")}>
       <NearbyRow accessibilityLabel={t("nearby")}>
-        {trade === "none" ? null : (
+        {ownTrade === "none" ? null : (
           <NearbyAvatar
             name={effectiveProfileName ?? ""}
             imageUrl={effectiveProfilePicture ?? undefined}
             label={t("nearbyYou")}
             isSelf
             onPress={() => navigateTo({ route: "proxyPayments" })}
-            {...badge(trade)}
+            {...badge(ownTrade)}
           />
         )}
         {nearby.map(({ pubkey, contactId, state }) => {

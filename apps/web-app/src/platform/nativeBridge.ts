@@ -878,6 +878,7 @@ interface AndroidBeaconBridge {
   startIdentityScan?: () => void;
   stop?: () => void;
   stopIdentityScan?: () => void;
+  takeStoppedByUser?: () => boolean;
 }
 
 const getAndroidBeaconBridge = (): AndroidBeaconBridge | null => {
@@ -913,6 +914,15 @@ export const getNativeBeaconPermissionState = (): BeaconPermissionState => {
 export const isNativeBeaconRunning = (): boolean => {
   try {
     return getAndroidBeaconBridge()?.isRunning?.() === true;
+  } catch {
+    return false;
+  }
+};
+
+/** Whether the notification's Stop action ran since the last call; native clears it on read. */
+export const takeNativeBeaconStoppedByUser = (): boolean => {
+  try {
+    return getAndroidBeaconBridge()?.takeStoppedByUser?.() === true;
   } catch {
     return false;
   }

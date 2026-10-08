@@ -82,6 +82,8 @@ const beaconStatusText = (
   if (permission !== "granted") return t("beaconStatusPermissionNeeded");
   if (!status.bluetoothOn || status.error === "bluetooth_unavailable")
     return t("beaconStatusBluetoothOff");
+  if (!status.running || status.error?.startsWith("advertise_failed_"))
+    return t("beaconStatusNotBroadcasting");
   return t("beaconStatusBroadcasting").replace("{count}", String(keyCount));
 };
 

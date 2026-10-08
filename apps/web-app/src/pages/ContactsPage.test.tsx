@@ -11,16 +11,21 @@ import { ContactsPage } from "./ContactsPage";
 const beacon = vi.hoisted(() => {
   const state: {
     supported: boolean;
+    running: boolean;
     trade: "none" | "buy" | "sell";
     nearby: NearbyContact[];
     rows: ContactRowLike[];
-  } = { supported: false, trade: "none", nearby: [], rows: [] };
+  } = { supported: false, running: true, trade: "none", nearby: [], rows: [] };
   return state;
 });
 
 vi.mock("../app/hooks/useBeacon", () => ({
   useBeaconSupport: () => beacon.supported,
-  useBeacon: () => ({ trade: beacon.trade }),
+  useBeacon: () => ({
+    enabled: true,
+    status: { running: beacon.running },
+    trade: beacon.trade,
+  }),
   useNearbyContacts: () => beacon.nearby,
 }));
 
@@ -72,6 +77,7 @@ const renderContacts = () =>
 describe("ContactsPage", () => {
   afterEach(() => {
     beacon.supported = false;
+    beacon.running = true;
     beacon.trade = "none";
     beacon.nearby = [];
     beacon.rows = [];
@@ -103,6 +109,22 @@ describe("ContactsPage", () => {
     });
     await act(async () => avatars[0]?.click());
     expect(navigateTo).toHaveBeenCalledWith({ route: "proxyPayments" });
+    await unmount();
+  });
+
+  it("leaves the user out while their trade is not published", async () => {
+    beacon.supported = true;
+    beacon.running = false;
+    beacon.trade = "sell";
+    beacon.nearby = [{ ...bea, state: "nearby" }];
+    beacon.rows = [{ id: bea.contactId, name: "Bea Stone" }];
+    const { container, unmount } = await renderContacts();
+
+    expect(
+      [...container.querySelectorAll('[role="group"] button')].map((element) =>
+        element.getAttribute("aria-label"),
+      ),
+    ).toEqual(["Bea Stone"]);
     await unmount();
   });
 

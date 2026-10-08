@@ -39,6 +39,14 @@ describe("ContactNewPage", () => {
             kind: "found" as const,
             contacts: [
               {
+                isExactMatch: false,
+                lnAddress: "",
+                name: "Someone Else",
+                npub: encodeNpub(unknown),
+                pictureUrl: null,
+                query: encodeNpub(known),
+              },
+              {
                 isExactMatch: true,
                 lnAddress: "",
                 name: "Dana Kral",
@@ -82,6 +90,7 @@ describe("ContactNewPage", () => {
       ),
     ).toEqual(["nearby", "contactSuggestionsTitle"]);
     expect(container.textContent).toContain("Dana Kral");
+    expect(container.textContent).not.toContain("Someone Else");
     expect(container.textContent).toContain(encodeNpub(unknown).slice(0, 10));
 
     const [addDana] = [...container.querySelectorAll("button")].filter(

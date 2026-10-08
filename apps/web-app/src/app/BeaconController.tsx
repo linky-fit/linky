@@ -4,7 +4,11 @@ import {
   type NostrSecretKey,
   type Pubkey,
 } from "@linky-fit/linkstr";
-import type { ContactId } from "@linky-fit/linksync";
+import type {
+  ContactId,
+  ConversationRow,
+  MessageRow,
+} from "@linky-fit/linksync";
 import React from "react";
 import { navigateTo } from "../hooks/useRouting";
 import type { NativeBeaconKey } from "../platform/nativeBridge";
@@ -52,6 +56,28 @@ const useBeaconContacts = (
   }, [ownPubkey, rows]);
 };
 
+const byLastMessage = (
+  contacts: ReadonlyArray<BeaconContact>,
+  conversations: ReadonlyArray<ConversationRow>,
+  messages: ReadonlyArray<MessageRow>,
+): ReadonlyArray<BeaconContact> => {
+  const contactByConversation = contactIdByConversationId(
+    conversations,
+    contacts,
+  );
+  const lastAt = new Map<string, number>();
+  for (const { conversationId, createdAtSec } of messages) {
+    const contactId = conversationId
+      ? contactByConversation.get(conversationId)
+      : undefined;
+    if (!contactId || !createdAtSec) continue;
+    lastAt.set(contactId, Math.max(lastAt.get(contactId) ?? 0, createdAtSec));
+  }
+  return [...contacts].sort(
+    (a, b) => (lastAt.get(b.id) ?? 0) - (lastAt.get(a.id) ?? 0),
+  );
+};
+
 /** Derives the key table while the beacon is on; recently messaged contacts get the lowest priority, so native advertises them first. */
 const BeaconKeyTable = ({
   contacts,
@@ -63,29 +89,9 @@ const BeaconKeyTable = ({
   const messages = useMessageRows();
   const conversations = useConversationRows();
 
-  const ordered = React.useMemo(() => {
-    const contactByConversation = contactIdByConversationId(
-      conversations,
-      contacts,
-    );
-    const lastAt = new Map<string, number>();
-    for (const { conversationId, createdAtSec } of messages) {
-      const contactId = conversationId
-        ? contactByConversation.get(conversationId)
-        : undefined;
-      if (!contactId || !createdAtSec) continue;
-      lastAt.set(contactId, Math.max(lastAt.get(contactId) ?? 0, createdAtSec));
-    }
-    return [...contacts].sort(
-      (a, b) => (lastAt.get(b.id) ?? 0) - (lastAt.get(a.id) ?? 0),
-    );
-  }, [contacts, conversations, messages]);
-  const orderKey = ordered
-    .map((contact) => `${contact.pubkey}:${contact.name}`)
-    .join("\n");
-
   React.useEffect(() => {
     const timeout = window.setTimeout(() => {
+      const ordered = byLastMessage(contacts, conversations, messages);
       const keys = beaconKeysFor(
         secretKey,
         ordered.map((contact) => contact.pubkey),
@@ -107,9 +113,7 @@ const BeaconKeyTable = ({
       );
     }, KEY_TABLE_DEBOUNCE_MS);
     return () => window.clearTimeout(timeout);
-    // `orderKey` stands for `ordered`, which changes identity on every message.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderKey, secretKey]);
+  }, [contacts, conversations, messages, secretKey]);
 
   React.useEffect(() => () => setBeaconKeyTable(null), []);
   return null;

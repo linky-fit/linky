@@ -250,7 +250,10 @@ function SearchCandidateRow({
   );
 }
 
-/** Nearby npubs as search candidates; each is looked up once, and shows as its short npub until its profile arrives. */
+/**
+ * Nearby npubs as search candidates; each is looked up once, and shows as its short npub until its profile arrives.
+ * An npub query is an exact kind-0 lookup only, so who was nearby never reaches a search relay.
+ */
 const useNearbyCandidates = (
   pubkeys: ReadonlyArray<Pubkey>,
   searchNewContact: ContactNewPageProps["searchNewContact"],
@@ -265,8 +268,11 @@ const useNearbyCandidates = (
       const npub = encodeNpub(pubkey);
       if (requested.current.has(npub)) continue;
       requested.current.add(npub);
-      void searchNewContact(npub).then((result) => {
-        const [candidate] = result.kind === "found" ? result.contacts : [];
+      const show = (result: ContactSearchResult) => {
+        const candidate =
+          result.kind === "found"
+            ? result.contacts.find((contact) => contact.npub === npub)
+            : undefined;
         if (candidate)
           setFound((current) =>
             new Map(current).set(npub, {
@@ -275,7 +281,8 @@ const useNearbyCandidates = (
               query: formatShortNpub(npub),
             }),
           );
-      });
+      };
+      void searchNewContact(npub, show).then(show);
     }
   }, [pubkeys, searchNewContact]);
 

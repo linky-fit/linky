@@ -1,6 +1,7 @@
 package fit.linky.app;
 
 import android.annotation.SuppressLint;
+import android.app.ForegroundServiceStartNotAllowedException;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -54,6 +55,8 @@ public final class BeaconService extends Service {
 	static final String EVENT_STATUS = "linky-beacon-status";
 	static final String EVENT_NEARBY = "linky-beacon-nearby";
 	static final String EXTRA_OPEN_PUBKEY = "linky_beacon_open_pubkey";
+	/** Set by the notification's Stop action, so the web app turns the switch off even when it missed the status event. */
+	static final String PREF_STOPPED_BY_USER = "beacon_stopped_by_user";
 	private static final String TAG = "LinkyBeacon";
 	private static final String ACTION_STOP = "fit.linky.app.beacon.STOP";
 	private static final String RUNNING_CHANNEL_ID = "linky_beacon";
@@ -74,6 +77,8 @@ public final class BeaconService extends Service {
 	private static byte[] identity;
 	private static boolean appResumed;
 	private static BeaconService instance;
+	/** The last start()/stop() call, which a service still being created has to honor. */
+	private static boolean wanted;
 	private static volatile boolean running;
 
 	private final Map<String, Sighting> nearby = new LinkedHashMap<>();
@@ -158,11 +163,18 @@ public final class BeaconService extends Service {
 	};
 
 	static void start(Context context) {
-		ContextCompat.startForegroundService(context, new Intent(context, BeaconService.class));
+		wanted = true;
+		try {
+			ContextCompat.startForegroundService(context, new Intent(context, BeaconService.class));
+		} catch (ForegroundServiceStartNotAllowedException error) {
+			wanted = false;
+			dispatchIdle(context, "start_not_allowed");
+		}
 	}
 
 	static void stop(Context context) {
 		main.post(() -> {
+			wanted = false;
 			if (instance == null) {
 				dispatchIdle(context, null);
 			} else {
@@ -258,10 +270,17 @@ public final class BeaconService extends Service {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 		if (intent != null && ACTION_STOP.equals(intent.getAction())) {
+			getSharedPreferences(MainActivity.PREFS_NAME, MODE_PRIVATE).edit().putBoolean(PREF_STOPPED_BY_USER, true).apply();
+			wanted = false;
 			stopSelf();
 			return START_NOT_STICKY;
 		}
+		// A started foreground service must call startForeground even when stop() overtook it.
 		startForeground(RUNNING_NOTIFICATION_ID, runningNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+		if (!wanted) {
+			stopSelf();
+			return START_NOT_STICKY;
+		}
 		lastStatus = null;
 		dispatchStatus();
 		dispatchNearby();

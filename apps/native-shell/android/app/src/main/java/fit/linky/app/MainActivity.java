@@ -69,7 +69,7 @@ public class MainActivity extends BridgeActivity {
 	private static final String EXTRA_NOTIFICATION_OUTER_EVENT_ID = "outerEventId";
 	private static final String EXTRA_NOTIFICATION_RECIPIENT_PUBKEY = "recipientPubkey";
 	private static final long NFC_READ_SUPPRESS_AFTER_WRITE_MS = 4000L;
-	private static final String PREFS_NAME = "linky.native.bridge";
+	static final String PREFS_NAME = "linky.native.bridge";
 	private static final String PREF_PENDING_DEEP_LINK_URL = "pending_deep_link_url";
 	private static final String PREF_PENDING_NOTIFICATION_OPEN_DETAIL = "pending_notification_open_detail";
 	private static final String PREF_PENDING_NOTIFICATION_ROUTE = "pending_notification_route";

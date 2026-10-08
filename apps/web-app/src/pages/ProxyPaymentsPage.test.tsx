@@ -66,6 +66,30 @@ describe("NearbyBeaconSection", () => {
       },
       "beaconStatusBluetoothOff",
     ],
+    [
+      {
+        enabled: true,
+        status: {
+          running: false,
+          bluetoothOn: true,
+          advertising: false,
+          error: "start_not_allowed",
+        },
+      },
+      "beaconStatusNotBroadcasting",
+    ],
+    [
+      {
+        enabled: true,
+        status: {
+          running: true,
+          bluetoothOn: true,
+          advertising: false,
+          error: "advertise_failed_1",
+        },
+      },
+      "beaconStatusNotBroadcasting",
+    ],
     [{ enabled: true }, "beaconStatusBroadcasting"],
   ])("shows the status of %o", async (overrides, status) => {
     const { container, unmount } = await render(overrides);

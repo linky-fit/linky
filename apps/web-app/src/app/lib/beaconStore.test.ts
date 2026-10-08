@@ -2,6 +2,8 @@ import { derivePubkey, NostrSecretKey } from "@linky-fit/linkstr";
 import { createIdFromString } from "@linky-fit/linksync";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const native = vi.hoisted(() => ({ stoppedByUser: false }));
+
 const bridgeCalls = vi.hoisted(() => {
   const calls: string[][] = [];
   const record =
@@ -17,6 +19,11 @@ const bridgeCalls = vi.hoisted(() => {
     setTrade: record("setTrade"),
     start: record("start"),
     stop: record("stop"),
+    takeStoppedByUser: () => {
+      const stopped = native.stoppedByUser;
+      native.stoppedByUser = false;
+      return stopped;
+    },
   });
   return calls;
 });
@@ -155,10 +162,23 @@ describe("beacon store and native service", () => {
     setBeaconKeyTable([key]);
     setBeaconEnabled(true);
     dispatchStatus(true, null);
+    native.stoppedByUser = true;
     dispatchStatus(false, null);
 
     expect(getBeaconSnapshot().enabled).toBe(false);
     expect(localStorage.getItem("linky.beacon.enabled.v1")).toBeNull();
+    expect(native.stoppedByUser).toBe(false);
+  });
+
+  it("retries a refused start when the app returns to the foreground", () => {
+    setBeaconKeyTable([key]);
+    setBeaconEnabled(true);
+    dispatchStatus(false, "start_not_allowed");
+    bridgeCalls.length = 0;
+
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(bridgeCalls.at(-1)).toEqual(["start"]);
+    expect(getBeaconSnapshot().enabled).toBe(true);
   });
 
   it("mirrors native nearby and identity snapshots", () => {
@@ -188,5 +208,26 @@ describe("beacon store and native service", () => {
       new CustomEvent("linky-beacon-permission", { detail: "{" }),
     );
     expect(getBeaconSnapshot()).toBe(before);
+  });
+});
+
+describe("beacon store at launch", () => {
+  const launch = async () => {
+    vi.resetModules();
+    return (await import("./beaconStore")).getBeaconSnapshot();
+  };
+
+  it("starts with the switch off after the notification stopped the service unheard", async () => {
+    localStorage.setItem("linky.beacon.enabled.v1", "true");
+    native.stoppedByUser = true;
+
+    expect((await launch()).enabled).toBe(false);
+    expect(localStorage.getItem("linky.beacon.enabled.v1")).toBeNull();
+  });
+
+  it("keeps the switch on when no Stop is pending", async () => {
+    localStorage.setItem("linky.beacon.enabled.v1", "true");
+
+    expect((await launch()).enabled).toBe(true);
   });
 });
