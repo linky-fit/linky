@@ -32,7 +32,6 @@ const RELEASE_ASSETS_URL =
   "https://github.com/linky-fit/linky/releases/latest/download";
 const BUNDLES_DIR = "live-updates";
 const STAGING_DIR = `${BUNDLES_DIR}/staging`;
-const BUILTIN_ASSET_PATH = "public";
 const PENDING_VERSION_KEY = "linky.liveUpdate.pendingVersion";
 const REJECTED_VERSION_KEY = "linky.liveUpdate.rejectedVersion";
 const CHECK_INTERVAL_MS = 30 * 60_000;
@@ -108,10 +107,9 @@ const pruneBundles = async (runningLive: boolean): Promise<void> => {
 
 /**
  * A live bundle starts unpersisted, so a bundle that never mounts is dropped on
- * the next launch, which then rejects it. Once it mounts and matches the shell
- * it is kept for later launches.
+ * the next launch, which then rejects it. Once it mounts it is kept for later launches.
  */
-const settleRunningBundle = async (shellRuntime: string): Promise<boolean> => {
+const settleRunningBundle = async (): Promise<void> => {
   const pending = safeLocalStorageGet(PENDING_VERSION_KEY);
   safeLocalStorageRemove(PENDING_VERSION_KEY);
   if (pending && pending !== __APP_VERSION__) {
@@ -121,30 +119,15 @@ const settleRunningBundle = async (shellRuntime: string): Promise<boolean> => {
   const { path } = await WebView.getServerBasePath();
   const runningLive = path === (await absolutePath(bundleDir(__APP_VERSION__)));
   if (runningLive) {
-    const bundleRuntime = decodeRuntimeFile(
-      await fetch("/native-runtime.json").then((response) => response.text()),
-    );
-    if (bundleRuntime !== shellRuntime) {
-      reportAppLog({
-        tag: "liveUpdate.reverted",
-        summary: `Live update ${__APP_VERSION__} does not match this shell; reverting to the built-in bundle`,
-        links: { liveUpdate: __APP_VERSION__ },
-        payload: { bundleRuntime, shellRuntime, version: __APP_VERSION__ },
-      });
-      rejectBundle(__APP_VERSION__, "built for another native runtime");
-      await WebView.setServerAssetPath({ path: BUILTIN_ASSET_PATH });
-      return false;
-    }
     await WebView.persistServerBasePath();
     reportAppLog({
       tag: "liveUpdate.booted",
       summary: `Running live update ${__APP_VERSION__}`,
       links: { liveUpdate: __APP_VERSION__ },
-      payload: { runtime: shellRuntime, version: __APP_VERSION__ },
+      payload: { version: __APP_VERSION__ },
     });
   }
   await pruneBundles(runningLive);
-  return true;
 };
 
 const fetchManifest = async (
@@ -169,9 +152,10 @@ const fetchManifest = async (
   return manifest;
 };
 
+/** Unpacks the bundle into app storage; null when it was built for other native code. */
 const downloadBundle = async (
   manifest: LiveUpdateManifest,
-): Promise<string> => {
+): Promise<string | null> => {
   const target = bundleDir(manifest.version);
   if (await exists(target)) return absolutePath(target);
 
@@ -192,6 +176,14 @@ const downloadBundle = async (
   );
   if (!files.some(([name]) => name === "index.html")) {
     throw new Error("bundle has no index.html");
+  }
+  const runtimeFile = files.find(([name]) => name === "native-runtime.json");
+  const bundleRuntime = decodeRuntimeFile(
+    runtimeFile ? new TextDecoder().decode(runtimeFile[1]) : null,
+  );
+  if (bundleRuntime !== manifest.runtime) {
+    rejectBundle(manifest.version, "built for another native runtime");
+    return null;
   }
 
   await Filesystem.rmdir({
@@ -261,6 +253,7 @@ const checkForUpdate = async (shellRuntime: string): Promise<void> => {
       return;
     }
     const path = await downloadBundle(manifest);
+    if (!path) return;
     recordPwaRegistered(() => applyBundle(path, manifest.version));
     await handlePwaUpdateAvailable();
   } catch (error) {
@@ -278,7 +271,7 @@ export const startNativeLiveUpdates = async (): Promise<void> => {
   const shellRuntime = decodeRuntimeFile(readNativeBuiltinRuntimeFile());
   if (!shellRuntime) return;
   try {
-    if (!(await settleRunningBundle(shellRuntime))) return;
+    await settleRunningBundle();
   } catch (error) {
     reportFailure("startup", error);
     return;
