@@ -256,6 +256,24 @@ test("proxy payment: bank details reach exactly one acceptor, who is paid in sat
         return decodeURIComponent(match[2]);
       });
 
+    await test.step("asking again for the same bank QR opens the live offer", async () => {
+      await a.page.goBack();
+      await a.page.waitForURL(/#wallet\/bank-payment\//);
+      const cta = a.page.getByRole("button", { name: "Ask 2 contacts to pay" });
+      await expect(cta).toBeEnabled({ timeout: 60_000 });
+      await cta.click();
+      await a.page.waitForURL(new RegExp(`bank-payment-offer/${offerId}$`), {
+        timeout: 60_000,
+      });
+      const offeredQrs = await a.page.evaluate(
+        () =>
+          Object.keys(localStorage).filter((key) =>
+            key.startsWith("linky.bank_payment_offer_spd.v1."),
+          ).length,
+      );
+      expect(offeredQrs, "A created no second offer").toBe(1);
+    });
+
     await test.step("B and C accept while A is offline", async () => {
       // Both acceptors must be on the offer page before the first accept:
       // A's auto-responder terminates every other candidate the moment one
