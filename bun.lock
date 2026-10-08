@@ -5,6 +5,29 @@
     "": {
       "name": "linky",
     },
+    "apps/beacon-demo": {
+      "name": "@linky-fit/beacon-demo",
+      "version": "0.1.0",
+      "dependencies": {
+        "@linky-fit/ui": "workspace:*",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
+        "react-native": "0.86.3",
+        "react-native-svg": "15.15.4",
+        "react-native-web": "0.21.3",
+      },
+      "devDependencies": {
+        "@linky-fit/config": "workspace:*",
+        "@types/node": "^24.10.1",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "@vitejs/plugin-react-swc": "^4.2.2",
+        "eslint": "^9.39.1",
+        "prettier": "^3.4.2",
+        "typescript": "~5.9.3",
+        "vite": "^7.2.4",
+      },
+    },
     "apps/desktop": {
       "name": "@linky-fit/desktop",
       "version": "0.1.0",
@@ -1025,6 +1048,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@js-sdsl/ordered-map": ["@js-sdsl/ordered-map@4.4.2", "", {}, "sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw=="],
+
+    "@linky-fit/beacon-demo": ["@linky-fit/beacon-demo@workspace:apps/beacon-demo"],
 
     "@linky-fit/config": ["@linky-fit/config@workspace:packages/config"],
 

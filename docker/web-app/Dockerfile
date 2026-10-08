@@ -13,6 +13,7 @@ WORKDIR /app
 # Manifests first so editing source does not bust the dependency layer.
 COPY package.json bun.lock ./
 COPY patches patches
+COPY apps/beacon-demo/package.json apps/beacon-demo/
 COPY apps/desktop/package.json apps/desktop/
 COPY apps/linkshu-cli/package.json apps/linkshu-cli/
 COPY apps/native-shell/package.json apps/native-shell/

@@ -1,0 +1,34 @@
+{
+  "name": "@linky-fit/beacon-demo",
+  "private": true,
+  "version": "0.1.0",
+  "license": "0BSD",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "eslint": "eslint --fix .",
+    "prettier": "prettier --write .",
+    "typecheck": "tsc -b",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@linky-fit/ui": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-native": "0.86.3",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "0.21.3"
+  },
+  "devDependencies": {
+    "@linky-fit/config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react-swc": "^4.2.2",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  }
+}
