@@ -2,6 +2,7 @@ package fit.linky.app;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -32,6 +34,65 @@ public class BeaconCodecTest {
 			byte[] entry = BeaconCodec.entry(key, vector.getLong("slot"), vector.getInt("nonce"), vector.getInt("state"));
 			assertEquals("vector " + i, vector.getString("entryHex"), BeaconCodec.hex(entry));
 		}
+	}
+
+	@Test
+	public void gattPacketsRoundTripTheSharedVectors() throws Exception {
+		JSONArray vectors = new JSONObject(new String(Files.readAllBytes(findVectors().toPath()), StandardCharsets.UTF_8)).getJSONArray("vectors");
+		for (int i = 0; i < vectors.length(); i++) {
+			JSONObject vector = vectors.getJSONObject(i);
+			byte[] key = BeaconCodec.unhex(vector.getString("beaconKeyHex"), 32);
+			int nonce = vector.getInt("nonce");
+			byte[] packet = BeaconCodec.contactPacket(List.of(key), vector.getLong("slot"), nonce, vector.getInt("state"));
+
+			assertEquals("vector " + i, "01" + String.format("%02x", nonce) + vector.getString("entryHex"), BeaconCodec.hex(packet));
+			assertEquals("vector " + i, Map.of("contact", vector.getInt("state")), new BeaconCodec.Listener(Map.of("contact", key)).match(packet, vector.getLong("slot")));
+		}
+	}
+
+	@Test
+	public void gattPacketKeepsTheFirstContactsThatFitOneLongValue() {
+		List<byte[]> keys = new ArrayList<>();
+		Map<String, byte[]> byContact = new LinkedHashMap<>();
+		for (int i = 0; i < 200; i++) {
+			byte[] key = new byte[32];
+			key[0] = (byte) i;
+			key[1] = (byte) (i >> 8);
+			keys.add(key);
+			byContact.put("contact" + i, key);
+		}
+
+		byte[] packet = BeaconCodec.contactPacket(keys, SLOT, 9, BeaconCodec.STATE_SELL);
+		Map<String, Integer> seen = new BeaconCodec.Listener(byContact).match(packet, SLOT);
+
+		assertTrue(packet.length <= BeaconCodec.MAX_PACKET_BYTES);
+		assertEquals(170, seen.size());
+		assertTrue(seen.containsKey("contact169"));
+		assertFalse(seen.containsKey("contact170"));
+		assertArrayEquals(new byte[] { 1, 0 }, BeaconCodec.contactPacket(List.of(), SLOT, 0, BeaconCodec.STATE_NEARBY));
+	}
+
+	@Test
+	public void handshakesSkipAndroidPeersAndForeignServices() {
+		List<UUID> linky = List.of(UUID.randomUUID(), BeaconCodec.LINKY_SERVICE_UUID);
+
+		assertTrue(BeaconCodec.isHandshakePeer(linky, null));
+		assertTrue(BeaconCodec.isHandshakePeer(linky, new byte[] { 0x01 }));
+		assertFalse(BeaconCodec.isHandshakePeer(linky, BeaconCodec.ANDROID_MARKER));
+		assertFalse(BeaconCodec.isHandshakePeer(List.of(UUID.randomUUID()), null));
+		assertFalse(BeaconCodec.isHandshakePeer(null, null));
+	}
+
+	@Test
+	public void overflowBitFortyMarksABackgroundedLinkyIphone() {
+		byte[] linky = BeaconCodec.unhex("01" + "0000000000" + "01" + "00000000000000000000", 17);
+		byte[] otherApp = BeaconCodec.unhex("0100000000008000000000000000000020", 17);
+
+		assertTrue(BeaconCodec.hasLinkyOverflowBit(BeaconCodec.overflowArea(linky)));
+		assertFalse(BeaconCodec.hasLinkyOverflowBit(BeaconCodec.overflowArea(otherApp)));
+		assertNull(BeaconCodec.overflowArea(BeaconCodec.unhex("1005031c", 4)));
+		assertNull(BeaconCodec.overflowArea(BeaconCodec.unhex("0200000000000100000000000000000000", 17)));
+		assertNull(BeaconCodec.overflowArea(null));
 	}
 
 	@Test

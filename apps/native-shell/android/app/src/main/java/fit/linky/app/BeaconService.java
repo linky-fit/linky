@@ -47,8 +47,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
-/** Advertises the contact set (and the identity set while the app is on screen) and scans for contacts' beacons. */
+/**
+ * Advertises the contact set (and the identity set while the app is on screen), scans for contacts' beacons and
+ * exchanges contact packets with non-Android Linky phones through {@link BeaconGatt}.
+ */
 @RequiresApi(31)
 @SuppressLint("MissingPermission")
 public final class BeaconService extends Service {
@@ -76,6 +80,8 @@ public final class BeaconService extends Service {
 	private static int nonce = new SecureRandom().nextInt(256);
 	private static byte[] identity;
 	private static boolean appResumed;
+	/** Receives pubkeys read from peers' IDENTITY characteristic while the identity scan runs. */
+	private static Consumer<byte[]> identityListener;
 	private static BeaconService instance;
 	/** The last start()/stop() call, which a service still being created has to honor. */
 	private static boolean wanted;
@@ -86,6 +92,7 @@ public final class BeaconService extends Service {
 	private BluetoothAdapter adapter;
 	private BluetoothLeAdvertiser advertiser;
 	private BluetoothLeScanner scanner;
+	private BeaconGatt gatt;
 	private BeaconCodec.Listener listener = new BeaconCodec.Listener(Map.of());
 	private Map<String, Contact> contactsByPubkey = Map.of();
 	private List<BeaconCodec.Frame> frames = List.of();
@@ -144,9 +151,10 @@ public final class BeaconService extends Service {
 			if (record == null) {
 				return;
 			}
-			long slot = BeaconCodec.slot(System.currentTimeMillis());
-			for (int id : new int[] { BeaconCodec.CONTACT_ADV_ID, BeaconCodec.CONTACT_SCAN_RESPONSE_ID }) {
-				listener.match(record.getManufacturerSpecificData(id), slot).forEach(BeaconService.this::markSeen);
+			mergePacket(record.getManufacturerSpecificData(BeaconCodec.CONTACT_ADV_ID));
+			mergePacket(record.getManufacturerSpecificData(BeaconCodec.CONTACT_SCAN_RESPONSE_ID));
+			if (gatt != null) {
+				gatt.onScanRecord(result.getDevice(), record);
 			}
 		}
 
@@ -246,6 +254,10 @@ public final class BeaconService extends Service {
 		});
 	}
 
+	static void setIdentityListener(Consumer<byte[]> listener) {
+		main.post(() -> identityListener = listener);
+	}
+
 	@Override
 	public void onCreate() {
 		super.onCreate();
@@ -319,11 +331,18 @@ public final class BeaconService extends Service {
 			return;
 		}
 		error = null;
-		ScanFilter filter = new ScanFilter.Builder()
-			.setManufacturerData(BeaconCodec.CONTACT_ADV_ID, new byte[] { BeaconCodec.VERSION }, new byte[] { (byte) 0xFF })
-			.build();
+		List<ScanFilter> filters = List.of(
+			new ScanFilter.Builder()
+				.setManufacturerData(BeaconCodec.CONTACT_ADV_ID, new byte[] { BeaconCodec.VERSION }, new byte[] { (byte) 0xFF })
+				.build(),
+			new ScanFilter.Builder().setServiceUuid(BeaconGatt.SERVICE).build(),
+			new ScanFilter.Builder()
+				.setManufacturerData(BeaconCodec.APPLE_COMPANY_ID, new byte[] { BeaconCodec.APPLE_OVERFLOW_TYPE }, new byte[] { (byte) 0xFF })
+				.build()
+		);
 		ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build();
-		scanner.startScan(List.of(filter), settings, scanCallback);
+		scanner.startScan(filters, settings, scanCallback);
+		gatt = new BeaconGatt(this, main, advertiser);
 		refreshFrames();
 		updateIdentitySet();
 		Log.d(TAG, "radio started");
@@ -332,6 +351,9 @@ public final class BeaconService extends Service {
 	private void stopRadio() {
 		main.removeCallbacks(cycleFrames);
 		try {
+			if (gatt != null) {
+				gatt.close();
+			}
 			if (scanner != null) {
 				scanner.stopScan(scanCallback);
 			}
@@ -343,6 +365,7 @@ public final class BeaconService extends Service {
 		contactCallback = null;
 		contactSet = null;
 		identityCallback = null;
+		gatt = null;
 		advertiser = null;
 		scanner = null;
 		Log.d(TAG, "radio stopped");
@@ -459,6 +482,34 @@ public final class BeaconService extends Service {
 			advertiser.stopAdvertisingSet(identityCallback);
 		}
 		identityCallback = null;
+	}
+
+	byte[] contactPacket() {
+		List<byte[]> keys = new ArrayList<>(contacts.size());
+		contacts.forEach(contact -> keys.add(contact.key()));
+		return BeaconCodec.contactPacket(keys, BeaconCodec.slot(System.currentTimeMillis()), nonce, trade);
+	}
+
+	byte[] identityValue() {
+		return appResumed && identity != null ? identity : new byte[0];
+	}
+
+	void mergePacket(byte[] packet) {
+		listener.match(packet, BeaconCodec.slot(System.currentTimeMillis())).forEach(this::markSeen);
+	}
+
+	void mergeIdentity(byte[] pubkey) {
+		if (identityListener != null && pubkey != null && pubkey.length == 32) {
+			identityListener.accept(pubkey);
+		}
+	}
+
+	boolean wantsIdentity() {
+		return identityListener != null;
+	}
+
+	boolean wantsHandshake() {
+		return !contacts.isEmpty() || wantsIdentity();
 	}
 
 	private void markSeen(String pubkey, int state) {

@@ -65,8 +65,8 @@ final class LinkyNativeBeaconBridge {
 				record.getManufacturerSpecificData(BeaconCodec.IDENTITY_ADV_ID),
 				record.getManufacturerSpecificData(BeaconCodec.IDENTITY_SCAN_RESPONSE_ID)
 			);
-			if (pubkey != null && identities.put(BeaconCodec.hex(pubkey), System.currentTimeMillis()) == null) {
-				dispatchIdentities();
+			if (pubkey != null) {
+				addIdentity(pubkey);
 			}
 		}
 
@@ -264,6 +264,7 @@ final class LinkyNativeBeaconBridge {
 
 	private void updateIdentityScan() {
 		boolean wanted = identityScanWanted && activityResumed && "granted".equals(getPermissionState());
+		BeaconService.setIdentityListener(wanted ? this::addIdentity : null);
 		if (wanted == (identityScanner != null)) {
 			return;
 		}
@@ -288,6 +289,12 @@ final class LinkyNativeBeaconBridge {
 		ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
 		identityScanner.startScan(List.of(filter), settings, identityCallback);
 		main.postDelayed(identityExpiry, IDENTITY_TICK_MS);
+	}
+
+	private void addIdentity(byte[] pubkey) {
+		if (identities.put(BeaconCodec.hex(pubkey), System.currentTimeMillis()) == null) {
+			dispatchIdentities();
+		}
 	}
 
 	private void dispatchIdentities() {
