@@ -54,7 +54,9 @@
         "@capacitor/ios": "^7.4.3",
         "@linky-fit/config": "workspace:*",
         "@types/node": "^24.10.1",
+        "effect": "^3.19.19",
         "eslint": "^9.39.1",
+        "fflate": "^0.8.3",
         "prettier": "^3.4.2",
         "typescript": "~5.9.3",
       },
@@ -161,6 +163,7 @@
         "@linky-fit/recurring-payment": "workspace:*",
         "@linky-fit/site": "workspace:*",
         "@linky-fit/ui": "workspace:*",
+        "@noble/curves": "^1.9.7",
         "@noble/hashes": "^1.5.0",
         "@scure/base": "^2.0.0",
         "@scure/bip32": "^2.0.1",
@@ -170,6 +173,7 @@
         "core-js": "^3.50.0",
         "dompurify": "^3.4.16",
         "effect": "^3.19.19",
+        "fflate": "^0.8.3",
         "jsqr": "^1.4.0",
         "pdfjs-dist": "^6.2.108",
         "qrcode": "^1.5.4",
@@ -2113,6 +2117,8 @@
     "fetch-blob": ["fetch-blob@3.2.0", "", { "dependencies": { "node-domexception": "^1.0.0", "web-streams-polyfill": "^3.0.3" } }, "sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ=="],
 
     "fetch-nodeshim": ["fetch-nodeshim@0.4.10", "", {}, "sha512-m6I8ALe4L4XpdETy7MJZWs6L1IVMbjs99bwbpIKphxX+0CTns4IKDWJY0LWfr4YsFjfg+z1TjzTMU8lKl8rG0w=="],
+
+    "fflate": ["fflate@0.8.3", "", {}, "sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA=="],
 
     "file-entry-cache": ["file-entry-cache@8.0.0", "", { "dependencies": { "flat-cache": "^4.0.0" } }, "sha512-XXTUwCvisa5oacNGRP9SfNtYBNAMi+RPwBFmblZEF7N7swHYQS6/Zfk7SRwx4D5j3CH211YNRco1DEMNVfZCnQ=="],
 

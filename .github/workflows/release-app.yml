@@ -108,6 +108,7 @@ jobs:
         run: |
           echo "APK_UPLOAD_PATH=$RUNNER_TEMP/linky.apk" >> "$GITHUB_ENV"
           echo "RELEASE_NOTES_PATH=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_ENV"
+          echo "LIVE_UPDATE_DIR=$RUNNER_TEMP/live-update" >> "$GITHUB_ENV"
 
       - name: Prepare release notes
         run: apps/native-shell/scripts/extract-release-notes.sh "$RELEASE_TAG" "$RELEASE_NOTES_PATH"
@@ -127,6 +128,13 @@ jobs:
       - name: Build Android App Bundle
         working-directory: apps/native-shell/android
         run: bash ../scripts/with-java17.sh ./gradlew bundleRelease
+
+      # Shells built from the same native code pick this web bundle up
+      # without a store update; see apps/native-shell/README.md.
+      - name: Pack the live update
+        env:
+          LIVE_UPDATE_SIGNING_KEY: ${{ secrets.LIVE_UPDATE_SIGNING_KEY }}
+        run: bun apps/native-shell/scripts/publish-live-update.ts "$RELEASE_TAG" "$LIVE_UPDATE_DIR"
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v7
@@ -152,9 +160,9 @@ jobs:
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" --notes-file "$RELEASE_NOTES_PATH"
-            gh release upload "$RELEASE_TAG" "$APK_UPLOAD_PATH" --clobber
+            gh release upload "$RELEASE_TAG" "$APK_UPLOAD_PATH" "$LIVE_UPDATE_DIR"/* --clobber
           else
-            gh release create "$RELEASE_TAG" "$APK_UPLOAD_PATH" \
+            gh release create "$RELEASE_TAG" "$APK_UPLOAD_PATH" "$LIVE_UPDATE_DIR"/* \
               --title "Linky $RELEASE_TAG" \
               --notes-file "$RELEASE_NOTES_PATH" \
               --target "$RELEASE_SHA"

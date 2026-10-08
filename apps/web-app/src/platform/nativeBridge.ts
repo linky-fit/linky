@@ -128,6 +128,10 @@ interface AndroidDeepLinksBridge {
   consumePendingUrl?: () => string | null;
 }
 
+interface AndroidRuntimeBridge {
+  readBuiltinRuntimeFile?: () => string | null;
+}
+
 interface AndroidNfcBridge {
   areSupported?: () => boolean;
   cancelWrite?: () => void;
@@ -257,6 +261,11 @@ const getAndroidWindowInsetsBridge = (): AndroidWindowInsetsBridge | null => {
 
 const getAndroidDeepLinksBridge = (): AndroidDeepLinksBridge | null => {
   const value = Reflect.get(globalThis, "LinkyNativeDeepLinks");
+  return isRecord(value) ? value : null;
+};
+
+const getAndroidRuntimeBridge = (): AndroidRuntimeBridge | null => {
+  const value = Reflect.get(globalThis, "LinkyNativeRuntime");
   return isRecord(value) ? value : null;
 };
 
@@ -751,6 +760,20 @@ export const cancelNativeNfcWrite = (): boolean => {
     return true;
   } catch {
     return false;
+  }
+};
+
+/** The `native-runtime.json` bundled in the APK, which names the native code this shell was built from. */
+export const readNativeBuiltinRuntimeFile = (): string | null => {
+  const bridge = getAndroidRuntimeBridge();
+  if (!isNativePlatform() || !bridge?.readBuiltinRuntimeFile) {
+    return null;
+  }
+
+  try {
+    return asNonEmptyString(bridge.readBuiltinRuntimeFile());
+  } catch {
+    return null;
   }
 };
 

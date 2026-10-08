@@ -42,6 +42,9 @@ import com.journeyapps.barcodescanner.camera.CameraSettings;
 
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -166,6 +169,7 @@ public class MainActivity extends BridgeActivity {
 		webView.addJavascriptInterface(new LinkyNativeWindowInsetsBridge(), "LinkyNativeWindowInsets");
 		webView.addJavascriptInterface(new LinkyNativeDeepLinksBridge(), "LinkyNativeDeepLinks");
 		webView.addJavascriptInterface(new LinkyNativeNfcBridge(), "LinkyNativeNfc");
+		webView.addJavascriptInterface(new LinkyNativeRuntimeBridge(), "LinkyNativeRuntime");
 
 		View rootView = webView.getRootView();
 		nativeQrScannerOverlay = rootView.findViewById(R.id.native_qr_scan_overlay);
@@ -1135,6 +1139,23 @@ public class MainActivity extends BridgeActivity {
 		@JavascriptInterface
 		public int getKeyboardInsetPx() {
 			return latestKeyboardInsetPx;
+		}
+	}
+
+	private final class LinkyNativeRuntimeBridge {
+		// Read from the APK, not the served bundle: a live update replaces the latter.
+		@JavascriptInterface
+		public String readBuiltinRuntimeFile() {
+			try (InputStream input = getAssets().open("public/native-runtime.json")) {
+				ByteArrayOutputStream output = new ByteArrayOutputStream();
+				byte[] buffer = new byte[1024];
+				for (int read = input.read(buffer); read != -1; read = input.read(buffer)) {
+					output.write(buffer, 0, read);
+				}
+				return output.toString("UTF-8");
+			} catch (IOException error) {
+				return null;
+			}
 		}
 	}
 

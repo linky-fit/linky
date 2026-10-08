@@ -62,6 +62,20 @@ bun run native:aab:release
 # apps/native-shell/android/app/build/outputs/bundle/release/app-release.aab
 ```
 
+## Live updates
+
+An Android shell keeps its web app current without a store update, the way the browser does through its service worker.
+
+- `android:prepare` writes `native-runtime.json` into the web build: a hash of the tracked files in `android/`, `ios/`, `capacitor.config.ts` and the installed versions of the Capacitor packages. Any change there makes a new runtime.
+- Each app release attaches `live-update-<runtime>.zip` and its signed manifest `live-update-<runtime>.json` to the GitHub release (`scripts/publish-live-update.ts`).
+- The app fetches `releases/latest/download/live-update-<its runtime>.json`. A shell whose runtime the latest release no longer matches gets a 404 and stays on its current bundle until the store update arrives.
+- A newer bundle with a valid signature and SHA-256 is unpacked into app storage and offered like a web update: applied right away on a fresh untouched launch, otherwise from the update banner, never in the middle of wallet work.
+- The switch is not persisted until the new bundle mounts, so a bundle that fails to boot is dropped on the next launch. Installing a new APK goes back to the bundle inside it.
+
+Release CI signs with the `LIVE_UPDATE_SIGNING_KEY` secret, the hex Ed25519 key matching `LIVE_UPDATE_PUBLIC_KEY` in `apps/web-app/src/platform/liveUpdateManifest.ts`; the script refuses a key that doesn't match. Rotating it means changing both in one release; installed shells reject that release's manifest and pick it up from the store, as with a native change.
+
+iOS doesn't expose its runtime yet, so it gets no live updates.
+
 ## Common commands
 
 ```bash

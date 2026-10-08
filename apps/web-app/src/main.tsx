@@ -1,5 +1,6 @@
 import "./platform/browserPolyfills";
 import { Buffer } from "buffer";
+import { Capacitor } from "@capacitor/core";
 import { StrictMode } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
@@ -707,6 +708,11 @@ const bootstrap = async () => {
       window.dispatchEvent(new Event("linky-app-mounted"));
       dynamicImportFetchRetry.clear();
       evoluOpenRetry.clear();
+      if (Capacitor.getPlatform() === "android" && !import.meta.env.DEV) {
+        void import("./platform/nativeLiveUpdate.ts").then(
+          ({ startNativeLiveUpdates }) => startNativeLiveUpdates(),
+        );
+      }
     };
     flushSync(() => {
       root.render(

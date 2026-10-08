@@ -20,6 +20,16 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
 };
 
 const TAG_DESCRIPTIONS: Record<string, string> = {
+  "liveUpdate.downloaded":
+    "The Android app downloaded a newer web bundle published for its native runtime and verified its signature and SHA-256. It applies like a web update: right away on a fresh untouched launch, otherwise from the update banner.",
+  "liveUpdate.applying":
+    "The Android app is switching to a downloaded web bundle and reloading. The bundle is kept only once it mounts; if it never does, the next launch runs the previous bundle.",
+  "liveUpdate.booted":
+    "The Android app mounted a live-updated web bundle that matches its native runtime and kept it for later launches.",
+  "liveUpdate.reverted":
+    "The running web bundle was built for different native code than this Android shell, so the app went back to the bundle shipped in the APK.",
+  "liveUpdate.failed":
+    "Checking for, downloading or settling a live update failed (network, a rejected signature, a SHA-256 mismatch, storage). The app keeps its current bundle and checks again later.",
   "profile.pictureUploadStarted":
     "A cropped profile photo is being uploaded publicly before publishing its URL to Nostr. The blob link is the SHA-256 of the photo bytes.",
   "profile.pictureUploaded":
