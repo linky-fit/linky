@@ -105,5 +105,6 @@ Android:
 - `nostr://`, `cashu://` and `nostrconnect://` URLs are forwarded to the web app: `nostr://npub...` opens or creates the contact, `cashu://cashu...` imports the token, `nostrconnect://...` is handed over whole as a Nostr Connect login request.
 - NFC: reads NDEF URI and `text/plain` records with those schemes; writes `cashu://cashu...` from token detail and `nostr://npub...` from the profile.
 - File export (data backup, chat images and PDFs) writes to the app cache and opens the share sheet.
+- Beacon (experimental, Android 12+): `BeaconService` is a `connectedDevice` foreground service that advertises Bluetooth LE beacons for mutual contacts and scans for theirs; `LinkyNativeBeaconBridge` exposes it as `window.LinkyNativeBeacon`. The wire format lives in `BeaconCodec`, checked against `apps/web-app/src/app/lib/beaconVectors.json` by `cd android && bash ../scripts/with-java17.sh ./gradlew :app:testDebugUnitTest`.
 
 iOS: Keychain-backed secret storage, native QR scanning and CoreNFC NDEF writing for the same payloads. Notifications and deep links are not wired on iOS yet.

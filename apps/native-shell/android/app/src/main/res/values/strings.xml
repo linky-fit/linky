@@ -10,4 +10,12 @@
     <string name="push_notification_channel_name">Linky messages</string>
     <string name="push_notification_fallback_title">Linky</string>
     <string name="push_notification_fallback_body">Nová aktivita v Linky</string>
+    <string name="beacon_running_channel_name">Beacon</string>
+    <string name="beacon_running_title">Beacon is on</string>
+    <string name="beacon_running_text">Mutual contacts nearby can see you</string>
+    <string name="beacon_stop">Stop</string>
+    <string name="beacon_trade_channel_name">Nearby trades</string>
+    <string name="beacon_trade_fallback_title">Contact nearby</string>
+    <string name="beacon_trade_buy">Nearby, buys BTC</string>
+    <string name="beacon_trade_sell">Nearby, sells BTC</string>
 </resources>
