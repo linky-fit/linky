@@ -84,7 +84,9 @@ const beaconStatusText = (
     return t("beaconStatusBluetoothOff");
   if (!status.running || status.error?.startsWith("advertise_failed_"))
     return t("beaconStatusNotBroadcasting");
-  return t("beaconStatusBroadcasting").replace("{count}", String(keyCount));
+  return keyCount === 1
+    ? t("beaconStatusBroadcastingOne")
+    : t("beaconStatusBroadcastingOther").replace("{count}", String(keyCount));
 };
 
 const BEACON_INTRO_POINTS: ReadonlyArray<{ icon: IconName; key: I18nKey }> = [

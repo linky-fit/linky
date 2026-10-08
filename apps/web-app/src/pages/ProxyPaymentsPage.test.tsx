@@ -90,7 +90,8 @@ describe("NearbyBeaconSection", () => {
       },
       "beaconStatusNotBroadcasting",
     ],
-    [{ enabled: true }, "beaconStatusBroadcasting"],
+    [{ enabled: true, keyCount: 1 }, "beaconStatusBroadcastingOne"],
+    [{ enabled: true }, "beaconStatusBroadcastingOther"],
   ])("shows the status of %o", async (overrides, status) => {
     const { container, unmount } = await render(overrides);
     expect(container.textContent).toContain(status);
