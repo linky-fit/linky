@@ -14,6 +14,7 @@ import {
   setNativeBeaconTrade,
   startNativeBeacon,
   stopNativeBeacon,
+  takeNativeBeaconStoppedByUser,
   type BeaconPermissionState,
   type NativeBeaconKey,
   type NativeBeaconSighting,
@@ -130,6 +131,9 @@ let pushed: {
   trade: BeaconTrade | null;
   started: boolean;
 } = { ...NOTHING_PUSHED };
+
+// The notification's Stop action ran while no page was listening.
+if (takeNativeBeaconStoppedByUser()) writeBeaconEnabled(false);
 
 let snapshot: BeaconSnapshot = {
   supported: false,
@@ -291,6 +295,7 @@ export const setBeaconPeers = (context: {
 export const setBeaconKeyTable = (
   next: ReadonlyArray<NativeBeaconKey> | null,
 ): void => {
+  if (JSON.stringify(next) === JSON.stringify(keyTable)) return;
   keyTable = next;
   update({});
 };
@@ -349,14 +354,18 @@ const onStatus = (status: NativeBeaconStatus): void => {
       payload: status,
     });
   // The notification's Stop action: off until the user turns the switch on again.
-  if (!status.running && status.error === null && pushed.started) {
+  if (
+    !status.running &&
+    status.error === null &&
+    (takeNativeBeaconStoppedByUser() || pushed.started)
+  ) {
     pushed = { ...NOTHING_PUSHED };
     writeBeaconEnabled(false);
     update({ status, enabled: false });
     return;
   }
   update({ status });
-  // A failed start is retried on the next store change rather than in a loop.
+  // A failed start is retried on the next store change or return to the app rather than in a loop.
   if (!status.running && status.error !== null) pushed = { ...NOTHING_PUSHED };
 };
 
@@ -380,6 +389,8 @@ if (typeof window !== "undefined") {
     update({ pendingOpen: { pubkey, atMs: Date.now() } }),
   );
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") refreshBeaconPermission();
+    if (document.visibilityState !== "visible") return;
+    refreshBeaconPermission();
+    reconcileNative();
   });
 }

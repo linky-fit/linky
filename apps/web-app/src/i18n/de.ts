@@ -1141,6 +1141,7 @@ export const de = {
   beaconStatusOff: "Aus",
   beaconStatusBroadcasting: "Sendet an {count} Kontakte",
   beaconStatusBluetoothOff: "Bluetooth ist aus",
+  beaconStatusNotBroadcasting: "Sendet nicht",
   beaconStatusPermissionNeeded: "Berechtigung fehlt",
   beaconTrade: "Handel",
   beaconTradeNone: "Keiner",

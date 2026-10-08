@@ -195,6 +195,16 @@ final class LinkyNativeBeaconBridge {
 		}
 	}
 
+	/** Whether the notification's Stop action ran since the last call; reading clears it. */
+	@JavascriptInterface
+	public boolean takeStoppedByUser() {
+		boolean stopped = preferences.getBoolean(BeaconService.PREF_STOPPED_BY_USER, false);
+		if (stopped) {
+			preferences.edit().remove(BeaconService.PREF_STOPPED_BY_USER).apply();
+		}
+		return stopped;
+	}
+
 	@JavascriptInterface
 	public boolean isRunning() {
 		return isSupported() && BeaconService.isRunning();

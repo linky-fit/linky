@@ -1,14 +1,29 @@
+import { derivePubkey, encodeNpub, NostrSecretKey } from "@linky-fit/linkstr";
 import { createId } from "@linky-fit/linksync";
-import { Effect } from "effect";
-import { act } from "react";
+import { Effect, Exit } from "effect";
+import React, { act } from "react";
 import { expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
 import { useContactEditor } from "./useContactEditor";
 
-vi.mock("@linky-fit/linkstr-react", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@linky-fit/linkstr-react")>()),
-  useAtomSet: () => vi.fn(),
+const relays = vi.hoisted(() => ({
+  fetchProfile: vi.fn(async () => Exit.succeed({ profile: null })),
+  searchProfiles: vi.fn(),
 }));
+
+vi.mock("@linky-fit/linkstr-react", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@linky-fit/linkstr-react")>();
+  return {
+    ...actual,
+    useAtomSet: (atom: unknown) =>
+      atom === actual.fetchProfileAtom
+        ? relays.fetchProfile
+        : atom === actual.searchProfilesAtom
+          ? relays.searchProfiles
+          : vi.fn(),
+  };
+});
 vi.mock("./useContactSuggestions", () => ({
   useContactSuggestions: () => [],
 }));
@@ -80,5 +95,34 @@ it("keeps unsaved edits through contact updates, but resets them when changing c
   );
   expect(view.container.querySelector("output")?.textContent).toBe(otherId);
   expect(view.container.querySelector("input")?.value).toBe("Bob");
+  await view.unmount();
+});
+
+it("looks an npub up by its kind-0 profile only, without a relay text search", async () => {
+  const pubkey = derivePubkey(NostrSecretKey.make(new Uint8Array(32).fill(7)));
+  const npub = encodeNpub(pubkey);
+  const searches: Array<
+    ReturnType<typeof useContactEditor>["searchNewContact"]
+  > = [];
+  const Search = () => {
+    const { searchNewContact } = useContactEditor({
+      ...params,
+      route: { kind: "contactNew" },
+    });
+    React.useEffect(() => {
+      searches.push(searchNewContact);
+    }, [searchNewContact]);
+    return null;
+  };
+  const view = await renderIntoDocument(<Search />);
+
+  const result = await searches.at(-1)?.(npub);
+
+  expect(relays.fetchProfile).toHaveBeenCalledWith(pubkey);
+  expect(relays.searchProfiles).not.toHaveBeenCalled();
+  expect(result).toEqual({
+    kind: "found",
+    contacts: [expect.objectContaining({ npub, isExactMatch: true })],
+  });
   await view.unmount();
 });

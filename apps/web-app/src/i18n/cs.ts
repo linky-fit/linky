@@ -1133,6 +1133,7 @@ export const cs = {
   beaconStatusOff: "Vypnuto",
   beaconStatusBroadcasting: "Vysílá kontaktům: {count}",
   beaconStatusBluetoothOff: "Bluetooth je vypnutý",
+  beaconStatusNotBroadcasting: "Nevysílá",
   beaconStatusPermissionNeeded: "Chybí oprávnění",
   beaconTrade: "Obchod",
   beaconTradeNone: "Žádný",
