@@ -26,10 +26,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The Android app is switching to a downloaded web bundle and reloading. The bundle is kept only once it mounts; if it never does, the next launch runs the previous bundle.",
   "liveUpdate.booted":
     "The Android app mounted a live-updated web bundle that matches its native runtime and kept it for later launches.",
-  "liveUpdate.reverted":
-    "The running web bundle was built for different native code than this Android shell, so the app went back to the bundle shipped in the APK.",
   "liveUpdate.rejected":
-    "A live update failed on this device: it was applied but never mounted (the launch after it ran the previous bundle), or it was built for other native code. The app stops offering that version until a newer release arrives.",
+    "A live update failed on this device: its download was built for other native code than its manifest claims, so it was never applied, or it was applied but never mounted (the launch after it ran the previous bundle). The app stops offering that version until a newer release arrives.",
   "liveUpdate.failed":
     "Checking for, downloading or settling a live update failed (network, a rejected signature, a SHA-256 mismatch, storage). The app keeps its current bundle and checks again later.",
   "profile.pictureUploadStarted":

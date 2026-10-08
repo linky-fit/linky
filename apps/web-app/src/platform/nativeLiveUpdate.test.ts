@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
   httpGet: vi.fn(),
   getServerBasePath: vi.fn(),
   setServerBasePath: vi.fn(),
-  setServerAssetPath: vi.fn(),
   persistServerBasePath: vi.fn(),
   writeFile: vi.fn(),
   rename: vi.fn(),
@@ -39,7 +38,6 @@ vi.mock("@capacitor/core", () => ({
   WebView: {
     getServerBasePath: mocks.getServerBasePath,
     persistServerBasePath: mocks.persistServerBasePath,
-    setServerAssetPath: mocks.setServerAssetPath,
     setServerBasePath: mocks.setServerBasePath,
   },
 }));
@@ -293,14 +291,6 @@ describe("startNativeLiveUpdates", () => {
         { name: "staging" },
       ],
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ runtime: SHELL_RUNTIME })),
-        ),
-      ),
-    );
     const { startNativeLiveUpdates } = await loadModules();
 
     await startNativeLiveUpdates();
@@ -315,28 +305,31 @@ describe("startNativeLiveUpdates", () => {
     await waitForCheck();
   });
 
-  it("returns to the built-in bundle when the running live bundle was built for another runtime", async () => {
-    mocks.getServerBasePath.mockResolvedValue({
-      path: `${DATA_DIR}/live-updates/26.10.3`,
-    });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ runtime: "fedcba9876543210" })),
-        ),
+  it("rejects a bundle built for other native code without leaving the running bundle", async () => {
+    const foreignBundle = zipSync({
+      "index.html": strToU8("<html></html>"),
+      "native-runtime.json": strToU8(
+        JSON.stringify({ runtime: "fedcba9876543210" }),
       ),
+    });
+    serveRelease(
+      signedManifest({ sha256: bundleSha256(foreignBundle) }),
+      foreignBundle,
     );
-    const { startNativeLiveUpdates } = await loadModules();
+    const { pwaUpdate, startNativeLiveUpdates } = await loadModules();
+    const needRefresh: boolean[] = [];
+    pwaUpdate.subscribePwaNeedRefresh((value) => needRefresh.push(value));
 
     await startNativeLiveUpdates();
-
-    expect(mocks.setServerAssetPath).toHaveBeenCalledWith({ path: "public" });
-    expect(localStorage.getItem("linky.liveUpdate.rejectedVersion")).toBe(
-      "26.10.3",
+    await vi.waitFor(() =>
+      expect(localStorage.getItem("linky.liveUpdate.rejectedVersion")).toBe(
+        "26.10.4",
+      ),
     );
-    expect(mocks.persistServerBasePath).not.toHaveBeenCalled();
-    expect(mocks.httpGet).not.toHaveBeenCalled();
+
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+    expect(mocks.setServerBasePath).not.toHaveBeenCalled();
+    expect(needRefresh).toEqual([false]);
   });
 
   it("rejects a bundle that was applied but never mounted and stops offering it", async () => {
