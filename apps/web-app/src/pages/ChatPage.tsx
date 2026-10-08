@@ -31,12 +31,12 @@ import type { ReplyContext } from "../app/hooks/messages/useSendChatMessage";
 import {
   type BankPaymentOfferInfo,
   decodeBankPaymentOffer,
-  isBankPaymentOfferExpired,
 } from "@linky-fit/proxy-payment";
 import {
   isBankPaymentOfferMinimized,
   setBankPaymentOfferMinimized,
 } from "../app/lib/bankPaymentOfferStorage";
+import { bankPaymentOfferToOpen } from "../app/lib/bankPaymentOfferRows";
 import { formatChatMessagePreviewText } from "../app/lib/chatMessageDisplay";
 import {
   captureChatViewportAnchor,
@@ -1217,32 +1217,14 @@ export const ChatPage: FC<ChatPageProps> = ({
     const chatId = (selectedContact?.id ?? "").trim();
     if (!chatId) return;
 
-    const nowSec = nowSeconds();
-    let newestOffer: { offerId: string; updatedAtSec: number } | null = null;
-
-    for (const message of bankPaymentOfferMessages) {
-      if (message.contactId.trim() !== chatId) continue;
-      if (message.direction !== "in") continue;
-
-      const info = decodeBankPaymentOffer(message.content);
-      if (!info || info.status !== "offered") continue;
-      if (isBankPaymentOfferExpired(info, message.createdAtSec, nowSec)) {
-        continue;
-      }
-      if (isBankPaymentOfferMinimized(chatId, info.offerId)) continue;
-
-      const updatedAtSec = info.statusUpdatedAtSec ?? message.createdAtSec;
-      if (!newestOffer || updatedAtSec > newestOffer.updatedAtSec) {
-        newestOffer = { offerId: info.offerId, updatedAtSec };
-      }
-    }
-
-    if (newestOffer) {
-      navigateTo({
-        route: "bankPaymentOffer",
-        chatId,
-        offerId: newestOffer.offerId,
-      });
+    const offerId = bankPaymentOfferToOpen(
+      bankPaymentOfferMessages,
+      chatId,
+      nowSeconds(),
+      (id) => isBankPaymentOfferMinimized(chatId, id),
+    );
+    if (offerId) {
+      navigateTo({ route: "bankPaymentOffer", chatId, offerId });
     }
   }, [
     bankPaymentOfferMessages,
