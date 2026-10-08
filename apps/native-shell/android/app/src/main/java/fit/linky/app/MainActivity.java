@@ -136,12 +136,14 @@ public class MainActivity extends BridgeActivity {
 
 	private androidx.activity.result.ActivityResultLauncher<String> notificationPermissionLauncher;
 	private SharedPreferences bridgePreferences;
+	private LinkyNativeBeaconBridge beaconBridge;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		// super.onCreate() re-delivers the launch intent through onNewIntent(), which
-		// writes to bridgePreferences — so it must be initialized first.
+		// uses bridgePreferences and beaconBridge — so they must be initialized first.
 		bridgePreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+		beaconBridge = new LinkyNativeBeaconBridge(this, bridgePreferences);
 		super.onCreate(savedInstanceState);
 		activeInstanceRef = new WeakReference<>(this);
 		getOnBackPressedDispatcher().addCallback(this, appNavigationBackCallback);
@@ -171,6 +173,7 @@ public class MainActivity extends BridgeActivity {
 		webView.addJavascriptInterface(new LinkyNativeDeepLinksBridge(), "LinkyNativeDeepLinks");
 		webView.addJavascriptInterface(new LinkyNativeNfcBridge(), "LinkyNativeNfc");
 		webView.addJavascriptInterface(new LinkyNativeRuntimeBridge(), "LinkyNativeRuntime");
+		webView.addJavascriptInterface(beaconBridge, "LinkyNativeBeacon");
 
 		View rootView = webView.getRootView();
 		nativeQrScannerOverlay = rootView.findViewById(R.id.native_qr_scan_overlay);
@@ -249,6 +252,7 @@ public class MainActivity extends BridgeActivity {
 		super.onResume();
 		activeInstanceRef = new WeakReference<>(this);
 		appInForeground = true;
+		beaconBridge.onResume();
 		if (nativeQrScannerOpen && hasCameraPermission() && nativeQrScannerView != null) {
 			nativeQrScannerView.resume();
 		}
@@ -270,6 +274,7 @@ public class MainActivity extends BridgeActivity {
 		}
 		super.onPause();
 		appInForeground = false;
+		beaconBridge.onPause();
 		if (pendingNfcWriteUrl != null) {
 			finishPendingNfcWrite("cancelled", null);
 			return;
@@ -314,6 +319,8 @@ public class MainActivity extends BridgeActivity {
 			cachePendingNotificationRoute(notificationRoute);
 			dispatchNotificationOpen(intent);
 		}
+
+		beaconBridge.handleIntent(intent);
 	}
 
 	static void dispatchScanResult(String status, String value, String message) {
@@ -353,6 +360,18 @@ public class MainActivity extends BridgeActivity {
 		}
 
 		activity.dispatchWindowEvent(EVENT_SCAN_RESULT, detail);
+	}
+
+	static void dispatchBeaconEvent(String eventName, JSONObject detail) {
+		MainActivity activity = activeInstanceRef.get();
+		WebView webView = activity == null ? null : activity.getBridgeWebView();
+		if (webView == null) {
+			return;
+		}
+
+		String script = "window.dispatchEvent(new CustomEvent(" + JSONObject.quote(eventName)
+			+ ", { detail: " + JSONObject.quote(detail.toString()) + " }));";
+		activity.runOnUiThread(() -> webView.evaluateJavascript(script, null));
 	}
 
 	private Bridge getCapacitorBridge() {
