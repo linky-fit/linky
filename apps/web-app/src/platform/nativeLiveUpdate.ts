@@ -152,10 +152,9 @@ const fetchManifest = async (
   return manifest;
 };
 
-/** Unpacks the bundle into app storage; null when it was built for other native code. */
 const downloadBundle = async (
   manifest: LiveUpdateManifest,
-): Promise<string | null> => {
+): Promise<string> => {
   const target = bundleDir(manifest.version);
   if (await exists(target)) return absolutePath(target);
 
@@ -176,14 +175,6 @@ const downloadBundle = async (
   );
   if (!files.some(([name]) => name === "index.html")) {
     throw new Error("bundle has no index.html");
-  }
-  const runtimeFile = files.find(([name]) => name === "native-runtime.json");
-  const bundleRuntime = decodeRuntimeFile(
-    runtimeFile ? new TextDecoder().decode(runtimeFile[1]) : null,
-  );
-  if (bundleRuntime !== manifest.runtime) {
-    rejectBundle(manifest.version, "built for another native runtime");
-    return null;
   }
 
   await Filesystem.rmdir({
@@ -253,7 +244,6 @@ const checkForUpdate = async (shellRuntime: string): Promise<void> => {
       return;
     }
     const path = await downloadBundle(manifest);
-    if (!path) return;
     recordPwaRegistered(() => applyBundle(path, manifest.version));
     await handlePwaUpdateAvailable();
   } catch (error) {

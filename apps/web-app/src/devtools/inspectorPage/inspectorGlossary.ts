@@ -27,7 +27,7 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   "liveUpdate.booted":
     "The Android app mounted a live-updated web bundle that matches its native runtime and kept it for later launches.",
   "liveUpdate.rejected":
-    "A live update failed on this device: its download was built for other native code than its manifest claims, so it was never applied, or it was applied but never mounted (the launch after it ran the previous bundle). The app stops offering that version until a newer release arrives.",
+    "A live update was applied but never mounted: the launch after it ran the previous bundle. The app stops offering that version until a newer release arrives.",
   "liveUpdate.failed":
     "Checking for, downloading or settling a live update failed (network, a rejected signature, a SHA-256 mismatch, storage). The app keeps its current bundle and checks again later.",
   "profile.pictureUploadStarted":
