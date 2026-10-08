@@ -1,6 +1,14 @@
 import { base64 } from "@scure/base";
 import { strToU8, zipSync } from "fflate";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from "vitest";
 import {
   bundleSha256,
   signLiveUpdateManifest,
@@ -50,6 +58,7 @@ vi.mock("@capacitor/filesystem", () => ({
 }));
 
 vi.mock("./nativeBridge", () => ({
+  NATIVE_RESUME_EVENT: "linky-native-resume",
   readNativeBuiltinRuntimeFile: mocks.readBuiltinRuntime,
 }));
 
@@ -96,7 +105,11 @@ const serveRelease = (manifest: LiveUpdateManifest | null, zip = bundle) => {
           : { status: 404, data: "" },
       );
     }
-    return Promise.resolve({ status: 200, data: base64.encode(zip) });
+    // Android wraps the base64 body at 76 characters.
+    return Promise.resolve({
+      status: 200,
+      data: base64.encode(zip).replace(/.{76}/g, "$&\n"),
+    });
   });
 };
 
@@ -116,9 +129,12 @@ const waitForCheck = () =>
   });
 
 describe("startNativeLiveUpdates", () => {
+  let addWindowListener: MockInstance<typeof window.addEventListener>;
+
   beforeEach(() => {
+    addWindowListener = vi.spyOn(window, "addEventListener");
     localStorage.clear();
-    vi.useFakeTimers({ toFake: ["setInterval"] });
+    vi.useFakeTimers({ toFake: ["setInterval", "Date"] });
     vi.stubGlobal("__APP_VERSION__", "26.10.3");
     vi.stubEnv("DEV", false);
     mocks.readBuiltinRuntime.mockReturnValue(
@@ -134,10 +150,14 @@ describe("startNativeLiveUpdates", () => {
   });
 
   afterEach(() => {
+    for (const [type, listener] of addWindowListener.mock.calls) {
+      window.removeEventListener(type, listener);
+    }
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     vi.resetAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("does nothing in a shell without a native runtime", async () => {
@@ -339,5 +359,20 @@ describe("startNativeLiveUpdates", () => {
       "live-updates/26.10.4",
     ]);
     expect(needRefresh).toEqual([false]);
+  });
+
+  it("checks again when the app returns to the foreground", async () => {
+    serveRelease(null);
+    const { startNativeLiveUpdates } = await loadModules();
+
+    await startNativeLiveUpdates();
+    await waitForCheck();
+    window.dispatchEvent(new Event("linky-native-resume"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.httpGet).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(5 * 60_000);
+    window.dispatchEvent(new Event("linky-native-resume"));
+    await vi.waitFor(() => expect(mocks.httpGet).toHaveBeenCalledTimes(2));
   });
 });
