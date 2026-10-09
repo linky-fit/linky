@@ -69,6 +69,7 @@ import {
 import type { FilePickerHandle } from "../../utils/pickFile";
 import { nowSeconds } from "../../utils/time";
 import { prepareProfilePicture } from "../lib/profilePicture";
+import { profileMetadataForNewKey } from "../lib/profileMetadata";
 import type { I18nKey, Translate } from "../../i18n";
 
 type NostrIdentitySource = "custom" | "derived";
@@ -406,12 +407,20 @@ export const useProfileAuthDomain = ({
       if (!previousNsec || previousNsec === newNsec) return true;
 
       const previousNpub = await deriveNpubFromNsec(previousNsec);
-      const metadata =
+      const previousMetadata =
         myProfileMetadataRef.current ??
         (previousNpub
           ? (loadCachedProfile(previousNpub)?.metadata ?? null)
           : null);
-      if (!metadata) return true;
+      if (!previousMetadata) return true;
+
+      const newNpub = await deriveNpubFromNsec(newNsec);
+      if (!newNpub) return false;
+      const metadata = profileMetadataForNewKey(
+        previousMetadata,
+        previousNpub,
+        newNpub,
+      );
 
       const config = buildLinkstrConfig(
         newNsec,
@@ -434,10 +443,7 @@ export const useProfileAuthDomain = ({
         return false;
       }
 
-      const newNpub = await deriveNpubFromNsec(newNsec);
-      if (newNpub) {
-        saveCachedProfile(newNpub, metadata, nowSeconds());
-      }
+      saveCachedProfile(newNpub, metadata, nowSeconds());
       return true;
     },
     [

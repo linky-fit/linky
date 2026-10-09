@@ -2,6 +2,7 @@ import { nip19 } from "nostr-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getProfileNip05,
+  isNpubDefaultNip05,
   parseNip05IdentifierInput,
   resolveNip05Input,
   resolveVerifiedNip05Identifier,
@@ -42,6 +43,22 @@ describe("parseNip05IdentifierInput", () => {
     expect(parseNip05IdentifierInput("npub1abc")).toBeNull();
     expect(parseNip05IdentifierInput("nostr:npub1abc")).toBeNull();
     expect(parseNip05IdentifierInput("npub1abc@npub.cash")).toBeNull();
+  });
+});
+
+describe("isNpubDefaultNip05", () => {
+  it("matches only npub handles on linky.fit", () => {
+    expect(
+      isNpubDefaultNip05(
+        "NPUB1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8@Linky.Fit",
+      ),
+    ).toBe(true);
+    expect(isNpubDefaultNip05("hynek@linky.fit")).toBe(false);
+    expect(
+      isNpubDefaultNip05(
+        "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8@nostr.com",
+      ),
+    ).toBe(false);
   });
 });
 

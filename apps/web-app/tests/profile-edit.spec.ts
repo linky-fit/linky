@@ -85,9 +85,6 @@ test("profile edits save after switching to a custom identity", async ({
   expect(photos.size).toBe(1);
   await page.goto("/#profile/edit");
   await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Alice");
-  const originalAddress = await page
-    .getByRole("textbox", { name: "Lightning address", exact: true })
-    .inputValue();
 
   await page.goto("/#advanced");
   const paste = page.getByRole("button", { name: "Paste custom nostr keys" });
@@ -102,13 +99,14 @@ test("profile edits save after switching to a custom identity", async ({
     )
     .toBe("custom");
   const keySwitchTime = nowSeconds();
+  const customKeyAddress = `${nip19.npubEncode(pubkey)}@linky.fit`;
 
   await page.goto("/#profile");
   await expect(page.getByTestId("profile-detail")).toContainText("Alice");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(
     page.getByRole("textbox", { name: "Lightning address", exact: true }),
-  ).toHaveValue(originalAddress);
+  ).toHaveValue(customKeyAddress);
   await page.getByLabel("Name", { exact: true }).fill("Alice updated");
   await page.getByLabel("Status", { exact: true }).fill("Available");
   await pickPhoto(page, "#e74c3c");
@@ -139,7 +137,7 @@ test("profile edits save after switching to a custom identity", async ({
     expect(photos.size).toBe(2);
     expect(metadata).toEqual({
       name: "Alice updated",
-      lud16: originalAddress,
+      lud16: customKeyAddress,
       picture: [...photos.keys()][1],
     });
 

@@ -8,6 +8,7 @@ import type { Lang } from "../../../i18n";
 import { navigateTo, type useRouting } from "../../../hooks/useRouting";
 import { getBestNostrName } from "../../../utils/formatting";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
+import { useNpubNip05Cleanup } from "../profile/useNpubNip05Cleanup";
 import { useProfileEditor } from "../profile/useProfileEditor";
 import { useProfileStatusEditor } from "../profile/useProfileStatusEditor";
 import type { Translate } from "../../../i18n";
@@ -20,6 +21,7 @@ interface UseProfileCompositionParams {
   nostrMetadataByNpub: Record<string, ProfileMetadata | null>;
   nostrPictureByNpub: Record<string, string | null>;
   nostrStatusByNpub: Record<string, string | null>;
+  nostrBootstrapReady: boolean;
   route: ReturnType<typeof useRouting>;
   setStatus: React.Dispatch<React.SetStateAction<string | null>>;
   t: Translate;
@@ -32,6 +34,7 @@ export const useProfileComposition = ({
   nostrMetadataByNpub,
   nostrPictureByNpub,
   nostrStatusByNpub,
+  nostrBootstrapReady,
   route,
   setStatus,
   t,
@@ -163,6 +166,12 @@ export const useProfileComposition = ({
     if (watchedStatus === undefined) return;
     setMyProfileStatus(watchedStatus);
   }, [setMyProfileStatus, watchedStatus]);
+
+  useNpubNip05Cleanup({
+    currentNpub,
+    enabled: nostrBootstrapReady,
+    setMyProfileMetadata,
+  });
 
   const {
     profileStatusCurrencies,

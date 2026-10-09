@@ -89,7 +89,8 @@ export const parseNip05IdentifierInput = (
   };
 };
 
-const parseDefaultDomainLocalPart = (value: string): string | null => {
+/** The normalized local part of a linky.fit address or handle; null for other domains. */
+export const parseDefaultDomainLocalPart = (value: string): string | null => {
   const input = stripNostrUriPrefix(value);
   const atIndex = input.indexOf("@");
   if (atIndex < 0 || atIndex !== input.lastIndexOf("@")) return null;
@@ -107,6 +108,12 @@ export const getDefaultNip05IdentifierFromAddress = (
   if (!localPart || looksLikeDirectNpub(localPart)) return null;
 
   return `${localPart}@${DEFAULT_NIP05_DOMAIN}`;
+};
+
+/** Whether `nip05` is an `npub…@linky.fit` handle, which linky.fit never verifies. */
+export const isNpubDefaultNip05 = (nip05: string): boolean => {
+  const localPart = parseDefaultDomainLocalPart(nip05);
+  return localPart !== null && looksLikeDirectNpub(localPart);
 };
 
 /** The nip05 a profile publishes with this lightning address; a handle from another domain survives. */
