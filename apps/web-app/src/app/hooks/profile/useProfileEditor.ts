@@ -20,7 +20,7 @@ import {
   saveCachedStatus,
 } from "../../../profileCache";
 import { getBestNostrName } from "../../../utils/formatting";
-import { getDefaultNip05IdentifierFromAddress } from "../../../utils/nostrNip05";
+import { getProfileNip05 } from "../../../utils/nostrNip05";
 import {
   getOwnLightningAddressInputCandidate,
   type OwnLightningAddressInputCandidate,
@@ -272,9 +272,6 @@ export const useProfileEditor = ({
 
         const trimmedName = name.trim();
         const trimmedLightningAddress = lightningAddress.trim();
-        const nextNip05 = getDefaultNip05IdentifierFromAddress(
-          trimmedLightningAddress,
-        );
         const trimmedPicture = await prepareProfilePicture(
           picture,
           currentNsec,
@@ -288,11 +285,7 @@ export const useProfileEditor = ({
         // The own pubkey is watched, so cache/state carry the newest profile.
         const prev =
           myProfileMetadata ?? loadCachedProfile(currentNpub)?.metadata ?? null;
-        const keptNip05 =
-          nextNip05 ??
-          (getDefaultNip05IdentifierFromAddress(prev?.nip05 ?? "")
-            ? undefined
-            : prev?.nip05);
+        const nip05 = getProfileNip05(trimmedLightningAddress, prev?.nip05);
 
         const nextMetadata = new ProfileMetadata({
           ...(trimmedName
@@ -304,7 +297,7 @@ export const useProfileEditor = ({
                 ...(prev?.lud06 ? { lud06: prev.lud06 } : {}),
               }
             : {}),
-          ...(keptNip05 ? { nip05: keptNip05 } : {}),
+          ...(nip05 ? { nip05 } : {}),
           ...(trimmedPicture ? { picture: trimmedPicture } : {}),
           ...(prev?.about ? { about: prev.about } : {}),
         });

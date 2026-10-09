@@ -1,5 +1,5 @@
 import { ProfileMetadata } from "@linky-fit/linkstr";
-import { getDefaultNip05IdentifierFromAddress } from "../../utils/nostrNip05";
+import { getProfileNip05 } from "../../utils/nostrNip05";
 
 export const applyLightningAddressToProfileMetadata = (
   previous: ProfileMetadata,
@@ -7,17 +7,9 @@ export const applyLightningAddressToProfileMetadata = (
 ): {
   lightningAddress: string;
   metadata: ProfileMetadata;
-  nip05: string | null;
 } => {
   const trimmedLightningAddress = lightningAddress.trim();
-  const nextNip05 = getDefaultNip05IdentifierFromAddress(
-    trimmedLightningAddress,
-  );
-  const keptNip05 =
-    nextNip05 ??
-    (getDefaultNip05IdentifierFromAddress(previous.nip05 ?? "")
-      ? undefined
-      : previous.nip05);
+  const nip05 = getProfileNip05(trimmedLightningAddress, previous.nip05);
 
   const metadata = new ProfileMetadata({
     ...(previous.name ? { name: previous.name } : {}),
@@ -30,12 +22,11 @@ export const applyLightningAddressToProfileMetadata = (
           ...(previous.lud06 ? { lud06: previous.lud06 } : {}),
         }
       : {}),
-    ...(keptNip05 ? { nip05: keptNip05 } : {}),
+    ...(nip05 ? { nip05 } : {}),
   });
 
   return {
     lightningAddress: trimmedLightningAddress,
     metadata,
-    nip05: nextNip05,
   };
 };

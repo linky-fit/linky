@@ -14,7 +14,6 @@ describe("applyLightningAddressToProfileMetadata", () => {
     );
 
     expect(next.lightningAddress).toBe("Alice42@Linky.Fit");
-    expect(next.nip05).toBe("alice42@linky.fit");
     expect(next.metadata).toEqual(
       new ProfileMetadata({
         displayName: "Alice",

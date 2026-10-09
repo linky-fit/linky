@@ -89,19 +89,35 @@ export const parseNip05IdentifierInput = (
   };
 };
 
-export const getDefaultNip05IdentifierFromAddress = (
-  value: string,
-): string | null => {
+const parseDefaultDomainLocalPart = (value: string): string | null => {
   const input = stripNostrUriPrefix(value);
   const atIndex = input.indexOf("@");
   if (atIndex < 0 || atIndex !== input.lastIndexOf("@")) return null;
 
   const localPart = normalizeLocalPart(input.slice(0, atIndex));
   const domain = normalizeDomain(input.slice(atIndex + 1));
-  if (!localPart || domain !== DEFAULT_NIP05_DOMAIN) return null;
+  return domain === DEFAULT_NIP05_DOMAIN ? localPart : null;
+};
+
+/** The handle of a bought linky.fit name; `npub…@linky.fit` addresses get none, as linky.fit verifies only bought names. */
+export const getDefaultNip05IdentifierFromAddress = (
+  value: string,
+): string | null => {
+  const localPart = parseDefaultDomainLocalPart(value);
+  if (!localPart || looksLikeDirectNpub(localPart)) return null;
 
   return `${localPart}@${DEFAULT_NIP05_DOMAIN}`;
 };
+
+/** The nip05 a profile publishes with this lightning address; a handle from another domain survives. */
+export const getProfileNip05 = (
+  lightningAddress: string,
+  previousNip05: string | undefined,
+): string | undefined =>
+  getDefaultNip05IdentifierFromAddress(lightningAddress) ??
+  (previousNip05 && !parseDefaultDomainLocalPart(previousNip05)
+    ? previousNip05
+    : undefined);
 
 const readRelays = (value: unknown, pubkeyHex: string): string[] => {
   if (!isRecord(value)) return [];
