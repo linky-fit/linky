@@ -42,7 +42,7 @@ const ProfileContent = Schema.parseJson(
 const text = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
-const decodeNpub = (value: string): string | null => {
+export const decodeNpub = (value: string): string | null => {
   try {
     const decoded = nip19.decode(value.toLowerCase());
     return decoded.type === "npub" ? decoded.data : null;
