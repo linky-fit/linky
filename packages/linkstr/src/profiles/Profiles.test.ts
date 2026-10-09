@@ -11,7 +11,7 @@ import { RelayUnreachable } from "../services/NostrTransport";
 import type { NostrTransport } from "../services/NostrTransport";
 import { RelayPolicy } from "../services/RelayPolicy";
 import { makeIdentity, stubPlainTransport } from "../testing";
-import { decodeProfileMetadata } from "./codec";
+import { decodeProfileMetadata, encodeProfileContent } from "./codec";
 import { ProfileMetadata, StatusDraft } from "./domain";
 import { Profiles } from "./Profiles";
 
@@ -110,6 +110,40 @@ describe("decodeProfileMetadata", () => {
     );
     assert(Option.isSome(both));
     expect(both.value.picture).toBe("https://pic.test/p.png");
+  });
+});
+
+describe("profile content round-trip", () => {
+  it("keeps unmodeled fields through decode and encode", () => {
+    const content = {
+      name: "alice",
+      website: "https://alice.test",
+      bot: false,
+      nested: { tags: ["a", 1, null] },
+    };
+    const decoded = decodeProfileMetadata(JSON.stringify(content));
+    assert(Option.isSome(decoded));
+    expect(decoded.value.extraFields).toEqual({
+      website: "https://alice.test",
+      bot: false,
+      nested: { tags: ["a", 1, null] },
+    });
+
+    const next = new ProfileMetadata({ ...decoded.value, name: "bob" });
+    expect(JSON.parse(encodeProfileContent(next))).toEqual({
+      ...content,
+      name: "bob",
+    });
+  });
+
+  it("leaves extraFields out when every field is modeled", () => {
+    const decoded = decodeProfileMetadata(
+      JSON.stringify({ display_name: "Alice", displayName: "x", image: "y" }),
+    );
+    assert(Option.isSome(decoded));
+    expect(decoded.value).toEqual(
+      new ProfileMetadata({ displayName: "Alice", picture: "y" }),
+    );
   });
 });
 

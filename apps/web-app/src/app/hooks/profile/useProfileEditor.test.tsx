@@ -50,7 +50,10 @@ describe("profile editor", () => {
     );
   });
 
-  const setup = async (lightningAddress: string) => {
+  const setup = async (
+    lightningAddress: string,
+    myProfileMetadata = new ProfileMetadata({ lud16: lightningAddress }),
+  ) => {
     const editor: { current: ReturnType<typeof useProfileEditor> | null } = {
       current: null,
     };
@@ -62,7 +65,7 @@ describe("profile editor", () => {
         effectiveMyLightningAddress: lightningAddress,
         effectiveProfileName: "Alice",
         effectiveProfilePicture: null,
-        myProfileMetadata: new ProfileMetadata({ lud16: lightningAddress }),
+        myProfileMetadata,
         myProfileStatus: null,
         ownedLightningAddresses: [],
         ownedLightningAddressesLoading: false,
@@ -173,5 +176,33 @@ describe("profile editor", () => {
     expect(editor.current?.profileIsSaving).toBe(false);
     expect(mocks.publishStatus).toHaveBeenCalledTimes(1);
     expect(mocks.publishProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps fields it does not edit, including ones set in other apps", async () => {
+    const editor = await setup(
+      "alice@linky.fit",
+      new ProfileMetadata({
+        about: "Builder",
+        displayName: "Alice",
+        extraFields: { banner: "https://example.com/b.png", bot: false },
+        lud16: "alice@linky.fit",
+        name: "Alice",
+        nip05: "alice@nostr.example",
+      }),
+    );
+    await act(async () => editor.current?.setProfileEditName("New name"));
+    await act(async () => editor.current?.saveProfileEdits());
+
+    expect(mocks.publishProfile).toHaveBeenCalledWith(
+      new ProfileMetadata({
+        about: "Builder",
+        displayName: "New name",
+        extraFields: { banner: "https://example.com/b.png", bot: false },
+        lud16: "alice@linky.fit",
+        name: "New name",
+        nip05: "alice@linky.fit",
+        picture: "https://blossom.primal.net/photo.jpg",
+      }),
+    );
   });
 });

@@ -4,7 +4,7 @@ import {
   publishStatusAtom,
   useAtomSet,
 } from "@linky-fit/linkstr-react";
-import { Exit } from "effect";
+import { Exit, Struct } from "effect";
 import React from "react";
 import { buildLoreleiAvatarUrl } from "../../../derivedProfile";
 import { navigateTo } from "../../../hooks/useRouting";
@@ -288,6 +288,17 @@ export const useProfileEditor = ({
         const nip05 = getProfileNip05(trimmedLightningAddress, prev?.nip05);
 
         const nextMetadata = new ProfileMetadata({
+          ...(prev
+            ? Struct.omit(
+                prev,
+                "name",
+                "displayName",
+                "lud16",
+                "lud06",
+                "nip05",
+                "picture",
+              )
+            : {}),
           ...(trimmedName
             ? { name: trimmedName, displayName: trimmedName }
             : {}),
@@ -299,7 +310,6 @@ export const useProfileEditor = ({
             : {}),
           ...(nip05 ? { nip05 } : {}),
           ...(trimmedPicture ? { picture: trimmedPicture } : {}),
-          ...(prev?.about ? { about: prev.about } : {}),
         });
 
         const statusExit = await publishStatus(

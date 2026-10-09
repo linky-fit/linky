@@ -32,12 +32,12 @@ The result is a `ProfileFetchResult`: `result.profile?.metadata.displayName`, `r
 
 ### Wire format
 
-| Event   | Kind  | Tags                                                     | Content                                                                                          |
-| ------- | ----- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| profile | 0     | none                                                     | JSON `name`, `display_name`, `picture`, `lud16`, `lud06`, `nip05`, `about`; empty fields omitted |
-| status  | 30315 | `["d", "general"]`, `["expiration", expiresAt]` when set | opaque string; empty clears                                                                      |
+| Event   | Kind  | Tags                                                     | Content                                                                                                                        |
+| ------- | ----- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| profile | 0     | none                                                     | JSON `name`, `display_name`, `picture`, `lud16`, `lud06`, `nip05`, `about` and every `extraFields` entry; empty fields omitted |
+| status  | 30315 | `["d", "general"]`, `["expiration", expiresAt]` when set | opaque string; empty clears                                                                                                    |
 
-Decoding kind 0 is tolerant: unknown fields are ignored, non-string values dropped, `displayName` accepted when `display_name` is absent, and `picture` falls back to a legacy `image`. A status whose `d` tag is not `general`, or whose expiration has passed, is dropped.
+Decoding kind 0 is tolerant: non-string values of the modeled fields are dropped, `displayName` accepted when `display_name` is absent, and `picture` falls back to a legacy `image`. Every other field (`website`, `banner`, `bot`, custom keys) lands raw in `extraFields`, which encoding writes back. To change a profile without dropping fields another app set, build the next `ProfileMetadata` from the decoded one (`new ProfileMetadata({ ...previous, name: "dave" })`) rather than from scratch. A status whose `d` tag is not `general`, or whose expiration has passed, is dropped.
 
 ### Fetching
 
