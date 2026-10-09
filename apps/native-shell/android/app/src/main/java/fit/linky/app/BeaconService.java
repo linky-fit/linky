@@ -28,6 +28,7 @@ import android.content.pm.ServiceInfo;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.annotation.RequiresApi;
@@ -69,6 +70,7 @@ public final class BeaconService extends Service {
 	private static final long NEARBY_TTL_MS = 120_000L;
 	private static final long FRAME_MS = 300L;
 	private static final long TICK_MS = 10_000L;
+	private static final long SCREEN_OFF_RESCAN_MS = 2_000L;
 
 	record Contact(String pubkey, byte[] key, double priority, String name) {}
 
@@ -167,6 +169,29 @@ public final class BeaconService extends Service {
 		public void onScanFailed(int errorCode) {
 			error = "scan_failed_" + errorCode;
 			dispatchStatus();
+		}
+	};
+
+	/**
+	 * Some vendor stacks (Nothing on Android 16) suspend every running scan when the screen turns off, filtered or not,
+	 * until it turns on again; a scan started after that keeps running.
+	 */
+	private final Runnable rescanWhileScreenOff = () -> {
+		if (scanner != null && !getSystemService(PowerManager.class).isInteractive()) {
+			scanner.stopScan(scanCallback);
+			startScan();
+			Log.d(TAG, "scan restarted with the screen off");
+		}
+	};
+
+	private final BroadcastReceiver screenOffReceiver = new BroadcastReceiver() {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			getSystemService(PowerManager.class)
+				.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "linky:beacon-rescan")
+				.acquire(SCREEN_OFF_RESCAN_MS + 1_000L);
+			main.removeCallbacks(rescanWhileScreenOff);
+			main.postDelayed(rescanWhileScreenOff, SCREEN_OFF_RESCAN_MS);
 		}
 	};
 
@@ -273,6 +298,12 @@ public final class BeaconService extends Service {
 			new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
 			ContextCompat.RECEIVER_NOT_EXPORTED
 		);
+		ContextCompat.registerReceiver(
+			this,
+			screenOffReceiver,
+			new IntentFilter(Intent.ACTION_SCREEN_OFF),
+			ContextCompat.RECEIVER_NOT_EXPORTED
+		);
 		if (adapter != null && adapter.isEnabled()) {
 			startRadio();
 		}
@@ -303,7 +334,9 @@ public final class BeaconService extends Service {
 	public void onDestroy() {
 		Log.d(TAG, "service destroyed");
 		main.removeCallbacks(tick);
+		main.removeCallbacks(rescanWhileScreenOff);
 		unregisterReceiver(bluetoothStateReceiver);
+		unregisterReceiver(screenOffReceiver);
 		stopRadio();
 		nearby.clear();
 		instance = null;
@@ -331,6 +364,14 @@ public final class BeaconService extends Service {
 			return;
 		}
 		error = null;
+		startScan();
+		gatt = new BeaconGatt(this, main, advertiser);
+		refreshFrames();
+		updateIdentitySet();
+		Log.d(TAG, "radio started");
+	}
+
+	private void startScan() {
 		List<ScanFilter> filters = List.of(
 			new ScanFilter.Builder()
 				.setManufacturerData(BeaconCodec.CONTACT_ADV_ID, new byte[] { BeaconCodec.VERSION }, new byte[] { (byte) 0xFF })
@@ -341,10 +382,6 @@ public final class BeaconService extends Service {
 		);
 		ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build();
 		scanner.startScan(filters, settings, scanCallback);
-		gatt = new BeaconGatt(this, main, advertiser);
-		refreshFrames();
-		updateIdentitySet();
-		Log.d(TAG, "radio started");
 	}
 
 	private void stopRadio() {
