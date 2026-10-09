@@ -574,6 +574,8 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
         handshakes[peripheral.identifier] = nil
         if succeeded && running {
             follow(peripheral)
+        } else {
+            followed[peripheral.identifier] = nil
         }
         central?.cancelPeripheralConnection(peripheral)
     }

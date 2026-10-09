@@ -197,6 +197,7 @@ final class BeaconGatt {
 	private void handshake(BluetoothDevice device, boolean confirmed) {
 		long now = System.currentTimeMillis();
 		throttledUntil.values().removeIf(until -> until <= now);
+		linkyPeersSeenAt.values().removeIf(seenAt -> seenAt <= now - LINKY_PEER_MEMORY_MS);
 		if (server == null || handshakes.size() >= MAX_HANDSHAKES || throttledUntil.containsKey(device.getAddress()) || !service.wantsHandshake()) {
 			return;
 		}
