@@ -128,7 +128,9 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
     private static let handshakeThrottle: TimeInterval = 40
     private static let handshakeTimeout: TimeInterval = 10
     private static let maxHandshakes = 2
+    private static let maxFollowed = 8
     private static let tickInterval: TimeInterval = 10
+    private static let minBackgroundHold: TimeInterval = 5
 
     struct Contact {
         let pubkey: String
@@ -148,6 +150,7 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
 
     private struct Handshake {
         let peripheral: CBPeripheral
+        let startedAt: Date
         var steps: [Step]
         var characteristics: [CBUUID: CBCharacteristic] = [:]
     }
@@ -173,6 +176,11 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
     private var identityParts: [UUID: (first: Data?, second: Data?)] = [:]
     private var handshakes: [UUID: Handshake] = [:]
     private var lastHandshake: [UUID: Date] = [:]
+    /// Linky peers of successful handshakes. A suspended app runs again only on a CoreBluetooth event, and its scan
+    /// reports a peer once, so a connection request to each followed peer is what wakes it for the next handshake.
+    private var followed: [UUID: (peripheral: CBPeripheral, succeededAt: Date)] = [:]
+    private var backgroundTask = UIBackgroundTaskIdentifier.invalid
+    private var backgroundTaskStartedAt = Date.distantPast
     private var tickTimer: Timer?
     private var pending: [String: [String: Any]] = [:]
 
@@ -187,6 +195,7 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
         let center = NotificationCenter.default
         center.addObserver(self, selector: #selector(appStateChanged), name: UIApplication.didBecomeActiveNotification, object: nil)
         center.addObserver(self, selector: #selector(appStateChanged), name: UIApplication.willResignActiveNotification, object: nil)
+        center.addObserver(self, selector: #selector(appStateChanged), name: UIApplication.didEnterBackgroundNotification, object: nil)
         // Without a bridge (background relaunch) nobody receives notification taps; the bridge takes over once it loads.
         if UNUserNotificationCenter.current().delegate == nil {
             UNUserNotificationCenter.current().delegate = self
@@ -252,6 +261,9 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
         updateScan()
         updateTimer()
         handshakes.values.forEach { finishHandshake($0.peripheral) }
+        followed.values.forEach { central?.cancelPeripheralConnection($0.peripheral) }
+        followed.removeAll()
+        releaseBackgroundTime()
         nearby.removeAll()
         notified.removeAll()
         servedPackets.removeAll()
@@ -340,11 +352,48 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
             dispatchIdentities()
         }
         updateScan()
+        advanceFollows()
     }
 
     @objc private func appStateChanged() {
         dispatchPermission()
-        updateScan()
+        if appActive {
+            releaseBackgroundTime()
+        } else {
+            holdBackgroundTime()
+        }
+        tick()
+    }
+
+    /// Keeps the app running for a while after a wake, so the tick can expire sightings and run due handshakes.
+    private func holdBackgroundTime() {
+        guard !appActive, !followed.isEmpty, backgroundTask == .invalid else {
+            return
+        }
+        backgroundTaskStartedAt = Date()
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "LinkyBeacon") { [weak self] in
+            self?.backgroundTimeExpired()
+        }
+    }
+
+    private func releaseBackgroundTime() {
+        guard backgroundTask != .invalid else {
+            return
+        }
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
+    }
+
+    private func backgroundTimeExpired() {
+        let held = Date().timeIntervalSince(backgroundTaskStartedAt)
+        releaseBackgroundTime()
+        // An idle link never wakes a suspended app, its reconnection does; the hold check keeps that from spinning.
+        if held >= Self.minBackgroundHold {
+            followed.values.map(\.peripheral)
+                .filter { $0.state == .connected && handshakes[$0.identifier] == nil }
+                .forEach { central?.cancelPeripheralConnection($0) }
+        }
+        tick()
     }
 
     // MARK: Peripheral role
@@ -455,15 +504,24 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         if central.state != .poweredOn {
             handshakes.removeAll()
+            followed.removeAll()
+            releaseBackgroundTime()
         }
         updateScan()
+        advanceFollows()
         dispatchPermission(force: true)
         dispatchStatus()
     }
 
     func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
-        let restored = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? []
-        restored.forEach { central.cancelPeripheralConnection($0) }
+        for peripheral in dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral] ?? [] {
+            if running {
+                peripheral.delegate = self
+                followed[peripheral.identifier] = (peripheral, Date())
+            } else {
+                central.cancelPeripheralConnection(peripheral)
+            }
+        }
     }
 
     func centralManager(
@@ -482,35 +540,78 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
         }
     }
 
+    private func isThrottled(_ id: UUID) -> Bool {
+        lastHandshake[id].map { Date().timeIntervalSince($0) < Self.handshakeThrottle } ?? false
+    }
+
     private func startHandshake(_ peripheral: CBPeripheral) {
         let id = peripheral.identifier
         var steps: [Step] = running ? [.readContacts, .writeContacts] : []
         if identityScanActive {
             steps.append(.readIdentity)
         }
-        guard let central, !steps.isEmpty, handshakes[id] == nil, lastHandshake[id] == nil,
+        guard let central, !steps.isEmpty, handshakes[id] == nil, !isThrottled(id),
               handshakes.count < Self.maxHandshakes else {
             return
         }
-        lastHandshake[id] = Date()
-        handshakes[id] = Handshake(peripheral: peripheral, steps: steps)
+        let startedAt = Date()
+        lastHandshake[id] = startedAt
+        handshakes[id] = Handshake(peripheral: peripheral, startedAt: startedAt, steps: steps)
         peripheral.delegate = self
-        central.connect(peripheral)
+        if peripheral.state == .connected {
+            peripheral.discoverServices([Self.serviceUUID])
+        } else {
+            central.connect(peripheral)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.handshakeTimeout) { [weak self] in
-            if self?.handshakes[id]?.peripheral === peripheral {
+            if self?.handshakes[id]?.startedAt == startedAt {
                 self?.finishHandshake(peripheral)
             }
         }
     }
 
-    private func finishHandshake(_ peripheral: CBPeripheral) {
+    private func finishHandshake(_ peripheral: CBPeripheral, succeeded: Bool = false) {
         handshakes[peripheral.identifier] = nil
+        if succeeded && running {
+            follow(peripheral)
+        }
         central?.cancelPeripheralConnection(peripheral)
     }
 
+    private func follow(_ peripheral: CBPeripheral) {
+        followed[peripheral.identifier] = (peripheral, Date())
+        if followed.count > Self.maxFollowed, let stalest = followed.min(by: { $0.value.succeededAt < $1.value.succeededAt }) {
+            followed[stalest.key] = nil
+            central?.cancelPeripheralConnection(stalest.value.peripheral)
+        }
+    }
+
+    /// Reconnects followed peers once their throttle has passed, or at once when no clock will run until the next wake.
+    private func advanceFollows() {
+        guard let central, central.state == .poweredOn else {
+            return
+        }
+        let clockRunning = appActive || backgroundTask != .invalid
+        for (id, follow) in followed where handshakes[id] == nil {
+            let due = !isThrottled(id)
+            switch follow.peripheral.state {
+            case .connected where due:
+                startHandshake(follow.peripheral)
+            case .disconnected where due || !clockRunning:
+                central.connect(follow.peripheral)
+            default:
+                break
+            }
+        }
+    }
+
     private func nextStep(_ peripheral: CBPeripheral) {
-        guard var handshake = handshakes[peripheral.identifier], !handshake.steps.isEmpty else {
+        guard var handshake = handshakes[peripheral.identifier] else {
             finishHandshake(peripheral)
+            return
+        }
+        guard !handshake.steps.isEmpty else {
+            finishHandshake(peripheral, succeeded: true)
             return
         }
         let step = handshake.steps.removeFirst()
@@ -528,15 +629,24 @@ final class BeaconEngine: NSObject, CBCentralManagerDelegate, CBPeripheralManage
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        peripheral.discoverServices([Self.serviceUUID])
+        if handshakes[peripheral.identifier] != nil {
+            peripheral.discoverServices([Self.serviceUUID])
+        } else if followed[peripheral.identifier] != nil {
+            holdBackgroundTime()
+            tick()
+        } else {
+            central.cancelPeripheralConnection(peripheral)
+        }
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         handshakes[peripheral.identifier] = nil
+        followed[peripheral.identifier] = nil
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         handshakes[peripheral.identifier] = nil
+        advanceFollows()
     }
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
