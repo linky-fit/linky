@@ -9,12 +9,21 @@ import {
 } from "nostr-tools";
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
-import { waitForProfileStatusOnRelay } from "./helpers/relay";
+import {
+  publishProfileToRelay,
+  waitForProfileStatusOnRelay,
+} from "./helpers/relay";
 import { NOSTR_RELAY_URL } from "./helpers/stack";
 import { AVATAR_SIZE_PX } from "../src/utils/image";
 import { nowSeconds } from "../src/utils/time";
 
 test.use({ serviceWorkers: "block", viewport: MOBILE_VIEWPORT });
+
+const decodeProfileContent = Schema.decodeUnknownSync(
+  Schema.parseJson(
+    Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+  ),
+);
 
 const pickPhoto = async (page: Page, color: string): Promise<void> => {
   const png = await page.evaluate((fill) => {
@@ -157,6 +166,65 @@ test("profile edits save after switching to a custom identity", async ({
         await reader.close();
       }
     });
+  } finally {
+    pool.close([NOSTR_RELAY_URL]);
+  }
+});
+
+test("a custom key keeps its existing profile, and an edit keeps fields set in other apps", async ({
+  page,
+}) => {
+  const secretKey = generateSecretKey();
+  const pubkey = getPublicKey(secretKey);
+  const nsec = nip19.nsecEncode(secretKey);
+  await publishProfileToRelay(nsec, {
+    name: "Bob",
+    website: "https://bob.example",
+  });
+  const existingProfileTime = nowSeconds();
+  await setBaseStorage(page);
+  await stubFiatRates(page);
+  await stubThirdPartyAssets(page);
+  await page.addInitScript((value) => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText: async () => value, writeText: async () => {} },
+    });
+  }, nsec);
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Create a profile" }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Alice");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Confirm profile" }).click();
+  await expect(page.getByTestId("profile-qr-button")).toBeVisible();
+
+  await page.goto("/#advanced");
+  const paste = page.getByRole("button", { name: "Paste custom nostr keys" });
+  await paste.click();
+  await paste.click();
+  await expect(page).toHaveURL(/#contacts$/);
+
+  await page.goto("/#profile");
+  await expect(page.getByTestId("profile-detail")).toContainText("Bob");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Bob updated");
+  await expect.poll(nowSeconds).toBeGreaterThan(existingProfileTime);
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByTestId("profile-detail")).toContainText("Bob updated");
+
+  const pool = new SimplePool();
+  try {
+    await expect
+      .poll(async () => {
+        const events = await pool.querySync([NOSTR_RELAY_URL], {
+          authors: [pubkey],
+          kinds: [0],
+        });
+        const newest = events.sort((a, b) => b.created_at - a.created_at)[0];
+        return newest ? decodeProfileContent(newest.content) : null;
+      })
+      .toMatchObject({ name: "Bob updated", website: "https://bob.example" });
   } finally {
     pool.close([NOSTR_RELAY_URL]);
   }
