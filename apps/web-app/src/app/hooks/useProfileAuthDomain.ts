@@ -20,6 +20,7 @@ import {
   StatusDraft,
 } from "@linky-fit/linkstr";
 import {
+  fetchProfileAtom,
   linkstrConfigAtom,
   publishProfileAtom,
   publishStatusAtom,
@@ -69,7 +70,7 @@ import {
 import type { FilePickerHandle } from "../../utils/pickFile";
 import { nowSeconds } from "../../utils/time";
 import { prepareProfilePicture } from "../lib/profilePicture";
-import { profileMetadataForNewKey } from "../lib/profileMetadata";
+import { carryProfileToNewKey } from "../lib/keySwitchProfile";
 import type { I18nKey, Translate } from "../../i18n";
 
 type NostrIdentitySource = "custom" | "derived";
@@ -190,6 +191,7 @@ export const useProfileAuthDomain = ({
   const publishStatus = useAtomSet(publishStatusAtom, {
     mode: "promiseExit",
   });
+  const fetchProfile = useAtomSet(fetchProfileAtom, { mode: "promiseExit" });
 
   React.useEffect(() => {
     let cancelled = false;
@@ -414,24 +416,25 @@ export const useProfileAuthDomain = ({
           : null);
       if (!previousMetadata) return true;
 
-      const newNpub = await deriveNpubFromNsec(newNsec);
-      if (!newNpub) return false;
-      const metadata = profileMetadataForNewKey(
-        previousMetadata,
-        previousNpub,
-        newNpub,
-      );
-
+      const newPrivBytes = await decodeNsecPrivateBytes(newNsec);
       const config = buildLinkstrConfig(
         newNsec,
         recommendedNostrRelays(),
         inboxCursors,
       );
-      if (config === null) return false;
+      if (!newPrivBytes || config === null) return false;
+      const newPubkey = derivePubkey(newPrivBytes);
 
       setLinkstrConfig(config);
-      const publishExit = await publishProfile(metadata);
-      if (Exit.isFailure(publishExit)) {
+      const carried = await carryProfileToNewKey({
+        fetchProfile,
+        newNpub: encodeNpub(newPubkey),
+        newPubkey,
+        previousMetadata,
+        previousNpub,
+        publishProfile,
+      });
+      if (!carried) {
         // Hand the runtime back to the still-active identity before bailing.
         setLinkstrConfig(
           buildLinkstrConfig(
@@ -440,15 +443,14 @@ export const useProfileAuthDomain = ({
             inboxCursors,
           ),
         );
-        return false;
       }
-
-      saveCachedProfile(newNpub, metadata, nowSeconds());
-      return true;
+      return carried;
     },
     [
       currentNsec,
+      decodeNsecPrivateBytes,
       deriveNpubFromNsec,
+      fetchProfile,
       inboxCursors,
       myProfileMetadataRef,
       publishProfile,
