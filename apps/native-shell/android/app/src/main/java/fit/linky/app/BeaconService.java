@@ -71,6 +71,7 @@ public final class BeaconService extends Service {
 	private static final long FRAME_MS = 300L;
 	private static final long TICK_MS = 10_000L;
 	private static final long SCREEN_OFF_RESCAN_MS = 2_000L;
+	private static final String SCAN_FAILED = "scan_failed_";
 
 	record Contact(String pubkey, byte[] key, double priority, String name) {}
 
@@ -167,7 +168,7 @@ public final class BeaconService extends Service {
 
 		@Override
 		public void onScanFailed(int errorCode) {
-			error = "scan_failed_" + errorCode;
+			error = SCAN_FAILED + errorCode;
 			dispatchStatus();
 		}
 	};
@@ -177,16 +178,27 @@ public final class BeaconService extends Service {
 	 * until it turns on again; a scan started after that keeps running.
 	 */
 	private final Runnable rescanWhileScreenOff = () -> {
-		if (scanner != null && !getSystemService(PowerManager.class).isInteractive()) {
+		if (scanner == null || getSystemService(PowerManager.class).isInteractive()) {
+			return;
+		}
+		try {
 			scanner.stopScan(scanCallback);
 			startScan();
-			Log.d(TAG, "scan restarted with the screen off");
+		} catch (IllegalStateException ignored) {
+			// The adapter is going down; bluetoothStateReceiver stops the radio.
+			return;
 		}
+		if (error != null && error.startsWith(SCAN_FAILED)) {
+			error = null;
+			dispatchStatus();
+		}
+		Log.d(TAG, "scan restarted with the screen off");
 	};
 
 	private final BroadcastReceiver screenOffReceiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(Context context, Intent intent) {
+			// postDelayed counts uptime, which stops while the CPU sleeps.
 			getSystemService(PowerManager.class)
 				.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "linky:beacon-rescan")
 				.acquire(SCREEN_OFF_RESCAN_MS + 1_000L);
