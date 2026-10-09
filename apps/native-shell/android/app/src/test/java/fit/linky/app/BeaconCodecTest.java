@@ -85,14 +85,41 @@ public class BeaconCodecTest {
 
 	@Test
 	public void overflowBitFortyMarksABackgroundedLinkyIphone() {
-		byte[] linky = BeaconCodec.unhex("01" + "0000000000" + "01" + "00000000000000000000", 17);
-		byte[] otherApp = BeaconCodec.unhex("0100000000008000000000000000000020", 17);
+		byte[] backgroundedLinky = BeaconCodec.unhex("00000000808000000000000080000000", 16);
+		byte[] otherApps = BeaconCodec.unhex("00000000000100000000000080000000", 16);
 
-		assertTrue(BeaconCodec.hasLinkyOverflowBit(BeaconCodec.overflowArea(linky)));
-		assertFalse(BeaconCodec.hasLinkyOverflowBit(BeaconCodec.overflowArea(otherApp)));
-		assertNull(BeaconCodec.overflowArea(BeaconCodec.unhex("1005031c", 4)));
-		assertNull(BeaconCodec.overflowArea(BeaconCodec.unhex("0200000000000100000000000000000000", 17)));
-		assertNull(BeaconCodec.overflowArea(null));
+		assertTrue(BeaconCodec.hasLinkyOverflowBit(backgroundedLinky));
+		assertFalse(BeaconCodec.hasLinkyOverflowBit(otherApps));
+	}
+
+	@Test
+	public void overflowAreaIsFoundInWhicheverAppleBlockCarriesIt() {
+		String flags = "020106";
+		String serviceUuids = "1107" + "c2ffa0cc4d0af4a95d4f3f695a0567d9";
+		String nearbyInfo = "0aff4c00" + "1005031c0e8c3a";
+		String overflow = "14ff4c00" + "01" + "0000000000" + "01" + "00000000000000000000";
+		String expected = "000000000001" + "00000000000000000000";
+
+		assertEquals(expected, hexOrNull(BeaconCodec.appleOverflowArea(raw(flags + nearbyInfo + overflow + serviceUuids))));
+		assertEquals(expected, hexOrNull(BeaconCodec.appleOverflowArea(raw(flags + overflow + serviceUuids + nearbyInfo))));
+		assertEquals(expected, hexOrNull(BeaconCodec.appleOverflowArea(raw(flags + "1bff4c00" + "1005031c0e8c3a" + overflow.substring(8) + "000000"))));
+	}
+
+	@Test
+	public void recordsWithoutAnAppleOverflowAreaYieldNothing() {
+		assertNull(BeaconCodec.appleOverflowArea(null));
+		assertNull(BeaconCodec.appleOverflowArea(raw("020106" + "0aff4c00" + "1005031c0e8c3a")));
+		assertNull(BeaconCodec.appleOverflowArea(raw("14ffffff" + "0100000000000100000000000000000000")));
+		assertNull(BeaconCodec.appleOverflowArea(raw("0aff4c00" + "01000000000001")));
+		assertNull(BeaconCodec.appleOverflowArea(raw("15ff4c00" + "01000000")));
+	}
+
+	private static byte[] raw(String hex) {
+		return BeaconCodec.unhex(hex, hex.length() / 2);
+	}
+
+	private static String hexOrNull(byte[] bytes) {
+		return bytes == null ? null : BeaconCodec.hex(bytes);
 	}
 
 	@Test
