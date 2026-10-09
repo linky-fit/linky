@@ -18,10 +18,7 @@ export const applyLightningAddressToProfileMetadata = (
   const nip05 = getProfileNip05(trimmedLightningAddress, previous.nip05);
 
   const metadata = new ProfileMetadata({
-    ...(previous.name ? { name: previous.name } : {}),
-    ...(previous.displayName ? { displayName: previous.displayName } : {}),
-    ...(previous.picture ? { picture: previous.picture } : {}),
-    ...(previous.about ? { about: previous.about } : {}),
+    ...Struct.omit(previous, "lud16", "lud06", "nip05"),
     ...(trimmedLightningAddress
       ? {
           lud16: trimmedLightningAddress,

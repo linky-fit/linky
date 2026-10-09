@@ -10,7 +10,7 @@ import {
 } from "@linky-fit/linksync";
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { saveCachedProfile } from "../../profileCache";
+import { loadCachedProfile, saveCachedProfile } from "../../profileCache";
 import { applyProfileWatchEvent } from "./useLinkstrProfileSync";
 
 const NPUB = "npub1gcxzte5zlkncx26j68ez60fzkvtkm9e0vrwdcvsjakxf9mu9qewqlfnj5z";
@@ -153,5 +153,29 @@ describe("applyProfileWatchEvent contact-row policy", () => {
     expect(contactPatches()).toEqual([
       { id: c1, lnAddress: "vitor@ln.example", name: "Vitor" },
     ]);
+  });
+
+  it("refreshes a cache that decoded the same event without its extra fields", () => {
+    const pubkey = decodeNpub(NPUB);
+    if (!pubkey) throw new Error("test npub must decode");
+    const withExtras = new ProfileMetadata({
+      name: "Vitor",
+      extraFields: { website: "https://vitor.example" },
+    });
+    const fact = new ProfileUpdated({
+      metadata: withExtras,
+      pubkey,
+      updatedAt: UnixSeconds.make(100),
+    });
+    saveCachedProfile(NPUB, metadata({ name: "Vitor" }), 100);
+
+    const first = makeCtx([]);
+    applyProfileWatchEvent(fact, first.ctx);
+    expect(first.ctx.setNostrMetadataByNpub).toHaveBeenCalledTimes(1);
+    expect(loadCachedProfile(NPUB)?.metadata).toEqual(withExtras);
+
+    const repeat = makeCtx([]);
+    applyProfileWatchEvent(fact, repeat.ctx);
+    expect(repeat.ctx.setNostrMetadataByNpub).not.toHaveBeenCalled();
   });
 });

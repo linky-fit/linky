@@ -47,13 +47,26 @@ const decodeNpubToPubkey = (npub: string): Pubkey | null => {
 
 const encodePubkeyToNpub = (pubkey: Pubkey): string => encodeNpub(pubkey);
 
+/**
+ * Whether `fact` should replace the cached profile. An equal timestamp is the
+ * same event, so it replaces only a cache that decoded it differently, e.g.
+ * before unmodeled fields were kept.
+ */
+const supersedesCache = (
+  cached: { metadata: ProfileMetadata; updatedAt: number },
+  fact: ProfileUpdated,
+): boolean =>
+  fact.updatedAt > cached.updatedAt ||
+  (fact.updatedAt === cached.updatedAt &&
+    JSON.stringify(fact.metadata) !== JSON.stringify(cached.metadata));
+
 const cacheFetchedProfile = (
   npub: string,
   profile: ProfileUpdated | null,
 ): ProfileMetadata | null => {
   if (!profile) return null;
   const cached = loadCachedProfile(npub);
-  if (cached && profile.updatedAt <= cached.updatedAt) return cached.metadata;
+  if (cached && !supersedesCache(cached, profile)) return cached.metadata;
   saveCachedProfile(npub, profile.metadata, profile.updatedAt);
   return profile.metadata;
 };
@@ -200,7 +213,7 @@ const applyProfileUpdated = (
   ctx: ProfileSyncContext,
 ): void => {
   const cached = loadCachedProfile(npub);
-  if (cached && fact.updatedAt <= cached.updatedAt) {
+  if (cached && !supersedesCache(cached, fact)) {
     // A one-shot fetch may have cached this fact before a new contact's row existed.
     syncContactsFromProfile(npub, cached.metadata, cached.metadata, ctx);
     return;

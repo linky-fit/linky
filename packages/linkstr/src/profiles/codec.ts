@@ -22,7 +22,7 @@ const LenientString = Schema.transform(
   },
 );
 
-const WireProfile = Schema.Struct({
+const wireFields = {
   name: Schema.optional(LenientString),
   display_name: Schema.optional(LenientString),
   displayName: Schema.optional(LenientString),
@@ -32,16 +32,28 @@ const WireProfile = Schema.Struct({
   lud06: Schema.optional(LenientString),
   nip05: Schema.optional(LenientString),
   about: Schema.optional(LenientString),
-});
+};
+
+const WireProfile = Schema.Struct(
+  wireFields,
+  Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+);
+
+const extraFieldsOf = (
+  wire: Readonly<Record<string, unknown>>,
+): { extraFields?: Record<string, unknown> } => {
+  const extra = Object.entries(wire).filter(([key]) => !(key in wireFields));
+  return extra.length === 0 ? {} : { extraFields: Object.fromEntries(extra) };
+};
 
 const nonEmpty = (value: string | undefined): string | undefined =>
   value === "" ? undefined : value;
 
 /**
- * Tolerant kind-0 content: unknown fields are ignored. Decoding lets the
- * wire's `display_name` win over the nonstandard `displayName` spelling and
- * falls back from a missing `picture` to the legacy `image`; encoding emits
- * standard names only and omits empty fields.
+ * Tolerant kind-0 content: unmodeled fields pass through `extraFields`.
+ * Decoding lets the wire's `display_name` win over the nonstandard
+ * `displayName` spelling and falls back from a missing `picture` to the
+ * legacy `image`; encoding emits standard names only and omits empty fields.
  */
 const ProfileContent = Schema.parseJson(
   Schema.transform(WireProfile, ProfileMetadata, {
@@ -54,8 +66,10 @@ const ProfileContent = Schema.parseJson(
       lud06: wire.lud06,
       nip05: wire.nip05,
       about: wire.about,
+      ...extraFieldsOf(wire),
     }),
     encode: (metadata) => ({
+      ...metadata.extraFields,
       name: nonEmpty(metadata.name),
       display_name: nonEmpty(metadata.displayName),
       picture: nonEmpty(metadata.picture),

@@ -145,3 +145,28 @@ describe("profileMetadataForNewKey", () => {
     );
   });
 });
+
+describe("unmodeled fields", () => {
+  const extraFields = { website: "https://alice.example", bot: false };
+
+  it("survive every metadata derivation", () => {
+    expect(
+      applyLightningAddressToProfileMetadata(
+        new ProfileMetadata({ extraFields, name: "alice" }),
+        "alice@getalby.com",
+      ).metadata.extraFields,
+    ).toEqual(extraFields);
+    expect(
+      dropNpubNip05(
+        new ProfileMetadata({ extraFields, nip05: `${OLD_NPUB}@linky.fit` }),
+      )?.extraFields,
+    ).toEqual(extraFields);
+    expect(
+      profileMetadataForNewKey(
+        new ProfileMetadata({ extraFields, lud16: `${OLD_NPUB}@linky.fit` }),
+        OLD_NPUB,
+        NEW_NPUB,
+      ).extraFields,
+    ).toEqual(extraFields);
+  });
+});
