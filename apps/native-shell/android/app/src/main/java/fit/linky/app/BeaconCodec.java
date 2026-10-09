@@ -40,15 +40,17 @@ final class BeaconCodec {
 	static final UUID IDENTITY_CHARACTERISTIC_UUID = UUID.fromString("CEDFD0D0-FDDC-434C-BAF6-820E631A49BF");
 	static final byte[] ANDROID_MARKER = { 0x02 };
 	static final int APPLE_COMPANY_ID = 0x004C;
-	static final int APPLE_OVERFLOW_TYPE = 0x01;
+	private static final int APPLE_OVERFLOW_TYPE = 0x01;
 	static final int MAX_PACKET_BYTES = 512;
 	private static final int ENTRY_BYTES = 3;
 	private static final int HEADER_BYTES = 2;
 	private static final int MAX_PACKET_ENTRIES = (MAX_PACKET_BYTES - HEADER_BYTES) / ENTRY_BYTES;
 	private static final int OVERFLOW_AREA_BYTES = 16;
-	// Bit 40 of iOS's background overflow area belongs to OVERFLOW_MARKER_UUID 0x...0017, which the iOS app advertises.
+	private static final int AD_MANUFACTURER_DATA = 0xFF;
+	// Bit 40 of iOS's background overflow area belongs to OVERFLOW_MARKER_UUID 0x...0017, which the iOS app advertises;
+	// iOS counts bits from the most significant one of each byte (seen on an iOS 27 iPhone).
 	private static final int LINKY_OVERFLOW_BYTE = 5;
-	private static final int LINKY_OVERFLOW_MASK = 0x01;
+	private static final int LINKY_OVERFLOW_MASK = 0x80;
 	private static final int PUBKEY_BYTES = 32;
 	private static final int IDENTITY_ADV_PUBKEY_BYTES = 22;
 
@@ -101,12 +103,39 @@ final class BeaconCodec {
 		return serviceUuids != null && serviceUuids.contains(LINKY_SERVICE_UUID) && !Arrays.equals(linkyServiceData, ANDROID_MARKER);
 	}
 
-	/** Returns the 16-byte overflow area of Apple manufacturer data, or null when it is something else. */
-	static byte[] overflowArea(byte[] appleData) {
-		if (appleData == null || appleData.length < 1 + OVERFLOW_AREA_BYTES || appleData[0] != APPLE_OVERFLOW_TYPE) {
+	/**
+	 * Returns the 16-byte overflow area from a raw advertisement + scan response, or null when none carries one.
+	 * Walks every Apple manufacturer block, since a backgrounded iPhone sends several and ScanRecord keeps only the last.
+	 */
+	static byte[] appleOverflowArea(byte[] record) {
+		if (record == null) {
 			return null;
 		}
-		return Arrays.copyOfRange(appleData, 1, 1 + OVERFLOW_AREA_BYTES);
+		for (int i = 0; i + 1 < record.length; ) {
+			int end = i + 1 + (record[i] & 0xFF);
+			if (end > record.length) {
+				return null;
+			}
+			if (end - i >= 4 && (record[i + 1] & 0xFF) == AD_MANUFACTURER_DATA
+				&& (record[i + 2] & 0xFF) == (APPLE_COMPANY_ID & 0xFF) && record[i + 3] == (byte) (APPLE_COMPANY_ID >> 8)) {
+				byte[] area = appleOverflowItem(record, i + 4, end);
+				if (area != null) {
+					return area;
+				}
+			}
+			i = end;
+		}
+		return null;
+	}
+
+	/** Apple packs [type, length, value] items into one block; the overflow item has no length byte. */
+	private static byte[] appleOverflowItem(byte[] record, int start, int end) {
+		for (int j = start; j < end - 1; j += 2 + (record[j + 1] & 0xFF)) {
+			if (record[j] == APPLE_OVERFLOW_TYPE) {
+				return end - j - 1 >= OVERFLOW_AREA_BYTES ? Arrays.copyOfRange(record, j + 1, j + 1 + OVERFLOW_AREA_BYTES) : null;
+			}
+		}
+		return null;
 	}
 
 	static boolean hasLinkyOverflowBit(byte[] overflowArea) {

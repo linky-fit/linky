@@ -47,6 +47,8 @@ final class BeaconGatt {
 	private static final int MAX_HANDSHAKES = 2;
 	private static final int MAX_MTU = 517;
 	private static final int MAX_LOGGED_OVERFLOWS = 1000;
+	// iOS keeps one random address for about 15 minutes, so a confirmed iPhone stays recognizable for that long.
+	private static final long LINKY_PEER_MEMORY_MS = 15 * 60_000L;
 
 	private final BeaconService service;
 	private final Handler main;
@@ -54,6 +56,7 @@ final class BeaconGatt {
 	private final BluetoothGattServer server;
 	private final Map<String, Long> throttledUntil = new HashMap<>();
 	private final Set<String> overflowLogged = new HashSet<>();
+	private final Map<String, Long> linkyPeersSeenAt = new HashMap<>();
 	private final Set<Handshake> handshakes = new HashSet<>();
 	private final Map<String, byte[]> reads = new HashMap<>();
 	private final Map<String, byte[]> preparedWrites = new HashMap<>();
@@ -167,7 +170,7 @@ final class BeaconGatt {
 			handshake(device, true);
 			return;
 		}
-		byte[] overflow = BeaconCodec.overflowArea(record.getManufacturerSpecificData(BeaconCodec.APPLE_COMPANY_ID));
+		byte[] overflow = BeaconCodec.appleOverflowArea(record.getBytes());
 		if (overflow == null) {
 			return;
 		}
@@ -177,9 +180,18 @@ final class BeaconGatt {
 		if (overflowLogged.add(device.getAddress())) {
 			Log.d(TAG, "apple overflow " + device.getAddress() + " " + BeaconCodec.hex(overflow));
 		}
-		if (BeaconCodec.hasLinkyOverflowBit(overflow)) {
+		if (BeaconCodec.hasLinkyOverflowBit(overflow) || isRecentLinkyPeer(device.getAddress())) {
 			handshake(device, false);
 		}
+	}
+
+	private boolean isRecentLinkyPeer(String address) {
+		Long seenAt = linkyPeersSeenAt.get(address);
+		return seenAt != null && seenAt > System.currentTimeMillis() - LINKY_PEER_MEMORY_MS;
+	}
+
+	private void rememberLinkyPeer(String address) {
+		linkyPeersSeenAt.put(address, System.currentTimeMillis());
 	}
 
 	private void handshake(BluetoothDevice device, boolean confirmed) {
@@ -214,6 +226,7 @@ final class BeaconGatt {
 		if (offset + value.length > BeaconCodec.MAX_PACKET_BYTES) {
 			return BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH;
 		}
+		rememberLinkyPeer(device.getAddress());
 		if (!prepared) {
 			service.mergePacket(value);
 			return BluetoothGatt.GATT_SUCCESS;
@@ -271,6 +284,7 @@ final class BeaconGatt {
 				finish("no linky service");
 				return;
 			}
+			rememberLinkyPeer(address);
 			contacts = linky.getCharacteristic(BeaconCodec.CONTACTS_CHARACTERISTIC_UUID);
 			identity = linky.getCharacteristic(BeaconCodec.IDENTITY_CHARACTERISTIC_UUID);
 			require(contacts != null && gatt.readCharacteristic(contacts), "read contacts");

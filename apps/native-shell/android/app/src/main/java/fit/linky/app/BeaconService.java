@@ -336,9 +336,8 @@ public final class BeaconService extends Service {
 				.setManufacturerData(BeaconCodec.CONTACT_ADV_ID, new byte[] { BeaconCodec.VERSION }, new byte[] { (byte) 0xFF })
 				.build(),
 			new ScanFilter.Builder().setServiceUuid(BeaconGatt.SERVICE).build(),
-			new ScanFilter.Builder()
-				.setManufacturerData(BeaconCodec.APPLE_COMPANY_ID, new byte[] { BeaconCodec.APPLE_OVERFLOW_TYPE }, new byte[] { (byte) 0xFF })
-				.build()
+			// Any Apple block: the filter only sees the last one, and the overflow area is often an earlier one.
+			new ScanFilter.Builder().setManufacturerData(BeaconCodec.APPLE_COMPANY_ID, new byte[0]).build()
 		);
 		ScanSettings settings = new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_POWER).build();
 		scanner.startScan(filters, settings, scanCallback);
