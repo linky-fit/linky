@@ -619,7 +619,7 @@ public final class BeaconService extends Service {
 			.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
 			.putExtra(EXTRA_OPEN_PUBKEY, pubkey);
 		Notification notification = new NotificationCompat.Builder(this, TRADE_CHANNEL_ID)
-			.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+			.setSmallIcon(R.drawable.ic_stat_linky)
 			.setContentTitle(title)
 			.setContentText(text)
 			.setAutoCancel(true)
@@ -647,7 +647,7 @@ public final class BeaconService extends Service {
 			PendingIntent.FLAG_IMMUTABLE
 		);
 		return new NotificationCompat.Builder(this, RUNNING_CHANNEL_ID)
-			.setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+			.setSmallIcon(R.drawable.ic_stat_linky)
 			.setContentTitle(getString(R.string.beacon_running_title))
 			.setContentText(getString(R.string.beacon_running_text))
 			.setOngoing(true)
