@@ -78,7 +78,7 @@ public final class LinkyFirebaseMessagingService extends MessagingService {
             .setContentText(body)
             .setContentTitle(title)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(R.drawable.ic_stat_linky)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(body));
 
         NotificationManagerCompat.from(this).notify(
