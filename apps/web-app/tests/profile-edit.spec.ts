@@ -10,6 +10,7 @@ import {
 import { MOBILE_VIEWPORT, setBaseStorage } from "./helpers/appState";
 import { stubFiatRates, stubThirdPartyAssets } from "./helpers/network";
 import {
+  npubToHex,
   publishProfileToRelay,
   waitForProfileStatusOnRelay,
 } from "./helpers/relay";
@@ -171,26 +172,35 @@ test("profile edits save after switching to a custom identity", async ({
   }
 });
 
-test("a custom key keeps its existing profile, and an edit keeps fields set in other apps", async ({
+test("switching to a custom identity with a profile lets the user keep the Linky profile, import the Nostr one, or cancel", async ({
   page,
 }) => {
-  const secretKey = generateSecretKey();
-  const pubkey = getPublicKey(secretKey);
-  const nsec = nip19.nsecEncode(secretKey);
-  await publishProfileToRelay(nsec, {
+  const bob = generateSecretKey();
+  const carol = generateSecretKey();
+  const bobNpub = nip19.npubEncode(getPublicKey(bob));
+  const carolNpub = nip19.npubEncode(getPublicKey(carol));
+  await publishProfileToRelay(nip19.nsecEncode(bob), {
     name: "Bob",
+    about: "Bob's bio",
     website: "https://bob.example",
+  });
+  await publishProfileToRelay(nip19.nsecEncode(carol), {
+    name: "Carol",
+    website: "https://carol.example",
   });
   const existingProfileTime = nowSeconds();
   await setBaseStorage(page);
   await stubFiatRates(page);
   await stubThirdPartyAssets(page);
-  await page.addInitScript((value) => {
+  await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
-      value: { readText: async () => value, writeText: async () => {} },
+      value: {
+        readText: async () => sessionStorage.getItem("test.clipboard") ?? "",
+        writeText: async () => {},
+      },
     });
-  }, nsec);
+  });
 
   await page.goto("/");
   await page.getByRole("button", { name: "Create a profile" }).click();
@@ -199,32 +209,83 @@ test("a custom key keeps its existing profile, and an edit keeps fields set in o
   await page.getByRole("button", { name: "Confirm profile" }).click();
   await expect(page.getByTestId("profile-qr-button")).toBeVisible();
 
-  await page.goto("/#advanced");
-  const paste = page.getByRole("button", { name: "Paste custom nostr keys" });
-  await paste.click();
-  await paste.click();
-  await expect(page).toHaveURL(/#contacts$/);
-
-  await page.goto("/#profile");
-  await expect(page.getByTestId("profile-detail")).toContainText("Bob");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await page.getByLabel("Name", { exact: true }).fill("Bob updated");
-  await expect.poll(nowSeconds).toBeGreaterThan(existingProfileTime);
-  await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByTestId("profile-detail")).toContainText("Bob updated");
-
   const pool = new SimplePool();
+  const newestRelayProfile = async (npub: string) => {
+    const events = await pool.querySync([NOSTR_RELAY_URL], {
+      authors: [npubToHex(npub)],
+      kinds: [0],
+    });
+    const newest = events.sort((a, b) => b.created_at - a.created_at)[0];
+    return newest ? decodeProfileContent(newest.content) : null;
+  };
+  const identitySource = () =>
+    page.evaluate(() => localStorage.getItem("linky.nostr_identity_source.v1"));
+  const choice = page.getByTestId("identity-profile-choice");
+  const preview = page.getByTestId("identity-profile-preview");
+  const requestSwitch = async (secretKey: Uint8Array) => {
+    await page.goto("/#advanced");
+    await page.evaluate(
+      (nsec) => sessionStorage.setItem("test.clipboard", nsec),
+      nip19.nsecEncode(secretKey),
+    );
+    const paste = page.getByRole("button", { name: "Paste custom nostr keys" });
+    await paste.click();
+    await paste.click();
+    await expect(choice).toBeVisible();
+  };
+  const switchIdentity = async () => {
+    await expect.poll(nowSeconds).toBeGreaterThan(existingProfileTime);
+    await page.getByRole("button", { name: "Switch identity" }).click();
+    await expect(page).toHaveURL(/#contacts$/);
+  };
+
   try {
-    await expect
-      .poll(async () => {
-        const events = await pool.querySync([NOSTR_RELAY_URL], {
-          authors: [pubkey],
-          kinds: [0],
+    await test.step("cancel keeps the current identity", async () => {
+      await requestSwitch(bob);
+      await page.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(choice).toBeHidden();
+      await expect(page).toHaveURL(/#advanced$/);
+      expect(await identitySource()).not.toBe("custom");
+      expect(await newestRelayProfile(bobNpub)).toEqual({
+        name: "Bob",
+        about: "Bob's bio",
+        website: "https://bob.example",
+      });
+    });
+
+    await test.step("using the Nostr profile imports it with the Linky address", async () => {
+      await requestSwitch(bob);
+      await expect(preview).toContainText("Alice");
+      await page.getByRole("radio", { name: "Use Nostr profile" }).click();
+      await expect(preview).toContainText("Bob's bio");
+      await expect(preview).toContainText(`${bobNpub}@linky.fit`);
+      await switchIdentity();
+      await expect.poll(identitySource).toBe("custom");
+      await expect
+        .poll(() => newestRelayProfile(bobNpub))
+        .toEqual({
+          name: "Bob",
+          about: "Bob's bio",
+          website: "https://bob.example",
+          lud16: `${bobNpub}@linky.fit`,
         });
-        const newest = events.sort((a, b) => b.created_at - a.created_at)[0];
-        return newest ? decodeProfileContent(newest.content) : null;
-      })
-      .toMatchObject({ name: "Bob updated", website: "https://bob.example" });
+      await page.goto("/#profile");
+      await expect(page.getByTestId("profile-detail")).toContainText("Bob");
+    });
+
+    await test.step("keeping the Linky profile overwrites the identity's own", async () => {
+      await requestSwitch(carol);
+      await expect(preview).toContainText("Bob");
+      await switchIdentity();
+      await expect
+        .poll(() => newestRelayProfile(carolNpub))
+        .toEqual({
+          name: "Bob",
+          about: "Bob's bio",
+          website: "https://carol.example",
+          lud16: `${carolNpub}@linky.fit`,
+        });
+    });
   } finally {
     pool.close([NOSTR_RELAY_URL]);
   }

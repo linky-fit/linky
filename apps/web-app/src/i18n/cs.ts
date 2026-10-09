@@ -291,6 +291,18 @@ export const cs = {
   nostrPasteInvalid: "Neplatný Nostr klíč (očekávám nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Profil se nepodařilo publikovat pod novým klíčem. Klíče nebyly změněny — zkuste to znovu.",
+  identityProfileChoiceTitle: "Jaký profil má tato identita používat?",
+  identityProfileChoiceFound:
+    "Tato identita už má profil na Nostru. Vyberte, který profil pro ni Linky zveřejní.",
+  identityProfileChoiceUnchecked:
+    "Nepodařilo se ověřit, jestli tato identita už má profil. Přepnutím zveřejníte svůj profil z Linky a nahradíte případný existující profil.",
+  identityProfileUseLinky: "Ponechat profil z Linky",
+  identityProfileUseNostr: "Použít profil z Nostru",
+  identityProfileNoHandle: "Bez NIP-05 jména",
+  identityProfileAddressNote:
+    "Lightning adresa je vždy adresa této identity v Linky.",
+  identityProfileConfirm: "Přepnout identitu",
+  identityProfileCancel: "Zrušit",
 
   nostrRelay: "Nostr relay",
   nostrRelays: "Nostr relaye",

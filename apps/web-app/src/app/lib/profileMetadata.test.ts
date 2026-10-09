@@ -3,15 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   applyLightningAddressToProfileMetadata,
   dropNpubNip05,
-  profileMetadataForNewKey,
 } from "./profileMetadata";
 
 const OLD_NPUB =
   "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
-const NEW_NPUB =
-  "npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m";
-const OTHER_NPUB =
-  "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6";
 
 describe("applyLightningAddressToProfileMetadata", () => {
   it("adds matching NIP-05 metadata for claimed linky.fit addresses", () => {
@@ -94,58 +89,6 @@ describe("dropNpubNip05", () => {
   );
 });
 
-describe("profileMetadataForNewKey", () => {
-  const forNewKey = (
-    fields: ConstructorParameters<typeof ProfileMetadata>[0],
-  ) =>
-    profileMetadataForNewKey(new ProfileMetadata(fields), OLD_NPUB, NEW_NPUB);
-
-  it("moves the previous npub address to the new npub and drops its handle", () => {
-    expect(
-      forNewKey({
-        name: "alice",
-        lud16: `${OLD_NPUB}@linky.fit`,
-        nip05: `${OLD_NPUB}@linky.fit`,
-      }),
-    ).toEqual(
-      new ProfileMetadata({ name: "alice", lud16: `${NEW_NPUB}@linky.fit` }),
-    );
-  });
-
-  it("replaces a bought name, which stays with the previous key", () => {
-    expect(
-      forNewKey({
-        name: "alice",
-        lud16: "hynek@linky.fit",
-        nip05: "hynek@linky.fit",
-      }),
-    ).toEqual(
-      new ProfileMetadata({ name: "alice", lud16: `${NEW_NPUB}@linky.fit` }),
-    );
-  });
-
-  it("keeps a lightning address and handle from another domain", () => {
-    const fields = {
-      name: "alice",
-      lud16: "alice@getalby.com",
-      nip05: "alice@nostr.example",
-    };
-    expect(forNewKey(fields)).toEqual(new ProfileMetadata(fields));
-  });
-
-  it("drops a linky.fit handle next to a foreign address", () => {
-    expect(
-      forNewKey({ lud16: "alice@getalby.com", nip05: "hynek@linky.fit" }),
-    ).toEqual(new ProfileMetadata({ lud16: "alice@getalby.com" }));
-  });
-
-  it("keeps another npub's linky.fit address", () => {
-    expect(forNewKey({ lud16: `${OTHER_NPUB}@linky.fit` })).toEqual(
-      new ProfileMetadata({ lud16: `${OTHER_NPUB}@linky.fit` }),
-    );
-  });
-});
-
 describe("unmodeled fields", () => {
   const extraFields = { website: "https://alice.example", bot: false };
 
@@ -160,13 +103,6 @@ describe("unmodeled fields", () => {
       dropNpubNip05(
         new ProfileMetadata({ extraFields, nip05: `${OLD_NPUB}@linky.fit` }),
       )?.extraFields,
-    ).toEqual(extraFields);
-    expect(
-      profileMetadataForNewKey(
-        new ProfileMetadata({ extraFields, lud16: `${OLD_NPUB}@linky.fit` }),
-        OLD_NPUB,
-        NEW_NPUB,
-      ).extraFields,
     ).toEqual(extraFields);
   });
 });

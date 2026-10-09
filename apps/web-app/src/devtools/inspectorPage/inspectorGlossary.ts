@@ -38,8 +38,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The public photo upload failed. The profile save stops before replacing the previously published photo.",
   "profile.npubNip05Dropped":
     "On app start, the own profile fetched from relays still carried an npub…@linky.fit nip05, which linky.fit never verifies, so it was republished without it, every other field unchanged. Runs at most once per session; a failed publish retries on the next start. The wrap link is the new kind 0 event.",
-  "profile.keySwitchPublishSkipped":
-    "Switching to another Nostr key did not publish the previous key's profile for it. reason existing-profile: the new key already has a kind 0 on relays, which is kept as is. reason fetch-failed: no relay answered, so an unknown existing profile is not overwritten; the key switch still completes. The pubkey link is the new key.",
+  "identitySwitch.profileChecked":
+    "Before switching to a pasted custom identity, Linky fetched that identity's profile from the current relays and looked up its bought linky.fit name on npub.linky.fit. profile none: relays answered with no profile, so the switch publishes the Linky profile right away. found: the user picks the Linky or the Nostr profile. unchecked: no relay answered, so the user may only publish the Linky profile or cancel. boughtName found makes the name the identity's address and handle; none or lookup-failed use its npub address. The pubkey link is the identity to switch to.",
+  "identitySwitch.profileChosen":
+    "The user answered the profile choice of a custom identity switch. choice linky publishes the Linky name, picture and about; nostr publishes the identity's own profile; both use the identity's Linky address and keep the fields of its own profile Linky does not model. cancel leaves the current identity and stores nothing.",
   "keryx.paired":
     "The user paired with a Keryx company: confirmed its join origin, chose channels and subscribed. The payload lists the chosen channels and how many private feeds a master-signed pattern authorized. The company link is the join origin, shared by every row about that company.",
   "keryx.pairFailed":

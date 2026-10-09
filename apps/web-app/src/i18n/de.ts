@@ -301,6 +301,18 @@ export const de = {
   nostrPasteInvalid: "Ungültiger Nostr-Schlüssel (nsec… erwartet).",
   nostrKeySwitchProfilePublishFailed:
     "Profil konnte nicht unter dem neuen Schlüssel veröffentlicht werden. Schlüssel wurden nicht gewechselt — bitte erneut versuchen.",
+  identityProfileChoiceTitle: "Welches Profil soll diese Identität nutzen?",
+  identityProfileChoiceFound:
+    "Diese Identität hat bereits ein Profil auf Nostr. Wähle, welches Profil Linky für sie veröffentlicht.",
+  identityProfileChoiceUnchecked:
+    "Linky konnte nicht prüfen, ob diese Identität bereits ein Profil hat. Beim Wechsel wird dein Linky-Profil veröffentlicht und ersetzt ein vorhandenes Profil.",
+  identityProfileUseLinky: "Linky-Profil behalten",
+  identityProfileUseNostr: "Nostr-Profil nutzen",
+  identityProfileNoHandle: "Kein NIP-05-Handle",
+  identityProfileAddressNote:
+    "Die Lightning-Adresse ist immer die Linky-Adresse dieser Identität.",
+  identityProfileConfirm: "Identität wechseln",
+  identityProfileCancel: "Abbrechen",
 
   nostrRelay: "Nostr-Relay",
   nostrRelays: "Nostr-Relays",

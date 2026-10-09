@@ -89,8 +89,7 @@ export const parseNip05IdentifierInput = (
   };
 };
 
-/** The normalized local part of a linky.fit address or handle; null for other domains. */
-export const parseDefaultDomainLocalPart = (value: string): string | null => {
+const parseDefaultDomainLocalPart = (value: string): string | null => {
   const input = stripNostrUriPrefix(value);
   const atIndex = input.indexOf("@");
   if (atIndex < 0 || atIndex !== input.lastIndexOf("@")) return null;

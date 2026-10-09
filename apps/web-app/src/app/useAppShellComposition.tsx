@@ -123,6 +123,7 @@ export const useAppShellComposition = ({
   const { dismissToast, toasts, pushToast } = useToasts();
   const { lang, setLang, t } = useAppLanguage();
   const {
+    answerPendingIdentitySwitch,
     appOwnerId,
     appOwnerIdRef,
     appendIdentityChangeNoticesRef,
@@ -130,6 +131,7 @@ export const useAppShellComposition = ({
     isSeedLogin,
     logoutArmed,
     myProfileMetadataRef,
+    pendingIdentitySwitch,
     requestLogout,
     requestPasteNostrKeys,
     seedMnemonic,
@@ -1156,6 +1158,9 @@ export const useAppShellComposition = ({
       return closeCashuPaymentRequestConfirmation;
     }
     if (postPaySaveContact) return () => setPostPaySaveContact(null);
+    if (pendingIdentitySwitch) {
+      return () => void answerPendingIdentitySwitch(null);
+    }
     return null;
   })();
 
@@ -1554,6 +1559,7 @@ export const useAppShellComposition = ({
     relaySettingsContext,
   } = useSystemSettingsComposition({
     advancedSettingsInput: {
+      answerPendingIdentitySwitch,
       copyNostrKeys,
       copySeed,
       dedupeContacts,
@@ -1569,6 +1575,7 @@ export const useAppShellComposition = ({
       logoutArmed,
       openScan,
       payWithCashuEnabled,
+      pendingIdentitySwitch,
       pushToast,
       receiveMethod,
       relayUrls,

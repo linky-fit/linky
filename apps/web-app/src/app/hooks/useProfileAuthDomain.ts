@@ -18,6 +18,7 @@ import {
   encodeNpub,
   ProfileMetadata,
   StatusDraft,
+  type Pubkey,
 } from "@linky-fit/linkstr";
 import {
   fetchProfileAtom,
@@ -70,7 +71,13 @@ import {
 import type { FilePickerHandle } from "../../utils/pickFile";
 import { nowSeconds } from "../../utils/time";
 import { prepareProfilePicture } from "../lib/profilePicture";
-import { carryProfileToNewKey } from "../lib/keySwitchProfile";
+import {
+  checkIdentityForSwitch,
+  profileForIdentitySwitch,
+  type IdentityProfileCheck,
+  type IdentityProfileSource,
+} from "../lib/keySwitchProfile";
+import { fetchOwnedLightningAddress } from "../../utils/npubCashInfo";
 import type { I18nKey, Translate } from "../../i18n";
 
 type NostrIdentitySource = "custom" | "derived";
@@ -84,6 +91,16 @@ export interface PendingOnboardingProfile {
   pictureUrl: string;
   selectedPictureKind: "custom" | "generated";
   slip39Seed: string;
+}
+
+/** A custom identity waiting for the user to choose its profile. */
+export interface PendingIdentitySwitch {
+  check: Exclude<IdentityProfileCheck, { kind: "none" }>;
+  lightningAddress: string;
+  linkyProfile: ProfileMetadata;
+  npub: string;
+  nsec: string;
+  pubkey: Pubkey;
 }
 
 export interface ReturningOnboardingStep {
@@ -133,6 +150,10 @@ interface UseProfileAuthDomainParams {
 }
 
 interface UseProfileAuthDomainResult {
+  answerPendingIdentitySwitch: (
+    source: IdentityProfileSource | null,
+  ) => Promise<void>;
+  pendingIdentitySwitch: PendingIdentitySwitch | null;
   confirmPendingOnboardingProfile: () => Promise<void>;
   createNewAccount: () => Promise<void>;
   currentNpub: string | null;
@@ -182,6 +203,8 @@ export const useProfileAuthDomain = ({
   const [activeNostrIdentitySource, setActiveNostrIdentitySource] =
     React.useState<NostrIdentitySource>(() => getInitialNostrIdentitySource());
   const [logoutArmed, setLogoutArmed] = React.useState(false);
+  const [pendingIdentitySwitch, setPendingIdentitySwitch] =
+    React.useState<PendingIdentitySwitch | null>(null);
   const onboardingPhotoInputRef = React.useRef<FilePickerHandle | null>(null);
   const [isSeedLogin, setIsSeedLogin] = React.useState(false);
   const setLinkstrConfig = useAtomSet(linkstrConfigAtom);
@@ -403,38 +426,20 @@ export const useProfileAuthDomain = ({
     ],
   );
 
-  const republishProfileForNewKey = React.useCallback(
-    async (newNsec: string): Promise<boolean> => {
+  const publishProfileForNewKey = React.useCallback(
+    async (newNsec: string, metadata: ProfileMetadata): Promise<boolean> => {
       const previousNsec = (currentNsec ?? "").trim();
-      if (!previousNsec || previousNsec === newNsec) return true;
-
-      const previousNpub = await deriveNpubFromNsec(previousNsec);
-      const previousMetadata =
-        myProfileMetadataRef.current ??
-        (previousNpub
-          ? (loadCachedProfile(previousNpub)?.metadata ?? null)
-          : null);
-      if (!previousMetadata) return true;
-
-      const newPrivBytes = await decodeNsecPrivateBytes(newNsec);
+      const newNpub = await deriveNpubFromNsec(newNsec);
       const config = buildLinkstrConfig(
         newNsec,
         recommendedNostrRelays(),
         inboxCursors,
       );
-      if (!newPrivBytes || config === null) return false;
-      const newPubkey = derivePubkey(newPrivBytes);
+      if (!newNpub || config === null) return false;
 
       setLinkstrConfig(config);
-      const carried = await carryProfileToNewKey({
-        fetchProfile,
-        newNpub: encodeNpub(newPubkey),
-        newPubkey,
-        previousMetadata,
-        previousNpub,
-        publishProfile,
-      });
-      if (!carried) {
+      const publishExit = await publishProfile(metadata);
+      if (Exit.isFailure(publishExit)) {
         // Hand the runtime back to the still-active identity before bailing.
         setLinkstrConfig(
           buildLinkstrConfig(
@@ -443,16 +448,16 @@ export const useProfileAuthDomain = ({
             inboxCursors,
           ),
         );
+        return false;
       }
-      return carried;
+
+      saveCachedProfile(newNpub, metadata, nowSeconds());
+      return true;
     },
     [
       currentNsec,
-      decodeNsecPrivateBytes,
       deriveNpubFromNsec,
-      fetchProfile,
       inboxCursors,
-      myProfileMetadataRef,
       publishProfile,
       setLinkstrConfig,
     ],
@@ -463,6 +468,8 @@ export const useProfileAuthDomain = ({
       nsec: string,
       sourceSlip39Seed: string,
       options?: {
+        /** Published under the new identity before anything is stored. */
+        profileToPublish?: ProfileMetadata;
         identitySource?: NostrIdentitySource;
         invalidMessageKey?: I18nKey;
         persistSyncedIdentity?: boolean;
@@ -510,8 +517,10 @@ export const useProfileAuthDomain = ({
         Boolean(previousNsec) &&
         previousNsec !== raw;
 
-      const republished = await republishProfileForNewKey(raw);
-      if (!republished) {
+      const published = options?.profileToPublish
+        ? await publishProfileForNewKey(raw, options.profileToPublish)
+        : true;
+      if (!published) {
         pushToast(t("nostrKeySwitchProfilePublishFailed"));
         return;
       }
@@ -556,8 +565,8 @@ export const useProfileAuthDomain = ({
       appendIdentityChangeNoticesRef,
       currentNsec,
       deriveAppMnemonicFromSlip39,
+      publishProfileForNewKey,
       pushToast,
-      republishProfileForNewKey,
       t,
       upsertActiveNostrIdentity,
     ],
@@ -961,6 +970,19 @@ export const useProfileAuthDomain = ({
     updateReturningOnboardingStep,
   ]);
 
+  const switchToCustomIdentity = React.useCallback(
+    async (nsec: string, profileToPublish: ProfileMetadata) => {
+      await setIdentityFromNsecAndReload(nsec, (slip39Seed ?? "").trim(), {
+        identitySource: "custom",
+        invalidMessageKey: "nostrPasteInvalid",
+        profileToPublish,
+        recordChatNotice: true,
+        switchedAtSec: Math.ceil(Date.now() / 1000),
+      });
+    },
+    [setIdentityFromNsecAndReload, slip39Seed],
+  );
+
   const requestPasteNostrKeys = React.useCallback(async () => {
     if (onboardingIsBusy) return;
 
@@ -984,29 +1006,98 @@ export const useProfileAuthDomain = ({
         return;
       }
 
-      const privBytes = await decodeNsecPrivateBytes(raw);
-      if (!privBytes) {
+      const secretKey = await decodeNsecPrivateBytes(raw);
+      if (!secretKey) {
         pushToast(t("nostrPasteInvalid"));
         return;
       }
+      if (raw === (currentNsec ?? "").trim()) return;
 
-      await setIdentityFromNsecAndReload(raw, normalizedSeed, {
-        identitySource: "custom",
-        invalidMessageKey: "nostrPasteInvalid",
-        recordChatNotice: true,
-        switchedAtSec: Math.ceil(Date.now() / 1000),
+      const pubkey = derivePubkey(secretKey);
+      const npub = encodeNpub(pubkey);
+      const linkyProfile =
+        myProfileMetadataRef.current ??
+        (currentNpub ? loadCachedProfile(currentNpub)?.metadata : null) ??
+        new ProfileMetadata({});
+      const { check, lightningAddress } = await checkIdentityForSwitch({
+        fetchProfile,
+        lookupOwnedAddress: () => fetchOwnedLightningAddress(secretKey),
+        npub,
+        pubkey,
+      });
+      if (check.kind === "none") {
+        await switchToCustomIdentity(
+          raw,
+          profileForIdentitySwitch({
+            lightningAddress,
+            linkyProfile,
+            nostrProfile: null,
+            source: "linky",
+          }),
+        );
+        return;
+      }
+      setPendingIdentitySwitch({
+        check,
+        lightningAddress,
+        linkyProfile,
+        npub,
+        nsec: raw,
+        pubkey,
       });
     } finally {
       setOnboardingIsBusy(false);
     }
   }, [
+    currentNpub,
+    currentNsec,
     decodeNsecPrivateBytes,
+    fetchProfile,
+    myProfileMetadataRef,
     onboardingIsBusy,
     pushToast,
-    setIdentityFromNsecAndReload,
     slip39Seed,
+    switchToCustomIdentity,
     t,
   ]);
+
+  const answerPendingIdentitySwitch = React.useCallback(
+    async (source: IdentityProfileSource | null) => {
+      if (!pendingIdentitySwitch || onboardingIsBusy) return;
+      const { check, lightningAddress, linkyProfile, nsec, pubkey } =
+        pendingIdentitySwitch;
+      reportAppLog({
+        tag: "identitySwitch.profileChosen",
+        summary:
+          source === null
+            ? "User cancelled the identity switch"
+            : `User switched identity using the ${source} profile`,
+        links: { pubkey },
+        payload: { check: check.kind, choice: source ?? "cancel" },
+      });
+      if (source === null) {
+        setPendingIdentitySwitch(null);
+        return;
+      }
+
+      setOnboardingIsBusy(true);
+      try {
+        await switchToCustomIdentity(
+          nsec,
+          profileForIdentitySwitch({
+            lightningAddress,
+            linkyProfile,
+            nostrProfile: check.kind === "found" ? check.metadata : null,
+            source,
+          }),
+        );
+      } finally {
+        setPendingIdentitySwitch(null);
+        setOnboardingIsBusy(false);
+      }
+    },
+    [onboardingIsBusy, pendingIdentitySwitch, switchToCustomIdentity],
+  );
 
   const requestLogout = React.useCallback(
     ({ evoluConnected }: { evoluConnected: boolean }) => {
@@ -1048,6 +1139,7 @@ export const useProfileAuthDomain = ({
   }, [logoutArmed]);
 
   return {
+    answerPendingIdentitySwitch,
     confirmPendingOnboardingProfile,
     createNewAccount,
     currentNpub,
@@ -1060,6 +1152,7 @@ export const useProfileAuthDomain = ({
     onPendingOnboardingPhotoSelected,
     onPendingOnboardingPhotoError,
     pasteReturningSlip39FromClipboard,
+    pendingIdentitySwitch,
     pickPendingOnboardingPhoto,
     requestPasteNostrKeys,
     requestLogout,

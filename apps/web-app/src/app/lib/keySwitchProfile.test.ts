@@ -1,112 +1,179 @@
 import {
   decodeNpub,
-  EventId,
-  PlainEventReceipt,
   ProfileFetchResult,
   ProfileMetadata,
   ProfileUpdated,
   UnixSeconds,
 } from "@linky-fit/linkstr";
 import { Exit } from "effect";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadCachedProfile } from "../../profileCache";
-import { carryProfileToNewKey } from "./keySwitchProfile";
+import { describe, expect, it, vi } from "vitest";
+import {
+  checkIdentityForSwitch,
+  profileForIdentitySwitch,
+} from "./keySwitchProfile";
+
+const mocks = vi.hoisted(() => ({ reportAppLog: vi.fn() }));
+
+vi.mock("../../devtools/inspector/appLog", () => ({
+  reportAppLog: mocks.reportAppLog,
+}));
 
 const OLD_NPUB =
   "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8";
 const NEW_NPUB =
   "npub1gcxzte5zlkncx26j68ez60fzkvtkm9e0vrwdcvsjakxf9mu9qewqlfnj5z";
+const NEW_ADDRESS = `${NEW_NPUB}@linky.fit`;
 const newPubkey = decodeNpub(NEW_NPUB);
 if (!newPubkey) throw new Error("test npub must decode");
 
-type CarryArgs = Parameters<typeof carryProfileToNewKey>[0];
-
-const previousMetadata = new ProfileMetadata({
-  name: "Alice",
-  lud16: `${OLD_NPUB}@linky.fit`,
-});
-
-const receipt = new PlainEventReceipt({
-  eventId: EventId.make("e".repeat(64)),
-  kind: 0,
-  sentAt: UnixSeconds.make(100),
-  results: [],
-});
-
-const noProfile = Exit.succeed(
-  new ProfileFetchResult({ profile: null, status: null }),
-);
-
-const carry = (
-  fetchExit: Awaited<ReturnType<CarryArgs["fetchProfile"]>>,
-  publishExit: Awaited<ReturnType<CarryArgs["publishProfile"]>> = Exit.succeed(
-    receipt,
-  ),
-) => {
-  const publishProfile = vi.fn<CarryArgs["publishProfile"]>(
-    async () => publishExit,
-  );
-  const result = carryProfileToNewKey({
-    fetchProfile: async () => fetchExit,
-    newNpub: NEW_NPUB,
-    newPubkey,
-    previousMetadata,
-    previousNpub: OLD_NPUB,
-    publishProfile,
-  });
-  return { publishProfile, result };
-};
-
-describe("carryProfileToNewKey", () => {
-  beforeEach(() => localStorage.clear());
-
-  it("publishes the migrated profile when the new key has none", async () => {
-    const { publishProfile, result } = carry(noProfile);
-
-    expect(await result).toBe(true);
-    const migrated = new ProfileMetadata({
-      name: "Alice",
-      lud16: `${NEW_NPUB}@linky.fit`,
-    });
-    expect(publishProfile).toHaveBeenCalledWith(migrated);
-    expect(loadCachedProfile(NEW_NPUB)?.metadata).toEqual(migrated);
-  });
-
-  it("keeps the new key's existing profile", async () => {
-    const existing = new ProfileMetadata({ name: "Bob" });
-    const { publishProfile, result } = carry(
-      Exit.succeed(
-        new ProfileFetchResult({
-          profile: new ProfileUpdated({
-            metadata: existing,
+const fetched = (metadata: ProfileMetadata | null) =>
+  Exit.succeed(
+    new ProfileFetchResult({
+      profile: metadata
+        ? new ProfileUpdated({
+            metadata,
             pubkey: newPubkey,
             updatedAt: UnixSeconds.make(100),
-          }),
-          status: null,
-        }),
-      ),
-    );
+          })
+        : null,
+      status: null,
+    }),
+  );
 
-    expect(await result).toBe(true);
-    expect(publishProfile).not.toHaveBeenCalled();
-    expect(loadCachedProfile(NEW_NPUB)).toEqual({
-      metadata: existing,
-      updatedAt: 100,
+describe("checkIdentityForSwitch", () => {
+  const check = (
+    profileExit: Exit.Exit<ProfileFetchResult, unknown>,
+    lookupOwnedAddress: () => Promise<string | null>,
+  ) =>
+    checkIdentityForSwitch({
+      fetchProfile: async () => profileExit,
+      lookupOwnedAddress,
+      npub: NEW_NPUB,
+      pubkey: newPubkey,
     });
+
+  it.each([
+    ["none", fetched(null)],
+    ["found", fetched(new ProfileMetadata({ name: "Bob" }))],
+    ["unchecked", Exit.fail("unreachable")],
+  ] as const)("reports a %s profile", async (kind, exit) => {
+    const result = await check(exit, async () => null);
+
+    expect(result.check.kind).toBe(kind);
+    expect(mocks.reportAppLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        tag: "identitySwitch.profileChecked",
+        links: { pubkey: newPubkey },
+        payload: { boughtName: "none", profile: kind },
+      }),
+    );
   });
 
-  it("publishes nothing but lets the switch go on when no relay answers", async () => {
-    const { publishProfile, result } = carry(Exit.fail("unreachable"));
-
-    expect(await result).toBe(true);
-    expect(publishProfile).not.toHaveBeenCalled();
-    expect(loadCachedProfile(NEW_NPUB)).toBeNull();
+  it("uses the identity's bought name as its address", async () => {
+    const result = await check(fetched(null), async () => "bob@linky.fit");
+    expect(result.lightningAddress).toBe("bob@linky.fit");
   });
 
-  it("fails when the publish fails", async () => {
-    const { result } = carry(noProfile, Exit.fail("rejected"));
+  it("falls back to the npub address when the name lookup fails", async () => {
+    const result = await check(fetched(null), () =>
+      Promise.reject(new Error("offline")),
+    );
+    expect(result.lightningAddress).toBe(NEW_ADDRESS);
+    expect(mocks.reportAppLog).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        payload: { boughtName: "lookup-failed", profile: "none" },
+      }),
+    );
+  });
+});
 
-    expect(await result).toBe(false);
-    expect(loadCachedProfile(NEW_NPUB)).toBeNull();
+describe("profileForIdentitySwitch", () => {
+  const linkyProfile = new ProfileMetadata({
+    name: "Alice",
+    displayName: "Alice",
+    picture: "https://example.com/alice.png",
+    lud16: "hynek@linky.fit",
+    lud06: "lnurl1old",
+    nip05: "alice@old.example",
+    extraFields: { website: "https://alice.example" },
+  });
+  const nostrProfile = new ProfileMetadata({
+    name: "Bob",
+    about: "Bob's bio",
+    lud16: "bob@getalby.com",
+    nip05: "bob@nostr.example",
+    extraFields: { banner: "https://bob.example/b.png" },
+  });
+
+  it("publishes the Linky profile with the identity's own address and fields", () => {
+    expect(
+      profileForIdentitySwitch({
+        lightningAddress: NEW_ADDRESS,
+        linkyProfile,
+        nostrProfile,
+        source: "linky",
+      }),
+    ).toEqual(
+      new ProfileMetadata({
+        name: "Alice",
+        displayName: "Alice",
+        picture: "https://example.com/alice.png",
+        lud16: NEW_ADDRESS,
+        nip05: "bob@nostr.example",
+        extraFields: { banner: "https://bob.example/b.png" },
+      }),
+    );
+  });
+
+  it("imports the Nostr profile but keeps the Linky address", () => {
+    expect(
+      profileForIdentitySwitch({
+        lightningAddress: NEW_ADDRESS,
+        linkyProfile,
+        nostrProfile,
+        source: "nostr",
+      }),
+    ).toEqual(
+      new ProfileMetadata({
+        name: "Bob",
+        about: "Bob's bio",
+        lud16: NEW_ADDRESS,
+        nip05: "bob@nostr.example",
+        extraFields: { banner: "https://bob.example/b.png" },
+      }),
+    );
+  });
+
+  it("uses a bought name as the address and the handle", () => {
+    const profile = profileForIdentitySwitch({
+      lightningAddress: "bob@linky.fit",
+      linkyProfile,
+      nostrProfile,
+      source: "nostr",
+    });
+    expect(profile.lud16).toBe("bob@linky.fit");
+    expect(profile.nip05).toBe("bob@linky.fit");
+  });
+
+  it("carries the Linky profile's fields to an identity without a profile", () => {
+    expect(
+      profileForIdentitySwitch({
+        lightningAddress: NEW_ADDRESS,
+        linkyProfile: new ProfileMetadata({
+          name: "Alice",
+          lud16: `${OLD_NPUB}@linky.fit`,
+          nip05: "hynek@linky.fit",
+          extraFields: { website: "https://alice.example" },
+        }),
+        nostrProfile: null,
+        source: "linky",
+      }),
+    ).toEqual(
+      new ProfileMetadata({
+        name: "Alice",
+        lud16: NEW_ADDRESS,
+        extraFields: { website: "https://alice.example" },
+      }),
+    );
   });
 });
