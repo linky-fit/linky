@@ -1,7 +1,7 @@
 import { nip19 } from "nostr-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  getDefaultNip05IdentifierFromAddress,
+  getProfileNip05,
   parseNip05IdentifierInput,
   resolveNip05Input,
   resolveVerifiedNip05Identifier,
@@ -45,15 +45,29 @@ describe("parseNip05IdentifierInput", () => {
   });
 });
 
-describe("getDefaultNip05IdentifierFromAddress", () => {
-  it("normalizes linky.fit addresses", () => {
-    expect(getDefaultNip05IdentifierFromAddress("Hynek@Linky.Fit")).toBe(
+describe("getProfileNip05", () => {
+  const npubAddress =
+    "npub1kkht6jvgr8mt4844saf80j5jjwyy6fdy90sxsuxt4hfv8pel499s96jvz8@linky.fit";
+
+  it("publishes a bought linky.fit name as the handle", () => {
+    expect(getProfileNip05("Hynek@Linky.Fit", undefined)).toBe(
       "hynek@linky.fit",
     );
   });
 
-  it("ignores other domains", () => {
-    expect(getDefaultNip05IdentifierFromAddress("hynek@nostr.com")).toBeNull();
+  it("publishes no handle for an npub address, dropping an old one", () => {
+    expect(getProfileNip05(npubAddress, undefined)).toBeUndefined();
+    expect(getProfileNip05(npubAddress, npubAddress)).toBeUndefined();
+    expect(getProfileNip05(npubAddress, "hynek@linky.fit")).toBeUndefined();
+  });
+
+  it("keeps a handle from another domain", () => {
+    expect(getProfileNip05(npubAddress, "hynek@nostr.com")).toBe(
+      "hynek@nostr.com",
+    );
+    expect(getProfileNip05("hynek@nostr.com", "hynek@nostr.com")).toBe(
+      "hynek@nostr.com",
+    );
   });
 });
 
