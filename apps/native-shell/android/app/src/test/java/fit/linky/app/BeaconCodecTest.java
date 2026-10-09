@@ -102,7 +102,7 @@ public class BeaconCodecTest {
 
 		assertEquals(expected, hexOrNull(BeaconCodec.appleOverflowArea(raw(flags + nearbyInfo + overflow + serviceUuids))));
 		assertEquals(expected, hexOrNull(BeaconCodec.appleOverflowArea(raw(flags + overflow + serviceUuids + nearbyInfo))));
-		assertEquals(expected, hexOrNull(BeaconCodec.appleOverflowArea(raw(flags + "1bff4c00" + "1005031c0e8c3a" + overflow.substring(8) + "000000"))));
+		assertEquals(expected, hexOrNull(BeaconCodec.appleOverflowArea(raw(flags + "1eff4c00" + "1005031c0e8c3a" + overflow.substring(8) + "000000"))));
 	}
 
 	@Test
