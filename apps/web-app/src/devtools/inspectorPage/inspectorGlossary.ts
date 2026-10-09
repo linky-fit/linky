@@ -36,6 +36,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "The public photo upload returned an HTTPS URL and a matching SHA-256. The profile can now publish that URL.",
   "profile.pictureUploadFailed":
     "The public photo upload failed. The profile save stops before replacing the previously published photo.",
+  "profile.npubNip05Dropped":
+    "On app start, the own profile fetched from relays still carried an npub…@linky.fit nip05, which linky.fit never verifies, so it was republished without it, every other field unchanged. Runs at most once per session; a failed publish retries on the next start. The wrap link is the new kind 0 event.",
   "keryx.paired":
     "The user paired with a Keryx company: confirmed its join origin, chose channels and subscribed. The payload lists the chosen channels and how many private feeds a master-signed pattern authorized. The company link is the join origin, shared by every row about that company.",
   "keryx.pairFailed":

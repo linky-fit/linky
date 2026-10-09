@@ -654,6 +654,7 @@ export const useAppShellComposition = ({
     nostrMetadataByNpub,
     nostrPictureByNpub,
     nostrStatusByNpub,
+    nostrBootstrapReady,
     route,
     setStatus,
     t,
