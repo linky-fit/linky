@@ -1,77 +1,107 @@
-import type {
-  PlainEventReceipt,
-  ProfileFetchResult,
+import {
   ProfileMetadata,
-  Pubkey,
+  type ProfileFetchResult,
+  type Pubkey,
 } from "@linky-fit/linkstr";
-import { Exit } from "effect";
+import { Exit, Struct } from "effect";
+import { deriveDefaultLightningAddress } from "../../derivedProfile";
 import { reportAppLog } from "../../devtools/inspector/appLog";
-import { saveCachedProfile } from "../../profileCache";
-import { nowSeconds } from "../../utils/time";
-import { profileMetadataForNewKey } from "./profileMetadata";
+import { getProfileNip05 } from "../../utils/nostrNip05";
 
-interface CarryProfileToNewKeyArgs {
+/** What relays hold for an identity the user is about to switch to. */
+export type IdentityProfileCheck =
+  | { kind: "none" }
+  | { kind: "found"; metadata: ProfileMetadata }
+  | { kind: "unchecked" };
+
+/** Whose name, picture and about the switched-to identity publishes. */
+export type IdentityProfileSource = "linky" | "nostr";
+
+export interface IdentitySwitchCheck {
+  check: IdentityProfileCheck;
+  /** The identity's own Linky address: its bought name, else its npub address. */
+  lightningAddress: string;
+}
+
+/**
+ * Checks, before anything is switched, which profile the identity already has
+ * and whether it bought a linky.fit name. A failed profile fetch leaves the
+ * profile unchecked; a failed name lookup falls back to the npub address.
+ */
+export const checkIdentityForSwitch = async ({
+  fetchProfile,
+  lookupOwnedAddress,
+  npub,
+  pubkey,
+}: {
   fetchProfile: (
     pubkey: Pubkey,
   ) => Promise<Exit.Exit<ProfileFetchResult, unknown>>;
-  newNpub: string;
-  newPubkey: Pubkey;
-  previousMetadata: ProfileMetadata;
-  previousNpub: string | null;
-  publishProfile: (
-    metadata: ProfileMetadata,
-  ) => Promise<Exit.Exit<PlainEventReceipt, unknown>>;
-}
+  lookupOwnedAddress: () => Promise<string | null>;
+  npub: string;
+  pubkey: Pubkey;
+}): Promise<IdentitySwitchCheck> => {
+  const [profileExit, ownedAddress] = await Promise.all([
+    fetchProfile(pubkey),
+    lookupOwnedAddress().then(
+      (address) => ({ address, failed: false }),
+      () => ({ address: null, failed: true }),
+    ),
+  ]);
+  const profile = Exit.isSuccess(profileExit)
+    ? profileExit.value.profile
+    : null;
+  const check: IdentityProfileCheck = Exit.isFailure(profileExit)
+    ? { kind: "unchecked" }
+    : profile
+      ? { kind: "found", metadata: profile.metadata }
+      : { kind: "none" };
+  const boughtName = ownedAddress.failed
+    ? "lookup-failed"
+    : ownedAddress.address === null
+      ? "none"
+      : "found";
 
-const reportPublishSkipped = (
-  newPubkey: Pubkey,
-  reason: "existing-profile" | "fetch-failed",
-): void =>
   reportAppLog({
-    tag: "profile.keySwitchPublishSkipped",
-    summary:
-      reason === "existing-profile"
-        ? "Kept the new key's existing profile"
-        : "No relay answered for the new key's profile; published nothing",
-    links: { pubkey: newPubkey },
-    payload: { reason },
+    tag: "identitySwitch.profileChecked",
+    summary: `Identity to switch to: profile ${check.kind}, bought name ${boughtName}`,
+    links: { pubkey },
+    payload: { boughtName, profile: check.kind },
   });
+  return {
+    check,
+    lightningAddress:
+      ownedAddress.address ?? deriveDefaultLightningAddress(npub),
+  };
+};
 
 /**
- * Publishes the previous key's profile for a new key that has none on
- * relays. A profile the new key already has stays untouched, and so does an
- * unknown one: when the fetch fails, nothing is published. Resolves false
- * only when the publish itself failed.
+ * The profile an identity publishes when the user switches to it. `source`
+ * picks the name, picture and about; fields Linky does not model come from
+ * the identity's own profile when it has one. The Linky address always wins,
+ * and the handle is the bought name or a handle of another domain the
+ * identity already published.
  */
-export const carryProfileToNewKey = async ({
-  fetchProfile,
-  newNpub,
-  newPubkey,
-  previousMetadata,
-  previousNpub,
-  publishProfile,
-}: CarryProfileToNewKeyArgs): Promise<boolean> => {
-  const existingExit = await fetchProfile(newPubkey);
-  if (Exit.isFailure(existingExit)) {
-    reportPublishSkipped(newPubkey, "fetch-failed");
-    return true;
-  }
+export const profileForIdentitySwitch = ({
+  lightningAddress,
+  linkyProfile,
+  nostrProfile,
+  source,
+}: {
+  lightningAddress: string;
+  linkyProfile: ProfileMetadata;
+  nostrProfile: ProfileMetadata | null;
+  source: IdentityProfileSource;
+}): ProfileMetadata => {
+  const shown =
+    source === "nostr" && nostrProfile ? nostrProfile : linkyProfile;
+  const extraFields = (nostrProfile ?? linkyProfile).extraFields;
+  const nip05 = getProfileNip05(lightningAddress, nostrProfile?.nip05);
 
-  const existing = existingExit.value.profile;
-  if (existing) {
-    saveCachedProfile(newNpub, existing.metadata, existing.updatedAt);
-    reportPublishSkipped(newPubkey, "existing-profile");
-    return true;
-  }
-
-  const metadata = profileMetadataForNewKey(
-    previousMetadata,
-    previousNpub,
-    newNpub,
-  );
-  const publishExit = await publishProfile(metadata);
-  if (Exit.isFailure(publishExit)) return false;
-
-  saveCachedProfile(newNpub, metadata, nowSeconds());
-  return true;
+  return new ProfileMetadata({
+    ...Struct.omit(shown, "extraFields", "lud06", "lud16", "nip05"),
+    lud16: lightningAddress,
+    ...(nip05 ? { nip05 } : {}),
+    ...(extraFields ? { extraFields } : {}),
+  });
 };

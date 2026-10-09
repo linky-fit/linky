@@ -300,6 +300,18 @@ export const pt = {
   nostrPasteInvalid: "Chave Nostr inválida (esperado nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Não foi possível publicar seu perfil com a nova chave. As chaves não foram trocadas — tente de novo.",
+  identityProfileChoiceTitle: "Qual perfil esta identidade deve usar?",
+  identityProfileChoiceFound:
+    "Esta identidade já tem um perfil no Nostr. Escolha qual perfil o Linky publica para ela.",
+  identityProfileChoiceUnchecked:
+    "O Linky não conseguiu verificar se esta identidade já tem um perfil. Ao trocar, seu perfil do Linky é publicado e substitui qualquer perfil existente.",
+  identityProfileUseLinky: "Manter perfil do Linky",
+  identityProfileUseNostr: "Usar perfil do Nostr",
+  identityProfileNoHandle: "Sem identificador NIP-05",
+  identityProfileAddressNote:
+    "O endereço lightning é sempre o endereço Linky desta identidade.",
+  identityProfileConfirm: "Trocar identidade",
+  identityProfileCancel: "Cancelar",
 
   nostrRelay: "Relay Nostr",
   nostrRelays: "Relays Nostr",

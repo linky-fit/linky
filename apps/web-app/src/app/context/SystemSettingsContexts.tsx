@@ -11,6 +11,8 @@ import type {
 import React from "react";
 import type { EvoluErrorType, EvoluServerStatus } from "../../evolu";
 import type { ShardSummary } from "../hooks/useLinksync";
+import type { PendingIdentitySwitch } from "../hooks/useProfileAuthDomain";
+import type { IdentityProfileSource } from "../lib/keySwitchProfile";
 import type { PasswordManagerSaveResult } from "../../platform/passwordManager";
 import type { ProbeLightningFee } from "../hooks/composition/useLinkshuComposition";
 import type { MintMove } from "../hooks/mint/useMoveMintFunds";
@@ -18,6 +20,9 @@ import type { WriteOutcome } from "../lib/storeWrite";
 import type { LocalMintInfoRow } from "../types/appTypes";
 
 export interface AdvancedSettingsContextValue {
+  answerPendingIdentitySwitch: (
+    source: IdentityProfileSource | null,
+  ) => Promise<void>;
   copyNostrKeys: () => Promise<void>;
   copySeed: () => Promise<void>;
   dedupeContacts: () => Promise<void>;
@@ -33,6 +38,7 @@ export interface AdvancedSettingsContextValue {
   logoutArmed: boolean;
   openScan: () => void;
   payWithCashuEnabled: boolean;
+  pendingIdentitySwitch: PendingIdentitySwitch | null;
   pushToast: (message: string) => void;
   receiveMethod: ReceiveMethod;
   relayUrls: string[];

@@ -19,6 +19,7 @@ const translate = (key: string): string => key;
 const createAdvancedSettings = (
   pushToast: (message: string) => void,
 ): AdvancedSettingsContextValue => ({
+  answerPendingIdentitySwitch: noopAsync,
   copyNostrKeys: noopAsync,
   copySeed: noopAsync,
   dedupeContacts: noopAsync,
@@ -34,6 +35,7 @@ const createAdvancedSettings = (
   logoutArmed: false,
   openScan: noop,
   payWithCashuEnabled: true,
+  pendingIdentitySwitch: null,
   pushToast,
   receiveMethod: "universal",
   relayUrls: [],

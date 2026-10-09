@@ -289,6 +289,18 @@ export const en = {
   nostrPasteInvalid: "Invalid Nostr key (expected nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Could not publish your profile under the new key. Keys were not switched — try again.",
+  identityProfileChoiceTitle: "Which profile should this identity use?",
+  identityProfileChoiceFound:
+    "This identity already has a profile on Nostr. Choose which one Linky publishes for it.",
+  identityProfileChoiceUnchecked:
+    "Linky couldn't check whether this identity already has a profile. Switching publishes your Linky profile and replaces any profile it has.",
+  identityProfileUseLinky: "Keep Linky profile",
+  identityProfileUseNostr: "Use Nostr profile",
+  identityProfileNoHandle: "No NIP-05 handle",
+  identityProfileAddressNote:
+    "The lightning address is always this identity's Linky address.",
+  identityProfileConfirm: "Switch identity",
+  identityProfileCancel: "Cancel",
 
   nostrRelay: "Nostr relay",
   nostrRelays: "Nostr relays",

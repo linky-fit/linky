@@ -27,6 +27,7 @@ import {
 import { useExperimentalFeatures } from "../app/hooks/useExperimentalFeatures";
 import { usePushNotificationsSetting } from "../app/hooks/usePushNotificationsSetting";
 
+import { IdentityProfileChoiceSheet } from "../components/IdentityProfileChoiceSheet";
 import { useColorModePreference } from "../hooks/useColorMode";
 import { navigateTo } from "../hooks/useRouting";
 import type { I18nKey } from "../i18n";
@@ -41,6 +42,7 @@ import { RECEIVE_METHOD_LABEL_KEYS } from "../utils/receiveMethod";
 
 export function AdvancedPage(): React.ReactElement {
   const {
+    answerPendingIdentitySwitch,
     copyNostrKeys,
     dedupeContacts,
     dedupeContactsIsBusy,
@@ -53,6 +55,7 @@ export function AdvancedPage(): React.ReactElement {
     lightningInvoiceAutoPayLimit,
     logoutArmed,
     payWithCashuEnabled,
+    pendingIdentitySwitch,
     pushToast,
     receiveMethod,
     relayUrls,
@@ -402,6 +405,14 @@ export function AdvancedPage(): React.ReactElement {
       >
         {appVersionLabel}
       </Text>
+
+      {pendingIdentitySwitch ? (
+        <IdentityProfileChoiceSheet
+          onAnswer={answerPendingIdentitySwitch}
+          pending={pendingIdentitySwitch}
+          t={t}
+        />
+      ) : null}
     </Stack>
   );
 }
