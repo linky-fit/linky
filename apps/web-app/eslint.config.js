@@ -1,6 +1,7 @@
 import webAppEslintConfig, {
   platformSeamPlugin,
   platformSeamRules,
+  pureJsPbkdf2ImportPatterns,
   restrictedSyntax,
   testHelperImportPatterns,
   testHelperImportIgnores,
@@ -185,6 +186,7 @@ export default defineConfig([
             ...testHelperImportPatterns,
             ...evoluImportPatterns,
             ...wipeImportPatterns,
+            ...pureJsPbkdf2ImportPatterns,
           ],
         },
       ],
@@ -225,7 +227,13 @@ export default defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [...testHelperImportPatterns, ...wipeImportPatterns] },
+        {
+          patterns: [
+            ...testHelperImportPatterns,
+            ...wipeImportPatterns,
+            ...pureJsPbkdf2ImportPatterns,
+          ],
+        },
       ],
       "no-restricted-properties": "off",
     },
@@ -235,7 +243,13 @@ export default defineConfig([
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [...testHelperImportPatterns, ...evoluImportPatterns] },
+        {
+          patterns: [
+            ...testHelperImportPatterns,
+            ...evoluImportPatterns,
+            ...pureJsPbkdf2ImportPatterns,
+          ],
+        },
       ],
     },
   },

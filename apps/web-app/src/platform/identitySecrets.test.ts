@@ -20,6 +20,11 @@ vi.mock("../utils/pushNsecStorage", () => ({
   setStoredPushNsec: () => new Promise<void>(() => {}),
 }));
 
+// The wipe derives a seed on WebCrypto, which settles outside the fake clock.
+vi.mock("./linkshu/wipeLinkshuSeedBoundState", () => ({
+  wipeLinkshuSeedBoundState: () => Promise.resolve(),
+}));
+
 import { persistIdentitySecrets } from "./identitySecrets";
 
 afterEach(() => {

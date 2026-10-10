@@ -7,6 +7,7 @@ import {
   parseOwnerLaneIndex,
   parseSlip39Share,
   recoverMasterSecretFromSlip39Share,
+  type MasterSecret,
   type OwnerRole,
 } from "@linky-fit/identity";
 import { encodeNpub, encodeNsec } from "@linky-fit/linkstr";
@@ -33,21 +34,40 @@ const pendingOwnerMnemonicRequests = new Map<
   PendingOwnerMnemonicRequest[]
 >();
 
-const parseShare = async (rawText: string) => {
-  return Effect.runPromise(parseSlip39Share(rawText));
+// Recovery is deterministic PBKDF2 work and every derivation from one share
+// needs it, so the last share's result is reused.
+let lastRecovery: {
+  readonly rawText: string;
+  readonly masterSecret: Promise<MasterSecret>;
+} | null = null;
+
+const recoverMasterSecret = (rawText: string): Promise<MasterSecret> => {
+  if (lastRecovery?.rawText !== rawText) {
+    lastRecovery = {
+      rawText,
+      masterSecret: Effect.runPromise(
+        parseSlip39Share(rawText).pipe(
+          Effect.flatMap((share) => recoverMasterSecretFromSlip39Share(share)),
+        ),
+      ),
+    };
+  }
+  return lastRecovery.masterSecret;
 };
 
 export const deriveNostrKeysFromSlip39 = async (
   rawText: string,
 ): Promise<DerivedNostrKeys | null> => {
   try {
-    const share = await parseShare(rawText);
-    const identityLayer = Layer.provideMerge(
-      IdentityProvider.layer,
-      MasterSecretProvider.fromSlip39Share(share),
-    );
+    const masterSecret = await recoverMasterSecret(rawText);
     const identity = await Effect.runPromise(
-      Effect.provide(IdentityProvider, identityLayer),
+      Effect.provide(
+        IdentityProvider,
+        Layer.provide(
+          IdentityProvider.layer,
+          Layer.succeed(MasterSecretProvider, masterSecret),
+        ),
+      ),
     );
     const nsec = encodeNsec(identity.nostrSigningKey);
     const npub = encodeNpub(identity.nostrPublicKey);
@@ -69,10 +89,7 @@ export const deriveCashuBip85MnemonicFromSlip39 = async (
   rawText: string,
 ): Promise<string | null> => {
   try {
-    const share = await parseShare(rawText);
-    const masterSecret = await Effect.runPromise(
-      recoverMasterSecretFromSlip39Share(share),
-    );
+    const masterSecret = await recoverMasterSecret(rawText);
     return await Effect.runPromise(
       deriveCashuMnemonicFromMasterSecret(masterSecret),
     );
@@ -86,9 +103,8 @@ const deriveEvoluOwnerMnemonicsFromSlip39 = async (
   requests: ReadonlyArray<EvoluOwnerMnemonicRequest>,
 ): Promise<ReadonlyArray<string> | null> => {
   try {
-    const share = await parseShare(rawText);
     const [masterSecret, parsedRequests] = await Promise.all([
-      Effect.runPromise(recoverMasterSecretFromSlip39Share(share)),
+      recoverMasterSecret(rawText),
       Promise.all(
         requests.map(async (request) => ({
           index: await Effect.runPromise(

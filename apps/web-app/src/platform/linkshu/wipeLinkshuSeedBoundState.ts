@@ -1,5 +1,5 @@
+import { bip39MnemonicToSeed } from "@linky-fit/identity";
 import { Bip39Seed, Restore, runLinkshu } from "@linky-fit/linkshu";
-import { mnemonicToSeedSync } from "@scure/bip39";
 import { Effect } from "effect";
 import { migrateLegacyCashuLocalState } from "../../app/migrations/linkshuStorageMigration";
 import { linkshuAppInspector } from "../../devtools/inspector/linkshuInspector";
@@ -23,7 +23,9 @@ export const wipeLinkshuSeedBoundState = async (
   try {
     await runLinkshu(
       {
-        bip39Seed: Bip39Seed.make(mnemonicToSeedSync(mnemonic)),
+        bip39Seed: Bip39Seed.make(
+          await Effect.runPromise(bip39MnemonicToSeed(mnemonic)),
+        ),
         keyValueStore: localStorageKeyValueStore,
         inspector: linkshuAppInspector,
       },
