@@ -20,6 +20,20 @@ export const testHelperImportPatterns = [
   },
 ];
 
+export const pureJsPbkdf2ImportPatterns = [
+  {
+    group: ["@noble/hashes/pbkdf2", "@noble/hashes/pbkdf2.js"],
+    message:
+      "PBKDF2 runs on WebCrypto crypto.subtle; pure JS takes seconds on React Native.",
+  },
+  {
+    group: ["@scure/bip39"],
+    importNames: ["mnemonicToSeed", "mnemonicToSeedSync"],
+    message:
+      "Derive BIP-39 seeds with bip39MnemonicToSeed from @linky-fit/identity, which runs on WebCrypto.",
+  },
+];
+
 export const testHelperImportIgnores = [
   "**/*.test.{ts,tsx}",
   "**/testing/**",

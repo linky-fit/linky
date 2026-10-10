@@ -1,3 +1,4 @@
+export { bip39MnemonicToSeed } from "./bip39Seed";
 export { IdentityProvider, IdentityProviderError } from "./IdentityProvider";
 export { MasterSecretProvider } from "./MasterSecretProvider";
 export {
