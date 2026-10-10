@@ -17,8 +17,9 @@ import type { StubStorage } from "@linky-fit/linkstr/testing";
 import { Deferred, Effect, Exit, Layer, Schema } from "effect";
 import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
-import { AtomRegistry } from "./index";
+import { AsyncResult, AtomRegistry } from "./index";
 import { relayHealthAtom } from "./relayHealth";
+import { linkstrRuntimeAtom } from "./runtime";
 import { configWith, fakeTransport, makeIdentity, relayB } from "./testing";
 import type { PublishedEvent } from "./testing";
 
@@ -48,6 +49,16 @@ const gatedTransport = (
   });
 };
 
+/** Like `fakeTransport`, but the layer finishes building only once `built` opens. */
+const slowBuildingTransport = (
+  published: Array<PublishedEvent>,
+  built: Deferred.Deferred<void>,
+) =>
+  Layer.effect(
+    NostrTransport,
+    Effect.as(Deferred.await(built), fakeTransport(published, [])),
+  );
+
 const textInput = (ref: string) => ({
   op: {
     _tag: "chat.text" as const,
@@ -71,7 +82,7 @@ const bankOffer = (offerId: string) =>
     clientId: ClientId.make(`client-${offerId}`),
   });
 
-/** Lets a rebuilt runtime run anything it would re-run on its own. */
+/** Lets a rebuilt runtime run anything it would re-run on its own; callers assert that nothing happened, so this cannot poll. */
 const settleRebuild = async (registry: AtomRegistry.AtomRegistry) => {
   await linkstrCommands(registry).fetchOwnMuteList();
   await new Promise((resolve) => setTimeout(resolve, 50));
@@ -159,6 +170,78 @@ describe("linkstrCommands", () => {
 
     expect(Exit.hasInterrupts(exit)).toBe(true);
     expect(published).toEqual([]);
+  });
+
+  it("runs calls on the runtime current when they are made, even if the identity switches in the same pass", async () => {
+    const registry = AtomRegistry.make();
+    const storage = stubStorage();
+    const published: Array<PublishedEvent> = [];
+    const transport = Layer.succeed(
+      NostrTransport,
+      fakeTransport(published, []),
+    );
+    const outboxStore = OutboxStore.fromStringStorage(storage, storageKey);
+    registry.set(
+      linkstrConfigAtom,
+      configWith(alice, transport, { outboxStore }),
+    );
+    const commands = linkstrCommands(registry);
+
+    const enqueued = commands.enqueueOutbox(textInput("row-1"));
+    const profile = commands.publishProfile(
+      new ProfileMetadata({ name: "alice" }),
+    );
+    registry.set(
+      linkstrConfigAtom,
+      configWith(bob, transport, { outboxStore }),
+    );
+    const [enqueueExit, profileExit] = await Promise.all([enqueued, profile]);
+    await settleRebuild(registry);
+
+    assert(Exit.isSuccess(enqueueExit) && Exit.isSuccess(profileExit));
+    expect(storedJobs(storage).map((job) => job.ref)).toEqual(["row-1"]);
+    expect(
+      published
+        .filter((event) => event.kind === 0)
+        .map((event) => event.pubkey),
+    ).toEqual([alice.pubkey]);
+    expect(published.filter((event) => event.pubkey === bob.pubkey)).toEqual(
+      [],
+    );
+  });
+
+  it("interrupts a call whose runtime is torn down before it starts", async () => {
+    const registry = AtomRegistry.make();
+    const publishedAsAlice: Array<PublishedEvent> = [];
+    const publishedAsBob: Array<PublishedEvent> = [];
+    const built = Deferred.makeUnsafe<void>();
+    registry.set(
+      linkstrConfigAtom,
+      configWith(alice, slowBuildingTransport(publishedAsAlice, built)),
+    );
+
+    const pending = linkstrCommands(registry).publishProfile(
+      new ProfileMetadata({ name: "alice" }),
+    );
+    const unsubscribe = registry.subscribe(linkstrRuntimeAtom, (runtime) => {
+      if (!AsyncResult.isSuccess(runtime) || runtime.waiting) return;
+      unsubscribe();
+      registry.set(
+        linkstrConfigAtom,
+        configWith(
+          bob,
+          Layer.succeed(NostrTransport, fakeTransport(publishedAsBob, [])),
+        ),
+      );
+    });
+    Deferred.doneUnsafe(built, Exit.void);
+    const exit = await pending;
+    await settleRebuild(registry);
+
+    expect(Exit.hasInterrupts(exit)).toBe(true);
+    // Nothing forked onto the torn-down runtime, nor re-ran on the new one.
+    expect(publishedAsAlice).toEqual([]);
+    expect(publishedAsBob).toEqual([]);
   });
 
   it("runs concurrent calls separately, each resolving with its own receipt", async () => {
