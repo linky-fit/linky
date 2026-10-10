@@ -5,7 +5,11 @@ import type {
   PlatformPorts,
   SecretRead,
 } from "../platform/ports";
-import type { SessionSecrets, SessionState } from "../platform/session";
+import type {
+  SessionSecrets,
+  SessionState,
+  SignedInSession,
+} from "../platform/session";
 import { localStorageKv } from "../utils/storage";
 
 export const testPlatformPorts = (
@@ -22,7 +26,7 @@ export const testPlatformPorts = (
 
 export const signedInSession = (
   secrets: Partial<SessionSecrets> = {},
-): SessionState => ({
+): SignedInSession => ({
   _tag: "SignedIn",
   secrets: {
     nsec: "nsec1test",

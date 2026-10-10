@@ -2,7 +2,7 @@ import { NewProof, parseP2pkPubkey } from "@linky-fit/linkshu";
 import { encodeNpub, encodeNsec, type Pubkey } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
 import { RegistryContext } from "@linky-fit/linkstr-react";
-import { Effect, Option, Result, Schema, Scope } from "effect";
+import { Effect, Exit, Option, Result, Schema, Scope } from "effect";
 import { AsyncResult, AtomRegistry } from "effect/reactivity";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLinkshuComposition } from "../../hooks/composition/useLinkshuComposition";
@@ -14,12 +14,13 @@ import { INSPECTOR_REPORT_PATH } from "../../../devtools/inspector/inspectorRows
 import { buildCashuToken } from "../../../testUtils/cashuToken";
 import { makeTestLinkyStore } from "../../../testUtils/linkyStore";
 import { renderIntoDocument } from "../../../testUtils/renderIntoDocument";
-import type { SessionSecrets } from "../session/session";
+import type { SessionState } from "../session/session";
 import { sessionAtom } from "../session/session";
 import { walletRepositoryAtom } from "../session/store";
 import { linkshuCommandsAtom } from "./commands";
 import { walletReadModelAtom } from "./readModel";
 import {
+  LinkshuNotConfigured,
   linkshuRuntimeAtom,
   linkshuSeedAtom,
   WalletOpQueue,
@@ -61,10 +62,10 @@ const APP_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 const boot = (
-  secrets: Partial<SessionSecrets> = { appMnemonic: APP_MNEMONIC },
+  session: SessionState = signedInSession({ appMnemonic: APP_MNEMONIC }),
 ) => {
   openLinkyStore.mockResolvedValue(makeTestLinkyStore().store);
-  return makeTestAppRegistry({ session: signedInSession(secrets) });
+  return makeTestAppRegistry({ session });
 };
 
 const result = <A, E>(
@@ -115,7 +116,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("linkshuSeedAtom", () => {
   it("migrates the legacy cashu state before it resolves the seed", async () => {
-    const registry = boot({ appMnemonic: null });
+    const registry = boot(signedInSession());
     await result(registry, linkshuSeedAtom);
     expect(calls.order).toEqual([
       "migrate",
@@ -126,7 +127,7 @@ describe("linkshuSeedAtom", () => {
   });
 
   it("generates a cashu mnemonic once and never replaces it", async () => {
-    const registry = boot({ appMnemonic: null });
+    const registry = boot(signedInSession());
     const seed = await result(registry, linkshuSeedAtom);
     registry.set(sessionAtom, signedInSession({ nsec: "nsec1other" }));
     registry.refresh(linkshuRuntimeAtom);
@@ -136,6 +137,22 @@ describe("linkshuSeedAtom", () => {
     expect(calls.order.filter((call) => call === "writeCashuMnemonic")).toEqual(
       ["writeCashuMnemonic"],
     );
+  });
+
+  it("is not configured when the session could not read the cashu mnemonic", async () => {
+    const registry = boot({
+      ...signedInSession({ appMnemonic: APP_MNEMONIC }),
+      degraded: true,
+      cause: "bridge down",
+      unreadable: new Set(["cashuMnemonic"]),
+    });
+
+    const exit = await Effect.runPromiseExit(
+      AtomRegistry.getResult(registry, linkshuSeedAtom),
+    );
+
+    expect(exit).toEqual(Exit.fail(new LinkshuNotConfigured()));
+    expect(calls.order).not.toContain("writeCashuMnemonic");
   });
 });
 
@@ -244,10 +261,12 @@ describe("linkshu commands", () => {
     const identity = makeIdentity();
     const lockTo = (pubkey: Pubkey) =>
       parseP2pkPubkey(encodeNpub(pubkey)) ?? "";
-    const registry = boot({
-      appMnemonic: APP_MNEMONIC,
-      nsec: encodeNsec(identity.secretKey),
-    });
+    const registry = boot(
+      signedInSession({
+        appMnemonic: APP_MNEMONIC,
+        nsec: encodeNsec(identity.secretKey),
+      }),
+    );
     const commands = await commandsOf(registry);
     gateMints().release();
 
@@ -316,5 +335,26 @@ describe("linkshu commands", () => {
         }),
       ),
     );
+  });
+
+  it("does not re-run a finished command when the runtime rebuilds", async () => {
+    const registry = boot();
+    const unmount = registry.mount(linkshuCommandsAtom);
+    const commands = await commandsOf(registry);
+    const mints = gateMints();
+    mints.release();
+    await commands.receiveCashuToken(
+      buildCashuToken({ mint: "https://mint-a.test" }),
+    );
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+    await settle();
+    const mintCalls = mints.fetch.mock.calls.length;
+
+    registry.refresh(linkshuRuntimeAtom);
+    expect(await commandsOf(registry)).not.toBe(commands);
+    await settle();
+
+    expect(mints.fetch).toHaveBeenCalledTimes(mintCalls);
+    unmount();
   });
 });

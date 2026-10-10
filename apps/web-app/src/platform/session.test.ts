@@ -90,15 +90,37 @@ describe("loadSession", () => {
       _tag: "SignedIn",
       degraded: true,
       secrets: { nsec: "nsec1local", appMnemonic: "app words" },
+      unreadable: new Set(),
     });
     expect(mocks.reportAppLog).toHaveBeenCalledWith(
       expect.objectContaining({
         tag: "session.secretsDegraded",
-        payload: { keys: [NSEC, APP_MNEMONIC] },
+        payload: { keys: [NSEC, APP_MNEMONIC], unreadable: [] },
       }),
     );
     expect(JSON.stringify(mocks.reportAppLog.mock.calls)).not.toContain(
       "nsec1local",
+    );
+  });
+
+  it("marks a failed secret without a localStorage copy unreadable, not missing", async () => {
+    const session = await loadSession(
+      ports(
+        { [NSEC]: found("nsec1secure"), [CASHU_MNEMONIC]: unavailable },
+        { [APP_MNEMONIC]: "app words" },
+      ),
+    );
+    expect(session).toMatchObject({
+      _tag: "SignedIn",
+      degraded: true,
+      secrets: { cashuMnemonic: null },
+      unreadable: new Set(["cashuMnemonic"]),
+    });
+    expect(mocks.reportAppLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tag: "session.secretsDegraded",
+        payload: { keys: [CASHU_MNEMONIC], unreadable: [CASHU_MNEMONIC] },
+      }),
     );
   });
 
