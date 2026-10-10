@@ -9,7 +9,7 @@ import {
 import { Pubkey } from "@linky-fit/linkstr";
 import { Effect, Exit } from "effect";
 import { AtomRegistry } from "effect/reactivity";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   makeTestAppRegistry,
   signedInSession,
@@ -209,5 +209,43 @@ describe("appendIdentityChangeNotices", () => {
     expect(await notices(booted)).toEqual([
       [directConversationIdFor(chatting), "1"],
     ]);
+  });
+
+  describe("resolves so the identity switch can reload", () => {
+    const change = {
+      changedAtSec: 1_730_000_000,
+      identitySource: "custom",
+    } as const;
+    beforeEach(() => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it("when a store read never settles", async () => {
+      const booted = await boot();
+      Object.defineProperty(booted.conversations.messages, "all", {
+        value: Effect.never,
+      });
+      vi.useFakeTimers();
+
+      const appended = booted.commands.appendIdentityChangeNotices(change);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      await expect(appended).resolves.toBeUndefined();
+    });
+
+    it("when a store read dies", async () => {
+      const booted = await boot();
+      Object.defineProperty(booted.conversations, "all", {
+        value: Effect.die(new Error("database closed")),
+      });
+
+      await expect(
+        booted.commands.appendIdentityChangeNotices(change),
+      ).resolves.toBeUndefined();
+    });
   });
 });

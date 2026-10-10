@@ -65,11 +65,24 @@ const makeContactsCommands = ({
       links: { contact: id, conversation: directConversationIdFor(id) },
       payload: { contactId: id },
     });
-    const contact = await Effect.runPromise(contacts.byId(id));
-    const npub = normalizeNpubIdentifier(contact?.npub ?? "");
-    const unknownContactId = npub
-      ? buildUnknownContactId(decodeNpub(npub))
-      : null;
+    const unknownContactId = await Effect.runPromise(
+      contacts.byId(id).pipe(
+        Effect.map((contact) => {
+          const npub = normalizeNpubIdentifier(contact?.npub ?? "");
+          return npub ? buildUnknownContactId(decodeNpub(npub)) : null;
+        }),
+        // The contact is restored either way; only the message move is skipped.
+        Effect.catchCause((cause) =>
+          Effect.sync(() => {
+            console.warn(
+              "[linky][contacts] unarchived contact read failed",
+              cause,
+            );
+            return null;
+          }),
+        ),
+      ),
+    );
     if (unknownContactId)
       void messages.reassignContactMessages(unknownContactId, id);
     return outcome;
