@@ -11,21 +11,24 @@ import {
   type LinkyScope,
   type LinkyTable,
 } from "@linky-fit/linksync";
-import { createEvoluShardDb } from "@linky-fit/linksync/evolu";
+import {
+  createEvoluShardDb,
+  LinkyEvoluSchema,
+} from "@linky-fit/linksync/evolu";
+import type { AtomRegistry } from "@linky-fit/linkstr-react";
 import {
   editPatch,
   readRecurringPaymentOrder,
 } from "@linky-fit/recurring-payment";
 import { Effect } from "effect";
 import { recurringPaymentUpdate } from "../../app/lib/recurringPaymentStore";
-import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
+import { platformAtom } from "../../app/state/platform";
+import { evoluAtom, type OpenedEvolu } from "../../app/state/session/evolu";
 import {
-  evolu,
-  getLinkyStore,
-  ownerSync,
-  Schema,
-  setE2eMessagesRotation,
-} from "../../evolu";
+  readLinkyStore,
+  setMessagesRotation,
+} from "../../app/state/session/store";
+import { makeLocalStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
 
 /**
  * Test-only entry point the Playwright suites reach through
@@ -79,7 +82,7 @@ declare global {
   }
 }
 
-const isSchemaTable = (table: string): boolean => table in Schema;
+const isSchemaTable = (table: string): boolean => table in LinkyEvoluSchema;
 const isScope = (scope: string): scope is LinkyScope => scope in linkyScopes;
 const isShardTable = (scope: LinkyScope, table: string): table is LinkyTable =>
   linkyScopes[scope].tables.some((known) => known === table);
@@ -92,7 +95,10 @@ const isMutationResult = (
   typeof Reflect.get(value, "ok") === "boolean";
 
 // removal gate in app/migrations/AGENTS.md
-const upsert: LinkyE2eHooks["upsert"] = (table, row, ownerId) =>
+const upsert = (
+  { evolu }: OpenedEvolu,
+  ...[table, row, ownerId]: Parameters<LinkyE2eHooks["upsert"]>
+): Promise<void> =>
   new Promise((resolve, reject) => {
     if (!isSchemaTable(table)) {
       reject(new Error(`unknown table ${table}`));
@@ -114,27 +120,44 @@ const upsert: LinkyE2eHooks["upsert"] = (table, row, ownerId) =>
       reject(new Error(`upsert rejected: ${JSON.stringify(result)}`));
   });
 
-export const installLinkyE2eHooks = (): void => {
-  const db = createEvoluShardDb(evolu, ownerSync);
+export const installLinkyE2eHooks = (
+  registry: AtomRegistry.AtomRegistry,
+): void => {
+  const opened = (): OpenedEvolu => {
+    const evolu = registry.get(evoluAtom);
+    if (evolu === null) throw new Error("No Evolu database while signed out");
+    return evolu;
+  };
+  let shardDb: ReturnType<typeof createEvoluShardDb> | null = null;
+  const db = () => {
+    const { evolu, ownerSync } = opened();
+    shardDb ??= createEvoluShardDb(evolu, ownerSync);
+    return shardDb;
+  };
+  const getLinkyStore = () => readLinkyStore(registry);
   const walletStore = makeLocalStorageKeyValueStore();
   window.__linkyE2E = {
-    setMessagesRotation: setE2eMessagesRotation,
-    appOwnerId: () => evolu.appOwner.then((owner) => owner.id),
+    setMessagesRotation: (enabled) => {
+      if (!registry.get(platformAtom).config.isE2e)
+        throw new Error("E2E build required");
+      setMessagesRotation(enabled);
+    },
+    appOwnerId: () => opened().evolu.appOwner.then((owner) => owner.id),
     useOwners: (mnemonics) =>
       mnemonics.map((mnemonic) => {
         const owner = appOwnerFromMnemonic(mnemonic);
         if (owner === null) throw new Error("not a mnemonic");
-        evolu.useOwner(owner);
+        opened().evolu.useOwner(owner);
         return owner.id;
       }),
-    upsert,
+    upsert: (...args) => upsert(opened(), ...args),
     shardRows: async (scope, table) => {
       if (!isScope(scope)) throw new Error(`unknown scope ${scope}`);
       if (!isShardTable(scope, table))
         throw new Error(`${table} is not in scope ${scope}`);
       const store = await getLinkyStore();
       const shards = await Effect.runPromise(store.visibleShards(scope));
-      const rows = await Effect.runPromise(db.readTable(table));
+      const rows = await Effect.runPromise(db().readTable(table));
       return mergeShardRows(
         rows,
         new Map(shards.map((shard) => [shard.owner.id, shard.index])),

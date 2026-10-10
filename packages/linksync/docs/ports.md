@@ -90,6 +90,7 @@ An owner counts as synced once a relay has finished a sync round for it, and `ow
 
 ```ts
 import { createSharedWebWorker, evoluWebDeps } from "@evolu/web";
+import { linkyScopes } from "@linky-fit/linksync";
 import {
   createLinkyEvolu,
   makeEvoluRelaySettings,

@@ -19,7 +19,7 @@ import {
   scopeOfTable,
 } from "../app/lib/shardTables";
 import { EvoluCurrentTable } from "../components/EvoluCurrentTable";
-import { loadEvoluCurrentData } from "../evolu";
+import { loadEvoluCurrentData, useLinkyEvolu } from "../evolu";
 
 const PREVIEW_ROW_COUNT = 2;
 
@@ -27,6 +27,7 @@ export function EvoluCurrentDataPage(): React.ReactElement {
   const { evoluShards, requestRotateShard, rotatingShardScope } =
     useEvoluSettingsContext();
   const { t } = useAppShellCore();
+  const evolu = useLinkyEvolu();
   const [currentData, setCurrentData] = useState<Awaited<
     ReturnType<typeof loadEvoluCurrentData>
   > | null>(null);
@@ -34,8 +35,8 @@ export function EvoluCurrentDataPage(): React.ReactElement {
     {},
   );
   useEffect(() => {
-    void loadEvoluCurrentData().then(setCurrentData);
-  }, []);
+    void loadEvoluCurrentData(evolu).then(setCurrentData);
+  }, [evolu]);
   const dataSections = React.useMemo(
     () =>
       Object.entries(currentData ?? {})

@@ -20,6 +20,7 @@ import {
   type AppOwner,
   type LinkyStore,
 } from "@linky-fit/linksync";
+import type { LinkyEvolu } from "@linky-fit/linksync/evolu";
 import { Effect, ManagedRuntime } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
@@ -35,12 +36,12 @@ import {
   createNostrReactionsAllQuery,
   createOwnerMetaAllQuery,
   createTransactionsAllQuery,
-  evolu,
-  getLinkyStore,
+  useLinkyEvolu,
 } from "../../evolu";
 import { readStoredSlip39Seed } from "../../platform/identitySecrets";
 import { localStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
 import { resolveLinkshuSeed } from "../../platform/linkshu/resolveLinkshuSeed";
+import { useLinkyStore } from "../hooks/useLinksync";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { legacyProofsToMarkSpent } from "./legacySpentProofs";
 import {
@@ -80,7 +81,9 @@ const emit = (
   ]);
 };
 
-const readLegacyLaneSnapshot = async (): Promise<LegacyLaneSnapshot> => {
+const readLegacyLaneSnapshot = async (
+  evolu: LinkyEvolu,
+): Promise<LegacyLaneSnapshot> => {
   const [
     contacts,
     messages,
@@ -92,15 +95,15 @@ const readLegacyLaneSnapshot = async (): Promise<LegacyLaneSnapshot> => {
     identities,
     ownerMeta,
   ] = await Promise.all([
-    evolu.loadQuery(createContactsAllQuery()),
-    evolu.loadQuery(createNostrMessagesAllQuery()),
-    evolu.loadQuery(createNostrReactionsAllQuery()),
-    evolu.loadQuery(createCashuTokensAllQuery()),
-    evolu.loadQuery(createCashuProofsAllQuery()),
-    evolu.loadQuery(createCashuOperationsAllQuery()),
-    evolu.loadQuery(createTransactionsAllQuery()),
-    evolu.loadQuery(createNostrIdentitiesAllQuery()),
-    evolu.loadQuery(createOwnerMetaAllQuery()),
+    evolu.loadQuery(createContactsAllQuery(evolu)),
+    evolu.loadQuery(createNostrMessagesAllQuery(evolu)),
+    evolu.loadQuery(createNostrReactionsAllQuery(evolu)),
+    evolu.loadQuery(createCashuTokensAllQuery(evolu)),
+    evolu.loadQuery(createCashuProofsAllQuery(evolu)),
+    evolu.loadQuery(createCashuOperationsAllQuery(evolu)),
+    evolu.loadQuery(createTransactionsAllQuery(evolu)),
+    evolu.loadQuery(createNostrIdentitiesAllQuery(evolu)),
+    evolu.loadQuery(createOwnerMetaAllQuery(evolu)),
   ]);
   return {
     contacts,
@@ -151,14 +154,16 @@ const countsByScope = (report: LaneMigrationReport) => {
   return scopes;
 };
 
-const bootLaneMigration = async (): Promise<void> => {
+const bootLaneMigration = async (
+  evolu: LinkyEvolu,
+  store: LinkyStore,
+): Promise<void> => {
   const startedAtMs = Date.now();
   const firstRun = !isLaneMigrationDoneLocally();
   const gracePeriodActive = isLaneGracePeriodActive(startedAtMs);
   if (!firstRun && !gracePeriodActive) return;
-  const store = await getLinkyStore();
   const seed = (await readStoredSlip39Seed())?.trim() ?? "";
-  const ownerMeta = await evolu.loadQuery(createOwnerMetaAllQuery());
+  const ownerMeta = await evolu.loadQuery(createOwnerMetaAllQuery(evolu));
   const laneOwners: ReadonlyArray<AppOwner> = seed
     ? await deriveLegacyLaneOwners(
         seed,
@@ -187,7 +192,7 @@ const bootLaneMigration = async (): Promise<void> => {
     },
   );
 
-  const snapshot = await readLegacyLaneSnapshot();
+  const snapshot = await readLegacyLaneSnapshot(evolu);
   const report = await runLaneToShardMigration({
     store,
     snapshot,
@@ -196,7 +201,7 @@ const bootLaneMigration = async (): Promise<void> => {
   });
   markLaneMigrationDoneLocally();
 
-  const proofQuery = createCashuProofsAllQuery();
+  const proofQuery = createCashuProofsAllQuery(evolu);
   let mirroring = false;
   let dirty = false;
   const mirrorSpentProofs = async (): Promise<void> => {
@@ -260,7 +265,7 @@ const bootLaneMigration = async (): Promise<void> => {
       while (pending) {
         pending = false;
         if (!isLaneGracePeriodActive(Date.now())) return;
-        const latest = await readLegacyLaneSnapshot();
+        const latest = await readLegacyLaneSnapshot(evolu);
         const indexes = readLegacyLaneIndexes(
           latest.ownerMeta,
           store.appOwner.id,
@@ -305,15 +310,15 @@ const bootLaneMigration = async (): Promise<void> => {
     }
   };
   for (const query of [
-    createContactsAllQuery(),
-    createNostrMessagesAllQuery(),
-    createNostrReactionsAllQuery(),
-    createCashuTokensAllQuery(),
-    createCashuProofsAllQuery(),
-    createCashuOperationsAllQuery(),
-    createTransactionsAllQuery(),
-    createNostrIdentitiesAllQuery(),
-    createOwnerMetaAllQuery(),
+    createContactsAllQuery(evolu),
+    createNostrMessagesAllQuery(evolu),
+    createNostrReactionsAllQuery(evolu),
+    createCashuTokensAllQuery(evolu),
+    createCashuProofsAllQuery(evolu),
+    createCashuOperationsAllQuery(evolu),
+    createTransactionsAllQuery(evolu),
+    createNostrIdentitiesAllQuery(evolu),
+    createOwnerMetaAllQuery(evolu),
   ])
     evolu.subscribeQuery(query)(() => void reingestLateRows());
   // Late rows wait for hydration; the migrating screen waits only for the first run.
@@ -367,7 +372,8 @@ export const useLaneToShardMigration = (): boolean => {
   // Suspends until Evolu has opened, the way the shell's own queries do, so a
   // database that never answers still reaches the boot watchdog instead of
   // committing a screen that cannot progress.
-  React.use(getLinkyStore());
+  const store = useLinkyStore();
+  const evolu = useLinkyEvolu();
   const [migrating, setMigrating] = React.useState(
     () => !isLaneMigrationDoneLocally(),
   );
@@ -386,7 +392,7 @@ export const useLaneToShardMigration = (): boolean => {
 
   React.useEffect(() => {
     let cancelled = false;
-    bootRun ??= bootLaneMigration().catch((error: unknown) => {
+    bootRun ??= bootLaneMigration(evolu, store).catch((error: unknown) => {
       console.warn("[linky] lane migration failed", error);
       reportAppLog({
         tag: "evolu.laneMigrationFailed",
@@ -400,7 +406,7 @@ export const useLaneToShardMigration = (): boolean => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [evolu, store]);
 
   return migrating;
 };

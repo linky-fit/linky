@@ -52,6 +52,7 @@ vi.mock("../hooks/useRouting", () => ({
 vi.mock("../evolu", () => ({
   loadEvoluCurrentData: vi.fn(),
   loadEvoluHistoryData: vi.fn(),
+  useLinkyEvolu: () => ({}),
 }));
 
 const rowValue = (container: HTMLElement, label: string): string | null => {

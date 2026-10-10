@@ -1,12 +1,9 @@
+import { RegistryContext } from "@linky-fit/linkstr-react";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { makeTestAppRegistry } from "./testUtils/appRegistry";
 import { renderIntoDocument } from "./testUtils/renderIntoDocument";
 
-vi.hoisted(() => vi.stubEnv("VITE_EVOLU_SERVER_URLS", ""));
-vi.mock("@evolu/common", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@evolu/common")>()),
-  createEvolu: () => () => ({}),
-}));
 vi.mock("./hooks/useDeferredOnlineReady", () => ({
   useDeferredOnlineReady: () => false,
 }));
@@ -25,6 +22,7 @@ describe("Evolu relay settings", () => {
   it.each([{ saved: [custom], configured: [...recommended, custom] }])(
     "keeps the recommended relays when saving $saved and reopening settings",
     async ({ saved, configured }) => {
+      const registry = makeTestAppRegistry({ evoluPlatform: null });
       function Settings() {
         const servers = useEvoluServersManager();
         return (
@@ -39,7 +37,12 @@ describe("Evolu relay settings", () => {
           </>
         );
       }
-      const view = await renderIntoDocument(<Settings />);
+      const page = (
+        <RegistryContext.Provider value={registry}>
+          <Settings />
+        </RegistryContext.Provider>
+      );
+      const view = await renderIntoDocument(page);
       expect(view.container.querySelector("output")?.textContent).toBe(
         JSON.stringify(recommended),
       );
@@ -48,7 +51,7 @@ describe("Evolu relay settings", () => {
         JSON.stringify(configured),
       );
       await view.unmount();
-      const reopened = await renderIntoDocument(<Settings />);
+      const reopened = await renderIntoDocument(page);
       expect(reopened.container.querySelector("output")?.textContent).toBe(
         JSON.stringify(configured),
       );

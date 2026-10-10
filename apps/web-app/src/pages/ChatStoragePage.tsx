@@ -3,7 +3,7 @@ import { useState } from "react";
 import { keepNewest, linkyScopes, messageScopes } from "@linky-fit/linksync";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useAdvancedSettingsContext } from "../app/context/SystemSettingsContexts";
-import { useShardSummaries } from "../app/hooks/useLinksync";
+import { useLinkyStore, useShardSummaries } from "../app/hooks/useLinksync";
 import { forgetChatShards } from "../evolu";
 import { useArmedAction } from "../hooks/useArmedAction";
 
@@ -17,6 +17,7 @@ export function ChatStoragePage(): React.ReactElement {
   const { t } = useAppShellCore();
   const { pushToast } = useAdvancedSettingsContext();
   const summaries = useShardSummaries();
+  const store = useLinkyStore();
   const messages = summaries.find((shard) => shard.scope === "messages");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -34,7 +35,7 @@ export function ChatStoragePage(): React.ReactElement {
     setBusy(true);
     setFailed(false);
     try {
-      await forgetChatShards();
+      await forgetChatShards(store);
       pushToast(t("chatStorageForgotten"));
     } catch {
       setFailed(true);

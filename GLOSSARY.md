@@ -360,7 +360,11 @@ _Avoid_: blocked, untrusted, compromised
 
 **Device**:
 One installation of Linky with its own local copy of the user's data.
-_Avoid_: client, instance, session
+_Avoid_: client, instance
+
+**Session**:
+The identity secrets, Evolu instance and store one page load runs on; switching identity, restoring or logging out starts a new page load.
+_Avoid_: login, auth state
 
 **Evolu relay**:
 The server that syncs encrypted data between the user's devices; it never sees plaintext.

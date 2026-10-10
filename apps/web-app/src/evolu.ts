@@ -1,7 +1,6 @@
 export { ContactId, TransactionId } from "./evoluIds";
 import * as Evolu from "@evolu/common";
 import {
-  linkyScopes,
   messageScopes,
   type CashuOperationId,
   type CashuProofId,
@@ -9,42 +8,26 @@ import {
   type NostrIdentityId,
 } from "@linky-fit/linksync";
 import {
-  createLinkyEvolu,
   type LinkyEvolu,
   generateDbNameFromMnemonic,
   LinkyEvoluSchema,
-  makeEvoluRelaySettings,
   markAwaitingFirstHydration,
   normalizeEvoluRelayUrl,
-  openLinkyStore,
 } from "@linky-fit/linksync/evolu";
-import { createSharedWebWorker, evoluWebDeps } from "@evolu/web";
-import { flushSync } from "react-dom";
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
-import { INITIAL_MNEMONIC_STORAGE_KEY } from "./mnemonic";
-import { shouldUseInMemoryEvoluStorage } from "./platform/evoluWebStorage";
 import type { JsonValue } from "./types/json";
 import { base64 } from "@scure/base";
-import { localStorageKv, safeLocalStorageGet } from "./utils/storage";
+import { localStorageKv } from "./utils/storage";
 import { isRecord } from "./utils/unknown";
 import { getInspectorEmissionEnabled } from "./devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
 import { reportAppLog } from "./devtools/inspector/appLog";
-import { loadRecommendedRelays } from "./utils/recommendedRelays";
-import {
-  reportLinkyEvoluEvent,
-  reportShardsSubscribed,
-} from "./app/state/session/evoluInspector";
-
-const isEvoluLoggingEnabled = (): boolean => {
-  if (!import.meta.env.DEV) return false;
-
-  // Enable only when explicitly requested, because SQL logging is very noisy.
-  // Toggle in devtools: localStorage.setItem('linky_debug_evolu_sql', '1')
-  return safeLocalStorageGet("linky_debug_evolu_sql") === "1";
-};
+import { reportShardsSubscribed } from "./app/state/session/evoluInspector";
+import { evoluAtom, evoluRelaySettingsAtom } from "./app/state/session/evolu";
+import { sessionAtom, sessionSecrets } from "./app/state/session/session";
 
 export type EvoluServerStatus = "checking" | "connected" | "disconnected";
 export type EvoluErrorType = Evolu.EvoluError["type"];
@@ -55,11 +38,6 @@ interface EvoluDatabaseInfo {
   historyCount: number | null;
   updatedAtMs: number | null;
 }
-
-const envEvoluServerUrls = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
-  .split(",")
-  .map((url) => url.trim())
-  .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
 
 const isJsonValue = (value: unknown): value is JsonValue => {
   if (
@@ -170,22 +148,6 @@ const loadUntypedQueryRows = async (
 
 export const normalizeEvoluServerUrl = normalizeEvoluRelayUrl;
 
-// Read once per launch: a refreshed recommendation applies on the next start,
-// when the transports are created again.
-const evoluRelaySettings = makeEvoluRelaySettings(localStorageKv, {
-  envDefaults: envEvoluServerUrls,
-  recommended: loadRecommendedRelays().evolu,
-  hasStoredAccount: safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY) !== null,
-  onEvent: reportLinkyEvoluEvent,
-});
-
-export const setEvoluServerDisabled = evoluRelaySettings.setDisabled;
-
-const EVOLU_TRANSPORTS: ReadonlyArray<{
-  type: "WebSocket";
-  url: string;
-}> = evoluRelaySettings.activeUrls().map((url) => ({ type: "WebSocket", url }));
-
 const probeWebSocketConnection = (
   url: string,
   timeoutMs = 2500,
@@ -237,47 +199,18 @@ export type { CashuOperationId, CashuProofId, NostrIdentityId };
 /** The database schema, legacy lane tables included; see `LinkyEvoluSchema`. */
 export const Schema = LinkyEvoluSchema;
 
-const linkyEvolu = createLinkyEvolu({
-  evoluDeps: { ...evoluWebDeps, flushSync },
-  createWorker: (name) =>
-    createSharedWebWorker(
-      name,
-      () =>
-        new Worker(new URL("./evoluDb.worker.ts", import.meta.url), {
-          type: "module",
-        }),
-    ),
-  mnemonic: safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY),
-  transports: EVOLU_TRANSPORTS,
-  enableLogging: isEvoluLoggingEnabled(),
-  inMemory: shouldUseInMemoryEvoluStorage(),
-  onEvent: reportLinkyEvoluEvent,
-});
-
-/** Which owners finished a sync round with an Evolu relay; the shard store's hydration rests on it. */
-export const ownerSync = linkyEvolu.ownerSync;
-
-export const evolu = linkyEvolu.evolu;
-
-let linkyStorePromise: Promise<LinkyStore> | null = null;
-
-const appScopes = {
-  ...linkyScopes,
-  messages: {
-    ...linkyScopes.messages,
-    rotation: linkyScopes.messages.rotation,
-  },
+/** The signed-in session's database; only the authenticated shell renders this. */
+export const useLinkyEvolu = (): LinkyEvolu => {
+  const opened = useAtomValue(evoluAtom);
+  if (opened === null) throw new Error("No Evolu database while signed out");
+  return opened.evolu;
 };
 
-export const setE2eMessagesRotation = (enabled: boolean): void => {
-  if (import.meta.env.VITE_E2E !== "1") throw new Error("E2E build required");
-  appScopes.messages.rotation = enabled
-    ? { maxBytes: 256 * 1024, maxMutations: 8, cooldownMs: 0 }
-    : linkyScopes.messages.rotation;
-};
+/** The session's app mnemonic, which names the database. */
+const useAppMnemonic = (): string | null =>
+  sessionSecrets(useAtomValue(sessionAtom))?.appMnemonic ?? null;
 
-export const forgetChatShards = async () => {
-  const store = await getLinkyStore();
+export const forgetChatShards = async (store: LinkyStore) => {
   const forgotten = (
     await Effect.runPromise(
       Effect.forEach(messageScopes, (scope) =>
@@ -310,7 +243,7 @@ export const forgetChatShards = async () => {
 };
 
 /** Resolves once the local database has answered a query. */
-export const probeLocalDatabase = (): Promise<void> =>
+export const probeLocalDatabase = (evolu: LinkyEvolu): Promise<void> =>
   evolu
     .loadQuery(
       evolu.createQuery((db) =>
@@ -319,38 +252,27 @@ export const probeLocalDatabase = (): Promise<void> =>
     )
     .then(() => undefined);
 
-/** The shard store over this Evolu instance; see `openLinkyStore`. */
-export const getLinkyStore = (): Promise<LinkyStore> => {
-  linkyStorePromise ??= openLinkyStore(evolu, ownerSync, {
-    kv: localStorageKv,
-    scopes: appScopes,
-    hasEvoluRelay: EVOLU_TRANSPORTS.length > 0,
-    onEvent: reportLinkyEvoluEvent,
-  });
-  return linkyStorePromise;
-};
-
-export const createOwnerMetaAllQuery = () =>
+export const createOwnerMetaAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("ownerMeta").selectAll());
-export const createNostrIdentitiesAllQuery = () =>
+export const createNostrIdentitiesAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("nostrIdentity").selectAll());
-export const createCashuTokensAllQuery = () =>
+export const createCashuTokensAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) =>
     db.selectFrom("cashuToken").selectAll().orderBy("createdAt", "desc"),
   );
 
-export const createCashuProofsAllQuery = () =>
+export const createCashuProofsAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("cashuProof").selectAll());
-export const createCashuOperationsAllQuery = () =>
+export const createCashuOperationsAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("cashuOperation").selectAll());
 
-export const createContactsAllQuery = () =>
+export const createContactsAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("contact").selectAll());
-export const createNostrMessagesAllQuery = () =>
+export const createNostrMessagesAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("nostrMessage").selectAll());
-export const createNostrReactionsAllQuery = () =>
+export const createNostrReactionsAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("nostrReaction").selectAll());
-export const createTransactionsAllQuery = () =>
+export const createTransactionsAllQuery = (evolu: LinkyEvolu) =>
   evolu.createQuery((db) => db.selectFrom("transaction").selectAll());
 /** A `contact` row with its legacy chat columns; read only by the lane migration. */
 export type LegacyContactRow = Evolu.InferRow<
@@ -386,6 +308,7 @@ export const useEvoluLastError = (opts?: {
   logToConsole?: boolean;
 }): Evolu.EvoluError | null => {
   const logToConsole = opts?.logToConsole ?? false;
+  const evolu = useLinkyEvolu();
   const [lastError, setLastError] = useState<Evolu.EvoluError | null>(() =>
     evolu.getError(),
   );
@@ -417,12 +340,14 @@ export const useEvoluLastError = (opts?: {
         // ignore
       }
     };
-  }, [logToConsole]);
+  }, [evolu, logToConsole]);
 
   return lastError;
 };
 
 const getEvoluDatabaseInfo = async (
+  evolu: LinkyEvolu,
+  mnemonic: string | null,
   isCurrent: () => boolean,
 ): Promise<{
   bytes: number;
@@ -453,8 +378,6 @@ const getEvoluDatabaseInfo = async (
     try {
       const root = await navigator.storage?.getDirectory?.();
       if (!root) return 0;
-
-      const mnemonic = safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY);
 
       const expectedDir = `.${generateDbNameFromMnemonic(mnemonic)}`;
 
@@ -572,6 +495,7 @@ export interface EvoluHistoryRow {
 }
 
 export const subscribeEvoluHistoryMutationVersion = (
+  evolu: LinkyEvolu,
   listener: () => void,
 ): (() => void) => {
   const q = createUntypedQuery(evolu, (db) =>
@@ -586,6 +510,7 @@ export const subscribeEvoluHistoryMutationVersion = (
 };
 
 export const loadEvoluHistoryData = async (
+  evolu: LinkyEvolu,
   limit = 100,
   offset = 0,
 ): Promise<EvoluHistoryRow[]> => {
@@ -616,9 +541,9 @@ export const loadEvoluHistoryData = async (
   }
 };
 
-export const loadEvoluCurrentData = async (): Promise<
-  Record<string, Record<string, JsonValue>[]>
-> => {
+export const loadEvoluCurrentData = async (
+  evolu: LinkyEvolu,
+): Promise<Record<string, Record<string, JsonValue>[]>> => {
   const tables = [
     "contact",
     "conversation",
@@ -656,17 +581,19 @@ export const loadEvoluCurrentData = async (): Promise<
   return result;
 };
 
-export const wipeEvoluStorage = (): void => {
-  const storedMnemonic = safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY);
+/** Hard-wipes the local Evolu storage (journal and state) and reloads. */
+export const useWipeEvoluStorage = (): (() => void) => {
+  const evolu = useLinkyEvolu();
+  const mnemonic = useAppMnemonic();
+  return useCallback(() => {
+    const mnemonicResult = Evolu.Mnemonic.fromUnknown(mnemonic);
+    if (!mnemonicResult.ok) {
+      throw new Error("Missing stored mnemonic");
+    }
 
-  const mnemonicResult = Evolu.Mnemonic.fromUnknown(storedMnemonic);
-  if (!mnemonicResult.ok) {
-    throw new Error("Missing stored mnemonic");
-  }
-
-  markAwaitingFirstHydration(localStorageKv, mnemonicResult.value);
-  // Hard wipe Evolu local storage (journal + state) and reload.
-  void evolu.restoreAppOwner(mnemonicResult.value, { reload: true });
+    markAwaitingFirstHydration(localStorageKv, mnemonicResult.value);
+    void evolu.restoreAppOwner(mnemonicResult.value, { reload: true });
+  }, [evolu, mnemonic]);
 };
 
 export const useEvoluDatabaseInfoState = (opts?: {
@@ -675,6 +602,8 @@ export const useEvoluDatabaseInfoState = (opts?: {
 }) => {
   const enabled = opts?.enabled ?? true;
   const onError = opts?.onError;
+  const evolu = useLinkyEvolu();
+  const mnemonic = useAppMnemonic();
 
   const [info, setInfo] = useState<EvoluDatabaseInfo>(() => ({
     bytes: null,
@@ -699,6 +628,8 @@ export const useEvoluDatabaseInfoState = (opts?: {
       do {
         refreshRequested.current = false;
         const next = await getEvoluDatabaseInfo(
+          evolu,
+          mnemonic,
           () => generation === refreshGeneration.current,
         );
         if (generation !== refreshGeneration.current) return;
@@ -712,7 +643,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
         setIsBusy(false);
       }
     }
-  }, [enabled, onError]);
+  }, [enabled, evolu, mnemonic, onError]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -739,7 +670,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
       });
       onError?.(error);
     });
-    unsubscribe = subscribeEvoluHistoryMutationVersion(() => {
+    unsubscribe = subscribeEvoluHistoryMutationVersion(evolu, () => {
       void refresh();
     });
     void refresh();
@@ -748,7 +679,7 @@ export const useEvoluDatabaseInfoState = (opts?: {
       unsubscribeError();
       cancelRefresh();
     };
-  }, [enabled, onError, refresh]);
+  }, [enabled, evolu, onError, refresh]);
 
   return {
     info,
@@ -764,6 +695,7 @@ export const useEvoluServersManager = (opts?: {
   const probeIntervalMs = opts?.probeIntervalMs ?? 15000;
   const probeTimeoutMs = opts?.probeTimeoutMs ?? 3500;
   const canRunNetworkWork = useDeferredOnlineReady();
+  const evoluRelaySettings = useAtomValue(evoluRelaySettingsAtom);
 
   const [configuredUrls, setConfiguredUrlsState] = useState<string[]>(() => [
     ...evoluRelaySettings.configuredUrls(),
@@ -795,7 +727,7 @@ export const useEvoluServersManager = (opts?: {
   const refreshFromStorage = useCallback(() => {
     setConfiguredUrlsState([...evoluRelaySettings.configuredUrls()]);
     setDisabledUrlsState([...evoluRelaySettings.disabledUrls()]);
-  }, []);
+  }, [evoluRelaySettings]);
 
   const setServerUrls = useCallback(
     (nextUrls: string[]) => {
@@ -813,7 +745,7 @@ export const useEvoluServersManager = (opts?: {
       refreshFromStorage();
       setReloadRequired(true);
     },
-    [refreshFromStorage],
+    [evoluRelaySettings, refreshFromStorage],
   );
 
   const setServerOffline = useCallback(
@@ -822,7 +754,7 @@ export const useEvoluServersManager = (opts?: {
       refreshFromStorage();
       setReloadRequired(true);
     },
-    [refreshFromStorage],
+    [evoluRelaySettings, refreshFromStorage],
   );
 
   useEffect(() => {

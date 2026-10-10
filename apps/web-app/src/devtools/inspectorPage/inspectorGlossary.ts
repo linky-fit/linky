@@ -238,6 +238,10 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "Publishing the user's NIP-65 / NIP-17 relay lists after an add or remove failed; the local list was already updated, so the relays are out of sync until the next successful publish.",
   "relayList.syncFailed":
     "Fetching the user's relay lists from the relays at startup failed; the app keeps using its cached list.",
+  "session.secretsDegraded":
+    "At boot the native secure storage failed (an error or no answer within 5 s) for the listed secrets, and the app runs on their localStorage copies. The payload names the keys, never the values.",
+  "session.secretsUnavailable":
+    "At boot the native secure storage failed and localStorage holds no identity, so the app shows the signed-out screen without touching the stored account. The payload names the keys that failed.",
   "evolu.serversChanged":
     "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":

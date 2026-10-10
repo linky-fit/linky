@@ -1,5 +1,7 @@
+import { RegistryContext } from "@linky-fit/linkstr-react";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { makeTestAppRegistry } from "./testUtils/appRegistry";
 import { renderIntoDocument } from "./testUtils/renderIntoDocument";
 
 const database = vi.hoisted(() => ({
@@ -41,10 +43,18 @@ interface HarnessProps {
   enabled?: boolean;
 }
 
-const Harness = ({ onState, enabled = true }: HarnessProps) => {
+const Probe = ({ onState, enabled = true }: HarnessProps) => {
   onState(useEvoluDatabaseInfoState({ enabled }));
   return null;
 };
+
+const registry = makeTestAppRegistry();
+
+const Harness = (props: HarnessProps) => (
+  <RegistryContext.Provider value={registry}>
+    <Probe {...props} />
+  </RegistryContext.Provider>
+);
 
 const notifyMutation = () => {
   for (const listener of database.listeners) listener();

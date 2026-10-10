@@ -22,6 +22,7 @@ vi.mock("../app/context/SystemSettingsContexts", () => ({
 vi.mock("../evolu", () => ({
   loadEvoluCurrentData: vi.fn(),
   loadEvoluHistoryData: vi.fn(),
+  useLinkyEvolu: () => ({}),
 }));
 
 const secrets = [

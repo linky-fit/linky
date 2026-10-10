@@ -272,13 +272,12 @@ export const openLinkyStore = async (
 ): Promise<LinkyStore> => {
   const [owner] = await Promise.all([
     evolu.appOwner,
-    /* eslint-disable no-restricted-syntax -- waits for the database worker before any ShardDb exists */
+    // Waits for the database worker before any ShardDb exists.
     evolu.loadQuery(
       evolu.createQuery((db) =>
         db.selectFrom("shardPointer").select("id").limit(1),
       ),
     ),
-    /* eslint-enable no-restricted-syntax */
   ]);
   const key = (scope: string) =>
     `linky.shards.retainedFrom.${owner.id}.${scope}`;
