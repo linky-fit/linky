@@ -6,6 +6,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export { uiOnlyPlugin } from "./uiOnly.js";
+export { platformSeamPlugin, platformSeamRules } from "./platformSeam.js";
 
 export const testHelperImportPatterns = [
   {
