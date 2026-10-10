@@ -8,7 +8,7 @@ trap 'rm -rf "$consumer"' EXIT
 cd "$root"
 bun run build:npm
 tarballs=()
-for package in linkshu linkstr; do
+for package in linkshu linkstr linkauth; do
   tarball=$(cd "packages/$package/dist" && npm pack --silent --pack-destination "$consumer")
   tarballs+=("$consumer/$tarball")
 done

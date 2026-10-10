@@ -46,7 +46,7 @@ Tell us what changed and why the change should exist.
 
 If the PR makes anything resembling a UI change, include clear before and after screenshots. If the change depends on motion, timing, transitions or interaction details, include a short video.
 
-If you change the exported API or documented behavior of `@linky-fit/linkshu` or `@linky-fit/linkstr`, state the proposed SemVer effect (patch, minor or breaking). Leave `version` alone; the bump happens at release ([`docs/npm-releases.md`](./docs/npm-releases.md)).
+If you change the exported API or documented behavior of `@linky-fit/linkshu`, `@linky-fit/linkstr` or `@linky-fit/linkauth`, state the proposed SemVer effect (patch, minor or breaking). Leave `version` alone; the bump happens at release ([`docs/npm-releases.md`](./docs/npm-releases.md)).
 
 Paste this checklist into the description and tick the boxes:
 

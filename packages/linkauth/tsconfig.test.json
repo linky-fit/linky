@@ -1,0 +1,10 @@
+{
+  "extends": "@linky-fit/config/tsconfig/node",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": ["node", "vitest/globals"],
+    "resolveJsonModule": true
+  },
+  "include": ["src", "tsdown.config.ts"]
+}

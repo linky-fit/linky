@@ -38,11 +38,11 @@ Read `GLOSSARY.md` before discussing domain concepts. When the user uses a term 
 
 ## Package docs
 
-`packages/*/docs/` are consumer guides for keryx, linkshu, linkstr (with linkstr-react), linksync, proxy-payment and recurring-payment. Read the guide before using or changing a package. A change to an exported surface or documented behavior rewrites the affected guide in the same commit, so it describes only current behavior. Guides cover what to call, in which order, what it guarantees and how to recover from its errors; exported types and their doc comments are the reference, so guides leave field lists, `src/` paths and change history to the code and git.
+`packages/*/docs/` are consumer guides for keryx, linkauth, linkshu, linkstr (with linkstr-react), linksync, proxy-payment and recurring-payment. Read the guide before using or changing a package. A change to an exported surface or documented behavior rewrites the affected guide in the same commit, so it describes only current behavior. Guides cover what to call, in which order, what it guarantees and how to recover from its errors; exported types and their doc comments are the reference, so guides leave field lists, `src/` paths and change history to the code and git.
 
 ## Versions
 
-App releases use CalVer `YY.M.MICRO` (the counter resets monthly). Leave `version` fields alone; `@linky-fit/linkshu` and `@linky-fit/linkstr` releases follow `docs/npm-releases.md`.
+App releases use CalVer `YY.M.MICRO` (the counter resets monthly). Leave `version` fields alone; `@linky-fit/linkshu`, `@linky-fit/linkstr` and `@linky-fit/linkauth` releases follow `docs/npm-releases.md`.
 
 ## Debugging the dev app
 

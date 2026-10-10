@@ -1,0 +1,48 @@
+{
+  "name": "@linky-fit/linkauth",
+  "private": true,
+  "version": "0.4.0",
+  "license": "0BSD",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client/index.ts",
+    "./server": "./src/server/index.ts",
+    "./signer": "./src/signer/index.ts"
+  },
+  "scripts": {
+    "eslint": "eslint --fix .",
+    "prettier": "prettier --write .",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "build:npm": "tsdown"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.0.1",
+    "nostr-tools": "^2.25.2"
+  },
+  "devDependencies": {
+    "@linky-fit/config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.4.2",
+    "tsdown": "0.23.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "description": "Log in with a Nostr key: signer-approved, origin-bound login assertions for servers and browsers.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linky-fit/linky.git",
+    "directory": "packages/linkauth"
+  },
+  "homepage": "https://github.com/linky-fit/linky/tree/main/packages/linkauth",
+  "bugs": {
+    "url": "https://github.com/linky-fit/linky/issues"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  }
+}

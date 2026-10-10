@@ -23,6 +23,7 @@ COPY apps/web-app/package.json apps/web-app/
 COPY packages/config/package.json packages/config/
 COPY packages/identity/package.json packages/identity/
 COPY packages/keryx/package.json packages/keryx/
+COPY packages/linkauth/package.json packages/linkauth/
 COPY packages/linkshu/package.json packages/linkshu/
 COPY packages/linksync/package.json packages/linksync/
 COPY packages/linkstr/package.json packages/linkstr/
