@@ -608,9 +608,8 @@ describe("Receive.receive", () => {
       ).toEqual([]);
     });
 
-    const resumeDeferred = Effect.flatMap(
-      Receive,
-      (receive) => receive.resumeDeferred,
+    const resumeDeferred = Effect.flatMap(Receive, (receive) =>
+      receive.resumeDeferred(),
     );
 
     it("keeps the deferral while a refresh does not reach the mint, and receives it once one resolves it", async () => {
@@ -1740,9 +1739,8 @@ describe("Receive.receive of an unfinished receive", () => {
 });
 
 describe("Receive.resumeDeferred", () => {
-  const resumeDeferred = Effect.flatMap(
-    Receive,
-    (receive) => receive.resumeDeferred,
+  const resumeDeferred = Effect.flatMap(Receive, (receive) =>
+    receive.resumeDeferred(),
   );
 
   /** A mint whose state check fails until `reachable.now` is set. */
@@ -2405,6 +2403,54 @@ describe("Receive.receive of a P2PK-locked token", () => {
     expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
     expect(proofs.every((p) => p.state === "available")).toBe(true);
     expect(operations.map((op) => [op.kind, op.status])).toEqual([
+      ["receive", "done"],
+    ]);
+  });
+
+  it("keeps a locked deferral pending without the key and receives it with the key", async () => {
+    const reachable = { now: false };
+    const configs: Array<string | undefined> = [];
+    const swap = fakeReceiveSwap(() => Promise.resolve(receivedProofs));
+    const answer = answerProofStates();
+    const wallet = fakeWallet({
+      checkProofsStates: (proofs) =>
+        reachable.now
+          ? answer(proofs)
+          : Promise.reject(new TypeError("fetch failed")),
+      ...swap,
+      completeSwap: (preview, privkey) => {
+        configs.push(privkey);
+        return swap.completeSwap(preview);
+      },
+    });
+
+    const exit = await makeHarness(wallet).run(
+      Effect.gen(function* () {
+        const receive = yield* Receive;
+        const deferred = yield* Effect.flip(
+          receive.receive(new ReceiveDraft({ text: lockedToken }), {
+            unlockingKey: ownerKey,
+          }),
+        );
+        reachable.now = true;
+        return {
+          deferred,
+          withoutKey: yield* receive.resumeDeferred(),
+          withKey: yield* receive.resumeDeferred({ unlockingKey: ownerKey }),
+          ...(yield* inventory),
+        };
+      }),
+    );
+    assert(Exit.isSuccess(exit));
+    const { deferred, withoutKey, withKey, proofs, operations } = exit.value;
+
+    expect(deferred._tag).toBe("ReceiveDeferred");
+    expect(withoutKey.map((result) => result.status)).toEqual(["pending"]);
+    expect(withKey.map((result) => result.status)).toEqual(["received"]);
+    expect(configs).toEqual([ownerKey]);
+    expect(secretsOf(proofs)).toEqual(["rcv-a", "rcv-b"]);
+    expect(operations.map((op) => [op.kind, op.status])).toEqual([
+      ["deferredReceive", "done"],
       ["receive", "done"],
     ]);
   });

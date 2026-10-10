@@ -43,7 +43,7 @@ const receiveLocked = (text: string, unlockingKey: P2pkUnlockingKey) =>
   );
 ```
 
-`resumeDeferred` has no key, so a locked token deferred while its mint was down stays `pending`; receive its text again with the key to finish it.
+A locked token deferred while its mint was down needs the key again to finish: pass the same options to `resumeDeferred({ unlockingKey })`. A pass without it leaves that deferral `pending`.
 
 ## How it works
 
@@ -85,7 +85,7 @@ A fresh token whose mint cannot be loaded or refreshed (step 2), or cannot be as
 
 Receiving a deferred text again is a full receive: while the mint still cannot be used it returns the same `operationId`, and once the mint answers the `receive` it writes closes the deferral `done`. An unfinished receive of the text that finishes from its restored outputs closes the deferral too.
 
-`resumeDeferred` receives the text of every `pending` deferral again, under the same steps, and returns one `DeferredReceiveResult` per deferral; the doc comment on its `status` says what each outcome means. The deferral ends as follows:
+`resumeDeferred(options?)` receives the text of every `pending` deferral again, under the same steps and with the same `unlockingKey` option as `receive`, and returns one `DeferredReceiveResult` per deferral; the doc comment on its `status` says what each outcome means. The deferral ends as follows:
 
 | `status`   | Deferral                                                                                                                      |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -104,7 +104,7 @@ import { Receive } from "@linky-fit/linkshu";
 
 const retryDeferred = Effect.gen(function* () {
   const receive = yield* Receive;
-  for (const result of yield* receive.resumeDeferred) {
+  for (const result of yield* receive.resumeDeferred()) {
     if (result.status === "received" && result.receipt !== null) {
       // Announce result.receipt.amount like a live receive.
     }
