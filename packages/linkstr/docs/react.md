@@ -1,6 +1,6 @@
 # React
 
-`@linky-fit/linkstr-react` is the Effect atom binding: one config atom, one runtime atom built from it, and a fn atom per direct operation. It re-exports the `@effect/atom-react` hooks and the `effect/reactivity` modules (`useAtomSet`, `useAtomValue`, `useAtomMount`, `RegistryContext`, `Atom`, `AtomRegistry`, `AsyncResult`, …), so app code never imports the atom modules itself. It is a private workspace package, not part of the npm release.
+`@linky-fit/linkstr-react` is the Effect atom binding: one config atom, one runtime atom built from it, and a fn atom per direct operation. It re-exports the `@effect/atom-react` surface and the `effect/reactivity` modules (`useAtomSet`, `useAtomValue`, `useAtomMount`, `AtomRegistry`, `AsyncResult`, …), so app code never depends on either itself. It is a private workspace package, not part of the npm release.
 
 ## Configure
 
