@@ -1,26 +1,32 @@
+import type { AppOwner } from "@evolu/common";
 import {
   appOwnerFromMnemonic,
+  type ShardDb,
+  type ShardRetention,
+} from "../core";
+import {
   createLinkyStore,
-  type AppOwner,
   type LinkyDbSchema,
   type LinkyScopes,
   type LinkyStore,
-  type ShardDb,
-  type ShardRetention,
-} from "@linky-fit/linksync";
-import {
-  safeLocalStorageGet,
-  safeLocalStorageRemove,
-  safeLocalStorageSet,
-} from "./utils/storage";
+} from "../model";
+import type { KeyValueStorage } from "./keyValueStorage";
 
 /** Set while this device holds an account it adopted whose data, shard pointers included, has not arrived yet. */
 const awaitingFirstHydrationKey = (appOwnerId: AppOwner["id"]): string =>
   `linky.shards.awaitingFirstHydration.${appOwnerId}`;
 
-export const markAwaitingFirstHydration = (appMnemonic: string): void => {
+/**
+ * Marks the account of `appMnemonic` as adopted by this device, so its store
+ * holds every write until the account first hydrates. Call it on restore,
+ * before the store opens.
+ */
+export const markAwaitingFirstHydration = (
+  kv: KeyValueStorage,
+  appMnemonic: string,
+): void => {
   const owner = appOwnerFromMnemonic(appMnemonic);
-  if (owner) safeLocalStorageSet(awaitingFirstHydrationKey(owner.id), "1");
+  if (owner) kv.setItem(awaitingFirstHydrationKey(owner.id), "1");
 };
 
 // With no Evolu relay the worker counts every owner synced at once, though nothing of the account arrived.
@@ -40,22 +46,24 @@ export const createAccountStore = (
   db: ShardDb<LinkyDbSchema>,
   appOwner: AppOwner,
   {
+    kv,
     hasEvoluRelay,
     ...options
   }: {
+    readonly kv: KeyValueStorage;
     readonly scopes?: LinkyScopes;
     readonly retention?: ShardRetention;
     readonly hasEvoluRelay: boolean;
   },
 ): LinkyStore => {
   const key = awaitingFirstHydrationKey(appOwner.id);
-  const awaitingFirstHydration = safeLocalStorageGet(key) === "1";
+  const awaitingFirstHydration = kv.getItem(key) === "1";
   const store = createLinkyStore(
     awaitingFirstHydration && !hasEvoluRelay ? withoutOwnerSync(db) : db,
     appOwner,
     { ...options, holdWritesUntilHydrated: awaitingFirstHydration },
   );
   if (awaitingFirstHydration)
-    store.subscribeHydration(() => safeLocalStorageRemove(key));
+    store.subscribeHydration(() => kv.removeItem(key));
   return store;
 };

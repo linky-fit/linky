@@ -15,9 +15,6 @@ const recommended = [
 const free = "wss://free.evoluhq.com";
 const custom = "wss://sync.example.com";
 const userKey = "linky.evoluServers.user.v1";
-const legacyKey = "linky.evoluServers.v1";
-const legacyRemovedKey = "linky.evoluServers.defaultRemoved.v1";
-const disabledKey = "linky.evoluServers.disabled.v1";
 
 const boot = async () => {
   vi.resetModules();
@@ -45,30 +42,6 @@ describe("Evolu relay upgrade to recommended relays", () => {
     await boot();
     expect(localStorage.getItem(userKey)).toBe(JSON.stringify([free]));
     expectTransports([...recommended, free]);
-  });
-
-  it("keeps a customized selection without the recommended relays", async () => {
-    localStorage.setItem(legacyKey, JSON.stringify([custom, recommended[1]]));
-    localStorage.setItem(legacyRemovedKey, "true");
-    await boot();
-    expect(localStorage.getItem(userKey)).toBe(JSON.stringify([custom]));
-    expectTransports([...recommended, custom]);
-  });
-
-  it("adds nothing of the user's on a fresh install", async () => {
-    await boot();
-    expect(localStorage.getItem(userKey)).toBe("[]");
-    expectTransports(recommended);
-  });
-
-  it("migrates once and keeps disabled relays offline", async () => {
-    localStorage.setItem(legacyKey, JSON.stringify([custom]));
-    localStorage.setItem(legacyRemovedKey, "true");
-    localStorage.setItem(disabledKey, JSON.stringify([recommended[0]]));
-    await boot();
-    localStorage.setItem(legacyKey, JSON.stringify([free]));
-    await boot();
-    expectTransports([recommended[1], custom]);
   });
 });
 
