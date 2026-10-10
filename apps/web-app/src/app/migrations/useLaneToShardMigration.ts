@@ -12,6 +12,7 @@
 import {
   linkshuServices,
   Tokens,
+  type Bip39Seed,
   type LegacyTokenRow,
 } from "@linky-fit/linkshu";
 import {
@@ -21,7 +22,9 @@ import {
   type LinkyStore,
 } from "@linky-fit/linksync";
 import type { LinkyEvolu } from "@linky-fit/linksync/evolu";
+import { RegistryContext } from "@linky-fit/linkstr-react";
 import { Effect, ManagedRuntime } from "effect";
+import { AtomRegistry } from "effect/reactivity";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
 import { getInspectorEmissionEnabled } from "../../devtools/inspector/inspectorEnabled";
@@ -40,8 +43,8 @@ import {
 } from "../../evolu";
 import { readStoredSlip39Seed } from "../../platform/identitySecrets";
 import { localStorageKeyValueStore } from "../../platform/linkshu/localStorageKeyValueStore";
-import { resolveLinkshuSeed } from "../../platform/linkshu/resolveLinkshuSeed";
 import { useLinkyStore } from "../hooks/useLinksync";
+import { linkshuSeedAtom } from "../state/linkshu/runtime";
 import { getUnknownErrorMessage } from "../../utils/unknown";
 import { legacyProofsToMarkSpent } from "./legacySpentProofs";
 import {
@@ -121,12 +124,13 @@ const readLegacyLaneSnapshot = async (
 /** linkshu's legacy token ingest over the shard wallet; the runtime lives only for the call. */
 const ingestLegacyTokensThroughShards = async (
   store: LinkyStore,
+  resolveSeed: () => Promise<Bip39Seed>,
   rows: ReadonlyArray<LegacyTokenRow>,
 ): Promise<void> => {
   const wallet = makeWalletRepository(store);
   const runtime = ManagedRuntime.make(
     linkshuServices({
-      bip39Seed: await resolveLinkshuSeed(),
+      bip39Seed: await resolveSeed(),
       keyValueStore: localStorageKeyValueStore,
       proofStore: wallet.proofStore,
       operationStore: wallet.operationStore,
@@ -157,6 +161,7 @@ const countsByScope = (report: LaneMigrationReport) => {
 const bootLaneMigration = async (
   evolu: LinkyEvolu,
   store: LinkyStore,
+  resolveSeed: () => Promise<Bip39Seed>,
 ): Promise<void> => {
   const startedAtMs = Date.now();
   const firstRun = !isLaneMigrationDoneLocally();
@@ -197,7 +202,8 @@ const bootLaneMigration = async (
     store,
     snapshot,
     legacyOwnerIds: new Set(legacyOwnerIds),
-    ingestLegacyTokens: (rows) => ingestLegacyTokensThroughShards(store, rows),
+    ingestLegacyTokens: (rows) =>
+      ingestLegacyTokensThroughShards(store, resolveSeed, rows),
   });
   markLaneMigrationDoneLocally();
 
@@ -287,7 +293,7 @@ const bootLaneMigration = async (
           snapshot: latest,
           legacyOwnerIds: ownerIds,
           ingestLegacyTokens: (rows) =>
-            ingestLegacyTokensThroughShards(store, rows),
+            ingestLegacyTokensThroughShards(store, resolveSeed, rows),
         });
         lastSnapshotKey = nextKey;
         await mirrorSpentProofs();
@@ -374,6 +380,7 @@ export const useLaneToShardMigration = (): boolean => {
   // committing a screen that cannot progress.
   const store = useLinkyStore();
   const evolu = useLinkyEvolu();
+  const registry = React.useContext(RegistryContext);
   const [migrating, setMigrating] = React.useState(
     () => !isLaneMigrationDoneLocally(),
   );
@@ -392,21 +399,26 @@ export const useLaneToShardMigration = (): boolean => {
 
   React.useEffect(() => {
     let cancelled = false;
-    bootRun ??= bootLaneMigration(evolu, store).catch((error: unknown) => {
-      console.warn("[linky] lane migration failed", error);
-      reportAppLog({
-        tag: "evolu.laneMigrationFailed",
-        summary: "Owner lane migration failed; retrying on the next launch",
-        payload: { error: getUnknownErrorMessage(error, "unknown") },
-      });
-    });
+    // The wallet's own seed, so an nsec-only login never generates a second cashu mnemonic.
+    const resolveSeed = () =>
+      Effect.runPromise(AtomRegistry.getResult(registry, linkshuSeedAtom));
+    bootRun ??= bootLaneMigration(evolu, store, resolveSeed).catch(
+      (error: unknown) => {
+        console.warn("[linky] lane migration failed", error);
+        reportAppLog({
+          tag: "evolu.laneMigrationFailed",
+          summary: "Owner lane migration failed; retrying on the next launch",
+          payload: { error: getUnknownErrorMessage(error, "unknown") },
+        });
+      },
+    );
     void bootRun.then(() => {
       if (!cancelled) setMigrating(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [evolu, store]);
+  }, [evolu, registry, store]);
 
   return migrating;
 };
