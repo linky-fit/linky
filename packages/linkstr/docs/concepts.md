@@ -85,7 +85,7 @@ Capabilities enter as Effect services and the composition root supplies them:
 
 Vertical services (`Chat`, `Reactions`, `WrapInbox`, …) are `Context.Service` classes with a static `layer`. `linkstrServices(config)` assembles all of them; `runLinkstr` and the React runtime both call it ([getting-started.md](./getting-started.md#two-ways-to-run)). You only build layers by hand in tests.
 
-You need little Effect to use the package: `yield*` a service tag inside `Effect.gen` and call a method; handle failures with `Effect.catchTags` or `Effect.result` before the Promise boundary (`Effect.runPromise` rejects with a wrapped cause, not the tagged error); consume a `Stream` with `Stream.runForEach`; run anything that requires `Scope` (like `inbox.open`) inside `Effect.scoped`.
+You need little Effect to use the package: `yield*` a service tag inside `Effect.gen` and call a method; handle failures with `Effect.catchTags` or `Effect.result` before the Promise boundary (`Effect.runPromise` rejects with the tagged error, typed `unknown`); consume a `Stream` with `Stream.runForEach`; run anything that requires `Scope` (like `inbox.open`) inside `Effect.scoped`.
 
 ## Errors
 
