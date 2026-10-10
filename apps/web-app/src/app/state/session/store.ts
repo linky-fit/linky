@@ -60,6 +60,11 @@ export const readLinkyStore = (
 ): Promise<LinkyStore> =>
   Effect.runPromise(AtomRegistry.getResult(registry, linkyStoreAtom));
 
+/** The session's app owner id; it scopes the owner's device-local storage keys. */
+export const appOwnerIdAtom = Atom.keepAlive(
+  Atom.mapResult(linkyStoreAtom, (store) => store.appOwner.id),
+);
+
 const repositoryAtom = <R>(make: (store: LinkyStore) => R) =>
   Atom.keepAlive(Atom.mapResult(linkyStoreAtom, make));
 

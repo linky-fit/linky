@@ -1,3 +1,4 @@
+import { encodeNpub, identityFromNsec } from "@linky-fit/linkstr";
 import { Atom } from "effect/reactivity";
 import type { SessionSecrets, SessionState } from "../../../platform/session";
 
@@ -14,3 +15,9 @@ export const sessionSecrets = (session: SessionState): SessionSecrets | null =>
 export const currentNsecAtom = Atom.make(
   (get) => sessionSecrets(get(sessionAtom))?.nsec ?? null,
 );
+
+export const currentNpubAtom = Atom.make((get) => {
+  const nsec = get(currentNsecAtom)?.trim();
+  const identity = nsec ? identityFromNsec(nsec) : null;
+  return identity === null ? null : encodeNpub(identity.pubkey);
+});

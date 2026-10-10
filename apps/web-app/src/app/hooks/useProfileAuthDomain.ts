@@ -23,6 +23,7 @@ import {
 import {
   linkstrConfigAtom,
   useAtomSet,
+  useAtomValue,
   useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
 import { Cause, Exit, Option } from "effect";
@@ -58,7 +59,9 @@ import {
   deriveNostrKeysFromSlip39,
 } from "../../utils/slip39Nostr";
 import { looksLikeSlip39Share } from "@linky-fit/identity";
-import type { IdentityChangeMessageSource } from "../lib/identityChangeMessage";
+import { myProfileMetadataAtom } from "../state/contacts/profiles";
+import { currentNpubAtom } from "../state/session/session";
+import { useMessagesCommands } from "./messages/useMessagesCommands";
 import { buildLinkstrConfig } from "./useLinkstrConfigSync";
 import { clearLegacyLaneStorage } from "../migrations/laneToShardMigration";
 import { runWrite } from "../lib/storeWrite";
@@ -143,20 +146,12 @@ interface PersistNewProfileParams {
 }
 
 interface UseProfileAuthDomainParams {
-  appendIdentityChangeNoticesRef: React.MutableRefObject<
-    | ((args: {
-        changedAtSec: number;
-        identitySource: IdentityChangeMessageSource;
-      }) => void)
-    | null
-  >;
   currentNsec: string | null;
   /** Null outside an authenticated session; the identity mirror is then not written. */
   identityRepository: IdentityRepository | null;
   /** Null outside an authenticated session, like `identityRepository`. */
   inboxCursors: InboxCursorsRepository | null;
   lang: Lang;
-  myProfileMetadataRef: React.MutableRefObject<ProfileMetadata | null>;
   pushToast: (message: string) => void;
   t: Translate;
 }
@@ -197,16 +192,16 @@ interface UseProfileAuthDomainResult {
 }
 
 export const useProfileAuthDomain = ({
-  appendIdentityChangeNoticesRef,
   currentNsec,
   identityRepository,
   inboxCursors,
   lang,
-  myProfileMetadataRef,
   pushToast,
   t,
 }: UseProfileAuthDomainParams): UseProfileAuthDomainResult => {
-  const [currentNpub, setCurrentNpub] = React.useState<string | null>(null);
+  const currentNpub = useAtomValue(currentNpubAtom);
+  const myProfileMetadata = useAtomValue(myProfileMetadataAtom);
+  const messagesCommands = useMessagesCommands();
   const [onboardingIsBusy, setOnboardingIsBusy] = React.useState(false);
   const [onboardingStep, setOnboardingStep] =
     React.useState<OnboardingStep>(null);
@@ -287,29 +282,6 @@ export const useProfileAuthDomain = ({
     },
     [deriveNpubFromNsec, identityRepository],
   );
-
-  React.useEffect(() => {
-    const nsec = (currentNsec ?? "").trim();
-    if (!nsec) {
-      setCurrentNpub(null);
-      return;
-    }
-
-    let cancelled = false;
-    const run = async () => {
-      const privBytes = await decodeNsecPrivateBytes(nsec);
-      if (!privBytes) return;
-      const npub = encodeNpub(derivePubkey(privBytes));
-
-      if (cancelled) return;
-      setCurrentNpub(npub);
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentNsec, decodeNsecPrivateBytes]);
 
   const deriveAppMnemonicFromSlip39 = React.useCallback(
     async (seed: string): Promise<string | null> => {
@@ -569,7 +541,7 @@ export const useProfileAuthDomain = ({
       }
 
       if (shouldRecordChatNotice) {
-        appendIdentityChangeNoticesRef.current?.({
+        await messagesCommands?.appendIdentityChangeNotices({
           changedAtSec,
           identitySource,
         });
@@ -590,9 +562,9 @@ export const useProfileAuthDomain = ({
       globalThis.location.reload();
     },
     [
-      appendIdentityChangeNoticesRef,
       currentNsec,
       deriveAppMnemonicFromSlip39,
+      messagesCommands,
       publishProfileForNewKey,
       pushToast,
       t,
@@ -1029,7 +1001,7 @@ export const useProfileAuthDomain = ({
       const pubkey = derivePubkey(secretKey);
       const npub = encodeNpub(pubkey);
       const linkyProfile =
-        myProfileMetadataRef.current ??
+        myProfileMetadata ??
         (currentNpub ? loadCachedProfile(currentNpub)?.metadata : null) ??
         new ProfileMetadata({});
       const checkToken = {};
@@ -1078,7 +1050,7 @@ export const useProfileAuthDomain = ({
       currentNsec,
       decodeNsecPrivateBytes,
       fetchProfile,
-      myProfileMetadataRef,
+      myProfileMetadata,
       pushToast,
       switchIdentity,
       t,

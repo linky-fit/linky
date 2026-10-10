@@ -48,7 +48,7 @@ describe("useContactsDomain dedupe", () => {
         conversations,
         noGroupFilterValue: "",
         pushToast,
-        reassignContactMessages: () => 0,
+        reassignContactMessages: () => Promise.resolve(0),
         route: { kind: "contacts" },
         t: (key) => key,
       });

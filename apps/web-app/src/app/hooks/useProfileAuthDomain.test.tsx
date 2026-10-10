@@ -1,9 +1,12 @@
 import { encodeNsec, ProfileMetadata } from "@linky-fit/linkstr";
 import { makeIdentity } from "@linky-fit/linkstr/testing";
+import { AsyncResult } from "effect/reactivity";
 import { act, useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
 import type { IdentitySwitchCheck } from "../lib/keySwitchProfile";
+import { myProfileMetadataAtom } from "../state/contacts/profiles";
+import { messagesCommandsAtom } from "../state/messages/commands";
 import { useProfileAuthDomain } from "./useProfileAuthDomain";
 
 const currentNsec = encodeNsec(makeIdentity().secretKey);
@@ -16,11 +19,13 @@ const mocks = vi.hoisted(() => ({
   persistIdentitySecrets: vi.fn(),
   publishProfile: vi.fn(),
   readClipboardText: vi.fn(),
+  atomValues: new Map<unknown, unknown>(),
 }));
 
 vi.mock("@linky-fit/linkstr-react", () => ({
   linkstrConfigAtom: {},
   useAtomSet: () => vi.fn(),
+  useAtomValue: (atom: unknown) => mocks.atomValues.get(atom) ?? null,
   useLinkstrCommands: () => ({
     fetchProfile: vi.fn(),
     publishProfile: mocks.publishProfile,
@@ -83,20 +88,21 @@ describe("switching to a custom identity", () => {
     mocks.derivedNsec = currentNsec;
     mocks.identitySource = "derived";
     mocks.readClipboardText.mockResolvedValue(pastedNsec);
+    mocks.atomValues.set(
+      myProfileMetadataAtom,
+      new ProfileMetadata({ name: "Alice" }),
+    );
+    mocks.atomValues.set(messagesCommandsAtom, AsyncResult.initial());
   });
 
   const setup = async () => {
     const domain: { current: AuthDomain | null } = { current: null };
     const Probe = () => {
       const value = useProfileAuthDomain({
-        appendIdentityChangeNoticesRef: { current: null },
         currentNsec,
         identityRepository: null,
         inboxCursors: null,
         lang: "en",
-        myProfileMetadataRef: {
-          current: new ProfileMetadata({ name: "Alice" }),
-        },
         pushToast: vi.fn(),
         t: (key) => key,
       });

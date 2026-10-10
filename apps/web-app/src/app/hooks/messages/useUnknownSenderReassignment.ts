@@ -16,7 +16,7 @@ interface UseUnknownSenderReassignmentParams {
   contacts: ReadonlyArray<KnownContact>;
   /** Nothing moves before the account is hydrated: the contacts may not have arrived yet. */
   hydrated: boolean;
-  reassign: (fromContactId: string, toContactId: string) => number;
+  reassign: (fromContactId: string, toContactId: string) => Promise<number>;
   unknownSenders: ReadonlyArray<UnknownSender>;
 }
 
@@ -42,7 +42,7 @@ export const useUnknownSenderReassignment = ({
         }
         return normalizeNpubIdentifier(contact.npub ?? "") === unknownNpub;
       });
-      if (knownContact) reassign(unknownContactId, knownContact.id);
+      if (knownContact) void reassign(unknownContactId, knownContact.id);
     }
   }, [contacts, hydrated, reassign, unknownSenders]);
 };

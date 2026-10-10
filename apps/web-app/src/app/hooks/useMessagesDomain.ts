@@ -697,58 +697,6 @@ export const useMessagesDomain = ({
     [conversations, write],
   );
 
-  const reassignLocalNostrMessagesContactId = React.useCallback(
-    (fromContactId: string, toContactId: string) => {
-      const normalizedFrom = trimString(fromContactId);
-      const targetContactId = parseContactId(trimString(toContactId));
-      if (!normalizedFrom || !targetContactId) return 0;
-      const moving = nostrMessagesLocal.filter(
-        (message) => trimString(message.contactId) === normalizedFrom,
-      );
-      if (moving.length === 0) return 0;
-
-      const unknownPubkey = readUnknownContactIdPubkey(normalizedFrom);
-      if (unknownPubkey) {
-        void write(
-          "unknown sender move",
-          Effect.flatMap(
-            unknownSenders.moveToContact(unknownPubkey, targetContactId),
-            (moved) =>
-              Effect.sync(() => {
-                if (moved === 0) return;
-                reportAppLog({
-                  tag: "unknownSenders.movedToContact",
-                  summary: `Moved ${moved} messages of an unknown sender to their contact`,
-                  links: {
-                    pubkey: unknownPubkey,
-                    contact: targetContactId,
-                    conversation: directConversationIdFor(targetContactId),
-                  },
-                  payload: { moved },
-                });
-              }),
-          ),
-        );
-        return moving.length;
-      }
-
-      for (const message of moving) {
-        const messageId = parseMessageId(message.id);
-        if (!messageId) continue;
-        void write(
-          "message move",
-          Effect.flatMap(conversations.ensureDirect(targetContactId), () =>
-            conversations.messages.update(messageId, {
-              conversationId: directConversationIdFor(targetContactId),
-            }),
-          ),
-        );
-      }
-      return moving.length;
-    },
-    [conversations, nostrMessagesLocal, unknownSenders, write],
-  );
-
   const removeLocalNostrMessagesByContactId = React.useCallback(
     (contactId: string) => {
       const normalizedContactId = trimString(contactId);
@@ -1005,7 +953,6 @@ export const useMessagesDomain = ({
     nostrReactionsLocal,
     pendingPaymentsKey,
     reactionsByMessageId,
-    reassignLocalNostrMessagesContactId,
     removeLocalNostrMessagesByContactId,
     softDeleteLocalNostrReaction,
     softDeleteLocalNostrReactionsByWrapIds,

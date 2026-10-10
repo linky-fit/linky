@@ -1,4 +1,3 @@
-import type { ProfileMetadata } from "@linky-fit/linkstr";
 import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Lang, Translate } from "../../../i18n";
@@ -7,14 +6,13 @@ import {
   getInitialNostrIdentitySource,
   getInitialNostrIdentitySwitchedAtSec,
 } from "../../../utils/storage";
-import type { IdentityChangeMessageSource } from "../../lib/identityChangeMessage";
 import { platformAtom } from "../../state/platform";
 import { sessionAtom } from "../../state/session/session";
 import { toSyncedNostrIdentity } from "../../lib/syncedNostrIdentity";
 import {
   useIdentityRepository,
+  useAppOwnerId,
   useInboxCursorsRepository,
-  useLinkyStore,
   useSyncedNostrIdentityRow,
 } from "../useLinksync";
 import { useProfileAuthDomain } from "../useProfileAuthDomain";
@@ -38,29 +36,16 @@ export const useIdentityOwnersComposition = ({
 }: UseIdentityOwnersCompositionParams) => {
   const { lifecycle } = useAtomValue(platformAtom);
   const setSession = useAtomSet(sessionAtom);
-  const store = useLinkyStore();
   const identityRepository = useIdentityRepository();
   const inboxCursors = useInboxCursorsRepository();
-  const appOwnerId: string = store.appOwner.id;
+  const appOwnerId: string = useAppOwnerId();
   const appOwnerIdRef = React.useRef<string | null>(null);
 
-  const appendIdentityChangeNoticesRef = React.useRef<
-    | ((args: {
-        changedAtSec: number;
-        identitySource: IdentityChangeMessageSource;
-      }) => void)
-    | null
-  >(null);
-
-  const myProfileMetadataRef = React.useRef<ProfileMetadata | null>(null);
-
   const profileAuth = useProfileAuthDomain({
-    appendIdentityChangeNoticesRef,
     currentNsec,
     identityRepository,
     inboxCursors,
     lang,
-    myProfileMetadataRef,
     pushToast,
     t,
   });
@@ -124,9 +109,7 @@ export const useIdentityOwnersComposition = ({
     ...profileAuth,
     appOwnerId,
     appOwnerIdRef,
-    appendIdentityChangeNoticesRef,
     currentNsec,
-    myProfileMetadataRef,
     syncedNostrIdentityMatchesLocal,
   };
 };

@@ -38,6 +38,7 @@ import {
   contactsRepositoryAtom,
   conversationsRepositoryAtom,
   identityRepositoryAtom,
+  appOwnerIdAtom,
   inboxCursorsRepositoryAtom,
   keryxSubscriptionsRepositoryAtom,
   linkyStoreAtom,
@@ -51,6 +52,10 @@ import {
 /** The session's shard store; suspends until the local database has answered. */
 export const useLinkyStore = (): LinkyStore =>
   useAtomSuspense(linkyStoreAtom).value;
+
+/** The session's app owner id; suspends like `useLinkyStore`. */
+export const useAppOwnerId = (): string =>
+  useAtomSuspense(appOwnerIdAtom).value;
 
 export const useContactsRepository = (): ContactsRepository =>
   useAtomSuspense(contactsRepositoryAtom).value;

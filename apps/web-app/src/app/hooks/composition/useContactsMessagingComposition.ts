@@ -43,6 +43,8 @@ import {
   loadCachedProfile,
   releaseAllAvatarObjectUrls,
 } from "../../../profileCache";
+import { useProfileCache } from "../contacts/useProfileCache";
+import { useMessagesCommands } from "../messages/useMessagesCommands";
 import {
   ARCHIVED_CONTACTS_FILTER,
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
@@ -116,8 +118,6 @@ import { useIdentityOwnersComposition } from "./useIdentityOwnersComposition";
 import { safeLocalStorageGet } from "../../../utils/storage";
 import type { Translate } from "../../../i18n";
 import type { PushToastOptions } from "../../../hooks/useToasts";
-
-const inMemoryNostrPictureCache = new Map<string, string | null>();
 
 const INLINE_NPUB_PATTERN =
   /(?:nostr:)?npub1[023456789acdefghjklmnpqrstuvwxyz]+(?:@npub\.cash)?/gi;
@@ -269,24 +269,25 @@ export const useContactsMessagingComposition = ({
     [currentNsec],
   );
 
-  const [nostrPictureByNpub, setNostrPictureByNpub] = useState<
-    Record<string, string | null>
-  >(() => Object.fromEntries(inMemoryNostrPictureCache.entries()));
+  const {
+    cache: {
+      metadataByNpub: nostrMetadataByNpub,
+      pictureByNpub: nostrPictureByNpub,
+      statusByNpub: nostrStatusByNpub,
+    },
+    reset: resetProfileCache,
+    setMetadataByNpub: setNostrMetadataByNpub,
+    setPictureByNpub: setNostrPictureByNpub,
+    setStatusByNpub: setNostrStatusByNpub,
+  } = useProfileCache();
 
-  const [nostrStatusByNpub, setNostrStatusByNpub] = useState<
-    Record<string, string | null>
-  >({});
-
-  const [nostrMetadataByNpub, setNostrMetadataByNpub] = useState<
-    Record<string, ProfileMetadata | null>
-  >({});
-
+  // The cached avatar object URLs are revoked here, so no entry may keep one.
   React.useEffect(() => {
     return () => {
       releaseAllAvatarObjectUrls();
-      inMemoryNostrPictureCache.clear();
+      resetProfileCache();
     };
-  }, [currentNsec]);
+  }, [currentNsec, resetProfileCache]);
 
   const [chatDraft, setChatDraft] = useState<string>("");
   const [chatAttachments, setChatAttachments] = useState<File[]>([]);
@@ -336,12 +337,6 @@ export const useContactsMessagingComposition = ({
   React.useEffect(() => {
     replyContextRef.current = replyContext;
   }, [replyContext]);
-
-  React.useEffect(() => {
-    for (const [npub, url] of Object.entries(nostrPictureByNpub)) {
-      inMemoryNostrPictureCache.set(npub, url ?? null);
-    }
-  }, [nostrPictureByNpub]);
 
   const chatMessagesRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -400,14 +395,12 @@ export const useContactsMessagingComposition = ({
   );
 
   const accountHydrated = useAccountHydrated();
-  const reassignContactMessagesRef = React.useRef<
-    (fromContactId: string, toContactId: string) => number
-  >(() => 0);
-
+  const messagesCommands = useMessagesCommands();
   const reassignContactMessages = React.useCallback(
-    (fromContactId: string, toContactId: string) =>
-      reassignContactMessagesRef.current(fromContactId, toContactId),
-    [],
+    (fromContactId: string, toContactId: string): Promise<number> =>
+      messagesCommands?.reassignContactMessages(fromContactId, toContactId) ??
+      Promise.resolve(0),
+    [messagesCommands],
   );
 
   const {
@@ -474,7 +467,6 @@ export const useContactsMessagingComposition = ({
     nostrReactionsLocal,
     pendingPaymentsKey,
     reactionsByMessageId,
-    reassignLocalNostrMessagesContactId,
     removeLocalNostrMessagesByContactId,
     softDeleteLocalNostrReaction,
     softDeleteLocalNostrReactionsByWrapIds,
@@ -565,21 +557,6 @@ export const useContactsMessagingComposition = ({
     setStatus,
     t,
   });
-
-  const reassignNostrConversationContactId = React.useCallback(
-    (fromContactId: string, toContactId: string): number => {
-      const normalizedFrom = fromContactId.trim();
-      const normalizedTo = toContactId.trim();
-      if (!normalizedFrom || !normalizedTo || normalizedFrom === normalizedTo) {
-        return 0;
-      }
-
-      return reassignLocalNostrMessagesContactId(normalizedFrom, normalizedTo);
-    },
-    [reassignLocalNostrMessagesContactId],
-  );
-
-  reassignContactMessagesRef.current = reassignNostrConversationContactId;
 
   const lastVisibleMessageByContactId = React.useMemo(
     () =>
@@ -702,7 +679,7 @@ export const useContactsMessagingComposition = ({
   useUnknownSenderReassignment({
     contacts,
     hydrated: accountHydrated,
-    reassign: reassignNostrConversationContactId,
+    reassign: reassignContactMessages,
     unknownSenders: unknownContacts,
   });
 
@@ -814,6 +791,7 @@ export const useContactsMessagingComposition = ({
     fetchProfilesOneShot,
     nostrBootstrapReady,
     prefetchedMessageNpubs,
+    setNostrPictureByNpub,
     unknownNameByNpub,
   ]);
 
@@ -1219,13 +1197,13 @@ export const useContactsMessagingComposition = ({
             decodeNpub(restoredNpub),
           );
           if (unknownContactId) {
-            reassignNostrConversationContactId(unknownContactId, id);
+            void reassignContactMessages(unknownContactId, id);
           }
         }
       }
       return result;
     },
-    [contacts, contactsRepository, reassignNostrConversationContactId],
+    [contacts, contactsRepository, reassignContactMessages],
   );
 
   const restoreArchivedContact = React.useCallback(
@@ -1445,7 +1423,7 @@ export const useContactsMessagingComposition = ({
     const saved = saveNpubContact(npub);
     if (!saved) return;
     if (!saved.created) {
-      reassignNostrConversationContactId(contactId, saved.contact.id);
+      void reassignContactMessages(contactId, saved.contact.id);
       setStatus(t("contactSaved"));
       navigateTo({ route: "chat", id: saved.contact.id });
       return;
@@ -1455,7 +1433,7 @@ export const useContactsMessagingComposition = ({
       targetNpub: npub,
     };
   }, [
-    reassignNostrConversationContactId,
+    reassignContactMessages,
     route.kind,
     saveNpubContact,
     selectedChatContact,
@@ -1687,10 +1665,10 @@ export const useContactsMessagingComposition = ({
     if (!existing?.id) return;
 
     pendingUnknownContactAddRef.current = null;
-    reassignNostrConversationContactId(pending.sourceContactId, existing.id);
+    void reassignContactMessages(pending.sourceContactId, existing.id);
     setStatus(t("contactSaved"));
     navigateTo({ route: "chat", id: existing.id });
-  }, [contacts, reassignNostrConversationContactId, setStatus, t]);
+  }, [contacts, reassignContactMessages, setStatus, t]);
 
   const sendChatMessage = useSendChatMessage({
     appendLocalNostrMessage,
