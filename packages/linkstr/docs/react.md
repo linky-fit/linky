@@ -10,7 +10,7 @@ Build the config from `identityFromNsec(nsec)` and relay strings filtered throug
 
 ## Identity switches
 
-`linkstrRuntimeAtom` is built from `linkstrConfigAtom`. Any config change (new key, new relay list, inspector toggled) closes the previous runtime with its relay pool and subscriptions, then starts new ones. Treat it as a full restart of linkstr; stream atoms restart with it. A command still running on the closed runtime is interrupted and resolves with an interrupted failure; it is never repeated on the new runtime, so nothing started under one key is sent under the next. The runtime taps the transport with `observeTransport` and `inspectTransport` and provides `RelayHealth.live` and `Inspector.live` or `.disabled` ([diagnostics.md](./diagnostics.md)).
+`linkstrRuntimeAtom` is built from `linkstrConfigAtom`. Any config change (new key, new relay list, inspector toggled) closes the previous runtime with its relay pool and subscriptions, then starts new ones. Treat it as a full restart of linkstr; stream atoms restart with it. A command still running on the closed runtime is interrupted and resolves with an interrupted failure. This holds for every config change, including same-identity ones such as a relay edit or the inspector toggle: the command is never repeated on the new runtime, so nothing started under one key is sent under the next. Treat an interrupted `Exit` like any other failure. The runtime taps the transport with `observeTransport` and `inspectTransport` and provides `RelayHealth.live` and `Inspector.live` or `.disabled` ([diagnostics.md](./diagnostics.md)).
 
 ## Call an operation
 
@@ -24,7 +24,7 @@ const exit = await retractReaction(
 if (Exit.isFailure(exit)) console.warn(Cause.pretty(exit.cause)); // e.g. LinkstrNotConfigured
 ```
 
-Each call runs exactly once, on the runtime that is current when it starts; while that runtime is still being built, the call waits for it. Calls are independent: concurrent calls all run and each resolves with its own result. After the first command the registry keeps the runtime alive, so unmounting the calling component does not cancel a call.
+Each call runs exactly once, on the runtime that is current when the call is made; a config change later in the same synchronous pass does not move it. While that runtime is still being built, the call waits for it. Calls are independent: concurrent calls all run and each resolves with its own result. After the first command the registry keeps the runtime alive, so unmounting the calling component does not cancel a call.
 
 | Command                                    | Operation                                                                            |
 | ------------------------------------------ | ------------------------------------------------------------------------------------ |

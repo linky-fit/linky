@@ -161,6 +161,10 @@ const makeLinkstrCommands = (run: LinkstrRun) => ({
 
 export type LinkstrCommands = ReturnType<typeof makeLinkstrCommands>;
 
+type RunOnRuntime = <A, E>(
+  effect: Effect.Effect<A, E, LinkstrServices>,
+) => Promise<Exit.Exit<A, E>>;
+
 /**
  * Runs effects on one runtime build; rebuilding the runtime interrupts the
  * runs still in flight on the old one. Kept alive so the runtime outlives
@@ -170,13 +174,14 @@ const linkstrRunAtom = Atom.keepAlive(
   Atom.readable((get) =>
     AsyncResult.map(get(linkstrRuntimeAtom), (context) => {
       const running = new Set<Fiber.Fiber<unknown, unknown>>();
+      let closed = false;
       get.addFinalizer(() => {
+        closed = true;
         for (const fiber of running) fiber.interruptUnsafe();
       });
-      return <A, E>(
-        effect: Effect.Effect<A, E, LinkstrServices>,
-      ): Promise<Exit.Exit<A, E>> =>
+      const run: RunOnRuntime = (effect) =>
         new Promise((resolve) => {
+          if (closed) return resolve(Exit.interrupt());
           const fiber = Effect.runForkWith(context)(effect);
           running.add(fiber);
           fiber.addObserver((exit) => {
@@ -184,25 +189,39 @@ const linkstrRunAtom = Atom.keepAlive(
             resolve(exit);
           });
         });
+      return run;
     }),
   ),
 );
 
 /**
  * The linkstr operations over `registry`. Each call runs exactly once, on the
- * runtime current when the call starts (waiting while it builds), and
+ * runtime current when the call is made (waiting while it builds), and
  * resolves with its own `Exit`.
  */
 export const linkstrCommands = (
   registry: AtomRegistry.AtomRegistry,
 ): LinkstrCommands =>
-  makeLinkstrCommands(async (effect) => {
-    const run = await Effect.runPromiseExit(
-      AtomRegistry.getResult(registry, linkstrRunAtom, {
-        suspendOnWaiting: true,
-      }),
+  makeLinkstrCommands(<A, E>(effect: Effect.Effect<A, E, LinkstrServices>) => {
+    const runOn = (
+      run: Exit.Exit<RunOnRuntime, LinkstrNotConfigured>,
+    ): Promise<Exit.Exit<A, E | LinkstrNotConfigured>> =>
+      Exit.isSuccess(run)
+        ? run.value(effect)
+        : Promise.resolve(Exit.failCause(run.cause));
+    const current = registry.get(linkstrRunAtom);
+    if (current.waiting || AsyncResult.isInitial(current)) {
+      return Effect.runPromiseExit(
+        AtomRegistry.getResult(registry, linkstrRunAtom, {
+          suspendOnWaiting: true,
+        }),
+      ).then(runOn);
+    }
+    return runOn(
+      AsyncResult.isSuccess(current)
+        ? Exit.succeed(current.value)
+        : Exit.failCause(current.cause),
     );
-    return Exit.isSuccess(run) ? run.value(effect) : Exit.failCause(run.cause);
   });
 
 /** `linkstrCommands` over the nearest registry; stable across renders. */
