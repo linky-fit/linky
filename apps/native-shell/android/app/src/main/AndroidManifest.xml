@@ -28,6 +28,14 @@
         </service>
 
         <service
+            android:name=".LinkyUnifiedPushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+            </intent-filter>
+        </service>
+
+        <service
             android:name=".BeaconService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice"
@@ -114,6 +122,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Visible on Android 11+ so the shell can pick FCM only where Play Services exist. -->
+    <queries>
+        <package android:name="com.google.android.gms" />
+    </queries>
 
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />

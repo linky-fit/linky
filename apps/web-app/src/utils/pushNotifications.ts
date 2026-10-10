@@ -21,9 +21,14 @@ import {
 } from "@linky-fit/linkstr";
 import {
   getNativeNotificationPermissionState,
+  getNativePushTransport,
   NATIVE_PUSH_ACTION_EVENT,
+  type NativePushTransport,
   requestNativeNotificationPermission,
+  requestNativeUnifiedPushEndpoint,
+  unregisterNativeUnifiedPush,
 } from "../platform/nativeBridge";
+import { reportAppLog } from "../devtools/inspector/appLog";
 import { isNativePlatform } from "../platform/runtime";
 import { appendPushDebugLog } from "./pushDebugLog";
 import { base64 } from "@scure/base";
@@ -87,7 +92,7 @@ function getOrCreatePushInstallationId(): string {
 }
 
 interface StoredPushRegistration {
-  /** Web Push endpoint or native FCM token, depending on the store. */
+  /** Web Push endpoint (browser or UnifiedPush) or FCM token, depending on the store. */
   readonly id: string | null;
   readonly pubkey: string | null;
 }
@@ -107,7 +112,7 @@ const makePushRegistrationStore = (idKey: string, pubkeyKey: string) => ({
   },
 });
 
-const pwaRegistrationStore = makePushRegistrationStore(
+const webPushRegistrationStore = makePushRegistrationStore(
   REGISTERED_PUSH_ENDPOINT_STORAGE_KEY,
   REGISTERED_PUSH_PUBKEY_STORAGE_KEY,
 );
@@ -183,7 +188,10 @@ export async function hasNativePushRegistrationForIdentity(
     return false;
   }
 
-  const stored = nativeRegistrationStore.read();
+  const stored =
+    getNativePushTransport() === "unifiedpush"
+      ? webPushRegistrationStore.read()
+      : nativeRegistrationStore.read();
   if (!stored.id || !stored.pubkey) {
     return false;
   }
@@ -484,9 +492,18 @@ async function requestNativePushToken(): Promise<string> {
   return tokenPromise;
 }
 
+type PushRegistrationResult =
+  | { success: true }
+  | {
+      success: false;
+      error?: string;
+      /** The device has no Google Play Services and no UnifiedPush distributor. */
+      reason?: "no_push_distributor";
+    };
+
 async function registerNativePushNotifications(
   currentNsec: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<PushRegistrationResult> {
   const permissionState = getNativeNotificationPermissionState();
   if (permissionState === null || permissionState === "unsupported") {
     appendPushDebugLog("client", "native push unsupported", {
@@ -500,15 +517,113 @@ async function registerNativePushNotifications(
   }
 
   const granted = await requestNotificationPermission();
+  const transport = getNativePushTransport();
   appendPushDebugLog("client", "native push registration requested", {
     granted,
     permissionState,
+    transport,
   });
 
   if (!granted) {
     return { success: false, error: "Nativni notifikace nejsou povolene" };
   }
 
+  const result =
+    transport === "unifiedpush"
+      ? await registerUnifiedPush(currentNsec)
+      : await registerFcmPush(currentNsec);
+  if (result.success) {
+    await dropOtherTransportRegistration(currentNsec, transport);
+  }
+  reportAppLog({
+    tag: "push.nativeRegistered",
+    summary: result.success
+      ? `native push registered via ${transport}`
+      : `native push registration via ${transport} failed`,
+    links: { pubkey: derivePushIdentity(currentNsec).pubkey },
+    payload: {
+      transport,
+      ...(result.success ? {} : { error: result.error ?? "unknown" }),
+    },
+  });
+  return result;
+}
+
+async function registerUnifiedPush(
+  currentNsec: string,
+): Promise<PushRegistrationResult> {
+  try {
+    const registration = await requestNativeUnifiedPushEndpoint(
+      await fetchVapidPublicKey(),
+    );
+    appendPushDebugLog("client", "unifiedpush registration result", {
+      endpointHash:
+        registration.status === "endpoint"
+          ? registration.endpoint.slice(-24)
+          : null,
+      reason: registration.status === "failed" ? registration.reason : null,
+    });
+    if (registration.status === "failed") {
+      return registration.reason === "NO_DISTRIBUTOR"
+        ? {
+            success: false,
+            error: "UnifiedPush: NO_DISTRIBUTOR",
+            reason: "no_push_distributor",
+          }
+        : { success: false, error: `UnifiedPush: ${registration.reason}` };
+    }
+    return await subscribeWebPushEndpoint({
+      currentNsec,
+      replacedEndpoint: null,
+      subscription: {
+        endpoint: registration.endpoint,
+        expirationTime: null,
+        keys: { p256dh: registration.p256dh, auth: registration.auth },
+      },
+    });
+  } catch (error) {
+    appendPushDebugLog("client", "unifiedpush register exception", { error });
+    return { success: false, error: `Chyba: ${String(error ?? "")}` };
+  }
+}
+
+/** A device that gained or lost Play Services must not keep receiving every push twice. */
+async function dropOtherTransportRegistration(
+  currentNsec: string,
+  transport: NativePushTransport,
+): Promise<void> {
+  if (transport === "unifiedpush") {
+    const staleToken = nativeRegistrationStore.read().id;
+    if (staleToken === null) return;
+    await cleanupStaleRegistration({
+      details: { tokenHash: hashStoredIdentifier(staleToken) },
+      logPrefix: "native push fcm token cleanup",
+      unregister: () =>
+        unregisterOnServer(currentNsec, "/native/unsubscribe", {
+          token: staleToken,
+        }),
+    });
+    nativeRegistrationStore.clear();
+    return;
+  }
+
+  const staleEndpoint = webPushRegistrationStore.read().id;
+  if (staleEndpoint === null) return;
+  await cleanupStaleRegistration({
+    details: { endpointHash: hashStoredIdentifier(staleEndpoint) },
+    logPrefix: "native push unifiedpush endpoint cleanup",
+    unregister: () =>
+      unregisterOnServer(currentNsec, "/unsubscribe", {
+        endpoint: staleEndpoint,
+      }),
+  });
+  unregisterNativeUnifiedPush();
+  webPushRegistrationStore.clear();
+}
+
+async function registerFcmPush(
+  currentNsec: string,
+): Promise<PushRegistrationResult> {
   try {
     const installationId = getOrCreatePushInstallationId();
     const { pubkey } = derivePushIdentity(currentNsec);
@@ -589,6 +704,101 @@ async function registerNativePushNotifications(
   }
 }
 
+/**
+ * Hands a Web Push endpoint, from the browser or a UnifiedPush distributor, to
+ * the push service and drops the endpoint it replaces.
+ */
+async function subscribeWebPushEndpoint(params: {
+  currentNsec: string;
+  /** Endpoint this registration supersedes even when stored for another identity. */
+  replacedEndpoint: string | null;
+  subscription: PushSubscriptionData;
+}): Promise<PushRegistrationResult> {
+  const { currentNsec, replacedEndpoint, subscription } = params;
+  const installationId = getOrCreatePushInstallationId();
+  const { pubkey } = derivePushIdentity(currentNsec);
+  const { id: storedEndpoint, pubkey: storedPubkey } =
+    webPushRegistrationStore.read();
+  const previousEndpoint = replacedEndpoint ?? storedEndpoint;
+  const currentEndpoint = subscription.endpoint;
+
+  const challenge = await requestChallenge(pubkey, "subscribe");
+  appendPushDebugLog("client", "push challenge received", {
+    action: challenge.action,
+    expiresAt: challenge.expiresAt,
+    pubkey: challenge.pubkey,
+  });
+  const proof = await createOwnershipProof({
+    action: "subscribe",
+    challenge: challenge.challenge,
+    currentNsec,
+  });
+
+  const response = await fetch(`${PUSH_SERVER_URL}/subscribe`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      cleanupLegacySubscriptions: true,
+      installationId,
+      proofs: [proof],
+      recipientPubkeys: [pubkey],
+      subscription,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorMessage = await readErrorMessage(response);
+    appendPushDebugLog("client", "push register server error", {
+      endpointHash: currentEndpoint.slice(-24),
+      errorMessage,
+      pubkey,
+      status: response.status,
+    });
+    return {
+      success: false,
+      error: `Server vrátil chybu ${response.status}: ${errorMessage}`,
+    };
+  }
+
+  const shouldCleanupPreviousEndpoint =
+    previousEndpoint !== null &&
+    previousEndpoint !== currentEndpoint &&
+    (storedPubkey === null ||
+      storedPubkey === pubkey ||
+      replacedEndpoint !== null);
+  if (shouldCleanupPreviousEndpoint) {
+    await cleanupStaleRegistration({
+      details: {
+        currentEndpointHash: currentEndpoint.slice(-24),
+        installationId,
+        previousEndpointHash: previousEndpoint.slice(-24),
+        pubkey,
+        replacedEndpointHash:
+          replacedEndpoint === null ? null : replacedEndpoint.slice(-24),
+        storedPubkey,
+      },
+      logPrefix: "push stale endpoint cleanup",
+      unregister: () =>
+        unregisterOnServer(currentNsec, "/unsubscribe", {
+          endpoint: previousEndpoint,
+        }),
+    });
+  }
+
+  webPushRegistrationStore.write(currentEndpoint, pubkey);
+
+  appendPushDebugLog("client", "push register success", {
+    currentEndpointHash: currentEndpoint.slice(-24),
+    installationId,
+    previousEndpointHash:
+      previousEndpoint === null ? null : previousEndpoint.slice(-24),
+    pubkey,
+  });
+  return { success: true };
+}
+
 export async function requestNotificationPermission(): Promise<boolean> {
   if (isNativePlatform()) {
     const granted = await requestNativeNotificationPermission();
@@ -613,7 +823,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
 export async function registerPushNotifications(
   currentNsec: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<PushRegistrationResult> {
   if (isNativePlatform()) {
     return registerNativePushNotifications(currentNsec);
   }
@@ -651,7 +861,7 @@ export async function registerPushNotifications(
 
     const { pubkey } = derivePushIdentity(currentNsec);
     const { id: storedEndpoint, pubkey: storedPubkey } =
-      pwaRegistrationStore.read();
+      webPushRegistrationStore.read();
     const registration = await navigator.serviceWorker.ready;
     let subscription = await registration.pushManager.getSubscription();
     let replacedEndpoint: string | null = null;
@@ -691,8 +901,6 @@ export async function registerPushNotifications(
       subscription = null;
     }
 
-    const previousEndpoint = replacedEndpoint ?? storedEndpoint;
-
     if (!subscription) {
       try {
         const applicationServerKey = decodeBase64Url(vapidPublicKey);
@@ -720,83 +928,11 @@ export async function registerPushNotifications(
       safeLocalStorageSet(VAPID_KEY_STORAGE_KEY, vapidPublicKey);
     }
 
-    const challenge = await requestChallenge(pubkey, "subscribe");
-    appendPushDebugLog("client", "push challenge received", {
-      action: challenge.action,
-      expiresAt: challenge.expiresAt,
-      pubkey: challenge.pubkey,
-    });
-    const proof = await createOwnershipProof({
-      action: "subscribe",
-      challenge: challenge.challenge,
+    return await subscribeWebPushEndpoint({
       currentNsec,
+      replacedEndpoint,
+      subscription: toPushSubscriptionData(subscription),
     });
-
-    const response = await fetch(`${PUSH_SERVER_URL}/subscribe`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        cleanupLegacySubscriptions: true,
-        installationId,
-        proofs: [proof],
-        recipientPubkeys: [pubkey],
-        subscription: toPushSubscriptionData(subscription),
-      }),
-    });
-
-    if (!response.ok) {
-      const errorMessage = await readErrorMessage(response);
-      appendPushDebugLog("client", "push register server error", {
-        errorMessage,
-        pubkey,
-        status: response.status,
-        subscription: describeSubscription(subscription),
-      });
-      return {
-        success: false,
-        error: `Server vrátil chybu ${response.status}: ${errorMessage}`,
-      };
-    }
-
-    const currentEndpoint = subscription.endpoint;
-    const shouldCleanupPreviousEndpoint =
-      previousEndpoint !== null &&
-      previousEndpoint !== currentEndpoint &&
-      (storedPubkey === null ||
-        storedPubkey === pubkey ||
-        replacedEndpoint !== null);
-    if (shouldCleanupPreviousEndpoint) {
-      await cleanupStaleRegistration({
-        details: {
-          currentEndpointHash: currentEndpoint.slice(-24),
-          installationId,
-          previousEndpointHash: previousEndpoint.slice(-24),
-          pubkey,
-          replacedEndpointHash:
-            replacedEndpoint === null ? null : replacedEndpoint.slice(-24),
-          storedPubkey,
-        },
-        logPrefix: "push stale endpoint cleanup",
-        unregister: () =>
-          unregisterOnServer(currentNsec, "/unsubscribe", {
-            endpoint: previousEndpoint,
-          }),
-      });
-    }
-
-    pwaRegistrationStore.write(currentEndpoint, pubkey);
-
-    appendPushDebugLog("client", "push register success", {
-      currentEndpointHash: currentEndpoint.slice(-24),
-      installationId,
-      previousEndpointHash:
-        previousEndpoint === null ? null : previousEndpoint.slice(-24),
-      pubkey,
-      subscription: describeSubscription(subscription),
-    });
-    return { success: true };
   } catch (error) {
     appendPushDebugLog("client", "push register exception", { error });
     return { success: false, error: `Chyba: ${String(error ?? "")}` };
@@ -807,6 +943,22 @@ export async function unregisterPushNotifications(
   currentNsec: string,
 ): Promise<boolean> {
   setPushNotificationsDisabledByUser(true);
+
+  if (isNativePlatform() && getNativePushTransport() === "unifiedpush") {
+    const storedEndpoint = webPushRegistrationStore.read().id;
+    const responseOk =
+      storedEndpoint !== null &&
+      (await unregisterOnServer(currentNsec, "/unsubscribe", {
+        endpoint: storedEndpoint,
+      }).catch(() => false));
+    unregisterNativeUnifiedPush();
+    webPushRegistrationStore.clear();
+    appendPushDebugLog("client", "unifiedpush unregister result", {
+      endpointHash: hashStoredIdentifier(storedEndpoint),
+      responseOk,
+    });
+    return true;
+  }
 
   if (isNativePlatform()) {
     try {
@@ -839,7 +991,7 @@ export async function unregisterPushNotifications(
 
   try {
     if (!("serviceWorker" in navigator)) {
-      pwaRegistrationStore.clear();
+      webPushRegistrationStore.clear();
       appendPushDebugLog("client", "push unregister failed", {
         reason: "service_worker_unsupported",
       });
@@ -850,7 +1002,7 @@ export async function unregisterPushNotifications(
     const subscription = registration
       ? await registration.pushManager.getSubscription()
       : null;
-    const storedEndpoint = pwaRegistrationStore.read().id;
+    const storedEndpoint = webPushRegistrationStore.read().id;
 
     if (!subscription) {
       const responseOk = storedEndpoint
@@ -858,7 +1010,7 @@ export async function unregisterPushNotifications(
             endpoint: storedEndpoint,
           }).catch(() => false)
         : false;
-      pwaRegistrationStore.clear();
+      webPushRegistrationStore.clear();
       if (storedEndpoint) {
         appendPushDebugLog("client", "push unregister stale endpoint", {
           responseOk,
@@ -879,7 +1031,7 @@ export async function unregisterPushNotifications(
     const unsubscribed = await subscription.unsubscribe().catch(() => false);
     const isDisabled = responseOk || unsubscribed;
     if (isDisabled) {
-      pwaRegistrationStore.clear();
+      webPushRegistrationStore.clear();
     }
     appendPushDebugLog("client", "push unregister result", {
       ok: isDisabled,

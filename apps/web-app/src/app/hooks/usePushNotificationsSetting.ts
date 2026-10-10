@@ -100,7 +100,11 @@ export const usePushNotificationsSetting = (): PushNotificationsSetting => {
           const result = await registerPushNotifications(currentNsec);
           if (!result.success) {
             setPushNotificationsDisabledByUser(true);
-            pushToast(result.error ?? t("notificationsError"));
+            pushToast(
+              result.reason === "no_push_distributor"
+                ? t("notificationsNoPushDistributor")
+                : (result.error ?? t("notificationsError")),
+            );
             return false;
           }
           setPushNotificationsDisabledByUser(false);

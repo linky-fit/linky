@@ -119,6 +119,10 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation "com.google.firebase:firebase-messaging:$firebaseMessagingVersion"
+    implementation("org.unifiedpush.android:connector:$unifiedPushConnectorVersion") {
+        // security-crypto brings tink-android, which holds the same classes; the connector needs only its subtle Web Push primitives.
+        exclude group: 'com.google.crypto.tink', module: 'tink'
+    }
     implementation "androidx.security:security-crypto:$androidxSecurityCryptoVersion"
     implementation "com.journeyapps:zxing-android-embedded:$zxingEmbeddedVersion"
     implementation project(':capacitor-android')

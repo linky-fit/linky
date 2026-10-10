@@ -146,6 +146,8 @@ export const pt = {
   notifications: "Notificações",
   notificationsRegistering: "Registrando...",
   notificationsUnsupported: "Notificações não são suportadas",
+  notificationsNoPushDistributor:
+    "Este telefone não tem os Serviços do Google Play. Instale um app UnifiedPush, como o ntfy, para receber notificações.",
   notificationsNotLoggedIn: "Você não está conectado",
   notificationsRegistered: "Registradas",
   notificationsDisabled: "Notificações desativadas",
