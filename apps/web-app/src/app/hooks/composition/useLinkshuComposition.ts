@@ -788,7 +788,7 @@ export const useLinkshuComposition = ({
       returnToWallet: (id) =>
         runResult(
           Effect.flatMap(Tokens, (tokens) =>
-            tokens.returnToWallet(operationId(id)),
+            tokens.returnToWallet(operationId(id), unlockOptions),
           ),
         ),
     };

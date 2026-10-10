@@ -1,5 +1,10 @@
 import type { Proof as CashuProof } from "@cashu/cashu-ts";
-import { getEncodedToken, Keyset, MintOperationError } from "@cashu/cashu-ts";
+import {
+  createP2PKsecret,
+  getEncodedToken,
+  Keyset,
+  MintOperationError,
+} from "@cashu/cashu-ts";
 import { Deferred, Effect, Exit, Fiber, Layer, Result, Schema } from "effect";
 import { TestClock } from "effect/testing";
 import {
@@ -7,6 +12,7 @@ import {
   MintUnreachable,
   TokenAlreadySpent,
 } from "../domain/errors";
+import { P2pkUnlockingKey, p2pkPubkeyOf } from "../domain/p2pk";
 import {
   Amount,
   Bolt11Invoice,
@@ -962,6 +968,48 @@ describe("Tokens.returnToWallet", () => {
     ).toEqual([
       ["failed", "pending"],
       ["pending", "done"],
+    ]);
+  });
+
+  it("retries a failed P2PK-locked receive only with its key", async () => {
+    const ownerKey = P2pkUnlockingKey.make("0".repeat(63) + "1");
+    const lockedToken = tokenOf({
+      ...proof(6, ""),
+      secret: createP2PKsecret(p2pkPubkeyOf(ownerKey)),
+    });
+    const { run } = makeHarness({
+      receive: () => Promise.resolve(swappedProofs),
+    });
+
+    const exit = await run(
+      Effect.gen(function* () {
+        const tokens = yield* Tokens;
+        const transfer = yield* seedTransfer(
+          "receive",
+          "failed",
+          mint,
+          lockedToken,
+          6,
+          rejected,
+        );
+        return {
+          withoutKey: yield* Effect.result(tokens.returnToWallet(transfer.id)),
+          withKey: yield* Effect.result(
+            tokens.returnToWallet(transfer.id, { unlockingKey: ownerKey }),
+          ),
+          ...(yield* inventory),
+        };
+      }),
+    );
+
+    assert(Exit.isSuccess(exit));
+    const { withoutKey, withKey, proofs } = exit.value;
+    assert(withoutKey._tag === "Failure");
+    expect(withoutKey.failure._tag).toBe("TokenLocked");
+    expect(withKey._tag).toBe("Success");
+    expect(secretsOf(proofsIn(proofs, "available"))).toEqual([
+      "fresh-1",
+      "fresh-2",
     ]);
   });
 
