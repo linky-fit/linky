@@ -1,5 +1,12 @@
 {
+  "functions": {
+    "api/demo-auth/receive.ts": { "maxDuration": 10 }
+  },
   "rewrites": [
+    {
+      "source": "/demo/auth",
+      "destination": "/demo/auth/index.html"
+    },
     {
       "source": "/p/:id/picture",
       "destination": "/api/profile-picture?id=:id"
@@ -11,6 +18,10 @@
     {
       "source": "/.well-known/lnurlp/:user",
       "destination": "/api/lnurlp/:user"
+    },
+    {
+      "source": "/.well-known/linkauth.json",
+      "destination": "/api/linkauth"
     },
     {
       "source": "/.well-known/nostr.json",
@@ -28,6 +39,14 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Cache-Control", "value": "public, max-age=3600" }
       ]
+    },
+    {
+      "source": "/demo/auth(/.*)?",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
+      "source": "/api/demo-auth/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     }
   ]
 }

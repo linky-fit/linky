@@ -6,8 +6,13 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin, ViteDevServer } from "vite";
-import { defineConfig } from "vite";
-import { parseJsonObject } from "./api/_npubcash.js";
+import { defineConfig, loadEnv } from "vite";
+import type { DemoAuthRequest } from "./api/_demoAuth.js";
+import { parseJsonObject, type ApiResponse } from "./api/_npubcash.js";
+import demoAuthChallengeHandler from "./api/demo-auth/challenge.js";
+import demoAuthReceiveHandler from "./api/demo-auth/receive.js";
+import demoAuthVerifyHandler from "./api/demo-auth/verify.js";
+import linkauthDomainHandler from "./api/linkauth.js";
 import lnurlpHandler from "./api/lnurlp.js";
 import {
   absolutePreviewImages,
@@ -41,7 +46,7 @@ const trailingSlashRedirect = (): Plugin => ({
     server.middlewares.use(
       (req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
         const url = req.url ?? "";
-        if (/^\/(cashu|follow-us|blog(\/[\w-]+)?)$/u.test(url)) {
+        if (/^\/(cashu|follow-us|demo\/auth|blog(\/[\w-]+)?)$/u.test(url)) {
           res.statusCode = 302;
           res.setHeader("Location", `${url}/`);
           res.end();
@@ -89,42 +94,68 @@ const colorModeBootScript = (): Plugin => ({
   ],
 });
 
-const lnurlProxy = (): Plugin => ({
-  name: "lnurl-proxy",
-  configureServer(server: ViteDevServer) {
-    server.middlewares.use(
-      async (req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
-        const url = new URL(req.url ?? "", "http://localhost");
-        if (url.pathname !== "/api/lnurlp") return next();
+const readJsonBody = async (
+  req: IncomingMessage,
+): Promise<Record<string, unknown> | undefined> => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(Buffer.from(chunk));
+  return parseJsonObject(Buffer.concat(chunks).toString("utf8")) ?? undefined;
+};
 
-        await lnurlpHandler(
-          {
-            method: req.method ?? "",
-            headers: req.headers,
-            query: Object.fromEntries(url.searchParams),
-          },
-          {
-            setHeader: (name, value) => {
-              res.setHeader(name, value);
+const apiHandlers: Record<
+  string,
+  (req: DemoAuthRequest, res: ApiResponse) => unknown
+> = {
+  "/api/lnurlp": lnurlpHandler,
+  "/api/demo-auth/challenge": demoAuthChallengeHandler,
+  "/api/demo-auth/receive": demoAuthReceiveHandler,
+  "/api/demo-auth/verify": demoAuthVerifyHandler,
+  "/.well-known/linkauth.json": linkauthDomainHandler,
+};
+
+// Stands in for the Vercel functions in `api/`, in `vite` and `vite preview` alike.
+const apiRoutes = (): Plugin => {
+  const middleware = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: NextFunction,
+  ) => {
+    const url = new URL(req.url ?? "", "http://localhost");
+    const handler = apiHandlers[url.pathname];
+    if (!handler) return next();
+
+    await handler(
+      {
+        method: req.method ?? "",
+        headers: req.headers,
+        query: Object.fromEntries(url.searchParams),
+        body: req.method === "POST" ? await readJsonBody(req) : undefined,
+      },
+      {
+        setHeader: (name, value) => {
+          res.setHeader(name, value);
+        },
+        status: (code) => {
+          res.statusCode = code;
+          return {
+            json: (body) => {
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify(body));
             },
-            status: (code) => {
-              res.statusCode = code;
-              return {
-                json: (body) => {
-                  res.setHeader("Content-Type", "application/json");
-                  res.end(JSON.stringify(body));
-                },
-                send: (body) => {
-                  res.end(body);
-                },
-              };
+            send: (body) => {
+              res.end(body);
             },
-          },
-        );
+          };
+        },
       },
     );
-  },
-});
+  };
+  return {
+    name: "api-routes",
+    configureServer: (server) => void server.middlewares.use(middleware),
+    configurePreviewServer: (server) => void server.middlewares.use(middleware),
+  };
+};
 
 // Stands in for the `/p/:id` rewrites to `api/profile.ts` and `api/profile-picture.ts` in `vercel.json`.
 const sharedProfilePages = (): Plugin => {
@@ -167,30 +198,35 @@ const sharedProfilePages = (): Plugin => {
   };
 };
 
-export default defineConfig({
-  build: {
-    rollupOptions: {
-      input: {
-        ...blogArticleInputs,
-        blog: path.resolve(__dirname, "blog/index.html"),
-        cashu: path.resolve(__dirname, "cashu/index.html"),
-        followUs: path.resolve(__dirname, "follow-us/index.html"),
-        main: path.resolve(__dirname, "index.html"),
-        privacy: path.resolve(__dirname, "privacy.html"),
-        profile: path.resolve(__dirname, "p/index.html"),
+export default defineConfig(({ mode }) => {
+  // The api/ handlers read process.env; this lets a git-ignored .env.local feed them in `vite` and `vite preview`.
+  Object.assign(process.env, loadEnv(mode, __dirname, "LINKY_DEMO_AUTH_"));
+  return {
+    build: {
+      rollupOptions: {
+        input: {
+          ...blogArticleInputs,
+          blog: path.resolve(__dirname, "blog/index.html"),
+          cashu: path.resolve(__dirname, "cashu/index.html"),
+          demoAuth: path.resolve(__dirname, "demo/auth/index.html"),
+          followUs: path.resolve(__dirname, "follow-us/index.html"),
+          main: path.resolve(__dirname, "index.html"),
+          privacy: path.resolve(__dirname, "privacy.html"),
+          profile: path.resolve(__dirname, "p/index.html"),
+        },
       },
     },
-  },
-  define: {
-    __APP_VERSION__: JSON.stringify(readRootPackageVersion()),
-  },
-  plugins: [
-    linkyUi(),
-    react(),
-    colorModeBootScript(),
-    previewImages(),
-    trailingSlashRedirect(),
-    lnurlProxy(),
-    sharedProfilePages(),
-  ],
+    define: {
+      __APP_VERSION__: JSON.stringify(readRootPackageVersion()),
+    },
+    plugins: [
+      linkyUi(),
+      react(),
+      colorModeBootScript(),
+      previewImages(),
+      trailingSlashRedirect(),
+      apiRoutes(),
+      sharedProfilePages(),
+    ],
+  };
 });
