@@ -8,7 +8,6 @@ import {
 import type { ProfileMetadata } from "@linky-fit/linkstr";
 import {
   ContactId,
-  directConversationIdFor,
   NonEmptyString1000,
   PositiveInt,
   type ContactsRepository,
@@ -20,7 +19,11 @@ import {
   identityFromNsec,
   Pubkey,
 } from "@linky-fit/linkstr";
-import { useLinkstrCommands, useOutboxResults } from "@linky-fit/linkstr-react";
+import {
+  useAtomSuspense,
+  useLinkstrCommands,
+  useOutboxResults,
+} from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import React, { useMemo, useState } from "react";
 import { deriveDefaultProfile } from "../../../derivedProfile";
@@ -45,6 +48,7 @@ import {
 } from "../../../profileCache";
 import { useProfileCache } from "../contacts/useProfileCache";
 import { useMessagesCommands } from "../messages/useMessagesCommands";
+import { contactsCommandsAtom } from "../../state/contacts/commands";
 import {
   ARCHIVED_CONTACTS_FILTER,
   CONTACTS_ONBOARDING_HAS_BACKUPED_KEYS_STORAGE_KEY,
@@ -81,7 +85,6 @@ import type {
 import { useContactEditor } from "../contacts/useContactEditor";
 import { useVisibleContacts } from "../contacts/useVisibleContacts";
 import {
-  buildUnknownContactId,
   isUnknownContactId,
   normalizePubkeyHex,
   readUnknownContactIdPubkey,
@@ -1178,33 +1181,8 @@ export const useContactsMessagingComposition = ({
     return nostrMessagesRecent.some((m) => m.direction === "out");
   }, [nostrMessagesRecent]);
 
-  const unarchiveContact = React.useCallback(
-    async (id: ContactId) => {
-      const result = await runWrite(contactsRepository.unarchive(id));
-
-      if (result.ok) {
-        reportAppLog({
-          tag: "conversations.unarchived",
-          summary: "Restored a contact's conversation from the archive",
-          links: { contact: id, conversation: directConversationIdFor(id) },
-          payload: { contactId: id },
-        });
-        const restoredNpub = normalizeNpubIdentifier(
-          contacts.find((contact) => contact.id === id)?.npub ?? "",
-        );
-        if (restoredNpub) {
-          const unknownContactId = buildUnknownContactId(
-            decodeNpub(restoredNpub),
-          );
-          if (unknownContactId) {
-            void reassignContactMessages(unknownContactId, id);
-          }
-        }
-      }
-      return result;
-    },
-    [contacts, contactsRepository, reassignContactMessages],
-  );
+  const contactsCommands = useAtomSuspense(contactsCommandsAtom).value;
+  const unarchiveContact = contactsCommands.unarchiveContact;
 
   const restoreArchivedContact = React.useCallback(
     async (id: ContactId) => {
@@ -1236,25 +1214,11 @@ export const useContactsMessagingComposition = ({
   // to undo it.
   const archiveContact = React.useCallback(
     async (id: ContactId) => {
-      const archivedAtSec = PositiveInt.orThrow(Math.ceil(Date.now() / 1e3));
-      const result = await runWrite(
-        Effect.andThen(
-          contactsRepository.archive(id, archivedAtSec),
-          Effect.flatMap(conversationsRepository.ensureDirect(id), (chat) =>
-            conversationsRepository.markSeen(chat.id, archivedAtSec),
-          ),
-        ),
-      );
+      const result = await contactsCommands.archiveContact(id);
       if (!result.ok) {
         setStatus(`${t("errorPrefix")}: ${result.error}`);
         return;
       }
-      reportAppLog({
-        tag: "conversations.archived",
-        summary: "Archived a contact's conversation",
-        links: { contact: id, conversation: directConversationIdFor(id) },
-        payload: { archivedAtSec },
-      });
       closeContactDetail();
       pushToast(t("contactArchived"), {
         action: {
@@ -1267,8 +1231,7 @@ export const useContactsMessagingComposition = ({
     },
     [
       closeContactDetail,
-      contactsRepository,
-      conversationsRepository,
+      contactsCommands,
       pushToast,
       setStatus,
       t,
