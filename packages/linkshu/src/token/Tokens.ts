@@ -35,7 +35,7 @@ import type { OperationStatus, StoredOperation } from "../ports/OperationStore";
 import { NewProof, ProofStore } from "../ports/ProofStore";
 import type { ProofState, StoredProof } from "../ports/ProofStore";
 import { ReceiveReceipt } from "../receive/domain";
-import type { ReceiveError } from "../receive/domain";
+import type { ReceiveError, ReceiveUnlockOptions } from "../receive/domain";
 import {
   parseReceivable,
   receiveReplaced,
@@ -279,6 +279,7 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
      */
     const returnToWallet = (
       operationId: OperationId,
+      options: ReceiveUnlockOptions = {},
     ): Effect.Effect<
       ReceiveReceipt,
       ReceiveError | OperationNotFound | InvalidTransferTransition
@@ -299,10 +300,11 @@ export class Tokens extends Context.Service<Tokens>()("linkshu/Tokens", {
             to: transfer.kind === "send" ? "returned" : "done",
           });
         }
-        return yield* receiveReplaced(receiveContext, transfer.tokenText, {
-          operation: transfer,
-          reason: "returnToWallet",
-        });
+        return yield* receiveReplaced(
+          { ...receiveContext, unlockingKey: options.unlockingKey ?? null },
+          transfer.tokenText,
+          { operation: transfer, reason: "returnToWallet" },
+        );
       }).pipe(
         inspectOperationWith(
           inspector,
