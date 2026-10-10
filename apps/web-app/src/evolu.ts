@@ -1,25 +1,22 @@
-import { ContactId } from "./evoluIds";
 export { ContactId, TransactionId } from "./evoluIds";
-import { Schema as EffectSchema } from "effect";
 import * as Evolu from "@evolu/common";
-import { createEvolu, SimpleName } from "@evolu/common";
 import {
-  appOwnerFromMnemonic,
   linkyScopes,
   messageScopes,
-  LinkySchema,
   type CashuOperationId,
   type CashuProofId,
-  type LinkyScope,
   type LinkyStore,
   type NostrIdentityId,
-  type PointerRepair,
-  type ShardRotation,
 } from "@linky-fit/linksync";
 import {
-  createEvoluShardDb,
-  trackOwnerSync,
-  type UnconfirmedWrite,
+  createLinkyEvolu,
+  type LinkyEvolu,
+  generateDbNameFromMnemonic,
+  LinkyEvoluSchema,
+  makeEvoluRelaySettings,
+  markAwaitingFirstHydration,
+  normalizeEvoluRelayUrl,
+  openLinkyStore,
 } from "@linky-fit/linksync/evolu";
 import { createSharedWebWorker, evoluWebDeps } from "@evolu/web";
 import { flushSync } from "react-dom";
@@ -27,23 +24,19 @@ import { Effect } from "effect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeferredOnlineReady } from "./hooks/useDeferredOnlineReady";
 import { INITIAL_MNEMONIC_STORAGE_KEY } from "./mnemonic";
-import {
-  createAccountStore,
-  markAwaitingFirstHydration,
-} from "./firstHydration";
 import { shouldUseInMemoryEvoluStorage } from "./platform/evoluWebStorage";
 import type { JsonValue } from "./types/json";
 import { base64 } from "@scure/base";
-import {
-  safeLocalStorageGet,
-  safeLocalStorageGetJson,
-  safeLocalStorageSetJson,
-} from "./utils/storage";
-import { getUnknownErrorMessage, isRecord } from "./utils/unknown";
+import { localStorageKv, safeLocalStorageGet } from "./utils/storage";
+import { isRecord } from "./utils/unknown";
 import { getInspectorEmissionEnabled } from "./devtools/inspector/inspectorEnabled";
 import { reportInspectorRows } from "./devtools/inspector/reportInspectorRows";
 import { reportAppLog } from "./devtools/inspector/appLog";
 import { loadRecommendedRelays } from "./utils/recommendedRelays";
+import {
+  reportLinkyEvoluEvent,
+  reportShardsSubscribed,
+} from "./app/state/session/evoluInspector";
 
 const isEvoluLoggingEnabled = (): boolean => {
   if (!import.meta.env.DEV) return false;
@@ -52,20 +45,6 @@ const isEvoluLoggingEnabled = (): boolean => {
   // Toggle in devtools: localStorage.setItem('linky_debug_evolu_sql', '1')
   return safeLocalStorageGet("linky_debug_evolu_sql") === "1";
 };
-
-// Servers the user added; the recommended servers are always configured on top.
-const EVOLU_USER_SERVERS_STORAGE_KEY = "linky.evoluServers.user.v1";
-
-// Pre-recommendation storage, read once to migrate it into the user servers.
-const LEGACY_EVOLU_SERVERS_STORAGE_KEY = "linky.evoluServers.v1";
-const LEGACY_EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY =
-  "linky.evoluServers.defaultRemoved.v1";
-const LEGACY_DEFAULT_EVOLU_SERVER_URLS = [
-  "wss://evolu.linky.fit",
-  "wss://free.evoluhq.com",
-];
-
-const EVOLU_SERVERS_DISABLED_STORAGE_KEY = "linky.evoluServers.disabled.v1";
 
 export type EvoluServerStatus = "checking" | "connected" | "disconnected";
 export type EvoluErrorType = Evolu.EvoluError["type"];
@@ -81,32 +60,6 @@ const envEvoluServerUrls = (import.meta.env.VITE_EVOLU_SERVER_URLS ?? "")
   .split(",")
   .map((url) => url.trim())
   .filter((url) => url.startsWith("ws://") || url.startsWith("wss://"));
-
-// Generate a valid SimpleName (1-42 chars, alphanumeric + dash) from mnemonic
-// Each user gets their own SQLite database file
-const generateDbNameFromMnemonic = (mnemonic: string): string => {
-  // Simple hash function to create a short unique identifier
-  let hash = 0;
-  for (let i = 0; i < mnemonic.length; i++) {
-    const char = mnemonic.charCodeAt(i);
-    hash = ((hash << 5) - hash + char) | 0;
-  }
-  // Convert to positive hex string, take first 8 chars for brevity
-  const hashHex = Math.abs(hash).toString(16).padStart(8, "0").slice(0, 8);
-  return `linky-${hashHex}`;
-};
-
-type Stringifiable =
-  | string
-  | number
-  | boolean
-  | bigint
-  | symbol
-  | { toString(): string }
-  | null
-  | undefined;
-
-type EvoluServerUrlInput = Stringifiable;
 
 const isJsonValue = (value: unknown): value is JsonValue => {
   if (
@@ -188,7 +141,7 @@ interface EvoluQueryBuilder {
 }
 
 const createUntypedQuery = (
-  instance: EvoluInstance,
+  instance: LinkyEvolu,
   cb: (db: EvoluQueryBuilder) => EvoluSelectBuilder,
 ): unknown => {
   const fn = Reflect.get(Object(instance), "createQuery");
@@ -197,7 +150,7 @@ const createUntypedQuery = (
 };
 
 const loadUntypedQueryRows = async (
-  instance: EvoluInstance,
+  instance: LinkyEvolu,
   query: unknown,
 ): Promise<ReadonlyArray<EvoluQueryRow>> => {
   const fn = Reflect.get(Object(instance), "loadQuery");
@@ -215,151 +168,23 @@ const loadUntypedQueryRows = async (
   }
 };
 
-export const normalizeEvoluServerUrl = (
-  value: EvoluServerUrlInput,
-): string | null => {
-  const raw = String(value ?? "")
-    .trim()
-    .replace(/\/+$/, "");
-  if (!raw) return null;
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "wss:" && u.protocol !== "ws:") return null;
-    const pathname = u.pathname.replace(/\/+$/, "");
-    // Preserve pathname (some servers may be hosted under a path), but drop
-    // search/hash for stable identity.
-    return `${u.origin}${pathname === "/" ? "" : pathname}`.replace(/\/+$/, "");
-  } catch {
-    return null;
-  }
-};
-
-const normalizeUrlList = (
-  urls: ReadonlyArray<EvoluServerUrlInput>,
-): ReadonlyArray<string> => {
-  const combined = urls
-    .map(normalizeEvoluServerUrl)
-    .filter((v): v is string => Boolean(v));
-
-  const unique: string[] = [];
-  const seen = new Set<string>();
-  for (const url of combined) {
-    const key = url.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(url);
-  }
-
-  return unique;
-};
-
-const getEvoluDisabledServerUrls = (): ReadonlyArray<string> => {
-  const stored = safeLocalStorageGetJson(
-    EVOLU_SERVERS_DISABLED_STORAGE_KEY,
-    EffectSchema.Array(EffectSchema.String),
-    [],
-  );
-  return normalizeUrlList(stored);
-};
-
-export const setEvoluServerDisabled = (
-  url: string,
-  disabled: boolean,
-): void => {
-  const normalized = normalizeEvoluServerUrl(url);
-  if (!normalized) return;
-  const current = [...getEvoluDisabledServerUrls()];
-  const lower = normalized.toLowerCase();
-  const next = disabled
-    ? normalizeUrlList([...current, normalized])
-    : normalizeUrlList(current.filter((u) => u.toLowerCase() !== lower));
-  safeLocalStorageSetJson(EVOLU_SERVERS_DISABLED_STORAGE_KEY, next);
-};
+export const normalizeEvoluServerUrl = normalizeEvoluRelayUrl;
 
 // Read once per launch: a refreshed recommendation applies on the next start,
 // when the transports are created again.
-const RECOMMENDED_EVOLU_SERVER_URLS = normalizeUrlList(
-  envEvoluServerUrls.length > 0
-    ? envEvoluServerUrls
-    : loadRecommendedRelays().evolu,
-);
+const evoluRelaySettings = makeEvoluRelaySettings(localStorageKv, {
+  envDefaults: envEvoluServerUrls,
+  recommended: loadRecommendedRelays().evolu,
+  hasStoredAccount: safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY) !== null,
+  onEvent: reportLinkyEvoluEvent,
+});
 
-const isRecommendedEvoluServer = (url: string): boolean =>
-  RECOMMENDED_EVOLU_SERVER_URLS.some(
-    (recommended) => recommended.toLowerCase() === url.toLowerCase(),
-  );
-
-const getEvoluConfiguredServerUrls = (): ReadonlyArray<string> =>
-  normalizeUrlList([
-    ...RECOMMENDED_EVOLU_SERVER_URLS,
-    ...safeLocalStorageGetJson(
-      EVOLU_USER_SERVERS_STORAGE_KEY,
-      EffectSchema.Array(EffectSchema.String),
-      [],
-    ),
-  ]);
-
-const getEvoluActiveServerUrls = (): ReadonlyArray<string> => {
-  const configured = getEvoluConfiguredServerUrls();
-  const disabled = getEvoluDisabledServerUrls();
-  const disabledLower = new Set(disabled.map((u) => u.toLowerCase()));
-  return configured.filter((u) => !disabledLower.has(u.toLowerCase()));
-};
-
-const setEvoluServerUrls = (urls: ReadonlyArray<string>): void => {
-  safeLocalStorageSetJson(
-    EVOLU_USER_SERVERS_STORAGE_KEY,
-    normalizeUrlList(urls).filter((url) => !isRecommendedEvoluServer(url)),
-  );
-};
-
-// Older versions stored the full selection, or nothing while the built-in
-// defaults were untouched; servers that are not recommended now stay as the
-// user's. A fresh install has neither a selection nor a seed.
-const migrateLegacyEvoluServers = (): void => {
-  if (safeLocalStorageGet(EVOLU_USER_SERVERS_STORAGE_KEY) !== null) return;
-  const stored = safeLocalStorageGetJson(
-    LEGACY_EVOLU_SERVERS_STORAGE_KEY,
-    EffectSchema.Array(EffectSchema.String),
-    [],
-  );
-  const defaultsRemoved = safeLocalStorageGetJson(
-    LEGACY_EVOLU_SERVERS_DEFAULT_REMOVED_STORAGE_KEY,
-    EffectSchema.Boolean,
-    false,
-  );
-  const isExistingInstall =
-    safeLocalStorageGet(LEGACY_EVOLU_SERVERS_STORAGE_KEY) !== null ||
-    safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY) !== null;
-  const legacyDefaults =
-    envEvoluServerUrls.length > 0
-      ? envEvoluServerUrls
-      : LEGACY_DEFAULT_EVOLU_SERVER_URLS;
-  setEvoluServerUrls(
-    isExistingInstall && !defaultsRemoved
-      ? [...legacyDefaults, ...stored]
-      : stored,
-  );
-  reportAppLog({
-    tag: "evolu.userServersMigrated",
-    summary: "Kept the configured Evolu servers that are not recommended",
-    payload: { legacyServerUrls: stored, defaultsRemoved, isExistingInstall },
-  });
-};
-
-migrateLegacyEvoluServers();
-
-const EVOLU_SERVER_URLS: ReadonlyArray<string> = getEvoluActiveServerUrls();
-
-const buildEvoluTransports = (
-  urls: ReadonlyArray<string>,
-): ReadonlyArray<{ type: "WebSocket"; url: string }> =>
-  urls.map((url) => ({ type: "WebSocket", url }));
+export const setEvoluServerDisabled = evoluRelaySettings.setDisabled;
 
 const EVOLU_TRANSPORTS: ReadonlyArray<{
   type: "WebSocket";
   url: string;
-}> = buildEvoluTransports(EVOLU_SERVER_URLS);
+}> = evoluRelaySettings.activeUrls().map((url) => ({ type: "WebSocket", url }));
 
 const probeWebSocketConnection = (
   url: string,
@@ -406,298 +231,35 @@ const probeWebSocketConnection = (
   });
 };
 
-const CashuTokenId = Evolu.id("CashuToken");
-export type CashuTokenId = typeof CashuTokenId.Type;
+export type { CashuTokenId } from "@linky-fit/linksync/evolu";
 export type { CashuOperationId, CashuProofId, NostrIdentityId };
 
-const NostrMessageId = Evolu.id("NostrMessage");
-type NostrMessageId = typeof NostrMessageId.Type;
+/** The database schema, legacy lane tables included; see `LinkyEvoluSchema`. */
+export const Schema = LinkyEvoluSchema;
 
-const NostrReactionId = Evolu.id("NostrReaction");
-type NostrReactionId = typeof NostrReactionId.Type;
-
-const OwnerMetaId = Evolu.id("OwnerMeta");
-type OwnerMetaId = typeof OwnerMetaId.Type;
-
-/**
- * The app schema is a superset of the package's `LinkySchema`: the package
- * tables plus the legacy lane tables (`nostrMessage`, `nostrReaction`,
- * `cashuToken`, `ownerMeta`) and the legacy columns older versions wrote
- * (read cursors on `contact`, `category` and `phase` on `transaction`), all of
- * which only the lane migration reads. The package's branded ids are the
- * source of truth; only the legacy tables keep ids of their own.
- * Legacy schema removal gate in app/migrations/AGENTS.md.
- */
-export const Schema = {
-  ...LinkySchema,
-  contact: {
-    ...LinkySchema.contact,
-    // Read cursor: created_at (seconds) of the newest chat message the user
-    // has seen in this conversation.
-    chatLastSeenAtSec: Evolu.nullOr(Evolu.PositiveInt),
-    // Peer's reported seen window (createdAtSec bounds from their latest
-    // read receipt): our outgoing messages in (since, upTo] render as seen.
-    chatPeerSeenSinceSec: Evolu.nullOr(Evolu.PositiveInt),
-    chatPeerSeenAtSec: Evolu.nullOr(Evolu.PositiveInt),
-  },
-  nostrMessage: {
-    id: NostrMessageId,
-    contactId: ContactId,
-    // "in" | "out"
-    direction: Evolu.NonEmptyString100,
-    // Decrypted plaintext message.
-    content: Evolu.NonEmptyString,
-    // Incoming rows use the rumor id here as their de-duplication key.
-    wrapId: Evolu.NonEmptyString1000,
-    // Edits keep the original message's rumor id so reactions and replies resolve.
-    rumorId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // Sender pubkey hex (64 chars) of the inner message.
-    // Can be null for local-only queued placeholders.
-    pubkey: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // created_at (seconds) from the inner event when available.
-    createdAtSec: Evolu.PositiveInt,
-    // Client-generated id for optimistic send/ack matching.
-    clientId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "sent" | "pending"
-    status: Evolu.nullOr(Evolu.NonEmptyString100),
-    // "1" for local-only placeholders.
-    localOnly: Evolu.nullOr(Evolu.NonEmptyString100),
-    // Reply metadata (NIP-10).
-    replyToId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    replyToContent: Evolu.nullOr(Evolu.NonEmptyString),
-    rootMessageId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // Edit metadata.
-    editedAtSec: Evolu.nullOr(Evolu.PositiveInt),
-    editedFromId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "1" if the message content was edited.
-    isEdited: Evolu.nullOr(Evolu.NonEmptyString100),
-    // First known message content before edits.
-    originalContent: Evolu.nullOr(Evolu.NonEmptyString),
-  },
-  nostrReaction: {
-    id: NostrReactionId,
-    // Target message rumor id.
-    messageId: Evolu.NonEmptyString1000,
-    reactorPubkey: Evolu.NonEmptyString1000,
-    emoji: Evolu.NonEmptyString100,
-    createdAtSec: Evolu.PositiveInt,
-    // Gift-wrapped event id carrying the reaction or delete.
-    wrapId: Evolu.NonEmptyString1000,
-    // Client-generated id for optimistic send/ack matching.
-    clientId: Evolu.nullOr(Evolu.NonEmptyString1000),
-    // "sent" | "pending"
-    status: Evolu.nullOr(Evolu.NonEmptyString100),
-  },
-  cashuToken: {
-    id: CashuTokenId,
-    // Most recent (accepted) token.
-    token: Evolu.NonEmptyString,
-    // Token text the row was first created from — the row's stable identity
-    // for dedup. Reads fall back to rawToken/token for legacy rows.
-    originalTokenText: Evolu.nullOr(Evolu.NonEmptyString),
-    // Deprecated compatibility column. New rows use a deterministic id derived
-    // from the original token and only store the latest spendable token here.
-    rawToken: Evolu.nullOr(Evolu.NonEmptyString),
-    // Deprecated compatibility columns. New writes derive this metadata from
-    // token; keep the columns while older clients/data still use them.
-    mint: Evolu.nullOr(Evolu.NonEmptyString1000),
-    unit: Evolu.nullOr(Evolu.NonEmptyString100),
-    amount: Evolu.nullOr(Evolu.PositiveInt),
-    // "pending" | "accepted" | "error"
-    state: Evolu.nullOr(Evolu.NonEmptyString100),
-    error: Evolu.nullOr(Evolu.NonEmptyString1000),
-  },
-  transaction: {
-    ...LinkySchema.transaction,
-    // Deprecated compatibility column. New writes derive category from method.
-    category: Evolu.nullOr(Evolu.NonEmptyString100),
-    // Deprecated compatibility columns. New writes use method + status and
-    // derive labels/icons in the transaction view.
-    phase: Evolu.nullOr(Evolu.NonEmptyString100),
-  },
-  ownerMeta: {
-    id: OwnerMetaId,
-    scope: Evolu.NonEmptyString100,
-    value: Evolu.NonEmptyString1000,
-  },
-};
-
-const evoluWorker = trackOwnerSync((name) =>
-  createSharedWebWorker(
-    name,
-    () =>
-      new Worker(new URL("./evoluDb.worker.ts", import.meta.url), {
-        type: "module",
-      }),
-  ),
-);
-
-/** Which owners finished a sync round with an Evolu relay; the shard store's hydration rests on it. */
-export const ownerSync = evoluWorker.ownerSync;
-
-ownerSync.subscribeFailures(({ ownerId, error, endsRound }) => {
-  if (!getInspectorEmissionEnabled()) return;
-  reportInspectorRows([
-    {
-      at: Date.now(),
-      channel: "evolu.sync",
-      tag: "OwnerSyncFailed",
-      summary: endsRound
-        ? `An Evolu relay answered with ${error}; the owner's sync round ended there`
-        : `An Evolu relay answered with ${error} before any error-free answer; the owner stays unsynced`,
-      links: { owner: ownerId },
-      payload: { ownerId, error, endsRound },
-    },
-  ]);
+const linkyEvolu = createLinkyEvolu({
+  evoluDeps: { ...evoluWebDeps, flushSync },
+  createWorker: (name) =>
+    createSharedWebWorker(
+      name,
+      () =>
+        new Worker(new URL("./evoluDb.worker.ts", import.meta.url), {
+          type: "module",
+        }),
+    ),
+  mnemonic: safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY),
+  transports: EVOLU_TRANSPORTS,
+  enableLogging: isEvoluLoggingEnabled(),
+  inMemory: shouldUseInMemoryEvoluStorage(),
+  onEvent: reportLinkyEvoluEvent,
 });
 
-const evoluDeps: Evolu.EvoluDeps = {
-  ...evoluWebDeps,
-  flushSync,
-  createDbWorker: evoluWorker.createDbWorker,
-};
+/** Which owners finished a sync round with an Evolu relay; the shard store's hydration rests on it. */
+export const ownerSync = linkyEvolu.ownerSync;
 
-const createEvoluForUser = (mnemonic: string | null) => {
-  const dbName = mnemonic ? generateDbNameFromMnemonic(mnemonic) : "linky-anon";
-
-  const validatedName = SimpleName.from(dbName);
-  const finalName = validatedName.ok
-    ? validatedName.value
-    : SimpleName.orThrow("linky-default");
-
-  const externalAppOwner = mnemonic ? appOwnerFromMnemonic(mnemonic) : null;
-
-  return createEvolu(evoluDeps)(Schema, {
-    name: finalName,
-    transports: EVOLU_TRANSPORTS,
-    enableLogging: isEvoluLoggingEnabled(),
-    inMemory: shouldUseInMemoryEvoluStorage(),
-    ...(externalAppOwner ? { externalAppOwner } : {}),
-  });
-};
-
-type EvoluInstance = ReturnType<typeof createEvoluForUser>;
-
-let globalEvoluInstance: EvoluInstance | null = null;
-
-const getEvolu = (mnemonic?: string | null): EvoluInstance => {
-  if (mnemonic !== undefined) {
-    globalEvoluInstance = createEvoluForUser(mnemonic);
-  }
-
-  if (!globalEvoluInstance) {
-    globalEvoluInstance = createEvoluForUser(
-      safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY),
-    );
-  }
-
-  return globalEvoluInstance;
-};
-
-export const evolu = getEvolu();
+export const evolu = linkyEvolu.evolu;
 
 let linkyStorePromise: Promise<LinkyStore> | null = null;
-
-const reportShardRotated = (
-  store: LinkyStore,
-  rotation: ShardRotation<LinkyScope>,
-): void => {
-  if (!getInspectorEmissionEnabled()) return;
-  reportInspectorRows([
-    {
-      at: Date.now(),
-      channel: "evolu.sync",
-      tag: "ShardRotated",
-      summary: `${rotation.scope} shard pointer moved to index ${rotation.index}`,
-      links: { owner: store.shardOwner(rotation.scope, rotation.index).id },
-      payload: rotation,
-    },
-  ]);
-};
-
-const reportShardsSubscribed = async (
-  store: LinkyStore,
-  reason: "boot" | "rotation" | "forget",
-): Promise<void> => {
-  if (!getInspectorEmissionEnabled()) return;
-  const owners = (await Effect.runPromise(store.syncOwners())).map(
-    (owner) => owner.id,
-  );
-  reportInspectorRows([
-    {
-      at: Date.now(),
-      channel: "evolu.sync",
-      tag: "ShardsSubscribed",
-      summary: `Syncing the app owner and ${owners.length - 1} shards`,
-      links: { owner: owners },
-      payload: { reason, owners: owners.length },
-    },
-  ]);
-};
-
-const reportAccountHydrated = async (store: LinkyStore): Promise<void> => {
-  if (!getInspectorEmissionEnabled()) return;
-  const owners = (await Effect.runPromise(store.syncOwners())).map(
-    (owner) => owner.id,
-  );
-  reportInspectorRows([
-    {
-      at: Date.now(),
-      channel: "evolu.sync",
-      tag: "AccountHydrated",
-      summary: `Account data arrived for the app owner and ${owners.length - 1} shards`,
-      links: { owner: owners },
-      payload: {
-        owners: owners.length,
-        sincePageLoadMs: performance.now(),
-      },
-    },
-  ]);
-};
-
-const reportWriteUnconfirmed = (write: UnconfirmedWrite): void => {
-  if (!getInspectorEmissionEnabled()) return;
-  reportInspectorRows([
-    {
-      at: Date.now(),
-      channel: "evolu.sync",
-      tag: "WriteUnconfirmed",
-      summary: `Evolu did not confirm a ${write.table} write within 10 s; it may have been dropped`,
-      links: { owner: write.ownerId, row: write.id },
-      payload: write,
-    },
-  ]);
-};
-
-const reportShardPointersRepaired = (
-  store: LinkyStore,
-  repairs: ReadonlyArray<PointerRepair<LinkyScope>>,
-): void => {
-  if (!getInspectorEmissionEnabled() || repairs.length === 0) return;
-  reportInspectorRows(
-    repairs.map((repair) => ({
-      at: Date.now(),
-      channel: "evolu.sync",
-      tag: "ShardPointerRepaired",
-      summary: `${repair.scope} shard pointer moved back up from index ${repair.from} to ${repair.to}`,
-      links: { owner: store.shardOwner(repair.scope, repair.to).id },
-      payload: repair,
-    })),
-  );
-};
-
-/** Runs in the background: it waits for hydration and for the relay. */
-const repairShardPointers = (store: LinkyStore): void => {
-  void Effect.runPromise(store.repairPointers()).then(
-    (repairs) => reportShardPointersRepaired(store, repairs),
-    (error: unknown) =>
-      reportAppLog({
-        tag: "evolu.shardPointerRepairFailed",
-        summary: "Moving reset shard pointers back up failed",
-        payload: { error: getUnknownErrorMessage(error, "unknown") },
-      }),
-  );
-};
 
 const appScopes = {
   ...linkyScopes,
@@ -739,7 +301,10 @@ export const forgetChatShards = async () => {
         payload: forgotten,
       },
     ]);
-    await reportShardsSubscribed(store, "forget");
+    reportShardsSubscribed(
+      "forget",
+      (await Effect.runPromise(store.syncOwners())).map((owner) => owner.id),
+    );
   }
   return forgotten;
 };
@@ -754,54 +319,13 @@ export const probeLocalDatabase = (): Promise<void> =>
     )
     .then(() => undefined);
 
-/**
- * The shard store over this Evolu instance. Resolves once the app owner is
- * known and the local database has answered a query; `appOwner` alone
- * resolves before the database worker is up. The store subscribes the app
- * owner and every visible shard for the page's lifetime and follows its
- * pointers, so a rotation here or on another device subscribes the new shard.
- */
+/** The shard store over this Evolu instance; see `openLinkyStore`. */
 export const getLinkyStore = (): Promise<LinkyStore> => {
-  linkyStorePromise ??= Promise.all([
-    evolu.appOwner,
-    evolu.loadQuery(
-      evolu.createQuery((db) =>
-        db.selectFrom("shardPointer").select("id").limit(1),
-      ),
-    ),
-  ]).then(async ([owner]) => {
-    const key = (scope: string) =>
-      `linky.shards.retainedFrom.${owner.id}.${scope}`;
-    const store = createAccountStore(
-      createEvoluShardDb(evolu, ownerSync, {
-        onWriteUnconfirmed: reportWriteUnconfirmed,
-      }),
-      owner,
-      {
-        scopes: appScopes,
-        hasEvoluRelay: EVOLU_TRANSPORTS.length > 0,
-        retention: {
-          get: (scope) =>
-            safeLocalStorageGetJson(
-              key(scope),
-              EffectSchema.NullOr(EffectSchema.Natural),
-              null,
-            ) ?? undefined,
-          set: (scope, first) => safeLocalStorageSetJson(key(scope), first),
-        },
-      },
-    );
-    await Effect.runPromise(store.reconcileSync());
-    void reportShardsSubscribed(store, "boot");
-    store.followPointers((rotation) => {
-      reportShardRotated(store, rotation);
-      void reportShardsSubscribed(store, "rotation");
-    });
-    store.subscribeHydration(() => {
-      void reportAccountHydrated(store);
-    });
-    repairShardPointers(store);
-    return store;
+  linkyStorePromise ??= openLinkyStore(evolu, ownerSync, {
+    kv: localStorageKv,
+    scopes: appScopes,
+    hasEvoluRelay: EVOLU_TRANSPORTS.length > 0,
+    onEvent: reportLinkyEvoluEvent,
   });
   return linkyStorePromise;
 };
@@ -863,13 +387,12 @@ export const useEvoluLastError = (opts?: {
 }): Evolu.EvoluError | null => {
   const logToConsole = opts?.logToConsole ?? false;
   const [lastError, setLastError] = useState<Evolu.EvoluError | null>(() =>
-    getEvolu().getError(),
+    evolu.getError(),
   );
 
   useEffect(() => {
-    const instance = getEvolu();
-    const unsub = instance.subscribeError(() => {
-      const err = instance.getError();
+    const unsub = evolu.subscribeError(() => {
+      const err = evolu.getError();
       setLastError(err);
       if (!err) return;
       if (logToConsole) console.log("[linky][evolu] error", err.type);
@@ -926,8 +449,6 @@ const getEvoluDatabaseInfo = async (
     "setting",
   ] as const;
 
-  const instance = getEvolu();
-
   const dbBytesPromise = (async () => {
     try {
       const root = await navigator.storage?.getDirectory?.();
@@ -935,9 +456,7 @@ const getEvoluDatabaseInfo = async (
 
       const mnemonic = safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY);
 
-      const expectedDir = mnemonic
-        ? `.${generateDbNameFromMnemonic(mnemonic)}`
-        : ".linky-anon";
+      const expectedDir = `.${generateDbNameFromMnemonic(mnemonic)}`;
 
       let totalSize = 0;
       const allDirs: string[] = [];
@@ -971,10 +490,10 @@ const getEvoluDatabaseInfo = async (
     for (const table of tables) {
       if (!isCurrent()) break;
       try {
-        const q = createUntypedQuery(instance, (db) =>
+        const q = createUntypedQuery(evolu, (db) =>
           db.selectFrom(table).select((eb) => eb.fn.countAll().as("count")),
         );
-        const rows = await loadUntypedQueryRows(instance, q);
+        const rows = await loadUntypedQueryRows(evolu, q);
         out[table] = readCount(rows);
       } catch {
         out[table] = null;
@@ -986,12 +505,12 @@ const getEvoluDatabaseInfo = async (
   // Count history entries (time travel mutations)
   const historyCountPromise = (async () => {
     try {
-      const q = createUntypedQuery(instance, (db) =>
+      const q = createUntypedQuery(evolu, (db) =>
         db
           .selectFrom("evolu_history")
           .select((eb) => eb.fn.countAll().as("count")),
       );
-      const rows = await loadUntypedQueryRows(instance, q);
+      const rows = await loadUntypedQueryRows(evolu, q);
       return readCount(rows);
     } catch {
       return null;
@@ -1055,13 +574,12 @@ export interface EvoluHistoryRow {
 export const subscribeEvoluHistoryMutationVersion = (
   listener: () => void,
 ): (() => void) => {
-  const instance = getEvolu();
-  const q = createUntypedQuery(instance, (db) =>
+  const q = createUntypedQuery(evolu, (db) =>
     db.selectFrom("evolu_history").select((eb) => eb.fn.countAll().as("count")),
   );
-  const subscribeQuery = Reflect.get(Object(instance), "subscribeQuery");
+  const subscribeQuery = Reflect.get(Object(evolu), "subscribeQuery");
   if (typeof subscribeQuery !== "function") return () => {};
-  const subscribe = Reflect.apply(subscribeQuery, instance, [q]);
+  const subscribe = Reflect.apply(subscribeQuery, evolu, [q]);
   if (typeof subscribe !== "function") return () => {};
   const unsubscribe = Reflect.apply(subscribe, undefined, [listener]);
   return typeof unsubscribe === "function" ? unsubscribe : () => {};
@@ -1071,9 +589,8 @@ export const loadEvoluHistoryData = async (
   limit = 100,
   offset = 0,
 ): Promise<EvoluHistoryRow[]> => {
-  const instance = getEvolu();
   try {
-    const q = createUntypedQuery(instance, (db) =>
+    const q = createUntypedQuery(evolu, (db) =>
       db
         .selectFrom("evolu_history")
         .selectAll()
@@ -1081,7 +598,7 @@ export const loadEvoluHistoryData = async (
         .limit(limit)
         .offset(offset),
     );
-    const rows = await loadUntypedQueryRows(instance, q);
+    const rows = await loadUntypedQueryRows(evolu, q);
     const rawRows = toJsonRows(rows);
     const formattedRows: EvoluHistoryRow[] = rawRows.map((row) => ({
       ...row,
@@ -1122,15 +639,14 @@ export const loadEvoluCurrentData = async (): Promise<
     "setting",
   ] as const;
 
-  const instance = getEvolu();
   const result: Record<string, Record<string, JsonValue>[]> = {};
 
   for (const table of tables) {
     try {
-      const q = createUntypedQuery(instance, (db) =>
+      const q = createUntypedQuery(evolu, (db) =>
         db.selectFrom(table).selectAll().limit(100),
       );
-      const rows = await loadUntypedQueryRows(instance, q);
+      const rows = await loadUntypedQueryRows(evolu, q);
       result[table] = toJsonRows(rows);
     } catch {
       result[table] = [];
@@ -1148,9 +664,9 @@ export const wipeEvoluStorage = (): void => {
     throw new Error("Missing stored mnemonic");
   }
 
-  markAwaitingFirstHydration(mnemonicResult.value);
+  markAwaitingFirstHydration(localStorageKv, mnemonicResult.value);
   // Hard wipe Evolu local storage (journal + state) and reload.
-  void getEvolu().restoreAppOwner(mnemonicResult.value, { reload: true });
+  void evolu.restoreAppOwner(mnemonicResult.value, { reload: true });
 };
 
 export const useEvoluDatabaseInfoState = (opts?: {
@@ -1207,10 +723,9 @@ export const useEvoluDatabaseInfoState = (opts?: {
       refreshRequested.current = false;
       setIsBusy(false);
     };
-    const instance = getEvolu();
     let unsubscribe = () => {};
-    const unsubscribeError = instance.subscribeError(() => {
-      const error = instance.getError();
+    const unsubscribeError = evolu.subscribeError(() => {
+      const error = evolu.getError();
       if (error?.type !== "SqliteError") return;
       // Evolu leaves a failed loadQuery promise cached and unresolved until reload.
       queryFailed.current = true;
@@ -1251,10 +766,10 @@ export const useEvoluServersManager = (opts?: {
   const canRunNetworkWork = useDeferredOnlineReady();
 
   const [configuredUrls, setConfiguredUrlsState] = useState<string[]>(() => [
-    ...getEvoluConfiguredServerUrls(),
+    ...evoluRelaySettings.configuredUrls(),
   ]);
   const [disabledUrls, setDisabledUrlsState] = useState<string[]>(() => [
-    ...getEvoluDisabledServerUrls(),
+    ...evoluRelaySettings.disabledUrls(),
   ]);
   const [statusByUrl, setStatusByUrl] = useState<
     Record<string, EvoluServerStatus>
@@ -1278,20 +793,20 @@ export const useEvoluServersManager = (opts?: {
   );
 
   const refreshFromStorage = useCallback(() => {
-    setConfiguredUrlsState([...getEvoluConfiguredServerUrls()]);
-    setDisabledUrlsState([...getEvoluDisabledServerUrls()]);
+    setConfiguredUrlsState([...evoluRelaySettings.configuredUrls()]);
+    setDisabledUrlsState([...evoluRelaySettings.disabledUrls()]);
   }, []);
 
   const setServerUrls = useCallback(
     (nextUrls: string[]) => {
-      setEvoluServerUrls(nextUrls);
+      evoluRelaySettings.setUrls(nextUrls);
       if (getInspectorEmissionEnabled()) {
         reportAppLog({
           tag: "evolu.serversChanged",
           summary: "Updated Evolu servers; reload required",
           payload: {
-            configuredUrls: getEvoluConfiguredServerUrls(),
-            activeUrls: getEvoluActiveServerUrls(),
+            configuredUrls: evoluRelaySettings.configuredUrls(),
+            activeUrls: evoluRelaySettings.activeUrls(),
           },
         });
       }
@@ -1303,7 +818,7 @@ export const useEvoluServersManager = (opts?: {
 
   const setServerOffline = useCallback(
     (url: string, offline: boolean) => {
-      setEvoluServerDisabled(url, offline);
+      evoluRelaySettings.setDisabled(url, offline);
       refreshFromStorage();
       setReloadRequired(true);
     },
@@ -1375,7 +890,7 @@ export const useEvoluServersManager = (opts?: {
     refreshFromStorage,
     setServerUrls,
     isOffline,
-    isRecommended: isRecommendedEvoluServer,
+    isRecommended: evoluRelaySettings.isRecommended,
     setServerOffline,
   } as const;
 };

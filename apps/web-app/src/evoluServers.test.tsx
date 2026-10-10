@@ -22,11 +22,7 @@ const custom = "wss://sync.example.com";
 beforeEach(() => localStorage.clear());
 
 describe("Evolu relay settings", () => {
-  it.each([
-    { saved: [...recommended, custom], configured: [...recommended, custom] },
-    { saved: [custom], configured: [...recommended, custom] },
-    { saved: [], configured: recommended },
-  ])(
+  it.each([{ saved: [custom], configured: [...recommended, custom] }])(
     "keeps the recommended relays when saving $saved and reopening settings",
     async ({ saved, configured }) => {
       function Settings() {

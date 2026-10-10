@@ -1,13 +1,9 @@
-// @vitest-environment jsdom
-import {
-  appOwnerFromMnemonic,
-  linkyTableColumns,
-  makeInMemoryShardDb,
-  makeSettingsRepository,
-  type LinkyDbSchema,
-} from "@linky-fit/linksync";
 import { Effect } from "effect";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { appOwnerFromMnemonic, makeInMemoryShardDb } from "../core";
+import { linkyTableColumns, type LinkyDbSchema } from "../model";
+import { makeSettingsRepository } from "../repositories";
+import { memoryKeyValueStorage } from "../testing/keyValueStorage";
 import {
   createAccountStore,
   markAwaitingFirstHydration,
@@ -20,11 +16,14 @@ if (appOwner === null) throw new Error("invalid test mnemonic");
 const key = `linky.shards.awaitingFirstHydration.${appOwner.id}`;
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-const openAccount = (hasEvoluRelay = true) => {
+const openAccount = (
+  kv: ReturnType<typeof memoryKeyValueStorage>,
+  hasEvoluRelay = true,
+) => {
   const db = makeInMemoryShardDb<LinkyDbSchema>(linkyTableColumns, {
     holdSync: true,
   });
-  const store = createAccountStore(db, appOwner, { hasEvoluRelay });
+  const store = createAccountStore(db, appOwner, { kv, hasEvoluRelay });
   Effect.runSync(store.reconcileSync());
   let written = false;
   void Effect.runPromise(
@@ -41,34 +40,40 @@ const openAccount = (hasEvoluRelay = true) => {
   };
 };
 
-afterEach(() => localStorage.clear());
-
 describe("createAccountStore", () => {
   it("writes at once on a device without the marker, as one upgraded or a new account", async () => {
-    const account = openAccount();
+    const account = openAccount(memoryKeyValueStorage());
     await settle();
     expect(account.written()).toBe(true);
   });
 
   it("holds writes of a restored account until it hydrates, which ends the wait", async () => {
-    markAwaitingFirstHydration(mnemonic);
-    expect(localStorage.getItem(key)).toBe("1");
-    const account = openAccount();
+    const kv = memoryKeyValueStorage();
+    markAwaitingFirstHydration(kv, mnemonic);
+    expect(kv.getItem(key)).toBe("1");
+    const account = openAccount(kv);
     await settle();
     expect(account.written()).toBe(false);
 
     account.hydrate();
     await settle();
     expect(account.written()).toBe(true);
-    expect(localStorage.getItem(key)).toBeNull();
+    expect(kv.getItem(key)).toBeNull();
   });
 
   it("keeps a restored account unhydrated while no Evolu relay is enabled", async () => {
-    markAwaitingFirstHydration(mnemonic);
-    const account = openAccount(false);
+    const kv = memoryKeyValueStorage();
+    markAwaitingFirstHydration(kv, mnemonic);
+    const account = openAccount(kv, false);
     account.hydrate();
     await settle();
     expect(account.written()).toBe(false);
-    expect(localStorage.getItem(key)).toBe("1");
+    expect(kv.getItem(key)).toBe("1");
+  });
+
+  it("marks nothing for text that is not a mnemonic", () => {
+    const kv = memoryKeyValueStorage();
+    markAwaitingFirstHydration(kv, "not a mnemonic");
+    expect(kv.items.size).toBe(0);
   });
 });

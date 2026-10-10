@@ -42,7 +42,7 @@ import {
   writeStoredCashuMnemonic,
 } from "../../platform/identitySecrets";
 import { reportAppLog } from "../../devtools/inspector/appLog";
-import { markAwaitingFirstHydration } from "../../firstHydration";
+import { markAwaitingFirstHydration } from "@linky-fit/linksync/evolu";
 import { markLogoutPending } from "../../platform/logoutWipe";
 import { triggerPasswordManagerSeedSave } from "../../platform/passwordManager";
 import { CASHU_ONBOARDING_SET_MAIN_MINT_STORAGE_KEY } from "../../utils/constants";
@@ -64,6 +64,7 @@ import { clearLegacyLaneStorage } from "../migrations/laneToShardMigration";
 import { runWrite } from "../lib/storeWrite";
 import {
   getInitialNostrIdentitySource,
+  localStorageKv,
   safeLocalStorageSet,
 } from "../../utils/storage";
 import type { FilePickerHandle } from "../../utils/pickFile";
@@ -561,7 +562,7 @@ export const useProfileAuthDomain = ({
         switchedAtSec,
       });
       if (options?.restoredAccount === true)
-        markAwaitingFirstHydration(appMnemonic);
+        markAwaitingFirstHydration(localStorageKv, appMnemonic);
 
       if (options?.persistSyncedIdentity !== false) {
         await upsertActiveNostrIdentity(raw, identitySource, switchedAtSec);

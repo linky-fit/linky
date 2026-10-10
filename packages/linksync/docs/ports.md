@@ -1,6 +1,6 @@
 # Ports
 
-How the store talks to storage, and what a new runtime must implement.
+How the store talks to storage, what a new runtime must implement, and how a Linky app opens its database.
 
 ## `ShardDb`
 
@@ -83,3 +83,55 @@ const db = createEvoluShardDb(evolu, ownerSync);
 ```
 
 An owner counts as synced once a relay has finished a sync round for it, and `ownerSync` holds the owners reported since the worker started, so a page that opens later learns them too. An owner whose answers from a relay so far are all protocol errors stays unsynced, so hydration and pointer repair wait for it; `ownerSync.subscribeFailures(listener)` reports each such error while the page is open. The round detection relies on Evolu sending its next request from the microtasks of the response it got, and on the protocol header the worker reads, so every `package.json` pins the Evolu packages to exact versions; recheck both before moving a pin.
+
+## Linky database
+
+`@linky-fit/linksync/evolu` also opens the Linky database itself, so an app only injects its platform pieces.
+
+```ts
+import { createSharedWebWorker, evoluWebDeps } from "@evolu/web";
+import {
+  createLinkyEvolu,
+  makeEvoluRelaySettings,
+  openLinkyStore,
+} from "@linky-fit/linksync/evolu";
+import { flushSync } from "react-dom";
+
+const relays = makeEvoluRelaySettings(kv, {
+  envDefaults,
+  recommended,
+  hasStoredAccount,
+  onEvent,
+});
+const transports = relays
+  .activeUrls()
+  .map((url) => ({ type: "WebSocket" as const, url }));
+const { evolu, ownerSync } = createLinkyEvolu({
+  evoluDeps: { ...evoluWebDeps, flushSync },
+  createWorker: (name) =>
+    createSharedWebWorker(
+      name,
+      () =>
+        new Worker(new URL("./evoluDb.worker.ts", import.meta.url), {
+          type: "module",
+        }),
+    ),
+  mnemonic,
+  transports,
+  inMemory,
+  enableLogging,
+  onEvent,
+});
+const store = await openLinkyStore(evolu, ownerSync, {
+  kv,
+  scopes: linkyScopes,
+  hasEvoluRelay: transports.length > 0,
+  onEvent,
+});
+```
+
+- `kv` is a `KeyValueStorage`: synchronous, device-local `getItem`, `setItem` and `removeItem` that swallow storage failures (a `localStorage` wrapper on the web). The keys the package writes start with `linky.` and never change, because existing devices read them.
+- `createLinkyEvolu` wraps the worker with `trackOwnerSync` and opens `LinkyEvoluSchema`, which is `LinkySchema` plus the legacy lane tables and columns only the lane migration reads. The database is named by `generateDbNameFromMnemonic(mnemonic)` (`linky-anon` without a mnemonic) and owned by the mnemonic's app owner; without one Evolu creates its own. Call it once per page: each call starts its own worker tracking.
+- `openLinkyStore` resolves once the app owner is known and the local database has answered a query. It creates the store, reconciles sync, follows pointers for the store's lifetime and starts pointer repair in the background, so the caller only keeps the returned store; call it once per database. It applies the [first hydration](./core.md#hydration) marker and keeps [retention](./core.md#device-local-retention) in `kv`.
+- `makeEvoluRelaySettings` is the device-local Evolu relay list: the recommended relays (`envDefaults` replaces them when non-empty) followed by the user's, minus the disabled ones. `setUrls` saves the user's list without the recommended relays; `setDisabled` toggles one relay. Creating it migrates the storage of versions before recommended relays once: an existing device (`hasStoredAccount`, or one with a stored legacy selection) keeps the old default relays unless the user had removed them. The recommendation is read once, so a change applies to settings created later; the transports are built at startup, so a changed list applies after a reload. `normalizeEvoluRelayUrl` gives a relay URL's stable identity, or `null` when it is not `ws:` or `wss:`.
+- `onEvent` hears a `LinkyEvoluEvent` for what an inspector should show: relay protocol errors per owner, rotations, the owners subscribed at boot and after each rotation, hydration, unconfirmed writes, pointer repairs and their failure, and the relay migration. The events carry the owner ids to correlate on; turning them into rows is the app's job.

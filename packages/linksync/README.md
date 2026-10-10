@@ -2,7 +2,7 @@
 
 Synced storage for Linky: the Evolu schema with branded ids, one repository per data scope, and the shard mechanics that keep every Evolu owner under the relay's per-owner quota. A consumer calls repositories and never sees an owner id, a table name or a shard index.
 
-Entry points: `@linky-fit/linksync` (schema, ids, store, repositories, ports), `@linky-fit/linksync/evolu` (the Evolu 7 adapter) and `@linky-fit/linksync/react` (hooks; React is a peer dependency of this entry only).
+Entry points: `@linky-fit/linksync` (schema, ids, store, repositories, ports), `@linky-fit/linksync/evolu` (the Evolu 7 adapter and the Linky database) and `@linky-fit/linksync/react` (hooks; React is a peer dependency of this entry only).
 
 ## What belongs here
 
@@ -17,5 +17,5 @@ The exported types are the reference; the guides say what to call, in which orde
 1. [Concepts](./docs/concepts.md): the scope table, how a row moves between shards, forgetting, deterministic ids. Read first.
 2. [Core](./docs/core.md): creating a store, its lifecycle, rotation, device-local retention.
 3. [Repositories](./docs/repositories.md): one repository per scope; what most code calls.
-4. [Ports](./docs/ports.md): the `ShardDb` contract, the in-memory port (also for a consumer's tests), the Evolu 7 adapter.
+4. [Ports](./docs/ports.md): the `ShardDb` contract, the in-memory port (also for a consumer's tests), the Evolu 7 adapter, opening the Linky database.
 5. [React](./docs/react.md): binding a component to a repository or a store query.

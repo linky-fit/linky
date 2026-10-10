@@ -1,3 +1,4 @@
+import type { KeyValueStorage } from "@linky-fit/linksync/evolu";
 import { Option, Schema } from "effect";
 import {
   getDefaultAllowedDisplayCurrencies,
@@ -362,4 +363,11 @@ export const getInitialNostrIdentitySource = (): "custom" | "derived" =>
 export const getInitialNostrIdentitySwitchedAtSec = (): number | null => {
   const stored = readStoredInt(NOSTR_IDENTITY_SWITCHED_AT_SEC_STORAGE_KEY);
   return stored !== null && stored > 0 ? stored : null;
+};
+
+/** `localStorage` as linksync's device-local key-value port. */
+export const localStorageKv: KeyValueStorage = {
+  getItem: safeLocalStorageGet,
+  setItem: safeLocalStorageSet,
+  removeItem: safeLocalStorageRemove,
 };
