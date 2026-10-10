@@ -60,15 +60,16 @@ export class Receive extends Context.Service<Receive>()("linkshu/Receive", {
       instances: yield* WalletInstances,
       inspector: yield* Inspector.orNoop,
     };
+    const keyed = (options: ReceiveUnlockOptions): ReceiveContext => ({
+      ...ctx,
+      unlockingKey: options.unlockingKey ?? null,
+    });
 
     const receive = (
       draft: ReceiveDraft,
       options: ReceiveUnlockOptions = {},
     ): Effect.Effect<ReceiveReceipt, ReceiveError> =>
-      receiveDraft(
-        { ...ctx, unlockingKey: options.unlockingKey ?? null },
-        draft,
-      ).pipe(
+      receiveDraft(keyed(options), draft).pipe(
         // Params stay empty: the only input is token text (proof secrets).
         inspectOperationWith(
           ctx.inspector,
@@ -91,12 +92,13 @@ export class Receive extends Context.Service<Receive>()("linkshu/Receive", {
       );
 
     const resumeOne = (
+      keyedCtx: ReceiveContext,
       deferred: DeferredOperation,
     ): Effect.Effect<DeferredReceiveResult> =>
       Effect.gen(function* () {
         const recorded = yield* Ref.make(false);
         const outcome = yield* Effect.result(
-          receiveDeferred(ctx, deferred, recorded).pipe(
+          receiveDeferred(keyedCtx, deferred, recorded).pipe(
             Effect.map((receipt) =>
               deferredResult(deferred, "received", receipt),
             ),
@@ -128,7 +130,7 @@ export class Receive extends Context.Service<Receive>()("linkshu/Receive", {
           case "MintUnreachable":
           case "MintRejected":
           case "CounterLockTimeout":
-          case "TokenLocked": // only a receive of the text with its key finishes it
+          case "TokenLocked": // only a pass or receive with its key finishes it
             return deferredResult(deferred, "pending");
         }
       });
@@ -138,8 +140,11 @@ export class Receive extends Context.Service<Receive>()("linkshu/Receive", {
      * the rest of its deferrals for the next pass instead of waiting out its
      * timeout once per token.
      */
-    const resumeDeferred: Effect.Effect<ReadonlyArray<DeferredReceiveResult>> =
+    const resumeDeferred = (
+      options: ReceiveUnlockOptions = {},
+    ): Effect.Effect<ReadonlyArray<DeferredReceiveResult>> =>
       Effect.gen(function* () {
+        const keyedCtx = keyed(options);
         const deferrals = (yield* ctx.operationStore.loadAll).filter(
           isPendingDeferral,
         );
@@ -148,7 +153,7 @@ export class Receive extends Context.Service<Receive>()("linkshu/Receive", {
         for (const deferred of deferrals) {
           const result = unusable.has(deferred.mint)
             ? deferredResult(deferred, "pending")
-            : yield* resumeOne(deferred);
+            : yield* resumeOne(keyedCtx, deferred);
           if (result.status === "pending") unusable.add(deferred.mint);
           results.push(result);
         }

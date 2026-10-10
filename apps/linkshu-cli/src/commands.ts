@@ -143,7 +143,7 @@ const receiveToken = (text: string): Command =>
   );
 
 const resumeDeferredReceives: Command = Effect.gen(function* () {
-  const results = yield* (yield* Receive).resumeDeferred;
+  const results = yield* (yield* Receive).resumeDeferred();
   if (results.length === 0) {
     print("no deferred receives");
     return;

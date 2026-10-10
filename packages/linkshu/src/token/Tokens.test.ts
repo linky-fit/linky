@@ -702,9 +702,8 @@ describe("Tokens.forget on a deferred receive", () => {
     Effect.flip(receive.receive(new ReceiveDraft({ text: tokenA }))),
   );
 
-  const resumeDeferred = Effect.flatMap(
-    Receive,
-    (receive) => receive.resumeDeferred,
+  const resumeDeferred = Effect.flatMap(Receive, (receive) =>
+    receive.resumeDeferred(),
   );
 
   const statusesOf = (results: ReadonlyArray<DeferredReceiveResult>) =>

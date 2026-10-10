@@ -188,7 +188,7 @@ describe("receive vertical against the local mint", () => {
     });
     const results = await runLinkshu(
       config,
-      Effect.flatMap(Receive, (receive) => receive.resumeDeferred),
+      Effect.flatMap(Receive, (receive) => receive.resumeDeferred()),
     );
     const operations = await Effect.runPromise(storage.operations.loadAll);
     const proofs = await Effect.runPromise(storage.proofs.loadAll);
