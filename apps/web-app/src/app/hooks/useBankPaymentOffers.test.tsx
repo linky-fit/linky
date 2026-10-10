@@ -40,8 +40,7 @@ const { sendBankOfferMock } = vi.hoisted(() => ({
   sendBankOfferMock: vi.fn<SendBankOffer>(),
 }));
 vi.mock("@linky-fit/linkstr-react", () => ({
-  sendBankOfferAtom: "sendBankOfferAtom",
-  useAtomSet: () => sendBankOfferMock,
+  useLinkstrCommands: () => ({ sendBankOffer: sendBankOfferMock }),
 }));
 
 import { useBankPaymentOffers } from "./useBankPaymentOffers";

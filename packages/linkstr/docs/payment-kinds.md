@@ -4,7 +4,7 @@ Three gift-wrapped verticals around payments, each with its own Linky-invented k
 
 ## Payment notices
 
-`PaymentNotices.send(draft)` tells a peer "I just paid you" so their device can wake up and ingest the token that travelled in chat. The notice is a kind 24133 rumor wrapped **once**, to the recipient, and the wrap is push-marked, so a push server delivers a notification even though the token message itself was not push-marked ([chat.md](./chat.md#sending)). Send it after the token message was sent or enqueued; the token may still be in flight when the notice lands. In React use `sendPaymentNoticeAtom`.
+`PaymentNotices.send(draft)` tells a peer "I just paid you" so their device can wake up and ingest the token that travelled in chat. The notice is a kind 24133 rumor wrapped **once**, to the recipient, and the wrap is push-marked, so a push server delivers a notification even though the token message itself was not push-marked ([chat.md](./chat.md#sending)). Send it after the token message was sent or enqueued; the token may still be in flight when the notice lands. In React use the `sendPaymentNotice` command.
 
 ```ts
 import { Effect } from "effect";
@@ -85,7 +85,7 @@ const publishOnce = Effect.flatMap(PaymentTelemetry, (telemetry) =>
 );
 ```
 
-For durable delivery use `Outbox.enqueueTelemetry(draft, recipient, ref)` (`enqueuePaymentTelemetryAtom` in React): it retries with backoff on the outbox's background lane, so a failing report never delays chat sends, and returns an `OutboxJobId` rather than an `EnqueueReceipt`, because each attempt mints a new author and so a new rumor id ([outbox.md](./outbox.md)).
+For durable delivery use `Outbox.enqueueTelemetry(draft, recipient, ref)` (the `enqueuePaymentTelemetry` command in React): it retries with backoff on the outbox's background lane, so a failing report never delays chat sends, and returns an `OutboxJobId` rather than an `EnqueueReceipt`, because each attempt mints a new author and so a new rumor id ([outbox.md](./outbox.md)).
 
 `createdAtSec` is when the payment event happened, not when it was sent. `paymentType` says what kind of payment went out: `contact` for a payment to a contact on either rail, `lightning` for an invoice or Lightning address paid outside a contact, `proxy` for the sats of a proxy payment, `recurring` for a run of a recurring payment, `request` for a paid payment request; receives, restores and top-ups carry `null`. It may be left out of the draft. `classifyPaymentErrorCode(message)` maps a raw error string to a stable `errorCode`; `detectTelemetryEnvironment(facts)` is pure and turns browser facts into `{ devicePlatform, appRuntime }`; `PAYMENT_ANALYTICS_RECIPIENT_NPUB` is Linky's collector.
 
@@ -127,7 +127,7 @@ Nothing. `WrapInbox` has no decoder for kind 24134 and drops it as `WrapDropped(
 
 ## Bank offers
 
-`BankOffers.send(draft)` (`sendBankOfferAtom` in React) carries the proxy-payment flow: someone scanned a bank QR and offers contacts to pay it in exchange for sats. Every step is a **snapshot** of the whole offer, a kind 24135 rumor tagged `["linky", "bank_payment_offer"]`, gift-wrapped to the counterparty and to yourself. Linkstr encodes and decodes snapshots and binds each status to the authenticated author; the state machine, authorization against known offers and the response rules live in `@linky-fit/proxy-payment` (its `docs/offers.md`), which is the reducer to use with these facts.
+`BankOffers.send(draft)` (the `sendBankOffer` command in React) carries the proxy-payment flow: someone scanned a bank QR and offers contacts to pay it in exchange for sats. Every step is a **snapshot** of the whole offer, a kind 24135 rumor tagged `["linky", "bank_payment_offer"]`, gift-wrapped to the counterparty and to yourself. Linkstr encodes and decodes snapshots and binds each status to the authenticated author; the state machine, authorization against known offers and the response rules live in `@linky-fit/proxy-payment` (its `docs/offers.md`), which is the reducer to use with these facts.
 
 ```ts
 const receipt =

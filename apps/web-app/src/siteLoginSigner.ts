@@ -7,7 +7,6 @@ import {
   type NostrSecretKey,
   type RelayPublishResult,
 } from "@linky-fit/linkstr";
-import { linkstrRuntimeAtom } from "@linky-fit/linkstr-react";
 import { Data, Effect, Schema } from "effect";
 import { finalizeEvent } from "nostr-tools/pure";
 import { isRelayUrl } from "./utils/nostrRelays";
@@ -19,13 +18,11 @@ export const signSiteLogin = (
 ): LinkauthAssertion =>
   finalizeEvent({ ...template, created_at: nowSeconds() }, secretKey);
 
-/** Signs the login template with the identity's main key; fails with `LinkstrNotConfigured` while logged out. */
-export const signSiteLoginAtom = linkstrRuntimeAtom.fn<LinkauthTemplate>()(
-  (template) =>
-    Effect.map(LinkstrIdentity, ({ secretKey }) =>
-      signSiteLogin(template, secretKey),
-    ),
-);
+/** Signs the login template with the linkstr identity's main key. */
+export const signSiteLoginAsIdentity = (template: LinkauthTemplate) =>
+  Effect.map(LinkstrIdentity, ({ secretKey }) =>
+    signSiteLogin(template, secretKey),
+  );
 
 export interface SiteLoginDelivery {
   assertion: LinkauthAssertion;
@@ -56,6 +53,3 @@ export const deliverSiteLogin = ({
     }
     return { wrapId: wrap.id, results };
   });
-
-export const deliverSiteLoginAtom =
-  linkstrRuntimeAtom.fn<SiteLoginDelivery>()(deliverSiteLogin);

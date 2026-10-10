@@ -6,7 +6,7 @@ import {
   Pubkey,
   RumorId,
 } from "@linky-fit/linkstr";
-import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Result, Exit, Schema } from "effect";
 import React from "react";
 import { makeLocalId } from "../../../utils/validation";
@@ -62,9 +62,7 @@ export const useEditChatMessage = <
   t,
   updateLocalNostrMessage,
 }: UseEditChatMessageParams<TRoute, TContact>) => {
-  const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
-    mode: "promiseExit",
-  });
+  const { enqueueOutbox } = useLinkstrCommands();
 
   return React.useCallback(async () => {
     if (route.kind !== "chat") return;

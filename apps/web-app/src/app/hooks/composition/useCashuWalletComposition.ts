@@ -24,11 +24,7 @@ import {
   Pubkey,
   TokenMessageDraft,
 } from "@linky-fit/linkstr";
-import {
-  enqueueOutboxAtom,
-  sendPaymentNoticeAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Result, Exit, Option, Schema } from "effect";
 import React, { type ComponentRef, useMemo, useState } from "react";
 import type { CashuOperationId, ContactId } from "../../../evolu";
@@ -278,12 +274,7 @@ export const useCashuWalletComposition = ({
   const recurringPaymentsRepository = useRecurringPaymentsRepository();
   const accountHydrated = useAccountHydrated();
   const { allowTestMints, setAllowTestMints } = useAllowTestMints();
-  const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
-    mode: "promiseExit",
-  });
-  const sendPaymentNotice = useAtomSet(sendPaymentNoticeAtom, {
-    mode: "promiseExit",
-  });
+  const { enqueueOutbox, sendPaymentNotice } = useLinkstrCommands();
   const { appOwnerId, appOwnerIdRef, currentNpub, currentNsec } = identity;
   const {
     saveNpubContact,

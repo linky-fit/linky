@@ -5,10 +5,7 @@ import {
   PaymentTelemetryDraft,
   UnixSeconds,
 } from "@linky-fit/linkstr";
-import {
-  enqueuePaymentTelemetryAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit, Schema } from "effect";
 import React from "react";
 import {
@@ -146,9 +143,7 @@ export const useAnonymousPaymentTelemetry = ({
   makeLocalStorageKey,
 }: UseAnonymousPaymentTelemetryParams): void => {
   const flushRef = React.useRef<Promise<void> | null>(null);
-  const enqueuePaymentTelemetry = useAtomSet(enqueuePaymentTelemetryAtom, {
-    mode: "promiseExit",
-  });
+  const { enqueuePaymentTelemetry } = useLinkstrCommands();
 
   const flushQueue = React.useCallback(async () => {
     if (!appOwnerId) return;

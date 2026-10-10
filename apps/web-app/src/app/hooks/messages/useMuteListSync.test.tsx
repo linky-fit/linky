@@ -23,9 +23,10 @@ const { fetchMock, publishMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@linky-fit/linkstr-react", () => ({
-  fetchOwnMuteListAtom: "fetch",
-  publishMuteListAtom: "publish",
-  useAtomSet: (atom: string) => (atom === "fetch" ? fetchMock : publishMock),
+  useLinkstrCommands: () => ({
+    fetchOwnMuteList: fetchMock,
+    publishMuteList: publishMock,
+  }),
 }));
 
 import { useMuteListSync } from "./useMuteListSync";

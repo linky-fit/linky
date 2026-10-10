@@ -16,12 +16,10 @@ vi.mock("@linky-fit/linkstr-react", async (importOriginal) => {
     await importOriginal<typeof import("@linky-fit/linkstr-react")>();
   return {
     ...actual,
-    useAtomSet: (atom: unknown) =>
-      atom === actual.fetchProfileAtom
-        ? relays.fetchProfile
-        : atom === actual.searchProfilesAtom
-          ? relays.searchProfiles
-          : vi.fn(),
+    useLinkstrCommands: () => ({
+      fetchProfile: relays.fetchProfile,
+      searchProfiles: relays.searchProfiles,
+    }),
   };
 });
 vi.mock("./useContactSuggestions", () => ({

@@ -10,10 +10,10 @@ import type { OutboxResult } from "@linky-fit/linkstr";
 import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
 import { outboxResultsAtom, outboxResultsHandlerAtom } from "./outbox";
-import { enqueuePaymentTelemetryAtom } from "./paymentTelemetry";
-import { configWith, makeIdentity, settle } from "./testing";
+import { configWith, makeIdentity } from "./testing";
 
 const alice = makeIdentity();
 const collector = makeIdentity();
@@ -36,7 +36,7 @@ const draft = new PaymentTelemetryDraft({
   appVersion: "26.9.0",
 });
 
-describe("enqueuePaymentTelemetryAtom", () => {
+describe("enqueuePaymentTelemetry", () => {
   it("delivers through the outbox and reports a telemetry receipt", async () => {
     const published: Array<SignedWrapEvent> = [];
     const registry = AtomRegistry.make();
@@ -53,12 +53,11 @@ describe("enqueuePaymentTelemetryAtom", () => {
     });
     const unmount = registry.mount(outboxResultsAtom);
 
-    registry.set(enqueuePaymentTelemetryAtom, {
+    const exit = await linkstrCommands(registry).enqueuePaymentTelemetry({
       draft,
       recipient: collector.pubkey,
       ref: OutboxRef.make("telemetry:telemetry-react"),
     });
-    const exit = await settle(registry, enqueuePaymentTelemetryAtom);
 
     expect(Exit.isSuccess(exit)).toBe(true);
     await expect.poll(() => handled.length).toBe(1);

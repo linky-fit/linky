@@ -2,11 +2,11 @@ import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
 import type { InspectorEvent } from "@linky-fit/linkstr";
 import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
 import { AtomRegistry } from "./index";
 import { inspectorEventsAtom, inspectorHandlerAtom } from "./inspector";
-import { retractReactionAtom } from "./reactions";
-import { configWith, makeIdentity, settle } from "./testing";
+import { configWith, makeIdentity } from "./testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -18,8 +18,7 @@ const draft = new RetractionDraft({
 });
 
 const retract = async (registry: AtomRegistry.AtomRegistry) => {
-  registry.set(retractReactionAtom, draft);
-  const exit = await settle(registry, retractReactionAtom);
+  const exit = await linkstrCommands(registry).retractReaction(draft);
   assert(Exit.isSuccess(exit));
 };
 

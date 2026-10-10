@@ -1,5 +1,5 @@
 import { StatusDraft } from "@linky-fit/linkstr";
-import { publishStatusAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import {
@@ -41,7 +41,7 @@ export const useProfileStatusEditor = ({
   const [profileStatusIsSaving, setProfileStatusIsSaving] =
     React.useState(false);
 
-  const publishStatus = useAtomSet(publishStatusAtom, { mode: "promiseExit" });
+  const { publishStatus } = useLinkstrCommands();
 
   const selectedProfileStatusCurrencies = React.useMemo(
     () => parseProfileGeneralStatus(myProfileStatus).currencies,

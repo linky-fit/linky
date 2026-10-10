@@ -112,7 +112,7 @@ The `asBob` layer is also the shape of a plain send test: run the operation agai
 
 ## `@linky-fit/linkstr-react/testing`
 
-`configWith(identity, transport, overrides?)` builds a `LinkstrConfig` on one relay (`relayA`) over the given transport layer; `settle(registry, fnAtom)` awaits the fn atom's `AsyncResult` as an `Exit`; `fakeTransport(published, subscriptions, stored?, fetchedFilters?)` (and `fakeTransportLayer`) accepts every publish, records subscriptions (each with an `eose()` that ends its stored events) and serves `stored` to fetches. `relayA`, `relayB` and `makeIdentity` are re-exported. Drive atoms with a bare `AtomRegistry` instead of rendering:
+`configWith(identity, transport, overrides?)` builds a `LinkstrConfig` on one relay (`relayA`) over the given transport layer; `fakeTransport(published, subscriptions, stored?, fetchedFilters?)` (and `fakeTransportLayer`) accepts every publish, records subscriptions (each with an `eose()` that ends its stored events) and serves `stored` to fetches. `relayA`, `relayB` and `makeIdentity` are re-exported. Drive commands and atoms with a bare `AtomRegistry` instead of rendering; `linkstrCommands(registry)` returns the same commands `useLinkstrCommands()` does:
 
 ```ts
 import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
@@ -120,14 +120,10 @@ import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import {
   AtomRegistry,
+  linkstrCommands,
   linkstrConfigAtom,
-  retractReactionAtom,
 } from "@linky-fit/linkstr-react";
-import {
-  configWith,
-  makeIdentity,
-  settle,
-} from "@linky-fit/linkstr-react/testing";
+import { configWith, makeIdentity } from "@linky-fit/linkstr-react/testing";
 import { Exit } from "effect";
 
 it("retracts through the configured transport", async () => {
@@ -140,15 +136,13 @@ it("retracts through the configured transport", async () => {
     configWith(alice, stubWrapTransport(published)),
   );
 
-  registry.set(
-    retractReactionAtom,
+  const exit = await linkstrCommands(registry).retractReaction(
     new RetractionDraft({
       to: bob.pubkey,
       reactionIds: [RumorId.make("ab".repeat(32))],
       clientId: ClientId.make("client-42"),
     }),
   );
-  const exit = await settle(registry, retractReactionAtom);
 
   assert(Exit.isSuccess(exit));
   expect(published).toHaveLength(2);

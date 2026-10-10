@@ -12,13 +12,10 @@ import { stubStorage, stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import type { StubStorage } from "@linky-fit/linkstr/testing";
 import { Exit, Schema } from "effect";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
-import {
-  enqueueOutboxAtom,
-  outboxResultsAtom,
-  outboxResultsHandlerAtom,
-} from "./outbox";
-import { configWith, makeIdentity, settle } from "./testing";
+import { outboxResultsAtom, outboxResultsHandlerAtom } from "./outbox";
+import { configWith, makeIdentity } from "./testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -61,8 +58,9 @@ describe("outbox atoms", () => {
     });
     const unmount = registry.mount(outboxResultsAtom);
 
-    registry.set(enqueueOutboxAtom, textInput("row-1"));
-    const exit = await settle(registry, enqueueOutboxAtom);
+    const exit = await linkstrCommands(registry).enqueueOutbox(
+      textInput("row-1"),
+    );
 
     assert(Exit.isSuccess(exit));
     expect(exit.value.ref).toBe("row-1");
@@ -100,8 +98,9 @@ describe("outbox atoms", () => {
     });
     const unmount = registry.mount(outboxResultsAtom);
 
-    registry.set(enqueueOutboxAtom, textInput("row-1"));
-    const exit = await settle(registry, enqueueOutboxAtom);
+    const exit = await linkstrCommands(registry).enqueueOutbox(
+      textInput("row-1"),
+    );
     expect(Exit.isSuccess(exit)).toBe(true);
 
     await expect.poll(() => calls).toBe(1);

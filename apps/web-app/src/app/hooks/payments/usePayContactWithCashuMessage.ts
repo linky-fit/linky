@@ -6,11 +6,7 @@ import {
   type PaymentNoticeContext,
 } from "@linky-fit/linkstr";
 import type { SendError, SendReceipt } from "@linky-fit/linkshu";
-import {
-  enqueueOutboxAtom,
-  sendPaymentNoticeAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Result } from "effect";
 import React from "react";
 import { ContactId } from "@linky-fit/linksync";
@@ -116,12 +112,7 @@ export const usePayContactWithCashuMessage = <TContact extends ContactRowLike>({
   updateLocalNostrMessage,
   walletMintBalances,
 }: UsePayContactWithCashuMessageParams) => {
-  const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
-    mode: "promiseExit",
-  });
-  const sendPaymentNotice = useAtomSet(sendPaymentNoticeAtom, {
-    mode: "promiseExit",
-  });
+  const { enqueueOutbox, sendPaymentNotice } = useLinkstrCommands();
 
   return React.useCallback(
     async (args: {

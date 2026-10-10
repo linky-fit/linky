@@ -28,8 +28,7 @@ const { enqueueOutboxMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@linky-fit/linkstr-react", () => ({
-  enqueueOutboxAtom: "enqueueOutboxAtom",
-  useAtomSet: () => enqueueOutboxMock,
+  useLinkstrCommands: () => ({ enqueueOutbox: enqueueOutboxMock }),
 }));
 
 import { useEditChatMessage } from "./useEditChatMessage";

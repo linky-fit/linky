@@ -120,7 +120,7 @@ Two plain replaceable events with empty content: kind 10002 (NIP-65) with one `[
 
 `fetchOwnMuteList()` asks every read and write relay for your kind 10000 and returns the newest as a `FetchedMuteList`, or `null` when every relay answered and none holds one. When no answering relay holds a list but some relay did not answer, it fails with `SomeRelaysUnanswered`, since the silent relay may hold the only list. Each relay gets 4 s, so a silent relay delays the result by that much at most. Fetch at startup so a new device learns who you blocked elsewhere, and again right before a publish: a replaceable event has no merge, so a publish built without the newest list drops what another device added to it.
 
-In React, call `publishMuteListAtom` with the complete pubkey list whenever it changes; it returns the same `PlainEventReceipt`. `fetchOwnMuteListAtom` runs `fetchOwnMuteList`.
+In React, call the `publishMuteList` command with the complete pubkey list whenever it changes; it returns the same `PlainEventReceipt`. The `fetchOwnMuteList` command runs `fetchOwnMuteList`.
 
 ```ts
 import { Effect } from "effect";
@@ -182,7 +182,7 @@ const watchEmployees = (employees: ReadonlyArray<Pubkey>) =>
 
 `AppDataQuery` narrows by `authors`, `identifiers` (`#d`), `taggedPubkeys` (`#p`) and `since`; every given field must match. `fetch(query)` asks every read relay once (5 s each) and returns the newest event per author and `d` tag, newest first. `watch(query)` is a scoped stream over every read relay, stored events first, then live ones, resubscribing with backoff; per slot it only emits versions newer than one it already emitted. Both verify each event's signature and drop events the query did not ask for, whatever a relay sends. An `AppDataEvent` carries the decoded fields and the signed `event` itself, for embedding or re-verifying elsewhere.
 
-In React, `publishAppDataAtom` and `fetchAppDataAtom` run `publish` and `fetch`.
+In React, the `publishAppData` and `fetchAppData` commands run `publish` and `fetch`.
 
 ### Wire format
 

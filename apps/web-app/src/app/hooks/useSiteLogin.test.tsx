@@ -49,18 +49,21 @@ const { deliverMock, logInMock, reportAppLogMock, signMock } = vi.hoisted(
   }),
 );
 
-vi.mock("@linky-fit/linkstr-react", () => ({
-  nostrConnectLoginAtom: "nostrConnectLogin",
-  useAtomSet: (atom: string) =>
-    atom === "signSiteLogin"
-      ? signMock
-      : atom === "deliverSiteLogin"
-        ? deliverMock
-        : logInMock,
-}));
+type SignerJob = { readonly sign: unknown } | { readonly deliver: unknown };
+
+vi.mock("@linky-fit/linkstr-react", () => {
+  const commands = {
+    nostrConnectLogin: logInMock,
+    run: (job: SignerJob) =>
+      "sign" in job ? signMock(job.sign) : deliverMock(job.deliver),
+  };
+  return { useLinkstrCommands: () => commands };
+});
 vi.mock("../../siteLoginSigner", () => ({
-  deliverSiteLoginAtom: "deliverSiteLogin",
-  signSiteLoginAtom: "signSiteLogin",
+  deliverSiteLogin: (delivery: unknown): SignerJob => ({ deliver: delivery }),
+  signSiteLoginAsIdentity: (template: unknown): SignerJob => ({
+    sign: template,
+  }),
 }));
 vi.mock("../../devtools/inspector/appLog", () => ({
   reportAppLog: reportAppLogMock,

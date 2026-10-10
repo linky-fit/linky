@@ -6,7 +6,7 @@ import {
   type BankOfferInboxEvent,
   type Pubkey,
 } from "@linky-fit/linkstr";
-import { sendBankOfferAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import {
   activeBankPaymentOffers,
   applyBankPaymentOfferReceipt,
@@ -138,7 +138,7 @@ export const useBankPaymentOffers = ({
   setStatus,
   t,
 }: UseBankPaymentOffersParams) => {
-  const sendBankOffer = useAtomSet(sendBankOfferAtom, { mode: "promiseExit" });
+  const { sendBankOffer } = useLinkstrCommands();
   const myPubHex = React.useMemo(
     () =>
       currentNsec ? (identityFromNsec(currentNsec)?.pubkey ?? null) : null,

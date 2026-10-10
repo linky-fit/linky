@@ -3,19 +3,18 @@ import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import {
   AtomRegistry,
+  linkstrCommands,
   linkstrConfigAtom,
-  retractReactionAtom,
 } from "@linky-fit/linkstr-react";
 import {
   configWith,
   makeIdentity,
   relayA,
-  settle,
 } from "@linky-fit/linkstr-react/testing";
 import { Exit } from "effect";
 import { expect, it } from "vitest";
 
-it("drives a linkstr-react atom with helpers imported through @linky-fit/linkstr-react/testing", async () => {
+it("drives a linkstr-react command with helpers imported through @linky-fit/linkstr-react/testing", async () => {
   const alice = makeIdentity();
   const bob = makeIdentity();
   const registry = AtomRegistry.make();
@@ -25,15 +24,13 @@ it("drives a linkstr-react atom with helpers imported through @linky-fit/linkstr
     configWith(alice, stubWrapTransport(published)),
   );
 
-  registry.set(
-    retractReactionAtom,
+  const exit = await linkstrCommands(registry).retractReaction(
     new RetractionDraft({
       to: bob.pubkey,
       reactionIds: [RumorId.make("ab".repeat(32))],
       clientId: ClientId.make("client-42"),
     }),
   );
-  const exit = await settle(registry, retractReactionAtom);
 
   expect(Exit.isSuccess(exit)).toBe(true);
   expect(published).toHaveLength(2);

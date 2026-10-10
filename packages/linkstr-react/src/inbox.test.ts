@@ -17,21 +17,16 @@ import { recipientOf } from "@linky-fit/linkstr/testing";
 import { Effect, Exit, Layer } from "effect";
 import type { Event as NostrToolsEvent } from "nostr-tools";
 import type { LinkstrConfig } from "./config";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
-import {
-  fetchWrapEventAtom,
-  wrapInboxAtom,
-  wrapInboxHandlerAtom,
-} from "./inbox";
+import { wrapInboxAtom, wrapInboxHandlerAtom } from "./inbox";
 import { inspectorEventsAtom, inspectorHandlerAtom } from "./inspector";
-import { retractReactionAtom } from "./reactions";
 import {
   configWith,
   fakeTransportLayer,
   makeIdentity,
   relayA,
   relayB,
-  settle,
 } from "./testing";
 import type { FakeSubscription, PublishedEvent } from "./testing";
 
@@ -40,14 +35,14 @@ const bob = makeIdentity();
 
 const firstReaction = RumorId.make("ab".repeat(32));
 
-describe("fetchWrapEventAtom", () => {
+describe("fetchWrapEvent", () => {
   it("returns a typed inbox event", async () => {
     const wrap = await wrapFromBob(firstReaction);
     const registry = AtomRegistry.make();
     registry.set(linkstrConfigAtom, twoRelayConfig(alice, [], [], [wrap]));
-    registry.set(fetchWrapEventAtom, { wrapId: WrapId.make(wrap.id) });
-
-    const exit = await settle(registry, fetchWrapEventAtom);
+    const exit = await linkstrCommands(registry).fetchWrapEvent({
+      wrapId: WrapId.make(wrap.id),
+    });
 
     expect(exit).toEqual(
       Exit.succeed(
@@ -76,15 +71,13 @@ const wrapFromBob = async (reactionId: RumorId): Promise<NostrToolsEvent> => {
   const registry = AtomRegistry.make();
   const published: Array<PublishedEvent> = [];
   registry.set(linkstrConfigAtom, twoRelayConfig(bob, published, []));
-  registry.set(
-    retractReactionAtom,
+  const exit = await linkstrCommands(registry).retractReaction(
     new RetractionDraft({
       to: alice.pubkey,
       reactionIds: [reactionId],
       clientId: ClientId.make("client-inbox"),
     }),
   );
-  const exit = await settle(registry, retractReactionAtom);
   assert(Exit.isSuccess(exit));
   registry.dispose();
   const wrap = published.find(

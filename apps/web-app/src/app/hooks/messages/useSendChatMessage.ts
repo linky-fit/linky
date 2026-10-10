@@ -8,7 +8,7 @@ import {
   RumorId,
   TextMessageDraft,
 } from "@linky-fit/linkstr";
-import { enqueueOutboxAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Result, Exit, Schema } from "effect";
 import React from "react";
 import { appendPushDebugLog } from "../../../utils/pushDebugLog";
@@ -90,9 +90,7 @@ export const useSendChatMessage = <
   triggerChatScrollToBottom,
   updateLocalNostrMessage,
 }: UseSendChatMessageParams<TRoute, TContact>) => {
-  const enqueueOutbox = useAtomSet(enqueueOutboxAtom, {
-    mode: "promiseExit",
-  });
+  const { enqueueOutbox } = useLinkstrCommands();
 
   return React.useCallback(
     async (options?: SendChatMessageOptions): Promise<ChatSendOutcome> => {

@@ -1,9 +1,5 @@
 import { ProfileMetadata, StatusDraft } from "@linky-fit/linkstr";
-import {
-  publishProfileAtom,
-  publishStatusAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit, Struct } from "effect";
 import React from "react";
 import { buildLoreleiAvatarUrl } from "../../../derivedProfile";
@@ -248,10 +244,7 @@ export const useProfileEditor = ({
     profileEditLnAddress,
   ]);
 
-  const publishProfile = useAtomSet(publishProfileAtom, {
-    mode: "promiseExit",
-  });
-  const publishStatus = useAtomSet(publishStatusAtom, { mode: "promiseExit" });
+  const { publishProfile, publishStatus } = useLinkstrCommands();
 
   const persistProfileValues = React.useCallback(
     async ({
