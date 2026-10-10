@@ -124,6 +124,7 @@ export const useAppShellComposition = ({
   const { lang, setLang, t } = useAppLanguage();
   const {
     answerPendingIdentitySwitch,
+    canSwitchToDefaultIdentity,
     appOwnerId,
     appOwnerIdRef,
     appendIdentityChangeNoticesRef,
@@ -136,6 +137,7 @@ export const useAppShellComposition = ({
     requestPasteNostrKeys,
     seedMnemonic,
     slip39Seed,
+    switchToDefaultIdentity,
     syncedNostrIdentityMatchesLocal,
   } = useIdentityOwnersComposition({
     currentNsec,
@@ -1560,6 +1562,7 @@ export const useAppShellComposition = ({
   } = useSystemSettingsComposition({
     advancedSettingsInput: {
       answerPendingIdentitySwitch,
+      canSwitchToDefaultIdentity,
       copyNostrKeys,
       copySeed,
       dedupeContacts,
@@ -1587,6 +1590,7 @@ export const useAppShellComposition = ({
       setLightningInvoiceAutoPayLimit,
       setPayWithCashuEnabled,
       setReceiveMethod,
+      switchToDefaultIdentity,
     },
     evoluSettingsInput: {
       evoluDatabaseBytes: evoluDbInfo.info.bytes,

@@ -20,6 +20,7 @@ import type { WriteOutcome } from "../lib/storeWrite";
 import type { LocalMintInfoRow } from "../types/appTypes";
 
 export interface AdvancedSettingsContextValue {
+  canSwitchToDefaultIdentity: boolean;
   answerPendingIdentitySwitch: (
     source: IdentityProfileSource | null,
   ) => Promise<void>;
@@ -50,6 +51,7 @@ export interface AdvancedSettingsContextValue {
   setLightningInvoiceAutoPayLimit: (value: number) => void;
   setPayWithCashuEnabled: (value: boolean) => void;
   setReceiveMethod: (value: ReceiveMethod) => void;
+  switchToDefaultIdentity: () => Promise<void>;
 }
 
 export interface EvoluSettingsContextValue {

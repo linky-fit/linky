@@ -204,6 +204,7 @@ export const en = {
   masterKeysShow: "Show",
   masterKeysHide: "Hide",
   pasteCustomNostrKeys: "Paste custom nostr keys",
+  switchToDefaultIdentity: "Switch back to default identity",
   copyNostrKeys: "Copy nostr keys",
   sensitiveActionArmedHint: "Sensitive action. Click once more to confirm.",
   derive: "Derive",
@@ -286,6 +287,8 @@ export const en = {
   cashuPaymentMeltConfirm: "Move to main mint",
   nostrPasteArmedHint:
     "Pasting Nostr keys will overwrite the current ones. Click once more to confirm.",
+  defaultIdentityArmedHint:
+    "This switches back to the identity your recovery seed creates. Click once more to confirm.",
   nostrPasteInvalid: "Invalid Nostr key (expected nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Could not publish your profile under the new key. Keys were not switched — try again.",
@@ -301,6 +304,9 @@ export const en = {
     "The lightning address is always this identity's Linky address.",
   identityProfileConfirm: "Switch identity",
   identityProfileCancel: "Cancel",
+  identityProfileChecking:
+    "Checking this identity's profile and lightning address…",
+  identityProfileSwitching: "Switching identity…",
 
   nostrRelay: "Nostr relay",
   nostrRelays: "Nostr relays",

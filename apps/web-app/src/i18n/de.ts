@@ -210,6 +210,7 @@ export const de = {
   masterKeysShow: "Anzeigen",
   masterKeysHide: "Ausblenden",
   pasteCustomNostrKeys: "Eigene Nostr-Schlüssel einfügen",
+  switchToDefaultIdentity: "Zurück zur Standard-Identität",
   copyNostrKeys: "Nostr-Schlüssel kopieren",
   sensitiveActionArmedHint:
     "Sensible Aktion. Klicke zum Bestätigen noch einmal.",
@@ -298,6 +299,8 @@ export const de = {
   cashuPaymentMeltConfirm: "Zum Haupt-Mint übertragen",
   nostrPasteArmedHint:
     "Das Einfügen überschreibt die aktuellen Nostr-Schlüssel. Klicke zum Bestätigen noch einmal.",
+  defaultIdentityArmedHint:
+    "Damit wechselst du zurück zur Identität aus deinem Wiederherstellungs-Seed. Klicke zum Bestätigen noch einmal.",
   nostrPasteInvalid: "Ungültiger Nostr-Schlüssel (nsec… erwartet).",
   nostrKeySwitchProfilePublishFailed:
     "Profil konnte nicht unter dem neuen Schlüssel veröffentlicht werden. Schlüssel wurden nicht gewechselt — bitte erneut versuchen.",
@@ -313,6 +316,9 @@ export const de = {
     "Die Lightning-Adresse ist immer die Linky-Adresse dieser Identität.",
   identityProfileConfirm: "Identität wechseln",
   identityProfileCancel: "Abbrechen",
+  identityProfileChecking:
+    "Profil und Lightning-Adresse dieser Identität werden geprüft…",
+  identityProfileSwitching: "Identität wird gewechselt…",
 
   nostrRelay: "Nostr-Relay",
   nostrRelays: "Nostr-Relays",

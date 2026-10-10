@@ -20,6 +20,7 @@ const createAdvancedSettings = (
   pushToast: (message: string) => void,
 ): AdvancedSettingsContextValue => ({
   answerPendingIdentitySwitch: noopAsync,
+  canSwitchToDefaultIdentity: false,
   copyNostrKeys: noopAsync,
   copySeed: noopAsync,
   dedupeContacts: noopAsync,
@@ -47,6 +48,7 @@ const createAdvancedSettings = (
   setLightningInvoiceAutoPayLimit: noop,
   setPayWithCashuEnabled: noop,
   setReceiveMethod: noop,
+  switchToDefaultIdentity: noopAsync,
 });
 
 type EvoluSettingsInput = Omit<

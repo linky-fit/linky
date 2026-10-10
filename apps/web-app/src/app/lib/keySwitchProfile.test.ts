@@ -50,6 +50,7 @@ describe("checkIdentityForSwitch", () => {
       lookupOwnedAddress,
       npub: NEW_NPUB,
       pubkey: newPubkey,
+      target: "custom",
     });
 
   it.each([
@@ -64,7 +65,7 @@ describe("checkIdentityForSwitch", () => {
       expect.objectContaining({
         tag: "identitySwitch.profileChecked",
         links: { pubkey: newPubkey },
-        payload: { boughtName: "none", profile: kind },
+        payload: { boughtName: "none", profile: kind, target: "custom" },
       }),
     );
   });
@@ -81,7 +82,11 @@ describe("checkIdentityForSwitch", () => {
     expect(result.lightningAddress).toBe(NEW_ADDRESS);
     expect(mocks.reportAppLog).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        payload: { boughtName: "lookup-failed", profile: "none" },
+        payload: {
+          boughtName: "lookup-failed",
+          profile: "none",
+          target: "custom",
+        },
       }),
     );
   });

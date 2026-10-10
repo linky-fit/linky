@@ -202,6 +202,7 @@ export const cs = {
   masterKeysShow: "Zobrazit",
   masterKeysHide: "Skrýt",
   pasteCustomNostrKeys: "Vložit vlastní nostr klíče",
+  switchToDefaultIdentity: "Přepnout zpět na výchozí identitu",
   copyNostrKeys: "Zkopírovat nostr klíče",
   sensitiveActionArmedHint:
     "Citlivá akce. Klikněte ještě jednou pro potvrzení.",
@@ -288,6 +289,8 @@ export const cs = {
   cashuPaymentMeltConfirm: "Převést do hlavního mintu",
   nostrPasteArmedHint:
     "Vložením Nostr klíčů přepíšete aktuální. Klikněte ještě jednou pro potvrzení.",
+  defaultIdentityArmedHint:
+    "Tímto se přepnete zpět na identitu z vaší obnovovací fráze. Klikněte ještě jednou pro potvrzení.",
   nostrPasteInvalid: "Neplatný Nostr klíč (očekávám nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Profil se nepodařilo publikovat pod novým klíčem. Klíče nebyly změněny — zkuste to znovu.",
@@ -303,6 +306,8 @@ export const cs = {
     "Lightning adresa je vždy adresa této identity v Linky.",
   identityProfileConfirm: "Přepnout identitu",
   identityProfileCancel: "Zrušit",
+  identityProfileChecking: "Ověřuji profil a lightning adresu této identity…",
+  identityProfileSwitching: "Přepínám identitu…",
 
   nostrRelay: "Nostr relay",
   nostrRelays: "Nostr relaye",

@@ -210,6 +210,7 @@ export const pt = {
   masterKeysShow: "Mostrar",
   masterKeysHide: "Ocultar",
   pasteCustomNostrKeys: "Colar chaves nostr próprias",
+  switchToDefaultIdentity: "Voltar à identidade padrão",
   copyNostrKeys: "Copiar chaves nostr",
   sensitiveActionArmedHint: "Ação sensível. Toque mais uma vez para confirmar.",
   derive: "Derivar",
@@ -297,6 +298,8 @@ export const pt = {
   cashuPaymentMeltConfirm: "Mover para o mint principal",
   nostrPasteArmedHint:
     "Colar chaves Nostr substitui as atuais. Toque mais uma vez para confirmar.",
+  defaultIdentityArmedHint:
+    "Isto volta para a identidade criada pela sua seed de recuperação. Toque mais uma vez para confirmar.",
   nostrPasteInvalid: "Chave Nostr inválida (esperado nsec…).",
   nostrKeySwitchProfilePublishFailed:
     "Não foi possível publicar seu perfil com a nova chave. As chaves não foram trocadas — tente de novo.",
@@ -312,6 +315,9 @@ export const pt = {
     "O endereço lightning é sempre o endereço Linky desta identidade.",
   identityProfileConfirm: "Trocar identidade",
   identityProfileCancel: "Cancelar",
+  identityProfileChecking:
+    "Verificando o perfil e o endereço lightning desta identidade…",
+  identityProfileSwitching: "Trocando de identidade…",
 
   nostrRelay: "Relay Nostr",
   nostrRelays: "Relays Nostr",
