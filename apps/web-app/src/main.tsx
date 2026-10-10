@@ -659,6 +659,15 @@ const bootstrap = async () => {
     }
     onLogoutInAnotherTab(() => window.location.reload());
 
+    if (Capacitor.isNativePlatform()) {
+      setStage("secret-backfill");
+      await import("./platform/nativeSecretBackfill.ts")
+        .then(({ backfillNativeSecrets }) => backfillNativeSecrets())
+        .catch((error: unknown) => {
+          console.warn("[linky][boot] native secret backfill skipped", error);
+        });
+    }
+
     setStage("storage-compat");
     let storagePromptShown = false;
     await prepareEvoluWebStorage({

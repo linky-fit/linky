@@ -20,6 +20,8 @@ const NOSTR_KIND_EXPLANATIONS: Record<number, string> = {
 };
 
 const TAG_DESCRIPTIONS: Record<string, string> = {
+  "secrets.nativeBackfill":
+    "On native app start, every identity secret found in WebView localStorage was checked against the native secret store (iOS Keychain, Android encrypted preferences). backfilled: it was missing natively, got written and read back equal. alreadyPresent: the native copy matches. mismatch: the native copy differs and was left alone. failed: there is no native store, or the read, write or read-back failed. localStorage is never changed. Outcomes are listed by storage key; values are never logged.",
   "liveUpdate.downloaded":
     "The Android app downloaded a newer web bundle published for its native runtime and verified its signature and SHA-256. It applies like a web update: right away on a fresh untouched launch, otherwise from the update banner.",
   "liveUpdate.applying":

@@ -100,6 +100,42 @@ export const readStoredSecret = async (key: string): Promise<string | null> => {
   return asNonEmptyString(safeLocalStorageGet(key));
 };
 
+/** Resolves undefined when there is no native secret store; rejects when it fails to answer. */
+export const readNativeSecret = async (
+  key: string,
+): Promise<string | null | undefined> => {
+  const androidValue = await readAndroidStoredSecret(key);
+  if (androidValue !== undefined) return androidValue;
+  if (!supportsIosNativeSecretStorage() && !getNativeSecretStorage()) {
+    return undefined;
+  }
+  return readNativeSecretValue(key);
+};
+
+export const writeNativeSecret = async (
+  key: string,
+  value: string,
+): Promise<void> => {
+  await writeAndroidStoredSecret(key, value);
+
+  if (supportsIosNativeSecretStorage()) {
+    try {
+      await LinkySecretStorage.set({ key, value });
+    } catch {
+      // ignore
+    }
+  }
+
+  const secretStorage = getNativeSecretStorage();
+  if (secretStorage) {
+    try {
+      await secretStorage.set({ key, value });
+    } catch {
+      // ignore
+    }
+  }
+};
+
 export const writeStoredSecret = async (
   key: string,
   value: string,
@@ -111,32 +147,7 @@ export const writeStoredSecret = async (
   }
 
   if (isNativePlatform()) {
-    const wroteToAndroidBridge = await writeAndroidStoredSecret(
-      key,
-      normalized,
-    );
-
-    if (supportsIosNativeSecretStorage()) {
-      try {
-        await LinkySecretStorage.set({ key, value: normalized });
-      } catch {
-        // ignore
-      }
-    }
-
-    const secretStorage = getNativeSecretStorage();
-    if (secretStorage) {
-      try {
-        await secretStorage.set({ key, value: normalized });
-      } catch {
-        // ignore
-      }
-    }
-
-    if (wroteToAndroidBridge) {
-      safeLocalStorageSet(key, normalized);
-      return;
-    }
+    await writeNativeSecret(key, normalized);
   }
 
   safeLocalStorageSet(key, normalized);
