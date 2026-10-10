@@ -5,10 +5,9 @@ import {
   type ProfileMetadata,
 } from "@linky-fit/linkstr";
 import {
-  discoverActiveProfilesAtom,
   linkstrConfigAtom,
-  useAtomSet,
   useAtomValue,
+  useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
@@ -91,9 +90,7 @@ export const useContactSuggestions = (
     ContactSuggestionCandidate[]
   >([]);
   const linkstrConfig = useAtomValue(linkstrConfigAtom);
-  const discoverActiveProfiles = useAtomSet(discoverActiveProfilesAtom, {
-    mode: "promiseExit",
-  });
+  const { discoverActiveProfiles } = useLinkstrCommands();
   const canDiscover = (linkstrConfig?.readRelays.length ?? 0) > 0;
 
   React.useEffect(() => {

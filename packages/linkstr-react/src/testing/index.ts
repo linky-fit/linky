@@ -8,11 +8,8 @@ import type {
   NostrTransportService,
 } from "@linky-fit/linkstr";
 import { Effect, Layer } from "effect";
-import type { Exit } from "effect";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import type { LinkstrConfig } from "../config";
-import { AtomRegistry } from "../index";
-import type { AsyncResult, Atom } from "../index";
 
 export { makeIdentity } from "@linky-fit/linkstr/testing";
 
@@ -31,15 +28,6 @@ export const configWith = (
   transport,
   ...overrides,
 });
-
-/** Awaits an fn atom's AsyncResult; suspendOnWaiting skips the stale previous AsyncResult while a re-invocation runs. */
-export const settle = <A, E>(
-  registry: AtomRegistry.AtomRegistry,
-  atom: Atom.Atom<AsyncResult.AsyncResult<A, E>>,
-): Promise<Exit.Exit<A, E>> =>
-  Effect.runPromiseExit(
-    AtomRegistry.getResult(registry, atom, { suspendOnWaiting: true }),
-  );
 
 export type PublishedEvent = Parameters<NostrTransportService["publish"]>[1];
 

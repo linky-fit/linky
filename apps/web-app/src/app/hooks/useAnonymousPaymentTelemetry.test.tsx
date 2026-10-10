@@ -17,8 +17,9 @@ const { enqueuePaymentTelemetryMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@linky-fit/linkstr-react", () => ({
-  enqueuePaymentTelemetryAtom: "enqueuePaymentTelemetryAtom",
-  useAtomSet: () => enqueuePaymentTelemetryMock,
+  useLinkstrCommands: () => ({
+    enqueuePaymentTelemetry: enqueuePaymentTelemetryMock,
+  }),
 }));
 
 import { useAnonymousPaymentTelemetry } from "./useAnonymousPaymentTelemetry";

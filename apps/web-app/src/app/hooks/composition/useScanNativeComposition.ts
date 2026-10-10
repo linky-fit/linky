@@ -1,7 +1,7 @@
 import { Share } from "@capacitor/share";
 import { decodeNpub, identityFromNsec, WrapId } from "@linky-fit/linkstr";
 import type { WrapInboxEvent } from "@linky-fit/linkstr";
-import { fetchWrapEventAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit, Schema } from "effect";
 import React from "react";
 import type { ContactsRepository } from "@linky-fit/linksync";
@@ -161,9 +161,7 @@ export const useScanNativeComposition = ({
   setStatus,
   t,
 }: UseScanNativeCompositionParams) => {
-  const fetchWrapEvent = useAtomSet(fetchWrapEventAtom, {
-    mode: "promiseExit",
-  });
+  const { fetchWrapEvent } = useLinkstrCommands();
   const pendingNotificationOpenDetailsRef = React.useRef<
     QueuedNotificationOpenDetail[]
   >([]);

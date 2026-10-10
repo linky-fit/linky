@@ -1,5 +1,5 @@
 import { decodeNpub, SeenReceiptDraft, UnixSeconds } from "@linky-fit/linkstr";
-import { sendSeenReceiptAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
@@ -39,9 +39,7 @@ export const useChatSeenReceiptSync = ({
   selectedContact,
   sentUpToSecByPubkeyRef,
 }: UseChatSeenReceiptSyncParams): void => {
-  const sendSeenReceipt = useAtomSet(sendSeenReceiptAtom, {
-    mode: "promiseExit",
-  });
+  const { sendSeenReceipt } = useLinkstrCommands();
   const inFlightRef = React.useRef(false);
 
   React.useEffect(() => {

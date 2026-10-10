@@ -7,22 +7,14 @@ import type {
 import { Exit } from "effect";
 import { finalizeEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
 import {
-  discoverActiveProfilesAtom,
-  fetchProfileAtom,
   profileWatchAtom,
   profileWatchHandlerAtom,
-  publishProfileAtom,
-  publishStatusAtom,
   watchedProfilesAtom,
 } from "./profiles";
-import {
-  configWith,
-  fakeTransportLayer,
-  makeIdentity,
-  settle,
-} from "./testing";
+import { configWith, fakeTransportLayer, makeIdentity } from "./testing";
 import type { FakeSubscription, PublishedEvent } from "./testing";
 
 const alice = makeIdentity();
@@ -95,7 +87,7 @@ describe("profileWatchAtom", () => {
   });
 });
 
-describe("fetchProfileAtom", () => {
+describe("fetchProfile", () => {
   it("returns the typed fetch result", async () => {
     const registry = AtomRegistry.make();
     registry.set(
@@ -110,8 +102,7 @@ describe("fetchProfileAtom", () => {
       ),
     );
 
-    registry.set(fetchProfileAtom, bob.pubkey);
-    const exit = await settle(registry, fetchProfileAtom);
+    const exit = await linkstrCommands(registry).fetchProfile(bob.pubkey);
 
     assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual(
@@ -126,7 +117,7 @@ describe("fetchProfileAtom", () => {
   });
 });
 
-describe("discoverActiveProfilesAtom", () => {
+describe("discoverActiveProfiles", () => {
   it("returns recently active authors with decoded profiles", async () => {
     const registry = AtomRegistry.make();
     registry.set(
@@ -147,8 +138,7 @@ describe("discoverActiveProfilesAtom", () => {
       ),
     );
 
-    registry.set(discoverActiveProfilesAtom, undefined);
-    const exit = await settle(registry, discoverActiveProfilesAtom);
+    const exit = await linkstrCommands(registry).discoverActiveProfiles();
 
     assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual([
@@ -161,7 +151,7 @@ describe("discoverActiveProfilesAtom", () => {
   });
 });
 
-describe("publishProfileAtom / publishStatusAtom", () => {
+describe("publishProfile / publishStatus", () => {
   it("publishes through the configured transport and returns receipts", async () => {
     const registry = AtomRegistry.make();
     const published: Array<PublishedEvent> = [];
@@ -170,18 +160,17 @@ describe("publishProfileAtom / publishStatusAtom", () => {
       configWith(alice, fakeTransportLayer(published, [])),
     );
 
-    registry.set(publishProfileAtom, new ProfileMetadata({ name: "alice" }));
-    const profileExit = await settle(registry, publishProfileAtom);
+    const profileExit = await linkstrCommands(registry).publishProfile(
+      new ProfileMetadata({ name: "alice" }),
+    );
     expect(Exit.isSuccess(profileExit)).toBe(true);
 
-    registry.set(
-      publishStatusAtom,
+    const statusExit = await linkstrCommands(registry).publishStatus(
       new StatusDraft({
         content: "stacking",
         expiresAt: UnixSeconds.make(base + 60),
       }),
     );
-    const statusExit = await settle(registry, publishStatusAtom);
     expect(Exit.isSuccess(statusExit)).toBe(true);
 
     expect(published.map((event) => event.kind)).toEqual([0, 30315]);

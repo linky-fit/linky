@@ -4,14 +4,14 @@ import { BankOfferDraft, BankOfferId, ClientId } from "@linky-fit/linkstr";
 import { recipientOf, stubWrapTransport } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
-import { sendBankOfferAtom } from "./bankOffers";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
-import { configWith, makeIdentity, settle } from "./testing";
+import { configWith, makeIdentity } from "./testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
 
-describe("sendBankOfferAtom", () => {
+describe("sendBankOffer", () => {
   it("delivers through the configured transport and returns a receipt", async () => {
     const registry = AtomRegistry.make();
     const published: Array<SignedWrapEvent> = [];
@@ -20,8 +20,7 @@ describe("sendBankOfferAtom", () => {
       configWith(alice, stubWrapTransport(published)),
     );
 
-    registry.set(
-      sendBankOfferAtom,
+    const exit = await linkstrCommands(registry).sendBankOffer(
       new BankOfferDraft({
         to: bob.pubkey,
         offerId: BankOfferId.make("offer-react"),
@@ -32,7 +31,6 @@ describe("sendBankOfferAtom", () => {
         clientId: ClientId.make("client-react"),
       }),
     );
-    const exit = await settle(registry, sendBankOfferAtom);
 
     assert(Exit.isSuccess(exit));
     expect(exit.value).toEqual(

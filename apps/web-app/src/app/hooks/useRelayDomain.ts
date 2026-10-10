@@ -3,11 +3,7 @@ import {
   RelayListEntry,
   RelayListsDraft,
 } from "@linky-fit/linkstr";
-import {
-  fetchOwnRelayListsAtom,
-  publishRelayListsAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import { navigateTo } from "../../hooks/useRouting";
@@ -154,9 +150,7 @@ export const useRelayDomain = ({
     return url || null;
   }, [route]);
 
-  const publishRelayLists = useAtomSet(publishRelayListsAtom, {
-    mode: "promiseExit",
-  });
+  const { publishRelayLists, fetchOwnRelayLists } = useLinkstrCommands();
 
   const publishNostrRelayLists = React.useCallback(
     async (urls: string[]) => {
@@ -181,10 +175,6 @@ export const useRelayDomain = ({
     },
     [currentNsec, publishRelayLists],
   );
-
-  const fetchOwnRelayLists = useAtomSet(fetchOwnRelayListsAtom, {
-    mode: "promiseExit",
-  });
 
   const relayProfileSyncForNpubRef = React.useRef<string | null>(null);
   const [syncAttempt, retrySync] = React.useReducer((n: number) => n + 1, 0);

@@ -12,9 +12,9 @@ import {
 } from "@linky-fit/linkstr/testing";
 import type { SignedWrapEvent } from "@linky-fit/linkstr/testing";
 import { Effect, Exit, Layer } from "effect";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
-import { retractReactionAtom } from "./reactions";
-import { configWith, makeIdentity, relayA, relayB, settle } from "./testing";
+import { configWith, makeIdentity, relayA, relayB } from "./testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -48,11 +48,10 @@ const retract = (
   registry: AtomRegistry.AtomRegistry,
   retraction: RetractionDraft,
 ) => {
-  registry.set(retractReactionAtom, retraction);
-  return settle(registry, retractReactionAtom);
+  return linkstrCommands(registry).retractReaction(retraction);
 };
 
-describe("retractReactionAtom", () => {
+describe("retractReaction", () => {
   it("delivers via the configured transport and returns a receipt", async () => {
     const registry = AtomRegistry.make();
     const published: Array<SignedWrapEvent> = [];
@@ -85,7 +84,6 @@ describe("retractReactionAtom", () => {
 
   it("rebuilds the runtime on config change and disposes the old one", async () => {
     const registry = AtomRegistry.make();
-    const unmount = registry.mount(retractReactionAtom);
     const disposed: Array<string> = [];
     const publishedAsAlice: Array<SignedWrapEvent> = [];
     const publishedAsBob: Array<SignedWrapEvent> = [];
@@ -114,7 +112,5 @@ describe("retractReactionAtom", () => {
     expect(publishedAsBob.map(recipientOf)).toContain(bob.pubkey);
     expect(publishedAsBob.map(recipientOf)).not.toContain(alice.pubkey);
     await expect.poll(() => disposed).toEqual(["alice"]);
-
-    unmount();
   });
 });

@@ -1,13 +1,6 @@
 import { Atom } from "effect/reactivity";
-import { Profiles, ProfileWatch } from "@linky-fit/linkstr";
-import type {
-  DiscoverActiveProfilesOptions,
-  ProfileMetadata,
-  ProfileWatchEvent,
-  Pubkey,
-  SearchProfilesOptions,
-  StatusDraft,
-} from "@linky-fit/linkstr";
+import { ProfileWatch } from "@linky-fit/linkstr";
+import type { ProfileWatchEvent, Pubkey } from "@linky-fit/linkstr";
 import { Effect, Stream } from "effect";
 import { linkstrRuntimeAtom } from "./runtime";
 
@@ -43,42 +36,3 @@ export const profileWatchAtom = linkstrRuntimeAtom.atom((get) => {
     }),
   );
 });
-
-export const fetchProfileAtom = linkstrRuntimeAtom.fn<Pubkey>()((pubkey) =>
-  Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(pubkey)),
-);
-
-export const fetchProfilesAtom = linkstrRuntimeAtom.fn<ReadonlyArray<Pubkey>>()(
-  (pubkeys) =>
-    Effect.flatMap(Profiles, (profiles) => profiles.fetchProfiles(pubkeys)),
-);
-
-export const discoverActiveProfilesAtom = linkstrRuntimeAtom.fn<
-  DiscoverActiveProfilesOptions | undefined
->()((options) =>
-  Effect.flatMap(Profiles, (profiles) =>
-    profiles.discoverActiveProfiles(options),
-  ),
-);
-
-export const searchProfilesAtom = linkstrRuntimeAtom.fn<{
-  readonly query: string;
-  readonly options?: SearchProfilesOptions;
-}>()(({ query, options }) =>
-  Effect.flatMap(Profiles, (profiles) =>
-    profiles.searchProfiles(query, options),
-  ),
-);
-
-export const publishProfileAtom = linkstrRuntimeAtom.fn<ProfileMetadata>()(
-  (metadata) =>
-    Effect.flatMap(Profiles, (profiles) => profiles.publishProfile(metadata)),
-);
-
-export const republishOwnProfileAtom = linkstrRuntimeAtom.fn<void>()(() =>
-  Effect.flatMap(Profiles, (profiles) => profiles.republishOwnProfile()),
-);
-
-export const publishStatusAtom = linkstrRuntimeAtom.fn<StatusDraft>()((draft) =>
-  Effect.flatMap(Profiles, (profiles) => profiles.publishStatus(draft)),
-);

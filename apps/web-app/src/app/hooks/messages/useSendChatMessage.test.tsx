@@ -41,8 +41,7 @@ const { createPrivateImageSendPayloadMock, enqueueOutboxMock } = vi.hoisted(
 );
 
 vi.mock("@linky-fit/linkstr-react", () => ({
-  enqueueOutboxAtom: "enqueueOutboxAtom",
-  useAtomSet: () => enqueueOutboxMock,
+  useLinkstrCommands: () => ({ enqueueOutbox: enqueueOutboxMock }),
 }));
 
 vi.mock("../../lib/privateImageMessage", async (importOriginal) => {

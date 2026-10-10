@@ -20,11 +20,7 @@ import {
   identityFromNsec,
   Pubkey,
 } from "@linky-fit/linkstr";
-import {
-  fetchProfilesAtom,
-  useAtomSet,
-  useOutboxResults,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands, useOutboxResults } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import React, { useMemo, useState } from "react";
 import { deriveDefaultProfile } from "../../../derivedProfile";
@@ -759,9 +755,7 @@ export const useContactsMessagingComposition = ({
     return npubs;
   }, [chatMentionedNpubs, unknownContactNpubs]);
 
-  const fetchProfilesOneShot = useAtomSet(fetchProfilesAtom, {
-    mode: "promiseExit",
-  });
+  const { fetchProfiles: fetchProfilesOneShot } = useLinkstrCommands();
 
   // Unknown senders and mentioned npubs are not watched; a cached read or one
   // batched profile fetch feeds both their display name and avatar.

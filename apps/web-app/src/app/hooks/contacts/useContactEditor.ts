@@ -10,11 +10,7 @@ import {
   type ProfileMetadata,
   type ProfileSearchHit,
 } from "@linky-fit/linkstr";
-import {
-  fetchProfileAtom,
-  searchProfilesAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { createId, type ContactsRepository } from "@linky-fit/linksync";
 import { Exit } from "effect";
 import React from "react";
@@ -166,12 +162,10 @@ export const useContactEditor = ({
 
   const openScannedContactPendingNpubRef = React.useRef<string | null>(null);
 
-  const fetchProfileOneShot = useAtomSet(fetchProfileAtom, {
-    mode: "promiseExit",
-  });
-  const searchProfilesOneShot = useAtomSet(searchProfilesAtom, {
-    mode: "promiseExit",
-  });
+  const {
+    fetchProfile: fetchProfileOneShot,
+    searchProfiles: searchProfilesOneShot,
+  } = useLinkstrCommands();
 
   const clearContactForm = React.useCallback(() => {
     setForm(makeEmptyContactForm());

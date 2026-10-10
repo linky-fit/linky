@@ -25,9 +25,10 @@ vi.mock("./publishCashuMessagePayment", () => ({
   publishCashuMessagePayment: publishMock,
 }));
 vi.mock("@linky-fit/linkstr-react", () => ({
-  enqueueOutboxAtom: "enqueueOutboxAtom",
-  sendPaymentNoticeAtom: "sendPaymentNoticeAtom",
-  useAtomSet: () => vi.fn(),
+  useLinkstrCommands: () => ({
+    enqueueOutbox: vi.fn(),
+    sendPaymentNotice: vi.fn(),
+  }),
 }));
 
 const CLIENT_ID = ClientId.make("run-client-id");

@@ -1,8 +1,4 @@
-import {
-  fetchOwnMuteListAtom,
-  publishMuteListAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
 import React from "react";
 import { reportAppLog } from "../../../devtools/inspector/appLog";
@@ -25,12 +21,7 @@ interface UseMuteListSyncParams {
  * inbox only until this device's first merge for the identity has run.
  */
 export const useMuteListSync = ({ enabled, pubkey }: UseMuteListSyncParams) => {
-  const fetchOwnMuteList = useAtomSet(fetchOwnMuteListAtom, {
-    mode: "promiseExit",
-  });
-  const publishMuteList = useAtomSet(publishMuteListAtom, {
-    mode: "promiseExit",
-  });
+  const { fetchOwnMuteList, publishMuteList } = useLinkstrCommands();
   const queueRef = React.useRef<Promise<boolean>>(Promise.resolve(false));
   const [syncedPubkey, setSyncedPubkey] = React.useState<string | null>(null);
 

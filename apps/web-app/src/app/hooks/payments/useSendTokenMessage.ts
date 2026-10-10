@@ -1,9 +1,5 @@
 import type { ClientId } from "@linky-fit/linkstr";
-import {
-  enqueueOutboxAtom,
-  sendPaymentNoticeAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { ContactId } from "../../../evolu";
 import { useLatest } from "../../../hooks/useLatest";
@@ -71,10 +67,7 @@ export const useSendTokenMessage = ({
   nostrMessagesLocal,
   updateLocalNostrMessage,
 }: UseSendTokenMessageParams): SendTokenMessage => {
-  const enqueueOutbox = useAtomSet(enqueueOutboxAtom, { mode: "promiseExit" });
-  const sendPaymentNotice = useAtomSet(sendPaymentNoticeAtom, {
-    mode: "promiseExit",
-  });
+  const { enqueueOutbox, sendPaymentNotice } = useLinkstrCommands();
   const messagesRef = useLatest(nostrMessagesLocal);
   const queuedRef = React.useRef(new Set<string>());
 

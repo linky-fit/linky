@@ -8,7 +8,7 @@ import {
   type ResolveLinkauthResult,
 } from "@linky-fit/linkauth/signer";
 import { linkauthAudience } from "@linky-fit/linkstr";
-import { nostrConnectLoginAtom, useAtomSet } from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Exit, Option } from "effect";
 import React from "react";
 import { navigateAwayTo } from "../../hooks/useRouting";
@@ -19,7 +19,10 @@ import {
   type PendingSiteLogin,
   type SiteLoginRequest,
 } from "../../siteLogin";
-import { deliverSiteLoginAtom, signSiteLoginAtom } from "../../siteLoginSigner";
+import {
+  deliverSiteLogin,
+  signSiteLoginAsIdentity,
+} from "../../siteLoginSigner";
 
 const SUCCESS_OVERLAY_MS = 2400;
 
@@ -128,13 +131,7 @@ export const useSiteLogin = ({
   setStatus,
   t,
 }: UseSiteLoginParams): SiteLoginResult => {
-  const logInOverRelays = useAtomSet(nostrConnectLoginAtom, {
-    mode: "promiseExit",
-  });
-  const signLogin = useAtomSet(signSiteLoginAtom, { mode: "promiseExit" });
-  const deliverLogin = useAtomSet(deliverSiteLoginAtom, {
-    mode: "promiseExit",
-  });
+  const { nostrConnectLogin: logInOverRelays, run } = useLinkstrCommands();
   const [pending, setPending] = React.useState<PendingSiteLogin | null>(null);
   const resolutionRef = React.useRef(0);
   const [isBusy, setIsBusy] = React.useState(false);
@@ -295,7 +292,7 @@ export const useSiteLogin = ({
     }
 
     const { delivery, template } = pending.login;
-    const signed = await signLogin(template);
+    const signed = await run(signSiteLoginAsIdentity(template));
     if (!Exit.isSuccess(signed)) {
       setIsBusy(false);
       return failed(signed.cause);
@@ -306,11 +303,13 @@ export const useSiteLogin = ({
       navigate(buildCallbackUrl(delivery.url, signed.value));
       return;
     }
-    const sent = await deliverLogin({
-      assertion: signed.value,
-      pubkey: delivery.pubkey,
-      relays: delivery.relays,
-    });
+    const sent = await run(
+      deliverSiteLogin({
+        assertion: signed.value,
+        pubkey: delivery.pubkey,
+        relays: delivery.relays,
+      }),
+    );
     setIsBusy(false);
     if (!Exit.isSuccess(sent)) return failed(sent.cause);
     const { results, wrapId } = sent.value;
@@ -319,15 +318,14 @@ export const useSiteLogin = ({
       { wrap: wrapId },
     );
   }, [
-    deliverLogin,
     isBusy,
     isDone,
     logInOverRelays,
     navigate,
     pending,
+    run,
     setStatus,
     showDone,
-    signLogin,
     t,
   ]);
 

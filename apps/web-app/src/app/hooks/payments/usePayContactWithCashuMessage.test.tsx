@@ -59,10 +59,10 @@ vi.mock("../../../hooks/useRouting", () => ({
 }));
 
 vi.mock("@linky-fit/linkstr-react", () => ({
-  enqueueOutboxAtom: "enqueueOutboxAtom",
-  sendPaymentNoticeAtom: "sendPaymentNoticeAtom",
-  useAtomSet: (atom: unknown) =>
-    atom === "enqueueOutboxAtom" ? enqueueOutboxMock : sendPaymentNoticeMock,
+  useLinkstrCommands: () => ({
+    enqueueOutbox: enqueueOutboxMock,
+    sendPaymentNotice: sendPaymentNoticeMock,
+  }),
 }));
 
 import { usePayContactWithCashuMessage } from "./usePayContactWithCashuMessage";

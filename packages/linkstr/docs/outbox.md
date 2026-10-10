@@ -79,7 +79,7 @@ export const startOutbox = (
 };
 ```
 
-In React the runtime is `linkstrRuntimeAtom`, the consumer is `useOutboxResults`, and enqueueing is `enqueueOutboxAtom` ([react.md](./react.md#outbox)).
+In React the runtime is `linkstrRuntimeAtom`, the consumer is `useOutboxResults`, and enqueueing is the `enqueueOutbox` command ([react.md](./react.md#outbox)).
 
 `enqueue(operation, ref)` returns an `EnqueueReceipt` at once. The rumor is encoded at enqueue time, so its `rumorId` is the exact id every retry publishes; write it to your local row now. Enqueue success means the job is stored, not that any relay accepted it.
 

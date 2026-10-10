@@ -13,15 +13,12 @@ const mocks = vi.hoisted(() => ({
   setStatus: vi.fn(),
 }));
 
-vi.mock("@linky-fit/linkstr-react", () => {
-  const publishProfileAtom = {};
-  return {
-    publishProfileAtom,
-    publishStatusAtom: {},
-    useAtomSet: (atom: unknown) =>
-      atom === publishProfileAtom ? mocks.publishProfile : mocks.publishStatus,
-  };
-});
+vi.mock("@linky-fit/linkstr-react", () => ({
+  useLinkstrCommands: () => ({
+    publishProfile: mocks.publishProfile,
+    publishStatus: mocks.publishStatus,
+  }),
+}));
 
 vi.mock("../../lib/profilePicture", () => ({
   prepareProfilePicture: mocks.prepareProfilePicture,

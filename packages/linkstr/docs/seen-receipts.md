@@ -37,7 +37,7 @@ const reportSeen = (
   );
 ```
 
-In React use `sendSeenReceiptAtom` ([react.md](./react.md)). When a send fails, roll your local "sent up to" value back; the next trigger resends a superseding receipt.
+In React use the `sendSeenReceipt` command ([react.md](./react.md)). When a send fails, roll your local "sent up to" value back; the next trigger resends a superseding receipt.
 
 ## The cursor model
 

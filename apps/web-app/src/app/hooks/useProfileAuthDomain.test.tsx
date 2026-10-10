@@ -18,17 +18,15 @@ const mocks = vi.hoisted(() => ({
   readClipboardText: vi.fn(),
 }));
 
-vi.mock("@linky-fit/linkstr-react", () => {
-  const publishProfileAtom = {};
-  return {
-    fetchProfileAtom: {},
-    linkstrConfigAtom: {},
-    publishProfileAtom,
-    publishStatusAtom: {},
-    useAtomSet: (atom: unknown) =>
-      atom === publishProfileAtom ? mocks.publishProfile : vi.fn(),
-  };
-});
+vi.mock("@linky-fit/linkstr-react", () => ({
+  linkstrConfigAtom: {},
+  useAtomSet: () => vi.fn(),
+  useLinkstrCommands: () => ({
+    fetchProfile: vi.fn(),
+    publishProfile: mocks.publishProfile,
+    publishStatus: vi.fn(),
+  }),
+}));
 
 vi.mock("../lib/keySwitchProfile", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/keySwitchProfile")>()),

@@ -15,15 +15,12 @@ const mocks = vi.hoisted(() => ({
   setMyProfileMetadata: vi.fn(),
 }));
 
-vi.mock("@linky-fit/linkstr-react", () => {
-  const fetchProfileAtom = {};
-  return {
-    fetchProfileAtom,
-    publishProfileAtom: {},
-    useAtomSet: (atom: unknown) =>
-      atom === fetchProfileAtom ? mocks.fetchProfile : mocks.publishProfile,
-  };
-});
+vi.mock("@linky-fit/linkstr-react", () => ({
+  useLinkstrCommands: () => ({
+    fetchProfile: mocks.fetchProfile,
+    publishProfile: mocks.publishProfile,
+  }),
+}));
 
 vi.mock("../../../hooks/useDeferredOnlineReady", () => ({
   useDeferredOnlineReady: () => true,

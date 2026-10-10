@@ -44,7 +44,7 @@ const reactThenRetract = (
   );
 ```
 
-`react` resolves with a `ReactionReceipt` once a relay accepted the peer's copy; `receipt.rumorId` is the reaction id a retraction refers to. To queue a reaction instead, enqueue `{ _tag: "reaction", draft }` ([outbox.md](./outbox.md)) and read the rumor id from the `EnqueueReceipt`. In React, `retractReactionAtom` is the direct operation ([react.md](./react.md)).
+`react` resolves with a `ReactionReceipt` once a relay accepted the peer's copy; `receipt.rumorId` is the reaction id a retraction refers to. To queue a reaction instead, enqueue `{ _tag: "reaction", draft }` ([outbox.md](./outbox.md)) and read the rumor id from the `EnqueueReceipt`. In React, the `retractReaction` command is the direct operation ([react.md](./react.md)).
 
 ## Sending
 

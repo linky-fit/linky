@@ -2,11 +2,11 @@ import { ClientId, RetractionDraft, RumorId } from "@linky-fit/linkstr";
 import type { RelayHealthState } from "@linky-fit/linkstr";
 import { stubWrapTransport } from "@linky-fit/linkstr/testing";
 import { Exit } from "effect";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
 import { AsyncResult, AtomRegistry } from "./index";
-import { retractReactionAtom } from "./reactions";
 import { relayHealthAtom } from "./relayHealth";
-import { configWith, makeIdentity, relayA, settle } from "./testing";
+import { configWith, makeIdentity, relayA } from "./testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -36,8 +36,7 @@ describe("relayHealthAtom", () => {
       .toBe(true);
     expect(healthOf(registry, relayA)).toBeUndefined();
 
-    registry.set(retractReactionAtom, draft);
-    const exit = await settle(registry, retractReactionAtom);
+    const exit = await linkstrCommands(registry).retractReaction(draft);
     assert(Exit.isSuccess(exit));
 
     await expect

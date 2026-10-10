@@ -21,11 +21,9 @@ import {
   type Pubkey,
 } from "@linky-fit/linkstr";
 import {
-  fetchProfileAtom,
   linkstrConfigAtom,
-  publishProfileAtom,
-  publishStatusAtom,
   useAtomSet,
+  useLinkstrCommands,
 } from "@linky-fit/linkstr-react";
 import { Cause, Exit, Option } from "effect";
 import type { Lang } from "../../i18n";
@@ -227,13 +225,7 @@ export const useProfileAuthDomain = ({
   const onboardingPhotoInputRef = React.useRef<FilePickerHandle | null>(null);
   const [isSeedLogin, setIsSeedLogin] = React.useState(false);
   const setLinkstrConfig = useAtomSet(linkstrConfigAtom);
-  const publishProfile = useAtomSet(publishProfileAtom, {
-    mode: "promiseExit",
-  });
-  const publishStatus = useAtomSet(publishStatusAtom, {
-    mode: "promiseExit",
-  });
-  const fetchProfile = useAtomSet(fetchProfileAtom, { mode: "promiseExit" });
+  const { publishProfile, publishStatus, fetchProfile } = useLinkstrCommands();
 
   React.useEffect(() => {
     let cancelled = false;

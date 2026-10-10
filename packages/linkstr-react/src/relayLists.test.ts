@@ -4,10 +4,9 @@ import type { SignedPlainEvent } from "@linky-fit/linkstr";
 import { stubPlainTransport } from "@linky-fit/linkstr/testing";
 import { Effect, Exit } from "effect";
 import { finalizeEvent } from "nostr-tools";
+import { linkstrCommands } from "./commands";
 import { linkstrConfigAtom } from "./config";
-import { publishMuteListAtom } from "./muteList";
-import { fetchOwnRelayListsAtom, publishRelayListsAtom } from "./relayLists";
-import { configWith, makeIdentity, settle } from "./testing";
+import { configWith, makeIdentity } from "./testing";
 
 const alice = makeIdentity();
 const bob = makeIdentity();
@@ -15,7 +14,7 @@ const bob = makeIdentity();
 const relayOne = RelayUrl.make("wss://one.test");
 const relayDm = RelayUrl.make("wss://dm.test");
 
-describe("publishRelayListsAtom", () => {
+describe("publishRelayLists", () => {
   it("publishes both list kinds and returns the paired receipt", async () => {
     const registry = AtomRegistry.make();
     const published: Array<SignedPlainEvent> = [];
@@ -24,14 +23,12 @@ describe("publishRelayListsAtom", () => {
       configWith(alice, stubPlainTransport(published)),
     );
 
-    registry.set(
-      publishRelayListsAtom,
+    const exit = await linkstrCommands(registry).publishRelayLists(
       new RelayListsDraft({
         relays: [new RelayListEntry({ relay: relayOne, marker: "write" })],
         dmRelays: [relayDm],
       }),
     );
-    const exit = await settle(registry, publishRelayListsAtom);
 
     assert(Exit.isSuccess(exit));
     expect(exit.value.relayList.kind).toBe(10002);
@@ -40,7 +37,7 @@ describe("publishRelayListsAtom", () => {
   });
 });
 
-describe("fetchOwnRelayListsAtom", () => {
+describe("fetchOwnRelayLists", () => {
   it("fetches the configured identity's lists", async () => {
     const registry = AtomRegistry.make();
     const stored = [
@@ -64,8 +61,7 @@ describe("fetchOwnRelayListsAtom", () => {
       ),
     );
 
-    registry.set(fetchOwnRelayListsAtom, undefined);
-    const exit = await settle(registry, fetchOwnRelayListsAtom);
+    const exit = await linkstrCommands(registry).fetchOwnRelayLists();
 
     assert(Exit.isSuccess(exit));
     expect(exit.value.relays).toEqual([
@@ -75,7 +71,7 @@ describe("fetchOwnRelayListsAtom", () => {
   });
 });
 
-describe("publishMuteListAtom", () => {
+describe("publishMuteList", () => {
   it("publishes the mute list for the configured identity", async () => {
     const registry = AtomRegistry.make();
     const published: Array<SignedPlainEvent> = [];
@@ -84,8 +80,7 @@ describe("publishMuteListAtom", () => {
       configWith(alice, stubPlainTransport(published)),
     );
 
-    registry.set(publishMuteListAtom, [bob.pubkey]);
-    const exit = await settle(registry, publishMuteListAtom);
+    const exit = await linkstrCommands(registry).publishMuteList([bob.pubkey]);
 
     assert(Exit.isSuccess(exit));
     expect(exit.value.kind).toBe(10000);

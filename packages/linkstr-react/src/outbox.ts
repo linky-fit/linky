@@ -1,23 +1,10 @@
 import { useAtomMount, useAtomSet } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import { Outbox } from "@linky-fit/linkstr";
-import type {
-  OutboxRef,
-  OutboxResult,
-  RumorFixedOperation,
-} from "@linky-fit/linkstr";
+import type { OutboxResult } from "@linky-fit/linkstr";
 import { Effect, Stream } from "effect";
 import { useEffect, useRef } from "react";
 import { linkstrRuntimeAtom } from "./runtime";
-
-export interface EnqueueOutboxInput {
-  readonly op: RumorFixedOperation;
-  readonly ref: OutboxRef;
-}
-
-export const enqueueOutboxAtom = linkstrRuntimeAtom.fn<EnqueueOutboxInput>()(
-  ({ op, ref }) => Effect.flatMap(Outbox, (outbox) => outbox.enqueue(op, ref)),
-);
 
 /** An object (not a bare function) so setting it never hits the atom
  * setter's updater-form interpretation of function values. */

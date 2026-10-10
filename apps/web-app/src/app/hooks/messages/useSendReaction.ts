@@ -8,11 +8,7 @@ import {
   RumorId,
   TargetKind,
 } from "@linky-fit/linkstr";
-import {
-  enqueueOutboxAtom,
-  retractReactionAtom,
-  useAtomSet,
-} from "@linky-fit/linkstr-react";
+import { useLinkstrCommands } from "@linky-fit/linkstr-react";
 import { Cause, Exit, Schema } from "effect";
 import React from "react";
 import { makeLocalId } from "../../../utils/validation";
@@ -65,10 +61,8 @@ export const useSendReaction = <
   t,
   updateLocalNostrReaction,
 }: UseSendReactionParams<TRoute, TContact>) => {
-  const enqueueOutbox = useAtomSet(enqueueOutboxAtom, { mode: "promiseExit" });
-  const linkstrRetract = useAtomSet(retractReactionAtom, {
-    mode: "promiseExit",
-  });
+  const { enqueueOutbox, retractReaction: linkstrRetract } =
+    useLinkstrCommands();
 
   return React.useCallback(
     async (args: SendReactionArgs) => {

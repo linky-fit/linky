@@ -17,10 +17,10 @@ import {
   linkstrConfigAtom,
   profileWatchAtom,
   profileWatchHandlerAtom,
-  republishOwnProfileAtom,
   useAtomMount,
   useAtomSet,
   useAtomValue,
+  useLinkstrCommands,
   watchedProfilesAtom,
 } from "@linky-fit/linkstr-react";
 import { Exit } from "effect";
@@ -283,9 +283,7 @@ export const useLinkstrProfileSync = ({
 }: UseLinkstrProfileSyncParams) => {
   const setWatchedProfiles = useAtomSet(watchedProfilesAtom);
   const setProfileWatchHandler = useAtomSet(profileWatchHandlerAtom);
-  const republishOwnProfile = useAtomSet(republishOwnProfileAtom, {
-    mode: "promiseExit",
-  });
+  const { republishOwnProfile } = useLinkstrCommands();
   const writeRelaysKey =
     useAtomValue(linkstrConfigAtom)?.writeRelays.join(" ") ?? "";
   useAtomMount(profileWatchAtom);
