@@ -6,7 +6,7 @@ import type { ScanDiagnostics } from "../hooks/useGuideScannerDomain";
 import type { Lang } from "../../i18n";
 import type { LnurlAuthPreview } from "../../lnurlAuth";
 import type { LnurlWithdrawPreview } from "../../lnurlPay";
-import type { NostrConnectRequest } from "../../nostrConnect";
+import type { PendingSiteLogin } from "../../siteLogin";
 import type { ProfileStatusCurrency } from "../../nostrStatus";
 import type { Route } from "../../types/route";
 import type {
@@ -98,7 +98,7 @@ export interface AppShellCoreContextValue {
   } | null;
   pendingLnurlAuthConfirmation: LnurlAuthPreview | null;
   pendingLnurlWithdrawConfirmation: LnurlWithdrawPreview | null;
-  pendingNostrConnectLoginConfirmation: NostrConnectRequest | null;
+  pendingSiteLoginConfirmation: PendingSiteLogin | null;
   pendingLightningInvoiceConfirmation: LightningInvoicePreview | null;
   pendingCashuPaymentRequestConfirmation: CashuPaymentRequestMessageInfo | null;
   postPaySaveContact: {
@@ -142,8 +142,8 @@ export interface AppShellCoreContextValue {
   lnurlAuthIsBusy: boolean;
   lnurlAuthIsDone: boolean;
   lnurlWithdrawIsBusy: boolean;
-  nostrConnectLoginIsBusy: boolean;
-  nostrConnectLoginIsDone: boolean;
+  siteLoginIsBusy: boolean;
+  siteLoginIsDone: boolean;
 }
 
 export interface AppShellActionsContextValue {
@@ -153,13 +153,13 @@ export interface AppShellActionsContextValue {
   closeShareOptions: () => void;
   closeLnurlAuthConfirmation: () => void;
   closeLnurlWithdrawConfirmation: () => void;
-  closeNostrConnectLoginConfirmation: () => void;
+  closeSiteLoginConfirmation: () => void;
   closeLightningInvoiceConfirmation: () => void;
   closeScan: () => void;
   confirmPaymentMintMelt: () => Promise<void>;
   confirmLnurlAuth: () => Promise<void>;
   confirmLnurlWithdraw: () => Promise<void>;
-  confirmNostrConnectLogin: () => Promise<void>;
+  confirmSiteLogin: () => Promise<void>;
   confirmLightningInvoicePayment: () => Promise<void>;
   closeCashuPaymentRequestConfirmation: () => void;
   confirmCashuPaymentRequest: () => Promise<void>;

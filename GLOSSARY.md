@@ -233,8 +233,28 @@ Linky signing the user into another website with a key derived from their identi
 _Avoid_: Lightning login, wallet login
 
 **Nostr Connect login**:
-Linky signing the user into another website with their identity in one NIP-46 exchange, started by scanning or opening the site's `nostrconnect://` link; nothing stays connected afterwards.
+Linky signing the user into another website with their identity in one NIP-46 exchange, started by scanning or opening the site's `nostrconnect://` link; nothing stays connected afterwards. It is a **Linkauth login** over relays. Linky refuses it for an origin that publishes a **domain document**: any page can show such a link naming that site, so the site's own `#linkauth` link is the way in.
 _Avoid_: nostr login, remote signer session, bunker login
+
+**Linkauth login**:
+The user approving, in Linky, one signed login event for a website's **audience**. The site asks either with a `nostrconnect://` link (a Nostr Connect login) or with a `#linkauth` link, which Linky answers only after verifying the site through its **domain document**; the approval proves ownership of the identity to that origin only and lets the site neither post as the user nor read their messages. The identity the site learns is the user's Nostr public key, the same on every site, together with their public profile.
+_Avoid_: sign in with Nostr, Nostr SSO, login assertion
+
+**Audience**:
+The origin a Linkauth login is bound to: the `o` of a `#linkauth` link, or the origin of the `url` in a `nostrconnect://` link. Linky shows it before the user approves. For a `#linkauth` link Linky marks the origin verified, meaning that origin published a domain document and Linky loaded it from there; the name and icon shown beside it come from that document and are labelled as the site's own claim, since any origin can publish any name. For a `nostrconnect://` link the origin and the name are the site's unverified claims.
+_Avoid_: domain, site URL, relying party
+
+**Domain document**:
+The small JSON file a site serves at `/.well-known/linkauth.json`, holding its name, icon, receiving key, relays and callbacks. Linky loads it directly from the device when it opens a `#linkauth` link; a site whose document cannot be loaded or does not list the link's callback is **unverified** and the login is not offered at all. Linky also loads it before offering a Nostr Connect login, and refuses that login when the document loads.
+_Avoid_: manifest, site profile, identity file
+
+**Delivery**:
+How an approved Linkauth login reaches the site. By **callback**, the same-device way, Linky sends the browser back to a page listed in the domain document with the signed login in its URL fragment. By **nostr**, the QR-code way, Linky publishes the signed login, encrypted to the site's receiving key, to the relays in the domain document, and the user finishes on the other device. A denial is sent only by callback.
+_Avoid_: redirect, callback mode, relay mode
+
+**Callback**:
+The page on the site, listed in its domain document, that a same-device Linkauth login returns the browser to, with the signed login or a denial in its URL fragment.
+_Avoid_: redirect URL, return URL
 
 ## Proxy payments
 

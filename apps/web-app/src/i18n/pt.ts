@@ -1070,23 +1070,51 @@ export const pt = {
   lnurlAuthDoneHint: "Você pode voltar ao site.",
   lnurlAuthFailed: "O login LNURL falhou",
   lnurlAuthUnavailable: "Entrar exige uma identidade desbloqueada.",
-  nostrConnectLoginConfirm: "Entrar",
-  nostrConnectLoginConfirmDevice: "Entrar e vincular dispositivo",
-  nostrConnectLoginWaiting: "Aguardando o site…",
-  nostrConnectLoginUnknownSite: "Site desconhecido",
-  nostrConnectLoginUnverified: "Não verificado",
-  nostrConnectLoginAs: "Entrar como",
-  nostrConnectLoginLinksDevice:
+  siteLoginConfirm: "Entrar",
+  siteLoginConfirmDevice: "Entrar e vincular dispositivo",
+  siteLoginWaiting: "Aguardando o site…",
+  siteLoginUnverified: "Não verificado",
+  siteLoginTo: "Entrar em",
+  siteLoginAs: "Entrar como",
+  siteLoginRevealsProfile: "{site} verá seu perfil público do Nostr.",
+  siteLoginLinksDevice:
     "{site} também pede para vincular um dos seus dispositivos a você. Você assina que esse dispositivo pode agir por você em {site}.",
-  nostrConnectLoginShares:
-    "O site recebe sua chave pública e uma assinatura de login de uso único. Ele não pode publicar em seu nome nem ler suas mensagens.",
-  nostrConnectLoginDone: "Conectado a {site}",
-  nostrConnectLoginDoneHint: "Você pode voltar ao site.",
-  nostrConnectLoginFailed: "O login com Nostr Connect falhou",
-  nostrConnectLoginTimedOut: "O site não respondeu.",
-  nostrConnectLoginRefused: "O Linky só assina pedidos de login.",
-  nostrConnectLoginUnreachable: "Não foi possível alcançar os relays do site.",
-  nostrConnectLoginUnavailable: "Entrar exige uma identidade desbloqueada.",
+  siteLoginShares:
+    "Ao aprovar, você prova a {site} que é dono desta chave Nostr. Vale só para este site, e ele não pode publicar em seu nome nem ler suas mensagens.",
+  siteLoginStartedHere:
+    "Aprove somente se você mesmo iniciou este login em {site}.",
+  siteLoginDone: "Conectado a {site}",
+  siteLoginDoneHint: "Você pode voltar ao site.",
+  siteLoginDoneReturning: "Levando você de volta ao site…",
+  siteLoginUnsupported: "Pedido de login não suportado",
+  siteLoginUnsupportedHint:
+    "O Linky só assina um login para o site que o pediu. Este pedido não diz qual é o site ou não pede um login, então não pode ser aprovado.",
+  siteLoginFailed: "O login falhou",
+  siteLoginTimedOut: "O site não respondeu.",
+  siteLoginRefused: "O Linky só assina pedidos de login.",
+  siteLoginUnreachable: "Não foi possível alcançar os relays do site.",
+  siteLoginUnavailable: "Entrar exige uma identidade desbloqueada.",
+  siteLoginVerified: "Verificado",
+  siteLoginNameClaim: "Nome informado pelo site",
+  siteLoginChecking: "Verificando {site}…",
+  siteLoginCheckingHint:
+    "O Linky está carregando o documento de domínio que o site publica. Nada foi assinado ainda.",
+  siteLoginCheckAddress:
+    "Aprove somente se você mesmo tocou em Entrar em {site} e a barra de endereço mostra {site}.",
+  siteLoginDoneOtherDevice:
+    "Aprovação enviada. Volte ao outro dispositivo para concluir.",
+  siteLoginCannotVerify: "Não foi possível verificar {site}",
+  siteLoginCannotVerifyHint:
+    "O Linky não conseguiu verificar este site, então o login não é oferecido. O site pode estar offline ou não publica uma identidade de login válida.",
+  siteLoginCallbackNotListed: "Endereço de retorno não publicado",
+  siteLoginCallbackNotListedHint:
+    "Este link enviaria seu login para uma página que {site} não publicou como destino de retorno, então o Linky não oferece o login.",
+  siteLoginInvalidLink: "Link de login inválido",
+  siteLoginInvalidLinkHint:
+    "Este link parece um login, mas está incompleto ou danificado, então o Linky não pode oferecê-lo.",
+  siteLoginSupportsLinky: "{site} aceita login com o Linky",
+  siteLoginSupportsLinkyHint:
+    "Use o botão Entrar com Linky em {site}. Qualquer página pode mostrar um código de login como este, então o Linky não o aprova para {site}.",
   lnurlWithdrawPreparing: "Preparando saque…",
   lnurlWithdrawPending: "O saque está aguardando liquidação na carteira.",
   lnurlWithdrawFailed: "O saque LNURLw falhou",

@@ -37,8 +37,8 @@ import { useContactsOnboardingProgress } from "../guide/useContactsOnboardingPro
 import { buildUnknownContactId } from "../messages/contactIdentity";
 import type { DispatchInboxEvent } from "../messages/useLinkstrInboxSync";
 import type { LnurlAuthResult } from "../useLnurlAuth";
-import type { NostrConnectLoginResult } from "../useNostrConnectLogin";
-import { takeNostrConnectHashLink } from "../../../nostrConnect";
+import type { SiteLoginResult } from "../useSiteLogin";
+import { takeSiteLoginHashLink } from "../../../siteLogin";
 import { isAnimatedQrFrame } from "../../../utils/animatedQr";
 import { useExperimentalFeatures } from "../useExperimentalFeatures";
 import { useGuideScannerDomain } from "../useGuideScannerDomain";
@@ -116,7 +116,8 @@ interface UseScanNativeCompositionParams {
   persistContactsOnboardingDismissed: () => void;
   pushToast: (message: string) => void;
   requestLnurlAuthConfirmation: LnurlAuthResult["requestLnurlAuthConfirmation"];
-  requestNostrConnectLoginConfirmation: NostrConnectLoginResult["requestNostrConnectLoginConfirmation"];
+  requestLinkauthLogin: SiteLoginResult["requestLinkauthLogin"];
+  requestSiteLoginConfirmation: SiteLoginResult["requestSiteLoginConfirmation"];
   route: ReturnType<typeof useRouting>;
   saveCashuFromText: CashuWalletCompositionResult["saveCashuFromText"];
   setPendingLightningInvoiceConfirmation: CashuWalletCompositionResult["setPendingLightningInvoiceConfirmation"];
@@ -151,7 +152,8 @@ export const useScanNativeComposition = ({
   persistContactsOnboardingDismissed,
   pushToast,
   requestLnurlAuthConfirmation,
-  requestNostrConnectLoginConfirmation,
+  requestLinkauthLogin,
+  requestSiteLoginConfirmation,
   route,
   saveCashuFromText,
   setPendingLightningInvoiceConfirmation,
@@ -616,7 +618,8 @@ export const useScanNativeComposition = ({
     requestLightningInvoiceConfirmation: setPendingLightningInvoiceConfirmation,
     requestLnurlAuthConfirmation,
     requestLnurlWithdrawConfirmation: setPendingLnurlWithdrawConfirmation,
-    requestNostrConnectLoginConfirmation,
+    requestLinkauthLogin,
+    requestSiteLoginConfirmation,
     saveCashuFromText,
     scanAcceptsBankPayment:
       scanEntryPoint === "send" || route.kind === "manualPay",
@@ -756,14 +759,14 @@ export const useScanNativeComposition = ({
 
   // An open app gets a web link as a hash change, not a fresh load.
   React.useEffect(() => {
-    const acceptNostrConnectHashLink = () => {
-      const uri = takeNostrConnectHashLink();
-      if (uri) updatePendingDeepLinkText(uri);
+    const acceptSiteLoginHashLink = () => {
+      const link = takeSiteLoginHashLink();
+      if (link) updatePendingDeepLinkText(link);
     };
-    acceptNostrConnectHashLink();
-    window.addEventListener("hashchange", acceptNostrConnectHashLink);
+    acceptSiteLoginHashLink();
+    window.addEventListener("hashchange", acceptSiteLoginHashLink);
     return () =>
-      window.removeEventListener("hashchange", acceptNostrConnectHashLink);
+      window.removeEventListener("hashchange", acceptSiteLoginHashLink);
   }, [updatePendingDeepLinkText]);
 
   React.useEffect(() => {

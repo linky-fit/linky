@@ -1052,23 +1052,51 @@ export const en = {
   lnurlAuthDoneHint: "You can go back to the site.",
   lnurlAuthFailed: "LNURL login failed",
   lnurlAuthUnavailable: "Signing in needs an unlocked identity.",
-  nostrConnectLoginConfirm: "Log in",
-  nostrConnectLoginConfirmDevice: "Log in and link device",
-  nostrConnectLoginWaiting: "Waiting for the site…",
-  nostrConnectLoginUnknownSite: "Unknown site",
-  nostrConnectLoginUnverified: "Unverified",
-  nostrConnectLoginAs: "Log in as",
-  nostrConnectLoginLinksDevice:
+  siteLoginConfirm: "Log in",
+  siteLoginConfirmDevice: "Log in and link device",
+  siteLoginWaiting: "Waiting for the site…",
+  siteLoginUnverified: "Unverified",
+  siteLoginTo: "Log in to",
+  siteLoginAs: "Log in as",
+  siteLoginRevealsProfile: "{site} will see your public Nostr profile.",
+  siteLoginLinksDevice:
     "{site} also asks to link one of its devices to you. You sign that this device may act for you in {site}.",
-  nostrConnectLoginShares:
-    "The site gets your public key and a one-time login signature. It can't post as you or read your messages.",
-  nostrConnectLoginDone: "Logged in to {site}",
-  nostrConnectLoginDoneHint: "You can return to the site.",
-  nostrConnectLoginFailed: "Nostr Connect login failed",
-  nostrConnectLoginTimedOut: "The site did not respond.",
-  nostrConnectLoginRefused: "Linky only signs login requests.",
-  nostrConnectLoginUnreachable: "Couldn't reach the site's relays.",
-  nostrConnectLoginUnavailable: "Logging in needs an unlocked identity.",
+  siteLoginShares:
+    "Approving proves to {site} that you own this Nostr key. It works for this site only, and the site can't post as you or read your messages.",
+  siteLoginStartedHere:
+    "Only approve if you started this login on {site} yourself.",
+  siteLoginDone: "Logged in to {site}",
+  siteLoginDoneHint: "You can return to the site.",
+  siteLoginDoneReturning: "Taking you back to the site…",
+  siteLoginUnsupported: "Unsupported login request",
+  siteLoginUnsupportedHint:
+    "Linky only signs a login for the site that asked for it. This request doesn't say which site, or doesn't ask for a login, so it can't be approved.",
+  siteLoginFailed: "Login failed",
+  siteLoginTimedOut: "The site did not respond.",
+  siteLoginRefused: "Linky only signs login requests.",
+  siteLoginUnreachable: "Couldn't reach the site's relays.",
+  siteLoginUnavailable: "Logging in needs an unlocked identity.",
+  siteLoginVerified: "Verified",
+  siteLoginNameClaim: "Name given by the site",
+  siteLoginChecking: "Checking {site}…",
+  siteLoginCheckingHint:
+    "Linky is loading the domain document the site publishes. Nothing is signed yet.",
+  siteLoginCheckAddress:
+    "Only approve if you pressed Log in on {site} yourself and its address bar shows {site}.",
+  siteLoginDoneOtherDevice:
+    "Approval sent. Go back to the other device to finish.",
+  siteLoginCannotVerify: "Can't verify {site}",
+  siteLoginCannotVerifyHint:
+    "Linky could not verify this site, so the login is not offered. The site may be offline, or it doesn't publish a valid login identity.",
+  siteLoginCallbackNotListed: "Return address not published",
+  siteLoginCallbackNotListedHint:
+    "This link would send your login to a page that {site} has not published as a place to return to, so Linky won't offer the login.",
+  siteLoginInvalidLink: "Invalid login link",
+  siteLoginInvalidLinkHint:
+    "This link looks like a login but is incomplete or damaged, so Linky can't offer the login.",
+  siteLoginSupportsLinky: "{site} supports logging in with Linky",
+  siteLoginSupportsLinkyHint:
+    "Use the Log in with Linky button on {site} instead. Any page can show a login code like this one, so Linky won't approve it for {site}.",
   lnurlWithdrawPreparing: "Preparing withdrawal…",
   lnurlWithdrawPending: "Withdrawal is waiting to settle into the wallet.",
   lnurlWithdrawFailed: "LNURLw withdrawal failed",

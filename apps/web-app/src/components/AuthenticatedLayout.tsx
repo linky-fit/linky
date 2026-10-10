@@ -12,7 +12,7 @@ import { CashuPaymentRequestConfirmModal } from "./CashuPaymentRequestConfirmMod
 import { LnurlAuthModal } from "./LnurlAuthModal";
 import { LnurlWithdrawConfirmModal } from "./LnurlWithdrawConfirmModal";
 import { NfcWriteModal } from "./NfcWriteModal";
-import { NostrConnectLoginModal } from "./NostrConnectLoginModal";
+import { SiteLoginModal } from "./SiteLoginModal";
 import { PaidOverlay } from "./PaidOverlay";
 import { PaymentMintMeltConfirmModal } from "./PaymentMintMeltConfirmModal";
 import { ProfileShareOverlay } from "./ProfileShareOverlay";
@@ -119,24 +119,23 @@ export function AuthenticatedLayout({
         />
       ) : null}
 
-      {state.pendingNostrConnectLoginConfirmation &&
-      !state.paidOverlayIsOpen ? (
-        <NostrConnectLoginModal
+      {state.pendingSiteLoginConfirmation && !state.paidOverlayIsOpen ? (
+        <SiteLoginModal
           identity={{
             name: state.effectiveProfileName,
             npub: state.currentNpub,
             picture: state.effectiveProfilePicture,
           }}
-          onClose={actions.closeNostrConnectLoginConfirmation}
-          onConfirm={actions.confirmNostrConnectLogin}
+          login={state.pendingSiteLoginConfirmation}
+          onClose={actions.closeSiteLoginConfirmation}
+          onConfirm={actions.confirmSiteLogin}
           phase={
-            state.nostrConnectLoginIsDone
+            state.siteLoginIsDone
               ? "done"
-              : state.nostrConnectLoginIsBusy
+              : state.siteLoginIsBusy
                 ? "busy"
                 : "confirm"
           }
-          request={state.pendingNostrConnectLoginConfirmation}
           t={state.t}
         />
       ) : null}

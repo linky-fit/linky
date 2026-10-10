@@ -1059,23 +1059,51 @@ export const cs = {
   lnurlAuthDoneHint: "Můžeš se vrátit na web.",
   lnurlAuthFailed: "Přihlášení přes LNURL selhalo",
   lnurlAuthUnavailable: "Přihlášení potřebuje odemčenou identitu.",
-  nostrConnectLoginConfirm: "Přihlásit",
-  nostrConnectLoginConfirmDevice: "Přihlásit a propojit zařízení",
-  nostrConnectLoginWaiting: "Čekám na web…",
-  nostrConnectLoginUnknownSite: "Neznámý web",
-  nostrConnectLoginUnverified: "Neověřeno",
-  nostrConnectLoginAs: "Přihlásit jako",
-  nostrConnectLoginLinksDevice:
+  siteLoginConfirm: "Přihlásit",
+  siteLoginConfirmDevice: "Přihlásit a propojit zařízení",
+  siteLoginWaiting: "Čekám na web…",
+  siteLoginUnverified: "Neověřeno",
+  siteLoginTo: "Přihlásit na",
+  siteLoginAs: "Přihlásit jako",
+  siteLoginRevealsProfile: "{site} uvidí tvůj veřejný profil na Nostru.",
+  siteLoginLinksDevice:
     "{site} chce také propojit jedno svoje zařízení s tebou. Podepíšeš, že to zařízení smí v {site} jednat za tebe.",
-  nostrConnectLoginShares:
-    "Web dostane tvůj veřejný klíč a jednorázový přihlašovací podpis. Nemůže za tebe nic zveřejňovat ani číst tvoje zprávy.",
-  nostrConnectLoginDone: "Přihlášeno na {site}",
-  nostrConnectLoginDoneHint: "Můžeš se vrátit na web.",
-  nostrConnectLoginFailed: "Přihlášení přes Nostr Connect selhalo",
-  nostrConnectLoginTimedOut: "Web neodpověděl.",
-  nostrConnectLoginRefused: "Linky podepisuje jen žádosti o přihlášení.",
-  nostrConnectLoginUnreachable: "Nepodařilo se spojit s relayi webu.",
-  nostrConnectLoginUnavailable: "Přihlášení potřebuje odemčenou identitu.",
+  siteLoginShares:
+    "Schválením webu {site} dokážeš, že vlastníš tento klíč Nostr. Platí jen pro tento web a web za tebe nemůže nic zveřejňovat ani číst tvoje zprávy.",
+  siteLoginStartedHere:
+    "Schval to jen tehdy, když jsi toto přihlášení sám zahájil na {site}.",
+  siteLoginDone: "Přihlášeno na {site}",
+  siteLoginDoneHint: "Můžeš se vrátit na web.",
+  siteLoginDoneReturning: "Vracím tě na web…",
+  siteLoginUnsupported: "Nepodporovaná žádost o přihlášení",
+  siteLoginUnsupportedHint:
+    "Linky podepíše přihlášení jen pro web, který o něj žádá. Tahle žádost neříká, o jaký web jde, nebo nežádá o přihlášení, proto ji nelze schválit.",
+  siteLoginFailed: "Přihlášení selhalo",
+  siteLoginTimedOut: "Web neodpověděl.",
+  siteLoginRefused: "Linky podepisuje jen žádosti o přihlášení.",
+  siteLoginUnreachable: "Nepodařilo se spojit s relayi webu.",
+  siteLoginUnavailable: "Přihlášení potřebuje odemčenou identitu.",
+  siteLoginVerified: "Ověřeno",
+  siteLoginNameClaim: "Název uvedl web",
+  siteLoginChecking: "Ověřuji {site}…",
+  siteLoginCheckingHint:
+    "Linky načítá dokument domény, který web zveřejňuje. Zatím se nic nepodepisuje.",
+  siteLoginCheckAddress:
+    "Schval to jen tehdy, když jsi na {site} sám klikl na Přihlásit a v adresním řádku vidíš {site}.",
+  siteLoginDoneOtherDevice:
+    "Schválení odesláno. Dokonči přihlášení na druhém zařízení.",
+  siteLoginCannotVerify: "{site} nelze ověřit",
+  siteLoginCannotVerifyHint:
+    "Linky tento web nedokázal ověřit, proto přihlášení nenabízí. Web může být nedostupný nebo nezveřejňuje platnou identitu pro přihlášení.",
+  siteLoginCallbackNotListed: "Návratová adresa není zveřejněná",
+  siteLoginCallbackNotListedHint:
+    "Tento odkaz by poslal tvoje přihlášení na stránku, kterou {site} nezveřejnil jako místo návratu, proto Linky přihlášení nenabízí.",
+  siteLoginInvalidLink: "Neplatný odkaz pro přihlášení",
+  siteLoginInvalidLinkHint:
+    "Odkaz vypadá jako přihlášení, ale je neúplný nebo poškozený, proto ho Linky nemůže nabídnout.",
+  siteLoginSupportsLinky: "{site} podporuje přihlášení přes Linky",
+  siteLoginSupportsLinkyHint:
+    "Použij místo toho tlačítko pro přihlášení přes Linky přímo na {site}. Takový přihlašovací kód může ukázat jakákoli stránka, proto ho Linky pro {site} neschválí.",
   lnurlWithdrawPreparing: "Připravuji výběr…",
   lnurlWithdrawPending: "Výběr čeká na připsání do peněženky.",
   lnurlWithdrawFailed: "Výběr přes LNURLw selhal",
