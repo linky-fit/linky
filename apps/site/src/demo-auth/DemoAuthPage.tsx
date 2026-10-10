@@ -1,10 +1,16 @@
 import {
+  linkauthLinks,
+  type LinkauthLinksOptions,
+} from "@linky-fit/linkauth/client";
+import {
   Button,
   Card,
   LoadingState,
+  ListRow,
   Notice,
   QRCode,
   Stack,
+  Switch,
   Text,
 } from "@linky-fit/ui";
 import { nip19 } from "nostr-tools";
@@ -12,6 +18,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { copyTextToClipboard } from "../clipboard";
 import { SiteLayout } from "../SiteLayout";
 import { useSiteLocale } from "../useSiteLocale";
+import { callbackUrl, signerAppUrl } from "./config";
 import { useDemoAuth, type DemoAuthState } from "./useDemoAuth";
 
 const docsUrl =
@@ -123,16 +130,23 @@ function OtherSigner({
 }
 
 function LoginOptions({
-  openUrl,
-  qrUrl,
+  nonce,
+  signerApp,
   uri,
   connectOtherSigner,
 }: {
-  openUrl: string;
-  qrUrl: string;
+  nonce: string;
+  signerApp: NonNullable<LinkauthLinksOptions["signerApp"]>;
   uri: string | null;
   connectOtherSigner: () => void;
 }) {
+  const { openUrl, qrUrl } = linkauthLinks({
+    audience: location.origin,
+    nonce,
+    callbackUrl,
+    signerApp,
+    ...(signerAppUrl ? { signerAppUrl } : {}),
+  });
   return (
     <Stack gap="$lg" testID="demo-auth-login">
       <Button
@@ -182,10 +196,12 @@ function LoggedIn({
 
 function StateView({
   state,
+  signerApp,
   retry,
   logOut,
 }: {
   state: DemoAuthState;
+  signerApp: NonNullable<LinkauthLinksOptions["signerApp"]>;
   retry: () => void;
   logOut: () => void;
 }) {
@@ -205,8 +221,8 @@ function StateView({
     case "waiting":
       return (
         <LoginOptions
-          openUrl={state.openUrl}
-          qrUrl={state.qrUrl}
+          nonce={state.nonce}
+          signerApp={signerApp}
           uri={state.uri}
           connectOtherSigner={state.connectOtherSigner}
         />
@@ -239,6 +255,7 @@ function StateView({
 
 function DemoAuthPage() {
   const [locale, setLocale] = useSiteLocale();
+  const [nightly, setNightly] = useState(true);
   const { state, retry, logOut } = useDemoAuth();
 
   return (
@@ -266,7 +283,25 @@ function DemoAuthPage() {
           </Text>
         </Stack>
         <PageCard testID="demo-auth-card">
-          <StateView state={state} retry={retry} logOut={logOut} />
+          {state.status === "waiting" && (
+            <ListRow
+              title="Use nightly"
+              description={nightly ? "Latest build" : "Released app"}
+              trailing={
+                <Switch
+                  accessibilityLabel="Use nightly"
+                  value={nightly}
+                  onValueChange={setNightly}
+                />
+              }
+            />
+          )}
+          <StateView
+            state={state}
+            signerApp={nightly ? "nightly" : "production"}
+            retry={retry}
+            logOut={logOut}
+          />
         </PageCard>
         <PageCard>
           <Text variant="title" color="$colorStrong">

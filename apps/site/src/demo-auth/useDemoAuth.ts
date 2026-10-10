@@ -2,7 +2,6 @@ import {
   clearCallback,
   connectNip46,
   LinkauthError,
-  linkauthLinks,
   readCallback,
   type LinkauthAssertion,
 } from "@linky-fit/linkauth/client";
@@ -18,14 +17,13 @@ import {
   savePubkey,
   verifyAssertion,
 } from "./api";
-import { callbackUrl, relays, signerAppUrl } from "./config";
+import { relays } from "./config";
 
 export type DemoAuthState =
   | { status: "starting" }
   | {
       status: "waiting";
-      openUrl: string;
-      qrUrl: string;
+      nonce: string;
       /** The NIP-46 link for other signers, once the relays listen. */
       uri: string | null;
       /** Opens the NIP-46 session; only the first call does anything. */
@@ -139,13 +137,6 @@ export const useDemoAuth = () => {
     const start = async () => {
       const audience = location.origin;
       const nonce = await fetchNonce(channels.signal);
-      const { openUrl, qrUrl } = linkauthLinks({
-        audience,
-        nonce,
-        callbackUrl,
-        signerApp: "nightly",
-        ...(signerAppUrl ? { signerAppUrl } : {}),
-      });
       let otherSignerConnected = false;
       const connectOtherSigner = () => {
         if (otherSignerConnected || channels.signal.aborted) return;
@@ -183,8 +174,7 @@ export const useDemoAuth = () => {
       };
       const waiting = (uri: string | null): DemoAuthState => ({
         status: "waiting",
-        openUrl,
-        qrUrl,
+        nonce,
         uri,
         connectOtherSigner,
       });
