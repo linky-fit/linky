@@ -101,4 +101,23 @@ describe("contacts commands", () => {
       ).toEqual([directConversationIdFor(id)]),
     );
   });
+
+  it("reports a restore that succeeded when reading the contact back fails", async () => {
+    const { commands, contacts } = await boot();
+    const id = createId<"Contact">();
+    await Effect.runPromise(
+      contacts.insert({ id, name: NonEmptyString1000.orThrow("Bob") }),
+    );
+    expect(await commands.archiveContact(id)).toEqual({ ok: true });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(contacts, "byId").mockReturnValueOnce(
+      Effect.die(new Error("database closed")),
+    );
+
+    expect(await commands.unarchiveContact(id)).toEqual({ ok: true });
+    vi.restoreAllMocks();
+    expect((await Effect.runPromise(contacts.byId(id)))?.archivedAtSec).toBe(
+      null,
+    );
+  });
 });

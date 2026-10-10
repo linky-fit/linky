@@ -42,11 +42,18 @@ export interface MessagesCommands {
     fromContactId: string,
     toContactId: string,
   ) => Promise<number>;
-  /** Adds a local-only identity change notice to every contact conversation that has a message. */
+  /**
+   * Adds a local-only identity change notice to every contact conversation
+   * that has a message. Never rejects and gives up after a bounded time, so
+   * the identity switch that awaits it always reloads.
+   */
   readonly appendIdentityChangeNotices: (
     change: IdentityChange,
   ) => Promise<void>;
 }
+
+// A failing Evolu database can leave its reads pending forever.
+const IDENTITY_CHANGE_NOTICES_TIMEOUT = "2 seconds";
 
 const parseContactId = (value: string): ContactId | null => {
   const result = ContactId.fromUnknown(value);
@@ -216,11 +223,12 @@ const makeMessagesCommands = ({
             );
           }
         }).pipe(
-          Effect.catch((error) =>
+          Effect.timeout(IDENTITY_CHANGE_NOTICES_TIMEOUT),
+          Effect.catchCause((cause) =>
             Effect.sync(() =>
               console.warn(
                 "[linky][messages] identity change notices failed",
-                error,
+                cause,
               ),
             ),
           ),
