@@ -2,6 +2,7 @@ import { Context, Duration, Effect, Layer, Schema } from "effect";
 import { SimplePool } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { RelayUrl } from "../domain/primitives";
+import { acquireRelayPool } from "../internal/relayPoolLifetime";
 import type { SignedPlainEvent, SignedWrapEvent } from "../internal/nostrEvent";
 
 export class RelayPublishResult extends Schema.Class<RelayPublishResult>(
@@ -288,18 +289,15 @@ export const makeNostrTransportSimplePool = (options?: {
   Layer.effect(
     NostrTransport,
     Effect.map(
-      Effect.acquireRelease(
-        // Ping detects dropped websockets (mobile background, network
-        // switch). Reconnect must stay OFF: nostr-tools re-fires
-        // subscriptions with `since = lastEmitted + 1`, which strips the
-        // NIP-59 backdate margin from gift-wrap filters and silently drops
-        // backdated wraps for the rest of the session. A hard close instead
-        // lets the inbox machine resubscribe with correct cursor-based
-        // filters — resubscribe policy lives there, not in the transport.
-        Effect.sync(
-          () => new SimplePool({ enablePing: true, enableReconnect: false }),
-        ),
-        (pool) => Effect.sync(() => pool.destroy()),
+      // Ping detects dropped websockets (mobile background, network
+      // switch). Reconnect must stay OFF: nostr-tools re-fires
+      // subscriptions with `since = lastEmitted + 1`, which strips the
+      // NIP-59 backdate margin from gift-wrap filters and silently drops
+      // backdated wraps for the rest of the session. A hard close instead
+      // lets the inbox machine resubscribe with correct cursor-based
+      // filters — resubscribe policy lives there, not in the transport.
+      acquireRelayPool(
+        () => new SimplePool({ enablePing: true, enableReconnect: false }),
       ),
       (pool) => makeRelayPoolTransport(pool, options),
     ),
