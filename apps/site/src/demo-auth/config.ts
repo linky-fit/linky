@@ -1,7 +1,6 @@
 import recommendedRelays from "../../public/recommended-relays.json";
 
-export const signerAppUrl =
-  import.meta.env.VITE_LINKY_APP_URL || "https://nightly.app.linky.fit";
+export const signerAppUrl = import.meta.env.VITE_LINKY_APP_URL || undefined;
 
 /** Must equal an entry in the callbacks of the domain document, which the api derives the same way. */
 export const callbackUrl = `${location.origin}/demo/auth/`;
