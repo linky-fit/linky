@@ -48,6 +48,7 @@ export {
   DEVICE_AUTHORIZATION_KIND,
   DEVICE_AUTHORIZATION_PERMISSION,
   deviceAuthorizationTemplate,
+  linkauthAudience,
   NOSTR_CONNECT_KIND,
   parseNostrConnectUri,
   requestsDeviceAuthorization,

@@ -1,8 +1,14 @@
+import {
+  isCanonicalAuthTemplate,
+  LINKAUTH_KIND,
+  LINKAUTH_PERMISSION,
+  normalizeAudience,
+} from "@linky-fit/linkauth/signer";
 import { Either, Option, Schema } from "effect";
 import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
 import { isPubkey, RelayUrl } from "../domain/primitives";
 import type { EventId, Pubkey, UnixSeconds } from "../domain/primitives";
-import { firstTagValue, NostrTags, tagValues } from "../internal/nostrEvent";
+import { firstTagValue, NostrTags } from "../internal/nostrEvent";
 import type { SignedPlainEvent } from "../internal/nostrEvent";
 import {
   decodeVerifiedPlainEvent,
@@ -16,12 +22,6 @@ import { DeviceAuthorization, NostrConnectRequest } from "./domain";
 export const NOSTR_CONNECT_KIND = 24133;
 
 const MAX_RELAYS = 5;
-const NIP98_AUTH_KIND = 27235;
-const NIP42_AUTH_KIND = 22242;
-const SIGNABLE_KINDS: ReadonlySet<number> = new Set([
-  NIP98_AUTH_KIND,
-  NIP42_AUTH_KIND,
-]);
 
 /**
  * Linky-invented kind binding the signer's key to a device key of the app
@@ -51,6 +51,17 @@ export const deviceAuthorizationTemplate = (args: {
 export const requestsDeviceAuthorization = (
   request: NostrConnectRequest,
 ): boolean => request.perms.includes(DEVICE_AUTHORIZATION_PERMISSION);
+
+/**
+ * The origin a site login would be bound to when the link explicitly asks
+ * for `sign_event:24139` and its `url` is an acceptable site; null otherwise.
+ */
+export const linkauthAudience = (
+  request: NostrConnectRequest,
+): string | null =>
+  request.url !== null && request.perms.includes(LINKAUTH_PERMISSION)
+    ? normalizeAudience(request.url)
+    : null;
 
 /** What a template authorizes when it is exactly the canonical shape. */
 const authorizationOf = (
@@ -217,14 +228,6 @@ const SignTemplate = Schema.parseJson(
 );
 const decodeSignTemplate = Schema.decodeUnknownEither(SignTemplate);
 
-const hostOf = (url: string): string | null => {
-  try {
-    return new URL(url).host.toLowerCase();
-  } catch {
-    return null;
-  }
-};
-
 const deviceAuthorizationPolicy = (
   request: NostrConnectRequest,
   template: PlainEventTemplate,
@@ -246,6 +249,22 @@ const deviceAuthorizationPolicy = (
     : Either.left("app tag does not match the approved name");
 };
 
+const linkauthPolicy = (
+  request: NostrConnectRequest,
+  template: PlainEventTemplate,
+): Either.Either<PlainEventTemplate, string> => {
+  // A blanket `sign_event` (or no perms) never covers it, as for device authorizations.
+  if (!request.perms.includes(LINKAUTH_PERMISSION)) {
+    return Either.left(`${LINKAUTH_PERMISSION} was not requested`);
+  }
+  if (request.url === null || normalizeAudience(request.url) === null) {
+    return Either.left("a login needs the site's url");
+  }
+  return isCanonicalAuthTemplate(template, request.url)
+    ? Either.right(template)
+    : Either.left("invalid login template");
+};
+
 const signableTemplate = (
   request: NostrConnectRequest,
   param: string | undefined,
@@ -254,27 +273,14 @@ const signableTemplate = (
     const template = yield* decodeSignTemplate(param).pipe(
       Either.mapLeft(() => "invalid event template"),
     );
-    if (template.kind === DEVICE_AUTHORIZATION_KIND) {
-      return yield* deviceAuthorizationPolicy(request, template);
+    switch (template.kind) {
+      case DEVICE_AUTHORIZATION_KIND:
+        return yield* deviceAuthorizationPolicy(request, template);
+      case LINKAUTH_KIND:
+        return yield* linkauthPolicy(request, template);
+      default:
+        return yield* Either.left(`kind ${template.kind} is not allowed`);
     }
-    if (!SIGNABLE_KINDS.has(template.kind)) {
-      return yield* Either.left(`kind ${template.kind} is not allowed`);
-    }
-    const permitted =
-      request.perms.length === 0 ||
-      request.perms.includes("sign_event") ||
-      request.perms.includes(`sign_event:${template.kind}`);
-    if (!permitted) {
-      return yield* Either.left(
-        `sign_event:${template.kind} was not requested`,
-      );
-    }
-    const siteHost = request.url === null ? null : hostOf(request.url);
-    const urls = tagValues(template.tags, "u");
-    if (request.url !== null && urls.some((url) => hostOf(url) !== siteHost)) {
-      return yield* Either.left("u tag does not match the site");
-    }
-    return template;
   });
 
 /** What answering one request means for the login. */
@@ -284,7 +290,7 @@ export type NostrConnectOutcome =
   | {
       readonly _tag: "Signed";
       readonly kind: number;
-      /** The device a signed device authorization names; null for logins. */
+      /** The device a signed device authorization names; null for site logins. */
       readonly device: Pubkey | null;
     }
   | { readonly _tag: "Refused"; readonly reason: string };
@@ -295,9 +301,9 @@ export interface NostrConnectAnswer {
 }
 
 /**
- * Login policy: share the pubkey, sign only NIP-98 / NIP-42 auth events the
- * URI permits for its own site and the device authorization it explicitly
- * asks for (`created_at` = `now`), refuse other signatures, and answer
+ * Login policy: share the pubkey, sign only the canonical linkauth login for
+ * the link's own `url` and the device authorization, each on its explicit
+ * permission (`created_at` = `now`), refuse other signatures, and answer
  * anything else with an error the login survives.
  */
 export const answerNostrConnectRequest = (

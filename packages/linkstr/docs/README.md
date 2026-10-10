@@ -60,6 +60,7 @@ Every event kind the package produces. Wrapped kinds travel inside a kind 1059 g
 | 30078 | app data (NIP-78)                         | no      | n/a                 | [plain-events.md](./plain-events.md#app-data-nip-78)        |
 | 24133 | NIP-46 Nostr Connect message (ephemeral)  | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#wire-format)          |
 | 24138 | device authorization (signed, embedded)   | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#device-authorization) |
+| 24139 | site login (signed, never published)      | no      | n/a                 | [nostr-connect.md](./nostr-connect.md#the-site-login-event) |
 | 24242 | Blossom upload auth (never published)     | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)                  |
 | 27235 | NIP-98 auth, push proof (never published) | no      | n/a                 | [http-auth.md](./http-auth.md#wire-format)                  |
 

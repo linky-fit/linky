@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@cashu/cashu-ts": "^4.0.0",
+    "@linky-fit/linkauth": "workspace:*",
     "@noble/curves": "^1.4.1",
     "@noble/hashes": "^2.0.1",
     "effect": "^3.19.19",
