@@ -6,13 +6,17 @@ import coreEslintConfig, {
 import { defineConfig } from "eslint/config";
 
 const runtimeMessage =
-  "The Evolu runtime is called only in src/evolu/evoluShardDb.ts; everything else goes through the ShardDb port.";
+  "The Evolu runtime is called only in src/evolu/evoluShardDb.ts and src/evolu/linkyEvolu.ts, which opens the database; everything else goes through the ShardDb port.";
 
 export default defineConfig([
   ...coreEslintConfig,
   {
     files: ["src/**/*.ts"],
-    ignores: ["src/evolu/evoluShardDb.ts", ...testHelperImportIgnores],
+    ignores: [
+      "src/evolu/evoluShardDb.ts",
+      "src/evolu/linkyEvolu.ts",
+      ...testHelperImportIgnores,
+    ],
     rules: {
       "no-restricted-imports": [
         "error",

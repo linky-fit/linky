@@ -1,15 +1,5 @@
 import {
   linkyScopes,
-  makeContactsRepository,
-  makeConversationsRepository,
-  makeIdentityRepository,
-  makeInboxCursorsRepository,
-  makeKeryxSubscriptionsRepository,
-  makeRecurringPaymentsRepository,
-  makeSettingsRepository,
-  makeTransactionsRepository,
-  makeUnknownSendersRepository,
-  makeWalletRepository,
   type ContactRow,
   type ContactsRepository,
   type ConversationRow,
@@ -39,27 +29,37 @@ import {
   useRepositoryRows,
 } from "@linky-fit/linksync/react";
 import type { StoredOperation } from "@linky-fit/linkshu";
+import { useAtomSuspense } from "@linky-fit/linkstr-react";
 import { Effect } from "effect";
 import React from "react";
 import { reportAppLog } from "../../devtools/inspector/appLog";
-import { getLinkyStore } from "../../evolu";
 import { getUnknownErrorMessage } from "../../utils/unknown";
+import {
+  contactsRepositoryAtom,
+  conversationsRepositoryAtom,
+  identityRepositoryAtom,
+  inboxCursorsRepositoryAtom,
+  keryxSubscriptionsRepositoryAtom,
+  linkyStoreAtom,
+  recurringPaymentsRepositoryAtom,
+  settingsRepositoryAtom,
+  transactionsRepositoryAtom,
+  unknownSendersRepositoryAtom,
+  walletRepositoryAtom,
+} from "../state/session/store";
 
-/** The shard store; resolved before the authenticated shell mounts, so this reads synchronously there. */
-export const useLinkyStore = (): LinkyStore => React.use(getLinkyStore());
+/** The session's shard store; suspends until the local database has answered. */
+export const useLinkyStore = (): LinkyStore =>
+  useAtomSuspense(linkyStoreAtom).value;
 
-export const useContactsRepository = (): ContactsRepository => {
-  const store = useLinkyStore();
-  return React.useMemo(() => makeContactsRepository(store), [store]);
-};
+export const useContactsRepository = (): ContactsRepository =>
+  useAtomSuspense(contactsRepositoryAtom).value;
 
 export const useContactRows = (): ReadonlyArray<ContactRow> =>
   useRepositoryRows(useContactsRepository());
 
-export const useConversationsRepository = (): ConversationsRepository => {
-  const store = useLinkyStore();
-  return React.useMemo(() => makeConversationsRepository(store), [store]);
-};
+export const useConversationsRepository = (): ConversationsRepository =>
+  useAtomSuspense(conversationsRepositoryAtom).value;
 
 export const useConversationRows = (): ReadonlyArray<ConversationRow> =>
   useRepositoryRows(useConversationsRepository());
@@ -77,15 +77,11 @@ export const useMessagesVisibleSinceSec = (): number | null => {
   return useLiveValue<number | null>(source, null);
 };
 
-export const useInboxCursorsRepository = (): InboxCursorsRepository => {
-  const store = useLinkyStore();
-  return React.useMemo(() => makeInboxCursorsRepository(store), [store]);
-};
+export const useInboxCursorsRepository = (): InboxCursorsRepository =>
+  useAtomSuspense(inboxCursorsRepositoryAtom).value;
 
-export const useUnknownSendersRepository = (): UnknownSendersRepository => {
-  const store = useLinkyStore();
-  return React.useMemo(() => makeUnknownSendersRepository(store), [store]);
-};
+export const useUnknownSendersRepository = (): UnknownSendersRepository =>
+  useAtomSuspense(unknownSendersRepositoryAtom).value;
 
 export const useMessageRows = (): ReadonlyArray<MessageRow> =>
   useRepositoryRows(useConversationsRepository().messages);
@@ -93,10 +89,8 @@ export const useMessageRows = (): ReadonlyArray<MessageRow> =>
 export const useReactionRows = (): ReadonlyArray<ReactionRow> =>
   useRepositoryRows(useConversationsRepository().reactions);
 
-export const useIdentityRepository = (): IdentityRepository => {
-  const store = useLinkyStore();
-  return React.useMemo(() => makeIdentityRepository(store), [store]);
-};
+export const useIdentityRepository = (): IdentityRepository =>
+  useAtomSuspense(identityRepositoryAtom).value;
 
 /** The synced active Nostr identity row, kept current; null until one syncs. */
 export const useSyncedNostrIdentityRow = (): NostrIdentityRow | null => {
@@ -108,10 +102,8 @@ export const useSyncedNostrIdentityRow = (): NostrIdentityRow | null => {
   return useLiveValue<NostrIdentityRow | null>(source, null);
 };
 
-export const useSettingsRepository = (): SettingsRepository => {
-  const store = useLinkyStore();
-  return React.useMemo(() => makeSettingsRepository(store), [store]);
-};
+export const useSettingsRepository = (): SettingsRepository =>
+  useAtomSuspense(settingsRepositoryAtom).value;
 
 /** One synced setting value, kept current; `null` until read or when absent. */
 export const useSetting = <K extends SettingKey>(
@@ -125,42 +117,30 @@ export const useSetting = <K extends SettingKey>(
   return useLiveValue<SettingValues[K] | null>(source, null);
 };
 
-export const useTransactionsRepository = (): TransactionsRepository => {
-  const store = useLinkyStore();
-  return React.useMemo(() => makeTransactionsRepository(store), [store]);
-};
+export const useTransactionsRepository = (): TransactionsRepository =>
+  useAtomSuspense(transactionsRepositoryAtom).value;
 
 export const useTransactionRecords = (): ReadonlyArray<TransactionRecord> =>
   useRepositoryRows(useTransactionsRepository());
 
-export const useRecurringPaymentsRepository =
-  (): RecurringPaymentsRepository => {
-    const store = useLinkyStore();
-    return React.useMemo(() => makeRecurringPaymentsRepository(store), [store]);
-  };
+export const useRecurringPaymentsRepository = (): RecurringPaymentsRepository =>
+  useAtomSuspense(recurringPaymentsRepositoryAtom).value;
 
 export const useRecurringPaymentRecords =
   (): ReadonlyArray<RecurringPaymentRecord> =>
     useRepositoryRows(useRecurringPaymentsRepository());
 
 export const useKeryxSubscriptionsRepository =
-  (): KeryxSubscriptionsRepository => {
-    const store = useLinkyStore();
-    return React.useMemo(
-      () => makeKeryxSubscriptionsRepository(store),
-      [store],
-    );
-  };
+  (): KeryxSubscriptionsRepository =>
+    useAtomSuspense(keryxSubscriptionsRepositoryAtom).value;
 
 export const useKeryxSubscriptionRows =
   (): ReadonlyArray<KeryxSubscriptionRecord> =>
     useRepositoryRows(useKeryxSubscriptionsRepository());
 
 /** linkshu's stores over the cashu shards; the wallet runtime is built on it. */
-export const useWalletRepository = (): WalletRepository => {
-  const store = useLinkyStore();
-  return React.useMemo(() => makeWalletRepository(store), [store]);
-};
+export const useWalletRepository = (): WalletRepository =>
+  useAtomSuspense(walletRepositoryAtom).value;
 
 const NO_OPERATIONS: ReadonlyArray<StoredOperation> = [];
 

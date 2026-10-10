@@ -8,7 +8,7 @@ import {
   useEvoluDatabaseInfoState,
   useEvoluLastError,
   useEvoluServersManager,
-  wipeEvoluStorage as wipeEvoluStorageImpl,
+  useWipeEvoluStorage,
   type ContactId,
 } from "../evolu";
 import { useRouting } from "../hooks/useRouting";
@@ -112,12 +112,10 @@ const parseContactId = (value: unknown): ContactId | null => {
 
 interface UseAppShellCompositionParams {
   currentNsec: string;
-  setCurrentNsec: (currentNsec: string | null) => void;
 }
 
 export const useAppShellComposition = ({
   currentNsec,
-  setCurrentNsec,
 }: UseAppShellCompositionParams) => {
   const route = useRouting();
   const { dismissToast, toasts, pushToast } = useToasts();
@@ -142,9 +140,7 @@ export const useAppShellComposition = ({
   } = useIdentityOwnersComposition({
     currentNsec,
     lang,
-    navigation: globalThis.location,
     pushToast,
-    setCurrentNsec,
     t,
   });
 
@@ -303,6 +299,7 @@ export const useAppShellComposition = ({
   );
 
   const evoluLastError = useEvoluLastError({ logToConsole: true });
+  const wipeEvoluStorageImpl = useWipeEvoluStorage();
   const evoluHasError = Boolean(evoluLastError);
 
   React.useEffect(() => {
@@ -321,7 +318,7 @@ export const useAppShellComposition = ({
     } catch {
       // ignore
     }
-  }, [evoluLastError]);
+  }, [evoluLastError, wipeEvoluStorageImpl]);
 
   const evoluDbInfo = useEvoluDatabaseInfoState({
     enabled:
@@ -376,7 +373,13 @@ export const useAppShellComposition = ({
     } finally {
       setEvoluWipeStorageIsBusy(false);
     }
-  }, [evoluLastError, evoluWipeStorageIsBusy, pushToast, t]);
+  }, [
+    evoluLastError,
+    evoluWipeStorageIsBusy,
+    pushToast,
+    t,
+    wipeEvoluStorageImpl,
+  ]);
 
   const [contactPaymentIntent, setContactPaymentIntent] = useState<
     "pay" | "request"

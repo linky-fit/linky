@@ -1,4 +1,5 @@
 import type { ProfileMetadata } from "@linky-fit/linkstr";
+import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import type { Lang, Translate } from "../../../i18n";
 import { persistSyncedActiveNostrIdentity } from "../../../platform/identitySecrets";
@@ -7,6 +8,8 @@ import {
   getInitialNostrIdentitySwitchedAtSec,
 } from "../../../utils/storage";
 import type { IdentityChangeMessageSource } from "../../lib/identityChangeMessage";
+import { platformAtom } from "../../state/platform";
+import { sessionAtom } from "../../state/session/session";
 import { toSyncedNostrIdentity } from "../../lib/syncedNostrIdentity";
 import {
   useIdentityRepository,
@@ -16,16 +19,10 @@ import {
 } from "../useLinksync";
 import { useProfileAuthDomain } from "../useProfileAuthDomain";
 
-interface IdentityOwnersNavigation {
-  reload: () => void;
-}
-
 interface UseIdentityOwnersCompositionParams {
   currentNsec: string;
   lang: Lang;
-  navigation: IdentityOwnersNavigation;
   pushToast: (message: string) => void;
-  setCurrentNsec: (currentNsec: string | null) => void;
   t: Translate;
 }
 
@@ -36,11 +33,11 @@ interface UseIdentityOwnersCompositionParams {
 export const useIdentityOwnersComposition = ({
   currentNsec,
   lang,
-  navigation,
   pushToast,
-  setCurrentNsec,
   t,
 }: UseIdentityOwnersCompositionParams) => {
+  const { lifecycle } = useAtomValue(platformAtom);
+  const setSession = useAtomSet(sessionAtom);
   const store = useLinkyStore();
   const identityRepository = useIdentityRepository();
   const inboxCursors = useInboxCursorsRepository();
@@ -103,14 +100,24 @@ export const useIdentityOwnersComposition = ({
       nsec: activeSyncedNostrIdentity.nsec,
       switchedAtSec: activeSyncedNostrIdentity.switchedAtSec,
     }).then(() => {
-      setCurrentNsec(activeSyncedNostrIdentity.nsec);
-      navigation.reload();
+      setSession((session) =>
+        session._tag === "SignedIn"
+          ? {
+              ...session,
+              secrets: {
+                ...session.secrets,
+                nsec: activeSyncedNostrIdentity.nsec,
+              },
+            }
+          : session,
+      );
+      lifecycle.reload();
     });
   }, [
     activeSyncedNostrIdentity,
-    navigation,
+    lifecycle,
+    setSession,
     syncedNostrIdentityMatchesLocal,
-    setCurrentNsec,
   ]);
 
   return {

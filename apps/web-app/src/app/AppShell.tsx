@@ -1,3 +1,4 @@
+import { useAtomValue } from "@linky-fit/linkstr-react";
 import { Stack } from "@linky-fit/ui";
 import React from "react";
 import { AuthenticatedLayout } from "../components/AuthenticatedLayout";
@@ -16,9 +17,9 @@ import {
 } from "./context/AppShellContexts";
 import { BeaconController } from "./BeaconController";
 import { RecurringPaymentsProvider } from "./context/RecurringPaymentsContext";
-import { useCurrentNsec } from "./hooks/useCurrentNsec";
 import { useLaneToShardMigration } from "./migrations/useLaneToShardMigration";
 import { AppRouteContent } from "./routes/AppRouteContent";
+import { sessionAtom } from "./state/session/session";
 import { useAppShellComposition } from "./useAppShellComposition";
 import { useUnauthenticatedAppShellComposition } from "./useUnauthenticatedAppShellComposition";
 
@@ -47,13 +48,9 @@ const TopBanners = ({ children }: { children: React.ReactNode }) => (
 
 interface AuthenticatedAppShellProps {
   currentNsec: string;
-  setCurrentNsec: (currentNsec: string | null) => void;
 }
 
-const AuthenticatedAppShell = ({
-  currentNsec,
-  setCurrentNsec,
-}: AuthenticatedAppShellProps) => {
+const AuthenticatedAppShell = ({ currentNsec }: AuthenticatedAppShellProps) => {
   const {
     advancedSettingsContext,
     appActions,
@@ -71,7 +68,7 @@ const AuthenticatedAppShell = ({
     relaySettingsContext,
     t,
     toasts,
-  } = useAppShellComposition({ currentNsec, setCurrentNsec });
+  } = useAppShellComposition({ currentNsec });
 
   const coreContextValue: AppShellCoreContextValue = appState;
 
@@ -204,18 +201,11 @@ const MigratedAppShell = (props: AuthenticatedAppShellProps) => {
 };
 
 const AppShell = () => {
-  const { currentNsec, isResolved, setCurrentNsec } = useCurrentNsec();
+  const session = useAtomValue(sessionAtom);
   usePersistentInspectorLogStartup();
 
-  if (!isResolved) return null;
-  if (!currentNsec) return <UnauthenticatedAppShell />;
-
-  return (
-    <MigratedAppShell
-      currentNsec={currentNsec}
-      setCurrentNsec={setCurrentNsec}
-    />
-  );
+  if (session._tag !== "SignedIn") return <UnauthenticatedAppShell />;
+  return <MigratedAppShell currentNsec={session.secrets.nsec} />;
 };
 
 export default AppShell;

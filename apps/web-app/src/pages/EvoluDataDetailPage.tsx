@@ -25,6 +25,7 @@ import {
 import {
   loadEvoluCurrentData,
   loadEvoluHistoryData,
+  useLinkyEvolu,
   type EvoluHistoryRow,
 } from "../evolu";
 import { formatEvoluRowCount } from "../utils/evoluRowCount";
@@ -59,12 +60,13 @@ const rowValue = (value: string) => (
 function CurrentDataTables({ inScopeView }: { inScopeView: InScopeView }) {
   const { evoluShards } = useEvoluSettingsContext();
   const { t } = useAppShellCore();
+  const evolu = useLinkyEvolu();
   const [currentData, setCurrentData] = useState<Awaited<
     ReturnType<typeof loadEvoluCurrentData>
   > | null>(null);
   useEffect(() => {
-    void loadEvoluCurrentData().then(setCurrentData);
-  }, []);
+    void loadEvoluCurrentData(evolu).then(setCurrentData);
+  }, [evolu]);
   if (!currentData) return <LoadingState label={t("loading")} />;
   return Object.entries(currentData)
     .filter(([tableName]) => inScopeView(tableName))
@@ -90,12 +92,13 @@ function CurrentDataTables({ inScopeView }: { inScopeView: InScopeView }) {
 function HistoryDataTable({ inScopeView }: { inScopeView: InScopeView }) {
   const { evoluShards } = useEvoluSettingsContext();
   const { t } = useAppShellCore();
+  const evolu = useLinkyEvolu();
   const [historyData, setHistoryData] = useState<EvoluHistoryRow[] | null>(
     null,
   );
   useEffect(() => {
-    void loadEvoluHistoryData().then(setHistoryData);
-  }, []);
+    void loadEvoluHistoryData(evolu).then(setHistoryData);
+  }, [evolu]);
   if (!historyData) return <LoadingState label={t("loading")} />;
   const rows = historyData.filter(
     (row) =>

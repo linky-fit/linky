@@ -531,7 +531,7 @@ export const useContactsMessagingComposition = ({
     t,
   });
 
-  useLinkstrConfigSync({ currentNsec, nostrFetchRelays: relayUrls });
+  useLinkstrConfigSync({ nostrFetchRelays: relayUrls });
   useLinkstrInspectorBridge();
 
   useLinkstrProfileSync({

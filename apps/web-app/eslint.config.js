@@ -47,17 +47,35 @@ const evoluImportPatterns = [
   {
     group: ["@evolu/*"],
     message:
-      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/evoluDb.worker.ts and src/app/migrations import @evolu/* directly.",
+      "Take Evolu re-exports from @linky-fit/linksync; only src/evolu.ts, src/evoluDb.worker.ts, src/platform/evolu.web.ts and src/app/migrations import @evolu/* directly.",
   },
 ];
 const wipeImportPatterns = [
   {
     group: ["**/evolu", "**/evolu.ts"],
-    importNames: ["wipeEvoluStorage"],
+    importNames: ["useWipeEvoluStorage"],
     message:
       "The WASM-OOM recovery is the only automatic wipe; local data is otherwise cleared only by the user.",
   },
 ];
+const stateMessage =
+  "src/app/state holds atoms and pure Effect code; React, translations, routing and toasts belong in the hooks in src/app/hooks.";
+const stateImportPatterns = [
+  {
+    group: [
+      "**/hooks/useRouting",
+      "**/hooks/useToasts",
+      "**/i18n",
+      "**/i18n/**",
+      "react-dom/*",
+      "@effect/atom-react/*",
+    ],
+    message: stateMessage,
+  },
+];
+const stateImportPaths = ["react", "react-dom", "@effect/atom-react"].map(
+  (name) => ({ name, message: stateMessage }),
+);
 
 const platformSeamMessage =
   "Browser APIs go behind the platform seam in src/platform (or a .web.ts sibling), so native builds can supply their own implementation.";
@@ -222,7 +240,30 @@ export default defineConfig([
     },
   },
   {
-    files: ["src/evolu.ts", "src/evoluDb.worker.ts", "src/app/migrations/**"],
+    files: ["src/app/state/**"],
+    ignores: testHelperImportIgnores,
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: stateImportPaths,
+          patterns: [
+            ...testHelperImportPatterns,
+            ...evoluImportPatterns,
+            ...wipeImportPatterns,
+            ...stateImportPatterns,
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "src/evolu.ts",
+      "src/evoluDb.worker.ts",
+      "src/platform/evolu.web.ts",
+      "src/app/migrations/**",
+    ],
     ignores: testHelperImportIgnores,
     rules: {
       "no-restricted-imports": [

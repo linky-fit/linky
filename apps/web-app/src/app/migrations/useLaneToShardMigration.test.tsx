@@ -1,6 +1,6 @@
 import { createId, type LinkyStore } from "@linky-fit/linksync";
 import { Effect } from "effect";
-import { act, Suspense } from "react";
+import { act, Suspense, use } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTestLinkyStore } from "../../testUtils/linkyStore";
 import { renderIntoDocument } from "../../testUtils/renderIntoDocument";
@@ -16,15 +16,15 @@ const legacy = vi.hoisted(() => ({
 
 vi.mock("../../evolu", () => {
   const query = (table: string) => () => table;
+  const evolu = {
+    loadQuery: (table: string) =>
+      Promise.resolve(legacy.tables.get(table) ?? []),
+    subscribeQuery: () => () => () => {},
+    useOwner: () => {},
+    update: legacy.update,
+  };
   return {
-    getLinkyStore: () => legacy.store,
-    evolu: {
-      loadQuery: (table: string) =>
-        Promise.resolve(legacy.tables.get(table) ?? []),
-      subscribeQuery: () => () => () => {},
-      useOwner: () => {},
-      update: legacy.update,
-    },
+    useLinkyEvolu: () => evolu,
     createCashuOperationsAllQuery: query("cashuOperation"),
     createCashuProofsAllQuery: query("cashuProof"),
     createCashuTokensAllQuery: query("cashuToken"),
@@ -36,6 +36,9 @@ vi.mock("../../evolu", () => {
     createTransactionsAllQuery: query("transaction"),
   };
 });
+vi.mock("../hooks/useLinksync", () => ({
+  useLinkyStore: () => use(legacy.store),
+}));
 vi.mock("../../platform/identitySecrets", () => ({
   readStoredSlip39Seed: () => Promise.resolve(null),
 }));

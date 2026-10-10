@@ -7,6 +7,7 @@ import type { InboxCursorsRepository } from "@linky-fit/linksync";
 import {
   linkstrConfigAtom,
   useAtomSet,
+  useAtomValue,
   type LinkstrConfig,
 } from "@linky-fit/linkstr-react";
 import React from "react";
@@ -23,6 +24,7 @@ import {
   localInboxCursorKey,
   syncedInboxCursorStore,
 } from "../lib/syncedInboxCursorStore";
+import { currentNsecAtom } from "../state/session/session";
 import { useInboxCursorsRepository } from "./useLinksync";
 
 const OUTBOX_STORAGE_KEY = "linky.outbox";
@@ -64,12 +66,11 @@ export const buildLinkstrConfig = (
 
 /** Keeps the linkstr runtime in sync with the active identity and relay list. */
 export const useLinkstrConfigSync = ({
-  currentNsec,
   nostrFetchRelays,
 }: {
-  currentNsec: string | null;
   nostrFetchRelays: readonly string[];
 }) => {
+  const currentNsec = useAtomValue(currentNsecAtom);
   const inspectorEnabled = useInspectorEmissionEnabled();
   const setLinkstrConfig = useAtomSet(linkstrConfigAtom);
   const inboxCursors = useInboxCursorsRepository();

@@ -691,19 +691,46 @@ const bootstrap = async () => {
     });
 
     setStage("import-app");
-    const [{ default: App }, { ErrorBoundary }] = await Promise.all([
+    const [
+      { default: App },
+      { ErrorBoundary },
+      { makeAppRegistry, RegistryContext },
+      { evoluAtom, evoluRelaySettingsAtom },
+      { makeWebPlatformPorts },
+      { loadSession, mirrorPushNsec },
+      { probeLocalDatabase },
+    ] = await Promise.all([
       import("./App.tsx"),
       import("./ErrorBoundary.tsx"),
+      import("./app/registry.ts"),
+      import("./app/state/session/evolu.ts"),
+      import("./platform/ports.web.ts"),
+      import("./platform/session.ts"),
+      import("./evolu.ts"),
     ]);
     console.log("[linky][boot] app modules loaded");
 
-    setStage("import-evolu");
-    const { evolu, probeLocalDatabase } = await import("./evolu.ts");
-    console.log("[linky][boot] evolu loaded");
+    setStage("load-session");
+    const ports = makeWebPlatformPorts();
+    const session = await loadSession(ports);
+    mirrorPushNsec(session);
+    console.log("[linky][boot] session loaded", { session: session._tag });
+
+    // Only a signed-in session opens the database.
+    const signedIn = session._tag === "SignedIn";
+    if (signedIn) setStage("import-evolu");
+    const evoluPlatform = signedIn
+      ? (await import("./platform/evolu.web.ts")).makeWebEvoluPlatform()
+      : null;
+    const registry = makeAppRegistry({ ports, session, evoluPlatform });
+    // Built on every boot: building it migrates the stored relay list once.
+    registry.get(evoluRelaySettingsAtom);
+    const opened = registry.get(evoluAtom);
+    console.log("[linky][boot] evolu loaded", { opened: opened !== null });
     if (import.meta.env.DEV || import.meta.env.VITE_E2E === "1") {
       const { installLinkyE2eHooks } =
         await import("./devtools/e2e/installLinkyE2eHooks.ts");
-      installLinkyE2eHooks();
+      installLinkyE2eHooks(registry);
     }
 
     setStage("await-initial-local-data");
@@ -726,24 +753,27 @@ const bootstrap = async () => {
     flushSync(() => {
       root.render(
         <StrictMode>
-          <ErrorBoundary
-            onError={() => {
-              window.clearTimeout(stuckTimer);
-              signalBootFailure();
-            }}
-          >
-            <BootCommitSignal onCommit={recordAppCommit} />
-            <App />
-          </ErrorBoundary>
+          <RegistryContext.Provider value={registry}>
+            <ErrorBoundary
+              onError={() => {
+                window.clearTimeout(stuckTimer);
+                signalBootFailure();
+              }}
+            >
+              <BootCommitSignal onCommit={recordAppCommit} />
+              <App />
+            </ErrorBoundary>
+          </RegistryContext.Provider>
         </StrictMode>,
       );
     });
     console.log("[linky][boot] render scheduled");
+    if (opened === null) return;
     // No root Suspense boundary on purpose: the shell suspends on the shard
     // store until the database answers, and a boundary above the app would
     // swap the mounted tree for a fallback. The probe tells a database that
     // never answers apart from a render that never commits.
-    void probeLocalDatabase().then(() => {
+    void probeLocalDatabase(opened.evolu).then(() => {
       if (!appCommitRecorded) setStage("await-render-commit");
     });
     // A reload can start the new database worker while the previous page's
@@ -752,8 +782,8 @@ const bootstrap = async () => {
     // SqliteError instead of ever answering a query. Retry with a growing
     // pause, then land on the boot-error screen with the temporary-session
     // option.
-    const unsubscribeEvoluError = evolu.subscribeError(() => {
-      const error = evolu.getError();
+    const unsubscribeEvoluError = opened.evolu.subscribeError(() => {
+      const error = opened.evolu.getError();
       if (appCommitRecorded || error?.type !== "SqliteError") return;
       unsubscribeEvoluError();
       window.clearTimeout(stuckTimer);

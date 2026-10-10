@@ -12,12 +12,17 @@ import { base64 } from "@scure/base";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppShellCore } from "../app/context/AppShellContexts";
 import { useEvoluSettingsContext } from "../app/context/SystemSettingsContexts";
-import { loadEvoluHistoryData, type EvoluHistoryRow } from "../evolu";
+import {
+  loadEvoluHistoryData,
+  useLinkyEvolu,
+  type EvoluHistoryRow,
+} from "../evolu";
 import { decodeBase64Url } from "../utils/base64";
 const BATCH_SIZE = 50;
 export function EvoluHistoryDataPage(): React.ReactElement {
   const { evoluSyncOwnerIds } = useEvoluSettingsContext();
   const { t } = useAppShellCore();
+  const evolu = useLinkyEvolu();
   const [historyData, setHistoryData] = useState<EvoluHistoryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -50,12 +55,12 @@ export function EvoluHistoryDataPage(): React.ReactElement {
     [normalizeOwnerId],
   );
   useEffect(() => {
-    loadEvoluHistoryData(BATCH_SIZE, 0).then((data) => {
+    loadEvoluHistoryData(evolu, BATCH_SIZE, 0).then((data) => {
       setHistoryData(data);
       setIsLoading(false);
       setHasMore(data.length === BATCH_SIZE);
     });
-  }, []);
+  }, [evolu]);
   const visibleHistoryData = useMemo(() => {
     if (allowedOwnerIds.size === 0) return [];
     return historyData.filter((row) =>
@@ -78,7 +83,7 @@ export function EvoluHistoryDataPage(): React.ReactElement {
     setIsLoadingMore(true);
     const newOffset = offset + BATCH_SIZE;
     try {
-      const newData = await loadEvoluHistoryData(BATCH_SIZE, newOffset);
+      const newData = await loadEvoluHistoryData(evolu, BATCH_SIZE, newOffset);
       if (newData.length > 0) {
         setHistoryData((prev) => [...prev, ...newData]);
         setOffset(newOffset);
@@ -91,7 +96,7 @@ export function EvoluHistoryDataPage(): React.ReactElement {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [isLoadingMore, hasMore, offset]);
+  }, [evolu, isLoadingMore, hasMore, offset]);
   if (isLoading) {
     return <LoadingState label={t("loading")} />;
   }

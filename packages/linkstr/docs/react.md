@@ -2,6 +2,10 @@
 
 `@linky-fit/linkstr-react` is the Effect atom binding: one config atom, one runtime atom built from it, a command per direct operation, and stream atoms for the long-running feeds. It re-exports the `@effect/atom-react` surface and the `effect/reactivity` modules (`useAtomSet`, `useAtomValue`, `useAtomMount`, `AtomRegistry`, `AsyncResult`, …), so app code never depends on either itself. It is a private workspace package, not part of the npm release.
 
+## Registry
+
+The atoms live in the registry React reads through `RegistryContext`; without a provider that is atom-react's default registry. An app that also reads atoms outside React, such as boot code or test hooks, builds its own with `AtomRegistry.make({ scheduleTask, defaultIdleTTL: 400 })` (the default registry's settings) and wraps the tree in `RegistryContext.Provider`, so both sides share one runtime. The Linky web app does this in `main.tsx`.
+
 ## Configure
 
 `linkstrConfigAtom` holds a `LinkstrConfig | null`. Set it when an identity is available; set it to `null` on logout. While it is null, every command resolves with a `LinkstrNotConfigured` failure. The config is `linkstrServices`'s plus `allowInsecureLocalhost` and `inspector`; key the `inboxCursorStore` storage by pubkey so switching accounts never reuses a cursor.
