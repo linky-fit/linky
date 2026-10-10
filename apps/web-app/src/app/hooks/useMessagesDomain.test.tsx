@@ -105,7 +105,7 @@ const fromNostr = (contactId: string): NewLocalNostrMessage => ({
 });
 
 describe("useMessagesDomain", () => {
-  it("stores an unknown sender's message in their scope and moves it when they become a contact", async () => {
+  it("stores an unknown sender's message in their scope and follows it to their contact", async () => {
     const { store } = makeTestLinkyStore();
     const contactId = createId<"Contact">();
     const { conversations, domain, unknownSenders, view } = await renderDomain(
@@ -127,12 +127,9 @@ describe("useMessagesDomain", () => {
     expect(await Effect.runPromise(conversations.messages.all)).toEqual([]);
 
     await act(async () => {
-      expect(
-        domain().reassignLocalNostrMessagesContactId(
-          unknownSenderId,
-          contactId,
-        ),
-      ).toBe(1);
+      await Effect.runPromise(
+        unknownSenders.moveToContact(Pubkey.make(UNKNOWN_SENDER), contactId),
+      );
     });
     const rows = await Effect.runPromise(conversations.messages.all);
     expect(rows.map((row) => [row.id, row.conversationId])).toEqual([

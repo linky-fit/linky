@@ -10,7 +10,7 @@ const NPUB = "npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m";
 
 describe("useUnknownSenderReassignment", () => {
   it("moves an unknown sender's conversation to the matching contact only once hydrated", async () => {
-    const reassign = vi.fn<Params["reassign"]>(() => 1);
+    const reassign = vi.fn<Params["reassign"]>(() => Promise.resolve(1));
     const contactId = createId<"Contact">();
     const params: Params = {
       contacts: [{ id: contactId, npub: NPUB }],

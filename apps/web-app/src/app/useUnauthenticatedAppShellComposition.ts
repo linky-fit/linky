@@ -1,4 +1,3 @@
-import type { ProfileMetadata } from "@linky-fit/linkstr";
 import React from "react";
 import { useToasts } from "../hooks/useToasts";
 import { takeAddContactHashLink } from "../sharedProfileLink";
@@ -8,7 +7,6 @@ import {
   PENDING_SHARED_PROFILE_NPUB_STORAGE_KEY,
 } from "../utils/constants";
 import { safeLocalStorageSet } from "../utils/storage";
-import type { IdentityChangeMessageSource } from "./lib/identityChangeMessage";
 import { useAppLanguage } from "./hooks/useAppLanguage";
 import { useProfileAuthDomain } from "./hooks/useProfileAuthDomain";
 
@@ -32,21 +30,11 @@ export const useUnauthenticatedAppShellComposition = () => {
     }
   }, []);
 
-  const appendIdentityChangeNoticesRef = React.useRef<
-    | ((args: {
-        changedAtSec: number;
-        identitySource: IdentityChangeMessageSource;
-      }) => void)
-    | null
-  >(null);
-  const myProfileMetadataRef = React.useRef<ProfileMetadata | null>(null);
   const onboarding = useProfileAuthDomain({
-    appendIdentityChangeNoticesRef,
     currentNsec: null,
     identityRepository: null,
     inboxCursors: null,
     lang,
-    myProfileMetadataRef,
     pushToast,
     t,
   });

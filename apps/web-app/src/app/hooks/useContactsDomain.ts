@@ -44,7 +44,7 @@ interface UseContactsDomainParams {
   reassignContactMessages: (
     fromContactId: string,
     toContactId: string,
-  ) => number;
+  ) => Promise<number>;
   route: Route;
   t: Translate;
 }
@@ -216,7 +216,7 @@ export const useContactsDomain = ({
           const duplicateId: ContactId = contact.id;
           if (duplicateId === keepId) continue;
 
-          movedMessages += reassignContactMessages(duplicateId, keepId);
+          movedMessages += await reassignContactMessages(duplicateId, keepId);
           const removed = await runWrite(
             contactsRepository.remove(duplicateId),
           );

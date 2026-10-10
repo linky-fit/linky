@@ -65,7 +65,6 @@ import { useScanNativeComposition } from "./hooks/composition/useScanNativeCompo
 import { useSystemSettingsComposition } from "./hooks/composition/useSystemSettingsComposition";
 import { useMainMenuState } from "./hooks/layout/useMainMenuState";
 import { useNativeBackHandler } from "./hooks/layout/useNativeBackHandler";
-import { isUnknownContactId } from "./hooks/messages/contactIdentity";
 import { useChatMessageEffects } from "./hooks/messages/useChatMessageEffects";
 import { useAppDataTransfer } from "./hooks/useAppDataTransfer";
 import { useAppLanguage } from "./hooks/useAppLanguage";
@@ -88,10 +87,6 @@ import {
 import { useOwnerScopedStorage } from "./hooks/useOwnerScopedStorage";
 import { useStatusToasts } from "./hooks/useStatusToasts";
 import { useStoragePersistRequestEffect } from "./hooks/useStoragePersistRequestEffect";
-import {
-  buildIdentityChangeMessageContent,
-  buildIdentityChangeMessageWrapId,
-} from "./lib/identityChangeMessage";
 import { runWrite } from "./lib/storeWrite";
 import { parsePrivateImageMessage } from "./lib/privateImageMessage";
 import { showPwaNotification } from "./lib/pwaNotifications";
@@ -125,11 +120,9 @@ export const useAppShellComposition = ({
     canSwitchToDefaultIdentity,
     appOwnerId,
     appOwnerIdRef,
-    appendIdentityChangeNoticesRef,
     currentNpub,
     isSeedLogin,
     logoutArmed,
-    myProfileMetadataRef,
     pendingIdentitySwitch,
     requestLogout,
     requestPasteNostrKeys,
@@ -572,47 +565,6 @@ export const useAppShellComposition = ({
     t,
   });
 
-  React.useEffect(() => {
-    appendIdentityChangeNoticesRef.current = ({
-      changedAtSec,
-      identitySource,
-    }) => {
-      if (!Number.isFinite(changedAtSec) || changedAtSec <= 0) return;
-
-      for (const contactId of lastMessageByContactId.keys()) {
-        const normalizedContactId = contactId.trim();
-        if (!normalizedContactId) continue;
-        if (isUnknownContactId(normalizedContactId)) continue;
-
-        appendLocalNostrMessage({
-          contactId: normalizedContactId,
-          content: buildIdentityChangeMessageContent({
-            changedAtSec,
-            source: identitySource,
-          }),
-          createdAtSec: Math.trunc(changedAtSec),
-          direction: "out",
-          localOnly: true,
-          pubkey: "",
-          rumorId: null,
-          wrapId: buildIdentityChangeMessageWrapId({
-            changedAtSec,
-            contactId: normalizedContactId,
-            source: identitySource,
-          }),
-        });
-      }
-    };
-
-    return () => {
-      appendIdentityChangeNoticesRef.current = null;
-    };
-  }, [
-    appendIdentityChangeNoticesRef,
-    appendLocalNostrMessage,
-    lastMessageByContactId,
-  ]);
-
   const {
     shuffleProfileAvatar,
     derivedProfile,
@@ -620,7 +572,6 @@ export const useAppShellComposition = ({
     effectiveProfileName,
     effectiveProfilePicture,
     isProfileEditing,
-    myProfileMetadata,
     myProfileStatus,
     npubCashInfoInFlightRef,
     npubCashInfoLoadedAtMsRef,
@@ -666,12 +617,6 @@ export const useAppShellComposition = ({
     setStatus,
     t,
   });
-
-  // The identity-owners composition runs before the profile composition, so
-  // the key-switch flow reaches the current profile through this ref.
-  React.useEffect(() => {
-    myProfileMetadataRef.current = myProfileMetadata;
-  }, [myProfileMetadata, myProfileMetadataRef]);
 
   const {
     allCashuProofs,

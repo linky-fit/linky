@@ -1,4 +1,5 @@
 import type { ProfileMetadata } from "@linky-fit/linkstr";
+import { useAtomSet, useAtomValue } from "@linky-fit/linkstr-react";
 import React from "react";
 import {
   deriveDefaultLightningAddress,
@@ -11,6 +12,7 @@ import { normalizeNpubIdentifier } from "../../../utils/nostrNpub";
 import { useNpubNip05Cleanup } from "../profile/useNpubNip05Cleanup";
 import { useProfileEditor } from "../profile/useProfileEditor";
 import { useProfileStatusEditor } from "../profile/useProfileStatusEditor";
+import { myProfileMetadataAtom } from "../../state/contacts/profiles";
 import type { Translate } from "../../../i18n";
 
 interface UseProfileCompositionParams {
@@ -55,8 +57,8 @@ export const useProfileComposition = ({
   const [myProfileStatus, setMyProfileStatus] = React.useState<string | null>(
     null,
   );
-  const [myProfileMetadata, setMyProfileMetadata] =
-    React.useState<ProfileMetadata | null>(null);
+  const myProfileMetadata = useAtomValue(myProfileMetadataAtom);
+  const setMyProfileMetadata = useAtomSet(myProfileMetadataAtom);
 
   const npubCashInfoInFlightRef = React.useRef(false);
   const npubCashInfoLoadedForNpubRef = React.useRef<string | null>(null);
