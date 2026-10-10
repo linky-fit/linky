@@ -10,6 +10,7 @@ import {
   TestClock,
   TestContext,
 } from "effect";
+import { authTemplate, createNonce } from "@linky-fit/linkauth";
 import { finalizeEvent, verifyEvent } from "nostr-tools";
 import type { Event as NostrToolsEvent, Filter } from "nostr-tools";
 import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
@@ -75,9 +76,9 @@ class FakeSite {
       clientPubkey: this.client.pubkey,
       relays: [...relays],
       secret: "s3cret",
-      perms: fields.perms ?? ["sign_event:27235"],
+      perms: fields.perms ?? ["sign_event:24139"],
       name: "PEAU·RLA",
-      url: "https://peaurla.test",
+      url: "https://peaurla.test/login",
       image: null,
     });
 
@@ -142,16 +143,12 @@ class FakeSite {
   });
 }
 
-const nip98Template = (url: string, kind = 27235) =>
-  JSON.stringify({
-    kind,
-    content: "",
-    tags: [
-      ["u", url],
-      ["method", "GET"],
-    ],
-    created_at: 1,
-  });
+const loginTemplate = () =>
+  JSON.stringify(
+    authTemplate({ audience: "https://peaurla.test", nonce: createNonce() }),
+  );
+
+const noteTemplate = JSON.stringify({ kind: 1, content: "hi", tags: [] });
 
 const isAck = (reply: SignerReply) => reply.result === "s3cret";
 
@@ -185,7 +182,7 @@ const runTest = <A, E>(program: Effect.Effect<A, E>) =>
   );
 
 describe("NostrConnect.login", () => {
-  it("acks, signs the site's NIP-98 event and disconnects", () =>
+  it("acks, signs the site's login and disconnects", () =>
     runTest(
       Effect.gen(function* () {
         const site = new FakeSite((site, reply) => {
@@ -193,7 +190,7 @@ describe("NostrConnect.login", () => {
             site.send({
               id: "sign-1",
               method: "sign_event",
-              params: [nip98Template("https://peaurla.test/api/login")],
+              params: [loginTemplate()],
             });
           }
         });
@@ -203,7 +200,7 @@ describe("NostrConnect.login", () => {
           Exit.succeed(
             expect.objectContaining({
               clientPubkey: site.client.pubkey,
-              signedKind: 27235,
+              signedKind: 24139,
             }),
           ),
         );
@@ -215,7 +212,7 @@ describe("NostrConnect.login", () => {
         expect(verifyEvent(event)).toBe(true);
         expect(event).toMatchObject({
           pubkey: me.pubkey,
-          kind: 27235,
+          kind: 24139,
           created_at: START_MILLIS / 1000,
         });
         expect(site.subscriptions).toHaveLength(2);
@@ -259,7 +256,7 @@ describe("NostrConnect.login", () => {
             site.send({
               id: "sign",
               method: "sign_event",
-              params: [nip98Template("https://peaurla.test/")],
+              params: [loginTemplate()],
             });
           }
         });
@@ -280,7 +277,7 @@ describe("NostrConnect.login", () => {
             site.send({
               id: "note",
               method: "sign_event",
-              params: [nip98Template("https://peaurla.test/", 1)],
+              params: [noteTemplate],
             });
           }
         });
@@ -347,7 +344,7 @@ describe("NostrConnect.login", () => {
               site.send({
                 id: "sign",
                 method: "sign_event",
-                params: [nip98Template("https://peaurla.test/")],
+                params: [loginTemplate()],
               });
             }
           },
@@ -355,7 +352,7 @@ describe("NostrConnect.login", () => {
         );
         const exit = yield* Fiber.await(yield* forkLogin(site));
         expect(exit).toEqual(
-          Exit.succeed(expect.objectContaining({ signedKind: 27235 })),
+          Exit.succeed(expect.objectContaining({ signedKind: 24139 })),
         );
       }),
     ));

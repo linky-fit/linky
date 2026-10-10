@@ -12,7 +12,7 @@ export class NostrConnectClientDraft extends Schema.Class<NostrConnectClientDraf
 )({
   /** The signer answers on these relays only. */
   relays: Schema.NonEmptyArray(RelayUrl),
-  /** NIP-46 permissions, e.g. `sign_event:27235` or `DEVICE_AUTHORIZATION_PERMISSION`. */
+  /** NIP-46 permissions, e.g. `DEVICE_AUTHORIZATION_PERMISSION`. */
   perms: Schema.Array(Schema.NonEmptyTrimmedString),
   /** Shown to the user by the signer; a device authorization repeats it. */
   name: Schema.optional(Schema.NonEmptyTrimmedString),

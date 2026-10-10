@@ -1,3 +1,8 @@
+import {
+  authTemplate,
+  createNonce,
+  LINKAUTH_PERMISSION,
+} from "@linky-fit/linkauth";
 import { Effect, Fiber, Layer, Stream } from "effect";
 import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import type { Event as NostrToolsEvent } from "nostr-tools";
@@ -458,11 +463,12 @@ const collectNostrConnectEmissions = (): Promise<InspectorEvent[]> => {
           id: "sign",
           method: "sign_event",
           params: [
-            JSON.stringify({
-              kind: 27235,
-              content: "",
-              tags: [["u", "https://site.test/login"]],
-            }),
+            JSON.stringify(
+              authTemplate({
+                audience: "https://site.test",
+                nonce: createNonce(),
+              }),
+            ),
           ],
         }),
         siteKey,
@@ -518,7 +524,7 @@ const collectNostrConnectEmissions = (): Promise<InspectorEvent[]> => {
         clientPubkey: site.pubkey,
         relays: [relay],
         secret: loginSecret,
-        perms: [],
+        perms: [LINKAUTH_PERMISSION],
         name: null,
         url: "https://site.test",
         image: null,

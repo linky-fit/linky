@@ -1,3 +1,8 @@
+import {
+  authTemplate,
+  createNonce,
+  LINKAUTH_PERMISSION,
+} from "@linky-fit/linkauth";
 import { finalizeEvent, verifyEvent } from "nostr-tools";
 import { decrypt, encrypt, getConversationKey } from "nostr-tools/nip44";
 import { Schema } from "effect";
@@ -9,6 +14,7 @@ import {
   decodeNostrConnectRequest,
   DEVICE_AUTHORIZATION_PERMISSION,
   deviceAuthorizationTemplate,
+  linkauthAudience,
   verifyDeviceAuthorization,
   encodeNostrConnectEvent,
   openNostrConnectChannel,
@@ -33,7 +39,7 @@ describe("parseNostrConnectUri", () => {
           relay,
           `relay=${encodeURIComponent("wss://relay-b.test")}`,
           "secret=s3cret",
-          `perms=${encodeURIComponent("sign_event:27235, nip44_encrypt")}`,
+          `perms=${encodeURIComponent("sign_event:24139, nip44_encrypt")}`,
           `name=${encodeURIComponent("PEAU·RLA")}`,
           `url=${encodeURIComponent("https://peaurla.test")}`,
           `image=${encodeURIComponent("https://peaurla.test/logo.png")}`,
@@ -48,7 +54,7 @@ describe("parseNostrConnectUri", () => {
           RelayUrl.make("wss://relay-b.test"),
         ],
         secret: "s3cret",
-        perms: ["sign_event:27235", "nip44_encrypt"],
+        perms: ["sign_event:24139", "nip44_encrypt"],
         name: "PEAU·RLA",
         url: "https://peaurla.test",
         image: "https://peaurla.test/logo.png",
@@ -123,14 +129,18 @@ const rpc = (method: string, params: Array<string> = []) =>
 const signRequest = (template: object) =>
   rpc("sign_event", [JSON.stringify(template)]);
 
+const SITE = "https://peaurla.test";
+const loginTemplate = (audience = SITE) =>
+  authTemplate({ audience, nonce: createNonce() });
+const allowedLogin = { perms: [LINKAUTH_PERMISSION], url: `${SITE}/login` };
+
 const nip98 = {
   kind: 27235,
   content: "",
   tags: [
-    ["u", "https://PEAURLA.test/api/login"],
+    ["u", "https://npub.linky.fit/api/wallet"],
     ["method", "POST"],
   ],
-  created_at: 1,
 };
 
 describe("answerNostrConnectRequest", () => {
@@ -154,19 +164,17 @@ describe("answerNostrConnectRequest", () => {
     });
   });
 
-  it("signs an allowed template as is, with created_at set to now", () => {
+  it("signs the canonical login for the link's origin, with created_at set to now", () => {
+    const template = loginTemplate();
     const answer = answerNostrConnectRequest(
-      requestWith({
-        perms: ["sign_event:27235"],
-        url: "https://peaurla.test/login",
-      }),
+      requestWith(allowedLogin),
       me,
-      signRequest(nip98),
+      signRequest(template),
       now,
     );
     expect(answer.outcome).toEqual({
       _tag: "Signed",
-      kind: 27235,
+      kind: 24139,
       device: null,
     });
     assert("result" in answer.response);
@@ -176,70 +184,123 @@ describe("answerNostrConnectRequest", () => {
     expect(verifyEvent(event)).toBe(true);
     expect(event).toMatchObject({
       pubkey: me.pubkey,
-      kind: 27235,
-      content: "",
-      tags: nip98.tags,
+      ...template,
       created_at: now,
     });
   });
 
-  it("signs NIP-42 auth under a plain sign_event perm and without a site url", () => {
+  it.each([
+    ["no perms", { ...allowedLogin, perms: [] }, "sign_event:24139"],
+    [
+      "a blanket sign_event",
+      { ...allowedLogin, perms: ["sign_event"] },
+      "sign_event:24139",
+    ],
+    [
+      "another kind's permission",
+      { ...allowedLogin, perms: ["sign_event:27235"] },
+      "sign_event:24139",
+    ],
+    ["no url", { ...allowedLogin, url: null }, "needs the site's url"],
+    [
+      "an unacceptable url",
+      { ...allowedLogin, url: "http://peaurla.test" },
+      "needs the site's url",
+    ],
+    [
+      "a template for another origin",
+      { ...allowedLogin, url: "https://evil.test" },
+      "invalid login template",
+    ],
+  ])("refuses a login with %s", (_, fields, reason) => {
     const answer = answerNostrConnectRequest(
-      requestWith({ perms: ["sign_event"] }),
+      requestWith(fields),
       me,
-      signRequest({
-        kind: 22242,
-        content: "",
-        tags: [
-          ["relay", "wss://relay.test"],
-          ["challenge", "c"],
-        ],
-      }),
+      signRequest(loginTemplate()),
       now,
     );
-    expect(answer.outcome).toEqual({
-      _tag: "Signed",
-      kind: 22242,
-      device: null,
-    });
+    assert("error" in answer.response);
+    expect(answer.response.error).toContain(reason);
+    expect(answer.outcome._tag).toBe("Refused");
   });
 
   it.each([
-    ["a disallowed kind", {}, { ...nip98, kind: 1 }, "kind 1 is not allowed"],
     [
-      "a kind outside the perms",
-      { perms: ["sign_event:22242"] },
-      nip98,
-      "sign_event:27235 was not requested",
+      "extra tags",
+      { ...loginTemplate(), tags: [...loginTemplate().tags, ["u", "x"]] },
     ],
+    ["other content", { ...loginTemplate(), content: "pay me" }],
+    ["a non-canonical audience", loginTemplate(`${SITE}/path`)],
+  ])("refuses a login template with %s", (_, template) => {
+    const answer = answerNostrConnectRequest(
+      requestWith(allowedLogin),
+      me,
+      signRequest(template),
+      now,
+    );
+    expect(answer.response).toEqual({
+      id: "r1",
+      error: "invalid login template",
+    });
+  });
+
+  // #546: a site must not obtain a credential for the user's wallet backend.
+  it.each([
+    ["with its url and perms", allowedLogin],
+    ["with perms only", { perms: [LINKAUTH_PERMISSION] }],
+    ["with its url only", { perms: [], url: SITE }],
+    ["with a blanket sign_event", { perms: ["sign_event"], url: SITE }],
     [
-      "a u tag for another site",
-      { url: "https://evil.test" },
-      nip98,
-      "u tag does not match the site",
+      "with the NIP-98 permission",
+      { perms: ["sign_event:27235"], url: "https://npub.linky.fit" },
     ],
-    [
-      "a second u tag for another site",
-      { url: "https://peaurla.test" },
-      {
-        ...nip98,
-        tags: [...nip98.tags, ["u", "https://evil.test/api"]],
-      },
-      "u tag does not match the site",
-    ],
-    ["a malformed template", {}, { kind: 27235 }, "invalid event template"],
-  ])("refuses %s", (_, fields, template, reason) => {
+    ["with no link fields", {}],
+  ])("never signs a NIP-98 event for the wallet backend %s", (_, fields) => {
     expect(
       answerNostrConnectRequest(
         requestWith(fields),
         me,
-        signRequest(template),
+        signRequest(nip98),
         now,
       ),
     ).toEqual({
-      response: { id: "r1", error: reason },
-      outcome: { _tag: "Refused", reason },
+      response: { id: "r1", error: "kind 27235 is not allowed" },
+      outcome: { _tag: "Refused", reason: "kind 27235 is not allowed" },
     });
+  });
+
+  it.each([
+    [
+      "a NIP-42 event",
+      { kind: 22242, content: "", tags: [["challenge", "c"]] },
+    ],
+    ["a note", { kind: 1, content: "hi", tags: [] }],
+    ["a malformed template", { kind: 24139 }],
+  ])("refuses %s", (_, template) => {
+    expect(
+      answerNostrConnectRequest(
+        requestWith(allowedLogin),
+        me,
+        signRequest(template),
+        now,
+      ).outcome._tag,
+    ).toBe("Refused");
+  });
+});
+
+describe("linkauthAudience", () => {
+  it.each([
+    ["the explicit permission and an https url", allowedLogin, SITE],
+    [
+      "a localhost url",
+      { ...allowedLogin, url: "http://localhost:3000/x" },
+      "http://localhost:3000",
+    ],
+    ["a bare sign_event", { ...allowedLogin, perms: ["sign_event"] }, null],
+    ["no url", { ...allowedLogin, url: null }, null],
+    ["a plain http url", { ...allowedLogin, url: "http://peaurla.test" }, null],
+  ])("reads %s", (_, fields, audience) => {
+    expect(linkauthAudience(requestWith(fields))).toBe(audience);
   });
 });
 

@@ -15,7 +15,7 @@ export class NostrConnectRequest extends Schema.Class<NostrConnectRequest>(
   perms: Schema.Array(Schema.String),
   /** Claimed by the site, unverified. */
   name: Schema.NullOr(Schema.String),
-  /** Claimed by the site, unverified; signed `u` tags must match its host. */
+  /** Claimed by the site, unverified; a login is signed for its origin. */
   url: Schema.NullOr(Schema.String),
   image: Schema.NullOr(Schema.String),
 }) {}

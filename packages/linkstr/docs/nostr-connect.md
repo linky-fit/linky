@@ -1,16 +1,17 @@
 # Nostr Connect
 
-`NostrConnect` is the signer side of NIP-46: it answers one `nostrconnect://` link for the configured identity. `NostrConnectClient` is the app side: it opens such a link and asks the user's signer to sign. A [device authorization](#device-authorization) is the one event beyond a login that the signer signs, and only on an explicit permission.
+`NostrConnect` is the signer side of NIP-46: it answers one `nostrconnect://` link for the configured identity. `NostrConnectClient` is the app side: it opens such a link and asks the user's signer to sign. It signs only two kinds of event, each on an explicit permission: a site login from [`@linky-fit/linkauth`](#the-site-login-event) and a [device authorization](#device-authorization). Never an event the site designed itself.
 
 ## The signer
 
-A website shows a `nostrconnect://` link or QR code (NIP-46) to let a user sign in with their Nostr key. `NostrConnect.login` answers it once as the remote signer for the configured identity: it acknowledges the link, shares the public key, signs the site's login event, then closes every subscription. There is no session and nothing is stored; a second login needs a fresh link.
+A website shows a `nostrconnect://` link or QR code (NIP-46) to let a user sign in with their Nostr key. `NostrConnect.login` answers it once as the remote signer for the configured identity: it acknowledges the link, shares the public key, signs the site's login, then closes every subscription. There is no session and nothing is stored; a second login needs a fresh link.
 
 ### Calling it
 
 1. Parse what the user scanned or opened with `parseNostrConnectUri(text)`. It returns a `NostrConnectRequest`, or `null` when the text is not a usable link: wrong scheme, no `relay` that is a valid `RelayUrl`, a client pubkey that is not on the curve, or no `secret`. Whitespace and scheme case are tolerated; duplicate relays are dropped and at most five are kept.
-2. Show the user `name`, `url` and `image` before going on. The site supplies them itself and nothing verifies them. When `requestsDeviceAuthorization(request)` is true, say that approving also links one of the site's devices ([device authorization](#device-authorization)).
-3. Call `login(request)`, or `nostrConnectLoginAtom` in React. It resolves with a `NostrConnectLoginReceipt` once the site got what it asked for.
+2. When `linkauthAudience(request)` returns an origin, the request is a site login. Any page can show a link that names another site's origin and relay what the user approves, and the signed login is the same one that site receives from its own Log in with Linky link. So first load the origin's domain document with `fetchDomainDocument(origin)` from `@linky-fit/linkauth`, and when it returns `ok: true`, refuse the request and point the user to the site's own Log in with Linky button. `NostrConnect.login` does not make this check; make it before calling it.
+3. Show the user `name`, `url` and `image` before going on. The site supplies them itself and nothing verifies them. For a site login, show the origin prominently, as the site the user is signing in to, say that the site will see the identity's public key and profile, and ask them to approve only a login they started on that origin themselves. When `requestsDeviceAuthorization(request)` is true, say that approving also links one of the site's devices ([device authorization](#device-authorization)).
+4. Call `login(request)`, or `nostrConnectLoginAtom` in React. It resolves with a `NostrConnectLoginReceipt` once the site got what it asked for.
 
 ```ts
 import { Effect } from "effect";
@@ -38,15 +39,12 @@ Interrupting `login` (the user cancels, the screen unmounts) closes its subscrip
 | `ping`           | `pong`                                                                                              |
 | anything else    | `error: unsupported method <method>`; the login keeps waiting, so optional probes do not break it   |
 
-`sign_event` signs the template's kind, tags and content unchanged when all three hold:
+`sign_event` signs a template, with `created_at` set to now, in two cases:
 
-- the kind is 27235 (NIP-98 HTTP auth) or 22242 (NIP-42 relay auth);
-- the link has no `perms`, or they contain `sign_event` or `sign_event:<kind>`;
-- the link has no `url`, or every `u` tag of the template has the same host (case-insensitive).
+- **A site login.** The link asks for `sign_event:24139` explicitly (`LINKAUTH_PERMISSION`; no perms or a bare `sign_event` do not cover it), has a `url` that is an acceptable site (https, or http on localhost), and the template is exactly the [canonical login](#the-site-login-event) for the origin of that `url`, with any valid nonce.
+- **A device authorization.** The link's `perms` name `sign_event:24138` explicitly (`DEVICE_AUTHORIZATION_PERMISSION`; no perms or a bare `sign_event` do not cover it), the link has a `name`, and the template is exactly `deviceAuthorizationTemplate({ device, app: <that name> })`.
 
-It also signs a kind 24138 device authorization when the link's `perms` name `sign_event:24138` explicitly (`DEVICE_AUTHORIZATION_PERMISSION`; no perms or a bare `sign_event` do not cover it), the link has a `name`, and the template is exactly `deviceAuthorizationTemplate({ device, app: <that name> })`.
-
-Anything else is refused: the site gets an `error` reply with the reason and `login` fails with `NostrConnectRequestRefused`.
+Anything else is refused, including NIP-98 (27235) and NIP-42 (22242) events: those are credentials a site must not be able to ask for. The site gets an `error` reply with the reason and `login` fails with `NostrConnectRequestRefused`.
 
 ### When it ends
 
@@ -72,6 +70,10 @@ Every message is a kind 24133 plain event signed by the identity, tagged `["p", 
 24133 is also the payment-notice rumor kind ([payment-kinds.md](./payment-kinds.md#payment-notices)). They never collide: a payment notice only ever travels inside a kind 1059 gift wrap.
 
 Inspector rows name the operation `nostrConnect.login`; its params omit the secret.
+
+### The site login event
+
+A login is a kind 24139 event defined by `@linky-fit/linkauth`: `authTemplate({ audience, nonce })` with the audience equal to `normalizeAudience(url)`. The signer checks it with `isCanonicalAuthTemplate(template, url)`, so the origin the user is shown is the origin that is signed, and a site cannot ask for a different one. The site's server verifies the signed event with `verifyLinkauth` (see the linkauth docs); linkstr only signs it.
 
 ## Device authorization
 
