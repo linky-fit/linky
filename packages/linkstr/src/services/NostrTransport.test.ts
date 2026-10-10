@@ -279,6 +279,59 @@ describe("makeRelayPoolTransport fetch", () => {
     expect(subscriptions[0]?.closedByClient).toBe(true);
   });
 
+  it("resolves empty when the relay answers EOSE with nothing", async () => {
+    const { pool, subscriptions } = makeSubscribingPool();
+
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const fiber = yield* Effect.fork(
+          makeRelayPoolTransport(pool).fetch(relayOk, { kinds: [0] }),
+        );
+        yield* eventually(() => subscriptions.length === 1);
+        subscriptions[0]?.params.oneose?.();
+        return yield* Fiber.join(fiber);
+      }),
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it.each([
+    ["stays silent", () => undefined],
+    [
+      "closes the subscription",
+      (params: RelaySubscriptionParams) =>
+        params.onclose?.("auth-required: sign in"),
+    ],
+  ])(
+    "fails with RelayUnreachable when the relay %s without EOSE or events",
+    async (_case, misbehave) => {
+      const { pool, subscriptions } = makeSubscribingPool();
+
+      const exit = await Effect.runPromiseExit(
+        Effect.gen(function* () {
+          const fiber = yield* Effect.fork(
+            makeRelayPoolTransport(pool, {
+              fetchEoseTimeout: Duration.millis(50),
+            }).fetch(relayOk, { kinds: [0] }),
+          );
+          yield* eventually(() => subscriptions.length === 1);
+          const [subscription] = subscriptions;
+          if (subscription === undefined) throw new Error("never subscribed");
+          misbehave(subscription.params);
+          return yield* Fiber.join(fiber);
+        }),
+      );
+
+      expect(exit).toEqual(
+        Exit.fail(
+          expect.objectContaining({ _tag: "RelayUnreachable", relay: relayOk }),
+        ),
+      );
+      expect(subscriptions[0]?.params.eoseTimeout).toBeGreaterThan(50);
+    },
+  );
+
   it("fails with RelayUnreachable when the relay cannot be reached", async () => {
     const { pool } = makeSubscribingPool();
 

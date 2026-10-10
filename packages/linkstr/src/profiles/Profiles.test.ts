@@ -244,6 +244,35 @@ describe("Profiles.publishStatus", () => {
 });
 
 describe("Profiles.fetchProfile", () => {
+  const answeringOnlyStatus = (answerProfile: boolean) =>
+    stubPlainTransport([], () => true, {
+      fetch: (relay, filter) =>
+        filter.kinds?.includes(0) === true && !answerProfile
+          ? new RelayUnreachable({ relay, detail: "no EOSE within 5000 ms" })
+          : Effect.succeed([]),
+    });
+
+  it("fails when no relay answers the profile query, even if statuses arrive", async () => {
+    const exit = await runWith(
+      answeringOnlyStatus(false),
+      Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(bob.pubkey)),
+    );
+
+    expect(exit).toEqual(
+      Exit.fail(expect.objectContaining({ _tag: "AllRelaysUnreachable" })),
+    );
+  });
+
+  it("returns no profile once a relay answers the profile query empty", async () => {
+    const exit = await runWith(
+      answeringOnlyStatus(true),
+      Effect.flatMap(Profiles, (profiles) => profiles.fetchProfile(bob.pubkey)),
+    );
+
+    assert(Exit.isSuccess(exit));
+    expect(exit.value.profile).toBeNull();
+  });
+
   it("returns the newest valid profile and status across relays", async () => {
     const inOneHour = Math.floor(Date.now() / 1000) + 3600;
     const stored = new Map<RelayUrl, ReadonlyArray<NostrToolsEvent>>([
