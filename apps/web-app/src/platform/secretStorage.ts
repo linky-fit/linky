@@ -136,6 +136,17 @@ export const writeNativeSecret = async (
   }
 };
 
+/** Removes the key from the native secure storage only; rejects when a native store fails. */
+export const removeNativeSecret = async (key: string): Promise<void> => {
+  await Promise.all([
+    removeAndroidStoredSecret(key),
+    supportsIosNativeSecretStorage()
+      ? LinkySecretStorage.remove({ key })
+      : undefined,
+    getNativeSecretStorage()?.remove({ key }),
+  ]);
+};
+
 export const writeStoredSecret = async (
   key: string,
   value: string,
