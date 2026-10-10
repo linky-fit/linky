@@ -282,7 +282,7 @@
     },
     "packages/linkauth": {
       "name": "@linky-fit/linkauth",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@noble/hashes": "^2.0.1",
         "nostr-tools": "^2.25.2",
@@ -299,7 +299,7 @@
     },
     "packages/linkshu": {
       "name": "@linky-fit/linkshu",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
         "@noble/hashes": "^2.0.1",
@@ -322,7 +322,7 @@
     },
     "packages/linkstr": {
       "name": "@linky-fit/linkstr",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@cashu/cashu-ts": "^4.0.0",
         "@linky-fit/linkauth": "workspace:*",
