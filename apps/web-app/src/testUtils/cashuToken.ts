@@ -1,5 +1,7 @@
 export interface CashuTokenOptions {
   amounts?: readonly number[];
+  /** A pubkey to P2PK-lock (NUT-11) every proof to. */
+  lockedTo?: string;
   memo?: string;
   mint?: string;
   unit?: string;
@@ -8,6 +10,7 @@ export interface CashuTokenOptions {
 /** A syntactically valid `cashuA…` token with fake proofs for the given amounts. */
 export const buildCashuToken = ({
   amounts = [21],
+  lockedTo,
   memo,
   mint = "https://mint.example",
   unit,
@@ -16,7 +19,13 @@ export const buildCashuToken = ({
     amount,
     C: `c-${index}`,
     id: "keyset",
-    secret: `secret-${index}`,
+    secret:
+      lockedTo === undefined
+        ? `secret-${index}`
+        : JSON.stringify([
+            "P2PK",
+            { nonce: `${index}`.padStart(64, "0"), data: lockedTo, tags: [] },
+          ]),
   }));
   const payload = JSON.stringify({
     token: [{ mint, proofs }],

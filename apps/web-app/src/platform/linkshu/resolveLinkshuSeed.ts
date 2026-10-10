@@ -3,56 +3,46 @@ import { Bip39Seed } from "@linky-fit/linkshu";
 import { generateMnemonic, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Effect } from "effect";
-import { INITIAL_MNEMONIC_STORAGE_KEY } from "../../mnemonic";
-import { CASHU_BIP85_MNEMONIC_STORAGE_KEY } from "../../utils/constants";
-import { safeLocalStorageGet } from "../../utils/storage";
-import { writeStoredCashuMnemonic } from "../identitySecrets";
+import type { SessionSecrets } from "../session";
+import {
+  readStoredCashuMnemonic,
+  writeStoredCashuMnemonic,
+} from "../identitySecrets";
 
-let cachedSeed: { mnemonic: string; bip39seed: Uint8Array } | null = null;
-
-const mnemonicToSeed = (mnemonic: string): Promise<Uint8Array> =>
-  Effect.runPromise(bip39MnemonicToSeed(mnemonic));
-
-/**
- * The legacy cashu read order: the stored cashu BIP-85 mnemonic, else the
- * initial app mnemonic — an invalid stored cashu mnemonic deliberately does
- * not fall through. The derived seed is cached per mnemonic because
- * deriving it is PBKDF2 work.
- */
-const readStoredSeed = async (): Promise<Uint8Array | null> => {
-  const cashuMnemonic = (
-    safeLocalStorageGet(CASHU_BIP85_MNEMONIC_STORAGE_KEY) ?? ""
-  ).trim();
-  const fallbackMnemonic = (
-    safeLocalStorageGet(INITIAL_MNEMONIC_STORAGE_KEY) ?? ""
-  ).trim();
-
-  const mnemonic = cashuMnemonic || fallbackMnemonic;
-  if (!mnemonic || !validateMnemonic(mnemonic, wordlist)) {
-    cachedSeed = null;
-    return null;
-  }
-  if (cachedSeed?.mnemonic !== mnemonic) {
-    cachedSeed = { mnemonic, bip39seed: await mnemonicToSeed(mnemonic) };
-  }
-  return cachedSeed.bip39seed;
+const validMnemonic = (mnemonic: string | null): string | null => {
+  const trimmed = (mnemonic ?? "").trim();
+  return trimmed && validateMnemonic(trimmed, wordlist) ? trimmed : null;
 };
 
+const seedOf = async (mnemonic: string): Promise<Bip39Seed> =>
+  Bip39Seed.make(await Effect.runPromise(bip39MnemonicToSeed(mnemonic)));
+
 /**
- * Resolves the wallet seed exactly as the legacy cashu code did. When
- * neither stored mnemonic is valid — an nsec-only login — a fresh 24-word
- * mnemonic is generated and persisted through the cashu-mnemonic write path,
- * which wipes stale seed-bound state before replacing a different mnemonic.
+ * The wallet seed: the session's cashu BIP-85 mnemonic, else its app
+ * mnemonic. An invalid cashu mnemonic deliberately does not fall through to
+ * the app mnemonic (the legacy order). With neither — an nsec-only login — a
+ * fresh 24-word mnemonic is generated and persisted through the
+ * cashu-mnemonic write path, which wipes stale seed-bound state before
+ * replacing a different mnemonic.
  */
-export const resolveLinkshuSeed = async (): Promise<Bip39Seed> => {
-  const existing = await readStoredSeed();
-  if (existing) return Bip39Seed.make(existing);
+export const resolveLinkshuSeed = async ({
+  cashuMnemonic,
+  appMnemonic,
+}: Pick<
+  SessionSecrets,
+  "cashuMnemonic" | "appMnemonic"
+>): Promise<Bip39Seed> => {
+  const sessionMnemonic = cashuMnemonic?.trim() ? cashuMnemonic : appMnemonic;
+  const valid = validMnemonic(sessionMnemonic);
+  if (valid) return seedOf(valid);
+
+  // A mnemonic saved after the session was read (another tab, an earlier
+  // resolution) is the wallet's; generating another would wipe its state.
+  const saved = validMnemonic(await readStoredCashuMnemonic());
+  if (saved) return seedOf(saved);
 
   const generated = generateMnemonic(wordlist, 256);
   await writeStoredCashuMnemonic(generated);
-  // Storage can be unavailable or another tab can win a concurrent write;
-  // whatever the legacy read path sees now is the wallet's seed.
-  return Bip39Seed.make(
-    (await readStoredSeed()) ?? (await mnemonicToSeed(generated)),
-  );
+  // Another tab can win a concurrent write; whatever storage holds now is the wallet's seed.
+  return seedOf(validMnemonic(await readStoredCashuMnemonic()) ?? generated);
 };

@@ -141,7 +141,6 @@ import {
   useSetting,
   useRecurringPaymentsRepository,
   useSettingsRepository,
-  useWalletRepository,
 } from "../useLinksync";
 import { runWrite } from "../../lib/storeWrite";
 import { useMeltRecovery } from "../payments/useMeltRecovery";
@@ -269,7 +268,6 @@ export const useCashuWalletComposition = ({
   t,
   transactions,
 }: UseCashuWalletCompositionParams) => {
-  const wallet = useWalletRepository();
   const settingsRepository = useSettingsRepository();
   const recurringPaymentsRepository = useRecurringPaymentsRepository();
   const accountHydrated = useAccountHydrated();
@@ -548,7 +546,7 @@ export const useCashuWalletComposition = ({
     walletOperations,
     walletProofs,
     walletTransfers,
-  } = useLinkshuComposition({ allowTestMints, currentNsec, wallet });
+  } = useLinkshuComposition({ allowTestMints });
 
   const cashuOpenTransfers = React.useMemo(
     () => walletTransfers.filter(isOpenTransfer),

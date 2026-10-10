@@ -1,68 +1,85 @@
-// @vitest-environment jsdom
 import { mnemonicToSeedSync, validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { INITIAL_MNEMONIC_STORAGE_KEY } from "../../mnemonic";
-import { CASHU_BIP85_MNEMONIC_STORAGE_KEY } from "../../utils/constants";
 import { resolveLinkshuSeed } from "./resolveLinkshuSeed";
 
-// The real write path goes through native secret storage; in the browser it
-// lands in localStorage, which is all the resolver's read path looks at.
+const stored = vi.hoisted(
+  (): { cashuMnemonic: string | null; writes: number } => ({
+    cashuMnemonic: null,
+    writes: 0,
+  }),
+);
 vi.mock("../identitySecrets", () => ({
+  readStoredCashuMnemonic: () => Promise.resolve(stored.cashuMnemonic),
   writeStoredCashuMnemonic: (mnemonic: string) => {
-    localStorage.setItem(CASHU_BIP85_MNEMONIC_STORAGE_KEY, mnemonic);
+    stored.cashuMnemonic = mnemonic;
+    stored.writes += 1;
     return Promise.resolve();
   },
 }));
 
 const CASHU_MNEMONIC =
   "legal winner thank year wave sausage worth useful legal winner thank yellow";
-const INITIAL_MNEMONIC =
+const APP_MNEMONIC =
   "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 
 afterEach(() => {
-  localStorage.clear();
+  stored.cashuMnemonic = null;
+  stored.writes = 0;
 });
 
 describe("resolveLinkshuSeed", () => {
-  it("prefers the stored cashu BIP-85 mnemonic", async () => {
-    localStorage.setItem(CASHU_BIP85_MNEMONIC_STORAGE_KEY, CASHU_MNEMONIC);
-    localStorage.setItem(INITIAL_MNEMONIC_STORAGE_KEY, INITIAL_MNEMONIC);
-
-    const seed = await resolveLinkshuSeed();
+  it("prefers the session's cashu BIP-85 mnemonic", async () => {
+    const seed = await resolveLinkshuSeed({
+      cashuMnemonic: CASHU_MNEMONIC,
+      appMnemonic: APP_MNEMONIC,
+    });
 
     expect(seed).toEqual(mnemonicToSeedSync(CASHU_MNEMONIC));
   });
 
-  it("falls back to the initial app mnemonic without persisting it as the cashu mnemonic", async () => {
-    localStorage.setItem(INITIAL_MNEMONIC_STORAGE_KEY, INITIAL_MNEMONIC);
+  it("falls back to the app mnemonic without persisting it as the cashu mnemonic", async () => {
+    const seed = await resolveLinkshuSeed({
+      cashuMnemonic: null,
+      appMnemonic: APP_MNEMONIC,
+    });
 
-    const seed = await resolveLinkshuSeed();
-
-    expect(seed).toEqual(mnemonicToSeedSync(INITIAL_MNEMONIC));
-    expect(localStorage.getItem(CASHU_BIP85_MNEMONIC_STORAGE_KEY)).toBeNull();
+    expect(seed).toEqual(mnemonicToSeedSync(APP_MNEMONIC));
+    expect(stored.writes).toBe(0);
   });
 
-  it("does not fall back past an invalid stored cashu mnemonic (legacy behavior)", async () => {
-    localStorage.setItem(CASHU_BIP85_MNEMONIC_STORAGE_KEY, "not a mnemonic");
-    localStorage.setItem(INITIAL_MNEMONIC_STORAGE_KEY, INITIAL_MNEMONIC);
+  it("does not fall back past an invalid cashu mnemonic (legacy behavior)", async () => {
+    stored.cashuMnemonic = "not a mnemonic";
+    const seed = await resolveLinkshuSeed({
+      cashuMnemonic: "not a mnemonic",
+      appMnemonic: APP_MNEMONIC,
+    });
 
-    const seed = await resolveLinkshuSeed();
-
-    expect(seed).not.toEqual(mnemonicToSeedSync(INITIAL_MNEMONIC));
-    const persisted = localStorage.getItem(CASHU_BIP85_MNEMONIC_STORAGE_KEY);
-    expect(validateMnemonic(persisted ?? "", wordlist)).toBe(true);
+    expect(seed).not.toEqual(mnemonicToSeedSync(APP_MNEMONIC));
+    expect(validateMnemonic(stored.cashuMnemonic, wordlist)).toBe(true);
   });
 
-  it("generates and persists a fresh cashu mnemonic when neither yields a valid one", async () => {
-    localStorage.setItem(CASHU_BIP85_MNEMONIC_STORAGE_KEY, "not a mnemonic");
+  it("generates and persists a fresh 24-word cashu mnemonic when neither yields a valid one", async () => {
+    const seed = await resolveLinkshuSeed({
+      cashuMnemonic: null,
+      appMnemonic: null,
+    });
 
-    const seed = await resolveLinkshuSeed();
+    const persisted = stored.cashuMnemonic ?? "";
+    expect(validateMnemonic(persisted, wordlist)).toBe(true);
+    expect(persisted.split(" ")).toHaveLength(24);
+    expect(seed).toEqual(mnemonicToSeedSync(persisted));
+  });
 
-    const persisted = localStorage.getItem(CASHU_BIP85_MNEMONIC_STORAGE_KEY);
-    expect(persisted).not.toBeNull();
-    expect(validateMnemonic(persisted ?? "", wordlist)).toBe(true);
-    expect(persisted?.split(" ")).toHaveLength(24);
-    expect(seed).toEqual(mnemonicToSeedSync(persisted ?? ""));
+  it("reuses a cashu mnemonic saved after the session was read instead of generating another", async () => {
+    stored.cashuMnemonic = CASHU_MNEMONIC;
+
+    const seed = await resolveLinkshuSeed({
+      cashuMnemonic: null,
+      appMnemonic: null,
+    });
+
+    expect(seed).toEqual(mnemonicToSeedSync(CASHU_MNEMONIC));
+    expect(stored.writes).toBe(0);
   });
 });
