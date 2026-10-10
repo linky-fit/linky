@@ -1,9 +1,10 @@
 import { derivePubkey, NostrSecretKey, type Pubkey } from "@linky-fit/linkstr";
 import { HDKey } from "@scure/bip32";
-import { entropyToMnemonic, mnemonicToSeedSync } from "@scure/bip39";
+import { entropyToMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { Context, Effect, Layer, Schema } from "effect";
 import { deriveBip85Entropy, deriveOwnerKeyAtPath } from "./bip85";
+import { bip39MnemonicToSeed } from "./bip39Seed";
 import {
   CASHU_SEED_PATH,
   cashuOwnerPath,
@@ -55,7 +56,17 @@ export class IdentityProvider extends Context.Service<
 
     const cashuEntropy = deriveBip85Entropy(root, CASHU_SEED_PATH, 32);
     const cashuMnemonic = entropyToMnemonic(cashuEntropy, wordlist);
-    const cashuWalletSeed = CashuSeed.make(mnemonicToSeedSync(cashuMnemonic));
+    const cashuWalletSeed = CashuSeed.make(
+      yield* bip39MnemonicToSeed(cashuMnemonic).pipe(
+        Effect.mapError(
+          (cause) =>
+            new IdentityProviderError({
+              cause,
+              message: "Cashu wallet seed derivation failed",
+            }),
+        ),
+      ),
+    );
 
     const storageMetaOwnerKey = deriveOwnerKeyAtPath(root, META_OWNER_PATH);
     const storageIdentityOwnerKey = deriveOwnerKeyAtPath(

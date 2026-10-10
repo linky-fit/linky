@@ -51,6 +51,12 @@ export const recoverMasterSecretFromSlip39Share = (
 ): Effect.Effect<MasterSecret, IdentityDerivationError> =>
   recoverMasterSecretFromSlip39Shares([share], passphrase);
 
+/**
+ * slip39-ts runs its PBKDF2 rounds on WebCrypto `crypto.subtle` (through
+ * uncrypto), which it reads when the module loads: on React Native,
+ * react-native-quick-crypto must be installed as the global `crypto` before
+ * this package is imported.
+ */
 export const recoverMasterSecretFromSlip39Shares = (
   shares: ReadonlyArray<Slip39Share>,
   passphrase: Slip39Passphrase = EMPTY_PASSPHRASE,
