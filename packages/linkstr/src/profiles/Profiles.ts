@@ -210,8 +210,10 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
         inspectPlainOperation(inspector, "profiles.publishStatus", draft),
       );
 
+    /** `requireProfileAnswer` fails unless some relay answered the kind 0 query. */
     const fetchProfileEntries = (
       pubkeys: ReadonlyArray<Pubkey>,
+      requireProfileAnswer = false,
     ): Effect.Effect<
       { result: Array<ProfileFetchEntry>; eventIds: Array<EventId> },
       AllRelaysUnreachable | NoReadRelaysConfigured
@@ -222,8 +224,9 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
         const authors = [...new Set(pubkeys)];
         if (authors.length === 0) return { result: [], eventIds: [] };
 
+        const filters = profileFilters(authors);
         const outcomes = yield* Effect.forEach(
-          profileFilters(authors),
+          filters,
           (filter) =>
             Effect.either(fetchPlainEvents(context.transport, relays, filter)),
           // Bounded: each filter already fans out to every read relay.
@@ -233,6 +236,15 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
         const firstFailure = outcomes.find(Either.isLeft);
         if (eventsPerFilter.length === 0 && firstFailure !== undefined) {
           return yield* Effect.fail(firstFailure.left);
+        }
+        const [profileFailure] = outcomes.flatMap((outcome, index) =>
+          Either.isLeft(outcome) &&
+          filters[index]?.kinds?.includes(PROFILE_KIND) === true
+            ? [outcome.left]
+            : [],
+        );
+        if (requireProfileAnswer && profileFailure !== undefined) {
+          return yield* Effect.fail(profileFailure);
         }
         const now: UnixSeconds = yield* nowSeconds;
 
@@ -278,7 +290,7 @@ export class Profiles extends Effect.Service<Profiles>()("linkstr/Profiles", {
       ProfileFetchResult,
       AllRelaysUnreachable | NoReadRelaysConfigured
     > =>
-      fetchProfileEntries([pubkey]).pipe(
+      fetchProfileEntries([pubkey], true).pipe(
         Effect.map(({ result, eventIds }) => ({
           result: new ProfileFetchResult({
             profile: result[0]?.profile ?? null,

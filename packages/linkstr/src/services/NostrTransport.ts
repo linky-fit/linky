@@ -31,7 +31,10 @@ export class RelayUnreachable extends Schema.TaggedError<RelayUnreachable>()(
  * backfill policy live in the inbox machine, not here.
  *
  * Fetching is the one-shot variant: collect stored events from one relay until
- * EOSE (or a bounded timeout, returning what arrived), then close.
+ * EOSE, then close. A relay that sends events but no EOSE before the timeout
+ * yields what arrived; one that sends neither, or closes the subscription
+ * first, fails with `RelayUnreachable`, so an empty result means the relay
+ * really holds nothing.
  */
 export interface SubscribeOptions {
   readonly alreadyHaveEvent?: (id: string) => boolean;
@@ -70,6 +73,8 @@ export interface RelaySubscriptionParams {
   readonly alreadyHaveEvent?: (id: string) => boolean;
   readonly oneose?: () => void;
   readonly onclose?: (reason: string) => void;
+  /** After it, nostr-tools fires `oneose` itself although the relay sent none. */
+  readonly eoseTimeout?: number;
 }
 
 export interface RelaySubscriptionHandle {
@@ -215,23 +220,33 @@ export const makeRelayPoolTransport = (
       let handle: RelaySubscriptionHandle | null = null;
       let timer: ReturnType<typeof setTimeout> | null = null;
       let done = false;
-      const settle = () => {
+      const settle = (unanswered: string | null) => {
         if (done) return;
         done = true;
         if (timer !== null) clearTimeout(timer);
         handle?.close();
-        resume(Effect.succeed(events));
+        resume(
+          unanswered !== null && events.length === 0
+            ? new RelayUnreachable({ relay, detail: unanswered })
+            : Effect.succeed(events),
+        );
       };
+      const eoseTimeoutMs = Duration.toMillis(fetchEoseTimeout);
       ensureRelay(relay).then(
         (connection) => {
           if (done) return;
-          timer = setTimeout(settle, Duration.toMillis(fetchEoseTimeout));
+          timer = setTimeout(
+            () => settle(`no EOSE within ${eoseTimeoutMs} ms`),
+            eoseTimeoutMs,
+          );
           handle = connection.subscribe([filter], {
             onevent: (event) => {
               events.push(event);
             },
-            oneose: settle,
-            onclose: settle,
+            oneose: () => settle(null),
+            onclose: (reason) => settle(`closed before EOSE: ${reason}`),
+            // Keeps nostr-tools from faking an EOSE before the timer above.
+            eoseTimeout: eoseTimeoutMs * 2,
           });
         },
         (reason) => {
