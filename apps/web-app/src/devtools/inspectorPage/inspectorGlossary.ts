@@ -242,6 +242,8 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
     "At boot the native secure storage failed (an error or no answer within 5 s) for the listed secrets, and the app runs on their localStorage copies. The payload names the keys, never the values.",
   "session.secretsUnavailable":
     "At boot the native secure storage failed and localStorage holds no identity, so the app shows the signed-out screen without touching the stored account. The payload names the keys that failed.",
+  "secrets.nativeWriteRolledBack":
+    "Saving identity secrets (a restore, identity switch or new cashu seed) on a native app: the native secure storage failed or did not read back the new value for the keys under missed. The app removed every key of the set from the native store, so the next boot reads the complete new set from localStorage instead of a mix of old and new secrets; notRemoved lists keys the native store also failed to remove. The payload names the keys, never the values.",
   "evolu.serversChanged":
     "The user changed the Evolu server list. The payload records the saved configured and enabled servers, including an empty selection. A reload applies the new transports.",
   "evolu.linkyRelayMigrated":

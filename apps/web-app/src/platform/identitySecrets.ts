@@ -11,9 +11,14 @@ import {
   setStoredPushNsec,
 } from "../utils/pushNsecStorage";
 import { forgetRecoveredMasterSecret } from "../utils/slip39Nostr";
+import { reportAppLog } from "../devtools/inspector/appLog";
+import { asNonEmptyString } from "../utils/validation";
 import { wipeLinkshuSeedBoundState } from "./linkshu/wipeLinkshuSeedBoundState";
+import { isNativePlatform } from "./runtime";
 import {
+  readNativeSecret,
   readStoredSecret,
+  removeNativeSecret,
   removeStoredSecret,
   writeStoredSecret,
 } from "./secretStorage";
@@ -57,6 +62,59 @@ const wipeCashuStateIfMnemonicChanged = async (
   await wipeLinkshuSeedBoundState(next);
 };
 
+const nativeHolds = async (key: string, value: string): Promise<boolean> => {
+  try {
+    return (await readNativeSecret(key)) === asNonEmptyString(value);
+  } catch {
+    return false;
+  }
+};
+
+const writeLocalSecret = (key: string, value: string): void => {
+  const normalized = asNonEmptyString(value);
+  if (normalized) safeLocalStorageSet(key, normalized);
+  else safeLocalStorageRemove(key);
+};
+
+/**
+ * Writes the secrets as one set. Boot reads the native store first, so when
+ * it misses any of them the set is removed from it and boot reads the
+ * complete localStorage copy instead of a mix of old and new secrets.
+ */
+const writeSecretSet = async (
+  secrets: Readonly<Record<string, string>>,
+): Promise<void> => {
+  const entries = Object.entries(secrets);
+  const writes = entries.map(([key, value]) => writeStoredSecret(key, value));
+  if (!isNativePlatform()) {
+    await Promise.all(writes);
+    return;
+  }
+  await Promise.allSettled(writes);
+  const held = await Promise.all(
+    entries.map(([key, value]) => nativeHolds(key, value)),
+  );
+  const missed = entries.filter((_, index) => !held[index]);
+  if (missed.length === 0) return;
+
+  // A native write that throws skips its localStorage write.
+  for (const [key, value] of entries) writeLocalSecret(key, value);
+  const removals = await Promise.allSettled(
+    entries.map(([key]) => removeNativeSecret(key)),
+  );
+  reportAppLog({
+    tag: "secrets.nativeWriteRolledBack",
+    summary: `Native secure storage missed ${missed.length} of ${entries.length} secrets; removed the set from it so boot reads localStorage`,
+    payload: {
+      keys: entries.map(([key]) => key),
+      missed: missed.map(([key]) => key),
+      notRemoved: entries
+        .filter((_, index) => removals[index].status === "rejected")
+        .map(([key]) => key),
+    },
+  });
+};
+
 interface PersistIdentitySecretsParams {
   appMnemonic: string;
   cashuMnemonic: string;
@@ -88,7 +146,7 @@ export const writeStoredCashuMnemonic = async (
   cashuMnemonic: string,
 ): Promise<void> => {
   await wipeCashuStateIfMnemonicChanged(cashuMnemonic);
-  await writeStoredSecret(CASHU_BIP85_MNEMONIC_STORAGE_KEY, cashuMnemonic);
+  await writeSecretSet({ [CASHU_BIP85_MNEMONIC_STORAGE_KEY]: cashuMnemonic });
 };
 
 const persistNostrIdentitySourceMarkers = (
@@ -116,12 +174,12 @@ export const persistIdentitySecrets = async ({
 }: PersistIdentitySecretsParams): Promise<void> => {
   await wipeCashuStateIfMnemonicChanged(cashuMnemonic);
 
-  await Promise.all([
-    writeStoredSecret(NOSTR_NSEC_STORAGE_KEY, nsec),
-    writeStoredSecret(NOSTR_SLIP39_SEED_STORAGE_KEY, slip39Seed),
-    writeStoredSecret(CASHU_BIP85_MNEMONIC_STORAGE_KEY, cashuMnemonic),
-    writeStoredSecret(INITIAL_MNEMONIC_STORAGE_KEY, appMnemonic),
-  ]);
+  await writeSecretSet({
+    [NOSTR_NSEC_STORAGE_KEY]: nsec,
+    [NOSTR_SLIP39_SEED_STORAGE_KEY]: slip39Seed,
+    [CASHU_BIP85_MNEMONIC_STORAGE_KEY]: cashuMnemonic,
+    [INITIAL_MNEMONIC_STORAGE_KEY]: appMnemonic,
+  });
 
   persistNostrIdentitySourceMarkers(identitySource, switchedAtSec);
 
@@ -136,7 +194,7 @@ export const persistSyncedActiveNostrIdentity = async ({
   nsec,
   switchedAtSec,
 }: PersistSyncedActiveNostrIdentityParams): Promise<void> => {
-  await writeStoredSecret(NOSTR_NSEC_STORAGE_KEY, nsec);
+  await writeSecretSet({ [NOSTR_NSEC_STORAGE_KEY]: nsec });
 
   persistNostrIdentitySourceMarkers(identitySource, switchedAtSec);
 
